@@ -1,48 +1,103 @@
 ---
-name: Request
-description: Any request
+name: Feature request
+description: Propose a focused improvement to OTClient
+title: "[Feature]: "
+labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this issue!
-  - type: dropdown
-    id: priority
-    attributes:
-      label: Priority
-      description: How critical is this?
-      options:
-        - Missing Content
-        - Enhancement
-    validations:
-      required: true
+        Describe the user problem before proposing an implementation. Keep each request focused on one logical feature.
 
-  - type: checkboxes
-    id: area
+  - type: textarea
+    id: problem
     attributes:
-      label: Area
-      description: Where is the problem?
-      options:
-        - label: Data
-        - label: Source
-        - label: Docker
-        - label: Other
+      label: Problem or use case
+      description: Who needs this feature, and what cannot be done safely or efficiently today?
+      placeholder: "As a ..., I need ... because ..."
     validations:
       required: true
 
   - type: textarea
-    id: missing-content
+    id: proposed-solution
     attributes:
-      label: What is missing?
-      description: script, module, etc. Attach screenshots, logs, etc, anything that can helps us
+      label: Proposed solution
+      description: Describe the desired behavior and user experience without assuming a particular implementation when possible.
     validations:
       required: true
 
-  - type: checkboxes
-    id: terms
+  - type: textarea
+    id: acceptance-criteria
     attributes:
-      label: Code of Conduct
-      description: By submitting this issue, you agree to follow our [Code of Conduct]
+      label: Acceptance criteria
+      description: List observable conditions that would make this request complete.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe workarounds or alternative designs and why they are insufficient.
+
+  - type: checkboxes
+    id: components
+    attributes:
+      label: Affected components
+      description: Select every area expected to change.
       options:
-        - label: I agree to follow this project's Code of Conduct
+        - label: C++ source
+        - label: Lua modules or mods
+        - label: UI, styles, or images
+        - label: Protocol or Canary integration
+        - label: Client assets or runtime data
+        - label: Build, packaging, or CI
+        - label: Documentation
+        - label: Other
+    validations:
+      required: true
+
+  - type: input
+    id: canary-version
+    attributes:
+      label: Canary version or scope
+      description: Give the exact release/commit used for the request, or explain why the feature is server-independent.
+      placeholder: "e.g. Canary v3.x, commit SHA, or server-independent"
+    validations:
+      required: true
+
+  - type: input
+    id: protocol-version
+    attributes:
+      label: Client protocol version or scope
+      description: Give the tested/target protocol, a version range, or explain why it is protocol-independent.
+      placeholder: "e.g. 1321, 1321-1524, or protocol-independent"
+    validations:
+      required: true
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and risks
+      description: Identify backward-compatibility concerns, server changes, feature flags, asset requirements, and likely regressions.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add mockups, screenshots, examples, or links that clarify the request.
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Acknowledgements
+      options:
+        - label: I searched for an existing request that covers this feature.
+          required: true
+        - label: This issue requests one logical feature.
           required: true

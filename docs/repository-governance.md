@@ -85,10 +85,13 @@ governance changes were implemented.
   uses its Actions cache read-only outside trusted pushes.
 - Pin every third-party `uses:` reference to a full commit SHA and let
   Dependabot propose later SHA updates.
-- Enable native auto-merge only for Dependabot patch and minor updates. The
-  workflow first verifies both repository auto-merge and the protected
-  `CI / Required` context, and never checks out pull request code in
-  `pull_request_target`.
+- Enable native auto-merge only for Dependabot patch and minor updates. A
+  read-only `pull_request_target` workflow uses the pinned metadata action and
+  uploads data without checking out PR code. After successful CI, a separate
+  trusted `workflow_run` validates the artifact's workflow provenance, the live
+  PR head, the successful `Required` job, repository auto-merge, and the
+  protected `CI / Required` context before requesting squash auto-merge. It
+  never executes artifact contents or pull request code.
 - Permit at most one automatic rerun for unambiguous infrastructure conclusions
   (`cancelled`, `timed_out`, or `startup_failure`). Ordinary failures are never
   retried automatically.

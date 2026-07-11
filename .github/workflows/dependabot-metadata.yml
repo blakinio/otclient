@@ -1,0 +1,86 @@
+---
+name: Dependabot Metadata
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: dependabot-metadata-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    name: Classify verified Dependabot update
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # This read-only workflow never checks out or executes pull request code.
+      - name: Read Dependabot metadata
+        id: dependabot-metadata
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a  # v2.5.0
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Write verified metadata
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MAINTAINER_CHANGES: ${{ steps.dependabot-metadata.outputs.maintainer-changes }}
+          METADATA_RUN_ID: ${{ github.run_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          UPDATE_TYPE: ${{ steps.dependabot-metadata.outputs.update-type }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${PR_NUMBER}" =~ ^[0-9]+$ || ! "${METADATA_RUN_ID}" =~ ^[0-9]+$ || ! "${HEAD_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Invalid Dependabot metadata::Run, pull request, or head SHA metadata is malformed."
+            exit 1
+          fi
+          if [[ "${AUTHOR}" != "dependabot[bot]" || "${HEAD_REPOSITORY}" != "${GITHUB_REPOSITORY}" ]]; then
+            echo "::error title=Invalid Dependabot metadata::Author or head repository validation failed."
+            exit 1
+          fi
+          if [[ -z "${UPDATE_TYPE}" || ( "${MAINTAINER_CHANGES}" != "true" && "${MAINTAINER_CHANGES}" != "false" ) ]]; then
+            echo "::error title=Incomplete Dependabot metadata::Update type or maintainer-change status is unavailable."
+            exit 1
+          fi
+
+          mkdir -p dependabot-metadata
+          jq -n \
+            --argjson pr_number "${PR_NUMBER}" \
+            --argjson metadata_run_id "${METADATA_RUN_ID}" \
+            --arg head_sha "${HEAD_SHA}" \
+            --arg base_ref "${BASE_REF}" \
+            --arg head_repository "${HEAD_REPOSITORY}" \
+            --arg author "${AUTHOR}" \
+            --arg update_type "${UPDATE_TYPE}" \
+            --arg maintainer_changes "${MAINTAINER_CHANGES}" \
+            '{
+              pr_number: $pr_number,
+              metadata_run_id: $metadata_run_id,
+              head_sha: $head_sha,
+              base_ref: $base_ref,
+              head_repository: $head_repository,
+              author: $author,
+              update_type: $update_type,
+              maintainer_changes: $maintainer_changes
+            }' > dependabot-metadata/metadata.json
+
+      - name: Upload verified metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: dependabot-metadata-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: dependabot-metadata/metadata.json
+          if-no-files-found: error
+          retention-days: 1

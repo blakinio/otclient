@@ -3,38 +3,80 @@ name: Reusable Fast Checks
 on:
   workflow_call:
 
-permissions:
-  contents: read
-  checks: write
-  pull-requests: read
+permissions: {}
 
 jobs:
-  run-checks:
+  syntax:
+    name: Syntax and workflow validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Setup reviewdog
-        uses: reviewdog/action-setup@v1.5.0
-
-      - name: Setup dependencies
+      - name: Install validation dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cppcheck libxml2-utils lua-check luajit yamllint
+          sudo apt-get install -y libxml2-utils shellcheck yamllint
 
       - name: Run yamllint
-        run: yamllint -c .yamllint.yaml .github
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' yaml_files < <(git ls-files -z '*.yaml' '*.yml')
+          if (( ${#yaml_files[@]} == 0 )); then
+            echo "No tracked YAML files found."
+            exit 1
+          fi
+          yamllint -c .yamllint.yaml "${yaml_files[@]}"
 
-      - name: Run analysis with reviewdog
-        if: github.event.pull_request != null && github.event.pull_request.head.repo.full_name == github.repository
+      - name: Run actionlint from pinned source
+        env:
+          ACTIONLINT_COMMIT: 914e7df21a07ef503a81201c76d2b11c789d3fca  # v1.7.12
+        run: go run "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_COMMIT}"
+
+      - name: Validate XML syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' xml_files < <(git ls-files -z '*.xml')
+          if (( ${#xml_files[@]} == 0 )); then
+            echo "No tracked XML files found."
+            exit 0
+          fi
+          printf '%s\0' "${xml_files[@]}" | xargs -0 -n 1 xmllint --noout
+
+  analysis:
+    name: Informational static analysis
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup reviewdog
+        uses: reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f  # v1.5.0
+
+      - name: Install analysis dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck lua-check
+
+      - name: Run informational analysis with reviewdog
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REVIEWDOG_REPORTER: github-pr-check
         run: |
-          reviewdog -reporter="${REVIEWDOG_REPORTER}" -runners=luac -fail-level=error -filter-mode=added
-          reviewdog -reporter="${REVIEWDOG_REPORTER}" -runners=luacheck -filter-mode=added || true
-          reviewdog -reporter="${REVIEWDOG_REPORTER}" -runners=xmllint -fail-level=error -filter-mode=added
-          reviewdog -reporter="${REVIEWDOG_REPORTER}" -runners=cppcheck -filter-mode=added || true
+          reviewdog -reporter="${REVIEWDOG_REPORTER}" -runners=luacheck -fail-level=none -filter-mode=added
+          reviewdog -reporter="${REVIEWDOG_REPORTER}" -runners=cppcheck -fail-level=none -filter-mode=added

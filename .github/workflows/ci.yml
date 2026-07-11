@@ -3,65 +3,15 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "cmake/**"
-      - "android/**"
-      - "browser/**"
-      - "data/**"
-      - "mods/**"
-      - "modules/**"
-      - "tools/**"
-      - "vc18/**"
-      - "vcpkg.json"
-      - "CMakeLists.txt"
-      - "CMakePresets.json"
-      - "Dockerfile"
-      - "Dockerfile.browser"
-      - "Dockerfile.browser.sh"
-      - "build_luajit_android.sh"
-      - "setup_android_deps.sh"
-      - "init.lua"
-      - "otclientrc.lua"
-      - "cacert.pem"
-      - "config.ini"
-      - ".dockerignore"
-      - ".yamllint.yaml"
-      - ".reviewdog.yml"
-      - ".github/workflows/**"
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   merge_group:
+    branches: [main]
+    types: [checks_requested]
   push:
-    branches:
-      - main
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "cmake/**"
-      - "android/**"
-      - "browser/**"
-      - "data/**"
-      - "mods/**"
-      - "modules/**"
-      - "tools/**"
-      - "vc18/**"
-      - "vcpkg.json"
-      - "CMakeLists.txt"
-      - "CMakePresets.json"
-      - "Dockerfile"
-      - "Dockerfile.browser"
-      - "Dockerfile.browser.sh"
-      - "build_luajit_android.sh"
-      - "setup_android_deps.sh"
-      - "init.lua"
-      - "otclientrc.lua"
-      - "cacert.pem"
-      - "config.ini"
-      - ".dockerignore"
-      - ".yamllint.yaml"
-      - ".reviewdog.yml"
-      - ".github/workflows/**"
+    branches: [main]
+
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -73,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       compile: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.compile }}
       macos: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.macos }}
@@ -81,14 +32,15 @@ jobs:
       browser: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.browser }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Detect changed paths
         id: filter
         if: github.event_name != 'workflow_dispatch' && github.event_name != 'merge_group'
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36  # v3.0.2
         with:
           filters: |
             compile:
@@ -97,19 +49,17 @@ jobs:
               - "cmake/**"
               - "vc18/**"
               - "vcpkg.json"
+              - "vcpkg-configuration.json"
               - "CMakeLists.txt"
               - "CMakePresets.json"
-              - ".yamllint.yaml"
-              - ".reviewdog.yml"
               - ".github/workflows/ci.yml"
               - ".github/workflows/reusable-build-linux.yml"
               - ".github/workflows/reusable-build-windows.yml"
-              - ".github/workflows/reusable-checks.yml"
-              - ".github/workflows/reusable-tests-lua.yml"
             macos:
               - "src/**"
               - "cmake/**"
               - "vcpkg.json"
+              - "vcpkg-configuration.json"
               - "CMakeLists.txt"
               - "CMakePresets.json"
               - ".github/workflows/ci.yml"
@@ -120,8 +70,10 @@ jobs:
               - "cmake/**"
               - "CMakeLists.txt"
               - "vcpkg.json"
+              - "vcpkg-configuration.json"
               - "build_luajit_android.sh"
               - "setup_android_deps.sh"
+              - "Dockerfile.android"
               - ".github/workflows/ci.yml"
               - ".github/workflows/reusable-build-android-apk.yml"
             docker:
@@ -130,9 +82,9 @@ jobs:
               - "src/**"
               - "cmake/**"
               - "vcpkg.json"
+              - "vcpkg-configuration.json"
               - "CMakeLists.txt"
               - "CMakePresets.json"
-              - ".yamllint.yaml"
               - ".github/workflows/ci.yml"
               - ".github/workflows/reusable-build-docker.yml"
             browser:
@@ -142,28 +94,24 @@ jobs:
               - "src/**"
               - "cmake/**"
               - "vcpkg.json"
+              - "vcpkg-configuration.json"
               - "CMakeLists.txt"
-              - ".yamllint.yaml"
               - ".github/workflows/ci.yml"
               - ".github/workflows/reusable-build-browser.yml"
 
   checks:
     name: Fast Checks
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     permissions:
       contents: read
       checks: write
       pull-requests: read
     uses: ./.github/workflows/reusable-checks.yml
-    secrets: inherit
 
   tests-lua:
     name: Lua Syntax
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     permissions:
       contents: read
     uses: ./.github/workflows/reusable-tests-lua.yml
-    secrets: inherit
 
   build-linux:
     name: Build - Linux
@@ -173,7 +121,6 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/reusable-build-linux.yml
-    secrets: inherit
 
   build-windows:
     name: Build - Windows
@@ -183,7 +130,6 @@ jobs:
       contents: read
       packages: read
     uses: ./.github/workflows/reusable-build-windows.yml
-    secrets: inherit
 
   build-macos:
     name: Build - macOS
@@ -191,9 +137,7 @@ jobs:
     if: needs.changes.outputs.macos == 'true' && needs.checks.result == 'success' && needs.tests-lua.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     permissions:
       contents: read
-      pull-requests: read
     uses: ./.github/workflows/reusable-build-macos.yml
-    secrets: inherit
 
   build-android-apk:
     name: Build - Android APK
@@ -201,9 +145,7 @@ jobs:
     if: needs.changes.outputs.android == 'true' && needs.checks.result == 'success' && needs.tests-lua.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     permissions:
       contents: read
-      pull-requests: read
     uses: ./.github/workflows/reusable-build-android-apk.yml
-    secrets: inherit
 
   build-docker:
     name: Build - Docker
@@ -211,12 +153,8 @@ jobs:
     if: needs.changes.outputs.docker == 'true' && needs.checks.result == 'success' && needs.tests-lua.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     permissions:
       contents: read
-      packages: write
+      packages: read
     uses: ./.github/workflows/reusable-build-docker.yml
-    with:
-      push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      vcpkg_binary_cache_access: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'readwrite' || 'read' }}
-    secrets: inherit
 
   build-browser:
     name: Build - Browser
@@ -225,4 +163,72 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/reusable-build-browser.yml
-    secrets: inherit
+
+  required:
+    name: Required
+    if: always()
+    needs:
+      - changes
+      - checks
+      - tests-lua
+      - build-linux
+      - build-windows
+      - build-macos
+      - build-android-apk
+      - build-docker
+      - build-browser
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Evaluate required jobs
+        env:
+          IS_DRAFT: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'true' || 'false' }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          jobs = json.loads(os.environ["NEEDS_JSON"])
+          rejected = {}
+
+          for name in ("changes", "checks", "tests-lua"):
+              result = jobs[name].get("result")
+              if result != "success":
+                  rejected[name] = f"expected success, got {result}"
+
+          scopes = jobs["changes"].get("outputs", {})
+          for scope in ("compile", "macos", "android", "docker", "browser"):
+              if scopes.get(scope) not in {"true", "false"}:
+                  rejected[f"scope:{scope}"] = (
+                      f"expected true or false, got {scopes.get(scope)!r}"
+                  )
+
+          build_scopes = {
+              "build-linux": "compile",
+              "build-windows": "compile",
+              "build-macos": "macos",
+              "build-android-apk": "android",
+              "build-docker": "docker",
+              "build-browser": "browser",
+          }
+          is_draft = os.environ["IS_DRAFT"] == "true"
+          for name, scope in build_scopes.items():
+              result = jobs[name].get("result")
+              if result not in {"success", "skipped"}:
+                  rejected[name] = f"unexpected conclusion {result}"
+              elif not is_draft and scopes.get(scope) == "true" and result != "success":
+                  rejected[name] = f"scope {scope}=true requires success, got {result}"
+
+          print("Required job results:")
+          for name in sorted(jobs):
+              print(f"- {name}: {jobs[name].get('result')}")
+
+          if rejected:
+              for name, reason in sorted(rejected.items()):
+                  print(f"::error title=Required CI job did not pass::{name}: {reason}")
+              sys.exit(1)
+          PY

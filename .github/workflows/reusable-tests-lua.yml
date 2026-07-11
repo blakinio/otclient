@@ -30,17 +30,20 @@ jobs:
               exit 1
             fi
           done
-          mapfile -d '' lua_files < <(git ls-files -z '*.lua')
+
+          mapfile -d '' lua_files < <(
+            find data modules mods -type f -name '*.lua' -print0 | sort -z
+          )
           if (( ${#lua_files[@]} == 0 )); then
-            echo "No tracked Lua files found." >&2
+            echo "No Lua files found in runtime roots." >&2
             exit 1
           fi
 
           failed=0
-          while IFS= read -r -d '' file; do
+          for file in "${lua_files[@]}"; do
             echo "=== ${file} ==="
             if ! luajit -b "${file}" /dev/null; then
               failed=1
             fi
-          done < <(printf '%s\0' "${lua_files[@]}")
+          done
           exit "${failed}"

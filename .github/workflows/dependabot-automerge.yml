@@ -1,0 +1,107 @@
+---
+name: Dependabot Auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  enable-automerge:
+    name: Enable native auto-merge
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # This workflow intentionally never checks out or executes pull request code.
+      - name: Read Dependabot metadata
+        id: dependabot-metadata
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a  # v2.5.0
+        with:
+          github-token: ${{ github.token }}
+
+      - name: Require manual review for other update types
+        if: >-
+          steps.dependabot-metadata.outputs.update-type != 'version-update:semver-patch' &&
+          steps.dependabot-metadata.outputs.update-type != 'version-update:semver-minor'
+        env:
+          UPDATE_TYPE: ${{ steps.dependabot-metadata.outputs.update-type }}
+        run: |
+          echo "::notice title=Manual dependency review required::Dependabot update type '${UPDATE_TYPE}' is not eligible for automatic merge."
+
+      - name: Verify repository merge policy
+        if: >-
+          steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$(gh api "repos/${REPOSITORY}" --jq '.allow_auto_merge')" != "true" ]]; then
+            echo "::error title=Repository auto-merge is disabled::Run scripts/configure-github-repository.sh --apply after maintainer approval."
+            exit 1
+          fi
+
+          encoded_base_ref="$(jq -rn --arg value "${BASE_REF}" '$value | @uri')"
+          protection_endpoint="repos/${REPOSITORY}/branches/${encoded_base_ref}/protection/required_status_checks"
+          required_check_present="false"
+          if legacy_required="$(
+            gh api "${protection_endpoint}" \
+              --jq '([.contexts[]?] + [.checks[]?.context]) | any(. == "CI / Required")' \
+              2>/dev/null
+          )"; then
+            required_check_present="${legacy_required}"
+          fi
+
+          # The administration endpoint may be hidden from the intentionally
+          # minimal token; normal branch metadata also exposes legacy contexts.
+          if [[ "${required_check_present}" != "true" ]]; then
+            branch_endpoint="repos/${REPOSITORY}/branches/${encoded_base_ref}"
+            if branch_required="$(
+              gh api "${branch_endpoint}" \
+                --jq '([.protection.required_status_checks.contexts[]?] + [.protection.required_status_checks.checks[]?.context]) | any(. == "CI / Required")'
+            )"; then
+              required_check_present="${branch_required}"
+            fi
+          fi
+
+          # A ruleset may protect the branch without legacy branch protection.
+          if [[ "${required_check_present}" != "true" ]]; then
+            rules_endpoint="repos/${REPOSITORY}/rules/branches/${encoded_base_ref}"
+            if ! required_check_present="$(
+              gh api "${rules_endpoint}" \
+                --jq '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[]?.context] | any(. == "CI / Required")'
+            )"; then
+              echo "::error title=Required status checks unavailable::The base branch has no readable branch protection or active ruleset requiring CI / Required."
+              exit 1
+            fi
+          fi
+          if [[ "${required_check_present}" != "true" ]]; then
+            echo "::error title=Required CI check is not protected::Base branch '${BASE_REF}' must require the exact status context 'CI / Required' in branch protection or an active ruleset."
+            exit 1
+          fi
+
+      # Native auto-merge waits for every required status check and ruleset condition.
+      - name: Enable squash auto-merge after required checks
+        if: >-
+          steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        shell: bash
+        run: gh pr merge --auto --squash "${PR_URL}"

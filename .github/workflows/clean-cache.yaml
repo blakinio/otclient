@@ -6,12 +6,13 @@ on:
     types:
       - closed
 
+permissions: {}
+
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     permissions:
       actions: write
-      contents: read
     steps:
       - name: Cleanup
         env:
@@ -19,18 +20,18 @@ jobs:
           REPO: ${{ github.repository }}
           BRANCH: refs/pull/${{ github.event.pull_request.number }}/merge
         run: |
-          if gh extension list | grep -q "actions/gh-actions-cache"; then
-            gh extension upgrade actions/gh-actions-cache
-          else
-            gh extension install actions/gh-actions-cache
+          set -euo pipefail
+          echo "Fetching cache IDs for ${BRANCH}"
+          cache_ids="$(gh cache list --repo "${REPO}" --ref "${BRANCH}" --limit 100 --json id --jq '.[].id')"
+
+          if [[ -z "${cache_ids}" ]]; then
+            echo "No pull request caches found."
+            exit 0
           fi
 
-          echo "Fetching cache keys"
-          cacheKeysForPR="$(gh actions-cache list -R "${REPO}" -B "${BRANCH}" -L 100 | cut -f 1)"
+          while IFS= read -r cache_id; do
+            [[ -n "${cache_id}" ]] || continue
+            gh cache delete "${cache_id}" --repo "${REPO}"
+          done <<< "${cache_ids}"
 
-          set +e
-          echo "Deleting caches..."
-          for cacheKey in ${cacheKeysForPR}; do
-            gh actions-cache delete "${cacheKey}" -R "${REPO}" -B "${BRANCH}" --confirm
-          done
-          echo "Done"
+          echo "Cache cleanup complete."

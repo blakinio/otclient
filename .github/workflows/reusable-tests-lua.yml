@@ -3,16 +3,22 @@ name: Reusable Lua Syntax
 on:
   workflow_call:
 
+permissions: {}
+
 jobs:
   job:
     name: Check Lua Syntax
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Setup LuaJIT
         run: sudo apt-get update && sudo apt-get install -y luajit
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Compile Lua files
         shell: bash
@@ -24,11 +30,17 @@ jobs:
               exit 1
             fi
           done
+          mapfile -d '' lua_files < <(git ls-files -z '*.lua')
+          if (( ${#lua_files[@]} == 0 )); then
+            echo "No tracked Lua files found." >&2
+            exit 1
+          fi
+
           failed=0
           while IFS= read -r -d '' file; do
             echo "=== ${file} ==="
             if ! luajit -b "${file}" /dev/null; then
               failed=1
             fi
-          done < <(find data modules mods -type f -name "*.lua" -print0)
+          done < <(printf '%s\0' "${lua_files[@]}")
           exit "${failed}"

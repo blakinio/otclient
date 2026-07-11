@@ -18,20 +18,15 @@ jobs:
     env:
       CC: gcc-14
       CXX: g++-14
-      VCPKG_BINARY_CACHE_ACCESS: ${{ secrets.VCPKG_PACKAGES_TOKEN != '' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') && 'readwrite' || 'read' }}
-      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,${{ secrets.VCPKG_PACKAGES_TOKEN != '' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') && 'readwrite' || 'read' }};nugettimeout,600"
+      VCPKG_BINARY_CACHE_ACCESS: read
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,read;nugettimeout,600"
       VCPKG_NUGET_REPOSITORY: https://github.com/${{ github.repository }}.git
-      VCPKG_NUGET_API_KEY: ${{ secrets.VCPKG_PACKAGES_TOKEN != '' && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') && secrets.VCPKG_PACKAGES_TOKEN || github.token }}
+      VCPKG_NUGET_API_KEY: ${{ github.token }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v9
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          persist-credentials: false
 
       - name: Get vcpkg baseline
         shell: bash
@@ -70,7 +65,7 @@ jobs:
           ninja --version
 
       - name: CCache
-        uses: hendrikmuhs/ccache-action@v1.2.23
+        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03  # v1.2.23
         with:
           max-size: "1G"
           key: ccache-linux-${{ matrix.buildtype }}
@@ -78,7 +73,7 @@ jobs:
             ccache-linux
 
       - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2  # v11.6
         with:
           vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
           vcpkgGitCommitId: ${{ env.VCPKG_GIT_COMMIT_ID }}
@@ -106,7 +101,7 @@ jobs:
             -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
 
       - name: Run CMake
-        uses: lukka/run-cmake@v10
+        uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956  # v10.9
         with:
           configurePreset: ${{ matrix.buildtype }}
           buildPreset: ${{ matrix.buildtype }}
@@ -114,29 +109,10 @@ jobs:
 
       - name: Run CTest
         if: matrix.buildtype == 'linux-debug'
-        run: ctest --test-dir build/${{ matrix.buildtype }} --output-on-failure --parallel 2
+        run: ctest --test-dir build/${{ matrix.buildtype }} --output-on-failure --no-tests=error --parallel 2
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: linux-${{ matrix.buildtype }}
           path: build/${{ matrix.buildtype }}/bin/
-
-      - name: Verify vcpkg binary cache push
-        if: success() && env.VCPKG_BINARY_CACHE_ACCESS == 'readwrite'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -d '' logs < <(find . -name "vcpkg-manifest-install.log" -print0)
-          if [[ ${#logs[@]} -eq 0 ]]; then
-            echo "No vcpkg manifest logs found." >&2
-            exit 1
-          fi
-          if grep -Eq "to [1-9][0-9]* binary cache\(s\)" -- "${logs[@]}"; then
-            exit 0
-          fi
-          if grep -q "to 0 binary cache(s)" -- "${logs[@]}"; then
-            echo "Binary cache push reported 0 caches and no successful push was found." >&2
-            exit 1
-          fi
-          echo "No binary cache push summary found; assuming no package was built for upload."

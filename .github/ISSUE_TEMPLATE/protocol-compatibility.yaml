@@ -1,0 +1,154 @@
+---
+name: Protocol compatibility report
+description: Report a client/Canary protocol mismatch with exact version details
+title: "[Protocol]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for login, packet parsing, opcode, feature negotiation, or gameplay behavior that differs by client protocol.
+
+        **Do not disclose security vulnerabilities here.** Use a private security advisory instead.
+
+  - type: input
+    id: client-commit
+    attributes:
+      label: OTClient commit or version
+      description: Provide the exact commit SHA, tag, or release.
+      placeholder: "e.g. 0123456789abcdef..."
+    validations:
+      required: true
+
+  - type: input
+    id: canary-version
+    attributes:
+      label: Canary version
+      description: Provide the exact Canary release, tag, or commit SHA.
+      placeholder: "e.g. v3.x or a full commit SHA"
+    validations:
+      required: true
+
+  - type: input
+    id: protocol-version
+    attributes:
+      label: Client protocol version
+      description: Enter the exact protocol selected by OTClient.
+      placeholder: "e.g. 1321"
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      description: Include platform, exact version, and architecture.
+      placeholder: "e.g. Windows 11 24H2 x64"
+    validations:
+      required: true
+
+  - type: textarea
+    id: assets
+    attributes:
+      label: Client assets
+      description: Identify things/sounds versions and source, and state whether they are original or customized.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Failure phase
+      options:
+        - Connection or handshake
+        - Authentication or login
+        - Character list or game entry
+        - Packet or opcode parsing
+        - In-game feature behavior
+        - Logout or disconnect
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: mismatch
+    attributes:
+      label: Compatibility mismatch
+      description: Describe the affected message, opcode, feature, or behavior. Include known server/client expectations.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide a minimal, deterministic sequence and any required server configuration or feature flags.
+      placeholder: |
+        1. Configure Canary with ...
+        2. Start OTClient using protocol ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected protocol behavior
+      description: Describe the expected packet flow or visible client behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual protocol behavior
+      description: Describe the observed packet flow, error, disconnect, or visible behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized client and server logs
+      description: Include both sides when possible, with timestamps and relevant opcodes. Remove credentials, tokens, IP addresses, and private player data. If no output exists, state that explicitly.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cipsoft-client
+    attributes:
+      label: Does the same behavior occur in the corresponding CipSoft client?
+      options:
+        - "No"
+        - "Yes"
+        - "Not tested"
+        - "Not applicable"
+    validations:
+      required: true
+
+  - type: textarea
+    id: cipsoft-details
+    attributes:
+      label: CipSoft comparison details
+      description: State the official client version and observed difference, or explain why comparison was not possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add packet captures with sensitive data removed, relevant code links, suspected root cause, or workarounds.
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Acknowledgements
+      options:
+        - label: I searched existing protocol compatibility reports.
+          required: true
+        - label: I removed credentials and private server/player data from this report.
+          required: true
+        - label: This report does not disclose an active security vulnerability.
+          required: true

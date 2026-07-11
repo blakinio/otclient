@@ -1,0 +1,95 @@
+---
+name: Retry CI Infrastructure Failure
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  retry-once:
+    name: Retry infrastructure failure once
+    # GitHub aggregates an exact job-level startup_failure as workflow failure;
+    # the script below proves that classification before issuing a retry.
+    if: >-
+      github.event.workflow_run.run_attempt == 1 &&
+      (github.event.workflow_run.conclusion == 'cancelled' ||
+      github.event.workflow_run.conclusion == 'timed_out' ||
+      github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      # No repository or pull request code is checked out or executed here.
+      - name: Classify conclusion and retry
+        env:
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${RUN_ID}" =~ ^[0-9]+$ || ! "${RUN_NUMBER}" =~ ^[0-9]+$ || ! "${WORKFLOW_ID}" =~ ^[0-9]+$ ]]; then
+            echo "::error title=Invalid workflow run metadata::Refusing to issue a retry request."
+            exit 1
+          fi
+
+          retry_reason=""
+          if [[ "${CONCLUSION}" == "cancelled" ]]; then
+            newer_runs="$(
+              gh api --method GET \
+                "repos/${REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs" \
+                -f branch="${HEAD_BRANCH}" \
+                -f event="${WORKFLOW_EVENT}" \
+                -F per_page=100 \
+                --jq ".workflow_runs | map(select(.run_number > ${RUN_NUMBER})) | length"
+            )"
+            if (( newer_runs > 0 )); then
+              echo "::notice title=Stale cancellation is not retried::A newer CI run already exists for this branch and event."
+              exit 0
+            fi
+            retry_reason="workflow was cancelled and has not been superseded"
+          elif [[ "${CONCLUSION}" == "timed_out" ]]; then
+            # Repository policy intentionally permits one retry for the exact timed_out conclusion.
+            retry_reason="workflow timed out"
+          elif [[ "${CONCLUSION}" == "failure" ]]; then
+            # startup_failure exists at job/check level; workflow_run aggregates it as failure.
+            jobs_endpoint="repos/${REPOSITORY}/actions/runs/${RUN_ID}/jobs?filter=latest&per_page=100"
+            startup_jobs="$(
+              gh api --paginate "${jobs_endpoint}" \
+                --jq '.jobs[] | select(.conclusion == "startup_failure") | .id'
+            )"
+            # The aggregate Required job is expected to fail when it observes a
+            # startup_failure; any other ordinary failure still blocks retry.
+            # The interpolation below belongs to jq and must remain single-quoted for Bash.
+            # shellcheck disable=SC2016
+            unexpected_jobs="$(
+              gh api --paginate "${jobs_endpoint}" \
+                --jq '.jobs[] | .conclusion as $conclusion | select(((["success", "skipped", "neutral", "startup_failure"] | index($conclusion)) == null) and (.name != "Required" or $conclusion != "failure")) | "\(.name)=\(.conclusion)"'
+            )"
+
+            if [[ -z "${startup_jobs}" || -n "${unexpected_jobs}" ]]; then
+              echo "::notice title=CI failure is not retryable::Only an exclusively startup_failure run may be retried automatically."
+              if [[ -n "${unexpected_jobs}" ]]; then
+                printf 'Non-infrastructure job conclusions:\n%s\n' "${unexpected_jobs}"
+              fi
+              exit 0
+            fi
+            retry_reason="all non-green jobs failed to start"
+          fi
+
+          echo "::notice title=Retrying CI once::Run ${RUN_ID}: ${retry_reason}."
+          gh api --method POST \
+            "repos/${REPOSITORY}/actions/runs/${RUN_ID}/rerun" \
+            --silent
+
+          # A re-run increments run_attempt, so this workflow will never retry it again.

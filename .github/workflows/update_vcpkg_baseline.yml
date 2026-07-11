@@ -5,6 +5,8 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch:
 
+permissions: {}
+
 concurrency:
   group: update-vcpkg-baseline
   cancel-in-progress: false
@@ -23,7 +25,7 @@ jobs:
       needs_update: ${{ steps.vcpkg.outputs.needs_update }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           ref: main
 
@@ -48,15 +50,17 @@ jobs:
 
           current_baseline="$(jq -r '."builtin-baseline"' vcpkg.json)"
 
-          echo "tag=${latest_tag}" >> "${GITHUB_OUTPUT}"
-          echo "baseline=${latest_baseline}" >> "${GITHUB_OUTPUT}"
-          echo "current=${current_baseline}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "tag=${latest_tag}"
+            echo "baseline=${latest_baseline}"
+            echo "current=${current_baseline}"
 
-          if [[ "${latest_baseline}" != "${current_baseline}" ]]; then
-            echo "needs_update=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "needs_update=false" >> "${GITHUB_OUTPUT}"
-          fi
+            if [[ "${latest_baseline}" != "${current_baseline}" ]]; then
+              echo "needs_update=true"
+            else
+              echo "needs_update=false"
+            fi
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Create or update single baseline PR
         if: steps.vcpkg.outputs.needs_update == 'true'
@@ -105,6 +109,8 @@ jobs:
 
             gh pr edit "${existing_pr}" --title "chore: Update vcpkg baseline to ${RELEASE_TAG}"
 
+            # Markdown backticks must remain inside a single-quoted format string.
+            # shellcheck disable=SC2016
             printf -v comment_body 'Updated to vcpkg **%s**\n\n**Previous baseline:** `%s`\n**New baseline:** `%s`\n\n**Release notes:** https://github.com/microsoft/vcpkg/releases/tag/%s' \
               "${RELEASE_TAG}" "${current_in_branch}" "${NEW_BASELINE}" "${RELEASE_TAG}"
 
@@ -131,6 +137,8 @@ jobs:
               git push --force-with-lease origin "${branch_name}"
             fi
 
+            # Markdown backticks must remain inside a single-quoted format string.
+            # shellcheck disable=SC2016
             printf -v pr_body '## vcpkg Baseline Update\n\nThis PR updates the vcpkg baseline to the latest release.\n\n**Release:** `%s`\n**Previous:** `%s`\n**New:** `%s`\n\n**Release notes:** https://github.com/microsoft/vcpkg/releases/tag/%s\n\n---\nThis PR is automatically updated when new vcpkg releases are published.' \
               "${RELEASE_TAG}" "${PREVIOUS}" "${NEW_BASELINE}" "${RELEASE_TAG}"
 

@@ -1,4 +1,4 @@
-#include <framework/pch.h>
+#include <framework/global.h>
 
 #include "input_message_builder.h"
 

@@ -1,4 +1,4 @@
-#include <framework/pch.h>
+#include <framework/global.h>
 
 #define private public
 #include <client/thingtype.h>

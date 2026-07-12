@@ -1,4 +1,4 @@
-#include <framework/pch.h>
+#include <framework/global.h>
 
 #include "test_environment.h"
 

@@ -6,31 +6,28 @@
 
 namespace otclient::test {
 
-inline testing::AssertionResult cursorIs(const InputMessage& message, const int expected)
+inline testing::AssertionResult cursorIs(InputMessage& message, const int expected)
 {
-    const auto& mutableMessage = const_cast<InputMessage&>(message);
-    if (mutableMessage.getReadPos() == expected)
+    if (message.getReadPos() == expected)
         return testing::AssertionSuccess();
     return testing::AssertionFailure() << "expected readPos " << expected
-                                       << ", got " << mutableMessage.getReadPos();
+                                       << ", got " << message.getReadPos();
 }
 
-inline testing::AssertionResult unreadIs(const InputMessage& message, const int expected)
+inline testing::AssertionResult unreadIs(InputMessage& message, const int expected)
 {
-    const auto& mutableMessage = const_cast<InputMessage&>(message);
-    if (mutableMessage.getUnreadSize() == expected)
+    if (message.getUnreadSize() == expected)
         return testing::AssertionSuccess();
     return testing::AssertionFailure() << "expected " << expected
-                                       << " unread bytes, got " << mutableMessage.getUnreadSize();
+                                       << " unread bytes, got " << message.getUnreadSize();
 }
 
-inline testing::AssertionResult consumed(const InputMessage& message)
+inline testing::AssertionResult consumed(InputMessage& message)
 {
-    const auto& mutableMessage = const_cast<InputMessage&>(message);
-    if (mutableMessage.getUnreadSize() == 0 && mutableMessage.eof())
+    if (message.getUnreadSize() == 0 && message.eof())
         return testing::AssertionSuccess();
     return testing::AssertionFailure() << "message is not fully consumed: unread="
-                                       << mutableMessage.getUnreadSize();
+                                       << message.getUnreadSize();
 }
 
 } // namespace otclient::test

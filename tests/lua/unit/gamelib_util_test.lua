@@ -1,0 +1,27 @@
+local root = assert(os.getenv("OTCLIENT_SOURCE_DIR"), "OTCLIENT_SOURCE_DIR is required")
+dofile(root .. "/tests/lua/helpers/stubs.lua")
+dofile(root .. "/modules/gamelib/util.lua")
+
+test("gamelib util loads with minimal client globals", function()
+  assertTrue(type(g_game) == "table")
+  assertTrue(type(g_ui) == "table")
+  assertTrue(type(g_resources) == "table")
+  assertTrue(type(g_logger.error) == "function")
+  assertTrue(type(modules) == "table")
+end)
+
+test("comma_value groups thousands deterministically", function()
+  assertEqual("1,234,567", comma_value(1234567))
+  assertEqual("", comma_value(nil))
+end)
+
+test("time helpers use fixed hour and minute formatting", function()
+  assertEqual("01:01", formatTimeBySeconds(3661))
+  assertEqual("02:05", formatTimeByMinutes(125))
+end)
+
+test("short_text preserves short values and truncates long values", function()
+  assertEqual("OTC", short_text("OTC", 5))
+  assertEqual("Re...", short_text("Redemption", 5))
+  assertEqual("", short_text(nil, 5))
+end)

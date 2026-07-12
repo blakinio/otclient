@@ -62,7 +62,9 @@ TEST(ProtocolLoopback, ReceivesOneWorldLightPacketFromLocalEphemeralPortAndClose
                 message->setBuffer(std::string(receivedBody.begin(), receivedBody.end()));
                 message->setReadPos(static_cast<uint16_t>(message->getMaxHeaderSize()));
                 ASSERT_EQ(Proto::GameServerAmbient, message->getU8());
-                receiver.onWorldLight(message->getU8(), message->getU8());
+                const auto intensity = message->getU8();
+                const auto color = message->getU8();
+                receiver.onWorldLight(intensity, color);
                 EXPECT_TRUE(message->eof());
                 EXPECT_EQ(0, message->getUnreadSize());
 

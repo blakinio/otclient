@@ -1,158 +1,85 @@
-# OTS / OTClient — dokument przekazania pracy między agentami
+# OTS / OTClient - agent handoff
 
-> **Status dokumentu:** aktywny  
-> **Ostatnia aktualizacja:** 2026-07-12, Europe/Warsaw  
-> **Główne repozytorium robocze:** `blakinio/otclient`  
-> **Główna gałąź:** `main`  
-> **Właściciel repozytorium:** `blakinio`  
-> **Lokalna ścieżka użytkownika:** `C:\Users\barte\Documents\New project`
+> Status: active
+> Last verified: 2026-07-12 (Europe/Warsaw)
+> Working repository: `blakinio/otclient`
+> Default branch: `main`
+> Local user path: `C:\Users\barte\Documents\New project`
 
----
+## 1. Purpose
 
-## 1. Po co istnieje ten plik
+This file is the durable handoff for every agent working on the OTS project. Read it before changing code. It exists so another agent can continue safely when the current conversation becomes slow, loses context, or reaches its token limit.
 
-Ten plik jest trwałym handoffem dla kolejnych agentów pracujących nad projektem OTS. Ma umożliwić bezpieczne przejęcie pracy, gdy:
+At the beginning of every session, verify the live GitHub and local Git state. Snapshots below are historical evidence, not a substitute for verification. After every important PR, merge, CI repair, policy change, or newly discovered blocker, update both the current-state section and the changelog.
 
-- bieżące okno rozmowy stanie się zbyt długie lub wolne,
-- zostanie osiągnięty limit tokenów,
-- pracę przejmie inny agent,
-- trzeba wrócić do projektu po przerwie,
-- lokalny agent utraci część kontekstu rozmowy.
+## 2. Project goal
 
-Każdy agent powinien:
+Maintain a stable OTClient Redemption fork designed to work with Canary. The project should provide:
 
-1. przeczytać ten dokument przed zmianami,
-2. zweryfikować dynamiczny stan GitHub i lokalnego repozytorium,
-3. nie zakładać, że stan opisany w sekcji „snapshot” nadal jest aktualny,
-4. aktualizować ten plik po każdym większym etapie, merge’u, zmianie polityki lub wykryciu istotnego problemu,
-5. nie usuwać historii decyzji bez wyraźnego powodu.
+- predictable client behavior and protocol compatibility with Canary;
+- secure, repeatable CI;
+- unit, integration, contract, Lua, and regression tests;
+- controlled upstream synchronization;
+- small reviewable PRs;
+- a base for future client, server, map, quest, NPC, monster, and content tooling;
+- clear operating rules for humans and AI agents.
 
----
+Long-term related repositories:
 
-## 2. Cel projektu
+- working fork: `https://github.com/blakinio/otclient`
+- OTClient upstream: `https://github.com/opentibiabr/otclient`
+- Canary server: `https://github.com/opentibiabr/canary`
+- Remere's Map Editor: `https://github.com/opentibiabr/remeres-map-editor`
+- client-editor: `https://github.com/opentibiabr/client-editor`
 
-Budujemy i utrzymujemy własny, stabilny fork OTClient Redemption przeznaczony do współpracy z Canary.
+Critical rule: ordinary PRs must target `blakinio/otclient:main`. Never open a PR to `opentibiabr/otclient` unless the user explicitly requests an upstream contribution. An accidental upstream PR happened earlier; it was closed without merge.
 
-Najważniejsze cele:
+## 3. Current verified snapshot
 
-- stabilny i przewidywalny klient dla serwera Canary,
-- zgodność protokołu klient–serwer,
-- bezpieczny i powtarzalny proces CI,
-- testy jednostkowe, integracyjne, kontraktowe i regresyjne,
-- ograniczenie regresji przy aktualizacjach z upstreamu,
-- możliwość dalszej rozbudowy funkcji klienta i mechanik serwerowych,
-- czytelne zasady pracy dla ludzi i agentów AI,
-- automatyzacja bez osłabiania bezpieczeństwa repozytorium.
+Snapshot taken on 2026-07-12. Re-check before acting.
 
-Długofalowo projekt może obejmować także:
+### 3.1 Main branch
 
-- rozwój mechanik OTS po stronie Canary,
-- edycję i generowanie map,
-- narzędzia do questów, NPC, potworów i zawartości,
-- integrację Remere’s Map Editor i client-editor,
-- testy kompatybilności klient–serwer,
-- regresje dla mechanik takich jak Forge, Wheel, Gem Atelier, Prey, Market i login.
+Latest verified `main` commit:
 
----
-
-## 3. Repozytoria i ich role
-
-### 3.1 Repozytorium robocze
-
-- `https://github.com/blakinio/otclient`
-- To jest repozytorium, w którym wykonujemy bieżące prace.
-- Wszystkie zwykłe branche i Pull Requesty mają trafiać tutaj.
-- Domyślny target PR: `blakinio/otclient:main`.
-
-### 3.2 Upstream OTClient
-
-- `https://github.com/opentibiabr/otclient`
-- Źródło aktualizacji upstream.
-- Nie należy otwierać PR-ów do upstreamu bez wyraźnej zgody użytkownika.
-- Nie należy przypadkowo używać upstreamu jako repozytorium docelowego PR.
-
-### 3.3 Canary
-
-- `https://github.com/opentibiabr/canary`
-- Serwer, z którym klient ma być kompatybilny.
-- Zmiany protokołu i mechanik trzeba analizować po obu stronach.
-
-### 3.4 Remere’s Map Editor
-
-- `https://github.com/opentibiabr/remeres-map-editor`
-- Narzędzie do map OTBM.
-- Potencjalny element przyszłego workflow generowania i walidacji map.
-
-### 3.5 Client Editor
-
-- `https://github.com/opentibiabr/client-editor`
-- Narzędzie pomocnicze dla danych i zasobów klienta.
-
-### 3.6 Zasada krytyczna
-
-Nigdy nie otwieraj PR-a do `opentibiabr/otclient`, jeśli użytkownik nie poprosił o wkład do upstreamu wprost.
-
-Wcześniej doszło do przypadkowego otwarcia PR-a do upstreamu. PR został zamknięty i nie został zmergowany. Nie wolno powtórzyć tego błędu.
-
----
-
-## 4. Aktualny zweryfikowany stan repozytorium
-
-### 4.1 `main`
-
-Snapshot z 2026-07-12:
-
-- aktualny commit `main`:
-  - `bdd83db12292bb646280372dfdf8ae5cd50e3072`
-  - `fix(ci): restore runtime-scoped Lua syntax checks`
-- poprzedni commit governance:
-  - `208c64d336eef7c199fa022daf08d1ee95295575`
-  - `Chore/repository governance (#1)`
-
-Przed rozpoczęciem pracy zawsze wykonaj:
-
-```powershell
-git fetch --all --prune
-git status -sb
-git branch -vv
-git log --oneline --decorate -10 origin/main
+```text
+bdd83db12292bb646280372dfdf8ae5cd50e3072
+fix(ci): restore runtime-scoped Lua syntax checks
 ```
 
-Nie zakładaj, że powyższy SHA nadal jest najnowszy.
+Previous governance merge:
 
-### 4.2 Otwarty Pull Request test foundation
+```text
+208c64d336eef7c199fa022daf08d1ee95295575
+Chore/repository governance (#1)
+```
 
-Snapshot z 2026-07-12:
+### 3.2 Open test-foundation PR
 
-- PR: `#3`
-- URL: `https://github.com/blakinio/otclient/pull/3`
-- tytuł: `test: establish client unit and integration test foundation`
-- stan: otwarty
-- draft: nie
-- base: `main`
-- base SHA: `bdd83db12292bb646280372dfdf8ae5cd50e3072`
-- head branch: `test/client-test-foundation`
-- head SHA: `92d29382e6a87cefb6453ac3b3d7b5224423fd3e`
-- liczba commitów w chwili snapshotu: 9
-- zmienione pliki: 43
-- additions: 1936
-- deletions: 14
-- mergeable: tak
-- CI przy ostatniej weryfikacji: `in_progress`
-- workflow: `CI`
-- run number: `7`
-- run ID: `29186723650`
+```text
+PR: https://github.com/blakinio/otclient/pull/3
+Title: test: establish client unit and integration test foundation
+Base: main
+Head: test/client-test-foundation
+Verified head SHA: 92d29382e6a87cefb6453ac3b3d7b5224423fd3e
+State at snapshot: open, not draft, mergeable
+Commits: 9
+Changed files: 43
+Additions: 1936
+Deletions: 14
+CI at snapshot: in progress, run 7, run id 29186723650
+```
 
-Ostatni commit na branchu testowym:
+Latest verified branch commit:
 
 ```text
 92d29382e6a87cefb6453ac3b3d7b5224423fd3e
 test: include client compile context in new tests
 ```
 
-Commit dodał wymagany kontekst kompilacyjny, m.in. `#include <framework/pch.h>`, do nowych testów i brakujące include’y dla typów klienta.
+That commit added `#include <framework/pch.h>` to new C++ test sources and missing client type includes used by tile tests.
 
-Dynamiczny stan sprawdzaj poleceniami:
+Live verification:
 
 ```powershell
 gh pr view 3 --repo blakinio/otclient
@@ -160,48 +87,39 @@ gh pr checks 3 --repo blakinio/otclient
 gh run list --repo blakinio/otclient --branch test/client-test-foundation
 ```
 
----
+## 4. Completed work and decisions
 
-## 5. Zakończone etapy i pełny changelog projektu
+### 4.1 Fork organization
 
-## 5.1 Uporządkowanie forka
+- The fork was audited against upstream and was initially synchronized.
+- OTClient Redemption was selected as the client base for Canary.
+- Production behavior changes must not be mixed with governance or test-infrastructure changes.
 
-- Fork `blakinio/otclient` został przeanalizowany względem upstreamu.
-- Na początku był zsynchronizowany z upstreamem.
-- Ustalono, że właściwą bazą klienta dla Canary jest OTClient Redemption.
-- Ustalono, że zmiany produkcyjne powinny być osobne od zmian governance i test infrastructure.
+### 4.2 Repository governance - PR #1
 
-## 5.2 Governance foundation — PR #1
+Branch: `chore/repository-governance`
 
-Gałąź:
-
-```text
-chore/repository-governance
-```
-
-Merge commit po squash:
+Squash result:
 
 ```text
 208c64d336eef7c199fa022daf08d1ee95295575
 Chore/repository governance (#1)
 ```
 
-Zakres obejmował m.in.:
+The governance work added or improved:
 
-- stabilny wymagany status CI,
-- minimalne uprawnienia GitHub Actions,
-- ograniczenie ryzyka workflowów uprzywilejowanych,
-- przypinęcie akcji do konkretnych SHA,
-- Dependabot,
-- bezpieczny workflow dla Dependabot,
-- retry tylko dla awarii infrastrukturalnych,
-- CODEOWNERS,
-- szablony issue,
-- szablon Pull Requesta,
-- dokumentację contribution/governance,
-- helper do konfiguracji ustawień repozytorium.
+- one stable required CI status;
+- minimal GitHub Actions permissions;
+- pinned external actions;
+- safer privileged workflows;
+- Dependabot configuration and safe automation;
+- one retry only for infrastructure failures;
+- CODEOWNERS;
+- issue and PR templates;
+- contribution and governance documentation;
+- a repository-settings helper script.
 
-Ważne pliki:
+Important files:
 
 ```text
 .github/CODEOWNERS
@@ -213,45 +131,29 @@ Ważne pliki:
 scripts/configure-github-repository.sh
 ```
 
-W governance dodano łącznie około 30 plików lub zmian organizacyjnych.
-
-### Problem podczas publikacji governance
-
-Lokalna gałąź: będnie śledziła `origin/main`.
-
-Naprawiono to przez:
+A local branch once tracked `origin/main` incorrectly. It was repaired with:
 
 ```powershell
 git branch --unset-upstream
 git push -u origin chore/repository-governance
 ```
 
-Wniosek dla kolejnych agentów:
+Always inspect `git branch -vv` after branch creation or first push.
 
-- po utworzeniu brancha zawsze sprawdź `git branch -vv`,
-- branch roboczy powinien śledzić odpowiadający mu branch na `origin`,
-- nie zakładaj, że `git push` ustawi poprawny upstream.
+### 4.3 Lua CI repair - PR #2
 
-## 5.3 Naprawa Lua CI — PR #2
+The first governance CI run failed because the blocking Lua job compiled every tracked `*.lua`, including files outside OTClient runtime roots. The failure propagated to `CI / Required`.
 
-Po merge governance CI początkowo nie przechodziło.
+Repair branch: `fix/ci-lua-syntax`
 
-Pierwotny problem:
+Squash result:
 
-- workflow Lua skanował wszystkie śledzone pliki `*.lua`,
-- część plików nie była runtime’owym kodem OTClient,
-- wymagany check `Lua Syntax / Check Lua Syntax` padał,
-- agregat `CI / Required` także padał,
-- buildy były pomijane zgodnie z wykrytym zakresem zmian.
+```text
+bdd83db12292bb646280372dfdf8ae5cd50e3072
+fix(ci): restore runtime-scoped Lua syntax checks
+```
 
-Naprawa:
-
-- branch: `fix/ci-lua-syntax`
-- PR #2: `fix(ci): restore runtime-scoped Lua syntax checks`
-- commit po squash:
-  - `bdd83db12292bb646280372dfdf8ae5cd50e3072`
-
-Nowy zakres blokującego sprawdzania Lua:
+The blocking Lua syntax scan now covers only:
 
 ```text
 data/
@@ -259,112 +161,74 @@ modules/
 mods/
 ```
 
-Pliki są wyszukiwane deterministycznie:
+Deterministic discovery:
 
 ```bash
 find data modules mods -type f -name '*.lua' -print0 | sort -z
 ```
 
-Prawdziwe błędy składni nadal są fatalne.
+Real Lua syntax errors remain fatal. Do not restore `git ls-files '*.lua'` without a full impact analysis.
 
-Po naprawie przeszły:
+### 4.4 Pull-request settings
 
-- Detect Build Scope,
-- Fast Checks,
-- syntax/workflow checks,
-- Lua Syntax,
-- informacyjna analiza statyczna,
-- `CI / Required`.
+Verified repository settings:
 
-Buildy platformowe mogły być pominięte, ponieważ zmiana dotyczyła tylko workflow CI. To było oczekiwane.
+- default branch: `main`;
+- auto-merge: enabled;
+- suggest/update PR branch: enabled;
+- squash merge: enabled;
+- merge commits: disabled;
+- rebase merge: disabled;
+- automatic head-branch deletion: enabled;
+- web commit sign-off: disabled;
+- commit comments: enabled.
 
-## 5.4 Ustawienia Pull Requestów
+Effective merge policy: squash only.
 
-Zweryfikowane ustawienia repozytorium:
+### 4.5 Main protection
 
-- default branch: `main`
-- Allow auto-merge: ON
-- Always suggest updating pull request branches / allow update branch: ON
-- Allow squash merging: ON
-- Allow merge commits: OFF
-- Allow rebase merging: OFF
-- Automatically delete head branches: ON
-- Require contributors to sign off web-based commits: OFF
-- Allow comments on commits: ON
+Use one modern Branch Ruleset, not a simultaneous legacy Branch protection rule.
 
-Efektywny sposób merge:
+Active ruleset: `Protect main`
+
+Effective rules:
 
 ```text
-squash only
+deletion
+non_fast_forward
+required_linear_history
+pull_request
+required_status_checks
 ```
 
-## 5.5 Ochrona `main`
+Parameters:
 
-Ustalono, że używamy:
+- target: `~DEFAULT_BRANCH`;
+- enforcement: active;
+- required approvals: 0;
+- code-owner review: off;
+- last-push approval: off;
+- review-thread resolution: required;
+- allowed merge method: squash only;
+- required check: `CI / Required`;
+- branch must be current with `main`;
+- force pushes and deletion blocked;
+- CodeQL is not a required ruleset condition;
+- repository administrator bypass exists for emergencies only.
 
-```text
-jednego Branch Ruleset
+The legacy endpoint correctly returns HTTP 404:
+
+```powershell
+gh api repos/blakinio/otclient/branches/main/protection
 ```
 
-Nie używamy równolegle klasycznej:
+This means no legacy rule is active. It does not mean `main` is unprotected. Inspect modern rules with:
 
-```text
-Branch protection rule
+```powershell
+gh api repos/blakinio/otclient/rules/branches/main
 ```
 
-Stara branch protection rule została usunięta.
-
-Weryfikacja klasycznego mechanizmu zwraca:
-
-```json
-{
-  "message": "Branch not protected",
-  "status": "404"
-}
-```
-
-To jest prawidłowe, ponieważ `main` jest chroniony przez Ruleset, nie przez legacy branch protection.
-
-### Aktywny Ruleset
-
-Nazwa:
-
-```text
-Protect main
-```
-
-Parametry:
-
-- target: `branch`
-- enforcement: `active`
-- branch target:
-  - `~DEFAULT_BRANCH`
-- blokada usuwania:
-  - `deletion`
-- blokada force push:
-  - `non_fast_forward`
-- liniowa historia:
-  - `required_linear_history`
-- wymagany Pull Request:
-  - approvals: `0`
-  - dismiss stale reviews: `false`
-  - Code Owner review: `false`
-  - last push approval: `false`
-  - review thread resolution: `true`
-  - allowed merge methods: tylko `squash`
-- wymagane checki:
-  - `CI / Required`
-- branch musi być aktualny względem `main`:
-  - `strict_required_status_checks_policy: true`
-- `do_not_enforce_on_create: false`
-- brak wymaganego CodeQL/code scanning w rulesecie
-- bypass:
-  - administrator repozytorium
-  - `RepositoryRole`
-  - actor ID `5`
-  - mode `always`
-
-Zweryfikowany efektywny wynik:
+Verified effective summary:
 
 ```json
 {
@@ -375,165 +239,63 @@ Zweryfikowany efektywny wynik:
     "pull_request",
     "required_status_checks"
   ],
-  "merge_methods": [
-    "squash"
-  ],
-  "checks": [
-    "CI / Required"
-  ]
+  "merge_methods": ["squash"],
+  "checks": ["CI / Required"]
 }
 ```
 
-### Ważny kompromis
+Do not use admin bypass merely to avoid failing CI, unresolved discussions, or an outdated PR branch.
 
-`strict_required_status_checks_policy: true` oznacza, że branch PR musi być aktualny względem `main`.
+## 5. CI invariants
 
-Może to czasem powodować ponowne uruchomienie CI lub potrzebę użycia `Update branch`, gdy `main` zmieni się w trakcie pracy.
+### 5.1 Stable required check
 
-Jest to świadoma aktualna decyzja. Nie wyłączaj tego bez wyraźnej decyzji użytkownika.
-
-## 5.6 GitHub CLI na komputerze użytkownika
-
-Na Windows zainstalowano:
-
-```text
-gh version 2.96.0
-```
-
-Użytkownik zalogował się jako:
-
-```text
-blakinio
-```
-
-Protokół Git:
-
-```text
-HTTPS
-```
-
-Na lokalnym komputerze użytkownika `gh` działa.
-
-Nie zakładaj jednak, że `gh` jest dostępne w każdym kontenerze agenta. Brak `gh` w kontenerze nie może blokować implementacji, lokalnych commitów ani zwykłego `git push`.
-
----
-
-## 6. Architektura CI, której nie wolno przypadkowo zepsuć
-
-## 6.1 Jeden stabilny wymagany check
-
-Ruleset wymaga dokładnie:
+The ruleset requires exactly:
 
 ```text
 CI / Required
 ```
 
-Nie dodawaj do Rulesetu nazw dynamicznych jobów matrix, warunkowych buildów ani checków, które nie występują przy każdym PR.
+Do not require dynamic matrix-job names or conditional platform checks directly. Some jobs can be skipped depending on path scope, while the aggregate must always run and correctly evaluate their results.
 
-`CI / Required` ma być agregatem uruchamianym zawsze i oceniać wyniki poprzednich jobów.
+### 5.2 Path scope
 
-To pozwala:
+Documentation-only changes may skip expensive builds, but they must still produce `CI / Required`. Avoid workflow-level path filters that prevent the required workflow from appearing at all.
 
-- wymagać jednego stabilnego statusu,
-- pomijać niepotrzebne buildy przy zmianach dokumentacji,
-- nie blokować merge przez brak warunkowego checka,
-- zachować czytelną ochronę `main`.
+### 5.3 Security
 
-## 6.2 Scope detection
+- Keep permissions minimal.
+- Do not execute untrusted PR code with secrets.
+- Use `pull_request_target` only with a proven safe model.
+- Never check out PR code in a privileged workflow.
+- Pin external actions to immutable SHAs.
+- Dependabot metadata/automation must remain read-only and same-repository constrained.
 
-Workflow wykrywa zakres zmian i może pominąć kosztowne buildy, gdy nie są potrzebne.
+### 5.4 Retry policy
 
-Ważne:
+Retry only clear infrastructure outcomes such as cancelled, timed out, or startup failure. Maximum one retry. Never retry or suppress genuine test failures to manufacture green CI.
 
-- dokumentacyjny PR nadal musi otrzymać `CI / Required`,
-- nie stosować workflow-level `paths` w sposób, który całkowicie uniemożliwi pojawienie się wymaganego checka,
-- warunkowe joby mogą być `skipped`, ale agregat musi poprawnie je interpretować.
+### 5.5 Forbidden CI shortcuts
 
-## 6.3 Uprawnienia i bezpieczeństwo
+Do not introduce:
 
-Zasady:
+- `continue-on-error` on required tests;
+- ignored exit codes;
+- catch-all scripts returning zero;
+- disabled tests without documented justification;
+- weaker assertions merely because a test exposed a defect.
 
-- minimalne `permissions`,
-- nie zwiększać globalnie uprawnień workflow,
-- akcje zewnętrzne przypinać do SHA,
-- nie wykonywać kodu z niezaufanego PR w kontekście sekretów,
-- `pull_request_target` tylko przy jasno udowodnionym bezpiecznym modelu,
-- nie checkoutować kodu PR w uprzywilejowanym workflow.
+## 6. PR #3 - client test foundation
 
-Bezpieczny workflow Dependabot:
+### 6.1 Purpose
 
-- read-only,
-- sprawdza, że aktorem jest Dependabot,
-- sprawdza, że PR pochodzi z tego samego repo,
-- nie checkoutuje kodu PR,
-- automatyzacja tylko w bezpiecznym zakresie.
+Create the first deterministic client test foundation without changing production client behavior.
 
-## 6.4 Retry infrastrukturalny
+Before this PR there were about 23 discovered GoogleTest cases in three targets, concentrated mainly in map spectators, string encoding, and OTML aliases. Lua CI mostly compiled syntax. There was no shared message-builder layer, bounded protocol loopback integration test, cross-language resource contract suite, or organized regression backlog.
 
-Retry nie może ukrywać błędów testów.
+### 6.2 New structure and targets
 
-Dopuszczony retry tylko dla przypadków infrastrukturalnych, np.:
-
-- cancelled,
-- timed out,
-- startup failure.
-
-Maksymalnie jeden kontrolowany retry.
-
-## 6.5 Lua syntax
-
-Blokujący Lua syntax job ma skanować runtime roots:
-
-```text
-data
-modules
-mods
-```
-
-Nie wracaj do:
-
-```bash
-git ls-files '*.lua'
-```
-
-bez analizy wpływu, ponieważ to wcześniej zepsuło CI.
-
----
-
-## 7. Test foundation — zakres PR #3
-
-## 7.1 Cel
-
-Utworzyć pierwszą deterministyczną bazę testów klienta:
-
-- unit,
-- integration,
-- contract,
-- Lua,
-- regression support.
-
-PR nie powinien zmieniać produkcyjnego zachowania klienta.
-
-## 7.2 Stan przed PR
-
-Przed zmianami:
-
-- około 23 wykrywane testy GoogleTest,
-- 3 istniejące targety,
-- coverage głównie dla:
-  - map spectators,
-  - string encoding,
-  - OTML aliases,
-- CTest wykonywany głównie w Linux Debug,
-- Lua CI sprawdzało głównie składnię,
-- brak wspólnych message builders,
-- brak testu protocol loopback,
-- brak cross-language resource contracts,
-- brak uporządkowanego backlogu regresji.
-
-## 7.3 Nowa struktura
-
-Nowe lub rozbudowane katalogi:
+Directories:
 
 ```text
 tests/unit/
@@ -543,7 +305,7 @@ tests/fixtures/
 tests/support/
 ```
 
-Nowe targety CMake:
+New CMake targets:
 
 ```text
 otclient_message_tests
@@ -553,7 +315,7 @@ otclient_protocol_contract_tests
 otclient_protocol_loopback_tests
 ```
 
-Nowe rejestracje CTest dla Lua:
+Lua CTest registrations:
 
 ```text
 otclient_lua_unit_tests
@@ -561,99 +323,28 @@ otclient_lua_contract_tests
 otclient_lua_runner_failure_contract
 ```
 
-Oczekiwany zakres po konfiguracji:
+Expected configured scope at the PR snapshot:
 
-- 58 przypadków GoogleTest,
-- 3 rejestracje Lua CTest,
-- 7 pozytywnych przypadków Lua,
-- 1 celowo negatywny kontrakt failure runnera.
+- 58 GoogleTest cases;
+- 3 Lua CTest registrations;
+- 7 positive Lua cases;
+- 1 intentional runner-failure contract.
 
-## 7.4 Pokryte obszary
+### 6.3 Covered areas
 
-### InputMessage
+- InputMessage numeric reads, strings, positions, cursor, unread bytes, EOF, skipping, empty bodies, bounds, and reserved-header offset behavior.
+- OutputMessage encoding, byte order, positions, size, append preservation, and reset.
+- TestEnvironment lifecycle, deterministic fake resources, fake game/local-player state, and callback order.
+- Synthetic Tile, ThingType, Item, and Creature builders; tile ordering, selection, overlap, add/remove, and empty-tile rules.
+- Selected opcode range and uniqueness contracts.
+- C++/Lua ResourceTypes and feature-name contracts, including fragment identifiers 84/85 and prevention of invalid `BANK_BALANCE` aliases.
+- A bounded local protocol loopback test on an ephemeral port for one world-light packet.
+- OTML nesting, comments, aliases, empty values, deterministic reload, and invalid indentation.
+- A minimal Lua runner with assertions, named reporting, nonzero failure status, client-global stubs, gamelib formatting tests, and ResourceTypes contracts.
 
-- U8,
-- U16,
-- U32,
-- U64,
-- strings,
-- positions,
-- cursor,
-- unread bytes,
-- EOF,
-- skipping,
-- empty bodies,
-- bounds,
-- reserved-header offset semantics.
+### 6.4 Local and CI validation
 
-### OutputMessage
-
-- kodowanie liczb,
-- kodowanie stringów,
-- byte order,
-- positions,
-- size,
-- append preservation,
-- reset.
-
-### TestEnvironment
-
-- lifecycle,
-- deterministic fake resources,
-- fake game state,
-- fake local player,
-- callback ordering.
-
-### Tile / Thing builders
-
-- syntetyczne Tile,
-- ThingType,
-- Item,
-- Creature,
-- ordering,
-- selection,
-- overlap,
-- add/remove,
-- reguły pustego tile.
-
-### Protocol contracts
-
-- wybrane zakresy opcode,
-- unikalność opcode,
-- kontrakty C++ ↔ Lua,
-- ResourceTypes,
-- feature names,
-- singular fragment identifiers `84/85`,
-- ochrona przed błędnymi aliasami `BANK_BALANCE`.
-
-### Integration
-
-- bounded loopback,
-- ephemeral local port,
-- limit około 3 sekund,
-- jeden world-light packet.
-
-### OTML
-
-- nesting,
-- comments,
-- aliases,
-- empty values,
-- deterministic reload,
-- invalid indentation.
-
-### Lua runner
-
-- assertions,
-- named reporting,
-- nonzero exit on failure,
-- minimal client-global stubs,
-- pure gamelib formatting tests,
-- ResourceTypes contracts.
-
-## 7.5 Presety lokalne
-
-Linux:
+Local commands for Linux:
 
 ```bash
 cmake --preset linux-tests
@@ -664,76 +355,39 @@ ctest --test-dir build/linux-tests -L lua --output-on-failure
 ctest --test-dir build/linux-tests -L integration --output-on-failure
 ```
 
-Odpowiedniki:
+Equivalent presets: `windows-tests`, `macos-tests`.
+Optional manual presets: `linux-asan-tests`, `linux-coverage-tests`.
 
-```text
-windows-tests
-macos-tests
-```
+Reported local validation before PR:
 
-Opcjonalna analiza ręczna:
+- CMake preset JSON parsed;
+- Lua unit cases 4/4 passed;
+- Lua resource contracts 3/3 passed;
+- intentional Lua runner failure contract passed;
+- new Lua sources compiled to LuaJIT bytecode;
+- modified workflows passed yamllint;
+- `git diff --check` passed.
 
-```text
-linux-asan-tests
-linux-coverage-tests
-```
+Full C++/CTest validation was delegated to CI because the local Windows checkout lacked the repository vcpkg toolchain. Never claim those tests passed locally unless they were actually run.
 
-## 7.6 Lokalna walidacja wykonana przed PR
+### 6.5 Deliberately excluded from PR #3
 
-Według opisu PR:
+Keep these for focused follow-up PRs:
 
-- CMake preset JSON parsuje się,
-- nowe Lua unit: 4/4,
-- nowe Lua resource contracts: 3/3,
-- Lua runner failure contract: passed,
-- nowe źródła Lua kompilują się do bytecode LuaJIT,
-- zmodyfikowane workflowy przeszły yamllint,
-- `git diff --check` przeszedł,
-- pełne C++/CTest przekazane do CI, ponieważ lokalny Windows nie miał toolchainu vcpkg repozytorium.
+- full Forge, Wheel, Gem Atelier, Prey, or Market coverage;
+- full login flow;
+- headless startup;
+- every parser opcode dispatch seam;
+- complete mock client globals;
+- Canary end-to-end tests;
+- production behavior changes;
+- repository settings, ruleset, or branch-protection changes.
 
-Nie wolno przedstawiać pełnych testów C++ jako zaliczonych lokalnie, jeśli nie zostały faktycznie uruchomione.
+The observed Wheel plural-fragment-name issue belongs in a later regression/fix PR.
 
-## 7.7 CI w PR #3
+### 6.6 Client assets
 
-Zmiany przewidują:
-
-- wymagany Linux test configuration,
-- osobne etykiety:
-  - unit,
-  - lua,
-  - integration,
-- dedykowany Windows test build/CTest,
-- docs-only nadal korzysta z path scope,
-- coverage i ASAN jako opcjonalne manual jobs,
-- brak progu coverage,
-- brak zewnętrznego tokenu do raportowania coverage.
-
-## 7.8 Rzeczy celowo poza zakresem PR #3
-
-Nie dodawać do tego PR bez bardzo dobrego powodu:
-
-- kompletnego Forge,
-- kompletnego Wheel,
-- kompletnego Gem Atelier,
-- Prey,
-- Market,
-- pełnego login flow,
-- headless startup,
-- wszystkich parser opcode dispatch seams,
-- pełnych mocków globali klienta,
-- Canary E2E,
-- zmian zachowania produkcyjnego,
-- zmian branch protection,
-- zmian Rulesetu,
-- zmian ustawień repozytorium.
-
-Wheel używający plural fragment names został zapisany jako przyszła regresja/fix, nie jako zmiana zachowania w PR foundation.
-
-## 7.9 Client assets
-
-PR #3 nie powinien zmieniać instalacji ani ładowania client-assets.
-
-Oczekiwane ścieżki runtime pozostają w stylu OTClient:
+PR #3 must not change client-assets installation or loading. Expected runtime locations remain:
 
 ```text
 data/things/<version>/
@@ -741,206 +395,85 @@ data/sounds/<version>/
 bin/*
 ```
 
-Nie osłabiać:
+Do not weaken manifest SHA-256 validation or secure fallback defaults. Never commit secrets, private server data, leaked files, or proprietary CipSoft assets.
 
-- strict manifest SHA-256,
-- bezpiecznych ustawień raw fallback,
-- walidacji źródła assetów.
+## 7. Immediate continuation plan
 
-Nie commitować:
+Priority 1: finish PR #3.
 
-- sekretów,
-- tokenów,
-- prywatnych danych serwera,
-- nielegalnie pozyskanych lub prawnie zastrzeżonych assetów CipSoft.
+1. Verify PR metadata and all checks.
+2. Confirm the head is `test/client-test-foundation` and base is `blakinio/otclient:main`.
+3. If CI fails, inspect the exact job and log; repair the cause on the same branch.
+4. Do not disable the failing test, weaken CI, or add `continue-on-error` to obtain green status.
+5. Before merge, require green `CI / Required`, an up-to-date branch, and no unresolved review threads.
+6. Confirm the PR is test/support/docs/CI only and does not alter production behavior.
+7. Merge with squash only.
+8. After merge, synchronize local `main`, prune remotes, and update this handoff with final SHA, test counts, CI duration, and follow-ups.
 
----
+Useful commands:
 
-## 8. Natychmiastowy plan dla kolejnego agenta
+```powershell
+git status -sb
+git diff --check
+git push
+gh pr checks 3 --repo blakinio/otclient --watch
+```
 
-### Priorytet 1 — dokończyć PR #3
+Recommended follow-up order after test foundation:
 
-1. Zweryfikować aktualny stan:
-   ```powershell
-   gh pr view 3 --repo blakinio/otclient
-   gh pr checks 3 --repo blakinio/otclient
-   ```
-
-2. Sprawdzić, czy branch nadal jest:
-   ```text
-   test/client-test-foundation
-   ```
-
-3. Upewnić się, że target to:
-   ```text
-   blakinio/otclient:main
-   ```
-
-4. Jeśli CI pada:
-   - odczytać konkretny job i log,
-   - naprawić przyczynę,
-   - nie wyłączać testu,
-   - nie zmieniać wymaganych checków,
-   - nie dodawać `continue-on-error` tylko po to, aby uzyskać zielony status,
-   - nie osłabiać kompilacji warningów bez analizy,
-   - commitować poprawkę na tym samym branchu.
-
-5. Po poprawkach:
-   ```powershell
-   git status -sb
-   git diff --check
-   git push
-   gh pr checks 3 --repo blakinio/otclient --watch
-   ```
-
-6. Przed merge:
-   - `CI / Required` musi być zielone,
-   - branch musi być aktualny względem `main`,
-   - wszystkie rozmowy review muszą być rozwiązane,
-   - PR nie może zawierać zmian produkcyjnego zachowania,
-   - sprawdzić summary i listę testów,
-   - merge tylko przez squash.
-
-7. Po merge:
-   ```powershell
-   git checkout main
-   git pull --ff-only origin main
-   git branch -d test/client-test-foundation
-   git fetch --prune
-   ```
-
-8. Zaktualizować ten dokument:
-   - nowy SHA `main`,
-   - numer merge,
-   - wynik CI,
-   - liczbę finalnych testów,
-   - czas CI,
-   - znane follow-upy.
-
-### Priorytet 2 — backlog regresji
-
-Po stabilnym merge test foundation kolejne PR-y powinny być małe i tematyczne.
-
-Rekomendowana kolejność:
-
-1. protocol parser contracts,
-2. login/character list seams,
-3. Forge contracts,
-4. Wheel contracts,
-5. Gem Atelier contracts,
-6. Prey,
-7. Market,
-8. Canary client/server E2E,
-9. headless client smoke test,
+1. protocol parser contracts;
+2. login/character-list seams;
+3. Forge contracts;
+4. Wheel contracts;
+5. Gem Atelier contracts;
+6. Prey;
+7. Market;
+8. Canary client/server E2E;
+9. headless client smoke test;
 10. map/content tooling integration.
 
-Każdy temat w osobnym branchu i PR.
+Each topic belongs in its own branch and PR.
 
----
+## 8. Standard operating procedure
 
-## 9. Standard pracy agenta
-
-## 9.1 Początek każdej sesji
-
-Na Windows:
+### 8.1 Session start
 
 ```powershell
 cd "C:\Users\barte\Documents\New project"
-
 git status -sb
 git remote -v
 git fetch --all --prune
 git branch -vv
 git log --oneline --decorate -10 origin/main
-
 gh auth status
 gh pr list --repo blakinio/otclient
 ```
 
-Agent w kontenerze powinien wykonać analogiczne polecenia dostępne w jego środowisku.
-
-## 9.2 Remote’y
-
-Docelowo:
+Expected remotes:
 
 ```text
 origin   -> https://github.com/blakinio/otclient.git
 upstream -> https://github.com/opentibiabr/otclient.git
 ```
 
-Nie zakładaj, że `upstream` istnieje. Najpierw sprawdź.
+Verify before adding or changing a remote.
 
-Dodanie upstreamu, gdy brak:
+### 8.2 New branches
 
-```powershell
-git remote add upstream https://github.com/opentibiabr/otclient.git
-git fetch upstream
-```
-
-## 9.3 Tworzenie brancha
-
-Nowy branch zawsze z aktualnego `origin/main`, chyba że użytkownik wyraźnie wskazał inną bazę.
+Create new work from current `origin/main` unless the user explicitly selects another base:
 
 ```powershell
 git fetch origin
 git checkout -B <branch-name> origin/main
 ```
 
-Nie twórz nowego zadania z:
+Do not base new work on `chore/repository-governance` or another stale task branch.
 
-```text
-chore/repository-governance
-```
+Use prefixes such as `feat/`, `fix/`, `test/`, `ci/`, `docs/`, `chore/`, and `refactor/`.
 
-ani z innego starego brancha.
+### 8.3 Commits and PRs
 
-## 9.4 Nazewnictwo branchy
-
-Stosowane prefiksy:
-
-```text
-feat/
-fix/
-test/
-ci/
-docs/
-chore/
-refactor/
-```
-
-Przykłady:
-
-```text
-test/client-test-foundation
-fix/ci-lua-syntax
-chore/repository-governance
-```
-
-## 9.5 Commity
-
-Preferowane Conventional Commits:
-
-```text
-feat:
-fix:
-test:
-ci:
-docs:
-chore:
-refactor:
-build:
-```
-
-Commity powinny być:
-
-- logiczne,
-- możliwie małe,
-- bez przypadkowych plików,
-- bez sekretów,
-- bez plików build output,
-- bez niepowiązanych refaktorów.
-
-Przed commitem:
+Use logical Conventional Commits. Before committing:
 
 ```powershell
 git status --short
@@ -948,200 +481,42 @@ git diff --check
 git diff --stat
 ```
 
-## 9.6 Pull Request
+Every important PR should explain goal, before/after state, scope, production impact, tests actually run, tests not run, risks, follow-ups, and any client-assets implications.
 
-Każdy istotny PR powinien zawierać:
+Never push directly to `main`. Target `blakinio/otclient:main` and merge with squash.
 
-- cel,
-- stan przed zmianą,
-- zakres zmian,
-- wpływ na produkcję,
-- sposób uruchomienia testów,
-- co faktycznie zweryfikowano,
-- czego nie zweryfikowano,
-- ryzyka,
-- follow-upy,
-- informację o client-assets, jeśli temat ich dotyczy.
+### 8.4 Missing GitHub CLI
 
-Target:
+The user's Windows machine has GitHub CLI 2.96.0 authenticated as `blakinio` over HTTPS. A container agent may not have `gh`. Missing `gh` is not a reason to stop implementation, commits, local tests, or normal `git push`; PR creation and monitoring can be completed later through an available GitHub integration or browser.
 
-```text
-blakinio/otclient:main
-```
+### 8.5 PowerShell and jq
 
-Merge:
-
-```text
-squash
-```
-
-Nie pushuj bezpośrednio do `main`.
-
-## 9.7 Admin bypass
-
-Bypass administratora istnieje na wypadek awarii.
-
-Nie używać go do:
-
-- ominięcia czerwonego CI,
-- szybkiego merge bez testów,
-- ominięcia unresolved conversations,
-- przepchnięcia nieaktualnego brancha.
-
-Bypass tylko w realnej sytuacji awaryjnej, z opisem powodu.
-
----
-
-## 10. Pułapki i znane błędy
-
-### 10.1 Przypadkowy PR do upstreamu
-
-Objaw:
-
-- PR celuje w `opentibiabr/otclient:main`.
-
-Działanie:
-
-- nie merge’ować,
-- zamknąć,
-- utworzyć poprawny PR w `blakinio/otclient`.
-
-### 10.2 Zły upstream lokalnego brancha
-
-Sprawdzenie:
-
-```powershell
-git branch -vv
-```
-
-Naprawa:
-
-```powershell
-git branch --unset-upstream
-git push -u origin <branch>
-```
-
-### 10.3 Agent nie ma `gh`
-
-Brak `gh` nie jest powodem do zatrzymania implementacji.
-
-Można nadal:
-
-- analizować kod,
-- tworzyć branch,
-- commitować,
-- testować,
-- wykonać `git push`.
-
-PR można utworzyć później przez przeglądarkę, przez dostępne narzędzie GitHub albo po instalacji `gh`.
-
-### 10.4 PowerShell i `gh --jq`
-
-Windows PowerShell może błędnie interpretować złożone wyrażenia `--jq`.
-
-Zamiast tego używać:
+Windows PowerShell can misinterpret complex `gh --jq` expressions. Prefer:
 
 ```powershell
 $rules = gh api repos/blakinio/otclient/rules/branches/main | ConvertFrom-Json
 ```
 
-Przykład inspekcji:
+Then inspect with native PowerShell objects.
 
-```powershell
-[PSCustomObject]@{
-    rules = @($rules.type)
-    merge_methods = @(
-        ($rules | Where-Object { $_.type -eq 'pull_request' }).parameters.allowed_merge_methods
-    )
-    checks = @(
-        ($rules | Where-Object { $_.type -eq 'required_status_checks' }).parameters.required_status_checks.context
-    )
-} | ConvertTo-Json -Depth 5
-```
+## 9. Truthfulness requirements
 
-### 10.5 `Branch not protected` 404
+Always distinguish:
 
-Polecenie:
+- executed locally;
+- executed in CI;
+- not executed;
+- impossible because of a missing toolchain or environment limitation.
 
-```powershell
-gh api repos/blakinio/otclient/branches/main/protection
-```
+Never state that all tests passed when only Lua, YAML, or CMake JSON checks were run.
 
-zwraca 404, ponieważ klasyczna ochrona została usunięta.
+For protocol changes, verify protocol version, feature flags, opcode on both sides, field order, numeric widths, version gates, C++/Lua agreement, unknown-opcode behavior, and regressions on older protocols.
 
-To jest poprawne.
+Production behavior fixes require a separate PR with a reproducing test, before/after behavior, Canary comparison, and legal observation of the official client's behavior when needed.
 
-Aktywne reguły sprawdzamy przez:
+## 10. Required reading
 
-```powershell
-gh api repos/blakinio/otclient/rules/branches/main
-```
-
-### 10.6 Dynamiczne nazwy checków
-
-Nie dodawaj do Rulesetu nazw takich jak konkretne platformowe joby matrix, jeżeli mogą zostać pominięte.
-
-Jedynym wymaganym statusem ma pozostać:
-
-```text
-CI / Required
-```
-
-### 10.7 Fałszywie zielone CI
-
-Zabronione skróty:
-
-- `continue-on-error` na krytycznych testach,
-- ignorowanie exit code,
-- wyłączanie testów bez uzasadnienia,
-- catch-all, który zawsze zwraca 0,
-- usunięcie testu tylko dlatego, że ujawnia błąd,
-- zmiana testu tak, aby akceptował nieprawidłowe zachowanie.
-
-### 10.8 Fałszywe deklaracje walidacji
-
-Agent ma jasno rozróżniać:
-
-- wykonano lokalnie,
-- wykonano w CI,
-- nie wykonano,
-- nie było możliwe z powodu brakującego toolchainu.
-
-Nie wolno pisać „wszystkie testy przeszły”, jeśli sprawdzono tylko Lua lub parsowanie CMake JSON.
-
----
-
-## 11. Zasady zmian produkcyjnych
-
-Test foundation ma pozostać test-only.
-
-Dalsze zmiany produkcyjne:
-
-- osobny branch,
-- osobny PR,
-- test reprodukujący problem,
-- opis zachowania przed i po,
-- porównanie z Canary,
-- w razie potrzeby porównanie z oficjalnym klientem poprzez legalną obserwację zachowania,
-- brak commitowania proprietary assets lub wycieków.
-
-Przy zmianie protokołu sprawdzić:
-
-- wersję protokołu,
-- feature flags,
-- opcode po obu stronach,
-- kolejność pól,
-- typy i szerokości liczb,
-- warunki wersji klienta,
-- zgodność C++ i Lua,
-- zachowanie przy nieznanym opcode,
-- regresje na starszych protokołach.
-
----
-
-## 12. Dokumenty, które kolejny agent powinien przeczytać
-
-W `main` lub aktualnym branchu:
+On `main` or the active branch:
 
 ```text
 .github/PULL_REQUEST_TEMPLATE.md
@@ -1152,7 +527,7 @@ W `main` lub aktualnym branchu:
 scripts/configure-github-repository.sh
 ```
 
-Na branchu `test/client-test-foundation`:
+On `test/client-test-foundation`:
 
 ```text
 docs/testing-strategy.md
@@ -1161,154 +536,88 @@ tests/
 CMakePresets.json
 ```
 
-Przed edycją workflowów należy przeczytać cały zależny workflow i sposób agregacji `CI / Required`, nie tylko pojedynczy job.
+Read the complete CI dependency chain and `CI / Required` aggregation before editing workflows.
 
----
+## 11. Handoff update format
 
-## 13. Protokół aktualizacji tego pliku
-
-Po każdym większym etapie agent ma dodać wpis do changelogu i zaktualizować snapshot.
-
-Minimalny wpis:
+After each major step, add a changelog entry:
 
 ```markdown
-### YYYY-MM-DD — krótki tytuł
+### YYYY-MM-DD - short title
 
 - Branch:
 - PR:
 - Base SHA:
 - Head SHA:
-- Co zmieniono:
-- Dlaczego:
-- Testy lokalne:
-- Wynik CI:
+- Changes:
+- Reason:
+- Local tests:
+- CI result:
 - Merge SHA:
-- Znane problemy:
-- Następny krok:
+- Known issues:
+- Next step:
 ```
 
-Nie nadpisywać dawnych decyzji bez śladu.
+Preserve historical decisions. When a decision changes, retain the old entry, record the new decision and reason, and update the current-state section.
 
-Gdy decyzja się zmienia:
+## 12. Changelog
 
-1. zachować poprzednią decyzję w changelogu,
-2. opisać nową,
-3. podać powód,
-4. zaktualizować sekcję „aktualny stan”.
+### 2026-07-12 - handoff document created
 
----
+- Recorded project goals, repository roles, governance, CI invariants, ruleset, PR #3 state, operating procedure, known traps, and continuation plan.
 
-## 14. Changelog handoffu
+### 2026-07-12 - PR #3 opened
 
-### 2026-07-12 — utworzenie dokumentu handoff
-
-- Spisano cel projektu.
-- Spisano role repozytoriów.
-- Udokumentowano governance PR #1.
-- Udokumentowano naprawę Lua CI PR #2.
-- Udokumentowano ustawienia repozytorium.
-- Udokumentowano aktywny Ruleset `Protect main`.
-- Potwierdzono brak legacy branch protection.
-- Spisano stan PR #3 test foundation.
-- Spisano procedury dla kolejnych agentów.
-- Spisano znane pułapki i wymagane polecenia weryfikacyjne.
-
-### 2026-07-12 — PR #3 test foundation otwarty
-
-- PR: `https://github.com/blakinio/otclient/pull/3`
 - Branch: `test/client-test-foundation`
 - Base: `main`
-- Scope: unit, integration, contract, Lua i regression foundation.
-- Produkcyjne zachowanie klienta nie powinno być zmieniane.
-- CI było w toku w chwili utworzenia tego dokumentu.
+- Scope: unit, integration, contract, Lua, and regression-test foundation.
+- Production behavior must remain unchanged.
+- CI was still running at the snapshot.
 
-### 2026-07-12 — końcowa poprawka kontekstu kompilacji nowych testów
+### 2026-07-12 - compile-context repair on PR #3
 
-- Commit:
-  - `92d29382e6a87cefb6453ac3b3d7b5224423fd3e`
-- Dodano wymagane `framework/pch.h`.
-- Dodano brakujące typy klienta w testach tile.
-- Cel: naprawić błędy kompilacji wynikające z kontekstu include/PCH.
+- Commit: `92d29382e6a87cefb6453ac3b3d7b5224423fd3e`
+- Added required PCH and missing client-type includes to new tests.
 
-### 2026-07-12 — Ruleset `Protect main`
+### 2026-07-12 - Protect main ruleset finalized
 
-- Włączono nowy Branch Ruleset.
-- Dozwolony tylko squash.
-- Wymagany `CI / Required`.
-- Wymagane rozwiązanie rozmów.
-- Approvals: 0.
-- Wymagany aktualny branch.
-- Blokada deletion i force push.
-- Liniowa historia.
-- Usunięto regułę CodeQL z wymagań.
-- Usunięto starą branch protection rule.
+- One active Branch Ruleset.
+- Squash only.
+- Required `CI / Required`.
+- Up-to-date branch and resolved discussions required.
+- Zero approvals for the sole-maintainer workflow.
+- Deletion and force push blocked.
+- Legacy branch protection and required CodeQL rule removed.
 
-### 2026-07-11 — naprawa runtime-scoped Lua CI
+### 2026-07-11 - Lua CI repair merged
 
-- PR #2 zmergowany.
-- Commit:
-  - `bdd83db12292bb646280372dfdf8ae5cd50e3072`
-- Blokujące sprawdzanie Lua ograniczono do:
-  - `data`,
-  - `modules`,
-  - `mods`.
-- `CI / Required` wróciło do stanu zielonego.
+- PR #2 merged.
+- Commit: `bdd83db12292bb646280372dfdf8ae5cd50e3072`
+- Blocking Lua scan limited to `data`, `modules`, and `mods`.
 
-### 2026-07-11 — repository governance
+### 2026-07-11 - repository governance merged
 
-- PR #1 zmergowany.
-- Commit:
-  - `208c64d336eef7c199fa022daf08d1ee95295575`
-- Dodano zasady repozytorium, CI, Dependabot, szablony, CODEOWNERS i dokumentację.
+- PR #1 merged.
+- Commit: `208c64d336eef7c199fa022daf08d1ee95295575`
+- Added governance, stable CI aggregation, Dependabot, templates, CODEOWNERS, and documentation.
 
----
-
-## 15. Szybki checklist dla nowego agenta
+## 13. New-agent checklist
 
 ```text
-[ ] Przeczytałem cały AGENT_HANDOFF.md.
-[ ] Sprawdziłem git status.
-[ ] Sprawdziłem remote -v.
-[ ] Wykonałem fetch --all --prune.
-[ ] Sprawdziłem aktualny origin/main.
-[ ] Sprawdziłem otwarte PR-y.
-[ ] Potwierdziłem właściwe repo docelowe: blakinio/otclient.
-[ ] Potwierdziłem właściwy branch.
-[ ] Nie pracuję na starej gałęzi governance.
-[ ] Nie zmieniam Rulesetu ani ustawień repo bez polecenia.
-[ ] Nie osłabiam CI.
-[ ] Nie mieszam zmian produkcyjnych z test foundation.
-[ ] Dokumentuję faktycznie wykonane testy.
-[ ] Aktualizuję ten plik przed przekazaniem pracy.
+[ ] Read AGENT_HANDOFF.md.
+[ ] Check git status, remotes, branches, and current origin/main.
+[ ] Fetch and prune.
+[ ] Inspect open PRs and live CI.
+[ ] Confirm target repository is blakinio/otclient.
+[ ] Confirm the correct task branch and base.
+[ ] Do not work from the old governance branch.
+[ ] Do not change rulesets or repository settings without instruction.
+[ ] Do not weaken CI.
+[ ] Do not mix production changes into test foundation.
+[ ] Report only tests actually executed.
+[ ] Update this file before handing work to another agent.
 ```
 
----
+## 14. One-line continuation instruction
 
-## 16. Najważniejsze źródła
-
-Repozytorium robocze:
-
-```text
-https://github.com/blakinio/otclient
-```
-
-Aktualny test foundation PR:
-
-```text
-https://github.com/blakinio/otclient/pull/3
-```
-
-Upstreamy projektu:
-
-```text
-https://github.com/opentibiabr/otclient
-https://github.com/opentibiabr/canary
-https://github.com/opentibiabr/remeres-map-editor
-https://github.com/opentibiabr/client-editor
-```
-
----
-
-## 17. Jednozdaniowe podsumowanie dla kolejnego agenta
-
-Kontynuuj rozwój `blakinio/otclient` z aktualnego `origin/main`, najpierw doprowadź PR #3 `test/client-test-foundation` do pełnego zielonego `CI / Required`, nie osłabiaj Rulesetu ani CI, nie mieszaj zmian produkcyjnych z test infrastructure i zapisuj każdy istotny etap w tym dokumencie.
+Continue from current `origin/main`; first bring PR #3 `test/client-test-foundation` to a fully green `CI / Required`, do not weaken CI or repository protection, keep production behavior changes separate, and record every significant result in this handoff.

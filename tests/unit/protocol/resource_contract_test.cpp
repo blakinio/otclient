@@ -46,10 +46,14 @@ Constants parseResourceTypes(const std::string& source)
 
 Constants parseGameFeatures(const std::string& source)
 {
-    const std::regex assignment(R"((?:^|\n)(Game[A-Za-z0-9_]+)\s*=\s*([0-9]+)\s*(?:\r?\n|$))");
+    const std::regex assignment(R"(^\s*(Game[A-Za-z0-9_]+)\s*=\s*([0-9]+)\s*$)");
     Constants constants;
-    for (std::sregex_iterator it(source.begin(), source.end(), assignment), end; it != end; ++it)
-        constants.emplace((*it)[1].str(), static_cast<uint32_t>(std::stoul((*it)[2].str())));
+    std::istringstream lines(source);
+    for (std::string line; std::getline(lines, line);) {
+        std::smatch match;
+        if (std::regex_match(line, match, assignment))
+            constants.emplace(match[1].str(), static_cast<uint32_t>(std::stoul(match[2].str())));
+    }
     return constants;
 }
 

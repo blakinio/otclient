@@ -56,6 +56,15 @@ public:
 
     void onAppear() override { setRemovedSilently(false); }
     void onDisappear() override { setRemovedSilently(true); }
+    void onPositionChange(const Position&, const Position& oldPosition) override
+    {
+        setOldPositionSilently(oldPosition);
+    }
+    void terminateWalk() override
+    {
+        m_walking = false;
+        m_walkOffset = {};
+    }
 
     ThingType* getThingType() const override { return m_type.get(); }
 

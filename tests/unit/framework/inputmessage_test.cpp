@@ -35,7 +35,10 @@ TEST(InputMessage, ReadsLengthPrefixedStringAndPositionFields)
         .build();
 
     EXPECT_EQ("Redemption", message->getString());
-    const Position position(message->getU16(), message->getU16(), message->getU8());
+    const auto x = message->getU16();
+    const auto y = message->getU16();
+    const auto z = message->getU8();
+    const Position position(x, y, z);
     EXPECT_EQ(0x1234, position.x);
     EXPECT_EQ(0x5678, position.y);
     EXPECT_EQ(7, position.z);

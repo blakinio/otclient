@@ -1,3 +1,5 @@
+#include <framework/pch.h>
+
 #include "input_message_builder.h"
 
 #include <limits>

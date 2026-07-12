@@ -1,3 +1,5 @@
+#include <framework/pch.h>
+
 #include "test_environment.h"
 
 #include <framework/core/resourcemanager.h>

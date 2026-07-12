@@ -1,10 +1,14 @@
+#include <framework/pch.h>
+
 #include <gtest/gtest.h>
 
 #include "support/assertions/tile_assertions.h"
 #include "support/builders/thing_builders.h"
 
 #include <client/const.h>
+#include <client/creature.h>
 #include <client/tile.h>
+#include <client/thingtype.h>
 
 namespace otclient::test {
 

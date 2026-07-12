@@ -1,3 +1,5 @@
+#include <framework/pch.h>
+
 #include <gtest/gtest.h>
 
 #include <client/const.h>

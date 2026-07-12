@@ -1,3 +1,5 @@
+#include <framework/pch.h>
+
 #include <gtest/gtest.h>
 
 #include "support/mocks/fake_game_state.h"

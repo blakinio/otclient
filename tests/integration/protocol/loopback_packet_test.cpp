@@ -1,3 +1,5 @@
+#include <framework/pch.h>
+
 #include <gtest/gtest.h>
 
 #include "support/builders/input_message_builder.h"

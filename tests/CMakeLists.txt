@@ -51,6 +51,10 @@ function(otclient_add_gtest TARGET_NAME)
             FRAMEWORK_XML
     )
 
+    if(WIN32)
+        target_compile_definitions(${TARGET_NAME} PRIVATE NOMINMAX)
+    endif()
+
     if(ASAN_ENABLED)
         if(MSVC)
             target_compile_options(${TARGET_NAME} PRIVATE /fsanitize=address)

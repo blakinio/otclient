@@ -3,6 +3,7 @@
 #include "test_environment.h"
 
 #include <framework/core/resourcemanager.h>
+#include <framework/graphics/texturemanager.h>
 
 #include <stdexcept>
 
@@ -19,11 +20,13 @@ TestEnvironment::TestEnvironment(const std::filesystem::path& resourceRoot)
         g_logger.setLevel(m_previousLogLevel);
         throw std::runtime_error("unable to mount test resource root");
     }
+    g_textures.init();
 }
 
 TestEnvironment::~TestEnvironment()
 {
     reset();
+    g_textures.terminate();
     g_resources.removeSearchPath(m_resourceRoot);
     g_resources.terminate();
     g_logger.setLevel(m_previousLogLevel);

@@ -4,6 +4,7 @@
 
 #include "support/assertions/tile_assertions.h"
 #include "support/builders/thing_builders.h"
+#include "support/test_environment/test_environment.h"
 
 #include <client/const.h>
 #include <client/creature.h>
@@ -11,6 +12,30 @@
 #include <client/thingtype.h>
 
 namespace otclient::test {
+
+namespace {
+
+class TileTestEnvironment final : public testing::Environment
+{
+public:
+    void SetUp() override
+    {
+        m_environment = std::make_unique<TestEnvironment>(std::filesystem::current_path());
+    }
+
+    void TearDown() override
+    {
+        m_environment.reset();
+    }
+
+private:
+    std::unique_ptr<TestEnvironment> m_environment;
+};
+
+[[maybe_unused]] testing::Environment* const g_tileTestEnvironment =
+    testing::AddGlobalTestEnvironment(new TileTestEnvironment);
+
+} // namespace
 
 TEST(ThingTypeBuilder, AppliesOnlyRequestedSyntheticFlags)
 {

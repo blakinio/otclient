@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        buildtype: [linux-debug, linux-release]
+        buildtype: [linux-tests, linux-release]
     runs-on: ubuntu-24.04
     env:
       CC: gcc-14
@@ -107,9 +107,17 @@ jobs:
           buildPreset: ${{ matrix.buildtype }}
           configurePresetAdditionalArgs: "['-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF']"
 
-      - name: Run CTest
-        if: matrix.buildtype == 'linux-debug'
-        run: ctest --test-dir build/${{ matrix.buildtype }} --output-on-failure --no-tests=error --parallel 2
+      - name: Run C++ unit tests
+        if: matrix.buildtype == 'linux-tests'
+        run: ctest --preset linux-tests -L unit -LE lua --parallel 2
+
+      - name: Run Lua tests
+        if: matrix.buildtype == 'linux-tests'
+        run: ctest --preset linux-tests -L lua --parallel 2
+
+      - name: Run integration tests
+        if: matrix.buildtype == 'linux-tests'
+        run: ctest --preset linux-tests -L integration --parallel 2
 
       - name: Upload artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

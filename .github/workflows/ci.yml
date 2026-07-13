@@ -165,7 +165,7 @@ jobs:
     uses: ./.github/workflows/reusable-build-browser.yml
 
   required:
-    name: Required
+    name: CI / Required
     if: always()
     needs:
       - changes

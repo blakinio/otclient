@@ -51,10 +51,10 @@ jobs:
           required_jobs="$(
             gh api --paginate \
               "repos/${REPOSITORY}/actions/runs/${CI_RUN_ID}/jobs?filter=latest&per_page=100" \
-              --jq '.jobs[] | select(.name == "Required" and .conclusion == "success") | .id'
+              --jq '.jobs[] | select(.name == "CI / Required" and .conclusion == "success") | .id'
           )"
           if [[ "$(printf '%s\n' "${required_jobs}" | sed '/^$/d' | wc -l)" -ne 1 ]]; then
-            echo "::error title=Required CI did not pass::The triggering CI run must contain exactly one successful Required job."
+            echo "::error title=Required CI did not pass::The triggering CI run must contain exactly one successful CI / Required job."
             exit 1
           fi
 

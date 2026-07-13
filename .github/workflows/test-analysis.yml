@@ -1,0 +1,129 @@
+name: Test Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Optional test analysis to run
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - coverage
+          - sanitizers
+
+permissions: {}
+
+jobs:
+  coverage:
+    name: Linux coverage
+    if: inputs.mode == 'all' || inputs.mode == 'coverage'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      CC: gcc-14
+      CXX: g++-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install test and coverage dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf autoconf-archive automake gcc-14 g++-14 lcov \
+            libgl1-mesa-dev libglu1-mesa-dev libltdl-dev libtool libtool-bin \
+            libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev \
+            luajit make ninja-build perl pkg-config
+
+      - name: Read vcpkg baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$(python3 -c 'import json; print(json.load(open("vcpkg.json"))["builtin-baseline"])')"
+          echo "VCPKG_GIT_COMMIT_ID=${baseline}" >> "${GITHUB_ENV}"
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2  # v11.6
+        with:
+          vcpkgGitURL: https://github.com/microsoft/vcpkg.git
+          vcpkgGitCommitId: ${{ env.VCPKG_GIT_COMMIT_ID }}
+
+      - name: Configure and build coverage tests
+        run: |
+          cmake --preset linux-coverage-tests -DOPTIONS_ENABLE_IPO=OFF
+          cmake --build --preset linux-coverage-tests --parallel 2
+
+      - name: Run coverage tests
+        run: ctest --preset linux-coverage-tests --parallel 2
+
+      - name: Generate HTML coverage report
+        shell: bash
+        run: |
+          set -euo pipefail
+          lcov --capture --directory build/linux-coverage-tests --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' '*/vcpkg_installed/*' '*/tests/*' --output-file coverage.filtered.info
+          genhtml coverage.filtered.info --output-directory coverage-html
+          {
+            echo '### Linux coverage summary'
+            echo '```text'
+            lcov --summary coverage.filtered.info
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: linux-coverage-html
+          path: coverage-html/
+          if-no-files-found: error
+
+  sanitizers:
+    name: Linux ASAN tests
+    if: inputs.mode == 'all' || inputs.mode == 'sanitizers'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      ASAN_OPTIONS: abort_on_error=1:detect_leaks=1:halt_on_error=1
+      CC: gcc-14
+      CXX: g++-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf autoconf-archive automake gcc-14 g++-14 \
+            libgl1-mesa-dev libglu1-mesa-dev libltdl-dev libtool libtool-bin \
+            libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev \
+            luajit make ninja-build perl pkg-config
+
+      - name: Read vcpkg baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$(python3 -c 'import json; print(json.load(open("vcpkg.json"))["builtin-baseline"])')"
+          echo "VCPKG_GIT_COMMIT_ID=${baseline}" >> "${GITHUB_ENV}"
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2  # v11.6
+        with:
+          vcpkgGitURL: https://github.com/microsoft/vcpkg.git
+          vcpkgGitCommitId: ${{ env.VCPKG_GIT_COMMIT_ID }}
+
+      - name: Configure and build ASAN tests
+        run: |
+          cmake --preset linux-asan-tests -DOPTIONS_ENABLE_IPO=OFF
+          cmake --build --preset linux-asan-tests --parallel 2
+
+      - name: Run ASAN tests
+        run: ctest --preset linux-asan-tests --parallel 2

@@ -91,9 +91,10 @@
       "name": "windows-tests",
       "inherits": "windows-debug",
       "displayName": "Windows - Tests",
-      "description": "Windows debug test build with isolated vcpkg triplet",
+      "description": "Windows debug test build with an isolated vcpkg install tree",
       "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-windows-test-debug",
+        "OTCLIENT_BUILD_CLIENT": "OFF",
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
         "VCPKG_HOST_TRIPLET": "x64-windows",
         "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed/windows-tests",
         "VCPKG_MANIFEST_FEATURES": "tests",
@@ -151,6 +152,41 @@
       }
     },
     {
+      "name": "linux-tests",
+      "inherits": "linux-debug",
+      "displayName": "Linux - Tests",
+      "description": "Linux debug build for deterministic C++ and Lua tests",
+      "binaryDir": "${sourceDir}/build/linux-tests",
+      "cacheVariables": {
+        "OTCLIENT_BUILD_CLIENT": "OFF",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed/linux-tests"
+      }
+    },
+    {
+      "name": "linux-asan-tests",
+      "inherits": "linux-tests",
+      "displayName": "Linux - ASAN Tests",
+      "description": "Linux test build with AddressSanitizer enabled",
+      "binaryDir": "${sourceDir}/build/linux-asan-tests",
+      "cacheVariables": {
+        "ASAN_ENABLED": "ON",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed/linux-asan-tests"
+      }
+    },
+    {
+      "name": "linux-coverage-tests",
+      "inherits": "linux-tests",
+      "displayName": "Linux - Coverage Tests",
+      "description": "Linux test build instrumented for gcov/lcov reporting",
+      "binaryDir": "${sourceDir}/build/linux-coverage-tests",
+      "cacheVariables": {
+        "CMAKE_C_FLAGS": "--coverage -O0 -g",
+        "CMAKE_CXX_FLAGS": "--coverage -O0 -g",
+        "CMAKE_EXE_LINKER_FLAGS": "--coverage",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed/linux-coverage-tests"
+      }
+    },
+    {
       "name": "macos-release",
       "inherits": "base",
       "displayName": "macOS - Release",
@@ -190,6 +226,17 @@
         "VCPKG_MANIFEST_FEATURES": "tests",
         "OTCLIENT_BUILD_TESTS": "ON"
       }
+    },
+    {
+      "name": "macos-tests",
+      "inherits": "macos-debug",
+      "displayName": "macOS - Tests",
+      "description": "macOS debug test build without the client executable",
+      "binaryDir": "${sourceDir}/build/macos-tests",
+      "cacheVariables": {
+        "OTCLIENT_BUILD_CLIENT": "OFF",
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed/macos-tests"
+      }
     }
   ],
   "buildPresets": [
@@ -200,6 +247,18 @@
     {
       "name": "linux-debug",
       "configurePreset": "linux-debug"
+    },
+    {
+      "name": "linux-tests",
+      "configurePreset": "linux-tests"
+    },
+    {
+      "name": "linux-asan-tests",
+      "configurePreset": "linux-asan-tests"
+    },
+    {
+      "name": "linux-coverage-tests",
+      "configurePreset": "linux-coverage-tests"
     },
     {
       "name": "windows-release",
@@ -228,6 +287,10 @@
     {
       "name": "macos-debug",
       "configurePreset": "macos-debug"
+    },
+    {
+      "name": "macos-tests",
+      "configurePreset": "macos-tests"
     }
   ],
   "testPresets": [
@@ -239,6 +302,39 @@
       },
       "execution": {
         "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "linux-tests",
+      "configurePreset": "linux-tests",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 120
+      }
+    },
+    {
+      "name": "linux-asan-tests",
+      "configurePreset": "linux-asan-tests",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 120
+      }
+    },
+    {
+      "name": "linux-coverage-tests",
+      "configurePreset": "linux-coverage-tests",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 120
       }
     },
     {
@@ -269,6 +365,17 @@
       },
       "execution": {
         "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "macos-tests",
+      "configurePreset": "macos-tests",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 120
       }
     }
   ]

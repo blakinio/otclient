@@ -160,6 +160,7 @@ protected:
 
     friend class ProtocolGame;
     friend class Map;
+    friend class GameLifecycleTestAccess;
 
 public:
     // login related

@@ -2,14 +2,25 @@
 
 #include <gtest/gtest.h>
 
-#define private public
-#define protected public
 #include <client/game.h>
-#undef protected
-#undef private
-
 #include <client/protocolgame.h>
 #include <client/protocolgamecallbackguard.h>
+
+class GameLifecycleTestAccess
+{
+public:
+    static void setProtocolGame(Game& game, ProtocolGamePtr protocol) { game.m_protocolGame = std::move(protocol); }
+    static const ProtocolGamePtr& protocolGame(const Game& game) { return game.m_protocolGame; }
+    static void setOnline(Game& game, const bool online) { game.m_online = online; }
+    static bool isOnline(const Game& game) { return game.m_online; }
+
+    static void processDisconnect(Game& game, const ProtocolGamePtr& sourceProtocol) { game.processDisconnect(sourceProtocol); }
+    static void processConnectionError(Game& game, const ProtocolGamePtr& sourceProtocol, const std::error_code& error)
+    {
+        game.processConnectionError(sourceProtocol, error);
+    }
+    static bool processGameEnd(Game& game, const ProtocolGamePtr& sourceProtocol) { return game.processGameEnd(sourceProtocol); }
+};
 
 TEST(ProtocolGameLifecycle, StaleCallbackCannotMutateReplacementSession)
 {
@@ -69,24 +80,24 @@ TEST(ProtocolGameLifecycle, StaleGameDisconnectCannotClearReplacementSession)
     Game game;
     const auto staleProtocol = std::make_shared<ProtocolGame>();
     const auto replacementProtocol = std::make_shared<ProtocolGame>();
-    game.m_protocolGame = replacementProtocol;
-    game.m_online = false;
+    GameLifecycleTestAccess::setProtocolGame(game, replacementProtocol);
+    GameLifecycleTestAccess::setOnline(game, false);
 
-    game.processDisconnect(staleProtocol);
+    GameLifecycleTestAccess::processDisconnect(game, staleProtocol);
 
-    EXPECT_EQ(game.m_protocolGame, replacementProtocol);
+    EXPECT_EQ(GameLifecycleTestAccess::protocolGame(game), replacementProtocol);
 }
 
 TEST(ProtocolGameLifecycle, CurrentGameDisconnectClearsCapturedSession)
 {
     Game game;
     const auto currentProtocol = std::make_shared<ProtocolGame>();
-    game.m_protocolGame = currentProtocol;
-    game.m_online = false;
+    GameLifecycleTestAccess::setProtocolGame(game, currentProtocol);
+    GameLifecycleTestAccess::setOnline(game, false);
 
-    game.processDisconnect(currentProtocol);
+    GameLifecycleTestAccess::processDisconnect(game, currentProtocol);
 
-    EXPECT_FALSE(game.m_protocolGame);
+    EXPECT_FALSE(GameLifecycleTestAccess::protocolGame(game));
 }
 
 TEST(ProtocolGameLifecycle, StaleConnectionErrorCannotClearReplacementSession)
@@ -94,24 +105,24 @@ TEST(ProtocolGameLifecycle, StaleConnectionErrorCannotClearReplacementSession)
     Game game;
     const auto staleProtocol = std::make_shared<ProtocolGame>();
     const auto replacementProtocol = std::make_shared<ProtocolGame>();
-    game.m_protocolGame = replacementProtocol;
-    game.m_online = false;
+    GameLifecycleTestAccess::setProtocolGame(game, replacementProtocol);
+    GameLifecycleTestAccess::setOnline(game, false);
 
-    game.processConnectionError(staleProtocol, asio::error::eof);
+    GameLifecycleTestAccess::processConnectionError(game, staleProtocol, asio::error::eof);
 
-    EXPECT_EQ(game.m_protocolGame, replacementProtocol);
+    EXPECT_EQ(GameLifecycleTestAccess::protocolGame(game), replacementProtocol);
 }
 
 TEST(ProtocolGameLifecycle, CurrentConnectionErrorClearsCapturedSession)
 {
     Game game;
     const auto currentProtocol = std::make_shared<ProtocolGame>();
-    game.m_protocolGame = currentProtocol;
-    game.m_online = false;
+    GameLifecycleTestAccess::setProtocolGame(game, currentProtocol);
+    GameLifecycleTestAccess::setOnline(game, false);
 
-    game.processConnectionError(currentProtocol, asio::error::eof);
+    GameLifecycleTestAccess::processConnectionError(game, currentProtocol, asio::error::eof);
 
-    EXPECT_FALSE(game.m_protocolGame);
+    EXPECT_FALSE(GameLifecycleTestAccess::protocolGame(game));
 }
 
 TEST(ProtocolGameLifecycle, StaleGameEndCannotMutateReplacementState)
@@ -119,14 +130,14 @@ TEST(ProtocolGameLifecycle, StaleGameEndCannotMutateReplacementState)
     Game game;
     const auto staleProtocol = std::make_shared<ProtocolGame>();
     const auto replacementProtocol = std::make_shared<ProtocolGame>();
-    game.m_protocolGame = replacementProtocol;
-    game.m_online = true;
+    GameLifecycleTestAccess::setProtocolGame(game, replacementProtocol);
+    GameLifecycleTestAccess::setOnline(game, true);
 
-    const auto ended = game.processGameEnd(staleProtocol);
+    const auto ended = GameLifecycleTestAccess::processGameEnd(game, staleProtocol);
 
     EXPECT_FALSE(ended);
-    EXPECT_TRUE(game.m_online);
-    EXPECT_EQ(game.m_protocolGame, replacementProtocol);
+    EXPECT_TRUE(GameLifecycleTestAccess::isOnline(game));
+    EXPECT_EQ(GameLifecycleTestAccess::protocolGame(game), replacementProtocol);
 }
 
 TEST(ProtocolGameLifecycle, NullSourceIsIgnored)

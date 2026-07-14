@@ -1,0 +1,23 @@
+diff --git a/src/client/protocolgame.cpp b/src/client/protocolgame.cpp
+index 6d55a88..2dda201 100644
+--- a/src/client/protocolgame.cpp
++++ b/src/client/protocolgame.cpp
+@@ -23,7 +23,6 @@
+ #include "framework/net/inputmessage.h"
+ #include "game.h"
+ #include "protocolgame.h"
+-#include "protocolgamecallbackguard.h"
+ 
+ void ProtocolGame::login(const std::string_view accountName, const std::string_view accountPassword, const std::string_view host, uint16_t port,
+                          const std::string_view characterName, const std::string_view authenticatorToken, const std::string_view sessionKey)
+@@ -85,9 +84,6 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
+ void ProtocolGame::onError(const std::error_code& error)
+ {
+     const auto sourceProtocol = static_self_cast<ProtocolGame>();
+-    (void)otclient::detail::runIfCurrentProtocolGame(sourceProtocol, g_game.getProtocolGame(), [&] {
+-        g_game.processConnectionError(error);
+-    });
+-
++    g_game.processConnectionError(sourceProtocol, error);
+     disconnect();
+ }

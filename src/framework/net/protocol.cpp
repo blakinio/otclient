@@ -433,25 +433,26 @@ void Protocol::onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet
 {
     if (m_disconnected)
         return;
-    auto self(asProtocol());
-    post(g_ioService, [&, packet] {
-        if (m_disconnected)
+
+    const auto self = asProtocol();
+    post(g_ioService, [self, packet] {
+        if (self->m_disconnected)
             return;
-        m_inputMessage->reset();
+        self->m_inputMessage->reset();
 
         // first update message header size
         int headerSize = 2; // 2 bytes for message size
-        if (m_checksumEnabled)
+        if (self->m_checksumEnabled)
             headerSize += 4; // 4 bytes for checksum
         if (g_game.getClientVersion() >= 1405) {
             headerSize += 1; // 1 bytes for padding size
-        } else if (m_xteaEncryptionEnabled) {
+        } else if (self->m_xteaEncryptionEnabled) {
             headerSize += 2; // 2 bytes for XTEA encrypted message size
         }
-        m_inputMessage->setHeaderSize(headerSize);
-        m_inputMessage->fillBuffer(packet->data(), 2);
-        m_inputMessage->readSize();
-        internalRecvData(packet->data() + 2, packet->size() - 2);
+        self->m_inputMessage->setHeaderSize(headerSize);
+        self->m_inputMessage->fillBuffer(packet->data(), 2);
+        self->m_inputMessage->readSize();
+        self->internalRecvData(packet->data() + 2, packet->size() - 2);
     });
 }
 
@@ -459,13 +460,14 @@ void Protocol::onLocalDisconnected(std::error_code ec)
 {
     if (m_disconnected)
         return;
-    auto self(asProtocol());
+
+    const auto self = asProtocol();
 #ifndef __EMSCRIPTEN__
-    post(g_ioService, [&, ec] {
-        if (m_disconnected)
+    post(g_ioService, [self, ec] {
+        if (self->m_disconnected)
             return;
-        m_disconnected = true;
-        onError(ec);
+        self->m_disconnected = true;
+        self->onError(ec);
     });
 #endif
 }
@@ -474,17 +476,18 @@ void Protocol::onPlayerPacket(const std::shared_ptr<std::vector<uint8_t>>& packe
 {
     if (m_disconnected)
         return;
-    auto self(asProtocol());
-#ifndef __EMSCRIPTEN__
-    post(g_ioService, [&, packet] {
-        if (m_disconnected)
-            return;
-        m_inputMessage->reset();
 
-        m_inputMessage->setHeaderSize(0);
-        m_inputMessage->fillBuffer(packet->data(), packet->size());
-        m_inputMessage->setMessageSize(packet->size());
-        onRecv(m_inputMessage);
+    const auto self = asProtocol();
+#ifndef __EMSCRIPTEN__
+    post(g_ioService, [self, packet] {
+        if (self->m_disconnected)
+            return;
+        self->m_inputMessage->reset();
+
+        self->m_inputMessage->setHeaderSize(0);
+        self->m_inputMessage->fillBuffer(packet->data(), packet->size());
+        self->m_inputMessage->setMessageSize(packet->size());
+        self->onRecv(self->m_inputMessage);
     });
 #endif
 }

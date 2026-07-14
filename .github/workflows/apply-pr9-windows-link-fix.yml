@@ -1,0 +1,201 @@
+name: Apply PR 9 Windows Link Fix
+
+on:
+  push:
+    branches: [fix/protocol-game-session-reentrancy]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          ref: fix/protocol-game-session-reentrancy
+          fetch-depth: 0
+
+      - name: Replace macro access with a friend test seam
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          header = Path('src/client/game.h')
+          text = header.read_text()
+          old = '    friend class ProtocolGame;\n    friend class Map;\n'
+          new = '    friend class ProtocolGame;\n    friend class Map;\n    friend class GameLifecycleTestAccess;\n'
+          if old not in text:
+              raise SystemExit('Game friend block not found')
+          header.write_text(text.replace(old, new, 1))
+
+          test = Path('tests/unit/protocol/protocol_game_lifecycle_test.cpp')
+          test.write_text(r'''#include <framework/global.h>
+
+#include <gtest/gtest.h>
+
+#include <client/game.h>
+#include <client/protocolgame.h>
+#include <client/protocolgamecallbackguard.h>
+
+class GameLifecycleTestAccess
+{
+public:
+    static void setProtocolGame(Game& game, ProtocolGamePtr protocol) { game.m_protocolGame = std::move(protocol); }
+    static const ProtocolGamePtr& protocolGame(const Game& game) { return game.m_protocolGame; }
+    static void setOnline(Game& game, const bool online) { game.m_online = online; }
+    static bool isOnline(const Game& game) { return game.m_online; }
+
+    static void processDisconnect(Game& game, const ProtocolGamePtr& sourceProtocol) { game.processDisconnect(sourceProtocol); }
+    static void processConnectionError(Game& game, const ProtocolGamePtr& sourceProtocol, const std::error_code& error)
+    {
+        game.processConnectionError(sourceProtocol, error);
+    }
+    static bool processGameEnd(Game& game, const ProtocolGamePtr& sourceProtocol) { return game.processGameEnd(sourceProtocol); }
+};
+
+TEST(ProtocolGameLifecycle, StaleCallbackCannotMutateReplacementSession)
+{
+    const auto firstProtocol = std::make_shared<ProtocolGame>();
+    const auto secondProtocol = std::make_shared<ProtocolGame>();
+    ProtocolGamePtr currentProtocol = secondProtocol;
+    bool callbackInvoked = false;
+
+    const auto staleHandled = otclient::detail::runIfCurrentProtocolGame(firstProtocol, currentProtocol, [&] {
+        callbackInvoked = true;
+        currentProtocol.reset();
+    });
+
+    EXPECT_FALSE(staleHandled);
+    EXPECT_FALSE(callbackInvoked);
+    EXPECT_EQ(currentProtocol, secondProtocol);
+}
+
+TEST(ProtocolGameLifecycle, CallbackReplacementIsDetectedAfterReentrantBoundary)
+{
+    const auto firstProtocol = std::make_shared<ProtocolGame>();
+    const auto secondProtocol = std::make_shared<ProtocolGame>();
+    ProtocolGamePtr currentProtocol = firstProtocol;
+    bool callbackInvoked = false;
+
+    const auto remainedCurrent = otclient::detail::runWhileCurrentProtocolGame(
+        firstProtocol,
+        [&] { return currentProtocol; },
+        [&] {
+            callbackInvoked = true;
+            currentProtocol = secondProtocol;
+        });
+
+    EXPECT_FALSE(remainedCurrent);
+    EXPECT_TRUE(callbackInvoked);
+    EXPECT_EQ(currentProtocol, secondProtocol);
+}
+
+TEST(ProtocolGameLifecycle, CurrentCallbackWithoutReplacementRemainsCurrent)
+{
+    const auto current = std::make_shared<ProtocolGame>();
+    ProtocolGamePtr currentProtocol = current;
+    int callbackCount = 0;
+
+    const auto remainedCurrent = otclient::detail::runWhileCurrentProtocolGame(
+        current,
+        [&] { return currentProtocol; },
+        [&] { ++callbackCount; });
+
+    EXPECT_TRUE(remainedCurrent);
+    EXPECT_EQ(callbackCount, 1);
+    EXPECT_EQ(currentProtocol, current);
+}
+
+TEST(ProtocolGameLifecycle, StaleGameDisconnectCannotClearReplacementSession)
+{
+    Game game;
+    const auto staleProtocol = std::make_shared<ProtocolGame>();
+    const auto replacementProtocol = std::make_shared<ProtocolGame>();
+    GameLifecycleTestAccess::setProtocolGame(game, replacementProtocol);
+    GameLifecycleTestAccess::setOnline(game, false);
+
+    GameLifecycleTestAccess::processDisconnect(game, staleProtocol);
+
+    EXPECT_EQ(GameLifecycleTestAccess::protocolGame(game), replacementProtocol);
+}
+
+TEST(ProtocolGameLifecycle, CurrentGameDisconnectClearsCapturedSession)
+{
+    Game game;
+    const auto currentProtocol = std::make_shared<ProtocolGame>();
+    GameLifecycleTestAccess::setProtocolGame(game, currentProtocol);
+    GameLifecycleTestAccess::setOnline(game, false);
+
+    GameLifecycleTestAccess::processDisconnect(game, currentProtocol);
+
+    EXPECT_FALSE(GameLifecycleTestAccess::protocolGame(game));
+}
+
+TEST(ProtocolGameLifecycle, StaleConnectionErrorCannotClearReplacementSession)
+{
+    Game game;
+    const auto staleProtocol = std::make_shared<ProtocolGame>();
+    const auto replacementProtocol = std::make_shared<ProtocolGame>();
+    GameLifecycleTestAccess::setProtocolGame(game, replacementProtocol);
+    GameLifecycleTestAccess::setOnline(game, false);
+
+    GameLifecycleTestAccess::processConnectionError(game, staleProtocol, asio::error::eof);
+
+    EXPECT_EQ(GameLifecycleTestAccess::protocolGame(game), replacementProtocol);
+}
+
+TEST(ProtocolGameLifecycle, CurrentConnectionErrorClearsCapturedSession)
+{
+    Game game;
+    const auto currentProtocol = std::make_shared<ProtocolGame>();
+    GameLifecycleTestAccess::setProtocolGame(game, currentProtocol);
+    GameLifecycleTestAccess::setOnline(game, false);
+
+    GameLifecycleTestAccess::processConnectionError(game, currentProtocol, asio::error::eof);
+
+    EXPECT_FALSE(GameLifecycleTestAccess::protocolGame(game));
+}
+
+TEST(ProtocolGameLifecycle, StaleGameEndCannotMutateReplacementState)
+{
+    Game game;
+    const auto staleProtocol = std::make_shared<ProtocolGame>();
+    const auto replacementProtocol = std::make_shared<ProtocolGame>();
+    GameLifecycleTestAccess::setProtocolGame(game, replacementProtocol);
+    GameLifecycleTestAccess::setOnline(game, true);
+
+    const auto ended = GameLifecycleTestAccess::processGameEnd(game, staleProtocol);
+
+    EXPECT_FALSE(ended);
+    EXPECT_TRUE(GameLifecycleTestAccess::isOnline(game));
+    EXPECT_EQ(GameLifecycleTestAccess::protocolGame(game), replacementProtocol);
+}
+
+TEST(ProtocolGameLifecycle, NullSourceIsIgnored)
+{
+    const auto currentProtocol = std::make_shared<ProtocolGame>();
+    ProtocolGamePtr sourceProtocol;
+    bool callbackInvoked = false;
+
+    const auto handled = otclient::detail::runIfCurrentProtocolGame(sourceProtocol, currentProtocol, [&] {
+        callbackInvoked = true;
+    });
+
+    EXPECT_FALSE(handled);
+    EXPECT_FALSE(callbackInvoked);
+}
+''')
+          PY
+
+          rm -f .github/workflows/apply-pr9-windows-link-fix.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "test(protocol): use a portable game lifecycle access seam"
+          git push origin HEAD:fix/protocol-game-session-reentrancy

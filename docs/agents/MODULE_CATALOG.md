@@ -23,7 +23,7 @@ Update this file in the same PR that adds/changes a reusable module, controller,
 
 | Module/tool | Status | Responsibility/public surface | Source/docs | Reuse notes |
 |---|---|---|---|---|
-| Client test foundation | active PR #3 | Deterministic C++ builders/assertions/fakes/environment, OTML fixtures, protocol loopback, Lua runner/contracts | `tests/support/**`, `tests/unit/**`, `tests/integration/**`, `tests/lua/**`, testing docs | Reuse support, labels, fixtures, and presets; do not create a second harness. |
+| Client test foundation | active PR #3 | Deterministic C++ builders/assertions/fakes/environment, OTML fixtures, protocol loopback, Lua runner/contracts | `tests/support/**`, `tests/unit/**`, `tests/integration/**`, `tests/lua/**`, `tests/fixtures/**`, testing docs | Reuse support, labels, fixtures, and presets; do not create a second harness. |
 | InputMessageBuilder | active #3 | Deterministic framed parser inputs | `tests/support/builders/input_message_builder.{h,cpp}` | Reuse for parser/protocol tests. |
 | OutputMessageInspector | active #3 | Inspects encoded output bytes in tests | `tests/support/builders/output_message_inspector.h` | Reuse instead of ad hoc internals. |
 | Thing/Tile builders/assertions | active #3 | Synthetic things/items/creatures and tile assertions | `tests/support/builders/thing_builders.*`, `tests/support/assertions/tile_assertions.h` | Reuse for map/tile/module tests. |

@@ -1,0 +1,27 @@
+diff --git a/src/client/game.h b/src/client/game.h
+index f8fb1fa..f458e58 100644
+--- a/src/client/game.h
++++ b/src/client/game.h
+@@ -37,10 +37,11 @@ public:
+ 
+ private:
+     void resetGameStates();
++    [[nodiscard]] bool resetGameStates(const ProtocolGamePtr& sourceProtocol);
+ 
+ protected:
+-    void processConnectionError(const std::error_code& ec);
+-    void processDisconnect();
++    void processConnectionError(const ProtocolGamePtr& sourceProtocol, const std::error_code& ec);
++    void processDisconnect(const ProtocolGamePtr& sourceProtocol);
+     void processPing();
+     void processPingBack();
+ 
+@@ -54,7 +55,7 @@ protected:
+     void processEnterGame();
+ 
+     void processGameStart();
+-    void processGameEnd();
++    [[nodiscard]] bool processGameEnd(const ProtocolGamePtr& sourceProtocol);
+     void processDeath(uint8_t deathType, uint8_t penality);
+ 
+     void processGMActions(const std::vector<uint8_t>& actions);

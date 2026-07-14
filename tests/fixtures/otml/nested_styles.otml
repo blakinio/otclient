@@ -1,0 +1,9 @@
+# Comments and empty values are deliberately part of this parser fixture.
+&accent: #33AAFF
+
+BasePanel < UIWidget
+  width: 120
+  empty-value:
+  Header < UIWidget
+    color: $accent
+    title: Redemption

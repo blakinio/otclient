@@ -74,7 +74,7 @@ jobs:
             # shellcheck disable=SC2016
             unexpected_jobs="$(
               gh api --paginate "${jobs_endpoint}" \
-                --jq '.jobs[] | .conclusion as $conclusion | select(((["success", "skipped", "neutral", "startup_failure"] | index($conclusion)) == null) and (.name != "Required" or $conclusion != "failure")) | "\(.name)=\(.conclusion)"'
+                --jq '.jobs[] | .conclusion as $conclusion | select(((["success", "skipped", "neutral", "startup_failure"] | index($conclusion)) == null) and (.name != "CI / Required" or $conclusion != "failure")) | "\(.name)=\(.conclusion)"'
             )"
 
             if [[ -z "${startup_jobs}" || -n "${unexpected_jobs}" ]]; then

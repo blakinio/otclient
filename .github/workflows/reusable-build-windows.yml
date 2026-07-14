@@ -16,7 +16,16 @@ jobs:
         include:
           - name: CMake Release
             type: CMake
+            preset: windows-release
+            run_tests: false
+            upload: true
             artifact: windows-cmake-release
+          - name: CMake Tests
+            type: CMake
+            preset: windows-tests
+            run_tests: true
+            upload: false
+            artifact: windows-cmake-tests
           - name: Solution Debug
             type: Solution
             configuration: Debug
@@ -121,7 +130,7 @@ jobs:
         with:
           max-size: "1G"
           variant: "sccache"
-          key: ccache-windows-release
+          key: ccache-windows-${{ matrix.preset }}
           restore-keys: |
             ccache-windows
 
@@ -158,16 +167,21 @@ jobs:
         if: matrix.type == 'CMake'
         uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956  # v10.9
         with:
-          configurePreset: windows-release
-          buildPreset: windows-release
-          configurePresetAdditionalArgs: "['-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF', '-DOTCLIENT_BUILD_TESTS=OFF']"
+          configurePreset: ${{ matrix.preset }}
+          buildPreset: ${{ matrix.preset }}
+          configurePresetAdditionalArgs: "['-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF']"
+
+      - name: Run CTest
+        if: matrix.type == 'CMake' && matrix.run_tests
+        shell: pwsh
+        run: ctest --preset ${{ matrix.preset }} --parallel 2
 
       - name: Upload artifacts (CMake)
-        if: matrix.type == 'CMake'
+        if: matrix.type == 'CMake' && matrix.upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: ${{ matrix.artifact }}
-          path: build/windows-release/bin/
+          path: build/${{ matrix.preset }}/bin/
 
       - name: Build project (MSBuild solution)
         if: matrix.type == 'Solution'

@@ -121,56 +121,58 @@ bool Protocol::isConnecting()
 
 void Protocol::send(const OutputMessagePtr& outputMessage, bool raw)
 {
-    if (m_player) {
-        m_player->onOutputPacket(outputMessage);
-        return;
-    }
-
-    if (m_recorder) {
-        m_recorder->addOutputPacket(outputMessage);
-    }
-
-    if (!raw) {
-        // padding
-        if (g_game.getClientVersion() >= 1405) {
-            outputMessage->writePaddingAmount();
+    m_sendSerializer.serialize([&] {
+        if (m_player) {
+            m_player->onOutputPacket(outputMessage);
+            return;
         }
 
-        // encrypt
-        if (m_xteaEncryptionEnabled) {
-            xteaEncrypt(outputMessage);
+        if (m_recorder) {
+            m_recorder->addOutputPacket(outputMessage);
         }
 
-        // write checksum
-        if (m_sequencedPackets) {
-            outputMessage->writeSequence(m_packetNumber++);
-        } else if (m_checksumEnabled) {
-            outputMessage->writeChecksum();
+        if (!raw) {
+            // padding
+            if (g_game.getClientVersion() >= 1405) {
+                outputMessage->writePaddingAmount();
+            }
+
+            // encrypt
+            if (m_xteaEncryptionEnabled) {
+                xteaEncrypt(outputMessage);
+            }
+
+            // write checksum
+            if (m_sequencedPackets) {
+                outputMessage->writeSequence(m_packetNumber++);
+            } else if (m_checksumEnabled) {
+                outputMessage->writeChecksum();
+            }
+
+            // write message size
+            if (g_game.getClientVersion() >= 1405) {
+                outputMessage->writeHeaderSize();
+            } else {
+                outputMessage->writeMessageSize();
+            }
         }
 
-        // write message size
-        if (g_game.getClientVersion() >= 1405) {
-            outputMessage->writeHeaderSize();
-        } else {
-            outputMessage->writeMessageSize();
+        onSend();
+
+        if (m_proxy) {
+            const auto packet = std::make_shared<ProxyPacket>(outputMessage->getHeaderBuffer(), outputMessage->getWriteBuffer());
+            g_proxy.send(m_proxy, packet);
+            outputMessage->reset();
+            return;
         }
-    }
 
-    onSend();
+        // send
+        if (m_connection)
+            m_connection->write(outputMessage->getHeaderBuffer(), outputMessage->getMessageSize());
 
-    if (m_proxy) {
-        const auto packet = std::make_shared<ProxyPacket>(outputMessage->getHeaderBuffer(), outputMessage->getWriteBuffer());
-        g_proxy.send(m_proxy, packet);
+        // reset message to allow reuse
         outputMessage->reset();
-        return;
-    }
-
-    // send
-    if (m_connection)
-        m_connection->write(outputMessage->getHeaderBuffer(), outputMessage->getMessageSize());
-
-    // reset message to allow reuse
-    outputMessage->reset();
+    });
 }
 
 void Protocol::recv()
@@ -417,7 +419,6 @@ void Protocol::onConnect() {
     }
     callLuaField("onConnect"); 
 }
-
 void Protocol::onRecv(const InputMessagePtr& inputMessage)
 {
     callLuaField("onRecv", inputMessage);

@@ -1,5 +1,6 @@
 otclient_add_gtest(otclient_protocol_contract_tests
     SOURCES
+        protocol_game_lifecycle_test.cpp
         resource_contract_test.cpp
     LABELS
         unit

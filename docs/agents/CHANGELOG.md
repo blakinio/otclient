@@ -9,6 +9,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 - Deferred proxy and packet-player callbacks now retain explicit shared protocol ownership instead of asynchronously capturing raw `this`.
 - Game connection-error, game-end and explicit logout paths now retain the exact source `ProtocolGame` through cleanup and revalidate identity after Lua-reentrant boundaries, so an obsolete session cannot disconnect its replacement.
 - Deterministic game-lifecycle regression tests use a dedicated friend access seam instead of preprocessor access remapping, preserving MSVC link compatibility.
+- Outbound protocol sends now serialize recording, framing, client sequence allocation and transport enqueue per protocol instance, preventing duplicate/gapped or wire-reordered sequenced packets when messages are emitted concurrently.
 
 ## 2026-07-12 bootstrap inventory
 

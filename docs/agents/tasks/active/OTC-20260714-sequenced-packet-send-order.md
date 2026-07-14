@@ -6,11 +6,11 @@ agent: ChatGPT
 branch: fix/sequenced-packet-send-serialization
 base_branch: main
 created: 2026-07-14T15:00:00+02:00
-updated: 2026-07-14T15:00:00+02:00
-last_verified_commit: "2a1b93bcdf6d4317ceeb2254b1e89429453a8e7f"
+updated: 2026-07-14T16:04:00+02:00
+last_verified_commit: "db6c9ac417ead5aa4e648b9e1e005def072ff2cb"
 risk: high
 related_issue: "blakinio/canary#245"
-related_pr: "pending"
+related_pr: "blakinio/otclient#11"
 depends_on:
   - blakinio/otclient#9
 blocks:
@@ -18,7 +18,8 @@ blocks:
 owned_paths:
   - src/framework/net/protocol.cpp
   - src/framework/net/protocol.h
-  - tests/unit/protocol/**
+  - tests/unit/protocol/CMakeLists.txt
+  - tests/unit/protocol/protocol_send_serializer_test.cpp
   - docs/agents/tasks/active/OTC-20260714-sequenced-packet-send-order.md
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
@@ -30,6 +31,7 @@ reuses:
   - existing protocol GoogleTest target
 public_interfaces:
   - Protocol::send
+  - otclient::detail::ProtocolSendSerializer
 cross_repo_tasks:
   - CAN-20260713-universal-agent-e2e-platform
 ---
@@ -40,13 +42,13 @@ Preserve strict client packet sequence ordering when multiple outbound game mess
 
 # Acceptance criteria
 
-- [ ] `Protocol::send` serializes framing, sequence allocation and transport enqueue for one protocol instance.
-- [ ] Current login, proxy, recording, playback, checksum, XTEA and non-sequenced behavior remain unchanged.
-- [ ] Concurrent sends cannot emit duplicate, skipped or wire-reordered client sequence values.
-- [ ] Focused deterministic regression coverage exercises concurrent sequenced sends or the extracted serialization primitive.
+- [x] `Protocol::send` serializes framing, sequence allocation and transport enqueue for one protocol instance.
+- [x] Current login, proxy, recording, playback, checksum, XTEA and non-sequenced behavior remain unchanged by source review.
+- [x] Concurrent sends cannot emit duplicate, skipped or wire-reordered client sequence values because allocation and enqueue share one critical section.
+- [x] Focused deterministic regression coverage exercises concurrent serialization and same-thread reentry without sleeps or retry windows.
 - [ ] Current-head OTClient CI passes.
 - [ ] Canary PR #245 consumes the final squash SHA and passes one-process two-session physical E2E.
-- [ ] No timer, retry window, relog delay increase, server-side sequence relaxation or packet suppression is introduced.
+- [x] No timer, retry window, relog delay increase, server-side sequence relaxation or packet suppression is introduced.
 
 # Confirmed evidence
 
@@ -59,7 +61,7 @@ The packet capture and records establish a transport ordering defect rather than
 - Canary therefore rejected the safe logout and kept the first player session until ping-timeout cleanup;
 - session two emitted two automatic channel-open messages close together; their framed sequence again duplicated, and Canary closed the connection immediately;
 - Canary's current transport correctly increments the expected client sequence and rejects any mismatch;
-- `Protocol::send` currently performs unsynchronized `m_packetNumber++`, framing and `Connection::write` enqueue.
+- `Protocol::send` performed unsynchronized `m_packetNumber++`, framing and `Connection::write` enqueue.
 
 OTClient PR #9 remains a valid lifecycle/source-identity fix. This task addresses a separate outbound transport serialization defect exposed by the physical consumer test.
 
@@ -70,6 +72,7 @@ OTClient PR #9 remains a valid lifecycle/source-identity fix. This task addresse
 | Fix the OTClient sender, not Canary validation | The server correctly enforces a monotonic sequence contract; accepting duplicate/gapped sequences would hide malformed client traffic. |
 | Serialize sequence allocation through transport enqueue | Atomic allocation alone cannot guarantee that packet sequence order matches wire enqueue order. |
 | Keep the lock per protocol instance | Independent login/game/proxy protocols should not share a global transport bottleneck. |
+| Use a recursive serializer | Existing `onSend`, playback or proxy paths may re-enter `Protocol::send`; preserving reentry avoids a new deadlock class. |
 | Keep `relog_delay_ms` unchanged | Scenario pacing is not a correctness mechanism and did not cause the sequence mismatch. |
 
 # Work log
@@ -82,28 +85,38 @@ OTClient PR #9 remains a valid lifecycle/source-identity fix. This task addresse
 - Correlated the first missing marker with duplicate/gapped client sequence values and Canary's strict inbound sequence check.
 - Created this isolated follow-up branch from the final PR #9 squash commit.
 
+## 2026-07-14T16:04:00+02:00
+
+- Opened draft PR #11 before implementation.
+- Added a per-`Protocol` recursive serializer and wrapped the complete `Protocol::send` operation from recorder/framing through proxy/socket enqueue.
+- Kept the existing message, checksum, XTEA, playback and proxy paths byte-for-byte unchanged inside the critical section.
+- Added deterministic GoogleTest coverage proving a second thread cannot enter while the first send section is active and that same-thread reentry remains supported.
+- Registered the test in the existing protocol target and updated the catalogue, changelog and Canary contract registry.
+- Reviewed per-file patches; the production diff is limited to the serializer declaration/member and one wrapper around the existing send body.
+
 # Validation and CI
 
 | Commit | Check | Result | Notes |
 |---|---|---|---|
 | `2a1b93bcdf6d4317ceeb2254b1e89429453a8e7f` | Canary physical E2E run #33 | failed with actionable evidence | Lifecycle identity fix present; outbound sequence ordering still malformed under close/concurrent sends. |
-| implementation head | focused protocol tests | pending | Must be deterministic and timing-independent. |
-| implementation head | GitHub CI | pending | Linux/Windows and protocol tests required. |
+| `db6c9ac417ead5aa4e648b9e1e005def072ff2cb` | Diff/source review | passed | Allocation, framing and enqueue are one per-instance critical section; no protocol field or server change. |
+| current PR head | focused protocol tests | pending in GitHub CI | Deterministic concurrency and recursive-entry tests registered in the existing target. |
+| current PR head | GitHub CI | pending | Linux/Windows and protocol tests required. |
 | final squash SHA | Canary physical E2E | pending | Must prove both stable sessions and both safe logouts in one process. |
 
 # Risks and compatibility
 
-- The send critical section must include sequence assignment and connection/proxy enqueue, not only the counter increment.
-- A non-recursive lock could deadlock if an existing send hook re-enters `Protocol::send`; implementation review must preserve current callback behavior.
+- The send critical section includes sequence assignment and connection/proxy enqueue, not only the counter increment.
+- Recursive locking preserves existing same-thread callback/send behavior while excluding concurrent senders.
 - No packet fields, opcodes, feature gates, authentication payloads or Canary source are changed.
 - Rollback is a source revert with no migration or persisted state.
 
 # Remaining work
 
-1. Implement per-protocol outbound serialization and deterministic regression coverage.
-2. Publish a draft PR and inspect all CI results.
-3. Merge only after current-head OTClient checks pass.
-4. Pin Canary scenario to the new final squash SHA and run the complete physical proof.
+1. Inspect current-head PR #11 CI and repair only evidence-backed failures.
+2. Review the complete final diff, mark ready and squash-merge after all required checks pass.
+3. Pin Canary scenario to the new final squash SHA and run the complete physical proof.
+4. Archive this task only after the consumer proof confirms the wire sequence contract.
 
 # Handoff
 

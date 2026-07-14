@@ -1,6 +1,6 @@
 # Canary ↔ OTClient Contract Registry
 
-Last reviewed: 2026-07-12
+Last reviewed: 2026-07-14
 
 Copy durable contract changes to both repositories. Task-specific details belong in task records.
 
@@ -33,6 +33,6 @@ Copy durable contract changes to both repositories. Task-specific details belong
 
 | Coordination ID | Canary PR/commit | OTClient PR/commit | Protocol | Rollout | Status | Last verified |
 |---|---|---|---:|---|---|---|
-| _none recorded_ | | | | | unverified | |
+| `OTS-20260714-protocol-session-lifecycle` | `blakinio/canary#245` physical two-session consumer proof | `blakinio/otclient#9` (supersedes merged #7) | unchanged | client-first-safe | OTClient implementation pending final CI/merge; Canary E2E must consume final squash SHA | OTClient PR #9 / Canary PR #245 |
 
 Rollout values: `server-first-safe`, `client-first-safe`, `backward-compatible`, `atomic-required`, `breaking-migration`, `unverified`.

@@ -33,6 +33,7 @@ Copy durable contract changes to both repositories. Task-specific details belong
 
 | Coordination ID | Canary PR/commit | OTClient PR/commit | Protocol | Rollout | Status | Last verified |
 |---|---|---|---:|---|---|---|
-| `OTS-20260714-protocol-session-lifecycle` | `blakinio/canary#245` physical two-session consumer proof | `blakinio/otclient#9` (supersedes merged #7) | unchanged | client-first-safe | OTClient implementation pending final CI/merge; Canary E2E must consume final squash SHA | OTClient PR #9 / Canary PR #245 |
+| `OTS-20260714-protocol-session-lifecycle` | `blakinio/canary#245` physical two-session consumer proof | `blakinio/otclient#9`, squash `2a1b93bcdf6d4317ceeb2254b1e89429453a8e7f` (supersedes #7) | unchanged | client-first-safe | lifecycle/source-identity fix merged; Canary run #33 exposed a separate outbound sequence-order defect | OTClient PR #9 / Canary run #33 |
+| `OTS-20260714-sequenced-packet-send-order` | `blakinio/canary#245`; strict monotonic client-sequence validation and one-process two-session E2E | `blakinio/otclient#11` | current sequenced game transport; no opcode/payload change | client-first-safe | OTClient implementation and CI pending; Canary must consume final squash SHA before physical proof | Canary run #33 / OTClient PR #11 |
 
 Rollout values: `server-first-safe`, `client-first-safe`, `backward-compatible`, `atomic-required`, `breaking-migration`, `unverified`.

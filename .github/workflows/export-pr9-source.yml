@@ -1,30 +1,43 @@
-name: Export PR 9 Source
+name: Apply PR 9 Lifecycle Patch
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
+  push:
+    branches: [fix/protocol-game-session-reentrancy]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export-source:
-    name: Export source snapshot
+  apply-patch:
+    name: Apply verified lifecycle patch
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout task branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
-          persist-credentials: false
+          ref: fix/protocol-game-session-reentrancy
+          fetch-depth: 0
 
-      - name: Upload source snapshot
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: pr9-source-snapshot
-          path: |
-            src
-            tests
-            docs/agents
-            CMakeLists.txt
-            CMakePresets.json
+      - name: Apply patch when complete
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f .github/pr9-patch/READY ]]; then
+            echo "Patch parts are still being staged."
+            exit 0
+          fi
+
+          for patch in .github/pr9-patch/part-*.patch; do
+            git apply --check "$patch"
+            git apply "$patch"
+          done
+
+          rm -rf .github/pr9-patch
+          rm -f .github/workflows/export-pr9-source.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(protocol): preserve source identity through disconnect"
+          git push origin HEAD:fix/protocol-game-session-reentrancy

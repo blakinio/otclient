@@ -1,0 +1,148 @@
+diff --git a/tests/unit/protocol/protocol_game_lifecycle_test.cpp b/tests/unit/protocol/protocol_game_lifecycle_test.cpp
+index 13032ac..36da171 100644
+--- a/tests/unit/protocol/protocol_game_lifecycle_test.cpp
++++ b/tests/unit/protocol/protocol_game_lifecycle_test.cpp
+@@ -2,6 +2,12 @@
+ 
+ #include <gtest/gtest.h>
+ 
++#define private public
++#define protected public
++#include <client/game.h>
++#undef protected
++#undef private
++
+ #include <client/protocolgame.h>
+ #include <client/protocolgamecallbackguard.h>
+ 
+@@ -9,11 +15,9 @@ TEST(ProtocolGameLifecycle, StaleCallbackCannotMutateReplacementSession)
+ {
+     const auto firstProtocol = std::make_shared<ProtocolGame>();
+     const auto secondProtocol = std::make_shared<ProtocolGame>();
+-    ProtocolGamePtr currentProtocol = firstProtocol;
++    ProtocolGamePtr currentProtocol = secondProtocol;
+     bool callbackInvoked = false;
+ 
+-    currentProtocol = secondProtocol;
+-
+     const auto staleHandled = otclient::detail::runIfCurrentProtocolGame(firstProtocol, currentProtocol, [&] {
+         callbackInvoked = true;
+         currentProtocol.reset();
+@@ -24,27 +28,105 @@ TEST(ProtocolGameLifecycle, StaleCallbackCannotMutateReplacementSession)
+     EXPECT_EQ(currentProtocol, secondProtocol);
+ }
+ 
+-TEST(ProtocolGameLifecycle, CurrentCallbackStillRunsAndDuplicateBecomesStale)
++TEST(ProtocolGameLifecycle, CallbackReplacementIsDetectedAfterReentrantBoundary)
++{
++    const auto firstProtocol = std::make_shared<ProtocolGame>();
++    const auto secondProtocol = std::make_shared<ProtocolGame>();
++    ProtocolGamePtr currentProtocol = firstProtocol;
++    bool callbackInvoked = false;
++
++    const auto remainedCurrent = otclient::detail::runWhileCurrentProtocolGame(
++        firstProtocol,
++        [&] { return currentProtocol; },
++        [&] {
++            callbackInvoked = true;
++            currentProtocol = secondProtocol;
++        });
++
++    EXPECT_FALSE(remainedCurrent);
++    EXPECT_TRUE(callbackInvoked);
++    EXPECT_EQ(currentProtocol, secondProtocol);
++}
++
++TEST(ProtocolGameLifecycle, CurrentCallbackWithoutReplacementRemainsCurrent)
+ {
+     const auto current = std::make_shared<ProtocolGame>();
+     ProtocolGamePtr currentProtocol = current;
+     int callbackCount = 0;
+ 
+-    const auto currentHandled = otclient::detail::runIfCurrentProtocolGame(current, currentProtocol, [&] {
+-        ++callbackCount;
+-        currentProtocol.reset();
+-    });
++    const auto remainedCurrent = otclient::detail::runWhileCurrentProtocolGame(
++        current,
++        [&] { return currentProtocol; },
++        [&] { ++callbackCount; });
+ 
+-    EXPECT_TRUE(currentHandled);
++    EXPECT_TRUE(remainedCurrent);
+     EXPECT_EQ(callbackCount, 1);
+-    EXPECT_FALSE(currentProtocol);
++    EXPECT_EQ(currentProtocol, current);
++}
+ 
+-    const auto duplicateHandled = otclient::detail::runIfCurrentProtocolGame(current, currentProtocol, [&] {
+-        ++callbackCount;
+-    });
++TEST(ProtocolGameLifecycle, StaleGameDisconnectCannotClearReplacementSession)
++{
++    Game game;
++    const auto staleProtocol = std::make_shared<ProtocolGame>();
++    const auto replacementProtocol = std::make_shared<ProtocolGame>();
++    game.m_protocolGame = replacementProtocol;
++    game.m_online = false;
+ 
+-    EXPECT_FALSE(duplicateHandled);
+-    EXPECT_EQ(callbackCount, 1);
++    game.processDisconnect(staleProtocol);
++
++    EXPECT_EQ(game.m_protocolGame, replacementProtocol);
++}
++
++TEST(ProtocolGameLifecycle, CurrentGameDisconnectClearsCapturedSession)
++{
++    Game game;
++    const auto currentProtocol = std::make_shared<ProtocolGame>();
++    game.m_protocolGame = currentProtocol;
++    game.m_online = false;
++
++    game.processDisconnect(currentProtocol);
++
++    EXPECT_FALSE(game.m_protocolGame);
++}
++
++TEST(ProtocolGameLifecycle, StaleConnectionErrorCannotClearReplacementSession)
++{
++    Game game;
++    const auto staleProtocol = std::make_shared<ProtocolGame>();
++    const auto replacementProtocol = std::make_shared<ProtocolGame>();
++    game.m_protocolGame = replacementProtocol;
++    game.m_online = false;
++
++    game.processConnectionError(staleProtocol, asio::error::eof);
++
++    EXPECT_EQ(game.m_protocolGame, replacementProtocol);
++}
++
++TEST(ProtocolGameLifecycle, CurrentConnectionErrorClearsCapturedSession)
++{
++    Game game;
++    const auto currentProtocol = std::make_shared<ProtocolGame>();
++    game.m_protocolGame = currentProtocol;
++    game.m_online = false;
++
++    game.processConnectionError(currentProtocol, asio::error::eof);
++
++    EXPECT_FALSE(game.m_protocolGame);
++}
++
++TEST(ProtocolGameLifecycle, StaleGameEndCannotMutateReplacementState)
++{
++    Game game;
++    const auto staleProtocol = std::make_shared<ProtocolGame>();
++    const auto replacementProtocol = std::make_shared<ProtocolGame>();
++    game.m_protocolGame = replacementProtocol;
++    game.m_online = true;
++
++    const auto ended = game.processGameEnd(staleProtocol);
++
++    EXPECT_FALSE(ended);
++    EXPECT_TRUE(game.m_online);
++    EXPECT_EQ(game.m_protocolGame, replacementProtocol);
+ }
+ 
+ TEST(ProtocolGameLifecycle, NullSourceIsIgnored)

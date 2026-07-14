@@ -27,7 +27,28 @@ jobs:
             exit 0
           fi
 
+          # Correct the single staging-only typo before validating the canonical patch blob.
+          sed -i 's/Final status: in_progress/Final status: in progress/' .github/pr9-patch/part-03.patch
+
+          declare -A expected=(
+            [part-00.patch]=c2938f61d0103fb132d74d44e26d5052399124af
+            [part-01.patch]=cc99a2c37bff0f719c705cf419499505673cfd2b
+            [part-02.patch]=4c36f4bdb527ad810fb839ebce8426d9624f504d
+            [part-03.patch]=1c608574bde89f220c9489922e7894d8852a0c8f
+            [part-04.patch]=c508c29e77ebe7cee9970c8e7c5fe3e92c050bd7
+            [part-05.patch]=c04585af98be9e5d92a9334f6568b8112d8176ae
+            [part-06.patch]=b6568a3731d7af66aacb9f3cac65a448e9a783bc
+            [part-07.patch]=616e072fbe28436cbb755d168ee46aaa4752dc82
+            [part-08.patch]=2dd66d37530b4d71a025335d9223fd2bcd721d5d
+          )
+
           for patch in .github/pr9-patch/part-*.patch; do
+            name="$(basename "$patch")"
+            actual="$(git hash-object "$patch")"
+            if [[ "$actual" != "${expected[$name]}" ]]; then
+              echo "Unexpected patch blob for $name: $actual"
+              exit 1
+            fi
             git apply --check "$patch"
             git apply "$patch"
           done

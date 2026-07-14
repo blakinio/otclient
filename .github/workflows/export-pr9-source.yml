@@ -18,20 +18,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Inventory lifecycle call sites
-        shell: bash
-        run: |
-          rg -n "process(ConnectionError|Disconnect|GameEnd)[[:space:]]*\(" src tests > pr9-lifecycle-symbols.txt || true
-
       - name: Upload source snapshot
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: pr9-source-snapshot
           path: |
-            src/client/game.cpp
-            src/client/game.h
-            src/client/protocolgame.cpp
-            src/client/protocolgamecallbackguard.h
-            tests/unit/protocol/protocol_game_lifecycle_test.cpp
-            docs/agents/tasks/active/OTC-20260714-protocol-session-reentrancy.md
-            pr9-lifecycle-symbols.txt
+            src
+            tests
+            docs/agents
+            CMakeLists.txt
+            CMakePresets.json

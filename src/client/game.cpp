@@ -29,6 +29,7 @@
 #include "localplayer.h"
 #include "map.h"
 #include "protocolgame.h"
+#include "protocolgamecallbackguard.h"
 #include "protocolcodes.h"
 #include "thingtype.h"
 #include "thingtypemanager.h"
@@ -55,6 +56,18 @@ void Game::terminate()
 
 void Game::resetGameStates()
 {
+    (void)resetGameStates({});
+}
+
+bool Game::resetGameStates(const ProtocolGamePtr& sourceProtocol)
+{
+    const auto sourceIsCurrent = [this, &sourceProtocol] {
+        return !sourceProtocol || otclient::detail::isCurrentProtocolGame(sourceProtocol, m_protocolGame);
+    };
+
+    if (!sourceIsCurrent())
+        return false;
+
     m_online = false;
     m_dead = false;
     m_serverBeat = 50;
@@ -75,19 +88,26 @@ void Game::resetGameStates()
     m_pingReceived = 0;
     m_unjustifiedPoints = UnjustifiedPoints();
 
-    for (const auto& it : m_containers) {
-        const auto& container = it.second;
+    const auto containers = m_containers;
+    for (const auto& [id, container] : containers) {
+        (void)id;
         if (container)
             container->onClose();
+        if (!sourceIsCurrent())
+            return false;
     }
 
     if (m_pingEvent) {
         m_pingEvent->cancel();
+        if (!sourceIsCurrent())
+            return false;
         m_pingEvent = nullptr;
     }
 
     if (m_checkConnectionEvent) {
         m_checkConnectionEvent->cancel();
+        if (!sourceIsCurrent())
+            return false;
         m_checkConnectionEvent = nullptr;
     }
 
@@ -95,29 +115,41 @@ void Game::resetGameStates()
     m_vips.clear();
     m_gmActions.clear();
     g_map.resetAwareRange();
+    return sourceIsCurrent();
 }
 
-void Game::processConnectionError(const std::error_code& ec)
+void Game::processConnectionError(const ProtocolGamePtr& sourceProtocol, const std::error_code& ec)
 {
-    // connection errors only have meaning if we still have a protocol
-    if (m_protocolGame) {
-        // eof = end of file, a clean disconnect
-        if (ec != asio::error::eof)
-            g_lua.callGlobalField("g_game", "onConnectionError", ec.message(), ec.value());
+    if (!otclient::detail::isCurrentProtocolGame(sourceProtocol, m_protocolGame))
+        return;
 
-        processDisconnect();
+    // eof = end of file, a clean disconnect
+    if (ec != asio::error::eof) {
+        const auto sourceRemainedCurrent = otclient::detail::runWhileCurrentProtocolGame(
+            sourceProtocol,
+            [this] { return m_protocolGame; },
+            [&] { g_lua.callGlobalField("g_game", "onConnectionError", ec.message(), ec.value()); });
+        if (!sourceRemainedCurrent)
+            return;
     }
+
+    processDisconnect(sourceProtocol);
 }
 
-void Game::processDisconnect()
+void Game::processDisconnect(const ProtocolGamePtr& sourceProtocol)
 {
-    if (isOnline())
-        processGameEnd();
+    if (!otclient::detail::isCurrentProtocolGame(sourceProtocol, m_protocolGame))
+        return;
 
-    if (m_protocolGame) {
-        m_protocolGame->disconnect();
+    if (isOnline() && !processGameEnd(sourceProtocol))
+        return;
+
+    if (!otclient::detail::isCurrentProtocolGame(sourceProtocol, m_protocolGame))
+        return;
+
+    sourceProtocol->disconnect();
+    if (otclient::detail::isCurrentProtocolGame(sourceProtocol, m_protocolGame))
         m_protocolGame = nullptr;
-    }
 }
 
 void Game::processUpdateNeeded(const std::string_view signature)
@@ -190,27 +222,43 @@ void Game::processGameStart()
     g_lua.callGlobalField("g_game", "onGameStart");
 }
 
-void Game::processGameEnd()
+bool Game::processGameEnd(const ProtocolGamePtr& sourceProtocol)
 {
+    if (!otclient::detail::isCurrentProtocolGame(sourceProtocol, m_protocolGame))
+        return false;
+
     // FPS fixed at 60 for when UI is rendering alone.
     g_app.setTargetFps(60u);
 
     m_online = false;
-    g_lua.callGlobalField("g_game", "onGameEnd");
+    if (!otclient::detail::runWhileCurrentProtocolGame(
+            sourceProtocol,
+            [this] { return m_protocolGame; },
+            [] { g_lua.callGlobalField("g_game", "onGameEnd"); }))
+        return false;
 
     if (m_connectionFailWarned) {
-        g_lua.callGlobalField("g_game", "onConnectionFailing", false);
+        if (!otclient::detail::runWhileCurrentProtocolGame(
+                sourceProtocol,
+                [this] { return m_protocolGame; },
+                [] { g_lua.callGlobalField("g_game", "onConnectionFailing", false); }))
+            return false;
         m_connectionFailWarned = false;
     }
 
-    // reset game state
-    resetGameStates();
+    // reset only the state that still belongs to this protocol.
+    if (!resetGameStates(sourceProtocol))
+        return false;
+
+    if (!otclient::detail::isCurrentProtocolGame(sourceProtocol, m_protocolGame))
+        return false;
 
     m_worldName = "";
     m_characterName = "";
 
-    // clean map creatures
+    // clean map creatures, but never let a replacement protocol be disconnected afterwards.
     g_map.cleanDynamicThings();
+    return otclient::detail::isCurrentProtocolGame(sourceProtocol, m_protocolGame);
 }
 
 void Game::processDeath(const uint8_t deathType, const uint8_t penality)
@@ -644,11 +692,13 @@ void Game::playRecord(const std::string_view& file)
 
 void Game::cancelLogin()
 {
-    // send logout even if the game has not started yet, to make sure that the player doesn't stay logged there
-    if (m_protocolGame)
-        m_protocolGame->sendLogout();
+    const auto sourceProtocol = m_protocolGame;
+    if (!sourceProtocol)
+        return;
 
-    processDisconnect();
+    // send logout even if the game has not started yet, to make sure that the player doesn't stay logged there
+    sourceProtocol->sendLogout();
+    processDisconnect(sourceProtocol);
 }
 
 void Game::forceLogout()
@@ -656,8 +706,12 @@ void Game::forceLogout()
     if (!isOnline())
         return;
 
-    m_protocolGame->sendLogout();
-    processDisconnect();
+    const auto sourceProtocol = m_protocolGame;
+    if (!sourceProtocol)
+        return;
+
+    sourceProtocol->sendLogout();
+    processDisconnect(sourceProtocol);
 }
 
 void Game::safeLogout()
@@ -665,7 +719,9 @@ void Game::safeLogout()
     if (!isOnline())
         return;
 
-    m_protocolGame->sendLogout();
+    const auto sourceProtocol = m_protocolGame;
+    if (sourceProtocol)
+        sourceProtocol->sendLogout();
 }
 
 bool Game::walk(const Otc::Direction direction)

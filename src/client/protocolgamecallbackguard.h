@@ -26,14 +26,30 @@
 
 namespace otclient::detail {
 
+template<typename ProtocolPtr>
+[[nodiscard]] bool isCurrentProtocolGame(const ProtocolPtr& sourceProtocol, const ProtocolPtr& currentProtocol)
+{
+    return sourceProtocol && sourceProtocol == currentProtocol;
+}
+
 template<typename ProtocolPtr, typename Callback>
 [[nodiscard]] bool runIfCurrentProtocolGame(const ProtocolPtr& sourceProtocol, const ProtocolPtr& currentProtocol, Callback&& callback)
 {
-    if (!sourceProtocol || sourceProtocol != currentProtocol)
+    if (!isCurrentProtocolGame(sourceProtocol, currentProtocol))
         return false;
 
     std::forward<Callback>(callback)();
     return true;
+}
+
+template<typename ProtocolPtr, typename CurrentProtocolProvider, typename Callback>
+[[nodiscard]] bool runWhileCurrentProtocolGame(const ProtocolPtr& sourceProtocol, CurrentProtocolProvider&& currentProtocolProvider, Callback&& callback)
+{
+    if (!isCurrentProtocolGame(sourceProtocol, currentProtocolProvider()))
+        return false;
+
+    std::forward<Callback>(callback)();
+    return isCurrentProtocolGame(sourceProtocol, currentProtocolProvider());
 }
 
 } // namespace otclient::detail

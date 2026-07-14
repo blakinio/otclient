@@ -16,13 +16,14 @@ Update this file in the same PR that adds/changes a reusable module, controller,
 | Optional/custom mods | maintained | Optional behavior outside shipped core | `mods/**` | Do not hide a required core fix here. Runtime Lua syntax CI covers this root. |
 | Protocol and features | maintained | Packet parsing/output, feature flags, game state | `src/client/**`, `modules/game_features/**`, affected modules | Check Canary payloads/opcodes/version gates and contracts. |
 | Protocol game callback guard | maintained; hardening PR #9 | Carries an exact source `ProtocolGame` through connection-error, game-end and disconnect cleanup; supports before/after callback identity checks | `src/client/protocolgamecallbackguard.h`, `src/client/protocolgame.cpp`, `src/client/game.{h,cpp}` | Reuse for lifecycle callbacks entering global `Game`; capture once, revalidate after Lua/callback boundaries, and never use time windows or relog flags. PR #9 supersedes PR #7 as the Canary consumer revision. |
+| Protocol outbound send serializer | active PR #11 | Serializes one protocol instance from output recording/framing through sequenced packet allocation and transport enqueue | `src/framework/net/protocol.{h,cpp}` | Keep sequence allocation and socket/proxy queue insertion in the same critical section; an atomic counter alone cannot preserve sequence-to-wire order. Recursive entry is retained for existing send hooks/playback paths. |
 | Client assets auto-install | maintained | Secure things/sounds/runtime-extra installation | installer sources and `docs/client-assets-auto-install.md` | Final paths remain `data/things/<version>/`, `data/sounds/<version>/`, expected `bin/*`; strict hashes stay enabled. |
 
 ## Reusable test infrastructure
 
 | Module/tool | Status | Responsibility/public surface | Source/docs | Reuse notes |
 |---|---|---|---|---|
-| Client test foundation | active PR #3 | Deterministic C++ builders/assertions/fakes/environment, OTML fixtures, protocol loopback, Lua runner/contracts | `tests/support/**`, `tests/unit/**`, `tests/integration/**`, `tests/lua/**`, `tests/fixtures/**`, testing docs | Reuse support, labels, fixtures, and presets; do not create a second harness. |
+| Client test foundation | active PR #3 | Deterministic C++ builders/assertions/fakes/environment, OTML fixtures, protocol loopback, Lua runner/contracts | `tests/support/**`, `tests/unit/**`, `tests/integration/**`, `tests/lua/**`, testing docs | Reuse support, labels, fixtures, and presets; do not create a second harness. |
 | InputMessageBuilder | active #3 | Deterministic framed parser inputs | `tests/support/builders/input_message_builder.{h,cpp}` | Reuse for parser/protocol tests. |
 | OutputMessageInspector | active #3 | Inspects encoded output bytes in tests | `tests/support/builders/output_message_inspector.h` | Reuse instead of ad hoc internals. |
 | Thing/Tile builders/assertions | active #3 | Synthetic things/items/creatures and tile assertions | `tests/support/builders/thing_builders.*`, `tests/support/assertions/tile_assertions.h` | Reuse for map/tile/module tests. |

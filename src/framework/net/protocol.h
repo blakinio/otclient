@@ -25,6 +25,26 @@
 #include "declarations.h"
 #include <framework/luaengine/luaobject.h>
 
+#include <mutex>
+#include <utility>
+
+namespace otclient::detail
+{
+    class ProtocolSendSerializer final
+    {
+    public:
+        template <typename Callback>
+        decltype(auto) serialize(Callback&& callback)
+        {
+            const std::scoped_lock lock(m_mutex);
+            return std::forward<Callback>(callback)();
+        }
+
+    private:
+        std::recursive_mutex m_mutex;
+    };
+}
+
 enum CompressionMode_t : uint8_t
 {
     COMPRESSION_MODE_UNKNOWN = 0,
@@ -100,6 +120,7 @@ private:
     bool xteaDecrypt(const InputMessagePtr& inputMessage) const;
     void xteaEncrypt(const OutputMessagePtr& outputMessage) const;
 
+    otclient::detail::ProtocolSendSerializer m_sendSerializer;
     bool m_checksumEnabled{ false };
     bool m_sequencedPackets{ false };
     bool m_xteaEncryptionEnabled{ false };

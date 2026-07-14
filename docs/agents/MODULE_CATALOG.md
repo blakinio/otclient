@@ -15,7 +15,7 @@ Update this file in the same PR that adds/changes a reusable module, controller,
 | Shipped game modules | maintained | Feature UI/controllers and interaction loaded through manifests | `modules/**` | Extend owning module; preserve dependencies, lifecycle cleanup, events, keys, widgets, localization. |
 | Optional/custom mods | maintained | Optional behavior outside shipped core | `mods/**` | Do not hide a required core fix here. Runtime Lua syntax CI covers this root. |
 | Protocol and features | maintained | Packet parsing/output, feature flags, game state | `src/client/**`, `modules/game_features/**`, affected modules | Check Canary payloads/opcodes/version gates and contracts. |
-| Protocol game callback guard | active PR #7 | Runs a callback only when its source shared protocol is still the exact current game protocol | `src/client/protocolgamecallbackguard.h`, `src/client/protocolgame.cpp` | Reuse for asynchronous `ProtocolGame` callbacks entering global `Game`; compare identity, never time windows or relog flags. |
+| Protocol game callback guard | maintained; merged PR #7 | Runs a callback only when its source shared protocol is still the exact current game protocol | `src/client/protocolgamecallbackguard.h`, `src/client/protocolgame.cpp` | Reuse for asynchronous `ProtocolGame` callbacks entering global `Game`; compare identity, never time windows or relog flags. Last verified at `3cb61bb40eded11dc1e7c2d6660a46772364f6d4`. |
 | Client assets auto-install | maintained | Secure things/sounds/runtime-extra installation | installer sources and `docs/client-assets-auto-install.md` | Final paths remain `data/things/<version>/`, `data/sounds/<version>/`, expected `bin/*`; strict hashes stay enabled. |
 
 ## Reusable test infrastructure

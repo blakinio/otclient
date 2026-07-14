@@ -67,6 +67,34 @@ TEST(ProtocolSendSerializer, SerializesConcurrentCallbacks)
     EXPECT_EQ((std::vector<int>{ 1, 2 }), order);
 }
 
+TEST(ProtocolSendSerializer, KeepsSequenceAllocationAndEnqueueInOneOrder)
+{
+    detail::ProtocolSendSerializer serializer;
+    constexpr int messageCount = 32;
+    int nextSequence = 0;
+    std::vector<int> wireOrder;
+    std::vector<std::thread> senders;
+    senders.reserve(messageCount);
+
+    for (int index = 0; index < messageCount; ++index) {
+        senders.emplace_back([&] {
+            serializer.serialize([&] {
+                const int sequence = nextSequence++;
+                wireOrder.push_back(sequence);
+            });
+        });
+    }
+
+    for (auto& sender : senders) {
+        sender.join();
+    }
+
+    ASSERT_EQ(messageCount, static_cast<int>(wireOrder.size()));
+    for (int index = 0; index < messageCount; ++index) {
+        EXPECT_EQ(index, wireOrder[index]);
+    }
+}
+
 TEST(ProtocolSendSerializer, AllowsSameThreadReentry)
 {
     detail::ProtocolSendSerializer serializer;

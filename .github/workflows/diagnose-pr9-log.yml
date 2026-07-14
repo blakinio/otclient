@@ -1,8 +1,9 @@
 name: Diagnose PR 9 Windows Log
 
 on:
-  push:
-    branches: [diag/pr9-windows-log]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
   actions: read

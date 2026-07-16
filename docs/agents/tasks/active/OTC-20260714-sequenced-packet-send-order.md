@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260714-sequenced-packet-send-order
 coordination_id: OTS-20260714-sequenced-packet-send-order
-status: in_progress
+status: ready
 agent: ChatGPT
 branch: fix/sequenced-packet-send-serialization
 base_branch: main
 created: 2026-07-14T15:00:00+02:00
-updated: 2026-07-14T16:04:00+02:00
-last_verified_commit: "db6c9ac417ead5aa4e648b9e1e005def072ff2cb"
+updated: 2026-07-16T20:35:00+02:00
+last_verified_commit: "5d06fd20220474111050480a530e4160114476ac"
 risk: high
 related_issue: "blakinio/canary#245"
 related_pr: "blakinio/otclient#11"
@@ -46,7 +46,7 @@ Preserve strict client packet sequence ordering when multiple outbound game mess
 - [x] Current login, proxy, recording, playback, checksum, XTEA and non-sequenced behavior remain unchanged by source review.
 - [x] Concurrent sends cannot emit duplicate, skipped or wire-reordered client sequence values because allocation and enqueue share one critical section.
 - [x] Focused deterministic regression coverage exercises concurrent serialization and same-thread reentry without sleeps or retry windows.
-- [ ] Current-head OTClient CI passes.
+- [x] Current-head OTClient CI passes.
 - [ ] Canary PR #245 consumes the final squash SHA and passes one-process two-session physical E2E.
 - [x] No timer, retry window, relog delay increase, server-side sequence relaxation or packet suppression is introduced.
 
@@ -94,14 +94,20 @@ OTClient PR #9 remains a valid lifecycle/source-identity fix. This task addresse
 - Registered the test in the existing protocol target and updated the catalogue, changelog and Canary contract registry.
 - Reviewed per-file patches; the production diff is limited to the serializer declaration/member and one wrapper around the existing send body.
 
+## 2026-07-16T20:35:00+02:00
+
+- Re-verified PR #11 exact head `5d06fd20220474111050480a530e4160114476ac`.
+- CI #76 completed full Linux tests/integration plus Linux release, Windows solution builds, Docker and Browser successfully.
+- CI #77 completed current-head `CI / Required` successfully; incremental build jobs were skipped because the immediately preceding full validation was reusable for the documentation-only checkpoint commit.
+- No implementation scope was broadened; the remaining proof is the post-merge Canary physical consumer run on the final squash SHA.
+
 # Validation and CI
 
 | Commit | Check | Result | Notes |
 |---|---|---|---|
 | `2a1b93bcdf6d4317ceeb2254b1e89429453a8e7f` | Canary physical E2E run #33 | failed with actionable evidence | Lifecycle identity fix present; outbound sequence ordering still malformed under close/concurrent sends. |
-| `db6c9ac417ead5aa4e648b9e1e005def072ff2cb` | Diff/source review | passed | Allocation, framing and enqueue are one per-instance critical section; no protocol field or server change. |
-| current PR head | focused protocol tests | pending in GitHub CI | Deterministic concurrency and recursive-entry tests registered in the existing target. |
-| current PR head | GitHub CI | pending | Linux/Windows and protocol tests required. |
+| `5d06fd20220474111050480a530e4160114476ac` | OTClient CI #76 | PASS | Full Linux test/integration and release builds, Windows solution builds, Docker and Browser passed. |
+| `5d06fd20220474111050480a530e4160114476ac` | OTClient CI #77 Required | PASS | Current-head required gate passed using valid immediate-parent reuse. |
 | final squash SHA | Canary physical E2E | pending | Must prove both stable sessions and both safe logouts in one process. |
 
 # Risks and compatibility
@@ -113,7 +119,7 @@ OTClient PR #9 remains a valid lifecycle/source-identity fix. This task addresse
 
 # Remaining work
 
-1. Inspect current-head PR #11 CI and repair only evidence-backed failures.
+1. Re-run exact-head CI after this evidence-only checkpoint update.
 2. Review the complete final diff, mark ready and squash-merge after all required checks pass.
 3. Pin Canary scenario to the new final squash SHA and run the complete physical proof.
 4. Archive this task only after the consumer proof confirms the wire sequence contract.

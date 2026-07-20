@@ -1,11 +1,11 @@
 ---
 task_id: OTC-20260720-agent-required-reads
-status: implementing
+status: validating
 branch: docs/agent-required-reads-20260720
 base_branch: main
 created: 2026-07-20
 updated: 2026-07-20
-related_pr: ""
+related_pr: "15"
 owned_paths:
   - docs/agents/tasks/TASK_TEMPLATE.md
   - docs/agents/tasks/active/OTC-20260720-agent-required-reads.md
@@ -35,11 +35,11 @@ Make compact continuation prompts carry task-specific architecture and contract 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T19:20:00+02:00
-head: db50a327a70f9902d4018a3b87f1a144b9d4c70a
+updated_at: 2026-07-20T19:24:00+02:00
+head: 4749055d7eb9938d6b145e57fcda0d398b67f503
 branch: docs/agent-required-reads-20260720
-pr: none
-status: implementing
+pr: 15
+status: validating
 context_routes:
   - agent-governance
 owned_paths:
@@ -48,11 +48,12 @@ owned_paths:
   - tools/agents/resume.py
 proven:
   - Existing portable resume carried checkpoint evidence but did not emit required architecture or contract reads.
-  - Task template already had stable frontmatter suitable for portable read-routing metadata.
+  - Task template frontmatter now carries required_reads search_first and optional_reads without changing checkpoint schema.
+  - Draft PR 15 is open against main and contains only agent handoff tooling and task metadata paths.
 derived:
-  - Keeping read routing in task frontmatter avoids changing checkpoint schema and preserves compatibility with existing active checkpoints.
+  - Existing active checkpoints remain compatible because missing routing metadata falls back to AGENTS.md and CONTEXT_HANDOFF.md.
 unknown:
-  - Final exact-head CI outcome.
+  - Final exact-head CI outcome after this checkpoint update.
 conflicts: []
 first_failure:
   marker: none
@@ -67,5 +68,5 @@ validation:
     result: PASS
     evidence: rollout is limited to agent handoff tooling and templates
 blockers: []
-next_action: Open the draft PR, verify exact-head CI and changed-file scope, then merge only if repository gates pass.
+next_action: Verify PR 15 exact-head CI, mergeability, review state and changed-file scope, then merge only if repository gates pass.
 ```

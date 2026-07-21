@@ -8,6 +8,23 @@ Services = {
     --websites = "http://localhost/?subtopic=accountmanagement", --./client_entergame "Forgot password and/or email"
     --createAccount = "http://localhost/clientcreateaccount.php", --./client_entergame -- createAccount.lua
     --getCoinsUrl = "http://localhost/?subtopic=shop&step=terms", --./game_market
+
+    -- Native desktop OAuth 2.0 Authorization Code + PKCE integration.
+    -- Fail closed by default: deployment must provide real HTTPS endpoints and
+    -- opt each compatible server into authMode = "oteryn_identity" below.
+    oterynIdentity = {
+        enabled = false,
+        authorizationEndpoint = "",
+        tokenEndpoint = "",
+        clientId = "otclient-desktop",
+        scope = "game.login",
+        callbackTimeoutMillis = 120000,
+        maxGameTicketTtlSeconds = 60,
+        -- Development only. Production endpoints must use HTTPS. When enabled,
+        -- only literal http://127.0.0.1 endpoints are accepted.
+        allowInsecureLoopback = false
+    },
+
     clientAssets = {
         enabled = true,
         repository = "dudantas/tibia-client",
@@ -59,6 +76,22 @@ if ENABLE_SERVERS then
     ---
     -- List of servers and their configuration parameters.
     -- Each entry defines port, protocol, and authentication options.
+    --
+    -- Migration controls:
+    --   authMode = "legacy" keeps the existing password flow as the primary mode.
+    --   authMode = "oteryn_identity" enables the Oteryn button when the nested
+    --   contract is also enabled and Services.oterynIdentity is configured.
+    --   legacyAuthEnabled = false prevents Enter/Login from falling back to the
+    --   password flow for that server.
+    --
+    -- A compatible Oteryn server entry additionally declares:
+    --   oterynIdentity = {
+    --       enabled = true,
+    --       protocolVersion = 1,
+    --       audience = "<login-server-audience>",
+    --       loginEndpoint = "https://<login-server>/v1/game-login"
+    --   }
+    --
     -- @table Servers_init
     --
     Servers_init = {
@@ -77,7 +110,9 @@ if ENABLE_SERVERS then
             port = 80,
             protocol = 1511,
             httpLogin = true,
-            useAuthenticator = false
+            useAuthenticator = false,
+            authMode = "legacy",
+            legacyAuthEnabled = true
         },
 
         -- External server
@@ -92,7 +127,9 @@ if ENABLE_SERVERS then
         ["ip.net"] = {
             port = 7171,
             protocol = 860,
-            httpLogin = false
+            httpLogin = false,
+            authMode = "legacy",
+            legacyAuthEnabled = true
         }
     }
 end

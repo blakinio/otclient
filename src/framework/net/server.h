@@ -28,14 +28,16 @@
 class Server final : public LuaObject
 {
 public:
-    Server(int port);
+    Server(int port, bool loopbackHttp = false);
     static ServerPtr create(int port);
-    bool isOpen() { return m_isOpen; }
+    bool isOpen() const { return m_isOpen; }
     void close();
 
     void acceptNext();
 
 private:
     bool m_isOpen{ true };
+    bool m_loopbackHttp{ false };
+    bool m_acceptPending{ false };
     asio::ip::tcp::acceptor m_acceptor;
 };

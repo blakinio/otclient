@@ -13,9 +13,13 @@ Module
     dofile 'entergame'
     dofile 'characterlist'
     dofile 'createAccount'
+    dofile 'oteryn_identity_core'
+    dofile 'oteryn_identity'
     EnterGame.init()
     CharacterList.init()
+    OterynIdentity.init()
 
   @onUnload: |
+    OterynIdentity.terminate()
     EnterGame.terminate()
     CharacterList.terminate()

@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260721-oteryn-identity-login
 coordination_id: OTS-20260721-oteryn-identity-auth
-status: in_progress
+status: validating
 agent: ChatGPT
 branch: feat/OTC-20260721-oteryn-identity-login
 base_branch: main
 created: 2026-07-21T21:00:00Z
-updated: 2026-07-22T09:25:00Z
-last_verified_commit: 1f0358a6e34a53d9b47aae04a1ecad885126eafc
+updated: 2026-07-22T09:31:00Z
+last_verified_commit: a2f73a90b8f6f987d34ee3cd516da10548560b03
 risk: high
 related_issue: ""
 related_pr: "17"
@@ -22,6 +22,10 @@ owned_paths:
   - modules/client_entergame/**
   - src/framework/net/server.*
   - src/framework/util/crypt.*
+  - src/framework/luafunctions.cpp
+  - tests/lua/contracts/oteryn_identity_core_test.lua
+  - tests/lua/CMakeLists.txt
+  - tests/integration/protocol/loopback_packet_test.cpp
   - init.lua
   - docs/agents/**
   - docs/auth/**
@@ -32,10 +36,12 @@ reuses:
   - system browser via g_platform.openUrl
   - framework event dispatcher
   - existing GameSessionKey game-world transport
+  - merged client test foundation
 public_interfaces:
   - Services.oterynIdentity deployment configuration
   - server/profile authMode oteryn_identity
   - loopback OAuth callback listener
+  - Server.createLoopbackHttp and Server.getLocalPort Lua bindings
   - Game Gateway protocol v1 response normalization
   - one-shot GameSessionKey handoff
 cross_repo_tasks:
@@ -59,9 +65,9 @@ Implement the OTClient consumer side of the current Oteryn game-auth architectur
 - [x] Game Session credential is handed to the existing `GameSessionKey` path once and client auto-replay/reconnect fails closed.
 - [x] Versioned client/Platform/Gateway contract and failure behavior are documented.
 - [x] Cross-repository registry records the remaining Canary Game Session adapter gate without claiming implementation outside `blakinio/otclient`.
-- [ ] Loopback callback uses an OS-assigned ephemeral port rather than bounded client-side port probing.
+- [x] Loopback callback binds IPv4 loopback port `0` and reads the OS-assigned ephemeral port before opening the browser.
 - [ ] Required desktop C++ builds complete on the final non-draft PR head.
-- [ ] Focused deterministic auth-contract tests are added using existing test infrastructure where available, without creating a parallel harness.
+- [x] Focused deterministic auth-contract tests are registered in the merged Lua test foundation and loopback ephemeral-port behavior is covered in the existing protocol integration target.
 - [x] Module catalogue, changelog, auth architecture and cross-repo contract docs updated.
 - [ ] Autonomous merge gate satisfied or exact remaining blocker documented.
 
@@ -74,6 +80,7 @@ Implement the OTClient consumer side of the current Oteryn game-auth architectur
 - Current Platform OAuth scope is `game:ticket`, ticket issuance is `POST /api/v1/game-auth/tickets`, and the deployed Gateway accepts strict `POST /v1/login` JSON containing only `protocol_version` and `game_login_ticket`.
 - Current Gateway returns `session.credential`, `session.expires_at`, authoritative `worlds` with `id/host/port`, and account-scoped `characters` with `world_id`.
 - The production Canary Game Session compatibility adapter remains unresolved in `GAME_SESSION_CANARY_CONTRACT.md`; this OTClient task cannot claim world-entry E2E readiness.
+- Client test foundation PR #3 is merged as `9733a8dd4b3b1fc4c3fd862fc32f1f2ea86f8a67` and is reused rather than duplicated.
 - Container network access cannot clone GitHub in this environment; GitHub connector state/files and GitHub Actions are the executable evidence source. No local build/runtime success is claimed.
 
 # Existing work to reuse
@@ -84,7 +91,7 @@ Implement the OTClient consumer side of the current Oteryn game-auth architectur
 | Platform URL open | system-browser authorization | `g_platform.openUrl` binding | Avoids embedded credential WebView. |
 | GameSessionKey | final client -> world credential field | `src/client/protocolgamesend.cpp` | Existing protocol branch sends session key + character instead of account/password. |
 | Event dispatcher | timeout/cancellation cleanup | framework Lua event APIs | Existing bounded lifecycle primitive. |
-| Client test foundation | future focused deterministic tests | active PR #3 | Must be reused when available; no second harness. |
+| Client test foundation | deterministic Lua contract and protocol integration coverage | merged PR #3, `tests/lua/**`, `tests/integration/**` | Reused directly; no parallel harness. |
 
 # Ownership and overlap check
 
@@ -108,15 +115,18 @@ browser Identity
 -> existing OTClient GameSessionKey world-entry field
 ```
 
-Current Lua syntax, workflow validation, informational static analysis and required CI passed on run `29907489042`. Platform builds were skipped because PR #17 is still draft; final desktop C++ compilation remains required before merge.
+The loopback callback now uses `Server.createLoopbackHttp()`, which binds `127.0.0.1:0`, and `Server.getLocalPort()` exposes the actual OS-assigned port to Lua. Pure Lua auth-contract coverage is registered in the existing `otclient_lua_contract_tests`, and the existing protocol integration target now verifies two simultaneous loopback listeners receive distinct non-zero OS-assigned ports.
+
+Draft CI run `29907489042` passed Lua syntax, workflow validation, informational static analysis and required CI. Platform builds were skipped because PR #17 was draft. The final non-draft build/test matrix remains the active merge gate.
 
 # Plan
 
-1. Replace client-side loopback port probing with an OS-assigned IPv4 loopback ephemeral port and expose the bound port safely to Lua.
-2. Add focused pure auth-contract tests through the existing repository test foundation if available on the current base; otherwise record the exact test-infrastructure dependency without inventing a second harness.
-3. Review final diff for credential/logging/persistence regressions and exact Gateway JSON compatibility.
-4. Update PR description/checkpoint, mark PR ready to force scoped desktop builds, repair failures, and merge only when the autonomous gate is satisfied.
-5. Leave production Canary Game Session adapter and cross-repository end-to-end proof to the separately scoped Phase 6/7 work.
+1. Update PR description to the actual Platform ticket + standalone Gateway architecture.
+2. Mark PR #17 ready for review so scoped Linux/Windows/macOS C++ builds and CTest targets execute.
+3. Inspect exact failing job/log if any, repair without weakening security semantics, and rerun final checks.
+4. Perform final credential/logging/persistence diff review and verify no stale login-server ticket contract remains.
+5. Merge autonomously only if the repository-required gate and relevant platform/test jobs are green.
+6. Leave production Canary Game Session adapter and cross-repository end-to-end proof to the separately scoped Phase 6/7 work.
 
 # Work log
 
@@ -132,14 +142,19 @@ Current Lua syntax, workflow validation, informational static analysis and requi
 - Changed: continued existing PR #17; corrected OAuth scope/callback path/config; split OAuth token exchange from Platform ticket issuance; replaced stale login-server ticket exchange with strict Game Gateway `/v1/login`; normalized authoritative `world_id` routing; added one-shot Game Session guard; added durable auth/cross-repo/catalogue/changelog documentation.
 - Learned: deployed Gateway rejects unknown JSON fields and returns `session.credential` rather than legacy `sessionkey`; production Canary adapter is still intentionally unresolved.
 - Validation: CI run `29907489042` passed Lua syntax, fast checks, informational static analysis and required gate; builds skipped while draft.
-- Remaining: OS-assigned loopback ephemeral port, focused tests, non-draft C++ builds and final merge gate.
+
+## 2026-07-22T09:31:00Z
+
+- Changed: replaced client-side port probing with OS-assigned loopback port `0`; exposed bound port through `Server.getLocalPort`; reused merged PR #3 test foundation for PKCE/callback/Gateway contract tests and loopback integration coverage.
+- Learned: repository build workflow intentionally skips compile jobs while a PR remains draft, so transition to ready-for-review is required for executable C++ validation.
+- Remaining: non-draft build/test matrix, failure repair if needed, final review and merge gate.
 
 # Decisions
 
 | Decision | Reason/evidence | ADR/contract |
 |---|---|---|
 | Use system browser + Authorization Code + PKCE S256 | first-party native-app contract; avoids embedded credential capture | Platform ADR 0009 / OTCLIENT_GAME_AUTH_CONTRACT |
-| Use IPv4 loopback callback with exact `/callback` path | matches current Platform native redirect contract | OTCLIENT_GAME_AUTH_CONTRACT |
+| Use IPv4 loopback `127.0.0.1:0` and read assigned port | OS owns ephemeral port selection and listener remains loopback-only | OTCLIENT_GAME_AUTH_CONTRACT |
 | Keep OAuth access token separate from Game Login Ticket | deployed Platform Phase 3 requires bearer-authenticated ticket issuance | GAME_GATEWAY_IDENTITY_CONTRACT |
 | Send only `protocol_version` + `game_login_ticket` to Gateway | current Gateway uses strict JSON decoding | deployed Gateway MVP |
 | Treat Gateway world routing as authoritative | client must not invent account/world ownership | OTCLIENT_GAME_AUTH_CONTRACT |
@@ -155,8 +170,10 @@ Current Lua syntax, workflow validation, informational static analysis and requi
 | `modules/client_entergame/oteryn_identity_core.lua` | PKCE/callback/Gateway validation primitives | implemented |
 | `modules/client_entergame/oteryn_identity.lua` | browser -> OAuth -> ticket -> Gateway orchestration | implemented |
 | `modules/client_entergame/oteryn_session_guard.lua` | one-shot Game Session handoff/replay guard | implemented |
-| `src/framework/net/server.*` | loopback-only callback HTTP primitive | implemented; OS-assigned port refinement pending |
-| `src/framework/util/crypt.cpp` | CSPRNG-backed UUID material | implemented |
+| `src/framework/net/server.*` | loopback-only HTTP callback with OS-assigned ephemeral port | implemented; build validation pending |
+| `src/framework/util/crypt.cpp` | CSPRNG-backed UUID material | implemented; build validation pending |
+| `tests/lua/contracts/oteryn_identity_core_test.lua` | deterministic PKCE/callback/Gateway contract coverage | implemented; CTest pending |
+| `tests/integration/protocol/loopback_packet_test.cpp` | OS-assigned loopback port integration coverage | implemented; CTest pending |
 | `Services.oterynIdentity` | deployment-owned Identity/Platform/Gateway endpoints and public client id | implemented, disabled by default |
 
 # Validation and CI
@@ -164,13 +181,15 @@ Current Lua syntax, workflow validation, informational static analysis and requi
 | Commit | Command/check/workflow | Result | Evidence/notes |
 |---|---|---|---|
 | a6868920443dc285656bd016acdb2c1ea566e511 | local git/build preflight | unavailable | sandbox DNS cannot resolve github.com; connector preflight completed |
-| 1f0358a6e34a53d9b47aae04a1ecad885126eafc | GitHub Actions CI run 29907489042 | PASS for required draft gate | Lua syntax, workflow validation and informational analysis passed; builds skipped because PR is draft |
+| 1f0358a6e34a53d9b47aae04a1ecad885126eafc | GitHub Actions CI run 29907489042 | PASS for required draft gate | Lua syntax, workflow validation and informational analysis passed; builds skipped because PR was draft |
+| a2f73a90b8f6f987d34ee3cd516da10548560b03 | GitHub Actions CI run 29908191261 | IN_PROGRESS | final draft-head quick validation triggered after auth contract and loopback tests were added; non-draft builds still required |
 
 Never write `passed` without verification.
 
 # Failed approaches and dead ends
 
 - Reusing generic wildcard `Server` directly for OAuth callback was rejected.
+- Client-side pseudo-random probing of ephemeral ports was replaced by OS-assigned loopback port `0`.
 - Treating OAuth token endpoint response as a Game Login Ticket was rejected after revalidation against merged Platform Phase 3.
 - Sending ticket directly to a legacy/login-server HTTP contract was rejected after revalidation against standalone Game Gateway MVP.
 - Adding client-selected account/world ownership data to Gateway requests is rejected.
@@ -187,10 +206,10 @@ Never write `passed` without verification.
 
 # Remaining work
 
-1. Implement OS-assigned loopback ephemeral port.
-2. Add/attach focused deterministic auth tests through existing test infrastructure.
-3. Run non-draft scoped builds and repair failures.
-4. Final review, ready-for-review transition and autonomous merge if all gates are green.
+1. Update PR description and mark ready for review.
+2. Run non-draft scoped builds/CTest and repair failures.
+3. Perform final diff/security review.
+4. Merge autonomously only if all required/relevant checks are green.
 
 # Handoff
 
@@ -200,7 +219,7 @@ Read this task, `docs/auth/oteryn-identity-login.md`, then inspect live PR #17 a
 
 ## Do not repeat
 
-Do not reintroduce direct ticket-to-login-server flow, persistent Oteryn password storage, client-authoritative world routing, OAuth refresh-token use, or automatic Game Session replay.
+Do not reintroduce direct ticket-to-login-server flow, persistent Oteryn password storage, client-authoritative world routing, OAuth refresh-token use, client-side port probing, or automatic Game Session replay.
 
 ## Required reads
 
@@ -218,7 +237,7 @@ Do not reintroduce direct ticket-to-login-server flow, persistent Oteryn passwor
 
 # Completion
 
-- Final status: in progress
+- Final status: validating
 - PR: #17 draft
 - Merge commit: pending
 - Catalogue updated: yes

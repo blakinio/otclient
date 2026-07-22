@@ -1015,8 +1015,10 @@ void Application::registerLuaFunctions()
     // Server
     g_lua.registerClass<Server>();
     g_lua.bindClassStaticFunction<Server>("create", &Server::create);
+    g_lua.bindClassStaticFunction<Server>("createLoopbackHttp", &Server::createLoopbackHttp);
     g_lua.bindClassMemberFunction<Server>("close", &Server::close);
     g_lua.bindClassMemberFunction<Server>("isOpen", &Server::isOpen);
+    g_lua.bindClassMemberFunction<Server>("getLocalPort", &Server::getLocalPort);
     g_lua.bindClassMemberFunction<Server>("acceptNext", &Server::acceptNext);
 #endif
 

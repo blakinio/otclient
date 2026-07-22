@@ -63,17 +63,37 @@ Server::Server(const int port, const bool loopbackHttp)
 ServerPtr Server::create(const int port)
 {
     try {
-        const bool loopbackHttp = port < 0;
-        const long long requestedPort = loopbackHttp ? -static_cast<long long>(port) : static_cast<long long>(port);
-        if (requestedPort < 0 || requestedPort > std::numeric_limits<unsigned short>::max()) {
+        if (port < 0 || port > std::numeric_limits<unsigned short>::max()) {
             g_logger.error("Failed to initialize server: invalid port");
             return nullptr;
         }
-        return std::make_shared<Server>(static_cast<int>(requestedPort), loopbackHttp);
+        return std::make_shared<Server>(port, false);
     } catch (const std::exception& e) {
         g_logger.error("Failed to initialize server: {}", e.what());
         return nullptr;
     }
+}
+
+ServerPtr Server::createLoopbackHttp()
+{
+    try {
+        return std::make_shared<Server>(0, true);
+    } catch (const std::exception& e) {
+        g_logger.error("Failed to initialize loopback HTTP server: {}", e.what());
+        return nullptr;
+    }
+}
+
+int Server::getLocalPort() const
+{
+    if (!m_isOpen)
+        return 0;
+
+    std::error_code error;
+    const auto endpoint = m_acceptor.local_endpoint(error);
+    if (error)
+        return 0;
+    return static_cast<int>(endpoint.port());
 }
 
 void Server::close()

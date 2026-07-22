@@ -30,7 +30,9 @@ class Server final : public LuaObject
 public:
     Server(int port, bool loopbackHttp = false);
     static ServerPtr create(int port);
+    static ServerPtr createLoopbackHttp();
     bool isOpen() const { return m_isOpen; }
+    int getLocalPort() const;
     void close();
 
     void acceptNext();

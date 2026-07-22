@@ -152,17 +152,18 @@ local function failFlow(flow, message)
     })
 end
 
-local function selectLoopbackListener(state)
-    local seed = tonumber(state:sub(1, 8), 16) or 0
-    local firstPort = 49152 + (seed % 16384)
-    for attempt = 0, 31 do
-        local port = 49152 + ((firstPort - 49152 + attempt * 37) % 16384)
-        local listener = Server.create(-port)
-        if listener then
-            return listener, port
-        end
+local function selectLoopbackListener()
+    local listener = Server.createLoopbackHttp()
+    if not listener then
+        return nil, nil
     end
-    return nil, nil
+
+    local port = listener:getLocalPort()
+    if type(port) ~= 'number' or port < 1 or port > 65535 then
+        listener:close()
+        return nil, nil
+    end
+    return listener, port
 end
 
 local function requireSafeEndpoints(identity)
@@ -510,7 +511,7 @@ local function beginAfterAssets(context)
         return
     end
 
-    local listener, port = selectLoopbackListener(state)
+    local listener, port = selectLoopbackListener()
     if not listener then
         local errorBox = displayErrorBox(tr('Login Error'), tr('Unable to open the local authentication callback.'))
         connect(errorBox, { onOk = EnterGame.show })

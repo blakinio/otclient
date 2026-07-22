@@ -123,7 +123,7 @@ if ENABLE_SERVERS then
         -- Configuration for external server ip.net.
         -- @class table
         -- @name ip_net
-        -- @field port TCP port used for connection
+        -- @field port Port used for TCP connection
         -- @field protocol Protocol identifier used by the server
         -- @field httpLogin Indicates if the server allows HTTP login
         --
@@ -159,7 +159,7 @@ if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then
     require("lldebugger").start()
     g_logger.debug("Started LUA debugger.")
 else
-    g_logger.debug("LUA debugger not started (not launched with VSCode local-lua).")
+    g_logger.debug("Lua debugger not started (not launched with VSCode local-lua).")
 end
 
 -- add data directory to the search path
@@ -180,3 +180,52 @@ g_resources.addSearchPath(g_resources.getWorkDir() .. 'mods', true)
 
 -- setup directory for saving configurations
 g_resources.setupUserWriteDir(('%s/'):format(g_app.getCompactName()))
+
+-- search all packages
+g_resources.searchAndAddPackages('/', '.otpkg', true)
+
+-- load settings
+g_configs.loadSettings('/config.otml')
+
+g_modules.discoverModules()
+
+-- libraries modules 0-99
+g_modules.autoLoadModules(99)
+g_modules.ensureModuleLoaded('corelib')
+g_modules.ensureModuleLoaded('gamelib')
+g_modules.ensureModuleLoaded('modulelib')
+g_modules.ensureModuleLoaded("startup")
+
+g_modules.autoLoadModules(999)
+g_modules.ensureModuleLoaded('game_shaders') -- pre load
+
+local function loadModules()
+    -- client modules 100-499
+    g_modules.autoLoadModules(499)
+    g_modules.ensureModuleLoaded('client')
+
+    -- game modules 500-999
+    g_modules.autoLoadModules(999)
+    g_modules.ensureModuleLoaded('game_interface')
+
+    -- mods 1000-9999
+    g_modules.autoLoadModules(9999)
+    g_modules.ensureModuleLoaded('client_mods')
+
+    local script = '/' .. g_app.getCompactName() .. 'rc.lua'
+
+    if g_resources.fileExists(script) then
+        dofile(script)
+    end
+
+    -- uncomment the line below so that modules are reloaded when modified. (Note: Use only mod dev)
+    -- g_modules.enableAutoReload()
+end
+
+-- run updater, must use data.zip
+if g_app.hasUpdater() then
+    g_modules.ensureModuleLoaded("updater")
+    return Updater.init(loadModules)
+end
+
+loadModules()

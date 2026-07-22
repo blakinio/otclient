@@ -6,6 +6,7 @@
 #include "support/mocks/fake_protocol_callback_receiver.h"
 
 #include <client/protocolcodes.h>
+#include <framework/net/server.h>
 
 #include <asio.hpp>
 
@@ -89,6 +90,30 @@ TEST(ProtocolLoopback, ReceivesOneWorldLightPacketFromLocalEphemeralPortAndClose
     EXPECT_FALSE(timedOut);
     ASSERT_TRUE(completed);
     EXPECT_EQ((std::vector<FakeProtocolCallbackReceiver::WorldLight>{ { 0x80, 0xD7 } }), receiver.worldLights());
+}
+
+TEST(ServerLoopback, CreatesDistinctOsAssignedEphemeralPortsAndCloses)
+{
+    const auto first = Server::createLoopbackHttp();
+    const auto second = Server::createLoopbackHttp();
+
+    ASSERT_NE(nullptr, first);
+    ASSERT_NE(nullptr, second);
+    ASSERT_TRUE(first->isOpen());
+    ASSERT_TRUE(second->isOpen());
+
+    const int firstPort = first->getLocalPort();
+    const int secondPort = second->getLocalPort();
+    EXPECT_GE(firstPort, 1);
+    EXPECT_LE(firstPort, 65535);
+    EXPECT_GE(secondPort, 1);
+    EXPECT_LE(secondPort, 65535);
+    EXPECT_NE(firstPort, secondPort);
+
+    first->close();
+    second->close();
+    EXPECT_FALSE(first->isOpen());
+    EXPECT_FALSE(second->isOpen());
 }
 
 } // namespace otclient::test

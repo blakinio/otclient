@@ -213,6 +213,7 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_http", "setUserAgent", &Http::setUserAgent, &g_http);
     g_lua.bindSingletonFunction("g_http", "setEnableTimeOutOnReadWrite", &Http::setEnableTimeOutOnReadWrite, &g_http);
     g_lua.bindSingletonFunction("g_http", "addCustomHeader", &Http::addCustomHeader, &g_http);
+    g_lua.bindSingletonFunction("g_http", "removeCustomHeader", &Http::removeCustomHeader, &g_http);
     g_lua.bindSingletonFunction("g_http", "get", &Http::get, &g_http);
     g_lua.bindSingletonFunction("g_http", "post", &Http::post, &g_http);
     g_lua.bindSingletonFunction("g_http", "download", &Http::download, &g_http);

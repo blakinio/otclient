@@ -184,7 +184,7 @@ local function postJsonWithBearer(url, accessToken, payload, callback)
     -- then overwrite it immediately so later HTTP operations cannot reuse it.
     HTTP.addCustomHeader({ Authorization = 'Bearer ' .. accessToken })
     local ok, operation = pcall(HTTP.postJSON, url, payload, callback)
-    HTTP.addCustomHeader({ Authorization = '' })
+    HTTP.removeCustomHeader('Authorization')
 
     if not ok or type(operation) ~= 'number' or operation < 0 then
         return nil

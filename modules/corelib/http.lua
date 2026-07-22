@@ -292,6 +292,13 @@ function HTTP.addCustomHeader(headerTable)
   end
 end
 
+function HTTP.removeCustomHeader(name)
+  if not g_http or not g_http.removeCustomHeader then
+    return
+  end
+  g_http.removeCustomHeader(name)
+end
+
 connect(g_http,
   {
     onGet = HTTP.onGet,

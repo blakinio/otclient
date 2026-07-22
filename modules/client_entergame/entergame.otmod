@@ -14,15 +14,12 @@ Module
     dofile 'characterlist'
     dofile 'createAccount'
     dofile 'oteryn_identity_core'
-    dofile 'oteryn_session_guard'
     dofile 'oteryn_identity'
     EnterGame.init()
     CharacterList.init()
-    OterynSessionGuard.init()
     OterynIdentity.init()
 
   @onUnload: |
     OterynIdentity.terminate()
-    OterynSessionGuard.terminate()
     EnterGame.terminate()
     CharacterList.terminate()

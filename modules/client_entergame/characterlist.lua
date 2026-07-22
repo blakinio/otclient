@@ -374,6 +374,12 @@ local function tryLogin(charInfo, tries)
         return
     end
 
+    if G.oterynGameSession and (G.oterynGameSessionConsumed or type(G.sessionKey) ~= 'string' or G.sessionKey == '') then
+        CharacterList.hide(true)
+        displayErrorBox(tr('Login Error'), tr('Your Oteryn game session can no longer be reused. Sign in with Oteryn again.'))
+        return
+    end
+
     if g_game.isOnline() then
         if tries == 1 then
             g_game.safeLogout()
@@ -392,6 +398,13 @@ local function tryLogin(charInfo, tries)
 
     g_game.loginWorld(G.account, G.password, charInfo.worldName, charInfo.worldHost, charInfo.worldPort,
                       charInfo.characterName, G.authenticatorToken, G.sessionKey)
+
+    if G.oterynGameSession then
+        -- Game::loginWorld synchronously passes the credential to ProtocolGame::login,
+        -- which copies it into ProtocolGame::m_sessionKey before connect() begins.
+        G.sessionKey = ''
+        G.oterynGameSessionConsumed = true
+    end
 
     loadBox = displayCancelBox(tr('Please wait'), tr('Connecting to game server...'))
     connect(loadBox, {

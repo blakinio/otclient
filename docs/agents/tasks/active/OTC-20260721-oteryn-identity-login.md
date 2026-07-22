@@ -6,8 +6,8 @@ agent: ChatGPT
 branch: feat/OTC-20260721-oteryn-identity-login
 base_branch: main
 created: 2026-07-21T21:00:00Z
-updated: 2026-07-22T09:42:00Z
-last_verified_commit: 392e8c05cc81e95e6b9548a2be8fdbb9b0a15aaf
+updated: 2026-07-22T10:08:00Z
+last_verified_commit: 1824991d2cd2af13838ee96e1581b9d4d4424ed9
 risk: high
 related_issue: ""
 related_pr: "17"
@@ -67,6 +67,7 @@ Implement the OTClient consumer side of the current Oteryn game-auth architectur
 - [x] Oteryn profile never silently falls back to legacy password login; legacy mode remains an explicit separate profile configuration.
 - [x] OAuth code exchange, Platform ticket issuance, and Game Gateway login are separate protocol steps matching merged producer implementations.
 - [x] Gateway worlds are authoritative and characters must reference an exact returned `world_id` before host/port are accepted.
+- [x] Oteryn RSA selection is deferred until the exact Gateway-authoritative `worldHost` is known and is applied immediately before `g_game.loginWorld`.
 - [x] Game Session credential is handed to the existing `GameSessionKey` path once and client auto-replay/reconnect fails closed.
 - [x] `Game::loginWorld` -> `ProtocolGame::login` synchronously copies the Game Session credential into `ProtocolGame::m_sessionKey` before asynchronous connect begins.
 - [x] Oteryn character-list UI does not invent a Free/Premium subscription classification when Gateway does not provide one.
@@ -88,6 +89,7 @@ Implement the OTClient consumer side of the current Oteryn game-auth architectur
 - `Game::loginWorld` creates `ProtocolGame` and calls `ProtocolGame::login(..., sessionKey)` synchronously; `ProtocolGame::login` assigns `m_sessionKey = sessionKey` before `connect(host, port)`.
 - Current Platform OAuth scope is `game:ticket`, ticket issuance is `POST /api/v1/game-auth/tickets`, and the deployed Gateway accepts strict `POST /v1/login` JSON containing only `protocol_version` and `game_login_ticket`.
 - Current Gateway returns `session.credential`, `session.expires_at`, authoritative `worlds` with `id/host/port`, and account-scoped `characters` with `world_id`.
+- Oteryn no longer selects RSA from the local pre-Gateway profile host; selection uses the exact validated Gateway world host at world-entry handoff.
 - The production Canary Game Session compatibility adapter remains unresolved in `GAME_SESSION_CANARY_CONTRACT.md`; this OTClient task cannot claim production world-entry E2E readiness.
 - Client test foundation PR #3 is merged as `9733a8dd4b3b1fc4c3fd862fc32f1f2ea86f8a67` and is reused directly.
 - Container network access cannot clone GitHub in this environment; GitHub connector state/files and GitHub Actions are the executable evidence source. No local build/runtime success is claimed.
@@ -102,6 +104,7 @@ system browser
 -> opaque one-time Game Login Ticket
 -> standalone Game Gateway POST /v1/login
 -> Game Session credential + authoritative worlds/characters
+-> Gateway-authoritative world host selects RSA
 -> selected world through existing OTClient GameSessionKey field
 ```
 
@@ -116,7 +119,7 @@ The loopback callback uses `Server.createLoopbackHttp()` to bind `127.0.0.1:0`; 
 | OAuth token separate from Game Login Ticket | Platform Phase 3 requires bearer-authenticated ticket issuance. |
 | Remove Authorization header after queueing | prevents credential or empty Authorization header from leaking to unrelated later HTTP requests. |
 | Send only `protocol_version` + `game_login_ticket` to Gateway | deployed Gateway uses strict JSON decoding. |
-| Gateway world routing authoritative | client must not invent account/world ownership. |
+| Gateway world routing and RSA host authoritative | client must not invent account/world routing or derive world crypto selection from stale local profile routing. |
 | Reuse existing `GameSessionKey` only as client wire field | existing OTClient sends session key + character without account/password; production Canary adapter remains pending. |
 | One-shot Game Session/no auto-replay | reconnect semantics are not approved by Phase 6 contract; fail closed. |
 | No automatic password fallback | prevents local UI/config downgrade from bypassing first-party native auth. |
@@ -128,7 +131,9 @@ The loopback callback uses `Server.createLoopbackHttp()` to bind `127.0.0.1:0`; 
 |---|---|---|
 | `1f0358a6e34a53d9b47aae04a1ecad885126eafc`, run `29907489042` | PASS draft required gate | Lua syntax, workflow validation and informational analysis passed; platform builds skipped because PR was draft. |
 | run `29908319555` | superseded/cancelled | concurrency cancellation after ready-for-review transition; not a code failure. |
-| `392e8c05cc81e95e6b9548a2be8fdbb9b0a15aaf`, run `29908924661` | ACTION_REQUIRED, no jobs | bot-authored cleanup commit did not produce executable PR jobs; this checkpoint commit exists to trigger normal validation on identical runtime code. |
+| `392e8c05cc81e95e6b9548a2be8fdbb9b0a15aaf`, run `29908924661` | ACTION_REQUIRED, no jobs | bot-authored cleanup commit did not produce executable PR jobs. |
+| `e9843b5c0f8863fcc906d73d63f92fb31534bfdd`, run `29909439825` | SUPERSEDED | full matrix started before the authoritative Gateway-world RSA correction; it is not the final merge gate. |
+| `1824991d2cd2af13838ee96e1581b9d4d4424ed9` | runtime correction | removed local-profile RSA selection and moved it to validated Gateway `worldHost`; this checkpoint commit triggers authoritative final CI on identical runtime code. |
 
 Never write `passed` without verification.
 
@@ -143,7 +148,7 @@ Never write `passed` without verification.
 
 - Continued existing PR #17 rather than creating a duplicate.
 - Corrected stale `OAuth token -> ticket -> login-server` design to current Platform ticket + standalone Game Gateway architecture.
-- Added authoritative `world_id` routing and one-shot Game Session guard.
+- Added authoritative `world_id` routing and one-shot Game Session handoff.
 - Revalidated producer contracts against Platform PRs #117/#119/#121/#122.
 
 ## 2026-07-22 — hardening
@@ -154,6 +159,8 @@ Never write `passed` without verification.
 - Proved `ProtocolGame::login` copies session credential before asynchronous connect.
 - Changed Oteryn account UI to display neutral `Oteryn Account` and suppress unsupported premium upsell classification.
 - Added explicit `Http.removeCustomHeader` and removed temporary Bearer Authorization from shared HTTP state after ticket request queueing.
+- Moved Game Session consumption to the exact `g_game.loginWorld` handoff instead of an outer UI wrapper.
+- Moved RSA selection from the local pre-Gateway profile host to the exact validated Gateway `worldHost` immediately before world login.
 
 # Failed approaches and dead ends
 
@@ -161,9 +168,9 @@ Never write `passed` without verification.
 - Client-side pseudo-random ephemeral-port probing: replaced by OS-assigned port `0`.
 - OAuth token endpoint returning the game ticket: rejected after producer revalidation.
 - Sending ticket directly to legacy/login-server: rejected after Gateway MVP revalidation.
-- Client-authoritative account/world identifiers: rejected.
+- Client-authoritative account/world identifiers or pre-Gateway world RSA selection: rejected.
 - Blind Game Session auto-reconnect/replay: rejected until Phase 6 defines semantics.
-- Merging before full diff review: rejected; review caught and repaired the accidental `init.lua` startup-tail deletion.
+- Merging before full diff review: rejected; review caught and repaired the accidental `init.lua` startup-tail deletion and later the stale pre-Gateway RSA selection.
 
 # Remaining work
 
@@ -172,7 +179,7 @@ Never write `passed` without verification.
 3. Perform final changed-file/security review and confirm no temporary workflows remain.
 4. Mark this task `ready`, update exact workflow evidence, and squash-merge PR #17 only if all required/relevant checks are green.
 5. Archive the task after merge.
-6. Continue autonomously to the separately scoped Phase 6 Canary Game Session adapter preflight; production E2E remains blocked until that adapter and Phase 7 are proven.
+6. Continue autonomously to the separately scoped Phase 6 Canary Game Session adapter; production E2E remains blocked until that adapter and Phase 7 are proven.
 
 # Handoff
 
@@ -182,7 +189,7 @@ Read this task and `docs/auth/oteryn-identity-login.md`, then inspect live PR #1
 
 ## Do not repeat
 
-Do not reintroduce direct ticket-to-login-server flow, persistent Oteryn password storage, client-authoritative world routing, OAuth refresh-token use, client-side port probing, global retained Authorization headers, or automatic Game Session replay.
+Do not reintroduce direct ticket-to-login-server flow, persistent Oteryn password storage, client-authoritative world routing, pre-Gateway local-host RSA selection, OAuth refresh-token use, client-side port probing, global retained Authorization headers, or automatic Game Session replay.
 
 ## Required reads
 

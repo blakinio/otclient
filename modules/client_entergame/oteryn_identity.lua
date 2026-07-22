@@ -7,7 +7,7 @@ local enterGameWindow
 local legacyDoLogin
 local originalWindowHeight
 local hostTextEdit
-local callbackPath = '/oteryn/oauth/callback'
+local callbackPath = '/callback'
 
 local function destroyWidget(widget)
     if widget then
@@ -124,9 +124,8 @@ local function clearSensitiveFlowFields(flow)
     flow.codeVerifier = nil
     flow.state = nil
     flow.authorizationCode = nil
-    flow.gameTicket = nil
     flow.accessToken = nil
-    flow.refreshToken = nil
+    flow.gameTicket = nil
 end
 
 local function finishFlow(flow)
@@ -166,97 +165,50 @@ local function selectLoopbackListener(state)
     return nil, nil
 end
 
-local function requireSafeEndpoints(identity, server)
+local function requireSafeEndpoints(identity)
     local allowInsecureLoopback = identity.allowInsecureLoopback == true
     return Core.isSafeEndpoint(identity.authorizationEndpoint, allowInsecureLoopback) and
         Core.isSafeEndpoint(identity.tokenEndpoint, allowInsecureLoopback) and
-        Core.isSafeEndpoint(server.oterynIdentity.loginEndpoint, allowInsecureLoopback)
+        Core.isSafeEndpoint(identity.ticketEndpoint, allowInsecureLoopback) and
+        Core.isSafeEndpoint(identity.gatewayLoginEndpoint, allowInsecureLoopback)
 end
 
-local function buildCharacters(response)
-    if type(response.worlds) ~= 'table' or type(response.characters) ~= 'table' then
+local function postJsonWithBearer(url, accessToken, payload, callback)
+    if type(accessToken) ~= 'string' or accessToken == '' then
         return nil
     end
 
-    local worlds = {}
-    for _, world in ipairs(response.worlds) do
-        if world.id == nil or type(world.name) ~= 'string' or type(world.externaladdressprotected) ~= 'string' or
-            tonumber(world.externalportprotected) == nil then
-            return nil
-        end
-        worlds[world.id] = {
-            name = world.name,
-            ip = world.externaladdressprotected,
-            port = tonumber(world.externalportprotected),
-            previewState = tonumber(world.previewstate) == 1,
-            pvptype = world.pvptype
-        }
-    end
+    -- g_http copies custom headers into the request before postJSON returns.
+    -- Keep the bearer globally visible only for that synchronous queueing window,
+    -- then overwrite it immediately so later HTTP operations cannot reuse it.
+    HTTP.addCustomHeader({ Authorization = 'Bearer ' .. accessToken })
+    local ok, operation = pcall(HTTP.postJSON, url, payload, callback)
+    HTTP.addCustomHeader({ Authorization = '' })
 
-    local characters = {}
-    for index, character in ipairs(response.characters) do
-        local world = worlds[character.worldid]
-        if not world or type(character.name) ~= 'string' or character.name == '' then
-            return nil
-        end
-        characters[index] = {
-            name = character.name,
-            level = character.level,
-            main = character.ismaincharacter,
-            dailyreward = character.dailyrewardstate,
-            hidden = character.ishidden,
-            vocation = character.vocation,
-            outfitid = character.outfitid,
-            headcolor = character.headcolor,
-            torsocolor = character.torsocolor,
-            legscolor = character.legscolor,
-            detailcolor = character.detailcolor,
-            addonsflags = character.addonsflags,
-            worldName = world.name,
-            worldIp = world.ip,
-            worldPort = world.port,
-            previewState = world.previewState,
-            pvptype = world.pvptype
-        }
+    if not ok or type(operation) ~= 'number' or operation < 0 then
+        return nil
     end
-    return characters
+    return operation
 end
 
-local function completeLogin(flow, response)
+local function completeGatewayLogin(flow, response)
     if activeFlow ~= flow then
         return
     end
-    if type(response) ~= 'table' or tonumber(response.protocol_version) ~= 1 or type(response.session) ~= 'table' then
-        failFlow(flow, 'The login server returned an invalid response.')
+
+    local normalized = Core.normalizeGatewayLoginResponse(response)
+    if not normalized then
+        failFlow(flow, 'The Oteryn Game Gateway returned an invalid login response.')
         return
     end
 
-    local sessionKey = response.session.sessionkey
-    if type(sessionKey) ~= 'string' or sessionKey == '' then
-        failFlow(flow, 'The login server returned an invalid session.')
-        return
-    end
-
-    local characters = buildCharacters(response)
-    if not characters then
-        failFlow(flow, 'The login server returned an invalid character list.')
-        return
-    end
-
-    local premiumUntil = tonumber(response.session.premiumuntil) or 0
-    local account = {
-        status = response.session.status or '',
-        premDays = math.max(0, math.floor((premiumUntil - os.time()) / 86400)),
-        subStatus = premiumUntil > os.time() and SubscriptionStatus.Premium or SubscriptionStatus.Free
-    }
-
-    -- The Oteryn path intentionally leaves primary credentials empty. Modern
-    -- game-world login must use GameSessionKey, which serializes sessionKey and
-    -- character name instead of account/password.
     G.account = ''
     G.password = ''
     G.authenticatorToken = ''
-    G.sessionKey = sessionKey
+    G.sessionKey = normalized.credential
+    G.oterynGameSession = true
+    G.oterynGameSessionConsumed = false
+    G.oterynGameSessionExpiresAt = normalized.expiresAt
     G.host = flow.host
     G.port = flow.port
     G.clientVersion = flow.clientVersion
@@ -266,13 +218,20 @@ local function completeLogin(flow, response)
     g_settings.set('client-version', flow.clientVersion)
     g_settings.set('last-auth-mode', 'oteryn_identity')
 
+    local account = {
+        status = AccountStatus.Ok,
+        premDays = 0,
+        subStatus = SubscriptionStatus.Free,
+        oterynIdentity = true
+    }
+
     finishFlow(flow)
     EnterGame.hide()
-    CharacterList.create(characters, account)
+    CharacterList.create(normalized.characters, account)
     CharacterList.show()
 end
 
-local function exchangeTicketWithLoginServer(flow)
+local function loginWithGateway(flow)
     if activeFlow ~= flow then
         return
     end
@@ -285,38 +244,92 @@ local function exchangeTicketWithLoginServer(flow)
 
     local request = {
         protocol_version = 1,
-        auth_mode = 'oteryn_identity',
-        game_ticket = ticket,
-        client_version = flow.clientVersion
+        game_login_ticket = ticket
     }
 
-    local endpoint = flow.server.oterynIdentity.loginEndpoint
-    flow.httpOperation = HTTP.postJSON(endpoint, request, function(response, err)
+    local operation = HTTP.postJSON(flow.identity.gatewayLoginEndpoint, request, function(response, err)
         if activeFlow ~= flow then
             return
         end
         flow.httpOperation = nil
-        if err then
-            local decoded = safeJsonDecode(response)
-            local code = decoded and decoded.error_code or nil
-            failFlow(flow, Core.mapLoginServerError(code))
-            return
-        end
         response = safeJsonDecode(response)
-        if not response then
-            failFlow(flow, 'The login server returned an invalid response.')
+        if err then
+            failFlow(flow, Core.mapGatewayError(response and response.error or nil))
             return
         end
-        if response.error_code then
-            failFlow(flow, Core.mapLoginServerError(response.error_code))
+        if type(response) ~= 'table' then
+            failFlow(flow, 'The Oteryn Game Gateway returned an invalid response.')
             return
         end
-        completeLogin(flow, response)
+        if response.error then
+            failFlow(flow, Core.mapGatewayError(response.error))
+            return
+        end
+        completeGatewayLogin(flow, response)
     end)
 
-    -- HTTP owns the queued request body now. Drop the Lua reference immediately;
-    -- the ticket is never written to settings and is not retained for retries.
+    if type(operation) ~= 'number' or operation < 0 then
+        failFlow(flow, 'The Oteryn Game Gateway is temporarily unavailable. Please try again.')
+        return
+    end
+
+    flow.httpOperation = operation
+    -- HTTP owns the queued JSON body now. Never retain or retry the one-time ticket.
     flow.gameTicket = nil
+end
+
+local function issueGameLoginTicket(flow)
+    if activeFlow ~= flow then
+        return
+    end
+
+    local accessToken = flow.accessToken
+    if type(accessToken) ~= 'string' or accessToken == '' then
+        failFlow(flow, 'Authentication expired. Please sign in again.')
+        return
+    end
+
+    local operation = postJsonWithBearer(flow.identity.ticketEndpoint, accessToken, {
+        protocol_version = 1
+    }, function(response, err)
+        if activeFlow ~= flow then
+            return
+        end
+        flow.httpOperation = nil
+        response = safeJsonDecode(response)
+        if err then
+            failFlow(flow, Core.mapTicketIssueError(response and response.error or nil))
+            return
+        end
+        if type(response) ~= 'table' or tonumber(response.protocol_version) ~= 1 then
+            failFlow(flow, 'Oteryn returned an invalid game login ticket response.')
+            return
+        end
+        if response.error then
+            failFlow(flow, Core.mapTicketIssueError(response.error))
+            return
+        end
+
+        local ticketTtl = tonumber(response.expires_in)
+        local maximumTtl = tonumber(flow.identity.maxGameTicketTtlSeconds) or 60
+        if type(response.ticket) ~= 'string' or response.ticket == '' or #response.ticket > 4096 or
+            not ticketTtl or ticketTtl <= 0 or ticketTtl > maximumTtl then
+            failFlow(flow, 'Oteryn returned an invalid game login ticket.')
+            return
+        end
+
+        flow.gameTicket = response.ticket
+        loginWithGateway(flow)
+    end)
+
+    -- The bearer was copied into the queued request. Drop the Lua reference now.
+    flow.accessToken = nil
+
+    if not operation then
+        failFlow(flow, 'Oteryn could not create a game login ticket. Please sign in again.')
+        return
+    end
+    flow.httpOperation = operation
 end
 
 local function exchangeAuthorizationCode(flow)
@@ -330,11 +343,10 @@ local function exchangeAuthorizationCode(flow)
         client_id = identity.clientId,
         code = flow.authorizationCode,
         redirect_uri = flow.redirectUri,
-        code_verifier = flow.codeVerifier,
-        audience = flow.server.oterynIdentity.audience
+        code_verifier = flow.codeVerifier
     })
 
-    flow.httpOperation = HTTP.post(identity.tokenEndpoint, body, function(data, err)
+    local operation = HTTP.post(identity.tokenEndpoint, body, function(data, err)
         if activeFlow ~= flow then
             return
         end
@@ -352,32 +364,25 @@ local function exchangeAuthorizationCode(flow)
             failFlow(flow, Core.mapOAuthError(response.error))
             return
         end
+        if type(response.access_token) ~= 'string' or response.access_token == '' then
+            failFlow(flow, 'Oteryn returned an invalid authentication response.')
+            return
+        end
 
-        -- OAuth access/refresh credentials, if returned by the platform, are not
-        -- persisted because this repository currently has no OS credential-store
-        -- abstraction. The game ticket is the only credential forwarded onward.
+        -- Refresh tokens are deliberately ignored in the first release.
         flow.accessToken = response.access_token
-        flow.refreshToken = response.refresh_token
-        flow.gameTicket = response.game_login_ticket
-        local ticketTtl = tonumber(response.game_login_ticket_expires_in)
-        local maximumTtl = tonumber(identity.maxGameTicketTtlSeconds) or 60
-        if type(flow.gameTicket) ~= 'string' or flow.gameTicket == '' or not ticketTtl or ticketTtl <= 0 or ticketTtl > maximumTtl then
-            failFlow(flow, 'Oteryn returned an invalid game login ticket.')
-            return
-        end
-        if response.game_login_ticket_audience and response.game_login_ticket_audience ~= flow.server.oterynIdentity.audience then
-            failFlow(flow, 'Oteryn returned a game login ticket for a different server.')
-            return
-        end
-
-        flow.authorizationCode = nil
-        flow.codeVerifier = nil
-        flow.accessToken = nil
-        flow.refreshToken = nil
-        exchangeTicketWithLoginServer(flow)
+        issueGameLoginTicket(flow)
     end)
 
+    -- HTTP owns the encoded request body now; clear code and verifier immediately.
     flow.authorizationCode = nil
+    flow.codeVerifier = nil
+
+    if type(operation) ~= 'number' or operation < 0 then
+        failFlow(flow, 'Oteryn Identity is temporarily unavailable. Please try again.')
+        return
+    end
+    flow.httpOperation = operation
 end
 
 local function onLoopbackRequest(flow, first, second, third, fourth)
@@ -385,8 +390,6 @@ local function onLoopbackRequest(flow, first, second, third, fourth)
         return
     end
 
-    -- LuaObject callbacks may expose only explicit arguments or include the
-    -- object as the first value depending on binding context. Accept both forms.
     local target, callbackError
     if type(first) == 'string' then
         target, callbackError = first, second
@@ -403,7 +406,8 @@ local function onLoopbackRequest(flow, first, second, third, fourth)
 
     local result, validationError = Core.parseCallbackTarget(target, callbackPath, flow.state)
     if not result then
-        if validationError == 'state_mismatch' or validationError == 'path_mismatch' or validationError == 'invalid_callback' or validationError == 'duplicate_parameter' then
+        if validationError == 'state_mismatch' or validationError == 'path_mismatch' or
+            validationError == 'invalid_callback' or validationError == 'duplicate_parameter' then
             if flow.listener then
                 flow.listener:acceptNext()
             end
@@ -439,12 +443,13 @@ local function openAuthorization(flow)
         response_type = 'code',
         client_id = identity.clientId,
         redirect_uri = flow.redirectUri,
-        scope = identity.scope or 'game.login',
+        scope = identity.scope,
         code_challenge = challenge,
         code_challenge_method = 'S256',
         state = flow.state
     })
-    local authorizationUrl = identity.authorizationEndpoint .. (identity.authorizationEndpoint:find('?', 1, true) and '&' or '?') .. query
+    local authorizationUrl = identity.authorizationEndpoint ..
+        (identity.authorizationEndpoint:find('?', 1, true) and '&' or '?') .. query
 
     flow.listener.onHttpRequest = function(first, second, third, fourth)
         onLoopbackRequest(flow, first, second, third, fourth)
@@ -476,7 +481,8 @@ local function beginAfterAssets(context)
         connect(errorBox, { onOk = EnterGame.show })
         return
     end
-    if type(identity.clientId) ~= 'string' or identity.clientId == '' or not requireSafeEndpoints(identity, server) then
+    if type(identity.clientId) ~= 'string' or identity.clientId == '' or identity.scope ~= 'game:ticket' or
+        not requireSafeEndpoints(identity) then
         local errorBox = displayErrorBox(tr('Login Error'), tr('Sign in with Oteryn is not securely configured.'))
         connect(errorBox, { onOk = EnterGame.show })
         return
@@ -486,7 +492,7 @@ local function beginAfterAssets(context)
     g_game.setProtocolVersion(g_game.getClientProtocolVersion(context.clientVersion))
     g_game.chooseRsa(context.host)
     if not g_game.getFeature(GameSessionKey) then
-        local errorBox = displayErrorBox(tr('Login Error'), tr('This server does not support session-key game login required by Oteryn.'))
+        local errorBox = displayErrorBox(tr('Login Error'), tr('This server does not support game-session login required by Oteryn.'))
         connect(errorBox, { onOk = EnterGame.show })
         return
     end
@@ -583,20 +589,21 @@ function OterynIdentity.updateUi()
     if not enterGameWindow or not oterynButton then
         return
     end
+
     local context = getSelectedContext()
     local identity = getIdentityConfig()
-    local enabled = identity and identity.enabled == true and context and Core.serverSupportsOteryn(context.server)
-    oterynButton:setVisible(enabled and true or false)
-    oterynButton:setEnabled(enabled and activeFlow == nil)
+    local oterynMode = identity and identity.enabled == true and context and Core.serverSupportsOteryn(context.server)
+    oterynButton:setVisible(oterynMode and true or false)
+    oterynButton:setEnabled(oterynMode and activeFlow == nil)
 
-    local legacyAllowed = not context or Core.legacyAllowed(context.server)
     local ids = {
         'accountNameTextEdit', 'accountPasswordTextEdit', 'rememberEmailBox', 'autoLoginBox', 'httpLoginBox'
     }
     for _, id in ipairs(ids) do
         local widget = enterGameWindow:getChildById(id)
         if widget then
-            widget:setEnabled(legacyAllowed)
+            widget:setVisible(not oterynMode)
+            widget:setEnabled(not oterynMode)
         end
     end
 end
@@ -626,10 +633,14 @@ function OterynIdentity.init()
     legacyDoLogin = EnterGame.doLogin
     EnterGame.doLogin = function(...)
         local context = getSelectedContext()
-        if context and context.server and context.server.authMode == 'oteryn_identity' and not Core.legacyAllowed(context.server) then
+        if context and Core.serverSupportsOteryn(context.server) then
             OterynIdentity.start()
             return
         end
+
+        G.oterynGameSession = false
+        G.oterynGameSessionConsumed = false
+        G.oterynGameSessionExpiresAt = nil
         return legacyDoLogin(...)
     end
 

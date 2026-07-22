@@ -10,14 +10,16 @@ Services = {
     --getCoinsUrl = "http://localhost/?subtopic=shop&step=terms", --./game_market
 
     -- Native desktop OAuth 2.0 Authorization Code + PKCE integration.
-    -- Fail closed by default: deployment must provide real HTTPS endpoints and
-    -- opt each compatible server into authMode = "oteryn_identity" below.
+    -- Fail closed by default. Deployment must provide the exact Platform and
+    -- Game Gateway HTTPS endpoints plus the registered public native client id.
     oterynIdentity = {
         enabled = false,
         authorizationEndpoint = "",
         tokenEndpoint = "",
-        clientId = "otclient-desktop",
-        scope = "game.login",
+        ticketEndpoint = "",
+        gatewayLoginEndpoint = "",
+        clientId = "",
+        scope = "game:ticket",
         callbackTimeoutMillis = 120000,
         maxGameTicketTtlSeconds = 60,
         -- Development only. Production endpoints must use HTTPS. When enabled,
@@ -78,18 +80,19 @@ if ENABLE_SERVERS then
     -- Each entry defines port, protocol, and authentication options.
     --
     -- Migration controls:
-    --   authMode = "legacy" keeps the existing password flow as the primary mode.
-    --   authMode = "oteryn_identity" enables the Oteryn button when the nested
-    --   contract is also enabled and Services.oterynIdentity is configured.
-    --   legacyAuthEnabled = false prevents Enter/Login from falling back to the
-    --   password flow for that server.
+    --   authMode = "legacy" keeps the existing password flow.
+    --   authMode = "oteryn_identity" makes browser-based Oteryn authentication
+    --   the authoritative flow for the profile.
+    --   legacyAuthEnabled is an explicit deployment compatibility flag; the
+    --   Oteryn UI never silently falls back to password authentication.
     --
-    -- A compatible Oteryn server entry additionally declares:
+    -- A compatible Oteryn profile additionally declares only the client-facing
+    -- protocol contract. Identity/Platform/Gateway endpoints are deployment-owned
+    -- Services.oterynIdentity settings and world routing comes from Game Gateway.
+    --
     --   oterynIdentity = {
     --       enabled = true,
-    --       protocolVersion = 1,
-    --       audience = "<login-server-audience>",
-    --       loginEndpoint = "https://<login-server>/v1/game-login"
+    --       protocolVersion = 1
     --   }
     --
     -- @table Servers_init
@@ -177,52 +180,3 @@ g_resources.addSearchPath(g_resources.getWorkDir() .. 'mods', true)
 
 -- setup directory for saving configurations
 g_resources.setupUserWriteDir(('%s/'):format(g_app.getCompactName()))
-
--- search all packages
-g_resources.searchAndAddPackages('/', '.otpkg', true)
-
--- load settings
-g_configs.loadSettings('/config.otml')
-
-g_modules.discoverModules()
-
--- libraries modules 0-99
-g_modules.autoLoadModules(99)
-g_modules.ensureModuleLoaded('corelib')
-g_modules.ensureModuleLoaded('gamelib')
-g_modules.ensureModuleLoaded('modulelib')
-g_modules.ensureModuleLoaded("startup")
-
-g_modules.autoLoadModules(999)
-g_modules.ensureModuleLoaded('game_shaders') -- pre load
-
-local function loadModules()
-    -- client modules 100-499
-    g_modules.autoLoadModules(499)
-    g_modules.ensureModuleLoaded('client')
-
-    -- game modules 500-999
-    g_modules.autoLoadModules(999)
-    g_modules.ensureModuleLoaded('game_interface')
-
-    -- mods 1000-9999
-    g_modules.autoLoadModules(9999)
-    g_modules.ensureModuleLoaded('client_mods')
-
-    local script = '/' .. g_app.getCompactName() .. 'rc.lua'
-
-    if g_resources.fileExists(script) then
-        dofile(script)
-    end
-
-    -- uncomment the line below so that modules are reloaded when modified. (Note: Use only mod dev)
-    -- g_modules.enableAutoReload()
-end
-
--- run updater, must use data.zip
-if g_app.hasUpdater() then
-    g_modules.ensureModuleLoaded("updater")
-    return Updater.init(loadModules)
-end
-
-loadModules()

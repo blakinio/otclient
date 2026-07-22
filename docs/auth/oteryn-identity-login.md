@@ -2,7 +2,7 @@
 
 ## Status
 
-`CLIENT IMPLEMENTATION IN PROGRESS — PLATFORM AND GAME GATEWAY PRODUCERS EXIST; PRODUCTION CANARY GAME SESSION ADAPTER IS NOT YET SELECTED`
+`CLIENT IMPLEMENTATION VALIDATING — PLATFORM AND GAME GATEWAY PRODUCERS EXIST; PRODUCTION CANARY GAME SESSION ADAPTER IS NOT YET SELECTED`
 
 This document describes the first-party Oteryn authentication path implemented by OTClient task `OTC-20260721-oteryn-identity-login` and coordinated as `OTS-20260721-oteryn-identity-auth`.
 
@@ -84,7 +84,7 @@ The client:
 1. creates a high-entropy `state` and PKCE `code_verifier` using CSPRNG-backed UUID material;
 2. derives `code_challenge = BASE64URL(SHA256(code_verifier))`;
 3. binds a desktop HTTP callback listener to IPv4 loopback only;
-4. uses callback path `/callback` and a runtime ephemeral port;
+4. uses callback path `/callback` and an OS-assigned ephemeral port obtained by binding `127.0.0.1:0`;
 5. opens the authorization URL in the operating system browser;
 6. accepts only the configured callback path;
 7. requires exact `state` equality;
@@ -104,7 +104,7 @@ Only one Oteryn flow may be active at a time.
 | OAuth access token | process memory, cleared after ticket request is queued | Platform ticket endpoint only |
 | OAuth refresh token | ignored | none |
 | Game Login Ticket | process memory, cleared after Gateway request is queued | Game Gateway only |
-| Game Session credential | process memory until first world-login handoff | Canary game connection only |
+| Game Session credential | process memory until first actual world-login handoff | Canary game connection only |
 
 No Oteryn password, OAuth token, ticket or Game Session credential is written to `g_settings`.
 
@@ -130,7 +130,7 @@ Expected response:
 }
 ```
 
-The access token is not sent to Game Gateway or Canary. The bearer header exists only while the HTTP layer synchronously copies it into the queued ticket request and is overwritten immediately afterwards.
+The access token is not sent to Game Gateway or Canary. The bearer header exists only while the HTTP layer synchronously copies it into the queued ticket request; the temporary `Authorization` entry is removed from shared HTTP header state immediately afterwards.
 
 ## Game Gateway login
 
@@ -166,8 +166,10 @@ For the Oteryn path:
 - `G.account`, `G.password` and `G.authenticatorToken` are empty;
 - `G.sessionKey` temporarily contains only the Gateway-issued Game Session credential;
 - the character list contains only Gateway-authoritative world routing;
-- the session credential is cleared after the first normal offline `CharacterList.doLogin` handoff;
-- a second attempt or auto-reconnect fails closed and requires a fresh `Sign in with Oteryn` flow.
+- `CharacterList.tryLogin` calls `g_game.loginWorld` first; C++ synchronously copies the session credential through `Game::loginWorld` into `ProtocolGame::m_sessionKey` before `connect()` begins;
+- only after that actual handoff returns does Lua clear `G.sessionKey` and mark the Oteryn Game Session consumed;
+- a second attempt or auto-reconnect fails closed and requires a fresh `Sign in with Oteryn` flow;
+- lack of subscription information from Gateway is shown neutrally as `Oteryn Account`, without inventing Free/Premium status or showing premium upsell based on missing data.
 
 This client-side handoff does not prove that production Canary accepts the credential. The exact Game Session adapter remains governed by `GAME_SESSION_CANARY_CONTRACT.md` and requires a separate Phase 6 implementation/evidence gate.
 
@@ -203,6 +205,7 @@ Cancellation or timeout closes the listener, cancels the active HTTP operation w
 - production service endpoints require HTTPS;
 - no confidential OAuth client secret is embedded in OTClient;
 - no bearer credential is put in a URL/query string;
+- temporary bearer HTTP state is removed after the one ticket request is queued;
 - ticket and Game Session values are never intentionally logged;
 - world routing is server-authoritative;
 - unsupported protocol versions fail closed;

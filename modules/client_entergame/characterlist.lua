@@ -104,7 +104,7 @@ local function isPremiumAccount(account)
 end
 
 local function updatePremiumBenefitsVisibility(account)
-    local showBenefits = shouldShowAppearance() and SHOW_PREMIUM_WIDGETS and not isPremiumAccount(account)
+    local showBenefits = shouldShowAppearance() and SHOW_PREMIUM_WIDGETS and (not account or not account.oterynIdentity) and not isPremiumAccount(account)
     if premiumBenefitsPanel then
         premiumBenefitsPanel:setVisible(showBenefits)
         if showBenefits then
@@ -731,7 +731,9 @@ function CharacterList.create(characters, account, otui)
         status = tr(' (Suspended)')
     end
 
-    if account.subStatus == SubscriptionStatus.Free then
+    if account.oterynIdentity then
+        accountStatusLabel:setText(('%s%s'):format(tr('Oteryn Account'), status))
+    elseif account.subStatus == SubscriptionStatus.Free then
         accountStatusLabel:setText(('%s%s'):format(tr('Free Account'), status))
         if accountStatusIcon then
             accountStatusIcon:setImageSource('/images/game/entergame/nopremium')

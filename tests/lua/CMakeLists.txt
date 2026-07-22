@@ -28,9 +28,10 @@ add_test(
         ${OTCLIENT_LUA_EXECUTABLE}
         ${OTCLIENT_LUA_RUNNER}
         ${CMAKE_CURRENT_SOURCE_DIR}/contracts/resource_types_test.lua
+        ${CMAKE_CURRENT_SOURCE_DIR}/contracts/oteryn_identity_core_test.lua
 )
 set_tests_properties(otclient_lua_contract_tests PROPERTIES
-    LABELS "lua;unit;protocol"
+    LABELS "lua;unit;protocol;auth"
     TIMEOUT 15
 )
 

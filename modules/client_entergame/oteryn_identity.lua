@@ -491,7 +491,6 @@ local function beginAfterAssets(context)
 
     g_game.setClientVersion(context.clientVersion)
     g_game.setProtocolVersion(g_game.getClientProtocolVersion(context.clientVersion))
-    g_game.chooseRsa(context.host)
     if not g_game.getFeature(GameSessionKey) then
         local errorBox = displayErrorBox(tr('Login Error'), tr('This server does not support game-session login required by Oteryn.'))
         connect(errorBox, { onOk = EnterGame.show })

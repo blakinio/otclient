@@ -396,6 +396,13 @@ local function tryLogin(charInfo, tries)
 
     CharacterList.hide()
 
+    if G.oterynGameSession then
+        -- Oteryn world routing is authoritative only after the Gateway response.
+        -- Select the RSA key from the exact returned world host immediately before
+        -- handing the Game Session credential to ProtocolGame.
+        g_game.chooseRsa(charInfo.worldHost)
+    end
+
     g_game.loginWorld(G.account, G.password, charInfo.worldName, charInfo.worldHost, charInfo.worldPort,
                       charInfo.characterName, G.authenticatorToken, G.sessionKey)
 

@@ -54,6 +54,14 @@ local function urlDecode(value)
     return invalid and nil or value
 end
 
+local function normalizePositiveInteger(value)
+    local number = tonumber(value)
+    if not number or number < 1 or number ~= math.floor(number) then
+        return nil
+    end
+    return number
+end
+
 function OterynIdentityCore.urlEncode(value)
     return (tostring(value or ''):gsub('([^%w%-._~])', function(char)
         return string.format('%%%02X', string.byte(char))
@@ -142,9 +150,7 @@ function OterynIdentityCore.serverSupportsOteryn(server)
         return false
     end
     local auth = server.oterynIdentity
-    return server.authMode == 'oteryn_identity' and auth.enabled == true and
-        tonumber(auth.protocolVersion) == 1 and type(auth.audience) == 'string' and auth.audience ~= '' and
-        type(auth.loginEndpoint) == 'string' and auth.loginEndpoint ~= ''
+    return server.authMode == 'oteryn_identity' and auth.enabled == true and tonumber(auth.protocolVersion) == 1
 end
 
 function OterynIdentityCore.legacyAllowed(server)
@@ -159,28 +165,104 @@ function OterynIdentityCore.mapOAuthError(code)
         return 'Authentication was cancelled or denied.'
     end
     if code == 'temporarily_unavailable' or code == 'server_error' then
-        return 'Oteryn is temporarily unavailable. Please try again.'
+        return 'Oteryn Identity is temporarily unavailable. Please try again.'
     end
     if code == 'invalid_grant' then
-        return 'Authentication expired. Please try again.'
+        return 'Authentication expired. Please sign in again.'
     end
     return 'Authentication failed. Please try again.'
 end
 
-function OterynIdentityCore.mapLoginServerError(code)
-    if code == 'ticket_expired' then
-        return 'The game login ticket expired. Please sign in again.'
+function OterynIdentityCore.mapTicketIssueError(code)
+    if code == 'unauthenticated' then
+        return 'Authentication expired. Please sign in again.'
     end
-    if code == 'ticket_reused' then
-        return 'The game login ticket was already used. Please sign in again.'
+    if code == 'game_login_unavailable' then
+        return 'Game login is currently unavailable. Please sign in again later.'
     end
-    if code == 'ticket_invalid' or code == 'ticket_audience_mismatch' then
-        return 'The game login ticket was rejected. Please sign in again.'
+    return 'Oteryn could not create a game login ticket. Please sign in again.'
+end
+
+function OterynIdentityCore.mapGatewayError(code)
+    if code == 'invalid_login' then
+        return 'The game login ticket is no longer valid. Please sign in again.'
     end
-    if code == 'rate_limited' then
-        return 'Too many login attempts. Please wait and try again.'
+    if code == 'invalid_request' then
+        return 'This OTClient build is not compatible with the configured Game Gateway.'
     end
-    return 'The login server is unavailable. Please try again.'
+    return 'The Oteryn Game Gateway is temporarily unavailable. Please try again.'
+end
+
+function OterynIdentityCore.normalizeGatewayLoginResponse(response)
+    if type(response) ~= 'table' or tonumber(response.protocol_version) ~= 1 then
+        return nil, 'invalid_protocol_version'
+    end
+    if type(response.session) ~= 'table' then
+        return nil, 'invalid_session'
+    end
+
+    local credential = response.session.credential
+    local expiresAt = response.session.expires_at
+    if type(credential) ~= 'string' or credential == '' or #credential > 4096 then
+        return nil, 'invalid_session'
+    end
+    if type(expiresAt) ~= 'string' or expiresAt == '' or #expiresAt > 128 then
+        return nil, 'invalid_session'
+    end
+    if type(response.worlds) ~= 'table' or type(response.characters) ~= 'table' then
+        return nil, 'invalid_character_list'
+    end
+
+    local worlds = {}
+    local worldCount = 0
+    for _, world in ipairs(response.worlds) do
+        local worldId = normalizePositiveInteger(world.id)
+        local port = normalizePositiveInteger(world.port)
+        if not worldId or worlds[worldId] or type(world.name) ~= 'string' or world.name == '' or
+            type(world.host) ~= 'string' or world.host == '' or not port or port > 65535 then
+            return nil, 'invalid_world'
+        end
+        worlds[worldId] = {
+            id = worldId,
+            slug = type(world.slug) == 'string' and world.slug or '',
+            name = world.name,
+            region = type(world.region) == 'string' and world.region or '',
+            host = world.host,
+            port = port
+        }
+        worldCount = worldCount + 1
+    end
+    if worldCount == 0 then
+        return nil, 'invalid_world'
+    end
+
+    local characters = {}
+    for index, character in ipairs(response.characters) do
+        local worldId = normalizePositiveInteger(character.world_id)
+        local world = worldId and worlds[worldId] or nil
+        if not world or type(character.name) ~= 'string' or character.name == '' then
+            return nil, 'invalid_character'
+        end
+        characters[index] = {
+            id = normalizePositiveInteger(character.id),
+            name = character.name,
+            level = tonumber(character.level) or 0,
+            vocation = character.vocation or 0,
+            worldId = worldId,
+            worldSlug = world.slug,
+            worldName = world.name,
+            worldIp = world.host,
+            worldPort = world.port,
+            previewState = false
+        }
+    end
+
+    return {
+        credential = credential,
+        expiresAt = expiresAt,
+        worlds = worlds,
+        characters = characters
+    }
 end
 
 function OterynIdentityCore.newFlow(nowMillis, timeoutMillis)

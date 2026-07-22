@@ -40,6 +40,7 @@
 
 #include <cppcodec/base64_rfc4648.hpp>
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 
 #include "framework/core/graphicalapplication.h"
 #include "framework/core/resourcemanager.h"
@@ -109,8 +110,25 @@ void Crypt::xorCrypt(std::string& buffer, const std::string& key)
         buffer[i] ^= key[i % keySize];
 }
 
-std::string Crypt::genUUID() {
-    return uuids::to_string(uuids::uuid_random_generator{ stdext::random_gen() }());
+std::string Crypt::genUUID()
+{
+    std::array<unsigned char, 16> bytes{};
+    if (RAND_bytes(bytes.data(), static_cast<int>(bytes.size())) != 1)
+        return {};
+
+    // RFC 4122 version 4 and variant bits. Callers that use UUID material for
+    // OAuth state/PKCE still combine multiple UUIDs and fail closed on empty.
+    bytes[6] = static_cast<unsigned char>((bytes[6] & 0x0fU) | 0x40U);
+    bytes[8] = static_cast<unsigned char>((bytes[8] & 0x3fU) | 0x80U);
+
+    std::ostringstream value;
+    value << std::hex << std::setfill('0');
+    for (std::size_t i = 0; i < bytes.size(); ++i) {
+        if (i == 4 || i == 6 || i == 8 || i == 10)
+            value << '-';
+        value << std::setw(2) << static_cast<unsigned int>(bytes[i]);
+    }
+    return value.str();
 }
 
 bool Crypt::setMachineUUID(std::string uuidstr)

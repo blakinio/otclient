@@ -8,6 +8,25 @@ Services = {
     --websites = "http://localhost/?subtopic=accountmanagement", --./client_entergame "Forgot password and/or email"
     --createAccount = "http://localhost/clientcreateaccount.php", --./client_entergame -- createAccount.lua
     --getCoinsUrl = "http://localhost/?subtopic=shop&step=terms", --./game_market
+
+    -- Native desktop OAuth 2.0 Authorization Code + PKCE integration.
+    -- Fail closed by default. Deployment must provide the exact Platform and
+    -- Game Gateway HTTPS endpoints plus the registered public native client id.
+    oterynIdentity = {
+        enabled = false,
+        authorizationEndpoint = "",
+        tokenEndpoint = "",
+        ticketEndpoint = "",
+        gatewayLoginEndpoint = "",
+        clientId = "",
+        scope = "game:ticket",
+        callbackTimeoutMillis = 120000,
+        maxGameTicketTtlSeconds = 60,
+        -- Development only. Production endpoints must use HTTPS. When enabled,
+        -- only literal http://127.0.0.1 endpoints are accepted.
+        allowInsecureLoopback = false
+    },
+
     clientAssets = {
         enabled = true,
         repository = "dudantas/tibia-client",
@@ -59,6 +78,23 @@ if ENABLE_SERVERS then
     ---
     -- List of servers and their configuration parameters.
     -- Each entry defines port, protocol, and authentication options.
+    --
+    -- Migration controls:
+    --   authMode = "legacy" keeps the existing password flow.
+    --   authMode = "oteryn_identity" makes browser-based Oteryn authentication
+    --   the authoritative flow for the profile.
+    --   legacyAuthEnabled is an explicit deployment compatibility flag; the
+    --   Oteryn UI never silently falls back to password authentication.
+    --
+    -- A compatible Oteryn profile additionally declares only the client-facing
+    -- protocol contract. Identity/Platform/Gateway endpoints are deployment-owned
+    -- Services.oterynIdentity settings and world routing comes from Game Gateway.
+    --
+    --   oterynIdentity = {
+    --       enabled = true,
+    --       protocolVersion = 1
+    --   }
+    --
     -- @table Servers_init
     --
     Servers_init = {
@@ -77,7 +113,9 @@ if ENABLE_SERVERS then
             port = 80,
             protocol = 1511,
             httpLogin = true,
-            useAuthenticator = false
+            useAuthenticator = false,
+            authMode = "legacy",
+            legacyAuthEnabled = true
         },
 
         -- External server
@@ -85,14 +123,16 @@ if ENABLE_SERVERS then
         -- Configuration for external server ip.net.
         -- @class table
         -- @name ip_net
-        -- @field port TCP port used for connection
+        -- @field port Port used for TCP connection
         -- @field protocol Protocol identifier used by the server
         -- @field httpLogin Indicates if the server allows HTTP login
         --
         ["ip.net"] = {
             port = 7171,
             protocol = 860,
-            httpLogin = false
+            httpLogin = false,
+            authMode = "legacy",
+            legacyAuthEnabled = true
         }
     }
 end
@@ -119,7 +159,7 @@ if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then
     require("lldebugger").start()
     g_logger.debug("Started LUA debugger.")
 else
-    g_logger.debug("LUA debugger not started (not launched with VSCode local-lua).")
+    g_logger.debug("Lua debugger not started (not launched with VSCode local-lua).")
 end
 
 -- add data directory to the search path

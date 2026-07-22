@@ -96,6 +96,7 @@ public:
     void setUserAgent(const std::string& userAgent) { m_userAgent = userAgent; }
 
     void addCustomHeader(const std::string& name, const std::string& value) { m_custom_header[name] = value; }
+    void removeCustomHeader(const std::string& name) { m_custom_header.erase(name); }
 
     void setEnableTimeOutOnReadWrite(const bool enable_time_out_on_read_write) { m_enable_time_out_on_read_write = enable_time_out_on_read_write; }
 

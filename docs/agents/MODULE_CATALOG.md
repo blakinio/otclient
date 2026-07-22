@@ -1,6 +1,6 @@
 # OTClient Module and System Catalogue
 
-Last reviewed: 2026-07-14
+Last reviewed: 2026-07-22
 
 This catalogue makes reusable client work visible. Verify source, manifests, tests, and open PR state before use.
 
@@ -16,6 +16,7 @@ Update this file in the same PR that adds/changes a reusable module, controller,
 | Optional/custom mods | maintained | Optional behavior outside shipped core | `mods/**` | Do not hide a required core fix here. Runtime Lua syntax CI covers this root. |
 | Protocol and features | maintained | Packet parsing/output, feature flags, game state | `src/client/**`, `modules/game_features/**`, affected modules | Check Canary payloads/opcodes/version gates and contracts. |
 | Protocol game callback guard | maintained; hardening PR #9 | Carries an exact source `ProtocolGame` through connection-error, game-end and disconnect cleanup; supports before/after callback identity checks | `src/client/protocolgamecallbackguard.h`, `src/client/protocolgame.cpp`, `src/client/game.{h,cpp}` | Reuse for lifecycle callbacks entering global `Game`; capture once, revalidate after Lua/callback boundaries, and never use time windows or relog flags. PR #9 supersedes PR #7 as the Canary consumer revision. |
+| Oteryn native identity login | active PR #17 | System-browser OAuth Authorization Code + PKCE, loopback callback, Platform Game Login Ticket issuance, Game Gateway login response normalization and one-shot Game Session handoff | `modules/client_entergame/oteryn_identity*.lua`, `modules/client_entergame/oteryn_session_guard.lua`, `src/framework/net/server.*`, `src/framework/util/crypt.cpp`, `init.lua` | First-party Oteryn profile only; disabled by default; no password fallback; routing comes from Gateway `world_id`; production Canary Game Session adapter remains a separate cross-repo gate. Coordination `OTS-20260721-oteryn-identity-auth`. |
 | Client assets auto-install | maintained | Secure things/sounds/runtime-extra installation | installer sources and `docs/client-assets-auto-install.md` | Final paths remain `data/things/<version>/`, `data/sounds/<version>/`, expected `bin/*`; strict hashes stay enabled. |
 
 ## Reusable test infrastructure

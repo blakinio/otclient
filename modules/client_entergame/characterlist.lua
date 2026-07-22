@@ -104,7 +104,7 @@ local function isPremiumAccount(account)
 end
 
 local function updatePremiumBenefitsVisibility(account)
-    local showBenefits = shouldShowAppearance() and SHOW_PREMIUM_WIDGETS and not isPremiumAccount(account)
+    local showBenefits = shouldShowAppearance() and SHOW_PREMIUM_WIDGETS and (not account or not account.oterynIdentity) and not isPremiumAccount(account)
     if premiumBenefitsPanel then
         premiumBenefitsPanel:setVisible(showBenefits)
         if showBenefits then
@@ -374,6 +374,12 @@ local function tryLogin(charInfo, tries)
         return
     end
 
+    if G.oterynGameSession and (G.oterynGameSessionConsumed or type(G.sessionKey) ~= 'string' or G.sessionKey == '') then
+        CharacterList.hide(true)
+        displayErrorBox(tr('Login Error'), tr('Your Oteryn game session can no longer be reused. Sign in with Oteryn again.'))
+        return
+    end
+
     if g_game.isOnline() then
         if tries == 1 then
             g_game.safeLogout()
@@ -390,8 +396,22 @@ local function tryLogin(charInfo, tries)
 
     CharacterList.hide()
 
+    if G.oterynGameSession then
+        -- Oteryn world routing is authoritative only after the Gateway response.
+        -- Select the RSA key from the exact returned world host immediately before
+        -- handing the Game Session credential to ProtocolGame.
+        g_game.chooseRsa(charInfo.worldHost)
+    end
+
     g_game.loginWorld(G.account, G.password, charInfo.worldName, charInfo.worldHost, charInfo.worldPort,
                       charInfo.characterName, G.authenticatorToken, G.sessionKey)
+
+    if G.oterynGameSession then
+        -- Game::loginWorld synchronously passes the credential to ProtocolGame::login,
+        -- which copies it into ProtocolGame::m_sessionKey before connect() begins.
+        G.sessionKey = ''
+        G.oterynGameSessionConsumed = true
+    end
 
     loadBox = displayCancelBox(tr('Please wait'), tr('Connecting to game server...'))
     connect(loadBox, {
@@ -731,7 +751,9 @@ function CharacterList.create(characters, account, otui)
         status = tr(' (Suspended)')
     end
 
-    if account.subStatus == SubscriptionStatus.Free then
+    if account.oterynIdentity then
+        accountStatusLabel:setText(('%s%s'):format(tr('Oteryn Account'), status))
+    elseif account.subStatus == SubscriptionStatus.Free then
         accountStatusLabel:setText(('%s%s'):format(tr('Free Account'), status))
         if accountStatusIcon then
             accountStatusIcon:setImageSource('/images/game/entergame/nopremium')

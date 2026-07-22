@@ -1,0 +1,50 @@
+name: Temporary Oteryn RSA Routing Patch
+
+on:
+  push:
+    branches:
+      - feat/OTC-20260721-oteryn-identity-login
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: feat/OTC-20260721-oteryn-identity-login
+          fetch-depth: 0
+
+      - name: Apply authoritative world RSA routing
+        shell: python
+        run: |
+          from pathlib import Path
+
+          identity = Path('modules/client_entergame/oteryn_identity.lua')
+          text = identity.read_text()
+          old = """    g_game.setClientVersion(context.clientVersion)\n    g_game.setProtocolVersion(g_game.getClientProtocolVersion(context.clientVersion))\n    g_game.chooseRsa(context.host)\n    if not g_game.getFeature(GameSessionKey) then\n"""
+          new = """    g_game.setClientVersion(context.clientVersion)\n    g_game.setProtocolVersion(g_game.getClientProtocolVersion(context.clientVersion))\n    if not g_game.getFeature(GameSessionKey) then\n"""
+          if old not in text:
+              raise SystemExit('pre-Gateway RSA block not found')
+          identity.write_text(text.replace(old, new, 1))
+
+          character_list = Path('modules/client_entergame/characterlist.lua')
+          text = character_list.read_text()
+          old = """    CharacterList.hide()\n\n    g_game.loginWorld(G.account, G.password, charInfo.worldName, charInfo.worldHost, charInfo.worldPort,\n                      charInfo.characterName, G.authenticatorToken, G.sessionKey)\n"""
+          new = """    CharacterList.hide()\n\n    if G.oterynGameSession then\n        -- Oteryn world routing is authoritative only after the Gateway response.\n        -- Select the RSA key from the exact returned world host immediately before\n        -- handing the Game Session credential to ProtocolGame.\n        g_game.chooseRsa(charInfo.worldHost)\n    end\n\n    g_game.loginWorld(G.account, G.password, charInfo.worldName, charInfo.worldHost, charInfo.worldPort,\n                      charInfo.characterName, G.authenticatorToken, G.sessionKey)\n"""
+          if old not in text:
+              raise SystemExit('world login block not found')
+          character_list.write_text(text.replace(old, new, 1))
+
+      - name: Commit patch and remove temporary workflow
+        run: |
+          rm .github/workflows/temporary-oteryn-rsa-routing.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(auth): select RSA from authoritative Gateway world"
+          git push origin HEAD:feat/OTC-20260721-oteryn-identity-login

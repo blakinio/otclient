@@ -1,26 +1,26 @@
 ---
 task_id: OTC-20260724-oteryn-login-shell
 coordination_id: OTS-20260721-oteryn-identity-auth
-status: implementing
+status: awaiting_visual_review
 agent: "GPT-5.6 Thinking"
 branch: feat/OTC-20260724-oteryn-login-shell
 base_branch: main
 created: 2026-07-24T21:44:57Z
-updated: 2026-07-24T21:44:57Z
-last_verified_commit: 8f2b6a8878c9cbc243a29c8b2dad7c755ca7a260
+updated: 2026-07-24T21:58:34Z
+last_verified_commit: 83203ca8521d414e274285e3aaa80aa5a7b1a139
 risk: low
 related_issue: ""
-related_pr: ""
+related_pr: "#23"
 depends_on:
   - merged Oteryn native identity login PR #17
 blocks:
-  - visual approval before merge
+  - runtime visual approval before merge
 owned_paths:
   - modules/client_entergame/entergame.otui
   - modules/client_entergame/entergame.otmod
   - modules/client_entergame/oteryn_login_theme.lua
   - modules/client_entergame/oteryn_characterlist.otui
-  - modules/client_entergame/characterlist.lua
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260724-oteryn-login-shell.md
@@ -49,23 +49,31 @@ Create a reversible OTUI/Lua-only visual prototype for the existing secure Otery
 
 ## Acceptance criteria
 
-- [ ] Existing Oteryn OAuth/PKCE behavior remains unchanged.
-- [ ] Legacy password login remains available and keeps every widget ID required by `entergame.lua`.
-- [ ] Oteryn mode presents a modern branded login shell and primary action.
-- [ ] Oteryn accounts use a dedicated modern character-list presentation while reusing `CharacterList` behavior.
-- [ ] No new proprietary or binary assets are committed.
-- [ ] Lua/OTUI-focused validation and complete diff review are recorded.
-- [ ] Prototype remains a draft until visual review.
+- [x] Existing Oteryn OAuth/PKCE behavior remains unchanged.
+- [x] Legacy server password login remains available and keeps every widget ID required by `entergame.lua`.
+- [x] Oteryn mode presents a modern branded login shell and primary action.
+- [x] Oteryn accounts use a dedicated modern character-list presentation while reusing `CharacterList` behavior.
+- [x] No new proprietary or binary assets are committed.
+- [x] Lua-focused CI and complete changed-file review are recorded.
+- [ ] Runtime visual approval is recorded before merge.
+
+## Current state
+
+- Draft PR #23 contains the prototype implementation.
+- The enter-game view is replaced by a large dark shell with a navy/blue/gold palette, an Oteryn-first action, separate legacy server mode and retained server/client selectors.
+- `oteryn_login_theme.lua` decorates the existing dynamic identity button, keeps the identity controller untouched and selects `oteryn_characterlist.otui` only for Oteryn accounts.
+- The dedicated character-list view reuses the existing character population, sorting, outfit, pinning, reconnect and game-entry logic.
+- No main-password fallback was added to the Oteryn profile.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T21:44:57Z
-head: 8f2b6a8878c9cbc243a29c8b2dad7c755ca7a260
+updated_at: 2026-07-24T21:58:34Z
+head: 83203ca8521d414e274285e3aaa80aa5a7b1a139
 branch: feat/OTC-20260724-oteryn-login-shell
-pr: none
-status: implementing
+pr: 23
+status: awaiting_visual_review
 context_routes:
   - client-entergame-ui
   - oteryn-identity
@@ -74,37 +82,54 @@ owned_paths:
   - modules/client_entergame/entergame.otmod
   - modules/client_entergame/oteryn_login_theme.lua
   - modules/client_entergame/oteryn_characterlist.otui
-  - modules/client_entergame/characterlist.lua
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260724-oteryn-login-shell.md
 proven:
-  - Oteryn native authentication is already implemented and merged; this task changes presentation only.
-  - CharacterList.create accepts an optional OTUI name, allowing an Oteryn-specific view without duplicating login behavior.
-  - The current enter-game Lua controller addresses legacy controls by stable widget IDs that must be preserved.
+  - Oteryn native authentication remains implemented by the existing identity controller; this task changes presentation only.
+  - CharacterList.create accepts an optional OTUI name, allowing an Oteryn-specific view without duplicating game-login behavior.
+  - All legacy widget IDs consumed by entergame.lua remain direct children of the enter-game root.
+  - Module unload order disconnects the wrapped identity callback before restoring the original function reference.
+  - CI run 180 completed successfully on code head 6112ad46f921243d20fd201249198050a10d2a8c, including Lua syntax and fast checks.
 derived:
-  - A small theme adapter can select the dedicated Oteryn character list and style the existing dynamic Oteryn button without modifying auth internals.
+  - A small theme adapter is sufficient to select the Oteryn character view and style the dynamic Oteryn button without changing auth internals.
 unknown:
-  - Exact runtime appearance until a built client is launched with the prototype branch.
+  - Exact rendered spacing and font metrics until a built desktop client is launched with this branch.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
+  marker: sandbox-runtime-unavailable
+  evidence: the execution environment cannot resolve github.com for a local clone and does not contain a runnable Windows OTClient build
 rejected_hypotheses:
   - Replacing the authentication controller is unnecessary because the merged flow already provides the required security behavior.
+  - A hardcoded live service-status claim was rejected; the prototype displays only neutral client readiness text.
 changed_paths:
+  - docs/agents/ACTIVE_WORK.md
+  - docs/agents/CHANGELOG.md
+  - docs/agents/MODULE_CATALOG.md
   - docs/agents/tasks/active/OTC-20260724-oteryn-login-shell.md
+  - modules/client_entergame/entergame.otmod
+  - modules/client_entergame/entergame.otui
+  - modules/client_entergame/oteryn_characterlist.otui
+  - modules/client_entergame/oteryn_login_theme.lua
 validation:
   - command: repository and overlap preflight
     result: PASS
-    evidence: main 8f2b6a8878c9cbc243a29c8b2dad7c755ca7a260; only open PR #22 is documentation-only and does not own login UI paths
+    evidence: task branch created from main 8f2b6a8878c9cbc243a29c8b2dad7c755ca7a260; no active runtime-UI overlap
+  - command: changed-file and complete patch review
+    result: PASS
+    evidence: PR #23 contains only the declared OTUI/Lua/docs paths and no auth/protocol/binary changes
+  - command: GitHub Actions CI run 180
+    result: PASS
+    evidence: completed success at 6112ad46f921243d20fd201249198050a10d2a8c; Lua Syntax and Fast Checks successful
 blockers:
-  - visual approval before merge
-next_action: Publish the draft PR, then implement the OTUI shell and theme adapter on its task branch.
+  - launch the branch in a desktop client and approve or adjust exact layout before merge
+next_action: Build or run the Windows client from PR #23 and capture the actual enter-game and Oteryn character-list screens for visual review.
 ```
 
 ## Compatibility and rollback
 
 - Authentication endpoints, credential lifecycle, Gateway response handling and Canary handoff are unchanged.
-- Legacy and Oteryn modes continue to share existing controllers.
-- Rollback is a normal revert of this prototype PR.
+- Legacy server mode and Oteryn mode continue to share existing controllers.
+- No new assets, stored credentials or configuration migrations are introduced.
+- Rollback is a normal revert of draft PR #23.

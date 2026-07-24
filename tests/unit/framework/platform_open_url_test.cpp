@@ -6,9 +6,11 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <thread>
+#include <utility>
 
 #if !defined(WIN32) && !defined(__APPLE__) && !defined(__EMSCRIPTEN__) && !defined(ANDROID)
 #include <sys/stat.h>

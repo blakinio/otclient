@@ -70,6 +70,7 @@ local function stylePrimaryButton()
     button:setMarginLeft(386)
     button:setMarginRight(66)
     button:setMarginBottom(338)
+    button:setImageSource('')
     button:setBackgroundColor('#1768d3')
     button:setBorderWidth(1)
     button:setBorderColor('#4b9cf2')
@@ -103,6 +104,28 @@ local function restoreConditionalLegacyWidgets()
     end
 end
 
+local function applyModeCopy()
+    local legacyDivider = getWidget('legacyDividerLabel')
+    if legacyDivider then
+        legacyDivider:setText(tr('LEGACY SERVER MODE'))
+    end
+
+    local legacyHint = getWidget('legacyModeHint')
+    if legacyHint then
+        legacyHint:setText(tr('Account and password login remains available on separate compatible custom-server profiles.'))
+    end
+
+    local loginHint = getWidget('oterynLoginHint')
+    if loginHint then
+        loginHint:setMarginTop(104)
+    end
+
+    local status = getWidget('systemsStatusLabel')
+    if status then
+        status:setText(tr('●  Client ready'))
+    end
+end
+
 local function applyModePresentation()
     local oterynMode = currentServerSupportsOteryn()
 
@@ -130,15 +153,35 @@ local function applyModePresentation()
         restoreConditionalLegacyWidgets()
     end
 
+    applyModeCopy()
     stylePrimaryButton()
 end
 
-local function applyOterynCharacterRows()
+local function applyOterynCharacterWindow()
     if not G.oterynGameSession then
-        return
+        return nil
     end
 
     local window = rootWidget:recursiveGetChildById('charactersWindow')
+    if not window then
+        return nil
+    end
+
+    local backButton = window:getChildById('buttonCancel')
+    if backButton then
+        backButton:setText(tr('Back'))
+    end
+
+    local accountIcon = window:getChildById('accountStatusIcon')
+    if accountIcon then
+        accountIcon:setImageSource('')
+    end
+
+    return window
+end
+
+local function applyOterynCharacterRows()
+    local window = applyOterynCharacterWindow()
     local list = window and window:getChildById('characters') or nil
     if not list then
         return

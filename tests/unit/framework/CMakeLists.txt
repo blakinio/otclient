@@ -9,3 +9,11 @@ otclient_add_gtest(otclient_message_tests
 )
 
 target_include_directories(otclient_message_tests PRIVATE ${CMAKE_SOURCE_DIR}/tests)
+
+otclient_add_gtest(otclient_platform_tests
+    SOURCES
+        platform_open_url_test.cpp
+    LABELS
+        unit
+        platform
+)

@@ -147,11 +147,13 @@ bool Platform::openUrl(std::string url, bool now)
     if(url.find("http://") == std::string::npos && url.find("https://") == std::string::npos)
         url.insert(0, "http://");
 
-    const auto& action = [url] {
+    const auto& action = [this, url] {
 #if defined(__APPLE__)
-        return system(fmt::format("open {}", url).c_str()) == 0;
-#else
+        return spawnProcess("/usr/bin/open", { url });
+#elif defined(ANDROID)
         return system(fmt::format("xdg-open {}", url).c_str()) == 0;
+#else
+        return spawnProcess("/usr/bin/env", { "xdg-open", url });
 #endif
     };
 

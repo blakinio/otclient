@@ -23,7 +23,7 @@ Module
     OterynLoginTheme.init()
 
   @onUnload: |
-    OterynLoginTheme.terminate()
     OterynIdentity.terminate()
+    OterynLoginTheme.terminate()
     EnterGame.terminate()
     CharacterList.terminate()

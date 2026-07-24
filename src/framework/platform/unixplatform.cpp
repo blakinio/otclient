@@ -147,11 +147,13 @@ bool Platform::openUrl(std::string url, bool now)
     if(url.find("http://") == std::string::npos && url.find("https://") == std::string::npos)
         url.insert(0, "http://");
 
-    const auto& action = [url] {
+    const auto action = [this, url] {
 #if defined(__APPLE__)
-        return system(fmt::format("open {}", url).c_str()) == 0;
-#else
+        return spawnProcess("/usr/bin/open", { url });
+#elif defined(ANDROID)
         return system(fmt::format("xdg-open {}", url).c_str()) == 0;
+#else
+        return spawnProcess("/usr/bin/env", { "xdg-open", url });
 #endif
     };
 
@@ -159,8 +161,8 @@ bool Platform::openUrl(std::string url, bool now)
         return action();
 
     g_dispatcher.scheduleEvent(action, 50);
-	
-	return true;
+
+    return true;
 }
 
 bool Platform::openDir(std::string path, bool now)
@@ -168,13 +170,13 @@ bool Platform::openDir(std::string path, bool now)
     const auto& action = [path] {
         return system(fmt::format("xdg-open {}", path).c_str()) == 0;
     };
-	
+
     if(now)
         return action();
-	
+
     g_dispatcher.scheduleEvent(action, 50);
-	
-	return true;
+
+    return true;
 }
 
 std::string Platform::getCPUName()
@@ -187,7 +189,7 @@ std::string Platform::getCPUName()
             stdext::trim(strs[0]);
             if(strs[0] == "model name") {
                 stdext::trim(strs[1]);
-                return strs[1];
+                return stdext::unsafe_cast<double>(strs[1].substr(0, strs[1].length() - 3)) * 1000;
             }
         }
     }
@@ -239,7 +241,6 @@ std::string Platform::traceback(const std::string_view where, int level, int max
 
     const int size = maxDepth + level + 1;
     std::vector<void*> buffer(size);
-
     int numLevels = backtrace(buffer.data(), size);
     char **tracebackBuffer = backtrace_symbols(buffer.data(), numLevels);
     if(tracebackBuffer) {
@@ -258,7 +259,6 @@ std::string Platform::traceback(const std::string_view where, int level, int max
         }
         free(tracebackBuffer);
     }
-
     return ss.str();
 #else
     std::stringstream ss;

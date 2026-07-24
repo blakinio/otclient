@@ -1,73 +1,414 @@
-EnterGameWindow < MainWindow
-  !text: tr('Enter Game')
-  size: 236 316
-
-
-EnterGameButton < Button
-  width: 64
-
-ServerListButton < UIButton
-  size: 17 17
-  image-source: /images/topbuttons/minimap
-  image-color: #ffffffff
+OterynShellButton < UIButton
+  height: 38
+  font: Verdana Bold-11px
+  color: #f2f5f9
+  text-align: center
+  background-color: #202b39
+  border-width: 1
+  border-color: #435269
+  padding: 8
 
   $hover !disabled:
-    image-color: #ffffff99
+    background-color: #29384a
+    border-color: #71839a
 
   $pressed:
-    image-color: #ffffff44
+    background-color: #17212e
+    border-color: #9b7a46
+    text-offset: 1 1
 
   $disabled:
-    image-color: #ffffff55
+    color: #8b96a5
+    background-color: #151d27
+    border-color: #303b49
 
-EnterGameWindow
+OterynInput < TextEdit
+  height: 34
+  font: verdana-11px-antialised
+  color: #e8edf4
+  background-color: #0a1018
+  border-width: 1
+  border-color: #354458
+  padding-left: 10
+  padding-right: 10
+
+  $focus:
+    border-color: #3f8ee8
+
+OterynPasswordInput < HiddenTextQtEdit
+  height: 34
+  font: verdana-11px-antialised
+  color: #e8edf4
+  background-color: #0a1018
+  border-width: 1
+  border-color: #354458
+  padding-left: 10
+  padding-right: 10
+
+  $focus:
+    border-color: #3f8ee8
+
+OterynAccountInput < HiddenTextQtToggleEdit
+  height: 34
+  font: verdana-11px-antialised
+  color: #e8edf4
+  background-color: #0a1018
+  border-width: 1
+  border-color: #354458
+  padding-left: 10
+  padding-right: 10
+
+  $focus:
+    border-color: #3f8ee8
+
+OterynSectionLabel < Label
+  font: Verdana Bold-11px
+  color: #c6a66a
+  text-auto-resize: true
+
+OterynBodyLabel < Label
+  font: verdana-11px-antialised
+  color: #aeb9c8
+  text-wrap: true
+  text-auto-resize: false
+
+MainWindow
   id: enterGame
+  !text: tr('Oteryn')
   &authenticatorEnabled: false
   &authenticatorHeight: 44
   &stayLoggedBoxEnabled: false
-  &stayLoggedBoxHeight: 24
-  size: 280 285
+  &stayLoggedBoxHeight: 0
+  size: 900 520
+  image-source:
+  background-color: #080d14
+  border-width: 1
+  border-color: #324156
+  padding: 0
+  color: #eef2f7
   @onEnter: EnterGame.doLogin()
+
+  UIWidget
+    id: ambientTop
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    height: 4
+    background-color: #9a7540
+    phantom: true
+
+  UIWidget
+    id: brandPanel
+    anchors.left: parent.left
+    anchors.top: ambientTop.bottom
+    anchors.bottom: parent.bottom
+    width: 320
+    background-color: #0b121c
+    border-width-right: 1
+    border-color-right: #28364a
+    phantom: true
+
+  UIWidget
+    id: brandGlow
+    anchors.left: brandPanel.left
+    anchors.right: brandPanel.right
+    anchors.top: brandPanel.top
+    height: 150
+    background-color: #112337
+    opacity: 0.66
+    phantom: true
+
+  Label
+    id: oterynWordmark
+    text: O T E R Y N
+    anchors.left: brandPanel.left
+    anchors.top: brandPanel.top
+    margin-left: 38
+    margin-top: 48
+    font: Verdana Bold-11px
+    color: #d0ad6a
+    text-auto-resize: true
+
+  Label
+    id: clientWordmark
+    text: OTCLIENT
+    anchors.left: oterynWordmark.left
+    anchors.top: oterynWordmark.bottom
+    margin-top: 18
+    font: Verdana Bold-11px
+    color: #f0f3f7
+    text-auto-resize: true
+
+  Label
+    id: clientTagline
+    !text: tr('ENTER THE GAME')
+    anchors.left: clientWordmark.left
+    anchors.top: clientWordmark.bottom
+    margin-top: 8
+    font: verdana-11px-antialised
+    color: #6ea6dc
+    text-auto-resize: true
+
+  UIWidget
+    id: brandDivider
+    anchors.left: clientWordmark.left
+    anchors.top: clientTagline.bottom
+    margin-top: 28
+    width: 190
+    height: 1
+    background-color: #755b35
+    phantom: true
+
+  Label
+    id: brandHeadline
+    !text: tr('Your legend begins here.')
+    anchors.left: clientWordmark.left
+    anchors.right: brandPanel.right
+    anchors.top: brandDivider.bottom
+    margin-top: 24
+    margin-right: 28
+    font: Verdana Bold-11px
+    color: #e7dcc8
+    text-wrap: true
+    text-auto-resize: false
+    height: 32
+
+  Label
+    id: brandDescription
+    !text: tr('Sign in securely, choose your hero and return to the realm of Oteryn.')
+    anchors.left: clientWordmark.left
+    anchors.right: brandPanel.right
+    anchors.top: brandHeadline.bottom
+    margin-top: 10
+    margin-right: 28
+    font: verdana-11px-antialised
+    color: #8f9cad
+    text-wrap: true
+    text-auto-resize: false
+    height: 72
+
+  UIWidget
+    id: securityBadge
+    anchors.left: clientWordmark.left
+    anchors.right: brandPanel.right
+    anchors.bottom: brandPanel.bottom
+    margin-right: 28
+    margin-bottom: 34
+    height: 62
+    background-color: #0e1823
+    border-width: 1
+    border-color: #293b50
+    phantom: true
+
+  Label
+    id: securityBadgeTitle
+    !text: tr('SECURE NATIVE SIGN-IN')
+    anchors.left: securityBadge.left
+    anchors.top: securityBadge.top
+    margin-left: 14
+    margin-top: 12
+    font: Verdana Bold-11px
+    color: #73b2ed
+    text-auto-resize: true
+
+  Label
+    id: securityBadgeText
+    !text: tr('OAuth 2.1 + PKCE · browser authentication')
+    anchors.left: securityBadgeTitle.left
+    anchors.top: securityBadgeTitle.bottom
+    margin-top: 7
+    font: verdana-11px-antialised
+    color: #8997a8
+    text-auto-resize: true
+
+  UIWidget
+    id: contentPanel
+    anchors.left: brandPanel.right
+    anchors.right: parent.right
+    anchors.top: ambientTop.bottom
+    anchors.bottom: parent.bottom
+    background-color: #0d141e
+    phantom: true
+
+  UIWidget
+    id: oterynPanel
+    anchors.left: contentPanel.left
+    anchors.right: contentPanel.right
+    anchors.top: contentPanel.top
+    anchors.bottom: contentPanel.bottom
+    margin-left: 38
+    margin-right: 38
+    margin-top: 28
+    margin-bottom: 28
+    background-color: #111a26
+    border-width: 1
+    border-color: #304156
+    phantom: true
+
+  UIWidget
+    id: legacyPanel
+    anchors.fill: oterynPanel
+    background-color: #111a26
+    border-width: 1
+    border-color: #304156
+    phantom: true
+
+  Label
+    id: welcomeLabel
+    !text: tr('Welcome back')
+    anchors.left: oterynPanel.left
+    anchors.top: oterynPanel.top
+    margin-left: 28
+    margin-top: 24
+    font: Verdana Bold-11px
+    color: #f0f3f8
+    text-auto-resize: true
+
+  Label
+    id: welcomeDescription
+    !text: tr('Choose how you want to sign in to your account.')
+    anchors.left: welcomeLabel.left
+    anchors.right: oterynPanel.right
+    anchors.top: welcomeLabel.bottom
+    margin-top: 8
+    margin-right: 28
+    font: verdana-11px-antialised
+    color: #9ba8b8
+    text-auto-resize: true
+
+  OterynSectionLabel
+    id: recommendedLabel
+    !text: tr('RECOMMENDED')
+    anchors.horizontalCenter: oterynPanel.horizontalCenter
+    anchors.top: welcomeDescription.bottom
+    margin-top: 29
+
+  UIWidget
+    id: recommendedLineLeft
+    anchors.left: oterynPanel.left
+    anchors.right: recommendedLabel.left
+    anchors.verticalCenter: recommendedLabel.verticalCenter
+    margin-left: 28
+    margin-right: 14
+    height: 1
+    background-color: #38485c
+    phantom: true
+
+  UIWidget
+    id: recommendedLineRight
+    anchors.left: recommendedLabel.right
+    anchors.right: oterynPanel.right
+    anchors.verticalCenter: recommendedLabel.verticalCenter
+    margin-left: 14
+    margin-right: 28
+    height: 1
+    background-color: #38485c
+    phantom: true
+
+  Label
+    id: oterynLoginHint
+    !text: tr('Secure passwordless sign-in using your Oteryn account.\nYour browser will open to complete authorization.')
+    anchors.left: oterynPanel.left
+    anchors.right: oterynPanel.right
+    anchors.top: recommendedLabel.bottom
+    margin-left: 55
+    margin-right: 55
+    margin-top: 82
+    height: 48
+    font: verdana-11px-antialised
+    color: #9caabd
+    text-align: center
+    text-wrap: true
+
+  OterynSectionLabel
+    id: legacyDividerLabel
+    !text: tr('LEGACY FALLBACK')
+    anchors.horizontalCenter: oterynPanel.horizontalCenter
+    anchors.top: oterynLoginHint.bottom
+    margin-top: 28
+
+  UIWidget
+    id: legacyDividerLeft
+    anchors.left: oterynPanel.left
+    anchors.right: legacyDividerLabel.left
+    anchors.verticalCenter: legacyDividerLabel.verticalCenter
+    margin-left: 28
+    margin-right: 14
+    height: 1
+    background-color: #38485c
+    phantom: true
+
+  UIWidget
+    id: legacyDividerRight
+    anchors.left: legacyDividerLabel.right
+    anchors.right: oterynPanel.right
+    anchors.verticalCenter: legacyDividerLabel.verticalCenter
+    margin-left: 14
+    margin-right: 28
+    height: 1
+    background-color: #38485c
+    phantom: true
+
+  Label
+    id: legacyModeHint
+    !text: tr('Account and password login remains available for compatible custom servers.')
+    anchors.left: oterynPanel.left
+    anchors.right: oterynPanel.right
+    anchors.top: legacyDividerLabel.bottom
+    margin-left: 48
+    margin-right: 48
+    margin-top: 18
+    height: 34
+    font: verdana-11px-antialised
+    color: #7f8b9a
+    text-align: center
+    text-wrap: true
 
   Label
     id: emailLabel
-    !text: tr('Acc Name:') 
-    anchors.left: parent.left
-    anchors.top: parent.top
+    !text: tr('Acc Name:')
+    anchors.left: legacyPanel.left
+    anchors.top: legacyPanel.top
+    margin-left: 30
+    margin-top: 78
+    font: Verdana Bold-11px
+    color: #b7c1ce
+    text-auto-resize: true
 
-    opacity: 0.8
+  OterynAccountInput
+    id: accountNameTextEdit
+    anchors.left: legacyPanel.left
+    anchors.right: legacyPanel.right
+    anchors.top: emailLabel.bottom
+    margin-left: 30
+    margin-right: 30
+    margin-top: 7
 
-      
   Label
     id: passwordLabel
     !text: tr('Password:')
     anchors.left: emailLabel.left
-    anchors.top: emailLabel.bottom
-    margin-top: 10
-    opacity: 0.8
+    anchors.top: accountNameTextEdit.bottom
+    margin-top: 13
+    font: Verdana Bold-11px
+    color: #b7c1ce
+    text-auto-resize: true
 
-  HiddenTextQtToggleEdit
-    id: accountNameTextEdit
-    anchors.right: accountPasswordTextEdit.right
-    anchors.verticalCenter: emailLabel.verticalCenter
-    anchors.left: accountPasswordTextEdit.left
-    
-  HiddenTextQtEdit
+  OterynPasswordInput
     id: accountPasswordTextEdit
-    anchors.right: parent.right
-    anchors.left: passwordLabel.right
-    anchors.verticalCenter: passwordLabel.verticalCenter
-    margin-left: 5
+    anchors.left: accountNameTextEdit.left
+    anchors.right: accountNameTextEdit.right
+    anchors.top: passwordLabel.bottom
+    margin-top: 7
 
   QtCheckBox
     id: rememberEmailBox
     !text: tr('Remember password')
     !tooltip: tr('Remember account and password when starts client')
-    anchors.left: passwordLabel.left
-    anchors.right: parent.right
+    anchors.left: accountNameTextEdit.left
     anchors.top: accountPasswordTextEdit.bottom
-    margin-top: 10
-    opacity: 0.8
+    margin-top: 11
+    color: #a7b2c0
     @onCheckChange: |
       self:getParent():getChildById('autoLoginBox'):setEnabled(self:isChecked())
       self:getParent():getChildById('rememberEmailTip'):setOn(self:isChecked())
@@ -76,8 +417,9 @@ EnterGameWindow
     id: rememberEmailTip
     image-source: /images/icons/show_gui_help_grey
     !specialtooltip: 'Be aware that your email address will be stored on your configuration file "config.otml" if you activate this option.'
-    anchors.right: accountNameTextEdit.right
+    anchors.left: rememberEmailBox.right
     anchors.verticalCenter: rememberEmailBox.verticalCenter
+    margin-left: 7
     visible: false
 
     $on:
@@ -87,163 +429,178 @@ EnterGameWindow
       visible: false
 
   UIButton
-    !text: tr('Forgot password and/or email')
     id: Forgot_password_email
+    !text: tr('Forgot password and/or email')
     font: verdana-11px-monochrome-underline
-    text-align: left
-    anchors.left: rememberEmailBox.left
-    anchors.right: parent.right
-    anchors.top: rememberEmailBox.bottom
-    opacity: 0.8
-    margin-top: 5
+    color: #66a8eb
+    text-align: right
+    anchors.right: accountNameTextEdit.right
+    anchors.verticalCenter: rememberEmailBox.verticalCenter
     @onClick: g_platform.openUrl(Services.websites)
-    @onSetup: | 
-        if Services and Services.websites then
-            self:setVisible(true)
-        else
-            self:setVisible(false)
-            self:hide()
-        end
+    @onSetup: |
+      if Services and Services.websites then
+        self:setVisible(true)
+      else
+        self:setVisible(false)
+      end
 
   QtCheckBox
     id: stayLoggedBox
     !text: tr('Stay logged during session')
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 6
-    margin-top: -16
+    anchors.left: accountNameTextEdit.left
+    anchors.top: rememberEmailBox.bottom
+    margin-top: 8
     visible: false
 
     $on:
       visible: true
-      margin-top: 8
-
-  HorizontalSeparator
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 8
-
-  MenuLabel
-    id: serverLabel
-    !text: tr('Server')
-    anchors.left: prev.left
-    anchors.top: prev.bottom
-    margin-top: 8
-    text-auto-resize: true
-
-  ServerListButton
-    id: serverListButton
-    !tooltip: tr('Server list')
-    anchors.right: parent.right
-    anchors.top: serverLabel.bottom
-    margin-top: 3
-    @onClick: EnterGame.showServerList()
-
-  TextEdit
-    id: serverHostTextEdit
-    !tooltip: tr('Make sure that your client uses\nthe correct game client version')
-    anchors.left: parent.left
-    anchors.right: serverListButton.left
-    anchors.top: serverLabel.bottom
-    margin-top: 2
-    margin-right: 4
-
-  MenuLabel
-    id: clientLabel
-    !text: tr('Client Version')
-    anchors.left: parent.left
-    anchors.top: serverHostTextEdit.bottom
-    text-auto-resize: true
-    margin-right: 10
-    margin-top: 8
-
-  ComboBox
-    id: clientComboBox
-    anchors.left: parent.left
-    anchors.right: parent.horizontalCenter
-    anchors.top: clientLabel.bottom
-    margin-top: 2
-    margin-right: 3
-    width: 90
-    menu-scroll: true
-    menu-height: 125
-    menu-scroll-step: 25
-
-  MenuLabel
-    id: portLabel
-    !text: tr('Port')
-    anchors.left: serverPortTextEdit.left
-    anchors.top: serverHostTextEdit.bottom
-    margin-top: 8
-    text-auto-resize: true
-
-  TextEdit
-    id: serverPortTextEdit
-    text: 7171
-    anchors.right: parent.right
-    anchors.left: parent.horizontalCenter
-    anchors.top: clientComboBox.top
-    margin-left: 3
 
   QtCheckBox
     id: autoLoginBox
     enabled: false
     !text: tr('Auto login')
     !tooltip: tr('Open charlist automatically when starting client')
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 10
+    anchors.left: accountNameTextEdit.left
+    anchors.top: stayLoggedBox.bottom
+    margin-top: 8
+    color: #8794a4
 
   QtCheckBox
     id: httpLoginBox
     enabled: true
     !text: tr('Enable HTTP login')
     !tooltip: tr('If login fails using HTTPS (encrypted) try with HTTP (unencrypted)')
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 2
+    anchors.left: autoLoginBox.right
+    anchors.verticalCenter: autoLoginBox.verticalCenter
+    margin-left: 28
+    color: #8794a4
 
-  HorizontalSeparator
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 6
-
-  QtButton
-    !text: tr('Login')
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 9
-    size: 86 20
+  OterynShellButton
+    id: legacyLoginButton
+    !text: tr('Login with account and password')
+    anchors.left: accountNameTextEdit.left
+    anchors.right: accountNameTextEdit.right
+    anchors.top: autoLoginBox.bottom
+    margin-top: 16
     @onClick: EnterGame.doLogin()
 
-  QtButton
+  OterynShellButton
     id: btnCreateNewAccount
     !text: tr('Create New Account')
-    anchors.left: parent.left
-    anchors.top: prev.bottom
-    margin-top: -17
-    size: 109 20
+    anchors.left: accountNameTextEdit.left
+    anchors.right: accountNameTextEdit.right
+    anchors.top: legacyLoginButton.bottom
+    margin-top: 9
     @onClick: |
       self:disable()
       createWidgetAccount()
-
-    @onSetup: | 
+    @onSetup: |
       if Services and Servers_init and table.size(Servers_init) == 1 and Services.createAccount then
         self:setVisible(true)
       else
         self:setVisible(false)
       end
 
+  UIWidget
+    id: serverCard
+    anchors.left: oterynPanel.left
+    anchors.right: oterynPanel.right
+    anchors.bottom: oterynPanel.bottom
+    margin-left: 28
+    margin-right: 28
+    margin-bottom: 20
+    height: 76
+    background-color: #0c131d
+    border-width: 1
+    border-color: #29384a
+    phantom: true
+
+  OterynSectionLabel
+    id: serverLabel
+    !text: tr('SERVER')
+    anchors.left: serverCard.left
+    anchors.top: serverCard.top
+    margin-left: 12
+    margin-top: 9
+
+  OterynInput
+    id: serverHostTextEdit
+    !tooltip: tr('Make sure that your client uses\nthe correct game client version')
+    anchors.left: serverCard.left
+    anchors.top: serverLabel.bottom
+    margin-left: 12
+    margin-top: 5
+    width: 220
+
+  UIButton
+    id: serverListButton
+    !tooltip: tr('Server list')
+    anchors.left: serverHostTextEdit.right
+    anchors.verticalCenter: serverHostTextEdit.verticalCenter
+    margin-left: 5
+    size: 32 32
+    background-color: #1b2837
+    border-width: 1
+    border-color: #41536a
+    image-source: /images/topbuttons/minimap
+    image-size: 17 17
+    image-color: #dce5ef
+    @onClick: EnterGame.showServerList()
+
+    $hover !disabled:
+      background-color: #26384b
+      border-color: #73869e
+
+  OterynSectionLabel
+    id: clientLabel
+    !text: tr('CLIENT')
+    anchors.left: serverListButton.right
+    anchors.top: serverLabel.top
+    margin-left: 16
+
+  ComboBox
+    id: clientComboBox
+    anchors.left: clientLabel.left
+    anchors.top: clientLabel.bottom
+    margin-top: 5
+    width: 86
+    height: 34
+    menu-scroll: true
+    menu-height: 125
+    menu-scroll-step: 25
+
+  OterynSectionLabel
+    id: portLabel
+    !text: tr('PORT')
+    anchors.left: clientComboBox.right
+    anchors.top: clientLabel.top
+    margin-left: 12
+
+  OterynInput
+    id: serverPortTextEdit
+    text: 7171
+    anchors.left: portLabel.left
+    anchors.right: serverCard.right
+    anchors.top: portLabel.bottom
+    margin-top: 5
+    margin-right: 12
+
   Label
     id: serverInfoLabel
-    font: verdana-11px-rounded
-    anchors.top: prev.top
-    anchors.left: parent.left
-    margin-top: 5
-    color: green
+    anchors.left: serverCard.left
+    anchors.bottom: serverCard.top
+    margin-bottom: 8
+    font: verdana-11px-antialised
+    color: #65c578
+    text-auto-resize: true
+
+  Label
+    id: systemsStatusLabel
+    !text: tr('●  All systems operational')
+    anchors.left: brandPanel.right
+    anchors.bottom: parent.bottom
+    margin-left: 52
+    margin-bottom: 8
+    font: verdana-11px-antialised
+    color: #65cb73
     text-auto-resize: true

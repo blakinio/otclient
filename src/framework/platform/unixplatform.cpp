@@ -189,7 +189,7 @@ std::string Platform::getCPUName()
             stdext::trim(strs[0]);
             if(strs[0] == "model name") {
                 stdext::trim(strs[1]);
-                return stdext::unsafe_cast<double>(strs[1].substr(0, strs[1].length() - 3)) * 1000;
+                return strs[1];
             }
         }
     }

@@ -17,8 +17,8 @@ Module
     dofile 'oteryn_identity'
     dofile 'oteryn_login_theme'
     EnterGame.init()
-    CharacterList.init()
     OterynLoginTheme.prepare()
+    CharacterList.init()
     OterynIdentity.init()
     OterynLoginTheme.init()
 

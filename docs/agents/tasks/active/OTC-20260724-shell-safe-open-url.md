@@ -1,16 +1,16 @@
 ---
 task_id: OTC-20260724-shell-safe-open-url
 coordination_id: OTS-20260721-oteryn-identity-auth
-status: implementing
+status: validating
 agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260724-shell-safe-open-url
 base_branch: main
 created: 2026-07-24T12:40:00+02:00
-updated: 2026-07-24T12:40:00+02:00
-last_verified_commit: b3bcea2a95959bb4e92cc0b80cd49f36b63699b2
+updated: 2026-07-24T13:03:00+02:00
+last_verified_commit: 9189d1063e968a0c2ffab11c5069db192e753397
 risk: medium
 related_issue: ""
-related_pr: ""
+related_pr: "20"
 depends_on:
   - "OTClient native identity merge bb87346f6c516a19d19497d82bb01fb389334ff5"
   - "Platform rehearsal PR blakinio/Oteryn-Platform#126"
@@ -19,7 +19,10 @@ blocks:
 owned_paths:
   - docs/agents/tasks/active/OTC-20260724-shell-safe-open-url.md
   - src/framework/platform/unixplatform.cpp
-  - tests/**/platform*open*url*
+  - tests/integration/framework/CMakeLists.txt
+  - tests/integration/framework/platform_open_url_test.cpp
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/CHANGELOG.md
 modules_touched:
   - Linux platform process launch
   - Oteryn system-browser OAuth boundary
@@ -30,130 +33,110 @@ public_interfaces:
 cross_repo_tasks:
   - CAN-20260723-native-auth-ephemeral-cutover-rehearsal
   - OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
+required_reads:
+  - docs/agents/BUILD_TEST_MATRIX.md
+  - docs/agents/CROSS_REPO_CONTRACTS.md
+  - docs/agents/tasks/active/OTC-20260724-shell-safe-open-url.md
+search_first:
+  - src/framework/platform/unixplatform.cpp
+  - tests/integration/framework/platform_open_url_test.cpp
+  - docs/agents/MODULE_CATALOG.md
+optional_reads:
+  - modules/client_entergame/oteryn_identity.lua
 ---
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-07-24T13:03:00+02:00
+head: 9189d1063e968a0c2ffab11c5069db192e753397
+branch: fix/OTC-20260724-shell-safe-open-url
+pr: 20
+status: validating
+context_routes:
+  - agent-governance
+  - cpp-runtime
+  - cross-repo-native-auth
+owned_paths:
+  - src/framework/platform/unixplatform.cpp
+  - tests/integration/framework/CMakeLists.txt
+  - tests/integration/framework/platform_open_url_test.cpp
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/CHANGELOG.md
+  - docs/agents/tasks/active/OTC-20260724-shell-safe-open-url.md
+proven:
+  - OTClient bb87346f generated a complete PKCE URL, while Unix Platform::openUrl passed it through system("xdg-open ...").
+  - Platform rehearsal run 30085898466 received only client_id and correctly returned HTTP 400; artifact 8593807390 retained the redacted diagnosis.
+  - PR 20 replaces shell parsing with argv-based spawnProcess and adds a one-argument URL regression test.
+  - Draft CI run 30087234932 passed syntax, static analysis, Lua syntax and CI Required.
+  - PR 20 is open, mergeable and restored to draft.
+derived:
+  - The missing OAuth parameters are a real Unix OTClient product defect, not a Platform or rehearsal-harness defect.
+  - A new exact Linux OTClient artifact must replace bb87346f in Platform PR 126 before the rehearsal can prove physical OAuth and malformed-Gateway handling.
+unknown:
+  - Final result of full OTClient CI run 30087461815.
+  - Linux release artifact ID and digest for the fixed OTClient head.
+  - Final cross-repository rehearsal result after repinning the fixed binary.
+conflicts:
+  - none
+first_failure:
+  marker: none
+  evidence: First unmet gate is incomplete full CI run 30087461815 on implementation head 9189d1063e968a0c2ffab11c5069db192e753397.
+rejected_hypotheses:
+  - OTClient module initialization omitted PKCE fields: source builds all required PKCE fields before openUrl.
+  - capture-xdg-open.sh truncated the URL: it requires exactly one argument and writes that argument unchanged.
+  - Platform authorization validation caused the defect: HTTP 400 was correct for the shell-truncated request.
+changed_paths:
+  - src/framework/platform/unixplatform.cpp
+  - tests/integration/framework/CMakeLists.txt
+  - tests/integration/framework/platform_open_url_test.cpp
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/CHANGELOG.md
+  - docs/agents/tasks/active/OTC-20260724-shell-safe-open-url.md
+validation:
+  - command: Platform rehearsal run 30085898466
+    result: FAIL
+    evidence: OAuth authorize request contained only client_id; artifact 8593807390.
+  - command: OTClient CI run 30087234932
+    result: PASS
+    evidence: syntax, static analysis, Lua syntax and CI Required succeeded on draft head.
+  - command: OTClient CI run 30087461815
+    result: NOT_RUN
+    evidence: full Linux/Windows/macOS/Android/Docker/Browser matrix was still queued or in progress at handoff.
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260724-shell-safe-open-url.md --require-checkpoint
+    result: PASS
+    evidence: compact checkpoint validated before resume generation.
+blockers:
+  - Full OTClient CI run 30087461815 has not reached a final conclusion.
+  - Platform PR 126 cannot repin an exact fixed OTClient binary until the Linux release artifact exists.
+next_action: Inspect the final result of OTClient CI run 30087461815 and record either its first failed job or the Linux release artifact identifiers.
+```
 
 # Goal
 
-Launch Unix desktop URLs without a shell so an OAuth authorization URL containing `&` reaches the system browser as one unchanged argument.
+Launch Unix desktop URLs without shell interpretation so OAuth Authorization Code + PKCE reaches the system browser as one unchanged argument.
+
+# Current implementation
+
+- PR: `blakinio/otclient#20`
+- Branch: `fix/OTC-20260724-shell-safe-open-url`
+- Implementation head under full CI: `9189d1063e968a0c2ffab11c5069db192e753397`
+- `Platform::openUrl` reuses `spawnProcess` for Unix desktop URL launch.
+- The focused Linux regression substitutes `xdg-open` through `PATH` and asserts one exact URL argument.
+- Catalogue and changelog entries are included.
+- PR remains draft and must not merge before exact-binary cross-repository rehearsal evidence is green.
 
 # Acceptance criteria
 
-- [ ] `Platform::openUrl` does not use shell command construction on Unix desktop.
-- [ ] A URL containing multiple query parameters is passed as one exact process argument.
-- [ ] Existing asynchronous `now` behavior remains compatible.
-- [ ] Required C++ build/tests and repository CI pass.
-- [ ] The Platform-hosted native-auth rehearsal reaches the malformed Gateway boundary with the rebuilt exact OTClient binary.
-- [ ] Module catalogue impact is recorded; no protocol or Canary wire contract changes.
-- [ ] Changelog records the behavior-level security fix.
-- [ ] Autonomous merge is held until cross-repository rehearsal evidence is green.
-
-# Confirmed context
-
-- Exact OTClient `bb87346f6c516a19d19497d82bb01fb389334ff5` builds a complete OAuth Authorization Code + PKCE URL in `modules/client_entergame/oteryn_identity.lua`.
-- Unix `Platform::openUrl` currently executes `system(fmt::format("xdg-open {}", url).c_str())`.
-- Platform rehearsal run `30085898466` retained only `client_id` at `/oauth/authorize`; all parameters after the first `&` were absent and Platform correctly returned HTTP 400.
-- `capture-xdg-open.sh` accepts one quoted argument and therefore is not the truncation source.
-- `Platform::spawnProcess` already provides argv-based `fork`/`execv` without shell interpretation.
-
-# Existing work to reuse
-
-| Module/task/PR | Reuse | Evidence/path | Why it fits |
-|---|---|---|---|
-| Platform process launch | `spawnProcess(process, args)` | `src/framework/platform/unixplatform.cpp` | Existing exact argv boundary; avoids new abstraction. |
-| Oteryn identity flow | Existing PKCE URL construction | `modules/client_entergame/oteryn_identity.lua`, merged PR #17 | Confirms product URL is correct before platform launch. |
-| Client test foundation | Existing C++ test presets/support | `tests/**`, docs/agents/BUILD_TEST_MATRIX.md | Add focused regression without parallel infrastructure. |
-
-# Ownership and overlap check
-
-- Open PRs inspected: none currently returned by live repository PR search.
-- Active tasks inspected: repository coordination snapshot and Oteryn identity catalogue entry.
-- Overlaps: none found for `src/framework/platform/unixplatform.cpp` or Unix URL launch.
-- Resolution: dedicated narrow fix branch/PR; no edits to upstream or unrelated platform code.
-
-# Current state
-
-Task claimed; implementation and focused test discovery pending.
-
-# Plan
-
-1. Reuse `spawnProcess` for Unix URL launch and add a focused argv-preservation regression.
-2. Open a draft PR and run required CI/build tests.
-3. Build an exact Linux OTClient binary and pin it into Platform rehearsal PR #126.
-4. Hold merge until cross-repository physical OAuth/malformed-Gateway evidence is green.
-
-# Work log
-
-## 2026-07-24T12:40:00+02:00
-
-- Changed: created task and branch.
-- Learned: shell interpretation truncates OAuth URLs at the first `&`.
-- Failed/blocked: current exact OTClient cannot physically reach the fake Gateway in the rehearsal.
-- Result: root cause assigned to Unix platform launch boundary.
-
-# Decisions
-
-| Decision | Reason/evidence | ADR |
-|---|---|---|
-| Reuse `spawnProcess` instead of quoting a shell command | argv preserves the URL exactly and avoids shell metacharacter/security ambiguity | not needed; local implementation choice |
-
-# Files and interfaces
-
-| Path/interface/config/schema | Purpose | Status |
-|---|---|---|
-| `src/framework/platform/unixplatform.cpp` | Shell-safe system-browser launch | planned |
-| focused platform regression test | Preserve full query URL as one argv element | discovery |
-
-# Validation and CI
-
-| Commit | Command/check/workflow | Result | Evidence/notes |
-|---|---|---|---|
-| b3bcea2a95959bb4e92cc0b80cd49f36b63699b2 | source/rehearsal root-cause inspection | passed | complete PKCE generated in Lua; Unix shell command truncates at `&` |
-
-# Failed approaches and dead ends
-
-- Waiting for more OTClient module globals did not change the malformed-helper failure.
-- Accepting Lua timeout evidence was rejected because the fake Gateway access log remained empty.
-
-# Risks and compatibility
-
-- Runtime: process launch path changes on Unix desktop only.
-- Data/migration: none.
-- Security: removes shell interpretation of externally constructed URLs.
-- Backward compatibility: same browser command and asynchronous scheduling semantics; URL becomes exact rather than shell-parsed.
-- Cross-repo rollout: client-first-safe; old server components are unaffected.
-- Rollback: revert the narrow platform commit and binary pin.
+- [x] Unix desktop URL launch no longer constructs a shell command.
+- [x] Focused test covers a URL containing multiple `&` query separators.
+- [x] Draft fast checks pass.
+- [ ] Full affected-platform CI passes.
+- [ ] Exact Linux artifact is pinned into Platform PR #126.
+- [ ] Physical production-like native-auth rehearsal passes.
+- [ ] PR remains unmerged until the cross-repository gate is green.
 
 # Remaining work
 
-1. Discover existing platform test seam and implement the smallest regression-backed fix.
-
-# Handoff
-
-## Start here
-
-Inspect current platform tests and `Platform::spawnProcess`; do not alter OAuth URL construction.
-
-## Do not repeat
-
-Do not weaken Platform OAuth validation or the fake Gateway access-log proof.
-
-## Required reads
-
-- `AGENTS.md`
-- `docs/agents/BUILD_TEST_MATRIX.md`
-- `docs/agents/CROSS_REPO_CONTRACTS.md`
-- `src/framework/platform/unixplatform.cpp`
-- `modules/client_entergame/oteryn_identity.lua`
-
-## Open questions
-
-- Whether current merged tests expose a direct process-launch seam or require a minimal helper extraction.
-
-# Completion
-
-- Final status: implementing
-- PR:
-- Merge commit:
-- Catalogue updated: pending
-- Changelog updated: pending
-- Archived at:
+1. Follow the checkpoint `next_action`.

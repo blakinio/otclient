@@ -92,6 +92,22 @@ TEST(ProtocolLoopback, ReceivesOneWorldLightPacketFromLocalEphemeralPortAndClose
     EXPECT_EQ((std::vector<FakeProtocolCallbackReceiver::WorldLight>{ { 0x80, 0xD7 } }), receiver.worldLights());
 }
 
+TEST(InputMessageFraming, SkippingUnreadBodyFromHeaderOffsetReachesEof)
+{
+    auto message = std::make_shared<InputMessage>();
+    message->setBuffer(std::string("\xFE\x01\x02\x03", 4));
+    message->setReadPos(static_cast<uint16_t>(message->getMaxHeaderSize()));
+
+    EXPECT_EQ(0xFE, message->getU8());
+    const auto unreadSize = message->getUnreadSize();
+    ASSERT_EQ(3, unreadSize);
+
+    message->skipBytes(static_cast<uint16_t>(unreadSize));
+
+    EXPECT_TRUE(message->eof());
+    EXPECT_EQ(0, message->getUnreadSize());
+}
+
 TEST(ServerLoopback, CreatesDistinctOsAssignedEphemeralPortsAndCloses)
 {
     const auto first = Server::createLoopbackHttp();

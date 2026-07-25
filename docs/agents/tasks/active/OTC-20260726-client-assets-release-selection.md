@@ -6,11 +6,11 @@ agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-client-assets-release-selection
 base_branch: main
 created: 2026-07-26T01:55:00+02:00
-updated: 2026-07-26T01:55:00+02:00
-last_verified_commit: "ff36aa74324eddbe6a64a79b23bd42d6a185fb7f"
+updated: 2026-07-26T02:08:00+02:00
+last_verified_commit: "3c392c34695a6bf6bb687b4ceef65b0726e4b823"
 risk: high
 related_issue: "opentibiabr/otclient#1766"
-related_pr: ""
+related_pr: "#37"
 depends_on: []
 blocks:
   - production asset auto-install enablement for release archives
@@ -18,7 +18,7 @@ owned_paths:
   - modules/client_assets/client_assets.otmod
   - modules/client_assets/client_assets_release_selector.lua
   - modules/client_assets/client_assets_release_adapter.lua
-  - tests/lua/fixtures/client_assets/releases.json
+  - tests/lua/fixtures/client_assets_releases.lua
   - tests/lua/unit/client_assets_release_selector_test.lua
   - tests/lua/CMakeLists.txt
   - docs/client-assets-auto-install.md
@@ -41,32 +41,32 @@ Prevent unrelated legacy or macOS release archives from being selected for a req
 
 # Acceptance criteria
 
-- [ ] Release assets are prepared cache-stably from each release's own tag/name, not a transient requested version.
-- [ ] A matching non-macOS archive is placed first for the existing resolver.
-- [ ] macOS `.app.zip`, `macos` and standalone `mac` variants are excluded.
-- [ ] An unrelated legacy archive is never accepted only because it is the first ZIP/RAR.
-- [ ] A release with no matching archive contains no archive candidates, forcing the existing codeload fallback.
-- [ ] Release fixtures cover matching tag, matching version label, client preference, legacy, Linux and macOS variants.
-- [ ] Tests verify final things/sounds/extras path contracts and required runtime file locations.
-- [ ] No proprietary or downloaded game assets are committed.
+- [x] Release assets are prepared cache-stably from each release's own tag/name, not a transient requested version.
+- [x] A matching non-macOS archive is placed first for the existing resolver.
+- [x] macOS `.app.zip`, `macos` and standalone `mac` variants are excluded.
+- [x] An unrelated legacy archive is never accepted only because it is the first ZIP/RAR.
+- [x] A release with no matching archive contains no archive candidates, forcing the existing codeload fallback.
+- [x] Release fixtures cover matching tag, matching version label, client preference, legacy, Linux and macOS variants.
+- [x] Tests verify final things/sounds/extras path contracts and required runtime file locations.
+- [x] No proprietary or downloaded game assets are committed.
 - [ ] Exact-head Lua Syntax, focused CTest and required CI pass.
-- [ ] Real release rehearsal or an exact documented blocker remains before claiming production runtime archive compatibility.
+- [x] A real release rehearsal requirement and the current environment blocker are documented before any production runtime archive compatibility claim.
 
 # Confirmed context
 
 - Current resolver `findReleaseArchive` returns the first non-mac archive and can fall back to an unrelated first archive.
-- Upstream commit `465b7a217e87502bb7f9980bf6e099718d0a9a49` scores tag/version matches and falls back to codeload when no match exists.
-- Directly replacing the 1559-line installer is unnecessary; the sandboxed module can prepare GitHub release JSON before the existing private resolver caches it.
-- Preparation must be stable across later client-version requests because `releasesCache` stores the transformed response.
-- Existing installer code already targets `data/things/<version>`, `data/sounds/<version>` and `bin`, and checks modern catalog/hash completeness before writing the completion marker.
+- Upstream commit `465b7a217e87502bb7f9980bf6e099718d0a9a49` scores tag/version matches and falls back to codeload when no best archive exists.
+- Directly replacing the 1559-line installer is unnecessary; the sandboxed module prepares GitHub release JSON before the existing private resolver caches it.
+- Preparation is stable across later client-version requests because each release is transformed only from its own tag/name and marked idempotently.
+- Existing installer code remains authoritative for strict hashes, extraction, `data/things/<version>`, `data/sounds/<version>`, `bin`, catalog/hash checks and completion marker timing.
 
-# Plan
+# Implementation
 
-1. Add a pure release selector/preparer with synthetic fixtures.
-2. Add a narrowly conditional GitHub releases JSON adapter before the existing resolver caches data.
-3. Prove the old private selection semantics choose the prepared best archive or codeload fallback.
-4. Record path/runtime completeness contracts without committing assets.
-5. Validate and retain a real-release rehearsal blocker if no network/runtime artifact environment is available.
+- `client_assets_release_selector.lua` scores matching archives, excludes macOS variants, removes unrelated archives and retains non-archive metadata.
+- `client_assets_release_adapter.lua` conditionally wraps only GitHub releases JSON responses and restores the original HTTP function on unload.
+- `client_assets_releases.lua` supplies synthetic matching, no-match, legacy, Linux, original, macOS and generic-tag fixtures without archive bytes.
+- `client_assets_release_selector_test.lua` exercises the existing private resolver semantics after preparation, cache idempotence, conditional HTTP wrapping, final paths and catalog/runtime-file completeness.
+- `docs/client-assets-auto-install.md` records the selection policy and mandatory networked clean-directory rehearsal before a production runtime claim.
 
 # Work log
 
@@ -74,31 +74,44 @@ Prevent unrelated legacy or macOS release archives from being selected for a req
 
 - Claimed the focused installer task on current `main` independently from the lifecycle/options stack.
 - Confirmed that request-specific destructive reordering would poison the release cache; selection is therefore derived per release.
-- External repositories remain read-only and no archive bytes are imported.
+- External repositories remained read-only and no archive bytes were imported.
+
+## 2026-07-26T02:08:00+02:00
+
+- Added selector, HTTP adapter, synthetic fixtures, focused tests, path/runtime contracts and documentation.
+- Preserved the existing private resolver and codeload fallback rather than copying the full upstream installer diff.
+- No local Lua interpreter, networked archive rehearsal or runnable graphical client is available in the sandbox. Repository CI can validate code/tests, but production runtime archive compatibility remains explicitly rehearsal-gated.
 
 # Validation and CI
 
 | Commit | Check | Result |
 |---|---|---|
-| pending | synthetic release selector fixtures | not-run |
-| pending | final-path/runtime-file contract tests | not-run |
-| pending | Lua Syntax | not-run |
-| pending | Windows CMake Tests / CTest | not-run |
-| pending | `CI / Required` | not-run |
-| pending | real release rehearsal | blocker until a networked runtime/artifact environment exists |
+| `3c392c34695a6bf6bb687b4ceef65b0726e4b823` | synthetic release selector fixtures | pending repository CTest |
+| `3c392c34695a6bf6bb687b4ceef65b0726e4b823` | final-path/runtime-file contract tests | pending repository CTest |
+| `3c392c34695a6bf6bb687b4ceef65b0726e4b823` | Lua Syntax | pending workflow publication |
+| pending final head | Windows CMake Tests / CTest | not-run |
+| pending final head | `CI / Required` | not-run |
+| unavailable in this sandbox | real release rehearsal | blocker: no networked artifact/runtime client environment |
 
 # Risks and compatibility
 
-- The adapter mutates only successful GitHub releases-array responses while the client-assets module is loaded.
+- The adapter transforms only successful GitHub releases-array responses while the client-assets module is loaded.
 - Other HTTP JSON requests pass through unchanged.
 - Existing private resolver, strict hashes, extraction, paths and codeload fallback remain authoritative.
+- Synthetic fixtures and compiled CI do not replace a real release download/startup rehearsal.
 - Rollback is a normal squash revert.
+
+# Remaining work
+
+1. Obtain lightweight draft CI on the current head.
+2. Mark ready, run exact-head Windows CTest/required CI, inspect full diff/reviews/current base and squash-merge if green.
+3. Archive the task while retaining the production rehearsal blocker in durable documentation.
 
 # Completion
 
 - Final status: in progress
-- PR: pending
+- PR: #37
 - Merge commit: pending
 - Catalogue updated: not required; internal installer policy
-- Changelog updated: pending
+- Changelog updated: yes
 - Archived at: pending

@@ -85,7 +85,6 @@ function controllerNpcTrader:disconnectNpcTalkEvent()
 end
 
 function controllerNpcTrader:onTerminate()
-    self:stopEquippedImbuementsTracking()
     if self:isLegacyMode() then
         self:legacy_terminate()
     else
@@ -94,7 +93,6 @@ function controllerNpcTrader:onTerminate()
 end
 
 function controllerNpcTrader:onGameEnd()
-    self:stopEquippedImbuementsTracking()
     if self:isLegacyMode() then
         self:legacy_hide()
     else
@@ -149,4 +147,67 @@ function getSellItems(...) -- Vbot Call
     end
 
     return controllerNpcTrader.sellItems or {}
+end
+
+function getBuyItems(...) -- Vbot Call
+    if controllerNpcTrader:isLegacyMode() then
+        return getBuyItemsLegacy(...)
+    end
+
+    return controllerNpcTrader.buyItems or {}
+end
+
+function getSellQuantity(item) -- Vbot Call
+    if controllerNpcTrader:isLegacyMode() then
+        return getSellQuantityLegacy(item)
+    end
+
+    if type(item) == 'number' then
+        item = Item.create(item)
+    end
+
+    return controllerNpcTrader:getSellQuantity(item)
+end
+
+function canTradeItem(item) -- Vbot Call
+    if controllerNpcTrader:isLegacyMode() then
+        return canTradeItemLegacy(item)
+    end
+
+    if type(item) == 'number' then
+        item = Item.create(item)
+    end
+
+    local tradeEntry = item
+    if item and not item.ptr then
+        for _, entry in ipairs(controllerNpcTrader.sellItems or {}) do
+            if entry.ptr:getId() == item:getId() and entry.ptr:getSubType() == item:getSubType() then
+                tradeEntry = entry
+                break
+            end
+        end
+
+        if tradeEntry == item then
+            for _, entry in ipairs(controllerNpcTrader.buyItems or {}) do
+                if entry.ptr:getId() == item:getId() and entry.ptr:getSubType() == item:getSubType() then
+                    tradeEntry = entry
+                    break
+                end
+            end
+        end
+    end
+
+    if not tradeEntry or not tradeEntry.ptr then
+        return false
+    end
+
+    return controllerNpcTrader:canTradeItem(tradeEntry)
+end
+
+function closeNpcTrade(...) -- Vbot Call
+    if controllerNpcTrader:isLegacyMode() then
+        return closeNpcTradeLegacy(...)
+    end
+
+    return g_game.closeNpcTrade()
 end

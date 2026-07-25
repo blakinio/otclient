@@ -8,13 +8,13 @@ local function isNonEmptyString(value)
 end
 
 function CharacterListLifecycleCore.normalizeLayoutPath(resources, layoutName)
-    if type(resources) ~= 'table' or type(resources.guessFilePath) ~= 'function' then
+    if resources == nil or type(resources.guessFilePath) ~= 'function' then
         return nil, 'invalid_resources'
     end
 
     local requestedLayout = isNonEmptyString(layoutName) and layoutName or DEFAULT_LAYOUT
-    local layoutPath = resources.guessFilePath(requestedLayout, 'otui')
-    if not isNonEmptyString(layoutPath) then
+    local success, layoutPath = pcall(resources.guessFilePath, requestedLayout, 'otui')
+    if not success or not isNonEmptyString(layoutPath) then
         return nil, 'invalid_layout'
     end
 

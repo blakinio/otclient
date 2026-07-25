@@ -1,6 +1,6 @@
 # OTClient Module and System Catalogue
 
-Last reviewed: 2026-07-24
+Last reviewed: 2026-07-25
 
 This catalogue makes reusable client work visible. Verify source, manifests, tests, and open PR state before use.
 
@@ -19,6 +19,9 @@ Update this file in the same PR that adds/changes a reusable module, controller,
 | Oteryn native identity login | active PR #17 | System-browser OAuth Authorization Code + PKCE, loopback callback, Platform Game Login Ticket issuance, Game Gateway login response normalization and one-shot Game Session handoff | `modules/client_entergame/oteryn_identity*.lua`, `modules/client_entergame/oteryn_session_guard.lua`, `src/framework/net/server.*`, `src/framework/util/crypt.cpp`, `init.lua` | First-party Oteryn profile only; disabled by default; no password fallback; routing comes from Gateway `world_id`; production Canary Game Session adapter remains a separate cross-repo gate. Coordination `OTS-20260721-oteryn-identity-auth`. |
 | Unix external URL launch | maintained; PR #20 | Launches browser URLs as exact argv values without shell parsing on Unix desktop | `src/framework/platform/unixplatform.cpp`, `tests/unit/framework/platform_open_url_test.cpp` | Reuse `Platform::spawnProcess`; never interpolate externally constructed URLs into a shell command. Linux resolves `xdg-open` through `/usr/bin/env` so controlled `PATH` interception remains testable. |
 | Client assets auto-install | maintained | Secure things/sounds/runtime-extra installation | installer sources and `docs/client-assets-auto-install.md` | Final paths remain `data/things/<version>/`, `data/sounds/<version>/`, expected `bin/*`; strict hashes stay enabled. |
+| Runtime Stats collection controls | active PR #26 | Lua-visible `g_stats.pause()` and `g_stats.resume()` suspend or resume new performance-stat samples | `src/framework/util/stats.{h,cpp}`, `src/framework/luafunctions.cpp` | Pausing discards newly completed `Stat` objects without retaining them. Treat this as diagnostics policy, not a security or correctness gate; always resume explicitly when temporary measurement suppression ends. |
+| User-directory override | active PR #26 | `--user-dir=<path>` redirects all persisted client state to a caller-selected absolute directory | `src/main.cpp`, `src/framework/core/resourcemanager.{h,cpp}` | Apply before `init.lua` resolves the write directory. The caller owns path access and isolation; do not log or export persisted credentials/configuration from the selected directory. |
+| Bot/manual-walk coordination | active PR #26 | `TargetBot.Danger()` exposes the current target danger while enabled; `modules.game_interface.lastManualWalk` records the latest keyboard walk timestamp | `mods/game_bot/default_configs/cavebot_1.3/targetbot/target.lua`, `modules/game_interface/gameinterface.lua`, `modules/game_walk/walk.lua` | Consumers must tolerate zero/offline state and missing optional bot modules. The timestamp is runtime-only and must not replace authoritative movement or combat state. |
 
 ## Reusable test infrastructure
 

@@ -5,7 +5,7 @@ Persistent operating memory for autonomous agents.
 ## Read order
 
 1. `../../AGENTS.md`
-2. `OTERYN_CLIENT_ARCHITECTURE.md` through `../architecture/OTERYN_CLIENT_ARCHITECTURE.md`
+2. `../architecture/OTERYN_CLIENT_ARCHITECTURE.md`
 3. `OTERYN_WORKSTREAM_MAP.md`
 4. `ACTIVE_WORK.md` as a coordination snapshot only
 5. all records under `tasks/active/`

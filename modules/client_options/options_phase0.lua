@@ -15,7 +15,7 @@ local function updateCanonicalWidget(value)
         if panel and panel.recursiveGetChildById then
             local widget = panel:recursiveGetChildById(canonicalKey)
             if widget then
-                widget:setChecked(value)
+                widget:setChecked(value, true)
                 return
             end
         end

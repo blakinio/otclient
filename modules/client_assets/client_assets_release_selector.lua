@@ -146,12 +146,33 @@ function ClientAssetsReleaseSelector.expectedInstallPaths(version)
     }
 end
 
-function ClientAssetsReleaseSelector.hasRequiredRuntimePaths(version, fileExists)
-    if type(fileExists) ~= 'function' then
+function ClientAssetsReleaseSelector.hasRequiredRuntimePaths(version, catalog, fileExists)
+    if type(catalog) ~= 'table' or type(fileExists) ~= 'function' then
         return false
     end
+
     local paths = ClientAssetsReleaseSelector.expectedInstallPaths(version)
-    return fileExists(paths.catalog) and fileExists(paths.manifestHash)
+    if not fileExists(paths.catalog) or not fileExists(paths.manifestHash) then
+        return false
+    end
+
+    local hasAppearances = false
+    local hasStaticData = false
+    for _, entry in ipairs(catalog) do
+        local entryType = entry.type
+        if entryType == 'appearances' or entryType == 'staticdata' or entryType == 'proficiencies' then
+            if type(entry.file) ~= 'string' or not fileExists(paths.thingsRoot .. entry.file) then
+                return false
+            end
+            if entryType == 'appearances' then
+                hasAppearances = true
+            elseif entryType == 'staticdata' then
+                hasStaticData = true
+            end
+        end
+    end
+
+    return hasAppearances and hasStaticData
 end
 
 return ClientAssetsReleaseSelector

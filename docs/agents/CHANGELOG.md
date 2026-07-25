@@ -4,6 +4,8 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 
 ## Unreleased
 
+- The reviewed `opentibiabr/otclient` synchronization retains bounded unknown-opcode recovery, pre-780 inventory use-with lookup, ground-border multi-use targeting, animator-driven always-animated creature phases, NPC trade imbuement accounting/lifecycle cleanup, `--user-dir`, Stats pause/resume, manual-walk/bot coordination, browser Lua/UIGraph/shader compatibility and Cocoa mouse delta handling.
+- Three reviewed upstream effects remain deliberately deferred: asset release-archive selection pending installer fixtures/path/runtime-load proof, Reward Wall source-byte semantics pending an exact Canary `OTS-*` contract, and rendering/preload ordering pending a framework-safe implementation without a framework-to-client dependency.
 - Required CI compilation is temporarily Windows-only; Linux, macOS, Android, browser and Docker reusable workflows remain available but are not called by the primary workflow. Fast/static checks and Lua syntax remain required.
 - Unix desktop browser URLs are now launched as exact process arguments instead of shell commands, preserving complete OAuth query strings and preventing shell metacharacter interpretation.
 - Added persistent multi-agent coordination, autonomous PR/CI/merge rules, active-work discovery, module catalogue, task/handoff templates, ADRs, and cross-repository contracts.

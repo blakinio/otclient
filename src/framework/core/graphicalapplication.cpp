@@ -26,7 +26,6 @@
 #include "clock.h"
 #include "eventdispatcher.h"
 #include "garbagecollection.h"
-#include "client/game.h"
 #include "framework/graphics/drawpoolmanager.h"
 #include "framework/graphics/graphics.h"
 #include "framework/graphics/image.h"
@@ -211,22 +210,20 @@ void GraphicalApplication::run()
                 continue;
             }
 
-            {
-                AutoStat s(STATS_RENDER, "DrawPreload");
-                m_drawEvents->preLoad();
-            }
+            const bool canDrawForeground = !g_drawPool.isDrawing(DrawPoolType::FOREGROUND) && m_drawEvents->canDraw(DrawPoolType::FOREGROUND);
 
-            bool canDrawForeground = !g_drawPool.isDrawing(DrawPoolType::FOREGROUND) && m_drawEvents->canDraw(DrawPoolType::FOREGROUND);
+            if (canDrawMap()) {
+                if (canDrawForeground) {
+                    tasks.emplace_back(g_asyncDispatcher->submit_task([] {
+                        AutoStat s(STATS_RENDER, "DrawForegroundUI");
+                        g_ui.render(DrawPoolType::FOREGROUND);
+                    }));
+                }
 
-            if (!g_game.isOnline() && canDrawForeground) {
-                AutoStat s(STATS_RENDER, "DrawForegroundUI");
-                g_ui.render(DrawPoolType::FOREGROUND);
-            } else if (canDrawMap() && canDrawForeground) {
-                tasks.emplace_back(g_asyncDispatcher->submit_task([] {
-                    AutoStat s(STATS_RENDER, "DrawForegroundUI");
-                    g_ui.render(DrawPoolType::FOREGROUND);
-                }));
-
+                {
+                    AutoStat s(STATS_RENDER, "DrawPreload");
+                    m_drawEvents->preLoad();
+                }
                 static constexpr std::array<DrawPoolType, 2> types{ DrawPoolType::LIGHT, DrawPoolType::FOREGROUND_MAP };
                 for (const auto type : types) {
                     if (m_drawEvents->canDraw(type)) {
@@ -244,6 +241,9 @@ void GraphicalApplication::run()
 
                 tasks.wait();
                 tasks.clear();
+            } else if (canDrawForeground) {
+                AutoStat s(STATS_RENDER, "DrawForegroundUI");
+                g_ui.render(DrawPoolType::FOREGROUND);
             }
 
             m_mapProcessFrameCounter.update();

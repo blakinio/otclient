@@ -2,6 +2,16 @@
 
 Always read current `CMakePresets.json`; active PR #3 may add/rename test presets. Validation must be proportional to changed paths, risk and the current milestone; a commit or small task step does not by itself justify compilation.
 
+## Temporary platform policy
+
+Windows is the only compiled and required client target for the current project phase.
+
+- Primary CI may use Ubuntu runners for path detection, YAML/static checks, Lua syntax and the final required-job evaluator, but those jobs must not compile a Linux client.
+- Required compilation and CTest coverage use `.github/workflows/reusable-build-windows.yml` only.
+- Linux, macOS, Android, browser and Docker reusable workflows remain in the repository but are not called by the primary CI workflow.
+- Do not claim compatibility with a dormant platform from Windows validation.
+- Re-enabling another compiled target requires an explicit repository-owner decision and a focused CI policy change.
+
 ## Validation timing and escalation
 
 - During a multi-step task, run cheap focused checks after each step: syntax, formatting, load/parse checks, generated-file consistency and directly affected tests.
@@ -16,13 +26,13 @@ Always read current `CMakePresets.json`; active PR #3 may add/rename test preset
 | Documentation/task records | Markdown/path review, `git diff --check` | Fast/docs checks; no compilation |
 | Lua module/mod | Runtime-root syntax/static checks and focused module test | Client runtime load/interaction; no C++ build unless compiled integration changed |
 | OTUI/style | Load/parse and interaction at relevant resolutions | Scaling evidence when useful; no C++ build unless compiled integration changed |
-| C++ implementation | Focused compile and CTest at coherent milestone completion | Required Linux plus affected Windows/macOS |
-| CMake/dependency/toolchain/public header | Configure/build immediately enough to protect subsequent work | Clean or full affected-platform validation at milestone completion |
-| Protocol | Parser/output tests and linked Canary version | Loopback or real integration |
-| Test infrastructure | Existing support tests and affected labels | Full test preset/CTest when infrastructure affects broad coverage |
-| Asset installer | Hash/path/fallback/extraction tests | Clean install/runtime load on affected platforms |
-| Android/browser/platform | Platform-specific build | Do not infer from desktop validation |
-| CI workflow | YAML and required-check/path-filter review | Observe emitted checks on PR; build only when selected by the workflow |
+| C++ implementation | Focused Windows compile and affected CTest at coherent milestone completion | Full required Windows matrix on final head |
+| CMake/dependency/toolchain/public header | Configure/build immediately enough to protect subsequent work | Clean Windows validation at milestone completion |
+| Protocol | Parser/output tests and linked Canary version | Windows loopback or real integration |
+| Test infrastructure | Existing support tests and affected labels | Full Windows test preset/CTest when infrastructure affects broad coverage |
+| Asset installer | Hash/path/fallback/extraction tests | Clean Windows install/runtime load |
+| Android/browser/non-Windows platform | Source review only while target is dormant | No compatibility claim; do not compile until policy changes |
+| CI workflow | YAML and required-check/path-filter review | Observe emitted checks on PR; only Windows build may be selected |
 
 ## Known release command
 
@@ -31,4 +41,4 @@ cmake --preset windows-release
 cmake --build --preset windows-release
 ```
 
-Use current testing strategy/presets after PR #3 state is resolved.
+Use current testing strategy and Windows presets after PR #3 state is resolved.

@@ -34,7 +34,13 @@ function CharacterList.create(characters, account, otui)
     currentLayoutPath = layoutPath
     characterListCreated = false
 
-    if not g_resources.fileExists(layoutPath) then
+    local lookupSuccess, layoutExists = pcall(g_resources.fileExists, layoutPath)
+    if not lookupSuccess then
+        reportFailure(layoutExists)
+        cleanupPartialWindow()
+        return false
+    end
+    if not layoutExists then
         reportFailure(string.format("layout '%s' was not found", layoutPath))
         cleanupPartialWindow()
         return false

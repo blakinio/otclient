@@ -85,6 +85,7 @@ function controllerNpcTrader:disconnectNpcTalkEvent()
 end
 
 function controllerNpcTrader:onTerminate()
+    self:stopEquippedImbuementsTracking()
     if self:isLegacyMode() then
         self:legacy_terminate()
     else
@@ -93,6 +94,7 @@ function controllerNpcTrader:onTerminate()
 end
 
 function controllerNpcTrader:onGameEnd()
+    self:stopEquippedImbuementsTracking()
     if self:isLegacyMode() then
         self:legacy_hide()
     else

@@ -6,8 +6,8 @@ agent: "GPT-5.6 Thinking"
 branch: docs/OTC-20260725-agent-architecture
 base_branch: main
 created: 2026-07-25T14:45:54+02:00
-updated: 2026-07-25T15:00:56+02:00
-last_verified_commit: "fde5b0699663c4d1845beeb60d5e785ae27fd30b"
+updated: 2026-07-25T21:00:00+02:00
+last_verified_commit: "226289a7d99f5f1b787c3b3eea627b4fa55c0b46"
 risk: low
 related_issue: ""
 related_pr: "#28"
@@ -74,6 +74,7 @@ Create a durable target architecture, repository/file ownership map and copy-rea
 | same | Lua Syntax | success |
 | same | `CI / Required` | success |
 | same | Platform builds | correctly skipped for documentation-only scope |
+| `226289a7d99f5f1b787c3b3eea627b4fa55c0b46` | PR #28 squash merge to `main` | verified |
 
 # Risks and compatibility
 
@@ -97,7 +98,8 @@ Do not create parallel architecture, prompt, protocol model, authentication flow
 
 - Final status: complete
 - PR: #28
-- Merge commit: pending PR merge
+- Merge commit: `226289a7d99f5f1b787c3b3eea627b4fa55c0b46`
 - Catalogue updated: not applicable; no runtime interface added
 - Changelog updated: not required for documentation-only architecture
 - Archived at: 2026-07-25T15:00:56+02:00
+- Post-merge verification: 2026-07-25T21:00:00+02:00

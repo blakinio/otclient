@@ -6,11 +6,11 @@ agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-options-phase0
 base_branch: main
 created: 2026-07-26T01:31:00+02:00
-updated: 2026-07-26T01:31:00+02:00
-last_verified_commit: "70818ce8fd6b134d0708071fd8e9fd0f87acb21a"
+updated: 2026-07-26T01:47:00+02:00
+last_verified_commit: "b39ea0c1c3e52de1546c4857f68971e20efa1a58"
 risk: medium
 related_issue: ""
-related_pr: ""
+related_pr: "#36"
 depends_on:
   - PR #35 Forge scheduled-event lifecycle
 blocks:
@@ -19,11 +19,7 @@ owned_paths:
   - modules/client_options/options.otmod
   - modules/client_options/options_migration_core.lua
   - modules/client_options/options_phase0.lua
-  - modules/client_options/data_options.lua
   - modules/client_options/styles/interface/actionbars.otui
-  - modules/client_options/styles/interface/interface.otui
-  - modules/client_options/styles/interface/HUD.otui
-  - modules/client_options/styles/controls/general.otui
   - tests/lua/unit/options_phase0_test.lua
   - tests/lua/CMakeLists.txt
   - docs/agents/CHANGELOG.md
@@ -33,7 +29,8 @@ modules_touched:
 reuses:
   - existing option controller and settings store
   - existing action-bar reset API
-  - existing inventory/container reload actions
+  - existing inventory/container reload action
+  - existing loaded panel/widget tree
   - existing Lua test runner
 public_interfaces:
   - showExpiryInInventory
@@ -47,63 +44,76 @@ Repair the deterministic Phase 0 option defects without adding unsupported produ
 
 # Acceptance criteria
 
-- [ ] Clear Right Bar 3 calls `resetAction(9)`.
-- [ ] The global reset button has a unique widget ID.
-- [ ] Inventory expiry cancels its own pending event.
-- [ ] Teleport and floor-change sliders display their own labels in setup callbacks.
-- [ ] Unsupported unused-item expiry and status-bar controls are not user-visible.
-- [ ] Cooldown-window wording matches actual behavior.
-- [ ] Canonical `showExpiryInInventory` reads a legacy stored value when needed and writes both keys for existing consumers.
-- [ ] Focused Lua/static tests cover all changed controls and migration decisions.
-- [ ] No new backend claim is made for hidden unsupported controls.
+- [x] Clear Right Bar 3 calls `resetAction(9)`.
+- [x] The global reset button has a unique widget ID.
+- [x] Inventory expiry owns and cancels its pending reload event independently from the container option.
+- [x] Teleport and floor-change sliders display their own labels after panel load and on later option changes.
+- [x] Unsupported unused-item expiry and status-bar controls are not user-visible.
+- [x] Cooldown-window wording matches actual behavior.
+- [x] Canonical `showExpiryInInventory` reads a legacy stored value when needed and writes both keys for existing consumers.
+- [x] Focused Lua/static tests cover action-bar wiring, migration, loaded-panel normalization and rapid event cancellation.
+- [x] No new backend claim is made for hidden unsupported controls.
 - [ ] Exact-head Lua Syntax, CTest and required CI pass before squash merge.
 
 # Confirmed context
 
-- `actionbars.otui` maps Right Bar 3 to action bar 7 and duplicates `clearRightBar3` for the global reset button.
-- `data_options.lua` guards inventory event removal with `showExpiryInContainers.event`.
-- `general.otui` displays the turn-delay label for teleport and floor-change setup callbacks.
-- `interface.otui` exposes a disabled unused-item-expiry checkbox with no proven backing distinction.
-- `HUD.otui` exposes two generic option checkboxes without IDs or matching option entries.
-- `showSpellGroupCooldowns` controls the complete cooldown window, so the visible label should describe a cooldown bar/window rather than only group internals.
+- `actionbars.otui` previously mapped Right Bar 3 to action bar 7 and duplicated `clearRightBar3` for the global reset button.
+- `data_options.lua` guards inventory event removal with `showExpiryInContainers.event`; the adapter now owns the event around the unchanged legacy action and deduplicates legacy removal.
+- `general.otui` has wrong setup-only labels; the backing actions already use correct labels, so the adapter normalizes the loaded widgets without rewriting the template.
+- `interface.otui` exposes a disabled unused-item-expiry checkbox with no proven backing distinction; the adapter hides it.
+- `HUD.otui` exposes two generic option checkboxes without IDs or matching option entries; the adapter recursively hides their panels by translated text.
+- `showSpellGroupCooldowns` controls the complete cooldown window; the adapter labels it `Show Cooldown Bar` and gives it an accurate tooltip.
 - Current stacked base: PR #35 head `70818ce8fd6b134d0708071fd8e9fd0f87acb21a`.
 
-# Plan
+# Implementation
 
-1. Add a pure compatibility helper for the inventory-expiry key.
-2. Install a narrow post-options adapter that performs migration and dual writes.
-3. Apply the five static OTUI/Lua repairs.
-4. Add focused static/migration tests.
-5. Validate the isolated diff after dependencies merge.
+- `options_migration_core.lua` defines canonical/legacy keys and deterministic precedence.
+- `options_phase0.lua` wraps `setOption/getOption`, dual-writes both keys, captures/cancels the inventory reload event and normalizes loaded widgets before user interaction.
+- `actionbars.otui` contains the direct bar-9 and unique-ID fixes.
+- `options_phase0_test.lua` verifies migration, static action-bar wiring, loaded widget state and rapid-toggle cleanup.
 
 # Work log
 
 ## 2026-07-26T01:31:00+02:00
 
-- Changed: claimed deterministic option repairs on a stacked branch from PR #35.
-- Learned: unsupported controls should be hidden rather than enabled because no authoritative backing option/action exists.
-- Safety: no new protocol, platform, authentication or rendering behavior is introduced.
+- Claimed deterministic option repairs on a stacked branch from PR #35.
+- Confirmed unsupported controls must be hidden rather than enabled because no authoritative backing option/action exists.
+
+## 2026-07-26T01:47:00+02:00
+
+- Added the compatibility helper and adapter without replacing the 863-line `data_options.lua`.
+- Corrected the action-bar OTUI directly.
+- Added focused static and mock lifecycle tests.
+- Updated the changelog.
+- No local Lua interpreter is available in the sandbox; repository CI remains the validation source of truth.
 
 # Validation and CI
 
 | Commit | Check | Result |
 |---|---|---|
-| pending | focused Lua/static tests | not-run |
-| pending | Lua Syntax | not-run |
-| pending | Windows CMake Tests / CTest | not-run |
-| pending | `CI / Required` | not-run |
+| `b39ea0c1c3e52de1546c4857f68971e20efa1a58` | focused Lua/static tests | pending repository CTest |
+| `b39ea0c1c3e52de1546c4857f68971e20efa1a58` | Lua Syntax | pending workflow publication |
+| pending refreshed head | Windows CMake Tests / CTest | not-run |
+| pending refreshed head | `CI / Required` | not-run |
 
 # Risks and compatibility
 
-- Existing consumers of the misspelled key remain supported through dual writes.
+- Existing consumers of the misspelled key remain supported through dual writes and canonical-to-legacy API mapping.
+- The adapter changes only the module sandbox and loaded options widgets.
 - Hidden controls can be reintroduced only with real backing behavior and acceptance tests.
 - Rollback is a normal squash revert.
+
+# Remaining work
+
+1. Obtain draft lightweight CI on the current stacked head.
+2. After PR #35 merges, refresh onto current `main`, inspect the isolated diff, mark ready and run full CTest/Windows CI.
+3. Squash-merge and archive this task.
 
 # Completion
 
 - Final status: in progress
-- PR: pending
+- PR: #36
 - Merge commit: pending
-- Catalogue updated: yes, compatibility alias documented in task
-- Changelog updated: pending
+- Catalogue updated: compatibility alias documented here; no catalogue entry required
+- Changelog updated: yes
 - Archived at: pending

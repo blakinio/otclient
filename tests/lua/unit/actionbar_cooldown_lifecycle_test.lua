@@ -14,7 +14,7 @@ test('cooldown lifecycle begins and ends isolated sessions', function()
 
     Core.recordCooldown(spells, 10, 500, 1000)
     assertFalse(Core.beginSession(state, spells, groups))
-    assertNotNil(spells[10])
+    assertTrue(spells[10] ~= nil)
 
     Core.endSession(state, spells, groups)
     assertFalse(state.active)

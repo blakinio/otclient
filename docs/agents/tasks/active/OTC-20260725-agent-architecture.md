@@ -1,16 +1,16 @@
 ---
 task_id: OTC-20260725-agent-architecture
 coordination_id: ""
-status: implementation
+status: validation
 agent: "GPT-5.6 Thinking"
 branch: docs/OTC-20260725-agent-architecture
 base_branch: main
 created: 2026-07-25T14:45:54+02:00
-updated: 2026-07-25T14:45:54+02:00
-last_verified_commit: ""
+updated: 2026-07-25T14:55:11+02:00
+last_verified_commit: "23729da8ed9336d55473d9ff5b97d92f94c4eda4"
 risk: low
 related_issue: ""
-related_pr: ""
+related_pr: "#28"
 depends_on:
   - "PR #27 Windows-only CI policy"
 blocks: []
@@ -40,11 +40,11 @@ Create a durable target architecture, repository/file ownership map and copy-rea
 
 # Acceptance criteria
 
-- [ ] Target client architecture documents trust boundaries, subsystem responsibilities and dependency direction.
-- [ ] File/workstream map distinguishes current paths, planned paths and ownership/overlap rules.
-- [ ] New-agent prompt includes preflight, Windows-only validation, Oteryn security invariants, Canary contracts and autonomous delivery requirements.
-- [ ] Agent read order links all new documents.
-- [ ] No client runtime code, assets, protocol or external repositories are changed.
+- [x] Target client architecture documents trust boundaries, subsystem responsibilities and dependency direction.
+- [x] File/workstream map distinguishes current paths, planned paths and ownership/overlap rules.
+- [x] New-agent prompt includes preflight, Windows-only validation, Oteryn security invariants, Canary contracts and autonomous delivery requirements.
+- [x] Agent read order links all new documents.
+- [x] No client runtime code, assets, protocol or external repositories are changed.
 - [ ] Documentation CI succeeds.
 
 # Confirmed context
@@ -70,20 +70,20 @@ Create a durable target architecture, repository/file ownership map and copy-rea
 
 - Open PRs inspected: #23, #25, #26 and #27.
 - No open PR owns the three new documentation paths.
-- `docs/agents/README.md` will receive only a narrow read-order update.
+- `docs/agents/README.md` received only a narrow read-order/core-document update.
 - `docs/agents/BUILD_TEST_MATRIX.md`, CI workflows, runtime modules and protocol files remain untouched.
 
 # Current state
 
-Branch and task record created. Architecture documents are being authored.
+The architecture, workstream map and standalone prompt are complete. Full changed-file and diff review found only the five declared documentation paths. PR #28 is ready for documentation CI.
 
 # Plan
 
-1. Define target architecture and non-negotiable boundaries.
-2. Define repository structure, workstreams, ownership and acceptance gates.
-3. Provide a standalone prompt for future agents.
-4. Update the agent documentation read order.
-5. Review the full diff and observe documentation CI.
+1. Define target architecture and non-negotiable boundaries. — complete
+2. Define repository structure, workstreams, ownership and acceptance gates. — complete
+3. Provide a standalone prompt for future agents. — complete
+4. Update the agent documentation read order. — complete
+5. Observe final documentation CI and close the task. — in progress
 
 # Work log
 
@@ -94,6 +94,14 @@ Branch and task record created. Architecture documents are being authored.
 - Failed/blocked: none.
 - Result: documentation can be added without touching active runtime work.
 
+## 2026-07-25T14:55:11+02:00
+
+- Changed: added the target architecture, detailed workstream/file map, copy-ready new-agent prompt and README read-order links.
+- Learned: stable architecture must remain separate from the volatile audit; planned paths are explicitly labelled and source/manifests remain authoritative.
+- Validation: reviewed all changed filenames and the complete PR diff; only declared documentation paths are present.
+- Failed/blocked: documentation CI has not yet completed.
+- Result: implementation is complete and ready for final CI.
+
 # Decisions
 
 | Decision | Reason/evidence | ADR |
@@ -101,22 +109,23 @@ Branch and task record created. Architecture documents are being authored.
 | Keep architecture separate from the mutable audit | Architecture defines stable boundaries; audit records current gaps and issue status. | none |
 | Make the new-agent prompt reference repository sources of truth rather than embed volatile SHAs | Prevents immediate staleness. | none |
 | Treat Windows-only as the active project policy while PR #27 remains the implementation dependency | Explicit owner decision; do not duplicate CI changes in this PR. | none |
+| Label future directories as planned, not existing | Prevents agents from treating a target structure as implementation evidence. | none |
 
 # Files and interfaces
 
 | Path | Purpose | Status |
 |---|---|---|
-| `docs/architecture/OTERYN_CLIENT_ARCHITECTURE.md` | Target technical architecture and boundaries | planned |
-| `docs/agents/OTERYN_WORKSTREAM_MAP.md` | File structure, ownership and work package routing | planned |
-| `docs/agents/prompts/OTCLIENT_NEW_AGENT_PROMPT.md` | Copy-ready autonomous agent prompt | planned |
-| `docs/agents/README.md` | Required read-order links | planned |
+| `docs/architecture/OTERYN_CLIENT_ARCHITECTURE.md` | Target technical architecture and boundaries | complete |
+| `docs/agents/OTERYN_WORKSTREAM_MAP.md` | File structure, ownership and work package routing | complete |
+| `docs/agents/prompts/OTCLIENT_NEW_AGENT_PROMPT.md` | Copy-ready autonomous agent prompt | complete |
+| `docs/agents/README.md` | Required read-order links | complete |
 
 # Validation and CI
 
 | Commit | Command/check/workflow | Result | Evidence/notes |
 |---|---|---|---|
-| pending | Markdown/path/full-diff review | not-run | Documentation-only; no client compilation required. |
-| pending | GitHub `CI / Required` | not-run | Must pass on final head. |
+| `23729da8ed9336d55473d9ff5b97d92f94c4eda4` | Changed-file and complete PR diff review | passed | Five declared documentation paths only; no source, assets, CI or external-repository changes. |
+| pending final head | GitHub `CI / Required` | not-run | PR must be marked ready to obtain final evidence. |
 
 # Failed approaches and dead ends
 
@@ -126,34 +135,32 @@ None.
 
 - Runtime: none; documentation only.
 - Data/migration: none.
-- Security: inaccurate boundaries could mislead future agents; documents must preserve current Oteryn invariants.
+- Security: documents preserve Oteryn password/fallback/session/routing and asset-integrity boundaries.
 - Backward compatibility: no shipped interfaces changed.
 - Cross-repo rollout: none.
-- Rollback: revert the documentation PR.
+- Rollback: revert PR #28.
 
 # Remaining work
 
-1. Author the architecture, workstream map and new-agent prompt.
+1. Mark PR #28 ready, observe final required documentation checks and update completion state.
 
 # Handoff
 
 ## Start here
 
-Read this task, then the three new documents when present.
+Read `docs/architecture/OTERYN_CLIENT_ARCHITECTURE.md`, then `docs/agents/OTERYN_WORKSTREAM_MAP.md`. Use `docs/agents/prompts/OTCLIENT_NEW_AGENT_PROMPT.md` for a fresh agent.
 
 ## Do not repeat
 
-Do not create a second architecture or agent prompt in another location. Extend these files.
+Do not create a second architecture or agent prompt in another location. Extend these files and keep volatile project status in tasks/audits.
 
 ## Required reads
 
 - `AGENTS.md`
 - `docs/agents/README.md`
-- `docs/agents/MODULE_CATALOG.md`
-- `docs/agents/REPOSITORY_MAP.md`
-- `docs/agents/KNOWN_RISKS.md`
-- `docs/agents/CROSS_REPO_CONTRACTS.md`
-- PR #25 audit
+- `docs/architecture/OTERYN_CLIENT_ARCHITECTURE.md`
+- `docs/agents/OTERYN_WORKSTREAM_MAP.md`
+- `docs/agents/prompts/OTCLIENT_NEW_AGENT_PROMPT.md`
 
 ## Open questions
 
@@ -161,9 +168,9 @@ None.
 
 # Completion
 
-- Final status: in progress
-- PR: pending
+- Final status: validation
+- PR: #28
 - Merge commit: pending
-- Catalogue updated: not applicable
+- Catalogue updated: not applicable; no reusable runtime interface added
 - Changelog updated: not required for documentation-only architecture
 - Archived at: pending

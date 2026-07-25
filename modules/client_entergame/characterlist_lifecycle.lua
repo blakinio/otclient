@@ -1,4 +1,4 @@
-local CharacterListLifecycleCore = dofile('characterlist_lifecycle_core')
+local CharacterListLifecycleCore = rawget(_G, 'CharacterListLifecycleCore') or dofile('characterlist_lifecycle_core')
 
 local originalCreate = CharacterList.create
 local originalDestroy = CharacterList.destroy

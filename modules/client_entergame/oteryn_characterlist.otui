@@ -1,0 +1,415 @@
+OterynCharacterAction < UIButton
+  height: 38
+  font: Verdana Bold-11px
+  color: #f1f4f8
+  text-align: center
+  background-color: #1d2a38
+  border-width: 1
+  border-color: #41536a
+  padding: 8
+
+  $hover !disabled:
+    background-color: #27384b
+    border-color: #74879e
+
+  $pressed:
+    background-color: #14202d
+    border-color: #a27b43
+    text-offset: 1 1
+
+  $disabled:
+    color: #7e8997
+    background-color: #141c26
+    border-color: #2d3947
+
+OterynEnterGameAction < OterynCharacterAction
+  background-color: #23672e
+  border-color: #56a764
+
+  $hover !disabled:
+    background-color: #2d7d39
+    border-color: #77c282
+
+  $pressed:
+    background-color: #194d22
+    border-color: #9ed6a6
+
+CharacterWidget < UIWidget
+  height: 64
+  background-color: #162331
+  border-width: 1
+  border-color: #2b3a4d
+  &updateOnStates: |
+    function(self)
+      local focused = self:isFocused()
+      local children = self:getChildren()
+      for i = 1, #children do
+        children[i]:setOn(focused)
+      end
+      if self.rowColor then
+        if focused then
+          self:setBackgroundColor('#25364a')
+          self:setBorderWidth(1)
+          self:setBorderColor('#c6984e')
+        else
+          self:setBackgroundColor(self.rowColor)
+          self:setBorderWidth(1)
+          self:setBorderColor('#2b3a4d')
+        end
+      end
+      local pin = self:getChildById('pin')
+      if pin then
+        pin:setVisible(focused and g_game.getFeature(GameEnterGameShowAppearance))
+      end
+    end
+  @onFocusChange: self:updateOnStates()
+
+  UICreature
+    id: outfitCreatureBox
+    size: 64 64
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    fixed-creature-size: true
+    padding-left: 5
+    padding-bottom: 4
+
+  Label
+    id: name
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 65
+    margin-top: 10
+    font: Verdana Bold-11px
+    color: #f1f3f6
+    text-auto-resize: true
+    background-color: alpha
+
+    $on:
+      color: #ffd58e
+
+  Label
+    id: level
+    &baseText: 'Level %s'
+    anchors.left: name.left
+    anchors.top: name.bottom
+    margin-top: 7
+    font: verdana-11px-antialised
+    color: #8e9caf
+    text-auto-resize: true
+    background-color: alpha
+
+    $on:
+      color: #d1d8e1
+
+  Label
+    id: vocation
+    anchors.left: level.right
+    anchors.top: level.top
+    margin-left: 12
+    font: verdana-11px-antialised
+    color: #8e9caf
+    text-auto-resize: true
+    background-color: alpha
+
+    $on:
+      color: #d1d8e1
+
+  Label
+    id: worldName
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 72
+    width: 205
+    height: 36
+    font: verdana-11px-antialised
+    color: #9eabbc
+    text-align: right
+    text-wrap: true
+    background-color: alpha
+
+    $on:
+      color: #e0e6ee
+
+  Label
+    id: mainCharacter
+    size: 9 8
+    anchors.left: name.right
+    anchors.top: name.top
+    margin-left: 7
+    margin-top: 2
+    image-source: /images/game/entergame/maincharacter
+    image-clip: 0 0 9 8
+
+  CheckBoxButton
+    id: pin
+    size: 12 12
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-right: 48
+    margin-top: 11
+    visible: false
+    tooltip: Pin this character to have it always shown at the top of the list.
+    icon-source: /game_questlog/images/icon-pin
+    @onCheckChange: onPinCharacter(self, self:isChecked())
+
+    $checked:
+      tooltip: Remove pin from this character.
+      image-color: #d9a654
+
+  Label
+    id: statusDailyReward
+    size: 11 19
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 26
+    image-source: /images/game/entergame/dailyreward_collected
+    image-clip: 0 0 11 19
+
+  Label
+    id: statusHidden
+    size: 11 19
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 8
+    image-source: /images/game/entergame/hidden
+    image-clip: 0 0 11 19
+
+MainWindow
+  id: charactersWindow
+  !text: tr('Select Character')
+  size: 820 520
+  visible: false
+  image-source:
+  background-color: #080d14
+  border-width: 1
+  border-color: #34465d
+  padding: 0
+  color: #eef2f7
+  @onEnter: CharacterList.doLogin()
+  @onEscape: CharacterList.hide(true)
+  @onSetup: |
+    g_keyboard.bindKeyPress('Up', function() self:getChildById('characters'):focusPreviousChild(KeyboardFocusReason) end, self)
+    g_keyboard.bindKeyPress('Down', function() self:getChildById('characters'):focusNextChild(KeyboardFocusReason) end, self)
+
+  UIWidget
+    id: accentLine
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    height: 4
+    background-color: #a47a3c
+    phantom: true
+
+  UIWidget
+    id: headerPanel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: accentLine.bottom
+    height: 82
+    background-color: #0d1621
+    border-width-bottom: 1
+    border-color-bottom: #29394d
+    phantom: true
+
+  Label
+    id: titleLabel
+    !text: tr('Choose your character')
+    anchors.left: headerPanel.left
+    anchors.top: headerPanel.top
+    margin-left: 28
+    margin-top: 20
+    font: Verdana Bold-11px
+    color: #f0f2f6
+    text-auto-resize: true
+
+  Label
+    id: titleHint
+    !text: tr('Select a hero, review the destination world and enter the game.')
+    anchors.left: titleLabel.left
+    anchors.top: titleLabel.bottom
+    margin-top: 8
+    font: verdana-11px-antialised
+    color: #8f9dae
+    text-auto-resize: true
+
+  Label
+    id: accountStatusCaption
+    !text: tr('SIGNED IN WITH OTERYN')
+    anchors.right: headerPanel.right
+    anchors.top: headerPanel.top
+    margin-right: 28
+    margin-top: 20
+    font: Verdana Bold-11px
+    color: #72afe7
+    text-auto-resize: true
+
+  Label
+    id: accountStatusIcon
+    size: 22 20
+    anchors.right: accountStatusLabel.left
+    anchors.verticalCenter: accountStatusLabel.verticalCenter
+    margin-right: 7
+    image-source: /images/game/entergame/premium
+    image-clip: 0 0 22 20
+
+  Label
+    id: accountStatusLabel
+    !text: tr('Oteryn Account')
+    anchors.right: headerPanel.right
+    anchors.top: accountStatusCaption.bottom
+    margin-right: 28
+    margin-top: 8
+    font: verdana-11px-antialised
+    color: #b8c3d0
+    text-auto-resize: true
+
+    $on:
+      color: #ef6f6f
+
+  UIWidget
+    id: characterTable
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: headerPanel.bottom
+    margin-left: 22
+    margin-right: 22
+    margin-top: 14
+    height: 30
+    background-color: #111a25
+    border-width: 1
+    border-color: #2d3c50
+
+    Label
+      !text: tr('CHARACTER')
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 14
+      font: Verdana Bold-11px
+      color: #b89359
+      text-auto-resize: true
+
+    Label
+      !text: tr('WORLD')
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 91
+      font: Verdana Bold-11px
+      color: #b89359
+      text-auto-resize: true
+
+  TextList
+    id: characters
+    anchors.left: characterTable.left
+    anchors.right: characterListScrollBar.left
+    anchors.top: characterTable.bottom
+    anchors.bottom: footerPanel.top
+    margin-top: 7
+    margin-bottom: 13
+    background-color: #0c131c
+    border-width: 1
+    border-color: #2a394c
+    padding: 5
+    focusable: false
+    vertical-scrollbar: characterListScrollBar
+    auto-focus: first
+
+  VerticalScrollBar
+    id: characterListScrollBar
+    anchors.top: characters.top
+    anchors.bottom: characters.bottom
+    anchors.right: characterTable.right
+    margin-left: 5
+    step: 64
+    pixels-scroll: true
+
+  UIWidget
+    id: footerPanel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: 82
+    background-color: #0d151f
+    border-width-top: 1
+    border-color-top: #29394c
+    phantom: true
+
+  Panel
+    id: buttonHidden
+    anchors.left: footerPanel.left
+    anchors.verticalCenter: footerPanel.verticalCenter
+    margin-left: 24
+    width: 160
+    height: 24
+    background-color: alpha
+
+    CheckBox
+      id: checkBoxHidden
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      checked: true
+      !text: tr('Show Hidden Characters')
+      text-auto-resize: true
+      color: #9ba7b5
+      @onCheckChange: onShowHiddenCharacters(self, self:isChecked())
+
+  Panel
+    id: buttonOutfit
+    anchors.left: buttonHidden.right
+    anchors.verticalCenter: buttonHidden.verticalCenter
+    margin-left: 14
+    width: 110
+    height: 24
+    background-color: alpha
+
+    CheckBox
+      id: checkBoxOutfit
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      !text: tr('Show Outfit')
+      text-auto-resize: true
+      color: #9ba7b5
+      @onCheckChange: onShowOutfits(self, self:isChecked())
+
+  OterynCharacterAction
+    id: autoReconnect
+    anchors.left: buttonOutfit.right
+    anchors.verticalCenter: footerPanel.verticalCenter
+    margin-left: 16
+    width: 150
+
+    $!on:
+      border-color: #704247
+
+    $on:
+      border-color: #4e8a58
+
+  OterynEnterGameAction
+    id: buttonOk
+    !text: tr('Enter Game')
+    anchors.right: footerPanel.right
+    anchors.verticalCenter: footerPanel.verticalCenter
+    margin-right: 24
+    width: 142
+    @onClick: CharacterList.doLogin()
+
+  OterynCharacterAction
+    id: buttonCancel
+    !text: tr('Logout')
+    anchors.right: buttonOk.left
+    anchors.verticalCenter: buttonOk.verticalCenter
+    margin-right: 10
+    width: 100
+    @onClick: CharacterList.hide(true)
+
+  Panel
+    id: premiumBenefitsPanel
+    anchors.left: parent.left
+    anchors.bottom: footerPanel.top
+    height: 0
+    visible: false
+
+  Button
+    id: premiumButton
+    anchors.right: parent.right
+    anchors.bottom: footerPanel.top
+    visible: false

@@ -4,6 +4,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 
 ## Unreleased
 
+- Draft PR #23 prototypes a modern dark navy, blue and antique-gold Oteryn enter-game shell plus a dedicated character-list presentation while preserving the existing identity, legacy-login and world-login controllers; no authentication, protocol or binary-asset behavior changes.
 - Unix desktop browser URLs are now launched as exact process arguments instead of shell commands, preserving complete OAuth query strings and preventing shell metacharacter interpretation.
 - Added persistent multi-agent coordination, autonomous PR/CI/merge rules, active-work discovery, module catalogue, task/handoff templates, ADRs, and cross-repository contracts.
 - Protocol-game error callbacks now validate the exact source `ProtocolGame` before entering global `Game`, preventing delayed callbacks from obsolete sessions from disconnecting a replacement login.

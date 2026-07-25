@@ -15,11 +15,15 @@ Module
     dofile 'createAccount'
     dofile 'oteryn_identity_core'
     dofile 'oteryn_identity'
+    dofile 'oteryn_login_theme'
     EnterGame.init()
+    OterynLoginTheme.prepare()
     CharacterList.init()
     OterynIdentity.init()
+    OterynLoginTheme.init()
 
   @onUnload: |
     OterynIdentity.terminate()
+    OterynLoginTheme.terminate()
     EnterGame.terminate()
     CharacterList.terminate()

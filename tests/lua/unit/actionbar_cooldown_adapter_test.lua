@@ -29,8 +29,8 @@ local function withHarness(callback)
         'setupActionBar',
         'spellCooldownCache',
         'spellGroupCooldownCache',
-        'tableEmptyOriginal',
         'toggleCooldownOption',
+        'updateActionBarEventSubscriptions',
         'updateButtonState',
         'updateCooldown',
         'updateInventoryItems',
@@ -38,9 +38,7 @@ local function withHarness(callback)
     }
     local saved = {}
     for _, name in ipairs(names) do
-        if name ~= 'tableEmptyOriginal' then
-            saved[name] = rawget(_G, name)
-        end
+        saved[name] = rawget(_G, name)
     end
     local savedTableEmpty = table.empty
 
@@ -135,6 +133,7 @@ local function withHarness(callback)
         state.originalGroupCalls = state.originalGroupCalls + 1
     end
     toggleCooldownOption = function() end
+    updateActionBarEventSubscriptions = function() end
 
     ActionBarController = {}
     function ActionBarController:onInit() end
@@ -156,9 +155,7 @@ local function withHarness(callback)
     local loadSuccess, loadError = pcall(dofile, sourceDir .. '/modules/game_actionbar/cooldown_lifecycle.lua')
     if not loadSuccess then
         table.empty = savedTableEmpty
-        for _, name in ipairs(names) do
-            if name ~= 'tableEmptyOriginal' then rawset(_G, name, saved[name]) end
-        end
+        for _, name in ipairs(names) do rawset(_G, name, saved[name]) end
         error(loadError, 0)
     end
 
@@ -167,9 +164,7 @@ local function withHarness(callback)
     end, debug.traceback)
 
     table.empty = savedTableEmpty
-    for _, name in ipairs(names) do
-        if name ~= 'tableEmptyOriginal' then rawset(_G, name, saved[name]) end
-    end
+    for _, name in ipairs(names) do rawset(_G, name, saved[name]) end
 
     if not success then error(result, 0) end
 end
@@ -221,7 +216,7 @@ test('action-bar adapter preserves pre-UI packets through controller start', fun
 
         assertEqual(1, state.originalStartCalls)
         assertEqual(3000, spellGroupCooldownCache[2].exhaustion)
-        assertEqual(2000, state.updates[#state.updates])
+        assertEqual(3000, state.updates[#state.updates])
     end)
 end)
 

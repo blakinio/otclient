@@ -334,10 +334,10 @@ UIWidget
         anchors.top: clearLeftBar3.bottom
         margin-right: 0
         margin-top: 3
-        @onClick: modules.game_actionbar.resetAction(7)
+        @onClick: modules.game_actionbar.resetAction(9)
 
     QtButton
-      id: clearRightBar3
+      id: resetAllActionBars
       !text: tr('reset')
       width: 60
       height: 18

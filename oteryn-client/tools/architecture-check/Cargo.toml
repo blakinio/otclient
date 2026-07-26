@@ -1,0 +1,18 @@
+[package]
+name = "oteryn-architecture-check"
+version = "0.1.0"
+description = "Validates Oteryn Rust workspace dependency boundaries"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "tool"
+
+[dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

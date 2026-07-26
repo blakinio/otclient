@@ -48,6 +48,7 @@ local function withHarness(callback)
         originalGroupCalls = 0,
         originalSpellCalls = 0,
         originalStartCalls = 0,
+        reentrantGroupDelay = nil,
         sequence = {},
         updates = {},
         visuals = false
@@ -141,6 +142,9 @@ local function withHarness(callback)
     function ActionBarController:onGameStart()
         state.originalStartCalls = state.originalStartCalls + 1
         spellGroupCooldownCache = {}
+        if state.reentrantGroupDelay then
+            onSpellGroupCooldown(2, state.reentrantGroupDelay)
+        end
         setupActionBar(1)
     end
     function ActionBarController:onGameEnd() end
@@ -217,6 +221,19 @@ test('action-bar adapter preserves pre-UI packets through controller start', fun
         assertEqual(1, state.originalStartCalls)
         assertEqual(3000, spellGroupCooldownCache[2].exhaustion)
         assertEqual(3000, state.updates[#state.updates])
+    end)
+end)
+
+test('action-bar adapter merges cooldown packets received reentrantly during controller start', function()
+    withHarness(function(state)
+        state.visuals = true
+        onSpellGroupCooldown(2, 3000)
+        state.reentrantGroupDelay = 5000
+
+        ActionBarController:onGameStart()
+
+        assertEqual(5000, spellGroupCooldownCache[2].exhaustion)
+        assertEqual(5000, state.updates[#state.updates])
     end)
 end)
 

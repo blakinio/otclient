@@ -6,8 +6,8 @@ agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-characterlist-recreation
 base_branch: main
 created: 2026-07-26T00:46:58+02:00
-updated: 2026-07-26T08:55:00+02:00
-last_verified_commit: "841031a129c3148e425de819abe907d8bc3f2e32"
+updated: 2026-07-26T09:22:00+02:00
+last_verified_commit: "ed7b32e62bd5258749ebaa77fc39ad88dac4364b"
 risk: medium
 related_issue: "opentibiabr/otclient#1775 (character-list relog subcase)"
 related_pr: "#31"
@@ -51,15 +51,16 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 
 - PR #26 synchronization, PR #25 audit and archive PR #38 are merged into `main`.
 - Current clean base: `ce4329ee13b39576915240605c2fe6657096c517`.
-- The reported failure resolves relative `characterlist` as `/characterlist.otui` during a deferred login callback and then indexes a nil `charactersWindow`.
+- `ResourceManager::guessFilePath` only adds `.otui`; the later `resolvePath` step uses the current Lua source path.
+- During a deferred callback with no module source context, relative `characterlist.otui` can therefore resolve as `/characterlist.otui`.
 - `CharacterList.destroy()` removes the window and UI references; existing `showAgain()` only acts while the old list widget still exists.
 - PR #23 owns enter-game presentation files and also edits `entergame.otmod`; this P1 lifecycle repair changes only one manifest line and will be reconciled into #23 after this repair reaches `main`.
 - No Canary, login-server, credential or Oteryn Identity contract changes are required.
 
 # Implementation
 
-- Relative layout requests are validated from the caller-provided module-local name and always anchored under `/client_entergame/`.
-- An absolute path returned by `guessFilePath` for a relative request is never trusted as the resource root; this directly covers the observed `/characterlist.otui` failure.
+- Relative layout requests are validated from the caller-provided module-local name and always anchored under `/client_entergame/` before `displayUI` performs deferred path resolution.
+- A synthetic root-returning resource fixture additionally proves that a relative layout can never escape the module root through an alternate resolver implementation.
 - Explicit absolute layouts remain supported after traversal validation.
 - The adapter preserves the last successful layout and recreates through the existing CharacterList controller.
 
@@ -78,18 +79,18 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 - Created a second clean backup `backup/OTC-20260726-characterlist-recreation-clean-c01a7daa` before refreshing onto archive merge `ce4329ee...`.
 - Recreated only the lifecycle helper, adapter, focused tests, manifest load order, CTest registration, changelog and task record.
 
-## 2026-07-26T08:55:00+02:00
+## 2026-07-26T09:22:00+02:00
 
-- Source review reproduced the important resolver behavior: a relative request may be returned as `/characterlist.otui`.
-- Corrected normalization so relative requests are anchored from their validated module-local name rather than trusting a root-level resolver result.
-- Added focused coverage for both legacy and Oteryn layouts when the resolver returns root-level paths.
+- Verified `guessFilePath` and `resolvePath` in framework source instead of inferring their behavior from the final error path.
+- Confirmed that the observed root path is produced by deferred resolution without module source context, not by `guessFilePath` itself.
+- Retained the absolute module anchoring and corrected implementation comments/task evidence to name the exact layer.
 
 # Decisions
 
 | Decision | Reason/evidence | ADR |
 |---|---|---|
 | Keep the existing CharacterList controller authoritative | Login, sorting, outfits, pinning and reconnect behavior already exist and must not be duplicated | none |
-| Anchor relative requests from the validated request name | The resource resolver may return `/characterlist.otui`, which is exactly the failing path | none |
+| Anchor relative requests before `displayUI` | Deferred `resolvePath` may lack the module source context and otherwise resolves at `/` | none |
 | Preserve explicit absolute layouts | PR #23 and future module callers may already pass a fully qualified shipped layout | none |
 | Catch UI creation failures at the adapter boundary | Prevents the known nil dereference and returns the user to a usable login screen | none |
 | Force-restack only after creating backup refs | Removes historical stack noise without risking loss of the reviewed implementation | none |

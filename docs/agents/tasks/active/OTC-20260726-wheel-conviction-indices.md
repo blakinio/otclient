@@ -6,8 +6,8 @@ agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-wheel-conviction-indices
 base_branch: main
 created: 2026-07-26T01:21:00+02:00
-updated: 2026-07-26T02:20:00+02:00
-last_verified_commit: "7df656ac1e9f270a89deb8b6d4985eb45ec497ee"
+updated: 2026-07-26T13:12:34+02:00
+last_verified_commit: "baa2a252d255bb61bef11cb85078b8822f180ef9"
 risk: low
 related_issue: "opentibiabr/otclient#1753"
 related_pr: "#34"
@@ -51,7 +51,8 @@ Replace shifted numeric ConvictionBonus accesses with one named index contract s
 - `WheelOfDestiny.configureSummary` dynamically calls the global `getConvictionPerks`, then expects a ten-slot summary view: special 1/2, skill, life, mana and five spells.
 - The legacy summary consumer therefore reads shifted source slots when it uses raw positions 3-10.
 - The mismatch is deterministic and independent of server payload changes.
-- Current stacked base: PR #33 code/task stack.
+- PR #33 and its task archive are merged into `main`.
+- Current clean base: `fc6a40fcca18b403b5936ac59f5f938b56bc5148`.
 
 # Implementation
 
@@ -74,12 +75,19 @@ Replace shifted numeric ConvictionBonus accesses with one named index contract s
 - Corrected task ownership from the unchanged `wheelclass.lua` to the actually changed `wheel.otmod`.
 - No local Lua interpreter is available; repository CTest/CI remains the validation source of truth.
 
+## 2026-07-26T13:12:34+02:00
+
+- Created backup branch `backup/OTC-20260726-wheel-conviction-indices-pre-autonomous-restack-543c81bf` at the original stacked head.
+- Restacked the seven Wheel task commits directly onto current `main`, removing the historical action-bar, character-list and upstream-synchronization stack from the PR diff.
+- Reviewed the isolated six-file diff and the existing producer/summary consumer; confirmed the change does not touch protocol parsing, feature gates, authentication or assets.
+- Located the repository Windows vcpkg LuaJIT and passed all three focused index/adapter tests.
+
 # Validation and CI
 
 | Commit | Check | Result |
 |---|---|---|
-| `7df656ac1e9f270a89deb8b6d4985eb45ec497ee` | focused Lua test | pending repository CTest |
-| `7df656ac1e9f270a89deb8b6d4985eb45ec497ee` | Lua Syntax | pending workflow publication |
+| `baa2a252d255bb61bef11cb85078b8822f180ef9` | `luajit tests/lua/helpers/runner.lua tests/lua/unit/wheel_conviction_indices_test.lua` | passed, 3 tests and 0 failed with repository Windows vcpkg LuaJIT |
+| `baa2a252d255bb61bef11cb85078b8822f180ef9` | `git diff --check origin/main...HEAD` | passed |
 | pending refreshed head | Windows CMake Tests / CTest | not-run |
 | pending refreshed head | `CI / Required` | not-run |
 
@@ -91,9 +99,9 @@ Replace shifted numeric ConvictionBonus accesses with one named index contract s
 
 # Remaining work
 
-1. After PR #33 merges, refresh onto current `main` and inspect the isolated diff.
-2. Mark ready, run full Windows CTest/required CI and review stable base/threads.
-3. Squash-merge and archive this task.
+1. Publish the refreshed head and mark PR #34 ready.
+2. Pass exact-head Windows CTest/required CI and verify review threads and stable base.
+3. Squash-merge and archive the task.
 
 # Completion
 

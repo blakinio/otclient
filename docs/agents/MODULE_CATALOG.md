@@ -2,53 +2,52 @@
 
 Last reviewed: 2026-07-26
 
-This catalogue makes reusable client work visible. Verify source, manifests, tests, and open PR state before use.
+This catalogue makes reusable work visible across the greenfield Rust client and legacy OTClient. Verify source, tasks, tests and open PR state before use.
 
 ## Maintenance contract
 
-Update this file in the same PR that adds/changes a reusable module, controller, widget infrastructure, protocol helper, message/test utility, platform abstraction, asset installer, public configuration, or integration contract. Include active PR work early so another agent does not duplicate it.
+Update this file in the same PR that adds or changes a reusable module/crate, public interface, protocol/UI integration point, test utility, platform abstraction, asset format or integration contract.
 
-## Core client/module areas
+## Greenfield Rust client
 
 | Module/system | Status | Responsibility/public surface | Primary paths | Reuse/safety notes |
 |---|---|---|---|---|
-| Shipped game modules | maintained | Feature UI/controllers and interaction loaded through manifests | `modules/**` | Extend owning module; preserve dependencies, lifecycle cleanup, events, keys, widgets, localization. |
-| Optional/custom mods | maintained | Optional behavior outside shipped core | `mods/**` | Do not hide a required core fix here. Runtime Lua syntax CI covers this root. |
-| Protocol and features | maintained | Packet parsing/output, feature flags, game state | `src/client/**`, `modules/game_features/**`, affected modules | Check Canary payloads/opcodes/version gates and contracts. |
-| Protocol game callback guard | maintained; hardening PR #9 | Carries an exact source `ProtocolGame` through connection-error, game-end and disconnect cleanup; supports before/after callback identity checks | `src/client/protocolgamecallbackguard.h`, `src/client/protocolgame.cpp`, `src/client/game.{h,cpp}` | Reuse for lifecycle callbacks entering global `Game`; capture once, revalidate after Lua/callback boundaries, and never use time windows or relog flags. PR #9 supersedes PR #7 as the Canary consumer revision. |
-| Oteryn native identity login | active PR #17 | System-browser OAuth Authorization Code + PKCE, loopback callback, Platform Game Login Ticket issuance, Game Gateway login response normalization and one-shot Game Session handoff | `modules/client_entergame/oteryn_identity*.lua`, `modules/client_entergame/oteryn_session_guard.lua`, `src/framework/net/server.*`, `src/framework/util/crypt.cpp`, `init.lua` | First-party Oteryn profile only; disabled by default; no password fallback; routing comes from Gateway `world_id`; production Canary Game Session adapter remains a separate cross-repo gate. Coordination `OTS-20260721-oteryn-identity-auth`. |
-| Unix external URL launch | maintained; PR #20 | Launches browser URLs as exact argv values without shell parsing on Unix desktop | `src/framework/platform/unixplatform.cpp`, `tests/unit/framework/platform_open_url_test.cpp` | Reuse `Platform::spawnProcess`; never interpolate externally constructed URLs into a shell command. Linux resolves `xdg-open` through `/usr/bin/env` so controlled `PATH` interception remains testable. |
-| Client assets auto-install | maintained | Secure things/sounds/runtime-extra installation | installer sources and `docs/client-assets-auto-install.md` | Final paths remain `data/things/<version>/`, `data/sounds/<version>/`, expected `bin/*`; strict hashes stay enabled. |
-| Runtime Stats collection controls | maintained; merged PR #26 | Lua-visible `g_stats.pause()` and `g_stats.resume()` suspend or resume new performance-stat samples | `src/framework/util/stats.{h,cpp}`, `src/framework/luafunctions.cpp` | Pausing discards newly completed `Stat` objects without retaining them. Treat this as diagnostics policy, not a security or correctness gate; always resume explicitly when temporary measurement suppression ends. |
-| User-directory override | maintained; merged PR #26 | `--user-dir=<path>` redirects all persisted client state to a caller-selected absolute directory | `src/main.cpp`, `src/framework/core/resourcemanager.{h,cpp}` | Apply before `init.lua` resolves the write directory. The caller owns path access and isolation; do not log or export persisted credentials/configuration from the selected directory. |
-| Bot/manual-walk coordination | maintained; merged PR #26 | `TargetBot.Danger()` exposes the current target danger while enabled; `modules.game_interface.lastManualWalk` records the latest keyboard walk timestamp | `mods/game_bot/default_configs/cavebot_1.3/targetbot/target.lua`, `modules/game_interface/gameinterface.lua`, `modules/game_walk/walk.lua` | Consumers must tolerate zero/offline state and missing optional bot modules. The timestamp is runtime-only and must not replace authoritative movement or combat state. |
+| Greenfield architecture package | active PR #45 | Normative Rust client architecture, workspace plan, lifecycle, protocol boundary, module/security/performance/asset models, audit program and agent prompt | `oteryn-client/**` | New product target. Foundation audit must complete before production workspace bootstrap. Legacy code is evidence only. |
+| Rust foundation audit | planned; blocked on PR #45 | Verified product/Canary/Oteryn/assets/performance/platform/test inputs and first bootstrap recommendation | `oteryn-client/docs/audits/foundation/**` | Audit-only; no production crates or speculative constants. |
+| Planned Rust workspace | not created | Future apps/crates/features/tools described by repository layout and workstreams | `oteryn-client/apps`, `crates`, `features`, `tools` | Create only after audit gate and in narrow packages. |
 
-## Reusable test infrastructure
+## Legacy core client/module areas
+
+| Module/system | Status | Responsibility/public surface | Primary paths | Reuse/safety notes |
+|---|---|---|---|---|
+| Shipped game modules | maintained legacy | Feature UI/controllers and interactions loaded through manifests | `modules/**` | Extend owning legacy module; do not structurally port into Rust. |
+| Optional/custom mods | maintained legacy | Optional behavior outside shipped legacy core | `mods/**` | Not a substitute for core fixes and not the Rust extension model. |
+| Protocol and features | maintained legacy | Packet parsing/output, feature flags and game state | `src/client/**`, `modules/game_features/**` | Exact Canary contracts required. Rust work consumes only audited evidence. |
+| Protocol game callback guard | maintained legacy | Exact source-session validation through connection/game-end cleanup | `src/client/protocolgamecallbackguard.h`, `src/client/protocolgame.cpp`, `src/client/game.{h,cpp}` | Legacy lifecycle evidence; Rust uses generation-owned session architecture rather than linking this code. |
+| Oteryn native identity login | maintained legacy | System-browser PKCE, loopback callback, Platform ticket, Gateway and one-shot handoff | `modules/client_entergame/oteryn_identity*.lua`, session guard, native helpers | Security/contract evidence for audit; Rust implementation is independent. No password fallback. |
+| Client assets auto-install | maintained legacy | Secure things/sounds/runtime-extra installation | installer sources and `docs/client-assets-auto-install.md` | Strict hashes/final paths remain mandatory for legacy. Rust uses a new signed pack pipeline. |
+| Runtime Stats controls | maintained legacy | Pause/resume legacy performance samples | `src/framework/util/stats.*`, Lua bindings | May help baseline audit; not a Rust diagnostics dependency. |
+| User-directory override | maintained legacy | Redirects persisted legacy state | `src/main.cpp`, resource manager | Do not infer greenfield settings/security policy from this behavior. |
+
+## Reusable legacy test infrastructure
 
 | Module/tool | Status | Responsibility/public surface | Source/docs | Reuse notes |
 |---|---|---|---|---|
-| Client test foundation | active PR #3 | Deterministic C++ builders/assertions/fakes/environment, OTML fixtures, protocol loopback, Lua runner/contracts | `tests/support/**`, `tests/unit/**`, `tests/integration/**`, `tests/lua/**`, testing docs | Reuse support, labels, fixtures, and presets; do not create a second harness. |
-| InputMessageBuilder | active #3 | Deterministic framed parser inputs | `tests/support/builders/input_message_builder.{h,cpp}` | Reuse instead of ad hoc internals. |
-| OutputMessageInspector | active #3 | Inspects encoded output bytes in tests | `tests/support/builders/output_message_inspector.h` | Reuse instead of ad hoc internals. |
-| Thing/Tile builders/assertions | active #3 | Synthetic things/items/creatures and tile assertions | `tests/support/builders/thing_builders.*`, `tests/support/assertions/tile_assertions.h` | Reuse for map/tile/module tests. |
-| TestEnvironment/fakes | active #3 | Deterministic lifecycle and substitutes for global resources/game state | `tests/support/test_environment/**`, `tests/support/mocks/**` | Prefer over new global mocking layers. |
-| Lua runner/stubs | active #3 | Named assertions, deterministic failure, minimal globals | `tests/lua/helpers/**` | Add focused tests to existing runner/contracts. |
-| Protocol loopback | active #3 | Bounded local socket integration for framed packets | `tests/integration/protocol/loopback_packet_test.cpp` | Extend for protocol regression cases. |
-
-## Current governance work
-
-| Item | Status | Paths | Note |
-|---|---|---|---|
-| Existing agent handoff | active PR #4 | `AGENT_HANDOFF.md` | Reconcile with `docs/agents/**`; avoid contradictory rules. |
+| Client test foundation | maintained legacy | Deterministic C++/Lua builders, fakes, fixtures and loopback | `tests/**` | Useful as audit evidence; Rust workspace gets native Cargo test support. |
+| InputMessageBuilder | maintained legacy | Framed parser inputs | `tests/support/builders/**` | Behavior/fixture reference only for Rust. |
+| OutputMessageInspector | maintained legacy | Encoded output inspection | `tests/support/builders/**` | Behavior/fixture reference only for Rust. |
+| Thing/Tile builders/assertions | maintained legacy | Synthetic legacy map/things | `tests/support/**` | Audit semantics/provenance before creating Rust equivalents. |
+| Protocol loopback | maintained legacy | Bounded local socket integration | `tests/integration/protocol/**` | Does not prove Rust adapter compatibility. |
 
 ## Entry template
 
 ```md
 ### Module name
+- Track: greenfield-rust | legacy-client
 - Status:
 - Responsibility/public surface:
 - Source paths:
-- Manifest/startup/dependencies:
+- Dependencies/lifecycle:
 - Tests:
 - Documentation:
 - Used by:

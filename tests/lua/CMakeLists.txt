@@ -15,6 +15,8 @@ add_test(
         ${OTCLIENT_LUA_EXECUTABLE}
         ${OTCLIENT_LUA_RUNNER}
         ${CMAKE_CURRENT_SOURCE_DIR}/unit/gamelib_util_test.lua
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit/characterlist_lifecycle_test.lua
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit/characterlist_lifecycle_adapter_test.lua
 )
 set_tests_properties(otclient_lua_unit_tests PROPERTIES
     LABELS "lua;unit"

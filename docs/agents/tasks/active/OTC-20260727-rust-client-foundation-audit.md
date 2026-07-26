@@ -1,14 +1,14 @@
 ---
 task_id: OTC-20260727-rust-client-foundation-audit
-status: awaiting_review
+status: awaiting_final_ci
 agent: "GPT-5.6 Thinking"
 track: greenfield-rust
 workstream: WS-R00
 branch: docs/OTC-20260727-rust-client-foundation-audit
 base_branch: main
 created: 2026-07-27T00:25:00+02:00
-updated: 2026-07-27T00:48:00+02:00
-last_verified_commit: "8bab327cb80acbb39a96f388b532abf793530251"
+updated: 2026-07-27T00:55:00+02:00
+last_verified_commit: "049612370d05e77652c62b724597badc1ec3edce"
 risk: high
 related_pr: "#47"
 depends_on:
@@ -56,7 +56,7 @@ Complete the mandatory foundation audit for the greenfield Rust Oteryn client an
 - [x] Accepted decisions are separated from blocked cross-repository, legal, runtime and product gaps.
 - [x] Exactly one narrow first package is recommended: WS-R01 workspace/toolchain/dependency-policy/architecture-check bootstrap.
 - [x] No Cargo workspace, production crate, legacy runtime dependency, protocol constant, private capture, secret or proprietary asset is added.
-- [ ] Complete final diff/consistency review is recorded on the final head.
+- [x] Complete 12-file changed-path/full-patch consistency review is recorded.
 - [ ] Exact-head required CI passes.
 - [ ] Autonomous merge gate is satisfied.
 
@@ -135,13 +135,22 @@ The initial workspace contains only a narrow architecture-policy tool and synthe
 - Preserved asset-rights and runtime-performance unknowns rather than inventing data.
 - Recommended one non-product WS-R01 bootstrap package.
 
+## 2026-07-27T00:55:00+02:00
+
+- Reviewed all 12 changed files and the complete PR patch.
+- Confirmed the diff contains only the active task record, audit index and ten numbered Markdown reports.
+- Checked relative links, evidence-cut consistency, gameplay-channel terminology, Current-profile qualification and separation of accepted decisions from unknown/blocked facts.
+- Confirmed there are no Cargo files, workflow changes, runtime code, copied legacy content, binary assets, secrets, credentials or private captures.
+- Confirmed the bootstrap recommendation creates only one tooling member and explicitly defers product crates and application dependencies.
+- No unsupported runtime, production, legal or performance claim was found.
+
 # Validation and CI
 
 | Commit | Check | Result | Evidence |
 |---|---|---|---|
 | `8bab327cb80acbb39a96f388b532abf793530251` | required output creation | PASS | audit index + ten numbered documents present; documentation/task paths only |
-| final head pending | complete changed-file/full-diff consistency review | not-run | inspect PR #47 after this checkpoint |
-| final head pending | required documentation/fast CI | not-run | no C++ or Rust build is required for audit-only content |
+| `049612370d05e77652c62b724597badc1ec3edce` | complete changed-file/full-patch consistency review | PASS | 12 declared Markdown paths, 2354 additions, no deletions or out-of-scope content |
+| final task-record head | required documentation/fast CI | pending | no C++ or Rust build is required for audit-only content |
 
 # Rejected approaches
 
@@ -164,9 +173,9 @@ The initial workspace contains only a narrow architecture-policy tool and synthe
 
 # Remaining work
 
-1. Review the complete 12-file changed-path set and full PR patch for consistency, links, evidence labels and unsupported claims.
-2. Update PR body with final findings and validation state.
-3. Pass exact-head required CI, mark ready, recheck reviews/mergeability and squash-merge.
+1. Update PR #47 body with findings and final review state.
+2. Pass exact-head required CI.
+3. Mark ready, recheck reviews/mergeability/checks and squash-merge.
 4. Archive this task through a separate lifecycle PR.
 5. Start the recommended WS-R01 bootstrap task only after audit merge/archive.
 
@@ -188,7 +197,7 @@ Perform a fresh preflight for the WS-R01 workspace/toolchain/architecture-check 
 
 # Completion
 
-- Final status: awaiting review/CI
+- Final status: awaiting final CI
 - PR: #47
 - Merge commit: pending
 - Catalogue updated: not required; no reusable implementation interface added

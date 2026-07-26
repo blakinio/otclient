@@ -7,15 +7,16 @@ Persistent operating memory for autonomous agents.
 1. `../../AGENTS.md`
 2. `../architecture/OTERYN_CLIENT_ARCHITECTURE.md`
 3. `OTERYN_WORKSTREAM_MAP.md`
-4. `ACTIVE_WORK.md` as a coordination snapshot only
-5. all records under `tasks/active/`
-6. all live open pull requests and their checks/review threads
-7. `MODULE_CATALOG.md`
-8. `REPOSITORY_MAP.md`
-9. `KNOWN_RISKS.md`
-10. `BUILD_TEST_MATRIX.md`
-11. `CROSS_REPO_CONTRACTS.md` when Canary, Oteryn Platform, protocol, identifiers, payloads, login or assets may be affected
-12. relevant tasks, ADRs, capability audits and source/tests
+4. `programs/OTCLIENT_UPSTREAM_INTELLIGENCE.md` when auditing upstream OTClient or forks
+5. `ACTIVE_WORK.md` as a coordination snapshot only
+6. all records under `tasks/active/`
+7. all live open pull requests and their checks/review threads
+8. `MODULE_CATALOG.md`
+9. `REPOSITORY_MAP.md`
+10. `KNOWN_RISKS.md`
+11. `BUILD_TEST_MATRIX.md`
+12. `CROSS_REPO_CONTRACTS.md` when Canary, Oteryn Platform, protocol, identifiers, payloads, login or assets may be affected
+13. relevant tasks, ADRs, capability audits and source/tests
 
 A completely new agent should start from the copy-ready prompt in `prompts/OTCLIENT_NEW_AGENT_PROMPT.md`, but must still perform the full live preflight above.
 
@@ -25,6 +26,7 @@ A completely new agent should start from the copy-ready prompt in `prompts/OTCLI
 |---|---|
 | `../architecture/OTERYN_CLIENT_ARCHITECTURE.md` | Stable target architecture, trust boundaries, dependency direction and definition of done. |
 | `OTERYN_WORKSTREAM_MAP.md` | Repository structure, workstream routing, path ownership, package sizing and acceptance gates. |
+| `programs/OTCLIENT_UPSTREAM_INTELLIGENCE.md` | Durable baseline, candidate statuses and audit workflow for read-only upstream/fork monitoring; machine state lives in `artifacts/upstream/otclient/candidates.json`. |
 | `prompts/OTCLIENT_NEW_AGENT_PROMPT.md` | Standalone startup prompt for a fresh autonomous agent. |
 | `MODULE_CATALOG.md` | Existing reusable modules, services and test infrastructure. |
 | `REPOSITORY_MAP.md` | Fast path-to-responsibility navigation. |
@@ -39,6 +41,7 @@ A completely new agent should start from the copy-ready prompt in `prompts/OTCLI
 - `ACTIVE_WORK.md` is a convenience index and can become stale.
 - The architecture defines stable boundaries; it does not prove that a planned module is already implemented.
 - The workstream map routes changes; source and manifests confirm the actual owner.
+- `programs/OTCLIENT_UPSTREAM_INTELLIGENCE.md` and its JSON registry preserve audited upstream candidate state, but current source and live PR/issue status must still be revalidated before implementation.
 - `MODULE_CATALOG.md` is a reusable-system discovery index, not a substitute for source/tests.
 - Capability audits describe current gaps and evidence levels; revalidate volatile issue/PR status.
 - `CHANGELOG.md` records completed behavior/architecture changes.

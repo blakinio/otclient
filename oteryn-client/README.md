@@ -10,6 +10,8 @@ Long-term game-server target: Oteryn
 
 The existing repository roots `src/`, `modules/`, `mods/`, `data/` and the existing CMake build remain the legacy client. They may be inspected for verified behavior, protocol evidence, asset metadata and regression scenarios, but the Rust client must not link them, execute their Lua/OTUI modules, include their headers or inherit their global-state architecture.
 
+Legacy maintenance routes are preserved in repository-root `docs/architecture/LEGACY_OTCLIENT_ARCHITECTURE.md` and `docs/agents/LEGACY_OTCLIENT_WORKSTREAMS.md`.
+
 ## Product contract
 
 The client must provide:

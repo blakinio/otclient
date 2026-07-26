@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260726-forge-scheduled-events
 coordination_id: ""
-status: in_progress
+status: complete
 agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-forge-scheduled-events
 base_branch: main
 created: 2026-07-26T01:25:00+02:00
-updated: 2026-07-26T14:30:15+02:00
-last_verified_commit: "1dd02f88defde9a307d8d101608dedb0d19c7ba1"
+updated: 2026-07-26T18:22:39+02:00
+last_verified_commit: "1207f8de1ae9d38133c84d8dbcd4a05fc5e82fbf"
 risk: medium
 related_issue: "opentibiabr/otclient#1691"
 related_pr: "#35"
@@ -47,20 +47,20 @@ Prevent Forge scheduled callbacks from outliving their controller generation by 
 - [x] Reopening Forge starts a fresh generation without inheriting old timers.
 - [x] Focused Lua tests cover execution, cancellation, stale generations and repeated lifecycle cycles.
 - [x] No Forge protocol or economy payload changes.
-- [ ] Exact-head Lua Syntax, CTest and required CI pass before squash merge.
+- [x] Exact-head Lua Syntax, CTest and required CI passed before squash merge.
 
 # Confirmed context
 
 - Issue #1691 identifies six delayed callbacks: unloadModule, updateBonusButton, timeoutCallback, clearRightItem, continueAnimation and startResultAnimation.
-- Current `terminate()` clears `ForgeController.callbacks` but does not retain/cancel all `scheduleEvent` handles.
-- C++ may therefore retain a Lua function after the Lua closure table is released.
-- PR #34 and its task archive are merged into `main`.
-- Current clean base: `59d0a11e17b6fbc213f56bdb6ea3e381102e70d8`.
+- The previous `terminate()` cleared `ForgeController.callbacks` without retaining and cancelling every `scheduleEvent` handle.
+- C++ could therefore retain a Lua function after the Lua closure table was released.
+- PR #34 and its task archive were merged before this change.
+- Clean implementation base: `59d0a11e17b6fbc213f56bdb6ea3e381102e70d8`.
 
 # Implementation
 
 - `forge_event_lifecycle_core.lua` owns generation state and tracked handles without retaining completed or cancelled callback references.
-- `forge_event_lifecycle.lua` wraps the Forge sandbox scheduler, removes completed handles and cancels/invalidate all pending handles at hide, game end, game start and terminate boundaries.
+- `forge_event_lifecycle.lua` wraps the Forge sandbox scheduler, removes completed handles and cancels/invalidates all pending handles at hide, game end, game start and terminate boundaries.
 - Generation checks keep a raced callback harmless after cancellation or a reopened Forge session.
 - The existing Forge controller and its callback table remain authoritative.
 
@@ -68,8 +68,8 @@ Prevent Forge scheduled callbacks from outliving their controller generation by 
 
 ## 2026-07-26T01:25:00+02:00
 
-- Changed: claimed the focused Forge scheduled-event repair.
-- Learned: cancellation alone is insufficient for a queue race; cancellation and generation validation are required together.
+- Claimed the focused Forge scheduled-event repair.
+- Determined that cancellation alone is insufficient for a queue race; cancellation and generation validation are required together.
 
 ## 2026-07-26T14:30:15+02:00
 
@@ -80,32 +80,37 @@ Prevent Forge scheduled callbacks from outliving their controller generation by 
 - Removed the unbounded callback list and added a 100-cycle regression proving that tracked handles return to zero without an accumulating callback collection.
 - Passed all nine focused core/adapter tests with the repository Windows vcpkg LuaJIT.
 
+## 2026-07-26T18:22:39+02:00
+
+- Verified exact-head CI run `30202214048` completed successfully on `1207f8de1ae9d38133c84d8dbcd4a05fc5e82fbf`.
+- Verified PR #35 squash-merged as `1a201fa24991ea9724f26320cc4b5e62bbe43c3c`.
+- Archived the completed task and released the deterministic-options dependency.
+
 # Validation and CI
 
 | Commit | Check | Result |
 |---|---|---|
-| `1dd02f88defde9a307d8d101608dedb0d19c7ba1` | `luajit tests/lua/helpers/runner.lua tests/lua/unit/forge_event_lifecycle_test.lua tests/lua/unit/forge_event_lifecycle_adapter_test.lua` | passed, 9 tests and 0 failed with repository Windows vcpkg LuaJIT |
+| `1dd02f88defde9a307d8d101608dedb0d19c7ba1` | focused Lua runner | passed, 9 tests and 0 failed with repository Windows vcpkg LuaJIT |
 | `1dd02f88defde9a307d8d101608dedb0d19c7ba1` | `git diff --check origin/main...HEAD` | passed |
-| pending | Windows CMake Tests / CTest | not-run |
-| pending | `CI / Required` | not-run |
+| `1207f8de1ae9d38133c84d8dbcd4a05fc5e82fbf` | Runtime Lua syntax | passed in run `30202214048` |
+| `1207f8de1ae9d38133c84d8dbcd4a05fc5e82fbf` | Windows CMake Tests / CTest | passed in run `30202214048` |
+| `1207f8de1ae9d38133c84d8dbcd4a05fc5e82fbf` | required Windows build matrix and `CI / Required` | passed in run `30202214048` |
 
 # Risks and compatibility
 
 - Forge packets, prices, convergence rules and animation timings remain unchanged.
-- Adapter must not capture unrelated module timers.
+- Only module-owned Forge timers are tracked.
 - Rollback is a normal squash revert.
 
 # Remaining work
 
-1. Publish the refreshed head and mark PR #35 ready.
-2. Pass exact-head Windows CTest/required CI and verify review threads and stable base.
-3. Squash-merge and archive the task.
+None.
 
 # Completion
 
-- Final status: in progress
+- Final status: complete
 - PR: #35
-- Merge commit: pending
+- Merge commit: `1a201fa24991ea9724f26320cc4b5e62bbe43c3c`
 - Catalogue updated: not applicable
 - Changelog updated: yes
-- Archived at: pending
+- Archived at: 2026-07-26T18:22:39+02:00

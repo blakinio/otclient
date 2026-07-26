@@ -4,7 +4,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 
 ## Unreleased
 
-- The target Oteryn client is now a greenfield Rust product isolated under `oteryn-client/`; Canary is the first protocol adapter, Oteryn is the target ecosystem, gameplay channels are selected through login/relog, and production workspace bootstrap is gated by a documented foundation audit. The existing C++/Lua/OTUI client remains legacy/reference evidence and is not a Rust runtime dependency.
+- The target Oteryn client is now a greenfield Rust product isolated under `oteryn-client/`; Canary is the first protocol adapter, Oteryn is the target ecosystem, gameplay channels are selected through login/relog, and production workspace bootstrap is gated by a documented foundation audit. The existing C++/Lua/OTUI client remains legacy/reference evidence and is not a Rust runtime dependency; its maintenance architecture and workstreams remain separately documented.
 - Forge now tracks every module-owned scheduled handle, cancels pending events before hide/game-end/terminate cleanup, releases callback references and uses generation guards so a raced stale callback cannot touch a reopened controller.
 - Wheel of Destiny conviction summaries now use one named parser-order contract so skill, life leech, mana leech and five spell perks read slots 5-12 instead of the shifted legacy 3-10 assumptions.
 - Action-bar cooldown protocol state is retained independently from visual options, subscribed for the module lifetime, reset at session boundaries and restored after relog/rebuild using the longest individual or spell-group remaining time for spells, runes and multi-actions.

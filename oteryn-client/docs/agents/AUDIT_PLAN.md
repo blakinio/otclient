@@ -156,18 +156,19 @@ Recommend minimum, recommended and high-refresh Windows hardware tiers with evid
 
 ## 9. Platform/dependency audit
 
-Evaluate candidate Rust dependencies through primary documentation and current versions at audit time. Candidates include, but are not automatically selected:
+ADR-0002 selects `wgpu` as the renderer abstraction. The audit therefore evaluates the exact current `wgpu` version, Windows backends, maintenance, license, unsafe/FFI surface, binary/runtime implications and fit with the measured asset/render requirements. It may recommend an ADR amendment only if evidence shows the selected boundary is unsuitable.
 
-- `wgpu`;
-- `winit`;
-- async runtime/network stack;
+Other dependency categories remain candidates rather than automatic selections:
+
+- window/event integration such as `winit`;
+- async runtime and networking stack;
 - audio backend;
 - text shaping/font stack;
 - image/audio compression;
 - WebAssembly runtime;
-- tracing/crash integration.
+- tracing and crash integration.
 
-Record license, maintenance, Windows support, unsafe/FFI surface, binary size and architecture fit. Final dependency choices require bootstrap/package decisions, not popularity alone.
+Use current primary documentation. Record license, maintenance, Windows support, unsafe/FFI surface, binary size and architecture fit. Final package/version choices belong to narrow bootstrap tasks and must not be based on popularity alone.
 
 ## 10. Test/fixture inventory
 

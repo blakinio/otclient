@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - ci/OTC-20260727-tibia-linux-runner-analysis
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/tibia-linux-runner-analysis.yml
+      - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
   workflow_dispatch:
 
 permissions:
@@ -11,7 +17,7 @@ permissions:
 
 concurrency:
   group: tibia-linux-runner-analysis
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   install-and-analyze:

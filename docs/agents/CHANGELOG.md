@@ -4,6 +4,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 
 ## Unreleased
 
+- Deterministic option defects are repaired without exposing unsupported features: Right Bar 3 clears bar 9, reset IDs are unique, inventory expiry owns/cancels its reload event, delay labels match their actions, dead status/unused-expiry controls are hidden, cooldown-window wording is accurate, and `showExpiryInInventory` dual-reads/writes the legacy `showExpiryInInvetory` key.
 - Forge now tracks every module-owned scheduled handle, cancels pending events before hide/game-end/terminate cleanup, releases callback references and uses generation guards so a raced stale callback cannot touch a reopened controller.
 - Wheel of Destiny conviction summaries now use one named parser-order contract so skill, life leech, mana leech and five spell perks read slots 5-12 instead of the shifted legacy 3-10 assumptions.
 - Action-bar cooldown protocol state is retained independently from visual options, subscribed for the module lifetime, reset at session boundaries and restored after relog/rebuild using the longest individual or spell-group remaining time for spells, runes and multi-actions.

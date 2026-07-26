@@ -14,7 +14,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 - Deferred proxy and packet-player callbacks now retain explicit shared protocol ownership instead of asynchronously capturing raw `this`.
 - Game connection-error, game-end and explicit logout paths now retain the exact source `ProtocolGame` through cleanup and revalidate identity after Lua-reentrant boundaries, so an obsolete session cannot disconnect its replacement.
 - Deterministic game-lifecycle regression tests use a dedicated friend access seam instead of preprocessor access remapping, preserving MSVC link compatibility.
-- Oteryn native authentication is active in PR #17: system-browser OAuth Authorization Code + PKCE, OS-assigned loopback callback, separate Platform Game Login Ticket issuance, standalone Game Gateway `/v1/login` consumption, server-authoritative world routing, and a one-shot `GameSessionKey` handoff consumed only after the actual `g_game.loginWorld` transfer without an Oteryn password fallback.
+- Oteryn native authentication is active in PR #17: system-browser Authorization Code + PKCE, OS-assigned loopback callback, separate Platform Game Login Ticket issuance, standalone Game Gateway `/v1/login` consumption, server-authoritative world routing, and a one-shot `GameSessionKey` handoff consumed only after the actual `g_game.loginWorld` transfer without an Oteryn password fallback.
 - The Oteryn login profile is disabled by default and production enablement remains blocked on the separately selected/proven Canary Game Session adapter and exact-version cross-repository E2E.
 
 ## 2026-07-12 bootstrap inventory

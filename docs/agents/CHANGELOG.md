@@ -4,6 +4,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 
 ## Unreleased
 
+- Forge now tracks every module-owned scheduled handle, cancels pending events before hide/game-end/terminate cleanup, releases callback references and uses generation guards so a raced stale callback cannot touch a reopened controller.
 - Wheel of Destiny conviction summaries now use one named parser-order contract so skill, life leech, mana leech and five spell perks read slots 5-12 instead of the shifted legacy 3-10 assumptions.
 - Action-bar cooldown protocol state is retained independently from visual options, subscribed for the module lifetime, reset at session boundaries and restored after relog/rebuild using the longest individual or spell-group remaining time for spells, runes and multi-actions.
 - Character-list lifecycle now retains an absolute module-local OTUI path, safely recreates a destroyed legacy or Oteryn list from the existing login response, and returns to EnterGame instead of dereferencing a nil window when layout loading fails.
@@ -22,6 +23,6 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 ## 2026-07-12 bootstrap inventory
 
 - Runtime Lua syntax checks are scoped to `data`, `modules`, and `mods` after merged PR #2.
-- Reusable client unit/integration/Lua test foundation was merged in PR #3: message builders, fake resources/state, test environment, tile/thing builders, Lua runner/contracts, OTML fixtures, and protocol loopback.
+- Reusable client unit/integration/Lua test foundation was merged in PR #3: message builders, fake resources/state, test environment, tile/thing builders, Lua runner/contracts, OTML fixtures, protocol loopback.
 - Standalone agent handoff is active in PR #4 and must be reconciled with this system.
 - Client-assets auto-install retains strict hashes and OTC-standard final paths.

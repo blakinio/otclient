@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "workspace_root": "/repo/oteryn-client",
+  "packages": [
+    {
+      "name": "oteryn-tool",
+      "category": "tool",
+      "manifest_path": "/repo/oteryn-client/tools/tool/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "unreviewed-code",
+          "path": null,
+          "source": "git+https://example.invalid/unreviewed.git"
+        }
+      ]
+    }
+  ]
+}

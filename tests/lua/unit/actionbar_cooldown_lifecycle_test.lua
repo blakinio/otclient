@@ -69,3 +69,22 @@ test('cooldown lifecycle cache copies are independent from later reset', functio
     assertEqual(20, copy[4].exhaustion)
     assertEqual(10, copy[4].startTime)
 end)
+
+test('cooldown lifecycle merge retains the latest expiration from reentrant callbacks', function()
+    local preserved = {
+        [1] = { startTime = 1000, exhaustion = 3000 },
+        [2] = { startTime = 1000, exhaustion = 4000 }
+    }
+    local duringRebuild = {
+        [1] = { startTime = 2000, exhaustion = 5000 },
+        [2] = { startTime = 1500, exhaustion = 1000 },
+        [3] = { startTime = 2500, exhaustion = 2000 }
+    }
+
+    Core.mergeCache(preserved, duringRebuild)
+    assertEqual(2000, preserved[1].startTime)
+    assertEqual(5000, preserved[1].exhaustion)
+    assertEqual(1000, preserved[2].startTime)
+    assertEqual(4000, preserved[2].exhaustion)
+    assertEqual(2500, preserved[3].startTime)
+end)

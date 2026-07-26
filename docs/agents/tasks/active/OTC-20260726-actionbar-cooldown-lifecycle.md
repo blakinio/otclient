@@ -6,8 +6,8 @@ agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-actionbar-cooldown-lifecycle
 base_branch: main
 created: 2026-07-26T01:09:00+02:00
-updated: 2026-07-26T02:14:00+02:00
-last_verified_commit: "a219d0c5cf2705958d0756d4f3ad2c226c12bbd0"
+updated: 2026-07-26T11:53:43+02:00
+last_verified_commit: "8b4ede558b2380675716491ac6259b54fd711e80"
 risk: medium
 related_issue: "opentibiabr/otclient#1776"
 related_pr: "#33"
@@ -53,7 +53,8 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 
 # Confirmed context
 
-- Current stacked base: PR #31 head `8baa23d6fda45fa4a8083d0a7753c9d503d98063`.
+- PR #31 and its task archive are merged into `main`.
+- Current clean base: `0353394b1db8d3222c724ef1dda721cc328a34ab`.
 - Legacy listeners connect only after action bars become active, allowing early protocol packets to be missed.
 - Legacy callbacks return before caching when both visual options are disabled.
 - Legacy `setupActionBar` can stop an overlay after `updateButton` restores it.
@@ -80,6 +81,13 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 - Source review found a second race: a callback received reentrantly during original `onGameStart` could land in a temporary cache and be overwritten. Added cache merging by latest expiration and a mock reentrant-start test.
 - No local Lua interpreter is available; repository CTest/CI remains the source of truth.
 
+## 2026-07-26T11:53:43+02:00
+
+- Created backup branch `backup/OTC-20260726-actionbar-cooldown-lifecycle-pre-autonomous-restack-f2341371` at the original stacked head.
+- Restacked the 16 task commits directly onto current `main`, removing all character-list and upstream-synchronization history from the PR diff.
+- Reviewed the isolated eight-file diff and confirmed it does not touch authentication, protocol parsing, feature gates or assets.
+- Located the repository Windows vcpkg LuaJIT and passed all 12 focused helper/adapter tests.
+
 # Decisions
 
 | Decision | Reason/evidence |
@@ -94,8 +102,8 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 
 | Commit | Check | Result |
 |---|---|---|
-| `a219d0c5cf2705958d0756d4f3ad2c226c12bbd0` | focused Lua tests | pending repository CTest |
-| `a219d0c5cf2705958d0756d4f3ad2c226c12bbd0` | Lua Syntax | pending workflow publication |
+| `8b4ede558b2380675716491ac6259b54fd711e80` | `luajit tests/lua/helpers/runner.lua tests/lua/unit/actionbar_cooldown_lifecycle_test.lua tests/lua/unit/actionbar_cooldown_adapter_test.lua` | passed, 12 tests and 0 failed with repository Windows vcpkg LuaJIT |
+| `8b4ede558b2380675716491ac6259b54fd711e80` | `git diff --check origin/main...HEAD` | passed |
 | pending refreshed head | Windows CMake Tests / CTest | not-run |
 | pending refreshed head | `CI / Required` | not-run |
 
@@ -108,8 +116,8 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 
 # Remaining work
 
-1. After PR #31 merges, refresh onto current `main` and inspect the isolated diff.
-2. Mark ready, run full Windows CTest/required CI, review threads and stable base.
+1. Publish the refreshed head and mark PR #33 ready.
+2. Pass exact-head Windows CTest/required CI and verify review threads and stable base.
 3. Squash-merge and archive the task.
 
 # Completion

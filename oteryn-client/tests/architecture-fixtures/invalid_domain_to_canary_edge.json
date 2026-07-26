@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "workspace_root": "/repo/oteryn-client",
+  "packages": [
+    {
+      "name": "oteryn-game-domain",
+      "category": "game-domain",
+      "manifest_path": "/repo/oteryn-client/crates/game-domain/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "oteryn-protocol-canary",
+          "path": "/repo/oteryn-client/crates/protocol-canary",
+          "source": null
+        }
+      ]
+    },
+    {
+      "name": "oteryn-protocol-canary",
+      "category": "protocol-canary",
+      "manifest_path": "/repo/oteryn-client/crates/protocol-canary/Cargo.toml",
+      "dependencies": []
+    }
+  ]
+}

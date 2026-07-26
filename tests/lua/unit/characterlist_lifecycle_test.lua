@@ -9,10 +9,28 @@ function resources.guessFilePath(path, extension)
     return path .. '.' .. extension
 end
 
+local rootResolvingResources = {}
+function rootResolvingResources.guessFilePath(path, extension)
+    if path:sub(-(extension:len() + 1)) == '.' .. extension then
+        return '/' .. path:gsub('^/+', '')
+    end
+    return '/' .. path:gsub('^/+', '') .. '.' .. extension
+end
+
 test('character list lifecycle resolves the default layout inside its module', function()
     local path, err = Core.normalizeLayoutPath(resources)
     assertNil(err)
     assertEqual('/client_entergame/characterlist.otui', path)
+end)
+
+test('character list lifecycle anchors relative names when resolver returns a root path', function()
+    local path, err = Core.normalizeLayoutPath(rootResolvingResources, 'characterlist')
+    assertNil(err)
+    assertEqual('/client_entergame/characterlist.otui', path)
+
+    local oterynPath, oterynError = Core.normalizeLayoutPath(rootResolvingResources, 'oteryn_characterlist.otui')
+    assertNil(oterynError)
+    assertEqual('/client_entergame/oteryn_characterlist.otui', oterynPath)
 end)
 
 test('character list lifecycle resolves custom legacy and Oteryn layout names', function()

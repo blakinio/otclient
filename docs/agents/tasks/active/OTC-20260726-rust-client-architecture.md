@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260726-rust-client-architecture
 coordination_id: ""
-status: in_progress
+status: awaiting_ci
 agent: "GPT-5.6 Thinking"
 branch: docs/OTC-20260726-rust-client-architecture
 base_branch: main
 created: 2026-07-26T23:30:22+02:00
-updated: 2026-07-27T00:02:00+02:00
-last_verified_commit: "7ee647f79bd2f4a61bf7d04831a3fbcb66ccd0fb"
+updated: 2026-07-27T00:04:00+02:00
+last_verified_commit: "e0465891dcdaffc537684e40d7796cbd733ca737"
 risk: high
 related_issue: ""
 related_pr: "#45"
@@ -150,17 +150,24 @@ Define one complete, agent-ready greenfield Rust client architecture in an isola
 
 - Reviewed all changed filenames and the complete PR patch.
 - Found that the first routing rewrite removed too much durable legacy maintenance knowledge.
-- Restored that knowledge as explicit `LEGACY_OTCLIENT_ARCHITECTURE.md` and `LEGACY_OTCLIENT_WORKSTREAMS.md` documents while retaining Rust as the only target architecture.
+- Restored that knowledge as explicit legacy architecture/workstream documents while retaining Rust as the only target architecture.
 - Restored detailed legacy catalogue rows and preserved historical changelog wording.
 - Restored legacy upstream-intelligence and new-agent discovery routes.
-- Aligned the audit dependency section with accepted ADR-0002: `wgpu` is selected at the architecture level, while exact version/backend/dependency details remain audit/bootstrap decisions.
+- Aligned the audit dependency section with ADR-0002: `wgpu` is selected at architecture level; exact version/backend details remain audit/bootstrap decisions.
+
+## 2026-07-27T00:04:00+02:00
+
+- Rechecked the final 31-file changed-path set: documentation/governance only, entirely within declared ownership.
+- Rechecked architecture routing, relative paths, track separation and gameplay-channel terminology.
+- No runtime, workflow, binary, asset, secret or external-repository file is present.
+- Package is ready for exact-head documentation/fast CI.
 
 # Validation and CI
 
 | Commit | Command/check/workflow | Result | Evidence/notes |
 |---|---|---|---|
-| `7ee647f79bd2f4a61bf7d04831a3fbcb66ccd0fb` | complete changed-file and PR patch review | PASS | 31 documentation/governance files only; no runtime/asset/external-repo changes; identified issues repaired in subsequent commits |
-| final head pending | second complete diff/path review | pending | recheck after this task checkpoint |
+| `7ee647f79bd2f4a61bf7d04831a3fbcb66ccd0fb` | complete changed-file and PR patch review | PASS | 31 documentation/governance files only; initial legacy-knowledge deletion identified and repaired |
+| `e0465891dcdaffc537684e40d7796cbd733ca737` | final changed-path and architecture consistency review | PASS | 31 owned docs files; routes, terminology and legacy/Rust separation checked |
 | final head pending | documentation/fast CI | pending | no C++ or Rust build required for docs-only package |
 
 # Failed approaches and dead ends
@@ -169,7 +176,7 @@ Define one complete, agent-ready greenfield Rust client architecture in an isola
 - Moving legacy source into `legacy/` now was rejected because it would create a huge unrelated diff and conflict with active PRs.
 - Treating gameplay channels as network streams was rejected; they are parallel world instances.
 - Creating empty Cargo crates before the audit was rejected because placeholders would freeze unsupported assumptions.
-- Deleting detailed legacy governance was rejected during full-diff review; it is now preserved in explicitly scoped reference documents.
+- Deleting detailed legacy governance was rejected during full-diff review; it is preserved in explicitly scoped reference documents.
 
 # Risks and compatibility
 
@@ -182,10 +189,9 @@ Define one complete, agent-ready greenfield Rust client architecture in an isola
 
 # Remaining work
 
-1. Re-review final changed files/diff after this checkpoint.
-2. Update PR body and inspect exact-head required CI.
-3. Mark ready and squash-merge only when the autonomous merge gate passes.
-4. After merge, start the foundation audit from the copy-ready prompt; do not bootstrap Cargo first.
+1. Inspect exact-head documentation/fast CI and fix any issue.
+2. Mark ready and squash-merge only when the autonomous merge gate passes.
+3. After merge, start the foundation audit from the copy-ready prompt; do not bootstrap Cargo first.
 
 # Handoff
 
@@ -210,7 +216,7 @@ Do not create another Rust architecture, move legacy source or create production
 
 # Completion
 
-- Final status: in progress
+- Final status: awaiting CI
 - PR: #45
 - Merge commit: pending
 - Catalogue updated: yes

@@ -57,10 +57,27 @@ test('client asset release preparation is cache-stable and idempotent', function
     assertNil(legacyFindReleaseArchive(preparedAgain[2]))
 end)
 
-test('client asset selector recognizes only GitHub releases API URLs', function()
+test('client asset selector recognizes and scopes configured GitHub release URLs', function()
+    local defaultConfig = { repository = 'dudantas/tibia-client' }
+    local customConfig = {
+        repository = 'ignored/repository',
+        releasesUrl = 'https://api.github.com/repos/oteryn/assets/releases?per_page=50'
+    }
+
     assertTrue(Selector.isGitHubReleasesUrl('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100'))
     assertFalse(Selector.isGitHubReleasesUrl('https://api.github.com/repos/dudantas/tibia-client/git/trees/v15.24'))
     assertFalse(Selector.isGitHubReleasesUrl('https://example.invalid/releases'))
+
+    assertTrue(Selector.isConfiguredReleasesUrl(
+        'https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', defaultConfig))
+    assertFalse(Selector.isConfiguredReleasesUrl(
+        'https://api.github.com/repos/other/repository/releases', defaultConfig))
+    assertTrue(Selector.isConfiguredReleasesUrl(
+        'https://api.github.com/repos/oteryn/assets/releases?per_page=100', customConfig))
+    assertFalse(Selector.isConfiguredReleasesUrl(
+        'https://api.github.com/repos/ignored/repository/releases', customConfig))
+    assertFalse(Selector.isConfiguredReleasesUrl(
+        'https://api.github.com/repos/dudantas/tibia-client/releases', false))
 end)
 
 test('client asset final paths match the production installer contract', function()
@@ -97,9 +114,15 @@ local function withAdapterHarness(callback)
     local savedAdapter = rawget(_G, 'ClientAssetsReleaseAdapter')
     local savedSelector = rawget(_G, 'ClientAssetsReleaseSelector')
     local savedHTTP = rawget(_G, 'HTTP')
+    local savedServices = rawget(_G, 'Services')
     local state = { calls = 0 }
 
     ClientAssetsReleaseSelector = Selector
+    Services = {
+        clientAssets = {
+            repository = 'dudantas/tibia-client'
+        }
+    }
     HTTP = {}
     local originalGetJSON = function(url, responseCallback)
         state.calls = state.calls + 1
@@ -113,6 +136,7 @@ local function withAdapterHarness(callback)
         ClientAssetsReleaseAdapter = savedAdapter
         ClientAssetsReleaseSelector = savedSelector
         HTTP = savedHTTP
+        Services = savedServices
         error(loadError, 0)
     end
 
@@ -124,21 +148,28 @@ local function withAdapterHarness(callback)
     ClientAssetsReleaseAdapter = savedAdapter
     ClientAssetsReleaseSelector = savedSelector
     HTTP = savedHTTP
+    Services = savedServices
     if not success then error(result, 0) end
 end
 
-test('client asset adapter prepares only GitHub release responses and restores HTTP on unload', function()
+test('client asset adapter prepares only configured release responses and restores HTTP on unload', function()
     withAdapterHarness(function(_, originalGetJSON)
         ClientAssetsReleaseAdapter.init()
         local wrapper = HTTP.getJSON
         assertFalse(wrapper == originalGetJSON)
 
         local prepared = nil
-        HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases', function(data)
+        HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function(data)
             prepared = data
         end)
         assertEqual('https://example.invalid/client.zip', legacyFindReleaseArchive(prepared[1]))
         assertNil(legacyFindReleaseArchive(prepared[2]))
+
+        local otherRepository = nil
+        HTTP.getJSON('https://api.github.com/repos/other/repository/releases', function(data)
+            otherRepository = data
+        end)
+        assertEqual(fixtures, otherRepository)
 
         local passthrough = nil
         HTTP.getJSON('https://example.invalid/catalog.json', function(data)

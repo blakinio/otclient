@@ -9,6 +9,18 @@ local function clearTable(values)
     end
 end
 
+local function cooldownEnd(cooldown)
+    if type(cooldown) ~= 'table' then
+        return 0
+    end
+    local startTime = tonumber(cooldown.startTime)
+    local exhaustion = tonumber(cooldown.exhaustion)
+    if not startTime or not exhaustion then
+        return 0
+    end
+    return startTime + exhaustion
+end
+
 function CooldownLifecycleCore.newSessionState()
     return {
         active = false,
@@ -74,14 +86,12 @@ function CooldownLifecycleCore.getRemaining(cooldown, now)
         return 0
     end
 
-    local startTime = tonumber(cooldown.startTime)
-    local exhaustion = tonumber(cooldown.exhaustion)
     local currentTime = tonumber(now)
-    if not startTime or not exhaustion or not currentTime then
+    if not currentTime then
         return 0
     end
 
-    local remaining = startTime + exhaustion - currentTime
+    local remaining = cooldownEnd(cooldown) - currentTime
     return remaining > 0 and remaining or 0
 end
 
@@ -119,6 +129,22 @@ function CooldownLifecycleCore.copyCache(cache)
         end
     end
     return copy
+end
+
+function CooldownLifecycleCore.mergeCache(target, source)
+    if type(target) ~= 'table' or type(source) ~= 'table' then
+        return target
+    end
+
+    for key, cooldown in pairs(source) do
+        if type(cooldown) == 'table' and cooldownEnd(cooldown) >= cooldownEnd(target[key]) then
+            target[key] = {
+                exhaustion = cooldown.exhaustion,
+                startTime = cooldown.startTime
+            }
+        end
+    end
+    return target
 end
 
 function CooldownLifecycleCore.shouldRender(showProgress, showTime)

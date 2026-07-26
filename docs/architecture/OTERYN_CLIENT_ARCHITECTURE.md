@@ -1,7 +1,7 @@
 # Oteryn Client Architecture Routing
 
 Status: routing document  
-Last reviewed: 2026-07-26
+Last reviewed: 2026-07-27
 
 ## Target product
 

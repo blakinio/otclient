@@ -20,7 +20,12 @@ local function stripCurrentDirectory(path)
 end
 
 local function containsTraversal(path)
-    return path == '..' or path:sub(1, 3) == '../' or path:find('/../', 1, true) ~= nil
+    for segment in path:gmatch('[^/]+') do
+        if segment == '..' then
+            return true
+        end
+    end
+    return false
 end
 
 local function ensureLayoutExtension(path)

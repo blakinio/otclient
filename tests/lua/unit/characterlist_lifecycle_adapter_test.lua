@@ -130,3 +130,18 @@ test('character list adapter restores EnterGame when the layout is missing', fun
         assertEqual(0, #state.createPaths)
     end)
 end)
+
+test('character list adapter retains the last successfully created layout', function()
+    withHarness(function(state)
+        assertTrue(CharacterList.create(G.characters, G.characterAccount, 'characterlist'))
+        assertTrue(CharacterList.destroy())
+
+        state.missingLayouts['/client_entergame/oteryn_characterlist.otui'] = true
+        assertFalse(CharacterList.create(G.characters, G.characterAccount, 'oteryn_characterlist'))
+        assertTrue(CharacterList.showAgain())
+
+        assertEqual(2, #state.createPaths)
+        assertEqual('/client_entergame/characterlist.otui', state.createPaths[1])
+        assertEqual('/client_entergame/characterlist.otui', state.createPaths[2])
+    end)
+end)

@@ -53,6 +53,14 @@ test('character list lifecycle rejects relative traversal', function()
     local path, err = Core.normalizeLayoutPath(resources, '../characterlist')
     assertNil(path)
     assertEqual('invalid_layout', err)
+
+    local nestedPath, nestedError = Core.normalizeLayoutPath(resources, 'layouts/..')
+    assertNil(nestedPath)
+    assertEqual('invalid_layout', nestedError)
+
+    local absolutePath, absoluteError = Core.normalizeLayoutPath(resources, '/client_entergame/..')
+    assertNil(absolutePath)
+    assertEqual('invalid_layout', absoluteError)
 end)
 
 test('character list lifecycle recreates only missing windows with retained login data', function()

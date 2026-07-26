@@ -31,7 +31,6 @@ function CharacterList.create(characters, account, otui)
         return false
     end
 
-    currentLayoutPath = layoutPath
     characterListCreated = false
 
     local lookupSuccess, layoutExists = pcall(g_resources.fileExists, layoutPath)
@@ -53,6 +52,7 @@ function CharacterList.create(characters, account, otui)
         return false
     end
 
+    currentLayoutPath = layoutPath
     characterListCreated = true
     return true
 end

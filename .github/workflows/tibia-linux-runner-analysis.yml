@@ -1,0 +1,220 @@
+name: Tibia Linux package analysis
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260727-tibia-linux-runner-analysis
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tibia-linux-runner-analysis
+  cancel-in-progress: false
+
+jobs:
+  install-and-analyze:
+    name: Install and analyze on Synology
+    runs-on: [self-hosted, oteryn-staging]
+    timeout-minutes: 45
+
+    steps:
+      - name: Verify isolated runner prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker version
+          docker info --format 'Docker={{.ServerVersion}} Architecture={{.Architecture}} OS={{.OperatingSystem}}'
+
+      - name: Download, install and statically analyze Linux client
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          readonly state_root='/var/lib/oteryn-staging-state/tibia-linux-analysis'
+
+          docker run --rm \
+            --name tibia-linux-runner-analysis \
+            --network bridge \
+            --mount "type=bind,src=${state_root},dst=/analysis" \
+            ubuntu:24.04 \
+            bash -lc '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                bash \
+                binutils \
+                ca-certificates \
+                coreutils \
+                curl \
+                dbus-x11 \
+                file \
+                findutils \
+                fonts-dejavu-core \
+                grep \
+                libdbus-1-3 \
+                libegl1 \
+                libfontconfig1 \
+                libfreetype6 \
+                libgl1 \
+                libglx0 \
+                libopengl0 \
+                libx11-6 \
+                libx11-xcb1 \
+                libxcb-cursor0 \
+                libxcb-glx0 \
+                libxcb-icccm4 \
+                libxcb-image0 \
+                libxcb-keysyms1 \
+                libxcb-randr0 \
+                libxcb-render-util0 \
+                libxcb-render0 \
+                libxcb-shape0 \
+                libxcb-shm0 \
+                libxcb-sync1 \
+                libxcb-util1 \
+                libxcb-xfixes0 \
+                libxcb-xinerama0 \
+                libxcb-xkb1 \
+                libxi6 \
+                libxkbcommon-x11-0 \
+                libxrender1 \
+                libxtst6 \
+                procps \
+                sed \
+                tar \
+                util-linux \
+                xvfb
+
+              rm -rf /analysis/current
+              mkdir -p /analysis/current/download /analysis/current/home /analysis/current/report
+
+              readonly archive=/analysis/current/download/tibia.x64.tar.gz
+              readonly source_url=https://static.tibia.com/download/tibia.x64.tar.gz
+
+              curl --fail --location --retry 5 --retry-delay 3 \
+                --output "${archive}" \
+                "${source_url}"
+
+              sha256sum "${archive}" > /analysis/current/report/launcher-archive.sha256
+              tar -tzf "${archive}" > /analysis/current/report/launcher-archive-files.txt
+              tar -xzf "${archive}" -C /analysis/current/download
+
+              readonly launcher=/analysis/current/download/Tibia/Tibia
+              test -x "${launcher}"
+
+              {
+                printf "source_url=%s\n" "${source_url}"
+                printf "analysis_utc=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                printf "container_arch=%s\n" "$(uname -m)"
+                file "${launcher}"
+                sha256sum "${launcher}"
+              } > /analysis/current/report/launcher-summary.txt
+
+              set +e
+              HOME=/analysis/current/home \
+              XDG_DATA_HOME=/analysis/current/home/.local/share \
+              XDG_CONFIG_HOME=/analysis/current/home/.config \
+              LIBGL_ALWAYS_SOFTWARE=1 \
+              QT_XCB_GL_INTEGRATION=none \
+              dbus-run-session -- \
+                xvfb-run -a -s "-screen 0 1280x800x24" \
+                "${launcher}" \
+                > /analysis/current/report/launcher-stdout.log \
+                2> /analysis/current/report/launcher-stderr.log &
+              launcher_pid=$!
+              set -e
+
+              client_path=""
+              for _ in $(seq 1 150); do
+                client_path="$(find /analysis/current/home -type f -path "*/packages/*/bin/client" -perm -111 -print -quit 2>/dev/null || true)"
+                if [ -n "${client_path}" ]; then
+                  break
+                fi
+                if ! kill -0 "${launcher_pid}" 2>/dev/null; then
+                  break
+                fi
+                sleep 10
+              done
+
+              if kill -0 "${launcher_pid}" 2>/dev/null; then
+                sleep 20
+                kill "${launcher_pid}" 2>/dev/null || true
+                sleep 3
+                kill -9 "${launcher_pid}" 2>/dev/null || true
+              fi
+              wait "${launcher_pid}" 2>/dev/null || true
+
+              find /analysis/current/home -type f -printf "%s\t%p\n" \
+                | sort -n \
+                > /analysis/current/report/installed-files.tsv
+
+              find /analysis/current/home -type f \
+                \( -name package.json -o -name assets.json -o -name tibiametadata.json \) \
+                -print \
+                > /analysis/current/report/metadata-files.txt
+
+              client_path="$(find /analysis/current/home -type f -path "*/packages/*/bin/client" -perm -111 -print -quit 2>/dev/null || true)"
+
+              {
+                printf "analysis_utc=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                printf "state_path=%s\n" "/var/lib/oteryn-staging-state/tibia-linux-analysis/current"
+                printf "launcher_archive_sha256=%s\n" "$(cut -d " " -f1 /analysis/current/report/launcher-archive.sha256)"
+
+                if [ -z "${client_path}" ]; then
+                  printf "game_client_found=no\n"
+                  printf "result=Launcher did not install a separate packages/*/bin/client during this run.\n"
+                else
+                  printf "game_client_found=yes\n"
+                  printf "game_client_path=%s\n" "${client_path}"
+                  printf "game_client_size=%s\n" "$(stat -c %s "${client_path}")"
+                  printf "game_client_sha256=%s\n" "$(sha256sum "${client_path}" | cut -d " " -f1)"
+                  printf "game_client_file="
+                  file -b "${client_path}"
+
+                  printf "\n[ELF header]\n"
+                  readelf -h "${client_path}" || true
+
+                  printf "\n[Dynamic dependencies]\n"
+                  readelf -d "${client_path}" | grep -E "NEEDED|RPATH|RUNPATH" || true
+
+                  printf "\n[Selected indicators]\n"
+                  strings -a -n 5 "${client_path}" \
+                    | grep -Ei "battleye|beclient|beservice|protected|unprotected|loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin|--battleye" \
+                    | sort -u \
+                    | head -n 1000 \
+                    || true
+                fi
+              } > /analysis/current/report/analysis-report.txt
+
+              chmod -R a+rX /analysis/current
+            '
+
+      - name: Print text-only analysis report
+        shell: bash
+        run: |
+          set -euo pipefail
+          readonly state_root='/var/lib/oteryn-staging-state/tibia-linux-analysis'
+
+          docker run --rm \
+            --mount "type=bind,src=${state_root},dst=/analysis,readonly" \
+            alpine:3.22 \
+            sh -lc '
+              echo "===== analysis-report.txt ====="
+              cat /analysis/current/report/analysis-report.txt
+              echo
+              echo "===== launcher-summary.txt ====="
+              cat /analysis/current/report/launcher-summary.txt
+              echo
+              echo "===== metadata-files.txt ====="
+              cat /analysis/current/report/metadata-files.txt || true
+              echo
+              echo "===== launcher stderr tail ====="
+              tail -n 200 /analysis/current/report/launcher-stderr.log || true
+              echo
+              echo "===== launcher stdout tail ====="
+              tail -n 200 /analysis/current/report/launcher-stdout.log || true
+            '

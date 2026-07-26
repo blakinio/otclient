@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260726-rust-client-architecture
 coordination_id: ""
-status: awaiting_ci
+status: awaiting_final_ci
 agent: "GPT-5.6 Thinking"
 branch: docs/OTC-20260726-rust-client-architecture
 base_branch: main
 created: 2026-07-26T23:30:22+02:00
-updated: 2026-07-27T00:06:00+02:00
-last_verified_commit: "d38cea5246a6c024948d9de8940129bcf4b82c68"
+updated: 2026-07-27T00:12:00+02:00
+last_verified_commit: "33183027cc8c65e75d4b4911d3e8c5f0914a0add"
 risk: high
 related_issue: ""
 related_pr: "#45"
@@ -51,44 +51,39 @@ Define one complete, agent-ready greenfield Rust client architecture in an isola
 
 # Acceptance criteria
 
-- [x] Normative architecture defines a new Rust client rather than a line-by-line OTClient rewrite.
-- [x] Current C++/Lua/OTUI code is classified as legacy/reference evidence and is not a target runtime dependency.
-- [x] All new-client architecture and agent documents are isolated under `oteryn-client/`.
-- [x] Repository layout and crate dependency direction support non-overlapping workstreams.
-- [x] Canary and future Oteryn protocols are isolated behind one domain adapter boundary.
-- [x] Account session, character/world/gameplay-channel selection, game session and relog lifecycles are explicit.
-- [x] Gameplay channels are parallel world instances selected at login/relog, not network streams.
-- [x] Renderer, world storage, UI, assets, audio, input, launcher/updater, diagnostics and extension boundaries are defined.
-- [x] Security model covers Identity, one-shot tickets, untrusted input, updater/assets and WASM extensions.
-- [x] Performance budgets are documented as targets requiring reproducible measurement.
-- [x] A standalone foundation-audit plan and copy-ready first-agent prompt are present.
-- [x] Five durable ADRs record core product decisions.
-- [x] Root routing points to the new architecture without editing active legacy implementation paths.
-- [x] Detailed legacy architecture/workstream knowledge remains available for active C++/Lua work.
-- [x] Complete changed-file/full-patch consistency review was performed and resulting issues were repaired.
-- [ ] Required documentation/fast CI passes on the final head.
+- [x] New client is a greenfield Rust product, not a line-by-line OTClient rewrite.
+- [x] Legacy C++/Lua/OTUI remains buildable and is reference evidence only for the Rust track.
+- [x] New-client architecture and agent documents are isolated under `oteryn-client/`.
+- [x] Workspace layout, crates, dependency direction and non-overlapping workstreams are defined.
+- [x] Canary and future Oteryn wire formats are isolated behind typed domain adapters.
+- [x] Account session, selection, game session, reconnect and channel-relog lifecycles are explicit.
+- [x] Gameplay channels are parallel world instances, not network streams.
+- [x] Renderer, world, UI, input, audio, assets, diagnostics, updater and extension boundaries are defined.
+- [x] Identity, one-shot ticket, parser, updater, assets and WASM security invariants are documented.
+- [x] Performance budgets are targets requiring reproducible percentile measurements.
+- [x] Mandatory foundation audit, workstream map and copy-ready first-agent prompt exist.
+- [x] Five ADRs preserve the core decisions.
+- [x] Detailed legacy architecture/workstream knowledge remains available.
+- [x] Complete changed-file/full-patch consistency review was performed and findings repaired.
+- [x] Required checks passed on implementation head `33183027cc8c65e75d4b4911d3e8c5f0914a0add`.
+- [ ] Required checks pass on this final task-record head.
 - [ ] Autonomous merge gate is satisfied.
 
 # Confirmed context
 
-- The previous target architecture required evolving the C++/Lua client and conflicted with the confirmed greenfield direction.
-- The new product selects architecture for performance, safety and maintainability rather than OTClient-internal compatibility.
-- Canary is the initial server compatibility target; Oteryn is the long-term target.
-- Gameplay-channel changes happen through relog. Seamless live channel transfer is not required.
-- Open PRs inspected before ownership: #37 assets, #36 options Phase 0 and #23 legacy login-shell prototype.
-- None owns the architecture/program paths changed here.
-- Draft PR #45 was opened from `main` at `24452895ca44c4e9a98853d69fcc863b62bc089f`.
+- Previous target documentation prescribed incremental C++/Lua evolution and conflicted with the confirmed greenfield direction.
+- Canary is the initial compatibility target; Oteryn is the long-term ecosystem.
+- Channel changes use relog with a fresh game-entry transaction; seamless transfer is out of scope.
+- Open PRs #37, #36 and #23 were inspected and do not own these architecture paths.
+- PR #45 was opened from `main` at `24452895ca44c4e9a98853d69fcc863b62bc089f`.
 
-# Architecture package
+# Delivered package
 
-## Entry and nested governance
+## Greenfield entry and architecture
 
 - `oteryn-client/README.md`
 - `oteryn-client/AGENTS.md`
-
-## Normative architecture
-
-- `ARCHITECTURE.md`
+- `oteryn-client/docs/architecture/ARCHITECTURE.md`
 - `REPOSITORY_LAYOUT.md`
 - `CLIENT_LIFECYCLE.md`
 - `MODULE_MODEL.md`
@@ -118,81 +113,69 @@ Define one complete, agent-ready greenfield Rust client architecture in an isola
 - `docs/architecture/LEGACY_OTCLIENT_ARCHITECTURE.md`
 - `docs/agents/LEGACY_OTCLIENT_WORKSTREAMS.md`
 
-# Decisions
+# Key decisions
 
-| Decision | Reason/evidence | ADR |
+| Decision | Reason | ADR |
 |---|---|---|
-| Isolate new product under `oteryn-client/` | avoids dependency/CI/path conflicts while legacy stays buildable | 0001 |
-| Require foundation audit before Cargo bootstrap | Canary/assets/hardware/dependency facts remain incomplete | 0001 / audit gate |
-| Use data-oriented runtime and `wgpu` | frame-time/locality/control goals without OpenGL/legacy coupling | 0002 |
-| Keep protocol adapters outside domain | Canary now and Oteryn later without another client rewrite | 0003 |
-| Compile first-party modules; sandbox optional extensions in WASM | performance, reviewability and containment | 0004 |
-| Change gameplay channels through relog | confirmed product behavior and simpler session ownership | 0005 |
-| Preserve legacy maintenance knowledge separately | active legacy PRs still require exact owner/test/contract routing | legacy reference docs |
+| New product under `oteryn-client/` | isolates dependencies and CI while legacy remains operational | 0001 |
+| Audit before Cargo bootstrap | exact Canary, asset, hardware and dependency facts remain to verify | 0001 |
+| Data-oriented runtime and `wgpu` | locality, predictable frame time and modern GPU abstraction | 0002 |
+| Wire adapters outside domain | Canary now and Oteryn later without another client rewrite | 0003 |
+| Static first-party crates and sandboxed WASM | performance, reviewability and containment | 0004 |
+| Gameplay-channel changes through relog | confirmed product behavior and deterministic session ownership | 0005 |
 
 # Work log
 
 ## 2026-07-26T23:30:22+02:00
 
-- Created the task branch and draft PR.
-- Confirmed the old normative target conflicted with the requested product direction.
+- Created task branch and draft PR #45 after overlap inspection.
 
 ## 2026-07-26T23:52:03+02:00
 
-- Added isolated architecture, nested instructions, workspace plan and five ADRs.
-- Defined account/game lifecycle and Channel 1 -> Channel 2 relog behavior.
-- Defined domain/protocol isolation, static modules, WASM boundary, signed asset pipeline and performance/test gates.
-- Added mandatory ten-document foundation audit and standalone first-agent prompt.
-- Updated root routing, discovery, risk, validation, catalogue and changelog documents.
-- Added no production crates, legacy runtime code, external writes, assets or secrets.
+- Added the isolated architecture, workspace plan, security/performance/asset models, workstreams, audit and ADRs.
+- Added no production crates, legacy runtime changes, assets, secrets or external-repository writes.
 
 ## 2026-07-27T00:02:00+02:00
 
-- Reviewed all changed filenames and the complete PR patch.
-- Found that the first routing rewrite removed too much durable legacy maintenance knowledge.
-- Restored that knowledge as explicit legacy architecture/workstream documents while retaining Rust as the only target architecture.
-- Restored detailed legacy catalogue rows and preserved historical changelog wording.
-- Restored legacy upstream-intelligence and new-agent discovery routes.
-- Aligned the audit dependency section with ADR-0002: `wgpu` is selected at architecture level; exact version/backend details remain audit/bootstrap decisions.
+- Full patch review found that initial routing edits removed too much legacy maintenance knowledge.
+- Restored it in explicitly scoped legacy architecture/workstream documents and restored catalogue/discovery detail.
+- Aligned audit wording with accepted `wgpu` ADR.
 
-## 2026-07-27T00:06:00+02:00
+## 2026-07-27T00:12:00+02:00
 
-- Rechecked the final 31-file changed-path set: documentation/governance only, entirely within declared ownership.
-- Rechecked architecture routing, relative paths, track separation and gameplay-channel terminology.
-- Added the legacy-route pointer to the Rust entry README.
-- No runtime, workflow, binary, asset, secret or external-repository file is present.
-- Package is ready for exact-head documentation/fast CI.
+- Exact-head run `30222552414` completed successfully on `33183027cc8c65e75d4b4911d3e8c5f0914a0add`.
+- `Detect Build Scope`, `Fast Checks / Syntax and workflow validation`, `Fast Checks / Informational static analysis`, `Lua Syntax / Check Lua Syntax` and `CI / Required` succeeded.
+- Windows build was correctly skipped for the documentation-only scope.
+- No PR comments or review-change requests are open; PR was mergeable before this final task-record commit.
 
 # Validation and CI
 
-| Commit | Command/check/workflow | Result | Evidence/notes |
+| Commit | Check | Result | Evidence |
 |---|---|---|---|
-| `7ee647f79bd2f4a61bf7d04831a3fbcb66ccd0fb` | complete changed-file and PR patch review | PASS | 31 documentation/governance files only; initial legacy-knowledge deletion identified and repaired |
-| `d38cea5246a6c024948d9de8940129bcf4b82c68` | final changed-path and architecture consistency review | PASS | owned docs only; routes, terminology and legacy/Rust separation checked |
-| final head pending | documentation/fast CI | pending | no C++ or Rust build required for docs-only package |
+| `7ee647f79bd2f4a61bf7d04831a3fbcb66ccd0fb` | complete changed-file and patch review | PASS | initial governance-loss issue found and repaired |
+| `33183027cc8c65e75d4b4911d3e8c5f0914a0add` | workflow run `30222552414` | PASS | all required documentation-scope jobs succeeded; Windows build skipped by path scope |
+| final task-record head | required CI | pending | must pass before readiness/merge |
 
 # Failed approaches and dead ends
 
-- Keeping greenfield design as an optional section inside the old architecture was rejected because agents need one normative target.
-- Moving legacy source into `legacy/` now was rejected because it would create a huge unrelated diff and conflict with active PRs.
-- Treating gameplay channels as network streams was rejected; they are parallel world instances.
-- Creating empty Cargo crates before the audit was rejected because placeholders would freeze unsupported assumptions.
-- Deleting detailed legacy governance was rejected during full-diff review; it is preserved in explicitly scoped reference documents.
+- A greenfield appendix inside the old architecture was rejected because agents need one normative target.
+- Moving legacy source to `legacy/` now was rejected as a huge unrelated/conflicting diff.
+- Treating gameplay channels as transport streams was rejected.
+- Creating placeholder Cargo crates before the audit was rejected.
+- Removing detailed legacy governance was detected during review and repaired.
 
 # Risks and compatibility
 
-- Runtime: documentation only; no runtime behavior changed.
-- Data/migration: legacy paths remain until a separate retirement task.
-- Security: existing Identity/asset guarantees are preserved or strengthened in the target model.
-- Backward compatibility: existing client remains buildable and active PR ownership is unchanged.
-- Cross-repository rollout: exact Canary/Oteryn implementation requires separate coordinated tasks.
-- Rollback: normal documentation PR revert.
+- Documentation only; no runtime or build behavior changed.
+- Existing client and active PR ownership remain intact.
+- Exact Canary/Oteryn implementation still requires coordinated tasks and evidence.
+- Rollback is a normal squash revert.
 
 # Remaining work
 
-1. Inspect exact-head documentation/fast CI and fix any issue.
-2. Mark ready and squash-merge only when the autonomous merge gate passes.
-3. After merge, start the foundation audit from the copy-ready prompt; do not bootstrap Cargo first.
+1. Pass required CI on this final task-record head.
+2. Mark PR #45 ready, recheck mergeability/checks/diff/reviews and squash-merge.
+3. Start the separate foundation-audit task from the committed copy-ready prompt; do not bootstrap Cargo first.
 
 # Handoff
 
@@ -207,17 +190,17 @@ Define one complete, agent-ready greenfield Rust client architecture in an isola
 
 Do not create another Rust architecture, move legacy source or create production crates before the audit gate.
 
-## Open questions reserved for audit/cross-repository work
+## Audit-owned open questions
 
-- exact initial Canary revision and fixture set;
-- exact legally usable asset sources;
+- exact initial Canary revision and fixtures;
+- legally usable asset sources;
 - concrete Windows hardware tiers;
-- final Rust dependency package/versions;
-- native Oteryn transport/schema/session-resume design.
+- exact dependency packages/versions;
+- native Oteryn transport/schema/resume design.
 
 # Completion
 
-- Final status: awaiting CI
+- Final status: awaiting final CI
 - PR: #45
 - Merge commit: pending
 - Catalogue updated: yes

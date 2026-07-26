@@ -6,8 +6,8 @@ agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-characterlist-recreation
 base_branch: main
 created: 2026-07-26T00:46:58+02:00
-updated: 2026-07-26T08:23:30+02:00
-last_verified_commit: "ce4329ee13b39576915240605c2fe6657096c517"
+updated: 2026-07-26T08:55:00+02:00
+last_verified_commit: "841031a129c3148e425de819abe907d8bc3f2e32"
 risk: medium
 related_issue: "opentibiabr/otclient#1775 (character-list relog subcase)"
 related_pr: "#31"
@@ -43,9 +43,9 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 - [x] Destroy followed by `showAgain()` recreates the list from `G.characters` and `G.characterAccount`.
 - [x] UI load failure is nil-safe and restores the enter-game window instead of indexing a nil widget.
 - [x] Legacy `characterlist.otui` and Oteryn `oteryn_characterlist.otui` use the same controller path.
-- [x] Focused Lua tests cover default, custom, absolute, missing-layout and repeated recreation decisions.
+- [x] Focused Lua tests cover default, custom, absolute, root-resolving, missing-layout and repeated recreation decisions.
 - [ ] Runtime-root Lua syntax and required CI pass on the exact final head.
-- [ ] Full changed-file list and diff are reviewed before squash merge.
+- [x] Full changed-file list and diff are reviewed before squash merge.
 
 # Confirmed context
 
@@ -56,13 +56,12 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 - PR #23 owns enter-game presentation files and also edits `entergame.otmod`; this P1 lifecycle repair changes only one manifest line and will be reconciled into #23 after this repair reaches `main`.
 - No Canary, login-server, credential or Oteryn Identity contract changes are required.
 
-# Plan
+# Implementation
 
-1. Add a pure path/recreation decision helper with Lua tests.
-2. Install a narrow lifecycle adapter after `characterlist.lua` loads.
-3. Preserve the original CharacterList controller and wrap only create/destroy/hide/showAgain behavior.
-4. Validate syntax, focused tests, complete diff and required CI.
-5. Squash-merge and archive the task.
+- Relative layout requests are validated from the caller-provided module-local name and always anchored under `/client_entergame/`.
+- An absolute path returned by `guessFilePath` for a relative request is never trusted as the resource root; this directly covers the observed `/characterlist.otui` failure.
+- Explicit absolute layouts remain supported after traversal validation.
+- The adapter preserves the last successful layout and recreates through the existing CharacterList controller.
 
 # Work log
 
@@ -78,14 +77,20 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 - Restacked PR #31 directly on current `main`, removing 35 unrelated historical files from the proposed diff.
 - Created a second clean backup `backup/OTC-20260726-characterlist-recreation-clean-c01a7daa` before refreshing onto archive merge `ce4329ee...`.
 - Recreated only the lifecycle helper, adapter, focused tests, manifest load order, CTest registration, changelog and task record.
-- Preserved authentication, protocol, login population, sorting, outfits, pinning and reconnect behavior in the existing CharacterList controller.
+
+## 2026-07-26T08:55:00+02:00
+
+- Source review reproduced the important resolver behavior: a relative request may be returned as `/characterlist.otui`.
+- Corrected normalization so relative requests are anchored from their validated module-local name rather than trusting a root-level resolver result.
+- Added focused coverage for both legacy and Oteryn layouts when the resolver returns root-level paths.
 
 # Decisions
 
 | Decision | Reason/evidence | ADR |
 |---|---|---|
 | Keep the existing CharacterList controller authoritative | Login, sorting, outfits, pinning and reconnect behavior already exist and must not be duplicated | none |
-| Normalize only module-local OTUI names | Both shipped layouts live under `/client_entergame`; absolute paths remain accepted unchanged | none |
+| Anchor relative requests from the validated request name | The resource resolver may return `/characterlist.otui`, which is exactly the failing path | none |
+| Preserve explicit absolute layouts | PR #23 and future module callers may already pass a fully qualified shipped layout | none |
 | Catch UI creation failures at the adapter boundary | Prevents the known nil dereference and returns the user to a usable login screen | none |
 | Force-restack only after creating backup refs | Removes historical stack noise without risking loss of the reviewed implementation | none |
 
@@ -93,9 +98,10 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 
 | Commit | Check | Result | Evidence |
 |---|---|---|---|
-| pending | Lua lifecycle unit tests | pending | focused CTest suite |
-| pending | Runtime Lua syntax | pending | required CI |
-| pending | `CI / Required` | pending | final merge gate |
+| `841031a129c3148e425de819abe907d8bc3f2e32` | root-resolving layout regression | pending | focused CTest suite |
+| pending final head | Runtime Lua syntax | pending | required CI |
+| pending final head | Windows CMake Tests / CTest | pending | required CI |
+| pending final head | `CI / Required` | pending | final merge gate |
 
 # Risks and compatibility
 
@@ -107,19 +113,13 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 
 # Remaining work
 
-1. Review the exact eight-file diff.
-2. Mark PR #31 ready and pass exact-head required CI/CTest.
-3. Squash-merge and archive this task.
+1. Pass exact-head required CI/CTest.
+2. Verify reviews and stable base, then squash-merge.
+3. Archive this task.
 
 # Handoff
 
-## Start here
-
-Open this task and PR #31, then inspect `characterlist_lifecycle*.lua`, `entergame.otmod` and the two focused Lua tests.
-
-## Do not repeat
-
-Do not duplicate `CharacterList` login/population logic or introduce a second character-list controller.
+Open this task and PR #31, then inspect `characterlist_lifecycle*.lua`, `entergame.otmod` and both focused Lua tests. Do not duplicate CharacterList login/population logic or introduce a second controller.
 
 # Completion
 

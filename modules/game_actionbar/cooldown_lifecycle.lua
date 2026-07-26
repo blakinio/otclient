@@ -261,6 +261,8 @@ function ActionBarController:onGameStart()
         return originalControllerOnGameStart(self)
     end, debug.traceback)
 
+    CooldownLifecycleCore.mergeCache(preservedSpellCache, spellCooldownCache)
+    CooldownLifecycleCore.mergeCache(preservedGroupCache, spellGroupCooldownCache)
     spellCooldownCache = preservedSpellCache
     spellGroupCooldownCache = preservedGroupCache
     rebuildSpellCache = nil

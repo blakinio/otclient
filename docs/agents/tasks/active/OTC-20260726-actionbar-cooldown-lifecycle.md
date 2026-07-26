@@ -6,11 +6,11 @@ agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-actionbar-cooldown-lifecycle
 base_branch: main
 created: 2026-07-26T01:09:00+02:00
-updated: 2026-07-26T01:09:00+02:00
-last_verified_commit: "8baa23d6fda45fa4a8083d0a7753c9d503d98063"
+updated: 2026-07-26T02:14:00+02:00
+last_verified_commit: "a219d0c5cf2705958d0756d4f3ad2c226c12bbd0"
 risk: medium
 related_issue: "opentibiabr/otclient#1776"
-related_pr: ""
+related_pr: "#33"
 depends_on:
   - PR #31 character-list lifecycle repair
 blocks:
@@ -20,6 +20,7 @@ owned_paths:
   - modules/game_actionbar/cooldown_lifecycle.lua
   - modules/game_actionbar/cooldown_lifecycle_core.lua
   - tests/lua/unit/actionbar_cooldown_lifecycle_test.lua
+  - tests/lua/unit/actionbar_cooldown_adapter_test.lua
   - tests/lua/CMakeLists.txt
   - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260726-actionbar-cooldown-lifecycle.md
@@ -40,41 +41,44 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 
 # Acceptance criteria
 
-- [ ] Cooldown protocol callbacks are subscribed for the module lifetime, not only after visible action bars are built.
-- [ ] New session boundaries reset individual and group caches synchronously before new packets.
-- [ ] Cooldown packets update caches even when visual cooldown options are disabled.
-- [ ] Rebuilding an action button clears stale widget timers before restoration, not after it.
-- [ ] Restoration uses the maximum remaining individual/primary/secondary group cooldown.
-- [ ] Text spells, simple rune buttons and multi-actions use the same authoritative remaining-time decision.
-- [ ] Unload/logout cancels module-owned scheduled events and clears session caches.
-- [ ] Focused Lua tests cover cache-first handling, max remaining selection, session reset and relog restoration.
+- [x] Cooldown protocol callbacks are subscribed for the module lifetime, not only after visible action bars are built.
+- [x] New session boundaries reset individual and group caches synchronously before new packets.
+- [x] Cooldown packets update caches even when visual cooldown options are disabled.
+- [x] Rebuilding an action button clears stale widget timers before restoration, not after it.
+- [x] Restoration uses the maximum remaining individual/primary/secondary group cooldown.
+- [x] Text spells, simple rune buttons and multi-actions use the same authoritative remaining-time decision.
+- [x] Unload/logout disconnects module-owned subscriptions and clears session caches.
+- [x] Focused Lua tests cover cache-first handling, max remaining selection, session reset, pre-UI packets, reentrant start and relog restoration.
 - [ ] Exact-head required CI and focused CTest pass before squash merge.
 
 # Confirmed context
 
 - Current stacked base: PR #31 head `8baa23d6fda45fa4a8083d0a7753c9d503d98063`.
-- `game_actionbar.lua` currently connects cooldown listeners only when action bars are active.
-- Its deferred `onGameStart` reset can erase packets that arrived before UI construction.
-- `onSpellCooldown` and group callbacks return before caching when both visual options are disabled.
-- `setupActionBar` can call `updateButton` and then stop the newly restored overlay.
-- Simple rune restoration is not consistently routed through the same individual/group calculation.
+- Legacy listeners connect only after action bars become active, allowing early protocol packets to be missed.
+- Legacy callbacks return before caching when both visual options are disabled.
+- Legacy `setupActionBar` can stop an overlay after `updateButton` restores it.
+- Simple runes were not consistently routed through the same individual/group calculation.
 - No protocol or Canary payload change is required.
 
-# Plan
+# Implementation
 
-1. Add a pure session/cache/remaining-time helper with focused Lua tests.
-2. Install a narrow adapter after existing action-bar logic loads.
-3. Subscribe at module lifetime and keep session cache updates independent of visual preferences.
-4. Wrap button rebuild/restoration without replacing persisted mappings or the action-bar controller.
-5. Validate exact diff, lifecycle tests and required Windows gate after the dependency stack reaches current `main`.
+- `cooldown_lifecycle_core.lua` owns session transitions, cache records/copies/merges and maximum remaining-time calculation.
+- `cooldown_lifecycle.lua` installs module-lifetime event subscriptions, records protocol truth before visual decisions and restores all supported action types after rebuild.
+- Existing `ActionBarController`, mappings and widgets remain authoritative.
+- Reentrant callbacks received while the original `onGameStart` rebuild is running are merged back by latest expiration, preventing a temporary cache table from discarding them.
 
 # Work log
 
 ## 2026-07-26T01:09:00+02:00
 
-- Changed: claimed the cooldown lifecycle repair on a stacked branch from PR #31.
-- Learned: the authoritative protocol state and presentation overlay must be separated; visual options may suppress rendering but must not suppress cache updates.
-- Dependency: PR #25 audit and PR #31 lifecycle repair are still progressing through their own protected gates.
+- Claimed the repair on a stacked branch from PR #31.
+- Separated authoritative protocol state from presentation preferences.
+
+## 2026-07-26T02:14:00+02:00
+
+- Completed helper, adapter, manifest load order, lifecycle tests and changelog.
+- Source review found a second race: a callback received reentrantly during original `onGameStart` could land in a temporary cache and be overwritten. Added cache merging by latest expiration and a mock reentrant-start test.
+- No local Lua interpreter is available; repository CTest/CI remains the source of truth.
 
 # Decisions
 
@@ -84,32 +88,35 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 | Add a module-local adapter and pure helper | Minimizes risk in large legacy files and makes state transitions testable. |
 | Treat maximum remaining cooldown as authoritative | An action cannot be available before either its individual or any group cooldown expires. |
 | Preserve caches when visuals are disabled | Preferences control presentation only, not protocol truth. |
+| Merge rebuild-time caches by latest expiration | Reentrant packets must not be overwritten by deferred UI setup. |
 
 # Validation and CI
 
 | Commit | Check | Result |
 |---|---|---|
-| pending | focused Lua tests | not-run |
-| pending | Lua Syntax | not-run |
-| pending | Windows CMake Tests / CTest | not-run |
-| pending | `CI / Required` | not-run |
+| `a219d0c5cf2705958d0756d4f3ad2c226c12bbd0` | focused Lua tests | pending repository CTest |
+| `a219d0c5cf2705958d0756d4f3ad2c226c12bbd0` | Lua Syntax | pending workflow publication |
+| pending refreshed head | Windows CMake Tests / CTest | not-run |
+| pending refreshed head | `CI / Required` | not-run |
 
 # Risks and compatibility
 
-- Protocol payloads and feature gates remain unchanged.
-- The adapter must avoid duplicate event subscriptions with legacy `connecting()` logic.
-- Persisted action mappings/hotkeys must remain untouched.
+- Protocol payloads and feature gates are unchanged.
+- Adapter replaces the legacy subscription toggle with one idempotent module-lifetime subscription set.
+- Persisted action mappings/hotkeys remain untouched.
 - Rollback is a normal squash revert.
 
 # Remaining work
 
-1. Implement helper, adapter, tests and manifest load order.
+1. After PR #31 merges, refresh onto current `main` and inspect the isolated diff.
+2. Mark ready, run full Windows CTest/required CI, review threads and stable base.
+3. Squash-merge and archive the task.
 
 # Completion
 
 - Final status: in progress
-- PR: pending
+- PR: #33
 - Merge commit: pending
 - Catalogue updated: not applicable; no new public interface
-- Changelog updated: pending
+- Changelog updated: yes
 - Archived at: pending

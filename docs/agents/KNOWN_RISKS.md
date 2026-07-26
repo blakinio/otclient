@@ -6,6 +6,7 @@
 - Open PR and active task state is authoritative; indexes can be stale.
 - Proprietary assets, credentials, private captures and personal data must not be committed.
 - Cross-repository protocol/login/identifier/asset facts require exact producer and consumer evidence.
+- Greenfield routing must not erase the detailed legacy architecture/workstream knowledge still required by active existing-client work.
 
 ## Greenfield Rust client
 

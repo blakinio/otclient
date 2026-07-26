@@ -1,0 +1,439 @@
+{
+  "schema_version": 1,
+  "program_id": "OTC-PROGRAM-UPSTREAM-INTELLIGENCE",
+  "as_of": "2026-07-26",
+  "baseline": {
+    "audit_date": "2026-07-17",
+    "common_upstream_tip": "bdea0b23b4a738809d698cb7e4f88a299dd6bffc",
+    "target_tip": "2a1b93bcdf6d4317ceeb2254b1e89429453a8e7f",
+    "target_ahead": 9,
+    "target_behind": 0
+  },
+  "current_snapshot": {
+    "target": {
+      "repository": "blakinio/otclient",
+      "ref": "main",
+      "sha": "ca78b71397cd2196ab841144c27275d0462902d7",
+      "commits_after_common_tip": 37
+    },
+    "upstream": {
+      "repository": "opentibiabr/otclient",
+      "ref": "main",
+      "sha": "e1a1ff150332b8879c91d46d8dc1402e78af9c3e",
+      "commits_after_common_tip": 24
+    },
+    "relationship_note": "Counts are independently measured from the 2026-07-17 common tip. Squash/adapted imports mean they must not be subtracted to infer exact ahead/behind.",
+    "fork_tips": [
+      {
+        "repository": "OTAcademy/otclientv8",
+        "sha": "08d348b8b0c5d87ef5415be1950da1e324b5373b",
+        "review_state": "tip_recorded"
+      },
+      {
+        "repository": "tibia-devs/otclient-mehah",
+        "sha": "5c276fa02cf0f9ffec188832d223b93b82f5de00",
+        "review_state": "tip_recorded"
+      },
+      {
+        "repository": "zimbadev/otc",
+        "sha": "0236ecf0d36c6384ac7a7ddbc600af87da79a5db",
+        "review_state": "tip_recorded"
+      },
+      {
+        "repository": "solchanel/otclient-15",
+        "sha": "86f2c397863e3a3fb5413ca83c0436d72fb21a23",
+        "review_state": "tip_recorded_requires_code_triage"
+      }
+    ]
+  },
+  "status_values": [
+    "pending",
+    "in_progress",
+    "implemented",
+    "partially_implemented",
+    "deferred",
+    "blocked",
+    "test_required",
+    "profile_required",
+    "watch",
+    "superseded"
+  ],
+  "candidates": [
+    {
+      "id": "OTC-INT-001",
+      "priority": "P0",
+      "source": "opentibiabr/otclient#1758",
+      "title": "Lua/C++ callback heap corruption",
+      "status": "pending",
+      "disposition": "IMPLEMENT_OR_ADAPT",
+      "local_state": "missing",
+      "dependencies": [],
+      "notes": "PR closed without merge; recheck current luainterface before implementation."
+    },
+    {
+      "id": "OTC-INT-002",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1765",
+      "title": "NPC trade active-imbuement double subtraction",
+      "status": "implemented",
+      "disposition": "ADAPTED",
+      "local_state": "present via local PR #26",
+      "dependencies": [],
+      "notes": "Local integration includes lifecycle cleanup."
+    },
+    {
+      "id": "OTC-INT-003",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1763",
+      "title": "draw preLoad before foreground",
+      "status": "deferred",
+      "disposition": "TEST_OR_ADAPT",
+      "local_state": "excluded from local PR #26",
+      "dependencies": [],
+      "notes": "Avoid framework-to-client dependency reversal; requires framework-safe design."
+    },
+    {
+      "id": "OTC-INT-004",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1761",
+      "title": "AnimateAlways respects Animator timings",
+      "status": "implemented",
+      "disposition": "IMPLEMENTED",
+      "local_state": "present via local PR #26",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-INT-005",
+      "priority": "P1",
+      "source": "OTAcademy/otclientv8@ece0ee8cd4049c57eed3a2550aef7c8e2e87bae3",
+      "title": "proxy-enabled exit crash",
+      "status": "pending",
+      "disposition": "MANUAL_REIMPLEMENTATION",
+      "local_state": "missing",
+      "dependencies": [],
+      "notes": "Must preserve local protocol/session lifecycle."
+    },
+    {
+      "id": "OTC-ISSUE-001",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1691",
+      "title": "Forge scheduled Lua callback lifecycle race",
+      "status": "implemented",
+      "disposition": "ADAPTED",
+      "local_state": "merged local PR #35; archived by #42",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-ISSUE-002",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1738",
+      "title": "protocol 15.24 compatibility bundle",
+      "status": "partially_implemented",
+      "disposition": "SPLIT_ADAPT",
+      "local_state": "bundle unresolved",
+      "dependencies": [],
+      "notes": "Track level percent, XP formula, resource constants, Forge requests and initial state independently."
+    },
+    {
+      "id": "OTC-ISSUE-003",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1743",
+      "title": "Forge Convergence on Canary 15.11+",
+      "status": "blocked",
+      "disposition": "TEST_OR_ADAPT",
+      "local_state": "not resolved",
+      "dependencies": [
+        "OTC-ISSUE-002"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "OTC-ISSUE-004",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1753",
+      "title": "Wheel conviction summary indices",
+      "status": "implemented",
+      "disposition": "IMPLEMENTED",
+      "local_state": "merged local PR #34; archived by #41",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-ISSUE-005",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#946 and #1757",
+      "title": "missing lastManualWalk breaks bundled game_bot",
+      "status": "implemented",
+      "disposition": "IMPLEMENTED",
+      "local_state": "present via local PR #26",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-ISSUE-006",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1562",
+      "title": "container drop and hit-testing",
+      "status": "pending",
+      "disposition": "TEST_OR_ADAPT",
+      "local_state": "nearest-child workaround remains incomplete",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-ISSUE-007",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1601 and #1764",
+      "title": "AutoStats CPU overhead",
+      "status": "partially_implemented",
+      "disposition": "ADAPT",
+      "local_state": "pause/resume present via local PR #26",
+      "dependencies": [],
+      "notes": "Fast path still needed to avoid allocation/timing while paused."
+    },
+    {
+      "id": "OTC-ISSUE-008",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1731",
+      "title": "startup performance",
+      "status": "profile_required",
+      "disposition": "PROFILE",
+      "local_state": "not measured",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-ISSUE-009",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1447",
+      "title": "outfit window performance",
+      "status": "profile_required",
+      "disposition": "PROFILE",
+      "local_state": "not measured",
+      "dependencies": [],
+      "notes": "Lazy/virtualized rendering remains a concept."
+    },
+    {
+      "id": "OTC-ISSUE-010",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1041",
+      "title": "updater checksum blocks UI",
+      "status": "profile_required",
+      "disposition": "PROFILE_THEN_ADAPT",
+      "local_state": "not resolved",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-NEW-001",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1752",
+      "title": "unknown opcode busy-loop/OOM recovery",
+      "status": "implemented",
+      "disposition": "IMPLEMENTED",
+      "local_state": "present via local PR #26",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-NEW-002",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1766",
+      "title": "client asset archive selection by version",
+      "status": "in_progress",
+      "disposition": "ADAPT",
+      "local_state": "local PR #37 open/draft",
+      "dependencies": [],
+      "notes": "Strict hashes and standard final paths remain mandatory."
+    },
+    {
+      "id": "OTC-NEW-003",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1748",
+      "title": "Reward Wall shrine/panel source-byte semantics",
+      "status": "deferred",
+      "disposition": "ADAPT",
+      "local_state": "excluded from local PR #26",
+      "dependencies": [],
+      "notes": "Requires exact Canary producer and shared OTS contract."
+    },
+    {
+      "id": "OTC-NEW-004",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1767",
+      "title": "peekBytes truncates length to 8 bits",
+      "status": "pending",
+      "disposition": "IMPLEMENT",
+      "local_state": "missing locally",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-NEW-005",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1768",
+      "title": "creature information flicker while walking",
+      "status": "test_required",
+      "disposition": "TEST_OR_ADAPT",
+      "local_state": "missing locally",
+      "dependencies": [],
+      "notes": "Benchmark rendering cost before adoption."
+    },
+    {
+      "id": "OTC-NEW-006",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1750",
+      "title": "ground-border use-with target fallback",
+      "status": "implemented",
+      "disposition": "IMPLEMENTED",
+      "local_state": "present via local PR #26",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-NEW-007",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1775",
+      "title": "Canary 15.25 Monk protocol/vocation/relog bundle",
+      "status": "partially_implemented",
+      "disposition": "SPLIT_TEST_OR_ADAPT",
+      "local_state": "character-list relog fixed by local PR #31",
+      "dependencies": [],
+      "notes": "Opcode/parser and Monk vocation mapping remain unresolved."
+    },
+    {
+      "id": "OTC-NEW-008",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1772",
+      "title": "Cyclopedia automap flag subtype byte not consumed",
+      "status": "pending",
+      "disposition": "ADAPT_OR_IMPLEMENT",
+      "local_state": "missing locally",
+      "dependencies": [],
+      "notes": "Protocol-desync risk; add parser regression."
+    },
+    {
+      "id": "OTC-NEW-009",
+      "priority": "P1",
+      "source": "opentibiabr/otclient#1774",
+      "title": "Gem Atelier wrong gem lock/destroy and inverted state",
+      "status": "pending",
+      "disposition": "ADAPT_OR_IMPLEMENT",
+      "local_state": "missing locally",
+      "dependencies": [],
+      "notes": "Destructive action requires exact gem identity regression."
+    },
+    {
+      "id": "OTC-NEW-010",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1773",
+      "title": "stale container loot-value frame",
+      "status": "pending",
+      "disposition": "TEST_OR_ADAPT",
+      "local_state": "missing locally",
+      "dependencies": [],
+      "notes": ""
+    },
+    {
+      "id": "OTC-NEW-011",
+      "priority": "P2",
+      "source": "opentibiabr/otclient#1771",
+      "title": "equipped expirestop countdown runs locally",
+      "status": "pending",
+      "disposition": "ADAPT_OR_IMPLEMENT",
+      "local_state": "missing locally",
+      "dependencies": [],
+      "notes": ""
+    }
+  ],
+  "deduplicated_or_superseded": [
+    {
+      "source": "opentibiabr/otclient#1650",
+      "resolution": "fixed by merged PR #1652; present in baseline"
+    },
+    {
+      "source": "opentibiabr/otclient#1665",
+      "resolution": "fixed by merged PR #1675; present in baseline"
+    },
+    {
+      "source": "opentibiabr/otclient#1644 and #1574",
+      "resolution": "superseded by merged PR #1684; present in baseline"
+    },
+    {
+      "source": "opentibiabr/otclient#1733",
+      "resolution": "fixed by merged PR #1739; present in baseline"
+    },
+    {
+      "source": "tibia-devs/otclient-mehah@b967b4408a51a2e1c4f94f1df096f7168652aea7",
+      "resolution": "equivalent DrawPool null guard already present"
+    },
+    {
+      "source": "zimbadev/otc feature IDs",
+      "resolution": "GameTileAddThingWithStackpos and GameCharacterSkillStats already present"
+    }
+  ],
+  "watch": [
+    {
+      "source": "opentibiabr/otclient#1605",
+      "reason": "legacy 7.80-8.54 ThingAttrChargeable movement/desync"
+    },
+    {
+      "source": "opentibiabr/otclient#1729",
+      "reason": "mount issue unconfirmed client-side"
+    },
+    {
+      "source": "opentibiabr/otclient#1681",
+      "reason": "VIP issue targets protocol 10.98"
+    },
+    {
+      "source": "opentibiabr/otclient#1633",
+      "reason": "manaPercent evidence is stale/old-protocol"
+    },
+    {
+      "source": "opentibiabr/otclient#1741",
+      "reason": "renamed monster battle-list behavior unconfirmed on Canary"
+    },
+    {
+      "source": "opentibiabr/otclient#1541",
+      "reason": "vBot use-with targets protocol 7.6"
+    },
+    {
+      "source": "opentibiabr/otclient#1648",
+      "reason": "low-value bot danger feature"
+    },
+    {
+      "source": "opentibiabr/otclient#1642",
+      "reason": "Android critical issue closed/completed"
+    },
+    {
+      "source": "opentibiabr/otclient#1511",
+      "reason": "ASIO 1.34 issue closed/not-planned"
+    }
+  ],
+  "untriaged_upstream_commits": [
+    {
+      "sha": "ef80e7f5dc5836af9160b0503d4602aef2a3e24c",
+      "source": "opentibiabr/otclient#1770",
+      "title": "clip text selection background to visible widget area"
+    },
+    {
+      "sha": "36f45957936a9735bbd00cb838a5750bac2159fd",
+      "source": "opentibiabr/otclient#1769",
+      "title": "temporary chat mode"
+    }
+  ],
+  "audit_history": [
+    {
+      "date": "2026-07-17",
+      "kind": "baseline",
+      "summary": "Target was 9 ahead and 0 behind upstream at common tip bdea0b23."
+    },
+    {
+      "date": "2026-07-26",
+      "kind": "durable_registry_bootstrap",
+      "summary": "Imported audited candidate state, current repository tips and fork watch into versioned Markdown and JSON sources."
+    }
+  ]
+}

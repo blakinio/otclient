@@ -6,8 +6,8 @@ agent: "GPT-5.6 Thinking"
 branch: docs/OTC-20260726-rust-client-architecture
 base_branch: main
 created: 2026-07-26T23:30:22+02:00
-updated: 2026-07-27T00:04:00+02:00
-last_verified_commit: "e0465891dcdaffc537684e40d7796cbd733ca737"
+updated: 2026-07-27T00:06:00+02:00
+last_verified_commit: "d38cea5246a6c024948d9de8940129bcf4b82c68"
 risk: high
 related_issue: ""
 related_pr: "#45"
@@ -155,10 +155,11 @@ Define one complete, agent-ready greenfield Rust client architecture in an isola
 - Restored legacy upstream-intelligence and new-agent discovery routes.
 - Aligned the audit dependency section with ADR-0002: `wgpu` is selected at architecture level; exact version/backend details remain audit/bootstrap decisions.
 
-## 2026-07-27T00:04:00+02:00
+## 2026-07-27T00:06:00+02:00
 
 - Rechecked the final 31-file changed-path set: documentation/governance only, entirely within declared ownership.
 - Rechecked architecture routing, relative paths, track separation and gameplay-channel terminology.
+- Added the legacy-route pointer to the Rust entry README.
 - No runtime, workflow, binary, asset, secret or external-repository file is present.
 - Package is ready for exact-head documentation/fast CI.
 
@@ -167,7 +168,7 @@ Define one complete, agent-ready greenfield Rust client architecture in an isola
 | Commit | Command/check/workflow | Result | Evidence/notes |
 |---|---|---|---|
 | `7ee647f79bd2f4a61bf7d04831a3fbcb66ccd0fb` | complete changed-file and PR patch review | PASS | 31 documentation/governance files only; initial legacy-knowledge deletion identified and repaired |
-| `e0465891dcdaffc537684e40d7796cbd733ca737` | final changed-path and architecture consistency review | PASS | 31 owned docs files; routes, terminology and legacy/Rust separation checked |
+| `d38cea5246a6c024948d9de8940129bcf4b82c68` | final changed-path and architecture consistency review | PASS | owned docs only; routes, terminology and legacy/Rust separation checked |
 | final head pending | documentation/fast CI | pending | no C++ or Rust build required for docs-only package |
 
 # Failed approaches and dead ends

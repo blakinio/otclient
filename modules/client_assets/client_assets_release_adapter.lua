@@ -4,6 +4,10 @@ local Selector = rawget(_G, 'ClientAssetsReleaseSelector') or dofile('client_ass
 local originalGetJSON = nil
 local wrappedGetJSON = nil
 
+local function serviceConfig()
+    return Services and Services.clientAssets
+end
+
 function ClientAssetsReleaseAdapter.init()
     if wrappedGetJSON or not HTTP or type(HTTP.getJSON) ~= 'function' then
         return
@@ -11,7 +15,7 @@ function ClientAssetsReleaseAdapter.init()
 
     originalGetJSON = HTTP.getJSON
     wrappedGetJSON = function(url, callback)
-        if not Selector.isGitHubReleasesUrl(url) or type(callback) ~= 'function' then
+        if not Selector.isConfiguredReleasesUrl(url, serviceConfig()) or type(callback) ~= 'function' then
             return originalGetJSON(url, callback)
         end
 

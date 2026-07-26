@@ -1,0 +1,175 @@
+# Rust Workspace Operations
+
+Status: WS-R01 bootstrap policy  
+Required compiled platform: Windows x86-64 MSVC
+
+## Scope
+
+The initial workspace contains exactly one non-product member:
+
+```text
+tools/architecture-check
+```
+
+It validates workspace metadata and declared dependency categories. It is not the client, launcher, renderer, protocol stack, domain, UI, asset runtime or extension host.
+
+Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
+
+## Toolchain
+
+`rust-toolchain.toml` pins Rust `1.94.0`, released through the stable channel on 2026-07-02, with the minimal profile plus `clippy`, `rustfmt` and the `x86_64-pc-windows-msvc` target.
+
+Policy:
+
+- required CI uses the pinned toolchain;
+- `Cargo.lock` is committed and required commands use `--locked` where supported;
+- nightly-only production requirements need an evidence-backed ADR;
+- changing the toolchain requires a focused task, release-note review and exact-head Windows validation;
+- portability of source is not a compatibility claim for another platform.
+
+## Normal commands
+
+Run from `oteryn-client/`:
+
+```text
+cargo metadata --locked --format-version 1
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --all-targets --locked
+cargo run --locked -p oteryn-architecture-check -- workspace .
+cargo deny check
+```
+
+`cargo deny check` uses `deny.toml` and cargo-deny `0.19.0` in CI. Tool upgrades require current upstream release review and an exact version pin.
+
+## Workspace package requirements
+
+Every workspace package must:
+
+- use the `oteryn-` package-name prefix;
+- live under `oteryn-client/`;
+- inherit workspace edition, Rust version, license/repository and lint policy where applicable;
+- declare one architecture category:
+
+```toml
+[package.metadata.oteryn]
+category = "tool"
+```
+
+- use crates.io registry dependencies or reviewed workspace-local path dependencies only;
+- avoid external git/path sources unless a later focused policy change explicitly approves them;
+- avoid a dependency on legacy `src/`, `modules/` or `mods/` runtime code/content.
+
+Known categories are defined by the architecture checker and follow the accepted architecture, including `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.
+
+Adding or changing a category is an architecture-policy change. Update the checker, synthetic positive/negative fixtures, architecture/workstream documentation and module catalogue in one focused PR.
+
+## Architecture checker
+
+Usage:
+
+```text
+cargo run --locked -p oteryn-architecture-check -- workspace .
+cargo run --locked -p oteryn-architecture-check -- fixture tests/architecture-fixtures/valid_minimal_workspace.json
+```
+
+The workspace command runs locked Cargo metadata and validates:
+
+- package naming and category metadata;
+- workspace path containment;
+- dependency source policy;
+- workspace-local path dependency resolution;
+- prohibited category edges;
+- dependency cycles.
+
+Stable rule codes:
+
+| Code | Meaning |
+|---|---|
+| `E001_PACKAGE_NAME` | package does not use the `oteryn-` prefix |
+| `E002_UNKNOWN_CATEGORY` | package category is not recognized |
+| `E003_OUTSIDE_WORKSPACE` | package or path dependency escapes `oteryn-client/` |
+| `E004_UNAPPROVED_SOURCE` | dependency uses an unapproved registry/git source |
+| `E005_FORBIDDEN_EDGE` | category dependency violates architecture direction |
+| `E006_DEPENDENCY_CYCLE` | workspace dependency graph contains a cycle |
+| `E008_UNKNOWN_WORKSPACE_DEP` | workspace path dependency cannot be resolved |
+| `E009_DUPLICATE_PACKAGE` | graph contains duplicate package names |
+
+The checker intentionally validates metadata/graph policy only. It does not replace Cargo, Clippy, source review, security review, protocol tests or runtime validation.
+
+## Synthetic fixtures
+
+`tests/architecture-fixtures/` contains original metadata-only graphs:
+
+- one valid minimal workspace;
+- legacy path dependency;
+- game-domain -> Canary adapter;
+- renderer -> concrete feature;
+- UI core -> concrete feature;
+- dependency cycle;
+- unapproved source dependency.
+
+Fixtures contain no game source, protocol bytes, credentials or assets. New architecture rules require both a valid example and a focused invalid fixture.
+
+## Lint and unsafe policy
+
+Workspace Rust policy:
+
+- unsafe Rust is forbidden by default;
+- standard Rust/Clippy warnings fail required CI;
+- `unwrap`, `expect`, `panic`, `todo`, `unimplemented` and debug macros are denied by policy;
+- exceptions require a narrow owning package, documented reason and tests rather than a workspace-wide allowance;
+- external-input parsers need explicit bounded error handling in their later workstreams.
+
+The bootstrap tool contains no unsafe code and no native/FFI dependency.
+
+## Supply-chain policy
+
+`deny.toml` applies to the Windows target and currently:
+
+- denies known advisories and yanked releases;
+- denies wildcard dependencies;
+- denies duplicate dependency versions;
+- permits the explicit initial license set only;
+- denies unknown registries and git sources;
+- permits crates.io as the external registry.
+
+Do not broaden license/source policy merely to make CI green. Investigate the exact dependency and either reject it, replace it or update policy through a reviewed task with legal/security rationale.
+
+The initial workspace pins only `serde_json` for parsing Cargo metadata and synthetic JSON fixtures. Application dependencies such as GPU, windowing, async, HTTP/TLS, text, audio or WebAssembly runtimes remain outside this package.
+
+## CI behavior
+
+`.github/workflows/rust-client.yml` is additive and path-scoped. It does not edit or replace the legacy C++/Lua workflow graph.
+
+The workflow validates on `windows-latest`:
+
+- pinned toolchain availability/version;
+- locked metadata;
+- formatting;
+- Clippy with warnings denied;
+- tests;
+- real workspace architecture policy;
+- cargo-deny advisories, licenses, bans and sources.
+
+A successful Rust workflow proves only this workspace/tooling package. It does not prove client runtime, GPU, server, protocol, assets or non-Windows compatibility.
+
+## Adding the next crate
+
+Before adding a crate:
+
+1. perform the full repository/task preflight;
+2. identify the audit finding and accepted workstream gate;
+3. claim exact paths and any shared public contract;
+4. create only the crate(s) needed for the bounded observable result;
+5. choose dependencies from current primary sources and record license/unsafe/maintenance review;
+6. declare category metadata;
+7. update architecture fixtures if a new edge/category appears;
+8. run all workspace and owning-workstream validation;
+9. update the module catalogue and architecture/ADR when public boundaries change.
+
+The expected next package is selected after live preflight; this bootstrap does not authorize starting multiple foundation/product workstreams in parallel.
+
+## Rollback
+
+This package has no runtime or user-data migration. A normal squash revert removes the workspace/tooling/CI foundation. Generated Cargo build output and caches are transient and are never repository or release truth.

@@ -39,6 +39,7 @@ Always inspect current `CMakePresets.json`; live PRs may change test presets. Ex
 - Primary CI may use Ubuntu for path detection, YAML/static checks, Lua syntax and required-job evaluation, but not to claim Linux client compatibility.
 - Required compilation and CTest coverage use the current Windows workflow/presets.
 - Linux, macOS, Android, browser and Docker workflows are dormant unless explicitly re-enabled.
+- `docs/architecture/LEGACY_OTCLIENT_ARCHITECTURE.md` and `docs/agents/LEGACY_OTCLIENT_WORKSTREAMS.md` preserve detailed owner-specific evidence requirements.
 
 Known release command:
 

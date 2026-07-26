@@ -4,8 +4,7 @@ function ForgeEventLifecycleCore.newRegistry()
     return {
         active = false,
         generation = 0,
-        handles = {},
-        retiredCallbacks = {}
+        handles = {}
     }
 end
 
@@ -53,10 +52,11 @@ end
 
 function ForgeEventLifecycleCore.retire(registry, handle)
     local entry = ForgeEventLifecycleCore.take(registry, handle)
-    if entry and entry.callback then
-        registry.retiredCallbacks[#registry.retiredCallbacks + 1] = entry.callback
+    if not entry then
+        return false
     end
-    return entry
+    entry.callback = nil
+    return true
 end
 
 function ForgeEventLifecycleCore.isCurrent(registry, generation)
@@ -69,12 +69,9 @@ function ForgeEventLifecycleCore.cancelAll(registry, removeCallback)
     end
 
     local cancelled = 0
-    for handle, entry in pairs(registry.handles) do
+    for handle in pairs(registry.handles) do
         if type(removeCallback) == 'function' then
             pcall(removeCallback, handle)
-        end
-        if entry.callback then
-            registry.retiredCallbacks[#registry.retiredCallbacks + 1] = entry.callback
         end
         registry.handles[handle] = nil
         cancelled = cancelled + 1

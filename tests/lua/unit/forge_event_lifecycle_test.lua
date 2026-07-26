@@ -45,18 +45,34 @@ test('Forge event registry cancels every pending handle before teardown', functi
     assertTrue(removed[20])
     assertEqual(0, Core.pendingCount(registry))
     assertFalse(registry.active)
-    assertEqual(2, #registry.retiredCallbacks)
+    assertNil(registry.retiredCallbacks)
 end)
 
-test('Forge event registry retains manually removed callback references', function()
+test('Forge event registry releases manually removed callback references', function()
     local registry = Core.newRegistry()
     local generation = Core.beginGeneration(registry)
     local callback = function() end
 
     Core.track(registry, 'manual', generation, callback)
-    local entry = Core.retire(registry, 'manual')
+    assertTrue(Core.retire(registry, 'manual'))
+    assertFalse(Core.retire(registry, 'manual'))
+    assertEqual(0, Core.pendingCount(registry))
+    assertNil(registry.retiredCallbacks)
+end)
 
-    assertEqual(callback, entry.callback)
-    assertEqual(1, #registry.retiredCallbacks)
-    assertEqual(callback, registry.retiredCallbacks[1])
+test('Forge event registry does not accumulate callbacks across lifecycle cycles', function()
+    local registry = Core.newRegistry()
+    local removed = 0
+
+    for cycle = 1, 100 do
+        local generation = Core.beginGeneration(registry)
+        Core.track(registry, cycle, generation, function() end)
+        assertEqual(1, Core.cancelAll(registry, function()
+            removed = removed + 1
+        end))
+        assertEqual(0, Core.pendingCount(registry))
+        assertNil(registry.retiredCallbacks)
+    end
+
+    assertEqual(100, removed)
 end)

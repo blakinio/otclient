@@ -4,7 +4,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 
 ## Unreleased
 
-- Forge now retains every module-owned scheduled callback, cancels pending handles before hide/game-end/terminate cleanup and uses generation guards so a raced stale callback cannot touch a reopened controller.
+- Forge now tracks every module-owned scheduled handle, cancels pending events before hide/game-end/terminate cleanup, releases callback references and uses generation guards so a raced stale callback cannot touch a reopened controller.
 - Wheel of Destiny conviction summaries now use one named parser-order contract so skill, life leech, mana leech and five spell perks read slots 5-12 instead of the shifted legacy 3-10 assumptions.
 - Action-bar cooldown protocol state is retained independently from visual options, subscribed for the module lifetime, reset at session boundaries and restored after relog/rebuild using the longest individual or spell-group remaining time for spells, runes and multi-actions.
 - Character-list lifecycle now retains an absolute module-local OTUI path, safely recreates a destroyed legacy or Oteryn list from the existing login response, and returns to EnterGame instead of dereferencing a nil window when layout loading fails.

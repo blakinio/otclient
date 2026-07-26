@@ -1,6 +1,6 @@
 # OTClient Module and System Catalogue
 
-Last reviewed: 2026-07-26
+Last reviewed: 2026-07-27
 
 This catalogue makes reusable work visible across the greenfield Rust client and existing OTClient. Verify source, manifests, tasks, tests and open PR state before use.
 
@@ -16,7 +16,9 @@ Update this file in the same PR that adds or changes a reusable module/crate, co
 | Rust foundation audit | planned; blocked on PR #45 | Verified product/Canary/Oteryn/assets/performance/platform/test inputs and first bootstrap recommendation | `oteryn-client/docs/audits/foundation/**` | Audit-only; no production crates or speculative constants. |
 | Planned Rust workspace | not created | Future applications, crates, features and tools described by layout/workstreams | `oteryn-client/apps`, `crates`, `features`, `tools` | Create only after the audit gate and in narrow packages. |
 
-## Existing client/module areas
+## Existing legacy client/module areas
+
+Detailed maintenance boundaries are in `docs/architecture/LEGACY_OTCLIENT_ARCHITECTURE.md` and `docs/agents/LEGACY_OTCLIENT_WORKSTREAMS.md`.
 
 | Module/system | Status | Responsibility/public surface | Primary paths | Reuse/safety notes |
 |---|---|---|---|---|

@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260726-characterlist-recreation
 coordination_id: ""
-status: in_progress
+status: complete
 agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-characterlist-recreation
 base_branch: main
 created: 2026-07-26T00:46:58+02:00
-updated: 2026-07-26T11:00:00+02:00
-last_verified_commit: "e9061b680331233d2153e0f3afb2fd78b7f9aaa1"
+updated: 2026-07-26T11:49:01+02:00
+last_verified_commit: "5accfca40a2d66802d73fab069cd284b836c22ef"
 risk: medium
 related_issue: "opentibiabr/otclient#1775 (character-list relog subcase)"
 related_pr: "#31"
@@ -44,7 +44,7 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 - [x] UI load failure is nil-safe and restores the enter-game window instead of indexing a nil widget.
 - [x] Legacy `characterlist.otui` and Oteryn `oteryn_characterlist.otui` use the same controller path.
 - [x] Focused Lua tests cover default, custom, absolute, root-resolving, missing-layout and repeated recreation decisions.
-- [ ] Runtime-root Lua syntax and required CI pass on the exact final head.
+- [x] Runtime-root Lua syntax and required CI pass on the exact final head.
 - [x] Full changed-file list and diff are reviewed before squash merge.
 
 # Confirmed context
@@ -106,12 +106,12 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 
 | Commit | Check | Result | Evidence |
 |---|---|---|---|
-| `841031a129c3148e425de819abe907d8bc3f2e32` | root-resolving layout regression | pending | focused CTest suite |
 | `e9061b680331233d2153e0f3afb2fd78b7f9aaa1` | `luajit tests/lua/helpers/runner.lua tests/lua/unit/characterlist_lifecycle_test.lua tests/lua/unit/characterlist_lifecycle_adapter_test.lua` | passed | 10 focused tests, 0 failed, using the repository Windows vcpkg LuaJIT |
 | `e9061b680331233d2153e0f3afb2fd78b7f9aaa1` | `git diff --check` | passed | no whitespace errors |
-| pending final head | Runtime Lua syntax | pending | required CI |
-| pending final head | Windows CMake Tests / CTest | pending | required CI |
-| pending final head | `CI / Required` | pending | final merge gate |
+| `5accfca40a2d66802d73fab069cd284b836c22ef` | Runtime Lua syntax | passed | run `30195023839`, `Lua Syntax / Check Lua Syntax` |
+| `5accfca40a2d66802d73fab069cd284b836c22ef` | Windows CMake Tests / CTest | passed | run `30195023839`, `Build - Windows / Compile (CMake Tests)` |
+| `5accfca40a2d66802d73fab069cd284b836c22ef` | required Windows build matrix | passed | run `30195023839`: CMake Release, CMake Tests, Solution DirectX, Solution OpenGL and Solution Debug |
+| `5accfca40a2d66802d73fab069cd284b836c22ef` | `CI / Required` | passed | exact-head aggregate in run `30195023839` |
 
 # Risks and compatibility
 
@@ -123,9 +123,7 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 
 # Remaining work
 
-1. Pass exact-head required CI/CTest.
-2. Verify reviews and stable base, then squash-merge.
-3. Archive this task.
+None.
 
 # Handoff
 
@@ -133,9 +131,9 @@ Open this task and PR #31, then inspect `characterlist_lifecycle*.lua`, `enterga
 
 # Completion
 
-- Final status: in progress
+- Final status: complete
 - PR: #31
-- Merge commit: pending
+- Merge commit: `a9a03b88c14ee0d5d7b61332ca83f464b5b670e8`
 - Catalogue updated: not applicable; no public reusable interface
 - Changelog updated: yes
-- Archived at: pending
+- Archived at: 2026-07-26T11:49:01+02:00

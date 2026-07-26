@@ -7,6 +7,7 @@ Navigation map, not exhaustive inventory. Confirm live paths, manifests, tasks a
 | Greenfield Oteryn client | `oteryn-client/**` | New Rust product, architecture, audits, future workspace/crates/features/tools. Read nested `AGENTS.md`; audit gate applies. |
 | Greenfield architecture | `oteryn-client/docs/architecture/**` | Normative target design and ADRs. Do not create parallel architectures. |
 | Greenfield agent program | `oteryn-client/docs/agents/**` | Audit, workstreams, prompts and implementation gates. |
+| Legacy architecture/routing | `docs/architecture/LEGACY_OTCLIENT_ARCHITECTURE.md`, `docs/agents/LEGACY_OTCLIENT_WORKSTREAMS.md` | Maintained knowledge for existing C++/Lua tasks; not the target architecture. |
 | Legacy framework/engine | `src/framework/**` | Existing C++ application, graphics, networking, Lua/OTML, resources and platform abstractions. Legacy/reference only for the Rust track. |
 | Legacy game/protocol | `src/client/**` | Existing protocol, game state, map/things and services. Coordinate exact Canary facts. |
 | Legacy shipped modules | `modules/**` | Existing Lua/OTUI functionality. Preserve lifecycle/dependencies for legacy tasks; do not port structurally into Rust. |

@@ -2,9 +2,32 @@ local CharacterListLifecycleCore = {}
 
 local MODULE_UI_ROOT = '/client_entergame/'
 local DEFAULT_LAYOUT = 'characterlist'
+local LAYOUT_EXTENSION = '.otui'
 
 local function isNonEmptyString(value)
     return type(value) == 'string' and value ~= ''
+end
+
+local function normalizeSeparators(path)
+    return tostring(path or ''):gsub('\\', '/')
+end
+
+local function stripCurrentDirectory(path)
+    while path:sub(1, 2) == './' do
+        path = path:sub(3)
+    end
+    return path
+end
+
+local function containsTraversal(path)
+    return path == '..' or path:sub(1, 3) == '../' or path:find('/../', 1, true) ~= nil
+end
+
+local function ensureLayoutExtension(path)
+    if path:sub(-#LAYOUT_EXTENSION):lower() == LAYOUT_EXTENSION then
+        return path
+    end
+    return path .. LAYOUT_EXTENSION
 end
 
 function CharacterListLifecycleCore.normalizeLayoutPath(resources, layoutName)
@@ -13,25 +36,33 @@ function CharacterListLifecycleCore.normalizeLayoutPath(resources, layoutName)
     end
 
     local requestedLayout = isNonEmptyString(layoutName) and layoutName or DEFAULT_LAYOUT
-    local success, layoutPath = pcall(resources.guessFilePath, requestedLayout, 'otui')
-    if not success or not isNonEmptyString(layoutPath) then
+    requestedLayout = stripCurrentDirectory(normalizeSeparators(requestedLayout))
+    if not isNonEmptyString(requestedLayout) or containsTraversal(requestedLayout) then
         return nil, 'invalid_layout'
     end
 
-    layoutPath = layoutPath:gsub('\\', '/')
-    if layoutPath:sub(1, 1) == '/' then
-        return layoutPath
-    end
-
-    while layoutPath:sub(1, 2) == './' do
-        layoutPath = layoutPath:sub(3)
-    end
-
-    if layoutPath == '..' or layoutPath:sub(1, 3) == '../' or layoutPath:find('/../', 1, true) then
+    local explicitlyAbsolute = requestedLayout:sub(1, 1) == '/'
+    local success, guessedPath = pcall(resources.guessFilePath, requestedLayout, 'otui')
+    if not success or not isNonEmptyString(guessedPath) then
         return nil, 'invalid_layout'
     end
 
-    return MODULE_UI_ROOT .. layoutPath
+    guessedPath = normalizeSeparators(guessedPath)
+    if containsTraversal(guessedPath) then
+        return nil, 'invalid_layout'
+    end
+
+    if explicitlyAbsolute then
+        if guessedPath:sub(1, 1) ~= '/' then
+            return nil, 'invalid_layout'
+        end
+        return guessedPath
+    end
+
+    -- Relative module resources must never inherit a root-level path returned by
+    -- guessFilePath (for example `/characterlist.otui`). Build the module-local
+    -- path from the validated request instead.
+    return MODULE_UI_ROOT .. ensureLayoutExtension(requestedLayout)
 end
 
 function CharacterListLifecycleCore.shouldRecreate(isCreated, characters, account)

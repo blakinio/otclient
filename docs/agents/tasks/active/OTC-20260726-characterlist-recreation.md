@@ -6,8 +6,8 @@ agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-characterlist-recreation
 base_branch: main
 created: 2026-07-26T00:46:58+02:00
-updated: 2026-07-26T09:22:00+02:00
-last_verified_commit: "ed7b32e62bd5258749ebaa77fc39ad88dac4364b"
+updated: 2026-07-26T11:00:00+02:00
+last_verified_commit: "e9061b680331233d2153e0f3afb2fd78b7f9aaa1"
 risk: medium
 related_issue: "opentibiabr/otclient#1775 (character-list relog subcase)"
 related_pr: "#31"
@@ -62,7 +62,8 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 - Relative layout requests are validated from the caller-provided module-local name and always anchored under `/client_entergame/` before `displayUI` performs deferred path resolution.
 - A synthetic root-returning resource fixture additionally proves that a relative layout can never escape the module root through an alternate resolver implementation.
 - Explicit absolute layouts remain supported after traversal validation.
-- The adapter preserves the last successful layout and recreates through the existing CharacterList controller.
+- Traversal validation rejects every complete `..` segment, including a trailing segment in relative or absolute paths.
+- The adapter updates its retained layout only after successful UI creation and recreates through the existing CharacterList controller.
 
 # Work log
 
@@ -85,6 +86,12 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 - Confirmed that the observed root path is produced by deferred resolution without module source context, not by `guessFilePath` itself.
 - Retained the absolute module anchoring and corrected implementation comments/task evidence to name the exact layer.
 
+## 2026-07-26T11:00:00+02:00
+
+- Full pre-merge diff review found that traversal validation missed a trailing `..` segment and that a failed layout attempt could replace the last successful layout.
+- Tightened validation to reject every complete `..` segment and delayed retained-layout mutation until `CharacterList.create` succeeds.
+- Added focused regressions for relative/absolute trailing traversal and failed-layout retention.
+
 # Decisions
 
 | Decision | Reason/evidence | ADR |
@@ -100,6 +107,8 @@ Make the legacy and Oteryn character-list layouts safely reusable after the list
 | Commit | Check | Result | Evidence |
 |---|---|---|---|
 | `841031a129c3148e425de819abe907d8bc3f2e32` | root-resolving layout regression | pending | focused CTest suite |
+| `e9061b680331233d2153e0f3afb2fd78b7f9aaa1` | `luajit tests/lua/helpers/runner.lua tests/lua/unit/characterlist_lifecycle_test.lua tests/lua/unit/characterlist_lifecycle_adapter_test.lua` | passed | 10 focused tests, 0 failed, using the repository Windows vcpkg LuaJIT |
+| `e9061b680331233d2153e0f3afb2fd78b7f9aaa1` | `git diff --check` | passed | no whitespace errors |
 | pending final head | Runtime Lua syntax | pending | required CI |
 | pending final head | Windows CMake Tests / CTest | pending | required CI |
 | pending final head | `CI / Required` | pending | final merge gate |

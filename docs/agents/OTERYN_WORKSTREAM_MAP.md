@@ -7,13 +7,13 @@ Last reviewed: 2026-07-26
 
 ### Greenfield Rust client
 
-Any new product architecture, Rust engine, renderer, UI, protocol adapter, asset pack, launcher or first-party feature belongs under:
+New product architecture, Rust engine, renderer, UI, protocol adapter, asset pack, launcher and first-party features belong under:
 
 ```text
 oteryn-client/**
 ```
 
-Read:
+Required routing documents:
 
 - `oteryn-client/AGENTS.md`;
 - `oteryn-client/docs/architecture/**`;
@@ -25,7 +25,7 @@ The foundation audit is the first required workstream. Production Rust workspace
 
 ### Legacy C++/Lua OTClient
 
-Existing maintenance, open PR completion, behavior fixes and comparison evidence remain under:
+Existing maintenance, active PR completion, behavior fixes and comparison evidence remain under:
 
 ```text
 src/**
@@ -36,7 +36,12 @@ tests/**
 CMake*/cmake/vc18
 ```
 
-Legacy work follows the current owner module, exact Canary contract and root repository validation policy. It must not define the target architecture or add dependencies from `oteryn-client/` to legacy runtime code.
+Detailed legacy ownership and acceptance rules are preserved in:
+
+- `docs/architecture/LEGACY_OTCLIENT_ARCHITECTURE.md`;
+- `docs/agents/LEGACY_OTCLIENT_WORKSTREAMS.md`.
+
+Legacy work follows the current owner module, exact Canary contract and root validation policy. It must not define the target architecture or create a dependency from `oteryn-client/` to legacy runtime code.
 
 ## 2. Greenfield workstreams
 
@@ -62,28 +67,13 @@ WS-R15 launcher/updater/packaging
 WS-R16 WebAssembly extension platform
 ```
 
-Use that document for exact planned paths, boundaries and package sizing.
-
-## 3. Legacy high-contention paths
-
-Until the legacy client is retired, preserve existing ownership discipline:
-
-- `src/client/protocolgameparse.cpp`: one active task per affected parser region;
-- `modules/client_entergame/**`: separate presentation from authentication/session work;
-- `modules/game_interface/**`: composition infrastructure, not a general feature-state owner;
-- `modules/client_options/**`: option metadata/orchestration separate from feature behavior;
-- `data/images/**`, `data/styles/**`: explicit namespace and provenance ownership;
-- `.github/workflows/**`, CMake and presets: dedicated CI/build ownership.
-
-Open PR and active task state is authoritative.
-
-## 4. Shared cross-repository contracts
+## 3. Shared cross-repository contracts
 
 Identity, game tickets, character/world/gameplay-channel routing, protocol messages, identifiers, feature capabilities and asset compatibility require shared coordination IDs and exact producer/consumer evidence.
 
 Canary is the first compatibility target for the Rust client. Oteryn is the target ecosystem. Neither wire format may leak into the game domain or feature UI.
 
-## 5. Package sizing
+## 4. Package sizing
 
 Good:
 
@@ -102,7 +92,7 @@ Bad:
 - copy legacy modules into Rust;
 - weaken CI or security to unblock a feature.
 
-## 6. Required task routing metadata
+## 5. Required task routing metadata
 
 Every task identifies:
 

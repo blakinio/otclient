@@ -4,6 +4,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 
 ## Unreleased
 
+- Character-list lifecycle now retains an absolute module-local OTUI path, safely recreates a destroyed legacy or Oteryn list from the existing login response, and returns to EnterGame instead of dereferencing a nil window when layout loading fails.
 - The reviewed `opentibiabr/otclient` synchronization retains bounded unknown-opcode recovery, pre-780 inventory use-with lookup, ground-border multi-use targeting, animator-driven always-animated creature phases, NPC trade imbuement accounting/lifecycle cleanup, `--user-dir`, Stats pause/resume, manual-walk/bot coordination, browser Lua/UIGraph/shader compatibility and Cocoa mouse delta handling.
 - Three reviewed upstream effects remain deliberately deferred: asset release-archive selection pending installer fixtures/path/runtime-load proof, Reward Wall source-byte semantics pending an exact Canary `OTS-*` contract, and rendering/preload ordering pending a framework-safe implementation without a framework-to-client dependency.
 - Required CI compilation is temporarily Windows-only; Linux, macOS, Android, browser and Docker reusable workflows remain available but are not called by the primary workflow. Fast/static checks and Lua syntax remain required.

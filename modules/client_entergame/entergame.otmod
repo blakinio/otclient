@@ -12,6 +12,7 @@ Module
   @onLoad: |
     dofile 'entergame'
     dofile 'characterlist'
+    dofile 'characterlist_lifecycle'
     dofile 'createAccount'
     dofile 'oteryn_identity_core'
     dofile 'oteryn_identity'

@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260726-actionbar-cooldown-lifecycle
 coordination_id: ""
-status: in_progress
+status: complete
 agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-actionbar-cooldown-lifecycle
 base_branch: main
 created: 2026-07-26T01:09:00+02:00
-updated: 2026-07-26T11:53:43+02:00
-last_verified_commit: "8b4ede558b2380675716491ac6259b54fd711e80"
+updated: 2026-07-26T13:08:51+02:00
+last_verified_commit: "8e69cd8b6a78512b3c932c409b0da400169ce7f4"
 risk: medium
 related_issue: "opentibiabr/otclient#1776"
 related_pr: "#33"
@@ -49,7 +49,7 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 - [x] Text spells, simple rune buttons and multi-actions use the same authoritative remaining-time decision.
 - [x] Unload/logout disconnects module-owned subscriptions and clears session caches.
 - [x] Focused Lua tests cover cache-first handling, max remaining selection, session reset, pre-UI packets, reentrant start and relog restoration.
-- [ ] Exact-head required CI and focused CTest pass before squash merge.
+- [x] Exact-head required CI and focused CTest pass before squash merge.
 
 # Confirmed context
 
@@ -104,8 +104,10 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 |---|---|---|
 | `8b4ede558b2380675716491ac6259b54fd711e80` | `luajit tests/lua/helpers/runner.lua tests/lua/unit/actionbar_cooldown_lifecycle_test.lua tests/lua/unit/actionbar_cooldown_adapter_test.lua` | passed, 12 tests and 0 failed with repository Windows vcpkg LuaJIT |
 | `8b4ede558b2380675716491ac6259b54fd711e80` | `git diff --check origin/main...HEAD` | passed |
-| pending refreshed head | Windows CMake Tests / CTest | not-run |
-| pending refreshed head | `CI / Required` | not-run |
+| `8e69cd8b6a78512b3c932c409b0da400169ce7f4` | Runtime Lua syntax | passed in run `30197297841` |
+| `8e69cd8b6a78512b3c932c409b0da400169ce7f4` | Windows CMake Tests / CTest | passed in run `30197297841` |
+| `8e69cd8b6a78512b3c932c409b0da400169ce7f4` | required Windows build matrix | passed in run `30197297841`: CMake Release, CMake Tests, Solution DirectX, Solution OpenGL and Solution Debug |
+| `8e69cd8b6a78512b3c932c409b0da400169ce7f4` | `CI / Required` | passed, exact-head aggregate in run `30197297841` |
 
 # Risks and compatibility
 
@@ -116,15 +118,13 @@ Keep action-bar cooldown protocol state authoritative across login/logout/reload
 
 # Remaining work
 
-1. Publish the refreshed head and mark PR #33 ready.
-2. Pass exact-head Windows CTest/required CI and verify review threads and stable base.
-3. Squash-merge and archive the task.
+None.
 
 # Completion
 
-- Final status: in progress
+- Final status: complete
 - PR: #33
-- Merge commit: pending
+- Merge commit: `c6a55327ce8048d5595c94c17c75e63e8568499a`
 - Catalogue updated: not applicable; no new public interface
 - Changelog updated: yes
-- Archived at: pending
+- Archived at: 2026-07-26T13:08:51+02:00

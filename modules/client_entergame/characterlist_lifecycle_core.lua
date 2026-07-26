@@ -59,9 +59,9 @@ function CharacterListLifecycleCore.normalizeLayoutPath(resources, layoutName)
         return guessedPath
     end
 
-    -- Relative module resources must never inherit a root-level path returned by
-    -- guessFilePath (for example `/characterlist.otui`). Build the module-local
-    -- path from the validated request instead.
+    -- A deferred UI callback may have no active module source context, causing
+    -- later ResourceManager::resolvePath to resolve a relative layout at `/`.
+    -- Build the absolute module-local path before handing it to displayUI.
     return MODULE_UI_ROOT .. ensureLayoutExtension(requestedLayout)
 end
 

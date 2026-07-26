@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260726-wheel-conviction-indices
 coordination_id: ""
-status: in_progress
+status: complete
 agent: "GPT-5.6 Thinking"
 branch: fix/OTC-20260726-wheel-conviction-indices
 base_branch: main
 created: 2026-07-26T01:21:00+02:00
-updated: 2026-07-26T13:12:34+02:00
-last_verified_commit: "baa2a252d255bb61bef11cb85078b8822f180ef9"
+updated: 2026-07-26T14:22:11+02:00
+last_verified_commit: "7931762c75c03d80ef183b10374b6e43ef44874a"
 risk: low
 related_issue: "opentibiabr/otclient#1753"
 related_pr: "#34"
@@ -43,7 +43,7 @@ Replace shifted numeric ConvictionBonus accesses with one named index contract s
 - [x] Wheel summary reads skill/life/mana/spells through the named contract.
 - [x] Focused Lua tests prove every index, summary extraction order and scoped adapter restoration.
 - [x] No protocol parser, payload width or Canary contract changes.
-- [ ] Exact-head Lua Syntax, CTest and required CI pass before squash merge.
+- [x] Exact-head Lua Syntax, CTest and required CI pass before squash merge.
 
 # Confirmed context
 
@@ -88,8 +88,10 @@ Replace shifted numeric ConvictionBonus accesses with one named index contract s
 |---|---|---|
 | `baa2a252d255bb61bef11cb85078b8822f180ef9` | `luajit tests/lua/helpers/runner.lua tests/lua/unit/wheel_conviction_indices_test.lua` | passed, 3 tests and 0 failed with repository Windows vcpkg LuaJIT |
 | `baa2a252d255bb61bef11cb85078b8822f180ef9` | `git diff --check origin/main...HEAD` | passed |
-| pending refreshed head | Windows CMake Tests / CTest | not-run |
-| pending refreshed head | `CI / Required` | not-run |
+| `7931762c75c03d80ef183b10374b6e43ef44874a` | Runtime Lua syntax | passed in run `30199720339` |
+| `7931762c75c03d80ef183b10374b6e43ef44874a` | Windows CMake Tests / CTest | passed in run `30199720339` |
+| `7931762c75c03d80ef183b10374b6e43ef44874a` | required Windows build matrix | passed in run `30199720339`: CMake Release, CMake Tests, Solution DirectX, Solution OpenGL and Solution Debug |
+| `7931762c75c03d80ef183b10374b6e43ef44874a` | `CI / Required` | passed, exact-head aggregate in run `30199720339` |
 
 # Risks and compatibility
 
@@ -99,15 +101,13 @@ Replace shifted numeric ConvictionBonus accesses with one named index contract s
 
 # Remaining work
 
-1. Publish the refreshed head and mark PR #34 ready.
-2. Pass exact-head Windows CTest/required CI and verify review threads and stable base.
-3. Squash-merge and archive the task.
+None.
 
 # Completion
 
-- Final status: in progress
+- Final status: complete
 - PR: #34
-- Merge commit: pending
+- Merge commit: `218e1339cb6644a2f0db9ea03d59a63d7553d44d`
 - Catalogue updated: not applicable
 - Changelog updated: yes
-- Archived at: pending
+- Archived at: 2026-07-26T14:22:11+02:00

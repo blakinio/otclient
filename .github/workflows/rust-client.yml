@@ -1,0 +1,63 @@
+name: Rust Client
+
+on:
+  pull_request:
+    paths:
+      - "oteryn-client/**"
+      - ".github/workflows/rust-client.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-client-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Rust Client / Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: oteryn-client
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt --target x86_64-pc-windows-msvc
+          rustup default 1.94.0
+          $version = rustc --version
+          if ($version -notmatch '^rustc 1\.94\.0 ') {
+            throw "Unexpected Rust compiler: $version"
+          }
+          rustc --version --verbose
+          cargo --version --verbose
+
+      - name: Validate locked workspace metadata
+        run: cargo metadata --locked --format-version 1 | Out-Null
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Lint workspace
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Test workspace
+        run: cargo test --workspace --all-targets --locked
+
+      - name: Validate architecture policy
+        run: cargo run --locked -p oteryn-architecture-check -- workspace .
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version 0.19.0 --locked
+
+      - name: Check advisories licenses bans and sources
+        run: cargo deny check

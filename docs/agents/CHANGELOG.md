@@ -4,6 +4,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 
 ## Unreleased
 
+- Character-list lifecycle now retains an absolute module-local OTUI path, safely recreates a destroyed legacy or Oteryn list from the existing login response, and returns to EnterGame instead of dereferencing a nil window when layout loading fails.
 - The reviewed `opentibiabr/otclient` synchronization retains bounded unknown-opcode recovery, pre-780 inventory use-with lookup, ground-border multi-use targeting, animator-driven always-animated creature phases, NPC trade imbuement accounting/lifecycle cleanup, `--user-dir`, Stats pause/resume, manual-walk/bot coordination, browser Lua/UIGraph/shader compatibility and Cocoa mouse delta handling.
 - Three reviewed upstream effects remain deliberately deferred: asset release-archive selection pending installer fixtures/path/runtime-load proof, Reward Wall source-byte semantics pending an exact Canary `OTS-*` contract, and rendering/preload ordering pending a framework-safe implementation without a framework-to-client dependency.
 - Required CI compilation is temporarily Windows-only; Linux, macOS, Android, browser and Docker reusable workflows remain available but are not called by the primary workflow. Fast/static checks and Lua syntax remain required.
@@ -13,7 +14,7 @@ Curated behavior/architecture log for discovery; not a replacement for Git histo
 - Deferred proxy and packet-player callbacks now retain explicit shared protocol ownership instead of asynchronously capturing raw `this`.
 - Game connection-error, game-end and explicit logout paths now retain the exact source `ProtocolGame` through cleanup and revalidate identity after Lua-reentrant boundaries, so an obsolete session cannot disconnect its replacement.
 - Deterministic game-lifecycle regression tests use a dedicated friend access seam instead of preprocessor access remapping, preserving MSVC link compatibility.
-- Oteryn native authentication is active in PR #17: system-browser Authorization Code + PKCE, OS-assigned loopback callback, separate Platform Game Login Ticket issuance, standalone Game Gateway `/v1/login` consumption, server-authoritative world routing, and a one-shot `GameSessionKey` handoff consumed only after the actual `g_game.loginWorld` transfer without an Oteryn password fallback.
+- Oteryn native authentication is active in PR #17: system-browser OAuth Authorization Code + PKCE, OS-assigned loopback callback, separate Platform Game Login Ticket issuance, standalone Game Gateway `/v1/login` consumption, server-authoritative world routing, and a one-shot `GameSessionKey` handoff consumed only after the actual `g_game.loginWorld` transfer without an Oteryn password fallback.
 - The Oteryn login profile is disabled by default and production enablement remains blocked on the separately selected/proven Canary Game Session adapter and exact-version cross-repository E2E.
 
 ## 2026-07-12 bootstrap inventory

@@ -1,9 +1,16 @@
 local ClientAssetsReleaseSelector = {}
 
 local ARCHIVE_EXTENSIONS = { '.zip', '.rar' }
+local DEFAULT_REPOSITORY = 'dudantas/tibia-client'
 
 local function endsWith(value, suffix)
     return type(value) == 'string' and suffix ~= '' and value:sub(-#suffix) == suffix
+end
+
+local function normalizedUrlRoot(url)
+    url = tostring(url or ''):lower()
+    url = url:gsub('[?#].*$', '')
+    return url:gsub('/+$', '')
 end
 
 function ClientAssetsReleaseSelector.isArchivePath(path)
@@ -128,9 +135,32 @@ function ClientAssetsReleaseSelector.prepareReleases(releases)
 end
 
 function ClientAssetsReleaseSelector.isGitHubReleasesUrl(url)
-    url = tostring(url or ''):lower()
-    return url:find('api.github.com/repos/', 1, true) ~= nil and
-        url:find('/releases', 1, true) ~= nil
+    local root = normalizedUrlRoot(url)
+    return root:match('^https://api%.github%.com/repos/[^/]+/[^/]+/releases$') ~= nil
+end
+
+function ClientAssetsReleaseSelector.configuredReleasesUrl(serviceConfig)
+    if serviceConfig == false then
+        return nil
+    end
+
+    if type(serviceConfig) == 'table' then
+        if type(serviceConfig.releasesUrl) == 'string' and serviceConfig.releasesUrl ~= '' then
+            return serviceConfig.releasesUrl
+        end
+        if type(serviceConfig.repository) == 'string' and serviceConfig.repository ~= '' then
+            return string.format('https://api.github.com/repos/%s/releases', serviceConfig.repository)
+        end
+    end
+
+    return string.format('https://api.github.com/repos/%s/releases', DEFAULT_REPOSITORY)
+end
+
+function ClientAssetsReleaseSelector.isConfiguredReleasesUrl(url, serviceConfig)
+    local configuredUrl = ClientAssetsReleaseSelector.configuredReleasesUrl(serviceConfig)
+    return configuredUrl ~= nil and
+        ClientAssetsReleaseSelector.isGitHubReleasesUrl(configuredUrl) and
+        normalizedUrlRoot(url) == normalizedUrlRoot(configuredUrl)
 end
 
 function ClientAssetsReleaseSelector.expectedInstallPaths(version)

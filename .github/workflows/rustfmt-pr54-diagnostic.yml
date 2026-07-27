@@ -1,4 +1,4 @@
-name: Test PR54 Diagnostic
+name: Restack PR54 Diagnostic
 
 on:
   pull_request:
@@ -6,18 +6,53 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  test-failure:
-    runs-on: windows-2025
+  restack:
+    runs-on: ubuntu-latest
     steps:
-      - name: Print exact test failure
-        shell: pwsh
+      - name: Checkout product branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC-20260727-rust-foundation-primitives
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Merge current main with bounded conflict resolution
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          rustup toolchain install 1.94.0 --profile minimal *> $null
-          git clone --quiet --depth 1 --branch feat/OTC-20260727-rust-foundation-primitives `
-            https://github.com/${{ github.repository }}.git repo
-          Set-Location repo/oteryn-client
-          cargo +1.94.0 test --workspace --all-targets --locked -- --nocapture
+          set -euo pipefail
+          readonly expected_conflict="oteryn-client/docs/agents/WORKSTREAMS.md"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --quiet origin main
+
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "Product branch already contains current main."
+            exit 0
+          fi
+
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_status=$?
+          set -e
+
+          if [[ $merge_status -ne 0 ]]; then
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
+            if [[ ${#conflicts[@]} -ne 1 || "${conflicts[0]}" != "$expected_conflict" ]]; then
+              printf 'Unexpected merge conflicts:\n'
+              printf '%s\n' "${conflicts[@]}"
+              git merge --abort
+              exit 1
+            fi
+
+            git checkout --ours -- "$expected_conflict"
+            git add "$expected_conflict"
+          fi
+
+          git diff --check
+          git commit -m "Merge current main into foundation primitives"
+          git push origin HEAD:feat/OTC-20260727-rust-foundation-primitives

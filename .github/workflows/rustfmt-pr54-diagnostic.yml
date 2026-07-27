@@ -1,9 +1,9 @@
 name: Rustfmt PR54 Diagnostic
 
 on:
-  push:
+  pull_request:
     branches:
-      - diag/rustfmt-pr54
+      - main
 
 permissions:
   contents: read

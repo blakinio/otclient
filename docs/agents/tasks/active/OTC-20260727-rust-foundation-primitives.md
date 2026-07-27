@@ -11,8 +11,8 @@ coordinator_task: OTC-20260727-multi-agent-orchestration
 branch: feat/OTC-20260727-rust-foundation-primitives
 base_branch: main
 created: 2026-07-27T10:46:08+02:00
-updated: 2026-07-27T11:58:00+02:00
-last_verified_commit: "174f71440a72e90a21a791122d217e5d59cbabe9"
+updated: 2026-07-27T12:08:00+02:00
+last_verified_commit: "ff094828dc4db45e049daab0007fd41c32d652e7"
 required_base_commit: "cc2f3a6d2531aeb22c680b292345f9a51246864b"
 risk: medium
 related_pr: "#54"
@@ -32,7 +32,6 @@ owned_paths:
   - oteryn-client/tools/architecture-check/**
   - oteryn-client/tests/architecture-fixtures/**
   - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
-  - oteryn-client/docs/agents/WORKSTREAMS.md
   - oteryn-client/docs/operations/RUST_WORKSPACE.md
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
@@ -43,9 +42,9 @@ shared_path_lease:
   - oteryn-client/tools/architecture-check/**
   - oteryn-client/tests/architecture-fixtures/**
   - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
-  - oteryn-client/docs/agents/WORKSTREAMS.md
   - oteryn-client/docs/operations/RUST_WORKSPACE.md
   - docs/agents/MODULE_CATALOG.md
+  - docs/agents/BUILD_TEST_MATRIX.md
   - docs/agents/CHANGELOG.md
 contract_role: producer
 contracts_produced:
@@ -107,14 +106,16 @@ Ownership result:
 - no other live task or PR owns `oteryn-client/crates/foundation/**`, Cargo/lockfile integration, architecture-check foundation policy/fixtures or the foundation public contracts;
 - PR #48 remains an isolated non-merge operational workflow;
 - PRs #37 and #23 remain legacy-client work with possible shared catalogue/changelog edits only; their live state must be rechecked immediately before merge;
-- coordinator task `OTC-20260727-multi-agent-orchestration` is archived by merged PR #57.
+- coordinator task `OTC-20260727-multi-agent-orchestration` is archived by merged PR #57;
+- `docs/agents/BUILD_TEST_MATRIX.md` already contains the required foundation-crate validation matrix, so it remains unchanged while still covered by the shared-path lease;
+- `oteryn-client/docs/agents/WORKSTREAMS.md` is restored byte-for-byte from current `main` and is not part of the product diff.
 
 Environment limitation:
 
 - the execution sandbox cannot resolve `github.com`, so a local clone/worktree and local Cargo commands are unavailable;
 - all repository writes use the dedicated task branch through the authenticated GitHub connector;
 - exact build/lint/test/supply-chain evidence comes from repository CI on the exact PR head;
-- a temporary unmerged diagnostic PR was used only to expose truncated rustfmt/test output and perform the bounded current-main merge; it is closed and is not part of the product diff.
+- a temporary unmerged diagnostic PR was used only to expose truncated rustfmt/test output, perform the bounded current-main merge, verify Cargo lockfile regeneration and remove the unnecessary workstreams diff; it is closed and is not part of the product diff.
 
 # Implemented design
 
@@ -141,11 +142,12 @@ Environment limitation:
 - [x] Drop semantics and repeated create/cancel/drop resource release are tested.
 - [x] Display/Debug output for primitive errors is deterministic and secret-free by construction.
 - [x] No game/domain/protocol/platform identity, events, commands, channels, assets or legacy runtime coupling is added.
-- [x] Branch contains current `main` `cc2f3a6d2531aeb22c680b292345f9a51246864b`; the only merge conflict was the declared `WORKSTREAMS.md` shared path and its resolved content preserves both the parallel protocol and foundation ownership.
-- [ ] Workspace metadata, format, Clippy, tests, real architecture check and cargo-deny pass on the final exact head.
-- [ ] Rust Client / Windows, Rust Client / Supply Chain, repository CI / Required and all current required checks pass on the final exact head.
+- [x] Branch contains current `main` `cc2f3a6d2531aeb22c680b292345f9a51246864b`; the only restack conflict was the declared shared path `WORKSTREAMS.md`, and its unnecessary product change was subsequently removed by restoring current `main`.
+- [x] Pinned Cargo 1.94.0 regenerates `Cargo.lock` with a zero diff.
+- [ ] Workspace metadata, format, Clippy, tests, real architecture check and cargo-deny pass on the final exact head created by this record update.
+- [ ] Rust Client / Windows, Rust Client / Supply Chain, repository CI / Required and all current required checks pass on that final exact head.
 - [ ] Full changed-file list, complete diff, comments, reviews and unresolved threads are inspected on the final head.
-- [x] Task, module catalogue, Rust workspace operations, workstreams, repository layout and changelog are current for validation.
+- [x] Task, module catalogue, Rust workspace operations, repository layout and changelog are current for validation; the existing build/test matrix already covers this package.
 - [ ] Merge occurs only through the autonomous merge gate.
 - [ ] Completed task is archived in a separate lifecycle PR.
 
@@ -153,10 +155,12 @@ Environment limitation:
 
 - Diagnostic head `e4d615f3d77dfa23906b6a98b194cfbeb7764450`: locked workspace metadata passed; rustfmt identified formatting-only changes.
 - Diagnostic head `9b8feefabcde7e8b11c2f48f7c9ac13eb4ed8818`: `Rust Client / Supply Chain` passed, including cargo-deny advisories, licenses, bans and sources.
-- Pinned Rust 1.94.0 diagnostic identified exactly three rustfmt-only changes; all were applied.
-- Windows diagnostic on head `768238b06b0b91b295d49ada0a85849bad62d7d0` showed 14/15 foundation tests passing and isolated the single failure to the timing-bound spin-loop test. The deterministic synchronized cancellation race replaced it.
-- Restacked head `174f71440a72e90a21a791122d217e5d59cbabe9` contains current `main`; workflow runs created by the temporary integration bot require approval and are not treated as validation evidence.
-- Exact-head validation after this task metadata commit is pending.
+- Pinned Rust 1.94.0 diagnostics identified and applied the exact rustfmt-only changes.
+- Windows diagnostic on head `768238b06b0b91b295d49ada0a85849bad62d7d0` isolated the only test failure to a timing-bound spin loop. The deterministic synchronized cancellation race replaced it.
+- Pinned Cargo 1.94.0 `generate-lockfile` produced no `Cargo.lock` diff after restack.
+- Exact implementation head `ff094828dc4db45e049daab0007fd41c32d652e7` passed `Rust Client / Windows`, `Rust Client / Supply Chain`, repository fast/static/Lua checks and `CI / Required`. Windows passed locked metadata, formatting, Clippy, workspace tests and the real architecture check.
+- Head `ea754d16837e95153389bc98df640c6ac6c6ab7e` removes the unnecessary `WORKSTREAMS.md` product diff; its bot-authored workflow runs are not treated as validation evidence.
+- Exact-head validation after this user-authored task-record commit is pending.
 - No runtime, server, protocol, GPU, performance or non-Windows compatibility claim is made.
 
 # Stop conditions

@@ -43,10 +43,7 @@ fn invalid_fixtures_report_expected_rules() -> Result<(), String> {
             "invalid_ui_core_to_feature_edge.json",
             "E005_FORBIDDEN_EDGE",
         ),
-        (
-            "invalid_foundation_upward_edge.json",
-            "E005_FORBIDDEN_EDGE",
-        ),
+        ("invalid_foundation_upward_edge.json", "E005_FORBIDDEN_EDGE"),
         ("invalid_feature_cycle.json", "E006_DEPENDENCY_CYCLE"),
         (
             "invalid_unapproved_source_dependency.json",

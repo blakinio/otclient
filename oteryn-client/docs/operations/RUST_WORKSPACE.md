@@ -5,13 +5,14 @@ Required compiled platform: Windows x86-64 MSVC
 
 ## Scope
 
-The initial workspace contains exactly one non-product member:
+The workspace contains two bounded members:
 
 ```text
+crates/foundation
 tools/architecture-check
 ```
 
-It validates workspace metadata and declared dependency categories. It is not the client, launcher, renderer, protocol stack, domain, UI, asset runtime or extension host.
+`oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Neither is the client, launcher, renderer, protocol stack, domain, UI, asset runtime or extension host.
 
 Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
 
@@ -53,14 +54,16 @@ Every workspace package must:
 
 ```toml
 [package.metadata.oteryn]
-category = "tool"
+category = "foundation"
 ```
 
 - use crates.io registry dependencies or reviewed workspace-local path dependencies only;
 - avoid external git/path sources unless a later focused policy change explicitly approves them;
-- avoid a dependency on legacy `src/`, `modules/` or `mods/` runtime code/content.
+- avoid a dependency on legacy `src/`, `modules` or `mods` runtime code/content.
 
-Known categories are defined by the architecture checker and follow the accepted architecture, including `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.
+Known categories are defined by the architecture checker and follow the accepted architecture, including `foundation`, `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.
+
+`foundation` is the bottom reusable category. It must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. Lower product layers may depend on it only for generic primitives that do not encode product/server behavior.
 
 Adding or changing a category is an architecture-policy change. Update the checker, synthetic positive/negative fixtures, architecture/workstream documentation and module catalogue in one focused PR.
 
@@ -101,7 +104,9 @@ The checker intentionally validates metadata/graph policy only. It does not repl
 
 `tests/architecture-fixtures/` contains original metadata-only graphs:
 
-- one valid minimal workspace;
+- one valid minimal tool workspace;
+- one valid lower-layer dependency on `foundation`;
+- one invalid `foundation` dependency upward into a product layer;
 - legacy path dependency;
 - game-domain -> Canary adapter;
 - renderer -> concrete feature;
@@ -110,6 +115,19 @@ The checker intentionally validates metadata/graph policy only. It does not repl
 - unapproved source dependency.
 
 Fixtures contain no game source, protocol bytes, credentials or assets. New architecture rules require both a valid example and a focused invalid fixture.
+
+## Foundation crate contract
+
+`oteryn-foundation` is standard-library-only and owns:
+
+- `ProcessGeneration`, `SessionGeneration` and `TaskGeneration` as distinct checked `u64` newtypes;
+- `Moment`, `Deadline`, `MonotonicClock`, `SystemClock` and deterministic thread-safe `ManualClock`;
+- `CancellationSource` as the unique cancellation authority and cloneable observation-only `CancellationToken`;
+- closed `GenerationError` and `TimeError` enums containing no arbitrary external text.
+
+Cancellation is always explicit. Dropping an observer has no effect; dropping an uncancelled source does not implicitly cancel its surviving tokens. The final source/token drop releases shared state and starts no background work.
+
+The crate contains no Character/World/Channel identifiers, Identity/session implementation, async runtime, scheduler, executor, global event bus, hidden thread, network, GPU, UI, asset, tracing, serialization, FFI or legacy runtime dependency.
 
 ## Lint and unsafe policy
 
@@ -121,7 +139,7 @@ Workspace Rust policy:
 - exceptions require a narrow owning package, documented reason and tests rather than a workspace-wide allowance;
 - external-input parsers need explicit bounded error handling in their later workstreams.
 
-The bootstrap tool contains no unsafe code and no native/FFI dependency.
+The current workspace crates contain no unsafe code and no native/FFI dependency.
 
 ## Supply-chain policy
 
@@ -136,7 +154,7 @@ The bootstrap tool contains no unsafe code and no native/FFI dependency.
 
 Do not broaden license/source policy merely to make CI green. Investigate the exact dependency and either reject it, replace it or update policy through a reviewed task with legal/security rationale.
 
-The initial workspace pins only `serde_json` for parsing Cargo metadata and synthetic JSON fixtures. Application dependencies such as GPU, windowing, async, HTTP/TLS, text, audio or WebAssembly runtimes remain outside this package.
+The workspace pins only `serde_json` for the architecture tool's Cargo metadata and synthetic JSON fixtures. `oteryn-foundation` has zero external dependencies. Application dependencies such as GPU, windowing, async, HTTP/TLS, text, audio or WebAssembly runtimes remain outside this package.
 
 ## CI behavior
 
@@ -148,12 +166,12 @@ The Windows job validates:
 - locked metadata;
 - formatting;
 - Clippy with warnings denied;
-- tests;
+- tests, including crate unit/doctests and architecture fixtures;
 - the real workspace architecture policy.
 
 A separate Ubuntu job runs the immutable official cargo-deny action against `oteryn-client/Cargo.toml` and the colocated `deny.toml` for advisories, licenses, bans and sources. Supply-chain execution on Ubuntu does not replace the required Windows compilation/test evidence.
 
-A successful Rust workflow proves only this workspace/tooling package. It does not prove client runtime, GPU, server, protocol, assets or non-Windows product compatibility.
+A successful Rust workflow proves only the workspace packages compiled and tested on the stated revision. It does not prove client runtime, GPU, server, protocol, assets or non-Windows product compatibility.
 
 ## Adding the next crate
 
@@ -169,8 +187,8 @@ Before adding a crate:
 8. run all workspace and owning-workstream validation;
 9. update the module catalogue and architecture/ADR when public boundaries change.
 
-The expected next package is selected after live preflight; this bootstrap does not authorize starting multiple foundation/product workstreams in parallel. A copy-ready prompt for the next bounded foundation package is stored at `docs/agents/prompts/NEXT_FOUNDATION_AGENT.md`.
+The expected next package is selected after live preflight. It must not be folded into a completed foundation-primitives PR.
 
 ## Rollback
 
-This package has no runtime or user-data migration. A normal squash revert removes the workspace/tooling/CI foundation. Generated Cargo build output and caches are transient and are never repository or release truth.
+The foundation primitives have no runtime or user-data migration. A normal squash revert removes the crate/category change. Generated Cargo build output and caches are transient and are never repository or release truth.

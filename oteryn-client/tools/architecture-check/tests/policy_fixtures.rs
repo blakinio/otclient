@@ -18,6 +18,16 @@ fn valid_minimal_workspace_passes() -> Result<(), String> {
 }
 
 #[test]
+fn valid_foundation_dependency_passes() -> Result<(), String> {
+    let violations = check_fixture(&fixture_path("valid_foundation_dependency.json"))?;
+    assert!(
+        violations.is_empty(),
+        "unexpected violations: {violations:?}"
+    );
+    Ok(())
+}
+
+#[test]
 fn invalid_fixtures_report_expected_rules() -> Result<(), String> {
     let cases = [
         (
@@ -33,6 +43,7 @@ fn invalid_fixtures_report_expected_rules() -> Result<(), String> {
             "invalid_ui_core_to_feature_edge.json",
             "E005_FORBIDDEN_EDGE",
         ),
+        ("invalid_foundation_upward_edge.json", "E005_FORBIDDEN_EDGE"),
         ("invalid_feature_cycle.json", "E006_DEPENDENCY_CYCLE"),
         (
             "invalid_unapproved_source_dependency.json",

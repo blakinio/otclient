@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "workspace_root": "/repo/oteryn-client",
+  "packages": [
+    {
+      "name": "oteryn-foundation",
+      "category": "foundation",
+      "manifest_path": "/repo/oteryn-client/crates/foundation/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "oteryn-platform",
+          "path": "/repo/oteryn-client/crates/platform",
+          "source": null
+        }
+      ]
+    },
+    {
+      "name": "oteryn-platform",
+      "category": "platform",
+      "manifest_path": "/repo/oteryn-client/crates/platform/Cargo.toml",
+      "dependencies": []
+    }
+  ]
+}

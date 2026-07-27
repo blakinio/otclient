@@ -36,6 +36,7 @@ oteryn-client/
 │       ├── Cargo.toml
 │       └── src/main.rs
 ├── crates/
+│   ├── foundation/
 │   ├── app-runtime/
 │   ├── platform/
 │   ├── identity/
@@ -114,6 +115,7 @@ oteryn-client/
 
 | Crate | Owns | Must not own |
 |---|---|---|
+| `foundation` | generic technical generations, monotonic time, explicit cancellation and primitive-specific errors | product lifecycle policy, domain IDs, protocol, platform services, async runtime or global event bus |
 | `app-runtime` | top-level state machine, service composition, error routing | packet parsing, concrete widgets |
 | `platform` | OS abstractions | game rules or feature state |
 | `identity` | PKCE orchestration and safe callback boundary | character/game state |
@@ -172,27 +174,34 @@ apps
 features
 ├── application contracts
 ├── game-domain read/command APIs
-└── ui-runtime/ui-core
+├── ui-runtime/ui-core
+└── foundation when a generic primitive is required
 
 application services
 ├── game-domain
 ├── protocol-core traits
-└── engine primitives
+├── engine primitives
+└── foundation
 
-game-domain / simulation / world-storage
-└── small foundation crates only
+game-domain / simulation / world-storage / render-types
+└── foundation
 
 protocol-canary / protocol-oteryn
 ├── protocol-core
-└── game-domain contracts
+├── game-domain contracts
+└── foundation when a generic primitive is required
 
 renderer
 ├── render-types
 ├── asset-runtime
-└── platform/GPU dependencies
+├── platform/GPU dependencies
+└── foundation when a generic primitive is required
+
+foundation
+└── Rust standard library and separately reviewed non-product dependencies only
 ```
 
-`game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime.
+`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime.
 
 ## 6. Cargo workspace policy
 

@@ -15,6 +15,7 @@ const ALLOWED_SPARSE_REGISTRY: &str = "sparse+https://index.crates.io/";
 const KNOWN_CATEGORIES: &[&str] = &[
     "tool",
     "app",
+    "foundation",
     "platform",
     "runtime",
     "identity",
@@ -424,31 +425,32 @@ fn is_within(path: &str, normalized_root: &str) -> bool {
 }
 
 fn forbidden_edge(source: &str, target: &str) -> bool {
-    matches!(
-        (source, target),
-        (
-            "game-domain",
-            "protocol-canary"
-                | "protocol-oteryn"
-                | "feature"
-                | "renderer"
-                | "ui-core"
-                | "ui-runtime"
-        ) | (
-            "renderer",
-            "protocol-canary" | "protocol-oteryn" | "feature"
-        ) | ("ui-core", "protocol-canary" | "protocol-oteryn" | "feature")
-            | (
-                "platform",
-                "game-domain"
-                    | "game-simulation"
-                    | "protocol-canary"
+    (source == "foundation" && target != "foundation")
+        || matches!(
+            (source, target),
+            (
+                "game-domain",
+                "protocol-canary"
                     | "protocol-oteryn"
                     | "feature"
-            )
-            | ("asset-types", "identity")
-            | ("feature", "feature" | "protocol-canary" | "protocol-oteryn")
-    )
+                    | "renderer"
+                    | "ui-core"
+                    | "ui-runtime"
+            ) | (
+                "renderer",
+                "protocol-canary" | "protocol-oteryn" | "feature"
+            ) | ("ui-core", "protocol-canary" | "protocol-oteryn" | "feature")
+                | (
+                    "platform",
+                    "game-domain"
+                        | "game-simulation"
+                        | "protocol-canary"
+                        | "protocol-oteryn"
+                        | "feature"
+                )
+                | ("asset-types", "identity")
+                | ("feature", "feature" | "protocol-canary" | "protocol-oteryn")
+        )
 }
 
 fn find_cycle(edges: &BTreeMap<String, Vec<String>>) -> Option<Vec<String>> {

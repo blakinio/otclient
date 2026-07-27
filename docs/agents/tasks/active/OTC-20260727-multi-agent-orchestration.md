@@ -1,14 +1,14 @@
 ---
 task_id: OTC-20260727-multi-agent-orchestration
-status: awaiting_ci
+status: awaiting_final_ci
 agent: "GPT-5.6 Thinking"
 track: greenfield-rust
 workstream: coordination
 branch: docs/OTC-20260727-multi-agent-orchestration
 base_branch: main
 created: 2026-07-27T10:30:00+02:00
-updated: 2026-07-27T11:05:00+02:00
-last_verified_commit: "c5d1b3e68bedbdda70d001feee3a3fc9dde61b38"
+updated: 2026-07-27T11:15:00+02:00
+last_verified_commit: "f1b2ffb3c57a4e8de05a9cb4ad005f5027324cef"
 risk: medium
 related_pr: "#55"
 depends_on:
@@ -63,7 +63,8 @@ Prepare a complete, repository-native system for several autonomous agents to wo
 - [x] PROGRAM, WORKSTREAMS and shared agent discovery route to the new system.
 - [x] No runtime code, Cargo metadata, protocol constants, workflows, assets or external repositories are changed.
 - [x] Complete 12-file changed-path and content review found no out-of-scope path.
-- [ ] Exact-head required CI passes.
+- [x] Required Rust and repository CI passed on implementation head `f1b2ffb3c57a4e8de05a9cb4ad005f5027324cef`.
+- [ ] Required checks pass on this final task-record head.
 - [ ] Autonomous merge gate is satisfied.
 
 # Confirmed context
@@ -144,13 +145,23 @@ Prepare a complete, repository-native system for several autonomous agents to wo
 - Reviewed the 12 changed paths and all authored content for path ownership, link consistency, lane terminology, shared-path lease rules and non-goals.
 - Confirmed no Cargo, lockfile, workflow, runtime, protocol, asset, binary, secret or external-repository change.
 
+## 2026-07-27T11:15:00+02:00
+
+- Rust workflow run `30252231754` passed on implementation head `f1b2ffb3c57a4e8de05a9cb4ad005f5027324cef`.
+- `Rust Client / Windows` passed locked metadata, formatting, Clippy, tests and real architecture validation.
+- `Rust Client / Supply Chain` passed advisories, licenses, bans and source policy.
+- Repository CI run `30252231858` passed Detect Build Scope, Lua Syntax, both Fast Checks and `CI / Required`; the legacy Windows build was correctly skipped for documentation-only scope.
+- This final task-record commit intentionally requires a new exact-head CI pass before readiness.
+
 # Validation and CI
 
 | Commit | Check | Result | Evidence |
 |---|---|---|---|
 | `55f73be78e040254975fafdc82da2e6b611e63a6` | base/preflight | PASS | workspace bootstrap archived; open legacy/operational PR ownership inspected |
 | `c5d1b3e68bedbdda70d001feee3a3fc9dde61b38` | changed-file/content/path consistency review | PASS | 12 declared documentation/task paths only; live PR #54 incorporated without overlap |
-| final task-record head | required docs/fast CI | pending | no C++ or Rust build claim for docs-only package |
+| `f1b2ffb3c57a4e8de05a9cb4ad005f5027324cef` | Rust run `30252231754` | PASS | Windows workspace checks and Supply Chain passed |
+| `f1b2ffb3c57a4e8de05a9cb4ad005f5027324cef` | repository CI run `30252231858` | PASS | scope, Lua, both Fast Checks and `CI / Required`; build skipped correctly |
+| final task-record head | exact-head required checks | pending | required before readiness/merge |
 
 # Non-goals
 
@@ -164,11 +175,10 @@ Prepare a complete, repository-native system for several autonomous agents to wo
 
 # Remaining work
 
-1. Update PR #55 body with live foundation-lane state and delivered scope.
-2. Pass exact-head required CI.
-3. Mark ready, recheck reviews/mergeability/checks and squash-merge.
-4. Archive this task separately.
-5. Launch one coordinator and the three isolated research agents; register existing PR #54 as W1-F rather than launching another foundation worker.
+1. Pass exact-head required checks on this final task-record commit.
+2. Mark PR #55 ready, inspect reviews/threads/mergeability and squash-merge.
+3. Archive this task in a separate lifecycle PR.
+4. Start one coordinator session; register live PR #54 as W1-F and launch only the unclaimed research lanes.
 
 # Handoff
 
@@ -184,7 +194,7 @@ After merge/archive, start the coordinator session and let it register live PR #
 
 # Completion
 
-- Final status: awaiting CI
+- Final status: awaiting final CI
 - PR: #55
 - Merge commit: pending
 - Archived at: pending

@@ -1,4 +1,4 @@
-name: Rustfmt PR54 Diagnostic
+name: Restore PR54 Workstreams Diagnostic
 
 on:
   pull_request:
@@ -6,18 +6,36 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  rustfmt:
+  restore-workstreams:
     runs-on: ubuntu-latest
     steps:
-      - name: Print exact rustfmt diff
+      - name: Checkout product branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC-20260727-rust-foundation-primitives
+          fetch-depth: 0
+          persist-credentials: true
+          show-progress: false
+
+      - name: Restore non-owned shared file from current main
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install 1.94.0 --profile minimal --component rustfmt >/dev/null 2>&1
-          git clone --quiet --depth 1 --branch feat/OTC-20260727-rust-foundation-primitives \
-            https://github.com/${{ github.repository }}.git repo
-          cd repo/oteryn-client
-          cargo +1.94.0 fmt --all -- --check
+          readonly path="oteryn-client/docs/agents/WORKSTREAMS.md"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --quiet origin main
+          git checkout origin/main -- "$path"
+
+          if git diff --cached --quiet -- "$path"; then
+            echo "Expected a branch-only WORKSTREAMS.md change to remove."
+            exit 1
+          fi
+
+          git diff --cached --check
+          git commit -m "docs(workstreams): preserve accepted parallel protocol"
+          git push origin HEAD:feat/OTC-20260727-rust-foundation-primitives

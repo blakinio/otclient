@@ -7,12 +7,13 @@ Persistent operating memory for autonomous agents across the legacy client and t
 1. `../../AGENTS.md`.
 2. Determine the track from the changed paths.
 3. For new Rust-client work, read `../../oteryn-client/AGENTS.md`, its architecture and agent program.
-4. For legacy C++/Lua client work, read the legacy architecture/workstream owner and inspect source/module/test conventions.
-5. Read `ACTIVE_WORK.md` only as a coordination snapshot.
-6. Inspect all records under `tasks/active/` and all live open PRs/checks/review threads.
-7. Read `MODULE_CATALOG.md`, `REPOSITORY_MAP.md`, `KNOWN_RISKS.md` and `BUILD_TEST_MATRIX.md`.
-8. Read `CROSS_REPO_CONTRACTS.md` for protocol, identifiers, login, routing, gameplay channels or assets.
-9. Read relevant tasks, ADRs, audits, source and tests.
+4. When several Rust-client agents may run concurrently, read the multi-agent execution protocol and current accepted wave plan before claiming work.
+5. For legacy C++/Lua client work, read the legacy architecture/workstream owner and inspect source/module/test conventions.
+6. Read `ACTIVE_WORK.md` only as a coordination snapshot.
+7. Inspect all records under `tasks/active/` and all live open PRs/checks/review threads.
+8. Read `MODULE_CATALOG.md`, `REPOSITORY_MAP.md`, `KNOWN_RISKS.md` and `BUILD_TEST_MATRIX.md`.
+9. Read `CROSS_REPO_CONTRACTS.md` for protocol, identifiers, login, routing, gameplay channels or assets.
+10. Read relevant tasks, ADRs, audits, source and tests.
 
 ## Product tracks
 
@@ -29,10 +30,17 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/architecture/SECURITY_MODEL.md` | Trust boundaries and invariants. |
 | `../../oteryn-client/docs/agents/PROGRAM.md` | Ordered audit-first implementation gates. |
 | `../../oteryn-client/docs/agents/WORKSTREAMS.md` | Agent ownership and package routing. |
+| `../../oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md` | Parallel lane, shared-path lease and contract/merge protocol. |
+| `../../oteryn-client/docs/agents/INITIAL_PARALLEL_WAVE.md` | First safe coordinator plus worker wave and dependency DAG. |
+| `../../oteryn-client/docs/agents/templates/PARALLEL_TASK.md` | Additional task metadata for parallel work. |
+| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Copy-ready coordinator prompt. |
+| `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common prefix for parallel workers. |
 | `../../oteryn-client/docs/agents/AUDIT_PLAN.md` | Mandatory foundation audit. |
 | `../../oteryn-client/docs/agents/prompts/FIRST_AUDIT_AGENT.md` | Standalone prompt for the first audit agent. |
 
 The current C++/Lua/OTUI code is evidence only for this track and must not become a Rust runtime dependency.
+
+Parallel Rust work is permitted only through unique tasks/branches/worktrees, non-overlapping ownership and one producer per public contract. Cargo/lockfile, architecture-check policy, Rust CI and other shared integration paths are serialized through the task-based lease protocol; no manually edited global lock table is used.
 
 ### Legacy OTClient
 
@@ -62,9 +70,10 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 ## Sources of truth
 
 - Git, current `main`, open PRs and checks are authoritative for branch/merge/live state.
-- Active task files are authoritative for ownership, progress, failures and handoff.
+- Active task files are authoritative for ownership, progress, failures, parallel leases and handoff.
 - `ACTIVE_WORK.md` can be stale.
 - `oteryn-client/docs/architecture/**` is authoritative for the new client.
+- `MULTI_AGENT_EXECUTION.md` defines how parallel work is coordinated but does not override product architecture or live task/PR state.
 - The legacy source, exact tests and `LEGACY_OTCLIENT_*` documents govern only existing-client maintenance and audit evidence.
 - Upstream intelligence records are durable memory but volatile issue/PR/source status must be revalidated.
 - Cross-repository facts require current producer/consumer evidence.
@@ -77,6 +86,7 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - inspect current `main`, open PRs, review threads and active tasks;
 - route the task to greenfield or legacy paths;
 - read the nearest nested `AGENTS.md`;
+- for parallel Rust work, verify the current wave, lane, shared-path lease and producer/consumer dependencies;
 - search for existing owners and reusable work;
 - create a bounded task, branch and draft PR;
 - declare ownership, dependencies and cross-repository tasks.
@@ -86,17 +96,20 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - update the task after discoveries, failures, decisions, tests and reviews;
 - keep the PR body current;
 - update catalogues/contracts/ADRs when public boundaries change;
+- respect the unique shared-path lease and do not duplicate another lane's contract;
 - do not cross from legacy to Rust paths opportunistically;
 - preserve security, licensing and exact-version gates.
 
 ### Finish
 
+- rebase/restack on required producer/current `main` when parallel dependencies changed;
 - inspect the full changed-file list and diff;
 - run proportional focused checks and exact-head required CI;
 - update task/docs/contracts/catalogue as applicable;
 - merge only through the root autonomous merge gate;
+- archive the task separately;
 - leave one concrete next action.
 
 ## Avoiding duplicate work
 
-Search by responsibility, path, crate/module, protocol field, identifier, feature capability, asset schema, test fixture, task ownership and open PR. Extend the owning architecture or interface rather than creating a parallel framework.
+Search by responsibility, path, crate/module, protocol field, identifier, feature capability, asset schema, test fixture, task ownership, parallel contract role and open PR. Extend the owning architecture or interface rather than creating a parallel framework.

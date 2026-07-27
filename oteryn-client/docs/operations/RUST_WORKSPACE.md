@@ -40,7 +40,7 @@ cargo run --locked -p oteryn-architecture-check -- workspace .
 cargo deny check
 ```
 
-`cargo deny check` uses `deny.toml` and cargo-deny `0.19.0` in CI. Tool upgrades require current upstream release review and an exact version pin.
+Local `cargo deny check` uses `deny.toml`. CI pins `EmbarkStudios/cargo-deny-action` at commit `3c6349835b2b7b196a839186cb8b78e02f7b5f25`, which contains cargo-deny `0.20.2`. Tool or action upgrades require current upstream release review and an exact immutable pin.
 
 ## Workspace package requirements
 
@@ -125,7 +125,7 @@ The bootstrap tool contains no unsafe code and no native/FFI dependency.
 
 ## Supply-chain policy
 
-`deny.toml` applies to the Windows target and currently:
+`deny.toml` applies to the required Windows dependency target and currently:
 
 - denies known advisories and yanked releases;
 - denies wildcard dependencies;
@@ -142,17 +142,18 @@ The initial workspace pins only `serde_json` for parsing Cargo metadata and synt
 
 `.github/workflows/rust-client.yml` is additive and path-scoped. It does not edit or replace the legacy C++/Lua workflow graph.
 
-The workflow validates on `windows-latest`:
+The Windows job validates:
 
 - pinned toolchain availability/version;
 - locked metadata;
 - formatting;
 - Clippy with warnings denied;
 - tests;
-- real workspace architecture policy;
-- cargo-deny advisories, licenses, bans and sources.
+- the real workspace architecture policy.
 
-A successful Rust workflow proves only this workspace/tooling package. It does not prove client runtime, GPU, server, protocol, assets or non-Windows compatibility.
+A separate Ubuntu job runs the immutable official cargo-deny action against `oteryn-client/Cargo.toml` and the colocated `deny.toml` for advisories, licenses, bans and sources. Supply-chain execution on Ubuntu does not replace the required Windows compilation/test evidence.
+
+A successful Rust workflow proves only this workspace/tooling package. It does not prove client runtime, GPU, server, protocol, assets or non-Windows product compatibility.
 
 ## Adding the next crate
 
@@ -168,7 +169,7 @@ Before adding a crate:
 8. run all workspace and owning-workstream validation;
 9. update the module catalogue and architecture/ADR when public boundaries change.
 
-The expected next package is selected after live preflight; this bootstrap does not authorize starting multiple foundation/product workstreams in parallel.
+The expected next package is selected after live preflight; this bootstrap does not authorize starting multiple foundation/product workstreams in parallel. A copy-ready prompt for the next bounded foundation package is stored at `docs/agents/prompts/NEXT_FOUNDATION_AGENT.md`.
 
 ## Rollback
 

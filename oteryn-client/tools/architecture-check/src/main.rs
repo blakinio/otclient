@@ -1,4 +1,4 @@
-use oteryn_architecture_check::{Violation, check_fixture, check_workspace};
+use oteryn_architecture_check::{check_fixture, check_workspace, Violation};
 use std::env;
 use std::path::Path;
 use std::process::ExitCode;

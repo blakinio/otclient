@@ -3,6 +3,8 @@
 Status: launch plan after this coordination package is merged  
 Wave ID: `OTERYN-W1-FOUNDATION-EVIDENCE`
 
+At plan creation, lane W1-F was already claimed by task `OTC-20260727-rust-foundation-primitives` and draft PR #54. Live task/PR state remains authoritative: do not launch a second foundation worker when that lane is still active or has already merged.
+
 ## 1. Objective
 
 Start several agents immediately without allowing competing implementation of the young Rust workspace or unresolved shared contracts.
@@ -86,6 +88,15 @@ The coordinator should avoid editing implementation worker paths or shared Rust 
 ## 4. Lane W1-F — Foundation implementation
 
 Prompt: `prompts/NEXT_FOUNDATION_AGENT.md`
+
+Current live assignment at plan creation:
+
+```text
+task: OTC-20260727-rust-foundation-primitives
+PR:   #54
+```
+
+Do not start another W1-F session while the task/PR remains active. The coordinator treats the existing task as the implementation lane, verifies its ownership and updates the wave from live state after it merges, blocks or closes.
 
 Purpose:
 
@@ -287,8 +298,9 @@ Before opening agent sessions:
 
 1. merge this coordination package;
 2. copy the coordinator prompt into one session;
-3. copy `NEXT_FOUNDATION_AGENT.md` into the implementation session;
-4. copy the three research prompts into separate sessions;
-5. require each session to perform its own fresh preflight;
-6. do not assign branches or PR numbers in advance;
-7. let live Git/task state determine whether a lane remains safe to claim.
+3. inspect live tasks/PRs for W1-F: when task `OTC-20260727-rust-foundation-primitives` or another foundation owner is active, register that existing worker and do not launch `NEXT_FOUNDATION_AGENT.md` again;
+4. launch `NEXT_FOUNDATION_AGENT.md` only when no live task/PR owns the foundation crate/category/shared workspace paths and the lane is still required;
+5. copy the three research prompts into separate sessions;
+6. require each session to perform its own fresh preflight;
+7. do not assign branches or PR numbers in advance;
+8. let live Git/task state determine whether a lane remains safe to claim.

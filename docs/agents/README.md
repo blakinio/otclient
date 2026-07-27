@@ -31,10 +31,12 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/agents/PROGRAM.md` | Ordered audit-first implementation gates. |
 | `../../oteryn-client/docs/agents/WORKSTREAMS.md` | Agent ownership and package routing. |
 | `../../oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md` | Parallel lane, shared-path lease and contract/merge protocol. |
-| `../../oteryn-client/docs/agents/INITIAL_PARALLEL_WAVE.md` | First safe coordinator plus worker wave and dependency DAG. |
+| `../../oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md` | Current accepted coordinator/worker wave, exact dependencies and lease state. |
+| `../../oteryn-client/docs/agents/INITIAL_PARALLEL_WAVE.md` | Historical first-wave launch plan and dependency evidence. |
 | `../../oteryn-client/docs/agents/templates/PARALLEL_TASK.md` | Additional task metadata for parallel work. |
-| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Copy-ready coordinator prompt. |
+| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Copy-ready current-wave coordinator prompt. |
 | `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common prefix for parallel workers. |
+| `../../oteryn-client/docs/agents/prompts/NEXT_DIAGNOSTICS_AGENT.md` | Copy-ready bounded Gate 1 diagnostics/redaction worker prompt. |
 | `../../oteryn-client/docs/agents/AUDIT_PLAN.md` | Mandatory foundation audit. |
 | `../../oteryn-client/docs/agents/prompts/FIRST_AUDIT_AGENT.md` | Standalone prompt for the first audit agent. |
 
@@ -74,6 +76,7 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - `ACTIVE_WORK.md` can be stale.
 - `oteryn-client/docs/architecture/**` is authoritative for the new client.
 - `MULTI_AGENT_EXECUTION.md` defines how parallel work is coordinated but does not override product architecture or live task/PR state.
+- `CURRENT_PARALLEL_WAVE.md` is the accepted launch plan; historical wave documents do not authorize duplicate work.
 - The legacy source, exact tests and `LEGACY_OTCLIENT_*` documents govern only existing-client maintenance and audit evidence.
 - Upstream intelligence records are durable memory but volatile issue/PR/source status must be revalidated.
 - Cross-repository facts require current producer/consumer evidence.

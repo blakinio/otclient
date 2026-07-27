@@ -1,6 +1,6 @@
 # Parallel Wave Coordinator Agent Prompt
 
-Copy the block below into one fresh coordinator session after the multi-agent coordination package is merged.
+Copy the block below into one fresh coordinator session. The coordinator must use live Git/task/PR state and `CURRENT_PARALLEL_WAVE.md`; historical wave documents are evidence only.
 
 ```text
 Work autonomously in repository:
@@ -27,24 +27,25 @@ Mandatory reads:
 2. docs/agents/README.md
 3. oteryn-client/AGENTS.md
 4. oteryn-client/docs/architecture/ARCHITECTURE.md
-5. oteryn-client/docs/agents/PROGRAM.md
-6. oteryn-client/docs/agents/WORKSTREAMS.md
-7. oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md
-8. oteryn-client/docs/agents/INITIAL_PARALLEL_WAVE.md
-9. oteryn-client/docs/operations/RUST_WORKSPACE.md
-10. the merged foundation audit and current prompt files
-11. every active Rust-client task, open PR, review thread and required check
+5. oteryn-client/docs/architecture/SECURITY_MODEL.md
+6. oteryn-client/docs/agents/PROGRAM.md
+7. oteryn-client/docs/agents/WORKSTREAMS.md
+8. oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md
+9. oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md
+10. oteryn-client/docs/operations/RUST_WORKSPACE.md
+11. relevant historical wave/audit/archive records
+12. every active Rust-client task, open PR, review thread and required check
 
 Goal:
 
 Keep one parallel wave safe and mergeable by enforcing non-overlapping ownership, one producer per public contract, serialized shared workspace integration and correct dependency/merge order.
 
-Initial concurrency limit:
+Concurrency limit:
 
 - one coordinator;
 - at most four workers;
 - no more than three implementation workers;
-- Initial Wave 1 should use one implementation worker plus three isolated evidence workers.
+- the current accepted wave uses one implementation worker plus three isolated evidence workers.
 
 Coordinator startup:
 
@@ -54,6 +55,26 @@ Coordinator startup:
 4. Do not commit a manually maintained global lock table.
 5. Confirm or reject each proposed lane from live state.
 6. Create a bounded coordination task/branch/draft PR only when durable coordination documentation or a repair is actually needed.
+
+Current transition checkpoint at plan creation:
+
+- foundation implementation PR #54 merged at `7a68f6e7d92eb6b05078bb001e4881d78544a82b`;
+- foundation archive PR #58 merged at `acbc78c618e6998fe29d16833f5c907d8ae8d1e8`;
+- W1-F is archived and must never be relaunched;
+- its Cargo/lockfile/shared integration lease is released;
+- no greenfield Rust product PR or diagnostics owner was open;
+- Canary, asset-input and Windows-platform evidence lanes were unclaimed.
+
+Revalidate all of those facts. Newer live state overrides the checkpoint.
+
+Current wave:
+
+- W2-DIAG: one bounded `oteryn-diagnostics` structured diagnostics and secret-redaction contract package using `NEXT_DIAGNOSTICS_AGENT.md`;
+- W2-CP: Canary Current-profile evidence; docs-only isolated path;
+- W2-AR: asset input/provenance evidence; docs-only isolated path;
+- W2-PR: Windows platform/dependency evidence; docs-only isolated path.
+
+Do not launch W2-DIAG when another task owns diagnostics, Cargo/lockfile or the same public contract. Do not launch a second worker for any claimed research path.
 
 For each worker verify:
 
@@ -77,7 +98,7 @@ Shared integration paths:
 - .github/workflows/rust-client.yml
 - shared catalogue/test-matrix/changelog/workspace docs
 
-At most one task may lease the affected shared path set. A worker without the lease may continue only in isolated owned paths and must use parallel_lane_state=integration_ready when waiting.
+At most one task may lease the affected shared path set. A worker without the lease may continue only in isolated owned paths and must use `parallel_lane_state=integration_ready` when waiting.
 
 Contract policy:
 
@@ -87,6 +108,19 @@ Contract policy:
 - contract changes go through the owning producer workstream or a dedicated contract PR;
 - unresolved Platform/Canary identifiers, routing or protocol facts remain blocked rather than inferred.
 
+Diagnostics-lane boundaries:
+
+- one `oteryn-diagnostics` crate only;
+- redaction at diagnostic-value creation;
+- no global logger/subscriber, sink, upload, crash-report, support-bundle, replay or runtime-service integration;
+- no arbitrary external text silently classified as safe;
+- architecture-check policy remains read-only unless a real missing rule is proven;
+- no product/runtime compatibility claim from a contract-only crate.
+
+Research boundaries:
+
+Do not allow research agents to change accepted architecture, Cargo files, product crates, asset bytes, protocol constants or external repositories. A finding requiring architecture/contract change becomes a separate blocked recommendation.
+
 Operating cycle:
 
 1. Re-read active task and PR state after material merges or blockers.
@@ -94,18 +128,9 @@ Operating cycle:
 3. Tell the affected worker through its task/PR what must be split, rebased or blocked.
 4. Choose the next shared-path lease and merge order.
 5. Prefer contract producers and PRs with more downstream dependents.
-6. Require the next PR to rebase/restack on current main and rerun exact-head checks.
+6. Require each PR to rebase/restack on current main and rerun exact-head checks after relevant merges.
 7. Verify every merged task receives a separate archive lifecycle PR.
 8. Close the wave only when every lane is merged/archived or explicitly deferred.
-
-Initial Wave 1:
-
-- W1-F: foundation implementation using NEXT_FOUNDATION_AGENT.md; sole Rust workspace/shared-path lease holder. At coordination-package creation this lane was already task `OTC-20260727-rust-foundation-primitives` / draft PR #54. Inspect live state and register that worker; never launch a duplicate foundation session while an owner remains active or after it has merged.
-- W1-CP: Canary Current-profile evidence; docs-only isolated path.
-- W1-AR: asset input/provenance evidence; docs-only isolated path.
-- W1-PR: Windows platform dependency evidence; docs-only isolated path.
-
-Do not allow research agents to change accepted architecture, Cargo files, product crates or protocol constants. A finding requiring an architecture/contract change becomes a separate blocked recommendation.
 
 Merge readiness check for each lane:
 
@@ -127,5 +152,5 @@ Stop coordination and record a blocker when:
 - a worker branch/task no longer matches its claimed paths;
 - secrets, proprietary data or forbidden external writes appear.
 
-At wave completion produce one concise, evidence-based Wave 2 recommendation. Do not implement Wave 2 inside the coordinator task.
+At wave completion produce one concise, evidence-based next-wave recommendation. Do not implement that next wave inside the coordinator task.
 ```

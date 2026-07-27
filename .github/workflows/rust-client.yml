@@ -18,7 +18,7 @@ jobs:
   windows:
     name: Rust Client / Windows
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     defaults:
       run:
         shell: pwsh
@@ -46,54 +46,14 @@ jobs:
           Write-Host $version
           cargo --version
 
-      - name: Regenerate lockfile for bootstrap repair
-        run: cargo generate-lockfile
-
-      - name: Upload generated lockfile
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: generated-rust-lockfile
-          path: oteryn-client/Cargo.lock
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Validate workspace metadata
+      - name: Validate locked workspace metadata
         run: cargo metadata --locked --format-version 1 | Out-Null
 
-      - name: Format bootstrap sources for repair
-        run: cargo fmt --all
+      - name: Check formatting
+        run: cargo fmt --all --check
 
-      - name: Upload formatted bootstrap sources
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: formatted-rust-bootstrap
-          path: |
-            oteryn-client/tools/architecture-check/src/*.rs
-            oteryn-client/tools/architecture-check/tests/*.rs
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Run Clippy and capture diagnostics
-        id: clippy
-        continue-on-error: true
-        run: |
-          cargo clippy --workspace --all-targets --locked -- -D warnings *> clippy.log
-          exit $LASTEXITCODE
-
-      - name: Upload Clippy diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: rust-clippy-diagnostics
-          path: oteryn-client/clippy.log
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Enforce Clippy result
-        if: steps.clippy.outcome == 'failure'
-        run: |
-          Get-Content clippy.log
-          throw "Clippy failed; diagnostics were uploaded"
+      - name: Lint workspace
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Test workspace
         run: cargo test --workspace --all-targets --locked
@@ -101,8 +61,20 @@ jobs:
       - name: Validate architecture policy
         run: cargo run --locked -p oteryn-architecture-check -- workspace .
 
-      - name: Install cargo-deny
-        run: cargo install cargo-deny --version 0.19.0 --locked
+  supply-chain:
+    name: Rust Client / Supply Chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          show-progress: false
 
       - name: Check advisories licenses bans and sources
-        run: cargo deny check
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # cargo-deny 0.20.2
+        with:
+          rust-version: "1.94.0"
+          manifest-path: "oteryn-client/Cargo.toml"
+          arguments: "--all-features"
+          command: "check"

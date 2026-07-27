@@ -104,6 +104,23 @@ generation_type!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::any::TypeId;
+
+    #[test]
+    fn generation_newtypes_are_distinct_public_types() {
+        assert_ne!(
+            TypeId::of::<ProcessGeneration>(),
+            TypeId::of::<SessionGeneration>()
+        );
+        assert_ne!(
+            TypeId::of::<ProcessGeneration>(),
+            TypeId::of::<TaskGeneration>()
+        );
+        assert_ne!(
+            TypeId::of::<SessionGeneration>(),
+            TypeId::of::<TaskGeneration>()
+        );
+    }
 
     #[test]
     fn generations_are_ordered_and_advance_without_wraparound() -> Result<(), GenerationError> {

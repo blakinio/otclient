@@ -15,7 +15,7 @@ Does not own production crates. This is the first required workstream.
 
 Acceptance: every conclusion links evidence or is marked unknown; no copied proprietary assets; one exact next implementation package is recommended.
 
-## WS-R01 — Workspace, governance and foundation primitives
+## WS-R01 — Workspace, governance and CI
 
 Planned paths:
 
@@ -25,14 +25,13 @@ Cargo.lock
 rust-toolchain.toml
 rustfmt.toml
 deny.toml
-crates/foundation/**
 tools/architecture-check/**
 CI paths dedicated to oteryn-client
 ```
 
-Owns toolchain, workspace metadata, lints, dependency/license/security policy, architecture-edge checks, Windows Rust CI and the bottom-layer generic foundation primitives: technical generations, monotonic time, explicit cancellation and primitive-specific errors.
+Owns toolchain, workspace metadata, lints, dependency/license/security policy, architecture-edge checks and Windows Rust CI.
 
-Boundary: no gameplay, protocol, renderer, platform-service, application-shell or domain-identifier implementation. `foundation` cannot depend upward into product categories.
+Boundary: no gameplay or renderer implementation.
 
 ## WS-R02 — Platform and application runtime
 
@@ -44,9 +43,9 @@ crates/app-runtime/**
 crates/platform/**
 ```
 
-Owns Windows process/window/event integration, application state machine, cancellation policy, startup/shutdown and service composition.
+Owns Windows process/window/event integration, application state machine, cancellation, startup/shutdown and service composition.
 
-Boundary: does not parse protocols or own feature UI. It may reuse foundation cancellation primitives but owns the application lifecycle policy that applies them.
+Boundary: does not parse protocols or own feature UI.
 
 ## WS-R03 — Identity, account session and directory
 
@@ -252,10 +251,6 @@ Native dynamic plugins are out of scope.
 
 ## Shared path rules
 
-### Foundation contracts
-
-WS-R01 owns the `foundation` category and its generic primitives. Product workstreams may consume them but must not add game/domain identifiers, product lifecycle policy or runtime frameworks to the foundation crate without a separately reviewed ownership change.
-
 ### Domain contracts
 
 One owner for affected events/commands/IDs at a time. Protocol and feature agents consume a reviewed version rather than editing adjacent shared contracts in parallel.
@@ -298,7 +293,7 @@ Workstream ownership decides the default producer:
 
 | Contract | Default producer |
 |---|---|
-| generic foundation primitives | WS-R01 Gate 1 foundation task |
+| generic foundation primitives | Gate 1 foundation task under WS-R02/WS-R04 coordination |
 | domain IDs/events/commands/snapshots | WS-R04 |
 | transport/adapter trait | WS-R05 |
 | Canary wire mapping/capabilities | WS-R06 |
@@ -333,7 +328,7 @@ Later waves should use at most three implementation lanes until shared foundatio
 
 Good packages:
 
-- add typed technical generation primitives and focused tests;
+- add typed identifier crate and property tests;
 - render one synthetic instanced map scene with metrics;
 - parse one verified Canary message family with malformed fixtures;
 - implement character/channel selection against a fake directory;

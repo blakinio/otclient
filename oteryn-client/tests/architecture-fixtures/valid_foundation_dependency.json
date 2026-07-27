@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "workspace_root": "/repo/oteryn-client",
+  "packages": [
+    {
+      "name": "oteryn-foundation",
+      "category": "foundation",
+      "manifest_path": "/repo/oteryn-client/crates/foundation/Cargo.toml",
+      "dependencies": []
+    },
+    {
+      "name": "oteryn-game-domain",
+      "category": "game-domain",
+      "manifest_path": "/repo/oteryn-client/crates/game-domain/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "oteryn-foundation",
+          "path": "/repo/oteryn-client/crates/foundation",
+          "source": null
+        }
+      ]
+    }
+  ]
+}

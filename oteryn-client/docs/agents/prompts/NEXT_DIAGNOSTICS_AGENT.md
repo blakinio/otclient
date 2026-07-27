@@ -62,7 +62,7 @@ Required functional envelope:
 - deterministic `Debug`/`Display` behavior that cannot reveal sensitive values;
 - safe correlation/technical context without account, character, world, protocol or product identifiers;
 - bounded data structures and deterministic behavior;
-- focused regression tests proving representative access tokens, authorization codes, PKCE verifiers, game tickets, cookies, private chat and personal paths do not appear in formatted diagnostics;
+- focused regression tests using obviously synthetic marker values shaped like access tokens, authorization codes, PKCE verifiers, game tickets, cookies, private chat and personal paths, proving those marker values do not appear in formatted diagnostics;
 - compile-time or constructor-level barriers preventing arbitrary untrusted strings from silently becoming safe fields;
 - documentation of what downstream callers must classify before creating an event.
 
@@ -76,7 +76,7 @@ Required boundaries:
 - no application service composition;
 - no protocol, authentication, directory, gameplay-channel, asset, renderer, UI or legacy-client implementation;
 - no arbitrary raw external text in errors or safe diagnostic fields;
-- no secret-bearing test fixture, real endpoint, real token or private path;
+- no real secret, real endpoint, real token, private capture or personal path in any fixture or example;
 - diagnostics must not be required for correctness and must own no authoritative state;
 - no unsafe or FFI.
 

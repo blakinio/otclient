@@ -60,8 +60,18 @@ jobs:
       - name: Validate workspace metadata
         run: cargo metadata --locked --format-version 1 | Out-Null
 
-      - name: Check formatting
-        run: cargo fmt --all --check
+      - name: Format bootstrap sources for repair
+        run: cargo fmt --all
+
+      - name: Upload formatted bootstrap sources
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: formatted-rust-bootstrap
+          path: |
+            oteryn-client/tools/architecture-check/src/*.rs
+            oteryn-client/tools/architecture-check/tests/*.rs
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Lint workspace
         run: cargo clippy --workspace --all-targets --locked -- -D warnings

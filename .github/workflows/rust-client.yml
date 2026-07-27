@@ -5,45 +5,76 @@ on:
     paths:
       - "oteryn-client/**"
       - ".github/workflows/rust-client.yml"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: rust-client-format-repair-${{ github.event.pull_request.number }}
+  group: rust-client-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  format-repair:
-    name: Rust Client / Format Repair
+  windows:
+    name: Rust Client / Windows
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         shell: pwsh
         working-directory: oteryn-client
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
     steps:
-      - name: Checkout PR head
+      - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
           show-progress: false
 
-      - name: Install pinned Rust formatter
+      - name: Install pinned Rust toolchain
         run: |
-          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
-          rustup default 1.94.0 | Out-Null
-
-      - name: Format and commit exact output
-        run: |
-          cargo fmt --all
-          git diff --quiet -- tools/architecture-check
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Rust sources already match pinned rustfmt"
-            exit 0
+          $output = rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt --target x86_64-pc-windows-msvc 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            throw ($output -join "`n")
           }
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tools/architecture-check
-          git commit -m "style(rust): apply pinned rustfmt output"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          rustup default 1.94.0 | Out-Null
+          $version = rustc --version
+          if ($version -notmatch '^rustc 1\.94\.0 ') {
+            throw "Unexpected Rust compiler: $version"
+          }
+          Write-Host $version
+          cargo --version
+
+      - name: Validate locked workspace metadata
+        run: cargo metadata --locked --format-version 1 | Out-Null
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Lint workspace
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Test workspace
+        run: cargo test --workspace --all-targets --locked
+
+      - name: Validate architecture policy
+        run: cargo run --locked -p oteryn-architecture-check -- workspace .
+
+  supply-chain:
+    name: Rust Client / Supply Chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          show-progress: false
+
+      - name: Check advisories licenses bans and sources
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # cargo-deny 0.20.2
+        with:
+          rust-version: "1.94.0"
+          manifest-path: "oteryn-client/Cargo.toml"
+          arguments: "--all-features"
+          command: "check"

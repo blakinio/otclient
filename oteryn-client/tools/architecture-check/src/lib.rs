@@ -190,28 +190,29 @@ pub fn validate_graph(graph: &WorkspaceGraph) -> Vec<Violation> {
     for package in &graph.packages {
         let mut targets = Vec::new();
         for dependency in &package.dependencies {
-            if let Some(source) = &dependency.source {
-                if source != ALLOWED_REGISTRY && source != ALLOWED_SPARSE_REGISTRY {
-                    violations.push(Violation::new(
-                        "E004_UNAPPROVED_SOURCE",
-                        format!(
-                            "package '{}' dependency '{}' uses unapproved source '{}'",
-                            package.name, dependency.name, source
-                        ),
-                    ));
-                }
+            if let Some(source) = &dependency.source
+                && source != ALLOWED_REGISTRY
+                && source != ALLOWED_SPARSE_REGISTRY
+            {
+                violations.push(Violation::new(
+                    "E004_UNAPPROVED_SOURCE",
+                    format!(
+                        "package '{}' dependency '{}' uses unapproved source '{}'",
+                        package.name, dependency.name, source
+                    ),
+                ));
             }
 
-            if let Some(path) = &dependency.path {
-                if !is_within(path, &root) {
-                    violations.push(Violation::new(
-                        "E003_OUTSIDE_WORKSPACE",
-                        format!(
-                            "package '{}' dependency '{}' points outside the Rust workspace: '{}'",
-                            package.name, dependency.name, path
-                        ),
-                    ));
-                }
+            if let Some(path) = &dependency.path
+                && !is_within(path, &root)
+            {
+                violations.push(Violation::new(
+                    "E003_OUTSIDE_WORKSPACE",
+                    format!(
+                        "package '{}' dependency '{}' points outside the Rust workspace: '{}'",
+                        package.name, dependency.name, path
+                    ),
+                ));
             }
 
             if let Some(target) = packages_by_name.get(&dependency.name) {

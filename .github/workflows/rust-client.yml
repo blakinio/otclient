@@ -29,20 +29,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          show-progress: false
 
       - name: Install pinned Rust toolchain
         run: |
-          rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt --target x86_64-pc-windows-msvc
-          rustup default 1.94.0
+          $output = rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt --target x86_64-pc-windows-msvc 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            throw ($output -join "`n")
+          }
+          rustup default 1.94.0 | Out-Null
           $version = rustc --version
           if ($version -notmatch '^rustc 1\.94\.0 ') {
             throw "Unexpected Rust compiler: $version"
           }
-          rustc --version --verbose
-          cargo --version --verbose
+          Write-Host $version
+          cargo --version
 
       - name: Validate locked workspace metadata
-        run: cargo metadata --locked --format-version 1 | Out-Null
+        run: |
+          $output = cargo metadata --locked --format-version 1 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            throw ($output -join "`n")
+          }
 
       - name: Check formatting
         run: cargo fmt --all --check

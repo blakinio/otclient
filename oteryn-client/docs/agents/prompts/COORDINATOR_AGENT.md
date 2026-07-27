@@ -100,7 +100,7 @@ Operating cycle:
 
 Initial Wave 1:
 
-- W1-F: foundation implementation using NEXT_FOUNDATION_AGENT.md; sole Rust workspace/shared-path lease holder.
+- W1-F: foundation implementation using NEXT_FOUNDATION_AGENT.md; sole Rust workspace/shared-path lease holder. At coordination-package creation this lane was already task `OTC-20260727-rust-foundation-primitives` / draft PR #54. Inspect live state and register that worker; never launch a duplicate foundation session while an owner remains active or after it has merged.
 - W1-CP: Canary Current-profile evidence; docs-only isolated path.
 - W1-AR: asset input/provenance evidence; docs-only isolated path.
 - W1-PR: Windows platform dependency evidence; docs-only isolated path.

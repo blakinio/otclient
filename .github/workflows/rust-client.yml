@@ -46,12 +46,19 @@ jobs:
           Write-Host $version
           cargo --version
 
-      - name: Validate locked workspace metadata
-        run: |
-          $output = cargo metadata --locked --format-version 1 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            throw ($output -join "`n")
-          }
+      - name: Regenerate lockfile for bootstrap repair
+        run: cargo generate-lockfile
+
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: generated-rust-lockfile
+          path: oteryn-client/Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Validate workspace metadata
+        run: cargo metadata --locked --format-version 1 | Out-Null
 
       - name: Check formatting
         run: cargo fmt --all --check

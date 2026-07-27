@@ -278,7 +278,10 @@ mod tests {
         let clock = ManualClock::new(Moment::from_elapsed(Duration::from_secs(2)));
         let observer = clock.clone();
 
-        assert_eq!(clock.advance(Duration::from_millis(250))?.elapsed(), Duration::from_millis(2250));
+        assert_eq!(
+            clock.advance(Duration::from_millis(250))?.elapsed(),
+            Duration::from_millis(2250)
+        );
         assert_eq!(observer.now(), clock.now());
         Ok(())
     }

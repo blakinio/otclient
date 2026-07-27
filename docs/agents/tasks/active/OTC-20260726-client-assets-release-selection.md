@@ -7,7 +7,7 @@ branch: fix/OTC-20260726-client-assets-release-selection
 base_branch: main
 created: 2026-07-26T01:55:00+02:00
 updated: 2026-07-27T09:05:00+02:00
-last_verified_commit: "070a1d842e0276e5db67a27eee6943304543445e"
+last_verified_commit: "2ae0aa80d8448b43b81a5951fe1402ed0a440be3"
 risk: high
 related_issue: "opentibiabr/otclient#1766"
 related_pr: "#37"
@@ -50,7 +50,7 @@ Prevent unrelated legacy or macOS release archives from being selected for a req
 - [x] Tests verify final things/sounds/extras path contracts and required runtime file locations.
 - [x] Only the new test is registered; the shared Lua suite retains `LABELS "lua;unit"` without a global `assets` label.
 - [x] No proprietary or downloaded game assets are committed.
-- [ ] Exact-head Lua Syntax, focused CTest and required Windows CI pass.
+- [ ] Final exact-head Lua Syntax, focused CTest and required Windows CI pass with the required check attached to the PR.
 - [x] A real release rehearsal requirement and the current environment blocker are documented before any production runtime archive compatibility claim.
 
 # Confirmed context
@@ -93,15 +93,21 @@ Prevent unrelated legacy or macOS release archives from being selected for a req
 - Retained all newer shared Lua test registrations and explicitly rejected adding `assets` to the common suite labels.
 - Real-release rehearsal remains not performed; no claim of production runtime archive compatibility is made.
 
+## 2026-07-27 required-check refresh
+
+- Exact-head run `30244985640` on `2ae0aa80d8448b43b81a5951fe1402ed0a440be3` passed Lua Syntax, both Fast Checks, every required Windows build, CMake Tests/CTest and `CI / Required`.
+- GitHub's branch rule nevertheless reported required check `CI / Required` as `expected` during merge attempts, including after rerunning only that successful job.
+- Preserved the verified head as `backup/OTC-20260726-client-assets-release-selection-pre-required-check-refresh`.
+- Updated this existing task record to produce a clean `synchronize` event; the diff remains exactly the same nine paths and the new head requires fresh exact-head evidence.
+
 # Validation and CI
 
 | Commit | Check | Result |
 |---|---|---|
 | `070a1d842e0276e5db67a27eee6943304543445e` | original draft head | superseded by restack |
-| pending final restack head | exact nine-file diff review | pending after ref update |
-| pending final restack head | Lua Syntax | pending required CI |
-| pending final restack head | Windows CMake Tests / CTest | pending required CI |
-| pending final restack head | required Windows matrix and `CI / Required` | pending |
+| `2ae0aa80d8448b43b81a5951fe1402ed0a440be3` | exact nine-file diff and review threads | PASS; no review threads |
+| `2ae0aa80d8448b43b81a5951fe1402ed0a440be3` | run `30244985640`: Lua, Windows matrix, CTest, `CI / Required` | PASS; superseded because branch protection did not attach the required check |
+| pending synchronized head | final exact-head Windows CI and `CI / Required` | pending |
 | unavailable in this environment | real release rehearsal | explicit blocker: clean real-release download, hash validation and client startup evidence required |
 
 # Risks and compatibility
@@ -114,10 +120,9 @@ Prevent unrelated legacy or macOS release archives from being selected for a req
 
 # Remaining work
 
-1. Move the completed nine-file restack onto the PR branch and re-review the exact diff and review state.
-2. Mark PR #37 ready and pass exact-head Windows CMake Tests/CTest, the required Windows matrix and `CI / Required`.
-3. Squash-merge the code if green while retaining the real-release rehearsal blocker.
-4. Archive this task in a separate docs-only PR with final head, CI run, squash merge SHA and the unresolved rehearsal requirement.
+1. Pass the synchronized head's exact-head Windows CMake Tests/CTest, required Windows matrix and `CI / Required`.
+2. Re-check the exact nine-file diff, reviews and current `main`, then squash-merge if the branch rule accepts the required check.
+3. Archive this task in a separate docs-only PR with final head, CI run, squash merge SHA and the unresolved rehearsal requirement.
 
 # Completion
 

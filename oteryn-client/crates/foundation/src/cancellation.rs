@@ -166,9 +166,7 @@ mod tests {
             let mut winners = 0;
             let mut all_observed = true;
             for handle in handles {
-                let (won, observed) = handle
-                    .join()
-                    .map_err(|_| "cancellation racer panicked")?;
+                let (won, observed) = handle.join().map_err(|_| "cancellation racer panicked")?;
                 winners += usize::from(won);
                 all_observed &= observed;
             }

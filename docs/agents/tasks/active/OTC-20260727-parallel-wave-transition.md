@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260727-parallel-wave-transition
-status: validating
+status: awaiting_ci
 agent: "GPT-5.6 Thinking"
 track: greenfield-rust
 workstream: coordination
@@ -11,8 +11,8 @@ coordinator_task: OTC-20260727-parallel-wave-transition
 branch: docs/OTC-20260727-parallel-wave-transition
 base_branch: main
 created: 2026-07-27T12:45:00+02:00
-updated: 2026-07-27T13:05:00+02:00
-last_verified_commit: "206b98dfea58638a82e38c9e8804fde391fc99a2"
+updated: 2026-07-27T13:15:00+02:00
+last_verified_commit: "f0568602f8ab2d806fb5daeb822bc3a9619ede0b"
 required_base_commit: "acbc78c618e6998fe29d16833f5c907d8ae8d1e8"
 risk: low
 related_pr: "#59"
@@ -91,8 +91,8 @@ Replace the stale launch routing with one current, repository-native parallel pl
 - [x] Coordinator and diagnostics worker prompts route to the current wave rather than treating PR #54 as active.
 - [x] Shared discovery distinguishes the historical initial wave from the current accepted wave.
 - [x] No Rust source, Cargo metadata, lockfile, CI, architecture policy, asset, protocol constant or external repository changes occur.
-- [ ] Complete changed-path/content review passes on the final head.
-- [ ] Exact-head required documentation/repository CI passes.
+- [x] Complete five-file changed-path/content/link review passed on `f0568602f8ab2d806fb5daeb822bc3a9619ede0b`.
+- [ ] Exact-head required documentation/repository CI passes on the final task-record head.
 - [ ] Autonomous merge gate is satisfied.
 
 # Design decisions
@@ -102,6 +102,17 @@ Replace the stale launch routing with one current, repository-native parallel pl
 - The package is owned by WS-R14 and may consume only merged foundation primitives.
 - The `diagnostics` architecture category already exists, so architecture-check changes are not part of the default package.
 - One implementation plus three research lanes preserves the initial conservative concurrency profile while the Rust workspace remains young.
+- Redaction regression fixtures must use obviously synthetic marker values shaped like sensitive classes; real secrets, endpoints, captures and personal paths remain forbidden.
+
+# Review findings
+
+- Changed paths exactly match the five declared documentation/task owners.
+- No edit touches Rust source, Cargo metadata, lockfile, architecture checker, workflow, protocol, assets or legacy runtime.
+- Current-wave dependencies and merge SHAs match merged PR #54/#58 evidence.
+- Current and historical wave routing is unambiguous.
+- Diagnostics scope is bounded to contracts and tests; product logging/sinks/upload/replay/runtime integration are explicitly excluded.
+- The diagnostics prompt was clarified so redaction tests use synthetic marker data rather than real secret-bearing fixtures.
+- Open PR #48/#37/#23 ownership remains outside these paths and the planned Rust diagnostics lane.
 
 # Non-goals
 
@@ -118,15 +129,14 @@ Replace the stale launch routing with one current, repository-native parallel pl
 | Commit | Check | Result | Evidence |
 |---|---|---|---|
 | `acbc78c618e6998fe29d16833f5c907d8ae8d1e8` | live-state preflight | PASS | PR #54/#58 merged and archived; no open Rust product owner; three evidence lanes unclaimed |
-| final head | complete documentation/path/link review | pending | five documentation/task files only |
-| final head | exact-head repository CI | pending | docs-only package; no runtime claim |
+| `f0568602f8ab2d806fb5daeb822bc3a9619ede0b` | complete documentation/path/link review | PASS | five declared files; synthetic redaction-fixture wording clarified; no out-of-scope path |
+| final task-record head | exact-head repository CI | pending | docs-only package; no runtime claim |
 
 # Remaining work
 
-1. Review the complete five-file diff and current live overlap state.
-2. Pass exact-head required checks.
-3. Mark PR #59 ready and squash-merge through the autonomous gate.
-4. Archive this task separately.
+1. Pass exact-head required checks on this final task-record commit.
+2. Mark PR #59 ready, recheck reviews/threads/mergeability and squash-merge.
+3. Archive this task separately.
 
 # Handoff
 
@@ -142,7 +152,7 @@ After this plan and its archive merge, start one coordinator session. It should 
 
 # Completion
 
-- Final status: validating
+- Final status: awaiting CI
 - PR: #59
 - Merge commit: pending
 - Archived at: pending

@@ -12,9 +12,12 @@ Update this file in the same PR that adds or changes a reusable module/crate, co
 
 | Module/system | Status | Responsibility/public surface | Primary paths | Reuse/safety notes |
 |---|---|---|---|---|
-| Greenfield architecture package | active PR #45 | Normative Rust client architecture, workspace plan, lifecycle, protocol boundary, module/security/performance/asset models, audit program and agent prompt | `oteryn-client/**` | Foundation audit must complete before production workspace bootstrap. Legacy code is evidence only. |
-| Rust foundation audit | planned; blocked on PR #45 | Verified product/Canary/Oteryn/assets/performance/platform/test inputs and first bootstrap recommendation | `oteryn-client/docs/audits/foundation/**` | Audit-only; no production crates or speculative constants. |
-| Planned Rust workspace | not created | Future applications, crates, features and tools described by layout/workstreams | `oteryn-client/apps`, `crates`, `features`, `tools` | Create only after the audit gate and in narrow packages. |
+| Greenfield architecture package | merged PR #45 | Normative Rust client architecture, workspace plan, lifecycle, protocol boundary, module/security/performance/asset models and agent program | `oteryn-client/docs/architecture/**`, `oteryn-client/docs/agents/**` | Target architecture. Legacy code is evidence only and is not a Rust runtime dependency. |
+| Rust foundation audit | merged PR #47 | Verified product/Canary/Oteryn/assets/performance/platform/test inputs, risks/gaps and first implementation recommendation | `oteryn-client/docs/audits/foundation/**` | Authorizes narrow packages only. Channel-aware native routing, real asset rights and numeric performance/hardware evidence remain separate gates. |
+| Rust workspace policy | active PR #50 | One-member Rust workspace, pinned toolchain, lockfile, workspace lints, dependency policy and additive Rust CI | `oteryn-client/Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `rustfmt.toml`, `deny.toml`, `.github/workflows/rust-client.yml` | Contains no product application or engine crate. Windows is required compiled proof; cargo-deny runs as a separate supply-chain job. |
+| Oteryn architecture checker | active PR #50 | Validates workspace package names/categories, path containment, dependency sources, forbidden category edges, unresolved path dependencies and cycles | `oteryn-client/tools/architecture-check/**`, `oteryn-client/tests/architecture-fixtures/**` | Metadata/graph policy only. It does not replace Cargo, source review, security review, protocol tests or runtime validation. |
+| Rust workspace operations | active PR #50 | Commands, category metadata, rule codes, CI/supply-chain policy and procedure for adding the next crate | `oteryn-client/docs/operations/RUST_WORKSPACE.md` | Read before editing workspace manifests or adding a category/crate. |
+| Next foundation agent prompt | active PR #50 | Copy-ready bounded prompt for one standard-library-first foundation primitives crate | `oteryn-client/docs/agents/prompts/NEXT_FOUNDATION_AGENT.md` | Use only after PR #50 is merged and archived; fresh preflight remains mandatory. |
 
 ## Existing legacy client/module areas
 
@@ -50,7 +53,8 @@ Detailed maintenance boundaries are in `docs/architecture/LEGACY_OTCLIENT_ARCHIT
 | Item | Status | Paths | Note |
 |---|---|---|---|
 | Existing agent handoff | active PR #4 | `AGENT_HANDOFF.md` | Reconcile with root/nested agent docs; avoid contradictory rules. |
-| Rust architecture package | active PR #45 | `oteryn-client/**` and shared routing docs | New target architecture; does not modify active legacy implementation paths. |
+| Official Tibia Linux runner analysis | draft operational PR #48 | dedicated workflow and task record | One-off non-merge operational analysis; does not own Rust workspace/product paths. |
+| Rust workspace bootstrap | active PR #50 | Rust workspace/tooling/CI/docs paths listed above | Single authorized WS-R01 package; product crates remain out of scope. |
 
 ## Entry template
 

@@ -1,4 +1,4 @@
-name: Lockfile PR54 Diagnostic
+name: Rustfmt PR54 Diagnostic
 
 on:
   pull_request:
@@ -9,16 +9,15 @@ permissions:
   contents: read
 
 jobs:
-  lockfile:
+  rustfmt:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify Cargo regenerates no lockfile change
+      - name: Print exact rustfmt diff
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install 1.94.0 --profile minimal >/dev/null 2>&1
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt >/dev/null 2>&1
           git clone --quiet --depth 1 --branch feat/OTC-20260727-rust-foundation-primitives \
             https://github.com/${{ github.repository }}.git repo
           cd repo/oteryn-client
-          cargo +1.94.0 generate-lockfile
-          git diff --exit-code -- Cargo.lock
+          cargo +1.94.0 fmt --all -- --check

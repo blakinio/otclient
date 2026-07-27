@@ -223,6 +223,26 @@ Bad parallelism:
 - renderer and asset format changing the same shared types independently;
 - bootstrap crates before the audit gate.
 
+### Parallel execution protocol
+
+Parallel work follows:
+
+- `MULTI_AGENT_EXECUTION.md` for coordinator/worker roles, lane states, shared-path leases, contract ownership and merge order;
+- `INITIAL_PARALLEL_WAVE.md` for the first safe launch plan;
+- `templates/PARALLEL_TASK.md` for additional task metadata;
+- `prompts/COORDINATOR_AGENT.md` and lane prompts for copy-ready sessions.
+
+Initial operating limits:
+
+- one coordinator plus at most four workers;
+- no more than three simultaneous implementation lanes;
+- one active producer per public contract;
+- one active lease holder per shared integration path set;
+- Cargo/lockfile and architecture-policy integration are serialized;
+- research lanes may run early only in isolated docs paths and cannot freeze product contracts.
+
+A consumer task may begin final integration only after its producer contract merges and the exact producer commit is recorded. Any producer or shared-path merge invalidates stale consumer workspace evidence until the consumer rebases/restacks and revalidates.
+
 ## Stop conditions
 
 Stop and record a blocker for:
@@ -233,4 +253,7 @@ Stop and record a blocker for:
 - architecture dependency violation requiring a new ADR;
 - secret/proprietary material in proposed fixtures;
 - cross-repository atomic change without both sides ready;
-- performance claim without reproducible measurement.
+- performance claim without reproducible measurement;
+- unresolved parallel path or contract ownership overlap;
+- a shared integration path already leased by another active task;
+- an unmerged producer contract required by a consumer.

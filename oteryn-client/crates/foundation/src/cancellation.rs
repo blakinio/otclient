@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Debug)]
 struct CancellationState {
@@ -169,7 +169,9 @@ mod tests {
         assert!(source.cancel());
 
         for handle in handles {
-            let observed = handle.join().map_err(|_| "cancellation observer panicked")?;
+            let observed = handle
+                .join()
+                .map_err(|_| "cancellation observer panicked")?;
             assert!(observed);
         }
         Ok(())

@@ -177,7 +177,10 @@ pub fn validate_graph(graph: &WorkspaceGraph) -> Vec<Violation> {
         {
             violations.push(Violation::new(
                 "E009_DUPLICATE_PACKAGE",
-                format!("workspace contains duplicate package name '{}'", package.name),
+                format!(
+                    "workspace contains duplicate package name '{}'",
+                    package.name
+                ),
             ));
         }
     }
@@ -238,7 +241,10 @@ pub fn validate_graph(graph: &WorkspaceGraph) -> Vec<Violation> {
     if let Some(cycle) = find_cycle(&workspace_edges) {
         violations.push(Violation::new(
             "E006_DEPENDENCY_CYCLE",
-            format!("workspace dependency cycle detected: {}", cycle.join(" -> ")),
+            format!(
+                "workspace dependency cycle detected: {}",
+                cycle.join(" -> ")
+            ),
         ));
     }
 
@@ -421,23 +427,26 @@ fn forbidden_edge(source: &str, target: &str) -> bool {
         (source, target),
         (
             "game-domain",
-            "protocol-canary" | "protocol-oteryn" | "feature" | "renderer" | "ui-core"
+            "protocol-canary"
+                | "protocol-oteryn"
+                | "feature"
+                | "renderer"
+                | "ui-core"
                 | "ui-runtime"
         ) | (
             "renderer",
             "protocol-canary" | "protocol-oteryn" | "feature"
-        ) | (
-            "ui-core",
-            "protocol-canary" | "protocol-oteryn" | "feature"
-        ) | (
-            "platform",
-            "game-domain" | "game-simulation" | "protocol-canary" | "protocol-oteryn"
-                | "feature"
-        ) | ("asset-types", "identity")
+        ) | ("ui-core", "protocol-canary" | "protocol-oteryn" | "feature")
             | (
-                "feature",
-                "feature" | "protocol-canary" | "protocol-oteryn"
+                "platform",
+                "game-domain"
+                    | "game-simulation"
+                    | "protocol-canary"
+                    | "protocol-oteryn"
+                    | "feature"
             )
+            | ("asset-types", "identity")
+            | ("feature", "feature" | "protocol-canary" | "protocol-oteryn")
     )
 }
 

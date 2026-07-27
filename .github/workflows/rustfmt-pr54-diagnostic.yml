@@ -1,0 +1,23 @@
+name: Rustfmt PR54 Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/rustfmt-pr54
+
+permissions:
+  contents: read
+
+jobs:
+  rustfmt-diff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print exact rustfmt diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt >/dev/null 2>&1
+          git clone --quiet --depth 1 --branch feat/OTC-20260727-rust-foundation-primitives \
+            https://github.com/${{ github.repository }}.git repo
+          cd repo/oteryn-client
+          cargo +1.94.0 fmt --all -- --check

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "workspace_root": "/repo/oteryn-client",
+  "packages": [
+    {
+      "name": "oteryn-ui-core",
+      "category": "ui-core",
+      "manifest_path": "/repo/oteryn-client/crates/ui-core/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "oteryn-feature-chat",
+          "path": "/repo/oteryn-client/features/chat",
+          "source": null
+        }
+      ]
+    },
+    {
+      "name": "oteryn-feature-chat",
+      "category": "feature",
+      "manifest_path": "/repo/oteryn-client/features/chat/Cargo.toml",
+      "dependencies": []
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "workspace_root": "/repo/oteryn-client",
+  "packages": [
+    {
+      "name": "oteryn-feature-a",
+      "category": "feature",
+      "manifest_path": "/repo/oteryn-client/features/a/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "oteryn-feature-b",
+          "path": "/repo/oteryn-client/features/b",
+          "source": null
+        }
+      ]
+    },
+    {
+      "name": "oteryn-feature-b",
+      "category": "feature",
+      "manifest_path": "/repo/oteryn-client/features/b/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "oteryn-feature-a",
+          "path": "/repo/oteryn-client/features/a",
+          "source": null
+        }
+      ]
+    }
+  ]
+}

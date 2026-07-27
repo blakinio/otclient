@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "workspace_root": "/repo/oteryn-client",
+  "packages": [
+    {
+      "name": "oteryn-architecture-check",
+      "category": "tool",
+      "manifest_path": "/repo/oteryn-client/tools/architecture-check/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "serde_json",
+          "path": null,
+          "source": "registry+https://github.com/rust-lang/crates.io-index"
+        }
+      ]
+    }
+  ]
+}

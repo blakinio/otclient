@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "workspace_root": "/repo/oteryn-client",
+  "packages": [
+    {
+      "name": "oteryn-renderer",
+      "category": "renderer",
+      "manifest_path": "/repo/oteryn-client/crates/renderer/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "oteryn-feature-inventory",
+          "path": "/repo/oteryn-client/features/inventory",
+          "source": null
+        }
+      ]
+    },
+    {
+      "name": "oteryn-feature-inventory",
+      "category": "feature",
+      "manifest_path": "/repo/oteryn-client/features/inventory/Cargo.toml",
+      "dependencies": []
+    }
+  ]
+}

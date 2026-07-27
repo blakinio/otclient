@@ -1,6 +1,6 @@
 # Rust Workspace Operations
 
-Status: WS-R01 bootstrap policy  
+Status: active workspace policy after WS-R01 bootstrap  
 Required compiled platform: Windows x86-64 MSVC
 
 ## Scope

@@ -7,8 +7,8 @@ workstream: WS-R01
 branch: ci/OTC-20260727-rust-workspace-bootstrap
 base_branch: main
 created: 2026-07-27T01:20:00+02:00
-updated: 2026-07-27T09:45:00+02:00
-last_verified_commit: "3cbaf3700986f8eac3d9e750e59fa940c6dacdb7"
+updated: 2026-07-27T10:00:00+02:00
+last_verified_commit: "6522ded9049ed3a3de8fe7f3d7bcb2a966cf252a"
 risk: medium
 related_pr: "#50"
 depends_on:
@@ -70,7 +70,7 @@ Create the smallest production-quality Rust workspace foundation for the greenfi
 - [x] Supply-chain policy is a separate job and does not substitute for Windows compilation/testing.
 - [x] Workspace operations, module catalogue, validation matrix and changelog are current.
 - [x] A copy-ready prompt for the next bounded foundation agent is committed.
-- [ ] Complete final changed-file/full-diff review is recorded on the final head.
+- [x] Complete 23-file changed-path and full-patch review is recorded on the final implementation head.
 - [ ] Exact-head Rust Windows, Rust supply-chain and repository required checks pass.
 - [ ] Autonomous merge gate is satisfied.
 
@@ -147,6 +147,16 @@ Synthetic fixtures cover a valid minimal workspace plus legacy path, domain-to-C
 - Slow source compilation of an older cargo-deny release was replaced with the current immutable official action in a separate Ubuntu supply-chain job; Windows remains the required compiled job.
 - The next-agent prompt was added at the user's request.
 
+## Final review
+
+- Reviewed the complete 23-file PR path list and full patch against current `main` after options PR #36/#51 merged.
+- Preserved the merged deterministic-options changelog entry.
+- Confirmed the diff contains one workflow, one tool crate, seven metadata-only fixtures, workspace policy files, operations/prompt/governance documentation and this task only.
+- Confirmed no client/launcher executable, renderer, protocol, domain, UI, asset, audio, feature or placeholder crate is present.
+- Confirmed no legacy source/runtime dependency, protocol constant, game asset, credential, private capture, generated build output or external-repository write is present.
+- Confirmed temporary lock/format/Clippy diagnostic artifact steps are absent from the final workflow.
+- Confirmed the official supply-chain action and checkout action use immutable commit pins.
+
 # Validation and CI
 
 | Commit/run | Check | Result | Evidence |
@@ -156,7 +166,8 @@ Synthetic fixtures cover a valid minimal workspace plus legacy path, domain-to-C
 | run `30244788743` | generated lock + format discovery | partial PASS | locked metadata passed after generation; formatting delta captured |
 | run `30245288403` | strict Clippy discovery | expected failure | two actionable `collapsible_if` findings captured |
 | run `30245617416` | repaired Rust source | PASS through architecture validation | metadata, format, Clippy, tests and real checker passed; old cargo-deny install superseded |
-| final head | Windows + supply-chain + repository required checks | pending | run after final task/diff review and ready transition |
+| `6522ded9049ed3a3de8fe7f3d7bcb2a966cf252a` | complete changed-file/full-patch review | PASS | 23 declared files; merged-main changelog preserved; no out-of-scope runtime/content |
+| final task-record head | Windows + supply-chain + repository required checks | pending | run after ready transition |
 
 # Rejected approaches
 
@@ -181,12 +192,11 @@ Synthetic fixtures cover a valid minimal workspace plus legacy path, domain-to-C
 
 # Remaining work
 
-1. Review the complete final changed-file list and full patch, including merged-main option history.
-2. Update PR #50 body with final implementation/validation state.
-3. Mark ready and pass exact-head Windows, supply-chain and repository required checks.
-4. Recheck mergeability, comments, reviews and unresolved threads; squash-merge only under the autonomous gate.
-5. Archive this task in a separate lifecycle PR.
-6. Do not start the next crate; hand off using `NEXT_FOUNDATION_AGENT.md`.
+1. Update PR #50 body with final implementation/review state.
+2. Mark ready and pass exact-head Windows, supply-chain and repository required checks.
+3. Recheck mergeability, comments, reviews and unresolved threads; squash-merge only under the autonomous gate.
+4. Archive this task in a separate lifecycle PR.
+5. Do not start the next crate; hand off using `NEXT_FOUNDATION_AGENT.md`.
 
 # Handoff
 
@@ -206,7 +216,7 @@ After this PR and its archive merge, give a fresh agent the committed `NEXT_FOUN
 
 # Completion
 
-- Final status: awaiting final review/CI
+- Final status: awaiting final CI
 - PR: #50
 - Merge commit: pending
 - Catalogue updated: yes

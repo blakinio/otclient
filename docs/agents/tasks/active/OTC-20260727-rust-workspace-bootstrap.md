@@ -1,21 +1,21 @@
 ---
 task_id: OTC-20260727-rust-workspace-bootstrap
-status: in_progress
+status: awaiting_final_ci
 agent: "GPT-5.6 Thinking"
 track: greenfield-rust
 workstream: WS-R01
 branch: ci/OTC-20260727-rust-workspace-bootstrap
 base_branch: main
 created: 2026-07-27T01:20:00+02:00
-updated: 2026-07-27T01:20:00+02:00
-last_verified_commit: "a10c6c7620d5b28b7d68060dd8427e4766f63cc2"
+updated: 2026-07-27T09:45:00+02:00
+last_verified_commit: "3cbaf3700986f8eac3d9e750e59fa940c6dacdb7"
 risk: medium
-related_pr: "pending"
+related_pr: "#50"
 depends_on:
   - merged PR #47 foundation audit
   - merged PR #49 audit task archival
 blocks:
-  - Rust foundation crates
+  - Rust foundation primitives crate
   - renderer/domain/asset/protocol workstreams
 owned_paths:
   - oteryn-client/Cargo.toml
@@ -26,6 +26,7 @@ owned_paths:
   - oteryn-client/tools/architecture-check/**
   - oteryn-client/tests/architecture-fixtures/**
   - oteryn-client/docs/operations/RUST_WORKSPACE.md
+  - oteryn-client/docs/agents/prompts/NEXT_FOUNDATION_AGENT.md
   - .github/workflows/rust-client.yml
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/BUILD_TEST_MATRIX.md
@@ -38,104 +39,176 @@ contracts_touched: []
 modules_touched: []
 reuses:
   - foundation audit bootstrap recommendation
-  - existing repository required-check and Windows-only policy
+  - existing repository required-check and Windows-only compilation policy
+  - pinned repository action policy
 public_interfaces:
-  - Rust workspace metadata policy
+  - Rust workspace metadata and lint policy
   - architecture category and dependency-edge policy
-  - path-scoped Rust CI entry point
+  - stable architecture violation codes
+  - path-scoped Rust Windows and supply-chain CI entry point
 cross_repo_tasks: []
 ---
 
 # Goal
 
-Create the smallest production-quality Rust workspace foundation for the greenfield Oteryn client: one architecture-policy tool, synthetic dependency-graph fixtures, pinned stable toolchain, lint/supply-chain policy and additive Windows CI. Do not add any product application or engine crate.
+Create the smallest production-quality Rust workspace foundation for the greenfield Oteryn client: one architecture-policy tool, synthetic dependency-graph fixtures, pinned stable toolchain, lint/supply-chain policy and additive CI. Do not add any product application or engine crate.
 
 # Acceptance criteria
 
-- [ ] Current stable Rust toolchain is selected from official Rust metadata and pinned.
-- [ ] Workspace contains exactly one member: `oteryn-architecture-check`.
-- [ ] No placeholder application, renderer, protocol, domain, UI, asset, audio or feature crate exists.
-- [ ] `Cargo.lock` is committed and all required commands use `--locked` where applicable.
-- [ ] Unsafe Rust is forbidden by default through workspace/package policy.
-- [ ] Architecture checker validates the real workspace and synthetic policy graphs.
-- [ ] Valid fixture passes and every required invalid fixture fails for the expected rule.
-- [ ] Legacy `src/`, `modules/` and `mods/` runtime dependencies are rejected.
-- [ ] Dependency cycle and forbidden category edges are rejected with actionable errors.
-- [ ] Dependency/license/advisory policy is documented and enforced without weakening unrelated checks.
-- [ ] Rust CI is additive, path-scoped and does not replace or weaken existing legacy checks.
-- [ ] Required Windows Rust build/lint/test succeeds on exact head.
-- [ ] Full changed-file/diff review contains no product implementation, protocol constants, assets or secrets.
-- [ ] Catalogue, build/test matrix, changelog and task record are current.
+- [x] Rust `1.94.0` is pinned and successfully installed on the required Windows x86-64 MSVC runner.
+- [x] Workspace contains exactly one member: `oteryn-architecture-check`.
+- [x] No placeholder application, renderer, protocol, domain, UI, asset, audio or feature crate exists.
+- [x] Generated `Cargo.lock` is committed and required Cargo commands use `--locked` where supported.
+- [x] Unsafe Rust is forbidden by workspace policy.
+- [x] Architecture checker validates the real workspace and synthetic policy graphs.
+- [x] Valid fixture passes and every required invalid fixture reports the expected stable rule family.
+- [x] Dependencies escaping into legacy `src/`, `modules` or `mods` paths are rejected.
+- [x] Dependency cycles, forbidden category edges, unresolved path dependencies and unapproved sources are rejected with actionable errors.
+- [x] Dependency/license/advisory policy is documented and uses an immutable official cargo-deny action pin.
+- [x] Rust CI is additive and path-scoped; no legacy workflow file or required check was weakened.
+- [x] The Windows job covers locked metadata, formatting, Clippy, tests and real architecture validation.
+- [x] Supply-chain policy is a separate job and does not substitute for Windows compilation/testing.
+- [x] Workspace operations, module catalogue, validation matrix and changelog are current.
+- [x] A copy-ready prompt for the next bounded foundation agent is committed.
+- [ ] Complete final changed-file/full-diff review is recorded on the final head.
+- [ ] Exact-head Rust Windows, Rust supply-chain and repository required checks pass.
 - [ ] Autonomous merge gate is satisfied.
 
 # Confirmed context
 
-- Foundation audit and archive are merged on current `main`.
-- Audit authorizes this package only; product implementation remains out of scope.
-- Official stable channel metadata reports Rust `1.94.0` dated 2026-07-02. The task will pin this exact toolchain after validating Windows availability through CI.
-- Open PR #48 owns only agent documentation under `oteryn-client/docs/agents/**` and does not overlap this task.
-- Other live PRs inspected are legacy asset/options/docs work and do not own these Rust workspace paths.
-- `.github/workflows/**` remains high contention; this task claims one new dedicated `rust-client.yml` workflow only and will not edit existing workflow files unless a proven required-check integration issue forces a separately documented change.
+- Foundation audit and lifecycle archive are merged.
+- The audit authorized this package only; product implementation remains out of scope.
+- Rust `1.94.0` dated 2026-07-02 was selected from current stable metadata and has installed successfully in Windows CI.
+- Current official cargo-deny action commit `3c6349835b2b7b196a839186cb8b78e02f7b5f25` contains cargo-deny `0.20.2` and is pinned immutably.
+- PR #48 is a separate draft operational analysis and does not overlap implementation paths.
+- PR #36 and its archive #51 merged while this PR was open; their option behavior and changelog entry were preserved.
+- This task adds one new workflow and does not modify the existing legacy CI workflow graph.
 
-# Plan
+# Delivered implementation
 
-1. Read current CI/action conventions and official Rust/cargo-deny documentation.
-2. Add one-member workspace and pinned toolchain/lint metadata.
-3. Implement a dependency-policy checker using a small versioned text policy/fixture format with no product dependencies.
-4. Add valid and forbidden synthetic fixture graphs.
-5. Add supply-chain policy and workspace operations documentation.
-6. Add an additive Windows workflow scoped to Rust-client/tooling paths.
-7. Run/inspect exact-head CI, repair root causes and review the complete diff.
-8. Merge only when all required checks pass.
+## Workspace policy
 
-# Explicit non-goals
+- one workspace member under `tools/architecture-check`;
+- Rust edition 2024 and minimum/pinned Rust `1.94`/`1.94.0`;
+- committed generated lockfile;
+- unsafe forbidden and strict Rust/Clippy workspace lints;
+- narrow explicit dependency and license policy;
+- only `serde_json` as the application-workspace external dependency.
 
-- no client or launcher executable;
-- no `wgpu`, windowing, async, HTTP/TLS, text, audio or WASM dependencies;
-- no game/domain identifiers, events or commands;
-- no Canary/Oteryn parsing or protocol constants;
-- no asset schema or importer;
-- no native UI or feature code;
-- no legacy C++/Lua/OTUI dependency;
-- no performance or runtime/server compatibility claim.
+## Architecture checker
+
+The checker consumes locked Cargo metadata or schema-versioned synthetic JSON and validates:
+
+- `oteryn-` package-name prefix;
+- recognized category metadata;
+- package and path dependency containment inside `oteryn-client/`;
+- approved crates.io source forms;
+- forbidden architecture-category edges;
+- unresolved workspace path dependencies;
+- dependency cycles;
+- duplicate package names.
+
+Stable codes: `E001`, `E002`, `E003`, `E004`, `E005`, `E006`, `E008`, `E009`.
+
+Synthetic fixtures cover a valid minimal workspace plus legacy path, domain-to-Canary, renderer-to-feature, UI-core-to-feature, feature cycle and unapproved-source failures.
+
+## CI and operations
+
+- `Rust Client / Windows`: pinned toolchain, locked metadata, format, Clippy, tests and real workspace policy.
+- `Rust Client / Supply Chain`: immutable official cargo-deny action, advisories, licenses, bans and sources.
+- existing legacy workflows remain unchanged.
+- `RUST_WORKSPACE.md` documents commands, categories, rule codes, adding crates and rollback.
+
+## Next-agent prompt
+
+`oteryn-client/docs/agents/prompts/NEXT_FOUNDATION_AGENT.md` is a standalone prompt for one standard-library-first `oteryn-foundation` primitives package. It explicitly excludes protocol identifiers, application/runtime systems and additional placeholder crates.
+
+# Work log
+
+## 2026-07-27T01:20:00+02:00
+
+- Created the bounded WS-R01 task, branch and draft PR #50 after audit/archive merge and overlap inspection.
+- Claimed only the one-member workspace, architecture policy, one additive workflow and required governance docs.
+
+## Workspace implementation
+
+- Added the pinned workspace/toolchain/lint/deny configuration.
+- Implemented the architecture checker CLI/library and seven synthetic graph fixtures.
+- Added Windows Rust CI and workspace operations documentation.
+- Added no product crate, runtime behavior, protocol constant, asset, credential or external-repository write.
+
+## CI repair evidence
+
+- Initial manually written lockfile was rejected by locked metadata; CI was used to generate the authoritative lockfile, which was then committed.
+- Pinned `rustfmt` identified formatting differences; generated formatting was inspected and committed, after which formatting passed.
+- Strict Clippy identified two collapsible nested conditions; diagnostics were captured, the conditions were converted to let-chains and Clippy passed.
+- Windows metadata, Clippy, unit/integration fixture tests and real architecture validation have all passed on repair heads.
+- Temporary repair artifact/log steps were removed from the final workflow.
+- Slow source compilation of an older cargo-deny release was replaced with the current immutable official action in a separate Ubuntu supply-chain job; Windows remains the required compiled job.
+- The next-agent prompt was added at the user's request.
 
 # Validation and CI
 
-| Commit | Check | Result | Evidence |
+| Commit/run | Check | Result | Evidence |
 |---|---|---|---|
-| `a10c6c7620d5b28b7d68060dd8427e4766f63cc2` | base/preflight | PASS | audit/archive merged; no overlapping owned paths found |
-| pending | Rust metadata/fmt/clippy/test/architecture/license/advisory | not-run | |
+| `a10c6c7620d5b28b7d68060dd8427e4766f63cc2` | base/preflight | PASS | audit/archive merged; no overlapping owned paths |
+| run `30224914936` | first Windows bootstrap | expected failure | exposed invalid hand-authored lockfile |
+| run `30244788743` | generated lock + format discovery | partial PASS | locked metadata passed after generation; formatting delta captured |
+| run `30245288403` | strict Clippy discovery | expected failure | two actionable `collapsible_if` findings captured |
+| run `30245617416` | repaired Rust source | PASS through architecture validation | metadata, format, Clippy, tests and real checker passed; old cargo-deny install superseded |
+| final head | Windows + supply-chain + repository required checks | pending | run after final task/diff review and ready transition |
+
+# Rejected approaches
+
+- creating the complete planned crate tree as placeholders;
+- adding `wgpu`, windowing, async, network, text, audio or WASM dependencies during bootstrap;
+- linking legacy C++/Lua/OTUI runtime code;
+- hand-maintaining a guessed lockfile after Cargo rejected it;
+- relaxing formatting or Clippy policy instead of repairing source;
+- retaining temporary CI artifact/debug steps;
+- compiling stale cargo-deny from source in the Windows product job;
+- weakening license/source policy to obtain green CI;
+- expanding the architecture checker into a source parser or second build system.
 
 # Risks and compatibility
 
-- Workflow overlap: one new workflow file only; preserve current required-check graph.
-- Tool drift: pin Rust and action/tool versions based on current primary sources.
-- License policy: use a narrow explicit allowlist suitable for the initial dependency tree; do not broaden merely for green CI.
-- Architecture checker scope: metadata/graph policy only, not a second build system.
-- Rollback: normal squash revert; no runtime or persistent user data.
+- Runtime: no client runtime or user-data migration exists.
+- Legacy compatibility: legacy source/build/workflows are unchanged.
+- Rust compatibility: only Windows x86-64 MSVC compilation is claimed.
+- Security: unsafe is forbidden; unknown registries/git sources and unapproved licenses are denied; no secrets are present.
+- Architecture: metadata rules are a guardrail, not a substitute for ADR/source review.
+- Rollback: normal squash revert removes the workspace/tooling/CI foundation.
 
 # Remaining work
 
-1. Open the early draft PR.
-2. Inspect current workflow conventions and implement the one-member workspace.
+1. Review the complete final changed-file list and full patch, including merged-main option history.
+2. Update PR #50 body with final implementation/validation state.
+3. Mark ready and pass exact-head Windows, supply-chain and repository required checks.
+4. Recheck mergeability, comments, reviews and unresolved threads; squash-merge only under the autonomous gate.
+5. Archive this task in a separate lifecycle PR.
+6. Do not start the next crate; hand off using `NEXT_FOUNDATION_AGENT.md`.
 
 # Handoff
 
 ## Start here
 
+- `oteryn-client/docs/operations/RUST_WORKSPACE.md`
+- `oteryn-client/docs/agents/prompts/NEXT_FOUNDATION_AGENT.md`
 - `oteryn-client/docs/audits/foundation/10-bootstrap-recommendation.md`
-- `oteryn-client/docs/agents/WORKSTREAMS.md`
-- `.github/workflows/ci.yml`
 
 ## Do not repeat
 
-Do not create product placeholder crates or add application dependencies.
+Do not add product placeholder crates, application dependencies or unresolved Platform/Canary identifiers to the foundation package.
+
+## First next action
+
+After this PR and its archive merge, give a fresh agent the committed `NEXT_FOUNDATION_AGENT.md` prompt for one bounded standard-library-first foundation primitives crate.
 
 # Completion
 
-- Final status: in progress
-- PR: pending
+- Final status: awaiting final review/CI
+- PR: #50
 - Merge commit: pending
-- Catalogue updated: pending
-- Changelog updated: pending
+- Catalogue updated: yes
+- Changelog updated: yes
 - Archived at: pending

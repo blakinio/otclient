@@ -1,4 +1,4 @@
-name: Rustfmt PR54 Diagnostic
+name: Test PR54 Diagnostic
 
 on:
   pull_request:
@@ -9,15 +9,15 @@ permissions:
   contents: read
 
 jobs:
-  rustfmt-diff:
-    runs-on: ubuntu-latest
+  test-failure:
+    runs-on: windows-2025
     steps:
-      - name: Print exact rustfmt diff
-        shell: bash
+      - name: Print exact test failure
+        shell: pwsh
         run: |
-          set -euo pipefail
-          rustup toolchain install 1.94.0 --profile minimal --component rustfmt >/dev/null 2>&1
-          git clone --quiet --depth 1 --branch feat/OTC-20260727-rust-foundation-primitives \
+          $ErrorActionPreference = "Stop"
+          rustup toolchain install 1.94.0 --profile minimal *> $null
+          git clone --quiet --depth 1 --branch feat/OTC-20260727-rust-foundation-primitives `
             https://github.com/${{ github.repository }}.git repo
-          cd repo/oteryn-client
-          cargo +1.94.0 fmt --all -- --check
+          Set-Location repo/oteryn-client
+          cargo +1.94.0 test --workspace --all-targets --locked -- --nocapture

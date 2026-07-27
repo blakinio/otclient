@@ -141,39 +141,43 @@ mod tests {
     }
 
     #[test]
-    fn cancellation_observation_is_thread_safe() -> Result<(), &'static str> {
-        const OBSERVERS: usize = 8;
-        const SPINS: usize = 1_000_000;
+    fn cancellation_race_is_thread_safe() -> Result<(), &'static str> {
+        const RACERS: usize = 8;
 
         let source = CancellationSource::new();
         let token = source.token();
-        let barrier = Arc::new(Barrier::new(OBSERVERS + 1));
-        let mut handles = Vec::with_capacity(OBSERVERS);
+        let start = Barrier::new(RACERS + 1);
 
-        for _ in 0..OBSERVERS {
-            let observer = token.clone();
-            let start = Arc::clone(&barrier);
-            handles.push(thread::spawn(move || {
-                start.wait();
-                for _ in 0..SPINS {
-                    if observer.is_cancelled() {
-                        return true;
-                    }
-                    std::hint::spin_loop();
-                }
-                observer.is_cancelled()
-            }));
-        }
+        let (winners, all_observed) = thread::scope(|scope| {
+            let mut handles = Vec::with_capacity(RACERS);
 
-        barrier.wait();
-        assert!(source.cancel());
+            for _ in 0..RACERS {
+                let observer = token.clone();
+                let owner = &source;
+                let start_line = &start;
+                handles.push(scope.spawn(move || {
+                    start_line.wait();
+                    (owner.cancel(), observer.is_cancelled())
+                }));
+            }
 
-        for handle in handles {
-            let observed = handle
-                .join()
-                .map_err(|_| "cancellation observer panicked")?;
-            assert!(observed);
-        }
+            start.wait();
+
+            let mut winners = 0;
+            let mut all_observed = true;
+            for handle in handles {
+                let (won, observed) = handle
+                    .join()
+                    .map_err(|_| "cancellation racer panicked")?;
+                winners += usize::from(won);
+                all_observed &= observed;
+            }
+
+            Ok::<_, &'static str>((winners, all_observed))
+        })?;
+
+        assert_eq!(winners, 1);
+        assert!(all_observed);
         Ok(())
     }
 }

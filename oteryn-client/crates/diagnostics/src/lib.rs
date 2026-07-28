@@ -130,7 +130,10 @@ impl Display for StaticTextError {
         match self {
             Self::Empty => formatter.write_str("diagnostic static text cannot be empty"),
             Self::TooLong { max_bytes } => {
-                write!(formatter, "diagnostic static text exceeds {max_bytes} bytes")
+                write!(
+                    formatter,
+                    "diagnostic static text exceeds {max_bytes} bytes"
+                )
             }
             Self::InvalidCharacters => {
                 formatter.write_str("diagnostic static text contains invalid characters")

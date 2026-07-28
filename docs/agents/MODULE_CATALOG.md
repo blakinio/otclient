@@ -1,6 +1,6 @@
 # OTClient Module and System Catalogue
 
-Last reviewed: 2026-07-27
+Last reviewed: 2026-07-28
 
 This catalogue makes reusable work visible across the greenfield Rust client and existing OTClient. Verify source, manifests, tasks, tests and open PR state before use.
 
@@ -18,6 +18,7 @@ Update this file in the same PR that adds or changes a reusable module/crate, co
 | Oteryn architecture checker | merged PR #50; extended by merged PR #54 | Validates workspace package names/categories, path containment, dependency sources, forbidden category edges, unresolved path dependencies and cycles | `oteryn-client/tools/architecture-check/**`, `oteryn-client/tests/architecture-fixtures/**` | Metadata/graph policy only. PR #54 adds the bottom-layer `foundation` category and rejects its upward product dependencies. |
 | Rust workspace operations | merged PR #50; updated by merged PR #54 | Commands, category metadata, rule codes, CI/supply-chain policy and procedure for adding crates | `oteryn-client/docs/operations/RUST_WORKSPACE.md` | Read before editing workspace manifests or adding a category/crate. |
 | Oteryn foundation primitives | merged PR #54; archived by #58 | Typed process/session/task generations, monotonic system/manual clocks, deadlines, explicit cancellation source/token ownership and primitive-specific non-secret errors | `oteryn-client/crates/foundation/**` | Standard library only; no game/domain identifiers, async runtime, hidden threads, global event bus, secrets or upward product dependencies. |
+| Oteryn diagnostics contracts | active PR #61 | Bounded structured events, stable severity/category/code, reviewed static safe text, explicit sensitive classifications, redaction-at-creation and safe technical context | `oteryn-client/crates/diagnostics/**` | Contract-only and standard-library-first. No global logger/subscriber, sink, upload, support bundle, replay, async runtime, protocol/auth data or authoritative state. Arbitrary runtime text has no implicit safe conversion. |
 | Next foundation agent prompt | merged PR #50 | Historical handoff that scoped the PR #54 foundation package | `oteryn-client/docs/agents/prompts/NEXT_FOUNDATION_AGENT.md` | Fresh live task and architecture state remain authoritative. |
 
 ## Existing legacy client/module areas

@@ -8,8 +8,7 @@
 //!
 //! - reviewed non-sensitive literals use [`SafeText::trusted_static`];
 //! - secret or private runtime text uses [`DiagnosticValue::redacted`];
-//! - bounded technical numbers, durations, monotonic time and generations use
-//!   their dedicated variants.
+//! - bounded technical values use dedicated variants.
 //!
 //! Arbitrary runtime text has no implicit safe conversion:
 //!
@@ -20,9 +19,7 @@
 //! let value: DiagnosticValue = untrusted.into();
 //! ```
 
-use oteryn_foundation::{
-    Moment, ProcessGeneration, SessionGeneration, TaskGeneration,
-};
+use oteryn_foundation::{Moment, ProcessGeneration, SessionGeneration, TaskGeneration};
 use std::fmt::{self, Debug, Display, Formatter};
 use std::time::Duration;
 
@@ -91,9 +88,6 @@ impl Display for DiagnosticCategory {
 }
 
 /// Stable numeric diagnostic code allocated by the owning component.
-///
-/// Numeric codes cannot contain external text or secrets. Allocation policy is
-/// intentionally left to later owning workstreams and catalogues.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DiagnosticCode(u32);
 
@@ -117,40 +111,41 @@ impl Display for DiagnosticCode {
     }
 }
 
-/// Failure while validating reviewed safe text.
+/// Failure while validating reviewed static text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SafeTextError {
-    /// Empty diagnostic text is not useful.
+pub enum StaticTextError {
+    /// Empty text is not accepted.
     Empty,
-    /// Text exceeds the fixed byte limit.
+    /// Text exceeds its fixed byte limit.
     TooLong {
         /// Maximum accepted UTF-8 byte length.
         max_bytes: usize,
     },
-    /// Text contains an ASCII control character.
-    ControlCharacter,
+    /// Text contains characters forbidden for the selected static-text type.
+    InvalidCharacters,
 }
 
-impl Display for SafeTextError {
+impl Display for StaticTextError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Empty => formatter.write_str("safe diagnostic text cannot be empty"),
+            Self::Empty => formatter.write_str("diagnostic static text cannot be empty"),
             Self::TooLong { max_bytes } => {
-                write!(formatter, "safe diagnostic text exceeds {max_bytes} bytes")
+                write!(formatter, "diagnostic static text exceeds {max_bytes} bytes")
             }
-            Self::ControlCharacter => {
-                formatter.write_str("safe diagnostic text contains a control character")
+            Self::InvalidCharacters => {
+                formatter.write_str("diagnostic static text contains invalid characters")
             }
         }
     }
 }
 
-impl std::error::Error for SafeTextError {}
+impl std::error::Error for StaticTextError {}
 
-/// Reviewed static diagnostic text that is explicitly classified non-sensitive.
+/// Reviewed static diagnostic text explicitly classified as non-sensitive.
 ///
-/// This type accepts only a `'static` literal or another `'static` string. It
-/// deliberately provides no `From<String>` or `From<&str>` implementation.
+/// This type deliberately provides no `From<String>` or `From<&str>`
+/// implementation. Runtime text must use a typed non-text value or explicit
+/// redaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SafeText(&'static str);
 
@@ -159,19 +154,18 @@ impl SafeText {
     ///
     /// # Errors
     ///
-    /// Returns a closed [`SafeTextError`] for empty, oversized or control-bearing
-    /// input. The rejected text is never copied into the error.
-    pub fn trusted_static(value: &'static str) -> Result<Self, SafeTextError> {
+    /// Returns a closed [`StaticTextError`] without copying rejected text.
+    pub fn trusted_static(value: &'static str) -> Result<Self, StaticTextError> {
         if value.is_empty() {
-            return Err(SafeTextError::Empty);
+            return Err(StaticTextError::Empty);
         }
         if value.len() > MAX_SAFE_TEXT_BYTES {
-            return Err(SafeTextError::TooLong {
+            return Err(StaticTextError::TooLong {
                 max_bytes: MAX_SAFE_TEXT_BYTES,
             });
         }
         if value.bytes().any(|byte| byte.is_ascii_control()) {
-            return Err(SafeTextError::ControlCharacter);
+            return Err(StaticTextError::InvalidCharacters);
         }
         Ok(Self(value))
     }
@@ -189,36 +183,6 @@ impl Display for SafeText {
     }
 }
 
-/// Failure while validating a structured field key.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FieldKeyError {
-    /// A field key must contain at least one character.
-    Empty,
-    /// The field key exceeds the fixed byte limit.
-    TooLong {
-        /// Maximum accepted byte length.
-        max_bytes: usize,
-    },
-    /// The field key is not lower snake case ASCII.
-    InvalidSyntax,
-}
-
-impl Display for FieldKeyError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Empty => formatter.write_str("diagnostic field key cannot be empty"),
-            Self::TooLong { max_bytes } => {
-                write!(formatter, "diagnostic field key exceeds {max_bytes} bytes")
-            }
-            Self::InvalidSyntax => {
-                formatter.write_str("diagnostic field key must use lower snake case ASCII")
-            }
-        }
-    }
-}
-
-impl std::error::Error for FieldKeyError {}
-
 /// Reviewed static lower-snake-case field key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FieldKey(&'static str);
@@ -228,24 +192,23 @@ impl FieldKey {
     ///
     /// # Errors
     ///
-    /// Returns a closed [`FieldKeyError`] without retaining rejected text.
-    pub fn trusted_static(value: &'static str) -> Result<Self, FieldKeyError> {
+    /// Returns a closed [`StaticTextError`] without copying rejected text.
+    pub fn trusted_static(value: &'static str) -> Result<Self, StaticTextError> {
         if value.is_empty() {
-            return Err(FieldKeyError::Empty);
+            return Err(StaticTextError::Empty);
         }
         if value.len() > MAX_FIELD_KEY_BYTES {
-            return Err(FieldKeyError::TooLong {
+            return Err(StaticTextError::TooLong {
                 max_bytes: MAX_FIELD_KEY_BYTES,
             });
         }
 
         let mut bytes = value.bytes();
         let valid_first = bytes.next().is_some_and(|byte| byte.is_ascii_lowercase());
-        let valid_rest = bytes.all(|byte| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
-        });
+        let valid_rest =
+            bytes.all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_');
         if !valid_first || !valid_rest {
-            return Err(FieldKeyError::InvalidSyntax);
+            return Err(StaticTextError::InvalidCharacters);
         }
 
         Ok(Self(value))
@@ -308,9 +271,8 @@ impl Display for SensitiveKind {
 
 /// Irreversibly redacted sensitive diagnostic value.
 ///
-/// The constructor accepts sensitive text only to make classification explicit;
-/// the value is neither copied nor retained. Formatting exposes only the
-/// classification.
+/// The input is accepted only to make classification explicit. It is neither
+/// copied nor retained.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SensitiveValue {
     kind: SensitiveKind,
@@ -353,7 +315,7 @@ pub enum DiagnosticValue {
     Signed(i64),
     /// Boolean technical value.
     Boolean(bool),
-    /// Bounded standard duration.
+    /// Standard duration.
     Duration(Duration),
     /// Monotonic time from the owning clock origin.
     Moment(Moment),
@@ -372,60 +334,6 @@ impl DiagnosticValue {
     #[must_use]
     pub const fn redacted(kind: SensitiveKind, value: &str) -> Self {
         Self::Redacted(SensitiveValue::redacted(kind, value))
-    }
-}
-
-impl From<SafeText> for DiagnosticValue {
-    fn from(value: SafeText) -> Self {
-        Self::SafeText(value)
-    }
-}
-
-impl From<u64> for DiagnosticValue {
-    fn from(value: u64) -> Self {
-        Self::Unsigned(value)
-    }
-}
-
-impl From<i64> for DiagnosticValue {
-    fn from(value: i64) -> Self {
-        Self::Signed(value)
-    }
-}
-
-impl From<bool> for DiagnosticValue {
-    fn from(value: bool) -> Self {
-        Self::Boolean(value)
-    }
-}
-
-impl From<Duration> for DiagnosticValue {
-    fn from(value: Duration) -> Self {
-        Self::Duration(value)
-    }
-}
-
-impl From<Moment> for DiagnosticValue {
-    fn from(value: Moment) -> Self {
-        Self::Moment(value)
-    }
-}
-
-impl From<ProcessGeneration> for DiagnosticValue {
-    fn from(value: ProcessGeneration) -> Self {
-        Self::ProcessGeneration(value)
-    }
-}
-
-impl From<SessionGeneration> for DiagnosticValue {
-    fn from(value: SessionGeneration) -> Self {
-        Self::SessionGeneration(value)
-    }
-}
-
-impl From<TaskGeneration> for DiagnosticValue {
-    fn from(value: TaskGeneration) -> Self {
-        Self::TaskGeneration(value)
     }
 }
 
@@ -666,10 +574,7 @@ impl DiagnosticEvent {
     ///
     /// Returns [`DiagnosticBuildError::TooManyFields`] at the fixed limit or
     /// [`DiagnosticBuildError::DuplicateField`] for a repeated key.
-    pub fn try_add_field(
-        &mut self,
-        field: DiagnosticField,
-    ) -> Result<(), DiagnosticBuildError> {
+    pub fn try_add_field(&mut self, field: DiagnosticField) -> Result<(), DiagnosticBuildError> {
         if self.fields.len() >= MAX_EVENT_FIELDS {
             return Err(DiagnosticBuildError::TooManyFields {
                 max_fields: MAX_EVENT_FIELDS,
@@ -753,22 +658,9 @@ mod tests {
     use super::*;
 
     const FIELD_KEYS: [&str; MAX_EVENT_FIELDS] = [
-        "field_00",
-        "field_01",
-        "field_02",
-        "field_03",
-        "field_04",
-        "field_05",
-        "field_06",
-        "field_07",
-        "field_08",
-        "field_09",
-        "field_10",
-        "field_11",
-        "field_12",
-        "field_13",
-        "field_14",
-        "field_15",
+        "field_00", "field_01", "field_02", "field_03", "field_04", "field_05", "field_06",
+        "field_07", "field_08", "field_09", "field_10", "field_11", "field_12", "field_13",
+        "field_14", "field_15",
     ];
 
     fn basic_event() -> Result<DiagnosticEvent, Box<dyn std::error::Error>> {
@@ -792,16 +684,16 @@ mod tests {
 
     #[test]
     fn reviewed_safe_text_is_bounded_and_rejects_controls() {
-        assert_eq!(SafeText::trusted_static(""), Err(SafeTextError::Empty));
+        assert_eq!(SafeText::trusted_static(""), Err(StaticTextError::Empty));
         assert_eq!(
             SafeText::trusted_static("line\nbreak"),
-            Err(SafeTextError::ControlCharacter)
+            Err(StaticTextError::InvalidCharacters)
         );
         assert_eq!(
             SafeText::trusted_static(
                 "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
             ),
-            Err(SafeTextError::TooLong {
+            Err(StaticTextError::TooLong {
                 max_bytes: MAX_SAFE_TEXT_BYTES,
             })
         );
@@ -813,10 +705,10 @@ mod tests {
 
     #[test]
     fn field_keys_are_static_lower_snake_case() {
-        assert_eq!(FieldKey::trusted_static(""), Err(FieldKeyError::Empty));
+        assert_eq!(FieldKey::trusted_static(""), Err(StaticTextError::Empty));
         assert_eq!(
             FieldKey::trusted_static("Bad-Key"),
-            Err(FieldKeyError::InvalidSyntax)
+            Err(StaticTextError::InvalidCharacters)
         );
         assert_eq!(
             FieldKey::trusted_static("field_key_2").map(FieldKey::as_str),
@@ -827,22 +719,16 @@ mod tests {
     #[test]
     fn every_sensitive_class_is_redacted_in_debug_and_display() {
         let markers = [
-            (SensitiveKind::AccessToken, "synthetic_access_token_marker"),
-            (SensitiveKind::RefreshToken, "synthetic_refresh_token_marker"),
-            (
-                SensitiveKind::AuthorizationCode,
-                "synthetic_authorization_code_marker",
-            ),
-            (SensitiveKind::PkceVerifier, "synthetic_pkce_verifier_marker"),
-            (SensitiveKind::GameTicket, "synthetic_game_ticket_marker"),
-            (
-                SensitiveKind::SessionSecret,
-                "synthetic_session_secret_marker",
-            ),
-            (SensitiveKind::Cookie, "synthetic_cookie_marker"),
-            (SensitiveKind::PrivateChat, "synthetic_private_chat_marker"),
-            (SensitiveKind::PersonalPath, "synthetic_personal_path_marker"),
-            (SensitiveKind::Confidential, "synthetic_confidential_marker"),
+            (SensitiveKind::AccessToken, "marker_access"),
+            (SensitiveKind::RefreshToken, "marker_refresh"),
+            (SensitiveKind::AuthorizationCode, "marker_code"),
+            (SensitiveKind::PkceVerifier, "marker_pkce"),
+            (SensitiveKind::GameTicket, "marker_ticket"),
+            (SensitiveKind::SessionSecret, "marker_session"),
+            (SensitiveKind::Cookie, "marker_cookie"),
+            (SensitiveKind::PrivateChat, "marker_chat"),
+            (SensitiveKind::PersonalPath, "marker_path"),
+            (SensitiveKind::Confidential, "marker_confidential"),
         ];
 
         for (kind, marker) in markers {
@@ -858,9 +744,9 @@ mod tests {
     }
 
     #[test]
-    fn event_formatting_never_reveals_sensitive_markers(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let marker = "synthetic_game_ticket_marker_for_event";
+    fn event_formatting_never_reveals_sensitive_markers() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let marker = "marker_game_ticket_event";
         let mut event = basic_event()?;
         event.try_add_field(DiagnosticField::new(
             FieldKey::trusted_static("ticket")?,
@@ -878,13 +764,12 @@ mod tests {
     }
 
     #[test]
-    fn event_fields_are_unique_and_bounded(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn event_fields_are_unique_and_bounded() -> Result<(), Box<dyn std::error::Error>> {
         let mut event = basic_event()?;
         for (index, key) in FIELD_KEYS.into_iter().enumerate() {
             event.try_add_field(DiagnosticField::new(
                 FieldKey::trusted_static(key)?,
-                DiagnosticValue::Unsigned(index as u64),
+                DiagnosticValue::Unsigned(u64::try_from(index)?),
             ))?;
         }
 
@@ -916,8 +801,8 @@ mod tests {
     }
 
     #[test]
-    fn technical_context_and_event_format_are_deterministic(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn technical_context_and_event_format_are_deterministic()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut event = basic_event()?;
         event.try_add_field(DiagnosticField::new(
             FieldKey::trusted_static("retry_count")?,
@@ -933,7 +818,10 @@ mod tests {
             "warning validation/D00000021 [t=2.000000000s process=3 session=5 task=8 correlation=C000000000000000d] operation rejected retry_count=2 elapsed=1.000000025s"
         );
         assert_eq!(event.code().get(), 21);
-        assert_eq!(event.context().correlation_id(), Some(CorrelationId::new(13)));
+        assert_eq!(
+            event.context().correlation_id(),
+            Some(CorrelationId::new(13))
+        );
         assert_eq!(event.fields()[0].key().as_str(), "retry_count");
         Ok(())
     }

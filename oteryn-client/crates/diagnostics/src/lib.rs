@@ -722,16 +722,46 @@ mod tests {
     #[test]
     fn every_sensitive_class_is_redacted_in_debug_and_display() {
         let markers = [
-            (SensitiveKind::AccessToken, "marker_access"),
-            (SensitiveKind::RefreshToken, "marker_refresh"),
-            (SensitiveKind::AuthorizationCode, "marker_code"),
-            (SensitiveKind::PkceVerifier, "marker_pkce"),
-            (SensitiveKind::GameTicket, "marker_ticket"),
-            (SensitiveKind::SessionSecret, "marker_session"),
-            (SensitiveKind::Cookie, "marker_cookie"),
-            (SensitiveKind::PrivateChat, "marker_chat"),
-            (SensitiveKind::PersonalPath, "marker_path"),
-            (SensitiveKind::Confidential, "marker_confidential"),
+            (
+                SensitiveKind::AccessToken,
+                "synthetic.jwt.header.synthetic_payload.synthetic_signature",
+            ),
+            (
+                SensitiveKind::RefreshToken,
+                "synthetic-refresh-token::opaque::00000001",
+            ),
+            (
+                SensitiveKind::AuthorizationCode,
+                "synthetic-auth-code_A1b2C3d4",
+            ),
+            (
+                SensitiveKind::PkceVerifier,
+                "synthetic_pkce_verifier_abcdefghijklmnopqrstuvwxyz_0123456789",
+            ),
+            (
+                SensitiveKind::GameTicket,
+                "synthetic-game-ticket.00000001.synthetic-signature",
+            ),
+            (
+                SensitiveKind::SessionSecret,
+                "synthetic-session-secret:0000000000000001",
+            ),
+            (
+                SensitiveKind::Cookie,
+                "synthetic_session_cookie=synthetic_value; HttpOnly",
+            ),
+            (
+                SensitiveKind::PrivateChat,
+                "synthetic private chat message marker",
+            ),
+            (
+                SensitiveKind::PersonalPath,
+                "C:\\Users\\SyntheticUser\\Private\\marker.txt",
+            ),
+            (
+                SensitiveKind::Confidential,
+                "synthetic confidential runtime marker",
+            ),
         ];
 
         for (kind, marker) in markers {
@@ -749,7 +779,7 @@ mod tests {
     #[test]
     fn event_formatting_never_reveals_sensitive_markers() -> Result<(), Box<dyn std::error::Error>>
     {
-        let marker = "marker_game_ticket_event";
+        let marker = "synthetic-game-ticket.event.synthetic-signature";
         let mut event = basic_event()?;
         event.try_add_field(DiagnosticField::new(
             FieldKey::trusted_static("ticket")?,

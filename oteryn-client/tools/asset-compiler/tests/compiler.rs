@@ -204,10 +204,8 @@ fn malformed_extended_and_unsupported_manifests_are_rejected() -> Result<(), Box
         Err(CompilerError::InvalidManifest)
     );
 
-    let unsupported = directory.write(
-        "unsupported.json",
-        br#"{"schema_version":2,"assets":[]}"#,
-    )?;
+    let unsupported =
+        directory.write("unsupported.json", br#"{"schema_version":2,"assets":[]}"#)?;
     assert_eq!(
         compile_manifest(&unsupported, &directory.path().join("unsupported.pack")),
         Err(CompilerError::UnsupportedManifestVersion)
@@ -228,10 +226,7 @@ fn unknown_kind_and_duplicate_ids_are_rejected() -> Result<(), Box<dyn Error>> {
         "provenance": "original synthetic test fixture"
     })
     .to_string();
-    let unknown_manifest = directory.write(
-        "unknown.json",
-        manifest(&unknown_entry).as_bytes(),
-    )?;
+    let unknown_manifest = directory.write("unknown.json", manifest(&unknown_entry).as_bytes())?;
     assert_eq!(
         compile_manifest(&unknown_manifest, &directory.path().join("unknown.pack")),
         Err(CompilerError::UnknownAssetKind)
@@ -247,7 +242,10 @@ fn unknown_kind_and_duplicate_ids_are_rejected() -> Result<(), Box<dyn Error>> {
         .as_bytes(),
     )?;
     assert_eq!(
-        compile_manifest(&duplicate_manifest, &directory.path().join("duplicate.pack")),
+        compile_manifest(
+            &duplicate_manifest,
+            &directory.path().join("duplicate.pack")
+        ),
         Err(CompilerError::Asset(AssetError::DuplicateId))
     );
     Ok(())
@@ -263,15 +261,10 @@ fn manifest_size_and_record_count_are_bounded() -> Result<(), Box<dyn Error>> {
     );
 
     let entries = (0..=MAX_RECORDS)
-        .map(|index| {
-            u32::try_from(index + 1).map(|id| blob_entry(id, "missing.bin"))
-        })
+        .map(|index| u32::try_from(index + 1).map(|id| blob_entry(id, "missing.bin")))
         .collect::<Result<Vec<_>, _>>()?
         .join(",");
-    let too_many = directory.write(
-        "too-many.json",
-        manifest(&entries).as_bytes(),
-    )?;
+    let too_many = directory.write("too-many.json", manifest(&entries).as_bytes())?;
     assert_eq!(
         compile_manifest(&too_many, &directory.path().join("too-many.pack")),
         Err(CompilerError::TooManyAssets)
@@ -334,10 +327,8 @@ fn symbolic_links_and_special_files_are_rejected_on_unix() -> Result<(), Box<dyn
     let directory = TestDirectory::new()?;
     directory.write("real.bin", b"synthetic")?;
     symlink("real.bin", directory.path().join("link.bin"))?;
-    let link_manifest = directory.write(
-        "link.json",
-        manifest(&blob_entry(1, "link.bin")).as_bytes(),
-    )?;
+    let link_manifest =
+        directory.write("link.json", manifest(&blob_entry(1, "link.bin")).as_bytes())?;
     assert_eq!(
         compile_manifest(&link_manifest, &directory.path().join("link.pack")),
         Err(CompilerError::SourceSymlink)
@@ -365,8 +356,8 @@ fn symbolic_links_and_special_files_are_rejected_on_unix() -> Result<(), Box<dyn
 
 #[cfg(windows)]
 #[test]
-fn symbolic_link_sources_and_outputs_are_rejected_when_windows_allows_creation(
-) -> Result<(), Box<dyn Error>> {
+fn symbolic_link_sources_and_outputs_are_rejected_when_windows_allows_creation()
+-> Result<(), Box<dyn Error>> {
     use std::os::windows::fs::symlink_file;
 
     let directory = TestDirectory::new()?;

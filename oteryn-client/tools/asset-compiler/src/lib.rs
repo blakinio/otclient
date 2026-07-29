@@ -339,8 +339,10 @@ impl OutputTarget {
         if !metadata.is_dir() {
             return Err(CompilerError::InvalidOutputPath);
         }
-        if path.exists() {
-            return Err(CompilerError::OutputExists);
+        match fs::symlink_metadata(path) {
+            Ok(_) => return Err(CompilerError::OutputExists),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(CompilerError::InvalidOutputPath),
         }
 
         let temporary_path = parent.join(format!(".{file_name}.oteryn-tmp"));

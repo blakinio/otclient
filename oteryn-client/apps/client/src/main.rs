@@ -85,21 +85,23 @@ mod windows_shell {
             })
         }
 
-        fn fail_and_exit(&mut self, event_loop: &ActiveEventLoop, failure: RuntimeError) {
+        fn remember_failure(&mut self, failure: RuntimeError) {
             if self.failure.is_none() {
                 self.failure = Some(failure);
             }
+        }
+
+        fn fail_and_exit(&mut self, event_loop: &ActiveEventLoop, failure: RuntimeError) {
+            self.remember_failure(failure);
             self.request_exit(event_loop);
         }
 
         fn request_exit(&mut self, event_loop: &ActiveEventLoop) {
-            let close_result = self
+            if let Err(error) = self
                 .state
-                .request_close(PROCESS_GENERATION, self.clock.now());
-            if let Err(error) = close_result {
-                if self.failure.is_none() {
-                    self.failure = Some(RuntimeError::Shell(error));
-                }
+                .request_close(PROCESS_GENERATION, self.clock.now())
+            {
+                self.remember_failure(RuntimeError::Shell(error));
             }
             event_loop.exit();
         }
@@ -206,20 +208,17 @@ mod windows_shell {
 
         fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
             if !matches!(self.state.phase(), ShellPhase::Closing | ShellPhase::Exited) {
-                if let Err(error) = self
+                let close_result = self
                     .state
-                    .request_close(PROCESS_GENERATION, self.clock.now())
-                {
-                    if self.failure.is_none() {
-                        self.failure = Some(RuntimeError::Shell(error));
-                    }
+                    .request_close(PROCESS_GENERATION, self.clock.now());
+                if let Err(error) = close_result {
+                    self.remember_failure(RuntimeError::Shell(error));
                 }
             }
             if self.state.phase() == ShellPhase::Closing {
-                if let Err(error) = self.state.mark_exited(self.clock.now()) {
-                    if self.failure.is_none() {
-                        self.failure = Some(RuntimeError::Shell(error));
-                    }
+                let exit_result = self.state.mark_exited(self.clock.now());
+                if let Err(error) = exit_result {
+                    self.remember_failure(RuntimeError::Shell(error));
                 }
             }
         }

@@ -3,6 +3,7 @@ members = [
     "apps/client",
     "crates/diagnostics",
     "crates/foundation",
+    "crates/renderer",
     "crates/test-support",
     "tools/architecture-check",
 ]
@@ -15,7 +16,9 @@ license = "MIT"
 repository = "https://github.com/blakinio/otclient"
 
 [workspace.dependencies]
+pollster = { version = "=1.0.1", default-features = false }
 serde_json = "=1.0.145"
+wgpu = { version = "=30.0.0", default-features = false, features = ["std", "dx12"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

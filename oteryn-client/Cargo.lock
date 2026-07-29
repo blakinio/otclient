@@ -33,6 +33,14 @@ name = "oteryn-foundation"
 version = "0.1.0"
 
 [[package]]
+name = "oteryn-test-support"
+version = "0.1.0"
+dependencies = [
+ "oteryn-diagnostics",
+ "oteryn-foundation",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -37,6 +37,7 @@ oteryn-client/
 │       └── src/main.rs
 ├── crates/
 │   ├── foundation/
+│   ├── test-support/
 │   ├── app-runtime/
 │   ├── platform/
 │   ├── identity/
@@ -116,6 +117,7 @@ oteryn-client/
 | Crate | Owns | Must not own |
 |---|---|---|
 | `foundation` | generic technical generations, monotonic time, explicit cancellation and primitive-specific errors | product lifecycle policy, domain IDs, protocol, platform services, async runtime or global event bus |
+| `test-support` | deterministic test-owned timelines/context and classified diagnostic-event fixtures using merged lower contracts | another clock abstraction, sleep/scheduler/executor, global fixture registry, product services or external fixture loading |
 | `app-runtime` | top-level state machine, service composition, error routing | packet parsing, concrete widgets |
 | `platform` | OS abstractions | game rules or feature state |
 | `identity` | PKCE orchestration and safe callback boundary | character/game state |
@@ -141,6 +143,8 @@ oteryn-client/
 | `diagnostics` | metrics, tracing, redaction and replay hooks | authoritative game state |
 | `extension-api` | stable capability-limited guest ABI | host implementation details |
 | `extension-host` | WASM runtime, quotas and capability enforcement | native plugin loading |
+
+`test-support` is physically under `crates/` because it is a reusable library package, but it declares architecture category `tool`. It may consume reviewed lower contracts for tests and must never become a runtime service locator.
 
 ## 4. Feature crate contract
 
@@ -197,11 +201,15 @@ renderer
 ├── platform/GPU dependencies
 └── foundation when a generic primitive is required
 
+test-support (tool category)
+├── diagnostics
+└── foundation
+
 foundation
 └── Rust standard library and separately reviewed non-product dependencies only
 ```
 
-`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime.
+`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service.
 
 ## 6. Cargo workspace policy
 
@@ -233,6 +241,7 @@ Generated code belongs in the owning crate's build output or generated-source pa
 ## 8. Test placement
 
 - crate-local unit/property tests stay near the source;
+- reusable deterministic Rust test helpers live in `crates/test-support/` and remain test-owned;
 - cross-crate integration tests live under top-level `tests/`;
 - protocol fixtures are versioned and provenance-documented;
 - renderer scenes and expected metrics live under `benches/scenes/`;
@@ -256,7 +265,7 @@ Do not create all directories empty. Create only the slice required by the activ
 
 1. audit documents and fixtures inventory;
 2. workspace/toolchain and architecture check;
-3. foundation crates and application shell;
+3. foundation and deterministic test-support crates, then application shell;
 4. renderer vertical slice;
 5. domain and synthetic replay slice;
 6. Canary adapter and minimum playable connection;

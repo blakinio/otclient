@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/diagnostics", "crates/foundation", "tools/architecture-check"]
+members = [
+    "crates/diagnostics",
+    "crates/foundation",
+    "crates/test-support",
+    "tools/architecture-check",
+]
 resolver = "3"
 
 [workspace.package]

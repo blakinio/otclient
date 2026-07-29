@@ -1,140 +1,81 @@
 # Current Parallel Agent Wave
 
-Status: accepted launch plan  
+Status: completed and closed  
 Wave ID: `OTERYN-W3-TEST-SUPPORT`  
-Evidence cut: `main` `0b1cd7914c04efd6b41a4a1b975234df715e6104`
+Closure evidence cut: `main` `3431ecbecdd104df35cd569fa353a94fbe8ee67e`
 
-Live Git, active task records and open PRs remain authoritative. W1 and W2 are completed, archived and not launchable. This plan authorizes exactly one implementation lane after its coordination-plan lifecycle merges.
+Live Git, active tasks and open PRs remain authoritative. This is the durable W3 completion record. **No W3 lane is launchable.** A future wave requires a separate accepted plan after a fresh preflight.
 
-## 1. Confirmed transition state
+## 1. Closure result
 
-- W1-F foundation primitives are merged/archived and must not be relaunched.
-- W2-DIAG, W2-CP, W2-AR and W2-PR are merged/archived through PR #70.
-- All W2 task, contract and shared-path leases are released.
-- Open PRs #23 and #37 own legacy paths only; PR #48 is isolated non-merge operational work.
-- No active Rust-client task or open PR owns deterministic test support, `crates/test-support`, Cargo/lockfile integration or the proposed public surface.
+| Work | Delivery | Delivery merge | Archive | Archive merge | State |
+|---|---:|---|---:|---|---|
+| W3 plan | PR #71 | `15ed1dbecdd05d4eabe6d6d1e667febbcbd122dd` | PR #72 | `9bb2f60d780d2ea6723015876cf95c7fa5e3cbfe` | archived |
+| W3-TEST | PR #73 | `5d768bd08ec1040c1f283467e8cd2753f20bc3ac` | PR #74 | `3431ecbecdd104df35cd569fa353a94fbe8ee67e` | archived |
 
-## 2. Objective
+W1, W2 and W3 are completed and must not be relaunched.
 
-Complete Gate 1 package 5 with one small deterministic Rust test-support crate that reuses merged clock and diagnostics contracts without introducing runtime infrastructure.
+## 2. Delivered contract
 
-The wave uses:
+W3 added exactly one `oteryn-test-support` library crate with architecture category `tool`.
 
-```text
-1 coordinator
-1 implementation worker
-```
+It provides:
 
-No evidence or secondary implementation lane is authorized.
+- `TestTimeline`, directly backed by the existing shared `oteryn_foundation::ManualClock`;
+- explicit current/advance/try-set operations and exact technical-context construction;
+- `DiagnosticEventFixture`, accepting reviewed static message/key text and already-classified `DiagnosticValue` values;
+- closed `TestSupportError` composition;
+- compile-fail barriers against runtime-owned message/key strings;
+- deterministic tests for time, clone/thread observation, backwards/overflow non-mutation, typed context, field ordering/bounds/duplicates and redaction.
 
-## 3. Dependency graph
+It added no external dependency, second clock, wall-clock source, sleep, polling, timer wheel, async runtime, executor, scheduler, global registry, environment mutation, logger/sink, product service, protocol/auth data or external fixture loader.
 
-```text
-merged oteryn-foundation (#54)
-          +
-merged oteryn-diagnostics (#61)
-          |
-          v
-W3-TEST deterministic test support
-```
+## 3. Validation evidence
 
-## 4. Lane W3-C — Coordinator
+| Evidence | Result |
+|---|---|
+| PR #73 final Rust Client run `30436270771` | PASS: Windows workspace and Supply Chain |
+| PR #73 final repository run `30436270937` | PASS: all required jobs and `CI / Required` |
+| PR #73 ready-for-review run `30436380645` | PASS: all emitted required jobs and `CI / Required` |
+| PR #74 lifecycle run `30436648332` | PASS: `CI / Required` |
+| PR #74 ready-for-review run `30436772873` | PASS: all emitted required jobs and `CI / Required` |
 
-Prompt: `prompts/COORDINATOR_AGENT.md`
+## 4. Lease and ownership closure
 
-Responsibilities:
+| Path/contract group | Closure state |
+|---|---|
+| Cargo workspace/lockfile | released by archived W3-TEST |
+| test-support crate/public contract | merged producer; no active producer task |
+| shared catalogue/matrix/changelog/layout/workspace docs | released |
+| architecture checker/fixtures | unchanged; no lease |
+| Rust CI/toolchain/deny policy | unchanged; no lease |
+| W3 coordination paths | closure task only until its archive merges |
 
-- verify live ownership and the exact required base before worker launch;
-- prevent W1/W2 relaunch;
-- grant one Cargo/lockfile/shared-document lease only to W3-TEST;
-- require exact-head Windows workspace, architecture, supply-chain and repository CI;
-- merge/archive the worker independently;
-- close W3 and recommend exactly one next bounded package.
+Open PRs #23 and #37 own legacy paths. PR #48 is isolated operational non-merge work. They own no greenfield Rust package or shared W3 lease.
 
-The coordinator does not implement the worker package while preparing or closing the wave.
+## 5. Exactly one next bounded recommendation
 
-## 5. Lane W3-TEST — Deterministic test support and fake time
+The next package should be a **blank-window Windows application-shell spike** based on merged W2-PR evidence.
 
-Prompt: `prompts/NEXT_TEST_SUPPORT_AGENT.md`
+Required envelope:
 
-Workstream: WS-R01 test infrastructure, consuming WS-R14 diagnostics contracts  
-Contract role: producer
+- one small application/platform vertical slice only;
+- main-thread event-loop/window ownership and deterministic shutdown ordering;
+- fresh primary-source version, license, MSRV, advisory and source preflight before adding dependencies;
+- `winit 0.30.13` remains only the evidence candidate until that preflight accepts an exact version;
+- no renderer or GPU surface, protocol, identity, assets, audio, feature UI, persistence or async runtime;
+- named Windows runtime evidence for launch, close, resize/minimize/restore, focus, DPI and IME behavior;
+- one unique Cargo/lockfile/shared-document lease through a separate accepted wave.
 
-Required merged producers:
+This recommendation is not an accepted wave and is not pre-claimed. A future coordinator must create a separate task/plan after checking live Git, tasks, PRs, contracts and leases.
 
-```text
-oteryn-foundation: PR #54 merge 7a68f6e7d92eb6b05078bb001e4881d78544a82b
-oteryn-diagnostics: PR #61 merge 6d0c5ce243e62ff1e5b548a626c3f5e228506717
-W3 plan/archive: current main at worker preflight
-```
+## 6. Prohibited relaunches
 
-Purpose:
+Do not relaunch:
 
-- add exactly one `oteryn-test-support` library crate under `oteryn-client/crates/test-support/`;
-- provide deterministic test-owned timeline/context and diagnostic-event fixture builders;
-- consume `oteryn_foundation::ManualClock` directly rather than defining another clock trait or implementation;
-- consume classified `oteryn-diagnostics` values rather than adding arbitrary runtime strings;
-- keep every failure type closed and secret-free;
-- remain usable without window, network, filesystem, async runtime or product service startup.
+- W1-F foundation primitives;
+- any W2 implementation/evidence lane;
+- W3 planning;
+- W3-TEST deterministic test support.
 
-Required design boundaries:
-
-- standard-library-first; only merged workspace-local `oteryn-foundation` and `oteryn-diagnostics` dependencies;
-- architecture category `tool`; no new architecture category or checker-policy change;
-- no second clock abstraction and no `MonotonicClock` implementation;
-- no sleep, wall-clock time, hidden thread, executor, scheduler, timer wheel or polling loop;
-- no global mutable fixture registry, singleton or environment mutation;
-- no logger/subscriber/sink installation, telemetry, crash report, support bundle or replay implementation;
-- no protocol, authentication, endpoint, user data, proprietary asset or private path fixture;
-- no product/runtime integration and no compatibility or performance claim.
-
-Expected exclusive path:
-
-```text
-oteryn-client/crates/test-support/**
-```
-
-Expected shared-path lease:
-
-```text
-oteryn-client/Cargo.toml
-oteryn-client/Cargo.lock
-oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
-oteryn-client/docs/operations/RUST_WORKSPACE.md
-docs/agents/MODULE_CATALOG.md
-docs/agents/BUILD_TEST_MATRIX.md
-docs/agents/CHANGELOG.md
-```
-
-The architecture checker, its fixtures, Rust toolchain, deny policy and CI workflow remain read-only because the accepted `tool -> foundation/diagnostics` graph needs no new category or rule.
-
-Acceptance envelope:
-
-- exactly one new library crate and no external dependency;
-- deterministic timeline/context construction using the shared `ManualClock` state;
-- deterministic diagnostic event/field insertion order and explicit classified values;
-- focused tests for time progression, backwards/overflow propagation, generations/context, duplicate/bounded fields, redaction and clone/thread observation;
-- compile/doctest barrier showing arbitrary runtime strings are not accepted as safe fixture values;
-- locked metadata, formatting, Clippy, workspace tests, architecture validation and supply-chain checks pass on exact final head;
-- full diff contains no runtime integration or unrelated cleanup.
-
-## 6. Shared-path lease
-
-| Path group | Lease holder | Other work |
-|---|---|---|
-| Cargo workspace/lockfile | W3-TEST | read-only |
-| test-support crate/public surface | W3-TEST | no duplicate producer |
-| shared catalogue/matrix/changelog/layout/workspace docs | W3-TEST | read-only |
-| architecture checker/fixtures | none | read-only |
-| Rust CI/toolchain/deny policy | none | read-only |
-
-The worker claims the lease only through its active task and live draft PR after a fresh overlap check.
-
-## 7. Merge and completion rules
-
-- W3-TEST starts only after this plan and its archive are merged.
-- Any material producer change requires restack and exact-head revalidation.
-- The worker merges only through the root autonomous gate and receives a separate archive PR.
-- W3 closes only after the worker is merged/archived, no lease remains and one evidence-based next package is recorded.
-
-Candidate next package after successful closure: the bounded Windows application-shell spike from merged W2-PR evidence. It is not authorized by this plan.
+Extend merged contracts only through a new bounded owning task after live authorization.

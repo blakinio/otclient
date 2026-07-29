@@ -1,191 +1,109 @@
 # Current Parallel Agent Wave
 
-Status: accepted launch plan  
+Status: completed and closed  
 Wave ID: `OTERYN-W5-RENDER-SURFACE`  
-Evidence cut: `main` `37c9b3496eef4b7360bf9f5d753491540b5a2727`
+Closure evidence cut: `main` `1bbbf5828d46684a38d5360c63c2d970a64014e1`
 
-Live Git, active tasks and open PRs remain authoritative. W1, W2, W3 and W4 are completed, archived and not launchable. This plan authorizes exactly one implementation lane only after the W5 plan and its lifecycle archive merge.
+Live Git, active tasks and open PRs remain authoritative. This is the durable W5 completion record. **No W1-W5 lane is launchable.** A future wave requires a separate accepted plan and separate plan archive after a fresh preflight.
 
-## 1. Confirmed transition state
+## 1. Closure result
 
-- W1 foundation primitives are merged/archived and must not be relaunched.
-- All W2 implementation/evidence lanes are merged/archived and must not be relaunched.
-- W3 deterministic test support is merged/archived and must not be relaunched.
-- W4 planning and the Windows application shell are merged/archived and must not be relaunched.
-- Legacy client-assets PR #37 and archive PR #83 are merged; their task owns no current Rust path.
-- Open PR #23 owns legacy OTUI/Lua presentation only; PR #48 is isolated operational non-merge work.
-- No active Rust task or open PR owns `oteryn-client/crates/renderer/`, the renderer-surface public contract or its Cargo/lockfile integration.
-- All previous Rust Cargo/lockfile/dependency-policy/shared-document leases are released.
+| Work | Delivery | Delivery merge | Archive | Archive merge | State |
+|---|---:|---|---:|---|---|
+| W5 plan | PR #84 | `af1de7c9df83b1c736cdfcf6bd1db408dbc9e9e8` | PR #85 | `e9dcf70e8d60bcb5ba3e82280482108d43306f5f` | archived |
+| W5-RENDER | PR #86 | `247837ad405a79fe6d9a8d2bc18b86911a2dcefa` | PR #87 | `1bbbf5828d46684a38d5360c63c2d970a64014e1` | archived |
 
-## 2. Objective
+W1, W2, W3, W4 and W5 are completed and must not be relaunched.
 
-Implement one bounded Windows renderer surface-ownership spike that consumes the merged application-shell window/lifecycle contract and proves deterministic device/surface ownership, clear/present and orderly shutdown without beginning game rendering, assets, shader-framework, UI or protocol work.
+## 2. Delivered contract
 
-The wave uses:
+W5 added exactly one `oteryn-renderer` crate and narrowly composed it into the existing Windows application shell.
 
-```text
-1 coordinator
-1 implementation worker
-```
+It provides:
 
-No secondary implementation or research lane is authorized.
+- typed transactional surface lifecycle keyed by `ProcessGeneration`;
+- explicit unconfigured, configured, suspended, lost and closing states;
+- zero-size suspension, stale-generation rejection, checked counters, bounded recovery and idempotent close;
+- Windows-only safe ownership of wgpu instance, surface, adapter, device and queue;
+- one original constant DX12 clear/present path with event-driven redraw;
+- exact `wgpu 30.0.0` with default features disabled and only `std` plus `dx12`;
+- exact `pollster 1.0.1` for one synchronous main-thread bootstrap;
+- fatal renderer failures routed through the existing shell close path;
+- renderer resources released before the shell window.
 
-## 3. Dependency graph
+It added no game/map/entity rendering, assets, textures, shader module or pipeline framework, render graph, UI, protocol, identity, networking, audio, persistence, updater or extension runtime.
 
-```text
-merged foundation (#54)
-merged diagnostics (#61)
-merged test support (#73)
-merged Windows application shell (#79)
-W5 plan/archive
-          |
-          v
-W5-RENDER renderer surface-ownership spike
-```
+## 3. Validation evidence
 
-## 4. Lane W5-C — Coordinator
+| Evidence | Result |
+|---|---|
+| PR #86 final head | `cb6042875f51a71cbbd84cd7e6a1af7acad5a4f0` |
+| Rust Client run `30470014282` | PASS: locked metadata, formatting, Clippy with warnings denied, all workspace tests, architecture policy and cargo-deny |
+| repository run `30470017491` | PASS: all emitted required checks and `CI / Required` job `90638159006` |
+| implementation diff | PASS: exactly 15 authorized paths, no final workflow change |
+| PR #87 archive run `30474596520` | PASS: `CI / Required` job `90653302895`; Windows build correctly skipped for docs-only scope |
+| comments, reviews and unresolved threads | none |
 
-Prompt: `prompts/COORDINATOR_AGENT.md`
+## 4. Compatibility boundaries
 
-Responsibilities:
+Hosted Windows compilation and deterministic tests do not prove:
 
-- verify current ownership, exact base and the merged W5 plan lifecycle before worker launch;
-- prevent W1-W4 relaunch and prevent a second renderer producer;
-- grant one Cargo/lockfile/dependency-policy/shared-document lease only to W5-RENDER;
-- require exact dependency, Windows workspace, architecture, supply-chain and repository CI evidence;
-- require explicit automated versus interactive GPU evidence classification;
-- merge/archive the worker independently;
-- close W5 and record exactly one next bounded recommendation.
+- visible interactive launch or presentation;
+- real resize, minimize, suspend or resume behavior;
+- actual surface or device-loss recovery;
+- GPU, driver or hardware compatibility;
+- minimum supported Windows release;
+- frame time, memory, power or other performance targets.
 
-The coordinator does not implement the renderer package while preparing or closing the wave.
+Production asset compatibility and redistribution are also not established. Proprietary or unlicensed game bytes remain forbidden, and production Canary-compatible asset inputs remain blocked on exact source-format and rights evidence.
 
-## 5. Lane W5-RENDER — Renderer surface ownership
+## 5. Lease and ownership closure
 
-Prompt: `prompts/NEXT_RENDERER_SURFACE_AGENT.md`
+| Path or contract group | Closure state |
+|---|---|
+| Cargo workspace, lockfile and dependency policy | released by archived W5-RENDER |
+| renderer package and public surface contract | merged producer; no active producer task |
+| application-shell composition paths | released after renderer merge/archive |
+| shared catalogue, matrix, changelog, layout and workspace docs | released |
+| architecture checker, rules and fixtures | unchanged; no lease |
+| Rust CI and toolchain | unchanged; no lease |
+| W5 coordination paths | closure task only until its archive merges |
 
-Workstream: WS-R08 renderer  
-Contract role: producer
+Open PR #23 owns legacy OTUI/Lua presentation only. PR #48 is isolated operational non-merge work. Neither owns a greenfield Rust package, W5 contract or shared-path lease.
 
-Required merged producers:
+## 6. Exactly one next bounded recommendation
 
-```text
-oteryn-foundation: PR #54
-oteryn-diagnostics: PR #61
-oteryn-test-support: PR #73
-oteryn-client application shell: PR #79
-W5 plan/archive: current main at worker preflight
-```
+The next package should be planned as a **small normalized synthetic asset schema/compiler slice** under WS-R09.
 
-Purpose:
+A future accepted plan must require:
 
-- add exactly one package under `oteryn-client/crates/renderer/` with package name `oteryn-renderer` and architecture category `renderer`;
-- exact-pin `wgpu = "=30.0.0"` with default features disabled and Windows `std` plus `dx12` only, unless fresh primary evidence changes before the worker starts;
-- exact-pin `pollster = "=1.0.1"` with default features disabled for one synchronous main-thread adapter/device bootstrap only;
-- preserve the shell's main-thread event-loop/window ownership and deterministic close path;
-- own one wgpu instance, surface, adapter, device and queue on the main/event thread;
-- configure only for non-zero physical size and handle resize, minimize, suspend, loss, reconfigure and close explicitly;
-- clear and present one original constant color only;
-- expose a deterministic CPU-side surface lifecycle independent of a GPU or interactive desktop;
-- keep backend failures mapped into closed, non-secret error kinds without arbitrary backend text.
+- synthetic or original fixtures only, with no proprietary or unlicensed game bytes;
+- typed stable asset identifiers and a bounded metadata/pack schema;
+- explicit compiler schema version, provenance/license reference and content hashes;
+- deterministic, byte-identical compiler output for identical inputs;
+- bounded counts, lengths and offsets, checked arithmetic, deterministic ordering and clear failures;
+- path traversal and symlink rejection plus decompression size/ratio limits where applicable;
+- exact architecture, workspace, supply-chain and repository CI through one unique future shared-path lease.
 
-Required design boundaries:
+That first slice must not include:
 
-- no game/map/entity rendering, render snapshot schema or domain extraction;
-- no textures, assets, asset schemas, upload pipeline or proprietary material;
-- no WGSL/shader module, shader framework, render graph, pipeline or bind group;
-- no UI, text, input feature, protocol, identity, networking, audio, settings, persistence, updater or extension runtime;
-- no direct Win32/windows-sys dependency, unsafe code or direct raw-window-handle dependency;
-- no global renderer singleton, global mutable registry or global logger/subscriber;
-- no reusable async runtime, executor, reactor, scheduler, polling loop, hidden service or background thread;
-- no continuous animation loop or frame-time/performance claim;
-- no minimum Windows, GPU, driver, adapter, hardware or device-loss recovery compatibility claim.
+- runtime mounting, streaming or cache policy;
+- GPU upload, atlas/texture-array strategy or renderer integration;
+- a real Tibia/Canary importer or proprietary fixtures;
+- downloads, updater, activation or rollback;
+- protocol, UI, audio or production-pack compatibility;
+- an invented signature/authenticated-manifest design without a separate security decision.
 
-Expected exclusive paths:
+This recommendation is not an accepted wave and is not pre-claimed. A future coordinator must create and merge a separate planning task and its archive before creating a worker task, branch, dependency change or lease.
 
-```text
-oteryn-client/crates/renderer/**
-oteryn-client/docs/research/renderer/W5_RUNTIME_EVIDENCE.md
-```
+## 7. Prohibited relaunches
 
-Expected shared-path lease:
+Do not relaunch:
 
-```text
-oteryn-client/Cargo.toml
-oteryn-client/Cargo.lock
-oteryn-client/deny.toml
-oteryn-client/apps/client/Cargo.toml
-oteryn-client/apps/client/src/main.rs
-oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
-oteryn-client/docs/operations/RUST_WORKSPACE.md
-docs/agents/MODULE_CATALOG.md
-docs/agents/BUILD_TEST_MATRIX.md
-docs/agents/CHANGELOG.md
-```
+- W1 foundation primitives;
+- any W2 implementation or evidence lane;
+- W3 deterministic test support;
+- W4 planning or Windows application shell;
+- W5 planning or renderer surface ownership.
 
-`deny.toml` is leased only for a narrowly evidenced license/source adjustment if exact cargo-deny proves the existing allowlist insufficient. Architecture checker/rules/fixtures, Rust toolchain and CI workflows remain read-only unless a separate blocker is recorded.
-
-## 6. Dependency evidence cut
-
-Primary registry/source evidence reviewed on 2026-07-29:
-
-- `wgpu 30.0.0`: Rust 1.87, MIT/Apache-2.0, explicit `dx12` feature; workspace Rust is 1.94;
-- `pollster 1.0.1`: Rust 1.69, MIT/Apache-2.0, no dependencies;
-- Cargo registry resolution and the generated lockfile are authoritative when a GitHub release page lags the registry;
-- exact cargo-deny advisories, licenses, bans and sources remain a required worker gate and may reject the candidates without policy weakening.
-
-No dependency is added by this planning task.
-
-## 7. Deterministic acceptance envelope
-
-The worker must test a backend-neutral state contract covering at least:
-
-- unconfigured to configured for non-zero size;
-- zero-size/minimized suspension without surface configuration;
-- resize and restore reconfiguration;
-- stale process-generation rejection without mutation;
-- timeout/occluded skip policy;
-- outdated/lost transition and bounded reconfigure policy;
-- validation/fatal failure classification;
-- idempotent closing and no presentation after close;
-- bounded counters with explicit overflow behavior.
-
-The Windows adapter must:
-
-- create the surface from a shell-owned window without storing borrowed stack data;
-- request the adapter/device once during startup on the main thread;
-- use event-driven redraw only;
-- clear/present without shaders or assets;
-- drop renderer resources before releasing the shell window;
-- route a fatal renderer error through the existing shell close path.
-
-## 8. Runtime evidence policy
-
-Hosted Windows compilation and CPU-side tests do not prove interactive GPU behavior. The worker must publish a matrix distinguishing:
-
-- `PASS` for exact automated state/build/architecture/supply-chain evidence;
-- `OBSERVED` only for behavior genuinely exercised on a named interactive Windows/GPU environment;
-- `BLOCKED` for visible presentation, resize/minimize, suspend/resume, real surface loss, adapter/device loss, GPU/driver/hardware compatibility and performance when unavailable.
-
-Unavailable interactive evidence is not inferred from compilation and is not a blocker to merging this bounded ownership spike when all automated acceptance and documentation requirements pass.
-
-## 9. Shared-path lease
-
-| Path group | Lease holder after worker launch | Other work |
-|---|---|---|
-| Cargo workspace/lockfile and dependency policy | W5-RENDER | read-only |
-| renderer package/public surface contract | W5-RENDER | no duplicate producer |
-| shell Cargo/main composition | W5-RENDER | no parallel shell integration |
-| shared catalogue/matrix/changelog/layout/workspace docs | W5-RENDER | read-only |
-| architecture checker/rules/fixtures | none | read-only |
-| Rust CI/toolchain | none | read-only |
-
-The worker claims the lease only through its active task and live draft PR after a fresh overlap check.
-
-## 10. Merge and completion rules
-
-- W5-RENDER starts only after this plan and its archive merge.
-- Any material shell producer, dependency evidence or `main` change requires restack and exact-head revalidation.
-- The worker merges only through the root autonomous gate and receives a separate archive PR.
-- W5 closes only after the worker is merged/archived, no lease remains and one evidence-based next package is recorded.
-
-Candidate next package after successful closure: a small normalized synthetic asset schema/compiler slice only if W5 proves a stable clear/present boundary. It is not authorized by this plan.
+Extend merged contracts only through a new bounded owning task after live authorization.

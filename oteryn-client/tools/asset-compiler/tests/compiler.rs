@@ -119,6 +119,10 @@ fn unsafe_portable_source_paths_are_rejected() -> Result<(), Box<dyn Error>> {
         "C:/windows.bin",
         "folder\\escape.bin",
         "./current.bin",
+        "folder/./current.bin",
+        "folder//double.bin",
+        "folder/trailing/",
+        "control\u{0000}.bin",
     ];
 
     for (index, invalid_path) in invalid_paths.iter().enumerate() {
@@ -224,10 +228,7 @@ fn unknown_kind_and_duplicate_ids_are_rejected() -> Result<(), Box<dyn Error>> {
         "provenance": "original synthetic test fixture"
     })
     .to_string();
-    let unknown_manifest = directory.write(
-        "unknown.json",
-        manifest(&unknown_entry).as_bytes(),
-    )?;
+    let unknown_manifest = directory.write("unknown.json", manifest(&unknown_entry).as_bytes())?;
     assert_eq!(
         compile_manifest(&unknown_manifest, &directory.path().join("unknown.pack")),
         Err(CompilerError::UnknownAssetKind)
@@ -262,16 +263,10 @@ fn manifest_size_and_record_count_are_bounded() -> Result<(), Box<dyn Error>> {
     );
 
     let entries = (0..=MAX_RECORDS)
-        .map(|index| {
-            u32::try_from(index + 1)
-                .map(|id| blob_entry(id, "missing.bin"))
-        })
+        .map(|index| u32::try_from(index + 1).map(|id| blob_entry(id, "missing.bin")))
         .collect::<Result<Vec<_>, _>>()?
         .join(",");
-    let too_many = directory.write(
-        "too-many.json",
-        manifest(&entries).as_bytes(),
-    )?;
+    let too_many = directory.write("too-many.json", manifest(&entries).as_bytes())?;
     assert_eq!(
         compile_manifest(&too_many, &directory.path().join("too-many.pack")),
         Err(CompilerError::TooManyAssets)

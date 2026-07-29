@@ -10,8 +10,8 @@ parallel_lane_state: active
 branch: feat/OTC-20260729-synthetic-asset-schema-compiler
 base_branch: main
 created: 2026-07-29T20:05:00+02:00
-updated: 2026-07-29T20:17:00+02:00
-last_verified_commit: "373fb38bb1d121ba8aad1680aecde3aa7cdce0fe"
+updated: 2026-07-29T20:20:00+02:00
+last_verified_commit: "d6b49c72e1c053273a0aca91d34250ac8e155793"
 required_base_commit: "8094d9075fecd7b7c3de0d1b0eb400207a839776"
 risk: medium
 related_pr: "#92"
@@ -117,9 +117,10 @@ No asset runtime, mounting, streaming, cache, activation, renderer/GPU integrati
 
 - Branch, unique lease and draft PR #92 exist from the exact authorized base.
 - Both package implementations, focused tests and original synthetic fixtures are present.
-- Rust run `30478218458` reached the locked metadata gate and failed only because the generated lockfile does not yet include the two packages and exact SHA-256 dependency graph; Supply Chain passed the predecessor lock.
-- The execution environment has no local Rust toolchain or network clone path. A temporary branch-only lockfile-generation workflow is therefore authorized solely to run `cargo generate-lockfile` on the pinned hosted toolchain and emit the exact generated file.
-- That temporary workflow must be deleted before final scope review, must never reach `main`, and does not alter permanent CI policy.
+- Rust run `30478218458` proved the predecessor lock was stale; temporary generator run `30478760455` generated and committed the exact lock on Rust 1.94/Windows, then its workflow was removed from the branch.
+- Rust run `30478907534` passed locked metadata and Supply Chain but failed only `cargo fmt --check`; lint/tests/architecture were not executed after that gate.
+- The execution environment has no local Rust toolchain. One temporary branch-only formatter workflow is authorized to apply exactly `cargo fmt --all` on the pinned hosted toolchain and commit that mechanical output.
+- The formatter workflow must be deleted before final scope review, must never reach `main`, and does not alter permanent CI policy.
 
 # Completion
 

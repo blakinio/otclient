@@ -115,9 +115,9 @@ No asset runtime, renderer integration, real importer, proprietary input, update
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-07-29T22:11:18Z
-head: 3cea444505bfcc5dc4b08b12d1046ef0c34a0f7a
+head: 21bafbf898a17c3000f542bb68310279eb210c67
 branch: docs/archive-OTC-20260729-synthetic-asset-schema-compiler
-pr: none
+pr: 94
 status: ready
 context_routes:
   - agent-governance
@@ -133,10 +133,8 @@ proven:
 derived:
   - W6-ASSET is completed, archived and no longer launchable.
   - The Cargo, lockfile and shared-document lease is released after archival.
-unknown:
-  - none
-conflicts:
-  - none
+unknown: []
+conflicts: []
 first_failure:
   marker: none
   evidence: none
@@ -157,7 +155,6 @@ validation:
   - command: Squash merge PR #92
     result: PASS
     evidence: merge commit 3cea444505bfcc5dc4b08b12d1046ef0c34a0f7a
-blockers:
-  - none
+blockers: []
 next_action: Create a new bounded task before any asset runtime, real importer, renderer integration, updater or signing work.
 ```

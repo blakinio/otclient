@@ -10,8 +10,8 @@ parallel_lane_state: active
 branch: feat/OTC-20260729-synthetic-asset-schema-compiler
 base_branch: main
 created: 2026-07-29T20:05:00+02:00
-updated: 2026-07-29T20:31:00+02:00
-last_verified_commit: "845a56a7dd23dd5917a9d1147be2586f980b3fd5"
+updated: 2026-07-29T23:42:00+02:00
+last_verified_commit: "7cb689b4e1410f30539384428923fda57bbfa263"
 required_base_commit: "8094d9075fecd7b7c3de0d1b0eb400207a839776"
 risk: medium
 related_pr: "#92"
@@ -160,3 +160,80 @@ Automated synthetic compiler evidence does not prove real Tibia/Canary format co
 - Merge commit: pending
 - Shared-path lease: active
 - Archived at: pending
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-07-29T21:42:00Z
+head: 7cb689b4e1410f30539384428923fda57bbfa263
+branch: feat/OTC-20260729-synthetic-asset-schema-compiler
+pr: 92
+status: validating
+context_routes:
+  - agent-governance
+  - rust-assets
+  - supply-chain
+owned_paths:
+  - oteryn-client/crates/asset-types/**
+  - oteryn-client/tools/asset-compiler/**
+  - oteryn-client/assets/test-fixtures/synthetic-v1/**
+  - oteryn-client/docs/research/assets/W6_FORMAT_AND_SECURITY_EVIDENCE.md
+  - docs/agents/tasks/active/OTC-20260729-synthetic-asset-schema-compiler.md
+  - oteryn-client/Cargo.toml
+  - oteryn-client/Cargo.lock
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/BUILD_TEST_MATRIX.md
+  - docs/agents/CHANGELOG.md
+proven:
+  - PR #92 is open, non-draft and mergeable with 18 authorized changed paths at head 7cb689b4e1410f30539384428923fda57bbfa263.
+  - Rust Client run 30479573355 passed locked metadata, formatting, Clippy, tests, architecture and Supply Chain on implementation head 142a0b657d128d9e26b1a54c4f768a75aa722673.
+  - Current-head Rust Client run 30481944434 passed locked metadata and Supply Chain but failed Windows formatting in compiler.rs.
+  - Current-head repository CI run 30481944797 passed.
+  - PR #93 explicitly defers docs/agents/CHANGELOG.md while this task holds the shared-path lease.
+derived:
+  - The first current merge-gate blocker is mechanical rustfmt output in asset-compiler tests, not dependency, architecture or supply-chain policy.
+  - A full preflight is unnecessary unless main, ownership or the shared-path lease changes.
+unknown:
+  - Exact final Rust Client outcome after the formatting-only fix.
+conflicts:
+  - none
+first_failure:
+  marker: Rust Client / Windows -> Check formatting
+  evidence: run 30481944434 job 90677971694; rustfmt diff begins at oteryn-client/tools/asset-compiler/tests/compiler.rs:204
+rejected_hypotheses:
+  - stale lockfile: current-head locked metadata passed in run 30481944434
+  - supply-chain policy failure: job 90677971571 passed advisories, licenses, bans and sources
+changed_paths:
+  - docs/agents/BUILD_TEST_MATRIX.md
+  - docs/agents/CHANGELOG.md
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/tasks/active/OTC-20260729-synthetic-asset-schema-compiler.md
+  - oteryn-client/Cargo.lock
+  - oteryn-client/Cargo.toml
+  - oteryn-client/assets/test-fixtures/synthetic-v1/blob.txt
+  - oteryn-client/assets/test-fixtures/synthetic-v1/checker.rgba
+  - oteryn-client/assets/test-fixtures/synthetic-v1/manifest.json
+  - oteryn-client/crates/asset-types/Cargo.toml
+  - oteryn-client/crates/asset-types/src/lib.rs
+  - oteryn-client/crates/asset-types/tests/pack.rs
+  - oteryn-client/docs/operations/RUST_WORKSPACE.md
+  - oteryn-client/docs/research/assets/W6_FORMAT_AND_SECURITY_EVIDENCE.md
+  - oteryn-client/tools/asset-compiler/Cargo.toml
+  - oteryn-client/tools/asset-compiler/src/lib.rs
+  - oteryn-client/tools/asset-compiler/src/main.rs
+  - oteryn-client/tools/asset-compiler/tests/compiler.rs
+validation:
+  - command: Rust Client run 30479573355
+    result: PASS
+    evidence: implementation head 142a0b657d128d9e26b1a54c4f768a75aa722673; all Windows workspace and Supply Chain steps passed
+  - command: Rust Client run 30481944434
+    result: FAIL
+    evidence: current head; first failure cargo fmt --all --check in job 90677971694
+  - command: Repository CI run 30481944797
+    result: PASS
+    evidence: current-head required repository graph passed
+blockers:
+  - Current head fails the required Rust formatting check.
+next_action: Apply pinned Rust 1.94 cargo fmt --all output to oteryn-client/tools/asset-compiler/tests/compiler.rs and push the formatting-only fix to PR #92.
+```

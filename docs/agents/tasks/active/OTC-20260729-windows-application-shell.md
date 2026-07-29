@@ -1,21 +1,21 @@
 ---
 task_id: OTC-20260729-windows-application-shell
-status: in_progress
+status: awaiting_ci
 agent: "GPT-5.6 Thinking"
 track: greenfield-rust
 workstream: WS-R02
 parallel_wave: OTERYN-W4-WINDOWS-SHELL
 parallel_lane: W4-SHELL
-parallel_lane_state: active
+parallel_lane_state: validating
 coordinator_task: OTC-20260729-plan-w4-windows-shell
 branch: feat/OTC-20260729-windows-application-shell
 base_branch: main
 created: 2026-07-29T11:55:00+02:00
-updated: 2026-07-29T11:55:00+02:00
-last_verified_commit: "b16e0a8c17cf1ce7b0808ef577cce0d5bc76f0b3"
+updated: 2026-07-29T12:25:00+02:00
+last_verified_commit: "f5bb0fdda6c2555a6949f14d6afcc1edf843cfb9"
 required_base_commit: "b16e0a8c17cf1ce7b0808ef577cce0d5bc76f0b3"
 risk: medium
-related_pr: pending
+related_pr: "#79"
 depends_on:
   - W4 plan PR #77 and archive PR #78
   - oteryn-foundation PR #54
@@ -26,7 +26,6 @@ owned_paths:
   - oteryn-client/apps/client/**
   - oteryn-client/docs/research/windows-platform/W4_RUNTIME_EVIDENCE.md
   - docs/agents/tasks/active/OTC-20260729-windows-application-shell.md
-  - .github/workflows/w4-lockfile-bootstrap.yml (temporary non-final bootstrap only if required)
 shared_path_lease:
   - oteryn-client/Cargo.toml
   - oteryn-client/Cargo.lock
@@ -65,7 +64,7 @@ public_interfaces:
   - WindowSnapshot
 cross_repo_tasks: []
 performance_evidence:
-  - no performance claim; interactive cycle evidence unavailable unless genuinely observed
+  - no performance claim; interactive cycle evidence unavailable and recorded BLOCKED
 security_evidence:
   - no secrets, arbitrary diagnostic text, direct Win32, unsafe code, protocol or asset input
 ---
@@ -76,46 +75,69 @@ Add exactly one `oteryn-client` application package that compiles a bounded wini
 
 # Acceptance criteria
 
-- [ ] Exactly one application package under `oteryn-client/apps/client/`, category `app`.
-- [ ] Exact `winit = "=0.30.13"` is the sole new direct external dependency.
-- [ ] Foundation, diagnostics and test-support contracts are reused concretely.
-- [ ] Shell startup/running/closing/exited transitions and stale-generation rejection are deterministic.
-- [ ] Commands and diagnostic history are bounded; duplicate close is idempotent.
-- [ ] One main-thread `ApplicationHandler` creates a resizable blank window and handles required lifecycle/input event classes without renderer work.
-- [ ] One named one-shot thread sends a bounded proxy event and is joined after event-loop return.
-- [ ] No renderer/GPU, direct Win32/windows-sys/raw-window-handle, unsafe, async runtime, protocol, identity, network, assets, audio, feature UI or persistence.
-- [ ] Runtime evidence distinguishes automated PASS from interactive BLOCKED cases.
-- [ ] Workspace, lockfile, dependency policy and owning documentation are current.
-- [ ] Exact-head Windows, supply-chain and repository CI pass.
-- [ ] PR merges and task archives independently; lease is released.
+- [x] Exactly one application package under `oteryn-client/apps/client/`, category `app`.
+- [x] Exact `winit = "=0.30.13"` is the sole new direct external dependency.
+- [x] Foundation, diagnostics and test-support contracts are reused concretely.
+- [x] Shell startup/running/closing/exited transitions and stale-generation rejection are deterministic.
+- [x] Commands and diagnostic history are bounded; duplicate close is idempotent.
+- [x] One main-thread `ApplicationHandler` creates a resizable blank window and handles required lifecycle/input event classes without renderer work.
+- [x] One named one-shot thread sends a bounded proxy event and is joined after event-loop return.
+- [x] No renderer/GPU, direct Win32/windows-sys/raw-window-handle, unsafe, async runtime, protocol, identity, network, assets, audio, feature UI or persistence.
+- [x] Runtime evidence distinguishes automated PASS from interactive BLOCKED cases.
+- [x] Workspace, generated lockfile, unchanged dependency policy and owning documentation are current.
+- [x] Reviewed implementation head passes Windows, supply-chain and repository CI.
+- [ ] Final task-record head passes exact CI; PR merges and task archives independently.
 
-# Dependency evidence
+# Delivered contract
 
-- `winit 0.30.13` remains current primary evidence on 2026-07-29.
-- License: Apache-2.0.
-- Declared MSRV: Rust 1.70; workspace pins Rust 1.94.
-- Direct dependency will be exact-pinned and reviewed through cargo metadata/cargo-deny.
-- No direct native/unsafe dependency is added by this package; transitive boundaries remain owned by winit and are recorded, not re-exported.
+- `ShellState` owns a typed process generation, explicit `Starting`, `Running`, `Closing` and `Exited` phases, a bounded command batch and a 32-event diagnostic history.
+- stale-generation and oversized batches are rejected transactionally without mutating the original state.
+- duplicate close and exit completion are idempotent.
+- `WindowSnapshot` deterministically tracks physical size/minimization, scale factor, focus, modifiers and IME state without native handles.
+- the Windows binary creates one resizable blank window from one main-thread `ApplicationHandler`, enables IME, handles the accepted event classes, and exits through one close path.
+- one named `oteryn-shell-wake` thread sends one generation-owned proxy event and is joined after `run_app` returns.
+- lifecycle diagnostics use reviewed static messages/keys and typed values only.
 
-# Plan
+# Dependency and runtime evidence
 
-1. Open early draft PR and confirm unique lease.
-2. Implement deterministic library state and tests.
-3. Implement minimal main-thread winit adapter.
-4. Generate the lockfile through the pinned resolver. If local Cargo remains unavailable, use one temporary PR-only workflow to emit the generated lockfile artifact, record the blocker, import the artifact, and remove the workflow before final review.
-5. Update dependency/runtime evidence and owning documentation.
-6. Review full diff, validate exact head, merge and archive.
+- direct exact dependency: `winit 0.30.13`, Apache-2.0, declared MSRV Rust 1.70; workspace Rust 1.94.0.
+- `Cargo.lock` was generated by pinned Cargo 1.94.0 and exact cargo-deny passed without editing `deny.toml`.
+- named CI runner: Microsoft Windows Server 2025 Datacenter `10.0.26100`, image `windows-2025-vs2026`, image version `20260714.173.1`.
+- interactive launch/close, multi-monitor DPI, real IME, physical input, shutdown/logoff and minimum-Windows support remain explicitly `BLOCKED` in `W4_RUNTIME_EVIDENCE.md`.
+
+# Failures and fixes
+
+1. Local Cargo/rustfmt execution was unavailable through the connector environment. Temporary PR-only workflows generated the lockfile, applied pinned rustfmt and exact text/document updates on the owned branch; every temporary workflow was removed before final review.
+2. The first lockfile push used GitHub's synthetic merge ref and was rejected. Checkout was narrowed to the exact PR branch before the successful generated commit.
+3. The first Windows run passed metadata and supply-chain but reported rustfmt differences; pinned rustfmt output was applied.
+4. Clippy reported five nested conditional patterns; failure recording was centralized without changing behavior.
+5. Seven of eight tests passed; one assertion expected decorated generation text while the foundation Display contract emits plain numeric generations. The expected value was corrected and all eight tests passed.
 
 # Validation
 
-| Revision | Check | Result |
-|---|---|---|
-| `b16e0a8c17cf1ce7b0808ef577cce0d5bc76f0b3` | live ownership/base/producer/dependency preflight | PASS |
+| Evidence | Result |
+|---|---|
+| live ownership/base/producer/dependency preflight on `b16e0a8c17cf1ce7b0808ef577cce0d5bc76f0b3` | PASS |
+| generated lockfile and unchanged cargo-deny policy | PASS |
+| complete twelve-file path/full-diff review on `f5bb0fdda6c2555a6949f14d6afcc1edf843cfb9` | PASS |
+| Rust Client run `30443333151` | PASS: metadata, fmt, Clippy, eight tests, architecture and Supply Chain |
+| repository CI run `30443331444` | PASS: all required jobs and `CI / Required` |
+| final task-record head | exact-head rerun pending |
+
+# Boundaries preserved
+
+- no renderer/GPU surface, `wgpu`, shader, render loop or direct raw-window-handle dependency;
+- no direct `windows-sys`, Win32 FFI/message hook or unsafe code;
+- no async runtime, executor, scheduler, polling loop or background service;
+- no protocol, identity, networking, endpoint, assets, audio, feature UI, settings, persistence or updater;
+- no global mutable app registry, logger/subscriber or arbitrary external diagnostic text;
+- no minimum-Windows, interactive DPI/IME/input, hardware or performance compatibility claim;
+- no permanent CI workflow or dependency-policy change.
 
 # Completion
 
-- Final status: in progress
-- PR: pending
+- Final status: awaiting final exact-head CI
+- PR: #79
 - Merge commit: pending
-- Shared-path lease: held by W4-SHELL
+- Shared-path lease: held by W4-SHELL until archive merge
 - Archived at: pending

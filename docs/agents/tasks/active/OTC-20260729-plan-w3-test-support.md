@@ -1,20 +1,20 @@
 ---
 task_id: OTC-20260729-plan-w3-test-support
-status: in_progress
+status: awaiting_ci
 agent: "GPT-5.6 Thinking"
 track: greenfield-rust
 workstream: coordination
 parallel_wave: OTERYN-W3-TEST-SUPPORT
 parallel_lane: W3-C
-parallel_lane_state: active
+parallel_lane_state: validating
 branch: docs/OTC-20260729-plan-w3-test-support
 base_branch: main
 created: 2026-07-29T09:24:00+02:00
-updated: 2026-07-29T09:24:00+02:00
-last_verified_commit: "0b1cd7914c04efd6b41a4a1b975234df715e6104"
+updated: 2026-07-29T09:31:00+02:00
+last_verified_commit: "891fbfdaa4be38ab639817235232b10566c27cd9"
 required_base_commit: "0b1cd7914c04efd6b41a4a1b975234df715e6104"
 risk: low
-related_pr: pending
+related_pr: "#71"
 depends_on:
   - completed/archived W2 at PR #70
 owned_paths:
@@ -53,33 +53,38 @@ Create one accepted, bounded W3 launch plan for deterministic Rust test support 
 
 # Acceptance criteria
 
-- [ ] Live `main`, active tasks and open PR ownership are recorded.
-- [ ] W3 has exactly one implementation lane and one unique shared-path lease holder.
-- [ ] The worker scope consumes `ManualClock` and diagnostics rather than duplicating them.
-- [ ] No async runtime, executor, scheduler, global registry or product integration is authorized.
-- [ ] Current coordinator/discovery routing points to W3 and forbids W1/W2 relaunch.
+- [x] Live `main`, active tasks and open PR ownership are recorded.
+- [x] W3 has exactly one implementation lane and one unique shared-path lease holder.
+- [x] The worker scope consumes `ManualClock` and diagnostics rather than duplicating them.
+- [x] No async runtime, executor, scheduler, global registry or product integration is authorized.
+- [x] Current coordinator/discovery routing points to W3 and forbids W1/W2 relaunch.
 - [ ] Exact-head required CI passes; plan merges and archives separately.
 
 # Confirmed live state
 
-- Current `main`: `0b1cd7914c04efd6b41a4a1b975234df715e6104`.
+- Current required `main`: `0b1cd7914c04efd6b41a4a1b975234df715e6104`.
 - W1 and W2 are completed/archived and not launchable.
 - Open PRs #23 and #37 own legacy paths; PR #48 is isolated operational work.
 - No active Rust task or open PR owns `crates/test-support`, Cargo/lockfile integration or the test-support public surface.
 
-# Planned worker
+# Delivered plan
 
-One lane `W3-TEST` will add one small `oteryn-test-support` crate with deterministic test-owned builders around merged foundation and diagnostics contracts.
+- `CURRENT_PARALLEL_WAVE.md` accepts exactly one W3 implementation lane.
+- `COORDINATOR_AGENT.md` routes coordination to W3 and preserves historical-wave prohibitions.
+- `NEXT_TEST_SUPPORT_AGENT.md` defines the bounded worker package, tests, lease and merge lifecycle.
+- `docs/agents/README.md` exposes current launch routing.
 
 # Validation
 
 | Revision | Check | Result |
 |---|---|---|
 | `0b1cd7914c04efd6b41a4a1b975234df715e6104` | live preflight and overlap review | PASS |
+| `891fbfdaa4be38ab639817235232b10566c27cd9` | complete five-file content/path review | PASS |
+| final task-record head | exact-head required CI | pending |
 
 # Completion
 
-- Final status: in progress
-- PR: pending
+- Final status: awaiting exact-head CI
+- PR: #71
 - Merge commit: pending
 - Archived at: pending

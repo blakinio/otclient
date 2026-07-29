@@ -209,8 +209,7 @@ impl DiagnosticEventFixture {
         value: DiagnosticValue,
     ) -> Result<(), TestSupportError> {
         let key = FieldKey::trusted_static(key)?;
-        self.event
-            .try_add_field(DiagnosticField::new(key, value))?;
+        self.event.try_add_field(DiagnosticField::new(key, value))?;
         Ok(())
     }
 
@@ -335,7 +334,10 @@ mod tests {
 
         assert_eq!(context.occurred_at(), timeline.now());
         assert_eq!(context.process_generation(), ProcessGeneration::new(2));
-        assert_eq!(context.session_generation(), Some(SessionGeneration::new(5)));
+        assert_eq!(
+            context.session_generation(),
+            Some(SessionGeneration::new(5))
+        );
         assert_eq!(context.task_generation(), Some(TaskGeneration::new(8)));
         assert_eq!(context.correlation_id(), Some(CorrelationId::new(13)));
         Ok(())
@@ -382,8 +384,8 @@ mod tests {
     }
 
     #[test]
-    fn redacted_runtime_text_is_absent_from_display_debug_and_clones(
-    ) -> Result<(), TestSupportError> {
+    fn redacted_runtime_text_is_absent_from_display_debug_and_clones()
+    -> Result<(), TestSupportError> {
         let marker = "synthetic-secret-shaped-marker";
         let mut fixture = basic_fixture()?;
         fixture.try_add_field(

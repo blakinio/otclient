@@ -99,9 +99,11 @@ W6 does not recursively discover directories, parse archives, decompress data, e
 | `digest` | transitive `0.11.3` | hash trait implementation | generated lockfile and cargo-deny authoritative |
 | `block-buffer` | transitive `0.12.1` | SHA-256 implementation support | generated lockfile and cargo-deny authoritative |
 | `crypto-common` | transitive `0.2.2` | digest implementation support | generated lockfile and cargo-deny authoritative |
-| `hybrid-array` | transitive `0.4.13` | digest implementation support | generated lockfile and cargo-deny authoritative |
+| `hybrid-array` | transitive `0.4.13` | fixed-size digest storage | generated lockfile and cargo-deny authoritative |
+| `typenum` | transitive `1.20.1` | compile-time digest dimensions | generated lockfile and cargo-deny authoritative |
+| `cpufeatures` | transitive `0.3.0` | target CPU feature selection | generated lockfile and cargo-deny authoritative |
 
-Generated `Cargo.lock` records SHA-256 crate checksum `446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4`. No cargo-deny policy weakening was required.
+The new resolution also reuses the already-present `cfg-if` and `libc` packages. Generated `Cargo.lock` records SHA-256 crate checksum `446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4`. No cargo-deny policy weakening was required.
 
 ## Original fixture provenance
 

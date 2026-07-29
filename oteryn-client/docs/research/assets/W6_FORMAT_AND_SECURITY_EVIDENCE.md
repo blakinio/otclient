@@ -1,6 +1,6 @@
 # W6 Synthetic Asset Format and Security Evidence
 
-Evidence cut: implementation branch after Rust Client run `30479573355` on 2026-07-29.
+Evidence cut: implementation branch after Rust Client run `30479573355` on 2026-07-29; final synchronized validation pending after full-diff hardening.
 
 ## Scope
 
@@ -83,9 +83,10 @@ The compiler:
 - checks metadata length before allocation and caps the subsequent read;
 - never stores source paths or source-machine absolute paths in pack bytes;
 - exposes stable reviewed error text without arbitrary OS error strings;
-- requires a non-existing final output;
-- writes with `create_new` to a same-directory temporary file, syncs it and renames it only after complete validation/encoding;
-- removes a failed temporary output and preserves an existing final output.
+- uses `symlink_metadata` to require that no filesystem entry, including a dangling symlink, already occupies the final output path;
+- requires the same-directory temporary output path to be absent;
+- writes with `create_new` to that temporary file, syncs it and renames it only after complete validation/encoding;
+- removes a failed temporary output and preserves an existing final output or stale temporary entry.
 
 W6 does not recursively discover directories, parse archives, decompress data, execute scripts, watch files or access a network.
 
@@ -116,24 +117,36 @@ They contain no Tibia, Canary or other third-party game assets.
 
 Rust Client run `30479573355` used hosted Microsoft Windows Server 2025, OS build `10.0.26100`, runner image `windows-2025-vs2026`, Rust 1.94.
 
-PASS:
+PASS on that implementation head:
 
 - `cargo metadata --locked`;
 - `cargo fmt --all -- --check`;
 - workspace Clippy with warnings denied;
-- all workspace tests, including W6 deterministic, digest, malformed-input, path and Windows symlink cases;
+- all workspace tests then present;
 - architecture policy;
 - cargo-deny advisories, licenses, bans and sources.
 
-W6 tests prove:
+Full-diff review then added tests for:
+
+- zero IDs, empty/control/oversized metadata;
+- unsupported pack version, unknown kind and non-canonical record order;
+- oversized encoded record count and payload length before allocation/read;
+- unsupported manifest version, unknown kind, duplicate IDs and record-count overflow;
+- oversized manifest and sparse oversized source rejection;
+- stale temporary output preservation;
+- dangling final-output symlink rejection on platforms where symlink creation is permitted;
+- Unix-gated non-regular socket rejection.
+
+Final synchronized exact-head CI is required before merge and supersedes `30479573355` as merge evidence.
+
+Previously validated and retained tests cover:
 
 - known SHA-256 vector;
 - byte-identical repeated compilation and manifest-order independence;
 - encode/decode round trip;
-- duplicate, malformed, truncated, trailing, unknown, digest and size failures;
-- RGBA8 payload validation;
+- duplicate, malformed, truncated, trailing, digest and RGBA8 failures;
 - portable absolute/parent/prefix/separator path rejection;
-- Windows symlink rejection when the runner permits symlink creation;
+- Windows source-symlink rejection when the runner permits symlink creation;
 - directory rejection;
 - preservation of an existing final output;
 - absence of the source-machine absolute path in compiled bytes.

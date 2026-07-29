@@ -1,0 +1,18 @@
+[package]
+name = "oteryn-asset-types"
+version = "0.1.0"
+description = "Bounded synthetic asset schema and deterministic pack format for the Oteryn client"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "asset-types"
+
+[dependencies]
+sha2.workspace = true
+
+[lints]
+workspace = true

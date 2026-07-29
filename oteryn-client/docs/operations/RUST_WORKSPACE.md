@@ -5,14 +5,16 @@ Required compiled platform: Windows x86-64 MSVC
 
 ## Scope
 
-The workspace contains two bounded members:
+The workspace contains four bounded members:
 
 ```text
 crates/foundation
+crates/diagnostics
+crates/test-support
 tools/architecture-check
 ```
 
-`oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Neither is the client, launcher, renderer, protocol stack, domain, UI, asset runtime or extension host.
+`oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. None is the client, launcher, renderer, protocol stack, domain, UI, asset runtime or extension host.
 
 Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
 
@@ -64,6 +66,8 @@ category = "foundation"
 Known categories are defined by the architecture checker and follow the accepted architecture, including `foundation`, `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.
 
 `foundation` is the bottom reusable category. It must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. Lower product layers may depend on it only for generic primitives that do not encode product/server behavior.
+
+`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. The current `oteryn-test-support` tool depends only on `foundation` and `diagnostics`.
 
 Adding or changing a category is an architecture-policy change. Update the checker, synthetic positive/negative fixtures, architecture/workstream documentation and module catalogue in one focused PR.
 
@@ -129,6 +133,28 @@ Cancellation is always explicit. Dropping an observer has no effect; dropping an
 
 The crate contains no Character/World/Channel identifiers, Identity/session implementation, async runtime, scheduler, executor, global event bus, hidden thread, network, GPU, UI, asset, tracing, serialization, FFI or legacy runtime dependency.
 
+## Diagnostics crate contract
+
+`oteryn-diagnostics` owns stable bounded diagnostic contracts only:
+
+- severity, category and code values;
+- reviewed static safe text and lower-snake-case field keys;
+- explicit sensitive classifications redacted at creation without retaining input text;
+- technical context using foundation moments/generations and a diagnostic correlation ID;
+- at most 16 unique fields in deterministic insertion order.
+
+It installs no global logger/subscriber or sink and performs no file, network, telemetry, crash-report, support-bundle, replay, async-runtime or product-service work.
+
+## Deterministic test-support contract
+
+`oteryn-test-support` is a test-only `tool` package and owns:
+
+- `TestTimeline`, which directly owns/clones the shared `ManualClock`, advances or sets it explicitly and builds exact technical context;
+- `DiagnosticEventFixture`, which validates reviewed static message/key literals and accepts only already-classified `DiagnosticValue` values;
+- `TestSupportError`, which wraps only closed static-text and bounded-event failures.
+
+It defines no second clock trait/implementation, wall-clock source, sleep, polling loop, timer wheel, async runtime, executor, scheduler, hidden production thread, global registry, environment mutation, logger/sink, product service or external fixture loader. Thread tests use explicit barriers only to prove shared manual-clock observation.
+
 ## Lint and unsafe policy
 
 Workspace Rust policy:
@@ -154,7 +180,7 @@ The current workspace crates contain no unsafe code and no native/FFI dependency
 
 Do not broaden license/source policy merely to make CI green. Investigate the exact dependency and either reject it, replace it or update policy through a reviewed task with legal/security rationale.
 
-The workspace pins only `serde_json` for the architecture tool's Cargo metadata and synthetic JSON fixtures. `oteryn-foundation` has zero external dependencies. Application dependencies such as GPU, windowing, async, HTTP/TLS, text, audio or WebAssembly runtimes remain outside this package.
+The workspace pins only `serde_json` for the architecture tool's Cargo metadata and synthetic JSON fixtures. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. Application dependencies such as GPU, windowing, async, HTTP/TLS, text, audio or WebAssembly runtimes remain outside these packages.
 
 ## CI behavior
 
@@ -187,8 +213,8 @@ Before adding a crate:
 8. run all workspace and owning-workstream validation;
 9. update the module catalogue and architecture/ADR when public boundaries change.
 
-The expected next package is selected after live preflight. It must not be folded into a completed foundation-primitives PR.
+The expected next package is selected after live preflight. It must not be folded into a completed package or reuse an expired shared-path lease.
 
 ## Rollback
 
-The foundation primitives have no runtime or user-data migration. A normal squash revert removes the crate/category change. Generated Cargo build output and caches are transient and are never repository or release truth.
+The current foundation, diagnostics and test-support packages have no runtime or user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output and caches are transient and are never repository or release truth.

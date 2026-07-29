@@ -1,0 +1,129 @@
+name: W4 Documentation Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - "oteryn-client/**"
+      - "docs/agents/**"
+      - ".github/workflows/w4-lockfile-bootstrap.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: w4-docs-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: W4 / Update owning documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.head_ref }}
+          show-progress: false
+
+      - name: Apply exact documentation updates
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}: {old[:80]!r}")
+              file.write_text(text.replace(old, new), encoding="utf-8")
+
+          replace_once(
+              "docs/agents/MODULE_CATALOG.md",
+              "| Oteryn deterministic test support | active PR #73 |",
+              "| Oteryn deterministic test support | merged PR #73; archived by #74 |",
+          )
+          replace_once(
+              "docs/agents/MODULE_CATALOG.md",
+              "| Oteryn deterministic test support | merged PR #73; archived by #74 | `TestTimeline` backed directly by `ManualClock`, exact technical-context construction and `DiagnosticEventFixture` for reviewed static keys/messages plus already-classified values | `oteryn-client/crates/test-support/**` | Test-only `tool` crate. No second clock, sleep, async runtime, executor, scheduler, hidden thread, global registry, sink, product integration or external fixture data. |\n",
+              "| Oteryn deterministic test support | merged PR #73; archived by #74 | `TestTimeline` backed directly by `ManualClock`, exact technical-context construction and `DiagnosticEventFixture` for reviewed static keys/messages plus already-classified values | `oteryn-client/crates/test-support/**` | Test-only `tool` crate. No second clock, sleep, async runtime, executor, scheduler, hidden thread, global registry, sink, product integration or external fixture data. |\n| Oteryn Windows application shell | active PR #79 | `ShellState`, `ShellPhase`, `ShellCommand`, `ShellError` and `WindowSnapshot`; one main-thread `winit` blank-window adapter with deterministic close and one joined proxy-wake thread | `oteryn-client/apps/client/**`, `oteryn-client/docs/research/windows-platform/W4_RUNTIME_EVIDENCE.md` | Exact `winit 0.30.13`; no renderer/GPU, direct Win32, unsafe, async runtime, protocol, identity, assets, audio, feature UI or persistence. Interactive DPI/IME/input/minimum-Windows compatibility remains unproven. |\n",
+          )
+
+          replace_once(
+              "docs/agents/BUILD_TEST_MATRIX.md",
+              "| Deterministic test-support crate | explicit `ManualClock` reuse, start/advance/backwards/overflow/thread observation, exact context, insertion order, duplicate/bound propagation, synthetic redaction and compile-fail runtime-string barriers | Windows workspace build/lint/doctest, architecture validation and supply-chain policy; no runtime compatibility claim |\n",
+              "| Deterministic test-support crate | explicit `ManualClock` reuse, start/advance/backwards/overflow/thread observation, exact context, insertion order, duplicate/bound propagation, synthetic redaction and compile-fail runtime-string barriers | Windows workspace build/lint/doctest, architecture validation and supply-chain policy; no runtime compatibility claim |\n| Windows application shell | deterministic phase/generation/command/diagnostic tests, exact `winit` pin, main-thread adapter compile and explicit runtime-evidence matrix | Windows workspace build/lint/test, architecture and supply-chain checks; interactive launch, DPI, IME, input and minimum-Windows claims remain blocked until genuinely observed |\n",
+          )
+          replace_once(
+              "docs/agents/BUILD_TEST_MATRIX.md",
+              "- deterministic test support reuses `ManualClock` directly and must not create another clock, scheduler, executor, sleep loop, global registry or product service.\n",
+              "- deterministic test support reuses `ManualClock` directly and must not create another clock, scheduler, executor, sleep loop, global registry or product service;\n- the Windows application shell owns one main-thread event loop/window boundary, uses exact `winit 0.30.13`, and must not infer interactive compatibility from CI compilation.\n",
+          )
+
+          replace_once(
+              "docs/agents/CHANGELOG.md",
+              "## Unreleased\n\n",
+              "## Unreleased\n\n- The greenfield Rust workspace now includes the bounded `oteryn-client` Windows application shell: a deterministic typed lifecycle/command/window snapshot, bounded structured diagnostics, one main-thread `winit 0.30.13` blank-window adapter and one joined proxy-wake thread. It adds no renderer/GPU, direct Win32, unsafe, async runtime, protocol, identity, networking, assets, audio, feature UI or persistence; interactive DPI/IME/input/minimum-Windows compatibility remains explicitly unproven.\n",
+          )
+
+          replace_once(
+              "oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md",
+              "│   │   ├── Cargo.toml\n│   │   └── src/main.rs\n",
+              "│   │   ├── Cargo.toml\n│   │   └── src/\n│   │       ├── lib.rs\n│   │       └── main.rs\n",
+          )
+          replace_once(
+              "oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md",
+              "`test-support` is physically under `crates/` because it is a reusable library package, but it declares architecture category `tool`. It may consume reviewed lower contracts for tests and must never become a runtime service locator.\n",
+              "`test-support` is physically under `crates/` because it is a reusable library package, but it declares architecture category `tool`. It may consume reviewed lower contracts for tests and must never become a runtime service locator.\n\n`apps/client` is the concrete `app` package. Its current W4 boundary is only deterministic shell state plus a main-thread blank-window adapter; renderer, protocol, feature composition and persistence remain absent.\n",
+          )
+          replace_once(
+              "oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md",
+              "`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service.\n",
+              "`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. The current `apps/client` shell may depend on foundation/diagnostics and the exact windowing library, but it owns no renderer or product service.\n",
+          )
+
+          replace_once(
+              "oteryn-client/docs/operations/RUST_WORKSPACE.md",
+              "The workspace contains four bounded members:\n\n```text\ncrates/foundation\ncrates/diagnostics\ncrates/test-support\ntools/architecture-check\n```\n",
+              "The workspace contains five bounded members:\n\n```text\napps/client\ncrates/foundation\ncrates/diagnostics\ncrates/test-support\ntools/architecture-check\n```\n",
+          )
+          replace_once(
+              "oteryn-client/docs/operations/RUST_WORKSPACE.md",
+              "`oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. None is the client, launcher, renderer, protocol stack, domain, UI, asset runtime or extension host.\n",
+              "`oteryn-client` is the bounded Windows blank-window application shell. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Renderer, protocol stack, domain, product UI, asset runtime and extension host remain absent.\n",
+          )
+          replace_once(
+              "oteryn-client/docs/operations/RUST_WORKSPACE.md",
+              "Known categories are defined by the architecture checker and follow the accepted architecture, including `foundation`, `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.\n",
+              "Known categories are defined by the architecture checker and follow the accepted architecture, including `app`, `foundation`, `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.\n",
+          )
+          replace_once(
+              "oteryn-client/docs/operations/RUST_WORKSPACE.md",
+              "`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. The current `oteryn-test-support` tool depends only on `foundation` and `diagnostics`.\n",
+              "`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. The current `oteryn-test-support` tool depends only on `foundation` and `diagnostics`.\n\nThe current `app` package depends directly on foundation/diagnostics and exact `winit 0.30.13`; `oteryn-test-support` is dev-only. It must not absorb renderer, protocol, feature, persistence or direct Win32 responsibilities.\n",
+          )
+          replace_once(
+              "oteryn-client/docs/operations/RUST_WORKSPACE.md",
+              "## Lint and unsafe policy\n",
+              "## Windows application-shell contract\n\n`oteryn-client` currently owns only:\n\n- deterministic `ShellState`, phase, command, error and window-snapshot contracts;\n- bounded lifecycle diagnostics using reviewed diagnostics values;\n- one main-thread `winit::ApplicationHandler` that creates one blank resizable window;\n- one named one-shot proxy-wake thread joined after the event loop returns;\n- explicit runtime-evidence blockers in `docs/research/windows-platform/W4_RUNTIME_EVIDENCE.md`.\n\nIt owns no renderer/GPU surface, direct Win32/FFI, unsafe code, async runtime, protocol, identity, networking, assets, audio, feature UI, persistence or updater. Compilation on a hosted Windows runner is not an interactive compatibility claim.\n\n## Lint and unsafe policy\n",
+          )
+          replace_once(
+              "oteryn-client/docs/operations/RUST_WORKSPACE.md",
+              "The workspace pins only `serde_json` for the architecture tool's Cargo metadata and synthetic JSON fixtures. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. Application dependencies such as GPU, windowing, async, HTTP/TLS, text, audio or WebAssembly runtimes remain outside these packages.\n",
+              "The workspace pins `serde_json` for the architecture tool and exact `winit 0.30.13` for the Windows application shell. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. GPU, async, HTTP/TLS, text, audio and WebAssembly runtimes remain absent.\n",
+          )
+          replace_once(
+              "oteryn-client/docs/operations/RUST_WORKSPACE.md",
+              "The current foundation, diagnostics and test-support packages have no runtime or user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output and caches are transient and are never repository or release truth.\n",
+              "The current foundation, diagnostics, test-support and blank-window shell packages have no user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output and caches are transient and are never repository or release truth.\n",
+          )
+          PY
+
+      - name: Commit owning documentation to PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/agents/MODULE_CATALOG.md docs/agents/BUILD_TEST_MATRIX.md docs/agents/CHANGELOG.md oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md oteryn-client/docs/operations/RUST_WORKSPACE.md
+          git commit -m "docs(rust): document Windows application shell"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"

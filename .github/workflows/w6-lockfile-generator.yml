@@ -1,0 +1,47 @@
+name: W6 Lockfile Generator
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/w6-lockfile-generator.yml
+      - oteryn-client/Cargo.toml
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lockfile:
+    runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: oteryn-client
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          show-progress: false
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          $output = rustup toolchain install 1.94.0 --profile minimal --target x86_64-pc-windows-msvc 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            throw ($output -join "`n")
+          }
+          rustup default 1.94.0 | Out-Null
+
+      - name: Generate and emit Cargo.lock
+        shell: pwsh
+        run: |
+          cargo generate-lockfile
+          if ($LASTEXITCODE -ne 0) {
+            throw "cargo generate-lockfile failed"
+          }
+          $bytes = [System.IO.File]::ReadAllBytes("Cargo.lock")
+          $encoded = [Convert]::ToBase64String($bytes)
+          Write-Host "LOCKFILE_BASE64_BEGIN"
+          for ($offset = 0; $offset -lt $encoded.Length; $offset += 1000) {
+            $length = [Math]::Min(1000, $encoded.Length - $offset)
+            Write-Host $encoded.Substring($offset, $length)
+          }
+          Write-Host "LOCKFILE_BASE64_END"

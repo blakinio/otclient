@@ -230,6 +230,9 @@ fn oversized_payload_length_is_rejected_before_payload_read() -> Result<(), Box<
         .checked_sub(4)
         .ok_or_else(|| io::Error::other("encoded test pack must contain a payload length"))?;
     encoded[payload_length_offset..].copy_from_slice(&oversized.to_le_bytes());
-    assert_eq!(AssetPack::decode(&encoded), Err(AssetError::PayloadTooLarge));
+    assert_eq!(
+        AssetPack::decode(&encoded),
+        Err(AssetError::PayloadTooLarge)
+    );
     Ok(())
 }

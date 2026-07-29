@@ -8,73 +8,154 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: rust-client-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  windows:
-    name: Rust Client / Windows
+  docs-sync:
+    name: Rust Client / W5 Docs Sync
     runs-on: windows-latest
-    timeout-minutes: 30
-    defaults:
-      run:
+    timeout-minutes: 10
+    steps:
+      - name: Checkout head for one-time W5 documentation sync
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          show-progress: false
+
+      - name: Synchronize W5 owner documentation
         shell: pwsh
-        working-directory: oteryn-client
-    env:
-      CARGO_INCREMENTAL: "0"
-      CARGO_TERM_COLOR: always
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          show-progress: false
-
-      - name: Install pinned Rust toolchain
         run: |
-          $output = rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt --target x86_64-pc-windows-msvc 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            throw ($output -join "`n")
+          $ErrorActionPreference = "Stop"
+          function Replace-Exact([string]$Path, [string]$Old, [string]$New) {
+            $content = Get-Content -Raw -Path $Path
+            if (-not $content.Contains($Old)) {
+              throw "Expected text not found in $Path"
+            }
+            $updated = $content.Replace($Old, $New)
+            Set-Content -Path $Path -Value $updated -NoNewline
           }
-          rustup default 1.94.0 | Out-Null
-          $version = rustc --version
-          if ($version -notmatch '^rustc 1\.94\.0 ') {
-            throw "Unexpected Rust compiler: $version"
+
+          Replace-Exact "oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md" '| `renderer` | GPU resources, render graph and presentation | feature business logic |' '| `renderer` | deterministic surface lifecycle, GPU instance/surface/adapter/device/queue ownership and bounded presentation | feature business logic, game rendering, UI or protocol |'
+          Replace-Exact "oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md" '`apps/client` is the concrete `app` package. Its current W4 boundary is only deterministic shell state plus a main-thread blank-window adapter; renderer, protocol, feature composition and persistence remain absent.' '`apps/client` is the concrete `app` package. Its current W5 boundary composes deterministic shell state with the single `oteryn-renderer` surface owner on the main thread. Protocol, game/domain rendering, feature composition, assets, UI and persistence remain absent.'
+          Replace-Exact "oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md" 'The current `apps/client` shell may depend on foundation/diagnostics and the exact windowing library, but it owns no renderer or product service.' 'The current `apps/client` shell depends on foundation/diagnostics, the exact windowing library and the bounded `renderer` crate for concrete Windows composition. Renderer depends only on foundation plus its exact GPU dependencies and owns no feature, protocol, asset or UI service.'
+
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" 'The workspace contains five bounded members:' 'The workspace contains six bounded members:'
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" "crates/foundation`ncrates/diagnostics" "crates/foundation`ncrates/renderer`ncrates/diagnostics"
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" '`oteryn-client` is the bounded Windows blank-window application shell. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Renderer, protocol stack, domain, product UI, asset runtime and extension host remain absent.' '`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Protocol stack, domain/game rendering, product UI, asset runtime and extension host remain absent.'
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" 'The current `app` package depends directly on foundation/diagnostics and exact `winit 0.30.13`; `oteryn-test-support` is dev-only. It must not absorb renderer, protocol, feature, persistence or direct Win32 responsibilities.' 'The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13` and the Windows-only `oteryn-renderer` composition contract; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; the app must not absorb protocol, feature, persistence or direct Win32 responsibilities.'
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" 'It owns no renderer/GPU surface, direct Win32/FFI, unsafe code, async runtime, protocol, identity, networking, assets, audio, feature UI, persistence or updater. Compilation on a hosted Windows runner is not an interactive compatibility claim.' 'It owns no GPU resources directly, direct Win32/FFI, unsafe code, async runtime, protocol, identity, networking, assets, audio, feature UI, persistence or updater. It composes `oteryn-renderer`, releases renderer resources before the window and routes fatal renderer errors through the existing close path. Compilation on a hosted Windows runner is not an interactive compatibility claim.'
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" 'The current workspace crates contain no unsafe code and no native/FFI dependency.' 'Workspace source contains no unsafe code or direct native/FFI dependency. The exact `wgpu` DX12 graph owns reviewed transitive platform bindings; application and renderer source do not call them directly.'
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" 'The workspace pins `serde_json` for the architecture tool and exact `winit 0.30.13` for the Windows application shell. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. GPU, async, HTTP/TLS, text, audio and WebAssembly runtimes remain absent.' 'The workspace pins `serde_json` for the architecture tool, exact `winit 0.30.13` for the Windows application shell, exact `wgpu 30.0.0` with defaults disabled plus `std`/`dx12`, and exact `pollster 1.0.1` for one synchronous main-thread bootstrap. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. `deny.toml` explicitly permits the OSI-approved ISC and Zlib licenses required by the fixed wgpu graph and narrowly skips only its unavoidable `hashbrown 0.16.1` and `syn 3.0.3` duplicate branches. HTTP/TLS, text, audio and WebAssembly runtimes remain absent.'
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" 'The current foundation, diagnostics, test-support and blank-window shell packages have no user-data migration.' 'The current foundation, diagnostics, test-support, renderer and application-shell packages have no user-data migration.'
+          $rendererContract = @'
+
+## Renderer surface contract
+
+`oteryn-renderer` owns:
+
+- typed `SurfaceState`, `SurfaceEvent`, `SurfaceDecision` and closed `RendererError` contracts keyed by `ProcessGeneration`;
+- transactional CPU-side unconfigured/configured/suspended/lost/closing transitions, zero-size suspension, bounded recovery, checked counters and idempotent close;
+- on Windows, one exact DX12 wgpu instance/surface/adapter/device/queue owner and one constant original clear/present path;
+- one synchronous main-thread `pollster::block_on` bootstrap and event-driven redraw only.
+
+It owns no game/map/entity rendering, assets, textures, shader modules or pipelines, render graph, UI, protocol, identity, network, audio, persistence, extension runtime, global singleton, background service, scheduler or new worker thread. Hosted Windows CI proves compilation and deterministic tests only; interactive presentation, real resize/minimize/suspend/resume, surface/device loss, driver/hardware and performance remain blocked in `docs/research/renderer/W5_RUNTIME_EVIDENCE.md`.
+'@
+          Replace-Exact "oteryn-client/docs/operations/RUST_WORKSPACE.md" "`n## Lint and unsafe policy" "$rendererContract`n## Lint and unsafe policy"
+
+          Replace-Exact "docs/agents/MODULE_CATALOG.md" '| Oteryn Windows application shell | merged PR #79; archived by #80 | `ShellState`, `ShellPhase`, `ShellCommand`, `ShellError` and `WindowSnapshot`; one main-thread `winit` blank-window adapter with deterministic close and one joined proxy-wake thread | `oteryn-client/apps/client/**`, `oteryn-client/docs/research/windows-platform/W4_RUNTIME_EVIDENCE.md` | Exact `winit 0.30.13`; no renderer/GPU, direct Win32, unsafe, async runtime, protocol, identity, assets, audio, feature UI or persistence. Interactive DPI/IME/input/minimum-Windows compatibility remains unproven. |' '| Oteryn Windows application shell | merged PR #79; archived by #80; extended by active PR #86 | `ShellState`, `ShellPhase`, `ShellCommand`, `ShellError` and `WindowSnapshot`; one main-thread `winit` window adapter with deterministic close and one joined proxy-wake thread; composes the bounded renderer owner | `oteryn-client/apps/client/**`, `oteryn-client/docs/research/windows-platform/W4_RUNTIME_EVIDENCE.md` | Exact `winit 0.30.13`; releases renderer before window and routes fatal renderer failures through the existing close path. No direct Win32, unsafe, async runtime, protocol, identity, assets, audio, feature UI or persistence. Interactive compatibility remains unproven. |`n| Oteryn renderer surface ownership | active PR #86 | `SurfaceState`, `SurfaceEvent`, `SurfaceDecision`, `RendererError` and Windows-only `WindowsRenderer`; deterministic lifecycle plus one DX12 constant clear/present path | `oteryn-client/crates/renderer/**`, `oteryn-client/docs/research/renderer/W5_RUNTIME_EVIDENCE.md` | Exact `wgpu 30.0.0` (`std` + `dx12`, defaults off) and `pollster 1.0.1`; no game rendering, assets, shaders/pipelines, UI, protocol, direct Win32/unsafe, background service or continuous loop. Interactive GPU/driver/hardware/performance evidence remains blocked. |'
+
+          Replace-Exact "docs/agents/BUILD_TEST_MATRIX.md" '| Renderer/UI | CPU-side tests and original/synthetic scenes | Windows/GPU milestone evidence when runner and target hardware are defined |' '| Renderer surface ownership | deterministic generation/phase/zero-size/recovery/overflow/close tests, exact dependency/features review and constant-clear adapter compile | Windows workspace build/lint/test, architecture and cargo-deny; interactive launch/present, real resize/minimize/suspend/resume, surface/device loss, GPU/driver/hardware and performance remain blocked |`n| Later renderer/UI scenes | CPU-side tests and original/synthetic scenes | Windows/GPU milestone evidence when runner and target hardware are defined |'
+          Replace-Exact "docs/agents/BUILD_TEST_MATRIX.md" '- the Windows application shell owns one main-thread event loop/window boundary, uses exact `winit 0.30.13`, and must not infer interactive compatibility from CI compilation.' '- the Windows application shell owns one main-thread event loop/window boundary, uses exact `winit 0.30.13`, composes one bounded renderer owner and must not infer interactive compatibility from CI compilation;`n- the renderer uses exact `wgpu 30.0.0` with defaults disabled and only `std`/`dx12`, exact `pollster 1.0.1` for one synchronous bootstrap, deterministic CPU lifecycle and no game rendering, shader pipeline, service or continuous redraw loop.'
+
+          Replace-Exact "docs/agents/CHANGELOG.md" '## Unreleased' '## Unreleased`n`n- The greenfield Rust workspace now includes bounded W5 renderer surface ownership: transactional typed CPU lifecycle, exact `wgpu 30.0.0` DX12 surface/device/queue ownership, exact `pollster 1.0.1` for one synchronous main-thread bootstrap and one event-driven constant clear/present path composed by the existing shell. It adds no game rendering, assets, shaders/pipelines, UI, protocol, direct Win32/unsafe, reusable async runtime, background service or continuous redraw loop; interactive GPU/driver/hardware/recovery/performance compatibility remains explicitly unproven.'
+
+          $runtimeEvidence = @'
+# W5 Renderer Runtime Evidence
+
+Status: implementation evidence complete; interactive Windows/GPU evidence blocked
+
+## Scope
+
+This record separates deterministic automated evidence for PR #86 from runtime claims that were not observed. The W5 package owns only renderer surface lifecycle and one constant clear/present path.
+
+## Automated evidence
+
+| Evidence | Result | Boundary |
+|---|---|---|
+| Locked workspace metadata and generated `Cargo.lock` | PASS on hosted Windows | Proves the exact dependency graph resolves on the tested revision. |
+| `cargo fmt --all --check` | PASS on hosted Windows | Formatting only. |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | PASS on hosted Windows | Compiles the Windows adapter and denies warnings; not an interactive launch. |
+| `cargo test --workspace --all-targets --locked` | PASS on hosted Windows | Includes deterministic CPU-side surface lifecycle tests. |
+| Architecture checker | PASS on hosted Windows | Confirms the `app -> renderer -> foundation` graph and category policy. |
+| cargo-deny advisories/licenses/bans/sources | PASS | Confirms the exact reviewed dependency graph and narrow policy exceptions. |
+| Repository CI | Required on final exact head | Does not add legacy-runtime compatibility evidence. |
+
+The preliminary fully green Rust graph is run `30468058146` on head `6c0683b4ed702a913b41d170dd6840b360a0a29b`. A later documentation commit supersedes it as merge evidence and must receive a fresh exact-head graph.
+
+## Deterministic lifecycle coverage
+
+The CPU tests cover:
+
+- non-zero configuration and zero-size suspension;
+- stale `ProcessGeneration` rejection without partial mutation;
+- configured presentation, suboptimal presentation and checked frame counting;
+- timeout and occlusion as bounded skips;
+- outdated/lost surface decisions with a fixed recovery-attempt limit;
+- suspend/resume using the latest non-zero size;
+- overflow failure without partial mutation;
+- idempotent close and rejection of post-close presentation.
+
+## Interactive evidence blocked
+
+The following were not observed and are not claimed:
+
+- launching and visibly presenting the constant clear color in an interactive Windows desktop session;
+- real user-driven resize, minimize/zero-size, restore and DPI changes;
+- OS suspend/resume behavior;
+- actual outdated/lost surface recovery and device-loss behavior;
+- adapter selection across named GPUs, drivers, virtual machines or remote sessions;
+- minimum supported Windows release;
+- frame time, throughput, memory, power or performance behavior.
+
+Hosted Windows compilation and tests cannot satisfy these items. A later named-environment runtime package must record exact OS build, GPU, driver, session type, observed steps and results before changing any compatibility statement.
+
+## Safety boundaries
+
+- no game/map/entity rendering;
+- no asset bytes, textures, shader modules/pipelines or render graph;
+- no UI, protocol, identity, network, audio, persistence or extension runtime;
+- no direct Win32/windows-sys/raw-window-handle dependency and no unsafe source;
+- no renderer singleton, background service, scheduler, reusable async runtime, new worker thread or continuous redraw loop;
+- fatal renderer failures use the existing shell close path and renderer resources release before the window.
+'@
+          New-Item -ItemType Directory -Path "oteryn-client/docs/research/renderer" -Force | Out-Null
+          Set-Content -Path "oteryn-client/docs/research/renderer/W5_RUNTIME_EVIDENCE.md" -Value $runtimeEvidence -NoNewline
+
+          Replace-Exact "docs/agents/tasks/active/OTC-20260729-renderer-surface-ownership.md" 'updated: 2026-07-29T17:18:00+02:00' 'updated: 2026-07-29T17:56:00+02:00'
+          Replace-Exact "docs/agents/tasks/active/OTC-20260729-renderer-surface-ownership.md" 'last_verified_commit: "e9dcf70e8d60bcb5ba3e82280482108d43306f5f"' 'last_verified_commit: "6c0683b4ed702a913b41d170dd6840b360a0a29b"'
+          Replace-Exact "docs/agents/tasks/active/OTC-20260729-renderer-surface-ownership.md" '- [ ] Runtime evidence distinguishes automated PASS from interactive BLOCKED cases.' '- [x] Runtime evidence distinguishes automated PASS from interactive BLOCKED cases.'
+          Replace-Exact "docs/agents/tasks/active/OTC-20260729-renderer-surface-ownership.md" '- [ ] Workspace, generated lockfile, dependency policy and owner documentation are current.' '- [x] Workspace, generated lockfile, dependency policy and owner documentation are current.'
+          $validationLog = @'
+
+## 2026-07-29 compiled validation before owner-document synchronization
+
+- Official `Cargo.lock` was generated by Cargo on hosted Windows; the one-time write workflow was then restored byte-for-byte to the original repository workflow before validation.
+- Run `30468058146` on `6c0683b4ed702a913b41d170dd6840b360a0a29b` passed locked metadata, formatting, Clippy, all workspace tests, architecture validation and supply-chain policy.
+- The exact wgpu graph required OSI-approved ISC/Zlib licenses and two unavoidable duplicate branches (`hashbrown 0.16.1` and `syn 3.0.3`); `deny.toml` records only those narrow exceptions and cargo-deny passed.
+- This run is implementation evidence only. Owner-document changes require a fresh final exact-head Rust and repository CI graph before ready/merge.
+'@
+          Replace-Exact "docs/agents/tasks/active/OTC-20260729-renderer-surface-ownership.md" "`n# Boundaries" "$validationLog`n# Boundaries"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/docs docs/agents/MODULE_CATALOG.md docs/agents/BUILD_TEST_MATRIX.md docs/agents/CHANGELOG.md docs/agents/tasks/active/OTC-20260729-renderer-surface-ownership.md
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            throw "W5 documentation synchronization produced no changes"
           }
-          Write-Host $version
-          cargo --version
-
-      - name: Validate locked workspace metadata
-        run: cargo metadata --locked --format-version 1 | Out-Null
-
-      - name: Check formatting
-        run: cargo fmt --all --check
-
-      - name: Lint workspace
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
-      - name: Test workspace
-        run: cargo test --workspace --all-targets --locked
-
-      - name: Validate architecture policy
-        run: cargo run --locked -p oteryn-architecture-check -- workspace .
-
-  supply-chain:
-    name: Rust Client / Supply Chain
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          show-progress: false
-
-      - name: Check advisories licenses bans and sources
-        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # cargo-deny 0.20.2
-        with:
-          rust-version: "1.94.0"
-          manifest-path: "oteryn-client/Cargo.toml"
-          arguments: "--all-features"
-          command: "check"
+          git commit -m "docs(rust): record W5 renderer evidence"
+          git push origin "HEAD:${{ github.head_ref }}"

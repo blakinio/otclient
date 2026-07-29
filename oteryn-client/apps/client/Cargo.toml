@@ -1,0 +1,23 @@
+[package]
+name = "oteryn-client"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.oteryn]
+category = "app"
+
+[dependencies]
+oteryn-diagnostics = { version = "=0.1.0", path = "../../crates/diagnostics" }
+oteryn-foundation = { version = "=0.1.0", path = "../../crates/foundation" }
+
+[target.'cfg(windows)'.dependencies]
+winit = "=0.30.13"
+
+[dev-dependencies]
+oteryn-test-support = { version = "=0.1.0", path = "../../crates/test-support" }
+
+[lints]
+workspace = true

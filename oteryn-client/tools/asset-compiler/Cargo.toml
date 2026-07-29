@@ -1,0 +1,19 @@
+[package]
+name = "oteryn-asset-compiler"
+version = "0.1.0"
+description = "Deterministic offline compiler for bounded synthetic Oteryn asset packs"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "tool"
+
+[dependencies]
+oteryn-asset-types = { version = "=0.1.0", path = "../../crates/asset-types" }
+serde_json.workspace = true
+
+[lints]
+workspace = true

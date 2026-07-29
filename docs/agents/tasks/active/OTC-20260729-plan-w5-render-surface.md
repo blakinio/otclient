@@ -1,20 +1,20 @@
 ---
 task_id: OTC-20260729-plan-w5-render-surface
-status: in_progress
+status: awaiting_ci
 agent: "GPT-5.6 Thinking"
 track: greenfield-rust
 workstream: coordination
 parallel_wave: OTERYN-W5-RENDER-SURFACE
 parallel_lane: W5-C
-parallel_lane_state: active
+parallel_lane_state: validating
 branch: docs/OTC-20260729-plan-w5-render-surface
 base_branch: main
 created: 2026-07-29T15:31:00+02:00
-updated: 2026-07-29T15:31:00+02:00
-last_verified_commit: "37c9b3496eef4b7360bf9f5d753491540b5a2727"
+updated: 2026-07-29T15:44:00+02:00
+last_verified_commit: "0f369ed20ff640284a15b63375c1f1397b591564"
 required_base_commit: "37c9b3496eef4b7360bf9f5d753491540b5a2727"
 risk: low
-related_pr: pending
+related_pr: "#84"
 depends_on:
   - W4 shell PR #79 and archive PR #80
   - W4 closure PR #81 and archive PR #82
@@ -57,17 +57,17 @@ Accept one bounded W5 launch plan for a renderer surface-ownership spike that co
 
 # Acceptance criteria
 
-- [ ] Current `main`, active tasks, open PRs and shared leases are revalidated.
-- [ ] W1, W2, W3 and W4 remain completed and prohibited from relaunch.
-- [ ] Exactly one implementation worker `W5-RENDER` is authorized.
-- [ ] The worker owns one `oteryn-renderer` crate and the narrow shell composition changes only.
-- [ ] Exact dependency candidates, licenses, MSRV, source and advisory gate are recorded from current primary evidence.
-- [ ] Main-thread window/surface ownership and deterministic shell shutdown remain authoritative.
-- [ ] CPU-side zero-size, suspend, loss, reconfigure and closing behavior is deterministic and testable without a GPU.
-- [ ] No game/map/entity rendering, textures/assets, shader framework, UI, protocol, identity, networking, audio, persistence or extension runtime is authorized.
-- [ ] No global renderer singleton, hidden service, reusable async runtime or scheduler is authorized.
-- [ ] Interactive GPU, driver, hardware and performance claims remain explicitly blocked unless genuinely observed.
-- [ ] Planning changes no Rust source, Cargo, lockfile, dependency policy, CI, architecture or legacy runtime.
+- [x] Current `main`, active tasks, open PRs and shared leases are revalidated.
+- [x] W1, W2, W3 and W4 remain completed and prohibited from relaunch.
+- [x] Exactly one implementation worker `W5-RENDER` is authorized.
+- [x] The worker owns one `oteryn-renderer` crate and the narrow shell composition changes only.
+- [x] Exact dependency candidates, licenses, MSRV, source and advisory gate are recorded from current primary evidence.
+- [x] Main-thread window/surface ownership and deterministic shell shutdown remain authoritative.
+- [x] CPU-side zero-size, suspend, loss, reconfigure and closing behavior is deterministic and testable without a GPU.
+- [x] No game/map/entity rendering, textures/assets, shader framework, UI, protocol, identity, networking, audio, persistence or extension runtime is authorized.
+- [x] No global renderer singleton, hidden service, reusable async runtime or scheduler is authorized.
+- [x] Interactive GPU, driver, hardware and performance claims remain explicitly blocked unless genuinely observed.
+- [x] Planning changes no Rust source, Cargo, lockfile, dependency policy, CI, architecture or legacy runtime.
 - [ ] Exact-head required CI passes; plan merges and archives independently before any worker task/branch/lease exists.
 
 # Live preflight
@@ -78,7 +78,7 @@ Accept one bounded W5 launch plan for a renderer surface-ownership spike that co
 - Open PR #23 owns legacy OTUI/Lua presentation only.
 - Open PR #48 is isolated operational non-merge work.
 - No active Rust task or open PR owns `crates/renderer`, the renderer surface contract, Cargo/lockfile integration or the proposed W5 lease.
-- The architecture checker already recognizes category `renderer`; no checker/rule/fixture change is justified by this plan.
+- The architecture checker already recognizes category `renderer` and permits renderer dependencies except protocol adapters/features; no checker/rule/fixture change is justified by this plan.
 
 # Primary dependency evidence
 
@@ -141,14 +141,22 @@ docs/agents/CHANGELOG.md
 - exact Windows workspace, formatting, Clippy, tests, architecture, supply-chain and repository CI pass;
 - runtime evidence distinguishes automated `PASS`, genuinely exercised `OBSERVED` and unavailable interactive `BLOCKED` cases.
 
+# Validation
+
+| Revision | Check | Result |
+|---|---|---|
+| `37c9b3496eef4b7360bf9f5d753491540b5a2727` | live base/open-PR/active-task/lease preflight | PASS |
+| `0f369ed20ff640284a15b63375c1f1397b591564` | complete five-file path/content review | PASS |
+| final task-record head | exact-head required CI pending |
+
 # Boundaries
 
 This plan changes coordination documentation only. It creates no worker task, implementation branch, dependency change or shared lease. It makes no interactive Windows, GPU, driver, hardware or performance compatibility claim.
 
 # Completion
 
-- Final status: in progress
-- PR: pending
+- Final status: awaiting exact-head CI
+- PR: #84
 - Merge commit: pending
 - Worker launch: prohibited until plan and plan archive merge
 - Archived at: pending

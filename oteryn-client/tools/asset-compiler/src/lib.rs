@@ -254,7 +254,14 @@ fn required_u64(object: &Map<String, Value>, key: &str) -> Result<u64, CompilerE
 }
 
 fn validated_relative_path(value: &str) -> Result<PathBuf, CompilerError> {
-    if value.is_empty() || value.contains('\\') || value.contains(':') {
+    if value.is_empty()
+        || value.contains('\\')
+        || value.contains(':')
+        || value.chars().any(char::is_control)
+        || value
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+    {
         return Err(CompilerError::InvalidSourcePath);
     }
 

@@ -7,7 +7,7 @@ Persistent operating memory for autonomous agents across the legacy client and t
 1. `../../AGENTS.md`.
 2. Determine the track from the changed paths.
 3. For new Rust-client work, read `../../oteryn-client/AGENTS.md`, its architecture and agent program.
-4. When several Rust-client agents may run concurrently, read the multi-agent execution protocol and the latest wave completion/accepted-plan record before claiming work.
+4. When several Rust-client agents may run concurrently, read the multi-agent execution protocol and current accepted wave before claiming work.
 5. For legacy C++/Lua client work, read the legacy architecture/workstream owner and inspect source/module/test conventions.
 6. Read `ACTIVE_WORK.md` only as a coordination snapshot.
 7. Inspect all records under `tasks/active/` and all live open PRs/checks/review threads.
@@ -31,20 +31,21 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/agents/PROGRAM.md` | Ordered audit-first implementation gates. |
 | `../../oteryn-client/docs/agents/WORKSTREAMS.md` | Agent ownership and package routing. |
 | `../../oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md` | Parallel lane, shared-path lease and contract/merge protocol. |
-| `../../oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md` | Latest wave status. W2 is completed/closed and none of its lanes is launchable; a new wave requires a separate accepted plan. |
+| `../../oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md` | Current accepted W3 plan. It authorizes only the deterministic test-support lane after the plan lifecycle merges. |
 | `../../oteryn-client/docs/agents/INITIAL_PARALLEL_WAVE.md` | Historical first-wave launch plan and dependency evidence. |
 | `../../oteryn-client/docs/agents/templates/PARALLEL_TASK.md` | Additional task metadata for parallel work. |
-| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Copy-ready post-W2 coordinator/planning prompt; it revalidates closure and must not relaunch W1/W2. |
-| `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common prefix for parallel workers after an accepted wave exists. |
+| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Copy-ready W3 coordinator prompt. |
+| `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common prefix for parallel workers. |
+| `../../oteryn-client/docs/agents/prompts/NEXT_TEST_SUPPORT_AGENT.md` | Copy-ready bounded W3 deterministic test-support worker prompt. |
 | `../../oteryn-client/docs/agents/prompts/NEXT_DIAGNOSTICS_AGENT.md` | Historical W2-DIAG prompt; completed work must not be relaunched. |
 | `../../oteryn-client/docs/agents/AUDIT_PLAN.md` | Mandatory foundation audit. |
 | `../../oteryn-client/docs/agents/prompts/FIRST_AUDIT_AGENT.md` | Historical standalone prompt for the completed first audit. |
 
 The current C++/Lua/OTUI code is evidence only for this track and must not become a Rust runtime dependency.
 
-Parallel Rust work is permitted only through a newly accepted live wave, unique tasks/branches/worktrees, non-overlapping ownership and one producer per public contract. Cargo/lockfile, architecture-check policy, Rust CI and other shared integration paths are serialized through the task-based lease protocol; no manually edited global lock table is used.
+Parallel Rust work is permitted only through a live accepted wave, unique tasks/branches/worktrees, non-overlapping ownership and one producer per public contract. Cargo/lockfile, architecture-check policy, Rust CI and other shared integration paths are serialized through the task-based lease protocol; no manually edited global lock table is used.
 
-The completed W2 record recommends one deterministic Rust test-support/fake-time package, but that recommendation is not an accepted wave or active claim. A future coordinator must perform a fresh live preflight and create a separate plan before launching it.
+W1 and W2 are completed and cannot be relaunched. W3 contains exactly one implementation lane for deterministic test support; no secondary worker or product package is authorized by that plan.
 
 ### Legacy OTClient
 
@@ -78,7 +79,7 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - `ACTIVE_WORK.md` can be stale.
 - `oteryn-client/docs/architecture/**` is authoritative for the new client.
 - `MULTI_AGENT_EXECUTION.md` defines how parallel work is coordinated but does not override product architecture or live task/PR state.
-- `CURRENT_PARALLEL_WAVE.md` records the latest wave status; when it is closed, it authorizes no worker launch.
+- `CURRENT_PARALLEL_WAVE.md` records the latest wave status and exact launch authorization.
 - Historical wave/prompt documents never authorize duplicate work.
 - The legacy source, exact tests and `LEGACY_OTCLIENT_*` documents govern only existing-client maintenance and audit evidence.
 - Upstream intelligence records are durable memory but volatile issue/PR/source status must be revalidated.
@@ -93,7 +94,7 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - route the task to greenfield or legacy paths;
 - read the nearest nested `AGENTS.md`;
 - for parallel Rust work, verify an accepted launchable wave, lane, shared-path lease and producer/consumer dependencies;
-- when the latest wave is closed, coordinate a separate new plan rather than launching its completed lanes;
+- never launch a historical completed lane;
 - search for existing owners and reusable work;
 - create a bounded task, branch and draft PR;
 - declare ownership, dependencies and cross-repository tasks.

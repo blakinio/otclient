@@ -3,6 +3,7 @@ use oteryn_asset_types::{
     PACK_SCHEMA_VERSION,
 };
 use std::error::Error;
+use std::io;
 
 fn record(id: u32, kind: AssetKind, payload: &[u8]) -> Result<AssetRecord, AssetError> {
     AssetRecord::new(
@@ -116,9 +117,9 @@ fn malformed_and_trailing_input_is_rejected() -> Result<(), Box<dyn Error>> {
 #[test]
 fn digest_mismatch_is_rejected() -> Result<(), Box<dyn Error>> {
     let mut encoded = AssetPack::new(vec![record(1, AssetKind::Blob, b"abc")?])?.encode()?;
-    let final_byte = encoded
-        .last_mut()
-        .ok_or("encoded test pack must contain a payload")?;
+    let Some(final_byte) = encoded.last_mut() else {
+        return Err(io::Error::other("encoded test pack must contain a payload").into());
+    };
     *final_byte ^= 0xff;
     assert_eq!(
         AssetPack::decode(&encoded),

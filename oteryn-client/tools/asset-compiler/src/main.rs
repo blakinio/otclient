@@ -7,7 +7,9 @@ use std::process::ExitCode;
 fn main() -> ExitCode {
     match run(env::args_os().skip(1).collect()) {
         Ok((record_count, encoded_bytes)) => {
-            println!("compiled {record_count} synthetic asset record(s) into {encoded_bytes} byte(s)");
+            println!(
+                "compiled {record_count} synthetic asset record(s) into {encoded_bytes} byte(s)"
+            );
             ExitCode::SUCCESS
         }
         Err(message) => {

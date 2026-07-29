@@ -200,9 +200,11 @@ fn pack_does_not_embed_absolute_source_paths() -> Result<(), Box<dyn Error>> {
     compile_manifest(&manifest_path, &output)?;
     let encoded = fs::read(output)?;
     let absolute = directory.path().to_string_lossy();
-    assert!(!encoded
-        .windows(absolute.len())
-        .any(|window| window == absolute.as_bytes()));
+    assert!(
+        !encoded
+            .windows(absolute.len())
+            .any(|window| window == absolute.as_bytes())
+    );
     Ok(())
 }
 
@@ -227,8 +229,7 @@ fn symbolic_link_sources_are_rejected_on_unix() -> Result<(), Box<dyn Error>> {
 
 #[cfg(windows)]
 #[test]
-fn symbolic_link_sources_are_rejected_when_windows_allows_creation(
-) -> Result<(), Box<dyn Error>> {
+fn symbolic_link_sources_are_rejected_when_windows_allows_creation() -> Result<(), Box<dyn Error>> {
     use std::os::windows::fs::symlink_file;
 
     let directory = TestDirectory::new()?;

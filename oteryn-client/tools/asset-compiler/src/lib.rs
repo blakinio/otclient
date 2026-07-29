@@ -53,8 +53,8 @@ pub fn compile_manifest(
 ) -> Result<CompileReport, CompilerError> {
     let output = OutputTarget::new(output_path)?;
     let manifest_bytes = read_bounded_manifest(manifest_path)?;
-    let manifest: Value = serde_json::from_slice(&manifest_bytes)
-        .map_err(|_| CompilerError::InvalidJson)?;
+    let manifest: Value =
+        serde_json::from_slice(&manifest_bytes).map_err(|_| CompilerError::InvalidJson)?;
     let root = canonical_manifest_root(manifest_path)?;
     let records = parse_manifest(&manifest, &root)?;
     let pack = AssetPack::new(records).map_err(CompilerError::Asset)?;
@@ -207,10 +207,8 @@ fn parse_asset(value: &Value, root: &Path) -> Result<AssetRecord, CompilerError>
     }
 
     let id_value = required_u64(object, "id")?;
-    let id = AssetId::new(
-        u32::try_from(id_value).map_err(|_| CompilerError::InvalidManifest)?,
-    )
-    .map_err(CompilerError::Asset)?;
+    let id = AssetId::new(u32::try_from(id_value).map_err(|_| CompilerError::InvalidManifest)?)
+        .map_err(CompilerError::Asset)?;
     let logical_name = required_string(object, "name")?.to_owned();
     let license = required_string(object, "license")?.to_owned();
     let provenance = required_string(object, "provenance")?.to_owned();
@@ -231,15 +229,8 @@ fn parse_asset(value: &Value, root: &Path) -> Result<AssetRecord, CompilerError>
     AssetRecord::new(metadata, payload).map_err(CompilerError::Asset)
 }
 
-fn require_exact_keys(
-    object: &Map<String, Value>,
-    allowed: &[&str],
-) -> Result<(), CompilerError> {
-    if object.len() != allowed.len()
-        || object
-            .keys()
-            .any(|key| !allowed.contains(&key.as_str()))
-    {
+fn require_exact_keys(object: &Map<String, Value>, allowed: &[&str]) -> Result<(), CompilerError> {
+    if object.len() != allowed.len() || object.keys().any(|key| !allowed.contains(&key.as_str())) {
         return Err(CompilerError::InvalidManifest);
     }
     Ok(())
@@ -295,8 +286,8 @@ fn read_source(root: &Path, relative: &Path) -> Result<Vec<u8>, CompilerError> {
             return Err(CompilerError::InvalidSourcePath);
         };
         current.push(part);
-        let metadata = fs::symlink_metadata(&current)
-            .map_err(|_| CompilerError::SourceUnavailable)?;
+        let metadata =
+            fs::symlink_metadata(&current).map_err(|_| CompilerError::SourceUnavailable)?;
         if metadata.file_type().is_symlink() {
             return Err(CompilerError::SourceSymlink);
         }

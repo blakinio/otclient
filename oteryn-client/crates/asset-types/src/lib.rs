@@ -92,8 +92,8 @@ impl AssetKind {
                     .checked_mul(u64::from(height))
                     .and_then(|value| value.checked_mul(4))
                     .ok_or(AssetError::ArithmeticOverflow)?;
-                let expected = usize::try_from(pixels)
-                    .map_err(|_| AssetError::ArithmeticOverflow)?;
+                let expected =
+                    usize::try_from(pixels).map_err(|_| AssetError::ArithmeticOverflow)?;
                 if expected != payload_len {
                     return Err(AssetError::PayloadLengthMismatch);
                 }
@@ -259,8 +259,8 @@ impl AssetPack {
         let mut encoded = Vec::new();
         append_bytes(&mut encoded, &PACK_MAGIC)?;
         append_bytes(&mut encoded, &PACK_SCHEMA_VERSION.to_le_bytes())?;
-        let record_count = u32::try_from(self.records.len())
-            .map_err(|_| AssetError::TooManyRecords)?;
+        let record_count =
+            u32::try_from(self.records.len()).map_err(|_| AssetError::TooManyRecords)?;
         append_bytes(&mut encoded, &record_count.to_le_bytes())?;
 
         for record in &self.records {
@@ -273,8 +273,8 @@ impl AssetPack {
             append_text(&mut encoded, &record.metadata.license)?;
             append_text(&mut encoded, &record.metadata.provenance)?;
             append_bytes(&mut encoded, &record.digest)?;
-            let payload_len = u32::try_from(record.payload.len())
-                .map_err(|_| AssetError::PayloadTooLarge)?;
+            let payload_len =
+                u32::try_from(record.payload.len()).map_err(|_| AssetError::PayloadTooLarge)?;
             append_bytes(&mut encoded, &payload_len.to_le_bytes())?;
             append_bytes(&mut encoded, &record.payload)?;
         }
@@ -301,8 +301,8 @@ impl AssetPack {
             return Err(AssetError::UnsupportedVersion);
         }
 
-        let count = usize::try_from(decoder.read_u32()?)
-            .map_err(|_| AssetError::ArithmeticOverflow)?;
+        let count =
+            usize::try_from(decoder.read_u32()?).map_err(|_| AssetError::ArithmeticOverflow)?;
         if count > MAX_RECORDS {
             return Err(AssetError::TooManyRecords);
         }
@@ -334,8 +334,8 @@ impl AssetPack {
             let license = decoder.read_text(MAX_LICENSE_BYTES)?;
             let provenance = decoder.read_text(MAX_PROVENANCE_BYTES)?;
             let expected_digest = decoder.read_array::<SHA256_BYTES>()?;
-            let payload_len = usize::try_from(decoder.read_u32()?)
-                .map_err(|_| AssetError::ArithmeticOverflow)?;
+            let payload_len =
+                usize::try_from(decoder.read_u32()?).map_err(|_| AssetError::ArithmeticOverflow)?;
             if payload_len > MAX_ASSET_BYTES {
                 return Err(AssetError::PayloadTooLarge);
             }
@@ -469,8 +469,7 @@ impl<'a> Decoder<'a> {
         if length > limit {
             return Err(AssetError::TextTooLong);
         }
-        String::from_utf8(self.read_bytes(length)?.to_vec())
-            .map_err(|_| AssetError::InvalidUtf8)
+        String::from_utf8(self.read_bytes(length)?.to_vec()).map_err(|_| AssetError::InvalidUtf8)
     }
 
     fn read_bytes(&mut self, length: usize) -> Result<&'a [u8], AssetError> {

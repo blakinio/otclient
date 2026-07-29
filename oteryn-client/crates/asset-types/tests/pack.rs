@@ -22,9 +22,9 @@ fn record(id: u32, kind: AssetKind, payload: &[u8]) -> Result<AssetRecord, Asset
 fn sha256_matches_known_vector() -> Result<(), Box<dyn Error>> {
     let record = record(1, AssetKind::Blob, b"abc")?;
     let expected = [
-        0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d, 0xae,
-        0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61,
-        0xf2, 0x00, 0x15, 0xad,
+        0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d, 0xae, 0x22,
+        0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00,
+        0x15, 0xad,
     ];
     assert_eq!(*record.digest(), expected);
     Ok(())
@@ -107,10 +107,7 @@ fn malformed_and_trailing_input_is_rejected() -> Result<(), Box<dyn Error>> {
 
     let mut trailing = encoded;
     trailing.push(0);
-    assert_eq!(
-        AssetPack::decode(&trailing),
-        Err(AssetError::TrailingBytes)
-    );
+    assert_eq!(AssetPack::decode(&trailing), Err(AssetError::TrailingBytes));
     Ok(())
 }
 
@@ -121,10 +118,7 @@ fn digest_mismatch_is_rejected() -> Result<(), Box<dyn Error>> {
         return Err(io::Error::other("encoded test pack must contain a payload").into());
     };
     *final_byte ^= 0xff;
-    assert_eq!(
-        AssetPack::decode(&encoded),
-        Err(AssetError::DigestMismatch)
-    );
+    assert_eq!(AssetPack::decode(&encoded), Err(AssetError::DigestMismatch));
     Ok(())
 }
 
@@ -135,8 +129,5 @@ fn oversized_record_count_is_rejected_before_allocation() {
     encoded.extend_from_slice(&PACK_SCHEMA_VERSION.to_le_bytes());
     let count = u32::try_from(MAX_RECORDS + 1).unwrap_or(u32::MAX);
     encoded.extend_from_slice(&count.to_le_bytes());
-    assert_eq!(
-        AssetPack::decode(&encoded),
-        Err(AssetError::TooManyRecords)
-    );
+    assert_eq!(AssetPack::decode(&encoded), Err(AssetError::TooManyRecords));
 }

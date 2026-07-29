@@ -112,12 +112,8 @@ where
         }
 
         match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(frame) => {
-                self.present(frame, generation, false)
-            }
-            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
-                self.present(frame, generation, true)
-            }
+            wgpu::CurrentSurfaceTexture::Success(frame) => self.present(frame, generation, false),
+            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => self.present(frame, generation, true),
             wgpu::CurrentSurfaceTexture::Timeout => {
                 let decision = self.state.apply(SurfaceEvent::Timeout { generation })?;
                 self.execute(decision, generation)

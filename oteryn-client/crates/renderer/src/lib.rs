@@ -329,9 +329,7 @@ impl SurfaceState {
                 if self.size.is_zero()
                     || !matches!(
                         self.phase,
-                        SurfacePhase::Unconfigured
-                            | SurfacePhase::Suspended
-                            | SurfacePhase::Lost
+                        SurfacePhase::Unconfigured | SurfacePhase::Suspended | SurfacePhase::Lost
                     )
                 {
                     return Err(RendererError::InvalidTransition {
@@ -344,11 +342,12 @@ impl SurfaceState {
             }
             SurfaceEvent::Presented { suboptimal, .. } => {
                 self.require_presentable(SurfaceEventKind::Presented)?;
-                self.presented_frames = self.presented_frames.checked_add(1).ok_or(
-                    RendererError::CounterOverflow {
-                        counter: RendererCounter::PresentedFrames,
-                    },
-                )?;
+                self.presented_frames =
+                    self.presented_frames
+                        .checked_add(1)
+                        .ok_or(RendererError::CounterOverflow {
+                            counter: RendererCounter::PresentedFrames,
+                        })?;
                 if suboptimal {
                     self.phase = SurfacePhase::Lost;
                     self.next_recovery(SurfaceDecision::PresentAndReconfigure(self.size))
@@ -407,11 +406,12 @@ impl SurfaceState {
         &mut self,
         decision: SurfaceDecision,
     ) -> Result<SurfaceDecision, RendererError> {
-        self.reconfigure_attempts = self.reconfigure_attempts.checked_add(1).ok_or(
-            RendererError::CounterOverflow {
-                counter: RendererCounter::ReconfigureAttempts,
-            },
-        )?;
+        self.reconfigure_attempts =
+            self.reconfigure_attempts
+                .checked_add(1)
+                .ok_or(RendererError::CounterOverflow {
+                    counter: RendererCounter::ReconfigureAttempts,
+                })?;
         if self.reconfigure_attempts > MAX_RECONFIGURE_ATTEMPTS {
             return Err(RendererError::ReconfigureLimitExceeded {
                 max_attempts: MAX_RECONFIGURE_ATTEMPTS,

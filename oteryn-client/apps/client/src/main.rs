@@ -215,7 +215,7 @@ mod windows_shell {
                 | WindowEvent::MouseWheel { .. }
                 | WindowEvent::CursorMoved { .. }
                 | WindowEvent::CursorEntered { .. }
-                | WindowEvent::CursorLeft => {}
+                | WindowEvent::CursorLeft { .. } => {}
                 _ => {}
             }
         }

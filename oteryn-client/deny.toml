@@ -13,14 +13,23 @@ version = 2
 confidence-threshold = 0.8
 allow = [
     "Apache-2.0",
+    "ISC",
     "MIT",
     "Unicode-3.0",
+    "Zlib",
 ]
 
 [bans]
 multiple-versions = "deny"
 wildcards = "deny"
 highlight = "all"
+# wgpu 30's fixed DX12 graph requires hashbrown 0.16 via gpu-allocator
+# alongside 0.17 via naga/indexmap.
+# Its macro graph also requires syn 2 via bytemuck and syn 3 via windows macros.
+skip = [
+    { name = "hashbrown", version = "=0.16.1" },
+    { name = "syn", version = "=3.0.3" },
+]
 
 [sources]
 unknown-registry = "deny"

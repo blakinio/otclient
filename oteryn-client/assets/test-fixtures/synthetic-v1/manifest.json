@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "id": 1,
+      "kind": "blob",
+      "name": "synthetic-greeting",
+      "source": "blob.txt",
+      "license": "CC0-1.0",
+      "provenance": "Original synthetic fixture created for the Oteryn client test suite"
+    },
+    {
+      "id": 2,
+      "kind": "rgba8",
+      "name": "synthetic-rgba8-2x2",
+      "source": "checker.rgba",
+      "license": "CC0-1.0",
+      "provenance": "Original synthetic fixture created for the Oteryn client test suite",
+      "width": 2,
+      "height": 2
+    }
+  ]
+}

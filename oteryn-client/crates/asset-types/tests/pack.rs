@@ -223,7 +223,7 @@ fn oversized_record_count_is_rejected_before_allocation() {
 
 #[test]
 fn oversized_payload_length_is_rejected_before_payload_read() -> Result<(), Box<dyn Error>> {
-    let mut encoded = AssetPack::new(vec![record(1, AssetKind::Blob, &[])])?.encode()?;
+    let mut encoded = AssetPack::new(vec![record(1, AssetKind::Blob, &[])?])?.encode()?;
     let oversized = u32::try_from(MAX_ASSET_BYTES + 1)?;
     let payload_length_offset = encoded
         .len()

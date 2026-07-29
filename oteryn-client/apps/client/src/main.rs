@@ -15,9 +15,7 @@ mod windows_shell {
 
     #[derive(Debug, Clone, Copy)]
     enum ShellUserEvent {
-        Wake {
-            generation: ProcessGeneration,
-        },
+        Wake { generation: ProcessGeneration },
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,8 +34,12 @@ mod windows_shell {
                 Self::EventLoopCreation => {
                     formatter.write_str("Windows event loop could not be created")
                 }
-                Self::WindowCreation => formatter.write_str("Windows shell window could not be created"),
-                Self::EventLoopRun => formatter.write_str("Windows event loop terminated with an error"),
+                Self::WindowCreation => {
+                    formatter.write_str("Windows shell window could not be created")
+                }
+                Self::EventLoopRun => {
+                    formatter.write_str("Windows event loop terminated with an error")
+                }
                 Self::WorkerSpawn => formatter.write_str("shell wake worker could not be started"),
                 Self::WorkerJoin => formatter.write_str("shell wake worker did not finish cleanly"),
                 Self::Shell(error) => Display::fmt(error, formatter),

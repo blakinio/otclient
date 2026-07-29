@@ -205,7 +205,10 @@ impl Display for ShellError {
                 "shell rejected stale process generation {received}; current generation is {expected}"
             ),
             Self::CommandBatchTooLarge { max_commands } => {
-                write!(formatter, "shell command batch exceeds {max_commands} commands")
+                write!(
+                    formatter,
+                    "shell command batch exceeds {max_commands} commands"
+                )
             }
             Self::InvalidScaleFactor => formatter.write_str("shell scale factor must be non-zero"),
             Self::DiagnosticText(error) => Display::fmt(error, formatter),
@@ -341,11 +344,7 @@ impl ShellState {
             ShellPhase::Starting | ShellPhase::Running => {
                 self.phase = ShellPhase::Closing;
                 self.clear_transient_input();
-                self.record_lifecycle(
-                    CODE_CLOSE_REQUESTED,
-                    "shell close requested",
-                    occurred_at,
-                )?;
+                self.record_lifecycle(CODE_CLOSE_REQUESTED, "shell close requested", occurred_at)?;
                 Ok(true)
             }
             ShellPhase::Closing | ShellPhase::Exited => Ok(false),
@@ -445,11 +444,7 @@ impl ShellState {
             ShellCommand::Wake { .. } => {
                 if matches!(self.phase, ShellPhase::Starting | ShellPhase::Running) {
                     self.wake_count = self.wake_count.saturating_add(1);
-                    self.record_lifecycle(
-                        CODE_WAKE_RECEIVED,
-                        "shell wake received",
-                        occurred_at,
-                    )?;
+                    self.record_lifecycle(CODE_WAKE_RECEIVED, "shell wake received", occurred_at)?;
                 }
                 Ok(())
             }
@@ -525,7 +520,8 @@ mod tests {
     }
 
     #[test]
-    fn lifecycle_transitions_are_explicit_and_idempotent() -> Result<(), Box<dyn std::error::Error>> {
+    fn lifecycle_transitions_are_explicit_and_idempotent() -> Result<(), Box<dyn std::error::Error>>
+    {
         let (timeline, mut state) = timeline_and_state()?;
         assert_eq!(state.phase(), ShellPhase::Starting);
         assert!(state.mark_running(timeline.now())?);
@@ -625,15 +621,18 @@ mod tests {
         }
 
         assert_eq!(state.diagnostic_count(), MAX_SHELL_DIAGNOSTICS);
-        assert!(state
-            .diagnostics()
-            .all(|event| event.code() == DiagnosticCode::new(CODE_WAKE_RECEIVED)));
+        assert!(
+            state
+                .diagnostics()
+                .all(|event| event.code() == DiagnosticCode::new(CODE_WAKE_RECEIVED))
+        );
         assert_eq!(state.wake_count(), (MAX_SHELL_DIAGNOSTICS + 8) as u64);
         Ok(())
     }
 
     #[test]
-    fn merged_test_support_builds_compatible_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
+    fn merged_test_support_builds_compatible_diagnostics() -> Result<(), Box<dyn std::error::Error>>
+    {
         let timeline = TestTimeline::new(Moment::ZERO, ProcessGeneration::new(9));
         timeline.advance(Duration::from_millis(25))?;
         let context = timeline.context(None, None, Some(CorrelationId::new(11)));
@@ -644,7 +643,10 @@ mod tests {
             "shell fixture",
             context,
         )?;
-        fixture.try_add_field("generation", DiagnosticValue::ProcessGeneration(ProcessGeneration::new(9)))?;
+        fixture.try_add_field(
+            "generation",
+            DiagnosticValue::ProcessGeneration(ProcessGeneration::new(9)),
+        )?;
         let event = fixture.build();
 
         assert_eq!(event.context().occurred_at(), timeline.now());

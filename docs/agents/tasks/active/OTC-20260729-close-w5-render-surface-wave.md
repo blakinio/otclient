@@ -10,11 +10,11 @@ parallel_lane_state: active
 branch: docs/OTC-20260729-close-w5-render-surface-wave
 base_branch: main
 created: 2026-07-29T19:11:00+02:00
-updated: 2026-07-29T19:11:00+02:00
-last_verified_commit: "1bbbf5828d46684a38d5360c63c2d970a64014e1"
+updated: 2026-07-29T19:27:00+02:00
+last_verified_commit: "3c2dd5eea4fe65811bf4576730e4dbc42f9158dc"
 required_base_commit: "1bbbf5828d46684a38d5360c63c2d970a64014e1"
 risk: low
-related_pr: pending
+related_pr: "#88"
 depends_on:
   - W5 plan PR #84 and archive PR #85
   - W5 renderer implementation PR #86 and archive PR #87
@@ -57,13 +57,13 @@ Close `OTERYN-W5-RENDER-SURFACE` durably after its plan, implementation and life
 
 - [x] Fresh live preflight confirms `main` at `1bbbf5828d46684a38d5360c63c2d970a64014e1`.
 - [x] W5 plan/archive PR #84/#85 and renderer implementation/archive PR #86/#87 are merged.
-- [x] No W5 active task, worker PR or shared-path lease remains.
+- [x] No W5 active worker task, worker PR or shared-path lease remains.
 - [x] Open PR #23 is legacy OTUI/Lua only and PR #48 is isolated operational non-merge work.
-- [ ] `CURRENT_PARALLEL_WAVE.md` records W5 as completed and authorizes no worker launch.
-- [ ] Coordinator routing prevents W1-W5 relaunch and requires a separate future plan lifecycle.
-- [ ] Module catalogue records renderer PR #86 as merged and archived by #87.
-- [ ] Exactly one next bounded recommendation is recorded from current architecture and asset/licensing evidence.
-- [ ] No worker task, implementation branch, dependency change, shared-path lease or accepted next wave is created.
+- [x] `CURRENT_PARALLEL_WAVE.md` records W5 as completed and authorizes no worker launch.
+- [x] Coordinator routing prevents W1-W5 relaunch and requires a separate future plan lifecycle.
+- [x] Module catalogue records renderer PR #86 as merged and archived by #87.
+- [x] Exactly one next bounded recommendation is recorded from current architecture and asset/licensing evidence.
+- [x] No worker task, implementation branch, dependency change, shared-path lease or accepted next wave is created.
 - [ ] Exact-head required CI passes; PR merges and task archives independently.
 
 # Confirmed W5 evidence
@@ -81,6 +81,14 @@ Renderer implementation evidence:
 - implementation squash merge `247837ad405a79fe6d9a8d2bc18b86911a2dcefa`;
 - archive run `30474596520` passed `CI / Required` job `90653302895`;
 - archive squash merge `1bbbf5828d46684a38d5360c63c2d970a64014e1`.
+
+# Closure implementation
+
+- `CURRENT_PARALLEL_WAVE.md` is a durable completed W5 record and prohibits W1-W5 relaunch.
+- The coordinator prompt now authorizes planning only, never a worker launch by itself.
+- The catalogue records renderer delivery/archive state.
+- The complete branch diff contains exactly five documentation paths and no Rust source, Cargo, lockfile, dependency, CI, asset or legacy-runtime change.
+- PR #88 was opened as draft before final task synchronization; exact-head validation remains pending on the synchronized head.
 
 # Next bounded recommendation
 
@@ -105,7 +113,7 @@ Hosted Windows compilation and deterministic renderer tests do not prove visible
 # Completion
 
 - Final status: in progress
-- PR: pending
+- PR: #88
 - Merge commit: pending
 - Shared-path lease: none
 - Archived at: pending

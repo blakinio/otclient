@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: rust-client-${{ github.event.pull_request.number || github.ref }}
@@ -27,9 +27,10 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
     steps:
-      - name: Checkout
+      - name: Checkout head for one-time W5 bootstrap
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           show-progress: false
 
       - name: Install pinned Rust toolchain
@@ -46,16 +47,20 @@ jobs:
           Write-Host $version
           cargo --version
 
-      - name: Generate W5 dependency lock bootstrap
-        run: cargo generate-lockfile
-
-      - name: Upload W5 dependency lock bootstrap
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: w5-renderer-cargo-lock
-          path: oteryn-client/Cargo.lock
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit generated W5 lock and formatting
+        run: |
+          cargo generate-lockfile
+          cargo fmt --all
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock Cargo.toml apps/client/Cargo.toml apps/client/src/main.rs crates/renderer/Cargo.toml crates/renderer/src/lib.rs crates/renderer/src/windows.rs
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "No generated W5 changes to commit"
+            exit 0
+          }
+          git commit -m "chore(rust): generate W5 renderer lockfile"
+          git push origin "HEAD:${{ github.head_ref }}"
 
       - name: Validate locked workspace metadata
         run: cargo metadata --locked --format-version 1 | Out-Null

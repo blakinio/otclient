@@ -1,0 +1,43 @@
+name: Temporary OTC Rustfmt
+
+on:
+  push:
+    branches:
+      - feat/OTC-20260729-synthetic-asset-schema-compiler
+
+permissions:
+  contents: write
+
+jobs:
+  rustfmt:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-2025
+    steps:
+      - name: Check out task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC-20260729-synthetic-asset-schema-compiler
+          show-progress: false
+
+      - name: Install pinned formatter
+        shell: pwsh
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+
+      - name: Apply formatter
+        working-directory: oteryn-client
+        shell: pwsh
+        run: cargo +1.94.0 fmt --all
+
+      - name: Commit formatting-only change
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- oteryn-client/tools/asset-compiler/tests/compiler.rs
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "No formatting changes were required."
+            exit 0
+          }
+          git commit -m "style(assets): apply Rust 1.94 formatting"
+          git push origin HEAD:feat/OTC-20260729-synthetic-asset-schema-compiler

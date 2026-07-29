@@ -10,11 +10,11 @@ parallel_lane_state: active
 branch: feat/OTC-20260729-synthetic-asset-schema-compiler
 base_branch: main
 created: 2026-07-29T20:05:00+02:00
-updated: 2026-07-29T20:05:00+02:00
-last_verified_commit: "8094d9075fecd7b7c3de0d1b0eb400207a839776"
+updated: 2026-07-29T20:17:00+02:00
+last_verified_commit: "373fb38bb1d121ba8aad1680aecde3aa7cdce0fe"
 required_base_commit: "8094d9075fecd7b7c3de0d1b0eb400207a839776"
 risk: medium
-related_pr: pending
+related_pr: "#92"
 depends_on:
   - W6 plan PR #90 and archive PR #91
   - foundation asset/licensing audit PR #47
@@ -84,7 +84,7 @@ Implement the single authorized W6 synthetic asset schema/compiler slice as exac
 - [x] PR #23 remains legacy OTUI/Lua only; PR #48 remains isolated operational non-merge work.
 - [x] No active task or open PR owns the W6 package paths, schema/compiler contract or shared integration paths.
 - [x] This task holds the unique W6 Cargo/lockfile/shared-document lease.
-- [x] Architecture checker source/rules/fixtures, Rust toolchain and CI remain read-only.
+- [x] Architecture checker source/rules/fixtures, Rust toolchain and permanent CI remain read-only.
 
 # Authorized implementation
 
@@ -115,13 +115,16 @@ No asset runtime, mounting, streaming, cache, activation, renderer/GPU integrati
 
 # Current state
 
-- Worker branch and lease created from exact authorized base.
-- Implementation and draft PR pending.
+- Branch, unique lease and draft PR #92 exist from the exact authorized base.
+- Both package implementations, focused tests and original synthetic fixtures are present.
+- Rust run `30478218458` reached the locked metadata gate and failed only because the generated lockfile does not yet include the two packages and exact SHA-256 dependency graph; Supply Chain passed the predecessor lock.
+- The execution environment has no local Rust toolchain or network clone path. A temporary branch-only lockfile-generation workflow is therefore authorized solely to run `cargo generate-lockfile` on the pinned hosted toolchain and emit the exact generated file.
+- That temporary workflow must be deleted before final scope review, must never reach `main`, and does not alter permanent CI policy.
 
 # Completion
 
 - Final status: in progress
-- PR: pending
+- PR: #92
 - Merge commit: pending
 - Shared-path lease: active
 - Archived at: pending

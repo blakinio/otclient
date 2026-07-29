@@ -33,6 +33,14 @@ name = "oteryn-foundation"
 version = "0.1.0"
 
 [[package]]
+name = "oteryn-test-support"
+version = "0.1.0"
+dependencies = [
+ "oteryn-diagnostics",
+ "oteryn-foundation",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -78,7 +86,7 @@ dependencies = [
 name = "serde_derive"
 version = "1.0.229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
+checksum = "e7a5d71263a5a7d47b41f6b3f06ba27610cc18b0931f1799f710578e2309348"
 dependencies = [
  "proc-macro2",
  "quote",

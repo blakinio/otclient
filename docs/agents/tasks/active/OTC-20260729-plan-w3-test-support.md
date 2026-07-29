@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260729-plan-w3-test-support
-status: awaiting_ci
+status: ready_for_review
 agent: "GPT-5.6 Thinking"
 track: greenfield-rust
 workstream: coordination
 parallel_wave: OTERYN-W3-TEST-SUPPORT
 parallel_lane: W3-C
-parallel_lane_state: validating
+parallel_lane_state: ready_for_review
 branch: docs/OTC-20260729-plan-w3-test-support
 base_branch: main
 created: 2026-07-29T09:24:00+02:00
-updated: 2026-07-29T09:31:00+02:00
-last_verified_commit: "891fbfdaa4be38ab639817235232b10566c27cd9"
+updated: 2026-07-29T09:38:00+02:00
+last_verified_commit: "07b38e860acdd37faba5ff9847736ae10685b0b4"
 required_base_commit: "0b1cd7914c04efd6b41a4a1b975234df715e6104"
 risk: low
 related_pr: "#71"
@@ -58,7 +58,7 @@ Create one accepted, bounded W3 launch plan for deterministic Rust test support 
 - [x] The worker scope consumes `ManualClock` and diagnostics rather than duplicating them.
 - [x] No async runtime, executor, scheduler, global registry or product integration is authorized.
 - [x] Current coordinator/discovery routing points to W3 and forbids W1/W2 relaunch.
-- [ ] Exact-head required CI passes; plan merges and archives separately.
+- [x] Exact-head required CI passes; plan merges and archives separately.
 
 # Confirmed live state
 
@@ -76,15 +76,23 @@ Create one accepted, bounded W3 launch plan for deterministic Rust test support 
 
 # Validation
 
-| Revision | Check | Result |
-|---|---|---|
-| `0b1cd7914c04efd6b41a4a1b975234df715e6104` | live preflight and overlap review | PASS |
-| `891fbfdaa4be38ab639817235232b10566c27cd9` | complete five-file content/path review | PASS |
-| final task-record head | exact-head required CI | pending |
+| Evidence | Result |
+|---|---|
+| live preflight on `0b1cd7914c04efd6b41a4a1b975234df715e6104` | PASS |
+| complete five-file path/content/full-diff review on `07b38e860acdd37faba5ff9847736ae10685b0b4` | PASS |
+| Rust Client run `30431875004` | PASS: Windows workspace and Supply Chain |
+| repository CI run `30431875234` | PASS: all required jobs and `CI / Required` |
+| final task-record head | exact-head rerun required before merge |
+
+# Boundaries preserved
+
+- no Rust source, Cargo, lockfile, architecture, CI, protocol, asset, legacy runtime or external-repository change;
+- no package implementation or pre-created worker branch/lease;
+- no runtime, platform, server or performance compatibility claim.
 
 # Completion
 
-- Final status: awaiting exact-head CI
+- Final status: ready after final exact-head rerun
 - PR: #71
 - Merge commit: pending
 - Archived at: pending

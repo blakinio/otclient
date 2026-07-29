@@ -21,9 +21,13 @@ Installed assets must end up in:
 
 Do not introduce an alternative permanent assets root for runtime loading.
 
+For a modern client version to be considered complete, the things directory must contain `catalog-content.json`, `assets.json.sha256`, and the catalog-referenced appearances/static-data files. The installer writes `.client-assets-complete` only after those runtime-path checks pass.
+
 ## Main Module
 
 - Lua module: `modules/client_assets/client_assets.lua`
+- Release preparation policy: `modules/client_assets/client_assets_release_selector.lua`
+- Conditional GitHub releases adapter: `modules/client_assets/client_assets_release_adapter.lua`
 - Enter-game integration: `modules/client_entergame/entergame.lua`
 - Modern things/sounds loading: `modules/game_things/things.lua`
 
@@ -31,12 +35,26 @@ Do not introduce an alternative permanent assets root for runtime loading.
 
 The flow supports:
 
-- archive installation from the release/tag source ZIP as the default path
+- archive installation from a matching release/tag archive as the default path
+- codeload source ZIP fallback when a release contains no matching archive
 - manifest-driven installation as a fallback path when the archive cannot be installed
 - manifest hash identifier installation into `data/things/<version>/assets.json.sha256`
 - packaged files list (including large binaries distributed as `.zip`/`.rar`)
 - extraction of `.zip` and `.rar`
 - optional `.lzma` decompression
+
+### Release archive selection
+
+GitHub release JSON is prepared before the existing resolver caches it:
+
+1. Each release is evaluated from its own tag/name, so cache contents are stable across later client-version requests.
+2. Only non-macOS ZIP/RAR assets that identify the release tag or version label are candidates.
+3. A candidate containing `client` is preferred; `original` and `linux` variants receive a lower score.
+4. `.app.zip`, `macos`, and standalone `mac` variants are excluded.
+5. If no archive matches, every archive candidate is removed from the prepared release copy. The existing resolver therefore returns no release archive and uses its established codeload ZIP fallback.
+6. Non-archive metadata assets remain present.
+
+This policy prevents an unrelated legacy ZIP from being selected only because it appears first in a release.
 
 ## Integrity and Security Defaults
 
@@ -48,14 +66,14 @@ Defaults are hardened:
 
 `allowMissingPackedRawFallback` is a narrow compatibility fallback for repository releases that reference official `.lzma`/archive package files not stored in the assets repository. It is only used after the packed file is missing and the client falls back to the raw file from the same manifest/release source. It does not enable arbitrary hash mismatches for normal raw downloads.
 
-Release cache is scoped per source (`releasesUrl` / repository key), avoiding stale cross-source reuse.
+Release cache is scoped per source (`releasesUrl` / repository key), avoiding stale cross-source reuse. Release archive preparation is idempotent and per-release, avoiding request-specific cache poisoning.
 
 ## Runtime/Platform Notes
 
 - Desktop targets use `libarchive` for archive extraction when it is available.
 - Builds without `libarchive` still extract `.zip` archives through the vendored minizip fallback. This keeps the GitHub source ZIP flow functional on clean desktop builds.
 - `.rar` extraction requires `libarchive`. If a packaged `.rar` is optional and the build cannot extract it, installation should fail clearly or skip it according to the package configuration.
-- The default flow is archive-first because the release source ZIP is the canonical package for this repository. The manifest path remains a compatibility fallback, not the primary installation path.
+- The default flow is archive-first only when a matching release archive exists. The codeload ZIP and manifest paths remain compatibility fallbacks.
 - Emscripten login fallback was aligned with native `httpLogin` semantics.
 
 ## UX Behavior
@@ -65,6 +83,27 @@ Release cache is scoped per source (`releasesUrl` / repository key), avoiding st
 - Progress supports indeterminate mode when remote does not provide reliable content length.
 - Console logs show major phases and final install paths.
 
+## Validation Evidence
+
+Synthetic fixtures must cover:
+
+- a matching tag/client archive among unrelated legacy, Linux, original and macOS archives;
+- a release containing only unrelated/macOS archives, which must force codeload fallback;
+- a generic tag whose version is present in the release name;
+- idempotent preparation of cached releases;
+- final things/sounds/extras paths;
+- runtime completeness requiring catalog/hash/appearances/static-data files.
+
+Before claiming production runtime archive compatibility, perform a networked rehearsal against the configured real release source on a clean writable directory:
+
+1. record release/tag and selected URL;
+2. verify archive hash/integrity behavior remains strict;
+3. verify final paths and completion marker;
+4. start the exact client version and prove appearances/static data load;
+5. remove the rehearsal directory or retain it only as an external CI artifact, never in Git.
+
+If the execution environment cannot download real release artifacts or start the client, record that as an explicit blocker. Synthetic fixtures and compiled CI do not replace this rehearsal.
+
 ## Troubleshooting
 
 ### 1) Assets appear downloaded but game still cannot load
@@ -73,11 +112,12 @@ Check:
 
 - `data/things/<version>/catalog-content.json`
 - `data/things/<version>/assets.json.sha256`
+- catalog-referenced appearances/static-data files
 - `data/sounds/<version>/catalog-sound.json` (when sounds are enabled)
 
 ### 2) Missing `.lzma` package file
 
-If the console shows a 404 for `*.lzma`, the client is using the manifest fallback instead of the release source ZIP. First check why archive installation failed. The manifest fallback can install raw files through `allowMissingPackedRawFallback`, but this path is slower and should not be the normal flow for clean installs.
+If the console shows a 404 for `*.lzma`, the client is using the manifest fallback instead of a matching release archive/codeload source ZIP. First check why archive installation failed. The manifest fallback can install raw files through `allowMissingPackedRawFallback`, but this path is slower and should not be the normal flow for clean installs.
 
 ### 3) SHA-256 mismatch
 
@@ -96,7 +136,8 @@ If Content-Length is missing, UI may run in indeterminate mode during download a
 When changing this system, validate:
 
 1. Missing assets prompt appears for modern version.
-2. Install completes into `data/things/<version>` and `data/sounds/<version>`.
-3. Runtime loads modern assets from those paths.
-4. Hash verification behavior matches configuration.
-5. Windows/Linux CI remains green; Android does not attempt to resolve unsupported libarchive linkage.
+2. A matching release archive is selected, or the resolver falls back to codeload when no match exists.
+3. Install completes into `data/things/<version>` and `data/sounds/<version>`.
+4. Runtime loads modern assets from those paths.
+5. Hash verification behavior matches configuration.
+6. Windows required CI remains green; dormant platforms require their own acceptance before compatibility claims.

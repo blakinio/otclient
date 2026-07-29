@@ -14,6 +14,7 @@ oteryn-diagnostics = { version = "=0.1.0", path = "../../crates/diagnostics" }
 oteryn-foundation = { version = "=0.1.0", path = "../../crates/foundation" }
 
 [target.'cfg(windows)'.dependencies]
+oteryn-renderer = { version = "=0.1.0", path = "../../crates/renderer" }
 winit = "=0.30.13"
 
 [dev-dependencies]

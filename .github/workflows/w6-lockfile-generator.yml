@@ -7,7 +7,7 @@ on:
       - oteryn-client/Cargo.toml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate-lockfile:
@@ -16,9 +16,11 @@ jobs:
       run:
         working-directory: oteryn-client
     steps:
-      - name: Checkout
+      - name: Checkout feature branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          ref: feat/OTC-20260729-synthetic-asset-schema-compiler
+          fetch-depth: 0
           show-progress: false
 
       - name: Install pinned Rust toolchain
@@ -30,18 +32,26 @@ jobs:
           }
           rustup default 1.94.0 | Out-Null
 
-      - name: Generate and emit Cargo.lock
+      - name: Generate and commit Cargo.lock
         shell: pwsh
         run: |
           cargo generate-lockfile
           if ($LASTEXITCODE -ne 0) {
             throw "cargo generate-lockfile failed"
           }
-          $bytes = [System.IO.File]::ReadAllBytes("Cargo.lock")
-          $encoded = [Convert]::ToBase64String($bytes)
-          Write-Host "LOCKFILE_BASE64_BEGIN"
-          for ($offset = 0; $offset -lt $encoded.Length; $offset += 1000) {
-            $length = [Math]::Min(1000, $encoded.Length - $offset)
-            Write-Host $encoded.Substring($offset, $length)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Cargo.lock is already current"
+            exit 0
           }
-          Write-Host "LOCKFILE_BASE64_END"
+          git commit -m "build(assets): update generated lockfile"
+          if ($LASTEXITCODE -ne 0) {
+            throw "lockfile commit failed"
+          }
+          git push origin HEAD:feat/OTC-20260729-synthetic-asset-schema-compiler
+          if ($LASTEXITCODE -ne 0) {
+            throw "lockfile push failed"
+          }

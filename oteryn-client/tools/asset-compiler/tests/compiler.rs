@@ -1,5 +1,6 @@
 use oteryn_asset_compiler::{CompilerError, compile_manifest};
 use oteryn_asset_types::AssetError;
+use serde_json::json;
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -47,15 +48,29 @@ impl Drop for TestDirectory {
 }
 
 fn blob_entry(id: u32, source: &str) -> String {
-    format!(
-        r#"{{"id":{id},"kind":"blob","name":"blob-{id}","source":"{source}","license":"CC0-1.0","provenance":"original synthetic test fixture"}}"#
-    )
+    json!({
+        "id": id,
+        "kind": "blob",
+        "name": format!("blob-{id}"),
+        "source": source,
+        "license": "CC0-1.0",
+        "provenance": "original synthetic test fixture"
+    })
+    .to_string()
 }
 
 fn rgba_entry(id: u32, source: &str) -> String {
-    format!(
-        r#"{{"id":{id},"kind":"rgba8","name":"rgba-{id}","source":"{source}","license":"CC0-1.0","provenance":"original synthetic test fixture","width":2,"height":2}}"#
-    )
+    json!({
+        "id": id,
+        "kind": "rgba8",
+        "name": format!("rgba-{id}"),
+        "source": source,
+        "license": "CC0-1.0",
+        "provenance": "original synthetic test fixture",
+        "width": 2,
+        "height": 2
+    })
+    .to_string()
 }
 
 fn manifest(entries: &str) -> String {

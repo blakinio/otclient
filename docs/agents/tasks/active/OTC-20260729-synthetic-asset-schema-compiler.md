@@ -10,8 +10,8 @@ parallel_lane_state: active
 branch: feat/OTC-20260729-synthetic-asset-schema-compiler
 base_branch: main
 created: 2026-07-29T20:05:00+02:00
-updated: 2026-07-29T23:42:00+02:00
-last_verified_commit: "7cb689b4e1410f30539384428923fda57bbfa263"
+updated: 2026-07-30T00:01:20+02:00
+last_verified_commit: "bfc06d7b3dff70db895be3063e1512e6fd215e2b"
 required_base_commit: "8094d9075fecd7b7c3de0d1b0eb400207a839776"
 risk: medium
 related_pr: "#92"
@@ -111,8 +111,8 @@ No asset runtime, mounting, streaming, cache, activation, renderer/GPU integrati
 - [x] Cargo/lockfile/docs are integrated under the unique lease without policy weakening.
 - [x] Evidence document distinguishes automated proof from production/runtime/legal blockers.
 - [x] Current changed-file inventory is exactly 18 authorized paths with no workflow, toolchain, architecture-checker, `deny.toml` or `REPOSITORY_LAYOUT.md` change.
-- [ ] Complete final synchronized full-diff review passes.
-- [ ] Exact-head Rust Client and repository required CI pass after this task synchronization.
+- [x] Complete final synchronized full-diff review passes.
+- [x] Exact-head Rust Client and repository required CI pass after task synchronization.
 - [ ] PR squash-merges and the task archives separately.
 
 # Validation history
@@ -123,10 +123,13 @@ No asset runtime, mounting, streaming, cache, activation, renderer/GPU integrati
 - A temporary Rust 1.94 formatter applied exact `cargo fmt --all`; its workflow was then deleted and is absent from the PR diff.
 - Rust run `30479263818` passed locked metadata, formatting, Clippy and Supply Chain; one test helper encoded a backslash path as invalid JSON before path validation.
 - The helper now serializes source values through `serde_json`, so the portable path test reaches the intended validator.
-- Rust run `30479573355` on implementation head `142a0b657d128d9e26b1a54c4f768a75aa722673` passed locked metadata, formatting, Clippy, all workspace tests, architecture policy and Supply Chain. Windows job `90669816067` and Supply Chain job `90669816059` succeeded.
-- Required evidence and integration documentation were added after that run, so final exact-head validation is pending on the synchronized task head.
+- Rust run `30479573355` on implementation head `142a0b657d128d9e26b1a54c4f768a75aa722673` passed locked metadata, formatting, Clippy, all workspace tests, architecture policy and Supply Chain.
+- Rust run `30481944434` on synchronized head `7cb689b4e1410f30539384428923fda57bbfa263` passed locked metadata and Supply Chain but exposed only Rust 1.94 formatting differences in `tools/asset-compiler/tests/compiler.rs`.
+- The exact Rust 1.94 formatter output was applied; the temporary workflow was removed, and compare `983965a4..bfc06d7b` contains only the formatting change in `compiler.rs`.
+- Exact-head Rust Client run `30494270010` on `bfc06d7b3dff70db895be3063e1512e6fd215e2b` passed locked metadata, formatting, Clippy, all workspace tests, architecture policy and Supply Chain.
+- Exact-head repository CI run `30494270556` on `bfc06d7b3dff70db895be3063e1512e6fd215e2b` passed.
 
-# Final scope before exact-head validation
+# Final scope before merge
 
 Exactly 18 paths:
 
@@ -155,7 +158,7 @@ Automated synthetic compiler evidence does not prove real Tibia/Canary format co
 
 # Completion
 
-- Final status: in progress
+- Final status: ready for merge after checkpoint-only exact-head CI.
 - PR: #92
 - Merge commit: pending
 - Shared-path lease: active
@@ -165,8 +168,8 @@ Automated synthetic compiler evidence does not prove real Tibia/Canary format co
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-29T21:42:00Z
-head: 7cb689b4e1410f30539384428923fda57bbfa263
+updated_at: 2026-07-29T22:01:20Z
+head: bfc06d7b3dff70db895be3063e1512e6fd215e2b
 branch: feat/OTC-20260729-synthetic-asset-schema-compiler
 pr: 92
 status: validating
@@ -186,24 +189,25 @@ owned_paths:
   - docs/agents/BUILD_TEST_MATRIX.md
   - docs/agents/CHANGELOG.md
 proven:
-  - PR #92 is open, non-draft and mergeable with 18 authorized changed paths at head 7cb689b4e1410f30539384428923fda57bbfa263.
-  - Rust Client run 30479573355 passed locked metadata, formatting, Clippy, tests, architecture and Supply Chain on implementation head 142a0b657d128d9e26b1a54c4f768a75aa722673.
-  - Current-head Rust Client run 30481944434 passed locked metadata and Supply Chain but failed Windows formatting in compiler.rs.
-  - Current-head repository CI run 30481944797 passed.
-  - PR #93 explicitly defers docs/agents/CHANGELOG.md while this task holds the shared-path lease.
+  - PR #92 is open, non-draft and mergeable with exactly 18 authorized changed paths on head bfc06d7b3dff70db895be3063e1512e6fd215e2b.
+  - Exact-head Rust Client run 30494270010 passed locked metadata, Rust 1.94 formatting, Clippy, all workspace tests, architecture policy and Supply Chain.
+  - Exact-head repository CI run 30494270556 passed.
+  - Compare 983965a4..bfc06d7b contains only the formatter-generated compiler.rs change; the temporary workflow is absent from the final tree and PR diff.
+  - PR #92 has no review submissions, requested changes or unresolved review threads.
 derived:
-  - The first current merge-gate blocker is mechanical rustfmt output in asset-compiler tests, not dependency, architecture or supply-chain policy.
-  - A full preflight is unnecessary unless main, ownership or the shared-path lease changes.
+  - The formatting blocker is fixed and all implementation acceptance criteria are satisfied.
+  - Only checkpoint-only exact-head CI, squash merge and separate task archival remain.
 unknown:
-  - Exact final Rust Client outcome after the formatting-only fix.
+  - Exact checkpoint-only CI outcome and final squash merge SHA.
 conflicts:
   - none
 first_failure:
-  marker: Rust Client / Windows -> Check formatting
-  evidence: run 30481944434 job 90677971694; rustfmt diff begins at oteryn-client/tools/asset-compiler/tests/compiler.rs:204
+  marker: none
+  evidence: none
 rejected_hypotheses:
-  - stale lockfile: current-head locked metadata passed in run 30481944434
-  - supply-chain policy failure: job 90677971571 passed advisories, licenses, bans and sources
+  - stale lockfile: locked metadata passed in exact-head run 30494270010
+  - formatting failure: cargo fmt --all --check passed in exact-head run 30494270010
+  - supply-chain policy failure: Supply Chain passed in exact-head run 30494270010
 changed_paths:
   - docs/agents/BUILD_TEST_MATRIX.md
   - docs/agents/CHANGELOG.md
@@ -224,16 +228,13 @@ changed_paths:
   - oteryn-client/tools/asset-compiler/src/main.rs
   - oteryn-client/tools/asset-compiler/tests/compiler.rs
 validation:
-  - command: Rust Client run 30479573355
+  - command: Rust Client run 30494270010
     result: PASS
-    evidence: implementation head 142a0b657d128d9e26b1a54c4f768a75aa722673; all Windows workspace and Supply Chain steps passed
-  - command: Rust Client run 30481944434
-    result: FAIL
-    evidence: current head; first failure cargo fmt --all --check in job 90677971694
-  - command: Repository CI run 30481944797
+    evidence: head bfc06d7b3dff70db895be3063e1512e6fd215e2b; Windows workspace and Supply Chain jobs succeeded
+  - command: Repository CI run 30494270556
     result: PASS
-    evidence: current-head required repository graph passed
+    evidence: head bfc06d7b3dff70db895be3063e1512e6fd215e2b; required repository graph succeeded
 blockers:
-  - Current head fails the required Rust formatting check.
-next_action: Apply pinned Rust 1.94 cargo fmt --all output to oteryn-client/tools/asset-compiler/tests/compiler.rs and push the formatting-only fix to PR #92.
+  - none
+next_action: Verify checkpoint-only exact-head CI and squash-merge PR #92 when all required checks pass.
 ```

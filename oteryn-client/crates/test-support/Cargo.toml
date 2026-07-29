@@ -1,0 +1,17 @@
+[package]
+name = "oteryn-test-support"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.oteryn]
+category = "tool"
+
+[dependencies]
+oteryn-diagnostics = { version = "=0.1.0", path = "../diagnostics" }
+oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+
+[lints]
+workspace = true

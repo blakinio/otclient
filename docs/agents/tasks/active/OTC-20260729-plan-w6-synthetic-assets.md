@@ -10,11 +10,11 @@ parallel_lane_state: active
 branch: docs/OTC-20260729-plan-w6-synthetic-assets
 base_branch: main
 created: 2026-07-29T19:43:00+02:00
-updated: 2026-07-29T19:43:00+02:00
-last_verified_commit: "0aa75744a1cad0fad987f56545088f54b9adc098"
+updated: 2026-07-29T19:50:00+02:00
+last_verified_commit: "4cf07725dd3418977b95f3c11c25edb021ee9373"
 required_base_commit: "0aa75744a1cad0fad987f56545088f54b9adc098"
 risk: low
-related_pr: pending
+related_pr: "#90"
 depends_on:
   - W5 renderer surface PR #86 and archive PR #87
   - W5 closure PR #88 and archive PR #89
@@ -64,7 +64,7 @@ Accept one bounded W6 plan for a normalized synthetic asset schema and determini
 - Workspace Rust is 1.94; `serde_json = "=1.0.145"` is already an exact workspace dependency and passed current cargo-deny.
 - Primary crate evidence reviewed on 2026-07-29 supports candidate `sha2 0.11.0`, MIT OR Apache-2.0, Rust 1.85; the worker must revalidate exact source/features/advisories and cargo-deny before adoption.
 
-# Proposed accepted wave
+# Accepted wave
 
 Exactly one implementation lane `W6-ASSET` after this plan and its separate archive merge.
 
@@ -167,15 +167,21 @@ No production pack, legal redistribution, compatibility, security-signature or p
 # Acceptance criteria
 
 - [x] Fresh live preflight and ownership check completed.
-- [ ] Current wave, coordinator routing, worker prompt and README consistently authorize exactly one W6 worker only after plan archive.
-- [ ] Plan changes exactly five documentation paths.
-- [ ] No implementation, dependency, lease, source, Cargo, lockfile, CI or asset byte is added.
+- [x] Current wave, coordinator routing, worker prompt and README consistently authorize exactly one W6 worker only after plan archive.
+- [x] Plan changes exactly five documentation paths.
+- [x] No implementation, dependency, lease, source, Cargo, lockfile, CI or asset byte is added.
 - [ ] Exact-head required CI passes; plan merges and archives independently.
+
+# Validation state
+
+- PR #90 opened as draft before final task synchronization.
+- Complete five-path scope review passed on predecessor head `4cf07725dd3418977b95f3c11c25edb021ee9373`.
+- Exact-head Rust Client and repository CI are pending on the synchronized task head.
 
 # Completion
 
 - Final status: in progress
-- PR: pending
+- PR: #90
 - Merge commit: pending
 - Shared-path lease: none
 - Worker launch: prohibited until plan archive merge and fresh overlap check

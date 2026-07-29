@@ -10,8 +10,8 @@ parallel_lane_state: validating
 branch: docs/OTC-20260729-plan-w5-render-surface
 base_branch: main
 created: 2026-07-29T15:31:00+02:00
-updated: 2026-07-29T15:44:00+02:00
-last_verified_commit: "0f369ed20ff640284a15b63375c1f1397b591564"
+updated: 2026-07-29T15:48:00+02:00
+last_verified_commit: "383e7942e972822b3c05870e820946f266799863"
 required_base_commit: "37c9b3496eef4b7360bf9f5d753491540b5a2727"
 risk: low
 related_pr: "#84"
@@ -68,7 +68,7 @@ Accept one bounded W5 launch plan for a renderer surface-ownership spike that co
 - [x] No global renderer singleton, hidden service, reusable async runtime or scheduler is authorized.
 - [x] Interactive GPU, driver, hardware and performance claims remain explicitly blocked unless genuinely observed.
 - [x] Planning changes no Rust source, Cargo, lockfile, dependency policy, CI, architecture or legacy runtime.
-- [ ] Exact-head required CI passes; plan merges and archives independently before any worker task/branch/lease exists.
+- [ ] Final task-record head passes exact required CI; plan merges and archives independently before any worker task/branch/lease exists.
 
 # Live preflight
 
@@ -146,7 +146,9 @@ docs/agents/CHANGELOG.md
 | Revision | Check | Result |
 |---|---|---|
 | `37c9b3496eef4b7360bf9f5d753491540b5a2727` | live base/open-PR/active-task/lease preflight | PASS |
-| `0f369ed20ff640284a15b63375c1f1397b591564` | complete five-file path/content review | PASS |
+| `383e7942e972822b3c05870e820946f266799863` | complete five-file path/content review | PASS |
+| `383e7942e972822b3c05870e820946f266799863` | Rust Client run `30457406425` | PASS: Windows workspace and Supply Chain |
+| `383e7942e972822b3c05870e820946f266799863` | repository CI run `30457407027` | PASS: all emitted required jobs and `CI / Required` |
 | final task-record head | exact-head required CI pending |
 
 # Boundaries
@@ -155,7 +157,7 @@ This plan changes coordination documentation only. It creates no worker task, im
 
 # Completion
 
-- Final status: awaiting exact-head CI
+- Final status: awaiting final exact-head CI
 - PR: #84
 - Merge commit: pending
 - Worker launch: prohibited until plan and plan archive merge

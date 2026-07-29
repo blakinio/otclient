@@ -4,4 +4,6 @@ Module
   author: OTClient team
   website: https://github.com/opentibiabr/otclient
   sandboxed: true
-  scripts: [ client_assets ]
+  scripts: [ client_assets, client_assets_release_selector, client_assets_release_adapter ]
+  @onLoad: ClientAssetsReleaseAdapter.init()
+  @onUnload: ClientAssetsReleaseAdapter.terminate()

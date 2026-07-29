@@ -31,7 +31,9 @@ oteryn-client/
 ├── apps/
 │   ├── client/
 │   │   ├── Cargo.toml
-│   │   └── src/main.rs
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       └── main.rs
 │   └── launcher/
 │       ├── Cargo.toml
 │       └── src/main.rs
@@ -146,6 +148,8 @@ oteryn-client/
 
 `test-support` is physically under `crates/` because it is a reusable library package, but it declares architecture category `tool`. It may consume reviewed lower contracts for tests and must never become a runtime service locator.
 
+`apps/client` is the concrete `app` package. Its current W4 boundary is only deterministic shell state plus a main-thread blank-window adapter; renderer, protocol, feature composition and persistence remain absent.
+
 ## 4. Feature crate contract
 
 Each first-party feature follows a predictable structure:
@@ -209,7 +213,7 @@ foundation
 └── Rust standard library and separately reviewed non-product dependencies only
 ```
 
-`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service.
+`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. The current `apps/client` shell may depend on foundation/diagnostics and the exact windowing library, but it owns no renderer or product service.
 
 ## 6. Cargo workspace policy
 

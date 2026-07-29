@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "apps/client",
     "crates/diagnostics",
     "crates/foundation",
     "crates/test-support",

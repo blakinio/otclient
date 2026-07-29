@@ -5,16 +5,17 @@ Required compiled platform: Windows x86-64 MSVC
 
 ## Scope
 
-The workspace contains four bounded members:
+The workspace contains five bounded members:
 
 ```text
+apps/client
 crates/foundation
 crates/diagnostics
 crates/test-support
 tools/architecture-check
 ```
 
-`oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. None is the client, launcher, renderer, protocol stack, domain, UI, asset runtime or extension host.
+`oteryn-client` is the bounded Windows blank-window application shell. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Renderer, protocol stack, domain, product UI, asset runtime and extension host remain absent.
 
 Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
 
@@ -63,11 +64,13 @@ category = "foundation"
 - avoid external git/path sources unless a later focused policy change explicitly approves them;
 - avoid a dependency on legacy `src/`, `modules` or `mods` runtime code/content.
 
-Known categories are defined by the architecture checker and follow the accepted architecture, including `foundation`, `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.
+Known categories are defined by the architecture checker and follow the accepted architecture, including `app`, `foundation`, `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.
 
 `foundation` is the bottom reusable category. It must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. Lower product layers may depend on it only for generic primitives that do not encode product/server behavior.
 
 `tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. The current `oteryn-test-support` tool depends only on `foundation` and `diagnostics`.
+
+The current `app` package depends directly on foundation/diagnostics and exact `winit 0.30.13`; `oteryn-test-support` is dev-only. It must not absorb renderer, protocol, feature, persistence or direct Win32 responsibilities.
 
 Adding or changing a category is an architecture-policy change. Update the checker, synthetic positive/negative fixtures, architecture/workstream documentation and module catalogue in one focused PR.
 
@@ -155,6 +158,18 @@ It installs no global logger/subscriber or sink and performs no file, network, t
 
 It defines no second clock trait/implementation, wall-clock source, sleep, polling loop, timer wheel, async runtime, executor, scheduler, hidden production thread, global registry, environment mutation, logger/sink, product service or external fixture loader. Thread tests use explicit barriers only to prove shared manual-clock observation.
 
+## Windows application-shell contract
+
+`oteryn-client` currently owns only:
+
+- deterministic `ShellState`, phase, command, error and window-snapshot contracts;
+- bounded lifecycle diagnostics using reviewed diagnostics values;
+- one main-thread `winit::ApplicationHandler` that creates one blank resizable window;
+- one named one-shot proxy-wake thread joined after the event loop returns;
+- explicit runtime-evidence blockers in `docs/research/windows-platform/W4_RUNTIME_EVIDENCE.md`.
+
+It owns no renderer/GPU surface, direct Win32/FFI, unsafe code, async runtime, protocol, identity, networking, assets, audio, feature UI, persistence or updater. Compilation on a hosted Windows runner is not an interactive compatibility claim.
+
 ## Lint and unsafe policy
 
 Workspace Rust policy:
@@ -180,7 +195,7 @@ The current workspace crates contain no unsafe code and no native/FFI dependency
 
 Do not broaden license/source policy merely to make CI green. Investigate the exact dependency and either reject it, replace it or update policy through a reviewed task with legal/security rationale.
 
-The workspace pins only `serde_json` for the architecture tool's Cargo metadata and synthetic JSON fixtures. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. Application dependencies such as GPU, windowing, async, HTTP/TLS, text, audio or WebAssembly runtimes remain outside these packages.
+The workspace pins `serde_json` for the architecture tool and exact `winit 0.30.13` for the Windows application shell. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. GPU, async, HTTP/TLS, text, audio and WebAssembly runtimes remain absent.
 
 ## CI behavior
 
@@ -217,4 +232,4 @@ The expected next package is selected after live preflight. It must not be folde
 
 ## Rollback
 
-The current foundation, diagnostics and test-support packages have no runtime or user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output and caches are transient and are never repository or release truth.
+The current foundation, diagnostics, test-support and blank-window shell packages have no user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output and caches are transient and are never repository or release truth.

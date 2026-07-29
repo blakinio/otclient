@@ -23,10 +23,22 @@ add_test(
         ${CMAKE_CURRENT_SOURCE_DIR}/unit/wheel_conviction_indices_test.lua
         ${CMAKE_CURRENT_SOURCE_DIR}/unit/forge_event_lifecycle_test.lua
         ${CMAKE_CURRENT_SOURCE_DIR}/unit/forge_event_lifecycle_adapter_test.lua
-        ${CMAKE_CURRENT_SOURCE_DIR}/unit/options_phase0_test.lua
 )
 set_tests_properties(otclient_lua_unit_tests PROPERTIES
     LABELS "lua;unit"
+    TIMEOUT 15
+)
+
+add_test(
+    NAME otclient_lua_options_phase0_test
+    COMMAND ${CMAKE_COMMAND} -E env
+        "OTCLIENT_SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+        ${OTCLIENT_LUA_EXECUTABLE}
+        ${OTCLIENT_LUA_RUNNER}
+        ${CMAKE_CURRENT_SOURCE_DIR}/unit/options_phase0_test.lua
+)
+set_tests_properties(otclient_lua_options_phase0_test PROPERTIES
+    LABELS "lua;unit;options"
     TIMEOUT 15
 )
 

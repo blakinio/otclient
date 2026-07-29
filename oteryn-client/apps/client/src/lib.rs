@@ -678,7 +678,7 @@ mod tests {
 
         assert_eq!(
             display,
-            "shell rejected stale process generation process-generation:2; current generation is process-generation:3"
+            "shell rejected stale process generation 2; current generation is 3"
         );
         assert!(!debug.contains("token"));
         assert!(!display.contains("secret"));

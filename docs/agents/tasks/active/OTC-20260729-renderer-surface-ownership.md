@@ -11,8 +11,8 @@ coordinator_task: OTC-20260729-plan-w5-render-surface
 branch: feat/OTC-20260729-renderer-surface-ownership
 base_branch: main
 created: 2026-07-29T16:04:00+02:00
-updated: 2026-07-29T17:18:00+02:00
-last_verified_commit: "e9dcf70e8d60bcb5ba3e82280482108d43306f5f"
+updated: 2026-07-29T17:56:00+02:00
+last_verified_commit: "6c0683b4ed702a913b41d170dd6840b360a0a29b"
 required_base_commit: "e9dcf70e8d60bcb5ba3e82280482108d43306f5f"
 risk: medium
 related_pr: "#86"
@@ -87,8 +87,8 @@ Add exactly one `oteryn-renderer` package and narrowly compose it into the merge
 - [x] Fatal renderer failures route through the existing shell close path and renderer resources release before the window.
 - [x] No game rendering, assets, shaders/pipelines, UI, protocol, identity, network, audio, persistence or extensions.
 - [x] No direct Win32/windows-sys/raw-window-handle dependency, unsafe, global singleton, reusable async runtime or scheduler.
-- [ ] Runtime evidence distinguishes automated PASS from interactive BLOCKED cases.
-- [ ] Workspace, generated lockfile, dependency policy and owner documentation are current.
+- [x] Runtime evidence distinguishes automated PASS from interactive BLOCKED cases.
+- [x] Workspace, generated lockfile, dependency policy and owner documentation are current.
 - [ ] Exact-head Windows, supply-chain, architecture and repository CI pass; PR merges and task archives independently.
 
 # Live preflight
@@ -118,8 +118,15 @@ Add exactly one `oteryn-renderer` package and narrowly compose it into the merge
 - Reviewed root/nested agent policy, the accepted W5 wave, architecture checker, application-shell source and foundation generation contract.
 - Revalidated the exact `wgpu 30.0.0` surface acquisition/recovery API and `pollster 1.0.1` synchronous bootstrap contract from current primary documentation.
 - The execution environment has no local Rust/Cargo toolchain and cannot resolve GitHub for a clone, while repository access remains available through the GitHub connector.
-- To avoid manually fabricating `Cargo.lock`, one transient CI bootstrap commit will run `cargo generate-lockfile` and upload only the generated lockfile. The workflow change must be reverted immediately after retrieval and cannot appear in the final diff or final validation head.
-- No local compile/test result is claimed; exact hosted Windows, architecture and cargo-deny evidence remains mandatory on the final unmodified workflow.
+- To avoid manually fabricating `Cargo.lock`, a transient CI bootstrap generated and committed the official lockfile and `cargo fmt` output. The repository workflow was restored byte-for-byte before compiled validation and is absent from the final diff.
+- No local compile/test result is claimed; exact hosted Windows, architecture and cargo-deny evidence remains authoritative.
+
+## 2026-07-29 compiled validation before owner-document synchronization
+
+- Run `30468058146` on `6c0683b4ed702a913b41d170dd6840b360a0a29b` passed locked metadata, formatting, Clippy, all workspace tests, architecture validation and supply-chain policy.
+- The exact wgpu graph required OSI-approved ISC/Zlib licenses and two unavoidable duplicate branches (`hashbrown 0.16.1` and `syn 3.0.3`); `deny.toml` records only those narrow exceptions and cargo-deny passed.
+- Runtime evidence now separates deterministic automated PASS from interactive Windows/GPU/driver/hardware/recovery/performance BLOCKED cases.
+- This run is implementation evidence only. Owner-document changes require a fresh final exact-head Rust and repository CI graph before ready/merge.
 
 # Boundaries
 

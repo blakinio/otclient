@@ -5,17 +5,18 @@ Required compiled platform: Windows x86-64 MSVC
 
 ## Scope
 
-The workspace contains five bounded members:
+The workspace contains six bounded members:
 
 ```text
 apps/client
 crates/foundation
+crates/renderer
 crates/diagnostics
 crates/test-support
 tools/architecture-check
 ```
 
-`oteryn-client` is the bounded Windows blank-window application shell. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Renderer, protocol stack, domain, product UI, asset runtime and extension host remain absent.
+`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Protocol stack, domain/game rendering, product UI, asset runtime and extension host remain absent.
 
 Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
 
@@ -70,7 +71,7 @@ Known categories are defined by the architecture checker and follow the accepted
 
 `tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. The current `oteryn-test-support` tool depends only on `foundation` and `diagnostics`.
 
-The current `app` package depends directly on foundation/diagnostics and exact `winit 0.30.13`; `oteryn-test-support` is dev-only. It must not absorb renderer, protocol, feature, persistence or direct Win32 responsibilities.
+The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13` and the Windows-only `oteryn-renderer` composition contract; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; the app must not absorb protocol, feature, persistence or direct Win32 responsibilities.
 
 Adding or changing a category is an architecture-policy change. Update the checker, synthetic positive/negative fixtures, architecture/workstream documentation and module catalogue in one focused PR.
 
@@ -164,11 +165,22 @@ It defines no second clock trait/implementation, wall-clock source, sleep, polli
 
 - deterministic `ShellState`, phase, command, error and window-snapshot contracts;
 - bounded lifecycle diagnostics using reviewed diagnostics values;
-- one main-thread `winit::ApplicationHandler` that creates one blank resizable window;
+- one main-thread `winit::ApplicationHandler` that creates one resizable window;
 - one named one-shot proxy-wake thread joined after the event loop returns;
-- explicit runtime-evidence blockers in `docs/research/windows-platform/W4_RUNTIME_EVIDENCE.md`.
+- explicit shell runtime-evidence blockers in `docs/research/windows-platform/W4_RUNTIME_EVIDENCE.md`.
 
-It owns no renderer/GPU surface, direct Win32/FFI, unsafe code, async runtime, protocol, identity, networking, assets, audio, feature UI, persistence or updater. Compilation on a hosted Windows runner is not an interactive compatibility claim.
+It owns no GPU resources directly, direct Win32/FFI, unsafe code, async runtime, protocol, identity, networking, assets, audio, feature UI, persistence or updater. It composes `oteryn-renderer`, releases renderer resources before the window and routes fatal renderer errors through the existing close path. Compilation on a hosted Windows runner is not an interactive compatibility claim.
+
+## Renderer surface contract
+
+`oteryn-renderer` owns:
+
+- typed `SurfaceState`, `SurfaceEvent`, `SurfaceDecision` and closed `RendererError` contracts keyed by `ProcessGeneration`;
+- transactional CPU-side unconfigured/configured/suspended/lost/closing transitions, zero-size suspension, bounded recovery, checked counters and idempotent close;
+- on Windows, one exact DX12 wgpu instance/surface/adapter/device/queue owner and one constant original clear/present path;
+- one synchronous main-thread `pollster::block_on` bootstrap and event-driven redraw only.
+
+It owns no game/map/entity rendering, assets, textures, shader modules or pipelines, render graph, UI, protocol, identity, network, audio, persistence, extension runtime, global singleton, background service, scheduler or new worker thread. Hosted Windows CI proves compilation and deterministic tests only; interactive presentation, real resize/minimize/suspend/resume, surface/device loss, driver/hardware and performance remain blocked in `docs/research/renderer/W5_RUNTIME_EVIDENCE.md`.
 
 ## Lint and unsafe policy
 
@@ -180,7 +192,7 @@ Workspace Rust policy:
 - exceptions require a narrow owning package, documented reason and tests rather than a workspace-wide allowance;
 - external-input parsers need explicit bounded error handling in their later workstreams.
 
-The current workspace crates contain no unsafe code and no native/FFI dependency.
+Workspace source contains no unsafe code or direct native/FFI dependency. The exact `wgpu` DX12 graph owns reviewed transitive platform bindings; application and renderer source do not call them directly.
 
 ## Supply-chain policy
 
@@ -188,14 +200,14 @@ The current workspace crates contain no unsafe code and no native/FFI dependency
 
 - denies known advisories and yanked releases;
 - denies wildcard dependencies;
-- denies duplicate dependency versions;
-- permits the explicit initial license set only;
+- denies duplicate dependency versions except documented exact graph branches;
+- permits the explicit reviewed license set only;
 - denies unknown registries and git sources;
 - permits crates.io as the external registry.
 
 Do not broaden license/source policy merely to make CI green. Investigate the exact dependency and either reject it, replace it or update policy through a reviewed task with legal/security rationale.
 
-The workspace pins `serde_json` for the architecture tool and exact `winit 0.30.13` for the Windows application shell. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. GPU, async, HTTP/TLS, text, audio and WebAssembly runtimes remain absent.
+The workspace pins `serde_json` for the architecture tool, exact `winit 0.30.13` for the Windows application shell, exact `wgpu 30.0.0` with defaults disabled plus `std`/`dx12`, and exact `pollster 1.0.1` for one synchronous main-thread bootstrap. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. `deny.toml` explicitly permits the OSI-approved ISC and Zlib licenses required by the fixed wgpu graph and narrowly skips only its unavoidable `hashbrown 0.16.1` and `syn 3.0.3` duplicate branches. HTTP/TLS, text, audio and WebAssembly runtimes remain absent.
 
 ## CI behavior
 
@@ -232,4 +244,4 @@ The expected next package is selected after live preflight. It must not be folde
 
 ## Rollback
 
-The current foundation, diagnostics, test-support and blank-window shell packages have no user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output and caches are transient and are never repository or release truth.
+The current foundation, diagnostics, test-support, renderer and application-shell packages have no user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output and caches are transient and are never repository or release truth.

@@ -134,7 +134,7 @@ oteryn-client/
 | `game-simulation` | mutable session state and deterministic systems | rendering backend |
 | `world-storage` | chunks, entities, arenas and spatial queries | protocol logic |
 | `render-types` | backend-neutral extracted render data | game mutation |
-| `renderer` | GPU resources, render graph and presentation | feature business logic |
+| `renderer` | deterministic surface lifecycle, GPU instance/surface/adapter/device/queue ownership and bounded presentation | feature business logic, game rendering, UI or protocol |
 | `ui-core` | primitives, layout, input routing, accessibility | inventory/chat specifics |
 | `ui-runtime` | view-model binding, panel registry, persistence | protocol bytes |
 | `input` | devices, bindings, contexts and semantic actions | direct socket writes |
@@ -148,7 +148,7 @@ oteryn-client/
 
 `test-support` is physically under `crates/` because it is a reusable library package, but it declares architecture category `tool`. It may consume reviewed lower contracts for tests and must never become a runtime service locator.
 
-`apps/client` is the concrete `app` package. Its current W4 boundary is only deterministic shell state plus a main-thread blank-window adapter; renderer, protocol, feature composition and persistence remain absent.
+`apps/client` is the concrete `app` package. Its current W5 boundary composes deterministic shell state with the single `oteryn-renderer` surface owner on the main thread. Protocol, game/domain rendering, feature composition, assets, UI and persistence remain absent.
 
 ## 4. Feature crate contract
 
@@ -213,7 +213,7 @@ foundation
 └── Rust standard library and separately reviewed non-product dependencies only
 ```
 
-`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. The current `apps/client` shell may depend on foundation/diagnostics and the exact windowing library, but it owns no renderer or product service.
+`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. The current `apps/client` shell depends on foundation/diagnostics, the exact windowing library and the bounded `renderer` crate for concrete Windows composition. Renderer depends only on foundation plus its exact GPU dependencies and owns no feature, protocol, asset or UI service.
 
 ## 6. Cargo workspace policy
 

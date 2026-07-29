@@ -1,5 +1,5 @@
-use oteryn_asset_compiler::{CompilerError, compile_manifest};
-use oteryn_asset_types::AssetError;
+use oteryn_asset_compiler::{CompilerError, MAX_MANIFEST_BYTES, compile_manifest};
+use oteryn_asset_types::{AssetError, MAX_ASSET_BYTES, MAX_RECORDS};
 use serde_json::json;
 use std::env;
 use std::error::Error;
@@ -152,6 +152,22 @@ fn directories_are_not_accepted_as_sources() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn oversized_source_is_rejected_before_reading() -> Result<(), Box<dyn Error>> {
+    let directory = TestDirectory::new()?;
+    let source = fs::File::create(directory.path().join("oversized.bin"))?;
+    source.set_len(u64::try_from(MAX_ASSET_BYTES + 1)?)?;
+    let manifest_path = directory.write(
+        "manifest.json",
+        manifest(&blob_entry(1, "oversized.bin")).as_bytes(),
+    )?;
+    assert_eq!(
+        compile_manifest(&manifest_path, &directory.path().join("output.pack")),
+        Err(CompilerError::SourceTooLarge)
+    );
+    Ok(())
+}
+
+#[test]
 fn invalid_rgba_dimensions_are_rejected() -> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new()?;
     directory.write("checker.rgba", b"too short")?;
@@ -167,7 +183,7 @@ fn invalid_rgba_dimensions_are_rejected() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn malformed_or_extended_manifest_is_rejected() -> Result<(), Box<dyn Error>> {
+fn malformed_extended_and_unsupported_manifests_are_rejected() -> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new()?;
     let invalid_json = directory.write("invalid.json", b"{")?;
     assert_eq!(
@@ -183,11 +199,88 @@ fn malformed_or_extended_manifest_is_rejected() -> Result<(), Box<dyn Error>> {
         compile_manifest(&extended, &directory.path().join("extended.pack")),
         Err(CompilerError::InvalidManifest)
     );
+
+    let unsupported = directory.write(
+        "unsupported.json",
+        br#"{"schema_version":2,"assets":[]}"#,
+    )?;
+    assert_eq!(
+        compile_manifest(&unsupported, &directory.path().join("unsupported.pack")),
+        Err(CompilerError::UnsupportedManifestVersion)
+    );
     Ok(())
 }
 
 #[test]
-fn existing_final_output_is_preserved() -> Result<(), Box<dyn Error>> {
+fn unknown_kind_and_duplicate_ids_are_rejected() -> Result<(), Box<dyn Error>> {
+    let directory = TestDirectory::new()?;
+    directory.write("blob.txt", b"synthetic blob")?;
+    let unknown_entry = json!({
+        "id": 1,
+        "kind": "audio",
+        "name": "unknown",
+        "source": "blob.txt",
+        "license": "CC0-1.0",
+        "provenance": "original synthetic test fixture"
+    })
+    .to_string();
+    let unknown_manifest = directory.write(
+        "unknown.json",
+        manifest(&unknown_entry).as_bytes(),
+    )?;
+    assert_eq!(
+        compile_manifest(&unknown_manifest, &directory.path().join("unknown.pack")),
+        Err(CompilerError::UnknownAssetKind)
+    );
+
+    let duplicate_manifest = directory.write(
+        "duplicate.json",
+        manifest(&format!(
+            "{},{}",
+            blob_entry(7, "blob.txt"),
+            blob_entry(7, "blob.txt")
+        ))
+        .as_bytes(),
+    )?;
+    assert_eq!(
+        compile_manifest(&duplicate_manifest, &directory.path().join("duplicate.pack")),
+        Err(CompilerError::Asset(AssetError::DuplicateId))
+    );
+    Ok(())
+}
+
+#[test]
+fn manifest_size_and_record_count_are_bounded() -> Result<(), Box<dyn Error>> {
+    let directory = TestDirectory::new()?;
+    let oversized = directory.write(
+        "oversized.json",
+        &vec![b' '; MAX_MANIFEST_BYTES + 1],
+    )?;
+    assert_eq!(
+        compile_manifest(&oversized, &directory.path().join("oversized.pack")),
+        Err(CompilerError::ManifestTooLarge)
+    );
+
+    let entries = (0..=MAX_RECORDS)
+        .map(|index| {
+            u32::try_from(index + 1)
+                .map(|id| blob_entry(id, "missing.bin"))
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .join(",");
+    let too_many = directory.write(
+        "too-many.json",
+        manifest(&entries).as_bytes(),
+    )?;
+    assert_eq!(
+        compile_manifest(&too_many, &directory.path().join("too-many.pack")),
+        Err(CompilerError::TooManyAssets)
+    );
+    Ok(())
+}
+
+#[test]
+fn existing_final_and_temporary_outputs_are_preserved() -> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new()?;
     directory.write("blob.txt", b"synthetic blob")?;
     let manifest_path = directory.write(
@@ -199,7 +292,16 @@ fn existing_final_output_is_preserved() -> Result<(), Box<dyn Error>> {
         compile_manifest(&manifest_path, &output),
         Err(CompilerError::OutputExists)
     );
-    assert_eq!(fs::read(output)?, b"existing valid output");
+    assert_eq!(fs::read(&output)?, b"existing valid output");
+
+    fs::remove_file(&output)?;
+    let temporary = directory.write(".output.pack.oteryn-tmp", b"stale temporary output")?;
+    assert_eq!(
+        compile_manifest(&manifest_path, &output),
+        Err(CompilerError::TemporaryOutputExists)
+    );
+    assert_eq!(fs::read(temporary)?, b"stale temporary output");
+    assert!(!output.exists());
     Ok(())
 }
 
@@ -225,26 +327,46 @@ fn pack_does_not_embed_absolute_source_paths() -> Result<(), Box<dyn Error>> {
 
 #[cfg(unix)]
 #[test]
-fn symbolic_link_sources_are_rejected_on_unix() -> Result<(), Box<dyn Error>> {
+fn symbolic_links_and_special_files_are_rejected_on_unix() -> Result<(), Box<dyn Error>> {
     use std::os::unix::fs::symlink;
+    use std::os::unix::net::UnixListener;
 
     let directory = TestDirectory::new()?;
     directory.write("real.bin", b"synthetic")?;
     symlink("real.bin", directory.path().join("link.bin"))?;
-    let manifest_path = directory.write(
-        "manifest.json",
+    let link_manifest = directory.write(
+        "link.json",
         manifest(&blob_entry(1, "link.bin")).as_bytes(),
     )?;
     assert_eq!(
-        compile_manifest(&manifest_path, &directory.path().join("output.pack")),
+        compile_manifest(&link_manifest, &directory.path().join("link.pack")),
         Err(CompilerError::SourceSymlink)
+    );
+
+    let socket_path = directory.path().join("source.sock");
+    let _listener = UnixListener::bind(&socket_path)?;
+    let socket_manifest = directory.write(
+        "socket.json",
+        manifest(&blob_entry(2, "source.sock")).as_bytes(),
+    )?;
+    assert_eq!(
+        compile_manifest(&socket_manifest, &directory.path().join("socket.pack")),
+        Err(CompilerError::SourceNotFile)
+    );
+
+    let dangling_output = directory.path().join("dangling.pack");
+    symlink("missing.pack", &dangling_output)?;
+    assert_eq!(
+        compile_manifest(&link_manifest, &dangling_output),
+        Err(CompilerError::OutputExists)
     );
     Ok(())
 }
 
 #[cfg(windows)]
 #[test]
-fn symbolic_link_sources_are_rejected_when_windows_allows_creation() -> Result<(), Box<dyn Error>> {
+fn symbolic_link_sources_and_outputs_are_rejected_when_windows_allows_creation(
+) -> Result<(), Box<dyn Error>> {
     use std::os::windows::fs::symlink_file;
 
     let directory = TestDirectory::new()?;
@@ -262,6 +384,13 @@ fn symbolic_link_sources_are_rejected_when_windows_allows_creation() -> Result<(
     assert_eq!(
         compile_manifest(&manifest_path, &directory.path().join("output.pack")),
         Err(CompilerError::SourceSymlink)
+    );
+
+    let dangling_output = directory.path().join("dangling.pack");
+    symlink_file("missing.pack", &dangling_output)?;
+    assert_eq!(
+        compile_manifest(&manifest_path, &dangling_output),
+        Err(CompilerError::OutputExists)
     );
     Ok(())
 }

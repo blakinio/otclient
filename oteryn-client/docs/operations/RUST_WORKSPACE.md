@@ -5,18 +5,20 @@ Required compiled platform: Windows x86-64 MSVC
 
 ## Scope
 
-The workspace contains six bounded members:
+The workspace contains eight bounded members:
 
 ```text
 apps/client
+crates/asset-types
 crates/foundation
 crates/renderer
 crates/diagnostics
 crates/test-support
 tools/architecture-check
+tools/asset-compiler
 ```
 
-`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Protocol stack, domain/game rendering, product UI, asset runtime and extension host remain absent.
+`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-asset-types` owns the normalized synthetic schema-v1 IDs, metadata and deterministic pack contract. `oteryn-asset-compiler` is an offline `tool` package that consumes that contract and safely compiles constrained original/synthetic fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Protocol stack, domain/game rendering, product UI, asset runtime and extension host remain absent.
 
 Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
 
@@ -69,7 +71,7 @@ Known categories are defined by the architecture checker and follow the accepted
 
 `foundation` is the bottom reusable category. It must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. Lower product layers may depend on it only for generic primitives that do not encode product/server behavior.
 
-`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. The current `oteryn-test-support` tool depends only on `foundation` and `diagnostics`.
+`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. `oteryn-test-support` depends only on `foundation` and `diagnostics`; `oteryn-asset-compiler` depends only on `oteryn-asset-types` plus the exact workspace JSON parser.
 
 The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13` and the Windows-only `oteryn-renderer` composition contract; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; the app must not absorb protocol, feature, persistence or direct Win32 responsibilities.
 
@@ -182,6 +184,19 @@ It owns no GPU resources directly, direct Win32/FFI, unsafe code, async runtime,
 
 It owns no game/map/entity rendering, assets, textures, shader modules or pipelines, render graph, UI, protocol, identity, network, audio, persistence, extension runtime, global singleton, background service, scheduler or new worker thread. Hosted Windows CI proves compilation and deterministic tests only; interactive presentation, real resize/minimize/suspend/resume, surface/device loss, driver/hardware and performance remain blocked in `docs/research/renderer/W5_RUNTIME_EVIDENCE.md`.
 
+## Synthetic asset schema/compiler contract
+
+`oteryn-asset-types` owns:
+
+- non-zero `AssetId`, closed blob/RGBA8 `AssetKind` and bounded metadata;
+- schema-v1 synthetic limits, SHA-256 payload digests and deterministic canonical ordering;
+- an original little-endian length-delimited pack encoder plus strict decoder/validator;
+- closed stable `AssetError` values without arbitrary external text.
+
+`oteryn-asset-compiler` owns one offline compiler from a strict JSON manifest plus relative source files to one immutable output pack. It rejects unsafe path components, symbolic links, sources outside the canonical manifest root, directories/special files and oversized input. It writes through a same-directory `create_new` temporary file and final rename only after complete validation.
+
+The packages use original/synthetic fixtures only. They do not mount packs, stream assets, integrate with renderer/GPU, decode image formats, import Tibia/Canary data, download/update content, sign manifests or establish production compatibility. Exact format/security evidence and blockers live in `docs/research/assets/W6_FORMAT_AND_SECURITY_EVIDENCE.md`.
+
 ## Lint and unsafe policy
 
 Workspace Rust policy:
@@ -207,7 +222,7 @@ Workspace source contains no unsafe code or direct native/FFI dependency. The ex
 
 Do not broaden license/source policy merely to make CI green. Investigate the exact dependency and either reject it, replace it or update policy through a reviewed task with legal/security rationale.
 
-The workspace pins `serde_json` for the architecture tool, exact `winit 0.30.13` for the Windows application shell, exact `wgpu 30.0.0` with defaults disabled plus `std`/`dx12`, and exact `pollster 1.0.1` for one synchronous main-thread bootstrap. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. `deny.toml` explicitly permits the OSI-approved ISC and Zlib licenses required by the fixed wgpu graph and narrowly skips only its unavoidable `hashbrown 0.16.1` and `syn 3.0.3` duplicate branches. HTTP/TLS, text, audio and WebAssembly runtimes remain absent.
+The workspace pins `serde_json 1.0.145` for architecture tooling and the W6 manifest compiler, exact `sha2 0.11.0` with defaults disabled for SHA-256, exact `winit 0.30.13` for the Windows application shell, exact `wgpu 30.0.0` with defaults disabled plus `std`/`dx12`, and exact `pollster 1.0.1` for one synchronous main-thread bootstrap. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. `deny.toml` explicitly permits the OSI-approved ISC and Zlib licenses required by the fixed graph and narrowly skips only unavoidable reviewed duplicate branches. HTTP/TLS, image/archive/compression, text, audio and WebAssembly runtimes remain absent.
 
 ## CI behavior
 
@@ -219,12 +234,12 @@ The Windows job validates:
 - locked metadata;
 - formatting;
 - Clippy with warnings denied;
-- tests, including crate unit/doctests and architecture fixtures;
+- all workspace tests, including W6 deterministic pack, digest, malformed-input and filesystem-security tests;
 - the real workspace architecture policy.
 
 A separate Ubuntu job runs the immutable official cargo-deny action against `oteryn-client/Cargo.toml` and the colocated `deny.toml` for advisories, licenses, bans and sources. Supply-chain execution on Ubuntu does not replace the required Windows compilation/test evidence.
 
-A successful Rust workflow proves only the workspace packages compiled and tested on the stated revision. It does not prove client runtime, GPU, server, protocol, assets or non-Windows product compatibility.
+A successful Rust workflow proves only the workspace packages compiled and tested on the stated revision. It does not prove client runtime, GPU, server, protocol, real assets or non-Windows product compatibility.
 
 ## Adding the next crate
 
@@ -244,4 +259,4 @@ The expected next package is selected after live preflight. It must not be folde
 
 ## Rollback
 
-The current foundation, diagnostics, test-support, renderer and application-shell packages have no user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output and caches are transient and are never repository or release truth.
+The current foundation, diagnostics, test-support, renderer, application-shell and synthetic asset packages have no user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output, compiler outputs and caches are transient and are never repository or release truth.

@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260730-w7-identity
-status: validating
+status: ready_for_review
 agent: "W7-IDENTITY worker"
 track: greenfield-rust
 workstream: native-oauth-gateway
 parallel_wave: OTERYN-W7-TECHNICAL-LOGIN
 parallel_lane: W7-IDENTITY
-parallel_lane_state: validating
+parallel_lane_state: ready_for_review
 branch: feat/OTC-20260730-w7-identity
 base_branch: main
 created: 2026-07-30T21:45:00+02:00
-updated: 2026-07-30T22:42:00+02:00
-current_head: "5f74461106a48c945d89fed320dd88991361455f"
+updated: 2026-07-30T23:00:00+02:00
+validated_implementation_head: "99b28f3cfccb03f798f08c3b186737f0d274c575"
 required_base_commit: "626c7954e6e6999bb4b8c8d051500b543e3c09e0"
 required_producer_commit: "9ecc43a4465f6565bc1c12ea61f170a96edcbe35"
 required_producer_archive_commit: "8dcd353d5a9f19fabccf49508c27074f7749e3cf"
@@ -77,7 +77,7 @@ Implement the bounded Rust native Identity -> Game Login Ticket -> Gateway proto
 
 - explicit Identity/Gateway base URLs with HTTPS required outside loopback;
 - synchronous Ureq adapter using `NativeTls` and `PlatformVerifier` for normal system certificate/hostname validation;
-- redirects and environment proxy discovery disabled;
+- redirects, environment proxy discovery and automatic retries disabled;
 - bounded timeout, response headers and response body;
 - exact OAuth token, Game Login Ticket and Gateway protocol-v1 requests;
 - strict content type, no-store/no-cache, unknown-field and trailing-data validation;
@@ -91,6 +91,7 @@ Implement the bounded Rust native Identity -> Game Login Ticket -> Gateway proto
 - exact assigned port in authorization and token exchange;
 - direct system-browser process argument without shell interpolation;
 - bounded callback parser with exact path, IPv4 loopback peer, state, active generation, stale and duplicate checks;
+- callback request target has no ordinary `Clone` or revealing `Debug` surface;
 - cancellation/generation checks before and between one-shot stages;
 - one non-retried ticket issuance and one Gateway login;
 - refresh-token discard and terminal secret cleanup;
@@ -104,6 +105,7 @@ Synthetic tests cover:
 - bind-before-launch and dynamic callback port propagation;
 - complete fake browser/listener/HTTP success with exactly three requests;
 - callback state, peer, path, generation, duplicate, malformed, timeout and cancellation negatives;
+- callback code/state debug redaction;
 - unknown/trailing JSON, redirect, missing cache policy and oversized body rejection;
 - unsupported Gateway protocol version;
 - duplicate world ID, invalid port and unknown character/world relation;
@@ -122,11 +124,20 @@ All fixtures are synthetic. No production credential, account, private capture o
 - one exact documented `windows-sys 0.61.2` duplicate branch is allowed for native-tls/SChannel beside the existing winit `windows-sys 0.52` branch;
 - no manual `Cargo.lock` conflict resolution occurred.
 
-# Validation checkpoint
+# Validation evidence
 
-A complete source package at head `2f0ab6e06bfdbbfcc72bbf28266bc6b60d7cc4c2` passed Rust Client run `30579075364`, including locked metadata, formatting, strict Clippy, all workspace tests/doctests, architecture policy and cargo-deny. Later documentation and expanded negative tests invalidate that result as final merge evidence.
+Exact implementation/documentation head `99b28f3cfccb03f798f08c3b186737f0d274c575` passed:
 
-Final exact-head Rust Client and repository CI must pass after this task/evidence/shared-document checkpoint. Their run IDs and exact feature head will be recorded before ready/merge.
+- Rust Client run `30581250441`;
+- Windows job `91001745775`: locked metadata, formatting, strict Clippy, all workspace tests/doctests and architecture policy succeeded;
+- supply-chain job `91001745838`: advisories, licenses, bans and sources succeeded;
+- repository CI run `30581251450`;
+- `CI / Required` job `91002362697`: succeeded;
+- complete 17-path diff review;
+- no requested reviews, review submissions or unresolved review threads;
+- no temporary workflow, substitute ENTRY contract, credential, private capture or proprietary artifact in the final diff.
+
+This checkpoint commit changes only the task record. Its exact-head draft-state and ready-state checks remain required before merge.
 
 # Acceptance criteria
 
@@ -134,6 +145,6 @@ Final exact-head Rust Client and repository CI must pass after this task/evidenc
 - [x] no substitute ENTRY public types;
 - [x] focused fake browser/listener/HTTP tests cover success and required rejection/cleanup paths;
 - [x] dependency versions/features/licenses/advisories are pinned and reviewed for Rust 1.94;
-- [ ] final exact-head locked metadata, fmt, strict Clippy, all tests/doctests, architecture policy and cargo-deny pass;
-- [ ] full diff and review-thread checks pass;
-- [ ] merge through gates and archive separately.
+- [x] implementation/documentation head passed locked metadata, fmt, strict Clippy, all tests/doctests, architecture policy and cargo-deny;
+- [x] full diff and review-thread checks passed;
+- [ ] checkpoint exact-head CI, ready-state CI, merge and separate archive remain.

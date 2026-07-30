@@ -201,9 +201,7 @@ fn launch_system_browser(authorization_url: &Url) -> Result<(), IdentityError> {
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", unix)))]
 fn launch_system_browser(_authorization_url: &Url) -> Result<(), IdentityError> {
-    Err(IdentityError::new(
-        IdentityErrorKind::BrowserLaunchFailed,
-    ))
+    Err(IdentityError::new(IdentityErrorKind::BrowserLaunchFailed))
 }
 
 /// One accepted TCP callback request reduced to the security-relevant facts.
@@ -322,7 +320,9 @@ fn read_callback_target(
             return Err(IdentityError::new(IdentityErrorKind::CallbackTimeout));
         }
         stream
-            .set_read_timeout(Some(deadline.remaining(clock).min(Duration::from_millis(250))))
+            .set_read_timeout(Some(
+                deadline.remaining(clock).min(Duration::from_millis(250)),
+            ))
             .map_err(|_| IdentityError::new(IdentityErrorKind::ListenerUnavailable))?;
         match stream.read(&mut buffer) {
             Ok(0) => return Err(IdentityError::new(IdentityErrorKind::MalformedCallback)),
@@ -499,8 +499,8 @@ impl AuthorizationTransaction {
             self.callback_consumed = true;
             return Err(IdentityError::new(IdentityErrorKind::AuthorizationDenied));
         }
-        let returned_state = state
-            .ok_or_else(|| IdentityError::new(IdentityErrorKind::MalformedCallback))?;
+        let returned_state =
+            state.ok_or_else(|| IdentityError::new(IdentityErrorKind::MalformedCallback))?;
         if !constant_time_equal(
             self.state.expose_secret()?.as_bytes(),
             returned_state.as_bytes(),
@@ -509,8 +509,7 @@ impl AuthorizationTransaction {
         }
         let code = code.ok_or_else(|| IdentityError::new(IdentityErrorKind::MalformedCallback))?;
         self.callback_consumed = true;
-        SecretString::new(code)
-            .map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))
+        SecretString::new(code).map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))
     }
 
     fn take_verifier(&mut self) -> Result<SecretString, IdentityError> {
@@ -519,8 +518,7 @@ impl AuthorizationTransaction {
             .take()
             .ok_or_else(|| IdentityError::new(IdentityErrorKind::InvariantViolation))?;
         let value = verifier.expose_secret()?.to_owned();
-        SecretString::new(value)
-            .map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))
+        SecretString::new(value).map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))
     }
 }
 
@@ -658,11 +656,7 @@ where
         self.browser.open(&authorization_url)?;
         let callback_deadline = Deadline::after(self.clock.as_ref(), config.callback_timeout())
             .map_err(|_| IdentityError::new(IdentityErrorKind::InvalidConfiguration))?;
-        let attempt = receiver.receive(
-            self.clock.as_ref(),
-            callback_deadline,
-            cancellation,
-        )?;
+        let attempt = receiver.receive(self.clock.as_ref(), callback_deadline, cancellation)?;
         let code = transaction.accept_callback(sessions.active_account_session(), attempt)?;
         ensure_active(sessions, account_session_id, cancellation)?;
         let verifier = transaction.take_verifier()?;
@@ -779,9 +773,7 @@ impl IdentityError {
     pub const fn entry_failure(self) -> EntryFailure {
         let kind = match self.kind {
             IdentityErrorKind::DuplicateCallback => EntryFailureKind::DuplicateCallback,
-            IdentityErrorKind::StaleGeneration => {
-                EntryFailureKind::StaleAuthenticationTransaction
-            }
+            IdentityErrorKind::StaleGeneration => EntryFailureKind::StaleAuthenticationTransaction,
             IdentityErrorKind::Cancelled => EntryFailureKind::SafeCancellation,
             IdentityErrorKind::Platform(PlatformErrorKind::UnsupportedProtocolVersion) => {
                 EntryFailureKind::ProtocolMismatch
@@ -881,13 +873,11 @@ mod tests {
     }
 
     #[test]
-    fn transaction_uses_dynamic_loopback_redirect_and_redacts_debug() -> Result<(), Box<dyn Error>> {
+    fn transaction_uses_dynamic_loopback_redirect_and_redacts_debug() -> Result<(), Box<dyn Error>>
+    {
         let redirect = Url::parse("http://127.0.0.1:49152/callback")?;
-        let transaction = AuthorizationTransaction::new(
-            session()?,
-            redirect,
-            &FixedEntropy { byte: 3 },
-        )?;
+        let transaction =
+            AuthorizationTransaction::new(session()?, redirect, &FixedEntropy { byte: 3 })?;
         let debug = format!("{transaction:?}");
         assert!(!debug.contains("AwMDAw"));
         assert!(debug.contains("[REDACTED]"));
@@ -901,8 +891,7 @@ mod tests {
             session()?,
             redirect,
             "expected-state".to_owned(),
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
-                .to_owned(),
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~".to_owned(),
         )?;
         let wrong_state = CallbackAttempt {
             peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
@@ -946,8 +935,7 @@ mod tests {
             session()?,
             redirect,
             "expected-state".to_owned(),
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
-                .to_owned(),
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~".to_owned(),
         )?;
         let attempt = CallbackAttempt {
             peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
@@ -975,8 +963,7 @@ mod tests {
             session()?,
             redirect,
             "expected-state".to_owned(),
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~"
-                .to_owned(),
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~".to_owned(),
         )?;
         for target in [
             "/callback?code=one&code=two&state=expected-state",

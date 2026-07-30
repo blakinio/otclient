@@ -72,9 +72,7 @@ fn validate_base_url(value: &str) -> Result<Url, PlatformError> {
         || url.fragment().is_some()
         || url.path() != "/"
     {
-        return Err(PlatformError::new(
-            PlatformErrorKind::InvalidConfiguration,
-        ));
+        return Err(PlatformError::new(PlatformErrorKind::InvalidConfiguration));
     }
     let host = url
         .host_str()
@@ -86,9 +84,7 @@ fn validate_base_url(value: &str) -> Result<Url, PlatformError> {
     match url.scheme() {
         "https" => Ok(url),
         "http" if is_loopback => Ok(url),
-        _ => Err(PlatformError::new(
-            PlatformErrorKind::InvalidConfiguration,
-        )),
+        _ => Err(PlatformError::new(PlatformErrorKind::InvalidConfiguration)),
     }
 }
 
@@ -312,11 +308,15 @@ impl UreqTransport {
     /// environment-derived proxy configuration.
     pub fn new(timeout: Duration) -> Result<Self, PlatformError> {
         if timeout.is_zero() || timeout > Duration::from_secs(30) {
-            return Err(PlatformError::new(
-                PlatformErrorKind::InvalidConfiguration,
-            ));
+            return Err(PlatformError::new(PlatformErrorKind::InvalidConfiguration));
         }
         let config = ureq::Agent::config_builder()
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .provider(ureq::tls::TlsProvider::NativeTls)
+                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                    .build(),
+            )
             .timeout_global(Some(timeout))
             .max_redirects(0)
             .http_status_as_error(false)
@@ -386,18 +386,12 @@ impl HttpTransport for UreqTransport {
         if body.len() > MAX_RESPONSE_BODY_BYTES {
             return Err(HttpTransportError::ResponseTooLarge);
         }
-        HttpResponse::new(
-            status,
-            content_type,
-            cache_control,
-            pragma,
-            location,
-            body,
+        HttpResponse::new(status, content_type, cache_control, pragma, location, body).map_err(
+            |error| match error.kind() {
+                PlatformErrorKind::ResponseTooLarge => HttpTransportError::ResponseTooLarge,
+                _ => HttpTransportError::InvalidRequest,
+            },
         )
-        .map_err(|error| match error.kind() {
-            PlatformErrorKind::ResponseTooLarge => HttpTransportError::ResponseTooLarge,
-            _ => HttpTransportError::InvalidRequest,
-        })
     }
 }
 
@@ -519,9 +513,7 @@ where
         exchange: TokenExchange,
     ) -> Result<OAuthTokens, PlatformError> {
         if exchange.client_id.is_empty() || exchange.client_id.len() > MAX_CLIENT_ID_BYTES {
-            return Err(PlatformError::new(
-                PlatformErrorKind::InvalidConfiguration,
-            ));
+            return Err(PlatformError::new(PlatformErrorKind::InvalidConfiguration));
         }
         validate_dynamic_redirect(&exchange.redirect_uri)?;
         let code = exchange.code.expose_secret()?;
@@ -724,9 +716,7 @@ fn validate_dynamic_redirect(url: &Url) -> Result<(), PlatformError> {
         || url.username() != ""
         || url.password().is_some()
     {
-        return Err(PlatformError::new(
-            PlatformErrorKind::InvalidConfiguration,
-        ));
+        return Err(PlatformError::new(PlatformErrorKind::InvalidConfiguration));
     }
     Ok(())
 }
@@ -740,9 +730,7 @@ fn validate_sensitive_success(response: &HttpResponse) -> Result<(), PlatformErr
     }
     if !response.content_type.as_deref().is_some_and(|value| {
         value.eq_ignore_ascii_case("application/json")
-            || value
-                .to_ascii_lowercase()
-                .starts_with("application/json;")
+            || value.to_ascii_lowercase().starts_with("application/json;")
     }) {
         return Err(PlatformError::new(PlatformErrorKind::InvalidResponse));
     }

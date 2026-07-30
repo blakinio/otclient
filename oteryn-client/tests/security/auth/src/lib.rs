@@ -19,8 +19,8 @@ mod tests {
     use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
-    use time::format_description::well_known::Rfc3339;
     use time::OffsetDateTime;
+    use time::format_description::well_known::Rfc3339;
     use url::Url;
 
     const JSON: &str = "application/json";
@@ -75,11 +75,9 @@ mod tests {
         fn bind(&self, callback_path: &str) -> Result<Box<dyn CallbackReceiver>, IdentityError> {
             assert_eq!(callback_path, "/callback");
             assert_eq!(self.state.order.swap(1, Ordering::AcqRel), 0);
-            let redirect_uri = Url::parse(&format!(
-                "http://127.0.0.1:{}{}",
-                self.port, callback_path
-            ))
-            .map_err(|_| synthetic_identity_error())?;
+            let redirect_uri =
+                Url::parse(&format!("http://127.0.0.1:{}{}", self.port, callback_path))
+                    .map_err(|_| synthetic_identity_error())?;
             Ok(Box::new(FakeReceiver {
                 state: Arc::clone(&self.state),
                 redirect_uri,
@@ -153,7 +151,12 @@ mod tests {
                 1 => {
                     assert_eq!(request.url().path(), "/oauth/token");
                     assert_eq!(request.content_type(), "application/x-www-form-urlencoded");
-                    assert!(request.bearer().map_err(|_| HttpTransportError::InvalidRequest)?.is_none());
+                    assert!(
+                        request
+                            .bearer()
+                            .map_err(|_| HttpTransportError::InvalidRequest)?
+                            .is_none()
+                    );
                     let body = std::str::from_utf8(request.body())
                         .map_err(|_| HttpTransportError::InvalidRequest)?;
                     assert!(body.contains("grant_type=authorization_code"));
@@ -165,17 +168,25 @@ mod tests {
                 2 => {
                     assert_eq!(request.url().path(), "/api/v1/game-auth/tickets");
                     assert_eq!(
-                        request.bearer().map_err(|_| HttpTransportError::InvalidRequest)?,
+                        request
+                            .bearer()
+                            .map_err(|_| HttpTransportError::InvalidRequest)?,
                         Some("synthetic-access")
                     );
                     assert_eq!(request.body(), br#"{"protocol_version":1}"#);
                     json_response(
-                        br#"{"protocol_version":1,"ticket":"synthetic-ticket","expires_in":60}"#.to_vec(),
+                        br#"{"protocol_version":1,"ticket":"synthetic-ticket","expires_in":60}"#
+                            .to_vec(),
                     )
                 }
                 3 => {
                     assert_eq!(request.url().path(), "/v1/login");
-                    assert!(request.bearer().map_err(|_| HttpTransportError::InvalidRequest)?.is_none());
+                    assert!(
+                        request
+                            .bearer()
+                            .map_err(|_| HttpTransportError::InvalidRequest)?
+                            .is_none()
+                    );
                     let body: serde_json::Value = serde_json::from_slice(request.body())
                         .map_err(|_| HttpTransportError::InvalidRequest)?;
                     assert_eq!(body["protocol_version"], 1);
@@ -281,10 +292,8 @@ mod tests {
     fn fake_services_prove_dynamic_callback_and_one_shot_bootstrap() -> Result<(), Box<dyn Error>> {
         let browser_state = Arc::new(BrowserState::default());
         let http_state = Arc::new(Mutex::new(FakeHttpState::default()));
-        let endpoints = PlatformEndpoints::new(
-            "http://127.0.0.1:18080/",
-            "http://127.0.0.1:18081/",
-        )?;
+        let endpoints =
+            PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?;
         let platform = PlatformClient::new(endpoints, FakeHttp::new(Arc::clone(&http_state)));
         let client = IdentityClient::new(
             platform,
@@ -321,17 +330,20 @@ mod tests {
         assert!(!format!("{credential:?}").contains("synthetic-session-credential"));
         let state = lock(&http_state);
         assert_eq!(state.calls, 3);
-        assert!(state
-            .debug_outputs
-            .iter()
-            .all(|output| !output.contains("synthetic-access")
-                && !output.contains("synthetic-ticket")
-                && !output.contains("synthetic-code")));
+        assert!(
+            state
+                .debug_outputs
+                .iter()
+                .all(|output| !output.contains("synthetic-access")
+                    && !output.contains("synthetic-ticket")
+                    && !output.contains("synthetic-code"))
+        );
         Ok(())
     }
 
     #[test]
-    fn independent_transactions_use_unique_state_and_verifier_material() -> Result<(), Box<dyn Error>> {
+    fn independent_transactions_use_unique_state_and_verifier_material()
+    -> Result<(), Box<dyn Error>> {
         let entropy = CounterEntropy::new();
         let redirect = Url::parse("http://127.0.0.1:49152/callback")?;
         let config = IdentityConfig::new(
@@ -390,11 +402,10 @@ mod tests {
     }
 
     #[test]
-    fn cancellation_is_observed_before_listener_or_browser_side_effects() -> Result<(), Box<dyn Error>> {
-        let endpoints = PlatformEndpoints::new(
-            "http://127.0.0.1:18080/",
-            "http://127.0.0.1:18081/",
-        )?;
+    fn cancellation_is_observed_before_listener_or_browser_side_effects()
+    -> Result<(), Box<dyn Error>> {
+        let endpoints =
+            PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?;
         let client = IdentityClient::new(
             PlatformClient::new(endpoints, NoHttp),
             Box::new(CancelledBinder),
@@ -448,7 +459,8 @@ mod tests {
     }
 
     #[test]
-    fn strict_token_boundary_rejects_unknown_trailing_redirect_and_cache_failures() -> Result<(), Box<dyn Error>> {
+    fn strict_token_boundary_rejects_unknown_trailing_redirect_and_cache_failures()
+    -> Result<(), Box<dyn Error>> {
         let cases = [
             HttpResponse::new(
                 200,
@@ -484,17 +496,19 @@ mod tests {
             )?,
         ];
         for response in cases {
-            let endpoints = PlatformEndpoints::new(
-                "http://127.0.0.1:18080/",
-                "http://127.0.0.1:18081/",
-            )?;
+            let endpoints =
+                PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?;
             let client = PlatformClient::new(
                 endpoints,
                 SingleResponse {
                     response: Mutex::new(Some(response)),
                 },
             );
-            assert!(client.exchange_authorization_code(token_exchange()?).is_err());
+            assert!(
+                client
+                    .exchange_authorization_code(token_exchange()?)
+                    .is_err()
+            );
         }
         Ok(())
     }
@@ -514,10 +528,8 @@ mod tests {
         let sessions = MutableSession {
             active: Mutex::new(None),
         };
-        let endpoints = PlatformEndpoints::new(
-            "http://127.0.0.1:18080/",
-            "http://127.0.0.1:18081/",
-        )?;
+        let endpoints =
+            PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?;
         let client = IdentityClient::new(
             PlatformClient::new(endpoints, NoHttp),
             Box::new(CancelledBinder),

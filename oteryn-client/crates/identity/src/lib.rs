@@ -905,8 +905,9 @@ mod tests {
         assert_eq!(
             transaction
                 .accept_callback(Some(session()?), wrong_state)
-                .map_err(|error| error.kind()),
-            Err(IdentityErrorKind::InvalidCallbackState)
+                .err()
+                .map(|error| error.kind()),
+            Some(IdentityErrorKind::InvalidCallbackState)
         );
         let remote = CallbackAttempt {
             peer: "192.0.2.10".parse()?,
@@ -915,8 +916,9 @@ mod tests {
         assert_eq!(
             transaction
                 .accept_callback(Some(session()?), remote)
-                .map_err(|error| error.kind()),
-            Err(IdentityErrorKind::InvalidCallbackPeer)
+                .err()
+                .map(|error| error.kind()),
+            Some(IdentityErrorKind::InvalidCallbackPeer)
         );
         let valid = CallbackAttempt {
             peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
@@ -927,8 +929,9 @@ mod tests {
         assert_eq!(
             transaction
                 .accept_callback(Some(session()?), valid)
-                .map_err(|error| error.kind()),
-            Err(IdentityErrorKind::DuplicateCallback)
+                .err()
+                .map(|error| error.kind()),
+            Some(IdentityErrorKind::DuplicateCallback)
         );
         Ok(())
     }
@@ -949,14 +952,16 @@ mod tests {
         assert_eq!(
             transaction
                 .accept_callback(Some(AccountSessionId::new(8)?), attempt.clone())
-                .map_err(|error| error.kind()),
-            Err(IdentityErrorKind::StaleGeneration)
+                .err()
+                .map(|error| error.kind()),
+            Some(IdentityErrorKind::StaleGeneration)
         );
         assert_eq!(
             transaction
                 .accept_callback(Some(session()?), attempt)
-                .map_err(|error| error.kind()),
-            Err(IdentityErrorKind::InvalidCallbackPath)
+                .err()
+                .map(|error| error.kind()),
+            Some(IdentityErrorKind::InvalidCallbackPath)
         );
         Ok(())
     }
@@ -982,8 +987,8 @@ mod tests {
                 },
             );
             assert_eq!(
-                result.map_err(|error| error.kind()),
-                Err(IdentityErrorKind::MalformedCallback)
+                result.err().map(|error| error.kind()),
+                Some(IdentityErrorKind::MalformedCallback)
             );
         }
         Ok(())

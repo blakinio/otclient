@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260730-w7-entry-postmerge-reconcile
-status: validation
+status: ready
 agent: "W7 entry post-merge reconciliation worker"
 track: greenfield-rust
 workstream: agent-governance
@@ -9,8 +9,8 @@ parallel_lane: W7-ENTRY-POSTMERGE-DOCS
 branch: docs/OTC-20260730-w7-entry-postmerge-reconcile
 base_branch: main
 created: 2026-07-30T20:03:00+02:00
-updated: 2026-07-30T20:15:00+02:00
-last_verified_commit: "6c2a6686c4f3f9e9b5b626a5b583c2c22f23d1d3"
+updated: 2026-07-30T20:19:00+02:00
+last_verified_commit: "82c6c5e9b58d72fd821f909f3a0d9d4cdad2ad7f"
 risk: low
 related_pr: "#106"
 depends_on:
@@ -61,11 +61,13 @@ Draft PR #106 is open from the dedicated task branch. The three governance docum
 
 # Validation
 
-- module catalogue now records merged PR #104 and archive PR #105 plus the exact producer commit;
-- coordination README now records the completed producer and current consumer launch/restack gates;
-- archived producer task now records archive commit `8dcd353d5a9f19fabccf49508c27074f7749e3cf`, `status: archived`, `blockers: []` and a current next action;
-- exact-head CI and full changed-file review are pending.
+- module catalogue records merged PR #104, archive PR #105 and exact producer merge `9ecc43a4465f6565bc1c12ea61f170a96edcbe35`;
+- coordination README records the completed producer and current consumer launch/restack gates;
+- archived producer task records archive commit `8dcd353d5a9f19fabccf49508c27074f7749e3cf`, `status: archived`, `unknown: []`, `blockers: []` and a current next action;
+- full changed-file review: PASS, exactly four authorized documentation paths and no workflow helper;
+- repository CI run `30569670340` / CI #911 on head `82c6c5e9b58d72fd821f909f3a0d9d4cdad2ad7f`: PASS, including `CI / Required`; Windows correctly skipped for docs-only scope;
+- reviews and unresolved threads: pending final check immediately before readiness.
 
 # Next action
 
-Review the full four-file diff, wait for required exact-head checks, mark PR #106 ready and squash-merge, then archive this reconciliation task separately.
+Require green exact-head CI for this checkpoint commit, verify current `main` and review threads, mark PR #106 ready and squash-merge, then archive this reconciliation task separately.

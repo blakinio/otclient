@@ -7,7 +7,7 @@ Persistent operating memory for autonomous agents across the legacy client and t
 1. `../../AGENTS.md`.
 2. Determine the track from the changed paths.
 3. For new Rust-client work, read `../../oteryn-client/AGENTS.md`, its architecture and agent program.
-4. When several Rust-client agents may run concurrently, read the multi-agent execution protocol and latest wave completion/accepted-plan record before claiming work.
+4. When several Rust-client agents may run concurrently, read the multi-agent execution protocol and latest accepted/closed wave record before claiming work.
 5. For legacy C++/Lua client work, read the legacy architecture/workstream owner and inspect source/module/test conventions.
 6. Read `ACTIVE_WORK.md` only as a coordination snapshot.
 7. Inspect all records under `tasks/active/` and all live open PRs/checks/review threads.
@@ -31,11 +31,15 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/agents/PROGRAM.md` | Ordered audit-first implementation gates. |
 | `../../oteryn-client/docs/agents/WORKSTREAMS.md` | Agent ownership and package routing. |
 | `../../oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md` | Parallel lane, shared-path lease and contract/merge protocol. |
-| `../../oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md` | Latest closed-wave record. It currently authorizes no worker and contains one bounded W7 planning recommendation only. |
+| `../../oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md` | `OTERYN-W7-TECHNICAL-LOGIN` accepted plan, exact ownership, blockers and launch gates. |
 | `../../oteryn-client/docs/agents/INITIAL_PARALLEL_WAVE.md` | Historical first-wave launch plan and dependency evidence. |
 | `../../oteryn-client/docs/agents/templates/PARALLEL_TASK.md` | Additional task metadata for parallel work. |
-| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Copy-ready prompt for preparing the next planning package; it authorizes no worker launch. |
-| `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common prefix for parallel workers after an accepted plan. |
+| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Exact W7 coordinator/integrator prompt. |
+| `../../oteryn-client/docs/agents/prompts/W7_ENTRY_CONTRACT_AGENT.md` | Sole entry/session/directory contract producer prompt. |
+| `../../oteryn-client/docs/agents/prompts/W7_IDENTITY_AGENT.md` | PKCE/Identity/Gateway consumer prompt with real-callback blocker. |
+| `../../oteryn-client/docs/agents/prompts/W7_CANARY_ENTRY_AGENT.md` | Sole Current-profile transport/admission producer prompt. |
+| `../../oteryn-client/docs/agents/prompts/W7_LOGIN_E2E_AGENT.md` | Final fake-service/executable composition consumer prompt. |
+| `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common historical worker prefix; exact current lane prompts take precedence. |
 | `../../oteryn-client/docs/agents/prompts/NEXT_SYNTHETIC_ASSET_AGENT.md` | Historical W6-ASSET prompt; completed work must not be relaunched. |
 | `../../oteryn-client/docs/agents/prompts/NEXT_RENDERER_SURFACE_AGENT.md` | Historical W5-RENDER prompt; completed work must not be relaunched. |
 | `../../oteryn-client/docs/agents/prompts/NEXT_WINDOWS_SHELL_AGENT.md` | Historical W4-SHELL prompt; completed work must not be relaunched. |
@@ -44,11 +48,16 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/agents/AUDIT_PLAN.md` | Mandatory foundation audit. |
 | `../../oteryn-client/docs/agents/prompts/FIRST_AUDIT_AGENT.md` | Historical standalone prompt for the completed first audit. |
 
-The current C++/Lua/OTUI code is evidence only for this track and must not become a Rust runtime dependency.
+The current C++/Lua/OTUI code is evidence only for the Rust track and must not become a Rust runtime dependency.
 
-Parallel Rust work is permitted only through a live accepted wave, unique tasks/branches/worktrees, non-overlapping ownership and one producer per public contract. Cargo/lockfile, dependency policy, architecture-check policy, Rust CI and other shared integration paths are serialized through the task-based lease protocol; no manually edited global lock table is used.
+Parallel Rust work is permitted only through a live accepted wave, unique tasks/branches/worktrees, non-overlapping ownership and one producer per public contract. Cargo/lockfile, dependency policy, Rust CI and other shared integration paths are serialized through the task-based lease protocol; manually resolving `Cargo.lock` conflicts is prohibited.
 
-W1, W2, W3, W4, W5 and W6 are completed and cannot be relaunched. No Rust worker is currently authorized. The only recorded next action is a separate coordination-only plan for `OTERYN-W7-TECHNICAL-LOGIN`; that recommendation pre-claims no path, dependency, contract or lease and requires its own draft PR, accepted plan and separate plan-task archive before worker launch.
+W1-W6 are completed and cannot be relaunched. W7 workers remain unauthorized until the W7 planning PR and its separate planning-task archive merge and a fresh overlap/contract/lease check passes. After activation, use only the exact current prompts and dependency order in `CURRENT_PARALLEL_WAVE.md`.
+
+W7 has two mandatory proof boundaries:
+
+- real browser callback integration is blocked while Platform requires a fixed no-port redirect and the Rust security model requires an OS-assigned loopback port;
+- repository/fake tests or legacy OTClient E2E do not prove real Rust Identity/Gateway/Canary compatibility.
 
 ### Legacy OTClient
 
@@ -72,7 +81,7 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 | `REPOSITORY_MAP.md` | Fast path-to-responsibility navigation. |
 | `KNOWN_RISKS.md` | Cross-cutting and track-specific risks. |
 | `BUILD_TEST_MATRIX.md` | Current validation policy for both tracks. |
-| `CROSS_REPO_CONTRACTS.md` | Canary/Oteryn integration contract registry. |
+| `CROSS_REPO_CONTRACTS.md` | Canary/Oteryn integration contract registry and exact W7 evidence cut. |
 | `CHANGELOG.md` | Curated completed behavior/architecture changes. |
 
 ## Sources of truth
@@ -81,12 +90,10 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - Active task files are authoritative for ownership, progress, failures, parallel leases and handoff.
 - `ACTIVE_WORK.md` can be stale.
 - `oteryn-client/docs/architecture/**` is authoritative for the new client.
-- `MULTI_AGENT_EXECUTION.md` defines how parallel work is coordinated but does not override product architecture or live task/PR state.
-- `CURRENT_PARALLEL_WAVE.md` records the latest wave status and exact launch authorization.
+- `MULTI_AGENT_EXECUTION.md` defines parallel execution but does not override architecture/live state.
+- `CURRENT_PARALLEL_WAVE.md` records exact current launch authorization, ownership, dependencies, blockers and acceptance.
 - Historical wave/prompt documents never authorize duplicate work.
-- The legacy source, exact tests and `LEGACY_OTCLIENT_*` documents govern only existing-client maintenance and audit evidence.
-- Upstream intelligence records are durable memory but volatile issue/PR/source status must be revalidated.
-- Cross-repository facts require current producer/consumer evidence.
+- Cross-repository facts require current producer/consumer evidence; external repositories remain read-only unless a separate authorized task exists there.
 - ADRs preserve durable decisions.
 
 ## Lifecycle
@@ -96,11 +103,11 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - inspect current `main`, open PRs, review threads and active tasks;
 - route the task to greenfield or legacy paths;
 - read the nearest nested `AGENTS.md`;
-- for parallel Rust work, verify an accepted launchable wave, lane, shared-path lease and producer/consumer dependencies;
-- never launch a historical completed lane;
+- for parallel Rust work, verify the accepted lane, producer commits, blocker state and shared-path lease;
+- never launch a historical/completed lane;
 - search for existing owners and reusable work;
-- create a bounded task, branch and draft PR;
-- declare ownership, dependencies and cross-repository tasks.
+- create a bounded task, branch/worktree and early draft PR;
+- declare ownership, dependencies and cross-repository evidence.
 
 ### During
 
@@ -108,19 +115,20 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - keep the PR body current;
 - update catalogues/contracts/ADRs when public boundaries change;
 - respect the unique shared-path lease and do not duplicate another lane's contract;
-- do not cross from legacy to Rust paths opportunistically;
-- preserve security, licensing and exact-version gates.
+- mark `integration_ready` rather than editing leased shared paths;
+- preserve security, licensing, exact-version and no-secret gates.
 
 ### Finish
 
-- rebase/restack on required producer/current `main` when parallel dependencies changed;
+- restack on required producer/current `main` when dependencies changed;
+- regenerate lockfiles; never manually merge them;
 - inspect the full changed-file list and diff;
 - run proportional focused checks and exact-head required CI;
 - update task/docs/contracts/catalogue as applicable;
 - merge only through the root autonomous merge gate;
-- archive the task separately;
+- archive every merged task separately;
 - leave one concrete next action.
 
 ## Avoiding duplicate work
 
-Search by responsibility, path, crate/module, protocol field, identifier, feature capability, asset schema, test fixture, task ownership, parallel contract role and open PR. Extend the owning architecture or interface rather than creating a parallel framework.
+Search by responsibility, path, crate/module, protocol field, identifier, feature capability, asset schema, test fixture, task ownership, parallel contract role and open PR. Extend the owning architecture/interface rather than creating a parallel framework.

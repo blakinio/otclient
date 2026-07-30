@@ -5,20 +5,26 @@ Required compiled platform: Windows x86-64 MSVC
 
 ## Scope
 
-The workspace contains eight bounded members:
+The workspace contains fourteen bounded members:
 
 ```text
 apps/client
+crates/account-session
 crates/asset-types
-crates/foundation
-crates/renderer
 crates/diagnostics
+crates/foundation
+crates/game-session
+crates/identity
+crates/platform
+crates/renderer
 crates/test-support
+crates/world-directory
+tests/security/auth
 tools/architecture-check
 tools/asset-compiler
 ```
 
-`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-asset-types` owns the normalized synthetic schema-v1 IDs, metadata and deterministic pack contract. `oteryn-asset-compiler` is an offline `tool` package that consumes that contract and safely compiles constrained original/synthetic fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Protocol stack, domain/game rendering, product UI, asset runtime and extension host remain absent.
+`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-account-session`, `oteryn-world-directory` and `oteryn-game-session` are the sole W7 shared entry-contract producer packages. `oteryn-platform` owns strict bounded OAuth, Game Login Ticket and Gateway protocol-v1 HTTP/DTO boundaries. `oteryn-identity` owns CSPRNG PKCE, the pre-bound dynamic loopback callback and one synchronous generation-safe bootstrap transaction. `oteryn-identity-security-tests` is a synthetic-only `tool` package proving the cross-crate security boundary. `oteryn-asset-types` owns the normalized synthetic schema-v1 IDs, metadata and deterministic pack contract. `oteryn-asset-compiler` is an offline `tool` package that consumes that contract and safely compiles constrained original/synthetic fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Canary transport/protocol, domain/game rendering, product UI, asset runtime and extension host remain absent.
 
 Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
 
@@ -64,16 +70,19 @@ category = "foundation"
 ```
 
 - use crates.io registry dependencies or reviewed workspace-local path dependencies only;
+- give every workspace-local path dependency an exact matching package version;
 - avoid external git/path sources unless a later focused policy change explicitly approves them;
 - avoid a dependency on legacy `src/`, `modules` or `mods` runtime code/content.
 
-Known categories are defined by the architecture checker and follow the accepted architecture, including `app`, `foundation`, `tool`, `platform`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.
+Known categories are defined by the architecture checker and follow the accepted architecture, including `app`, `foundation`, `tool`, `platform`, `identity`, `account-session`, `world-directory`, `game-session`, `game-domain`, protocol adapters, renderer/UI layers, assets, diagnostics and `feature`.
 
 `foundation` is the bottom reusable category. It must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. Lower product layers may depend on it only for generic primitives that do not encode product/server behavior.
 
-`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. `oteryn-test-support` depends only on `foundation` and `diagnostics`; `oteryn-asset-compiler` depends only on `oteryn-asset-types` plus the exact workspace JSON parser.
+`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. `oteryn-test-support` depends only on `foundation` and `diagnostics`; `oteryn-asset-compiler` depends only on `oteryn-asset-types` plus the exact workspace JSON parser; `oteryn-identity-security-tests` consumes only the W7 Identity/Platform and merged ENTRY contracts required for synthetic fake-service evidence.
 
 The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13` and the Windows-only `oteryn-renderer` composition contract; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; the app must not absorb protocol, feature, persistence or direct Win32 responsibilities.
+
+`oteryn-platform` may depend on the merged ENTRY contracts and `foundation`; it terminates raw producer DTOs and must not own browser state, application orchestration, Canary wire, UI or deployment defaults. `oteryn-identity` may depend on `platform`, the merged ENTRY contracts and `foundation`; none of those lower packages may depend back on Identity.
 
 Adding or changing a category is an architecture-policy change. Update the checker, synthetic positive/negative fixtures, architecture/workstream documentation and module catalogue in one focused PR.
 
@@ -138,6 +147,41 @@ Fixtures contain no game source, protocol bytes, credentials or assets. New arch
 Cancellation is always explicit. Dropping an observer has no effect; dropping an uncancelled source does not implicitly cancel its surviving tokens. The final source/token drop releases shared state and starts no background work.
 
 The crate contains no Character/World/Channel identifiers, Identity/session implementation, async runtime, scheduler, executor, global event bus, hidden thread, network, GPU, UI, asset, tracing, serialization, FFI or legacy runtime dependency.
+
+## W7 entry-contract package contract
+
+`oteryn-account-session`, `oteryn-world-directory` and `oteryn-game-session` are the sole shared W7 producer packages. They own:
+
+- non-secret client-local `AccountSessionId` generations;
+- signed-64 `WorldId` and `CharacterId`, bounded authoritative world/character summaries, deterministic ordering and explicit validated selection;
+- client-local `DirectoryRevision` and reserved unpopulated `GameplayChannelId`;
+- non-`Clone`, unserialized, redacted one-shot `GameEntryCredential` and its explicit admission handoff;
+- deterministic entry lifecycle, typed failures/recovery actions and non-secret `SessionEntered`.
+
+Consumers must use exact producer merge `9ecc43a4465f6565bc1c12ea61f170a96edcbe35` and must not create substitute public types or infer server fields absent from Gateway protocol v1.
+
+## W7 Platform and Identity contract
+
+`oteryn-platform` owns:
+
+- explicit validated Identity/Gateway base URLs with HTTPS required outside loopback;
+- a synchronous bounded Ureq adapter selecting `NativeTls` and `PlatformVerifier` for the operating-system certificate store and hostname verification;
+- redirects disabled, environment proxy discovery disabled and no automatic retry;
+- bounded timeout, header block and response body;
+- exact OAuth code exchange, Game Login Ticket request and Gateway protocol-v1 request/response DTOs;
+- strict content type, no-store/no-cache, unknown-field, trailing-data, protocol-version, identifier, port, duplicate and relationship validation;
+- conversion only into merged `AccountDirectorySnapshot` and `GameEntryCredential`.
+
+`oteryn-identity` owns:
+
+- operating-system CSPRNG state and verifier bytes;
+- PKCE `S256` with base64url without padding;
+- binding IPv4 `127.0.0.1:0` before browser launch and using the actual assigned port;
+- direct system-browser process arguments without shell interpolation;
+- one bounded HTTP callback request with exact path, IPv4 loopback peer, state, generation, stale, duplicate, timeout and cancellation validation;
+- one synchronous authorization-code -> ticket -> Gateway bootstrap attempt with generation/cancellation checks between stages.
+
+Passwords, password fallback, embedded browsers, async runtimes, global service locators, credential persistence, Canary packets and hidden production defaults are prohibited. The OAuth refresh token is discarded in W7, and ticket issuance is never automatically retried because the producer revokes the associated token family. Deployed client ID, exact URLs, TLS/network state, interactive Windows browser return and real cross-repository E2E remain external evidence gates.
 
 ## Diagnostics crate contract
 
@@ -205,9 +249,9 @@ Workspace Rust policy:
 - standard Rust/Clippy warnings fail required CI;
 - `unwrap`, `expect`, `panic`, `todo`, `unimplemented` and debug macros are denied by policy;
 - exceptions require a narrow owning package, documented reason and tests rather than a workspace-wide allowance;
-- external-input parsers need explicit bounded error handling in their later workstreams.
+- external-input parsers need explicit bounded error handling in their owning workstream.
 
-Workspace source contains no unsafe code or direct native/FFI dependency. The exact `wgpu` DX12 graph owns reviewed transitive platform bindings; application and renderer source do not call them directly.
+Workspace source contains no unsafe code or direct native/FFI call. The exact `wgpu` DX12 graph and reviewed native-tls/SChannel graph own transitive platform bindings; application, renderer, Platform and Identity source do not call unsafe platform APIs directly.
 
 ## Supply-chain policy
 
@@ -222,7 +266,7 @@ Workspace source contains no unsafe code or direct native/FFI dependency. The ex
 
 Do not broaden license/source policy merely to make CI green. Investigate the exact dependency and either reject it, replace it or update policy through a reviewed task with legal/security rationale.
 
-The workspace pins `serde_json 1.0.145` for architecture tooling and the W6 manifest compiler, exact `sha2 0.11.0` with defaults disabled for SHA-256, exact `winit 0.30.13` for the Windows application shell, exact `wgpu 30.0.0` with defaults disabled plus `std`/`dx12`, and exact `pollster 1.0.1` for one synchronous main-thread bootstrap. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. `deny.toml` explicitly permits the OSI-approved ISC and Zlib licenses required by the fixed graph and narrowly skips only unavoidable reviewed duplicate branches. HTTP/TLS, image/archive/compression, text, audio and WebAssembly runtimes remain absent.
+The workspace pins `serde_json 1.0.145` for architecture tooling, W6 manifests and strict W7 fake-service JSON; exact `sha2 0.11.0` with defaults disabled for SHA-256; exact `winit 0.30.13` for the Windows application shell; exact `wgpu 30.0.0` with defaults disabled plus `std`/`dx12`; exact `pollster 1.0.1` for one synchronous main-thread bootstrap; and exact W7 Identity dependencies recorded in `Cargo.lock`, including `base64`, `getrandom`, `serde`, `time`, `url` and `ureq` with `native-tls-no-default`. `oteryn-foundation`, `oteryn-diagnostics` and `oteryn-test-support` add no external dependency. `deny.toml` explicitly permits the reviewed license set and narrowly skips only unavoidable exact graph branches, including `windows-sys 0.61.2` for SChannel beside the existing winit `windows-sys 0.52` branch. Image/archive/compression, audio and WebAssembly runtimes remain absent.
 
 ## CI behavior
 
@@ -234,12 +278,12 @@ The Windows job validates:
 - locked metadata;
 - formatting;
 - Clippy with warnings denied;
-- all workspace tests, including W6 deterministic pack, digest, malformed-input and filesystem-security tests;
+- all workspace tests, including W6 deterministic pack/filesystem security and W7 ENTRY/Identity fake-service/security negatives;
 - the real workspace architecture policy.
 
 A separate Ubuntu job runs the immutable official cargo-deny action against `oteryn-client/Cargo.toml` and the colocated `deny.toml` for advisories, licenses, bans and sources. Supply-chain execution on Ubuntu does not replace the required Windows compilation/test evidence.
 
-A successful Rust workflow proves only the workspace packages compiled and tested on the stated revision. It does not prove client runtime, GPU, server, protocol, real assets or non-Windows product compatibility.
+A successful Rust workflow proves only the workspace packages compiled and tested on the stated revision. It does not prove client runtime, system-browser interaction, deployed Identity/Gateway reachability, Canary compatibility, GPU, real assets or non-Windows product compatibility.
 
 ## Adding the next crate
 
@@ -259,4 +303,4 @@ The expected next package is selected after live preflight. It must not be folde
 
 ## Rollback
 
-The current foundation, diagnostics, test-support, renderer, application-shell and synthetic asset packages have no user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output, compiler outputs and caches are transient and are never repository or release truth.
+The current foundation, diagnostics, test-support, renderer, application-shell, W7 entry-contract, W7 Platform/Identity and synthetic asset packages have no user-data migration. A normal squash revert of the owning package removes its crate/workspace/documentation change. Generated Cargo build output, compiler outputs and caches are transient and are never repository or release truth.

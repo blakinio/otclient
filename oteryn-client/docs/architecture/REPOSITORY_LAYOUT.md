@@ -1,6 +1,6 @@
 # Oteryn Client Repository Layout
 
-Status: normative planned layout. Directories are created only when their workstream starts after the foundation audit.
+Status: normative active layout. Directories are created only when their accepted workstream starts.
 
 ## 1. Coexistence in the current repository
 
@@ -99,6 +99,7 @@ oteryn-client/
 │   ├── ui/
 │   ├── renderer/
 │   ├── security/
+│   │   └── auth/
 │   └── fixtures/
 ├── benches/
 │   ├── scenes/
@@ -121,8 +122,8 @@ oteryn-client/
 | `foundation` | generic technical generations, monotonic time, explicit cancellation and primitive-specific errors | product lifecycle policy, domain IDs, protocol, platform services, async runtime or global event bus |
 | `test-support` | deterministic test-owned timelines/context and classified diagnostic-event fixtures using merged lower contracts | another clock abstraction, sleep/scheduler/executor, global fixture registry, product services or external fixture loading |
 | `app-runtime` | top-level state machine, service composition, error routing | packet parsing, concrete widgets |
-| `platform` | OS abstractions | game rules or feature state |
-| `identity` | PKCE orchestration and safe callback boundary | character/game state |
+| `platform` | strict bounded producer-facing HTTP/DTO boundaries and concrete reviewed OS/network adapters | browser transaction state, game rules, feature state, Canary wire, UI or deployment defaults |
+| `identity` | CSPRNG PKCE transaction, pre-bound loopback callback, system-browser launch and generation-safe Identity/ticket/Gateway orchestration | passwords, substitute ENTRY contracts, character/game mutation, Canary wire, UI or persistence |
 | `account-session` | authenticated account lifetime | live game connection |
 | `world-directory` | characters, worlds, gameplay-channel descriptors | physical node assumptions |
 | `game-session` | one live game session lifecycle | wire-format details |
@@ -147,6 +148,8 @@ oteryn-client/
 | `extension-host` | WASM runtime, quotas and capability enforcement | native plugin loading |
 
 `test-support` is physically under `crates/` because it is a reusable library package, but it declares architecture category `tool`. It may consume reviewed lower contracts for tests and must never become a runtime service locator.
+
+The W7 Identity implementation keeps producer-specific DTOs inside `platform`. `identity` consumes that boundary plus the merged `account-session`, `world-directory` and `game-session` contracts. Raw OAuth, ticket and Gateway values never become new public domain types. The synchronous service is designed to run on an application-owned worker thread; it does not own a runtime thread or async executor.
 
 `apps/client` is the concrete `app` package. Its current W5 boundary composes deterministic shell state with the single `oteryn-renderer` surface owner on the main thread. Protocol, game/domain rendering, feature composition, assets, UI and persistence remain absent.
 
@@ -191,6 +194,19 @@ application services
 ├── engine primitives
 └── foundation
 
+identity
+├── platform
+├── account-session
+├── world-directory
+├── game-session
+└── foundation
+
+platform
+├── account-session
+├── world-directory
+├── game-session
+└── foundation
+
 game-domain / simulation / world-storage / render-types
 └── foundation
 
@@ -213,7 +229,7 @@ foundation
 └── Rust standard library and separately reviewed non-product dependencies only
 ```
 
-`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. The current `apps/client` shell depends on foundation/diagnostics, the exact windowing library and the bounded `renderer` crate for concrete Windows composition. Renderer depends only on foundation plus its exact GPU dependencies and owns no feature, protocol, asset or UI service.
+`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. `identity` may depend on the strict `platform` producer boundary and merged ENTRY contracts, but those lower crates must never depend back on Identity. The current `apps/client` shell depends on foundation/diagnostics, the exact windowing library and the bounded `renderer` crate for concrete Windows composition. Renderer depends only on foundation plus its exact GPU dependencies and owns no feature, protocol, asset or UI service.
 
 ## 6. Cargo workspace policy
 
@@ -247,6 +263,7 @@ Generated code belongs in the owning crate's build output or generated-source pa
 - crate-local unit/property tests stay near the source;
 - reusable deterministic Rust test helpers live in `crates/test-support/` and remain test-owned;
 - cross-crate integration tests live under top-level `tests/`;
+- W7 Identity fake browser/listener/HTTP and security negatives live in `tests/security/auth/`;
 - protocol fixtures are versioned and provenance-documented;
 - renderer scenes and expected metrics live under `benches/scenes/`;
 - UI snapshot/reference data contains only original or licensed material;
@@ -271,7 +288,7 @@ Do not create all directories empty. Create only the slice required by the activ
 2. workspace/toolchain and architecture check;
 3. foundation and deterministic test-support crates, then application shell;
 4. renderer vertical slice;
-5. domain and synthetic replay slice;
+5. account/directory/game-entry contracts and bounded Identity/Platform bootstrap;
 6. Canary adapter and minimum playable connection;
 7. first-party features;
 8. launcher/updater and release hardening;

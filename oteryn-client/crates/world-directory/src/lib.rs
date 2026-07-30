@@ -711,8 +711,8 @@ impl AccountDirectorySnapshot {
             });
         }
 
-        let world = find_world(&self.worlds, world_id)
-            .ok_or(DirectoryError::WorldNotFound(world_id))?;
+        let world =
+            find_world(&self.worlds, world_id).ok_or(DirectoryError::WorldNotFound(world_id))?;
         ensure_selectable(
             DirectorySubject::World,
             world.availability(),
@@ -776,7 +776,10 @@ impl AccountDirectorySnapshot {
             selection.directory_revision,
             selection.character.id(),
             selection.world.id(),
-            selection.gameplay_channel.as_ref().map(GameplayChannelSummary::id),
+            selection
+                .gameplay_channel
+                .as_ref()
+                .map(GameplayChannelSummary::id),
         )?;
         if current != *selection {
             return Err(DirectoryError::SelectionNoLongerMatches);
@@ -919,13 +922,18 @@ impl Display for DirectoryError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Identifier(error) => Display::fmt(error, formatter),
-            Self::EmptyText(field) => write!(formatter, "required directory text is empty: {field:?}"),
+            Self::EmptyText(field) => {
+                write!(formatter, "required directory text is empty: {field:?}")
+            }
             Self::TextTooLong { field, maximum } => write!(
                 formatter,
                 "directory text exceeds {maximum} UTF-8 bytes: {field:?}"
             ),
             Self::ControlCharacter(field) => {
-                write!(formatter, "directory text contains a control character: {field:?}")
+                write!(
+                    formatter,
+                    "directory text contains a control character: {field:?}"
+                )
             }
             Self::SurroundingWhitespace(field) => write!(
                 formatter,
@@ -942,7 +950,10 @@ impl Display for DirectoryError {
                 formatter.write_str("gameplay-channel count exceeds the directory limit")
             }
             Self::TooManyChannelsForWorld(world_id) => {
-                write!(formatter, "gameplay-channel count exceeds the per-world limit for {world_id}")
+                write!(
+                    formatter,
+                    "gameplay-channel count exceeds the per-world limit for {world_id}"
+                )
             }
             Self::DuplicateWorldId(id) => write!(formatter, "duplicate world identifier: {id}"),
             Self::DuplicateCharacterId(id) => {
@@ -1069,10 +1080,7 @@ fn find_world(worlds: &[WorldSummary], id: WorldId) -> Option<&WorldSummary> {
         .map(|index| &worlds[index])
 }
 
-fn find_character(
-    characters: &[CharacterSummary],
-    id: CharacterId,
-) -> Option<&CharacterSummary> {
+fn find_character(characters: &[CharacterSummary], id: CharacterId) -> Option<&CharacterSummary> {
     characters
         .binary_search_by_key(&id, CharacterSummary::id)
         .ok()
@@ -1268,7 +1276,10 @@ mod tests {
             None,
         )?;
 
-        assert_eq!(selection.account_session_id(), snapshot.account_session_id());
+        assert_eq!(
+            selection.account_session_id(),
+            snapshot.account_session_id()
+        );
         assert_eq!(selection.character().id(), CharacterId::new(10)?);
         assert_eq!(selection.world().route().host(), "world1.example.test");
         assert_eq!(selection.world().route().port(), 7172);

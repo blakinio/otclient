@@ -500,9 +500,7 @@ impl From<DirectoryError> for EntryFailure {
 impl Display for EntryFailure {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         let message = match self.kind {
-            EntryFailureKind::StaleAuthenticationTransaction => {
-                "stale authentication transaction"
-            }
+            EntryFailureKind::StaleAuthenticationTransaction => "stale authentication transaction",
             EntryFailureKind::DuplicateCallback => "duplicate authentication callback",
             EntryFailureKind::AccountSessionExpired => "account session expired",
             EntryFailureKind::DirectoryRevisionStale => "directory revision is stale",
@@ -704,13 +702,10 @@ impl EntryLifecycle {
         account_session_id: AccountSessionId,
     ) -> Result<(), EntryFailure> {
         match &self.state {
-            LifecycleState::Authenticating {
-                attempt_id: active,
-            } if *active == attempt_id => {}
+            LifecycleState::Authenticating { attempt_id: active } if *active == attempt_id => {}
             LifecycleState::Authenticating { .. } => return Err(stale_failure()),
             LifecycleState::AccountReady {
-                attempt_id: active,
-                ..
+                attempt_id: active, ..
             } if *active == attempt_id => {
                 return Err(EntryFailure::for_kind(EntryFailureKind::DuplicateCallback));
             }
@@ -812,8 +807,9 @@ impl EntryLifecycle {
             return Err(EntryFailure::for_kind(EntryFailureKind::CredentialExpired));
         }
         let request = match &self.state {
-            LifecycleState::EntryRequested { request }
-                if request.attempt_id() == attempt_id => request.as_ref().clone(),
+            LifecycleState::EntryRequested { request } if request.attempt_id() == attempt_id => {
+                request.as_ref().clone()
+            }
             _ if self.has_different_attempt(attempt_id) => return Err(stale_failure()),
             _ => return Err(invariant_failure()),
         };
@@ -1006,7 +1002,8 @@ impl EntryLifecycle {
     }
 
     fn has_different_attempt(&self, attempt_id: GameEntryAttemptId) -> bool {
-        self.active_attempt().is_some_and(|active| active != attempt_id)
+        self.active_attempt()
+            .is_some_and(|active| active != attempt_id)
     }
 }
 
@@ -1229,15 +1226,17 @@ mod tests {
             ))
         );
         assert_eq!(
-            lifecycle.directory().map(AccountDirectorySnapshot::revision),
+            lifecycle
+                .directory()
+                .map(AccountDirectorySnapshot::revision),
             Some(DirectoryRevision::new(2)?)
         );
         Ok(())
     }
 
     #[test]
-    fn cancellation_is_typed_and_terminal_secret_output_is_redacted(
-    ) -> Result<(), Box<dyn Error>> {
+    fn cancellation_is_typed_and_terminal_secret_output_is_redacted() -> Result<(), Box<dyn Error>>
+    {
         let clock = ManualClock::new(Moment::ZERO);
         let attempt_id = GameEntryAttemptId::new(8)?;
         let mut lifecycle = EntryLifecycle::new();
@@ -1276,10 +1275,7 @@ mod tests {
         let admission = credential.into_admission();
 
         assert_eq!(format!("{admission:?}"), "AdmissionCredential([REDACTED])");
-        assert_eq!(
-            admission.to_string(),
-            "[REDACTED ADMISSION CREDENTIAL]"
-        );
+        assert_eq!(admission.to_string(), "[REDACTED ADMISSION CREDENTIAL]");
         assert!(!format!("{admission:?}").contains("admission-secret"));
         Ok(())
     }

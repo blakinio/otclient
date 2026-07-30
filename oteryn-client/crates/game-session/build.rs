@@ -38,7 +38,7 @@ fn main() {
     };
     let lock_path = manifest_dir.join("../..").join("Cargo.lock");
     let current = match fs::read_to_string(&lock_path) {
-        Ok(value) => value,
+        Ok(value) => value.replace("\r\n", "\n"),
         Err(error) => fail(&format!("failed to read Cargo.lock: {error}")),
     };
 
@@ -63,7 +63,7 @@ fn main() {
         let text = String::from_utf8_lossy(chunk);
         println!("cargo:warning=W7_LOCK_{index:04}:{text}");
     }
-    println!("cargo:warning=W7_LOCK_SHA256_UNAVAILABLE_STD_ONLY");
+    println!("cargo:warning=W7_LOCK_COMPLETE");
 }
 
 fn insert_before(mut input: String, marker: &str, block: &str) -> String {

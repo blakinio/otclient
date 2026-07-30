@@ -10,11 +10,11 @@ parallel_lane_state: validating
 branch: docs/OTC-20260730-close-w6-current-main
 base_branch: main
 created: 2026-07-30T11:30:00+02:00
-updated: 2026-07-30T11:30:00+02:00
-last_verified_commit: pending
+updated: 2026-07-30T11:36:00+02:00
+last_verified_commit: "3f7213bcff0b67aaddc6d8d662480669f3a8e345"
 required_base_commit: "a8e95bbce06eda7eb7954843cb7833fbf87160cc"
 risk: low
-related_pr: pending
+related_pr: "#99"
 depends_on:
   - W6 plan PR #90 and archive PR #91
   - W6-ASSET implementation PR #92 and archive PR #94
@@ -61,7 +61,7 @@ This task does not accept W7, create worker lanes, implement Rust packages, add 
 - [x] Record that all W6 Cargo, lockfile, dependency-policy and shared-document leases are released.
 - [x] Update coordinator routing without claiming W7 acceptance.
 - [x] Leave exactly one next recommendation: plan `OTERYN-W7-TECHNICAL-LOGIN` after fresh contract and ownership preflight.
-- [ ] Review the exact changed-file list and complete diff.
+- [x] Review the exact changed-file list and complete diff; exactly four authorized coordination paths changed.
 - [ ] Pass exact-head Rust Client and repository CI.
 - [ ] Merge through repository gates and archive this task separately before W7 planning begins.
 
@@ -77,10 +77,10 @@ This task does not accept W7, create worker lanes, implement Rust packages, add 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T11:30:00+02:00
-head: pending
+updated_at: 2026-07-30T11:36:00+02:00
+head: pending-current-commit
 branch: docs/OTC-20260730-close-w6-current-main
-pr: pending
+pr: 99
 status: validating
 required_main: a8e95bbce06eda7eb7954843cb7833fbf87160cc
 proven:
@@ -90,6 +90,7 @@ proven:
   - PR #97 owns legacy asset rehearsal only.
   - No active Rust task or open PR owns Identity, account-session, directory, game-entry, transport, protocol-canary, technical-login composition or login E2E paths.
   - All prior Rust shared-path leases are released.
+  - PR #99 changes exactly four authorized coordination paths and the complete diff was reviewed.
 derived:
   - CURRENT_PARALLEL_WAVE.md on main was stale because it still authorized the completed W6 worker.
 unknown: []
@@ -100,7 +101,10 @@ changed_paths:
   - docs/agents/tasks/active/OTC-20260730-close-w6-current-main.md
   - oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md
   - oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md
-validation: []
+validation:
+  - command: complete PR #99 changed-file and diff review
+    result: PASS
+    evidence: exactly four authorized coordination paths; no product/dependency/workflow/external-repository change
 blockers: []
-next_action: Open the draft PR, inspect the full diff, run exact-head checks and merge only through the repository gate; archive this task separately before W7 planning.
+next_action: Mark PR #99 ready, wait for exact-head required checks and merge only through the repository gate; archive this task separately before W7 planning.
 ```

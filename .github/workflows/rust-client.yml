@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: rust-client-${{ github.event.pull_request.number || github.ref }}
@@ -28,10 +28,9 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5f25 # v4.3.1
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           show-progress: false
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - name: Install pinned Rust toolchain
         run: |
@@ -56,20 +55,6 @@ jobs:
       - name: Lint workspace
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-      - name: Materialize generated W7 lockfile
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat/OTC-20260730-w7-entry-contract'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock
-          git diff --cached --quiet
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Cargo.lock is already materialized"
-            exit 0
-          }
-          git commit -m "chore(w7): materialize generated lockfile"
-          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
-
       - name: Test workspace
         run: cargo test --workspace --all-targets --locked
 
@@ -82,7 +67,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5f25 # v4.3.1
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           show-progress: false
 

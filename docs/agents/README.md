@@ -28,6 +28,7 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/architecture/CLIENT_LIFECYCLE.md` | Account/game sessions, gameplay-channel login and relog. |
 | `../../oteryn-client/docs/architecture/PROTOCOL_BOUNDARY.md` | Canary/Oteryn adapter isolation. |
 | `../../oteryn-client/docs/architecture/SECURITY_MODEL.md` | Trust boundaries and invariants. |
+| `../../oteryn-client/docs/architecture/TECHNICAL_LOGIN.md` | Bounded W7 technical Identity/Gateway/Canary admission architecture. |
 | `../../oteryn-client/docs/agents/PROGRAM.md` | Ordered audit-first implementation gates. |
 | `../../oteryn-client/docs/agents/WORKSTREAMS.md` | Agent ownership and package routing. |
 | `../../oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md` | Parallel lane, shared-path lease and contract/merge protocol. |

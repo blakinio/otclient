@@ -1,16 +1,17 @@
 ---
 task_id: OTC-20260730-w7-identity
-status: in_progress
+status: validating
 agent: "W7-IDENTITY worker"
 track: greenfield-rust
 workstream: native-oauth-gateway
 parallel_wave: OTERYN-W7-TECHNICAL-LOGIN
 parallel_lane: W7-IDENTITY
-parallel_lane_state: active
+parallel_lane_state: validating
 branch: feat/OTC-20260730-w7-identity
 base_branch: main
 created: 2026-07-30T21:45:00+02:00
-updated: 2026-07-30T21:45:00+02:00
+updated: 2026-07-30T22:42:00+02:00
+current_head: "5f74461106a48c945d89fed320dd88991361455f"
 required_base_commit: "626c7954e6e6999bb4b8c8d051500b543e3c09e0"
 required_producer_commit: "9ecc43a4465f6565bc1c12ea61f170a96edcbe35"
 required_producer_archive_commit: "8dcd353d5a9f19fabccf49508c27074f7749e3cf"
@@ -18,7 +19,7 @@ workspace_repair_commit: "9e580a0fa615cc0e42f70c9d76395cf5a9fd0238"
 workspace_repair_archive_commit: "626c7954e6e6999bb4b8c8d051500b543e3c09e0"
 platform_revision: "55ba8840a7de6556b6b173f587179f986a5a68e1"
 risk: high
-related_pr: pending
+related_pr: "#110"
 owned_paths:
   - oteryn-client/crates/platform/**
   - oteryn-client/crates/identity/**
@@ -50,8 +51,11 @@ contracts_consumed:
   - Platform Gateway merge 8006534108d835474dadd208b0ec934e4a12528b
   - Platform hardening merge 53158217a6c6017230301cf4daa783b04fcc13d5
 blockers:
-  - exact deployed OAuth client ID, URLs, TLS/network reachability and secret injection remain external
-  - real Windows browser-return evidence remains interactive
+  - exact deployed OAuth client ID, Identity/Gateway URLs, TLS/DNS/firewall state and secret injection remain external
+  - real Windows browser launch/return against a configured producer remains interactive
+  - exact deployed cross-repository Identity -> Gateway -> Canary E2E remains unproven
+  - current token-family revocation bounds W7 to one bootstrap attempt
+  - Gateway v1 does not expose general multi-world issuer or gameplay-channel routing
 ---
 
 # Goal
@@ -62,41 +66,74 @@ Implement the bounded Rust native Identity -> Game Login Ticket -> Gateway proto
 
 - W7 plan and archive are merged.
 - W7-ENTRY-CONTRACT merged as `9ecc43a4465f6565bc1c12ea61f170a96edcbe35` and archived as `8dcd353d5a9f19fabccf49508c27074f7749e3cf`.
-- The post-merge workspace regression was repaired by PR #108 and archived by PR #109; the Cargo/shared-document lease is free.
-- No active PR or branch owns `crates/platform`, `crates/identity` or `tests/security/auth`.
+- The post-merge workspace regression was repaired by PR #108 and archived by PR #109; the Cargo/shared-document lease was free at launch.
+- No active PR or branch owned `crates/platform`, `crates/identity` or `tests/security/auth`.
 - PR #23 is legacy OTUI/Lua presentation only, #48 is isolated operational non-merge work, and #97 is a legacy asset rehearsal.
-- Platform current head `55ba8840a7de6556b6b173f587179f986a5a68e1` is six commits ahead of the planning cut only in UX/portal/testing paths; no OAuth, ticket or Gateway contract path changed.
+- Platform head `55ba8840a7de6556b6b173f587179f986a5a68e1` advanced from the planning cut only in UX/portal/testing paths; no inspected OAuth, ticket or Gateway contract path changed.
 
-# Required scope
+# Implemented result
 
-- PKCE `S256` with CSPRNG state and verifier;
-- bind IPv4 `127.0.0.1:0` before browser launch and use the actual assigned port;
-- injected hardened system-browser adapter;
-- exact callback path, loopback peer, state, generation, stale and duplicate validation;
-- bounded authorization-code token exchange;
-- one Game Login Ticket issuance with no duplicate retry;
-- strict Gateway protocol-v1 request/response parsing;
-- reject unknown/trailing/oversized JSON, redirects, invalid protocol version, IDs, ports, duplicates and world/character relations;
-- convert raw DTOs only into merged ENTRY types;
-- clear verifier, code, access/refresh token and ticket at terminal boundaries;
-- no password collection, password fallback, async runtime, persistence or production compatibility claim.
+## Platform boundary
 
-# Exact external surface
+- explicit Identity/Gateway base URLs with HTTPS required outside loopback;
+- synchronous Ureq adapter using `NativeTls` and `PlatformVerifier` for normal system certificate/hostname validation;
+- redirects and environment proxy discovery disabled;
+- bounded timeout, response headers and response body;
+- exact OAuth token, Game Login Ticket and Gateway protocol-v1 requests;
+- strict content type, no-store/no-cache, unknown-field and trailing-data validation;
+- signed-64 IDs, positive port, duplicate identifier and character/world relation validation;
+- raw DTO conversion only into merged ENTRY `AccountDirectorySnapshot` and `GameEntryCredential`.
 
-- authorization: `/oauth/authorize`;
-- token: `/oauth/token`;
-- scope: `game:ticket`;
-- callback base: `http://127.0.0.1/callback`, dynamic port accepted;
-- ticket: `POST /api/v1/game-auth/tickets`, body `{"protocol_version":1}`;
-- Gateway: `POST /v1/login`, body `{"protocol_version":1,"game_login_ticket":"..."}`;
-- Gateway success: `protocol_version`, `session { credential, expires_at }`, `worlds[] { id, slug, name, region, host, port }`, `characters[] { id, name, level, vocation, world_id }`.
+## Identity transaction
+
+- CSPRNG state/verifier and RFC PKCE `S256`;
+- IPv4 `127.0.0.1:0` bind before browser launch;
+- exact assigned port in authorization and token exchange;
+- direct system-browser process argument without shell interpolation;
+- bounded callback parser with exact path, IPv4 loopback peer, state, active generation, stale and duplicate checks;
+- cancellation/generation checks before and between one-shot stages;
+- one non-retried ticket issuance and one Gateway login;
+- refresh-token discard and terminal secret cleanup;
+- no password collection/fallback, embedded browser, async runtime, persistence, UI or Canary packet implementation.
+
+# Automated evidence
+
+Synthetic tests cover:
+
+- RFC PKCE vector and independent state/verifier material;
+- bind-before-launch and dynamic callback port propagation;
+- complete fake browser/listener/HTTP success with exactly three requests;
+- callback state, peer, path, generation, duplicate, malformed, timeout and cancellation negatives;
+- unknown/trailing JSON, redirect, missing cache policy and oversized body rejection;
+- unsupported Gateway protocol version;
+- duplicate world ID, invalid port and unknown character/world relation;
+- stale generation without network work;
+- access/code/ticket/session credential redaction;
+- conversion only into merged ENTRY types.
+
+All fixtures are synthetic. No production credential, account, private capture or proprietary material is present.
+
+# Dependency review
+
+- exact versions and features are committed in `Cargo.lock` generated by Cargo `1.94.0`;
+- `base64`, `getrandom`, `serde`, `time`, `url` and Ureq native TLS are the bounded new graph;
+- no wildcard, Git or unknown-registry dependency was introduced;
+- cargo-deny permits no new license class;
+- one exact documented `windows-sys 0.61.2` duplicate branch is allowed for native-tls/SChannel beside the existing winit `windows-sys 0.52` branch;
+- no manual `Cargo.lock` conflict resolution occurred.
+
+# Validation checkpoint
+
+A complete source package at head `2f0ab6e06bfdbbfcc72bbf28266bc6b60d7cc4c2` passed Rust Client run `30579075364`, including locked metadata, formatting, strict Clippy, all workspace tests/doctests, architecture policy and cargo-deny. Later documentation and expanded negative tests invalidate that result as final merge evidence.
+
+Final exact-head Rust Client and repository CI must pass after this task/evidence/shared-document checkpoint. Their run IDs and exact feature head will be recorded before ready/merge.
 
 # Acceptance criteria
 
-- [ ] one active task, branch and draft PR only;
-- [ ] no substitute ENTRY public types;
-- [ ] focused fake browser/listener/HTTP tests cover success and all required rejection/cleanup paths;
-- [ ] dependency versions/features/licenses/advisories are pinned and reviewed for Rust 1.94;
-- [ ] exact-head locked metadata, fmt, strict Clippy, all tests/doctests, architecture policy and cargo-deny pass;
+- [x] one active task, branch and draft PR only;
+- [x] no substitute ENTRY public types;
+- [x] focused fake browser/listener/HTTP tests cover success and required rejection/cleanup paths;
+- [x] dependency versions/features/licenses/advisories are pinned and reviewed for Rust 1.94;
+- [ ] final exact-head locked metadata, fmt, strict Clippy, all tests/doctests, architecture policy and cargo-deny pass;
 - [ ] full diff and review-thread checks pass;
 - [ ] merge through gates and archive separately.

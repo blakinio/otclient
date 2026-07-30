@@ -6,13 +6,13 @@ track: greenfield-rust
 workstream: account-session-world-directory-game-session
 parallel_wave: OTERYN-W7-TECHNICAL-LOGIN
 parallel_lane: W7-ENTRY-CONTRACT
-parallel_lane_state: validation
+parallel_lane_state: ready_to_merge
 coordinator_task: none
 branch: feat/OTC-20260730-w7-entry-contract
 base_branch: main
 created: 2026-07-30T12:25:00+02:00
-updated: 2026-07-30T13:00:00+02:00
-last_verified_commit: "4ef46befd5d6a45b6f75137a1f3976c6134f0309"
+updated: 2026-07-30T17:47:00+02:00
+last_verified_commit: "473847f6a906b1a70224455266f921781642b0a9"
 required_base_commit: "11a14721e1f3ef81e6bbab54cdfbb631d7ec81e0"
 risk: high
 related_pr: "#104"
@@ -95,7 +95,7 @@ Implement the sole shared contract producer for W7 account-session, directory an
 - PR #23 is legacy OTUI/Lua only; PR #48 is isolated operational non-merge work; PR #97 is legacy asset rehearsal only.
 - This is the first dependency root; it consumes no unmerged W7 producer.
 - The coordinator grants this lane the single shared Cargo/document lease because workspace membership and generated lockfile integration cannot complete otherwise.
-- All other W7 lanes remain unlaunched and may not touch the lease or define substitute types.
+- All other W7 lanes remain blocked from final compatibility claims until this producer feature merge and separate lifecycle archive merge.
 
 # Exclusive contract rules
 
@@ -107,7 +107,7 @@ Implement the sole shared contract producer for W7 account-session, directory an
 - `GameEntryCredential` owns secret bytes, is non-`Clone`, redacts `Debug`/`Display`, is never serializable/persisted and moves exactly once into admission.
 - Secret-buffer overwrite on Drop is a best-effort safe-Rust cleanup barrier, not a claim that compiler/runtime copies can never exist.
 - `EntryFailure` is bounded, typed and stable; it contains no secret or raw backend/OS error text.
-- No Platform DTO, OAuth message, HTTP client, transport interface, protocol opcode, packet enum or speculative multi-world/channel API may be added.
+- No Platform DTO, OAuth message, HTTP client, transport interface, protocol opcode, packet enum or speculative multi-world/channel API was added.
 
 # Acceptance criteria
 
@@ -121,10 +121,10 @@ Implement the sole shared contract producer for W7 account-session, directory an
 - [x] Add focused unit tests for legal and illegal transitions and no mutation after rejection.
 - [x] Update only lease-authorized Cargo and shared documentation paths.
 - [x] Keep architecture-check policy, lint/unsafe policy and dependency-deny policy unchanged.
-- [ ] Commit the generated pinned-toolchain `Cargo.lock` update.
-- [ ] Exact-head locked metadata, `cargo fmt --check`, strict Clippy, all workspace tests, architecture check, cargo-deny and repository required CI pass.
-- [ ] Complete changed-file/diff review and resolve every review thread.
-- [ ] Revalidate/restack on current `main` if it advances before final validation.
+- [x] Commit the generated pinned-toolchain `Cargo.lock` update.
+- [x] Exact-head locked metadata, `cargo fmt --check`, strict Clippy, all workspace tests, architecture check, cargo-deny and repository required CI pass.
+- [x] Complete changed-file/diff review and resolve every review thread.
+- [x] Revalidate/restack on current `main`; current main remains the required launch/archive commit and the branch is not behind it.
 - [ ] Merge through branch protection, then archive this task separately and release the full shared-path lease before downstream producer integration.
 
 # Validation environment
@@ -133,12 +133,12 @@ The worker sandbox cannot resolve GitHub DNS and has no Rust toolchain, so it ca
 
 # Parallel-task answers
 
-- Safe concurrency: no W7 sibling is launched; legacy/operational PRs own disjoint paths.
+- Safe concurrency: no overlapping owner was found; legacy/operational PRs own disjoint paths.
 - Exclusive paths/contracts: exactly those declared in front matter and the accepted W7 plan.
-- Shared paths: held exclusively by this task; all other tasks keep them read-only.
+- Shared paths: held exclusively by this task until the separate archive merge.
 - Contract role: sole producer.
 - Validation invalidation: any newer `main` changing foundation/test-support/workspace policy or the accepted W7 architecture invalidates prior full validation and requires restack/re-run.
-- `integration_ready`: exclusive crates/tests complete while generated lockfile/CI integration is being finalized under this lane's lease.
+- `integration_ready`: exact producer APIs, tests, lockfile and workspace integration are complete and validated; consumers must use the exact producer merge commit.
 - `blocked`: overlapping owner, changed external identifier width, architecture contradiction, dependency-policy failure or inability to prove redaction/one-shot semantics.
 - Independent merge: yes, after its own exact-head gates; it must merge before every W7 consumer finalizes.
 - Lease release: separate archive PR after the feature PR merges.
@@ -146,12 +146,12 @@ The worker sandbox cannot resolve GitHub DNS and has no Rust toolchain, so it ca
 # Implementation checkpoint
 
 ```yaml
-checkpoint_version: 1
-updated_at: 2026-07-30T13:00:00+02:00
-head: 4ef46befd5d6a45b6f75137a1f3976c6134f0309
+checkpoint_version: 2
+updated_at: 2026-07-30T17:47:00+02:00
+head: 473847f6a906b1a70224455266f921781642b0a9
 branch: feat/OTC-20260730-w7-entry-contract
 pr: 104
-status: validation
+status: ready_to_merge
 required_main: 11a14721e1f3ef81e6bbab54cdfbb631d7ec81e0
 proven:
   - W7 plan PR #101 and archive PR #102 are merged.
@@ -159,28 +159,33 @@ proven:
   - Three bounded crates and their focused tests are implemented without a new third-party dependency.
   - Credential and admission formatting is always redacted and ordinary cloning/serialization is absent.
   - Consumer API and migration notes are documented in the isolated evidence record.
+  - Generated Cargo.lock blob f704ec7526b1c91afa3d7028fc409f71b7d1c0d8 contains the three exact local package entries.
+  - Exact-head Rust Client run 30558334678 succeeded, including locked metadata, formatting, strict Clippy, tests, architecture and cargo-deny.
+  - Exact-head repository CI run 30558335550 succeeded.
+  - Full changed-file/diff review completed with 13 intended files and no helper workflow/build/generator residue.
+  - PR #104 has no review threads.
+  - Current main is 11a14721e1f3ef81e6bbab54cdfbb631d7ec81e0 and this branch is not behind it.
 derived:
-  - W7-IDENTITY, W7-CANARY-ENTRY and W7-LOGIN-E2E can consume these APIs only after the exact producer feature merge and separate archive release.
+  - W7-IDENTITY, W7-CANARY-ENTRY and W7-LOGIN-E2E may restack only on the exact feature merge commit published after squash merge.
 unknown:
-  - exact compiler/Clippy/test outcome until GitHub Actions completes on the final generated-lockfile head.
+  - exact producer squash-merge commit until PR #104 merges.
 conflicts: []
-first_failure:
-  marker: local-toolchain-unavailable
-  evidence: sandbox has no Rust toolchain and cannot resolve GitHub DNS; local Cargo validation is unavailable.
+first_failure: none
 changed_paths:
   - docs/agents/BUILD_TEST_MATRIX.md
   - docs/agents/CHANGELOG.md
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/tasks/active/OTC-20260730-w7-entry-contract.md
+  - oteryn-client/Cargo.lock
   - oteryn-client/Cargo.toml
   - oteryn-client/crates/account-session/**
   - oteryn-client/crates/world-directory/**
   - oteryn-client/crates/game-session/**
   - oteryn-client/docs/research/technical-login/W7_ENTRY_CONTRACT_EVIDENCE.md
 validation:
-  - GitHub Actions Rust Client run 30536380039 started on head 4ef46befd5d6a45b6f75137a1f3976c6134f0309.
-  - GitHub Actions repository CI run 30536380283 started on the same head.
+  - GitHub Actions Rust Client run 30558334678 succeeded on head 473847f6a906b1a70224455266f921781642b0a9.
+  - GitHub Actions repository CI run 30558335550 succeeded on the same head.
 blockers:
-  - generated Cargo.lock update and exact-head CI remain pending.
-next_action: Finalize the generated lockfile, inspect exact CI failures, repair the implementation, then complete exact-head review and merge gates.
+  - squash merge PR #104 and then merge the separate lifecycle archive PR.
+next_action: Re-run exact-head CI for this checkpoint-only commit, mark PR #104 ready, squash merge it, publish the exact producer merge commit, then archive the task and release the lease in a separate PR.
 ```

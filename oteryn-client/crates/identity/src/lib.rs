@@ -205,12 +205,24 @@ fn launch_system_browser(_authorization_url: &Url) -> Result<(), IdentityError> 
 }
 
 /// One accepted TCP callback request reduced to the security-relevant facts.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// The request target contains OAuth code/state material and therefore has no
+/// ordinary clone or revealing debug surface.
 pub struct CallbackAttempt {
     /// Remote peer observed by the bound listener.
     pub peer: IpAddr,
     /// Exact HTTP request target including query.
     pub target: String,
+}
+
+impl Debug for CallbackAttempt {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CallbackAttempt")
+            .field("peer", &self.peer)
+            .field("target", &"[REDACTED]")
+            .finish()
+    }
 }
 
 /// One pre-bound loopback callback receiver.
@@ -886,6 +898,14 @@ mod tests {
         let debug = format!("{transaction:?}");
         assert!(!debug.contains("AwMDAw"));
         assert!(debug.contains("[REDACTED]"));
+        let callback = CallbackAttempt {
+            peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            target: "/callback?code=synthetic-code&state=synthetic-state".to_owned(),
+        };
+        let callback_debug = format!("{callback:?}");
+        assert!(!callback_debug.contains("synthetic-code"));
+        assert!(!callback_debug.contains("synthetic-state"));
+        assert!(callback_debug.contains("[REDACTED]"));
         Ok(())
     }
 
@@ -920,15 +940,23 @@ mod tests {
                 .map(|error| error.kind()),
             Some(IdentityErrorKind::InvalidCallbackPeer)
         );
-        let valid = CallbackAttempt {
-            peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-            target: "/callback?code=synthetic-code&state=expected-state".to_owned(),
-        };
-        let code = transaction.accept_callback(Some(session()?), valid.clone())?;
+        let code = transaction.accept_callback(
+            Some(session()?),
+            CallbackAttempt {
+                peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                target: "/callback?code=synthetic-code&state=expected-state".to_owned(),
+            },
+        )?;
         assert_eq!(code.expose_secret()?, "synthetic-code");
         assert_eq!(
             transaction
-                .accept_callback(Some(session()?), valid)
+                .accept_callback(
+                    Some(session()?),
+                    CallbackAttempt {
+                        peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                        target: "/callback?code=synthetic-code&state=expected-state".to_owned(),
+                    },
+                )
                 .err()
                 .map(|error| error.kind()),
             Some(IdentityErrorKind::DuplicateCallback)
@@ -945,20 +973,28 @@ mod tests {
             "expected-state".to_owned(),
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~".to_owned(),
         )?;
-        let attempt = CallbackAttempt {
-            peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-            target: "/other?code=synthetic-code&state=expected-state".to_owned(),
-        };
         assert_eq!(
             transaction
-                .accept_callback(Some(AccountSessionId::new(8)?), attempt.clone())
+                .accept_callback(
+                    Some(AccountSessionId::new(8)?),
+                    CallbackAttempt {
+                        peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                        target: "/other?code=synthetic-code&state=expected-state".to_owned(),
+                    },
+                )
                 .err()
                 .map(|error| error.kind()),
             Some(IdentityErrorKind::StaleGeneration)
         );
         assert_eq!(
             transaction
-                .accept_callback(Some(session()?), attempt)
+                .accept_callback(
+                    Some(session()?),
+                    CallbackAttempt {
+                        peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                        target: "/other?code=synthetic-code&state=expected-state".to_owned(),
+                    },
+                )
                 .err()
                 .map(|error| error.kind()),
             Some(IdentityErrorKind::InvalidCallbackPath)

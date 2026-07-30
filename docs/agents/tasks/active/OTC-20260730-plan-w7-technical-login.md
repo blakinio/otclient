@@ -6,12 +6,12 @@ track: greenfield-rust
 workstream: coordination
 parallel_wave: OTERYN-W7-TECHNICAL-LOGIN
 parallel_lane: W7-C
-parallel_lane_state: validating
+parallel_lane_state: ready
 branch: docs/OTC-20260730-plan-w7-technical-login
 base_branch: main
 created: 2026-07-30T11:49:00+02:00
-updated: 2026-07-30T12:12:00+02:00
-last_verified_commit: "pending-current-head"
+updated: 2026-07-30T12:18:00+02:00
+last_verified_commit: "27a10dff058a12ee1ea853b01f63575c96d5375b"
 required_base_commit: "1922ef0201cd476cad2fabd42e6f9622e52891f6"
 risk: high
 related_pr: "#101"
@@ -74,8 +74,9 @@ Prepare one accepted, bounded multi-agent architecture and execution plan for th
 - [x] Recorded current Platform/Gateway/Canary producer cuts and legacy-reference proof boundary.
 - [x] Revalidated Platform loopback behavior: no-port registered base plus explicitly tested dynamic loopback port; fixed port 80 remains prohibited.
 - [x] Recorded no multi-world/channel, reusable account-session, deployed TLS/secret-manager or production claim.
-- [ ] Pass exact-head CI, inspect complete ten-file diff and confirm no unresolved review threads.
-- [ ] Merge through repository gates and archive this planning task separately before any worker launch.
+- [x] Inspected the complete ten-file diff and confirmed no unresolved review threads.
+- [x] Reviewed head `27a10dff058a12ee1ea853b01f63575c96d5375b` passed Rust Client run `30533414057` and repository CI run `30533414555`.
+- [ ] Pass the same exact-head gates on this final checkpoint commit, merge through repository gates and archive this planning task separately before any worker launch.
 
 # Plan outputs
 
@@ -115,11 +116,11 @@ Prepare one accepted, bounded multi-agent architecture and execution plan for th
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T12:12:00+02:00
-head: pending-current-head
+updated_at: 2026-07-30T12:18:00+02:00
+head: pending-final-checkpoint-commit
 branch: docs/OTC-20260730-plan-w7-technical-login
 pr: 101
-status: validating
+status: ready
 required_main: 1922ef0201cd476cad2fabd42e6f9622e52891f6
 proven:
   - W1-W6 are closed/archived and not launchable.
@@ -132,6 +133,9 @@ proven:
   - Platform current tests prove dynamic loopback-port authorization/token exchange for the registered no-port base.
   - Current Platform/Gateway source cut is 8e613c00503c0874e69e2085c740f87f4a87e002.
   - Current Canary source cut is 4b2d6f432d92628c42bde1d95daed6ae0d0eb88f.
+  - Complete ten-file diff review found only authorized documentation/coordination changes.
+  - No unresolved PR review thread exists.
+  - Reviewed head 27a10dff058a12ee1ea853b01f63575c96d5375b passed Rust Client 30533414057 and repository CI 30533414555.
 derived:
   - After plan and separate archive merge, ENTRY is the first launchable worker.
   - Identity may include the real loopback adapter after exact producer revalidation; deployment evidence remains separate.
@@ -140,8 +144,8 @@ unknown:
   - exact HTTPS/browser and crypto/compression dependencies; workers select only under current primary evidence and serialized lease.
 conflicts: []
 first_failure:
-  marker: exact-head-validation-pending
-  evidence: complete corrected plan is published but current-head CI and final diff/review gate are pending.
+  marker: final-checkpoint-exact-head-pending
+  evidence: the final task checkpoint commit must pass the same required checks before merge.
 changed_paths:
   - docs/agents/CROSS_REPO_CONTRACTS.md
   - docs/agents/README.md
@@ -153,12 +157,24 @@ changed_paths:
   - oteryn-client/docs/agents/prompts/W7_ENTRY_CONTRACT_AGENT.md
   - oteryn-client/docs/agents/prompts/W7_IDENTITY_AGENT.md
   - oteryn-client/docs/agents/prompts/W7_LOGIN_E2E_AGENT.md
-validation: []
+validation:
+  - command: complete PR #101 changed-file and diff review
+    result: PASS
+    evidence: exactly ten authorized documentation paths; no Rust product/dependency/workflow/external-repository change
+  - command: review-thread inspection
+    result: PASS
+    evidence: no unresolved review threads
+  - command: Rust Client run 30533414057
+    result: PASS
+    evidence: reviewed head 27a10dff058a12ee1ea853b01f63575c96d5375b
+  - command: repository CI run 30533414555
+    result: PASS
+    evidence: reviewed head 27a10dff058a12ee1ea853b01f63575c96d5375b
 blockers:
   - W7-BLOCK-REAL-RUST-E2E
   - W7-BLOCK-DEPLOYMENT-EVIDENCE
   - W7-BLOCK-MULTIWORLD-CHANNEL
   - W7-BLOCK-ACCOUNT-SESSION-REUSE
   - W7-BLOCK-EXACT-CANARY-CUT
-next_action: Complete exact-head CI/diff/review gate for PR #101, merge it, then archive this planning task separately before launching W7-ENTRY-CONTRACT.
+next_action: Pass exact-head required checks on this final checkpoint commit, merge PR #101, then archive this planning task separately before launching W7-ENTRY-CONTRACT.
 ```

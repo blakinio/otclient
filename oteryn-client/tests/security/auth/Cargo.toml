@@ -11,11 +11,11 @@ publish = false
 category = "tool"
 
 [dependencies]
-oteryn-account-session = { path = "../../../crates/account-session" }
-oteryn-foundation = { path = "../../../crates/foundation" }
-oteryn-identity = { path = "../../../crates/identity" }
-oteryn-platform = { path = "../../../crates/platform" }
-oteryn-world-directory = { path = "../../../crates/world-directory" }
+oteryn-account-session = { version = "=0.1.0", path = "../../../crates/account-session" }
+oteryn-foundation = { version = "=0.1.0", path = "../../../crates/foundation" }
+oteryn-identity = { version = "=0.1.0", path = "../../../crates/identity" }
+oteryn-platform = { version = "=0.1.0", path = "../../../crates/platform" }
+oteryn-world-directory = { version = "=0.1.0", path = "../../../crates/world-directory" }
 serde_json.workspace = true
 time = { version = "=0.3.54", default-features = false, features = ["formatting", "std"] }
 url = "=2.5.8"

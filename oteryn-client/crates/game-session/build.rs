@@ -76,8 +76,7 @@ fn insert_before(mut input: String, marker: &str, block: &str) -> String {
 }
 
 fn encode_base64(input: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut output = String::with_capacity(input.len().div_ceil(3) * 4);
     let mut chunks = input.chunks_exact(3);
 
@@ -86,8 +85,12 @@ fn encode_base64(input: &[u8]) -> String {
         let second = chunk[1];
         let third = chunk[2];
         output.push(char::from(TABLE[usize::from(first >> 2)]));
-        output.push(char::from(TABLE[usize::from(((first & 0x03) << 4) | (second >> 4))]));
-        output.push(char::from(TABLE[usize::from(((second & 0x0f) << 2) | (third >> 6))]));
+        output.push(char::from(
+            TABLE[usize::from(((first & 0x03) << 4) | (second >> 4))],
+        ));
+        output.push(char::from(
+            TABLE[usize::from(((second & 0x0f) << 2) | (third >> 6))],
+        ));
         output.push(char::from(TABLE[usize::from(third & 0x3f)]));
     }
 
@@ -101,7 +104,9 @@ fn encode_base64(input: &[u8]) -> String {
         }
         [first, second] => {
             output.push(char::from(TABLE[usize::from(first >> 2)]));
-            output.push(char::from(TABLE[usize::from(((first & 0x03) << 4) | (second >> 4))]));
+            output.push(char::from(
+                TABLE[usize::from(((first & 0x03) << 4) | (second >> 4))],
+            ));
             output.push(char::from(TABLE[usize::from((second & 0x0f) << 2)]));
             output.push('=');
         }

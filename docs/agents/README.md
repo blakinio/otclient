@@ -28,6 +28,7 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/architecture/CLIENT_LIFECYCLE.md` | Account/game sessions, gameplay-channel login and relog. |
 | `../../oteryn-client/docs/architecture/PROTOCOL_BOUNDARY.md` | Canary/Oteryn adapter isolation. |
 | `../../oteryn-client/docs/architecture/SECURITY_MODEL.md` | Trust boundaries and invariants. |
+| `../../oteryn-client/docs/architecture/TECHNICAL_LOGIN.md` | W7 account-to-game technical-login architecture and exact first-milestone boundary. |
 | `../../oteryn-client/docs/agents/PROGRAM.md` | Ordered audit-first implementation gates. |
 | `../../oteryn-client/docs/agents/WORKSTREAMS.md` | Agent ownership and package routing. |
 | `../../oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md` | Parallel lane, shared-path lease and contract/merge protocol. |
@@ -36,7 +37,7 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/agents/templates/PARALLEL_TASK.md` | Additional task metadata for parallel work. |
 | `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Exact W7 coordinator/integrator prompt. |
 | `../../oteryn-client/docs/agents/prompts/W7_ENTRY_CONTRACT_AGENT.md` | Sole entry/session/directory contract producer prompt. |
-| `../../oteryn-client/docs/agents/prompts/W7_IDENTITY_AGENT.md` | PKCE/Identity/Gateway consumer prompt with real-callback blocker. |
+| `../../oteryn-client/docs/agents/prompts/W7_IDENTITY_AGENT.md` | PKCE/Identity/Gateway consumer prompt with dynamic-loopback evidence. |
 | `../../oteryn-client/docs/agents/prompts/W7_CANARY_ENTRY_AGENT.md` | Sole Current-profile transport/admission producer prompt. |
 | `../../oteryn-client/docs/agents/prompts/W7_LOGIN_E2E_AGENT.md` | Final fake-service/executable composition consumer prompt. |
 | `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common historical worker prefix; exact current lane prompts take precedence. |
@@ -54,10 +55,13 @@ Parallel Rust work is permitted only through a live accepted wave, unique tasks/
 
 W1-W6 are completed and cannot be relaunched. W7 workers remain unauthorized until the W7 planning PR and its separate planning-task archive merge and a fresh overlap/contract/lease check passes. After activation, use only the exact current prompts and dependency order in `CURRENT_PARALLEL_WAVE.md`.
 
-W7 has two mandatory proof boundaries:
+W7 proof boundaries:
 
-- real browser callback integration is blocked while Platform requires a fixed no-port redirect and the Rust security model requires an OS-assigned loopback port;
-- repository/fake tests or legacy OTClient E2E do not prove real Rust Identity/Gateway/Canary compatibility.
+- Platform registers the no-port loopback base `http://127.0.0.1/callback`, while its current tests explicitly prove an otherwise matching OS-assigned dynamic port for authorization and token exchange; workers must revalidate this exact producer behavior and must not bind fixed port 80.
+- repository/fake tests or legacy OTClient E2E do not prove real Rust Identity/Gateway/Canary compatibility;
+- deployed TLS, firewall, client configuration, issuer mapping, secret injection and exact runtime revisions remain external evidence;
+- Gateway v1 does not provide general multi-world/gameplay-channel issuer routing;
+- current token-family revocation bounds W7 to one bootstrap attempt.
 
 ### Legacy OTClient
 
@@ -94,6 +98,7 @@ Legacy work follows exact path owners, existing lifecycle/protocol/security rule
 - `CURRENT_PARALLEL_WAVE.md` records exact current launch authorization, ownership, dependencies, blockers and acceptance.
 - Historical wave/prompt documents never authorize duplicate work.
 - Cross-repository facts require current producer/consumer evidence; external repositories remain read-only unless a separate authorized task exists there.
+- Protocol analysis is internal Oteryn/Canary compatibility work and must not be published as third-party gameplay manipulation or anti-cheat tooling.
 - ADRs preserve durable decisions.
 
 ## Lifecycle

@@ -16,8 +16,8 @@ use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::net::IpAddr;
 use std::time::Duration;
-use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 use url::Url;
 
 /// Maximum accepted response body for every sensitive native-auth request.
@@ -109,13 +109,6 @@ impl SecretString {
     pub fn expose_secret(&self) -> Result<&str, PlatformError> {
         std::str::from_utf8(&self.0)
             .map_err(|_| PlatformError::new(PlatformErrorKind::InvariantViolation))
-    }
-
-    fn into_secret_bytes(mut self) -> Vec<u8> {
-        let mut bytes = self.0.to_vec();
-        self.0.fill(0);
-        std::mem::swap(&mut bytes, &mut self.0.to_vec());
-        bytes
     }
 }
 
@@ -384,9 +377,12 @@ impl HttpTransport for UreqTransport {
         let body = response
             .body_mut()
             .with_config()
-            .limit(MAX_RESPONSE_BODY_BYTES + 1)
+            .limit((MAX_RESPONSE_BODY_BYTES + 1) as u64)
             .read_to_vec()
-            .map_err(|_| HttpTransportError::Unavailable)?;
+            .map_err(|error| match error {
+                ureq::Error::BodyExceedsLimit(_) => HttpTransportError::ResponseTooLarge,
+                _ => HttpTransportError::Unavailable,
+            })?;
         if body.len() > MAX_RESPONSE_BODY_BYTES {
             return Err(HttpTransportError::ResponseTooLarge);
         }
@@ -547,9 +543,7 @@ where
         validate_sensitive_success(&response)?;
         let dto: TokenResponseDto = parse_json(response.body.expose_secret())?;
         if dto.token_type != "Bearer" || dto.expires_in == 0 || dto.expires_in > 300 {
-            return Err(PlatformError::new(
-                PlatformErrorKind::InvalidResponse,
-            ));
+            return Err(PlatformError::new(PlatformErrorKind::InvalidResponse));
         }
         Ok(OAuthTokens {
             access_token: SecretString::new(dto.access_token)?,
@@ -574,9 +568,7 @@ where
         validate_sensitive_success(&response)?;
         let dto: TicketResponseDto = parse_json(response.body.expose_secret())?;
         if dto.protocol_version != 1 || dto.expires_in == 0 || dto.expires_in > 60 {
-            return Err(PlatformError::new(
-                PlatformErrorKind::InvalidResponse,
-            ));
+            return Err(PlatformError::new(PlatformErrorKind::InvalidResponse));
         }
         SecretString::new(dto.ticket)
     }
@@ -637,9 +629,7 @@ where
             .map_err(|_| PlatformError::new(PlatformErrorKind::InvalidResponse))?;
         let remaining = expires_at - utc_now;
         let remaining_seconds = remaining.whole_seconds();
-        if remaining_seconds <= 0
-            || remaining_seconds > MAX_GAME_SESSION_TTL.as_secs() as i64
-        {
+        if remaining_seconds <= 0 || remaining_seconds > MAX_GAME_SESSION_TTL.as_secs() as i64 {
             return Err(PlatformError::new(PlatformErrorKind::InvalidExpiry));
         }
         let deadline = Deadline::after(clock, Duration::from_secs(remaining_seconds as u64))
@@ -663,7 +653,6 @@ where
                     route,
                     Availability::Available,
                     Compatibility::Compatible,
-                    Vec::new(),
                 )
                 .map_err(|_| PlatformError::new(PlatformErrorKind::InvalidDirectory))?,
             );
@@ -684,10 +673,10 @@ where
             characters.push(
                 CharacterSummary::new(
                     id,
+                    world_id,
                     character.name,
                     level,
                     character.vocation.to_string(),
-                    world_id,
                     Availability::Available,
                     Compatibility::Compatible,
                 )
@@ -699,6 +688,7 @@ where
             directory_revision,
             worlds,
             characters,
+            Vec::new(),
         )
         .map_err(|_| PlatformError::new(PlatformErrorKind::InvalidDirectory))?;
         let credential = GameEntryCredential::new(dto.session.credential.into_bytes(), deadline)
@@ -725,11 +715,10 @@ where
 }
 
 fn validate_dynamic_redirect(url: &Url) -> Result<(), PlatformError> {
-    let port = url.port();
     if url.scheme() != "http"
         || url.host_str() != Some("127.0.0.1")
         || url.path() != "/callback"
-        || port.is_none()
+        || url.port().is_none()
         || url.query().is_some()
         || url.fragment().is_some()
         || url.username() != ""
@@ -749,24 +738,20 @@ fn validate_sensitive_success(response: &HttpResponse) -> Result<(), PlatformErr
     if response.status != 200 {
         return Err(PlatformError::new(PlatformErrorKind::RequestDenied));
     }
-    if !response
-        .content_type
-        .as_deref()
-        .is_some_and(|value| value.eq_ignore_ascii_case("application/json")
+    if !response.content_type.as_deref().is_some_and(|value| {
+        value.eq_ignore_ascii_case("application/json")
             || value
                 .to_ascii_lowercase()
-                .starts_with("application/json;"))
-    {
+                .starts_with("application/json;")
+    }) {
         return Err(PlatformError::new(PlatformErrorKind::InvalidResponse));
     }
-    if !response
-        .cache_control
+    if !response.cache_control.as_deref().is_some_and(|value| {
+        contains_directive(value, "no-store") && contains_directive(value, "no-cache")
+    }) || !response
+        .pragma
         .as_deref()
-        .is_some_and(|value| contains_directive(value, "no-store") && contains_directive(value, "no-cache"))
-        || !response
-            .pragma
-            .as_deref()
-            .is_some_and(|value| contains_directive(value, "no-cache"))
+        .is_some_and(|value| contains_directive(value, "no-cache"))
     {
         return Err(PlatformError::new(PlatformErrorKind::CachePolicyMissing));
     }

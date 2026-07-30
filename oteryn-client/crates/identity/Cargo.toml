@@ -12,11 +12,11 @@ category = "identity"
 [dependencies]
 base64 = "=0.22.1"
 getrandom = "=0.3.4"
-oteryn-account-session = { path = "../account-session" }
-oteryn-foundation = { path = "../foundation" }
-oteryn-game-session = { path = "../game-session" }
-oteryn-platform = { path = "../platform" }
-oteryn-world-directory = { path = "../world-directory" }
+oteryn-account-session = { version = "=0.1.0", path = "../account-session" }
+oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+oteryn-game-session = { version = "=0.1.0", path = "../game-session" }
+oteryn-platform = { version = "=0.1.0", path = "../platform" }
+oteryn-world-directory = { version = "=0.1.0", path = "../world-directory" }
 sha2.workspace = true
 url = "=2.5.8"
 

@@ -1046,6 +1046,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "oteryn-account-session"
+version = "0.1.0"
+
+[[package]]
 name = "oteryn-architecture-check"
 version = "0.1.0"
 dependencies = [
@@ -1090,6 +1094,15 @@ name = "oteryn-foundation"
 version = "0.1.0"
 
 [[package]]
+name = "oteryn-game-session"
+version = "0.1.0"
+dependencies = [
+ "oteryn-account-session",
+ "oteryn-foundation",
+ "oteryn-world-directory",
+]
+
+[[package]]
 name = "oteryn-renderer"
 version = "0.1.0"
 dependencies = [
@@ -1104,6 +1117,13 @@ version = "0.1.0"
 dependencies = [
  "oteryn-diagnostics",
  "oteryn-foundation",
+]
+
+[[package]]
+name = "oteryn-world-directory"
+version = "0.1.0"
+dependencies = [
+ "oteryn-account-session",
 ]
 
 [[package]]

@@ -1,0 +1,64 @@
+name: W7 Identity Test Fixup
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "oteryn-client/crates/identity/src/lib.rs"
+      - ".github/workflows/w7-identity-test-fixup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fixup:
+    if: github.event.pull_request.head.ref == 'feat/OTC-20260730-w7-identity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC-20260730-w7-identity
+          show-progress: false
+
+      - name: Compare only stable error categories
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("oteryn-client/crates/identity/src/lib.rs")
+          text = path.read_text(encoding="utf-8")
+          marker = "#[cfg(test)]\nmod tests {"
+          head, tail = text.split(marker, 1)
+          count_results = tail.count(".map_err(|error| error.kind()),")
+          count_expected = tail.count("Err(IdentityErrorKind::")
+          if count_results != 6 or count_expected != 6:
+              raise SystemExit(f"unexpected test assertion counts: {count_results}, {count_expected}")
+          tail = tail.replace(
+              ".map_err(|error| error.kind()),",
+              ".err().map(|error| error.kind()),",
+          )
+          tail = tail.replace("Err(IdentityErrorKind::", "Some(IdentityErrorKind::")
+          path.write_text(head + marker + tail, encoding="utf-8")
+
+      - name: Install formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+          rustup default 1.94.0
+
+      - name: Format and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd oteryn-client
+          cargo fmt --all
+          cargo fmt --all -- --check
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/crates/identity/src/lib.rs
+          git commit -m "test(identity): compare stable callback error kinds"
+          git push origin HEAD:feat/OTC-20260730-w7-identity

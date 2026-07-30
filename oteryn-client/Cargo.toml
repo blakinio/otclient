@@ -4,10 +4,10 @@ members = [
     "crates/asset-types",
     "crates/diagnostics",
     "crates/foundation",
+    "crates/game-session",
     "crates/renderer",
     "crates/test-support",
     "tools/architecture-check",
-    "tools/asset-compiler",
 ]
 resolver = "3"
 

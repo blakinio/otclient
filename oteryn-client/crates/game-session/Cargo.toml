@@ -1,0 +1,18 @@
+[package]
+name = "oteryn-game-session"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.oteryn]
+category = "game-session"
+
+[dependencies]
+oteryn-account-session = { version = "=0.1.0", path = "../account-session" }
+oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+oteryn-world-directory = { version = "=0.1.0", path = "../world-directory" }
+
+[lints]
+workspace = true

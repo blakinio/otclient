@@ -1,204 +1,82 @@
 # Current Parallel Agent Wave
 
-Status: accepted launch plan  
-Wave ID: `OTERYN-W6-SYNTHETIC-ASSETS`  
-Evidence cut: `main` `0aa75744a1cad0fad987f56545088f54b9adc098`
+Status: closed; no worker launch authorized  
+Last closed wave: `OTERYN-W6-SYNTHETIC-ASSETS`  
+Evidence cut: `main` `a8e95bbce06eda7eb7954843cb7833fbf87160cc`
 
-Live Git, active tasks and open PRs remain authoritative. W1-W5 are completed, archived and not launchable. This plan authorizes exactly one W6 implementation lane only after the W6 plan PR and its separate lifecycle archive merge.
+Live Git, active tasks, open PRs, reviews and exact checks remain authoritative. This document authorizes no implementation lane. A future wave requires a separate planning task, branch and draft PR, accepted plan, and separate planning-task archive before any worker starts or claims a shared-path lease.
 
-## 1. Confirmed transition state
+## 1. Completed wave history
 
-- W1 foundation primitives are merged/archived and must not be relaunched.
-- Every W2 implementation/evidence lane is merged/archived and must not be relaunched.
-- W3 deterministic test support is merged/archived and must not be relaunched.
-- W4 Windows application shell is merged/archived and must not be relaunched.
-- W5 renderer surface ownership is merged/archived and must not be relaunched.
-- Every prior Cargo, lockfile, dependency-policy, integration and shared-document lease is released.
-- Open PR #23 owns legacy OTUI/Lua presentation only; PR #48 is isolated operational non-merge work.
-- No active Rust task or open PR owns `crates/asset-types`, `tools/asset-compiler`, the normalized asset schema/compiler contract or its shared integration paths.
-- Architecture checker already recognizes categories `asset-types` and `tool`; no checker/rule/fixture change is needed.
+W1 through W6 are completed and must not be relaunched.
 
-## 2. Objective
+| Wave | Delivery | Lifecycle evidence | State |
+|---|---|---|---|
+| W1 foundation | merged foundation primitives | separately archived | completed |
+| W2 diagnostics/evidence | all authorized lanes merged | separately archived and closed | completed |
+| W3 deterministic test support | merged worker | separately archived and closed | completed |
+| W4 Windows shell | merged worker | separately archived and closed | completed |
+| W5 renderer surface | plan #84/#85, worker #86/#87, closure #88/#89 | all merged and archived | completed |
+| W6 synthetic assets | plan #90/#91, worker #92/#94 | implementation merged as `3cea444505bfcc5dc4b08b12d1046ef0c34a0f7a`; task archived | completed |
 
-Implement one bounded normalized synthetic asset schema and deterministic compiler slice that proves typed IDs, validated metadata, content hashing, deterministic pack encoding and safe relative-file ingestion without beginning runtime asset mounting, renderer integration or real game import.
+W6 delivered only the bounded synthetic/original asset schema and compiler slice recorded in the archived W6 task. It did not deliver asset runtime mounting, renderer integration, real game import, production packs, updater/signing, protocol, Identity, networking, UI or production compatibility.
 
-The wave uses:
+## 2. Released ownership and leases
 
-```text
-1 coordinator
-1 implementation worker
-```
+After PR #94:
 
-No secondary implementation or research lane is authorized.
+- `W6-ASSET` is archived and cannot be relaunched;
+- `oteryn-client/crates/asset-types/**` and `oteryn-client/tools/asset-compiler/**` have no active W6 owner;
+- the W6 Cargo workspace, `Cargo.lock`, dependency-policy and shared-document lease is released;
+- no W6 task owns `deny.toml`, repository layout, Rust workspace documentation, module catalogue, build matrix or changelog;
+- any future asset work requires a new bounded accepted task and must consume the merged W6 contract rather than redefine it.
 
-## 3. Dependency graph
+## 3. Current live-state reconciliation
 
-```text
-foundation asset/licensing audit (#47)
-merged workspace/architecture policy (#50/#53)
-completed renderer boundary (#86/#87)
-closed W5 (#88/#89)
-          |
-          v
-W6-ASSET synthetic schema/compiler slice
-```
+At this evidence cut:
 
-## 4. Lane W6-C — Coordinator
+- PR #93 merged as `bdb73eea3c862f31e87fca81317ab3511c3a85a0` and its task was archived separately by PR #95 as `a8e95bbce06eda7eb7954843cb7833fbf87160cc`;
+- PR #23 remains a legacy OTUI/Lua presentation-only draft and owns no Rust Identity, session, directory, transport, protocol or application-entry path;
+- PR #48 remains isolated operational non-merge work and owns no Rust implementation path;
+- PR #97 owns only the legacy real-release asset rehearsal and no Rust login path;
+- no active Rust task or other open PR owns Identity, account session, world directory, game-entry contracts, transport, `protocol-canary`, technical login composition or login E2E paths;
+- `docs/agents/CHANGELOG.md` is no longer leased by PR #93 after merge/archive;
+- every previous Rust Cargo, lockfile, dependency-policy and shared-document lease is released.
 
-Prompt: `prompts/COORDINATOR_AGENT.md`
+## 4. No accepted current wave
 
-Responsibilities:
+No coordinator may create worker tasks, worker branches, worker PRs or shared-path leases from this closed record.
 
-- verify exact live ownership, base and merged plan lifecycle before worker launch;
-- prevent every W1-W5 relaunch and prevent a second asset schema producer;
-- grant one Cargo/lockfile/dependency-policy/shared-document lease only to W6-ASSET;
-- require exact dependency, deterministic-format, filesystem-security, Windows workspace, architecture, supply-chain and repository CI evidence;
-- require explicit synthetic-versus-production evidence classification;
-- merge/archive the worker independently;
-- close W6 and record exactly one next bounded recommendation.
+A future coordinator must first:
 
-The coordinator does not implement the asset worker while preparing or closing the wave.
+1. inspect current `main`, all active tasks, open PRs, reviews and exact CI;
+2. read root and nested `AGENTS.md`, the Rust program/workstreams/multi-agent protocol, architecture, lifecycle, audits and current external contracts;
+3. create one bounded planning task, branch and early draft PR;
+4. publish exact lanes, ownership, producer/consumer declarations, dependencies, lease policy, evidence matrix, blockers and acceptance criteria;
+5. merge the plan through repository gates;
+6. archive the planning task separately;
+7. repeat the live overlap check before launching any worker.
 
-## 5. Lane W6-ASSET — Synthetic asset schema/compiler
+## 5. Exactly one next bounded recommendation
 
-Prompt: `prompts/NEXT_SYNTHETIC_ASSET_AGENT.md`
+Plan `OTERYN-W7-TECHNICAL-LOGIN` as a separate coordination-only package.
 
-Workstream: WS-R09 assets and tooling  
-Contract role: producer
+The planning package may evaluate a maximum `1 coordinator + 4 workers` for:
 
-Required merged producers/evidence:
+- one producer of typed account/session/directory/game-entry lifecycle contracts;
+- one Oteryn Authorization Code + PKCE/account-session/game-entry consumer;
+- one minimal Canary Current-profile transport/admission consumer and sole initial transport/protocol interface producer;
+- one final technical-login composition/fake-service E2E consumer.
 
-```text
-foundation asset/licensing audit: PR #47
-workspace/architecture policy: PR #50 / archive #53
-renderer boundary: PR #86 / archive #87
-W5 closure: PR #88 / archive #89
-W6 plan/archive: current main at worker preflight
-```
+The plan must remain bounded to one explicitly configured Canary world/issuer and one selected character, must not invent missing Platform/Gateway/Canary contracts, and must preserve typed recoverable failure, one-shot credential clearing, exact-version evidence and no production-compatibility claim.
 
-Purpose:
+This recommendation is not an accepted wave and pre-claims no path, contract, dependency or shared lease.
 
-- add `oteryn-asset-types` under `oteryn-client/crates/asset-types/`, category `asset-types`;
-- add `oteryn-asset-compiler` under `oteryn-client/tools/asset-compiler/`, category `tool`, depending on `oteryn-asset-types`;
-- define non-zero typed `AssetId` and a closed first-slice `AssetKind` limited to synthetic binary blobs and validated RGBA8 images;
-- define manifest schema version 1 and an original deterministic pack schema version 1;
-- store bounded logical metadata, license/provenance text and SHA-256 payload digests;
-- compile one constrained JSON manifest plus relative source files into one deterministic pack;
-- expose a strict decoder/validator for tooling/tests only;
-- use only original synthetic fixtures with documented provenance.
+## 6. Preserved blockers
 
-Required design boundaries:
-
-- maximum 4096 records, 16 MiB payload per record and 64 MiB compiled pack;
-- maximum 16,384 pixels per RGBA8 dimension with checked `width * height * 4`;
-- checked count, length, offset and allocation arithmetic;
-- deterministic sorting independent of manifest order;
-- original little-endian length-delimited encoding;
-- stable non-secret error kinds without absolute paths or arbitrary OS/backend text;
-- relative normalized source paths only;
-- absolute/root/prefix/parent/separator-escape and symlink rejection;
-- canonical containment under the manifest root;
-- directory and special-file rejection;
-- same-directory temporary output plus final rename so failed compilation preserves an existing final output.
-
-The numeric limits are synthetic schema-v1 engineering limits, not production budgets.
-
-Explicit exclusions:
-
-- no `asset-runtime` package, runtime mounting, streaming, cache, activation or rollback;
-- no renderer/GPU integration, upload, atlas/texture-array choice or visual output;
-- no image decoder, archive, compression/decompression, recursive discovery or watcher;
-- no real Tibia/Canary importer, official/proprietary fixture or production pack;
-- no download/updater, signature or authenticated-manifest design;
-- no protocol, identity, networking, UI, text, audio, localization, domain or feature work;
-- no production compatibility, redistribution-rights, security-signature or performance claim.
-
-Expected exclusive paths:
-
-```text
-oteryn-client/crates/asset-types/**
-oteryn-client/tools/asset-compiler/**
-oteryn-client/assets/test-fixtures/synthetic-v1/**
-oteryn-client/docs/research/assets/W6_FORMAT_AND_SECURITY_EVIDENCE.md
-```
-
-Expected shared-path lease:
-
-```text
-oteryn-client/Cargo.toml
-oteryn-client/Cargo.lock
-oteryn-client/deny.toml
-oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
-oteryn-client/docs/operations/RUST_WORKSPACE.md
-docs/agents/MODULE_CATALOG.md
-docs/agents/BUILD_TEST_MATRIX.md
-docs/agents/CHANGELOG.md
-```
-
-`deny.toml` is leased only for a narrowly evidenced license clarification if exact cargo-deny proves the current policy insufficient. Architecture checker source/rules/fixtures, Rust toolchain and CI workflows remain read-only unless a separate blocker is recorded.
-
-## 6. Dependency evidence cut
-
-Primary/current evidence reviewed on 2026-07-29:
-
-- workspace Rust is 1.94;
-- exact workspace `serde_json 1.0.145` already exists and passed current supply-chain checks;
-- candidate `sha2 0.11.0` reports Rust 1.85 and license `MIT OR Apache-2.0`;
-- W6 may use exact `sha2 = "=0.11.0"` with default features disabled for SHA-256 only;
-- no CLI framework, async runtime, archive, image, compression, signing, network or watcher dependency is authorized;
-- generated Cargo resolution and exact cargo-deny advisories/licenses/bans/sources remain authoritative and may reject the candidate without policy weakening.
-
-No dependency is added by this planning task.
-
-## 7. Deterministic acceptance envelope
-
-The worker must test at least:
-
-- typed ID, kind, metadata and bounded-string validation;
-- a known SHA-256 vector;
-- byte-identical repeated builds;
-- shuffled-manifest-order invariance;
-- encode/decode round trip;
-- duplicate ID and unknown schema/kind rejection;
-- malformed, truncated, trailing and oversized input;
-- count, length, offset and allocation overflow rejection;
-- RGBA8 dimension/payload mismatch and multiplication overflow;
-- absolute, parent, prefix, separator-escape and symlink path rejection;
-- source outside root, directory and special-file rejection;
-- failed compilation preserving an existing final output;
-- no source-machine absolute path in pack bytes or stable errors.
-
-Tests and fixtures must run without a GPU, window, network, proprietary input or interactive desktop.
-
-## 8. Evidence policy
-
-The worker evidence document must classify:
-
-- `PASS`: exact schema, deterministic encoding, hashing, malformed-input, path-safety, workspace, architecture and supply-chain tests actually executed;
-- `OBSERVED`: only behavior genuinely exercised on a named filesystem/Windows runner;
-- `BLOCKED`: production asset rights, real Canary-compatible input formats, runtime mounting, GPU integration, signing/authenticated manifests, production limits and performance.
-
-Synthetic compiler success is not production asset compatibility or redistribution approval.
-
-## 9. Shared-path lease
-
-| Path group | Lease holder after worker launch | Other work |
-|---|---|---|
-| Cargo workspace/lockfile and dependency policy | W6-ASSET | read-only |
-| asset-types public schema/pack contract | W6-ASSET | no duplicate producer |
-| asset-compiler tool and synthetic fixtures | W6-ASSET | no parallel compiler |
-| shared catalogue/matrix/changelog/layout/workspace docs | W6-ASSET | read-only |
-| architecture checker/rules/fixtures | none | read-only |
-| Rust CI/toolchain | none | read-only |
-| renderer/application shell | none | read-only; no W6 integration |
-
-The worker claims the lease only through its active task and live draft PR after a fresh overlap check.
-
-## 10. Merge and completion rules
-
-- W6-ASSET starts only after this plan and its separate archive merge.
-- Any material dependency evidence, schema producer or `main` change requires restack and exact-head revalidation.
-- The worker merges only through the root autonomous gate and receives a separate lifecycle archive PR.
-- W6 closes only after the worker is merged/archived, no lease remains and exactly one evidence-based next package is recorded.
-
-Candidate next package after successful closure: a read-only verified synthetic pack mounting/lookup slice under `asset-runtime`, only if W6 proves a stable bounded pack contract. It is not authorized by this plan.
+- A Rust Identity/Gateway/Canary consumer does not yet exist or prove compatibility.
+- Exact current Platform client-facing schemas and status documents require revalidation because some older contract headers conflict with later implemented evidence.
+- Canary Current compatibility requires an exact selected producer revision, build string, transport/login evidence and synthetic provenance-safe fixtures.
+- General multi-world/gameplay-channel identifier mapping and channel-aware issuer routing remain outside the one-exact-issuer milestone.
+- Repository tests cannot prove actual production network, TLS, secret-manager or deployed-revision state.
+- No proprietary credentials, packet captures or assets may enter Git.

@@ -10,11 +10,11 @@ parallel_lane_state: archived
 branch: docs/OTC-20260730-w7-entry-postmerge-reconcile
 base_branch: main
 created: 2026-07-30T20:03:00+02:00
-updated: 2026-07-30T20:25:00+02:00
-last_verified_commit: "e766820921245bef86ee8a4c343bf54c7fb25504"
+updated: 2026-07-30T20:27:00+02:00
+last_verified_commit: "947c528b480dc1e4ff7ab98970275227cdb5ef0e"
 risk: low
 related_pr: "#106"
-lifecycle_archive_pr: pending
+lifecycle_archive_pr: "#107"
 depends_on:
   - W7 entry producer PR #104 merged as 9ecc43a4465f6565bc1c12ea61f170a96edcbe35
   - W7 entry lifecycle archive PR #105 merged as 8dcd353d5a9f19fabccf49508c27074f7749e3cf
@@ -55,12 +55,14 @@ No Rust, Cargo, workflow, protocol or compatibility behavior changed.
 | ready-state synchronization CI #915 / run `30570093037` | PASS including `CI / Required` on `04b64107865db7af46b328929506683c7c5cd8b9` |
 | reviews and unresolved threads | none |
 | feature squash merge | `e766820921245bef86ee8a4c343bf54c7fb25504` |
+| lifecycle archive PR | #107, two task-record paths only |
 
 # Completion
 
 - Final status: completed
 - Feature PR: #106
 - Feature merge: `e766820921245bef86ee8a4c343bf54c7fb25504`
+- Lifecycle archive PR: #107
 - Shared-path lease: released
 - Product/code changes: none
 - Archived at: `docs/agents/tasks/archive/OTC-20260730-w7-entry-postmerge-reconcile.md`
@@ -69,10 +71,10 @@ No Rust, Cargo, workflow, protocol or compatibility behavior changed.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T18:25:00Z
-head: e766820921245bef86ee8a4c343bf54c7fb25504
+updated_at: 2026-07-30T18:27:00Z
+head: 947c528b480dc1e4ff7ab98970275227cdb5ef0e
 branch: docs/archive-OTC-20260730-w7-entry-postmerge-reconcile-v2
-pr: pending
+pr: 107
 status: archived
 context_routes:
   - agent-governance
@@ -85,11 +87,12 @@ proven:
   - CI runs 30569670340, 30569821215 and 30570093037 passed, including CI / Required.
   - No reviews, requested changes or unresolved threads remained at merge.
   - The stale active PR #104 catalogue state and obsolete W7 blanket authorization statement are removed.
+  - Archive PR #107 contains only active-task removal and completed archive-task addition.
 derived:
   - W7 entry producer governance is fully reconciled and this repair lane cannot be relaunched.
   - W7 consumers may proceed only under fresh accepted tasks and the exact producer restack gate.
 unknown:
-  - lifecycle archive PR number and merge commit until this archive merges.
+  - lifecycle archive merge commit until PR #107 merges.
 conflicts: []
 first_failure:
   marker: none
@@ -105,6 +108,6 @@ validation:
     result: PASS
     evidence: e766820921245bef86ee8a4c343bf54c7fb25504
 blockers:
-  - merge this lifecycle archive PR
-next_action: Validate and merge the two-path lifecycle archive, then publish its merge commit.
+  - merge lifecycle archive PR #107
+next_action: Validate and squash-merge PR #107, then publish its merge commit.
 ```

@@ -30,8 +30,6 @@ dependencies = [
 "#;
 
 fn main() {
-    println!("cargo:rerun-if-changed=../../Cargo.lock");
-
     let manifest_dir = match env::var_os("CARGO_MANIFEST_DIR") {
         Some(value) => PathBuf::from(value),
         None => fail("CARGO_MANIFEST_DIR is unavailable"),
@@ -42,21 +40,38 @@ fn main() {
         Err(error) => fail(&format!("failed to read Cargo.lock: {error}")),
     };
 
-    let with_account = insert_before(
-        current,
-        "[[package]]\nname = \"oteryn-architecture-check\"",
-        ACCOUNT_SESSION,
-    );
-    let with_game = insert_before(
-        with_account,
-        "[[package]]\nname = \"oteryn-renderer\"",
-        GAME_SESSION,
-    );
-    let generated = insert_before(
-        with_game,
-        "[[package]]\nname = \"owned_ttf_parser\"",
-        WORLD_DIRECTORY,
-    );
+    let generated = if current.contains("name = \"oteryn-account-session\"")
+        && current.contains("name = \"oteryn-game-session\"")
+        && current.contains("name = \"oteryn-world-directory\"")
+    {
+        current
+    } else {
+        let with_account = insert_before(
+            current,
+            "[[package]]\nname = \"oteryn-architecture-check\"",
+            ACCOUNT_SESSION,
+        );
+        let with_game = insert_before(
+            with_account,
+            "[[package]]\nname = \"oteryn-renderer\"",
+            GAME_SESSION,
+        );
+        insert_before(
+            with_game,
+            "[[package]]\nname = \"owned_ttf_parser\"",
+            WORLD_DIRECTORY,
+        )
+    };
+
+    let existing = match fs::read(&lock_path) {
+        Ok(value) => value,
+        Err(error) => fail(&format!("failed to re-read Cargo.lock: {error}")),
+    };
+    if existing != generated.as_bytes() {
+        if let Err(error) = fs::write(&lock_path, generated.as_bytes()) {
+            fail(&format!("failed to materialize Cargo.lock: {error}"));
+        }
+    }
 
     let encoded = encode_base64(generated.as_bytes());
     for (index, chunk) in encoded.as_bytes().chunks(480).enumerate() {

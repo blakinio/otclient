@@ -19,9 +19,10 @@ Final integration lease additionally owns:
 
 Required composition:
 - preserve the existing Windows winit window, renderer and close lifecycle;
-- keep browser, listener, HTTP and TCP work off the event-loop thread;
-- use typed runtime events for progress/result/cancellation;
-- expose one explicit technical configuration surface for authorization/token endpoints, Gateway base URL, expected world identity/host/port and selected character; no hidden production defaults or committed credentials;
+- keep browser, listener, HTTP and TCP work off the event-loop thread in explicitly owned cancellable/joined workers;
+- use typed runtime events for progress/result/cancellation and reject stale generations;
+- expose one explicit technical configuration surface for authorization/token endpoints, public OAuth client ID, Gateway base URL, expected world identity/host/port and selected character; no hidden production defaults or committed credentials;
+- bind OAuth callback to 127.0.0.1:0 and use the actual OS-assigned port proven by the Platform producer contract;
 - validate the selected character belongs to the selected world;
 - request/move one fresh credential into Canary admission;
 - report SessionEntered or typed recoverable EntryFailure;
@@ -29,10 +30,10 @@ Required composition:
 - disconnect safely and clear callback state, verifier, code, access/refresh token, Game Login Ticket, Game Session credential, transport keys and session buffers.
 
 Private fake-service E2E must prove:
-- valid PKCE success path;
+- valid PKCE success path on an OS-assigned loopback port;
 - stale callback rejection;
 - duplicate callback rejection;
-- state/path/origin/generation mismatch rejection;
+- state/path/peer/generation mismatch rejection;
 - malformed/oversized/trailing Gateway responses;
 - world-character mismatch rejection;
 - exactly one credential handoff and duplicate/late use rejection;
@@ -41,11 +42,12 @@ Private fake-service E2E must prove:
 - cancellation/window close/disconnect cleanup;
 - no credential in Debug, Display, logs, panic text, snapshots or diagnostics.
 
-Mandatory blocker handling:
-- if W7-BLOCK-IDENTITY-REDIRECT is unresolved, compose only fake Identity adapters and expose the real adapter as unavailable through a typed blocked failure; do not bind fixed port 80 or weaken security;
-- if exact deployed Identity/Gateway/Canary revisions, TLS or issuer mapping are unavailable, do not run/claim the real path;
+Real-path evidence rules:
+- revalidate current Platform dynamic-loopback tests and use the exact same redirect URI in authorization and token exchange;
+- observe a real system-browser launch and return on supported Windows only when the exact Platform/Gateway configuration is available;
+- if deployed Identity/Gateway/Canary revisions, TLS, client ID, issuer mapping or credentials are unavailable, do not run or claim the real path;
 - legacy OTClient physical E2E is reference only;
-- the final PR may merge a fully passing fake technical flow with exact real path explicitly blocked, as allowed by CURRENT_PARALLEL_WAVE.md.
+- the final PR may merge a fully passing fake technical flow with exact real/deployment path explicitly blocked, as allowed by CURRENT_PARALLEL_WAVE.md.
 
 Shared-path lease:
 - final integration may edit apps/client and the common Cargo/lockfile/deny/catalog/matrix/changelog/repository-layout/Rust-workspace paths only while explicitly granted;
@@ -59,5 +61,5 @@ Acceptance evidence:
 - full changed-file/diff review and no unresolved threads;
 - interactive real flow names exact producer revisions or is recorded blocked without compatibility claim.
 
-Do not add map rendering/decoding, inventory, chat, combat, general-purpose native UI, channel switching, production assets, updater/deployment code or password fallback. Merge through gates and archive separately.
+Do not add map rendering/decoding, inventory, chat, combat, general-purpose native UI, channel switching, production assets, updater/deployment code or password fallback. Internal protocol work is for project-owned Oteryn/Canary compatibility only and must not be published as abuse or anti-cheat tooling. Merge through gates and archive separately.
 ```

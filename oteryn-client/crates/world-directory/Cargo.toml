@@ -10,7 +10,7 @@ repository.workspace = true
 category = "world-directory"
 
 [dependencies]
-oteryn-account-session = { path = "../account-session" }
+oteryn-account-session = { version = "=0.1.0", path = "../account-session" }
 
 [lints]
 workspace = true

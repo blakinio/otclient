@@ -1,18 +1,25 @@
 [package]
-name = "oteryn-game-session"
+name = "oteryn-asset-compiler"
 version = "0.1.0"
+description = "Temporary W7 lockfile generator using the existing asset-compiler package identity"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+publish = false
+autolib = false
+build = "build.rs"
 
 [package.metadata.oteryn]
-category = "game-session"
+category = "tool"
 
 [dependencies]
-oteryn-account-session = { path = "../account-session" }
-oteryn-foundation = { path = "../foundation" }
-oteryn-world-directory = { path = "../world-directory" }
+oteryn-asset-types = { version = "=0.1.0", path = "../asset-types" }
+serde_json.workspace = true
+
+[[bin]]
+name = "w7-lockfile-generator"
+path = "src/lockgen.rs"
 
 [lints]
 workspace = true

@@ -1,74 +1,81 @@
-# Parallel Wave Coordinator Agent Prompt
+# W7 Technical Login Coordinator Prompt
 
-W1-W6 are completed and closed. No implementation wave is currently accepted. Copy the block below only to prepare the next planning package; do not create or implement worker packages from this closed-wave prompt.
+Copy the block below only after the W7 planning PR and its separate planning-task archive merge. The coordinator must not implement worker packages.
 
 ```text
 Work autonomously in repository:
 
 blakinio/otclient
 
-Role: coordinator preparing one bounded future Rust-client wave plan. Do not implement worker packages and do not launch workers before the planning PR and its separate archive merge.
+Role: coordinator and integrator for OTERYN-W7-TECHNICAL-LOGIN. Do not implement worker packages while coordinating.
 
-Current Git/main, root and nested AGENTS.md files, live task records, open PRs, reviews and exact CI results are authoritative. Do not rely on chat history or copied hashes.
+Current Git/main, root and nested AGENTS.md files, live task records, open PRs, reviews, shared-path leases and exact CI results are authoritative. Re-read oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md before every launch and merge. External repositories are read-only evidence.
 
-Repository safety:
+Before launching any worker:
 
-- routine writes only to blakinio/otclient;
-- external repositories are read-only evidence;
-- never push directly to main;
-- one task, branch and worktree per change;
-- create an early draft PR;
-- never bypass CI, review, branch protection or lifecycle rules;
-- never commit credentials, private captures, tokens or proprietary assets;
-- do not claim production compatibility from repository tests.
+1. verify the W7 planning PR and its separate archive PR are merged;
+2. record exact current main;
+3. inspect every active task and open PR, including legacy PRs #23, #48 and #97 or their current successors;
+4. verify no active owner exists for the worker's exclusive paths/public contracts;
+5. verify the shared Cargo/document lease is free;
+6. verify exact Platform/Gateway/Canary source revisions and blocked items remain current;
+7. stop if the fixed callback URI versus OS-assigned-port conflict has not been reconciled; do not weaken either contract.
 
-Mandatory reads:
+Launch at most four worker lanes using the exact prompts:
 
-1. AGENTS.md
-2. docs/agents/README.md
-3. docs/agents/CONTEXT_HANDOFF.md
-4. oteryn-client/AGENTS.md
-5. oteryn-client/docs/agents/PROGRAM.md
-6. oteryn-client/docs/agents/WORKSTREAMS.md
-7. oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md
-8. oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md
-9. relevant architecture, lifecycle, audit, research and operations documents
-10. every active Rust task and open PR
-11. exact current external producer contracts needed by the proposed wave
+- W7_ENTRY_CONTRACT_AGENT.md
+- W7_IDENTITY_AGENT.md
+- W7_CANARY_ENTRY_AGENT.md
+- W7_LOGIN_E2E_AGENT.md
 
-Preflight:
+Dependency order:
 
-- verify W1-W6 are merged, archived and not launchable;
-- verify PR #93 merged and its task archive merged through PR #95;
-- verify PR #23 remains legacy UI-only and PR #48 remains isolated operational non-merge work;
-- verify no active task or open PR owns the proposed paths or public contracts;
-- verify every prior Cargo, lockfile, dependency-policy and shared-document lease is released;
-- record exact current main in the planning task;
-- stop or split the plan wherever an exact external contract is missing.
+W7-ENTRY-CONTRACT -> W7-IDENTITY
+W7-ENTRY-CONTRACT -> W7-CANARY-ENTRY
+W7-ENTRY-CONTRACT -> W7-LOGIN-E2E private fake harness
+W7-IDENTITY + W7-CANARY-ENTRY -> W7-LOGIN-E2E final composition
 
-The next bounded recommendation is to plan OTERYN-W7-TECHNICAL-LOGIN with at most one coordinator and four workers:
+Coordinator rules:
 
-- W7-ENTRY-CONTRACT: sole producer of typed account/session/directory/game-entry lifecycle contracts;
-- W7-IDENTITY: consumer for Authorization Code + PKCE, callback validation, account session and one fresh game-entry request;
-- W7-CANARY-ENTRY: consumer and sole producer of the initial transport/Current-profile admission interface;
-- W7-LOGIN-E2E: final consumer/composition owner for the existing Rust window, fake-service E2E and executable integration.
+- one unique task, branch, worktree and early draft PR per lane;
+- one producer per public contract;
+- W7-ENTRY-CONTRACT is the only producer of AccountSessionId, CharacterId, WorldId, GameplayChannelId, DirectoryRevision, GameEntryRequest, GameEntryCredential, EntryFailure, SessionEntered and entry lifecycle states;
+- W7-CANARY-ENTRY is the only producer of the initial transport/Current-profile admission interface;
+- consumers may not create substitute public types;
+- only one active lane may lease Cargo.toml, Cargo.lock, deny.toml, MODULE_CATALOG.md, BUILD_TEST_MATRIX.md, CHANGELOG.md, REPOSITORY_LAYOUT.md, RUST_WORKSPACE.md or final apps/client integration surfaces;
+- workers without the lease keep shared paths read-only and mark integration_ready when exclusive work is complete;
+- manual Cargo.lock conflict resolution is prohibited; restack and regenerate from current main;
+- do not bypass CI, reviews, branch protection or lifecycle archives;
+- do not commit credentials, private packet captures, proprietary assets or runtime secrets;
+- do not infer production compatibility from repository/fake tests or legacy OTClient evidence.
 
-Planning requirements:
+Merge and archive order:
 
-- exact dependency graph and merge order;
-- exact owned paths;
-- exact producer/consumer declarations;
-- one active shared-path lease at a time;
-- no manual Cargo.lock conflict resolution;
-- automated versus interactive evidence matrix;
-- explicit blocked items and exact missing-contract evidence;
-- exact first-milestone acceptance criteria;
-- exact coordinator prompt and one exact prompt per worker;
-- no worker task, branch, PR or lease before the plan and separate plan archive merge.
+1. W7-ENTRY-CONTRACT;
+2. W7-CANARY-ENTRY and W7-IDENTITY ordered by downstream readiness, preserving the real Identity blocker;
+3. W7-LOGIN-E2E;
+4. separate archive PR after every merged worker;
+5. separate W7 closure PR;
+6. separate archive PR for the W7 closure.
 
-The first milestone may target only one explicitly configured world/issuer and one selected character. It excludes map rendering, broad world decoding, inventory, chat, combat, general native UI, channel switching, production assets and production deployment claims.
+At every merge gate require:
 
-Do not infer general multi-world/channel routing from the current one-exact-issuer Gateway v1 path. Do not define speculative production APIs. An affected lane remains blocked while unaffected planning can continue.
+- exact current base/producer commits;
+- complete changed-file and diff review;
+- no unresolved review threads;
+- pinned Rust 1.94 Windows build where applicable;
+- locked metadata, fmt, Clippy, tests, architecture check, cargo-deny and repository required CI;
+- no ownership or shared-lease conflict;
+- exact evidence and explicit blockers in task/PR.
 
-Merge the planning package only after complete changed-file review, exact-head required checks, no unresolved threads, current main reconciliation and the root autonomous merge gate. Archive the planning task separately before any worker launch.
+The first milestone is one explicit world/issuer and one selected matching character. It stops after the validated Current-profile admission prefix reaches enter-world opcode 0x0F and before map-description decoding. It excludes inventory, chat, combat, general native UI, channel switching, production assets and production-deployment claims.
+
+If exact external evidence is missing or conflicts:
+
+- mark the affected real adapter/claim blocked;
+- record exact repository, revision, file and contradiction;
+- permit only unaffected deterministic/fake work;
+- never add a speculative production API or security downgrade.
+
+W7 closes only after all merged tasks are separately archived, final exact-head gates pass, real Rust admission is named and proven or explicitly blocked, and the closure records exactly one next bounded recommendation without implementing it.
 ```

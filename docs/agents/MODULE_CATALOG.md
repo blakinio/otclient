@@ -47,7 +47,7 @@ Detailed maintenance boundaries are in `docs/architecture/LEGACY_OTCLIENT_ARCHIT
 
 | Module/tool | Status | Responsibility/public surface | Source/docs | Reuse notes |
 |---|---|---|---|---|
-| Client test foundation | maintained legacy; merged PR #3 | Deterministic C++ builders/assertions/fakes/environment, OTML fixtures, protocol loopback and Lua runner/contracts | `tests/support/**`, `tests/unit/**`, `tests/integration/**`, testing docs | Reuse for legacy work. Rust audit may reuse behavior evidence but the Rust workspace receives native Cargo test support. |
+| Client test foundation | maintained legacy; merged PR #3 | Deterministic C++ builders/assertions/fakes/environment, OTML fixtures, protocol loopback and Lua runner/contracts | `tests/support/**`, `tests/unit/**`, `tests/integration/**`, `tests/lua/**`, testing docs | Reuse for legacy work. Rust audit may reuse behavior evidence but the Rust workspace receives native Cargo test support. |
 | InputMessageBuilder | maintained legacy | Deterministic framed parser inputs | `tests/support/builders/input_message_builder.{h,cpp}` | Reuse instead of ad hoc legacy internals; audit semantics/provenance before Rust equivalents. |
 | OutputMessageInspector | maintained legacy | Inspects encoded output bytes in tests | `tests/support/builders/output_message_inspector.h` | Reuse for legacy output tests; not a Rust dependency. |
 | Thing/Tile builders/assertions | maintained legacy | Synthetic things/items/creatures and tile assertions | `tests/support/builders/thing_builders.*`, `tests/support/assertions/tile_assertions.h` | Reuse for legacy map/tile tests; audit behavior before recreation. |

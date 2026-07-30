@@ -1,9 +1,9 @@
 name: W7 Identity Lockfile Bootstrap
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/OTC-20260730-w7-identity
+      - main
     paths:
       - "oteryn-client/Cargo.toml"
       - "oteryn-client/crates/identity/Cargo.toml"
@@ -15,11 +15,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: w7-identity-lockfile
+  group: w7-identity-lockfile-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   generate-lockfile:
+    if: github.event.pull_request.head.ref == 'feat/OTC-20260730-w7-identity'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -10,14 +10,15 @@ parallel_lane_state: active
 branch: docs/OTC-20260730-close-w6-synthetic-assets-wave
 base_branch: main
 created: 2026-07-30T10:52:00+02:00
-updated: 2026-07-30T10:52:00+02:00
+updated: 2026-07-30T11:12:00+02:00
 last_verified_commit: ""
-required_base_commit: "4e09e32032e64831c30d6f7aeb31a2ebd4d4520a"
+required_base_commit: "a8e95bbce06eda7eb7954843cb7833fbf87160cc"
 risk: low
-related_pr: pending
+related_pr: "#96"
 depends_on:
   - W6 plan PR #90 and archive PR #91
   - W6-ASSET implementation PR #92 and archive PR #94
+  - merged legacy PR #93 and task archive PR #95 for current-main reconciliation
 owned_paths:
   - oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md
   - oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md
@@ -54,44 +55,58 @@ This task does not accept W7, create worker lanes, implement Rust packages, add 
 
 # Acceptance criteria
 
-- [ ] Reconcile exact current `main`, active tasks, open PRs and W6 merge/archive evidence.
-- [ ] Record W6 plan PR #90/archive #91 and implementation PR #92/archive #94 as complete.
-- [ ] Replace the launchable W6 record in `CURRENT_PARALLEL_WAVE.md` with a closed-wave record that authorizes no worker.
-- [ ] Record that all W6 Cargo, lockfile, dependency-policy and shared-document leases are released.
-- [ ] Preserve W6 synthetic-only and non-production boundaries.
-- [ ] Update the coordinator prompt so any future wave requires a new planning task, draft PR, accepted plan and separate plan archive before worker launch.
-- [ ] Update `docs/agents/README.md` routing without claiming W7 acceptance.
-- [ ] Leave exactly one bounded next recommendation: plan `OTERYN-W7-TECHNICAL-LOGIN` after fresh live contract/ownership preflight.
+- [x] Reconcile exact current `main`, active tasks, open PRs and W6 merge/archive evidence.
+- [x] Record W6 plan PR #90/archive #91 and implementation PR #92/archive #94 as complete.
+- [x] Replace the launchable W6 record in `CURRENT_PARALLEL_WAVE.md` with a closed-wave record that authorizes no worker.
+- [x] Record that all W6 Cargo, lockfile, dependency-policy and shared-document leases are released.
+- [x] Preserve W6 synthetic-only and non-production boundaries.
+- [x] Update the coordinator prompt so any future wave requires a new planning task, draft PR, accepted plan and separate plan archive before worker launch.
+- [x] Update `docs/agents/README.md` routing without claiming W7 acceptance.
+- [x] Leave exactly one bounded next recommendation: plan `OTERYN-W7-TECHNICAL-LOGIN` after fresh live contract/ownership preflight.
 - [ ] Final exact-head required CI and complete changed-file/review inspection pass.
 - [ ] Merge through repository gates and archive this task separately.
+
+# Completed W6 evidence
+
+| Work | Delivery | Merge | Archive | Archive merge |
+|---|---:|---|---:|---|
+| W6 plan | PR #90 | `e27a4f15fa30f03abfcd6f265f900922eb1312f0` | PR #91 | `8094d9075fecd7b7c3de0d1b0eb400207a839776` |
+| W6-ASSET | PR #92 | `3cea444505bfcc5dc4b08b12d1046ef0c34a0f7a` | PR #94 | `4e09e32032e64831c30d6f7aeb31a2ebd4d4520a` |
+
+PR #92 final feature head `c51b24c489b181bc8a950a94d1fdf272bc60be7a` passed Rust Client run `30494659925` and repository CI run `30494660024`. PR #94 separately archived the implementation task and released its shared-path lease.
 
 # Live-state checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T10:52:00+02:00
-head: pending
+updated_at: 2026-07-30T11:12:00+02:00
+head: d01076b90f57a6085f35e0a2fc612113e79e1614
 branch: docs/OTC-20260730-close-w6-synthetic-assets-wave
-pr: pending
+pr: 96
 status: active
-required_main: 4e09e32032e64831c30d6f7aeb31a2ebd4d4520a
+required_main: a8e95bbce06eda7eb7954843cb7833fbf87160cc
 proven:
   - PR #90 planned W6 and PR #91 archived that planning task.
   - PR #92 merged the bounded synthetic asset schema/compiler as 3cea444505bfcc5dc4b08b12d1046ef0c34a0f7a.
-  - PR #94 archived W6-ASSET and current main is 4e09e32032e64831c30d6f7aeb31a2ebd4d4520a.
-  - PR #93 is open legacy Lua/test work and does not own Rust Identity, session, transport, protocol or application-entry paths.
+  - PR #94 archived W6-ASSET and released every W6 Cargo, lockfile, dependency-policy and shared-document lease.
+  - PR #93 merged as bdb73eea3c862f31e87fca81317ab3511c3a85a0 after exact-head CI run 30496430978.
+  - PR #95 archived the PR #93 task as a8e95bbce06eda7eb7954843cb7833fbf87160cc.
   - PR #48 remains isolated operational non-merge work and PR #23 remains legacy UI-only.
+  - No active Rust task or other open PR owns Identity, account-session, directory, game-entry, transport, protocol-canary, technical-login composition or login-E2E paths.
 derived:
-  - CURRENT_PARALLEL_WAVE.md is stale because it still authorizes W6-ASSET after the lane was merged and archived.
-  - W6 must be closed through this separate lifecycle task before a W7 plan can be accepted.
+  - CURRENT_PARALLEL_WAVE.md was stale because it still authorized W6-ASSET after the lane was merged and archived.
+  - The published closure now authorizes no worker and leaves one W7 planning recommendation only.
 unknown: []
 conflicts: []
 first_failure:
-  marker: stale-current-wave-record
-  evidence: CURRENT_PARALLEL_WAVE.md still has status accepted launch plan for OTERYN-W6-SYNTHETIC-ASSETS.
+  marker: exact-head-validation-pending
+  evidence: closure documentation is published but final PR #96 CI and complete review are not yet recorded.
 changed_paths:
+  - docs/agents/README.md
   - docs/agents/tasks/active/OTC-20260730-close-w6-synthetic-assets-wave.md
+  - oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md
+  - oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md
 validation: []
 blockers: []
-next_action: Publish the bounded W6 closure documentation, validate it, merge it and archive this task before creating the W7 planning task.
+next_action: Complete exact-head validation and review for PR #96, merge it, then archive this task separately before creating the W7 planning task.
 ```

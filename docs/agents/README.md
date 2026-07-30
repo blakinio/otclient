@@ -53,7 +53,7 @@ The current C++/Lua/OTUI code is evidence only for the Rust track and must not b
 
 Parallel Rust work is permitted only through a live accepted wave, unique tasks/branches/worktrees, non-overlapping ownership and one producer per public contract. Cargo/lockfile, dependency policy, Rust CI and other shared integration paths are serialized through the task-based lease protocol; manually resolving `Cargo.lock` conflicts is prohibited.
 
-W1-W6 are completed and cannot be relaunched. W7 workers remain unauthorized until the W7 planning PR and its separate planning-task archive merge and a fresh overlap/contract/lease check passes. After activation, use only the exact current prompts and dependency order in `CURRENT_PARALLEL_WAVE.md`.
+W1-W6 are completed and cannot be relaunched. The W7 plan and its separate planning-task archive are merged. W7-ENTRY-CONTRACT is completed and archived; W7-IDENTITY and W7-CANARY-ENTRY may launch only after a fresh overlap/contract/lease check and must restack on producer merge `9ecc43a4465f6565bc1c12ea61f170a96edcbe35`. W7-LOGIN-E2E remains bound by the dependency order in `CURRENT_PARALLEL_WAVE.md`.
 
 W7 proof boundaries:
 

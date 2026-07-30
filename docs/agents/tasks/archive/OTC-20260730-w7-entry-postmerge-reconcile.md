@@ -10,8 +10,8 @@ parallel_lane_state: archived
 branch: docs/OTC-20260730-w7-entry-postmerge-reconcile
 base_branch: main
 created: 2026-07-30T20:03:00+02:00
-updated: 2026-07-30T20:27:00+02:00
-last_verified_commit: "947c528b480dc1e4ff7ab98970275227cdb5ef0e"
+updated: 2026-07-30T20:31:00+02:00
+last_verified_commit: "960ed56e0696a1013417690ad33385b8d136f7c6"
 risk: low
 related_pr: "#106"
 lifecycle_archive_pr: "#107"
@@ -53,9 +53,10 @@ No Rust, Cargo, workflow, protocol or compatibility behavior changed.
 | CI #911 / run `30569670340` | PASS including `CI / Required` |
 | exact-head CI #912 / run `30569821215` | PASS including `CI / Required` on `8e896e905fa4910af87fd553e44c53bf6e541366` |
 | ready-state synchronization CI #915 / run `30570093037` | PASS including `CI / Required` on `04b64107865db7af46b328929506683c7c5cd8b9` |
-| reviews and unresolved threads | none |
+| feature reviews and unresolved threads | none |
 | feature squash merge | `e766820921245bef86ee8a4c343bf54c7fb25504` |
-| lifecycle archive PR | #107, two task-record paths only |
+| lifecycle archive changed-file review | PASS: exactly active-task removal and archive-task addition |
+| lifecycle archive CI #918 / run `30570388652` | PASS including `CI / Required` on `960ed56e0696a1013417690ad33385b8d136f7c6` |
 
 # Completion
 
@@ -65,14 +66,15 @@ No Rust, Cargo, workflow, protocol or compatibility behavior changed.
 - Lifecycle archive PR: #107
 - Shared-path lease: released
 - Product/code changes: none
+- Remaining blockers: none
 - Archived at: `docs/agents/tasks/archive/OTC-20260730-w7-entry-postmerge-reconcile.md`
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T18:27:00Z
-head: 947c528b480dc1e4ff7ab98970275227cdb5ef0e
+updated_at: 2026-07-30T18:31:00Z
+head: 960ed56e0696a1013417690ad33385b8d136f7c6
 branch: docs/archive-OTC-20260730-w7-entry-postmerge-reconcile-v2
 pr: 107
 status: archived
@@ -84,15 +86,15 @@ owned_paths:
 proven:
   - PR #106 squash-merged as e766820921245bef86ee8a4c343bf54c7fb25504.
   - Final feature diff contained exactly four documentation paths and no helper residue.
-  - CI runs 30569670340, 30569821215 and 30570093037 passed, including CI / Required.
-  - No reviews, requested changes or unresolved threads remained at merge.
+  - Feature CI runs 30569670340, 30569821215 and 30570093037 passed, including CI / Required.
+  - No feature reviews, requested changes or unresolved threads remained at merge.
   - The stale active PR #104 catalogue state and obsolete W7 blanket authorization statement are removed.
   - Archive PR #107 contains only active-task removal and completed archive-task addition.
+  - Archive CI run 30570388652 passed, including CI / Required.
 derived:
   - W7 entry producer governance is fully reconciled and this repair lane cannot be relaunched.
   - W7 consumers may proceed only under fresh accepted tasks and the exact producer restack gate.
-unknown:
-  - lifecycle archive merge commit until PR #107 merges.
+unknown: []
 conflicts: []
 first_failure:
   marker: none
@@ -103,11 +105,13 @@ changed_paths:
 validation:
   - command: CI run 30570093037
     result: PASS
-    evidence: ready-state head 04b64107865db7af46b328929506683c7c5cd8b9
+    evidence: ready-state feature head 04b64107865db7af46b328929506683c7c5cd8b9
   - command: Squash merge PR #106
     result: PASS
     evidence: e766820921245bef86ee8a4c343bf54c7fb25504
-blockers:
-  - merge lifecycle archive PR #107
-next_action: Validate and squash-merge PR #107, then publish its merge commit.
+  - command: CI run 30570388652
+    result: PASS
+    evidence: archive checkpoint head 960ed56e0696a1013417690ad33385b8d136f7c6
+blockers: []
+next_action: none; future W7 work requires a new accepted consumer task and exact producer restack.
 ```

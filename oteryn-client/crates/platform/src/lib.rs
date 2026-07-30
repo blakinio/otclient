@@ -297,7 +297,7 @@ pub trait HttpTransport: Send + Sync {
     fn post(&self, request: HttpRequest) -> Result<HttpResponse, HttpTransportError>;
 }
 
-/// Production blocking HTTP adapter using rustls certificate and hostname validation.
+/// Production blocking HTTP adapter using platform-native certificate and hostname validation.
 #[derive(Clone)]
 pub struct UreqTransport {
     agent: ureq::Agent,

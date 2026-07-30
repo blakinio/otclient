@@ -246,38 +246,7 @@ mod tests {
     }
 
     fn synthetic_identity_error() -> IdentityError {
-        IdentityConfig::new(
-            "http://remote.invalid/",
-            "invalid".to_owned(),
-            "/callback".to_owned(),
-            Duration::from_secs(1),
-        )
-        .err()
-        .unwrap_or_else(|| {
-            let valid = IdentityConfig::new(
-                "http://127.0.0.1/",
-                "valid".to_owned(),
-                "/wrong".to_owned(),
-                Duration::from_secs(1),
-            );
-            match valid {
-                Err(error) => error,
-                Ok(_) => unreachable_identity_error(),
-            }
-        })
-    }
-
-    fn unreachable_identity_error() -> IdentityError {
-        let result = IdentityConfig::new(
-            "http://127.0.0.1/",
-            String::new(),
-            "/callback".to_owned(),
-            Duration::from_secs(1),
-        );
-        match result {
-            Err(error) => error,
-            Ok(_) => synthetic_identity_error(),
-        }
+        IdentityError::for_kind(IdentityErrorKind::InvariantViolation)
     }
 
     fn session() -> Result<AccountSessionId, Box<dyn Error>> {

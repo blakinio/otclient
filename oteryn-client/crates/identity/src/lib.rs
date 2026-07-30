@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, TcpListener, TcpStream};
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
@@ -755,6 +755,12 @@ pub struct IdentityError {
 
 impl IdentityError {
     const fn new(kind: IdentityErrorKind) -> Self {
+        Self::for_kind(kind)
+    }
+
+    /// Construct a stable redacted error from its closed category.
+    #[must_use]
+    pub const fn for_kind(kind: IdentityErrorKind) -> Self {
         Self { kind }
     }
 
@@ -867,8 +873,7 @@ mod tests {
         let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
         assert_eq!(
             pkce_challenge(verifier),
-            "E9Melhoa2OwvFrEMTJguCHaoeK1p1r_wW1gFWFOEjXk"
-                .replace("K1p1r_wW1gFWFOEjXk", "K1t8URWbuGJSstw-cM")
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
         );
     }
 

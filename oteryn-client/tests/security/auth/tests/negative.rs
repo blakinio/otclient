@@ -5,8 +5,8 @@ use oteryn_identity::{
     FixedAccountSession, IdentityClient, IdentityConfig, IdentityError, IdentityErrorKind,
 };
 use oteryn_platform::{
-    HttpRequest, HttpResponse, HttpTransport, HttpTransportError, PlatformClient,
-    PlatformEndpoints, PlatformErrorKind, SecretString, MAX_RESPONSE_BODY_BYTES,
+    HttpRequest, HttpResponse, HttpTransport, HttpTransportError, MAX_RESPONSE_BODY_BYTES,
+    PlatformClient, PlatformEndpoints, PlatformErrorKind, SecretString,
 };
 use oteryn_world_directory::DirectoryRevision;
 use std::error::Error;
@@ -60,9 +60,7 @@ impl CallbackReceiver for TimeoutReceiver {
         _deadline: Deadline,
         _cancellation: &oteryn_foundation::CancellationToken,
     ) -> Result<CallbackAttempt, IdentityError> {
-        Err(IdentityError::for_kind(
-            IdentityErrorKind::CallbackTimeout,
-        ))
+        Err(IdentityError::for_kind(IdentityErrorKind::CallbackTimeout))
     }
 }
 
@@ -84,8 +82,7 @@ fn revision() -> Result<DirectoryRevision, Box<dyn Error>> {
 
 #[test]
 fn callback_timeout_is_typed_and_stops_before_http() -> Result<(), Box<dyn Error>> {
-    let endpoints =
-        PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?;
+    let endpoints = PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?;
     let client = IdentityClient::new(
         PlatformClient::new(endpoints, NoHttp),
         Box::new(TimeoutBinder),
@@ -158,8 +155,7 @@ fn gateway_response(body: serde_json::Value) -> Result<HttpResponse, Box<dyn Err
 }
 
 fn request_gateway_case(body: serde_json::Value) -> Result<PlatformErrorKind, Box<dyn Error>> {
-    let endpoints =
-        PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?;
+    let endpoints = PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?;
     let client = PlatformClient::new(
         endpoints,
         SingleResponse {

@@ -26,9 +26,13 @@ highlight = "all"
 # wgpu 30's fixed DX12 graph requires hashbrown 0.16 via gpu-allocator
 # alongside 0.17 via naga/indexmap.
 # Its macro graph also requires syn 2 via bytemuck and syn 3 via windows macros.
+# The fixed Windows shell uses windows-sys 0.52 through winit, while the
+# reviewed native-tls/SChannel graph uses windows-sys 0.61 for the system TLS
+# certificate and hostname verifier. Both are target-specific generated bindings.
 skip = [
     { name = "hashbrown", version = "=0.16.1" },
     { name = "syn", version = "=3.0.3" },
+    { name = "windows-sys", version = "=0.61.2" },
 ]
 
 [sources]

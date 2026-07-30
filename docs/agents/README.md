@@ -31,12 +31,12 @@ Normative entry point: `../../oteryn-client/README.md`.
 | `../../oteryn-client/docs/agents/PROGRAM.md` | Ordered audit-first implementation gates. |
 | `../../oteryn-client/docs/agents/WORKSTREAMS.md` | Agent ownership and package routing. |
 | `../../oteryn-client/docs/agents/MULTI_AGENT_EXECUTION.md` | Parallel lane, shared-path lease and contract/merge protocol. |
-| `../../oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md` | Current accepted W6 plan. It authorizes one synthetic asset schema/compiler worker only after the plan lifecycle merges. |
+| `../../oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md` | Latest closed-wave record. It currently authorizes no worker and contains one bounded W7 planning recommendation only. |
 | `../../oteryn-client/docs/agents/INITIAL_PARALLEL_WAVE.md` | Historical first-wave launch plan and dependency evidence. |
 | `../../oteryn-client/docs/agents/templates/PARALLEL_TASK.md` | Additional task metadata for parallel work. |
-| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Copy-ready W6 coordinator prompt. |
-| `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common prefix for parallel workers. |
-| `../../oteryn-client/docs/agents/prompts/NEXT_SYNTHETIC_ASSET_AGENT.md` | Copy-ready bounded W6 synthetic asset schema/compiler worker prompt. |
+| `../../oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md` | Copy-ready prompt for preparing the next planning package; it authorizes no worker launch. |
+| `../../oteryn-client/docs/agents/prompts/WORKER_AGENT_BASE.md` | Common prefix for parallel workers after an accepted plan. |
+| `../../oteryn-client/docs/agents/prompts/NEXT_SYNTHETIC_ASSET_AGENT.md` | Historical W6-ASSET prompt; completed work must not be relaunched. |
 | `../../oteryn-client/docs/agents/prompts/NEXT_RENDERER_SURFACE_AGENT.md` | Historical W5-RENDER prompt; completed work must not be relaunched. |
 | `../../oteryn-client/docs/agents/prompts/NEXT_WINDOWS_SHELL_AGENT.md` | Historical W4-SHELL prompt; completed work must not be relaunched. |
 | `../../oteryn-client/docs/agents/prompts/NEXT_TEST_SUPPORT_AGENT.md` | Historical W3-TEST prompt; completed work must not be relaunched. |
@@ -48,7 +48,7 @@ The current C++/Lua/OTUI code is evidence only for this track and must not becom
 
 Parallel Rust work is permitted only through a live accepted wave, unique tasks/branches/worktrees, non-overlapping ownership and one producer per public contract. Cargo/lockfile, dependency policy, architecture-check policy, Rust CI and other shared integration paths are serialized through the task-based lease protocol; no manually edited global lock table is used.
 
-W1, W2, W3, W4 and W5 are completed and cannot be relaunched. W6 contains exactly one implementation lane for a bounded normalized synthetic asset schema/compiler slice after its plan and plan archive merge. No asset runtime, renderer integration, real game importer, proprietary asset, updater, protocol, UI, audio or secondary worker is authorized by that plan.
+W1, W2, W3, W4, W5 and W6 are completed and cannot be relaunched. No Rust worker is currently authorized. The only recorded next action is a separate coordination-only plan for `OTERYN-W7-TECHNICAL-LOGIN`; that recommendation pre-claims no path, dependency, contract or lease and requires its own draft PR, accepted plan and separate plan-task archive before worker launch.
 
 ### Legacy OTClient
 

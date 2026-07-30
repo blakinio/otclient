@@ -11,8 +11,8 @@ coordinator_task: none
 branch: feat/OTC-20260730-w7-entry-contract
 base_branch: main
 created: 2026-07-30T12:25:00+02:00
-updated: 2026-07-30T18:04:03+02:00
-last_verified_commit: "e2d4981ffdde493054b794214e7ad69881cf8a5d"
+updated: 2026-07-30T20:10:00+02:00
+last_verified_commit: "8dcd353d5a9f19fabccf49508c27074f7749e3cf"
 required_base_commit: "9ecc43a4465f6565bc1c12ea61f170a96edcbe35"
 risk: high
 related_pr: "#104"
@@ -90,6 +90,7 @@ The consumer contract and exact first calls for W7-IDENTITY, W7-CANARY-ENTRY and
 | comments, reviews and unresolved threads | none |
 | temporary infrastructure residue | none: no workflow, build script or generator path in the final diff |
 | squash merge | `9ecc43a4465f6565bc1c12ea61f170a96edcbe35` |
+| lifecycle archive merge | `8dcd353d5a9f19fabccf49508c27074f7749e3cf` |
 
 # Preserved boundaries
 
@@ -103,6 +104,7 @@ Credential cleanup is a best-effort safe-Rust overwrite barrier and is not a cla
 - Feature PR: #104
 - Producer merge commit: `9ecc43a4465f6565bc1c12ea61f170a96edcbe35`
 - Lifecycle archive PR: #105
+- Lifecycle archive merge: `8dcd353d5a9f19fabccf49508c27074f7749e3cf`
 - Shared-path lease: released by this lifecycle archive
 - Lane relaunch: forbidden; future changes require a new accepted task
 - Archived at: `docs/agents/tasks/archive/OTC-20260730-w7-entry-contract.md`
@@ -111,11 +113,11 @@ Credential cleanup is a best-effort safe-Rust overwrite barrier and is not a cla
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T16:04:03Z
-head: d1f8b4e6b092492cc2c951fca18fd8c1d59a6976
+updated_at: 2026-07-30T18:10:00Z
+head: 8dcd353d5a9f19fabccf49508c27074f7749e3cf
 branch: docs/archive-OTC-20260730-w7-entry-contract
 pr: 105
-status: validation
+status: archived
 context_routes:
   - agent-governance
   - rust-entry-contract
@@ -125,21 +127,19 @@ owned_paths:
 proven:
   - PR #104 squash-merged as 9ecc43a4465f6565bc1c12ea61f170a96edcbe35.
   - Final feature head e2d4981ffdde493054b794214e7ad69881cf8a5d passed Rust Client run 30559239345 and repository CI run 30559239645.
-  - The merged implementation contains exactly 13 authorized paths and no final workflow, build-script or generator residue.
+  - The merged implementation contains exactly 13 authorized paths and no workflow, build-script or generator residue.
   - No reviews, requested changes or unresolved review threads remained at merge.
-  - The exact producer merge commit is published for all consumer restacks.
-  - Archive PR #105 changes only the active and archive task records.
+  - Archive PR #105 squash-merged as 8dcd353d5a9f19fabccf49508c27074f7749e3cf.
+  - The producer task is completed, archived and has no remaining shared-path lease.
 derived:
-  - W7-ENTRY-CONTRACT is completed and no longer launchable.
-  - The Cargo, lockfile and shared-document lease is released after archive PR #105 merges.
-unknown:
-  - archive squash-merge commit until PR #105 merges.
+  - W7-ENTRY-CONTRACT is completed and cannot be relaunched.
+  - W7-IDENTITY and W7-CANARY-ENTRY may consume the contract only after a fresh overlap check and exact restack on the producer merge.
+unknown: []
 conflicts: []
 first_failure:
   marker: none
   evidence: none
 changed_paths:
-  - docs/agents/tasks/active/OTC-20260730-w7-entry-contract.md
   - docs/agents/tasks/archive/OTC-20260730-w7-entry-contract.md
 validation:
   - command: Rust Client run 30559239345
@@ -151,7 +151,9 @@ validation:
   - command: Squash merge PR #104
     result: PASS
     evidence: producer merge commit 9ecc43a4465f6565bc1c12ea61f170a96edcbe35
-blockers:
-  - merge lifecycle archive PR #105
-next_action: Validate the two-path lifecycle diff, merge archive PR #105 and publish its merge commit.
+  - command: Squash merge archive PR #105
+    result: PASS
+    evidence: lifecycle archive commit 8dcd353d5a9f19fabccf49508c27074f7749e3cf
+blockers: []
+next_action: W7 consumers may restack on producer merge 9ecc43a4465f6565bc1c12ea61f170a96edcbe35 under fresh authorized tasks.
 ```

@@ -1,0 +1,98 @@
+name: W7 Identity Source Fixup
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "oteryn-client/crates/identity/src/lib.rs"
+      - "oteryn-client/crates/platform/src/lib.rs"
+      - "oteryn-client/tests/security/auth/src/lib.rs"
+      - ".github/workflows/w7-identity-source-fixup.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: w7-identity-source-fixup-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  fixup:
+    if: github.event.pull_request.head.ref == 'feat/OTC-20260730-w7-identity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC-20260730-w7-identity
+          show-progress: false
+
+      - name: Apply deterministic source fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          identity = Path("oteryn-client/crates/identity/src/lib.rs")
+          text = identity.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  "use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};",
+                  "use std::net::{IpAddr, Ipv4Addr, TcpListener, TcpStream};",
+              ),
+              (
+                  """impl IdentityError {\n    const fn new(kind: IdentityErrorKind) -> Self {\n        Self { kind }\n    }""",
+                  """impl IdentityError {\n    const fn new(kind: IdentityErrorKind) -> Self {\n        Self::for_kind(kind)\n    }\n\n    /// Construct a stable redacted error from its closed category.\n    #[must_use]\n    pub const fn for_kind(kind: IdentityErrorKind) -> Self {\n        Self { kind }\n    }""",
+              ),
+              (
+                  """            \"E9Melhoa2OwvFrEMTJguCHaoeK1p1r_wW1gFWFOEjXk\"\n                .replace(\"K1p1r_wW1gFWFOEjXk\", \"K1t8URWbuGJSstw-cM\")""",
+                  "            \"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM\"",
+              ),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"identity anchor missing: {old[:60]!r}")
+              text = text.replace(old, new, 1)
+          identity.write_text(text, encoding="utf-8")
+
+          tests = Path("oteryn-client/tests/security/auth/src/lib.rs")
+          text = tests.read_text(encoding="utf-8")
+          old = """    fn synthetic_identity_error() -> IdentityError {\n        IdentityConfig::new(\n            \"http://remote.invalid/\",\n            \"invalid\".to_owned(),\n            \"/callback\".to_owned(),\n            Duration::from_secs(1),\n        )\n        .err()\n        .unwrap_or_else(|| {\n            let valid = IdentityConfig::new(\n                \"http://127.0.0.1/\",\n                \"valid\".to_owned(),\n                \"/wrong\".to_owned(),\n                Duration::from_secs(1),\n            );\n            match valid {\n                Err(error) => error,\n                Ok(_) => unreachable_identity_error(),\n            }\n        })\n    }\n\n    fn unreachable_identity_error() -> IdentityError {\n        let result = IdentityConfig::new(\n            \"http://127.0.0.1/\",\n            String::new(),\n            \"/callback\".to_owned(),\n            Duration::from_secs(1),\n        );\n        match result {\n            Err(error) => error,\n            Ok(_) => synthetic_identity_error(),\n        }\n    }"""
+          new = """    fn synthetic_identity_error() -> IdentityError {\n        IdentityError::for_kind(IdentityErrorKind::InvariantViolation)\n    }"""
+          if old not in text:
+              raise SystemExit("security-test error helper anchor missing")
+          tests.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          platform = Path("oteryn-client/crates/platform/src/lib.rs")
+          text = platform.read_text(encoding="utf-8")
+          old = "/// Production blocking HTTP adapter using rustls certificate and hostname validation."
+          new = "/// Production blocking HTTP adapter using platform-native certificate and hostname validation."
+          if old not in text:
+              raise SystemExit("platform adapter comment anchor missing")
+          platform.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+      - name: Install formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+          rustup default 1.94.0
+
+      - name: Format workspace
+        working-directory: oteryn-client
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+          cargo fmt --all -- --check
+
+      - name: Commit fixed sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/crates/identity/src/lib.rs oteryn-client/crates/platform/src/lib.rs oteryn-client/tests/security/auth/src/lib.rs
+          git commit -m "fix(identity): align strict source and test invariants"
+          git push origin HEAD:feat/OTC-20260730-w7-identity

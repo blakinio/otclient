@@ -6,12 +6,12 @@ track: greenfield-rust
 workstream: coordination
 parallel_wave: OTERYN-W6-SYNTHETIC-ASSETS
 parallel_lane: W6-C
-parallel_lane_state: validating
+parallel_lane_state: ready
 branch: docs/OTC-20260730-close-w6-current-main
 base_branch: main
 created: 2026-07-30T11:30:00+02:00
-updated: 2026-07-30T11:36:00+02:00
-last_verified_commit: "3f7213bcff0b67aaddc6d8d662480669f3a8e345"
+updated: 2026-07-30T11:40:00+02:00
+last_verified_commit: "ac3ef5c5fdf586692c78358c3df021e04e53bd66"
 required_base_commit: "a8e95bbce06eda7eb7954843cb7833fbf87160cc"
 risk: low
 related_pr: "#99"
@@ -62,7 +62,7 @@ This task does not accept W7, create worker lanes, implement Rust packages, add 
 - [x] Update coordinator routing without claiming W7 acceptance.
 - [x] Leave exactly one next recommendation: plan `OTERYN-W7-TECHNICAL-LOGIN` after fresh contract and ownership preflight.
 - [x] Review the exact changed-file list and complete diff; exactly four authorized coordination paths changed.
-- [ ] Pass exact-head Rust Client and repository CI.
+- [x] Rust Client run `30531204393` and repository CI run `30531208870` passed on reviewed head `ac3ef5c5fdf586692c78358c3df021e04e53bd66`.
 - [ ] Merge through repository gates and archive this task separately before W7 planning begins.
 
 # Evidence
@@ -77,11 +77,11 @@ This task does not accept W7, create worker lanes, implement Rust packages, add 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T11:36:00+02:00
+updated_at: 2026-07-30T11:40:00+02:00
 head: pending-current-commit
 branch: docs/OTC-20260730-close-w6-current-main
 pr: 99
-status: validating
+status: ready
 required_main: a8e95bbce06eda7eb7954843cb7833fbf87160cc
 proven:
   - W6 plan, worker and both lifecycle archives are merged.
@@ -91,6 +91,7 @@ proven:
   - No active Rust task or open PR owns Identity, account-session, directory, game-entry, transport, protocol-canary, technical-login composition or login E2E paths.
   - All prior Rust shared-path leases are released.
   - PR #99 changes exactly four authorized coordination paths and the complete diff was reviewed.
+  - Reviewed head ac3ef5c5fdf586692c78358c3df021e04e53bd66 passed Rust Client 30531204393 and repository CI 30531208870.
 derived:
   - CURRENT_PARALLEL_WAVE.md on main was stale because it still authorized the completed W6 worker.
 unknown: []
@@ -105,6 +106,12 @@ validation:
   - command: complete PR #99 changed-file and diff review
     result: PASS
     evidence: exactly four authorized coordination paths; no product/dependency/workflow/external-repository change
+  - command: Rust Client run 30531204393
+    result: PASS
+    evidence: reviewed head ac3ef5c5fdf586692c78358c3df021e04e53bd66
+  - command: repository CI run 30531208870
+    result: PASS
+    evidence: reviewed head ac3ef5c5fdf586692c78358c3df021e04e53bd66
 blockers: []
-next_action: Mark PR #99 ready, wait for exact-head required checks and merge only through the repository gate; archive this task separately before W7 planning.
+next_action: Merge PR #99 only after this resulting checkpoint head passes the same required checks, then archive this task separately before W7 planning.
 ```

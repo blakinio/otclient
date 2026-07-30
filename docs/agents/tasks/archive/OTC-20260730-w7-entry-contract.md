@@ -11,7 +11,7 @@ coordinator_task: none
 branch: feat/OTC-20260730-w7-entry-contract
 base_branch: main
 created: 2026-07-30T12:25:00+02:00
-updated: 2026-07-30T18:02:39+02:00
+updated: 2026-07-30T18:04:03+02:00
 last_verified_commit: "e2d4981ffdde493054b794214e7ad69881cf8a5d"
 required_base_commit: "9ecc43a4465f6565bc1c12ea61f170a96edcbe35"
 risk: high
@@ -102,6 +102,7 @@ Credential cleanup is a best-effort safe-Rust overwrite barrier and is not a cla
 - Final status: completed
 - Feature PR: #104
 - Producer merge commit: `9ecc43a4465f6565bc1c12ea61f170a96edcbe35`
+- Lifecycle archive PR: #105
 - Shared-path lease: released by this lifecycle archive
 - Lane relaunch: forbidden; future changes require a new accepted task
 - Archived at: `docs/agents/tasks/archive/OTC-20260730-w7-entry-contract.md`
@@ -110,11 +111,11 @@ Credential cleanup is a best-effort safe-Rust overwrite barrier and is not a cla
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T16:02:39Z
-head: pending
+updated_at: 2026-07-30T16:04:03Z
+head: d1f8b4e6b092492cc2c951fca18fd8c1d59a6976
 branch: docs/archive-OTC-20260730-w7-entry-contract
-pr: pending
-status: archiving
+pr: 105
+status: validation
 context_routes:
   - agent-governance
   - rust-entry-contract
@@ -127,11 +128,12 @@ proven:
   - The merged implementation contains exactly 13 authorized paths and no final workflow, build-script or generator residue.
   - No reviews, requested changes or unresolved review threads remained at merge.
   - The exact producer merge commit is published for all consumer restacks.
+  - Archive PR #105 changes only the active and archive task records.
 derived:
   - W7-ENTRY-CONTRACT is completed and no longer launchable.
-  - The Cargo, lockfile and shared-document lease is released after this archive PR merges.
+  - The Cargo, lockfile and shared-document lease is released after archive PR #105 merges.
 unknown:
-  - archive PR number and archive squash-merge commit until created and merged.
+  - archive squash-merge commit until PR #105 merges.
 conflicts: []
 first_failure:
   marker: none
@@ -150,6 +152,6 @@ validation:
     result: PASS
     evidence: producer merge commit 9ecc43a4465f6565bc1c12ea61f170a96edcbe35
 blockers:
-  - merge this lifecycle archive PR
-next_action: Validate the two-path lifecycle diff, merge the archive PR and publish its merge commit.
+  - merge lifecycle archive PR #105
+next_action: Validate the two-path lifecycle diff, merge archive PR #105 and publish its merge commit.
 ```

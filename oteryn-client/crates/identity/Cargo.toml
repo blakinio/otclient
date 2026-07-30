@@ -1,0 +1,24 @@
+[package]
+name = "oteryn-identity"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.oteryn]
+category = "identity"
+
+[dependencies]
+base64 = "=0.22.1"
+getrandom = "=0.3.4"
+oteryn-account-session = { path = "../account-session" }
+oteryn-foundation = { path = "../foundation" }
+oteryn-game-session = { path = "../game-session" }
+oteryn-platform = { path = "../platform" }
+oteryn-world-directory = { path = "../world-directory" }
+sha2.workspace = true
+url = "=2.5.8"
+
+[lints]
+workspace = true

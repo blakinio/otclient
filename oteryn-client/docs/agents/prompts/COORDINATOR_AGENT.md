@@ -15,11 +15,11 @@ Before launching any worker:
 
 1. verify the W7 planning PR and its separate archive PR are merged;
 2. record exact current main;
-3. inspect every active task and open PR, including legacy PRs #23, #48 and #97 or their current successors;
+3. inspect every active task and open PR, including legacy/operational work or their current successors;
 4. verify no active owner exists for the worker's exclusive paths/public contracts;
 5. verify the shared Cargo/document lease is free;
 6. verify exact Platform/Gateway/Canary source revisions and blocked items remain current;
-7. stop if the fixed callback URI versus OS-assigned-port conflict has not been reconciled; do not weaken either contract.
+7. revalidate that current Platform still accepts a dynamic port for the registered http://127.0.0.1/callback loopback base; do not bind fixed port 80 or infer behavior from the registration string alone.
 
 Launch at most four worker lanes using the exact prompts:
 
@@ -47,13 +47,14 @@ Coordinator rules:
 - manual Cargo.lock conflict resolution is prohibited; restack and regenerate from current main;
 - do not bypass CI, reviews, branch protection or lifecycle archives;
 - do not commit credentials, private packet captures, proprietary assets or runtime secrets;
-- do not infer production compatibility from repository/fake tests or legacy OTClient evidence.
+- do not infer production compatibility from repository/fake tests or legacy OTClient evidence;
+- protocol research and packet decoding are internal Oteryn/Canary compatibility work only and must not be published as third-party gameplay manipulation or anti-cheat tooling.
 
 Merge and archive order:
 
 1. W7-ENTRY-CONTRACT;
-2. W7-CANARY-ENTRY and W7-IDENTITY ordered by downstream readiness, preserving the real Identity blocker;
-3. W7-LOGIN-E2E;
+2. W7-IDENTITY and W7-CANARY-ENTRY after exact producer restack, serialized through the shared-path lease;
+3. W7-LOGIN-E2E after both consumers merge;
 4. separate archive PR after every merged worker;
 5. separate W7 closure PR;
 6. separate archive PR for the W7 closure.
@@ -72,9 +73,9 @@ The first milestone is one explicit world/issuer and one selected matching chara
 
 If exact external evidence is missing or conflicts:
 
-- mark the affected real adapter/claim blocked;
+- mark only the affected real adapter/claim blocked;
 - record exact repository, revision, file and contradiction;
-- permit only unaffected deterministic/fake work;
+- permit unaffected deterministic/fake work;
 - never add a speculative production API or security downgrade.
 
 W7 closes only after all merged tasks are separately archived, final exact-head gates pass, real Rust admission is named and proven or explicitly blocked, and the closure records exactly one next bounded recommendation without implementing it.

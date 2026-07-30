@@ -1,0 +1,24 @@
+[package]
+name = "oteryn-identity-security-tests"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "tool"
+
+[dependencies]
+oteryn-account-session = { path = "../../../crates/account-session" }
+oteryn-foundation = { path = "../../../crates/foundation" }
+oteryn-identity = { path = "../../../crates/identity" }
+oteryn-platform = { path = "../../../crates/platform" }
+oteryn-world-directory = { path = "../../../crates/world-directory" }
+serde_json.workspace = true
+time = { version = "=0.3.54", default-features = false, features = ["formatting", "std"] }
+url = "=2.5.8"
+
+[lints]
+workspace = true

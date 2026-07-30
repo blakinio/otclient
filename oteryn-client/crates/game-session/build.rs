@@ -67,10 +67,10 @@ fn main() {
         Ok(value) => value,
         Err(error) => fail(&format!("failed to re-read Cargo.lock: {error}")),
     };
-    if existing != generated.as_bytes() {
-        if let Err(error) = fs::write(&lock_path, generated.as_bytes()) {
-            fail(&format!("failed to materialize Cargo.lock: {error}"));
-        }
+    if existing != generated.as_bytes()
+        && let Err(error) = fs::write(&lock_path, generated.as_bytes())
+    {
+        fail(&format!("failed to materialize Cargo.lock: {error}"));
     }
 
     let encoded = encode_base64(generated.as_bytes());

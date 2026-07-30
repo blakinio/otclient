@@ -6,9 +6,12 @@ members = [
     "crates/diagnostics",
     "crates/foundation",
     "crates/game-session",
+    "crates/identity",
+    "crates/platform",
     "crates/renderer",
     "crates/test-support",
     "crates/world-directory",
+    "tests/security/auth",
     "tools/architecture-check",
     "tools/asset-compiler",
 ]

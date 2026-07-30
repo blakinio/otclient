@@ -6,12 +6,12 @@ track: greenfield-rust
 workstream: coordination
 parallel_wave: OTERYN-W6-SYNTHETIC-ASSETS
 parallel_lane: W6-C
-parallel_lane_state: active
+parallel_lane_state: ready
 branch: docs/OTC-20260730-close-w6-synthetic-assets-wave
 base_branch: main
 created: 2026-07-30T10:52:00+02:00
-updated: 2026-07-30T11:12:00+02:00
-last_verified_commit: ""
+updated: 2026-07-30T11:22:00+02:00
+last_verified_commit: "2fd758f8f3d59682cba42223c5ef06399fd83ffb"
 required_base_commit: "a8e95bbce06eda7eb7954843cb7833fbf87160cc"
 risk: low
 related_pr: "#96"
@@ -63,8 +63,8 @@ This task does not accept W7, create worker lanes, implement Rust packages, add 
 - [x] Update the coordinator prompt so any future wave requires a new planning task, draft PR, accepted plan and separate plan archive before worker launch.
 - [x] Update `docs/agents/README.md` routing without claiming W7 acceptance.
 - [x] Leave exactly one bounded next recommendation: plan `OTERYN-W7-TECHNICAL-LOGIN` after fresh live contract/ownership preflight.
-- [ ] Final exact-head required CI and complete changed-file/review inspection pass.
-- [ ] Merge through repository gates and archive this task separately.
+- [x] Exact-head Rust Client and repository CI passed on reviewed head `2fd758f8f3d59682cba42223c5ef06399fd83ffb`; no review threads exist and exactly four authorized paths were inspected.
+- [ ] The current ready-state checkpoint head passes the same required graph, merges through repository gates and receives a separate archive PR.
 
 # Completed W6 evidence
 
@@ -75,15 +75,28 @@ This task does not accept W7, create worker lanes, implement Rust packages, add 
 
 PR #92 final feature head `c51b24c489b181bc8a950a94d1fdf272bc60be7a` passed Rust Client run `30494659925` and repository CI run `30494660024`. PR #94 separately archived the implementation task and released its shared-path lease.
 
+# Closure validation
+
+| Evidence | Result |
+|---|---|
+| reviewed closure head | `2fd758f8f3d59682cba42223c5ef06399fd83ffb` |
+| Rust Client | run `30529528575`: success |
+| repository CI draft graph | run `30529528806`: success |
+| repository CI ready graph | run `30529758381`: success |
+| changed files | exactly four authorized coordination paths |
+| complete diff | reviewed; no product, dependency, workflow or external-repository changes |
+| review threads | none |
+| branch protection | preserved; merge was not bypassed while `CI / Required` publication remained pending |
+
 # Live-state checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-30T11:12:00+02:00
-head: d01076b90f57a6085f35e0a2fc612113e79e1614
+updated_at: 2026-07-30T11:22:00+02:00
+head: pending-current-commit
 branch: docs/OTC-20260730-close-w6-synthetic-assets-wave
 pr: 96
-status: active
+status: ready
 required_main: a8e95bbce06eda7eb7954843cb7833fbf87160cc
 proven:
   - PR #90 planned W6 and PR #91 archived that planning task.
@@ -93,20 +106,30 @@ proven:
   - PR #95 archived the PR #93 task as a8e95bbce06eda7eb7954843cb7833fbf87160cc.
   - PR #48 remains isolated operational non-merge work and PR #23 remains legacy UI-only.
   - No active Rust task or other open PR owns Identity, account-session, directory, game-entry, transport, protocol-canary, technical-login composition or login-E2E paths.
+  - Reviewed head 2fd758f8f3d59682cba42223c5ef06399fd83ffb passed Rust Client 30529528575 and repository CI runs 30529528806 and 30529758381.
 derived:
   - CURRENT_PARALLEL_WAVE.md was stale because it still authorized W6-ASSET after the lane was merged and archived.
   - The published closure now authorizes no worker and leaves one W7 planning recommendation only.
 unknown: []
 conflicts: []
 first_failure:
-  marker: exact-head-validation-pending
-  evidence: closure documentation is published but final PR #96 CI and complete review are not yet recorded.
+  marker: current-head-required-checks-pending
+  evidence: this checkpoint commit must pass the same exact-head required checks before merge.
 changed_paths:
   - docs/agents/README.md
   - docs/agents/tasks/active/OTC-20260730-close-w6-synthetic-assets-wave.md
   - oteryn-client/docs/agents/CURRENT_PARALLEL_WAVE.md
   - oteryn-client/docs/agents/prompts/COORDINATOR_AGENT.md
-validation: []
+validation:
+  - command: Rust Client run 30529528575
+    result: PASS
+    evidence: reviewed head 2fd758f8f3d59682cba42223c5ef06399fd83ffb
+  - command: Repository CI run 30529528806
+    result: PASS
+    evidence: reviewed head 2fd758f8f3d59682cba42223c5ef06399fd83ffb
+  - command: Repository CI run 30529758381
+    result: PASS
+    evidence: reviewed head 2fd758f8f3d59682cba42223c5ef06399fd83ffb
 blockers: []
-next_action: Complete exact-head validation and review for PR #96, merge it, then archive this task separately before creating the W7 planning task.
+next_action: Merge PR #96 only after the current checkpoint head passes exact required checks, then archive this task separately before creating the W7 planning task.
 ```

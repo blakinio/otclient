@@ -1,16 +1,13 @@
 [workspace]
 members = [
     "apps/client",
-    "crates/account-session",
     "crates/asset-types",
     "crates/diagnostics",
     "crates/foundation",
     "crates/game-session",
     "crates/renderer",
     "crates/test-support",
-    "crates/world-directory",
     "tools/architecture-check",
-    "tools/asset-compiler",
 ]
 resolver = "3"
 

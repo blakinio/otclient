@@ -10,14 +10,14 @@ repository.workspace = true
 category = "platform"
 
 [dependencies]
-oteryn-account-session = { path = "../account-session" }
-oteryn-foundation = { path = "../foundation" }
-oteryn-game-session = { path = "../game-session" }
-oteryn-world-directory = { path = "../world-directory" }
+oteryn-account-session = { version = "=0.1.0", path = "../account-session" }
+oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+oteryn-game-session = { version = "=0.1.0", path = "../game-session" }
+oteryn-world-directory = { version = "=0.1.0", path = "../world-directory" }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json.workspace = true
 time = { version = "=0.3.54", default-features = false, features = ["parsing", "std"] }
-ureq = { version = "=3.3.0", default-features = false, features = ["rustls"] }
+ureq = { version = "=3.3.0", default-features = false, features = ["native-tls-no-default"] }
 url = "=2.5.8"
 
 [lints]

@@ -4,6 +4,7 @@
 
 mod model;
 mod runtime;
+mod worker;
 
 pub use model::{RuntimeError, RuntimeSnapshot, TechnicalSelection, WorkerKind};
 pub use runtime::{MAX_RUNTIME_HISTORY, TechnicalLoginRuntime};

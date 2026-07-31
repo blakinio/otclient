@@ -1,0 +1,19 @@
+[package]
+name = "oteryn-app-runtime"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.oteryn]
+category = "runtime"
+
+[dependencies]
+oteryn-account-session = { version = "=0.1.0", path = "../account-session" }
+oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+oteryn-game-session = { version = "=0.1.0", path = "../game-session" }
+oteryn-world-directory = { version = "=0.1.0", path = "../world-directory" }
+
+[lints]
+workspace = true

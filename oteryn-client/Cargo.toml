@@ -2,6 +2,7 @@
 members = [
     "apps/client",
     "crates/account-session",
+    "crates/app-runtime",
     "crates/asset-types",
     "crates/diagnostics",
     "crates/foundation",
@@ -14,6 +15,7 @@ members = [
     "crates/test-support",
     "crates/transport",
     "crates/world-directory",
+    "tests/integration/technical-login",
     "tests/security/auth",
     "tools/architecture-check",
     "tools/asset-compiler",

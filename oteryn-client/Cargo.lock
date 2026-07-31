@@ -1320,6 +1320,16 @@ name = "oteryn-account-session"
 version = "0.1.0"
 
 [[package]]
+name = "oteryn-app-runtime"
+version = "0.1.0"
+dependencies = [
+ "oteryn-account-session",
+ "oteryn-foundation",
+ "oteryn-game-session",
+ "oteryn-world-directory",
+]
+
+[[package]]
 name = "oteryn-architecture-check"
 version = "0.1.0"
 dependencies = [
@@ -1345,10 +1355,18 @@ dependencies = [
 name = "oteryn-client"
 version = "0.1.0"
 dependencies = [
+ "oteryn-account-session",
+ "oteryn-app-runtime",
  "oteryn-diagnostics",
  "oteryn-foundation",
+ "oteryn-game-session",
+ "oteryn-identity",
+ "oteryn-platform",
+ "oteryn-protocol-canary",
  "oteryn-renderer",
  "oteryn-test-support",
+ "oteryn-transport",
+ "oteryn-world-directory",
  "winit",
 ]
 
@@ -1439,6 +1457,24 @@ dependencies = [
  "oteryn-foundation",
  "pollster",
  "wgpu",
+]
+
+[[package]]
+name = "oteryn-technical-login-integration-tests"
+version = "0.1.0"
+dependencies = [
+ "oteryn-account-session",
+ "oteryn-app-runtime",
+ "oteryn-foundation",
+ "oteryn-game-session",
+ "oteryn-identity",
+ "oteryn-platform",
+ "oteryn-protocol-canary",
+ "oteryn-transport",
+ "oteryn-world-directory",
+ "serde_json",
+ "time",
+ "url",
 ]
 
 [[package]]

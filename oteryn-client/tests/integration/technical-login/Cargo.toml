@@ -1,0 +1,28 @@
+[package]
+name = "oteryn-technical-login-integration-tests"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "tool"
+
+[dependencies]
+oteryn-account-session = { version = "=0.1.0", path = "../../../crates/account-session" }
+oteryn-app-runtime = { version = "=0.1.0", path = "../../../crates/app-runtime" }
+oteryn-foundation = { version = "=0.1.0", path = "../../../crates/foundation" }
+oteryn-game-session = { version = "=0.1.0", path = "../../../crates/game-session" }
+oteryn-identity = { version = "=0.1.0", path = "../../../crates/identity" }
+oteryn-platform = { version = "=0.1.0", path = "../../../crates/platform" }
+oteryn-protocol-canary = { version = "=0.1.0", path = "../../../crates/protocol-canary" }
+oteryn-transport = { version = "=0.1.0", path = "../../../crates/transport" }
+oteryn-world-directory = { version = "=0.1.0", path = "../../../crates/world-directory" }
+serde_json.workspace = true
+time = { version = "=0.3.54", default-features = false, features = ["formatting", "std"] }
+url = "=2.5.8"
+
+[lints]
+workspace = true

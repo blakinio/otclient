@@ -5,11 +5,12 @@ Required compiled platform: Windows x86-64 MSVC
 
 ## Scope
 
-The workspace contains seventeen bounded members:
+The workspace contains nineteen bounded members:
 
 ```text
 apps/client
 crates/account-session
+crates/app-runtime
 crates/asset-types
 crates/diagnostics
 crates/foundation
@@ -22,12 +23,13 @@ crates/renderer
 crates/test-support
 crates/transport
 crates/world-directory
+tests/integration/technical-login
 tests/security/auth
 tools/architecture-check
 tools/asset-compiler
 ```
 
-`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-account-session`, `oteryn-world-directory` and `oteryn-game-session` are the sole W7 shared entry-contract producer packages. `oteryn-platform` owns strict bounded OAuth, Game Login Ticket and Gateway protocol-v1 HTTP/DTO boundaries. `oteryn-identity` owns CSPRNG PKCE, the pre-bound dynamic loopback callback and one synchronous generation-safe bootstrap transaction. `oteryn-identity-security-tests` is a synthetic-only `tool` package proving the cross-crate security boundary. `oteryn-asset-types` owns the normalized synthetic schema-v1 IDs, metadata and deterministic pack contract. `oteryn-asset-compiler` is an offline `tool` package that consumes that contract and safely compiles constrained original/synthetic fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. `oteryn-transport` owns bounded non-reconnecting TCP connection mechanics, `oteryn-protocol-core` owns generic bounded binary helpers, and `oteryn-protocol-canary` owns the exact-evidence-gated Current admission boundary. Real Canary wire admission, domain/game rendering, product UI, asset runtime and extension host remain absent.
+`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner plus the explicit W7 technical-login controller. `oteryn-app-runtime` owns generation-checked cancellable/joined Identity and admission workers, typed progress/result state and terminal cleanup. `oteryn-technical-login-integration-tests` is an original synthetic-only `tool` package composing the exact merged producer APIs. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-account-session`, `oteryn-world-directory` and `oteryn-game-session` are the sole W7 shared entry-contract producer packages. `oteryn-platform` owns strict bounded OAuth, Game Login Ticket and Gateway protocol-v1 HTTP/DTO boundaries. `oteryn-identity` owns CSPRNG PKCE, the pre-bound dynamic loopback callback and one synchronous generation-safe bootstrap transaction. `oteryn-identity-security-tests` is a synthetic-only `tool` package proving the cross-crate security boundary. `oteryn-asset-types` owns the normalized synthetic schema-v1 IDs, metadata and deterministic pack contract. `oteryn-asset-compiler` is an offline `tool` package that consumes that contract and safely compiles constrained original/synthetic fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. `oteryn-transport` owns bounded non-reconnecting TCP connection mechanics, `oteryn-protocol-core` owns generic bounded binary helpers, and `oteryn-protocol-canary` owns the exact-evidence-gated Current admission boundary. Real Canary wire admission, domain/game rendering, product UI, asset runtime and extension host remain absent.
 
 Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
 
@@ -81,9 +83,9 @@ Known categories are defined by the architecture checker and follow the accepted
 
 `foundation` is the bottom reusable category. It must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. Lower product layers may depend on it only for generic primitives that do not encode product/server behavior.
 
-`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. `oteryn-test-support` depends only on `foundation` and `diagnostics`; `oteryn-asset-compiler` depends only on `oteryn-asset-types` plus the exact workspace JSON parser; `oteryn-identity-security-tests` consumes only the W7 Identity/Platform and merged ENTRY contracts required for synthetic fake-service evidence.
+`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. `oteryn-test-support` depends only on `foundation` and `diagnostics`; `oteryn-asset-compiler` depends only on `oteryn-asset-types` plus the exact workspace JSON parser; `oteryn-identity-security-tests` consumes only the W7 Identity/Platform and merged ENTRY contracts required for synthetic fake-service evidence; `oteryn-technical-login-integration-tests` consumes the exact merged W7 layers plus `app-runtime` for original fake-service composition only.
 
-The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13` and the Windows-only `oteryn-renderer` composition contract; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; the app must not absorb protocol, feature, persistence or direct Win32 responsibilities.
+The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13`, the Windows-only renderer and the exact W7 application/Identity/Canary composition layers; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; credential ownership remains inside producer lifecycle and adapter boundaries; the app must not absorb protocol parsing, feature state, persistence or direct Win32 responsibilities.
 
 `oteryn-platform` may depend on the merged ENTRY contracts and `foundation`; it terminates raw producer DTOs and must not own browser state, application orchestration, Canary wire, UI or deployment defaults. `oteryn-identity` may depend on `platform`, the merged ENTRY contracts and `foundation`; none of those lower packages may depend back on Identity.
 

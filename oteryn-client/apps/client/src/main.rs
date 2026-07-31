@@ -1,5 +1,11 @@
 #[cfg(windows)]
+mod technical_login;
+
+#[cfg(windows)]
 mod windows_shell {
+    use super::technical_login::{
+        TechnicalLoginController, TechnicalLoginError, TechnicalWorkerSignal,
+    };
     use oteryn_client::{ShellCommand, ShellError, ShellPhase, ShellState};
     use oteryn_foundation::{MonotonicClock, ProcessGeneration, SystemClock};
     use oteryn_renderer::{RendererError, WindowsRenderer};
@@ -7,17 +13,27 @@ mod windows_shell {
     use std::process::ExitCode;
     use std::sync::Arc;
     use std::thread::{self, JoinHandle};
+    use std::time::{Duration, Instant};
     use winit::application::ApplicationHandler;
     use winit::dpi::LogicalSize;
     use winit::event::{Ime, WindowEvent};
-    use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+    use winit::event_loop::{
+        ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy,
+    };
     use winit::window::{Window, WindowId};
 
     const PROCESS_GENERATION: ProcessGeneration = ProcessGeneration::new(1);
+    const ACTIVE_POLL_INTERVAL: Duration = Duration::from_millis(16);
 
     #[derive(Debug, Clone, Copy)]
     enum ShellUserEvent {
-        Wake { generation: ProcessGeneration },
+        Wake {
+            generation: ProcessGeneration,
+        },
+        TechnicalLogin {
+            generation: ProcessGeneration,
+            signal: TechnicalWorkerSignal,
+        },
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,6 +45,7 @@ mod windows_shell {
         WorkerJoin,
         Shell(ShellError),
         Renderer(RendererError),
+        TechnicalLogin(TechnicalLoginError),
     }
 
     impl Display for RuntimeError {
@@ -47,6 +64,7 @@ mod windows_shell {
                 Self::WorkerJoin => formatter.write_str("shell wake worker did not finish cleanly"),
                 Self::Shell(error) => Display::fmt(error, formatter),
                 Self::Renderer(error) => Display::fmt(error, formatter),
+                Self::TechnicalLogin(error) => Display::fmt(error, formatter),
             }
         }
     }
@@ -56,6 +74,7 @@ mod windows_shell {
             match self {
                 Self::Shell(error) => Some(error),
                 Self::Renderer(error) => Some(error),
+                Self::TechnicalLogin(error) => Some(error),
                 Self::EventLoopCreation
                 | Self::WindowCreation
                 | Self::EventLoopRun
@@ -77,23 +96,36 @@ mod windows_shell {
         }
     }
 
+    impl From<TechnicalLoginError> for RuntimeError {
+        fn from(error: TechnicalLoginError) -> Self {
+            Self::TechnicalLogin(error)
+        }
+    }
+
     struct ShellApplication {
         clock: SystemClock,
         state: ShellState,
         renderer: Option<WindowsRenderer<Arc<Window>>>,
         window: Option<Arc<Window>>,
+        technical_login: Option<TechnicalLoginController>,
+        technical_login_started: bool,
+        proxy: EventLoopProxy<ShellUserEvent>,
         failure: Option<RuntimeError>,
     }
 
     impl ShellApplication {
-        fn new() -> Result<Self, RuntimeError> {
+        fn new(proxy: EventLoopProxy<ShellUserEvent>) -> Result<Self, RuntimeError> {
             let clock = SystemClock::new();
             let state = ShellState::new(PROCESS_GENERATION, clock.now())?;
+            let technical_login = TechnicalLoginController::from_environment()?;
             Ok(Self {
                 clock,
                 state,
                 renderer: None,
                 window: None,
+                technical_login,
+                technical_login_started: false,
+                proxy,
                 failure: None,
             })
         }
@@ -109,6 +141,16 @@ mod windows_shell {
             self.request_exit(event_loop);
         }
 
+        fn shutdown_technical_login(&mut self) {
+            let result = self
+                .technical_login
+                .as_mut()
+                .map(TechnicalLoginController::shutdown);
+            if let Some(Err(error)) = result {
+                self.remember_failure(RuntimeError::TechnicalLogin(error));
+            }
+        }
+
         fn release_renderer_and_window(&mut self) {
             let renderer_close = self
                 .renderer
@@ -122,6 +164,7 @@ mod windows_shell {
         }
 
         fn request_exit(&mut self, event_loop: &ActiveEventLoop) {
+            self.shutdown_technical_login();
             self.release_renderer_and_window();
             if let Err(error) = self
                 .state
@@ -219,6 +262,76 @@ mod windows_shell {
                 _ => {}
             }
         }
+
+        fn start_technical_login(&mut self, event_loop: &ActiveEventLoop) {
+            if self.technical_login_started || self.technical_login.is_none() {
+                return;
+            }
+            let proxy = self.proxy.clone();
+            let result = self.technical_login.as_mut().map(|controller| {
+                controller.start(move |signal| {
+                    let _send_result = proxy.send_event(ShellUserEvent::TechnicalLogin {
+                        generation: PROCESS_GENERATION,
+                        signal,
+                    });
+                })
+            });
+            match result {
+                Some(Ok(())) => {
+                    self.technical_login_started = true;
+                    self.update_technical_title();
+                }
+                Some(Err(error)) => {
+                    self.fail_and_exit(event_loop, RuntimeError::TechnicalLogin(error));
+                }
+                None => {}
+            }
+        }
+
+        fn handle_technical_signal(
+            &mut self,
+            event_loop: &ActiveEventLoop,
+            generation: ProcessGeneration,
+            signal: TechnicalWorkerSignal,
+        ) {
+            if generation != PROCESS_GENERATION {
+                return;
+            }
+            let result = self
+                .technical_login
+                .as_mut()
+                .map(|controller| controller.handle_signal(signal));
+            if let Some(Err(error)) = result {
+                self.fail_and_exit(event_loop, RuntimeError::TechnicalLogin(error));
+                return;
+            }
+            self.update_technical_title();
+        }
+
+        fn poll_technical_login(&mut self, event_loop: &ActiveEventLoop) -> bool {
+            let result = self
+                .technical_login
+                .as_mut()
+                .map(TechnicalLoginController::poll);
+            if let Some(Err(error)) = result {
+                self.fail_and_exit(event_loop, RuntimeError::TechnicalLogin(error));
+                return false;
+            }
+            self.update_technical_title();
+            self.technical_login
+                .as_ref()
+                .is_some_and(TechnicalLoginController::has_active_worker)
+        }
+
+        fn update_technical_title(&self) {
+            let title = self
+                .technical_login
+                .as_ref()
+                .map(TechnicalLoginController::window_title);
+            if let (Some(title), Some(window)) = (title, self.window.as_ref()) {
+                window.set_title(title);
+            }
+        }
     }
 
     impl ApplicationHandler<ShellUserEvent> for ShellApplication {
@@ -231,6 +344,7 @@ mod windows_shell {
                     .map(|renderer| renderer.resume(PROCESS_GENERATION, size.width, size.height));
                 if result.is_none_or(|result| self.handle_renderer_result(event_loop, result)) {
                     window.request_redraw();
+                    self.start_technical_login(event_loop);
                 }
                 return;
             }
@@ -271,15 +385,22 @@ mod windows_shell {
             }
             self.renderer = Some(renderer);
             self.window = Some(Arc::clone(&window));
+            self.start_technical_login(event_loop);
             window.request_redraw();
         }
 
         fn user_event(&mut self, event_loop: &ActiveEventLoop, event: ShellUserEvent) {
-            let command = match event {
-                ShellUserEvent::Wake { generation } => ShellCommand::Wake { generation },
-            };
-            let result = self.state.apply_commands(&[command], self.clock.now());
-            self.handle_state_result(event_loop, result);
+            match event {
+                ShellUserEvent::Wake { generation } => {
+                    let result = self
+                        .state
+                        .apply_commands(&[ShellCommand::Wake { generation }], self.clock.now());
+                    self.handle_state_result(event_loop, result);
+                }
+                ShellUserEvent::TechnicalLogin { generation, signal } => {
+                    self.handle_technical_signal(event_loop, generation, signal);
+                }
+            }
         }
 
         fn window_event(
@@ -297,6 +418,16 @@ mod windows_shell {
             }
         }
 
+        fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+            if self.poll_technical_login(event_loop) {
+                event_loop.set_control_flow(ControlFlow::WaitUntil(
+                    Instant::now() + ACTIVE_POLL_INTERVAL,
+                ));
+            } else {
+                event_loop.set_control_flow(ControlFlow::Wait);
+            }
+        }
+
         fn suspended(&mut self, event_loop: &ActiveEventLoop) {
             self.state.set_focused(false);
             let result = self
@@ -309,6 +440,7 @@ mod windows_shell {
         }
 
         fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+            self.shutdown_technical_login();
             self.release_renderer_and_window();
             if !matches!(self.state.phase(), ShellPhase::Closing | ShellPhase::Exited) {
                 let close_result = self
@@ -342,7 +474,7 @@ mod windows_shell {
     }
 
     fn spawn_wake_worker(
-        proxy: winit::event_loop::EventLoopProxy<ShellUserEvent>,
+        proxy: EventLoopProxy<ShellUserEvent>,
     ) -> Result<JoinHandle<()>, RuntimeError> {
         thread::Builder::new()
             .name(String::from("oteryn-shell-wake"))
@@ -359,8 +491,9 @@ mod windows_shell {
             .build()
             .map_err(|_error| RuntimeError::EventLoopCreation)?;
         event_loop.set_control_flow(ControlFlow::Wait);
-        let wake_worker = spawn_wake_worker(event_loop.create_proxy())?;
-        let mut application = ShellApplication::new()?;
+        let proxy = event_loop.create_proxy();
+        let wake_worker = spawn_wake_worker(proxy.clone())?;
+        let mut application = ShellApplication::new(proxy)?;
 
         let run_result = event_loop
             .run_app(&mut application)

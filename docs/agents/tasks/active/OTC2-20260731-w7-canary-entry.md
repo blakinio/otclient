@@ -4,37 +4,37 @@ project_lane: otclient-v2
 policy_version: 2
 task_kind: implementation
 implementation_authorized: true
-status: in_progress
+status: ready
 agent: "W7-CANARY-ENTRY worker"
 track: greenfield-rust
 workstream: transport-protocol-canary
 parallel_wave: OTERYN-W7-TECHNICAL-LOGIN
 parallel_lane: W7-CANARY-ENTRY
-parallel_lane_state: validating
-phase: validate
-session_id: chat-github-20260731-w7-canary-entry-1
-session_role: implementer
-session_rotation_count: 0
+parallel_lane_state: ready
+phase: close
+session_id: chat-github-20260731-w7-canary-entry-2
+session_role: closer
+session_rotation_count: 1
 execution_mode: chat-github
-execution_reason: GitHub DNS and Cargo are unavailable in the sandbox; bounded repository changes use the GitHub connector and exact compilation uses repository CI
-context_pressure: high
+execution_reason: implementation is complete; closure requires exact GitHub state, task metadata, PR readiness, merge and post-merge archival
+context_pressure: medium
 context_growth: stable
-context_score: 10
+context_score: 7
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: one cohesive producer/consumer task with isolated implementation, workspace integration, exact-head validation and separate closure phases
+decomposition_reason: one cohesive producer/consumer task completed through implementation, exact-head validation and closure phases
 validation_level: full
-heavy_validation_runs: 3
+heavy_validation_runs: 4
 heavy_validation_result: passed
-first_relevant_error: none on code checkpoint 39bdf7c32cfb1a3e6a5986bedf40012f7e04f1e5; later generic failures were limited to temporary documentation workflow syntax and all temporary files are absent from the final diff
+first_relevant_error: final diff review found that timeout or cancellation after started I/O could leave a framing-unsafe connection marked Connected; e080922e closes the transport terminally after every started-I/O failure and exact-head CI passed
 stale_takeover_count: 0
-human_interruptions: 0
-lease_expires_at: 2026-07-31T11:30:00+02:00
+human_interruptions: 1
+lease_expires_at: 2026-07-31T14:00:00+02:00
 branch: feat/OTC2-20260731-w7-canary-entry
 base_branch: main
 created: 2026-07-31T09:12:00+02:00
-updated: 2026-07-31T10:45:00+02:00
-last_verified_commit: "7526e6ce295812ab6ac6cbb66a2da2aca4455fb1"
+updated: 2026-07-31T13:13:00+02:00
+last_verified_commit: "e080922e4629b03c6b259ef62355f742bea7222a"
 required_base_commit: "9ecc43a4465f6565bc1c12ea61f170a96edcbe35"
 current_main_commit: "e891baac5f56d3706ade502645320bc33db5642f"
 risk: high
@@ -84,7 +84,7 @@ Implement the smallest bounded Rust TCP transport and Canary Current-profile adm
 # Delivered
 
 - `oteryn-protocol-core`: bounded checked integer/string reader and writer; malformed, truncated, oversized, invalid UTF-8 and trailing-data rejection; closed stable errors; deterministic arbitrary bounded malformed-input tests.
-- `oteryn-transport`: one already-resolved TCP endpoint; explicit connect/read/write timeouts; caller-owned cancellation; checked directional frame limits; partial I/O; deterministic terminal state; no resolver, daemon, reconnect or socket exposure; timeout, abrupt-close and redaction tests.
+- `oteryn-transport`: one already-resolved TCP endpoint; explicit connect/read/write timeouts; caller-owned cancellation; checked directional frame limits; partial I/O; deterministic terminal closure after any started-I/O failure; no resolver, daemon, reconnect or socket exposure; timeout, cancellation, abrupt-close and redaction tests.
 - `oteryn-protocol-canary`: exact Current metadata; shared W7 lifecycle/credential/result consumption; application-facing `connect`, `enter_session`, `cancel`, `close`; original test-only synthetic exchange; production mode blocked before network and credential handoff until exact fixture/E2E evidence exists.
 - Exact contract: `oteryn-client/contracts/canary/current-entry/README.md`.
 - PASS/OBSERVED/UNKNOWN/BLOCKED evidence: `oteryn-client/docs/research/technical-login/W7_CANARY_ENTRY_EVIDENCE.md`.
@@ -96,9 +96,13 @@ Implement the smallest bounded Rust TCP transport and Canary Current-profile adm
 - Canary and Platform remained read-only.
 - Final PR diff contains exactly 18 intended code/test/task/contract/evidence/shared-integration paths and no temporary workflow or script.
 - Guarded lock generation added only the three local packages and preserved every external package version and checksum.
-- Windows merge-head Rust CI passed `cargo metadata --locked`, `cargo fmt --all --check`, full workspace Clippy with warnings denied, all workspace tests, architecture policy and cargo-deny on code checkpoint `39bdf7c32cfb1a3e6a5986bedf40012f7e04f1e5` against current `main` `e891baac5f56d3706ade502645320bc33db5642f`.
+- Final exact feature head `e080922e4629b03c6b259ef62355f742bea7222a` is 46 commits ahead of current `main` `e891baac5f56d3706ade502645320bc33db5642f` and zero commits behind.
+- Rust Client run `30617902848` passed locked metadata, formatting, strict Clippy, all workspace tests, architecture policy and supply-chain checks.
+- Repository CI run `30617903348` passed all required checks.
 - Duplicate second use is rejected before a second synthetic network attempt.
+- Timeout, cancellation and every other failure after started transport I/O close the connection terminally, preventing framing reuse.
 - Production admission fails closed before network I/O and before credential handoff.
+- No review comments, review submissions or unresolved review threads exist.
 
 # OBSERVED
 
@@ -115,42 +119,43 @@ Implement the smallest bounded Rust TCP transport and Canary Current-profile adm
 - Provenance-safe complete Current transcript bytes.
 - Named deployment revisions/configuration and one controlled real Rust admission through `0x0F`.
 
-# BLOCKED
+# BLOCKED compatibility claims
 
 - `W7-BLOCK-REAL-RUST-E2E`: production adapter remains fail-closed until exact configured Rust admission evidence exists.
 - `W7-BLOCK-DEPLOYMENT-EVIDENCE`: no DNS, TLS, firewall, secret-manager or deployment claim.
+
+These are explicit future compatibility gates, not blockers to merging the bounded fail-closed foundation delivered by this task.
 
 # Validation checkpoint
 
 ```yaml
 policy_version: 2
-updated_at: 2026-07-31T10:45:00+02:00
-head: 7526e6ce295812ab6ac6cbb66a2da2aca4455fb1
+updated_at: 2026-07-31T13:13:00+02:00
+head: e080922e4629b03c6b259ef62355f742bea7222a
 current_main: e891baac5f56d3706ade502645320bc33db5642f
 branch: feat/OTC2-20260731-w7-canary-entry
 pr: 113
-status: in_progress
-phase: validate
-session_role: implementer
+status: ready
+phase: close
+session_role: closer
 execution_mode: chat-github
-context_pressure: high
+context_pressure: medium
 context_growth: stable
-context_score: 10
+context_score: 7
 decomposition_decision: phased
 validation_level: full
-heavy_validation_runs: 3
+heavy_validation_runs: 4
 heavy_validation_result: passed
-first_relevant_error: none in the intended code or final diff
-last_completed_step: integrated all required shared documentation, removed every temporary helper and confirmed the exact 18-path final diff
+first_relevant_error: none remaining; the framing-unsafe non-terminal I/O failure state was repaired and exact-head CI passed
+last_completed_step: verified exact main ancestry, complete 18-path diff, both green workflow runs and empty review state
 proven:
   - exact merged W7 entry contracts are reused without substitutes
   - production admission fails closed before network and credential handoff
   - external dependency resolution did not change
-  - full Windows workspace Rust validation passed on the current merge-head
+  - all started-I/O failures close the transport terminally
+  - full Rust and repository CI passed on exact feature head e080922e4629b03c6b259ef62355f742bea7222a
 unknown:
-  - exact-head result after final restack commit
-blockers:
-  - W7-BLOCK-REAL-RUST-E2E
-  - W7-BLOCK-DEPLOYMENT-EVIDENCE
-next_action: Create a backup ref, restack the task branch on exact current main e891baac5f56d3706ade502645320bc33db5642f, then run final exact-head CI and complete diff/review inspection.
+  - real configured Canary wire admission through 0x0F
+blockers: []
+next_action: Mark PR #113 ready, require green checks on this task-only closure head, squash-merge with expected head SHA, then create and merge the archive-only task PR.
 ```

@@ -1,6 +1,7 @@
 # Post-W7 audit evidence index
 
-Task: `OTC2-20260731-rust-client-post-w7-audit`
+Task: `OTC2-20260731-rust-client-post-w7-audit`  
+Independent result: `VALIDATED_WITH_CORRECTIONS`
 
 ## Repository state
 
@@ -8,10 +9,20 @@ Task: `OTC2-20260731-rust-client-post-w7-audit`
 - W7 feature merge: `946063cd9c19ae1ae17726649bb4a0b9f21e6e32` / PR #118;
 - W7 archive merge: `227958e3fb33a3cf1a18b0b6da011290c2877cd2` / PR #119;
 - tested PR merge ref: `38b656add027f8aa21bdc5bde51424347137256c`;
-- open PRs at the cut: #97, #48 and #23; none changes `oteryn-client/**`;
-- no unresolved review threads or overlapping Rust-client task/lease were identified.
+- validator input branch head: `7c74c8b1801296a4f4788f0d69cb27c353476fe4`;
+- open PRs during validation: #120, #97, #48 and #23;
+- #120 changes only authorized audit/checkpoint paths;
+- #97, #48 and #23 do not change `oteryn-client/**`;
+- all four open PRs had zero unresolved review threads;
+- no overlapping Rust-client task/lease was identified.
 
-PR #119 changed only `docs/agents/MODULE_CATALOG.md` and moved the W7 task record from active to archive. The implementation, manifests, lockfile and workflow remained unchanged.
+PR #119 changed only:
+
+- `docs/agents/MODULE_CATALOG.md`;
+- `docs/agents/tasks/active/OTC2-20260731-w7-login-e2e.md`;
+- `docs/agents/tasks/archive/OTC2-20260731-w7-login-e2e.md`.
+
+The implementation, manifests, lockfile and workflow remained unchanged.
 
 Identical blobs between the tested PR merge ref and current `main`:
 
@@ -26,31 +37,47 @@ Rust Client run `30647931191`:
 - Windows job `91213890051`: locked metadata, formatting, strict Clippy, workspace tests and architecture check passed;
 - Supply Chain job `91213890169`: cargo-deny advisories, bans, licenses and sources passed;
 - checkout: `38b656add027f8aa21bdc5bde51424347137256c`;
-- 139 ordinary tests passed;
-- no documentation-test phase was present.
+- Rust/Cargo `1.94.0`;
+- 139 ordinary tests passed, independently re-summed from test-target results;
+- no documentation-test phase or `Doc-tests` output was present;
+- cargo-deny action built/used version `0.20.2` and reported advisories/bans/licenses/sources `ok`.
 
-Final heads for PRs #50, #54, #61, #73, #79, #86, #92, #104, #110, #113 and #118 have successful Rust Client workflow runs.
+## Workspace inventory evidence
+
+Root `oteryn-client/Cargo.toml` lists exactly 19 members. Every member manifest was independently read at exact `main`; the direct graph is recorded in `main-audit-report.md`. No manifest points to legacy `src/**`, `modules/**` or `mods/**`.
 
 ## Key source evidence
 
-- Identity secrets/callback: `oteryn-client/crates/identity/src/lib.rs:1-220,320-545,680-705`;
-- Platform secret/HTTP boundary: `oteryn-client/crates/platform/src/lib.rs:90-205,300-390`;
-- runtime cancellation/join: `oteryn-client/crates/app-runtime/src/runtime.rs:180-270,390-465`;
-- event-loop close path: `oteryn-client/apps/client/src/main.rs:105-175,185-235`;
-- configuration timeouts: `oteryn-client/apps/client/src/technical_login.rs:170-245`;
-- transport bounds: `oteryn-client/crates/transport/src/lib.rs:1-240`;
+- Identity secret copies/callback: `oteryn-client/crates/identity/src/lib.rs`;
+- Platform secret/HTTP boundary: `oteryn-client/crates/platform/src/lib.rs`;
+- runtime cancellation/join: `oteryn-client/crates/app-runtime/src/runtime.rs`;
+- event-loop close path: `oteryn-client/apps/client/src/main.rs`;
+- configuration timeouts: `oteryn-client/apps/client/src/technical_login.rs`;
+- transport bounds: `oteryn-client/crates/transport/src/lib.rs`;
 - asset source open: `oteryn-client/tools/asset-compiler/src/lib.rs:285-330`;
-- architecture edge policy: `oteryn-client/tools/architecture-check/src/lib.rs:385-455`.
+- architecture edge policy: `oteryn-client/tools/architecture-check/src/lib.rs`;
+- normative separation: `oteryn-client/docs/architecture/ARCHITECTURE.md`;
+- production Canary fail-closed: `oteryn-client/crates/protocol-canary/src/lib.rs`;
+- synthetic/production boundary tests: `oteryn-client/tests/integration/technical-login/src/lib.rs`.
 
 ## Governance evidence
 
-- `docs/agents/ACTIVE_WORK.md:1-20`;
+- `docs/agents/ACTIVE_WORK.md`;
 - `docs/agents/MODULE_CATALOG.md`;
 - `oteryn-client/docs/research/technical-login/W7_ENTRY_CONTRACT_EVIDENCE.md`;
 - `oteryn-client/docs/research/technical-login/W7_IDENTITY_EVIDENCE.md`;
 - `oteryn-client/docs/research/technical-login/W7_CANARY_ENTRY_EVIDENCE.md`;
 - `oteryn-client/docs/research/technical-login/W7_LOGIN_E2E_EVIDENCE.md`.
 
+## Unauthorized-change evidence
+
+At validator input head, compare against exact `main` contained only:
+
+- `docs/agents/tasks/active/OTC2-20260731-rust-client-post-w7-audit.md`;
+- `oteryn-client/docs/audits/post-w7/**`.
+
+Independent-validator corrections stayed within the same authorized paths.
+
 ## Local execution limitation
 
-`git ls-remote https://github.com/blakinio/otclient.git refs/heads/main` failed with exit code `128` because the sandbox could not resolve `github.com`. `cargo` and `cargo-deny` were unavailable locally. Local Cargo commands are therefore `NOT RUN`; exact repository CI is the execution evidence.
+The primary audit sandbox could not resolve `github.com`, and local `cargo`/`cargo-deny` were unavailable. Local Cargo commands remain `NOT RUN`; exact repository CI is the execution evidence.

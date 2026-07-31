@@ -121,7 +121,7 @@ oteryn-client/
 |---|---|---|
 | `foundation` | generic technical generations, monotonic time, explicit cancellation and primitive-specific errors | product lifecycle policy, domain IDs, protocol, platform services, async runtime or global event bus |
 | `test-support` | deterministic test-owned timelines/context and classified diagnostic-event fixtures using merged lower contracts | another clock abstraction, sleep/scheduler/executor, global fixture registry, product services or external fixture loading |
-| `app-runtime` | top-level state machine, service composition, error routing | packet parsing, concrete widgets |
+| `app-runtime` | generation-checked top-level entry state, owned cancellable/joined worker composition, typed progress/result routing and terminal cleanup | packet parsing, concrete widgets, raw sockets, producer DTOs or credentials outside the one-shot lifecycle |
 | `platform` | strict bounded producer-facing HTTP/DTO boundaries and concrete reviewed OS/network adapters | browser transaction state, game rules, feature state, Canary wire, UI or deployment defaults |
 | `identity` | CSPRNG PKCE transaction, pre-bound loopback callback, system-browser launch and generation-safe Identity/ticket/Gateway orchestration | passwords, substitute ENTRY contracts, character/game mutation, Canary wire, UI or persistence |
 | `account-session` | authenticated account lifetime | live game connection |
@@ -153,7 +153,9 @@ The W7 Identity implementation keeps producer-specific DTOs inside `platform`. `
 
 The W7 Canary entry implementation keeps generic bounded TCP ownership in `transport`, generic checked binary helpers in `protocol-core`, and exact source facts/outcome mapping in `protocol-canary`. It consumes the merged `game-session` and `world-directory` contracts; the production Current wire path is disabled before network and credential handoff until approved transcript/RSA/deployment evidence exists. Synthetic fixtures are deliberately not Canary bytes.
 
-`apps/client` is the concrete `app` package. Its current W5 boundary composes deterministic shell state with the single `oteryn-renderer` surface owner on the main thread. Protocol, game/domain rendering, feature composition, assets, UI and persistence remain absent.
+`apps/client` is the concrete `app` package. It preserves deterministic shell state and the single `oteryn-renderer` surface owner on the main thread, and now composes W7 technical login through typed `winit` user events. Browser, callback, HTTP and admission execute only in application-owned workers; explicit environment configuration is opt-in and contains no credentials or production defaults. Game/domain rendering, feature UI, assets and persistence remain absent.
+
+The W7 application runtime consumes the exact merged Identity and Canary interfaces plus producer-owned ENTRY lifecycle. It owns no replacement transport, protocol or session contract. The integration-test package composes original fake browser/listener/HTTP/admission services and cannot establish real Canary or deployment compatibility.
 
 ## 4. Feature crate contract
 

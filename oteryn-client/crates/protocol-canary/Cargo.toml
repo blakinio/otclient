@@ -1,0 +1,23 @@
+[package]
+name = "oteryn-protocol-canary"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.oteryn]
+category = "protocol-canary"
+
+[dependencies]
+oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+oteryn-game-session = { version = "=0.1.0", path = "../game-session" }
+oteryn-protocol-core = { version = "=0.1.0", path = "../protocol-core" }
+oteryn-transport = { version = "=0.1.0", path = "../transport" }
+oteryn-world-directory = { version = "=0.1.0", path = "../world-directory" }
+
+[dev-dependencies]
+oteryn-account-session = { version = "=0.1.0", path = "../account-session" }
+
+[lints]
+workspace = true

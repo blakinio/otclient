@@ -3,8 +3,8 @@ use crate::{RuntimeError, RuntimeSnapshot, TechnicalSelection, WorkerKind};
 use oteryn_account_session::AccountSessionId;
 use oteryn_foundation::{CancellationSource, CancellationToken, MonotonicClock};
 use oteryn_game_session::{
-    EntryFailure, EntryFailureKind, EntryLifecycle, EntryPhase, EntryProfile,
-    GameEntryAttemptId, GameEntryCredential, GameEntryRequest, SessionEntered,
+    EntryFailure, EntryFailureKind, EntryLifecycle, EntryPhase, EntryProfile, GameEntryAttemptId,
+    GameEntryCredential, GameEntryRequest, SessionEntered,
 };
 use oteryn_world_directory::AccountDirectorySnapshot;
 use std::collections::VecDeque;
@@ -121,9 +121,7 @@ impl TechnicalLoginRuntime {
                 Ok(attempt_id)
             }
             Err(_error) => {
-                self.set_failure(EntryFailure::for_kind(
-                    EntryFailureKind::TransportFailure,
-                ));
+                self.set_failure(EntryFailure::for_kind(EntryFailureKind::TransportFailure));
                 Err(RuntimeError::WorkerSpawn(WorkerKind::Identity))
             }
         }
@@ -186,9 +184,7 @@ impl TechnicalLoginRuntime {
             }
             Err(_error) => {
                 self.lifecycle = Some(EntryLifecycle::new());
-                self.set_failure(EntryFailure::for_kind(
-                    EntryFailureKind::TransportFailure,
-                ));
+                self.set_failure(EntryFailure::for_kind(EntryFailureKind::TransportFailure));
                 Err(RuntimeError::WorkerSpawn(WorkerKind::Connection))
             }
         }
@@ -295,13 +291,12 @@ impl TechnicalLoginRuntime {
             WorkerEvent::Identity { attempt_id, result } => {
                 self.require_active(attempt_id)?;
                 match result {
-                    Ok((account_session_id, directory, credential)) => self
-                        .apply_identity_success(
-                            attempt_id,
-                            account_session_id,
-                            directory,
-                            credential,
-                        ),
+                    Ok((account_session_id, directory, credential)) => self.apply_identity_success(
+                        attempt_id,
+                        account_session_id,
+                        directory,
+                        credential,
+                    ),
                     Err(failure) => {
                         self.lifecycle_mut()?.record_failure(attempt_id, failure)?;
                         self.set_failure(failure);
@@ -395,9 +390,9 @@ impl TechnicalLoginRuntime {
         ))?;
         self.sync_phase();
         let clock = Arc::clone(&self.clock);
-        if let Err(failure) = self
-            .lifecycle_mut()?
-            .credential_ready(attempt_id, credential, clock.as_ref())
+        if let Err(failure) =
+            self.lifecycle_mut()?
+                .credential_ready(attempt_id, credential, clock.as_ref())
         {
             self.lifecycle_mut()?.record_failure(attempt_id, failure)?;
             self.set_failure(failure);
@@ -483,7 +478,10 @@ impl Debug for TechnicalLoginRuntime {
             .debug_struct("TechnicalLoginRuntime")
             .field("snapshot", &self.snapshot())
             .field("identity_worker_active", &self.identity_worker.is_some())
-            .field("connection_worker_active", &self.connection_worker.is_some())
+            .field(
+                "connection_worker_active",
+                &self.connection_worker.is_some(),
+            )
             .field("history_len", &self.history.len())
             .finish()
     }

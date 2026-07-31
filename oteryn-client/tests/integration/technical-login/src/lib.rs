@@ -4,9 +4,7 @@
 mod tests {
     use oteryn_account_session::AccountSessionId;
     use oteryn_app_runtime::{TechnicalLoginRuntime, TechnicalSelection};
-    use oteryn_foundation::{
-        CancellationSource, Deadline, ManualClock, Moment, MonotonicClock,
-    };
+    use oteryn_foundation::{CancellationSource, Deadline, ManualClock, Moment, MonotonicClock};
     use oteryn_game_session::{
         EntryFailure, EntryFailureKind, EntryLifecycle, EntryPhase, EntryProfile,
         GameEntryAttemptId, GameEntryCredential, GameEntryRequest,
@@ -21,7 +19,7 @@ mod tests {
         PlatformEndpoints,
     };
     use oteryn_protocol_canary::{
-        CanaryAdmissionOutcome, CanaryEntryAdapter, CanaryConnectionState,
+        CanaryAdmissionOutcome, CanaryConnectionState, CanaryEntryAdapter,
     };
     use oteryn_transport::TransportConfig;
     use oteryn_world_directory::{
@@ -76,7 +74,9 @@ mod tests {
     impl BrowserLauncher for FakeBrowser {
         fn open(&self, authorization_url: &Url) -> Result<(), IdentityError> {
             if self.state.order.load(Ordering::Acquire) != 1 {
-                return Err(IdentityError::for_kind(IdentityErrorKind::InvariantViolation));
+                return Err(IdentityError::for_kind(
+                    IdentityErrorKind::InvariantViolation,
+                ));
             }
             *lock(&self.state.opened_url) = Some(authorization_url.clone());
             self.state.order.store(2, Ordering::Release);
@@ -91,16 +91,14 @@ mod tests {
 
     impl CallbackBinder for FakeBinder {
         fn bind(&self, callback_path: &str) -> Result<Box<dyn CallbackReceiver>, IdentityError> {
-            if callback_path != "/callback"
-                || self.state.order.swap(1, Ordering::AcqRel) != 0
-            {
-                return Err(IdentityError::for_kind(IdentityErrorKind::InvariantViolation));
+            if callback_path != "/callback" || self.state.order.swap(1, Ordering::AcqRel) != 0 {
+                return Err(IdentityError::for_kind(
+                    IdentityErrorKind::InvariantViolation,
+                ));
             }
-            let redirect_uri = Url::parse(&format!(
-                "http://127.0.0.1:{}{}",
-                self.port, callback_path
-            ))
-            .map_err(|_| IdentityError::for_kind(IdentityErrorKind::InvariantViolation))?;
+            let redirect_uri =
+                Url::parse(&format!("http://127.0.0.1:{}{}", self.port, callback_path))
+                    .map_err(|_| IdentityError::for_kind(IdentityErrorKind::InvariantViolation))?;
             Ok(Box::new(FakeReceiver {
                 state: Arc::clone(&self.state),
                 redirect_uri,
@@ -177,9 +175,7 @@ mod tests {
                     }
                     let body = std::str::from_utf8(request.body())
                         .map_err(|_| HttpTransportError::InvalidRequest)?;
-                    if !body.contains("code=synthetic-code")
-                        || !body.contains("code_verifier=")
-                    {
+                    if !body.contains("code=synthetic-code") || !body.contains("code_verifier=") {
                         return Err(HttpTransportError::InvalidRequest);
                     }
                     json_response(
@@ -211,10 +207,9 @@ mod tests {
                     {
                         return Err(HttpTransportError::InvalidRequest);
                     }
-                    let expires_at = (OffsetDateTime::now_utc()
-                        + time::Duration::seconds(60))
-                    .format(&Rfc3339)
-                    .map_err(|_| HttpTransportError::InvalidRequest)?;
+                    let expires_at = (OffsetDateTime::now_utc() + time::Duration::seconds(60))
+                        .format(&Rfc3339)
+                        .map_err(|_| HttpTransportError::InvalidRequest)?;
                     let response = serde_json::json!({
                         "protocol_version": 1,
                         "session": {
@@ -285,10 +280,7 @@ mod tests {
         let browser_state = Arc::new(BrowserState::default());
         let http_state = Arc::new(Mutex::new(HttpState::default()));
         let platform = PlatformClient::new(
-            PlatformEndpoints::new(
-                "http://127.0.0.1:18080/",
-                "http://127.0.0.1:18081/",
-            )?,
+            PlatformEndpoints::new("http://127.0.0.1:18080/", "http://127.0.0.1:18081/")?,
             FakeHttp {
                 state: Arc::clone(&http_state),
             },
@@ -313,8 +305,7 @@ mod tests {
         )?;
         let account_session = AccountSessionId::new(41)?;
         let directory_revision = DirectoryRevision::new(3)?;
-        let runtime_clock: Arc<dyn MonotonicClock> =
-            Arc::new(ManualClock::new(Moment::ZERO));
+        let runtime_clock: Arc<dyn MonotonicClock> = Arc::new(ManualClock::new(Moment::ZERO));
         let mut runtime = TechnicalLoginRuntime::new(runtime_clock);
 
         let attempt = runtime.start_authentication(
@@ -448,8 +439,8 @@ mod tests {
         Ok(())
     }
 
-    fn credential_ready_lifecycle(
-    ) -> Result<(EntryLifecycle, GameEntryAttemptId), Box<dyn Error>> {
+    fn credential_ready_lifecycle() -> Result<(EntryLifecycle, GameEntryAttemptId), Box<dyn Error>>
+    {
         let account = AccountSessionId::new(33)?;
         let world_id = WorldId::new(9)?;
         let world = WorldSummary::new(
@@ -477,12 +468,8 @@ mod tests {
             vec![character],
             Vec::new(),
         )?;
-        let selected = directory.select(
-            directory.revision(),
-            CharacterId::new(17)?,
-            world_id,
-            None,
-        )?;
+        let selected =
+            directory.select(directory.revision(), CharacterId::new(17)?, world_id, None)?;
         let attempt = GameEntryAttemptId::new(1)?;
         let clock = ManualClock::new(Moment::ZERO);
         let mut lifecycle = EntryLifecycle::new();
@@ -507,8 +494,8 @@ mod tests {
     }
 
     #[test]
-    fn production_canary_stays_fail_closed_before_credential_handoff()
-    -> Result<(), Box<dyn Error>> {
+    fn production_canary_stays_fail_closed_before_credential_handoff() -> Result<(), Box<dyn Error>>
+    {
         let (lifecycle, _attempt) = credential_ready_lifecycle()?;
         let request = lifecycle
             .request()

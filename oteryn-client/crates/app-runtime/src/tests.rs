@@ -81,15 +81,16 @@ fn fake_success_uses_one_handoff_and_returns_session_entered() -> Result<(), Box
     let worker_secret = expected_secret.clone();
 
     let attempt = runtime.start_authentication(selection()?, move |_attempt, _cancellation| {
-        let directory = snapshot().map_err(|_| {
-            EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-        })?;
-        let credential = credential(&worker_secret).map_err(|_| {
-            EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-        })?;
-        Ok((AccountSessionId::new(33).map_err(|_| {
-            EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-        })?, directory, credential))
+        let directory =
+            snapshot().map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?;
+        let credential = credential(&worker_secret)
+            .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?;
+        Ok((
+            AccountSessionId::new(33)
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            directory,
+            credential,
+        ))
     })?;
 
     poll_until(&mut runtime, EntryPhase::CredentialReady)?;
@@ -151,23 +152,15 @@ fn fake_success_uses_one_handoff_and_returns_session_entered() -> Result<(), Box
 fn invalid_world_character_relation_is_typed_and_never_connects() -> Result<(), Box<dyn Error>> {
     let clock: Arc<dyn MonotonicClock> = Arc::new(ManualClock::new(Moment::ZERO));
     let mut runtime = TechnicalLoginRuntime::new(clock);
-    let invalid_selection = TechnicalSelection::new(
-        CharacterId::new(99)?,
-        WorldId::new(11)?,
-        None,
-    );
+    let invalid_selection = TechnicalSelection::new(CharacterId::new(99)?, WorldId::new(11)?, None);
 
     runtime.start_authentication(invalid_selection, |_attempt, _cancellation| {
         Ok((
-            AccountSessionId::new(33).map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
-            snapshot().map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
-            credential(b"unused-secret").map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
+            AccountSessionId::new(33)
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            snapshot().map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            credential(b"unused-secret")
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
         ))
     })?;
 
@@ -177,7 +170,10 @@ fn invalid_world_character_relation_is_typed_and_never_connects() -> Result<(), 
         .failure()
         .ok_or_else(|| io::Error::other("missing typed selection failure"))?;
     assert_eq!(failure.kind(), EntryFailureKind::SelectedEntryUnavailable);
-    assert_eq!(failure.recommended_action(), RecoveryAction::ChooseAnotherCharacter);
+    assert_eq!(
+        failure.recommended_action(),
+        RecoveryAction::ChooseAnotherCharacter
+    );
     assert_eq!(
         runtime.start_connection(|lifecycle, _attempt, _token, _clock| {
             (
@@ -193,21 +189,17 @@ fn invalid_world_character_relation_is_typed_and_never_connects() -> Result<(), 
 }
 
 #[test]
-fn concurrent_authentication_is_rejected_and_second_attempt_is_fresh()
--> Result<(), Box<dyn Error>> {
+fn concurrent_authentication_is_rejected_and_second_attempt_is_fresh() -> Result<(), Box<dyn Error>>
+{
     let clock: Arc<dyn MonotonicClock> = Arc::new(ManualClock::new(Moment::ZERO));
     let mut runtime = TechnicalLoginRuntime::new(clock);
     let first = runtime.start_authentication(selection()?, |_attempt, _cancellation| {
         Ok((
-            AccountSessionId::new(33).map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
-            snapshot().map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
-            credential(b"first-fresh-secret").map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
+            AccountSessionId::new(33)
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            snapshot().map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            credential(b"first-fresh-secret")
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
         ))
     })?;
     assert_eq!(
@@ -232,15 +224,11 @@ fn concurrent_authentication_is_rejected_and_second_attempt_is_fresh()
 
     let second = runtime.start_authentication(selection()?, |_attempt, _cancellation| {
         Ok((
-            AccountSessionId::new(33).map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
-            snapshot().map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
-            credential(b"second-fresh-secret").map_err(|_| {
-                EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-            })?,
+            AccountSessionId::new(33)
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            snapshot().map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            credential(b"second-fresh-secret")
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
         ))
     })?;
     assert_ne!(first, second);

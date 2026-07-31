@@ -227,6 +227,7 @@ enum AdmissionMode {
 }
 
 enum AdmissionExchange {
+    #[cfg(test)]
     Entered,
     Outcome(CanaryAdmissionOutcome),
 }
@@ -343,6 +344,7 @@ impl CanaryEntryAdapter {
         };
 
         let final_outcome = match self.exchange(&request, &credential, cancellation) {
+            #[cfg(test)]
             AdmissionExchange::Entered => {
                 match lifecycle.session_entered(attempt_id, clock.now()) {
                     Ok(entered) => CanaryAdmissionOutcome::SessionEntered(entered),
@@ -386,6 +388,21 @@ impl CanaryEntryAdapter {
         }
     }
 
+    #[cfg(not(test))]
+    fn exchange(
+        &mut self,
+        _request: &GameEntryRequest,
+        _credential: &AdmissionCredential,
+        _cancellation: &CancellationToken,
+    ) -> AdmissionExchange {
+        match &mut self.mode {
+            AdmissionMode::EvidenceBlocked => {
+                AdmissionExchange::Outcome(CanaryAdmissionOutcome::RealAdmissionUnavailable)
+            }
+        }
+    }
+
+    #[cfg(test)]
     fn exchange(
         &mut self,
         request: &GameEntryRequest,
@@ -396,7 +413,6 @@ impl CanaryEntryAdapter {
             AdmissionMode::EvidenceBlocked => {
                 AdmissionExchange::Outcome(CanaryAdmissionOutcome::RealAdmissionUnavailable)
             }
-            #[cfg(test)]
             AdmissionMode::Synthetic(script) => script.exchange(request, credential, cancellation),
         }
     }

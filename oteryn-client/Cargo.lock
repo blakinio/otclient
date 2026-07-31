@@ -1355,10 +1355,18 @@ dependencies = [
 name = "oteryn-client"
 version = "0.1.0"
 dependencies = [
+ "oteryn-account-session",
+ "oteryn-app-runtime",
  "oteryn-diagnostics",
  "oteryn-foundation",
+ "oteryn-game-session",
+ "oteryn-identity",
+ "oteryn-platform",
+ "oteryn-protocol-canary",
  "oteryn-renderer",
  "oteryn-test-support",
+ "oteryn-transport",
+ "oteryn-world-directory",
  "winit",
 ]
 

@@ -3,40 +3,42 @@
 Task: `OTC2-20260731-rust-client-post-w7-audit`  
 Evidence cut: `227958e3fb33a3cf1a18b0b6da011290c2877cd2`  
 Audit branch: `docs/OTC2-20260731-rust-client-post-w7-audit`  
-Main report: `OTC2-20260731-rust-client-post-w7-audit.md`
+Validator input head: `7c74c8b1801296a4f4788f0d69cb27c353476fe4`  
+Main report: `main-audit-report.md`  
+Independent result: `VALIDATED_WITH_CORRECTIONS`
 
-## Required fresh checks
+## Completed fresh checks
 
-1. Ponownie sprawdź live `main`. Musi nadal wynosić `227958e3fb33a3cf1a18b0b6da011290c2877cd2`; w przeciwnym razie zwróć `REJECTED` albo wymagaj nowego evidence cut.
-2. Sprawdź wszystkie otwarte PR-y, aktywne taski, leases, ownership i review threads pod kątem `oteryn-client/**`.
-3. Ponownie zweryfikuj wszystkie `MEDIUM`:
-   - `OTC2-AUD-001` — ordinary secret copies kontra terminal cleanup claim;
-   - `OTC2-AUD-002` — blocking join na event-loop close path;
-   - `OTC2-AUD-003` — asset source-open TOCTOU;
-   - `OTC2-AUD-004` — niekompletny architecture edge policy.
-4. Sprawdź reprezentatywną próbkę `LOW`: `OTC2-AUD-005` i `OTC2-AUD-006`.
-5. Zweryfikuj Rust Client run `30647931191`, Windows job `91213890051`, Supply Chain job `91213890169`, checkout `38b656add027f8aa21bdc5bde51424347137256c`, 139 zwykłych testów i brak doc-test step.
-6. Zweryfikuj kompletność 19 członków workspace'u oraz direct dependency graph.
-7. Zweryfikuj, że PR #119 nie zmienił implementation/manifests/lockfile/workflows.
-8. Zweryfikuj, że audit branch zawiera wyłącznie:
-   - `docs/agents/tasks/active/OTC2-20260731-rust-client-post-w7-audit.md`;
-   - `oteryn-client/docs/audits/post-w7/**`.
-9. Spróbuj obalić wniosek: synthetic slice READY, real/production NOT READY.
-10. Zapisz wynik `VALIDATED`, `VALIDATED_WITH_CORRECTIONS` albo `REJECTED`. Korekty mogą zmieniać wyłącznie raporty audytu i task checkpoint.
+1. Live `main` ponownie potwierdzono jako `227958e3fb33a3cf1a18b0b6da011290c2877cd2`.
+2. Sprawdzono wszystkie live open PR-y #120, #97, #48 i #23, ich changed files oraz review threads. Tylko #120 dotyka dozwolonych dokumentów audytu; brak nierozwiązanych threads i pokrywającego Rust-client ownership/lease.
+3. Ponownie zweryfikowano wszystkie `MEDIUM`:
+   - `OTC2-AUD-001` — confirmed;
+   - `OTC2-AUD-002` — confirmed;
+   - `OTC2-AUD-003` — confirmed;
+   - `OTC2-AUD-004` — confirmed.
+4. Ponownie zweryfikowano reprezentatywne `LOW`:
+   - `OTC2-AUD-005` — confirmed;
+   - `OTC2-AUD-006` — confirmed.
+5. Zweryfikowano Rust Client run `30647931191`, Windows job `91213890051`, Supply Chain job `91213890169`, checkout `38b656add027f8aa21bdc5bde51424347137256c`, Rust/Cargo 1.94.0, 139 zwykłych testów, architecture PASS, cargo-deny 0.20.2 PASS i brak doc-test step.
+6. Odtworzono kompletność 19 członków workspace'u i direct dependency graph ze wszystkich manifestów.
+7. Potwierdzono, że PR #119 zmienił tylko `MODULE_CATALOG` oraz aktywny/archiwalny task W7; implementation/manifests/lockfile/workflows pozostały bez zmian.
+8. Potwierdzono, że validator input diff zawierał wyłącznie task checkpoint i `oteryn-client/docs/audits/post-w7/**`.
+9. Próba obalenia readiness conclusion nie powiodła się: synthetic slice pozostaje READY tylko w ograniczonym syntetycznym zakresie, a real/production pozostaje NOT READY.
+
+## Corrections applied
+
+- ustanowiono kanoniczny raport `main-audit-report.md`, którego wymagało zlecenie;
+- zaktualizowano live open-PR state o audit PR #120;
+- skorygowano nieaktualny head checkpointu i status walidacji;
+- usunięto nieaktualny blocker braku niezależnej sesji;
+- nie zmieniono implementation ani meritum findings/readiness.
 
 ## Evidence map
 
 - repository/live/CI index: `EVIDENCE_INDEX.md`;
-- findings and readiness: `OTC2-20260731-rust-client-post-w7-audit.md`;
-- local limitation: GitHub DNS i Cargo były niedostępne; nie zamieniaj CI PASS w local PASS.
+- findings, inventory, falsification i readiness: `main-audit-report.md`;
+- local limitation pozostaje `NOT RUN`; exact repository CI jest execution evidence.
 
-## Validator output contract
+## Final result
 
-Walidator musi zapisać:
-
-- exact main i audit branch head;
-- sprawdzone findings i korekty;
-- wynik command/CI evidence verification;
-- wynik unauthorized-change check;
-- końcowy status walidacji;
-- końcowy checkpoint tego samego tasku.
+`VALIDATED_WITH_CORRECTIONS`

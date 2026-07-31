@@ -1417,6 +1417,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "oteryn-protocol-canary"
+version = "0.1.0"
+dependencies = [
+ "oteryn-account-session",
+ "oteryn-foundation",
+ "oteryn-game-session",
+ "oteryn-protocol-core",
+ "oteryn-transport",
+ "oteryn-world-directory",
+]
+
+[[package]]
+name = "oteryn-protocol-core"
+version = "0.1.0"
+
+[[package]]
 name = "oteryn-renderer"
 version = "0.1.0"
 dependencies = [
@@ -1430,6 +1446,13 @@ name = "oteryn-test-support"
 version = "0.1.0"
 dependencies = [
  "oteryn-diagnostics",
+ "oteryn-foundation",
+]
+
+[[package]]
+name = "oteryn-transport"
+version = "0.1.0"
+dependencies = [
  "oteryn-foundation",
 ]
 

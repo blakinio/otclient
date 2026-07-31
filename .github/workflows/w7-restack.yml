@@ -1,0 +1,35 @@
+name: W7 Exact Main Restack
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260731-w7-canary-entry
+    paths:
+      - .github/workflows/w7-restack.yml
+
+permissions:
+  contents: write
+
+jobs:
+  restack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260731-w7-canary-entry
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Rebase on exact main
+        shell: bash
+        run: |
+          set -euo pipefail
+          old_head="$(git rev-parse HEAD)"
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "e891baac5f56d3706ade502645320bc33db5642f"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rebase origin/main
+          git merge-base --is-ancestor origin/main HEAD
+          git push --force-with-lease=refs/heads/feat/OTC2-20260731-w7-canary-entry:"${old_head}" origin HEAD:refs/heads/feat/OTC2-20260731-w7-canary-entry

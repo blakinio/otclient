@@ -1,0 +1,71 @@
+name: W7 Login Shared Docs
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260731-w7-login-e2e-final
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260731-w7-login-e2e-final
+          show-progress: false
+      - name: Update shared W7 records
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              target = Path(path)
+              text = target.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'missing expected text in {path}: {old[:80]}')
+              target.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          catalog = 'docs/agents/MODULE_CATALOG.md'
+          replace(catalog, '| W7 Canary Current entry transport | active PR #113 |', '| W7 Canary Current entry transport | merged PR #113; archived by #116 |')
+          replace(catalog, '| W7 Platform native-auth boundary | active PR #110 |', '| W7 Platform native-auth boundary | merged PR #110; archived by #111 |')
+          replace(catalog, '| W7 Identity PKCE transaction | active PR #110 |', '| W7 Identity PKCE transaction | merged PR #110; archived by #111 |')
+          replace(catalog, '| W7 Identity security tests | active PR #110 |', '| W7 Identity security tests | merged PR #110; archived by #111 |')
+          marker = '| Oteryn diagnostics contracts | merged PR #61; archived by #62 |'
+          row = '| W7 technical-login application runtime | active PR #118 | `oteryn-app-runtime` owns generation-checked cancellable/joined Identity and admission workers, bounded phase history and producer-owned `SessionEntered`/`EntryFailure`; the existing Windows shell adds explicit environment-only configuration and typed event-loop integration | `oteryn-client/crates/app-runtime/**`, `oteryn-client/tests/integration/technical-login/**`, `oteryn-client/apps/client/**`, `oteryn-client/docs/research/technical-login/W7_LOGIN_E2E_EVIDENCE.md` | Consumes exact ENTRY/Identity/Canary merges without substitute public contracts. Fake services prove the bounded flow and cleanup. Production Canary remains fail-closed; real/deployment and interactive desktop evidence remain explicit blockers without compatibility claims. |\n'
+          replace(catalog, marker, row + marker)
+
+          matrix = 'docs/agents/BUILD_TEST_MATRIX.md'
+          marker = '| Launcher/updater | signature/hash/tamper/interruption/rollback tests | Windows clean install/update/rollback evidence |'
+          row = '| W7 technical-login application composition | generation-tagged worker completion, one Identity and one admission worker, explicit cancellation/join, dynamic callback and strict fake Gateway flow, authoritative world-character/route validation, one-shot/duplicate handoff, fresh second attempt, ordered synthetic admission through `0x0F`, shutdown cleanup, redaction and production Canary fail-closed evidence | Windows locked metadata/fmt/strict Clippy/all-target tests/doctests, architecture and cargo-deny. Exact ENTRY/Identity/Canary merge commits and explicit configuration surface must be recorded. Real deployed path and interactive desktop observation remain external blockers and cannot be inferred from fake tests. |\n'
+          replace(matrix, marker, row + marker)
+          canary = '- W7 Canary production admission remains fail-closed before network and credential handoff until exact approved Current wire and controlled E2E evidence exist; synthetic success is lifecycle/parser evidence only;\n'
+          runtime = '- W7 application composition keeps browser/listener/HTTP/TCP work in explicitly cancelled and joined workers, rejects stale attempt signals, validates configured world ID/host/port and character against the authoritative directory, exposes no credential to the event loop and contains no hidden production defaults;\n'
+          replace(matrix, canary, canary + runtime)
+
+          replace('docs/agents/CHANGELOG.md', '## Unreleased\n\n', '## Unreleased\n\n- The greenfield Rust workspace now includes the W7 technical-login application composition: `oteryn-app-runtime` owns generation-tagged cancellable/joined Identity and admission workers and consumes only the merged ENTRY lifecycle; the existing Windows `winit` shell exposes one explicit environment-only configuration and handles typed completion events without network work on the event-loop thread. Original fake services prove dynamic callback, strict Gateway bootstrap, authoritative selection, one credential handoff, ordered synthetic admission through `0x0F`, fresh retry, cancellation/close and redaction. Production Canary remains fail-closed, and real deployment plus interactive desktop compatibility remain explicitly unproven.\n')
+
+          layout = 'oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md'
+          replace(layout, '| `app-runtime` | top-level state machine, service composition, error routing | packet parsing, concrete widgets |', '| `app-runtime` | generation-checked top-level entry state, owned cancellable/joined worker composition, typed progress/result routing and terminal cleanup | packet parsing, concrete widgets, raw sockets, producer DTOs or credentials outside the one-shot lifecycle |')
+          replace(layout, '`apps/client` is the concrete `app` package. Its current W5 boundary composes deterministic shell state with the single `oteryn-renderer` surface owner on the main thread. Protocol, game/domain rendering, feature composition, assets, UI and persistence remain absent.', '`apps/client` is the concrete `app` package. It preserves deterministic shell state and the single `oteryn-renderer` surface owner on the main thread, and now composes W7 technical login through typed `winit` user events. Browser, callback, HTTP and admission execute only in application-owned workers; explicit environment configuration is opt-in and contains no credentials or production defaults. Game/domain rendering, feature UI, assets and persistence remain absent.')
+          replace(layout, '\n## 4. Feature crate contract\n', '\nThe W7 application runtime consumes the exact merged Identity and Canary interfaces plus producer-owned ENTRY lifecycle. It owns no replacement transport, protocol or session contract. The integration-test package composes original fake browser/listener/HTTP/admission services and cannot establish real Canary or deployment compatibility.\n\n## 4. Feature crate contract\n')
+
+          workspace = 'oteryn-client/docs/operations/RUST_WORKSPACE.md'
+          replace(workspace, 'The workspace contains seventeen bounded members:', 'The workspace contains nineteen bounded members:')
+          replace(workspace, 'apps/client\ncrates/account-session\n', 'apps/client\ncrates/account-session\ncrates/app-runtime\n')
+          replace(workspace, 'crates/world-directory\ntests/security/auth\n', 'crates/world-directory\ntests/integration/technical-login\ntests/security/auth\n')
+          replace(workspace, '`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner.', '`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner plus the explicit W7 technical-login controller. `oteryn-app-runtime` owns generation-checked cancellable/joined Identity and admission workers, typed progress/result state and terminal cleanup. `oteryn-technical-login-integration-tests` is an original synthetic-only `tool` package composing the exact merged producer APIs.')
+          replace(workspace, '`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. `oteryn-test-support` depends only on `foundation` and `diagnostics`; `oteryn-asset-compiler` depends only on `oteryn-asset-types` plus the exact workspace JSON parser; `oteryn-identity-security-tests` consumes only the W7 Identity/Platform and merged ENTRY contracts required for synthetic fake-service evidence.', '`tool` packages may consume reviewed lower contracts for development/test/build purposes but must not become runtime service locators or bypass product dependency direction. `oteryn-test-support` depends only on `foundation` and `diagnostics`; `oteryn-asset-compiler` depends only on `oteryn-asset-types` plus the exact workspace JSON parser; `oteryn-identity-security-tests` consumes only the W7 Identity/Platform and merged ENTRY contracts required for synthetic fake-service evidence; `oteryn-technical-login-integration-tests` consumes the exact merged W7 layers plus `app-runtime` for original fake-service composition only.')
+          replace(workspace, 'The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13` and the Windows-only `oteryn-renderer` composition contract; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; the app must not absorb protocol, feature, persistence or direct Win32 responsibilities.', 'The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13`, the Windows-only renderer and the exact W7 application/Identity/Canary composition layers; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; credential ownership remains inside producer lifecycle and adapter boundaries; the app must not absorb protocol parsing, feature state, persistence or direct Win32 responsibilities.')
+          PY
+      - name: Commit shared records
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/agents/MODULE_CATALOG.md docs/agents/BUILD_TEST_MATRIX.md docs/agents/CHANGELOG.md oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md oteryn-client/docs/operations/RUST_WORKSPACE.md
+          git commit -m "docs(w7): integrate technical login runtime records"
+          git push origin HEAD:feat/OTC2-20260731-w7-login-e2e-final

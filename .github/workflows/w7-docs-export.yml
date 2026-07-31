@@ -1,44 +1,15 @@
-name: W7 Docs Export
+name: Retired W7 Docs Helper
 
 on:
-  push:
-    branches:
-      - feat/OTC2-20260731-w7-canary-entry
-    paths:
-      - .github/workflows/w7-docs-export.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  export-docs:
+  retired:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout task branch
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          ref: feat/OTC2-20260731-w7-canary-entry
-          fetch-depth: 1
-          show-progress: false
-
-      - name: Generate exact documentation
+      - name: No operation
         shell: bash
-        run: |
-          set -euo pipefail
-          python .github/scripts/w7_docs_update.py
-          git diff --check
-
-      - name: Export generated files
-        shell: bash
-        run: |
-          set -euo pipefail
-          tar -czf w7-docs.tar.gz \
-            docs/agents/BUILD_TEST_MATRIX.md \
-            docs/agents/CHANGELOG.md \
-            docs/agents/MODULE_CATALOG.md \
-            oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md \
-            oteryn-client/docs/operations/RUST_WORKSPACE.md
-          echo W7_DOCS_ARCHIVE_BEGIN
-          base64 -w0 w7-docs.tar.gz
-          echo
-          echo W7_DOCS_ARCHIVE_END
+        run: echo "retired"

@@ -45,7 +45,7 @@ pub(crate) struct TechnicalWorkerSignal {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ConfigField {
+pub(crate) enum ConfigField {
     OptIn,
     AuthorizationBase,
     GatewayBase,

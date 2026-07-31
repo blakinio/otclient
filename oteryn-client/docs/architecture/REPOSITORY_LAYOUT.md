@@ -127,9 +127,9 @@ oteryn-client/
 | `account-session` | authenticated account lifetime | live game connection |
 | `world-directory` | characters, worlds, gameplay-channel descriptors | physical node assumptions |
 | `game-session` | one live game session lifecycle | wire-format details |
-| `transport` | bytes, connection health, framing primitives | domain events or UI |
-| `protocol-core` | adapter interfaces and validated shared types | Canary/Oteryn constants |
-| `protocol-canary` | exact Canary encode/decode | UI and domain storage |
+| `transport` | one bounded non-reconnecting TCP connection, explicit timeouts/cancellation, directional frame limits, partial I/O and stable transport errors | DNS policy, credentials, protocol constants, reconnect loops, domain events or UI |
+| `protocol-core` | bounded checked binary reader/writer helpers, trailing-data policy and closed protocol errors | Canary/Oteryn constants, sockets, credentials or domain ownership |
+| `protocol-canary` | exact-version Canary adapters consuming shared lifecycle/domain contracts; W7 currently exposes evidence-gated Current admission outcomes only | raw application sockets/credentials, UI, domain storage, gameplay/map decoding, reconnect or compatibility claims without exact evidence |
 | `protocol-oteryn` | native Oteryn encode/decode | UI and domain storage |
 | `game-domain` | typed commands, events, identifiers and pure rules | sockets, GPU, widgets |
 | `game-simulation` | mutable session state and deterministic systems | rendering backend |
@@ -150,6 +150,8 @@ oteryn-client/
 `test-support` is physically under `crates/` because it is a reusable library package, but it declares architecture category `tool`. It may consume reviewed lower contracts for tests and must never become a runtime service locator.
 
 The W7 Identity implementation keeps producer-specific DTOs inside `platform`. `identity` consumes that boundary plus the merged `account-session`, `world-directory` and `game-session` contracts. Raw OAuth, ticket and Gateway values never become new public domain types. The synchronous service is designed to run on an application-owned worker thread; it does not own a runtime thread or async executor.
+
+The W7 Canary entry implementation keeps generic bounded TCP ownership in `transport`, generic checked binary helpers in `protocol-core`, and exact source facts/outcome mapping in `protocol-canary`. It consumes the merged `game-session` and `world-directory` contracts; the production Current wire path is disabled before network and credential handoff until approved transcript/RSA/deployment evidence exists. Synthetic fixtures are deliberately not Canary bytes.
 
 `apps/client` is the concrete `app` package. Its current W5 boundary composes deterministic shell state with the single `oteryn-renderer` surface owner on the main thread. Protocol, game/domain rendering, feature composition, assets, UI and persistence remain absent.
 
@@ -210,7 +212,13 @@ platform
 game-domain / simulation / world-storage / render-types
 └── foundation
 
-protocol-canary / protocol-oteryn
+protocol-canary
+├── transport
+├── protocol-core
+├── game-session/world-directory entry contracts
+└── foundation when a generic primitive is required
+
+protocol-oteryn
 ├── protocol-core
 ├── game-domain contracts
 └── foundation when a generic primitive is required

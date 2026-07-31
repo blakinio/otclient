@@ -17,9 +17,7 @@ mod windows_shell {
     use winit::application::ApplicationHandler;
     use winit::dpi::LogicalSize;
     use winit::event::{Ime, WindowEvent};
-    use winit::event_loop::{
-        ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy,
-    };
+    use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
     use winit::window::{Window, WindowId};
 
     const PROCESS_GENERATION: ProcessGeneration = ProcessGeneration::new(1);

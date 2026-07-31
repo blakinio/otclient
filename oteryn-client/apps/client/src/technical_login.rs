@@ -101,7 +101,10 @@ impl Display for TechnicalLoginError {
                 write!(formatter, "technical login requires explicit {field}")
             }
             Self::InvalidConfiguration(field) => {
-                write!(formatter, "technical login configuration {field} is invalid")
+                write!(
+                    formatter,
+                    "technical login configuration {field} is invalid"
+                )
             }
             Self::Runtime(error) => Display::fmt(error, formatter),
         }
@@ -148,7 +151,8 @@ impl TechnicalLoginConfig {
             }
         }
 
-        let authorization_base = required_string(AUTHORIZATION_BASE, ConfigField::AuthorizationBase)?;
+        let authorization_base =
+            required_string(AUTHORIZATION_BASE, ConfigField::AuthorizationBase)?;
         let gateway_base = required_string(GATEWAY_BASE, ConfigField::GatewayBase)?;
         let public_client_id = required_string(PUBLIC_CLIENT_ID, ConfigField::PublicClientId)?;
         let world_id = WorldId::new(required_i64(WORLD_ID, ConfigField::WorldId)?)
@@ -164,14 +168,11 @@ impl TechnicalLoginConfig {
         let connect_timeout = required_duration(CONNECT_TIMEOUT, ConfigField::ConnectTimeout)?;
         let read_timeout = required_duration(READ_TIMEOUT, ConfigField::ReadTimeout)?;
         let write_timeout = required_duration(WRITE_TIMEOUT, ConfigField::WriteTimeout)?;
-        let transport = TransportConfig::new(
-            connect_timeout,
-            read_timeout,
-            write_timeout,
-            4_096,
-            4_096,
-        )
-        .map_err(|_| TechnicalLoginError::InvalidConfiguration(ConfigField::ConnectTimeout))?;
+        let transport =
+            TransportConfig::new(connect_timeout, read_timeout, write_timeout, 4_096, 4_096)
+                .map_err(|_| {
+                    TechnicalLoginError::InvalidConfiguration(ConfigField::ConnectTimeout)
+                })?;
 
         PlatformEndpoints::new(&authorization_base, &gateway_base).map_err(|_| {
             TechnicalLoginError::InvalidConfiguration(ConfigField::AuthorizationBase)
@@ -182,9 +183,7 @@ impl TechnicalLoginConfig {
             "/callback".to_owned(),
             callback_timeout,
         )
-        .map_err(|_| {
-            TechnicalLoginError::InvalidConfiguration(ConfigField::AuthorizationBase)
-        })?;
+        .map_err(|_| TechnicalLoginError::InvalidConfiguration(ConfigField::AuthorizationBase))?;
         UreqTransport::new(http_timeout)
             .map_err(|_| TechnicalLoginError::InvalidConfiguration(ConfigField::HttpTimeout))?;
 
@@ -208,9 +207,7 @@ fn required_string(name: &str, field: ConfigField) -> Result<String, TechnicalLo
         Ok(value) if !value.is_empty() => Ok(value),
         Ok(_) => Err(TechnicalLoginError::InvalidConfiguration(field)),
         Err(env::VarError::NotPresent) => Err(TechnicalLoginError::MissingConfiguration(field)),
-        Err(env::VarError::NotUnicode(_)) => {
-            Err(TechnicalLoginError::InvalidConfiguration(field))
-        }
+        Err(env::VarError::NotUnicode(_)) => Err(TechnicalLoginError::InvalidConfiguration(field)),
     }
 }
 
@@ -267,17 +264,15 @@ impl TechnicalLoginController {
         let config = self.config.clone();
         let identity_clock = self.clock.clone();
         let selection = TechnicalSelection::new(config.character_id, config.world_id, None);
-        self.runtime.start_authentication(
-            selection,
-            move |attempt_id, cancellation| {
+        self.runtime
+            .start_authentication(selection, move |attempt_id, cancellation| {
                 let result = run_identity(&config, identity_clock, cancellation);
                 notifier(TechnicalWorkerSignal {
                     attempt_id,
                     stage: TechnicalWorkerStage::Identity,
                 });
                 result
-            },
-        )?;
+            })?;
         Ok(())
     }
 
@@ -339,15 +334,12 @@ impl TechnicalLoginController {
             .cloned()
             .ok_or(TechnicalLoginError::Runtime(RuntimeError::NoActiveAttempt))?;
         let transport = self.config.transport;
-        self.runtime.start_connection(
-            move |mut lifecycle, attempt_id, cancellation, clock| {
+        self.runtime
+            .start_connection(move |mut lifecycle, attempt_id, cancellation, clock| {
                 let result = (|| -> Result<SessionEntered, EntryFailure> {
-                    let request = lifecycle
-                        .request()
-                        .cloned()
-                        .ok_or_else(|| {
-                            EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
-                        })?;
+                    let request = lifecycle.request().cloned().ok_or_else(|| {
+                        EntryFailure::for_kind(EntryFailureKind::InvariantViolation)
+                    })?;
                     let mut adapter = CanaryEntryAdapter::new(transport);
                     match adapter.connect(&request, &cancellation) {
                         Ok(()) => match adapter.enter_session(
@@ -371,8 +363,7 @@ impl TechnicalLoginController {
                     stage: TechnicalWorkerStage::Admission,
                 });
                 (lifecycle, result)
-            },
-        )?;
+            })?;
         Ok(())
     }
 }

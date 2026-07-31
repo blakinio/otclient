@@ -5,7 +5,7 @@ Required compiled platform: Windows x86-64 MSVC
 
 ## Scope
 
-The workspace contains fourteen bounded members:
+The workspace contains seventeen bounded members:
 
 ```text
 apps/client
@@ -16,15 +16,18 @@ crates/foundation
 crates/game-session
 crates/identity
 crates/platform
+crates/protocol-canary
+crates/protocol-core
 crates/renderer
 crates/test-support
+crates/transport
 crates/world-directory
 tests/security/auth
 tools/architecture-check
 tools/asset-compiler
 ```
 
-`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-account-session`, `oteryn-world-directory` and `oteryn-game-session` are the sole W7 shared entry-contract producer packages. `oteryn-platform` owns strict bounded OAuth, Game Login Ticket and Gateway protocol-v1 HTTP/DTO boundaries. `oteryn-identity` owns CSPRNG PKCE, the pre-bound dynamic loopback callback and one synchronous generation-safe bootstrap transaction. `oteryn-identity-security-tests` is a synthetic-only `tool` package proving the cross-crate security boundary. `oteryn-asset-types` owns the normalized synthetic schema-v1 IDs, metadata and deterministic pack contract. `oteryn-asset-compiler` is an offline `tool` package that consumes that contract and safely compiles constrained original/synthetic fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. Canary transport/protocol, domain/game rendering, product UI, asset runtime and extension host remain absent.
+`oteryn-client` is the bounded Windows application shell and composes one main-thread renderer surface owner. `oteryn-renderer` owns deterministic surface lifecycle plus the exact DX12 instance/surface/adapter/device/queue and one constant clear/present path. `oteryn-foundation` provides standard-library-only technical generations, monotonic time, explicit cancellation ownership and primitive-specific errors. `oteryn-diagnostics` provides bounded structured and redacted diagnostic contracts. `oteryn-test-support` is a test-only `tool` crate composing those merged contracts into deterministic timelines, technical contexts and classified event fixtures. `oteryn-account-session`, `oteryn-world-directory` and `oteryn-game-session` are the sole W7 shared entry-contract producer packages. `oteryn-platform` owns strict bounded OAuth, Game Login Ticket and Gateway protocol-v1 HTTP/DTO boundaries. `oteryn-identity` owns CSPRNG PKCE, the pre-bound dynamic loopback callback and one synchronous generation-safe bootstrap transaction. `oteryn-identity-security-tests` is a synthetic-only `tool` package proving the cross-crate security boundary. `oteryn-asset-types` owns the normalized synthetic schema-v1 IDs, metadata and deterministic pack contract. `oteryn-asset-compiler` is an offline `tool` package that consumes that contract and safely compiles constrained original/synthetic fixtures. `oteryn-architecture-check` validates workspace metadata and declared dependency categories. `oteryn-transport` owns bounded non-reconnecting TCP connection mechanics, `oteryn-protocol-core` owns generic bounded binary helpers, and `oteryn-protocol-canary` owns the exact-evidence-gated Current admission boundary. Real Canary wire admission, domain/game rendering, product UI, asset runtime and extension host remain absent.
 
 Product crates are created only by the first work package that delivers observable behavior in their owning workstream. Empty placeholder crates are prohibited.
 
@@ -83,6 +86,8 @@ Known categories are defined by the architecture checker and follow the accepted
 The current `app` package depends directly on foundation/diagnostics, exact `winit 0.30.13` and the Windows-only `oteryn-renderer` composition contract; `oteryn-test-support` is dev-only. GPU ownership remains inside `oteryn-renderer`; the app must not absorb protocol, feature, persistence or direct Win32 responsibilities.
 
 `oteryn-platform` may depend on the merged ENTRY contracts and `foundation`; it terminates raw producer DTOs and must not own browser state, application orchestration, Canary wire, UI or deployment defaults. `oteryn-identity` may depend on `platform`, the merged ENTRY contracts and `foundation`; none of those lower packages may depend back on Identity.
+
+`oteryn-transport` depends only on `foundation`. `oteryn-protocol-core` has no product or external dependency. `oteryn-protocol-canary` may depend on `transport`, `protocol-core`, the merged W7 `game-session`/`world-directory` contracts and `foundation`; those lower packages must never depend back on the adapter. Application code must not receive the adapter's raw socket or credential.
 
 Adding or changing a category is an architecture-policy change. Update the checker, synthetic positive/negative fixtures, architecture/workstream documentation and module catalogue in one focused PR.
 
@@ -182,6 +187,14 @@ Consumers must use exact producer merge `9ecc43a4465f6565bc1c12ea61f170a96edcbe3
 - one synchronous authorization-code -> ticket -> Gateway bootstrap attempt with generation/cancellation checks between stages.
 
 Passwords, password fallback, embedded browsers, async runtimes, global service locators, credential persistence, Canary packets and hidden production defaults are prohibited. The OAuth refresh token is discarded in W7, and ticket issuance is never automatically retried because the producer revokes the associated token family. Deployed client ID, exact URLs, TLS/network state, interactive Windows browser return and real cross-repository E2E remain external evidence gates.
+
+## W7 Canary Current transport and admission contract
+
+`oteryn-transport` owns one bounded synchronous TCP connection to an already-resolved endpoint. It requires explicit non-zero connect/read/write timeouts, directional frame limits and caller-owned cancellation; handles partial reads/writes; exposes deterministic state and closed non-secret errors; and provides no resolver, daemon, reconnect loop or raw socket escape.
+
+`oteryn-protocol-core` owns bounded checked little-endian integer, exact-byte and `u16` UTF-8 string helpers plus explicit trailing-data policy and closed parse/encode errors. It contains no Canary constants or lifecycle types.
+
+`oteryn-protocol-canary` consumes exact shared ENTRY merge `9ecc43a4465f6565bc1c12ea61f170a96edcbe35` and records Current source revision `95b276db311cf6e9acd58b847f1fb0ca6697b137`. It exposes only `connect`, `enter_session`, `cancel` and `close` responsibilities plus shared lifecycle results/stable admission classifications. Original synthetic fixtures test bounded ownership and parsing only. Production Current RSA/XTEA/sequence/compression admission is disabled before network and credential handoff until approved exact transcript/key/deployment evidence and one controlled Rust entry through the ordered `0x0F` marker exist. Map/gameplay decoding, reconnect and channel relog are excluded.
 
 ## Diagnostics crate contract
 

@@ -16,7 +16,7 @@ created: 2026-07-31T18:59:00+02:00
 updated: 2026-07-31
 required_base_commit: 227958e3fb33a3cf1a18b0b6da011290c2877cd2
 last_verified_commit: 227958e3fb33a3cf1a18b0b6da011290c2877cd2
-related_pr: none
+related_pr: 120
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260731-rust-client-post-w7-audit.md
   - oteryn-client/docs/audits/post-w7/**
@@ -72,8 +72,8 @@ phase: G-aggregation-complete
 session_id: audit-main-20260731-001
 exact_main: 227958e3fb33a3cf1a18b0b6da011290c2877cd2
 branch: docs/OTC2-20260731-rust-client-post-w7-audit
-head: f08ad7c2c37ae58582205c216deeb6421eb0c153
-pr: none
+head: 6ddd563e90ce5d87f9d64e5f4baad83c917a3cb8
+pr: 120
 evidence_cut: main@227958e3fb33a3cf1a18b0b6da011290c2877cd2
 completed_domains:
   - live preflight

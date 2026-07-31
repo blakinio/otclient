@@ -1,6 +1,4 @@
-use super::{
-    AdmissionExchange, CanaryAdmissionOutcome, GameEntryRequest,
-};
+use super::{AdmissionExchange, CanaryAdmissionOutcome, GameEntryRequest};
 use oteryn_foundation::CancellationToken;
 use oteryn_game_session::AdmissionCredential;
 use oteryn_protocol_core::{
@@ -62,27 +60,25 @@ impl SyntheticScript {
             return AdmissionExchange::Outcome(CanaryAdmissionOutcome::CharacterRejected);
         }
         if credential.expose_secret() != self.expected_credential {
-            return AdmissionExchange::Outcome(
-                CanaryAdmissionOutcome::CredentialExpiredOrConsumed,
-            );
+            return AdmissionExchange::Outcome(CanaryAdmissionOutcome::CredentialExpiredOrConsumed);
         }
         match self.decision {
             SyntheticDecision::Entered => AdmissionExchange::Entered,
             SyntheticDecision::AdmissionDenied => {
                 AdmissionExchange::Outcome(CanaryAdmissionOutcome::AdmissionDenied)
             }
-            SyntheticDecision::CredentialExpiredOrConsumed => AdmissionExchange::Outcome(
-                CanaryAdmissionOutcome::CredentialExpiredOrConsumed,
-            ),
+            SyntheticDecision::CredentialExpiredOrConsumed => {
+                AdmissionExchange::Outcome(CanaryAdmissionOutcome::CredentialExpiredOrConsumed)
+            }
             SyntheticDecision::CharacterRejected => {
                 AdmissionExchange::Outcome(CanaryAdmissionOutcome::CharacterRejected)
             }
             SyntheticDecision::ProtocolMismatch => {
                 AdmissionExchange::Outcome(CanaryAdmissionOutcome::ProtocolMismatch)
             }
-            SyntheticDecision::ClientOrAssetMismatch => AdmissionExchange::Outcome(
-                CanaryAdmissionOutcome::ClientOrAssetMismatch,
-            ),
+            SyntheticDecision::ClientOrAssetMismatch => {
+                AdmissionExchange::Outcome(CanaryAdmissionOutcome::ClientOrAssetMismatch)
+            }
             SyntheticDecision::ConnectionLost => {
                 AdmissionExchange::Outcome(CanaryAdmissionOutcome::ConnectionLost)
             }

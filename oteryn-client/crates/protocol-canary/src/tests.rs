@@ -1,6 +1,6 @@
 use super::synthetic::{
-    SYNTHETIC_ACCEPTED, SYNTHETIC_CHALLENGE, SYNTHETIC_DENIED, SyntheticDecision,
-    SyntheticScript, parse_transcript, success_transcript, write_frame,
+    SYNTHETIC_ACCEPTED, SYNTHETIC_CHALLENGE, SYNTHETIC_DENIED, SyntheticDecision, SyntheticScript,
+    parse_transcript, success_transcript, write_frame,
 };
 use super::*;
 use oteryn_account_session::AccountSessionId;
@@ -236,9 +236,11 @@ fn wrong_character_is_rejected_without_secret_text() -> Result<(), Box<dyn Error
     );
     assert_eq!(attempts.load(Ordering::SeqCst), 1);
     assert!(!format!("{adapter:?}").contains("original-synthetic-credential"));
-    assert!(!CanaryAdmissionOutcome::CharacterRejected
-        .to_string()
-        .contains("original-synthetic-credential"));
+    assert!(
+        !CanaryAdmissionOutcome::CharacterRejected
+            .to_string()
+            .contains("original-synthetic-credential")
+    );
     Ok(())
 }
 
@@ -282,10 +284,7 @@ fn expired_and_consumed_credentials_fail_before_network_attempt() -> Result<(), 
         ),
     );
     let source = CancellationSource::new();
-    let request = expired
-        .request()
-        .ok_or("missing expired request")?
-        .clone();
+    let request = expired.request().ok_or("missing expired request")?.clone();
     expired_adapter.connect(&request, &source.token())?;
     assert_eq!(
         expired_adapter.enter_session(
@@ -378,8 +377,8 @@ fn synthetic_transcript_accepts_only_ordered_bounded_entry() -> Result<(), Proto
 }
 
 #[test]
-fn synthetic_transcript_rejects_malformed_truncated_oversized_and_invalid_text(
-) -> Result<(), ProtocolError> {
+fn synthetic_transcript_rejects_malformed_truncated_oversized_and_invalid_text()
+-> Result<(), ProtocolError> {
     assert_eq!(
         parse_transcript(&[5, 0, SYNTHETIC_CHALLENGE], 64),
         Err(ProtocolError::new(ProtocolErrorKind::Truncated))

@@ -356,9 +356,7 @@ impl Drop for TcpTransport {
 
 fn validate_frame_length(length: usize, maximum: usize) -> Result<(), TransportError> {
     if length == 0 {
-        return Err(TransportError::new(
-            TransportErrorKind::InvalidFrameLength,
-        ));
+        return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
     }
     if length > maximum {
         return Err(TransportError::new(TransportErrorKind::FrameTooLarge));
@@ -474,9 +472,7 @@ mod tests {
         let source = CancellationSource::new();
         let mut transport = TcpTransport::new(test_config()?);
         transport.connect(endpoint, &source.token())?;
-        let server = accept
-            .join()
-            .map_err(|_| "TCP accept thread panicked")??;
+        let server = accept.join().map_err(|_| "TCP accept thread panicked")??;
         Ok((transport, server))
     }
 
@@ -511,10 +507,7 @@ mod tests {
 
         server.write_all(b"ab")?;
         server.write_all(b"cd")?;
-        assert_eq!(
-            transport.read_exact_bounded(4, &source.token())?,
-            b"abcd"
-        );
+        assert_eq!(transport.read_exact_bounded(4, &source.token())?, b"abcd");
 
         transport.write_all_bounded(b"synthetic", &source.token())?;
         let mut received = [0_u8; 9];
@@ -529,9 +522,7 @@ mod tests {
         let source = CancellationSource::new();
         assert_eq!(
             transport.read_exact_bounded(0, &source.token()),
-            Err(TransportError::new(
-                TransportErrorKind::InvalidFrameLength
-            ))
+            Err(TransportError::new(TransportErrorKind::InvalidFrameLength))
         );
         assert_eq!(
             transport.write_all_bounded(&vec![0_u8; 1025], &source.token()),

@@ -165,27 +165,25 @@ impl CanaryAdmissionOutcome {
             Self::AdmissionDenied => Some(EntryFailure::for_kind(
                 EntryFailureKind::ServerAdmissionDenied,
             )),
-            Self::CredentialExpiredOrConsumed => Some(EntryFailure::for_kind(
-                EntryFailureKind::CredentialRejected,
-            )),
+            Self::CredentialExpiredOrConsumed => {
+                Some(EntryFailure::for_kind(EntryFailureKind::CredentialRejected))
+            }
             Self::CharacterRejected => Some(EntryFailure::selected_entry_unavailable(
                 DirectorySubject::Character,
             )),
-            Self::ProtocolMismatch | Self::RealAdmissionUnavailable => Some(
-                EntryFailure::for_kind(EntryFailureKind::ProtocolMismatch),
-            ),
+            Self::ProtocolMismatch | Self::RealAdmissionUnavailable => {
+                Some(EntryFailure::for_kind(EntryFailureKind::ProtocolMismatch))
+            }
             Self::ClientOrAssetMismatch => Some(EntryFailure::for_kind(
                 EntryFailureKind::AssetClientCompatibilityMismatch,
             )),
-            Self::ConnectionLost => Some(EntryFailure::for_kind(
-                EntryFailureKind::TransportFailure,
-            )),
-            Self::Cancelled => Some(EntryFailure::for_kind(
-                EntryFailureKind::SafeCancellation,
-            )),
-            Self::InvalidState => Some(EntryFailure::for_kind(
-                EntryFailureKind::InvariantViolation,
-            )),
+            Self::ConnectionLost => {
+                Some(EntryFailure::for_kind(EntryFailureKind::TransportFailure))
+            }
+            Self::Cancelled => Some(EntryFailure::for_kind(EntryFailureKind::SafeCancellation)),
+            Self::InvalidState => {
+                Some(EntryFailure::for_kind(EntryFailureKind::InvariantViolation))
+            }
         }
     }
 }
@@ -319,11 +317,7 @@ impl CanaryEntryAdapter {
             return CanaryAdmissionOutcome::RealAdmissionUnavailable;
         }
         if cancellation.is_cancelled() {
-            let outcome = record_outcome(
-                lifecycle,
-                attempt_id,
-                CanaryAdmissionOutcome::Cancelled,
-            );
+            let outcome = record_outcome(lifecycle, attempt_id, CanaryAdmissionOutcome::Cancelled);
             self.close();
             return outcome;
         }
@@ -349,13 +343,13 @@ impl CanaryEntryAdapter {
         };
 
         let final_outcome = match self.exchange(&request, &credential, cancellation) {
-            AdmissionExchange::Entered => match lifecycle.session_entered(attempt_id, clock.now()) {
-                Ok(entered) => CanaryAdmissionOutcome::SessionEntered(entered),
-                Err(failure) => outcome_from_entry_failure(failure),
-            },
-            AdmissionExchange::Outcome(outcome) => {
-                record_outcome(lifecycle, attempt_id, outcome)
+            AdmissionExchange::Entered => {
+                match lifecycle.session_entered(attempt_id, clock.now()) {
+                    Ok(entered) => CanaryAdmissionOutcome::SessionEntered(entered),
+                    Err(failure) => outcome_from_entry_failure(failure),
+                }
             }
+            AdmissionExchange::Outcome(outcome) => record_outcome(lifecycle, attempt_id, outcome),
         };
         drop(credential);
         self.close();
@@ -399,18 +393,19 @@ impl CanaryEntryAdapter {
         cancellation: &CancellationToken,
     ) -> AdmissionExchange {
         match &mut self.mode {
-            AdmissionMode::EvidenceBlocked => AdmissionExchange::Outcome(
-                CanaryAdmissionOutcome::RealAdmissionUnavailable,
-            ),
-            #[cfg(test)]
-            AdmissionMode::Synthetic(script) => {
-                script.exchange(request, credential, cancellation)
+            AdmissionMode::EvidenceBlocked => {
+                AdmissionExchange::Outcome(CanaryAdmissionOutcome::RealAdmissionUnavailable)
             }
+            #[cfg(test)]
+            AdmissionMode::Synthetic(script) => script.exchange(request, credential, cancellation),
         }
     }
 
     #[cfg(test)]
-    fn with_synthetic(transport_config: TransportConfig, script: synthetic::SyntheticScript) -> Self {
+    fn with_synthetic(
+        transport_config: TransportConfig,
+        script: synthetic::SyntheticScript,
+    ) -> Self {
         Self {
             state: CanaryConnectionState::Idle,
             transport_config,

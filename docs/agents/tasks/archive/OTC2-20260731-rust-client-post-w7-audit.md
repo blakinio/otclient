@@ -12,12 +12,12 @@ branch: docs/OTC2-20260731-rust-client-post-w7-audit
 archive_branch: docs/OTC2-20260731-archive-rust-client-post-w7-audit
 base_branch: main
 created: 2026-07-31T18:59:00+02:00
-updated: 2026-08-01T00:02:00+02:00
+updated: 2026-08-01T00:08:00+02:00
 completed: 2026-08-01T00:02:00+02:00
 required_base_commit: 227958e3fb33a3cf1a18b0b6da011290c2877cd2
 last_verified_commit: 97c4f7a1d32adac15ba0d0e0436097f477c1bb30
 related_pr: 120
-archive_pr: pending
+archive_pr: 121
 owned_paths: []
 modules_touched:
   - audit evidence only
@@ -50,6 +50,7 @@ The durable audit set is:
 - validator input head: `7c74c8b1801296a4f4788f0d69cb27c353476fe4`;
 - validated corrected branch head: `7642f58feb6f810da0921efb5ab19aa0eb25bbb7`;
 - audit merge commit: `97c4f7a1d32adac15ba0d0e0436097f477c1bb30` / PR #120;
+- archive PR: #121;
 - ready-state CI run `30668806296`: `CI / Required` success;
 - W7 Rust Client run `30647931191`: success;
 - Windows job `91213890051`: success with 139 ordinary tests;
@@ -72,11 +73,11 @@ This audit lane is complete and archived. No implementation authorization was gr
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-01T00:02:00+02:00
+updated_at: 2026-08-01T00:08:00+02:00
 head: 97c4f7a1d32adac15ba0d0e0436097f477c1bb30
 branch: main
 pr: 120
-archive_pr: pending
+archive_pr: 121
 status: archived
 phase: close
 final_result: VALIDATED_WITH_CORRECTIONS

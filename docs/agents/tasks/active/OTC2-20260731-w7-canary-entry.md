@@ -11,7 +11,7 @@ workstream: transport-protocol-canary
 parallel_wave: OTERYN-W7-TECHNICAL-LOGIN
 parallel_lane: W7-CANARY-ENTRY
 parallel_lane_state: active
-phase: implement
+phase: validate
 session_id: chat-github-20260731-w7-canary-entry-1
 session_role: implementer
 session_rotation_count: 0
@@ -23,18 +23,18 @@ context_score: 10
 estimate_confidence: medium
 decomposition_decision: phased
 decomposition_reason: one cohesive producer/consumer task with isolated implementation, workspace integration, exact-head validation and separate closure phases
-validation_level: component
-heavy_validation_runs: 1
+validation_level: focused
+heavy_validation_runs: 2
 heavy_validation_result: failed
-first_relevant_error: cargo fmt --all --check reported formatting-only diffs in the three owned Rust crates
+first_relevant_error: non-test Clippy found a test-only success variant plus request, credential and cancellation parameters unused in the production evidence-blocked exchange
 stale_takeover_count: 0
 human_interruptions: 0
-lease_expires_at: 2026-07-31T10:50:00+02:00
+lease_expires_at: 2026-07-31T11:00:00+02:00
 branch: feat/OTC2-20260731-w7-canary-entry
 base_branch: main
 created: 2026-07-31T09:12:00+02:00
-updated: 2026-07-31T10:05:00+02:00
-last_verified_commit: "a8e05a638a5b7730874e6c0c6e811255d50cbc9f"
+updated: 2026-07-31T10:08:00+02:00
+last_verified_commit: "117f2022bb6207c658766012d2de4cc7f2949c84"
 required_base_commit: "9ecc43a4465f6565bc1c12ea61f170a96edcbe35"
 current_main_commit: "e891baac5f56d3706ade502645320bc33db5642f"
 risk: high
@@ -97,8 +97,10 @@ Implement the smallest bounded Rust TCP transport and Canary Current-profile adm
 - Canary/Platform remained read-only.
 - Workspace members and generated lockfile contain exactly the three new local packages; a guarded CI bootstrap verified no external package version/checksum change and was removed from the branch.
 - `cargo metadata --locked` passed on Windows merge-head CI.
-- `cargo deny check` passed.
-- Exact `rustfmt` output was applied only to owned Rust sources; its temporary guarded workflow was removed.
+- `cargo deny check` passed twice.
+- `cargo fmt --all --check` passed after exact rustfmt output was applied and the temporary formatter workflow was removed.
+- Focused Clippy repair now compiles the synthetic success exchange only under `cfg(test)` and keeps production fail-closed.
+- A dedicated test now proves a second `enter_session` call returns `InvalidState` without incrementing the synthetic network-attempt counter.
 
 ## OBSERVED
 
@@ -123,32 +125,33 @@ Implement the smallest bounded Rust TCP transport and Canary Current-profile adm
 
 ```yaml
 policy_version: 2
-updated_at: 2026-07-31T10:05:00+02:00
-head: a8e05a638a5b7730874e6c0c6e811255d50cbc9f
+updated_at: 2026-07-31T10:08:00+02:00
+head: 117f2022bb6207c658766012d2de4cc7f2949c84
 current_main: e891baac5f56d3706ade502645320bc33db5642f
 branch: feat/OTC2-20260731-w7-canary-entry
 pr: 113
 status: in_progress
-phase: implement
+phase: validate
 session_role: implementer
 execution_mode: chat-github
 context_pressure: high
 context_growth: stable
 context_score: 10
 decomposition_decision: phased
-validation_level: component
-heavy_validation_runs: 1
+validation_level: focused
+heavy_validation_runs: 2
 heavy_validation_result: failed
-first_relevant_error: formatting-only diff; exact rustfmt output now committed
-last_completed_step: generated guarded Cargo.lock, passed locked metadata and cargo-deny, applied rustfmt, removed both temporary workflows, and adopted execution policy v2
+first_relevant_error: production Clippy saw test-only exchange code; cfg split committed in 36c080a9 and duplicate-use test committed in 117f2022
+last_completed_step: isolated test-only admission success from production, preserved fail-closed production behavior, and added duplicate-use rejection before a second exchange
 proven:
   - exact merged W7 entry contracts are reused without substitutes
   - real admission fails closed before network and credential handoff
   - external dependency resolution did not change
+  - locked metadata, formatting and cargo-deny pass on merge-head CI
 unknown:
-  - first Clippy/compiler/test result after formatting
+  - focused Clippy/test result after cfg split
 blockers:
   - W7-BLOCK-REAL-RUST-E2E
   - W7-BLOCK-DEPLOYMENT-EVIDENCE
-next_action: Observe the new merge-head CI against main e891baac, repair the first Clippy/compiler/test failure with focused changes, then restack the final branch on exact current main.
+next_action: Inspect the current merge-head CI, repair only the first remaining focused compiler/test error, then update shared catalogue/matrix/changelog and restack on exact current main.
 ```

@@ -1,0 +1,59 @@
+name: W7 Format Bootstrap
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260731-w7-canary-entry
+    paths:
+      - oteryn-client/crates/protocol-canary/src/**
+      - oteryn-client/crates/protocol-core/src/**
+      - oteryn-client/crates/transport/src/**
+      - .github/workflows/w7-format-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260731-w7-canary-entry
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Install pinned rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+          rustup default 1.94.0
+
+      - name: Format W7 crates
+        working-directory: oteryn-client
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all
+
+      - name: Commit formatting only
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only)"
+          if [ -z "$changed" ]; then
+            exit 0
+          fi
+          while IFS= read -r path; do
+            case "$path" in
+              oteryn-client/crates/protocol-canary/src/*.rs|oteryn-client/crates/protocol-core/src/*.rs|oteryn-client/crates/transport/src/*.rs) ;;
+              *) echo "unexpected formatted path: $path" >&2; exit 1 ;;
+            esac
+          done <<< "$changed"
+          git add oteryn-client/crates/protocol-canary/src oteryn-client/crates/protocol-core/src oteryn-client/crates/transport/src
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "style(rust): format W7 transport and protocol crates"
+          git push origin HEAD:feat/OTC2-20260731-w7-canary-entry

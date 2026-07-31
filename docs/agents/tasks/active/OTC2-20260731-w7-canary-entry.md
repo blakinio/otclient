@@ -10,7 +10,7 @@ track: greenfield-rust
 workstream: transport-protocol-canary
 parallel_wave: OTERYN-W7-TECHNICAL-LOGIN
 parallel_lane: W7-CANARY-ENTRY
-parallel_lane_state: active
+parallel_lane_state: validating
 phase: validate
 session_id: chat-github-20260731-w7-canary-entry-1
 session_role: implementer
@@ -20,21 +20,21 @@ execution_reason: GitHub DNS and Cargo are unavailable in the sandbox; bounded r
 context_pressure: high
 context_growth: stable
 context_score: 10
-estimate_confidence: medium
+estimate_confidence: high
 decomposition_decision: phased
 decomposition_reason: one cohesive producer/consumer task with isolated implementation, workspace integration, exact-head validation and separate closure phases
-validation_level: focused
-heavy_validation_runs: 2
-heavy_validation_result: failed
-first_relevant_error: non-test Clippy found a test-only success variant plus request, credential and cancellation parameters unused in the production evidence-blocked exchange
+validation_level: full
+heavy_validation_runs: 3
+heavy_validation_result: passed
+first_relevant_error: none on code checkpoint 39bdf7c32cfb1a3e6a5986bedf40012f7e04f1e5; later generic failures were limited to temporary documentation workflow syntax and all temporary files are absent from the final diff
 stale_takeover_count: 0
 human_interruptions: 0
-lease_expires_at: 2026-07-31T11:00:00+02:00
+lease_expires_at: 2026-07-31T11:30:00+02:00
 branch: feat/OTC2-20260731-w7-canary-entry
 base_branch: main
 created: 2026-07-31T09:12:00+02:00
-updated: 2026-07-31T10:08:00+02:00
-last_verified_commit: "117f2022bb6207c658766012d2de4cc7f2949c84"
+updated: 2026-07-31T10:45:00+02:00
+last_verified_commit: "7526e6ce295812ab6ac6cbb66a2da2aca4455fb1"
 required_base_commit: "9ecc43a4465f6565bc1c12ea61f170a96edcbe35"
 current_main_commit: "e891baac5f56d3706ade502645320bc33db5642f"
 risk: high
@@ -81,52 +81,51 @@ cross_repo_tasks: []
 
 Implement the smallest bounded Rust TCP transport and Canary Current-profile admission boundary that consumes one moved shared W7 credential and returns only shared entry lifecycle outcomes. Gameplay is excluded.
 
-# Durable implementation
+# Delivered
 
-- `oteryn-protocol-core`: bounded checked integer/string reader and writer; malformed, truncated, oversized, invalid UTF-8 and trailing-data rejection; closed stable errors; deterministic malformed-input tests.
-- `oteryn-transport`: one already-resolved TCP endpoint; explicit connect/read/write timeouts; cancellation; checked directional frame limits; partial I/O; deterministic terminal state; no resolver, daemon, reconnect or socket exposure; timeout/close/redaction tests.
-- `oteryn-protocol-canary`: exact Current metadata; shared W7 lifecycle/credential/result consumption; `connect`, `enter_session`, `cancel`, `close`; test-only original synthetic exchange; production mode blocked before network and credential handoff until exact fixture/E2E evidence exists.
+- `oteryn-protocol-core`: bounded checked integer/string reader and writer; malformed, truncated, oversized, invalid UTF-8 and trailing-data rejection; closed stable errors; deterministic arbitrary bounded malformed-input tests.
+- `oteryn-transport`: one already-resolved TCP endpoint; explicit connect/read/write timeouts; caller-owned cancellation; checked directional frame limits; partial I/O; deterministic terminal state; no resolver, daemon, reconnect or socket exposure; timeout, abrupt-close and redaction tests.
+- `oteryn-protocol-canary`: exact Current metadata; shared W7 lifecycle/credential/result consumption; application-facing `connect`, `enter_session`, `cancel`, `close`; original test-only synthetic exchange; production mode blocked before network and credential handoff until exact fixture/E2E evidence exists.
 - Exact contract: `oteryn-client/contracts/canary/current-entry/README.md`.
 - PASS/OBSERVED/UNKNOWN/BLOCKED evidence: `oteryn-client/docs/research/technical-login/W7_CANARY_ENTRY_EVIDENCE.md`.
+- Workspace, lockfile, module catalogue, validation matrix, changelog, repository layout and workspace operations documentation are integrated.
 
-# Evidence checkpoint
+# PASS
 
-## PASS
+- Exact producer contracts are reused; no substitute identifier, credential, lifecycle, failure or result type exists.
+- Canary and Platform remained read-only.
+- Final PR diff contains exactly 18 intended code/test/task/contract/evidence/shared-integration paths and no temporary workflow or script.
+- Guarded lock generation added only the three local packages and preserved every external package version and checksum.
+- Windows merge-head Rust CI passed `cargo metadata --locked`, `cargo fmt --all --check`, full workspace Clippy with warnings denied, all workspace tests, architecture policy and cargo-deny on code checkpoint `39bdf7c32cfb1a3e6a5986bedf40012f7e04f1e5` against current `main` `e891baac5f56d3706ade502645320bc33db5642f`.
+- Duplicate second use is rejected before a second synthetic network attempt.
+- Production admission fails closed before network I/O and before credential handoff.
 
-- Producer merge and ownership are exact; no substitute identifiers, credential, lifecycle, failure or result type exists.
-- Canary/Platform remained read-only.
-- Workspace members and generated lockfile contain exactly the three new local packages; a guarded CI bootstrap verified no external package version/checksum change and was removed from the branch.
-- `cargo metadata --locked` passed on Windows merge-head CI.
-- `cargo deny check` passed twice.
-- `cargo fmt --all --check` passed after exact rustfmt output was applied and the temporary formatter workflow was removed.
-- Focused Clippy repair now compiles the synthetic success exchange only under `cfg(test)` and keeps production fail-closed.
-- A dedicated test now proves a second `enter_session` call returns `InvalidState` without incrementing the synthetic network-attempt counter.
-
-## OBSERVED
+# OBSERVED
 
 - Selected Canary revision `95b276db311cf6e9acd58b847f1fb0ca6697b137`: release `3.6.1`, profile `current`, client/protocol `1525`.
 - Current uses server-first challenge, OpenTibia RSA bootstrap, XTEA, sequence checksum, modern padding and official compression signaling.
-- Source bounds: 65,500 network-message bytes, 4,096 input bytes, 30 character-name bytes.
+- Source bounds are 65,500 network-message bytes, 4,096 input bytes and 30 character-name bytes.
 - One-shot token is hash-stored, default 60-second TTL, account/character/profile bound and burned before field validation.
 - Ordered technical success prefix is `0x17 -> 0x1A -> 0xEF -> 0x0A -> 0x0F`; map follows and is excluded.
 
-## UNKNOWN
+# UNKNOWN
 
-- Exact production client-version string, asset hash and approved RSA material/encoding provenance.
+- Exact production client-version string and asset hash.
+- Approved exact RSA public-key material and encoding provenance for the Rust client.
 - Provenance-safe complete Current transcript bytes.
 - Named deployment revisions/configuration and one controlled real Rust admission through `0x0F`.
 
-## BLOCKED
+# BLOCKED
 
 - `W7-BLOCK-REAL-RUST-E2E`: production adapter remains fail-closed until exact configured Rust admission evidence exists.
-- `W7-BLOCK-DEPLOYMENT-EVIDENCE`: no DNS/TLS/firewall/secret-manager/deployment claim.
+- `W7-BLOCK-DEPLOYMENT-EVIDENCE`: no DNS, TLS, firewall, secret-manager or deployment claim.
 
 # Validation checkpoint
 
 ```yaml
 policy_version: 2
-updated_at: 2026-07-31T10:08:00+02:00
-head: 117f2022bb6207c658766012d2de4cc7f2949c84
+updated_at: 2026-07-31T10:45:00+02:00
+head: 7526e6ce295812ab6ac6cbb66a2da2aca4455fb1
 current_main: e891baac5f56d3706ade502645320bc33db5642f
 branch: feat/OTC2-20260731-w7-canary-entry
 pr: 113
@@ -138,20 +137,20 @@ context_pressure: high
 context_growth: stable
 context_score: 10
 decomposition_decision: phased
-validation_level: focused
-heavy_validation_runs: 2
-heavy_validation_result: failed
-first_relevant_error: production Clippy saw test-only exchange code; cfg split committed in 36c080a9 and duplicate-use test committed in 117f2022
-last_completed_step: isolated test-only admission success from production, preserved fail-closed production behavior, and added duplicate-use rejection before a second exchange
+validation_level: full
+heavy_validation_runs: 3
+heavy_validation_result: passed
+first_relevant_error: none in the intended code or final diff
+last_completed_step: integrated all required shared documentation, removed every temporary helper and confirmed the exact 18-path final diff
 proven:
   - exact merged W7 entry contracts are reused without substitutes
-  - real admission fails closed before network and credential handoff
+  - production admission fails closed before network and credential handoff
   - external dependency resolution did not change
-  - locked metadata, formatting and cargo-deny pass on merge-head CI
+  - full Windows workspace Rust validation passed on the current merge-head
 unknown:
-  - focused Clippy/test result after cfg split
+  - exact-head result after final restack commit
 blockers:
   - W7-BLOCK-REAL-RUST-E2E
   - W7-BLOCK-DEPLOYMENT-EVIDENCE
-next_action: Inspect the current merge-head CI, repair only the first remaining focused compiler/test error, then update shared catalogue/matrix/changelog and restack on exact current main.
+next_action: Create a backup ref, restack the task branch on exact current main e891baac5f56d3706ade502645320bc33db5642f, then run final exact-head CI and complete diff/review inspection.
 ```

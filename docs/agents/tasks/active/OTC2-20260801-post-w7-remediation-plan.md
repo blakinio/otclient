@@ -9,8 +9,8 @@ phase: discovery-and-plan
 branch: docs/OTC2-20260801-post-w7-remediation-plan
 base_branch: main
 created: 2026-08-01T00:30:20+02:00
-updated: 2026-08-01T00:34:13+02:00
-last_verified_commit: "675e658b291067ea95f2ebfe981521b893240425"
+updated: 2026-08-01T00:39:01+02:00
+last_verified_commit: "1b8e52b56c6ea3a1f59531801f95478aee254dca"
 required_base_commit: "d23edd0a8395deb586e2b93dd1954bb175243dc4"
 risk: high
 related_pr: "#122"
@@ -114,9 +114,10 @@ The first launch is only `R1-SECRET`. No other remediation worker is pre-claimed
 - current architecture, technical-login lifecycle and affected manifests/source paths reviewed;
 - current required CI workflow commands verified;
 - plan changed-path scope limited to exactly this task, one plan and one prompt;
-- draft planning PR #122 opened from the exact base with three declared changed paths.
+- draft planning PR #122 opened from the exact base with three declared changed paths;
+- reviewed planning head `1b8e52b56c6ea3a1f59531801f95478aee254dca` passed Rust Client run `30670414135` and repository CI run `30670414251`.
 
-No heavy runtime gate is required by task scope. The planning PR still requires all checks emitted for its exact final head.
+No heavy runtime gate is required by task scope. The final task-record-only head must pass the same emitted checks before readiness/merge.
 
 # Blockers and deferred decisions
 
@@ -130,8 +131,8 @@ No heavy runtime gate is required by task scope. The planning PR still requires 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T00:34:13+02:00
-head: 675e658b291067ea95f2ebfe981521b893240425
+updated_at: 2026-08-01T00:39:01+02:00
+head: 1b8e52b56c6ea3a1f59531801f95478aee254dca
 branch: docs/OTC2-20260801-post-w7-remediation-plan
 pr: 122
 status: validating
@@ -155,6 +156,7 @@ proven:
   - No remediation implementation, manifest, lockfile, workflow, rule or test path changed.
   - Exactly one first-worker prompt exists.
   - Draft PR #122 contains exactly the three declared planning paths.
+  - Reviewed head 1b8e52b56c6ea3a1f59531801f95478aee254dca passed Rust Client and repository CI.
 derived:
   - R3-ASSET-OPEN and R4-ARCH-POLICY are source-path independent but final integration is not currently safe in parallel.
   - PR #23 does not block isolated Rust source work but blocks concurrent shared-document edits.
@@ -164,8 +166,8 @@ unknown:
 conflicts:
   - PR #23 owns docs/agents/MODULE_CATALOG.md and docs/agents/CHANGELOG.md; no planning diff overlaps them.
 first_failure:
-  marker: exact-head-ci-pending
-  evidence: Rust Client run 30670283618 and CI run 30670283787 were still in progress for predecessor head 675e658b291067ea95f2ebfe981521b893240425.
+  marker: final-task-head-ci-pending
+  evidence: The task-record validation commit follows reviewed head 1b8e52b56c6ea3a1f59531801f95478aee254dca and requires a fresh exact-head run.
 rejected_hypotheses:
   - One task per finding can be accepted without overlap analysis.
   - R1-SECRET and R2-SHUTDOWN should be combined to reduce task count.
@@ -185,16 +187,16 @@ validation:
   - command: PR #122 exact changed-file review
     result: PASS
     evidence: exactly three declared Markdown paths and no implementation/shared-path overlap.
-  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC2-20260801-post-w7-remediation-plan.md --require-checkpoint
-    result: NOT_RUN
-    evidence: checkpoint was conformed to GOVERNANCE_CONTRACT.json; exact-head CI will execute repository validation.
-  - command: Rust Client exact-head workflow
-    result: NOT_RUN
-    evidence: final-head workflow result not yet available.
-  - command: repository CI exact-head workflow
-    result: NOT_RUN
-    evidence: final-head workflow result not yet available.
+  - command: checkpoint contract validation against tools/agents/checkpoint.py and GOVERNANCE_CONTRACT.json
+    result: PASS
+    evidence: exact required fields, status, evidence partitions, validation entries and compactness limits were verified.
+  - command: Rust Client workflow on reviewed head 1b8e52b56c6ea3a1f59531801f95478aee254dca
+    result: PASS
+    evidence: run 30670414135 passed Windows workspace and Supply Chain.
+  - command: repository CI on reviewed head 1b8e52b56c6ea3a1f59531801f95478aee254dca
+    result: PASS
+    evidence: run 30670414251 passed including CI / Required.
 blockers:
-  - Exact-head planning PR CI and review gate are not yet recorded.
-next_action: Complete the exact-head required CI and review gate for planning PR #122.
+  - Final task-record-only exact-head CI and review gate are not yet recorded.
+next_action: Complete the final task-record-only exact-head CI and review gate for planning PR #122.
 ```

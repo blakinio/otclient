@@ -34,19 +34,20 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: Generate lockfile and formatting
+      - name: Generate exact lockfile and formatting
         run: |
           cargo generate-lockfile
+          cargo update -p xcursor --precise 0.3.10
           cargo fmt --all
 
       - name: Commit generated outputs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock crates/app-runtime tests/integration/technical-login
+          git add Cargo.lock apps/client crates/app-runtime tests/integration/technical-login
           if git diff --cached --quiet; then
             echo "No generated changes"
             exit 0
           fi
-          git commit -m "chore(rust): generate W7 login lockfile and formatting"
+          git commit -m "chore(rust): generate exact W7 login outputs"
           git push origin HEAD:feat/OTC2-20260731-w7-login-e2e-final

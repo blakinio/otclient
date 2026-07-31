@@ -9,11 +9,11 @@ phase: discovery-and-plan
 branch: docs/OTC2-20260801-post-w7-remediation-plan
 base_branch: main
 created: 2026-08-01T00:30:20+02:00
-updated: 2026-08-01T00:30:20+02:00
-last_verified_commit: "e196c475bb2bb377ae961d511153c6a95d08e4e2"
+updated: 2026-08-01T00:31:51+02:00
+last_verified_commit: "10baa1e6eb6364e8975501aeb3eac88e2384e4bc"
 required_base_commit: "d23edd0a8395deb586e2b93dd1954bb175243dc4"
 risk: high
-related_pr: pending
+related_pr: "#122"
 depends_on:
   - OTC2-20260731-rust-client-post-w7-audit
   - audit PR #120 merge 97c4f7a1ec581072940ae87697b80a4ec9c53921
@@ -113,7 +113,8 @@ The first launch is only `R1-SECRET`. No other remediation worker is pre-claimed
 - canonical audit report and validator result cross-checked;
 - current architecture, technical-login lifecycle and affected manifests/source paths reviewed;
 - current required CI workflow commands verified;
-- plan changed-path scope limited to exactly this task, one plan and one prompt.
+- plan changed-path scope limited to exactly this task, one plan and one prompt;
+- draft planning PR #122 opened from the exact base with three declared changed paths.
 
 No heavy runtime gate is required by task scope. The planning PR still requires all checks emitted for its exact final head.
 
@@ -129,11 +130,11 @@ No heavy runtime gate is required by task scope. The planning PR still requires 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T00:30:20+02:00
-head: e196c475bb2bb377ae961d511153c6a95d08e4e2
+updated_at: 2026-08-01T00:31:51+02:00
+head: 10baa1e6eb6364e8975501aeb3eac88e2384e4bc
 branch: docs/OTC2-20260801-post-w7-remediation-plan
-pr: pending
-status: active
+pr: 122
+status: validating
 proven:
   - Exact main d23edd0a8395deb586e2b93dd1954bb175243dc4 contains merged audit and archive lifecycle state.
   - All four confirmed MEDIUM findings have one exact package disposition.
@@ -142,9 +143,10 @@ proven:
   - R4-ARCH-POLICY must classify all 29 categories and normal/build/dev edges explicitly while preserving the current 19-member graph.
   - No remediation implementation, manifest, lockfile, workflow, rule or test path changed.
   - Exactly one first-worker prompt exists.
+  - Draft PR #122 contains exactly the declared planning paths at the recorded head.
 conflicts:
   - PR #23 owns docs/agents/MODULE_CATALOG.md and docs/agents/CHANGELOG.md; no planning diff overlaps them.
 blockers:
   - exact-head planning PR CI and review gate not yet recorded
-next_action: Complete the exact-head required CI and review gate for the planning PR.
+next_action: Complete the exact-head required CI and review gate for planning PR #122.
 ```

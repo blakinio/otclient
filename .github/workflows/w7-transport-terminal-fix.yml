@@ -1,0 +1,45 @@
+name: W7 Transport Terminal Fix
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260731-w7-canary-entry
+    paths:
+      - .github/workflows/w7-transport-terminal-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260731-w7-canary-entry
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Apply and format focused fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/w7_transport_terminal_fix.py
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+          rustup default 1.94.0
+          cd oteryn-client
+          cargo fmt --all
+          cd ..
+          test "$(git diff --name-only)" = "oteryn-client/crates/transport/src/lib.rs"
+          git diff --check
+
+      - name: Commit focused fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add oteryn-client/crates/transport/src/lib.rs
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "fix(transport): close after incomplete frame I/O"
+          git push origin HEAD:feat/OTC2-20260731-w7-canary-entry

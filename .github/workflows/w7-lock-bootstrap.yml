@@ -1,0 +1,98 @@
+name: W7 Lock Bootstrap
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260731-w7-canary-entry
+    paths:
+      - oteryn-client/Cargo.toml
+      - oteryn-client/crates/protocol-canary/Cargo.toml
+      - oteryn-client/crates/protocol-core/Cargo.toml
+      - oteryn-client/crates/transport/Cargo.toml
+      - .github/workflows/w7-lock-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260731-w7-canary-entry
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.94.0 --profile minimal
+          rustup default 1.94.0
+          rustc --version | grep -E '^rustc 1\.94\.0 '
+
+      - name: Generate local-package lock entries
+        working-directory: oteryn-client
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock Cargo.lock.before
+          cargo metadata --format-version 1 >/dev/null
+          python - <<'PY'
+          import pathlib
+          import tomllib
+
+          root = pathlib.Path('.')
+          before = tomllib.loads((root / 'Cargo.lock.before').read_text(encoding='utf-8'))
+          after = tomllib.loads((root / 'Cargo.lock').read_text(encoding='utf-8'))
+
+          def external(packages):
+              return sorted(
+                  (
+                      package['name'],
+                      package['version'],
+                      package.get('source'),
+                      package.get('checksum'),
+                  )
+                  for package in packages
+                  if package.get('source') is not None
+              )
+
+          if external(before['package']) != external(after['package']):
+              raise SystemExit('external Cargo package resolution changed')
+
+          before_local = {
+              package['name']
+              for package in before['package']
+              if package.get('source') is None
+          }
+          after_local = {
+              package['name']
+              for package in after['package']
+              if package.get('source') is None
+          }
+          expected = {
+              'oteryn-protocol-canary',
+              'oteryn-protocol-core',
+              'oteryn-transport',
+          }
+          if after_local - before_local != expected:
+              raise SystemExit(
+                  f'unexpected local packages: {sorted(after_local - before_local)!r}'
+              )
+          PY
+          rm Cargo.lock.before
+
+      - name: Commit generated lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --short --untracked-files=all | grep -v '^ M oteryn-client/Cargo.lock$' || true)"
+          git add oteryn-client/Cargo.lock
+          git diff --cached --quiet && exit 0
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "chore(rust): generate W7 workspace lock entries"
+          git push origin HEAD:feat/OTC2-20260731-w7-canary-entry

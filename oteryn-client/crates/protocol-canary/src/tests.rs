@@ -160,6 +160,39 @@ fn successful_synthetic_admission_returns_shared_session_entered() -> Result<(),
 }
 
 #[test]
+fn duplicate_use_is_rejected_before_second_network_attempt() -> Result<(), Box<dyn Error>> {
+    let (mut lifecycle, attempt_id, clock) =
+        lifecycle_with_credential("Synthetic Character", Duration::from_secs(5))?;
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let mut adapter = CanaryEntryAdapter::with_synthetic(
+        transport_config()?,
+        script(
+            "Synthetic Character",
+            SyntheticDecision::Entered,
+            Arc::clone(&attempts),
+        ),
+    );
+    let source = CancellationSource::new();
+    let request = lifecycle
+        .request()
+        .ok_or("missing synthetic request")?
+        .clone();
+    adapter.connect(&request, &source.token())?;
+    assert!(matches!(
+        adapter.enter_session(&mut lifecycle, attempt_id, &clock, &source.token()),
+        CanaryAdmissionOutcome::SessionEntered(_)
+    ));
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+
+    assert_eq!(
+        adapter.enter_session(&mut lifecycle, attempt_id, &clock, &source.token()),
+        CanaryAdmissionOutcome::InvalidState
+    );
+    assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
 fn all_required_server_outcomes_are_typed_and_terminal() -> Result<(), Box<dyn Error>> {
     for (decision, expected) in [
         (

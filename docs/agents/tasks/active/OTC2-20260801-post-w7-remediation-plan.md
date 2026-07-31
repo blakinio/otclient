@@ -9,8 +9,8 @@ phase: discovery-and-plan
 branch: docs/OTC2-20260801-post-w7-remediation-plan
 base_branch: main
 created: 2026-08-01T00:30:20+02:00
-updated: 2026-08-01T00:31:51+02:00
-last_verified_commit: "10baa1e6eb6364e8975501aeb3eac88e2384e4bc"
+updated: 2026-08-01T00:34:13+02:00
+last_verified_commit: "675e658b291067ea95f2ebfe981521b893240425"
 required_base_commit: "d23edd0a8395deb586e2b93dd1954bb175243dc4"
 risk: high
 related_pr: "#122"
@@ -126,15 +126,26 @@ No heavy runtime gate is required by task scope. The planning PR still requires 
 - no detached/forced worker termination is permitted for `R2-SHUTDOWN`.
 - no current member manifest migration is authorized for `R4-ARCH-POLICY`.
 
-# Checkpoint
+## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T00:31:51+02:00
-head: 10baa1e6eb6364e8975501aeb3eac88e2384e4bc
+updated_at: 2026-08-01T00:34:13+02:00
+head: 675e658b291067ea95f2ebfe981521b893240425
 branch: docs/OTC2-20260801-post-w7-remediation-plan
 pr: 122
 status: validating
+context_routes:
+  - AGENTS.md and docs/agents/AGENTS.md
+  - docs/agents/EXECUTION_PROTOCOL.md
+  - docs/agents/CONTEXT_HANDOFF.md
+  - oteryn-client/docs/audits/post-w7/main-audit-report.md
+  - oteryn-client/docs/audits/post-w7/VALIDATOR_PACKET.md
+  - oteryn-client/docs/audits/post-w7/REMEDIATION_PLAN.md
+owned_paths:
+  - docs/agents/tasks/active/OTC2-20260801-post-w7-remediation-plan.md
+  - oteryn-client/docs/audits/post-w7/REMEDIATION_PLAN.md
+  - oteryn-client/docs/agents/prompts/NEXT_POST_W7_SECRET_LIFECYCLE_AGENT.md
 proven:
   - Exact main d23edd0a8395deb586e2b93dd1954bb175243dc4 contains merged audit and archive lifecycle state.
   - All four confirmed MEDIUM findings have one exact package disposition.
@@ -143,10 +154,47 @@ proven:
   - R4-ARCH-POLICY must classify all 29 categories and normal/build/dev edges explicitly while preserving the current 19-member graph.
   - No remediation implementation, manifest, lockfile, workflow, rule or test path changed.
   - Exactly one first-worker prompt exists.
-  - Draft PR #122 contains exactly the declared planning paths at the recorded head.
+  - Draft PR #122 contains exactly the three declared planning paths.
+derived:
+  - R3-ASSET-OPEN and R4-ARCH-POLICY are source-path independent but final integration is not currently safe in parallel.
+  - PR #23 does not block isolated Rust source work but blocks concurrent shared-document edits.
+unknown:
+  - Exact safe Windows opened-object primitive for R3-ASSET-OPEN.
+  - Whether R1-SECRET needs a new dependency after allocation inventory.
 conflicts:
   - PR #23 owns docs/agents/MODULE_CATALOG.md and docs/agents/CHANGELOG.md; no planning diff overlaps them.
+first_failure:
+  marker: exact-head-ci-pending
+  evidence: Rust Client run 30670283618 and CI run 30670283787 were still in progress for predecessor head 675e658b291067ea95f2ebfe981521b893240425.
+rejected_hypotheses:
+  - One task per finding can be accepted without overlap analysis.
+  - R1-SECRET and R2-SHUTDOWN should be combined to reduce task count.
+  - Another pre-open metadata check completely fixes OTC2-AUD-003.
+  - A partial denylist is equivalent to a complete architecture policy.
+changed_paths:
+  - docs/agents/tasks/active/OTC2-20260801-post-w7-remediation-plan.md
+  - oteryn-client/docs/audits/post-w7/REMEDIATION_PLAN.md
+  - oteryn-client/docs/agents/prompts/NEXT_POST_W7_SECRET_LIFECYCLE_AGENT.md
+validation:
+  - command: live main, merged audit/archive, open PR and active ownership reconciliation
+    result: PASS
+    evidence: main d23edd0a8395deb586e2b93dd1954bb175243dc4; PRs 120/121 merged; open PRs 23/48/97 inspected.
+  - command: canonical audit report and validator cross-check
+    result: PASS
+    evidence: both authoritative files confirm exactly four MEDIUM findings OTC2-AUD-001 through OTC2-AUD-004.
+  - command: PR #122 exact changed-file review
+    result: PASS
+    evidence: exactly three declared Markdown paths and no implementation/shared-path overlap.
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC2-20260801-post-w7-remediation-plan.md --require-checkpoint
+    result: NOT_RUN
+    evidence: checkpoint was conformed to GOVERNANCE_CONTRACT.json; exact-head CI will execute repository validation.
+  - command: Rust Client exact-head workflow
+    result: NOT_RUN
+    evidence: final-head workflow result not yet available.
+  - command: repository CI exact-head workflow
+    result: NOT_RUN
+    evidence: final-head workflow result not yet available.
 blockers:
-  - exact-head planning PR CI and review gate not yet recorded
+  - Exact-head planning PR CI and review gate are not yet recorded.
 next_action: Complete the exact-head required CI and review gate for planning PR #122.
 ```

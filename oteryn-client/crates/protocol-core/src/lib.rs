@@ -293,11 +293,7 @@ impl BoundedWriter {
     /// # Errors
     ///
     /// Rejects a string outside the field or output bounds.
-    pub fn write_u16_string(
-        &mut self,
-        value: &str,
-        max_bytes: usize,
-    ) -> Result<(), ProtocolError> {
+    pub fn write_u16_string(&mut self, value: &str, max_bytes: usize) -> Result<(), ProtocolError> {
         validate_limit(max_bytes)?;
         if value.len() > max_bytes {
             return Err(ProtocolError::new(ProtocolErrorKind::Oversized));

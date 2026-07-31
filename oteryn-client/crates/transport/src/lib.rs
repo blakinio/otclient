@@ -329,9 +329,10 @@ impl TcpTransport {
         result: Result<(), TransportError>,
     ) -> Result<(), TransportError> {
         if let Err(error) = result {
-            if error.kind() == TransportErrorKind::ConnectionLost {
-                self.close();
-            }
+            // Any error after frame I/O begins can leave the byte stream at an
+            // unknown frame boundary. Close terminally rather than permitting
+            // a caller to reuse a potentially desynchronized connection.
+            self.close();
             return Err(error);
         }
         Ok(())
@@ -552,6 +553,7 @@ mod tests {
             connected.read_exact_bounded(1, &connected_source.token()),
             Err(TransportError::new(TransportErrorKind::Cancelled))
         );
+        assert_eq!(connected.state(), ConnectionState::Closed);
         Ok(())
     }
 
@@ -563,6 +565,7 @@ mod tests {
             timed.read_exact_bounded(1, &source.token()),
             Err(TransportError::new(TransportErrorKind::Timeout))
         );
+        assert_eq!(timed.state(), ConnectionState::Closed);
         drop(server);
 
         let (mut closed, peer) = connected_pair()?;

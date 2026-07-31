@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260731-rust-client-post-w7-audit
-status: in_progress
+status: validation_pending
 task_kind: audit
 policy_version: 2
 implementation_authorized: false
 track: rust-client
 project_lane: otclient-v2
-phase: preflight
+phase: rotate
 execution_mode: codex
 context_pressure: high
 decomposition_decision: phased
 branch: docs/OTC2-20260731-rust-client-post-w7-audit
 base_branch: main
 created: 2026-07-31T18:59:00+02:00
-updated: 2026-07-31T19:15:00+02:00
+updated: 2026-07-31
 required_base_commit: 227958e3fb33a3cf1a18b0b6da011290c2877cd2
 last_verified_commit: 227958e3fb33a3cf1a18b0b6da011290c2877cd2
 related_pr: none
@@ -50,58 +50,76 @@ Perform a complete read-only implementation audit of the greenfield Rust client 
 
 # Evidence cut
 
-- repository: `blakinio/otclient`
-- exact `main`: `227958e3fb33a3cf1a18b0b6da011290c2877cd2`
-- W7 feature merge: `946063cd9c19ae1ae17726649bb4a0b9f21e6e32` / PR #118
-- W7 archive merge: `227958e3fb33a3cf1a18b0b6da011290c2877cd2` / PR #119
-- open PRs at cut: #97, #48, #23; all legacy/operational and none owns `oteryn-client/**`
-- local checkout: unavailable because the sandbox cannot resolve `github.com`; repository and CI evidence are inspected through the connected GitHub API
+- repository: `blakinio/otclient`;
+- exact `main`: `227958e3fb33a3cf1a18b0b6da011290c2877cd2`;
+- W7 feature merge: `946063cd9c19ae1ae17726649bb4a0b9f21e6e32` / PR #118;
+- W7 archive merge: `227958e3fb33a3cf1a18b0b6da011290c2877cd2` / PR #119;
+- tested PR merge ref: `38b656add027f8aa21bdc5bde51424347137256c`;
+- open PRs at cut: #97, #48, #23; none owns `oteryn-client/**`;
+- local checkout/Cargo: unavailable; exact repository CI used as execution evidence.
+
+# Durable reports
+
+- `oteryn-client/docs/audits/post-w7/OTC2-20260731-rust-client-post-w7-audit.md`;
+- `oteryn-client/docs/audits/post-w7/EVIDENCE_INDEX.md`;
+- `oteryn-client/docs/audits/post-w7/VALIDATOR_PACKET.md`.
 
 # Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-phase: A-live-preflight
+phase: G-aggregation-complete
 session_id: audit-main-20260731-001
 exact_main: 227958e3fb33a3cf1a18b0b6da011290c2877cd2
 branch: docs/OTC2-20260731-rust-client-post-w7-audit
-head: 227958e3fb33a3cf1a18b0b6da011290c2877cd2
+head: f08ad7c2c37ae58582205c216deeb6421eb0c153
 pr: none
 evidence_cut: main@227958e3fb33a3cf1a18b0b6da011290c2877cd2
 completed_domains:
-  - live repository state
-  - open PR inventory
-  - active task/ownership overlap check
-  - review-thread preflight
+  - live preflight
+  - governance and W1-W7 history
+  - workspace and dependency inventory
+  - architecture review
+  - correctness, lifecycle and security review
+  - tests, CI and supply-chain analysis
+  - claims-versus-evidence and readiness
+  - main report and validator packet
 finding_counts:
   critical: 0
   high: 0
-  medium: 0
-  low: 0
-  info: 0
+  medium: 4
+  low: 2
+  info: 1
 commands_summary:
-  - git ls-remote/clone: NOT_RUN; sandbox DNS failure, exit 128
-  - exact-main compare: PASS; main identical to 227958e3fb33a3cf1a18b0b6da011290c2877cd2
-  - main combined status: no status contexts returned
-  - main pull-request workflow runs: none returned for archive merge head
-first_relevant_failure: local checkout unavailable because github.com DNS resolution failed
+  - local git: FAIL exit 128; github.com DNS unavailable
+  - local Cargo commands: NOT_RUN; Cargo unavailable
+  - W7 CI run 30647931191: PASS; 139 ordinary tests
+  - W7 Supply Chain job 91213890169: PASS
+first_relevant_failure: local git could not resolve github.com
 proven:
-  - main is exactly 227958e3fb33a3cf1a18b0b6da011290c2877cd2
-  - PR #119 is merged and archived W7-LOGIN-E2E after PR #118
-  - open PRs #97, #48 and #23 do not change oteryn-client/**
-  - no open PR has unresolved inline review threads
-  - no overlapping Rust-client task or lease was identified from live open PR/task records
-
+  - exact main and W7/archive history
+  - 19-member workspace and current direct manifest graph
+  - W1-W7 final heads have green Rust workflow evidence
+  - W7 metadata/fmt/Clippy/tests/architecture/cargo-deny passed
+  - current implementation and lockfile were unchanged by PR #119
+  - synthetic technical-login slice is implemented and production Canary fails closed
 derived:
-  - the audit can proceed as one phased task without implementation ownership conflict
+  - current manifest graph follows the normative direction
+  - the workspace is ready for bounded development but not production
 unknown:
-  - local cargo command results until a checkout-capable environment is available
-  - exhaustive main-branch active-directory enumeration because the connector exposes files by path rather than recursive directory listing
+  - real Canary wire and deployed Identity/Gateway compatibility
+  - interactive Windows and GPU/driver behavior
+  - production asset/legal and performance evidence
 conflicts:
-  - docs/agents/ACTIVE_WORK.md lists obsolete PRs #4 and #3 while live open PRs are #97, #48 and #23
+  - terminal secret-cleanup claim exceeds enforced lifetime behavior
+  - live governance state conflicts with stale indexes/evidence headers
+  - doctest claims conflict with executed workflow
 blockers:
-  - none for static/API/CI audit; local command execution is an evidence limitation
+  - current environment cannot spawn a fresh independent-validator session
 artifact_index:
-  - pending: oteryn-client/docs/audits/post-w7/
-next_action: Read MODULE_CATALOG.md and BUILD_TEST_MATRIX.md at the exact evidence cut.
+  - oteryn-client/docs/audits/post-w7/OTC2-20260731-rust-client-post-w7-audit.md
+  - oteryn-client/docs/audits/post-w7/EVIDENCE_INDEX.md
+  - oteryn-client/docs/audits/post-w7/VALIDATOR_PACKET.md
+  - external audit-artifacts ZIP retained by the main session
+next_action: Start a fresh independent-validator session using oteryn-client/docs/audits/post-w7/VALIDATOR_PACKET.md.
 ```

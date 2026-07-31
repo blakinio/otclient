@@ -56,7 +56,6 @@ impl Debug for WorkerEvent {
 
 pub(crate) struct OwnedWorker {
     pub(crate) kind: WorkerKind,
-    pub(crate) attempt_id: GameEntryAttemptId,
     pub(crate) cancellation: CancellationSource,
     pub(crate) handle: JoinHandle<WorkerEvent>,
 }

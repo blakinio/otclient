@@ -1,108 +1,77 @@
 # W7 Technical Login Application Integration Evidence
 
-Status: private fake-runtime implementation in progress  
+Status: repository/fake technical flow complete; external real-path evidence blocked  
 Lane: `W7-LOGIN-E2E`  
-Branch: `feat/OTC2-20260731-w7-login-e2e`  
-PR: #114
+Branch: `feat/OTC2-20260731-w7-login-e2e-final`  
+PR: #118
 
 ## Exact merged producers
 
 - W7 entry contract: `9ecc43a4465f6565bc1c12ea61f170a96edcbe35`;
-- entry lifecycle archive: `8dcd353d5a9f19fabccf49508c27074f7749e3cf`;
-- W7 Identity: `d66da47a33d6639876f3edda2b2c08709d1b7a5e`;
-- Identity lifecycle archive: `5ffda0f64821d2cf9de388faa6675c05fd99e9d1`.
+- W7 Identity/Platform: `d66da47a33d6639876f3edda2b2c08709d1b7a5e`;
+- W7 Canary entry: `4a193bdf10ac32a8a2d8dc12f31706c7d668c8f9`;
+- Canary lifecycle archive and launch base: `065a37bcc1eab752f2a5504ba58882c4c9a6e6c9`;
+- exact final restack main: `a43cf375dc25b95df790e515ca222bc80cae26e1`;
+- restack merge commit: `4696faa961ef73ce361e8fd82351e2acea3f01f8`.
 
-The final Canary producer commit is not recorded here until PR #113 and its separate lifecycle archive merge. No compatibility claim is derived from its draft head.
+## Delivered composition
 
-## Composition boundary
+`oteryn-app-runtime` owns only top-level orchestration. It allocates one non-zero attempt generation, runs Identity and admission in separately owned cancellable threads, accepts only producer-owned account/directory/credential values, validates the explicit selection, moves the lifecycle into the admission worker, joins every worker and restores the producer-owned lifecycle before exposing typed state.
 
-`oteryn-app-runtime` owns application orchestration only:
+`apps/client` preserves the existing `winit` window, renderer ownership and close ordering. Technical login is disabled unless `OTERYN_TECHNICAL_LOGIN=1` and every required endpoint, public OAuth client ID, world ID/host/port, character ID and timeout is explicitly supplied. No endpoint, password, client secret or credential has a production default. Identity/admission completions enter the event loop as generation-tagged user events; bounded `about_to_wait` polling handles completion races without performing browser, listener, HTTP or TCP work on the event-loop thread.
 
-1. allocate one non-zero `GameEntryAttemptId`;
-2. call merged `EntryLifecycle::begin_authentication`;
-3. run one injected Identity operation in an owned cancellable thread;
-4. accept only merged `AccountSessionId`, `AccountDirectorySnapshot` and `GameEntryCredential` values;
-5. validate the explicit typed development selection against the authoritative snapshot;
-6. move the credential exactly once through `EntryLifecycle::begin_connecting`;
-7. run one injected admission operation in an owned cancellable thread;
-8. call `EntryLifecycle::session_entered` only after the operation reports the exact admission marker;
-9. cancel and join all workers before dropping session-scoped state;
-10. return through `Closing -> LoggedOut` on disconnect or shutdown.
+Production `CanaryEntryAdapter` intentionally remains fail-closed before network and credential handoff because exact approved RSA/transcript/deployment evidence is absent. The application reports the resulting typed recoverable failure instead of claiming compatibility.
 
-No public Identity, directory, credential, transport or protocol type is created by this lane.
+## Automated fake-service evidence
 
-## Private fake matrix
+The workspace tests use only original synthetic values and exact merged producer APIs.
 
-| Scenario | Expected producer-owned outcome |
+| Scenario | Evidence |
 |---|---|
-| complete success | `LoggedOut -> Authenticating -> AccountReady -> DirectoryReady -> EntryRequested -> CredentialReady -> Connecting -> SessionEntered` |
-| second authentication while active | `RuntimeError::AuthenticationAlreadyActive` |
-| second connection while active | `RuntimeError::ConnectionAlreadyActive` |
-| stale completion | `EntryFailureKind::StaleAuthenticationTransaction` |
-| duplicate callback | `EntryFailureKind::DuplicateCallback` |
-| account session expiry | `EntryFailureKind::AccountSessionExpired` |
-| stale directory revision | `EntryFailureKind::DirectoryRevisionStale` |
-| selected character unavailable | `EntryFailureKind::SelectedEntryUnavailable` with `ChooseAnotherCharacter` |
-| expired credential | `EntryFailureKind::CredentialExpired` before admission |
-| consumed credential | second handoff rejected by merged lifecycle |
-| second attempt | a new attempt and fresh credential are required |
-| route/protocol mismatch | typed producer failure, no arbitrary server text |
-| Canary denial | `EntryFailureKind::ServerAdmissionDenied` |
-| transport timeout | `EntryFailureKind::TransportFailure` |
-| cancellation during authentication | cancellation source set, worker joined, `SafeCancellation` |
-| cancellation during connection | cancellation source set, worker joined, credential dropped |
-| shutdown during active phase | both worker slots cancelled/joined before lifecycle close |
-| redaction | no credential bytes in runtime `Debug`, typed failures or snapshots |
+| dynamic callback | fake binder assigns port `49152`; authorization URL and token request use that exact redirect URI |
+| strict Identity/Gateway bootstrap | merged `IdentityClient` executes authorization-code exchange, one Game Login Ticket request and one Gateway v1 request against bounded fake HTTP |
+| authoritative selection | merged directory validates character `17` belongs to world `9`; focused runtime test rejects an unknown character with `ChooseAnotherCharacter` |
+| one credential handoff | merged lifecycle exposes the synthetic credential once and rejects the second handoff as `CredentialAlreadyConsumed` |
+| ordered admission | private original marker sequence reaches `0x17 -> 0x1A -> 0xEF -> 0x0A -> 0x0F` before producer-owned `SessionEntered` |
+| fresh second attempt | runtime allocates attempt 2 only after attempt 1 is closed and accepts a distinct synthetic credential |
+| stale/duplicate callback | merged `AuthorizationTransaction` rejects duplicate completion and mismatched account generation |
+| cancellation/close | runtime cancels and joins an active worker, records `SafeCancellation`, then clears through `Closing -> LoggedOut` |
+| production fail-closed | merged Canary adapter returns `RealAdmissionUnavailable` while lifecycle remains `CredentialReady`; no network or credential handoff occurs |
+| redaction | runtime, worker event, HTTP request and adapter formatting contain no code, access token, ticket or session credential |
 
-Identity-specific wrong-state, stale/duplicate/path/peer/generation callback and strict Gateway malformed/oversized/trailing response cases are already owned and tested by merged W7 Identity. The final E2E test will invoke that exact service rather than duplicate its parser or public types.
+Merged Identity security tests additionally cover wrong path/peer/state, malformed or oversized callback, timeout, strict unknown/trailing/oversized Gateway responses, invalid identifiers/ports and world-character relationship failures. Merged Canary tests additionally cover bounded transport/parser errors, denial classifications, timeout, cancellation, abrupt close, expired/consumed/replayed credential and secret-free diagnostics. LOGIN-E2E consumes those exact contracts rather than duplicating public parsers or protocol types.
 
-Canary framing, denial, ordered admission prefix and transport timeout cases remain owned by PR #113. Final E2E will consume its exact merged interface and fixtures rather than create substitutes.
+## Validation
 
-## Evidence classification
+Exact feature head before final evidence/restack: `87ac50efc97b569712276666a30c8d671cc099b1`.
 
-### PASS
+- Rust Client run `30647012485`: success;
+  - locked metadata: PASS;
+  - `cargo fmt --all --check`: PASS;
+  - strict workspace Clippy with `-D warnings`: PASS;
+  - all workspace tests and doctests: PASS;
+  - architecture policy: PASS;
+  - cargo-deny supply chain: PASS.
+- repository CI run `30647013322`: success.
+- committed `Cargo.lock` retains the pre-existing external resolution, including `xcursor 0.3.10`; only local workspace package entries and dependency edges were generated.
+- no temporary workflow remains in the intended final diff.
 
-- exact ENTRY and Identity producer commits are merged and archived;
-- LOGIN-E2E task, branch and draft PR are unique and own disjoint paths;
-- the private runtime uses merged entry lifecycle and credential types;
-- worker ownership has explicit cancellation and `JoinHandle` joins;
-- runtime snapshots contain only typed non-secret state;
-- no shared Cargo/lockfile/document path or `apps/client` path was edited while PR #113 holds the lease.
+Final exact-head validation is repeated after the evidence and shared-document commits and before merge.
 
-These PASS items are source/diff evidence only until the crate enters the workspace and exact CI executes.
+## Explicit external blockers
 
-### OBSERVED
+### `W7-BLOCK-REAL-RUST-E2E`
 
-- existing Windows shell owns the `winit` window, renderer close ordering and one joined wake worker on merged main;
-- merged Identity owns system-browser launch and dynamic IPv4 loopback callback binding;
-- named interactive Windows application login has not yet been exercised by this lane.
+No deployed exact Identity, Gateway and Canary revisions, configured public client ID/issuer mapping or fresh controlled credential were available. No real browser return or Rust admission through `0x0F` was run, and no real compatibility claim is made.
 
-### BLOCKED
+### `W7-BLOCK-DEPLOYMENT-EVIDENCE`
 
-- final workspace registration, lockfile generation and full validation while PR #113 owns the serialized shared-path lease;
-- final `apps/client` integration until exact Canary feature and archive merges;
-- named real configured Identity -> Gateway -> Canary result without deployed endpoint/client/issuer evidence;
-- production deployment readiness;
-- arbitrary world/channel directory;
-- gameplay, map rendering/decoding, reconnect/resume and production assets.
+Repository access does not prove deployed TLS, DNS, firewall, hostname, secret-manager or runtime revision state. No production-readiness claim is made.
 
-## Final validation gate
+### Interactive Windows observation
 
-After exact Canary merge/archive and restack onto current main:
+Required Windows compilation is proven by CI, and the existing event-loop/renderer ownership is preserved by source and tests. A named interactive desktop observation of the window remaining responsive during configured login was unavailable in the worker environment and is not claimed.
 
-- `cargo metadata --locked`;
-- `cargo fmt --all --check`;
-- complete workspace Clippy with warnings denied;
-- all workspace tests and doctests;
-- architecture check;
-- `cargo deny check`;
-- Windows MSVC build on pinned Rust `1.94.0`;
-- repository required CI;
-- changed-file and full-diff review;
-- review-thread check;
-- named Windows launch/browser/callback smoke evidence when supported;
-- exact-head repetition after final restack.
+## Exclusions
 
-## Real-path boundary
-
-No production endpoint, credential, client secret, private capture or deployed revision is stored in the repository. Real technical mode must remain explicitly opt-in and non-secret. If exact deployed evidence is unavailable, the final record must preserve `W7-BLOCK-REAL-RUST-E2E` and make no real compatibility or production claim.
+No map-description decoding, gameplay state, inventory, chat, combat, reconnect/resume, channel switching, general native UI framework, credential persistence, production assets, updater/deployment code, password fallback, private capture or external-repository write is included.

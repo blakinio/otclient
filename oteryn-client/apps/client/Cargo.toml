@@ -14,7 +14,15 @@ oteryn-diagnostics = { version = "=0.1.0", path = "../../crates/diagnostics" }
 oteryn-foundation = { version = "=0.1.0", path = "../../crates/foundation" }
 
 [target.'cfg(windows)'.dependencies]
+oteryn-account-session = { version = "=0.1.0", path = "../../crates/account-session" }
+oteryn-app-runtime = { version = "=0.1.0", path = "../../crates/app-runtime" }
+oteryn-game-session = { version = "=0.1.0", path = "../../crates/game-session" }
+oteryn-identity = { version = "=0.1.0", path = "../../crates/identity" }
+oteryn-platform = { version = "=0.1.0", path = "../../crates/platform" }
+oteryn-protocol-canary = { version = "=0.1.0", path = "../../crates/protocol-canary" }
 oteryn-renderer = { version = "=0.1.0", path = "../../crates/renderer" }
+oteryn-transport = { version = "=0.1.0", path = "../../crates/transport" }
+oteryn-world-directory = { version = "=0.1.0", path = "../../crates/world-directory" }
 winit = "=0.30.13"
 
 [dev-dependencies]

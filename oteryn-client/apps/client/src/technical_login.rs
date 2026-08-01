@@ -8,11 +8,11 @@ impl TechnicalLoginController {
     }
 
     pub(crate) fn poll_shutdown(&mut self) -> Result<ShutdownProgress, TechnicalLoginError> {
-        Ok(self.runtime.poll_shutdown()?)
-    }
-
-    pub(crate) fn retains_worker(&self) -> bool {
-        self.runtime.has_active_worker()
+        let progress = self.runtime.poll_shutdown()?;
+        if progress == ShutdownProgress::Complete {
+            self.shutdown()?;
+        }
+        Ok(progress)
     }
 
     pub(crate) fn is_shutting_down(&self) -> bool {

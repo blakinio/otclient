@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref_name || github.event.pull_request.head.sha }}
       - name: Install pinned Rust toolchain
         shell: pwsh
         run: |
@@ -26,6 +28,19 @@ jobs:
         shell: pwsh
         working-directory: oteryn-client
         run: cargo generate-lockfile
+      - name: Commit generated lockfile
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          git add oteryn-client/Cargo.lock
+          if (git diff --cached --quiet) {
+            Write-Host 'Cargo.lock is already current.'
+            exit 0
+          }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'build(asset-compiler): regenerate capability lockfile'
+          git push origin "HEAD:${{ github.ref_name }}"
       - name: Upload generated lockfile
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

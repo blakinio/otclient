@@ -132,9 +132,19 @@ Repository CI run `30701845062`:
 - informational static analysis — PASS;
 - `CI / Required` job `91374318993` — PASS.
 
+Final documentation-evidence head `48b6bc1beab9ecca9a348c654e1201daedabeebb` also passed:
+
+- Rust Client run `30702367732`;
+- Windows job `91375505764` — PASS for locked metadata, rustfmt, strict Clippy, full workspace tests and real-workspace architecture validation;
+- Supply Chain job `91375505751` — PASS;
+- repository CI run `30702367776` — PASS;
+- `CI / Required` job `91375624461` — PASS;
+- exact changed-file review — the audit task and report only;
+- comments, review submissions and unresolved review threads — none.
+
 The Rust workflow does not pass `--all-features` to Clippy or workspace tests; this report therefore claims the exact current required ladder only. Cargo-deny does run with `--all-features`.
 
-Final documentation-head CI and review evidence will be appended before merge.
+The evidence-append commit changes this report only and must retain green status gates before merge.
 
 ## Live PR and ownership review
 

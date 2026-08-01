@@ -6,9 +6,7 @@ mod model;
 mod runtime;
 mod worker;
 
-pub use model::{
-    RuntimeError, RuntimeSnapshot, ShutdownProgress, TechnicalSelection, WorkerKind,
-};
+pub use model::{RuntimeError, RuntimeSnapshot, ShutdownProgress, TechnicalSelection, WorkerKind};
 pub use runtime::{MAX_RUNTIME_HISTORY, SHUTDOWN_OVERDUE_AFTER, TechnicalLoginRuntime};
 
 #[cfg(test)]

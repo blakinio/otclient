@@ -1,21 +1,21 @@
 ---
 task_id: OTC-20260802-agent-quality-closeout-v21
-status: implementing
+status: validating
 agent: "GPT-5.6 Thinking"
 track: agent-governance
 workstream: quality-closeout-v21
 parallel_wave: GOVERNANCE-V21
 parallel_lane: QUALITY-CLOSEOUT
-parallel_lane_state: implementing
+parallel_lane_state: validating
 coordinator_task: none
 branch: docs/agent-quality-closeout-v21-20260802
 base_branch: main
 created: 2026-08-02T00:20:00+02:00
-updated: 2026-08-02T00:20:00+02:00
-last_verified_commit: "62468b7ab1199761c052abd19d2d688ff6ea0a39"
+updated: 2026-08-02T00:24:00+02:00
+last_verified_commit: "78edb2f12d5346ae6e9c7f5981fc4bcd997e18ec"
 required_base_commit: "f4eb8eef601a90a9f660672911f3e914f5ffae94"
 risk: low
-related_pr: ""
+related_pr: "#162"
 depends_on: []
 integration_after: []
 owned_paths:
@@ -38,10 +38,10 @@ reuses:
   - existing checkpoint and archive lifecycle
 public_interfaces: []
 cross_repo_tasks:
-  - blakinio/canary
-  - blakinio/freqtrade
-  - blakinio/Oteryn-Platform
-  - blakinio/Otheryn
+  - blakinio/canary#1053
+  - blakinio/freqtrade#988
+  - blakinio/Oteryn-Platform#443
+  - blakinio/Otheryn#299
 performance_evidence:
   - documentation-only
 security_evidence:
@@ -67,12 +67,12 @@ Make outcome-based evals, trust boundaries, full-stack vertical slices, independ
 ```yaml
 checkpoint_version: 1
 policy_version: 2
-updated_at: 2026-08-02T00:20:00+02:00
-head: 62468b7ab1199761c052abd19d2d688ff6ea0a39
+updated_at: 2026-08-02T00:24:00+02:00
+head: 78edb2f12d5346ae6e9c7f5981fc4bcd997e18ec
 branch: docs/agent-quality-closeout-v21-20260802
-pr: none
-status: implementing
-phase: integrate
+pr: 162
+status: validating
+phase: validate
 session_id: chat-20260802-quality-v21
 session_role: coordinator
 execution_mode: chat
@@ -86,10 +86,11 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260802-agent-quality-closeout-v21.md
 proven:
   - The v2.1 contract exists and is mandatory in the handover.
+  - PR 162 owns the governance contract, handover integration, and task record.
 derived:
   - Future substantial work must pass the integrated quality and closeout gate.
 unknown:
-  - Exact-head CI results and PR number.
+  - Exact-head CI result after this PR binding update.
 conflicts: []
 changed_paths:
   - docs/agents/AGENT_QUALITY_AND_CLOSEOUT.md
@@ -97,5 +98,5 @@ changed_paths:
   - docs/agents/tasks/active/OTC-20260802-agent-quality-closeout-v21.md
 validation: []
 blockers: []
-next_action: open the governance PR, record its exact identity, and validate the final head
+next_action: verify exact-head CI for PR 162, then complete merge and archive gates
 ```

@@ -11,11 +11,11 @@ coordinator_task: none
 branch: docs/agent-closeout-vertical-slice-v21-20260802
 base_branch: main
 created: 2026-08-02T00:14:00+02:00
-updated: 2026-08-02T00:14:00+02:00
-last_verified_commit: "unknown"
-required_base_commit: "unknown"
+updated: 2026-08-02T00:24:00+02:00
+last_verified_commit: "05911d1530883c76b5351e6b38282f6e97167f57"
+required_base_commit: "99ebed0914e296268d32642000af6d71664cadd9"
 risk: low
-related_pr: ""
+related_pr: "#164"
 depends_on: []
 integration_after: []
 owned_paths:
@@ -38,10 +38,10 @@ reuses:
   - existing task lifecycle and CI gates
 public_interfaces: []
 cross_repo_tasks:
-  - blakinio/canary
-  - blakinio/freqtrade
-  - blakinio/Oteryn-Platform
-  - blakinio/Otheryn
+  - blakinio/canary#1054
+  - blakinio/freqtrade#989
+  - blakinio/Oteryn-Platform#445
+  - blakinio/Otheryn#301
 performance_evidence:
   - documentation-only
 security_evidence:

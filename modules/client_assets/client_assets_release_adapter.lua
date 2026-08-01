@@ -29,6 +29,46 @@ local function logWarning(message)
     end
 end
 
+local function configuredRepository()
+    local config = serviceConfig()
+    local repository = type(config) == 'table' and config.repository or nil
+    if type(repository) == 'string' and repository:match('^[%w_.-]+/[%w_.-]+$') then
+        return repository
+    end
+
+    local releasesUrl = type(config) == 'table' and config.releasesUrl or nil
+    if type(releasesUrl) == 'string' then
+        repository = releasesUrl:match('^https://api%.github%.com/repos/([^/]+/[^/]+)/releases')
+        if repository then
+            return repository
+        end
+    end
+
+    return 'dudantas/tibia-client'
+end
+
+local function configuredReleasesUrl()
+    local config = serviceConfig()
+    local releasesUrl = type(config) == 'table' and config.releasesUrl or nil
+    if type(releasesUrl) ~= 'string' or releasesUrl == '' then
+        releasesUrl = string.format('https://api.github.com/repos/%s/releases', configuredRepository())
+    end
+
+    if not releasesUrl:find('per_page=', 1, true) then
+        releasesUrl = releasesUrl .. (releasesUrl:find('?', 1, true) and '&' or '?') .. 'per_page=100'
+    end
+    return releasesUrl
+end
+
+local function isConfiguredReleaseDownloadUrl(url)
+    if type(url) ~= 'string' then
+        return false
+    end
+
+    local prefix = string.format('https://github.com/%s/releases/download/', configuredRepository()):lower()
+    return url:sub(1, #prefix):lower() == prefix
+end
+
 local function addGitHubApiHeaders()
     if type(HTTP.addCustomHeader) ~= 'function' or type(HTTP.removeCustomHeader) ~= 'function' then
         return false
@@ -91,6 +131,43 @@ local function rememberArchiveDigests(releases)
     return boundDigests, missingDigests
 end
 
+local function finishReleaseCatalog(data, err)
+    if not err and type(data) == 'table' then
+        data = Selector.prepareReleases(data)
+        local boundDigests, missingDigests = rememberArchiveDigests(data)
+        logInfo(string.format(
+            'Bound %d configured release archive SHA-256 digest(s); %d selected archive(s) lacked a digest.',
+            boundDigests,
+            missingDigests))
+    end
+    return data, err
+end
+
+local function requestReleaseCatalog(url, callback)
+    local headersAdded = addGitHubApiHeaders()
+    local responseHandled = false
+    local function finishHeaders()
+        if responseHandled then
+            return
+        end
+        responseHandled = true
+        if headersAdded then
+            removeGitHubApiHeaders()
+        end
+    end
+
+    local ok, result = pcall(originalGetJSON, url, function(data, err)
+        finishHeaders()
+        data, err = finishReleaseCatalog(data, err)
+        return callback(data, err)
+    end)
+    if not ok then
+        finishHeaders()
+        error(result, 0)
+    end
+    return result
+end
+
 local function verifyDownloadedArchive(path, expectedSha256)
     local ok, contents = pcall(function()
         return g_resources.readFileContents('/downloads/' .. tostring(path))
@@ -107,6 +184,29 @@ local function verifyDownloadedArchive(path, expectedSha256)
     return true
 end
 
+local function failMissingDigest(url, path, callback)
+    logWarning(string.format('Refusing configured release archive without an authoritative SHA-256 digest: %s.', tostring(url)))
+    return callback(path, nil, string.format(
+        'Configured client asset archive is missing an authoritative SHA-256 digest: %s.',
+        tostring(url)))
+end
+
+local function downloadVerified(url, path, callback, progressCallback, expectedSha256)
+    return originalDownload(url, path, function(downloadPath, checksum, err)
+        if err then
+            return callback(downloadPath, checksum, err)
+        end
+
+        local ok, hashError = verifyDownloadedArchive(downloadPath, expectedSha256)
+        if not ok then
+            return callback(downloadPath, checksum, hashError)
+        end
+
+        logInfo(string.format('Verified downloaded asset archive SHA-256 for %s.', url))
+        return callback(downloadPath, checksum, nil)
+    end, progressCallback)
+end
+
 function ClientAssetsReleaseAdapter.init()
     if wrappedGetJSON or wrappedDownload or not HTTP or type(HTTP.getJSON) ~= 'function' then
         return
@@ -117,66 +217,40 @@ function ClientAssetsReleaseAdapter.init()
         if not Selector.isConfiguredReleasesUrl(url, serviceConfig()) or type(callback) ~= 'function' then
             return originalGetJSON(url, callback)
         end
-
-        local headersAdded = addGitHubApiHeaders()
-        local responseHandled = false
-        local function finishHeaders()
-            if responseHandled then
-                return
-            end
-            responseHandled = true
-            if headersAdded then
-                removeGitHubApiHeaders()
-            end
-        end
-
-        local ok, result = pcall(originalGetJSON, url, function(data, err)
-            finishHeaders()
-            if not err and type(data) == 'table' then
-                data = Selector.prepareReleases(data)
-                local boundDigests, missingDigests = rememberArchiveDigests(data)
-                logInfo(string.format(
-                    'Bound %d configured release archive SHA-256 digest(s); %d selected archive(s) lacked a digest.',
-                    boundDigests,
-                    missingDigests))
-            end
-            return callback(data, err)
-        end)
-        if not ok then
-            finishHeaders()
-            error(result, 0)
-        end
-        return result
+        return requestReleaseCatalog(url, callback)
     end
     HTTP.getJSON = wrappedGetJSON
 
     if type(HTTP.download) == 'function' then
         originalDownload = HTTP.download
         wrappedDownload = function(url, path, callback, progressCallback)
-            local expectedSha256 = archiveSha256ByUrl[url]
-            if expectedSha256 == nil or type(callback) ~= 'function' then
+            if type(callback) ~= 'function' or not isConfiguredReleaseDownloadUrl(url) then
                 return originalDownload(url, path, callback, progressCallback)
             end
+
+            local expectedSha256 = archiveSha256ByUrl[url]
             if expectedSha256 == MISSING_ARCHIVE_DIGEST then
-                logWarning(string.format('Refusing configured release archive without an authoritative SHA-256 digest: %s.', tostring(url)))
-                return callback(path, nil, string.format(
-                    'Configured client asset archive is missing an authoritative SHA-256 digest: %s.',
-                    tostring(url)))
+                return failMissingDigest(url, path, callback)
+            end
+            if expectedSha256 then
+                return downloadVerified(url, path, callback, progressCallback, expectedSha256)
             end
 
-            return originalDownload(url, path, function(downloadPath, checksum, err)
+            logInfo(string.format('Refreshing configured release digests before downloading %s.', url))
+            return requestReleaseCatalog(configuredReleasesUrl(), function(_, err)
                 if err then
-                    return callback(downloadPath, checksum, err)
+                    return callback(path, nil, string.format(
+                        'Unable to resolve an authoritative SHA-256 digest for %s: %s.',
+                        tostring(url),
+                        tostring(err)))
                 end
 
-                local ok, hashError = verifyDownloadedArchive(downloadPath, expectedSha256)
-                if not ok then
-                    return callback(downloadPath, checksum, hashError)
+                expectedSha256 = archiveSha256ByUrl[url]
+                if expectedSha256 == nil or expectedSha256 == MISSING_ARCHIVE_DIGEST then
+                    return failMissingDigest(url, path, callback)
                 end
-
-                logInfo(string.format('Verified downloaded asset archive SHA-256 for %s.', url))
-                return callback(downloadPath, checksum, nil)
-            end, progressCallback)
+                return downloadVerified(url, path, callback, progressCallback, expectedSha256)
+            end)
         end
         HTTP.download = wrappedDownload
     end

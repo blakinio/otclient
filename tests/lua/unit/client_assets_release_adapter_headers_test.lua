@@ -1,10 +1,11 @@
 local sourceDir = assert(os.getenv('OTCLIENT_SOURCE_DIR'), 'OTCLIENT_SOURCE_DIR is required')
 local Selector = dofile(sourceDir .. '/modules/client_assets/client_assets_release_selector.lua')
+local archiveUrl = 'https://github.com/dudantas/tibia-client/releases/download/v15.25.0a00a0/v15.25-client.zip'
 
 local function cloneAsset(digest)
     return {
         name = 'v15.25-client.zip',
-        browser_download_url = 'https://example.invalid/client.zip',
+        browser_download_url = archiveUrl,
         digest = digest
     }
 end
@@ -19,7 +20,7 @@ local function releaseWithDigest(digest)
     }
 end
 
-local function withHarness(releases, callback)
+local function withHarness(callback)
     local savedAdapter = rawget(_G, 'ClientAssetsReleaseAdapter')
     local savedSelector = rawget(_G, 'ClientAssetsReleaseSelector')
     local savedHTTP = rawget(_G, 'HTTP')
@@ -49,7 +50,8 @@ local function withHarness(releases, callback)
             state.activeHeaders[name] = nil
         end
     }
-    HTTP.getJSON = function(_, responseCallback)
+    HTTP.getJSON = function(url, responseCallback)
+        state.requestUrl = url
         state.requestHeaders = {}
         for name, value in pairs(state.activeHeaders) do
             state.requestHeaders[name] = value
@@ -102,7 +104,7 @@ local function withHarness(releases, callback)
 end
 
 test('client asset adapter keeps GitHub API headers until the configured response completes', function()
-    withHarness(releaseWithDigest('sha256:' .. string.rep('a', 64)), function(state)
+    withHarness(function(state)
         local response = nil
         HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function(data)
             response = data
@@ -120,28 +122,60 @@ test('client asset adapter keeps GitHub API headers until the configured respons
         assertEqual(2, state.headerRemoves)
         assertNil(state.activeHeaders.Accept)
         assertNil(state.activeHeaders['X-GitHub-Api-Version'])
-
-        state.requestHeaders = nil
-        HTTP.getJSON('https://example.invalid/catalog.json', function() end)
-        assertNil(state.requestHeaders.Accept)
-        assertNil(state.requestHeaders['X-GitHub-Api-Version'])
-        assertEqual(1, state.headerAdds)
     end)
 end)
 
-test('client asset adapter fails closed before downloading an archive without a digest', function()
-    withHarness(releaseWithDigest(nil), function(state)
-        HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function() end)
-        state.pendingResponse(releaseWithDigest(nil), nil)
+test('client asset adapter refreshes a missing digest binding before a configured release download', function()
+    withHarness(function(state)
+        local downloadError = 'not-called'
+        HTTP.download(archiveUrl, 'asset-downloads/1525/client.zip', function(_, _, err)
+            downloadError = err
+        end)
 
+        assertEqual(0, state.downloads)
+        assertTrue(state.requestUrl:find('https://api.github.com/repos/dudantas/tibia-client/releases', 1, true) == 1)
+        assertTrue(state.requestUrl:find('per_page=100', 1, true) ~= nil)
+        assertEqual('2026-03-10', state.activeHeaders['X-GitHub-Api-Version'])
+
+        state.pendingResponse(releaseWithDigest('sha256:' .. string.rep('a', 64)), nil)
+        assertEqual(1, state.downloads)
+        assertNil(downloadError)
+        assertNil(state.activeHeaders['X-GitHub-Api-Version'])
+
+        local verified = false
+        for _, message in ipairs(state.logs) do
+            if message:find('Verified downloaded asset archive SHA-256', 1, true) then
+                verified = true
+            end
+        end
+        assertTrue(verified)
+    end)
+end)
+
+test('client asset adapter fails closed when a refreshed configured release lacks a digest', function()
+    withHarness(function(state)
         local downloadError = nil
-        HTTP.download(
-            'https://example.invalid/client.zip',
-            'asset-downloads/1525/client.zip',
-            function(_, _, err) downloadError = err end)
+        HTTP.download(archiveUrl, 'asset-downloads/1525/client.zip', function(_, _, err)
+            downloadError = err
+        end)
+        state.pendingResponse(releaseWithDigest(nil), nil)
 
         assertEqual(0, state.downloads)
         assertTrue(type(downloadError) == 'string')
         assertTrue(downloadError:find('missing an authoritative SHA-256 digest', 1, true) ~= nil)
+    end)
+end)
+
+test('client asset adapter leaves unrelated downloads unchanged', function()
+    withHarness(function(state)
+        local downloadError = 'not-called'
+        HTTP.download('https://example.invalid/client.zip', 'other/client.zip', function(_, _, err)
+            downloadError = err
+        end)
+
+        assertEqual(1, state.downloads)
+        assertNil(downloadError)
+        assertNil(state.requestUrl)
+        assertEqual(0, state.headerAdds)
     end)
 end)

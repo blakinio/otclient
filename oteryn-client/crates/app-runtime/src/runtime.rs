@@ -1,39 +1,41 @@
-use crate::model::{
-    RuntimeError, RuntimeSnapshot, ShutdownProgress, TechnicalSelection, WorkerKind,
-};
-use crate::worker::{IdentityOutput, OwnedWorker, WorkerEvent};
+use crate::worker::{OwnedWorker, WorkerEvent};
+use crate::{RuntimeError, RuntimeSnapshot, ShutdownProgress, TechnicalSelection, WorkerKind};
 use oteryn_account_session::AccountSessionId;
 use oteryn_foundation::{CancellationSource, CancellationToken, Moment, MonotonicClock};
 use oteryn_game_session::{
-    EntryFailure, EntryFailureKind, EntryLifecycle, EntryPhase, GameEntryAttemptId,
-    GameEntryRequest, SessionEntered,
+    EntryFailure, EntryFailureKind, EntryLifecycle, EntryPhase, EntryProfile, GameEntryAttemptId,
+    GameEntryCredential, GameEntryRequest, SessionEntered,
 };
 use oteryn_world_directory::AccountDirectorySnapshot;
 use std::collections::VecDeque;
 use std::fmt::{self, Debug, Formatter};
-use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-/// Maximum retained public phase-history entries.
+/// Maximum retained non-secret lifecycle transitions.
 pub const MAX_RUNTIME_HISTORY: usize = 32;
 /// Bound after which shutdown reports an overdue worker while retaining ownership.
 pub const SHUTDOWN_OVERDUE_AFTER: Duration = Duration::from_secs(31);
 
-/// Deterministic application-owned W7 technical-login runtime.
+/// Deterministic owner of one authentication and one connection worker.
 pub struct TechnicalLoginRuntime {
     clock: Arc<dyn MonotonicClock>,
     lifecycle: Option<EntryLifecycle>,
-    selection: Option<TechnicalSelection>,
-    worker: Option<OwnedWorker>,
+    phase: EntryPhase,
+    failure: Option<EntryFailure>,
+    entered: Option<SessionEntered>,
     next_attempt: u64,
-    shutdown_started: Option<Moment>,
+    active_attempt: Option<GameEntryAttemptId>,
+    selection: Option<TechnicalSelection>,
+    identity_worker: Option<OwnedWorker>,
+    connection_worker: Option<OwnedWorker>,
     history: VecDeque<EntryPhase>,
+    shutdown_started: Option<Moment>,
 }
 
 impl TechnicalLoginRuntime {
-    /// Construct one runtime from an explicit monotonic clock.
+    /// Construct a logged-out runtime.
     #[must_use]
     pub fn new(clock: Arc<dyn MonotonicClock>) -> Self {
         let mut history = VecDeque::with_capacity(MAX_RUNTIME_HISTORY);
@@ -41,83 +43,105 @@ impl TechnicalLoginRuntime {
         Self {
             clock,
             lifecycle: Some(EntryLifecycle::new()),
-            selection: None,
-            worker: None,
+            phase: EntryPhase::LoggedOut,
+            failure: None,
+            entered: None,
             next_attempt: 1,
-            shutdown_started: None,
+            active_attempt: None,
+            selection: None,
+            identity_worker: None,
+            connection_worker: None,
             history,
+            shutdown_started: None,
         }
     }
 
-    /// Return the bounded secret-free runtime snapshot.
+    /// Return one redacted snapshot.
     #[must_use]
-    pub fn snapshot(&self) -> RuntimeSnapshot {
-        let lifecycle = self.lifecycle.as_ref();
+    pub const fn snapshot(&self) -> RuntimeSnapshot {
         RuntimeSnapshot {
-            phase: lifecycle.map_or(EntryPhase::LoggedOut, EntryLifecycle::phase),
-            active_attempt: lifecycle.and_then(EntryLifecycle::active_attempt),
-            failure: lifecycle.and_then(EntryLifecycle::failure),
-            entered: lifecycle.and_then(EntryLifecycle::entered),
+            phase: self.phase,
+            active_attempt: self.active_attempt,
+            failure: self.failure,
+            entered: self.entered,
             shutting_down: self.shutdown_started.is_some(),
         }
     }
 
-    /// Return the bounded oldest-to-newest phase history.
-    #[must_use]
-    pub fn phase_history(&self) -> Vec<EntryPhase> {
-        self.history.iter().copied().collect()
+    /// Iterate bounded phases in deterministic order.
+    pub fn history(&self) -> impl ExactSizeIterator<Item = EntryPhase> + '_ {
+        self.history.iter().copied()
     }
 
-    /// Return whether an owned worker still exists.
+    /// Return whether either application-owned worker is retained.
     #[must_use]
-    pub fn has_active_worker(&self) -> bool {
-        self.worker.is_some()
+    pub const fn has_active_worker(&self) -> bool {
+        self.identity_worker.is_some() || self.connection_worker.is_some()
     }
 
-    /// Start one owned Identity worker.
+    /// Start one Identity operation on an owned thread.
+    ///
+    /// Final composition maps merged `IdentityBootstrap` into the returned
+    /// producer-owned tuple.
     pub fn start_authentication<F>(
         &mut self,
         selection: TechnicalSelection,
         operation: F,
     ) -> Result<GameEntryAttemptId, RuntimeError>
     where
-        F: FnOnce(GameEntryAttemptId, CancellationToken) -> Result<IdentityOutput, EntryFailure>
-            + Send
+        F: FnOnce(
+                GameEntryAttemptId,
+                CancellationToken,
+            ) -> Result<
+                (
+                    AccountSessionId,
+                    AccountDirectorySnapshot,
+                    GameEntryCredential,
+                ),
+                EntryFailure,
+            > + Send
             + 'static,
     {
-        if self.shutdown_started.is_some() {
-            return Err(RuntimeError::ShuttingDown);
-        }
-        if self.worker.is_some() {
-            return Err(RuntimeError::AuthenticationAlreadyActive);
-        }
-        self.ensure_logged_out()?;
-        let attempt_id = self.allocate_attempt()?;
+        self.require_startable()?;
+        let attempt_id = self.allocate_attempt_id()?;
+        self.lifecycle_mut()?.begin_authentication(attempt_id)?;
+        self.active_attempt = Some(attempt_id);
+        self.selection = Some(selection);
+        self.failure = None;
+        self.entered = None;
+        self.sync_phase();
+
         let cancellation = CancellationSource::new();
         let token = cancellation.token();
         let handle = thread::Builder::new()
-            .name("oteryn-identity".to_owned())
+            .name(format!("oteryn-identity-{}", attempt_id.get()))
             .spawn(move || WorkerEvent::Identity {
                 attempt_id,
                 result: operation(attempt_id, token),
-            })
-            .map_err(|_| RuntimeError::WorkerSpawn(WorkerKind::Identity))?;
-        self.selection = Some(selection);
-        self.lifecycle_mut()?.begin_authentication(attempt_id)?;
-        self.record_phase();
-        self.worker = Some(OwnedWorker {
-            kind: WorkerKind::Identity,
-            cancellation,
-            handle,
-        });
-        Ok(attempt_id)
+            });
+
+        match handle {
+            Ok(handle) => {
+                self.identity_worker = Some(OwnedWorker {
+                    kind: WorkerKind::Identity,
+                    cancellation,
+                    handle,
+                });
+                Ok(attempt_id)
+            }
+            Err(_error) => {
+                self.set_failure(EntryFailure::for_kind(EntryFailureKind::TransportFailure));
+                Err(RuntimeError::WorkerSpawn(WorkerKind::Identity))
+            }
+        }
     }
 
-    /// Start one owned Canary connection/admission worker from a credential-ready lifecycle.
-    pub fn start_connection<F>(
-        &mut self,
-        operation: F,
-    ) -> Result<GameEntryAttemptId, RuntimeError>
+    /// Move the complete producer-owned lifecycle into one admission worker.
+    ///
+    /// This matches the Canary producer boundary: application code never
+    /// receives `AdmissionCredential`. The closure returns the lifecycle it
+    /// consumed together with its typed result.
+    pub fn start_connection<F>(&mut self, operation: F) -> Result<(), RuntimeError>
     where
         F: FnOnce(
                 EntryLifecycle,
@@ -131,22 +155,23 @@ impl TechnicalLoginRuntime {
         if self.shutdown_started.is_some() {
             return Err(RuntimeError::ShuttingDown);
         }
-        if self.worker.is_some() {
+        if self.identity_worker.is_some() {
+            return Err(RuntimeError::AuthenticationAlreadyActive);
+        }
+        if self.connection_worker.is_some() {
             return Err(RuntimeError::ConnectionAlreadyActive);
         }
-        let attempt_id = self
-            .lifecycle
-            .as_ref()
-            .and_then(EntryLifecycle::active_attempt)
-            .ok_or(RuntimeError::NoActiveAttempt)?;
-        let mut lifecycle = self.lifecycle.take().ok_or(RuntimeError::NoActiveAttempt)?;
-        lifecycle.mark_connecting(attempt_id)?;
-        self.record_external_phase(lifecycle.phase());
+        if self.phase != EntryPhase::CredentialReady {
+            return Err(EntryFailure::for_kind(EntryFailureKind::InvariantViolation).into());
+        }
+
+        let attempt_id = self.active_attempt.ok_or(RuntimeError::NoActiveAttempt)?;
+        let lifecycle = self.lifecycle.take().ok_or(RuntimeError::NoActiveAttempt)?;
         let cancellation = CancellationSource::new();
         let token = cancellation.token();
         let clock = Arc::clone(&self.clock);
-        let spawn = thread::Builder::new()
-            .name("oteryn-canary-entry".to_owned())
+        let handle = thread::Builder::new()
+            .name(format!("oteryn-connection-{}", attempt_id.get()))
             .spawn(move || {
                 let (lifecycle, result) = operation(lifecycle, attempt_id, token, clock);
                 WorkerEvent::Connection {
@@ -155,180 +180,219 @@ impl TechnicalLoginRuntime {
                     result,
                 }
             });
-        match spawn {
+
+        match handle {
             Ok(handle) => {
-                self.worker = Some(OwnedWorker {
+                self.connection_worker = Some(OwnedWorker {
                     kind: WorkerKind::Connection,
                     cancellation,
                     handle,
                 });
-                Ok(attempt_id)
+                self.record_phase(EntryPhase::Connecting);
+                Ok(())
             }
-            Err(_) => {
+            Err(_error) => {
                 self.lifecycle = Some(EntryLifecycle::new());
-                self.selection = None;
-                self.record_phase();
+                self.set_failure(EntryFailure::for_kind(EntryFailureKind::TransportFailure));
                 Err(RuntimeError::WorkerSpawn(WorkerKind::Connection))
             }
         }
     }
 
-    /// Poll one worker completion without blocking.
+    /// Join and apply every currently completed worker.
     pub fn poll(&mut self) -> Result<bool, RuntimeError> {
         if self.shutdown_started.is_some() {
             return Ok(false);
         }
-        let Some(worker) = self.worker.as_ref() else {
-            return Ok(false);
-        };
-        if !worker.is_finished() {
-            return Ok(false);
+        let mut progressed = false;
+        if self
+            .identity_worker
+            .as_ref()
+            .is_some_and(OwnedWorker::is_finished)
+            && let Some(worker) = self.identity_worker.take()
+        {
+            self.apply_event(worker.join()?)?;
+            progressed = true;
         }
-        let event = self
-            .worker
-            .take()
-            .ok_or(RuntimeError::NoActiveAttempt)?
-            .join()?;
-        self.apply_event(event)?;
-        Ok(true)
+        if self
+            .connection_worker
+            .as_ref()
+            .is_some_and(OwnedWorker::is_finished)
+            && let Some(worker) = self.connection_worker.take()
+        {
+            self.apply_event(worker.join()?)?;
+            progressed = true;
+        }
+        Ok(progressed)
     }
 
-    /// Request cancellation without joining an unfinished worker.
+    /// Cancel active operations without joining an unfinished worker.
     pub fn cancel_active(&mut self) -> Result<(), RuntimeError> {
-        let Some(worker) = self.worker.as_ref() else {
-            if let Some(lifecycle) = self.lifecycle.as_mut() {
-                lifecycle.mark_failure(EntryFailure::for_kind(
-                    EntryFailureKind::SafeCancellation,
-                ))?;
-                self.record_phase();
-            }
-            return Ok(());
-        };
-        worker.cancel();
-        if worker.is_finished() {
-            let event = self
-                .worker
-                .take()
-                .ok_or(RuntimeError::NoActiveAttempt)?
-                .join()?;
-            self.apply_event(event)?;
+        let attempt_id = self.active_attempt.ok_or(RuntimeError::NoActiveAttempt)?;
+        self.cancel_workers();
+        if let Some(kind) = self.unfinished_worker_kind() {
+            return Err(RuntimeError::ShutdownPending(kind));
         }
+        self.join_and_recover_workers()?;
+        if let Some(lifecycle) = self.lifecycle.as_mut()
+            && !matches!(
+                lifecycle.phase(),
+                EntryPhase::Failed | EntryPhase::Closing | EntryPhase::LoggedOut
+            )
+        {
+            lifecycle.cancel(attempt_id)?;
+        }
+        self.failure = Some(EntryFailure::for_kind(EntryFailureKind::SafeCancellation));
+        self.entered = None;
+        self.selection = None;
+        self.record_phase(EntryPhase::Failed);
         Ok(())
     }
 
-    /// Return to logged-out state without joining an unfinished worker.
+    /// Close every session-scoped value without joining an unfinished worker.
     pub fn disconnect_to_logged_out(&mut self) -> Result<(), RuntimeError> {
-        if let Some(worker) = self.worker.as_ref() {
-            worker.cancel();
-            if !worker.is_finished() {
-                return Err(RuntimeError::ShutdownPending);
-            }
+        self.cancel_workers();
+        if let Some(kind) = self.unfinished_worker_kind() {
+            return Err(RuntimeError::ShutdownPending(kind));
         }
-        if let Some(worker) = self.worker.take() {
-            let _event = worker.join()?;
-        }
-        self.reset_to_logged_out()
+        self.join_and_recover_workers()?;
+        self.finish_closing()
     }
 
-    /// Begin deterministic nonblocking shutdown and poll once.
+    /// Begin deterministic shutdown and poll once without blocking.
     pub fn begin_shutdown(&mut self) -> Result<ShutdownProgress, RuntimeError> {
         if self.shutdown_started.is_none() {
             self.shutdown_started = Some(self.clock.now());
-        }
-        if let Some(worker) = self.worker.as_ref() {
-            worker.cancel();
-        }
-        if let Some(lifecycle) = self.lifecycle.as_mut() {
-            let _result = lifecycle.mark_closing();
-            self.record_phase();
+            self.cancel_workers();
+            if let Some(lifecycle) = self.lifecycle.as_mut() {
+                lifecycle.close();
+            }
+            self.record_phase(EntryPhase::Closing);
         }
         self.poll_shutdown()
     }
 
-    /// Poll shutdown without joining an unfinished worker.
+    /// Poll deterministic shutdown without joining an unfinished worker.
     pub fn poll_shutdown(&mut self) -> Result<ShutdownProgress, RuntimeError> {
         let started = self
             .shutdown_started
             .ok_or(RuntimeError::ShutdownNotStarted)?;
-        let Some(worker) = self.worker.as_ref() else {
-            self.reset_to_logged_out()?;
-            return Ok(ShutdownProgress::Complete);
-        };
-        worker.cancel();
-        let kind = worker.kind;
-        let finished = worker.is_finished();
-        if finished {
-            let worker = self
-                .worker
-                .take()
-                .ok_or(RuntimeError::NoActiveAttempt)?;
-            let _event = worker.join()?;
-            self.reset_to_logged_out()?;
-            return Ok(ShutdownProgress::Complete);
+        self.cancel_workers();
+        self.join_finished_workers_for_shutdown()?;
+        if let Some(kind) = self.unfinished_worker_kind() {
+            let elapsed = self
+                .clock
+                .now()
+                .elapsed()
+                .saturating_sub(started.elapsed());
+            if elapsed >= SHUTDOWN_OVERDUE_AFTER {
+                return Ok(ShutdownProgress::Overdue(kind));
+            }
+            return Ok(ShutdownProgress::Pending(kind));
         }
-        let elapsed = self
-            .clock
-            .now()
-            .checked_duration_since(started)
-            .unwrap_or(Duration::MAX);
-        if elapsed >= SHUTDOWN_OVERDUE_AFTER {
-            Ok(ShutdownProgress::Overdue(kind))
-        } else {
-            Ok(ShutdownProgress::Pending(kind))
-        }
+        self.finish_closing()?;
+        Ok(ShutdownProgress::Complete)
     }
 
-    /// Compatibility wrapper that never blocks on an unfinished worker.
+    /// Compatibility wrapper that never joins an unfinished worker.
     pub fn shutdown(&mut self) -> Result<(), RuntimeError> {
         match self.begin_shutdown()? {
             ShutdownProgress::Complete => Ok(()),
-            ShutdownProgress::Pending(_) | ShutdownProgress::Overdue(_) => {
-                Err(RuntimeError::ShutdownPending)
-            }
+            ShutdownProgress::Pending(kind) => Err(RuntimeError::ShutdownPending(kind)),
+            ShutdownProgress::Overdue(kind) => Err(RuntimeError::ShutdownOverdue(kind)),
         }
+    }
+
+    fn require_startable(&self) -> Result<(), RuntimeError> {
+        if self.shutdown_started.is_some() {
+            return Err(RuntimeError::ShuttingDown);
+        }
+        if self.identity_worker.is_some() {
+            return Err(RuntimeError::AuthenticationAlreadyActive);
+        }
+        if self.connection_worker.is_some() {
+            return Err(RuntimeError::ConnectionAlreadyActive);
+        }
+        if !matches!(self.phase, EntryPhase::LoggedOut | EntryPhase::Failed) {
+            return Err(EntryFailure::for_kind(EntryFailureKind::InvariantViolation).into());
+        }
+        Ok(())
+    }
+
+    fn allocate_attempt_id(&mut self) -> Result<GameEntryAttemptId, RuntimeError> {
+        let attempt_id = GameEntryAttemptId::new(self.next_attempt)
+            .map_err(|_error| RuntimeError::AttemptIdExhausted)?;
+        self.next_attempt = self
+            .next_attempt
+            .checked_add(1)
+            .ok_or(RuntimeError::AttemptIdExhausted)?;
+        Ok(attempt_id)
     }
 
     fn apply_event(&mut self, event: WorkerEvent) -> Result<(), RuntimeError> {
         match event {
             WorkerEvent::Identity { attempt_id, result } => {
-                let active_attempt = self
-                    .lifecycle
-                    .as_ref()
-                    .and_then(EntryLifecycle::active_attempt);
-                if active_attempt != Some(attempt_id) {
-                    return Ok(());
-                }
+                self.require_active(attempt_id)?;
                 match result {
-                    Ok((account_session_id, directory, credential)) => {
-                        self.apply_identity_success(
-                            attempt_id,
-                            account_session_id,
-                            directory,
-                            credential,
-                        )?;
-                    }
+                    Ok((account_session_id, directory, credential)) => self.apply_identity_success(
+                        attempt_id,
+                        account_session_id,
+                        directory,
+                        credential,
+                    ),
                     Err(failure) => {
-                        self.lifecycle_mut()?.mark_failure(failure)?;
-                        self.record_phase();
+                        self.lifecycle_mut()?.record_failure(attempt_id, failure)?;
+                        self.set_failure(failure);
+                        Ok(())
                     }
                 }
             }
             WorkerEvent::Connection {
                 attempt_id,
-                mut lifecycle,
+                lifecycle,
                 result,
             } => {
-                if lifecycle.active_attempt() != Some(attempt_id) {
-                    return Ok(());
-                }
-                match result {
-                    Ok(entered) => lifecycle.mark_session_entered(attempt_id, entered)?,
-                    Err(failure) => lifecycle.mark_failure(failure)?,
-                }
+                self.require_active(attempt_id)?;
                 self.lifecycle = Some(lifecycle);
-                self.record_phase();
+                match result {
+                    Ok(entered) => self.apply_entered(entered),
+                    Err(failure) => self.apply_connection_failure(attempt_id, failure),
+                }
             }
         }
+    }
+
+    fn apply_entered(&mut self, entered: SessionEntered) -> Result<(), RuntimeError> {
+        if self
+            .lifecycle
+            .as_ref()
+            .and_then(EntryLifecycle::entered_result)
+            != Some(entered)
+        {
+            let failure = EntryFailure::for_kind(EntryFailureKind::InvariantViolation);
+            self.set_failure(failure);
+            return Err(failure.into());
+        }
+        self.failure = None;
+        self.entered = Some(entered);
+        self.record_phase(EntryPhase::SessionEntered);
+        Ok(())
+    }
+
+    fn apply_connection_failure(
+        &mut self,
+        attempt_id: GameEntryAttemptId,
+        failure: EntryFailure,
+    ) -> Result<(), RuntimeError> {
+        if self
+            .lifecycle
+            .as_ref()
+            .and_then(EntryLifecycle::failure)
+            .is_none()
+        {
+            self.lifecycle_mut()?.record_failure(attempt_id, failure)?;
+        }
+        self.set_failure(failure);
         Ok(())
     }
 
@@ -337,71 +401,172 @@ impl TechnicalLoginRuntime {
         attempt_id: GameEntryAttemptId,
         account_session_id: AccountSessionId,
         directory: AccountDirectorySnapshot,
-        credential: oteryn_game_session::GameEntryCredential,
+        credential: GameEntryCredential,
     ) -> Result<(), RuntimeError> {
+        self.lifecycle_mut()?
+            .account_ready(attempt_id, account_session_id)?;
+        self.sync_phase();
         let selection = self.selection.ok_or(RuntimeError::NoActiveAttempt)?;
-        let selected = directory.select_character(
+        let selected_entry = match directory.select(
+            directory.revision(),
             selection.character_id(),
             selection.world_id(),
             selection.gameplay_channel_id(),
-        )?;
-        let lifecycle = self.lifecycle_mut()?;
-        lifecycle.mark_account_ready(attempt_id, account_session_id)?;
-        lifecycle.install_directory(attempt_id, directory)?;
-        lifecycle.request_entry(
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                let failure = EntryFailure::from(error);
+                self.lifecycle_mut()?.record_failure(attempt_id, failure)?;
+                self.set_failure(failure);
+                return Ok(());
+            }
+        };
+        self.lifecycle_mut()?
+            .directory_ready(attempt_id, directory)?;
+        self.sync_phase();
+        let requested_at = self.clock.now();
+        self.lifecycle_mut()?.request_entry(GameEntryRequest::new(
             attempt_id,
-            GameEntryRequest::new(account_session_id, selected),
-        )?;
-        lifecycle.install_credential(attempt_id, credential)?;
-        self.record_phase();
-        Ok(())
-    }
-
-    fn ensure_logged_out(&mut self) -> Result<(), RuntimeError> {
-        if self
-            .lifecycle
-            .as_ref()
-            .is_some_and(|lifecycle| lifecycle.phase() == EntryPhase::LoggedOut)
+            selected_entry,
+            EntryProfile::CanaryCurrent,
+            requested_at,
+        ))?;
+        self.sync_phase();
+        let clock = Arc::clone(&self.clock);
+        if let Err(failure) =
+            self.lifecycle_mut()?
+                .credential_ready(attempt_id, credential, clock.as_ref())
         {
+            self.lifecycle_mut()?.record_failure(attempt_id, failure)?;
+            self.set_failure(failure);
             return Ok(());
         }
-        self.reset_to_logged_out()
-    }
-
-    fn reset_to_logged_out(&mut self) -> Result<(), RuntimeError> {
-        if let Some(lifecycle) = self.lifecycle.as_mut()
-            && lifecycle.phase() != EntryPhase::LoggedOut
-        {
-            lifecycle.disconnect()?;
-        }
-        self.lifecycle = Some(EntryLifecycle::new());
-        self.selection = None;
-        self.record_phase();
+        self.sync_phase();
         Ok(())
     }
 
-    fn allocate_attempt(&mut self) -> Result<GameEntryAttemptId, RuntimeError> {
-        let raw = NonZeroU64::new(self.next_attempt).ok_or(RuntimeError::AttemptIdExhausted)?;
-        self.next_attempt = self
-            .next_attempt
-            .checked_add(1)
-            .ok_or(RuntimeError::AttemptIdExhausted)?;
-        Ok(GameEntryAttemptId::new(raw))
+    fn require_active(&self, attempt_id: GameEntryAttemptId) -> Result<(), RuntimeError> {
+        if self.active_attempt == Some(attempt_id) {
+            Ok(())
+        } else {
+            Err(EntryFailure::for_kind(EntryFailureKind::StaleAuthenticationTransaction).into())
+        }
     }
 
     fn lifecycle_mut(&mut self) -> Result<&mut EntryLifecycle, RuntimeError> {
         self.lifecycle.as_mut().ok_or(RuntimeError::NoActiveAttempt)
     }
 
-    fn record_phase(&mut self) {
-        let phase = self
-            .lifecycle
-            .as_ref()
-            .map_or(EntryPhase::LoggedOut, EntryLifecycle::phase);
-        self.record_external_phase(phase);
+    fn sync_phase(&mut self) {
+        let phase = self.lifecycle.as_ref().map(EntryLifecycle::phase);
+        if let Some(phase) = phase {
+            self.record_phase(phase);
+        }
     }
 
-    fn record_external_phase(&mut self, phase: EntryPhase) {
+    fn set_failure(&mut self, failure: EntryFailure) {
+        self.failure = Some(failure);
+        self.entered = None;
+        self.selection = None;
+        self.record_phase(EntryPhase::Failed);
+    }
+
+    fn cancel_workers(&self) {
+        if let Some(worker) = self.identity_worker.as_ref() {
+            worker.cancel();
+        }
+        if let Some(worker) = self.connection_worker.as_ref() {
+            worker.cancel();
+        }
+    }
+
+    fn unfinished_worker_kind(&self) -> Option<WorkerKind> {
+        self.identity_worker
+            .as_ref()
+            .filter(|worker| !worker.is_finished())
+            .map(|worker| worker.kind)
+            .or_else(|| {
+                self.connection_worker
+                    .as_ref()
+                    .filter(|worker| !worker.is_finished())
+                    .map(|worker| worker.kind)
+            })
+    }
+
+    fn join_finished_workers_for_shutdown(&mut self) -> Result<(), RuntimeError> {
+        if self
+            .identity_worker
+            .as_ref()
+            .is_some_and(OwnedWorker::is_finished)
+            && let Some(worker) = self.identity_worker.take()
+        {
+            if let Err(error) = worker.join() {
+                self.lifecycle = Some(EntryLifecycle::new());
+                return Err(error);
+            }
+        }
+        if self
+            .connection_worker
+            .as_ref()
+            .is_some_and(OwnedWorker::is_finished)
+            && let Some(worker) = self.connection_worker.take()
+        {
+            let kind = worker.kind;
+            match worker.join() {
+                Ok(WorkerEvent::Connection { lifecycle, .. }) => {
+                    self.lifecycle = Some(lifecycle);
+                }
+                Ok(WorkerEvent::Identity { .. }) => {
+                    self.lifecycle = Some(EntryLifecycle::new());
+                    return Err(RuntimeError::WorkerJoin(kind));
+                }
+                Err(error) => {
+                    self.lifecycle = Some(EntryLifecycle::new());
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn join_and_recover_workers(&mut self) -> Result<(), RuntimeError> {
+        if let Some(worker) = self.identity_worker.take() {
+            let kind = worker.kind;
+            if worker.join().is_err() {
+                self.lifecycle = Some(EntryLifecycle::new());
+                return Err(RuntimeError::WorkerJoin(kind));
+            }
+        }
+        if let Some(worker) = self.connection_worker.take() {
+            let kind = worker.kind;
+            match worker.join() {
+                Ok(WorkerEvent::Connection { lifecycle, .. }) => {
+                    self.lifecycle = Some(lifecycle);
+                }
+                Ok(WorkerEvent::Identity { .. }) | Err(_) => {
+                    self.lifecycle = Some(EntryLifecycle::new());
+                    return Err(RuntimeError::WorkerJoin(kind));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn finish_closing(&mut self) -> Result<(), RuntimeError> {
+        let lifecycle = self.lifecycle.get_or_insert_with(EntryLifecycle::new);
+        lifecycle.close();
+        self.record_phase(EntryPhase::Closing);
+        self.lifecycle_mut()?.finish_closing()?;
+        self.record_phase(EntryPhase::LoggedOut);
+        self.active_attempt = None;
+        self.selection = None;
+        self.failure = None;
+        self.entered = None;
+        Ok(())
+    }
+
+    fn record_phase(&mut self, phase: EntryPhase) {
+        self.phase = phase;
         if self.history.back().copied() == Some(phase) {
             return;
         }
@@ -417,24 +582,23 @@ impl Debug for TechnicalLoginRuntime {
         formatter
             .debug_struct("TechnicalLoginRuntime")
             .field("snapshot", &self.snapshot())
-            .field("selection", &self.selection)
-            .field("worker", &self.worker.as_ref().map(|worker| worker.kind))
-            .field("next_attempt", &self.next_attempt)
-            .field("shutdown_started", &self.shutdown_started)
-            .field("history", &self.history)
+            .field("identity_worker_active", &self.identity_worker.is_some())
+            .field(
+                "connection_worker_active",
+                &self.connection_worker.is_some(),
+            )
+            .field("history_len", &self.history.len())
             .finish()
     }
 }
 
 impl Drop for TechnicalLoginRuntime {
     fn drop(&mut self) {
-        if let Some(worker) = self.worker.take() {
-            worker.cancel();
-            // The Windows event-loop path retains the controller until
-            // `poll_shutdown` reports `Complete`. This join is an ownership
-            // invariant fallback for non-event-loop callers and prevents an
-            // unfinished JoinHandle from being detached on misuse.
-            let _result = worker.join();
+        self.cancel_workers();
+        let _joined = self.join_and_recover_workers();
+        if let Some(lifecycle) = self.lifecycle.as_mut() {
+            lifecycle.close();
+            let _closed = lifecycle.finish_closing();
         }
     }
 }

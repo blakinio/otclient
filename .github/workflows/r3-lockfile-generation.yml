@@ -1,0 +1,32 @@
+name: R3 Lockfile Generation
+
+on:
+  push:
+    branches:
+      - fix/OTC2-20260801-asset-open-integrity-remediation
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal --target x86_64-pc-windows-msvc
+          rustup default 1.94.0
+      - name: Generate lockfile
+        shell: pwsh
+        working-directory: oteryn-client
+        run: cargo generate-lockfile
+      - name: Upload generated lockfile
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r3-cargo-lock
+          path: oteryn-client/Cargo.lock
+          if-no-files-found: error
+          retention-days: 1

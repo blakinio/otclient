@@ -1,6 +1,6 @@
 use oteryn_architecture_check::{
-    DependencyKind, FIXTURE_SCHEMA_VERSION, check_fixture, check_fixture_json, dependency_allowed,
-    known_categories,
+    check_fixture, check_fixture_json, dependency_allowed, known_categories, DependencyKind,
+    FIXTURE_SCHEMA_VERSION,
 };
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -63,10 +63,7 @@ fn valid_foundation_dependency_passes() -> Result<(), String> {
 #[test]
 fn invalid_fixtures_report_expected_rules() -> Result<(), String> {
     let cases = [
-        (
-            "invalid_legacy_path_dependency.json",
-            "E003_OUTSIDE_WORKSPACE",
-        ),
+        ("invalid_legacy_path_dependency.json", "E003_OUTSIDE_WORKSPACE"),
         (
             "invalid_domain_to_canary_edge.json",
             "E005_FORBIDDEN_EDGE",
@@ -127,9 +124,7 @@ fn every_category_pair_and_dependency_kind_matches_the_complete_policy() -> Resu
                     "policy mismatch for {kind} edge {source} -> {target}: {violations:?}"
                 );
                 assert!(
-                    violations
-                        .iter()
-                        .all(|violation| violation.code == "E005_FORBIDDEN_EDGE"),
+                    violations.iter().all(|violation| violation.code == "E005_FORBIDDEN_EDGE"),
                     "unexpected non-policy violation for {kind} edge {source} -> {target}: {violations:?}"
                 );
                 if expected_allowed {
@@ -147,7 +142,11 @@ fn every_category_pair_and_dependency_kind_matches_the_complete_policy() -> Resu
 
 #[test]
 fn product_to_tool_is_dev_only() -> Result<(), String> {
-    let normal = check_fixture_json(&edge_fixture("app", "tool", DependencyKind::Normal))?;
+    let normal = check_fixture_json(&edge_fixture(
+        "app",
+        "tool",
+        DependencyKind::Normal,
+    ))?;
     assert!(
         normal
             .iter()
@@ -166,10 +165,7 @@ fn build_dependencies_require_an_explicit_pair() -> Result<(), String> {
         "foundation",
         DependencyKind::Build,
     ))?;
-    assert!(
-        listed.is_empty(),
-        "unexpected listed build violation: {listed:?}"
-    );
+    assert!(listed.is_empty(), "unexpected listed build violation: {listed:?}");
 
     let unlisted = check_fixture_json(&edge_fixture(
         "app",

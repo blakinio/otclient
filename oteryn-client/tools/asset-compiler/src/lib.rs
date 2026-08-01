@@ -142,8 +142,8 @@ fn read_bounded_manifest(path: &Path) -> Result<(Vec<u8>, Dir), CompilerError> {
         .unwrap_or_else(|| Path::new("."));
     let root = Dir::open_ambient_dir(parent, ambient_authority())
         .map_err(|_| CompilerError::ManifestUnavailable)?;
-    let file = open_file_nofollow(&root, file_name)
-        .map_err(|_| CompilerError::ManifestUnavailable)?;
+    let file =
+        open_file_nofollow(&root, file_name).map_err(|_| CompilerError::ManifestUnavailable)?;
     let bytes = read_bounded_open_file(
         file,
         MAX_MANIFEST_BYTES,
@@ -167,9 +167,7 @@ fn read_bounded_open_file(
         return Err(too_large);
     }
 
-    let mut bytes = Vec::with_capacity(
-        usize::try_from(metadata.len()).map_err(|_| too_large)?,
-    );
+    let mut bytes = Vec::with_capacity(usize::try_from(metadata.len()).map_err(|_| too_large)?);
     file.take(usize_to_u64(limit + 1))
         .read_to_end(&mut bytes)
         .map_err(|_| unavailable)?;
@@ -460,8 +458,8 @@ mod tests {
     static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(1);
 
     #[test]
-    fn opened_source_handle_cannot_be_redirected_by_path_replacement()
-    -> Result<(), Box<dyn Error>> {
+    fn opened_source_handle_cannot_be_redirected_by_path_replacement() -> Result<(), Box<dyn Error>>
+    {
         let sequence = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
         let directory_path = env::temp_dir().join(format!(
             "oteryn-asset-open-handle-{}-{sequence}",
@@ -482,9 +480,9 @@ mod tests {
         })?;
 
         assert_eq!(payload, b"accepted object bytes");
-        let replacement = replacement.into_inner().ok_or_else(|| {
-            io::Error::other("source replacement hook did not run")
-        })?;
+        let replacement = replacement
+            .into_inner()
+            .ok_or_else(|| io::Error::other("source replacement hook did not run"))?;
         if replacement.is_ok() {
             assert_eq!(fs::read(&source_path)?, b"substituted path bytes");
         }

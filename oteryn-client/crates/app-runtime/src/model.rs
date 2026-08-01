@@ -63,6 +63,17 @@ impl Display for WorkerKind {
     }
 }
 
+/// Nonblocking progress of one explicit technical-login shutdown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShutdownProgress {
+    /// Cancellation was requested and the worker remains owned and unfinished.
+    Pending(WorkerKind),
+    /// The worker remains owned and unfinished beyond the accepted bound.
+    Overdue(WorkerKind),
+    /// No worker remains and the runtime is terminally logged out.
+    Complete,
+}
+
 /// Stable secret-free runtime failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeError {
@@ -82,6 +93,12 @@ pub enum RuntimeError {
     AttemptIdExhausted,
     /// Shutdown started and rejects new work.
     ShuttingDown,
+    /// Shutdown polling was requested before shutdown began.
+    ShutdownNotStarted,
+    /// An owned worker remains unfinished during a nonblocking operation.
+    ShutdownPending,
+    /// An owned worker remains unfinished beyond the accepted shutdown bound.
+    ShutdownOverdue(WorkerKind),
 }
 
 impl From<EntryFailure> for RuntimeError {
@@ -105,6 +122,15 @@ impl Display for RuntimeError {
             Self::NoActiveAttempt => formatter.write_str("no technical-login attempt is active"),
             Self::AttemptIdExhausted => formatter.write_str("entry attempt identity was exhausted"),
             Self::ShuttingDown => formatter.write_str("technical-login runtime is shutting down"),
+            Self::ShutdownNotStarted => {
+                formatter.write_str("technical-login shutdown has not started")
+            }
+            Self::ShutdownPending => {
+                formatter.write_str("technical-login shutdown is still pending")
+            }
+            Self::ShutdownOverdue(kind) => {
+                write!(formatter, "{kind} worker shutdown is overdue")
+            }
         }
     }
 }
@@ -119,7 +145,10 @@ impl Error for RuntimeError {
             | Self::ConnectionAlreadyActive
             | Self::NoActiveAttempt
             | Self::AttemptIdExhausted
-            | Self::ShuttingDown => None,
+            | Self::ShuttingDown
+            | Self::ShutdownNotStarted
+            | Self::ShutdownPending
+            | Self::ShutdownOverdue(_) => None,
         }
     }
 }

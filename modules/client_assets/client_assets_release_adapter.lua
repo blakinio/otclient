@@ -249,7 +249,7 @@ local function installHttpWrappers()
     if not wrappedDownload then
         originalDownload = HTTP.download
         wrappedDownload = function(url, path, callback, progressCallback)
-            if type(callback) ~= 'function' or not isConfiguredReleaseDownloadUrl(url) then
+            if type(callback) ~= 'function' then
                 return originalDownload(url, path, callback, progressCallback)
             end
 
@@ -259,6 +259,9 @@ local function installHttpWrappers()
             end
             if expectedSha256 then
                 return downloadVerified(url, path, callback, progressCallback, expectedSha256)
+            end
+            if not isConfiguredReleaseDownloadUrl(url) then
+                return originalDownload(url, path, callback, progressCallback)
             end
 
             logInfo(string.format('Refreshing configured release digests before downloading %s.', url))

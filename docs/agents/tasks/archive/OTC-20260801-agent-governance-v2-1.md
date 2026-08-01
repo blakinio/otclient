@@ -11,13 +11,13 @@ coordinator_task: none
 branch: main
 base_branch: main
 created: 2026-08-01T23:46:00+02:00
-updated: 2026-08-02T00:20:00+02:00
-completed: 2026-08-02T00:20:00+02:00
+updated: 2026-08-02T00:22:00+02:00
+completed: 2026-08-02T00:22:00+02:00
 last_verified_commit: "99ebed0914e296268d32642000af6d71664cadd9"
 risk: low
 related_pr: "#161"
 merge_commit: "99ebed0914e296268d32642000af6d71664cadd9"
-archive_pr: PENDING
+archive_pr: "#163"
 depends_on: []
 integration_after: []
 owned_paths: []
@@ -47,56 +47,45 @@ security_evidence:
 
 ## Terminal result
 
-PR #161 merged the v2.1 agent-governance contracts to `main` as `99ebed0914e296268d32642000af6d71664cadd9`.
+PR #161 merged agent-governance v2.1 to `main` as `99ebed0914e296268d32642000af6d71664cadd9`. PR #163 performs the terminal task move and releases active ownership.
 
-## Closeout evidence
+## Closeout
 
 ```yaml
-closeout:
-  implementation_complete: true
-  complete_feature_or_declared_partial: true
-  outcome_verified: true
-  scope:
-    changed_paths: 8
-    client_runtime_or_workflow_paths_changed: 0
-  audit:
-    result: PASS
-    validator: fresh-final-diff-review
-    findings_open_material: 0
-    evidence:
-      - all seven normative contracts exist and entry points route consistently
-      - client, protocol, asset, Canary, upstream, production and deployment restrictions remain authoritative
-      - zero unresolved review threads on PR 161
-  e2e:
-    result: NOT_APPLICABLE_WITH_REASON
-    evidence:
-      - governance documentation only; no executable client behavior changed
-      - path, content, lifecycle, CI, and PR-hygiene outcome verified
-  final_ci:
-    head: cf19ed5094e4ac7b2cd6aeac9d4f8bc5abce133d
-    result: PASS
-    checks:
-      - CI 1327
-      - ready-state CI / Required 1328
-  pull_requests:
-    unresolved_review_threads: 0
-    terminal_prs:
-      - blakinio/otclient#161 merged as 99ebed0914e296268d32642000af6d71664cadd9
-    archive_pr: PENDING
-  task_archived_or_terminal: true
-  ownership_released: true
-  stale_branches_reconciled: true
+implementation_complete: true
+outcome_verified: true
+scope:
+  changed_paths: 8
+  client_runtime_or_workflow_paths_changed: 0
+audit:
+  result: PASS
+  validator: fresh-final-diff-review
+  findings_open_material: 0
+  evidence:
+    - all seven normative contracts exist and entry points route consistently
+    - client, protocol, asset, Canary, upstream, production and deployment restrictions remain authoritative
+    - feature PR 161 had zero unresolved review threads
+e2e:
+  result: NOT_APPLICABLE_WITH_REASON
+  evidence:
+    - governance documentation only; no executable client behavior changed
+    - path, content, lifecycle, CI, review, and PR outcome were verified
+final_ci:
+  head: cf19ed5094e4ac7b2cd6aeac9d4f8bc5abce133d
+  result: PASS
+  checks:
+    - CI 1327
+    - ready-state CI / Required 1328
+pull_requests:
+  unresolved_review_threads: 0
+  terminal_prs:
+    - blakinio/otclient#161 merged as 99ebed0914e296268d32642000af6d71664cadd9
+  archive_pr: blakinio/otclient#163
+task_archived_or_terminal: true
+ownership_released: true
+stale_branches_reconciled: true
 ```
 
-## Acceptance
+The merged contracts require prompt/harness evaluation, trust/context boundaries, complete applicable client/backend vertical slices, outcome evidence, fresh audit, real E2E, exact-head CI, terminal related PRs, archival and autonomous continuation.
 
-- [x] Prompt/harness eval and rollback rules are normative.
-- [x] Trust and context boundaries are normative.
-- [x] Complete applicable client/backend vertical slices are required.
-- [x] Outcome evidence overrides worker narrative.
-- [x] Fresh audit, real E2E, exact-head CI, terminal PRs, archive and ownership release are required.
-- [x] Feature PR passed draft and ready-state CI and merged.
-- [x] No material finding or unresolved review thread remains.
-- [x] Active task ownership is released by this lifecycle move.
-
-No blocker remains. The archive PR is the only expected non-terminal related PR until this record reaches `main`.
+No material finding or blocker remains. Until PR #163 merges, it is the sole intentionally open related PR.

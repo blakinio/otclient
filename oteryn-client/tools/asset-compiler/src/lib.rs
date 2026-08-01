@@ -1,14 +1,18 @@
 //! Deterministic offline compiler for the bounded synthetic asset format.
 
+use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
+use cap_std::ambient_authority;
+use cap_std::fs::{Dir, File as CapabilityFile, OpenOptions as CapabilityOpenOptions};
 use oteryn_asset_types::{
     AssetError, AssetId, AssetKind, AssetMetadata, AssetPack, AssetRecord, MAX_ASSET_BYTES,
     MAX_RECORDS,
 };
 use serde_json::{Map, Value};
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fmt::{self, Display, Formatter};
-use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::fs::{self, OpenOptions};
+use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 /// Current constrained JSON manifest schema version.
@@ -39,9 +43,11 @@ impl CompileReport {
 
 /// Compile one constrained JSON manifest into one immutable synthetic pack.
 ///
-/// Source entries are resolved under the manifest directory. The final output
-/// must not already exist. A same-directory temporary file is committed with a
-/// final rename only after all parsing, validation and encoding succeeds.
+/// Source entries are resolved under the opened manifest-directory capability.
+/// Every path component is opened without following links, and source type,
+/// size and bytes are obtained from the same accepted file handle. The final
+/// output must not already exist. A same-directory temporary file is committed
+/// with a final rename only after all parsing, validation and encoding succeeds.
 ///
 /// # Errors
 ///
@@ -52,11 +58,10 @@ pub fn compile_manifest(
     output_path: &Path,
 ) -> Result<CompileReport, CompilerError> {
     let output = OutputTarget::new(output_path)?;
-    let manifest_bytes = read_bounded_manifest(manifest_path)?;
+    let (manifest_bytes, source_root) = read_bounded_manifest(manifest_path)?;
     let manifest: Value =
         serde_json::from_slice(&manifest_bytes).map_err(|_| CompilerError::InvalidJson)?;
-    let root = canonical_manifest_root(manifest_path)?;
-    let records = parse_manifest(&manifest, &root)?;
+    let records = parse_manifest(&manifest, &source_root)?;
     let pack = AssetPack::new(records).map_err(CompilerError::Asset)?;
     let encoded = pack.encode().map_err(CompilerError::Asset)?;
     output.commit(&encoded)?;
@@ -126,38 +131,55 @@ impl Error for CompilerError {
     }
 }
 
-fn read_bounded_manifest(path: &Path) -> Result<Vec<u8>, CompilerError> {
-    let metadata = fs::metadata(path).map_err(|_| CompilerError::ManifestUnavailable)?;
+fn read_bounded_manifest(path: &Path) -> Result<(Vec<u8>, Dir), CompilerError> {
+    let file_name = path
+        .file_name()
+        .filter(|value| !value.is_empty())
+        .ok_or(CompilerError::ManifestUnavailable)?;
+    let parent = path
+        .parent()
+        .filter(|value| !value.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let root = Dir::open_ambient_dir(parent, ambient_authority())
+        .map_err(|_| CompilerError::ManifestUnavailable)?;
+    let file = open_file_nofollow(&root, file_name)
+        .map_err(|_| CompilerError::ManifestUnavailable)?;
+    let bytes = read_bounded_open_file(
+        file,
+        MAX_MANIFEST_BYTES,
+        CompilerError::ManifestUnavailable,
+        CompilerError::ManifestTooLarge,
+    )?;
+    Ok((bytes, root))
+}
+
+fn read_bounded_open_file(
+    file: CapabilityFile,
+    limit: usize,
+    unavailable: CompilerError,
+    too_large: CompilerError,
+) -> Result<Vec<u8>, CompilerError> {
+    let metadata = file.metadata().map_err(|_| unavailable)?;
     if !metadata.is_file() {
-        return Err(CompilerError::ManifestUnavailable);
+        return Err(unavailable);
     }
-    if metadata.len() > usize_to_u64(MAX_MANIFEST_BYTES) {
-        return Err(CompilerError::ManifestTooLarge);
+    if metadata.len() > usize_to_u64(limit) {
+        return Err(too_large);
     }
 
-    let file = File::open(path).map_err(|_| CompilerError::ManifestUnavailable)?;
     let mut bytes = Vec::with_capacity(
-        usize::try_from(metadata.len()).map_err(|_| CompilerError::ManifestTooLarge)?,
+        usize::try_from(metadata.len()).map_err(|_| too_large)?,
     );
-    file.take(usize_to_u64(MAX_MANIFEST_BYTES + 1))
+    file.take(usize_to_u64(limit + 1))
         .read_to_end(&mut bytes)
-        .map_err(|_| CompilerError::ManifestUnavailable)?;
-    if bytes.len() > MAX_MANIFEST_BYTES {
-        return Err(CompilerError::ManifestTooLarge);
+        .map_err(|_| unavailable)?;
+    if bytes.len() > limit {
+        return Err(too_large);
     }
     Ok(bytes)
 }
 
-fn canonical_manifest_root(path: &Path) -> Result<PathBuf, CompilerError> {
-    let root = path.parent().unwrap_or_else(|| Path::new("."));
-    let canonical = fs::canonicalize(root).map_err(|_| CompilerError::ManifestUnavailable)?;
-    if !canonical.is_dir() {
-        return Err(CompilerError::ManifestUnavailable);
-    }
-    Ok(canonical)
-}
-
-fn parse_manifest(value: &Value, root: &Path) -> Result<Vec<AssetRecord>, CompilerError> {
+fn parse_manifest(value: &Value, root: &Dir) -> Result<Vec<AssetRecord>, CompilerError> {
     let object = value.as_object().ok_or(CompilerError::InvalidManifest)?;
     require_exact_keys(object, &["schema_version", "assets"])?;
     let schema_version = object
@@ -182,7 +204,7 @@ fn parse_manifest(value: &Value, root: &Path) -> Result<Vec<AssetRecord>, Compil
     Ok(records)
 }
 
-fn parse_asset(value: &Value, root: &Path) -> Result<AssetRecord, CompilerError> {
+fn parse_asset(value: &Value, root: &Dir) -> Result<AssetRecord, CompilerError> {
     let object = value.as_object().ok_or(CompilerError::InvalidManifest)?;
     let kind_name = required_string(object, "kind")?;
     match kind_name {
@@ -286,25 +308,44 @@ fn validated_relative_path(value: &str) -> Result<PathBuf, CompilerError> {
     Ok(normalized)
 }
 
-fn read_source(root: &Path, relative: &Path) -> Result<Vec<u8>, CompilerError> {
-    let mut current = root.to_path_buf();
-    for component in relative.components() {
+fn read_source(root: &Dir, relative: &Path) -> Result<Vec<u8>, CompilerError> {
+    read_source_with_hook(root, relative, || {})
+}
+
+fn read_source_with_hook<F>(
+    root: &Dir,
+    relative: &Path,
+    after_open: F,
+) -> Result<Vec<u8>, CompilerError>
+where
+    F: FnOnce(),
+{
+    let mut directory = root
+        .try_clone()
+        .map_err(|_| CompilerError::SourceUnavailable)?;
+    let mut components = relative.components().peekable();
+    let mut file = None;
+
+    while let Some(component) = components.next() {
         let Component::Normal(part) = component else {
             return Err(CompilerError::InvalidSourcePath);
         };
-        current.push(part);
-        let metadata =
-            fs::symlink_metadata(&current).map_err(|_| CompilerError::SourceUnavailable)?;
-        if metadata.file_type().is_symlink() {
-            return Err(CompilerError::SourceSymlink);
+        if components.peek().is_some() {
+            directory = directory
+                .open_dir_nofollow(Path::new(part))
+                .map_err(|_| classify_source_open_error(&directory, part, true))?;
+        } else {
+            file = Some(
+                open_file_nofollow(&directory, part)
+                    .map_err(|_| classify_source_open_error(&directory, part, false))?,
+            );
         }
     }
 
-    let canonical = fs::canonicalize(&current).map_err(|_| CompilerError::SourceUnavailable)?;
-    if !canonical.starts_with(root) {
-        return Err(CompilerError::SourceOutsideRoot);
-    }
-    let metadata = fs::metadata(&canonical).map_err(|_| CompilerError::SourceUnavailable)?;
+    let file = file.ok_or(CompilerError::InvalidSourcePath)?;
+    let metadata = file
+        .metadata()
+        .map_err(|_| CompilerError::SourceUnavailable)?;
     if !metadata.is_file() {
         return Err(CompilerError::SourceNotFile);
     }
@@ -312,7 +353,8 @@ fn read_source(root: &Path, relative: &Path) -> Result<Vec<u8>, CompilerError> {
         return Err(CompilerError::SourceTooLarge);
     }
 
-    let file = File::open(&canonical).map_err(|_| CompilerError::SourceUnavailable)?;
+    after_open();
+
     let mut payload = Vec::with_capacity(
         usize::try_from(metadata.len()).map_err(|_| CompilerError::SourceTooLarge)?,
     );
@@ -323,6 +365,25 @@ fn read_source(root: &Path, relative: &Path) -> Result<Vec<u8>, CompilerError> {
         return Err(CompilerError::SourceTooLarge);
     }
     Ok(payload)
+}
+
+fn open_file_nofollow(directory: &Dir, name: &OsStr) -> io::Result<CapabilityFile> {
+    let mut options = CapabilityOpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    directory.open_with(Path::new(name), &options)
+}
+
+fn classify_source_open_error(
+    directory: &Dir,
+    name: &OsStr,
+    directory_required: bool,
+) -> CompilerError {
+    match directory.symlink_metadata(Path::new(name)) {
+        Ok(metadata) if metadata.file_type().is_symlink() => CompilerError::SourceSymlink,
+        Ok(metadata) if directory_required && !metadata.is_dir() => CompilerError::SourceNotFile,
+        Ok(metadata) if !directory_required && !metadata.is_file() => CompilerError::SourceNotFile,
+        _ => CompilerError::SourceUnavailable,
+    }
 }
 
 fn usize_to_u64(value: usize) -> u64 {
@@ -385,5 +446,51 @@ impl OutputTarget {
         drop(file);
         fs::rename(&self.temporary_path, &self.final_path)
             .map_err(|_| CompilerError::OutputCommitFailed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use std::env;
+    use std::process;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(1);
+
+    #[test]
+    fn opened_source_handle_cannot_be_redirected_by_path_replacement()
+    -> Result<(), Box<dyn Error>> {
+        let sequence = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+        let directory_path = env::temp_dir().join(format!(
+            "oteryn-asset-open-handle-{}-{sequence}",
+            process::id()
+        ));
+        drop(fs::remove_dir_all(&directory_path));
+        fs::create_dir(&directory_path)?;
+        let source_path = directory_path.join("source.bin");
+        let moved_path = directory_path.join("accepted.bin");
+        fs::write(&source_path, b"accepted object bytes")?;
+
+        let root = Dir::open_ambient_dir(&directory_path, ambient_authority())?;
+        let replacement = RefCell::new(None);
+        let payload = read_source_with_hook(&root, Path::new("source.bin"), || {
+            let result = fs::rename(&source_path, &moved_path)
+                .and_then(|()| fs::write(&source_path, b"substituted path bytes"));
+            replacement.replace(Some(result));
+        })?;
+
+        assert_eq!(payload, b"accepted object bytes");
+        let replacement = replacement.into_inner().ok_or_else(|| {
+            io::Error::other("source replacement hook did not run")
+        })?;
+        if replacement.is_ok() {
+            assert_eq!(fs::read(&source_path)?, b"substituted path bytes");
+        }
+
+        drop(root);
+        drop(fs::remove_dir_all(&directory_path));
+        Ok(())
     }
 }

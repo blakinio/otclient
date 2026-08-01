@@ -237,12 +237,28 @@ fn launch_system_browser(_authorization_url: &Url) -> Result<(), IdentityError> 
 ///
 /// The request target contains OAuth code/state material and is retained by a
 /// non-cloneable redacted owner that overwrites its project-owned bytes on drop.
+/// External callers can construct an attempt and inspect only its non-secret peer;
+/// they cannot mutate, take or replace the accepted target.
+///
+/// ```compile_fail
+/// use oteryn_identity::CallbackAttempt;
+/// use std::net::{IpAddr, Ipv4Addr};
+///
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let mut attempt = CallbackAttempt::new(
+///         IpAddr::V4(Ipv4Addr::LOCALHOST),
+///         "/callback?code=secret&state=secret".to_owned(),
+///     )?;
+///     attempt.target.clear();
+///     Ok(())
+/// }
+/// ```
 pub struct CallbackAttempt {
     /// Remote peer observed by the bound listener.
     pub peer: IpAddr,
     /// Exact HTTP request target including query. The enclosing non-cloneable
     /// attempt overwrites this project-owned allocation on terminal drop.
-    pub target: String,
+    target: String,
 }
 
 impl CallbackAttempt {

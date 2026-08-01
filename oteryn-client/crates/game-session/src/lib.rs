@@ -248,17 +248,23 @@ impl Display for AdmissionCredential {
     }
 }
 
-struct SecretBytes(Box<[u8]>);
+struct SecretBytes(Vec<u8>);
 
 impl SecretBytes {
-    fn new(secret: Vec<u8>) -> Result<Self, CredentialValidationError> {
+    fn new(mut secret: Vec<u8>) -> Result<Self, CredentialValidationError> {
+        Self::validate_for_ownership(&mut secret)?;
+        Ok(Self(secret))
+    }
+
+    fn validate_for_ownership(secret: &mut [u8]) -> Result<(), CredentialValidationError> {
         if secret.is_empty() {
             return Err(CredentialValidationError::Empty);
         }
         if secret.len() > MAX_GAME_ENTRY_CREDENTIAL_BYTES {
+            secret.fill(0);
             return Err(CredentialValidationError::TooLarge);
         }
-        Ok(Self(secret.into_boxed_slice()))
+        Ok(())
     }
 
     fn as_slice(&self) -> &[u8] {
@@ -1286,6 +1292,16 @@ mod tests {
         secret.clear();
         assert!(secret.as_slice().iter().all(|byte| *byte == 0));
         Ok(())
+    }
+
+    #[test]
+    fn oversized_secret_input_is_cleared_before_rejection() {
+        let mut secret = vec![0xa5; MAX_GAME_ENTRY_CREDENTIAL_BYTES + 1];
+        assert_eq!(
+            SecretBytes::validate_for_ownership(&mut secret),
+            Err(CredentialValidationError::TooLarge)
+        );
+        assert!(secret.iter().all(|byte| *byte == 0));
     }
 
     #[test]

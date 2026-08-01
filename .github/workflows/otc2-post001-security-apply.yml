@@ -1,0 +1,47 @@
+name: Apply OTC2 POST-001 security fixture
+
+on:
+  push:
+    branches:
+      - fix/OTC2-20260801-secret-owner-completion
+
+permissions:
+  contents: write
+
+concurrency:
+  group: otc2-post001-security-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[post001 security applied]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          show-progress: false
+          fetch-depth: 0
+
+      - name: Install pinned Rust formatter
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+
+      - name: Apply exact security fixture patch
+        run: python .github/scripts/otc2_post001_security_apply.py
+
+      - name: Format and focused validation
+        working-directory: oteryn-client
+        run: |
+          cargo +1.94.0 fmt --all
+          cargo +1.94.0 test --locked -p oteryn-identity-security-tests
+
+      - name: Commit final security fixture patch
+        run: |
+          git rm .github/workflows/otc2-post001-security-apply.yml
+          git rm .github/scripts/otc2_post001_security_apply.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/tests/security/auth/src/lib.rs
+          git commit -m "test(auth): construct callback through bounded owner [post001 security applied]"
+          git push origin HEAD:fix/OTC2-20260801-secret-owner-completion

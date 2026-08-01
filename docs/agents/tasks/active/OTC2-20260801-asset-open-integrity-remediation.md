@@ -5,15 +5,15 @@ agent: "GPT-5.6 Thinking"
 lane: otclient-v2
 track: greenfield-rust
 workstream: asset-security
-phase: implementation
+phase: validation
 branch: fix/OTC2-20260801-asset-open-integrity-remediation
 base_branch: main
 created: 2026-08-01T14:00:00+02:00
-updated: 2026-08-01T14:00:00+02:00
-last_verified_commit: "a16c7e7da32bdc96404845341fd72fbdf4db9bc3"
+updated: 2026-08-01T14:25:00+02:00
+last_verified_commit: "1ec63633921da994ae6e99a9dc88e88cba92961b"
 required_base_commit: "a16c7e7da32bdc96404845341fd72fbdf4db9bc3"
 risk: high
-related_pr: null
+related_pr: 131
 depends_on:
   - OTC2-20260801-complete-architecture-policy
   - R4 implementation merge abe0c8c6a96026ba874f3fc58fa84eae3444b699
@@ -22,11 +22,14 @@ owned_paths:
   - docs/agents/tasks/active/OTC2-20260801-asset-open-integrity-remediation.md
   - oteryn-client/tools/asset-compiler/src/lib.rs
   - oteryn-client/tools/asset-compiler/tests/compiler.rs
+  - oteryn-client/tools/asset-compiler/tests/source_integrity.rs
   - oteryn-client/tools/asset-compiler/Cargo.toml
   - oteryn-client/Cargo.lock
+  - oteryn-client/deny.toml
   - oteryn-client/docs/architecture/decisions/2026-08-01-capability-safe-asset-source-open.md
 shared_path_lease:
   - oteryn-client/Cargo.lock
+  - oteryn-client/deny.toml
 modules_touched:
   - Rust asset compiler source acquisition
 crates_touched:
@@ -55,62 +58,79 @@ execution_mode: codex
 
 Remediate `OTC2-AUD-003` so every source payload is validated and read from the same opened regular-file object, with no pathname validation/open race.
 
-# Discovery checkpoint
+# Implemented contract
 
-The pinned standard library exposes safe Windows open flags and handle metadata but no safe handle-relative directory traversal API. Direct Win32/FFI is prohibited.
+- The manifest parent is opened once as a `cap_std::fs::Dir` capability.
+- The manifest file is opened relative to that capability without following the final link.
+- Every validated normal source component is traversed relative to the capability.
+- Every intermediate directory uses `open_dir_nofollow` one component at a time.
+- The final file uses `FollowSymlinks::No`.
+- Type, size and bytes use the same opened final file object.
+- Path metadata after an open failure is used only for stable error classification.
+- The public `compile_manifest(&Path, &Path)` and pack format are unchanged.
+- No project unsafe code, Win32/FFI, workflow or shared PR #23 documentation path remains in the diff.
 
-Reviewed capability solution:
+# Dependency review
 
-- `cap_std::fs::Dir` is an unforgeable opened-directory capability and resolves relative paths without escaping its directory tree;
-- `cap_fs_ext::DirExt::open_dir_nofollow` fails when its single path component names a symlink;
-- `cap_fs_ext::OpenOptionsFollowExt` with `FollowSymlinks::No` prevents following the final source component;
-- traversing one validated normal component at a time applies no-follow to every intermediate directory;
-- final type, size and bytes are obtained from the same opened `cap_std::fs::File` handle;
-- the reviewed crates are Bytecode Alliance releases `=4.0.2`, support Windows, use crates.io sources and offer an allowed MIT/Apache licensing alternative;
-- no unsafe project code or public CLI contract change is required.
+`cap-std` and `cap-fs-ext` are pinned to `=4.0.2`. Cargo 1.94.0 generated the lockfile. `cargo-deny` remains fail-closed and records only the exact reviewed capability-graph license and duplicate-version exceptions in `deny.toml`.
 
-This proves an implementable safe-Rust platform primitive and authorizes implementation. Open PRs #23, #48 and #97 do not touch the owned Rust paths or `Cargo.lock`.
+# Evidence
 
-# Acceptance
-
-- manifest directory is acquired once as a directory capability;
-- manifest file and every source are opened relative to that capability;
-- every intermediate source directory is opened one component at a time with no-follow;
-- the final source is opened with no-follow;
-- regular-file and size validation use metadata from the opened final handle;
-- the same handle supplies all payload bytes;
-- deterministic substitution tests prove a post-validation rename cannot redirect the read;
-- existing traversal, symlink, special-file, oversize and deterministic-output behavior remains covered;
-- no unsafe code, raw Win32/FFI or shared PR #23 documentation path changes.
+- Deterministic post-open substitution test: replacing the pathname after acquisition cannot redirect the current read.
+- Regular nested source integration test.
+- Intermediate directory symlink rejection integration test when the host permits symlink creation.
+- Existing traversal, final-symlink, special-file, oversize and deterministic-output tests remain active.
+- Decision record: `oteryn-client/docs/architecture/decisions/2026-08-01-capability-safe-asset-source-open.md`.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T14:00:00+02:00
-head: a16c7e7da32bdc96404845341fd72fbdf4db9bc3
+updated_at: 2026-08-01T14:25:00+02:00
+head: aebfde2fcf9fd4ec3a563a135b4cc986c98af3c9
 branch: fix/OTC2-20260801-asset-open-integrity-remediation
-pr: null
+pr: 131
 status: active
 proven:
-  - Current read_source performs symlink/canonical/metadata validation before File::open and is TOCTOU-vulnerable.
-  - Rust std has no safe handle-relative directory traversal API for the required Windows invariant.
-  - cap-std/cap-fs-ext 4.0.2 provide capability-relative and no-follow primitives on Windows and Unix.
-  - Open PRs have no asset-compiler or Cargo.lock overlap.
+  - Previous read_source used metadata and canonicalization before a later ambient File::open.
+  - Rust std has no safe handle-relative Windows traversal API for this invariant.
+  - cap-std/cap-fs-ext 4.0.2 provide the required safe capability and no-follow primitives.
+  - Every accepted source is now validated and read from one opened final file object.
+  - Source head 1ec63633921da994ae6e99a9dc88e88cba92961b passed locked metadata, rustfmt, strict Clippy, full workspace tests, architecture validation and Supply Chain.
+  - Rust Client run 30699475876 passed; Windows job 91367798935 passed; Supply Chain job 91367798976 passed.
+  - Open PRs have no asset-compiler, Cargo.lock or deny.toml overlap.
 derived:
-  - One bounded dependency-backed implementation can preserve compile_manifest path API while eliminating the race.
+  - The pathname substitution window reported by OTC2-AUD-003 is closed for manifest source acquisition.
 unknown:
-  - Exact generated Cargo.lock delta and cargo-deny duplicate-version impact.
+  - Final exact-head CI result after adding the intermediate-component test and ADR.
 conflicts: []
 first_failure:
-  marker: not-run
-  evidence: Implementation has not started.
+  marker: resolved
+  evidence: Initial rustfmt and cargo-deny failures were corrected with exact formatting and reviewed policy entries.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-asset-open-integrity-remediation.md
+  - oteryn-client/Cargo.lock
+  - oteryn-client/deny.toml
+  - oteryn-client/docs/architecture/decisions/2026-08-01-capability-safe-asset-source-open.md
+  - oteryn-client/tools/asset-compiler/Cargo.toml
+  - oteryn-client/tools/asset-compiler/src/lib.rs
+  - oteryn-client/tools/asset-compiler/tests/source_integrity.rs
 validation:
-  - command: ownership, overlap and primitive-discovery preflight
+  - command: cargo metadata --locked --format-version 1
     result: PASS
-    evidence: main a16c7e7da32bdc96404845341fd72fbdf4db9bc3; reviewed capability APIs; no open PR overlap.
+    evidence: Windows job 91367798935.
+  - command: cargo fmt --all --check
+    result: PASS
+    evidence: Windows job 91367798935.
+  - command: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+    result: PASS
+    evidence: Windows job 91367798935.
+  - command: cargo test --workspace --all-targets --all-features --locked
+    result: PASS
+    evidence: Windows job 91367798935.
+  - command: cargo deny check --all-features
+    result: PASS
+    evidence: Supply Chain job 91367798976.
 blockers: []
-next_action: Open the draft PR, add the pinned capability dependencies and implement exact-handle acquisition tests.
+next_action: Run exact-head validation, review and merge PR #131.
 ```

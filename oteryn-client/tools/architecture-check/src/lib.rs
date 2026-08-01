@@ -227,12 +227,7 @@ fn allowed_normal_edge(source: &str, target: &str) -> bool {
         ),
         "ui-core" => matches!(
             target,
-            "foundation"
-                | "render-types"
-                | "asset-types"
-                | "input"
-                | "settings"
-                | "diagnostics"
+            "foundation" | "render-types" | "asset-types" | "input" | "settings" | "diagnostics"
         ),
         "ui-runtime" => matches!(
             target,
@@ -550,7 +545,10 @@ fn graph_from_fixture(value: &Value) -> Result<WorkspaceGraph, String> {
         .as_object()
         .ok_or_else(|| "fixture root must be a JSON object".to_owned())?;
     let schema_version = required_u64(object.get("schema_version"), "schema_version")?;
-    if !matches!(schema_version, LEGACY_FIXTURE_SCHEMA_VERSION | FIXTURE_SCHEMA_VERSION) {
+    if !matches!(
+        schema_version,
+        LEGACY_FIXTURE_SCHEMA_VERSION | FIXTURE_SCHEMA_VERSION
+    ) {
         return Err(format!(
             "unsupported fixture schema_version {schema_version}; supported versions are {LEGACY_FIXTURE_SCHEMA_VERSION} and {FIXTURE_SCHEMA_VERSION}"
         ));
@@ -660,10 +658,7 @@ fn graph_from_cargo_metadata(value: &Value) -> Result<WorkspaceGraph, String> {
                 name: required_string(dependency_object.get("name"), "dependency.name")?,
                 path: optional_string(dependency_object.get("path"), "dependency.path")?,
                 source: optional_string(dependency_object.get("source"), "dependency.source")?,
-                kind: optional_dependency_kind(
-                    dependency_object.get("kind"),
-                    "dependency.kind",
-                )?,
+                kind: optional_dependency_kind(dependency_object.get("kind"), "dependency.kind")?,
             });
         }
 
@@ -702,20 +697,14 @@ fn required_u64(value: Option<&Value>, field: &str) -> Result<u64, String> {
         .ok_or_else(|| format!("{field} must be an unsigned integer"))
 }
 
-fn required_dependency_kind(
-    value: Option<&Value>,
-    field: &str,
-) -> Result<DependencyKind, String> {
+fn required_dependency_kind(value: Option<&Value>, field: &str) -> Result<DependencyKind, String> {
     let text = value
         .and_then(Value::as_str)
         .ok_or_else(|| format!("{field} must be one of normal, build or dev"))?;
     parse_dependency_kind(text, field)
 }
 
-fn optional_dependency_kind(
-    value: Option<&Value>,
-    field: &str,
-) -> Result<DependencyKind, String> {
+fn optional_dependency_kind(value: Option<&Value>, field: &str) -> Result<DependencyKind, String> {
     match value {
         None | Some(Value::Null) => Ok(DependencyKind::Normal),
         Some(Value::String(text)) => parse_dependency_kind(text, field),

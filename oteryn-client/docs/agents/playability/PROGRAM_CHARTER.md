@@ -67,7 +67,7 @@ All workers preserve the normative architecture:
 
 ### M0 — Technical entry foundation
 
-Current state: materially completed as a bounded synthetic foundation, with real deployment still unproven and focused LOW residual `OTC2-POST-001` remaining after the independent closure audit.
+Current state: materially completed as a bounded synthetic foundation, with real deployment still unproven. The independent closure audit residual `OTC2-POST-001` was closed by implementation PR #136 and lifecycle archive PR #137.
 
 Required outcome:
 
@@ -75,15 +75,15 @@ Required outcome:
 - native OAuth/PKCE, Gateway and Canary admission boundaries compose;
 - fake-service E2E reaches typed `SessionEntered` and shuts down safely;
 - architecture policy, source-open integrity and nonblocking shutdown findings are closed;
-- the active secret flow is materially corrected and all release-required public secret-owner seams, including `OTC2-POST-001`, are closed before credential-bearing M1 validation.
+- the active secret flow and all audited release-required public secret-owner seams are closed within the documented best-effort project-owned-memory boundary.
 
-M0 does not mean gameplay is visible or playable. Docs-only P0 discovery may proceed after lifecycle gates; M1 credential-bearing runtime validation may not claim complete secret-lifecycle closure while `OTC2-POST-001` remains.
+M0 does not mean gameplay is visible or playable. Docs-only P0 discovery may proceed after lifecycle gates. M1 remains gated by controlled staging, deployment and real credential-bearing runtime evidence rather than by an unresolved package-local secret-owner finding.
 
 ### M1 — Controlled real technical login
 
 A controlled project-owned staging environment proves:
 
-- `OTC2-POST-001` is closed and independently validated;
+- merged secret-owner completion PR #136 and archive PR #137 remain present on the exact validated base;
 - exact Identity, Gateway and Canary revisions/configuration are pinned;
 - the system browser returns through the dynamic loopback callback on supported Windows;
 - TLS, DNS, firewall and issuer mapping are correct;

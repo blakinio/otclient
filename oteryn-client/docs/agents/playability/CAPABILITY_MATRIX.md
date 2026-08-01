@@ -1,7 +1,7 @@
 # Oteryn Rust Client Capability Matrix
 
-Status cut: `main@958881038ca5a5bc2f25a878a898ab5446d5e5c4` after independent post-remediation audit PR #133.  
-Audit status: `VALIDATED_WITH_ONE_RESIDUAL`; `OTC2-AUD-002/003/004` are closed and `OTC2-AUD-001` is partially closed by focused LOW `OTC2-POST-001`.  
+Status cut: `main@02c7ac4b1d5bf1d37c20694bad45e830e430e822` after secret-owner completion archive PR #137.  
+Remediation status: independent audit PR #133 identified LOW `OTC2-POST-001`; implementation PR #136 and archive PR #137 closed it. `OTC2-AUD-001` through `OTC2-AUD-004` are closed within their documented boundaries.  
 This is a living planning matrix, not a release claim.
 
 ## Status rules
@@ -28,7 +28,7 @@ The coordinator updates rows only from merged code, exact CI/runtime evidence an
 | Windows event-loop/window shell | PARTIAL | bounded `winit` shell exists; interactive matrix incomplete | Windows shell/runtime acceptance | M1/M4 |
 | Renderer device/surface ownership | PARTIAL | deterministic `wgpu` surface boundary; no world/UI passes | renderer resource/world packages | M2-M4 |
 | Nonblocking technical worker shutdown | PROVEN | typed begin/poll shutdown remediation | extend to future workers | all |
-| Project-owned secret lifetime invariant | PARTIAL | active flow materially corrected; public mutable callback target and rejected oversized direct credential input remain as LOW `OTC2-POST-001` | one focused standard-library-only follow-up before credential-bearing M1 validation | M1 |
+| Project-owned secret lifetime invariant | PROVEN | callback target is externally immutable after bounded construction; rejected oversized direct credentials are cleared; claims remain limited to best-effort overwrite of project-owned initialized bytes | preserve in Identity/Platform/session changes; browser, HTTP/TLS, allocator and OS copies remain external boundaries | M1 |
 | Settings schema/migrations | ABSENT | no typed settings system | `settings-core` sole producer | M3/M4 |
 | Crash handling and support bundle | ABSENT | diagnostics contract only | diagnostics runtime/support package | M4/M6 |
 | Replay and deterministic benchmark harness | ABSENT | architecture target only | replay/benchmark tools | M3-M6 |
@@ -37,14 +37,14 @@ The coordinator updates rows only from merged code, exact CI/runtime evidence an
 
 | Capability | State | Current evidence/boundary | Next owning package | Milestone |
 |---|---|---|---|---|
-| OAuth Authorization Code + PKCE | SYNTHETIC_ONLY | fake browser/listener/HTTP security E2E | controlled deployment validation after `OTC2-POST-001` | M1 |
+| OAuth Authorization Code + PKCE | SYNTHETIC_ONLY | fake browser/listener/HTTP security E2E; package-local secret-owner residual is closed | controlled deployment validation | M1 |
 | Real browser loopback callback on Windows | UNKNOWN | no named interactive desktop evidence | P0 release/E2E then staging task | M1 |
 | Exact deployed Identity/Gateway compatibility | UNKNOWN | repository contracts only | controlled staging E2E | M1 |
 | Account generation/lifecycle | PARTIAL | one bounded bootstrap; token family consumed by ticket issuance | account relog/session design | M3/M4 |
 | Strict Gateway protocol-v1 directory | SYNTHETIC_ONLY | bounded fake response and relation validation | real staging validation | M1 |
 | World/character selection contracts | PROVEN | typed validated directory and explicit selection | native selection UI | M1/M4 |
 | Native login and character-selection UX | ABSENT | technical environment-only surface | UI/auth feature packages | M4 |
-| One-shot game-entry credential | PARTIAL | normal internal path is bounded/non-clone/redacted; direct oversized public constructor input is the LOW residual | focused `OTC2-POST-001` cleanup then reuse | M1 |
+| One-shot game-entry credential | PROVEN | bounded, non-cloneable, redacted one-shot owner; direct oversized input is cleared before rejection | preserve lifecycle contract; real Canary acceptance remains a separate staging claim | M1 |
 | Controlled real Canary admission | UNKNOWN | production path fail-closed without exact deployment proof | staging admission task | M1 |
 | Relog without full process restart | ABSENT | one bounded bootstrap only | account/game session lifecycle | M3/M4 |
 | Reconnect policy | ABSENT | no gameplay session reconnect | session recovery package | M3/M4 |
@@ -195,6 +195,6 @@ P0 must replace the major `UNKNOWN` areas with exact evidence:
 5. Staging, E2E, performance, packaging and release evidence plan.
 6. Coordinator aggregation that marks release-required versus deferred capabilities and proposes the smallest P1 contract producers.
 
-`OTC2-POST-001` does not block docs-only P0 discovery, but must be closed before credential-bearing M1 runtime validation or any broader secret-lifecycle completion claim.
+The package-local secret-owner follow-up is merged and archived. P0 launch now depends only on the programme lifecycle gates and fresh coordinator ownership preflight; M1 still requires controlled real staging evidence.
 
 No P0 worker changes Rust source or claims implementation readiness.

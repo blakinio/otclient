@@ -9,7 +9,7 @@ Implementation authorized: **false**
 
 No P0 worker may start until:
 
-1. post-remediation closure audit PR #133 and its separate lifecycle archive are merged;
+1. post-remediation audit PR #133, audit archive PR #134, secret-owner completion PR #136 and archive PR #137 are merged;
 2. full-playability programme planning PR and its separate lifecycle archive are merged;
 3. exact `main`, active tasks, open PRs, review state and required CI are rechecked;
 4. no existing task/PR owns a P0 output path;

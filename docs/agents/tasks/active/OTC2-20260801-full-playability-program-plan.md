@@ -9,15 +9,18 @@ phase: design
 branch: docs/OTC2-20260801-full-playability-program-plan
 base_branch: main
 created: 2026-08-01T15:38:00+02:00
-updated: 2026-08-01T15:38:00+02:00
-last_verified_commit: "67a6c9d726f7e70977803b028270475570210db0"
-required_base_commit: "67a6c9d726f7e70977803b028270475570210db0"
+updated: 2026-08-01T16:42:00+02:00
+last_verified_commit: "02c7ac4b1d5bf1d37c20694bad45e830e430e822"
+required_base_commit: "02c7ac4b1d5bf1d37c20694bad45e830e430e822"
 risk: high
-related_pr: null
+related_pr: 135
 depends_on:
   - merged W7 technical-login runtime and lifecycle archive
   - merged post-W7 remediations R1/R2/R4/R3
-  - closure audit task OTC2-20260801-post-remediation-closure-audit before worker launch
+  - closure audit PR #133 merge 958881038ca5a5bc2f25a878a898ab5446d5e5c4
+  - closure audit archive PR #134 merge 7596a792fbf747609a65e9fc35678b800b2d56e2
+  - secret-owner completion PR #136 merge 78567eaefb1f6a827ffa1bff3be6d4aa370ba858
+  - secret-owner archive PR #137 merge 02c7ac4b1d5bf1d37c20694bad45e830e430e822
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260801-full-playability-program-plan.md
   - oteryn-client/docs/agents/playability/PROGRAM_CHARTER.md
@@ -80,9 +83,9 @@ The planning package must define measurable milestones, current capability statu
 
 # Launch gate
 
-The programme documents may be reviewed while PR #133 performs the independent post-remediation closure audit. No P0 worker may start until:
+The post-remediation audit, its archive and the audited secret-owner follow-up are merged. No P0 worker may start until:
 
-1. the closure audit and its lifecycle archive are merged;
+1. audit PR #133, audit archive PR #134, secret-owner PR #136 and archive PR #137 remain merged on the exact base;
 2. this planning PR and its separate lifecycle archive are merged;
 3. a fresh coordinator preflight confirms no active task/PR/path conflict;
 4. each worker creates one task, one branch and one draft PR with exclusive owned paths.
@@ -99,16 +102,16 @@ The programme documents may be reviewed while PR #133 performs the independent p
 - [ ] No Rust source, manifest, lockfile, workflow, architecture checker, legacy runtime path, producer repository or PR #23-owned shared file is changed.
 - [ ] Exact changed-path review and required repository CI pass on the final head.
 
-# Context checkpoint
+## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T15:38:00+02:00
-head: 67a6c9d726f7e70977803b028270475570210db0
+updated_at: 2026-08-01T16:42:00+02:00
+head: 16a3e70bc9238cda6bd2489e2469f6ed70753dc2
 branch: docs/OTC2-20260801-full-playability-program-plan
-pr: none
-status: active
-phase: design
+pr: 135
+status: validating
+phase: validation
 context_routes:
   - docs/agents/PROMPTING_STANDARD.md
   - docs/agents/PROMPTING_HANDOVER.md
@@ -123,10 +126,10 @@ owned_paths:
   - oteryn-client/docs/agents/prompts/PLAYABILITY_COORDINATOR_AGENT.md
   - oteryn-client/docs/agents/prompts/P0_*_AGENT.md
 proven:
-  - Current main is 67a6c9d726f7e70977803b028270475570210db0.
+  - Current main is 02c7ac4b1d5bf1d37c20694bad45e830e430e822.
   - W7 provides a synthetic technical-login composition but no minimum playable gameplay slice.
   - R1, R2, R4 and R3 remediations are merged and archived.
-  - PR #133 independently audits remediation closure and owns only its audit task/report paths.
+  - Audit PR #133, audit archive PR #134, secret-owner completion PR #136 and archive PR #137 are merged.
   - Open PRs #23, #48 and #97 do not own the proposed playability planning paths.
   - Prompting Standard requires bounded task shapes, staged validation and durable checkpoints.
 derived:
@@ -139,14 +142,28 @@ unknown:
   - Interactive Windows and real staging acceptance state.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: planning package not yet written
+  marker: resolved-stale-status
+  evidence: programme documents and prompts are written; stale audit/residual status is normalized to current main.
 rejected_hypotheses:
   - Launch all gameplay agents immediately: rejected because shared domain/protocol/UI contracts and parity acceptance are not yet normalized.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-full-playability-program-plan.md
-validation: []
+  - oteryn-client/docs/agents/playability/PROGRAM_CHARTER.md
+  - oteryn-client/docs/agents/playability/ARCHITECTURE_HANDOFF.md
+  - oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md
+  - oteryn-client/docs/agents/playability/DEPENDENCY_AND_PARALLELISM.md
+  - oteryn-client/docs/agents/playability/WAVE_P0_DISCOVERY.md
+  - oteryn-client/docs/agents/prompts/PLAYABILITY_COORDINATOR_AGENT.md
+  - oteryn-client/docs/agents/prompts/P0_CANARY_CAPABILITY_AGENT.md
+  - oteryn-client/docs/agents/prompts/P0_LEGACY_PARITY_AGENT.md
+  - oteryn-client/docs/agents/prompts/P0_ASSET_PIPELINE_AGENT.md
+  - oteryn-client/docs/agents/prompts/P0_UX_INPUT_AUDIO_AGENT.md
+  - oteryn-client/docs/agents/prompts/P0_RELEASE_E2E_AGENT.md
+validation:
+  - command: programme document and Prompting Standard review
+    result: PASS
+    evidence: twelve declared documentation paths; implementation remains unauthorized and each worker prompt contains required bounded sections.
 blockers:
-  - P0 worker launch waits for PR #133 and its archive plus this plan/archive.
-next_action: Write the normative programme charter, architecture handoff, capability matrix, parallelism plan and bounded P0 prompts.
+  - P0 worker launch waits for this planning PR and its separate lifecycle archive.
+next_action: Validate, review and merge PR #135, archive the plan, then run a fresh P0 coordinator launch preflight.
 ```

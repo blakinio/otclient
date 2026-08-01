@@ -9,8 +9,8 @@ phase: validation
 branch: docs/OTC2-20260801-playability-p0-aggregation
 base_branch: main
 created: 2026-08-01T21:45:00+02:00
-updated: 2026-08-01T22:01:00+02:00
-last_verified_commit: "c8cede7baa221c02109e7c33829c4602c948d394"
+updated: 2026-08-01T22:08:00+02:00
+last_verified_commit: "b6dfea73115d5a3687f1444e8fa4d07cfb07050d"
 required_base_commit: "6808d8a9dd5a24a29c5ac96fe35bb463fe4da34b"
 risk: medium
 related_pr: 151
@@ -39,18 +39,18 @@ Aggregate all five merged and archived P0 evidence lanes into one normalized cap
 
 # Result
 
-The barrier accepted a four-package P1 contract spine:
+The barrier accepted four bounded P1 packages in exact integration order:
 
-1. `CANARY-SOURCE-INDEX` — exact deterministic source/fixture evidence, no runtime public types;
+1. `CANARY-SOURCE-INDEX` — deterministic exact-source and fixture evidence, no runtime public types;
 2. `GAME-DOMAIN-CONTRACT` — sole gameplay IDs/handles and closed `GameEvent`/`GameCommand` producer;
 3. `ASSET-PACK-RUNTIME` — immutable synthetic-v1 pack open/verify/index/lookup and logical handles;
 4. `INPUT-ACTIONS` — normalized physical events and semantic action/context producer.
 
-Integration order is serialized exactly as listed. Only one shared workspace/lockfile/architecture lease holder may integrate at a time. Simulation, protocol gameplay parsers, UI/audio, renderer resources and app composition remain outside P1.
+Only one shared workspace/lockfile/architecture lease holder may integrate at a time. Simulation, gameplay protocol parsers, renderer resources, UI/audio, app composition, deployment and production asset work remain outside P1.
 
 # P0 evidence barrier
 
-Merged and archived lanes:
+Merged and separately archived:
 
 - Canary: PR #140 / archive #150;
 - legacy workflows/parity: PR #141 / archive #149;
@@ -68,28 +68,27 @@ Exact base: `main@6808d8a9dd5a24a29c5ac96fe35bb463fe4da34b`.
 - [x] P1 names sole producers, exact paths, dependencies, shared-lease rules, validation and merge order;
 - [x] four prompts comply with `PROMPTING_STANDARD.md`;
 - [x] exactly the eight owned documentation paths change;
-- [ ] checkpoint validation, independent review and exact-head required CI pass;
+- [x] checkpoint contract/review and exact-head heavy validation pass;
 - [ ] task is separately archived after merge.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T22:01:00+02:00
-head: c8cede7baa221c02109e7c33829c4602c948d394
+updated_at: 2026-08-01T22:08:00+02:00
+head: b6dfea73115d5a3687f1444e8fa4d07cfb07050d
 branch: docs/OTC2-20260801-playability-p0-aggregation
 pr: 151
-status: validating
+status: ready
 context_routes:
   - docs/agents/PROMPTING_STANDARD.md
   - docs/agents/PROMPTING_HANDOVER.md
   - docs/agents/EXECUTION_PROTOCOL.md
   - docs/agents/CONTEXT_HANDOFF.md
-  - oteryn-client/docs/agents/playability/PROGRAM_CHARTER.md
   - oteryn-client/docs/agents/playability/ARCHITECTURE_HANDOFF.md
   - oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md
   - oteryn-client/docs/agents/playability/DEPENDENCY_AND_PARALLELISM.md
-  - oteryn-client/docs/agents/playability/WAVE_P0_DISCOVERY.md
+  - oteryn-client/docs/agents/playability/WAVE_P1_CONTRACT_SPINE.md
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p0-aggregation.md
   - oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md
@@ -101,28 +100,28 @@ owned_paths:
   - oteryn-client/docs/agents/prompts/P1_INPUT_ACTIONS_AGENT.md
 proven:
   - All five P0 reports and separate lifecycle archives are merged.
-  - P0 introduced no product implementation and retained exact evidence boundaries.
-  - Matrix now classifies release-required, later and owner-decision capabilities.
-  - P1 owns four disjoint exclusive package sets and one serialized shared integration lease.
+  - Matrix separates source evidence, implementation state, deployment proof and owner decisions.
+  - P1 has four disjoint exclusive package sets and one serialized shared integration lease.
   - Game-domain is the first gameplay public-contract producer.
+  - Exact-head Rust Client and repository CI passed on b6dfea73115d5a3687f1444e8fa4d07cfb07050d.
 derived:
   - Source-index may merge first because it publishes evidence and no workspace member.
-  - Asset-runtime and input-actions may develop independently but integrate only after previous shared-lease archive.
-  - Simulation/snapshot, protocol parsers, renderer resources, UI/audio and app composition require a post-P1 barrier.
+  - Asset-runtime and input-actions may develop independently but integrate serially after previous archives.
+  - Simulation, parsers, renderer resources, UI/audio and app composition require a post-P1 barrier.
 unknown:
-  - Exact deployed Canary cut/configuration/build.
-  - Production asset source/local-import/redistribution approval.
-  - Approved staging environment/account, final Windows support matrix, performance budgets, telemetry and release policy.
+  - Exact deployed Canary cut, configuration and build.
+  - Production asset source, local-import and redistribution approval.
+  - Staging account/environment, Windows matrix, budgets, privacy and release policy.
 conflicts:
-  - Historical Canary cuts remain conflicting deployment evidence; the inspected cut is not promoted to deployment truth.
-  - Server-declared optional features remain later unless product scope explicitly promotes them.
+  - Historical Canary cuts remain conflicting deployment evidence.
+  - Server-declared optional features are not automatically release requirements.
 first_failure:
   marker: none
-  evidence: all owned documents were created/updated without path conflict.
+  evidence: validation completed without ownership, checkpoint, review or CI failure.
 rejected_hypotheses:
-  - Start map/parser implementation in P1: rejected because shared game contracts and generated exact-source index must merge first.
-  - Combine UI, input and audio into one producer: rejected because each owns a distinct public contract and UI/audio dependencies remain later.
-  - Treat synthetic asset schema as production-ready: rejected; P1 runtime claim remains synthetic-v1 only.
+  - Start gameplay parsers in P1: rejected until game contracts and generated source index merge.
+  - Combine UI, input and audio: rejected because they own distinct public contracts.
+  - Treat synthetic assets as production-ready: rejected; P1 runtime is synthetic-v1 only.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p0-aggregation.md
   - oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md
@@ -133,18 +132,24 @@ changed_paths:
   - oteryn-client/docs/agents/prompts/P1_ASSET_PACK_RUNTIME_AGENT.md
   - oteryn-client/docs/agents/prompts/P1_INPUT_ACTIONS_AGENT.md
 validation:
-  - command: live P0 worker/archive and open-PR ownership reconciliation
+  - command: checkpoint governance contract review
     result: PASS
-    evidence: all five lanes merged/archived; unrelated #23/#48/#97 own no aggregation/P1 path.
-  - command: evidence normalization review
+    evidence: all required fields, allowed status/result values and compactness limits pass.
+  - command: live P0 archive and open-PR ownership reconciliation
     result: PASS
-    evidence: source evidence, implementation state, deployment proof and owner decisions remain distinct.
-  - command: Prompting Standard quality gate
+    evidence: all five lanes archived; unrelated PRs 23, 48 and 97 own no aggregation path.
+  - command: Prompting Standard quality gate and cross-document consistency review
     result: PASS
-    evidence: each prompt has one role/objective, exact ownership, policy v2, staged validation, checkpoint and stop/final contracts.
-  - command: changed-path compare against main@6808d8a9
+    evidence: four prompts match the accepted tasks, paths, order, validation and stop contracts.
+  - command: exact changed-file and review gate
     result: PASS
-    evidence: exactly eight declared documentation paths.
+    evidence: exactly eight owned paths; no comments, reviews or unresolved threads.
+  - command: Rust Client run 30715795977
+    result: PASS
+    evidence: Windows job 91411028596 passed metadata, format, strict Clippy, tests and architecture; Supply Chain 91411028605 passed.
+  - command: repository CI run 30715796054
+    result: PASS
+    evidence: CI Required job 91411148134 passed.
 blockers: []
-next_action: Run exact-head checkpoint/review/CI for PR 151, then merge and archive the barrier task.
+next_action: Run final exact-head CI on this checkpoint commit, mark PR 151 ready, merge and archive the barrier task.
 ```

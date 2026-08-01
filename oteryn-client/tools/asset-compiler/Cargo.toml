@@ -12,6 +12,8 @@ publish = false
 category = "tool"
 
 [dependencies]
+cap-fs-ext = "=4.0.2"
+cap-std = "=4.0.2"
 oteryn-asset-types = { version = "=0.1.0", path = "../../crates/asset-types" }
 serde_json.workspace = true
 

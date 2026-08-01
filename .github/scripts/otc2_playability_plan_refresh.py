@@ -99,3 +99,9 @@ replace_once(
     "1. audit PR #133, audit archive PR #134, secret-owner PR #136 and archive PR #137 remain merged on the exact base;",
     "task launch first gate",
 )
+replace_once(
+    task,
+    "# Context checkpoint",
+    "## Context checkpoint",
+    "task checkpoint heading",
+)

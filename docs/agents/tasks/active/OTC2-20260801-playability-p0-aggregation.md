@@ -9,11 +9,11 @@ phase: validation
 branch: docs/OTC2-20260801-playability-p0-aggregation
 base_branch: main
 created: 2026-08-01T21:45:00+02:00
-updated: 2026-08-01T21:58:00+02:00
-last_verified_commit: "dea7f0233d6f558e17ad105946493ad80f2d7603"
+updated: 2026-08-01T22:01:00+02:00
+last_verified_commit: "c8cede7baa221c02109e7c33829c4602c948d394"
 required_base_commit: "6808d8a9dd5a24a29c5ac96fe35bb463fe4da34b"
 risk: medium
-related_pr: null
+related_pr: 151
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p0-aggregation.md
   - oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md
@@ -75,10 +75,10 @@ Exact base: `main@6808d8a9dd5a24a29c5ac96fe35bb463fe4da34b`.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T21:58:00+02:00
-head: dea7f0233d6f558e17ad105946493ad80f2d7603
+updated_at: 2026-08-01T22:01:00+02:00
+head: c8cede7baa221c02109e7c33829c4602c948d394
 branch: docs/OTC2-20260801-playability-p0-aggregation
-pr: null
+pr: 151
 status: validating
 context_routes:
   - docs/agents/PROMPTING_STANDARD.md
@@ -146,5 +146,5 @@ validation:
     result: PASS
     evidence: exactly eight declared documentation paths.
 blockers: []
-next_action: Open the draft aggregation PR, run exact-head review/checkpoint/CI, then merge and archive the barrier task.
+next_action: Run exact-head checkpoint/review/CI for PR 151, then merge and archive the barrier task.
 ```

@@ -57,7 +57,7 @@ Implemented behavior:
 8. exchange the authorization code with the exact redirect and verifier;
 9. discard the W7 refresh token and use the access token only for one ticket issuance;
 10. perform one non-retried Gateway login and return the merged directory plus one fresh credential;
-11. reject stale completions and clear secret-bearing values on every terminal drop path.
+11. reject stale completions and move project-owned raw entropy, callback request/target, decoded callback values, OAuth form/header/JSON intermediates and producer secret fields into bounded owners that overwrite their visible bytes on terminal drop.
 
 No Oteryn or Canary password is collected, stored or used. There is no legacy fallback, embedded browser, async runtime, global singleton, credential persistence or Canary protocol implementation.
 
@@ -78,8 +78,11 @@ No directory revision, gameplay-channel identifier, issuer directory or general 
 
 ## Secret and error properties
 
-- state, verifier, authorization code, access token, refresh token, Game Login Ticket and Game Session credential have no ordinary clone or serialization surface;
-- secret wrappers redact `Debug` and `Display` and overwrite owned bytes on drop as a best-effort safe-Rust cleanup barrier;
+- state, verifier, authorization code, access token, refresh token, Game Login Ticket and Game Session credential use bounded non-`Clone` redacted owners after conversion into project types;
+- raw PKCE entropy arrays, callback read scratch and complete request bytes, the bounded callback target owner, decoded callback values, OAuth form bytes, the project-owned bearer-prefix precursor, Gateway JSON, strict secret DTO fields and sensitive response bodies receive deterministic best-effort overwrite of their visible project-owned bytes on terminal drop;
+- rejected secret constructor inputs are overwritten before release, and the verifier is moved directly into token exchange without an additional ordinary string copy;
+- the authorization URL is dropped immediately after direct browser launch, but `url`-crate storage, process arguments, operating-system/browser state, `ureq` header/body copies, TLS buffers, allocator reuse and compiler-created copies are outside the project-owned overwrite guarantee;
+- this is not a universal memory-erasure claim and does not assert control over bytes retained or copied by third-party libraries, the operating system or the browser;
 - request and response debug output redacts bearer and body material;
 - stable errors contain no raw backend body, URL secret, OS text or producer credential;
 - sensitive responses must be no-store/no-cache;
@@ -93,6 +96,7 @@ The workspace tests cover:
 
 - RFC 7636 PKCE `S256` known vector;
 - independent state and verifier/challenge material;
+- project-owned secret-buffer overwrite helpers and redacted callback formatting;
 - listener bind before browser launch;
 - actual dynamic loopback port propagation into authorization and token exchange;
 - one synthetic browser/listener/HTTP success path with exactly three HTTP requests;
@@ -104,6 +108,7 @@ The workspace tests cover:
 - duplicate world IDs, invalid port and unknown character/world relation;
 - stale generation without network work;
 - access, ticket, code and credential redaction in debug output;
+- exact Gateway request serialization and immediate secret-field deserialization into zeroing ownership;
 - conversion only into the merged ENTRY directory and credential types.
 
 All fixtures are synthetic and contain no account, production endpoint, private capture, proprietary asset or reusable credential.
@@ -118,6 +123,8 @@ New exact dependencies are minimal and pinned in `Cargo.lock`:
 - `time` for RFC 3339 session expiry parsing;
 - `url` for exact URL construction and validation;
 - `ureq` with `native-tls-no-default` for a bounded synchronous adapter.
+
+The post-W7 secret-lifecycle remediation adds no dependency and changes no manifest, lockfile or deny policy.
 
 The production HTTP adapter selects `NativeTls` and `PlatformVerifier`, preserving the operating system certificate store and hostname verification. Automatic redirects and proxy environment discovery are disabled.
 
@@ -150,6 +157,7 @@ The following remain explicitly blocked and are not represented as implementatio
 - real Rust Identity -> Gateway -> Canary end-to-end compatibility;
 - reusable account-session, relog or channel-switch behavior after ticket issuance;
 - general multi-world issuer or gameplay-channel routing;
+- universal erasure of secret copies outside project-owned buffers;
 - production rollout readiness.
 
 These deployment gaps block only real-path compatibility claims. They do not weaken or invalidate the deterministic implementation and fake-service evidence above.

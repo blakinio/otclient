@@ -78,8 +78,7 @@ fn regular_intermediate_directories_are_opened_successfully() -> Result<(), Box<
 }
 
 #[test]
-fn symlinked_intermediate_directories_are_rejected_when_supported()
--> Result<(), Box<dyn Error>> {
+fn symlinked_intermediate_directories_are_rejected_when_supported() -> Result<(), Box<dyn Error>> {
     let directory = TestDirectory::new()?;
     directory.write("real/payload.bin", b"must not be reached through a link")?;
     let linked = directory.path().join("linked");
@@ -90,10 +89,8 @@ fn symlinked_intermediate_directories_are_rejected_when_supported()
         Err(error) => return Err(Box::new(error)),
     }
 
-    let manifest_path = directory.write(
-        "manifest.json",
-        manifest("linked/payload.bin").as_bytes(),
-    )?;
+    let manifest_path =
+        directory.write("manifest.json", manifest("linked/payload.bin").as_bytes())?;
     let output = directory.path().join("output.pack");
     assert_eq!(
         compile_manifest(&manifest_path, &output),
@@ -114,6 +111,5 @@ fn create_directory_symlink(target: &Path, link: &Path) -> io::Result<()> {
 }
 
 fn symlink_creation_is_unavailable(error: &io::Error) -> bool {
-    error.kind() == io::ErrorKind::PermissionDenied
-        || error.kind() == io::ErrorKind::Unsupported
+    error.kind() == io::ErrorKind::PermissionDenied || error.kind() == io::ErrorKind::Unsupported
 }

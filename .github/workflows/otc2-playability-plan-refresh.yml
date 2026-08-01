@@ -1,0 +1,47 @@
+name: Refresh playability plan status
+
+on:
+  push:
+    branches:
+      - docs/OTC2-20260801-full-playability-program-plan
+
+permissions:
+  contents: write
+
+concurrency:
+  group: otc2-playability-plan-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: ${{ !contains(github.event.head_commit.message, '[playability refreshed]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          show-progress: false
+          fetch-depth: 0
+
+      - name: Apply exact status refresh
+        run: python .github/scripts/otc2_playability_plan_refresh.py
+
+      - name: Validate task checkpoint
+        run: >-
+          python tools/agents/checkpoint.py
+          docs/agents/tasks/active/OTC2-20260801-full-playability-program-plan.md
+          --require-checkpoint
+
+      - name: Commit final documentation-only refresh
+        run: |
+          git rm .github/workflows/otc2-playability-plan-refresh.yml
+          git rm .github/scripts/otc2_playability_plan_refresh.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/agents/tasks/active/OTC2-20260801-full-playability-program-plan.md
+          git add oteryn-client/docs/agents/playability/PROGRAM_CHARTER.md
+          git add oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md
+          git add oteryn-client/docs/agents/playability/WAVE_P0_DISCOVERY.md
+          git commit -m "docs(playability): refresh completed remediation status [playability refreshed]"
+          git push origin HEAD:docs/OTC2-20260801-full-playability-program-plan

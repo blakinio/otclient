@@ -144,10 +144,10 @@ mod tests {
                 .map(|(_, value)| value.into_owned())
                 .ok_or_else(|| IdentityError::for_kind(IdentityErrorKind::InvariantViolation))?;
             self.state.order.store(3, Ordering::Release);
-            Ok(CallbackAttempt {
-                peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                target: format!("/callback?code=synthetic-code&state={state}"),
-            })
+            CallbackAttempt::new(
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                format!("/callback?code=synthetic-code&state={state}"),
+            )
         }
     }
 
@@ -397,18 +397,12 @@ mod tests {
             .map(|(_, value)| value.into_owned())
             .ok_or_else(|| io::Error::other("missing synthetic state"))?;
         let target = format!("/callback?code=synthetic-code&state={state}");
-        let first = CallbackAttempt {
-            peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-            target: target.clone(),
-        };
+        let first = CallbackAttempt::new(IpAddr::V4(Ipv4Addr::LOCALHOST), target.clone())?;
         let _code = transaction.accept_callback(Some(account), first)?;
         let duplicate = transaction
             .accept_callback(
                 Some(account),
-                CallbackAttempt {
-                    peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                    target: target.clone(),
-                },
+                CallbackAttempt::new(IpAddr::V4(Ipv4Addr::LOCALHOST), target.clone())?,
             )
             .err()
             .ok_or_else(|| io::Error::other("duplicate callback was accepted"))?;
@@ -428,10 +422,10 @@ mod tests {
         let stale = stale_transaction
             .accept_callback(
                 Some(AccountSessionId::new(42)?),
-                CallbackAttempt {
-                    peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                    target: format!("/callback?code=synthetic-code&state={stale_state}"),
-                },
+                CallbackAttempt::new(
+                    IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    format!("/callback?code=synthetic-code&state={stale_state}"),
+                )?,
             )
             .err()
             .ok_or_else(|| io::Error::other("stale callback was accepted"))?;

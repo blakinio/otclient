@@ -119,10 +119,10 @@ mod tests {
                 .map(|(_, value)| value.into_owned())
                 .ok_or_else(synthetic_identity_error)?;
             self.state.order.store(3, Ordering::Release);
-            Ok(CallbackAttempt {
-                peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                target: format!("/callback?code=synthetic-code&state={state}"),
-            })
+            CallbackAttempt::new(
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                format!("/callback?code=synthetic-code&state={state}"),
+            )
         }
     }
 

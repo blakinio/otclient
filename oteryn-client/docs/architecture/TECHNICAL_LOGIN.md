@@ -27,7 +27,7 @@ start existing Rust executable
 -> submit the credential through the existing GameSessionKey world-login field
 -> validate the admission prefix through enter-world 0x0F
 -> report typed SessionEntered or typed recoverable failure
--> disconnect and clear every session-scoped secret
+-> disconnect and overwrite project-owned session-scoped secret buffers before release
 ```
 
 `SessionEntered` is a technical admission result. W7 does not claim map rendering, gameplay readiness, production rollout or general protocol coverage.
@@ -200,7 +200,7 @@ RecoverableFailure
 FatalFailure
 ```
 
-Every worker completion carries the originating generation. Obsolete completions are ignored and disposed. Application close cancels the active generation, closes listeners/sockets, joins workers and clears secrets before window/renderer destruction.
+Every worker completion carries the originating generation. Obsolete completions are ignored and disposed. Application close cancels the active generation, closes listeners/sockets, joins workers and drops project-owned secret owners before window/renderer destruction. This ordering does not imply erasure of copies retained by third-party libraries, the operating system or the browser.
 
 ## 8. Identity transaction
 
@@ -222,11 +222,14 @@ Required behavior:
 5. reject missing/duplicate code/state, wrong state/path/peer, OAuth error, oversize, timeout, cancellation and stale generation;
 6. exchange the code with the same redirect URI and verifier;
 7. use the access token only for ticket issuance and discard the refresh token in W7;
-8. clear the ticket after the Gateway request is committed;
+8. drop the ticket owner after the Gateway request is committed;
 9. parse strict Gateway protocol v1 and validate directory relations;
-10. return public account/directory state plus one fresh one-shot credential.
+10. return public account/directory state plus one fresh one-shot credential;
+11. overwrite visible bytes of project-owned raw entropy, callback scratch/request/target, decoded callback values, OAuth form, bearer-prefix precursor, Gateway JSON, secret DTO fields and sensitive response bodies when their terminal owners drop.
 
 Non-loopback Platform/Gateway URLs require HTTPS. Loopback fakes may use HTTP. Sensitive redirects are rejected unless a future exact contract requires them.
+
+The authorization URL is short-lived and dropped immediately after direct browser launch. The URL-library allocation, process arguments, operating-system/browser state, HTTP adapter copies and TLS buffers are outside the project-owned overwrite guarantee. No shell interpolation is used.
 
 ## 9. Canary admission transaction
 
@@ -242,7 +245,7 @@ Required behavior:
 6. decode bounded challenge, rejection/wait/advice and admission prefix;
 7. emit `SessionEntered` only after ordered enter-world `0x0F` for the active generation;
 8. stop before map description and disconnect deterministically;
-9. clear credential, XTEA/session keys and buffers on every terminal path;
+9. clear credential, XTEA/session keys and buffers on every terminal path within the exact owner guarantees defined by their implementation;
 10. never replay a credential after socket handoff.
 
 Initial source evidence includes self-login `0x17`, bug-report/time messages, pending `0x0A`, enter-world `0x0F`, then map description. Exact order/optionality must be pinned by worker evidence.
@@ -269,11 +272,14 @@ No error path silently falls back to legacy password authentication.
 
 - Passwords never enter the Rust native-auth path.
 - OAuth code/verifier/tokens, Game Login Ticket, Game Session credential, XTEA/session keys and sensitive frames never enter logs, diagnostics, titles, panic text, screenshots, fixtures or Git.
-- Secret-bearing types do not expose ordinary formatting, cloning or serialization that reveals bytes.
-- HTTP and protocol inputs are bounded before allocation.
+- Secret-bearing project types do not expose ordinary formatting, cloning or serialization that reveals bytes unless a bounded compatibility surface is explicitly documented.
+- Project-owned secret wrappers and request intermediates perform deterministic best-effort overwrite of their visible owned bytes before release; this is not a universal memory-erasure guarantee.
+- Raw PKCE entropy, callback scratch and complete request bytes, the callback target owner, decoded query values, OAuth form, bearer-prefix precursor, Gateway JSON, secret DTO fields and sensitive response bodies are included in the project-owned overwrite boundary.
+- `url`, `ureq`, native-TLS, allocator/compiler, operating-system process arguments and browser state may retain or copy bytes outside that boundary.
+- HTTP and protocol inputs are bounded before or during project-owned allocation.
 - Routing is accepted only from the validated Gateway response and explicit expected-world configuration.
 - Generation change invalidates callback, HTTP and socket completions.
-- One-shot credentials clear on handoff, error, cancellation, timeout and shutdown.
+- One-shot credentials drop their project-owned owners on handoff, error, cancellation, timeout and shutdown; external copies created after a protocol handoff are governed by the receiving boundary.
 - Local fixtures are synthetic and provenance-documented. Private captures stay outside Git and are reduced to sanitized facts.
 - Internal packet work supports only Oteryn/Canary interoperability and is not published as third-party gameplay or anti-cheat tooling.
 
@@ -283,9 +289,11 @@ No error path silently falls back to legacy password authentication.
 
 - contract validation/property tests for IDs, relations, expiry and one-shot consumption;
 - API-surface/redaction tests for secret types;
+- project-owned secret-buffer overwrite tests;
 - PKCE known vector and CSPRNG/state uniqueness tests;
 - loopback tests for OS-assigned port, path/state/peer, timeout, cancellation, stale and duplicate callback;
 - fake Platform/Gateway positive and bounded negative cases;
+- exact Gateway request serialization and immediate secret-field deserialization tests;
 - synthetic source-derived Canary challenge/login/admission fixtures pinned to an exact revision;
 - malformed/truncated/trailing/oversized/wrong-profile/unknown-message tests;
 - local TCP E2E: challenge -> login -> admission `0x0F` -> disconnect;
@@ -301,7 +309,7 @@ No error path silently falls back to legacy password authentication.
 - exact-version Rust client -> Gateway -> Canary admission in a project-owned controlled environment;
 - clean disconnect and server-side exactly-one entry/replay-rejection evidence.
 
-Repository tests do not prove production deployment state.
+Repository tests do not prove production deployment state or universal erasure of external secret copies.
 
 ## 13. Merge and rollout order
 

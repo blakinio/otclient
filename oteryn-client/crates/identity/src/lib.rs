@@ -14,6 +14,7 @@ use oteryn_platform::{
 };
 use oteryn_world_directory::{AccountDirectorySnapshot, DirectoryRevision};
 use sha2::{Digest, Sha256};
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::io::{Read, Write};
@@ -127,30 +128,58 @@ impl EntropySource for OsEntropy {
     }
 }
 
-/// Non-cloneable state/verifier bytes with redacted formatting and clearing.
-struct SecretBytes(Box<[u8]>);
+struct SecretArray<const N: usize>([u8; N]);
 
-impl SecretBytes {
-    fn new(value: Vec<u8>) -> Result<Self, IdentityError> {
-        if value.is_empty() || value.len() > MAX_PKCE_VERIFIER_BYTES {
-            return Err(IdentityError::new(IdentityErrorKind::InvalidSecret));
-        }
-        Ok(Self(value.into_boxed_slice()))
+impl<const N: usize> SecretArray<N> {
+    fn zeroed() -> Self {
+        Self([0; N])
     }
 
-    fn expose_secret(&self) -> Result<&str, IdentityError> {
-        std::str::from_utf8(&self.0)
-            .map_err(|_| IdentityError::new(IdentityErrorKind::InvariantViolation))
+    fn as_slice(&self) -> &[u8] {
+        &self.0
     }
-}
 
-impl Debug for SecretBytes {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        formatter.write_str("SecretBytes([REDACTED])")
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.0
     }
 }
 
-impl Drop for SecretBytes {
+impl<const N: usize> Drop for SecretArray<N> {
+    fn drop(&mut self) {
+        self.0.fill(0);
+    }
+}
+
+struct SecretBuffer(Vec<u8>);
+
+impl SecretBuffer {
+    fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    fn extend_from_slice(&mut self, bytes: &[u8]) {
+        self.0.extend_from_slice(bytes);
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    fn contains_header_end(&self) -> bool {
+        self.0.windows(4).any(|window| window == b"\r\n\r\n")
+    }
+
+    #[cfg(test)]
+    fn clear(&mut self) {
+        self.0.fill(0);
+    }
+}
+
+impl Drop for SecretBuffer {
     fn drop(&mut self) {
         self.0.fill(0);
     }
@@ -206,13 +235,41 @@ fn launch_system_browser(_authorization_url: &Url) -> Result<(), IdentityError> 
 
 /// One accepted TCP callback request reduced to the security-relevant facts.
 ///
-/// The request target contains OAuth code/state material and therefore has no
-/// ordinary clone or revealing debug surface.
+/// The request target contains OAuth code/state material and is retained by a
+/// non-cloneable redacted owner that overwrites its project-owned bytes on drop.
 pub struct CallbackAttempt {
     /// Remote peer observed by the bound listener.
     pub peer: IpAddr,
-    /// Exact HTTP request target including query.
+    /// Exact HTTP request target including query. The enclosing non-cloneable
+    /// attempt overwrites this project-owned allocation on terminal drop.
     pub target: String,
+}
+
+impl CallbackAttempt {
+    /// Own one bounded callback target for a receiver implementation or fake.
+    pub fn new(peer: IpAddr, target: String) -> Result<Self, IdentityError> {
+        if target.is_empty() || target.len() > MAX_CALLBACK_TARGET_BYTES {
+            let kind = if target.is_empty() {
+                IdentityErrorKind::MalformedCallback
+            } else {
+                IdentityErrorKind::CallbackTooLarge
+            };
+            clear_string(target);
+            return Err(IdentityError::new(kind));
+        }
+        Ok(Self { peer, target })
+    }
+
+    fn target(&self) -> &str {
+        &self.target
+    }
+}
+
+impl Drop for CallbackAttempt {
+    fn drop(&mut self) {
+        let mut bytes = std::mem::take(&mut self.target).into_bytes();
+        bytes.fill(0);
+    }
 }
 
 impl Debug for CallbackAttempt {
@@ -223,6 +280,11 @@ impl Debug for CallbackAttempt {
             .field("target", &"[REDACTED]")
             .finish()
     }
+}
+
+fn clear_string(mut value: String) {
+    let mut bytes = std::mem::take(&mut value).into_bytes();
+    bytes.fill(0);
 }
 
 /// One pre-bound loopback callback receiver.
@@ -298,11 +360,9 @@ impl CallbackReceiver for TcpCallbackReceiver {
             match self.listener.accept() {
                 Ok((mut stream, peer)) => {
                     let target = read_callback_target(&mut stream, clock, deadline, cancellation)?;
+                    let attempt = CallbackAttempt::new(peer.ip(), target)?;
                     write_callback_response(&mut stream)?;
-                    return Ok(CallbackAttempt {
-                        peer: peer.ip(),
-                        target,
-                    });
+                    return Ok(attempt);
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                     let remaining = deadline.remaining(clock);
@@ -322,8 +382,8 @@ fn read_callback_target(
     deadline: Deadline,
     cancellation: &CancellationToken,
 ) -> Result<String, IdentityError> {
-    let mut received = Vec::with_capacity(1024);
-    let mut buffer = [0_u8; 512];
+    let mut received = SecretBuffer::with_capacity(1024);
+    let mut buffer = SecretArray::<512>::zeroed();
     loop {
         if cancellation.is_cancelled() {
             return Err(IdentityError::new(IdentityErrorKind::Cancelled));
@@ -336,14 +396,15 @@ fn read_callback_target(
                 deadline.remaining(clock).min(Duration::from_millis(250)),
             ))
             .map_err(|_| IdentityError::new(IdentityErrorKind::ListenerUnavailable))?;
-        match stream.read(&mut buffer) {
+        match stream.read(buffer.as_mut_slice()) {
             Ok(0) => return Err(IdentityError::new(IdentityErrorKind::MalformedCallback)),
             Ok(count) => {
-                received.extend_from_slice(&buffer[..count]);
+                received.extend_from_slice(&buffer.as_slice()[..count]);
+                buffer.as_mut_slice()[..count].fill(0);
                 if received.len() > MAX_CALLBACK_REQUEST_BYTES {
                     return Err(IdentityError::new(IdentityErrorKind::CallbackTooLarge));
                 }
-                if received.windows(4).any(|window| window == b"\r\n\r\n") {
+                if received.contains_header_end() {
                     break;
                 }
             }
@@ -355,7 +416,7 @@ fn read_callback_target(
             Err(_) => return Err(IdentityError::new(IdentityErrorKind::ListenerUnavailable)),
         }
     }
-    let request = std::str::from_utf8(&received)
+    let request = std::str::from_utf8(received.as_slice())
         .map_err(|_| IdentityError::new(IdentityErrorKind::MalformedCallback))?;
     let request_line = request
         .split("\r\n")
@@ -411,8 +472,8 @@ impl ActiveAccountSession for FixedAccountSession {
 pub struct AuthorizationTransaction {
     session_id: AccountSessionId,
     redirect_uri: Url,
-    state: SecretBytes,
-    verifier: Option<SecretBytes>,
+    state: SecretString,
+    verifier: Option<SecretString>,
     challenge: String,
     callback_consumed: bool,
 }
@@ -425,12 +486,12 @@ impl AuthorizationTransaction {
         entropy: &dyn EntropySource,
     ) -> Result<Self, IdentityError> {
         validate_dynamic_redirect(&redirect_uri)?;
-        let mut state_bytes = [0_u8; STATE_RANDOM_BYTES];
-        let mut verifier_bytes = [0_u8; VERIFIER_RANDOM_BYTES];
-        entropy.fill(&mut state_bytes)?;
-        entropy.fill(&mut verifier_bytes)?;
-        let state = URL_SAFE_NO_PAD.encode(state_bytes);
-        let verifier = URL_SAFE_NO_PAD.encode(verifier_bytes);
+        let mut state_bytes = SecretArray::<STATE_RANDOM_BYTES>::zeroed();
+        let mut verifier_bytes = SecretArray::<VERIFIER_RANDOM_BYTES>::zeroed();
+        entropy.fill(state_bytes.as_mut_slice())?;
+        entropy.fill(verifier_bytes.as_mut_slice())?;
+        let state = URL_SAFE_NO_PAD.encode(state_bytes.as_slice());
+        let verifier = URL_SAFE_NO_PAD.encode(verifier_bytes.as_slice());
         Self::from_encoded_values(session_id, redirect_uri, state, verifier)
     }
 
@@ -440,15 +501,24 @@ impl AuthorizationTransaction {
         state: String,
         verifier: String,
     ) -> Result<Self, IdentityError> {
-        if verifier.len() < MIN_PKCE_VERIFIER_BYTES || verifier.len() > MAX_PKCE_VERIFIER_BYTES {
+        let state = SecretString::new(state)
+            .map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))?;
+        let verifier = SecretString::new(verifier)
+            .map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))?;
+        let verifier_text = verifier
+            .expose_secret()
+            .map_err(|_| IdentityError::new(IdentityErrorKind::InvariantViolation))?;
+        if verifier_text.len() < MIN_PKCE_VERIFIER_BYTES
+            || verifier_text.len() > MAX_PKCE_VERIFIER_BYTES
+        {
             return Err(IdentityError::new(IdentityErrorKind::InvalidSecret));
         }
-        let challenge = pkce_challenge(&verifier);
+        let challenge = pkce_challenge(verifier_text);
         Ok(Self {
             session_id,
             redirect_uri,
-            state: SecretBytes::new(state.into_bytes())?,
-            verifier: Some(SecretBytes::new(verifier.into_bytes())?),
+            state,
+            verifier: Some(verifier),
             challenge,
             callback_consumed: false,
         })
@@ -461,7 +531,10 @@ impl AuthorizationTransaction {
             .authorization_base
             .join("oauth/authorize")
             .map_err(|_| IdentityError::new(IdentityErrorKind::InvalidConfiguration))?;
-        let state = self.state.expose_secret()?;
+        let state = self
+            .state
+            .expose_secret()
+            .map_err(|_| IdentityError::new(IdentityErrorKind::InvariantViolation))?;
         url.query_pairs_mut()
             .append_pair("client_id", &config.client_id)
             .append_pair("redirect_uri", self.redirect_uri.as_str())
@@ -488,49 +561,33 @@ impl AuthorizationTransaction {
         if !matches!(attempt.peer, IpAddr::V4(address) if address.is_loopback()) {
             return Err(IdentityError::new(IdentityErrorKind::InvalidCallbackPeer));
         }
-        let callback = parse_callback_target(&attempt.target)?;
-        if callback.path() != self.redirect_uri.path() {
-            return Err(IdentityError::new(IdentityErrorKind::InvalidCallbackPath));
-        }
-        let mut code = None;
-        let mut state = None;
-        let mut oauth_error = None;
-        for (key, value) in callback.query_pairs() {
-            match key.as_ref() {
-                "code" if code.is_none() => code = Some(value.into_owned()),
-                "state" if state.is_none() => state = Some(value.into_owned()),
-                "error" if oauth_error.is_none() => oauth_error = Some(value.into_owned()),
-                "error_description" | "error_uri" => {}
-                "code" | "state" | "error" => {
-                    return Err(IdentityError::new(IdentityErrorKind::MalformedCallback));
-                }
-                _ => return Err(IdentityError::new(IdentityErrorKind::MalformedCallback)),
-            }
-        }
-        if oauth_error.is_some() {
+        let callback = parse_callback_target(attempt.target(), self.redirect_uri.path())?;
+        if callback.oauth_error {
             self.callback_consumed = true;
             return Err(IdentityError::new(IdentityErrorKind::AuthorizationDenied));
         }
-        let returned_state =
-            state.ok_or_else(|| IdentityError::new(IdentityErrorKind::MalformedCallback))?;
-        if !constant_time_equal(
-            self.state.expose_secret()?.as_bytes(),
-            returned_state.as_bytes(),
-        ) {
+        let returned_state = callback
+            .state
+            .ok_or_else(|| IdentityError::new(IdentityErrorKind::MalformedCallback))?;
+        let expected_state = self
+            .state
+            .expose_secret()
+            .map_err(|_| IdentityError::new(IdentityErrorKind::InvariantViolation))?;
+        if !constant_time_equal(expected_state.as_bytes(), returned_state.as_bytes()?) {
             return Err(IdentityError::new(IdentityErrorKind::InvalidCallbackState));
         }
-        let code = code.ok_or_else(|| IdentityError::new(IdentityErrorKind::MalformedCallback))?;
+        let code = callback
+            .code
+            .ok_or_else(|| IdentityError::new(IdentityErrorKind::MalformedCallback))?
+            .into_secret_string()?;
         self.callback_consumed = true;
-        SecretString::new(code).map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))
+        Ok(code)
     }
 
     fn take_verifier(&mut self) -> Result<SecretString, IdentityError> {
-        let verifier = self
-            .verifier
+        self.verifier
             .take()
-            .ok_or_else(|| IdentityError::new(IdentityErrorKind::InvariantViolation))?;
-        let value = verifier.expose_secret()?.to_owned();
-        SecretString::new(value).map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))
+            .ok_or_else(|| IdentityError::new(IdentityErrorKind::InvariantViolation))
     }
 }
 
@@ -548,6 +605,84 @@ impl Debug for AuthorizationTransaction {
     }
 }
 
+struct ParsedCallback {
+    code: Option<SecretQueryValue>,
+    state: Option<SecretQueryValue>,
+    oauth_error: bool,
+}
+
+enum SecretQueryValue {
+    Empty,
+    Secret(SecretString),
+}
+
+impl SecretQueryValue {
+    fn from_cow(value: Cow<'_, str>) -> Result<Self, IdentityError> {
+        if value.is_empty() {
+            Ok(Self::Empty)
+        } else {
+            SecretString::new(value.into_owned())
+                .map(Self::Secret)
+                .map_err(|_| IdentityError::new(IdentityErrorKind::InvalidSecret))
+        }
+    }
+
+    fn as_bytes(&self) -> Result<&[u8], IdentityError> {
+        match self {
+            Self::Empty => Ok(&[]),
+            Self::Secret(value) => value
+                .expose_secret()
+                .map(str::as_bytes)
+                .map_err(|_| IdentityError::new(IdentityErrorKind::InvariantViolation)),
+        }
+    }
+
+    fn into_secret_string(self) -> Result<SecretString, IdentityError> {
+        match self {
+            Self::Empty => Err(IdentityError::new(IdentityErrorKind::InvalidSecret)),
+            Self::Secret(value) => Ok(value),
+        }
+    }
+}
+
+fn parse_callback_target(
+    target: &str,
+    expected_path: &str,
+) -> Result<ParsedCallback, IdentityError> {
+    if !target.starts_with('/') || target.len() > MAX_CALLBACK_TARGET_BYTES || target.contains('#')
+    {
+        return Err(IdentityError::new(IdentityErrorKind::MalformedCallback));
+    }
+    let (path, query) = target.split_once('?').unwrap_or((target, ""));
+    if path != expected_path {
+        return Err(IdentityError::new(IdentityErrorKind::InvalidCallbackPath));
+    }
+    let mut code = None;
+    let mut state = None;
+    let mut oauth_error = false;
+    for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
+        let value = SecretQueryValue::from_cow(value)?;
+        match key.as_ref() {
+            "code" if code.is_none() => code = Some(value),
+            "state" if state.is_none() => state = Some(value),
+            "error" if !oauth_error => {
+                oauth_error = true;
+                drop(value);
+            }
+            "error_description" | "error_uri" => drop(value),
+            "code" | "state" | "error" => {
+                return Err(IdentityError::new(IdentityErrorKind::MalformedCallback));
+            }
+            _ => return Err(IdentityError::new(IdentityErrorKind::MalformedCallback)),
+        }
+    }
+    Ok(ParsedCallback {
+        code,
+        state,
+        oauth_error,
+    })
+}
+
 fn validate_dynamic_redirect(url: &Url) -> Result<(), IdentityError> {
     if url.scheme() != "http"
         || url.host_str() != Some("127.0.0.1")
@@ -561,14 +696,6 @@ fn validate_dynamic_redirect(url: &Url) -> Result<(), IdentityError> {
         return Err(IdentityError::new(IdentityErrorKind::InvalidConfiguration));
     }
     Ok(())
-}
-
-fn parse_callback_target(target: &str) -> Result<Url, IdentityError> {
-    if !target.starts_with('/') || target.len() > MAX_CALLBACK_TARGET_BYTES {
-        return Err(IdentityError::new(IdentityErrorKind::MalformedCallback));
-    }
-    Url::parse(&format!("http://127.0.0.1{target}"))
-        .map_err(|_| IdentityError::new(IdentityErrorKind::MalformedCallback))
 }
 
 fn pkce_challenge(verifier: &str) -> String {
@@ -666,6 +793,7 @@ where
         )?;
         let authorization_url = transaction.authorization_url(config)?;
         self.browser.open(&authorization_url)?;
+        drop(authorization_url);
         let callback_deadline = Deadline::after(self.clock.as_ref(), config.callback_timeout())
             .map_err(|_| IdentityError::new(IdentityErrorKind::InvalidConfiguration))?;
         let attempt = receiver.receive(self.clock.as_ref(), callback_deadline, cancellation)?;
@@ -880,6 +1008,10 @@ mod tests {
         Ok(AccountSessionId::new(7)?)
     }
 
+    fn callback(peer: IpAddr, target: &str) -> Result<CallbackAttempt, IdentityError> {
+        CallbackAttempt::new(peer, target.to_owned())
+    }
+
     #[test]
     fn pkce_s256_matches_the_rfc_7636_vector() {
         let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
@@ -887,6 +1019,13 @@ mod tests {
             pkce_challenge(verifier),
             "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
         );
+    }
+
+    #[test]
+    fn project_owned_secret_buffer_clear_overwrites_bytes() {
+        let mut buffer = SecretBuffer(vec![1, 2, 3, 4]);
+        buffer.clear();
+        assert_eq!(buffer.as_slice(), &[0, 0, 0, 0]);
     }
 
     #[test]
@@ -898,10 +1037,10 @@ mod tests {
         let debug = format!("{transaction:?}");
         assert!(!debug.contains("AwMDAw"));
         assert!(debug.contains("[REDACTED]"));
-        let callback = CallbackAttempt {
-            peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-            target: "/callback?code=synthetic-code&state=synthetic-state".to_owned(),
-        };
+        let callback = callback(
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            "/callback?code=synthetic-code&state=synthetic-state",
+        )?;
         let callback_debug = format!("{callback:?}");
         assert!(!callback_debug.contains("synthetic-code"));
         assert!(!callback_debug.contains("synthetic-state"));
@@ -918,44 +1057,48 @@ mod tests {
             "expected-state".to_owned(),
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~".to_owned(),
         )?;
-        let wrong_state = CallbackAttempt {
-            peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-            target: "/callback?code=synthetic-code&state=wrong".to_owned(),
-        };
         assert_eq!(
             transaction
-                .accept_callback(Some(session()?), wrong_state)
+                .accept_callback(
+                    Some(session()?),
+                    callback(
+                        IpAddr::V4(Ipv4Addr::LOCALHOST),
+                        "/callback?code=synthetic-code&state=wrong",
+                    )?,
+                )
                 .err()
                 .map(|error| error.kind()),
             Some(IdentityErrorKind::InvalidCallbackState)
         );
-        let remote = CallbackAttempt {
-            peer: "192.0.2.10".parse()?,
-            target: "/callback?code=synthetic-code&state=expected-state".to_owned(),
-        };
         assert_eq!(
             transaction
-                .accept_callback(Some(session()?), remote)
+                .accept_callback(
+                    Some(session()?),
+                    callback(
+                        "192.0.2.10".parse()?,
+                        "/callback?code=synthetic-code&state=expected-state",
+                    )?,
+                )
                 .err()
                 .map(|error| error.kind()),
             Some(IdentityErrorKind::InvalidCallbackPeer)
         );
         let code = transaction.accept_callback(
             Some(session()?),
-            CallbackAttempt {
-                peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                target: "/callback?code=synthetic-code&state=expected-state".to_owned(),
-            },
+            callback(
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                "/callback?code=synthetic-code&state=expected-state",
+            )?,
         )?;
         assert_eq!(code.expose_secret()?, "synthetic-code");
         assert_eq!(
             transaction
                 .accept_callback(
                     Some(session()?),
-                    CallbackAttempt {
-                        peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                        target: "/callback?code=synthetic-code&state=expected-state".to_owned(),
-                    },
+                    callback(
+                        IpAddr::V4(Ipv4Addr::LOCALHOST),
+                        "/callback?code=synthetic-code&state=expected-state",
+                    )?,
                 )
                 .err()
                 .map(|error| error.kind()),
@@ -977,10 +1120,10 @@ mod tests {
             transaction
                 .accept_callback(
                     Some(AccountSessionId::new(8)?),
-                    CallbackAttempt {
-                        peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                        target: "/other?code=synthetic-code&state=expected-state".to_owned(),
-                    },
+                    callback(
+                        IpAddr::V4(Ipv4Addr::LOCALHOST),
+                        "/other?code=synthetic-code&state=expected-state",
+                    )?,
                 )
                 .err()
                 .map(|error| error.kind()),
@@ -990,10 +1133,10 @@ mod tests {
             transaction
                 .accept_callback(
                     Some(session()?),
-                    CallbackAttempt {
-                        peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                        target: "/other?code=synthetic-code&state=expected-state".to_owned(),
-                    },
+                    callback(
+                        IpAddr::V4(Ipv4Addr::LOCALHOST),
+                        "/other?code=synthetic-code&state=expected-state",
+                    )?,
                 )
                 .err()
                 .map(|error| error.kind()),
@@ -1017,10 +1160,7 @@ mod tests {
         ] {
             let result = transaction.accept_callback(
                 Some(session()?),
-                CallbackAttempt {
-                    peer: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                    target: target.to_owned(),
-                },
+                callback(IpAddr::V4(Ipv4Addr::LOCALHOST), target)?,
             );
             assert_eq!(
                 result.err().map(|error| error.kind()),

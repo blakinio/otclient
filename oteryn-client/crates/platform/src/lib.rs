@@ -10,10 +10,11 @@ use oteryn_world_directory::{
     AccountDirectorySnapshot, Availability, CharacterId, CharacterSummary, Compatibility,
     DirectoryRevision, WorldId, WorldRoute, WorldSummary,
 };
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
+use serde::de::{DeserializeOwned, Error as _};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::io::{self, Write};
 use std::net::IpAddr;
 use std::time::Duration;
 use time::OffsetDateTime;
@@ -88,14 +89,16 @@ fn validate_base_url(value: &str) -> Result<Url, PlatformError> {
     }
 }
 
-/// Non-cloneable secret UTF-8 material with redacted formatting and best-effort clearing.
+/// Non-cloneable secret UTF-8 material with redacted formatting and
+/// deterministic best-effort overwrite of its project-owned bytes on drop.
 pub struct SecretString(Box<[u8]>);
 
 impl SecretString {
     /// Own one non-empty bounded secret string.
     pub fn new(value: String) -> Result<Self, PlatformError> {
-        let bytes = value.into_bytes();
+        let mut bytes = value.into_bytes();
         if bytes.is_empty() || bytes.len() > MAX_SECRET_BYTES {
+            bytes.fill(0);
             return Err(PlatformError::new(PlatformErrorKind::InvalidSecret));
         }
         Ok(Self(bytes.into_boxed_slice()))
@@ -105,6 +108,15 @@ impl SecretString {
     pub fn expose_secret(&self) -> Result<&str, PlatformError> {
         std::str::from_utf8(&self.0)
             .map_err(|_| PlatformError::new(PlatformErrorKind::InvariantViolation))
+    }
+
+    fn into_bytes(mut self) -> Vec<u8> {
+        std::mem::take(&mut self.0).into_vec()
+    }
+
+    #[cfg(test)]
+    fn clear(&mut self) {
+        self.0.fill(0);
     }
 }
 
@@ -129,16 +141,18 @@ impl Drop for SecretString {
 struct SecretBytes(Box<[u8]>);
 
 impl SecretBytes {
-    fn new(value: Vec<u8>) -> Result<Self, PlatformError> {
+    fn new(mut value: Vec<u8>) -> Result<Self, PlatformError> {
         if value.len() > MAX_RESPONSE_BODY_BYTES {
+            value.fill(0);
             return Err(PlatformError::new(PlatformErrorKind::ResponseTooLarge));
         }
         Ok(Self(value.into_boxed_slice()))
     }
 
     fn from_secret_string(value: String) -> Result<Self, PlatformError> {
-        let bytes = value.into_bytes();
+        let mut bytes = value.into_bytes();
         if bytes.is_empty() || bytes.len() > MAX_RESPONSE_BODY_BYTES {
+            bytes.fill(0);
             return Err(PlatformError::new(PlatformErrorKind::InvalidSecret));
         }
         Ok(Self(bytes.into_boxed_slice()))
@@ -146,6 +160,11 @@ impl SecretBytes {
 
     fn expose_secret(&self) -> &[u8] {
         &self.0
+    }
+
+    #[cfg(test)]
+    fn clear(&mut self) {
+        self.0.fill(0);
     }
 }
 
@@ -156,6 +175,83 @@ impl Debug for SecretBytes {
 }
 
 impl Drop for SecretBytes {
+    fn drop(&mut self) {
+        self.0.fill(0);
+    }
+}
+
+struct SecretTextBuffer(String);
+
+impl SecretTextBuffer {
+    fn new() -> Self {
+        Self(String::new())
+    }
+
+    fn as_mut_string(&mut self) -> &mut String {
+        &mut self.0
+    }
+
+    fn into_secret_bytes(mut self) -> Result<SecretBytes, PlatformError> {
+        SecretBytes::from_secret_string(std::mem::take(&mut self.0))
+    }
+}
+
+impl Drop for SecretTextBuffer {
+    fn drop(&mut self) {
+        let mut bytes = std::mem::take(&mut self.0).into_bytes();
+        bytes.fill(0);
+    }
+}
+
+struct SecretBuffer(Vec<u8>);
+
+impl SecretBuffer {
+    fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    fn extend_from_slice(&mut self, bytes: &[u8]) {
+        self.0.extend_from_slice(bytes);
+    }
+
+    #[cfg(test)]
+    fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+
+    fn as_str(&self) -> Result<&str, PlatformError> {
+        std::str::from_utf8(&self.0)
+            .map_err(|_| PlatformError::new(PlatformErrorKind::InvariantViolation))
+    }
+
+    fn into_secret_bytes(mut self) -> Result<SecretBytes, PlatformError> {
+        SecretBytes::new(std::mem::take(&mut self.0))
+    }
+
+    #[cfg(test)]
+    fn clear(&mut self) {
+        self.0.fill(0);
+    }
+}
+
+impl Write for SecretBuffer {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        if self.0.len().saturating_add(buffer.len()) > MAX_RESPONSE_BODY_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::WriteZero,
+                "sensitive request exceeds the size limit",
+            ));
+        }
+        self.0.extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Drop for SecretBuffer {
     fn drop(&mut self) {
         self.0.fill(0);
     }
@@ -229,7 +325,7 @@ pub struct HttpResponse {
     content_type: Option<String>,
     cache_control: Option<String>,
     pragma: Option<String>,
-    location: Option<String>,
+    has_location: bool,
     body: SecretBytes,
 }
 
@@ -243,12 +339,34 @@ impl HttpResponse {
         location: Option<String>,
         body: Vec<u8>,
     ) -> Result<Self, PlatformError> {
+        let has_location = location.is_some();
+        if let Some(location) = location {
+            clear_string(location);
+        }
+        Self::from_parts(
+            status,
+            content_type,
+            cache_control,
+            pragma,
+            has_location,
+            body,
+        )
+    }
+
+    fn from_parts(
+        status: u16,
+        content_type: Option<String>,
+        cache_control: Option<String>,
+        pragma: Option<String>,
+        has_location: bool,
+        body: Vec<u8>,
+    ) -> Result<Self, PlatformError> {
         Ok(Self {
             status,
             content_type,
             cache_control,
             pragma,
-            location,
+            has_location,
             body: SecretBytes::new(body)?,
         })
     }
@@ -262,7 +380,7 @@ impl Debug for HttpResponse {
             .field("content_type", &self.content_type)
             .field("cache_control", &self.cache_control)
             .field("pragma", &self.pragma)
-            .field("location", &self.location.as_ref().map(|_| "[REDACTED]"))
+            .field("location", &self.has_location.then_some("[REDACTED]"))
             .field("body", &"[REDACTED]")
             .finish()
     }
@@ -331,20 +449,35 @@ impl UreqTransport {
 
 impl HttpTransport for UreqTransport {
     fn post(&self, request: HttpRequest) -> Result<HttpResponse, HttpTransportError> {
+        let HttpRequest {
+            url,
+            content_type,
+            bearer,
+            body,
+        } = request;
         let mut builder = self
             .agent
-            .post(request.url().as_str())
+            .post(url.as_str())
             .header("Accept", "application/json")
-            .header("Content-Type", request.content_type());
-        if let Some(bearer) = request
-            .bearer()
-            .map_err(|_| HttpTransportError::InvalidRequest)?
-        {
-            let authorization = format!("Bearer {bearer}");
-            builder = builder.header("Authorization", &authorization);
+            .header("Content-Type", content_type);
+        if let Some(bearer) = bearer {
+            let bearer_text = bearer
+                .expose_secret()
+                .map_err(|_| HttpTransportError::InvalidRequest)?;
+            let mut authorization = SecretBuffer::with_capacity(7 + bearer_text.len());
+            authorization.extend_from_slice(b"Bearer ");
+            authorization.extend_from_slice(bearer_text.as_bytes());
+            builder = builder.header(
+                "Authorization",
+                authorization
+                    .as_str()
+                    .map_err(|_| HttpTransportError::InvalidRequest)?,
+            );
+            drop(authorization);
+            drop(bearer);
         }
         let mut response = builder
-            .send(request.body())
+            .send(body.expose_secret())
             .map_err(|_| HttpTransportError::Unavailable)?;
         if response
             .body()
@@ -368,11 +501,7 @@ impl HttpTransport for UreqTransport {
             .get("pragma")
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned);
-        let location = response
-            .headers()
-            .get("location")
-            .and_then(|value| value.to_str().ok())
-            .map(str::to_owned);
+        let has_location = response.headers().get("location").is_some();
         let status = response.status().as_u16();
         let body = response
             .body_mut()
@@ -384,14 +513,22 @@ impl HttpTransport for UreqTransport {
                 _ => HttpTransportError::Unavailable,
             })?;
         if body.len() > MAX_RESPONSE_BODY_BYTES {
+            let mut body = body;
+            body.fill(0);
             return Err(HttpTransportError::ResponseTooLarge);
         }
-        HttpResponse::new(status, content_type, cache_control, pragma, location, body).map_err(
-            |error| match error.kind() {
-                PlatformErrorKind::ResponseTooLarge => HttpTransportError::ResponseTooLarge,
-                _ => HttpTransportError::InvalidRequest,
-            },
+        HttpResponse::from_parts(
+            status,
+            content_type,
+            cache_control,
+            pragma,
+            has_location,
+            body,
         )
+        .map_err(|error| match error.kind() {
+            PlatformErrorKind::ResponseTooLarge => HttpTransportError::ResponseTooLarge,
+            _ => HttpTransportError::InvalidRequest,
+        })
     }
 }
 
@@ -518,14 +655,16 @@ where
         validate_dynamic_redirect(&exchange.redirect_uri)?;
         let code = exchange.code.expose_secret()?;
         let verifier = exchange.verifier.expose_secret()?;
-        let mut serializer = url::form_urlencoded::Serializer::new(String::new());
+        let mut form = SecretTextBuffer::new();
+        let mut serializer = url::form_urlencoded::Serializer::new(form.as_mut_string());
         serializer
             .append_pair("grant_type", "authorization_code")
             .append_pair("client_id", &exchange.client_id)
             .append_pair("redirect_uri", exchange.redirect_uri.as_str())
             .append_pair("code", code)
             .append_pair("code_verifier", verifier);
-        let body = SecretBytes::from_secret_string(serializer.finish())?;
+        let _ = serializer.finish();
+        let body = form.into_secret_bytes()?;
         let response = self.send(HttpRequest::new(
             self.endpoints.identity_url("oauth/token")?,
             "application/x-www-form-urlencoded",
@@ -538,8 +677,8 @@ where
             return Err(PlatformError::new(PlatformErrorKind::InvalidResponse));
         }
         Ok(OAuthTokens {
-            access_token: SecretString::new(dto.access_token)?,
-            refresh_token: SecretString::new(dto.refresh_token)?,
+            access_token: dto.access_token.into_secret(),
+            refresh_token: dto.refresh_token.into_secret(),
             expires_in: Duration::from_secs(dto.expires_in),
         })
     }
@@ -562,7 +701,7 @@ where
         if dto.protocol_version != 1 || dto.expires_in == 0 || dto.expires_in > 60 {
             return Err(PlatformError::new(PlatformErrorKind::InvalidResponse));
         }
-        SecretString::new(dto.ticket)
+        Ok(dto.ticket.into_secret())
     }
 
     /// Exchange one ticket for the authoritative directory and fresh one-shot
@@ -599,16 +738,20 @@ where
         C: MonotonicClock + ?Sized,
     {
         let ticket_text = ticket.expose_secret()?;
-        let body = serde_json::to_vec(&serde_json::json!({
-            "protocol_version": 1,
-            "game_login_ticket": ticket_text,
-        }))
+        let mut request_body = SecretBuffer::with_capacity(128 + ticket_text.len());
+        serde_json::to_writer(
+            &mut request_body,
+            &GatewayRequestDto {
+                protocol_version: 1,
+                game_login_ticket: ticket_text,
+            },
+        )
         .map_err(|_| PlatformError::new(PlatformErrorKind::InvariantViolation))?;
         let response = self.send(HttpRequest::new(
             self.endpoints.gateway_url("v1/login")?,
             "application/json",
             None,
-            SecretBytes::new(body)?,
+            request_body.into_secret_bytes()?,
         ))?;
         validate_sensitive_success(&response)?;
         let dto: GatewayResponseDto = parse_json(response.body.expose_secret())?;
@@ -722,7 +865,7 @@ fn validate_dynamic_redirect(url: &Url) -> Result<(), PlatformError> {
 }
 
 fn validate_sensitive_success(response: &HttpResponse) -> Result<(), PlatformError> {
-    if (300..400).contains(&response.status) || response.location.is_some() {
+    if (300..400).contains(&response.status) || response.has_location {
         return Err(PlatformError::new(PlatformErrorKind::RedirectRejected));
     }
     if response.status != 200 {
@@ -766,20 +909,55 @@ where
     Ok(value)
 }
 
+fn clear_string(value: String) {
+    let mut bytes = value.into_bytes();
+    bytes.fill(0);
+}
+
+struct SecretValue(SecretString);
+
+impl SecretValue {
+    fn into_secret(self) -> SecretString {
+        self.0
+    }
+
+    fn into_bytes(self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+}
+
+impl<'de> Deserialize<'de> for SecretValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        SecretString::new(value)
+            .map(Self)
+            .map_err(|_| D::Error::custom("invalid secret value"))
+    }
+}
+
+#[derive(Serialize)]
+struct GatewayRequestDto<'a> {
+    protocol_version: u32,
+    game_login_ticket: &'a str,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TokenResponseDto {
     token_type: String,
     expires_in: u64,
-    access_token: String,
-    refresh_token: String,
+    access_token: SecretValue,
+    refresh_token: SecretValue,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct TicketResponseDto {
     protocol_version: u32,
-    ticket: String,
+    ticket: SecretValue,
     expires_in: u64,
 }
 
@@ -795,7 +973,7 @@ struct GatewayResponseDto {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct GatewaySessionDto {
-    credential: String,
+    credential: SecretValue,
     expires_at: String,
 }
 
@@ -893,3 +1071,58 @@ impl Display for PlatformError {
 }
 
 impl Error for PlatformError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn project_owned_secret_owners_overwrite_their_visible_bytes() -> Result<(), Box<dyn Error>> {
+        let mut text = SecretString::new("synthetic-secret".to_owned())?;
+        text.clear();
+        assert!(text.0.iter().all(|byte| *byte == 0));
+
+        let mut bytes = SecretBytes::new(b"synthetic-body".to_vec())?;
+        bytes.clear();
+        assert!(bytes.0.iter().all(|byte| *byte == 0));
+
+        let mut buffer = SecretBuffer(b"Bearer synthetic-token".to_vec());
+        buffer.clear();
+        assert!(buffer.as_slice().iter().all(|byte| *byte == 0));
+        Ok(())
+    }
+
+    #[test]
+    fn secret_debug_and_display_are_redacted() -> Result<(), Box<dyn Error>> {
+        let secret = SecretString::new("synthetic-secret".to_owned())?;
+        assert_eq!(format!("{secret:?}"), "SecretString([REDACTED])");
+        assert_eq!(format!("{secret}"), "[REDACTED SECRET]");
+        Ok(())
+    }
+
+    #[test]
+    fn secret_dto_fields_enter_zeroing_ownership_during_deserialization()
+    -> Result<(), Box<dyn Error>> {
+        let dto: TicketResponseDto =
+            parse_json(br#"{"protocol_version":1,"ticket":"synthetic-ticket","expires_in":60}"#)?;
+        assert_eq!(dto.ticket.0.expose_secret()?, "synthetic-ticket");
+        Ok(())
+    }
+
+    #[test]
+    fn gateway_request_serialization_preserves_exact_wire_shape() -> Result<(), Box<dyn Error>> {
+        let mut body = SecretBuffer::with_capacity(128);
+        serde_json::to_writer(
+            &mut body,
+            &GatewayRequestDto {
+                protocol_version: 1,
+                game_login_ticket: "synthetic-ticket",
+            },
+        )?;
+        assert_eq!(
+            body.as_slice(),
+            br#"{"protocol_version":1,"game_login_ticket":"synthetic-ticket"}"#
+        );
+        Ok(())
+    }
+}

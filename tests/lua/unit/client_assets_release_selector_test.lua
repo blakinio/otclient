@@ -29,6 +29,17 @@ test('client asset selector prefers the matching client archive', function()
     assertEqual('SHA256SUMS.txt', prepared.assets[2].name)
 end)
 
+test('client asset selector normalizes only SHA-256 release digests', function()
+    local selected = Selector.selectArchive(fixtures[1])
+    assertEqual(string.rep('a', 64), Selector.assetSha256(selected))
+    assertEqual(string.rep('b', 64), Selector.normalizeSha256Digest('  SHA256:' .. string.rep('B', 64) .. '  '))
+    assertEqual(string.rep('c', 64), Selector.normalizeSha256Digest(string.rep('c', 64)))
+    assertNil(Selector.normalizeSha256Digest('sha512:' .. string.rep('d', 64)))
+    assertNil(Selector.normalizeSha256Digest('sha256:not-hex'))
+    assertNil(Selector.normalizeSha256Digest(string.rep('e', 63)))
+    assertNil(Selector.assetSha256({ digest = '' }))
+end)
+
 test('client asset selector excludes macOS and unrelated legacy archives', function()
     assertTrue(Selector.isMacArchivePath('Tibia.app.zip'))
     assertTrue(Selector.isMacArchivePath('client-macos.zip'))
@@ -115,7 +126,17 @@ local function withAdapterHarness(callback)
     local savedSelector = rawget(_G, 'ClientAssetsReleaseSelector')
     local savedHTTP = rawget(_G, 'HTTP')
     local savedServices = rawget(_G, 'Services')
-    local state = { calls = 0 }
+    local savedResources = rawget(_G, 'g_resources')
+    local savedCrypt = rawget(_G, 'g_crypt')
+    local savedLogger = rawget(_G, 'g_logger')
+    local archiveContents = 'synthetic verified archive bytes'
+    local state = {
+        calls = 0,
+        downloads = 0,
+        reads = 0,
+        logs = {},
+        archiveContents = archiveContents
+    }
 
     ClientAssetsReleaseSelector = Selector
     Services = {
@@ -129,7 +150,36 @@ local function withAdapterHarness(callback)
         responseCallback(fixtures, nil)
         return 'operation-' .. state.calls
     end
+    local originalDownload = function(url, path, responseCallback, progressCallback)
+        state.downloads = state.downloads + 1
+        state.lastDownloadUrl = url
+        state.lastDownloadPath = path
+        state.lastProgressCallback = progressCallback
+        if responseCallback then
+            responseCallback(path, 'transport-checksum', nil)
+        end
+        return 'download-' .. state.downloads
+    end
     HTTP.getJSON = originalGetJSON
+    HTTP.download = originalDownload
+    g_resources = {
+        readFileContents = function(path)
+            state.reads = state.reads + 1
+            state.lastReadPath = path
+            return archiveContents
+        end
+    }
+    g_crypt = {
+        sha256 = function(contents)
+            assertEqual(archiveContents, contents)
+            return string.rep('a', 64)
+        end
+    }
+    g_logger = {
+        info = function(message)
+            state.logs[#state.logs + 1] = message
+        end
+    }
 
     local loaded, loadError = pcall(dofile, sourceDir .. '/modules/client_assets/client_assets_release_adapter.lua')
     if not loaded then
@@ -137,11 +187,14 @@ local function withAdapterHarness(callback)
         ClientAssetsReleaseSelector = savedSelector
         HTTP = savedHTTP
         Services = savedServices
+        g_resources = savedResources
+        g_crypt = savedCrypt
+        g_logger = savedLogger
         error(loadError, 0)
     end
 
     local success, result = xpcall(function()
-        callback(state, originalGetJSON)
+        callback(state, originalGetJSON, originalDownload)
     end, debug.traceback)
 
     ClientAssetsReleaseAdapter.terminate()
@@ -149,14 +202,28 @@ local function withAdapterHarness(callback)
     ClientAssetsReleaseSelector = savedSelector
     HTTP = savedHTTP
     Services = savedServices
+    g_resources = savedResources
+    g_crypt = savedCrypt
+    g_logger = savedLogger
     if not success then error(result, 0) end
 end
 
+local function hasLog(state, fragment)
+    for _, message in ipairs(state.logs) do
+        if tostring(message):find(fragment, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
 test('client asset adapter prepares only configured release responses and restores HTTP on unload', function()
-    withAdapterHarness(function(_, originalGetJSON)
+    withAdapterHarness(function(_, originalGetJSON, originalDownload)
         ClientAssetsReleaseAdapter.init()
-        local wrapper = HTTP.getJSON
-        assertFalse(wrapper == originalGetJSON)
+        local getJsonWrapper = HTTP.getJSON
+        local downloadWrapper = HTTP.download
+        assertFalse(getJsonWrapper == originalGetJSON)
+        assertFalse(downloadWrapper == originalDownload)
 
         local prepared = nil
         HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function(data)
@@ -179,5 +246,62 @@ test('client asset adapter prepares only configured release responses and restor
 
         ClientAssetsReleaseAdapter.terminate()
         assertEqual(originalGetJSON, HTTP.getJSON)
+        assertEqual(originalDownload, HTTP.download)
+    end)
+end)
+
+test('client asset adapter verifies only configured selected release archives', function()
+    withAdapterHarness(function(state)
+        ClientAssetsReleaseAdapter.init()
+        HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function() end)
+
+        local verifiedPath = nil
+        local verifiedChecksum = nil
+        local verifiedError = 'unset'
+        HTTP.download(
+            'https://example.invalid/client.zip',
+            'asset-downloads/1524/client.zip',
+            function(path, checksum, err)
+                verifiedPath = path
+                verifiedChecksum = checksum
+                verifiedError = err
+            end)
+
+        assertEqual('asset-downloads/1524/client.zip', verifiedPath)
+        assertEqual('transport-checksum', verifiedChecksum)
+        assertNil(verifiedError)
+        assertEqual(1, state.reads)
+        assertEqual('/downloads/asset-downloads/1524/client.zip', state.lastReadPath)
+        assertTrue(hasLog(state, 'Verified downloaded asset archive SHA-256'))
+
+        local readsBefore = state.reads
+        local unrelatedError = 'unset'
+        HTTP.download(
+            'https://example.invalid/unrelated.zip',
+            'asset-downloads/1524/unrelated.zip',
+            function(_, _, err) unrelatedError = err end)
+        assertNil(unrelatedError)
+        assertEqual(readsBefore, state.reads)
+    end)
+end)
+
+test('client asset adapter rejects a selected release archive digest mismatch', function()
+    withAdapterHarness(function(state)
+        ClientAssetsReleaseAdapter.init()
+        HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function() end)
+        g_crypt.sha256 = function(contents)
+            assertEqual(state.archiveContents, contents)
+            return string.rep('b', 64)
+        end
+
+        local mismatchError = nil
+        HTTP.download(
+            'https://example.invalid/client.zip',
+            'asset-downloads/1524/client.zip',
+            function(_, _, err) mismatchError = err end)
+
+        assertTrue(type(mismatchError) == 'string')
+        assertTrue(mismatchError:find('Invalid SHA-256', 1, true) ~= nil)
+        assertFalse(hasLog(state, 'Verified downloaded asset archive SHA-256'))
     end)
 end)

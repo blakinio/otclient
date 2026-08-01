@@ -56,6 +56,12 @@ GitHub release JSON is prepared before the existing resolver caches it:
 
 This policy prevents an unrelated legacy ZIP from being selected only because it appears first in a release.
 
+### Configured release archive digest
+
+When the configured GitHub Releases response supplies a selected asset `digest` using the `sha256:<hex>` form, the conditional release adapter binds that digest to the exact selected `browser_download_url`. The downloaded archive is read from the existing download cache and its SHA-256 is verified before the installer callback can begin extraction. A mismatch fails closed.
+
+The adapter does not apply a digest from one URL to another, does not infer a digest for codeload fallback archives, and does not intercept unrelated HTTP downloads. Its `HTTP.getJSON` and `HTTP.download` wrappers are restored on module unload. A release asset without a valid SHA-256 digest retains the existing manifest/content integrity boundaries and cannot by itself satisfy the production archive-integrity rehearsal gate.
+
 ## Integrity and Security Defaults
 
 Defaults are hardened:
@@ -91,6 +97,8 @@ Synthetic fixtures must cover:
 - a release containing only unrelated/macOS archives, which must force codeload fallback;
 - a generic tag whose version is present in the release name;
 - idempotent preparation of cached releases;
+- valid and invalid GitHub release SHA-256 digest normalization;
+- exact selected-URL archive verification, mismatch rejection and unrelated-download passthrough;
 - final things/sounds/extras paths;
 - runtime completeness requiring catalog/hash/appearances/static-data files.
 
@@ -121,7 +129,7 @@ If the console shows a 404 for `*.lzma`, the client is using the manifest fallba
 
 ### 3) SHA-256 mismatch
 
-By default, mismatches fail installation. Verify upstream files and hashes first before changing integrity flags.
+By default, mismatches fail installation. Verify upstream files and hashes first before changing integrity flags. For a selected configured GitHub release asset, also confirm the release JSON contains a valid `sha256:<hex>` digest for the exact archive URL recorded by the installer.
 
 ### 4) Slow progress / “stuck”
 
@@ -137,7 +145,8 @@ When changing this system, validate:
 
 1. Missing assets prompt appears for modern version.
 2. A matching release archive is selected, or the resolver falls back to codeload when no match exists.
-3. Install completes into `data/things/<version>` and `data/sounds/<version>`.
-4. Runtime loads modern assets from those paths.
-5. Hash verification behavior matches configuration.
-6. Windows required CI remains green; dormant platforms require their own acceptance before compatibility claims.
+3. A configured selected release asset with a valid GitHub SHA-256 digest is verified before extraction.
+4. Install completes into `data/things/<version>` and `data/sounds/<version>`.
+5. Runtime loads modern assets from those paths.
+6. Hash verification behavior matches configuration.
+7. Windows required CI remains green; dormant platforms require their own acceptance before compatibility claims.

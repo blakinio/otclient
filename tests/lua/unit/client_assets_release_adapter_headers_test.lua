@@ -179,3 +179,83 @@ test('client asset adapter leaves unrelated downloads unchanged', function()
         assertEqual(0, state.headerAdds)
     end)
 end)
+
+test('client asset adapter installs HTTP wrappers when ensureClientVersion runs after HTTP startup', function()
+    local savedAdapter = rawget(_G, 'ClientAssetsReleaseAdapter')
+    local savedSelector = rawget(_G, 'ClientAssetsReleaseSelector')
+    local savedModules = rawget(_G, 'modules')
+    local savedClientAssets = rawget(_G, 'ClientAssets')
+    local savedHTTP = rawget(_G, 'HTTP')
+    local savedServices = rawget(_G, 'Services')
+    local savedLogger = rawget(_G, 'g_logger')
+
+    local state = {
+        ensureCalls = 0,
+        callbackOk = nil
+    }
+    local originalEnsureClientVersion = function(version, callback)
+        state.ensureCalls = state.ensureCalls + 1
+        state.version = version
+        callback(true, nil)
+        return 'ensure-operation'
+    end
+    local originalGetJSON = function() return 'get-operation' end
+    local originalDownload = function() return 'download-operation' end
+
+    ClientAssetsReleaseAdapter = nil
+    ClientAssetsReleaseSelector = Selector
+    modules = {
+        client_assets = {
+            ensureClientVersion = originalEnsureClientVersion
+        }
+    }
+    ClientAssets = nil
+    HTTP = nil
+    Services = { clientAssets = { repository = 'dudantas/tibia-client' } }
+    g_logger = {
+        info = function() end,
+        warning = function() end
+    }
+
+    local ok, result = xpcall(function()
+        dofile(sourceDir .. '/modules/client_assets/client_assets_release_adapter.lua')
+        ClientAssetsReleaseAdapter.init()
+        assertTrue(modules.client_assets.ensureClientVersion ~= originalEnsureClientVersion)
+
+        HTTP = {
+            getJSON = originalGetJSON,
+            download = originalDownload,
+            addCustomHeader = function() end,
+            removeCustomHeader = function() end
+        }
+
+        local operation = modules.client_assets.ensureClientVersion(1525, function(callbackOk)
+            state.callbackOk = callbackOk
+        end)
+
+        assertEqual('ensure-operation', operation)
+        assertEqual(1, state.ensureCalls)
+        assertEqual(1525, state.version)
+        assertTrue(state.callbackOk)
+        assertTrue(HTTP.getJSON ~= originalGetJSON)
+        assertTrue(HTTP.download ~= originalDownload)
+
+        ClientAssetsReleaseAdapter.terminate()
+        assertEqual(originalEnsureClientVersion, modules.client_assets.ensureClientVersion)
+        assertEqual(originalGetJSON, HTTP.getJSON)
+        assertEqual(originalDownload, HTTP.download)
+    end, debug.traceback)
+
+    if ClientAssetsReleaseAdapter and type(ClientAssetsReleaseAdapter.terminate) == 'function' then
+        pcall(ClientAssetsReleaseAdapter.terminate)
+    end
+    ClientAssetsReleaseAdapter = savedAdapter
+    ClientAssetsReleaseSelector = savedSelector
+    modules = savedModules
+    ClientAssets = savedClientAssets
+    HTTP = savedHTTP
+    Services = savedServices
+    g_logger = savedLogger
+
+    if not ok then error(result, 0) end
+end)

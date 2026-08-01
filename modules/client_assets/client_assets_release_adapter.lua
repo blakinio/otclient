@@ -5,6 +5,7 @@ local originalGetJSON = nil
 local wrappedGetJSON = nil
 local originalDownload = nil
 local wrappedDownload = nil
+local ensureWrappers = {}
 local archiveSha256ByUrl = {}
 local MISSING_ARCHIVE_DIGEST = {}
 local GITHUB_API_HEADERS = {
@@ -70,7 +71,7 @@ local function isConfiguredReleaseDownloadUrl(url)
 end
 
 local function addGitHubApiHeaders()
-    if type(HTTP.addCustomHeader) ~= 'function' or type(HTTP.removeCustomHeader) ~= 'function' then
+    if not HTTP or type(HTTP.addCustomHeader) ~= 'function' or type(HTTP.removeCustomHeader) ~= 'function' then
         return false
     end
 
@@ -207,21 +208,45 @@ local function downloadVerified(url, path, callback, progressCallback, expectedS
     end, progressCallback)
 end
 
-function ClientAssetsReleaseAdapter.init()
-    if wrappedGetJSON or wrappedDownload or not HTTP or type(HTTP.getJSON) ~= 'function' then
-        return
+local function releaseWrappersAreInstalled()
+    return HTTP and
+        wrappedGetJSON and HTTP.getJSON == wrappedGetJSON and
+        wrappedDownload and HTTP.download == wrappedDownload
+end
+
+local function forgetDetachedHttpWrappers()
+    if wrappedGetJSON and (not HTTP or HTTP.getJSON ~= wrappedGetJSON) then
+        originalGetJSON = nil
+        wrappedGetJSON = nil
+    end
+    if wrappedDownload and (not HTTP or HTTP.download ~= wrappedDownload) then
+        originalDownload = nil
+        wrappedDownload = nil
+    end
+end
+
+local function installHttpWrappers()
+    if not HTTP or type(HTTP.getJSON) ~= 'function' or type(HTTP.download) ~= 'function' then
+        return false
+    end
+    if releaseWrappersAreInstalled() then
+        return true
     end
 
-    originalGetJSON = HTTP.getJSON
-    wrappedGetJSON = function(url, callback)
-        if not Selector.isConfiguredReleasesUrl(url, serviceConfig()) or type(callback) ~= 'function' then
-            return originalGetJSON(url, callback)
+    forgetDetachedHttpWrappers()
+
+    if not wrappedGetJSON then
+        originalGetJSON = HTTP.getJSON
+        wrappedGetJSON = function(url, callback)
+            if not Selector.isConfiguredReleasesUrl(url, serviceConfig()) or type(callback) ~= 'function' then
+                return originalGetJSON(url, callback)
+            end
+            return requestReleaseCatalog(url, callback)
         end
-        return requestReleaseCatalog(url, callback)
+        HTTP.getJSON = wrappedGetJSON
     end
-    HTTP.getJSON = wrappedGetJSON
 
-    if type(HTTP.download) == 'function' then
+    if not wrappedDownload then
         originalDownload = HTTP.download
         wrappedDownload = function(url, path, callback, progressCallback)
             if type(callback) ~= 'function' or not isConfiguredReleaseDownloadUrl(url) then
@@ -254,10 +279,67 @@ function ClientAssetsReleaseAdapter.init()
         end
         HTTP.download = wrappedDownload
     end
+
+    return releaseWrappersAreInstalled()
+end
+
+local function wrapEnsureClientVersion(target)
+    if type(target) ~= 'table' or type(target.ensureClientVersion) ~= 'function' then
+        return
+    end
+
+    for _, entry in ipairs(ensureWrappers) do
+        if entry.target == target then
+            return
+        end
+    end
+
+    local original = target.ensureClientVersion
+    local wrapped = function(version, callback)
+        if not installHttpWrappers() then
+            local message = 'Unable to enable release archive SHA-256 verification because HTTP is unavailable.'
+            logWarning(message)
+            if type(callback) == 'function' then
+                return callback(false, message)
+            end
+            return false
+        end
+        return original(version, callback)
+    end
+
+    target.ensureClientVersion = wrapped
+    ensureWrappers[#ensureWrappers + 1] = {
+        target = target,
+        original = original,
+        wrapped = wrapped
+    }
+end
+
+local function installEnsureClientVersionWrappers()
+    if modules and type(modules.client_assets) == 'table' then
+        wrapEnsureClientVersion(modules.client_assets)
+    end
+    if type(ClientAssets) == 'table' then
+        wrapEnsureClientVersion(ClientAssets)
+    end
+end
+
+function ClientAssetsReleaseAdapter.init()
+    installEnsureClientVersionWrappers()
+    installHttpWrappers()
 end
 
 function ClientAssetsReleaseAdapter.terminate()
     clearGitHubApiHeaders()
+
+    for index = #ensureWrappers, 1, -1 do
+        local entry = ensureWrappers[index]
+        if entry.target.ensureClientVersion == entry.wrapped then
+            entry.target.ensureClientVersion = entry.original
+        end
+    end
+    ensureWrappers = {}
+
     if wrappedGetJSON and HTTP and HTTP.getJSON == wrappedGetJSON then
         HTTP.getJSON = originalGetJSON
     end

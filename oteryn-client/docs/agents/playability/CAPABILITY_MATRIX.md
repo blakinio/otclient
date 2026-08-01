@@ -1,12 +1,13 @@
 # Oteryn Rust Client Capability Matrix
 
-Status cut: `main@67a6c9d726f7e70977803b028270475570210db0` pending independent post-remediation closure audit.  
+Status cut: `main@958881038ca5a5bc2f25a878a898ab5446d5e5c4` after independent post-remediation audit PR #133.  
+Audit status: `VALIDATED_WITH_ONE_RESIDUAL`; `OTC2-AUD-002/003/004` are closed and `OTC2-AUD-001` is partially closed by focused LOW `OTC2-POST-001`.  
 This is a living planning matrix, not a release claim.
 
 ## Status rules
 
 - `PROVEN` — required exact evidence exists for the bounded claim.
-- `PARTIAL` — an owning foundation exists but the user workflow is incomplete.
+- `PARTIAL` — an owning foundation exists, but an accepted invariant or user workflow is incomplete.
 - `SYNTHETIC_ONLY` — proven only with original synthetic fixtures/fakes.
 - `UNKNOWN` — runtime/producer/legal evidence is missing.
 - `BLOCKED` — a named dependency prevents safe work or claim.
@@ -27,7 +28,7 @@ The coordinator updates rows only from merged code, exact CI/runtime evidence an
 | Windows event-loop/window shell | PARTIAL | bounded `winit` shell exists; interactive matrix incomplete | Windows shell/runtime acceptance | M1/M4 |
 | Renderer device/surface ownership | PARTIAL | deterministic `wgpu` surface boundary; no world/UI passes | renderer resource/world packages | M2-M4 |
 | Nonblocking technical worker shutdown | PROVEN | typed begin/poll shutdown remediation | extend to future workers | all |
-| Safe project-owned secret lifetime contract | PROVEN | remediated bounded overwrite claims | extend to new secret owners | all |
+| Project-owned secret lifetime invariant | PARTIAL | active flow materially corrected; public mutable callback target and rejected oversized direct credential input remain as LOW `OTC2-POST-001` | one focused standard-library-only follow-up before credential-bearing M1 validation | M1 |
 | Settings schema/migrations | ABSENT | no typed settings system | `settings-core` sole producer | M3/M4 |
 | Crash handling and support bundle | ABSENT | diagnostics contract only | diagnostics runtime/support package | M4/M6 |
 | Replay and deterministic benchmark harness | ABSENT | architecture target only | replay/benchmark tools | M3-M6 |
@@ -36,14 +37,14 @@ The coordinator updates rows only from merged code, exact CI/runtime evidence an
 
 | Capability | State | Current evidence/boundary | Next owning package | Milestone |
 |---|---|---|---|---|
-| OAuth Authorization Code + PKCE | SYNTHETIC_ONLY | fake browser/listener/HTTP security E2E | controlled deployment validation | M1 |
+| OAuth Authorization Code + PKCE | SYNTHETIC_ONLY | fake browser/listener/HTTP security E2E | controlled deployment validation after `OTC2-POST-001` | M1 |
 | Real browser loopback callback on Windows | UNKNOWN | no named interactive desktop evidence | P0 release/E2E then staging task | M1 |
 | Exact deployed Identity/Gateway compatibility | UNKNOWN | repository contracts only | controlled staging E2E | M1 |
 | Account generation/lifecycle | PARTIAL | one bounded bootstrap; token family consumed by ticket issuance | account relog/session design | M3/M4 |
 | Strict Gateway protocol-v1 directory | SYNTHETIC_ONLY | bounded fake response and relation validation | real staging validation | M1 |
 | World/character selection contracts | PROVEN | typed validated directory and explicit selection | native selection UI | M1/M4 |
 | Native login and character-selection UX | ABSENT | technical environment-only surface | UI/auth feature packages | M4 |
-| One-shot game-entry credential | PROVEN | non-clone/redacted/lifecycle tests | reuse | all |
+| One-shot game-entry credential | PARTIAL | normal internal path is bounded/non-clone/redacted; direct oversized public constructor input is the LOW residual | focused `OTC2-POST-001` cleanup then reuse | M1 |
 | Controlled real Canary admission | UNKNOWN | production path fail-closed without exact deployment proof | staging admission task | M1 |
 | Relog without full process restart | ABSENT | one bounded bootstrap only | account/game session lifecycle | M3/M4 |
 | Reconnect policy | ABSENT | no gameplay session reconnect | session recovery package | M3/M4 |
@@ -96,7 +97,7 @@ The coordinator updates rows only from merged code, exact CI/runtime evidence an
 
 | Capability | State | Current evidence/boundary | Next owning package | Milestone |
 |---|---|---|---|---|
-| Synthetic asset schema and deterministic compiler | PROVEN | typed IDs, pack v1, safe opened-object reads | preserve | all |
+| Synthetic asset schema and deterministic compiler | PROVEN | typed IDs, pack v1, capability-safe opened-object reads | preserve | all |
 | Immutable pack open/verify/index/lookup | ABSENT | no runtime crate | asset-runtime contract/implementation | P1/M2 |
 | Bounded async decode scheduling | ABSENT | none | asset-runtime decode layer | M2 |
 | RGBA texture upload/resource handles | ABSENT | no renderer resource integration | renderer-resource | M2 |
@@ -193,5 +194,7 @@ P0 must replace the major `UNKNOWN` areas with exact evidence:
 4. Windows UI/input/audio/accessibility acceptance inventory.
 5. Staging, E2E, performance, packaging and release evidence plan.
 6. Coordinator aggregation that marks release-required versus deferred capabilities and proposes the smallest P1 contract producers.
+
+`OTC2-POST-001` does not block docs-only P0 discovery, but must be closed before credential-bearing M1 runtime validation or any broader secret-lifecycle completion claim.
 
 No P0 worker changes Rust source or claims implementation readiness.

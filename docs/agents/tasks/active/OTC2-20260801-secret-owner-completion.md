@@ -9,8 +9,8 @@ phase: validation
 branch: fix/OTC2-20260801-secret-owner-completion
 base_branch: main
 created: 2026-08-01T16:03:00+02:00
-updated: 2026-08-01T16:18:00+02:00
-last_verified_commit: "361842c79365c35cdc6f041343875db57b508676"
+updated: 2026-08-01T16:25:00+02:00
+last_verified_commit: "230db54792f23e981a7d7a4083ff5c3be03dcd34"
 required_base_commit: "7596a792fbf747609a65e9fc35678b800b2d56e2"
 risk: medium
 related_pr: 136
@@ -23,15 +23,18 @@ owned_paths:
   - oteryn-client/crates/identity/src/lib.rs
   - oteryn-client/crates/game-session/src/lib.rs
   - oteryn-client/tests/integration/technical-login/src/lib.rs
+  - oteryn-client/tests/security/auth/src/lib.rs
 shared_path_lease: []
 modules_touched:
   - OAuth loopback callback owner
   - one-shot game-entry credential owner
   - technical-login callback fixtures
+  - identity security callback fixture
 crates_touched:
   - oteryn-identity
   - oteryn-game-session
   - oteryn-technical-login-integration-tests
+  - oteryn-identity-security-tests
 features_touched:
   - callback target encapsulation
   - rejected secret input cleanup
@@ -57,9 +60,9 @@ context_growth: stable
 context_score: 5
 estimate_confidence: high
 decomposition_decision: single
-decomposition_reason: both residuals and the required external fixtures share one audited secret-owner contract and rollback boundary
+decomposition_reason: both residuals and required external fixtures share one audited secret-owner contract and rollback boundary
 validation_level: heavy
-heavy_validation_runs: 2
+heavy_validation_runs: 3
 session_rotation_count: 0
 ---
 
@@ -71,7 +74,7 @@ Close audited LOW residual `OTC2-POST-001` without broadening any memory-erasure
 
 - the security-sensitive `CallbackAttempt.target` is private after accepted construction, so external safe Rust callers cannot mutate, take or replace it;
 - the non-secret copy-valued peer remains public;
-- all external technical-login fakes and regression cases construct attempts through the existing bounded `CallbackAttempt::new` API;
+- every external technical-login and identity-security fixture constructs attempts through the existing bounded `CallbackAttempt::new` API;
 - a compile-fail API example proves direct target mutation is unavailable;
 - the target remains bounded, redacted, non-cloneable and explicitly overwritten on terminal drop;
 - direct non-empty oversized `GameEntryCredential` input is filled with zeroes before `TooLarge` returns;
@@ -87,19 +90,19 @@ No shutdown, asset-open, architecture-policy, workflow, manifest, lockfile, depe
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T16:18:00+02:00
-head: 361842c79365c35cdc6f041343875db57b508676
+updated_at: 2026-08-01T16:25:00+02:00
+head: 230db54792f23e981a7d7a4083ff5c3be03dcd34
 branch: fix/OTC2-20260801-secret-owner-completion
 pr: 136
 status: active
 phase: validation
 proven:
-  - The final diff has exactly the task, identity source, game-session source and technical-login integration source.
+  - The final diff has exactly the task, identity source, game-session source, technical-login integration source and identity-security source.
   - CallbackAttempt.target is private and the compile-fail example attempts the previously available mutation.
-  - Every external integration fixture uses CallbackAttempt::new rather than struct literal access.
+  - Every external callback fixture uses CallbackAttempt::new rather than struct literal access.
   - SecretBytes::validate_for_ownership fills oversized initialized bytes before returning TooLarge.
   - Accepted SecretBytes retains the caller-owned Vec and clears its initialized bytes on drop.
-  - Focused identity, game-session and technical-login integration tests passed before commit 361842c79365c35cdc6f041343875db57b508676.
+  - Focused identity, game-session, technical-login integration and identity-security tests passed before their final source commits.
   - Temporary patch workflows and scripts removed themselves and are absent from the final diff.
 derived:
   - OTC2-POST-001 is closed if exact-head full workspace and review gates remain green.
@@ -108,25 +111,29 @@ unknown:
 conflicts: []
 first_failure:
   marker: resolved
-  evidence: first full Clippy exposed four integration fixtures; all now use CallbackAttempt::new.
+  evidence: full Clippy exposed four technical-login and one security fixture; all now use CallbackAttempt::new.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-secret-owner-completion.md
   - oteryn-client/crates/identity/src/lib.rs
   - oteryn-client/crates/game-session/src/lib.rs
   - oteryn-client/tests/integration/technical-login/src/lib.rs
+  - oteryn-client/tests/security/auth/src/lib.rs
 validation:
   - command: cargo +1.94.0 fmt --all
     result: PASS
     evidence: atomic source and fixture runners.
   - command: cargo +1.94.0 test --locked -p oteryn-identity
     result: PASS
-    evidence: fixture runner before commit 361842c79365c35cdc6f041343875db57b508676.
+    evidence: focused fixture runner.
   - command: cargo +1.94.0 test --locked -p oteryn-game-session
     result: PASS
-    evidence: fixture runner before commit 361842c79365c35cdc6f041343875db57b508676.
+    evidence: focused fixture runner.
   - command: cargo +1.94.0 test --locked -p oteryn-technical-login-integration-tests
     result: PASS
-    evidence: fixture runner before commit 361842c79365c35cdc6f041343875db57b508676.
+    evidence: focused technical-login fixture runner.
+  - command: cargo +1.94.0 test --locked -p oteryn-identity-security-tests
+    result: PASS
+    evidence: focused security fixture runner before commit 230db54792f23e981a7d7a4083ff5c3be03dcd34.
 blockers: []
 next_action: Run exact-head full validation and clean review on PR #136, then merge and archive the completed residual.
 ```

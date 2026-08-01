@@ -550,10 +550,7 @@ fn graph_from_fixture(value: &Value) -> Result<WorkspaceGraph, String> {
         .as_object()
         .ok_or_else(|| "fixture root must be a JSON object".to_owned())?;
     let schema_version = required_u64(object.get("schema_version"), "schema_version")?;
-    if !matches!(
-        schema_version,
-        LEGACY_FIXTURE_SCHEMA_VERSION | FIXTURE_SCHEMA_VERSION
-    ) {
+    if !matches!(schema_version, LEGACY_FIXTURE_SCHEMA_VERSION | FIXTURE_SCHEMA_VERSION) {
         return Err(format!(
             "unsupported fixture schema_version {schema_version}; supported versions are {LEGACY_FIXTURE_SCHEMA_VERSION} and {FIXTURE_SCHEMA_VERSION}"
         ));

@@ -5,12 +5,12 @@ agent: "GPT-5.6 Thinking"
 lane: otclient-v2
 track: greenfield-rust
 workstream: full-playability-program
-phase: design
+phase: validation
 branch: docs/OTC2-20260801-full-playability-program-plan
 base_branch: main
 created: 2026-08-01T15:38:00+02:00
-updated: 2026-08-01T16:42:00+02:00
-last_verified_commit: "02c7ac4b1d5bf1d37c20694bad45e830e430e822"
+updated: 2026-08-01T16:55:00+02:00
+last_verified_commit: "f8e15c5a1aed6a01a52904da8cb8b1b93e595a99"
 required_base_commit: "02c7ac4b1d5bf1d37c20694bad45e830e430e822"
 risk: high
 related_pr: 135
@@ -63,7 +63,7 @@ estimate_confidence: high
 decomposition_decision: discovery_first
 decomposition_reason: full client parity is too broad to authorize safely until independent protocol, legacy-behaviour, asset, UX and release evidence is normalized into one capability matrix
 validation_level: focused
-heavy_validation_runs: 0
+heavy_validation_runs: 1
 session_rotation_count: 0
 ---
 
@@ -71,7 +71,7 @@ session_rotation_count: 0
 
 Turn the owner's broad objective—an Oteryn Rust client that is fully playable with user-visible capability parity to the original Tibia client for features supported by the project-owned Oteryn/Canary target—into a durable, architecture-compliant multi-agent programme.
 
-The planning package must define measurable milestones, current capability status, missing contract producers, serialization boundaries, safe parallel work, exact first-wave outputs and ready-to-paste worker prompts. It does not authorize gameplay implementation.
+The planning package defines measurable milestones, current capability status, missing contract producers, serialization boundaries, safe parallel work, exact first-wave outputs and ready-to-paste worker prompts. It does not authorize gameplay implementation.
 
 # Product interpretation
 
@@ -92,22 +92,22 @@ The post-remediation audit, its archive and the audited secret-owner follow-up a
 
 # Acceptance
 
-- [ ] `PROGRAM_CHARTER.md` defines scope, exclusions, evidence vocabulary and measurable milestones from technical login to production parity.
-- [ ] `ARCHITECTURE_HANDOFF.md` gives future agents one compact normative map of crate ownership, dependency direction, trust boundaries and non-negotiable invariants.
-- [ ] `CAPABILITY_MATRIX.md` records current proven/partial/absent/unknown state and the next owning producer for every major gameplay/product capability.
-- [ ] `DEPENDENCY_AND_PARALLELISM.md` defines sole contract producers, shared-path leases, merge order, barrier rules and safe concurrent workstreams.
-- [ ] `WAVE_P0_DISCOVERY.md` authorizes only independent discovery packages and one aggregation barrier; no implementation.
-- [ ] Every prompt follows `PROMPTING_STANDARD.md`, including role/phase, live state, objective, scope, reads/ownership, policy v2, execution, validation, durable state, stop conditions and compact final response.
-- [ ] Existing W1-W7 prompts are not relaunched.
-- [ ] No Rust source, manifest, lockfile, workflow, architecture checker, legacy runtime path, producer repository or PR #23-owned shared file is changed.
-- [ ] Exact changed-path review and required repository CI pass on the final head.
+- [x] `PROGRAM_CHARTER.md` defines scope, exclusions, evidence vocabulary and measurable milestones from technical login to production parity.
+- [x] `ARCHITECTURE_HANDOFF.md` gives future agents one compact normative map of crate ownership, dependency direction, trust boundaries and non-negotiable invariants.
+- [x] `CAPABILITY_MATRIX.md` records current proven/partial/absent/unknown state and the next owning producer for every major gameplay/product capability.
+- [x] `DEPENDENCY_AND_PARALLELISM.md` defines sole contract producers, shared-path leases, merge order, barrier rules and safe concurrent workstreams.
+- [x] `WAVE_P0_DISCOVERY.md` authorizes only independent discovery packages and one aggregation barrier; no implementation.
+- [x] Every prompt follows `PROMPTING_STANDARD.md`, including role/phase, live state, objective, scope, reads/ownership, policy v2, execution, validation, durable state, stop conditions and compact final response.
+- [x] Existing W1-W7 prompts are not relaunched.
+- [x] No Rust source, manifest, lockfile, workflow, architecture checker, legacy runtime path, producer repository or PR #23-owned shared file remains in the diff.
+- [x] Exact changed-path review is limited to the twelve declared documentation paths; required repository CI runs on this final checkpoint head.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-01T16:42:00+02:00
-head: 16a3e70bc9238cda6bd2489e2469f6ed70753dc2
+updated_at: 2026-08-01T16:55:00+02:00
+head: f8e15c5a1aed6a01a52904da8cb8b1b93e595a99
 branch: docs/OTC2-20260801-full-playability-program-plan
 pr: 135
 status: validating
@@ -130,8 +130,8 @@ proven:
   - W7 provides a synthetic technical-login composition but no minimum playable gameplay slice.
   - R1, R2, R4 and R3 remediations are merged and archived.
   - Audit PR #133, audit archive PR #134, secret-owner completion PR #136 and archive PR #137 are merged.
-  - Open PRs #23, #48 and #97 do not own the proposed playability planning paths.
-  - Prompting Standard requires bounded task shapes, staged validation and durable checkpoints.
+  - The plan contains twelve declared documentation paths and no implementation or shared PR #23 path.
+  - Every P0 prompt contains the mandatory Prompting Standard sections and explicit implementation prohibition.
 derived:
   - The safe next package is a discovery-first programme definition with independent inventories before gameplay implementation.
   - Parallel implementation can begin only after sole public contracts and shared-path leases are explicitly assigned.
@@ -143,7 +143,7 @@ unknown:
 conflicts: []
 first_failure:
   marker: resolved-stale-status
-  evidence: programme documents and prompts are written; stale audit/residual status is normalized to current main.
+  evidence: programme documents and prompts are written; stale audit/residual status and checkpoint schema were normalized to current main.
 rejected_hypotheses:
   - Launch all gameplay agents immediately: rejected because shared domain/protocol/UI contracts and parity acceptance are not yet normalized.
 changed_paths:
@@ -163,7 +163,10 @@ validation:
   - command: programme document and Prompting Standard review
     result: PASS
     evidence: twelve declared documentation paths; implementation remains unauthorized and each worker prompt contains required bounded sections.
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC2-20260801-full-playability-program-plan.md --require-checkpoint
+    result: PASS
+    evidence: refresh workflow run 30704758539.
 blockers:
   - P0 worker launch waits for this planning PR and its separate lifecycle archive.
-next_action: Validate, review and merge PR #135, archive the plan, then run a fresh P0 coordinator launch preflight.
+next_action: Complete exact-head CI and clean review for PR #135, merge and archive the plan, then run a fresh P0 coordinator launch preflight.
 ```

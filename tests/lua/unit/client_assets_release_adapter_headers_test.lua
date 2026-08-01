@@ -31,7 +31,8 @@ local function withHarness(releases, callback)
         activeHeaders = {},
         headerAdds = 0,
         headerRemoves = 0,
-        downloads = 0
+        downloads = 0,
+        logs = {}
     }
 
     ClientAssetsReleaseSelector = Selector
@@ -53,7 +54,7 @@ local function withHarness(releases, callback)
         for name, value in pairs(state.activeHeaders) do
             state.requestHeaders[name] = value
         end
-        responseCallback(releases, nil)
+        state.pendingResponse = responseCallback
         return 'get-operation'
     end
     HTTP.download = function(_, path, responseCallback)
@@ -67,7 +68,10 @@ local function withHarness(releases, callback)
     g_crypt = {
         sha256 = function() return string.rep('a', 64) end
     }
-    g_logger = { info = function() end }
+    g_logger = {
+        info = function(message) state.logs[#state.logs + 1] = message end,
+        warning = function(message) state.logs[#state.logs + 1] = message end
+    }
 
     local loaded, loadError = pcall(dofile, sourceDir .. '/modules/client_assets/client_assets_release_adapter.lua')
     if not loaded then
@@ -97,13 +101,22 @@ local function withHarness(releases, callback)
     if not ok then error(result, 0) end
 end
 
-test('client asset adapter versions only the configured GitHub releases request', function()
+test('client asset adapter keeps GitHub API headers until the configured response completes', function()
     withHarness(releaseWithDigest('sha256:' .. string.rep('a', 64)), function(state)
-        HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function() end)
+        local response = nil
+        HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function(data)
+            response = data
+        end)
 
         assertEqual('application/vnd.github+json', state.requestHeaders.Accept)
         assertEqual('2026-03-10', state.requestHeaders['X-GitHub-Api-Version'])
+        assertEqual('application/vnd.github+json', state.activeHeaders.Accept)
+        assertEqual('2026-03-10', state.activeHeaders['X-GitHub-Api-Version'])
         assertEqual(1, state.headerAdds)
+        assertEqual(0, state.headerRemoves)
+
+        state.pendingResponse(releaseWithDigest('sha256:' .. string.rep('a', 64)), nil)
+        assertTrue(type(response) == 'table')
         assertEqual(2, state.headerRemoves)
         assertNil(state.activeHeaders.Accept)
         assertNil(state.activeHeaders['X-GitHub-Api-Version'])
@@ -119,6 +132,7 @@ end)
 test('client asset adapter fails closed before downloading an archive without a digest', function()
     withHarness(releaseWithDigest(nil), function(state)
         HTTP.getJSON('https://api.github.com/repos/dudantas/tibia-client/releases?per_page=100', function() end)
+        state.pendingResponse(releaseWithDigest(nil), nil)
 
         local downloadError = nil
         HTTP.download(

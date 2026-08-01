@@ -11,6 +11,7 @@ local GITHUB_API_HEADERS = {
     Accept = 'application/vnd.github+json',
     ['X-GitHub-Api-Version'] = '2026-03-10'
 }
+local activeGitHubHeaderRequests = 0
 
 local function serviceConfig()
     return Services and Services.clientAssets
@@ -22,26 +23,52 @@ local function logInfo(message)
     end
 end
 
-local function withGitHubApiHeaders(callback)
+local function logWarning(message)
+    if g_logger and type(g_logger.warning) == 'function' then
+        g_logger.warning('[client_assets] ' .. tostring(message))
+    end
+end
+
+local function addGitHubApiHeaders()
     if type(HTTP.addCustomHeader) ~= 'function' or type(HTTP.removeCustomHeader) ~= 'function' then
-        return callback()
+        return false
     end
 
-    HTTP.addCustomHeader(GITHUB_API_HEADERS)
-    local ok, result = pcall(callback)
-    for name in pairs(GITHUB_API_HEADERS) do
-        pcall(HTTP.removeCustomHeader, name)
+    if activeGitHubHeaderRequests == 0 then
+        HTTP.addCustomHeader(GITHUB_API_HEADERS)
     end
-    if not ok then
-        error(result, 0)
+    activeGitHubHeaderRequests = activeGitHubHeaderRequests + 1
+    return true
+end
+
+local function removeGitHubApiHeaders()
+    if activeGitHubHeaderRequests <= 0 then
+        return
     end
-    return result
+
+    activeGitHubHeaderRequests = activeGitHubHeaderRequests - 1
+    if activeGitHubHeaderRequests == 0 and HTTP and type(HTTP.removeCustomHeader) == 'function' then
+        for name in pairs(GITHUB_API_HEADERS) do
+            pcall(HTTP.removeCustomHeader, name)
+        end
+    end
+end
+
+local function clearGitHubApiHeaders()
+    if activeGitHubHeaderRequests > 0 and HTTP and type(HTTP.removeCustomHeader) == 'function' then
+        for name in pairs(GITHUB_API_HEADERS) do
+            pcall(HTTP.removeCustomHeader, name)
+        end
+    end
+    activeGitHubHeaderRequests = 0
 end
 
 local function rememberArchiveDigests(releases)
     archiveSha256ByUrl = {}
+    local boundDigests = 0
+    local missingDigests = 0
     if type(releases) ~= 'table' then
-        return
+        return boundDigests, missingDigests
     end
 
     for _, release in ipairs(releases) do
@@ -49,11 +76,19 @@ local function rememberArchiveDigests(releases)
             for _, asset in ipairs(release.assets) do
                 local url = type(asset) == 'table' and asset.browser_download_url or nil
                 if type(url) == 'string' and url ~= '' and Selector.isArchivePath(asset.name) then
-                    archiveSha256ByUrl[url] = Selector.assetSha256(asset) or MISSING_ARCHIVE_DIGEST
+                    local digest = Selector.assetSha256(asset)
+                    archiveSha256ByUrl[url] = digest or MISSING_ARCHIVE_DIGEST
+                    if digest then
+                        boundDigests = boundDigests + 1
+                    else
+                        missingDigests = missingDigests + 1
+                    end
                 end
             end
         end
     end
+
+    return boundDigests, missingDigests
 end
 
 local function verifyDownloadedArchive(path, expectedSha256)
@@ -83,15 +118,35 @@ function ClientAssetsReleaseAdapter.init()
             return originalGetJSON(url, callback)
         end
 
-        return withGitHubApiHeaders(function()
-            return originalGetJSON(url, function(data, err)
-                if not err and type(data) == 'table' then
-                    data = Selector.prepareReleases(data)
-                    rememberArchiveDigests(data)
-                end
-                return callback(data, err)
-            end)
+        local headersAdded = addGitHubApiHeaders()
+        local responseHandled = false
+        local function finishHeaders()
+            if responseHandled then
+                return
+            end
+            responseHandled = true
+            if headersAdded then
+                removeGitHubApiHeaders()
+            end
+        end
+
+        local ok, result = pcall(originalGetJSON, url, function(data, err)
+            finishHeaders()
+            if not err and type(data) == 'table' then
+                data = Selector.prepareReleases(data)
+                local boundDigests, missingDigests = rememberArchiveDigests(data)
+                logInfo(string.format(
+                    'Bound %d configured release archive SHA-256 digest(s); %d selected archive(s) lacked a digest.',
+                    boundDigests,
+                    missingDigests))
+            end
+            return callback(data, err)
         end)
+        if not ok then
+            finishHeaders()
+            error(result, 0)
+        end
+        return result
     end
     HTTP.getJSON = wrappedGetJSON
 
@@ -103,6 +158,7 @@ function ClientAssetsReleaseAdapter.init()
                 return originalDownload(url, path, callback, progressCallback)
             end
             if expectedSha256 == MISSING_ARCHIVE_DIGEST then
+                logWarning(string.format('Refusing configured release archive without an authoritative SHA-256 digest: %s.', tostring(url)))
                 return callback(path, nil, string.format(
                     'Configured client asset archive is missing an authoritative SHA-256 digest: %s.',
                     tostring(url)))
@@ -127,6 +183,7 @@ function ClientAssetsReleaseAdapter.init()
 end
 
 function ClientAssetsReleaseAdapter.terminate()
+    clearGitHubApiHeaders()
     if wrappedGetJSON and HTTP and HTTP.getJSON == wrappedGetJSON then
         HTTP.getJSON = originalGetJSON
     end

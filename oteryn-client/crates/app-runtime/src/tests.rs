@@ -10,7 +10,7 @@ use oteryn_world_directory::{
 };
 use std::error::Error;
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -239,31 +239,98 @@ fn concurrent_authentication_is_rejected_and_second_attempt_is_fresh() -> Result
     Ok(())
 }
 
+struct WorkerRelease {
+    state: Arc<(Mutex<bool>, Condvar)>,
+}
+
+impl WorkerRelease {
+    fn new() -> Self {
+        Self {
+            state: Arc::new((Mutex::new(false), Condvar::new())),
+        }
+    }
+
+    fn worker_state(&self) -> Arc<(Mutex<bool>, Condvar)> {
+        Arc::clone(&self.state)
+    }
+
+    fn release(&self) {
+        let (lock, wake) = &*self.state;
+        let mut released = match lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        *released = true;
+        wake.notify_all();
+    }
+}
+
+impl Drop for WorkerRelease {
+    fn drop(&mut self) {
+        self.release();
+    }
+}
+
 #[test]
-fn cancellation_joins_worker_and_shutdown_rejects_new_work() -> Result<(), Box<dyn Error>> {
-    let clock: Arc<dyn MonotonicClock> = Arc::new(ManualClock::new(Moment::ZERO));
-    let mut runtime = TechnicalLoginRuntime::new(clock);
-    runtime.start_authentication(selection()?, |_attempt, cancellation| {
+fn shutdown_is_nonblocking_reports_overdue_and_eventually_joins() -> Result<(), Box<dyn Error>> {
+    let clock = ManualClock::new(Moment::ZERO);
+    let runtime_clock: Arc<dyn MonotonicClock> = Arc::new(clock.clone());
+    let mut runtime = TechnicalLoginRuntime::new(runtime_clock);
+    let release = WorkerRelease::new();
+    let worker_release = release.worker_state();
+
+    runtime.start_authentication(selection()?, move |_attempt, cancellation| {
         while !cancellation.is_cancelled() {
             thread::yield_now();
+        }
+        let (lock, wake) = &*worker_release;
+        let mut released = match lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        while !*released {
+            released = match wake.wait(released) {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
         }
         Err(EntryFailure::for_kind(EntryFailureKind::SafeCancellation))
     })?;
 
-    runtime.cancel_active()?;
-    assert_eq!(runtime.snapshot().phase(), EntryPhase::Failed);
     assert_eq!(
-        runtime.snapshot().failure(),
-        Some(EntryFailure::for_kind(EntryFailureKind::SafeCancellation))
+        runtime.poll_shutdown(),
+        Err(RuntimeError::ShutdownNotStarted)
     );
-    runtime.shutdown()?;
-    assert_eq!(runtime.snapshot().phase(), EntryPhase::LoggedOut);
+    assert_eq!(
+        runtime.begin_shutdown()?,
+        ShutdownProgress::Pending(WorkerKind::Identity)
+    );
+    assert!(runtime.has_active_worker());
+    assert_eq!(runtime.snapshot().phase(), EntryPhase::Closing);
     assert!(runtime.snapshot().shutting_down());
+
+    clock.advance(SHUTDOWN_OVERDUE_AFTER)?;
+    assert_eq!(
+        runtime.poll_shutdown()?,
+        ShutdownProgress::Overdue(WorkerKind::Identity)
+    );
+    assert!(runtime.has_active_worker());
     assert_eq!(
         runtime.start_authentication(selection()?, |_attempt, _cancellation| {
             Err(EntryFailure::for_kind(EntryFailureKind::InvariantViolation))
         }),
         Err(RuntimeError::ShuttingDown)
     );
-    Ok(())
+
+    release.release();
+    for _ in 0..10_000 {
+        if runtime.poll_shutdown()? == ShutdownProgress::Complete {
+            assert!(!runtime.has_active_worker());
+            assert_eq!(runtime.snapshot().phase(), EntryPhase::LoggedOut);
+            assert!(runtime.snapshot().shutting_down());
+            return Ok(());
+        }
+        thread::yield_now();
+    }
+    Err(io::Error::other("shutdown worker did not finish after release").into())
 }

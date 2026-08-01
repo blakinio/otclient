@@ -82,7 +82,7 @@ impl ShellApplication {
                 let has_active_worker = self
                     .technical_login
                     .as_ref()
-                    .is_some_and(TechnicalLoginController::retains_worker);
+                    .is_some_and(TechnicalLoginController::has_active_worker);
                 self.remember_failure(RuntimeError::TechnicalLogin(error));
                 if has_active_worker {
                     true
@@ -267,7 +267,7 @@ impl ShellApplication {
         self.update_technical_title();
         self.technical_login
             .as_ref()
-            .is_some_and(TechnicalLoginController::retains_worker)
+            .is_some_and(TechnicalLoginController::has_active_worker)
     }
 
     fn update_technical_title(&self) {

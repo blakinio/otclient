@@ -210,7 +210,7 @@ fn concurrent_authentication_is_rejected_and_second_attempt_is_fresh() -> Result
     );
     poll_until(&mut runtime, EntryPhase::CredentialReady)?;
 
-    runtime.start_connection|"mut lifecycle, attempt, _token, clock| {
+    runtime.start_connection(|mut lifecycle, attempt, _token, clock| {
         let result = (|| -> Result<_, EntryFailure> {
             let admission = lifecycle.begin_connecting(attempt, clock.as_ref())?;
             assert_eq!(admission.expose_secret(), b"first-fresh-secret");

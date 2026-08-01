@@ -76,8 +76,7 @@ const PRODUCT_CATEGORIES: &[&str] = &[
     "feature",
 ];
 
-const ALLOWED_BUILD_EDGES: &[(&str, &str)] =
-    &[("tool", "foundation"), ("tool", "asset-types")];
+const ALLOWED_BUILD_EDGES: &[(&str, &str)] = &[("tool", "foundation"), ("tool", "asset-types")];
 
 /// Cargo dependency kinds covered by the architecture policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -180,9 +179,7 @@ fn allowed_normal_edge(source: &str, target: &str) -> bool {
                 | "diagnostics"
         ),
         "account-session" => matches!(target, "foundation" | "diagnostics"),
-        "world-directory" => {
-            matches!(target, "foundation" | "account-session" | "diagnostics")
-        }
+        "world-directory" => matches!(target, "foundation" | "account-session" | "diagnostics"),
         "game-session" => matches!(
             target,
             "foundation" | "account-session" | "world-directory" | "game-domain" | "diagnostics"
@@ -256,9 +253,10 @@ fn allowed_normal_edge(source: &str, target: &str) -> bool {
             "foundation" | "asset-types" | "asset-runtime" | "settings" | "diagnostics"
         ),
         "asset-types" => target == "foundation",
-        "asset-runtime" => {
-            matches!(target, "foundation" | "asset-types" | "settings" | "diagnostics")
-        }
+        "asset-runtime" => matches!(
+            target,
+            "foundation" | "asset-types" | "settings" | "diagnostics"
+        ),
         "settings" => matches!(target, "foundation" | "diagnostics"),
         "diagnostics" => target == "foundation",
         "extension-api" => matches!(
@@ -724,7 +722,9 @@ fn optional_dependency_kind(
     match value {
         None | Some(Value::Null) => Ok(DependencyKind::Normal),
         Some(Value::String(text)) => parse_dependency_kind(text, field),
-        Some(_) => Err(format!("{field} must be null or one of normal, build or dev")),
+        Some(_) => Err(format!(
+            "{field} must be null or one of normal, build or dev"
+        )),
     }
 }
 

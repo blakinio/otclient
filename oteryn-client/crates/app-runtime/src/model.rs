@@ -96,7 +96,7 @@ pub enum RuntimeError {
     /// Shutdown polling was requested before shutdown began.
     ShutdownNotStarted,
     /// An owned worker remains unfinished during a nonblocking operation.
-    ShutdownPending,
+    ShutdownPending(WorkerKind),
     /// An owned worker remains unfinished beyond the accepted shutdown bound.
     ShutdownOverdue(WorkerKind),
 }
@@ -125,8 +125,8 @@ impl Display for RuntimeError {
             Self::ShutdownNotStarted => {
                 formatter.write_str("technical-login shutdown has not started")
             }
-            Self::ShutdownPending => {
-                formatter.write_str("technical-login shutdown is still pending")
+            Self::ShutdownPending(kind) => {
+                write!(formatter, "{kind} worker shutdown is still pending")
             }
             Self::ShutdownOverdue(kind) => {
                 write!(formatter, "{kind} worker shutdown is overdue")
@@ -147,7 +147,7 @@ impl Error for RuntimeError {
             | Self::AttemptIdExhausted
             | Self::ShuttingDown
             | Self::ShutdownNotStarted
-            | Self::ShutdownPending
+            | Self::ShutdownPending(_)
             | Self::ShutdownOverdue(_) => None,
         }
     }

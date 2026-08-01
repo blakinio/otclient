@@ -36,7 +36,7 @@ No agent may infer product completion from a green build alone. Every milestone 
 Every capability uses one state:
 
 - `PROVEN` — exact automated and/or runtime acceptance required by the capability has passed on a named head/build.
-- `PARTIAL` — a bounded foundation exists, but the user workflow or required compatibility is incomplete.
+- `PARTIAL` — a bounded foundation exists, but an accepted invariant, user workflow or required compatibility is incomplete.
 - `SYNTHETIC_ONLY` — behaviour is proven only against original synthetic fixtures/fakes.
 - `UNKNOWN` — evidence is missing or stale; absence is not assumed.
 - `BLOCKED` — a named external contract, legal decision, fixture or deployment dependency prevents safe progress.
@@ -67,21 +67,23 @@ All workers preserve the normative architecture:
 
 ### M0 — Technical entry foundation
 
-Current intent: completed as a bounded synthetic foundation, with real deployment still unproven.
+Current state: materially completed as a bounded synthetic foundation, with real deployment still unproven and focused LOW residual `OTC2-POST-001` remaining after the independent closure audit.
 
 Required outcome:
 
 - Windows executable, window and renderer initialize;
 - native OAuth/PKCE, Gateway and Canary admission boundaries compose;
 - fake-service E2E reaches typed `SessionEntered` and shuts down safely;
-- secrets, architecture policy, source-open integrity and nonblocking shutdown remediations are closed.
+- architecture policy, source-open integrity and nonblocking shutdown findings are closed;
+- the active secret flow is materially corrected and all release-required public secret-owner seams, including `OTC2-POST-001`, are closed before credential-bearing M1 validation.
 
-M0 does not mean gameplay is visible or playable.
+M0 does not mean gameplay is visible or playable. Docs-only P0 discovery may proceed after lifecycle gates; M1 credential-bearing runtime validation may not claim complete secret-lifecycle closure while `OTC2-POST-001` remains.
 
 ### M1 — Controlled real technical login
 
 A controlled project-owned staging environment proves:
 
+- `OTC2-POST-001` is closed and independently validated;
 - exact Identity, Gateway and Canary revisions/configuration are pinned;
 - the system browser returns through the dynamic loopback callback on supported Windows;
 - TLS, DNS, firewall and issuer mapping are correct;
@@ -210,7 +212,7 @@ The programme is complete only when:
 
 - all release-required capability rows are `PARITY_PROVEN` or explicitly `DEFERRED` by an owner-approved product decision;
 - M1 through M6 acceptance is recorded on exact builds;
-- no active task, unresolved security finding, shared-path lease or unarchived implementation remains;
+- no active task, unresolved release-required security finding, shared-path lease or unarchived implementation remains;
 - the legacy client is no longer required for normal Oteryn play;
 - release and rollback procedures are proven.
 

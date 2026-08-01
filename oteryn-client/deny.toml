@@ -13,6 +13,7 @@ version = 2
 confidence-threshold = 0.8
 allow = [
     "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
     "ISC",
     "MIT",
     "Unicode-3.0",
@@ -29,10 +30,19 @@ highlight = "all"
 # The fixed Windows shell uses windows-sys 0.52 through winit, while the
 # reviewed native-tls/SChannel graph uses windows-sys 0.61 for the system TLS
 # certificate and hostname verifier. Both are target-specific generated bindings.
+# The reviewed cap-std/cap-fs-ext 4.0.2 graph uses io-lifetimes 2 through
+# fs-set-times and io-lifetimes 3 directly. On Windows it also uses windows-sys
+# 0.59 through fs-set-times/winx and 0.60 through io-extras; the latter selects
+# windows-targets/windows_x86_64_msvc 0.53 alongside winit's 0.52 bindings.
 skip = [
     { name = "hashbrown", version = "=0.16.1" },
+    { name = "io-lifetimes", version = "=2.0.4" },
     { name = "syn", version = "=3.0.3" },
+    { name = "windows-sys", version = "=0.59.0" },
+    { name = "windows-sys", version = "=0.60.2" },
     { name = "windows-sys", version = "=0.61.2" },
+    { name = "windows-targets", version = "=0.53.5" },
+    { name = "windows_x86_64_msvc", version = "=0.53.1" },
 ]
 
 [sources]

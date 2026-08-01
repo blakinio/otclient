@@ -171,7 +171,7 @@ fn build_dependencies_require_an_explicit_pair() -> Result<(), String> {
 }
 
 #[test]
-fn schema_v2_requires_dependency_kind() {
+fn schema_v2_requires_dependency_kind() -> Result<(), String> {
     let fixture = json!({
         "schema_version": FIXTURE_SCHEMA_VERSION,
         "workspace_root": "/workspace/oteryn-client",
@@ -198,11 +198,19 @@ fn schema_v2_requires_dependency_kind() {
     })
     .to_string();
 
-    let error = check_fixture_json(&fixture).expect_err("schema v2 must require dependency.kind");
+    let error = match check_fixture_json(&fixture) {
+        Ok(violations) => {
+            return Err(format!(
+                "schema v2 accepted a dependency without kind: {violations:?}"
+            ));
+        }
+        Err(error) => error,
+    };
     assert!(
         error.contains("dependency.kind"),
         "unexpected error: {error}"
     );
+    Ok(())
 }
 
 #[test]

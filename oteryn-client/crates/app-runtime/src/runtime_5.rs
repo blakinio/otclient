@@ -53,11 +53,10 @@ impl TechnicalLoginRuntime {
             .as_ref()
             .is_some_and(OwnedWorker::is_finished)
             && let Some(worker) = self.identity_worker.take()
+            && let Err(error) = worker.join()
         {
-            if let Err(error) = worker.join() {
-                self.lifecycle = Some(EntryLifecycle::new());
-                return Err(error);
-            }
+            self.lifecycle = Some(EntryLifecycle::new());
+            return Err(error);
         }
         if self
             .connection_worker

@@ -1,6 +1,6 @@
 use oteryn_architecture_check::{
-    DependencyKind, FIXTURE_SCHEMA_VERSION, check_fixture, check_fixture_json,
-    dependency_allowed, known_categories,
+    DependencyKind, FIXTURE_SCHEMA_VERSION, check_fixture, check_fixture_json, dependency_allowed,
+    known_categories,
 };
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -67,7 +67,10 @@ fn invalid_fixtures_report_expected_rules() -> Result<(), String> {
             "invalid_legacy_path_dependency.json",
             "E003_OUTSIDE_WORKSPACE",
         ),
-        ("invalid_domain_to_canary_edge.json", "E005_FORBIDDEN_EDGE"),
+        (
+            "invalid_domain_to_canary_edge.json",
+            "E005_FORBIDDEN_EDGE",
+        ),
         (
             "invalid_renderer_to_feature_edge.json",
             "E005_FORBIDDEN_EDGE",
@@ -76,7 +79,10 @@ fn invalid_fixtures_report_expected_rules() -> Result<(), String> {
             "invalid_ui_core_to_feature_edge.json",
             "E005_FORBIDDEN_EDGE",
         ),
-        ("invalid_foundation_upward_edge.json", "E005_FORBIDDEN_EDGE"),
+        (
+            "invalid_foundation_upward_edge.json",
+            "E005_FORBIDDEN_EDGE",
+        ),
         ("invalid_feature_cycle.json", "E006_DEPENDENCY_CYCLE"),
         (
             "invalid_unapproved_source_dependency.json",
@@ -141,11 +147,7 @@ fn every_category_pair_and_dependency_kind_matches_the_complete_policy() -> Resu
 
 #[test]
 fn product_to_tool_is_dev_only() -> Result<(), String> {
-    let normal = check_fixture_json(&edge_fixture(
-        "app",
-        "tool",
-        DependencyKind::Normal,
-    ))?;
+    let normal = check_fixture_json(&edge_fixture("app", "tool", DependencyKind::Normal))?;
     assert!(
         normal
             .iter()
@@ -164,7 +166,10 @@ fn build_dependencies_require_an_explicit_pair() -> Result<(), String> {
         "foundation",
         DependencyKind::Build,
     ))?;
-    assert!(listed.is_empty(), "unexpected listed build violation: {listed:?}");
+    assert!(
+        listed.is_empty(),
+        "unexpected listed build violation: {listed:?}"
+    );
 
     let unlisted = check_fixture_json(&edge_fixture(
         "app",

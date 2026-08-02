@@ -1,0 +1,379 @@
+name: Temporary P1 Aggregation Doc Patch
+
+on:
+  push:
+    branches:
+      - docs/OTC2-20260803-playability-p1-aggregation
+    paths:
+      - .github/workflows/temp-p1-aggregation-doc-patch.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p1-aggregation-doc-patch
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout aggregation branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Patch living playability contracts
+        shell: bash
+        env:
+          EXPECTED_PARENT: 7a2e6935322e7924da9b7b3c20a503b2decdcabe
+          WORKFLOW_PATH: .github/workflows/temp-p1-aggregation-doc-patch.yml
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "docs/OTC2-20260803-playability-p1-aggregation"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement, found {count}: {old[:80]!r}")
+              file.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          def replace_section(path: str, start: str, end: str, replacement: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              if text.count(start) != 1 or text.count(end) != 1:
+                  raise SystemExit(f"{path}: section markers are not unique: {start!r} / {end!r}")
+              begin = text.index(start)
+              finish = text.index(end, begin)
+              file.write_text(text[:begin] + replacement.rstrip() + "\n\n" + text[finish:], encoding="utf-8")
+
+          architecture = "oteryn-client/docs/agents/playability/ARCHITECTURE_HANDOFF.md"
+          replace_once(
+              architecture,
+              "| `crates/game-session` | game-session | one-shot entry credential/request/result lifecycle | no wire layout |\n| `crates/platform` | platform | strict Platform ticket/Gateway HTTP boundary | no browser state or game wire |",
+              "| `crates/game-session` | game-session | one-shot entry credential/request/result lifecycle | no wire layout |\n| `crates/game-domain` | game-domain | canonical session-scoped gameplay IDs/handles and closed v1 `GameEvent`/`GameCommand` envelopes | no Canary, simulation, renderer, UI or app policy |\n| `crates/platform` | platform | strict Platform ticket/Gateway HTTP boundary | no browser state or game wire |",
+          )
+          replace_once(
+              architecture,
+              "| `crates/protocol-canary` | protocol-canary | exact bounded Current-profile admission mapping | currently stops before map decode |\n| `crates/app-runtime` | app-runtime | technical-login orchestration, generations and worker shutdown | no duplicate backend contracts |",
+              "| `crates/protocol-canary` | protocol-canary | exact bounded Current-profile admission mapping | stops before gameplay decode; runtime source descriptors must be aligned with the P1 generated `bc0068ab…` index before P2 parser work |\n| `tools/canary-protocol-index` | tool/evidence | deterministic exact-source opcode/dispatch/feature index for inspected Canary Current cut | no wire-layout or deployment-equality claim |\n| `crates/app-runtime` | app-runtime | technical-login orchestration, generations and worker shutdown | no duplicate backend contracts |",
+          )
+          replace_once(
+              architecture,
+              "| `crates/asset-types` | asset-types | synthetic typed asset/pack schema | no runtime mounting |\n| `tools/asset-compiler` | tool | deterministic safe synthetic pack compiler | no production importer/runtime |",
+              "| `crates/asset-types` | asset-types | synthetic typed asset/pack schema | no runtime mounting |\n| `crates/asset-runtime` | asset-runtime | immutable verified synthetic-v1 pack open/index/lookup and generation-fenced handles | no media decode, GPU upload, loose files or production compatibility |\n| `crates/input-actions` | input-actions | framework-neutral physical events and semantic action/context/binding lifecycle | no platform adapter, default keymap, gameplay mapping, UI or settings |\n| `tools/asset-compiler` | tool | deterministic safe synthetic pack compiler | no production importer/runtime |",
+          )
+          replace_once(architecture, "- authoritative game domain/simulation;", "- authoritative simulation and immutable render snapshots;")
+          replace_once(architecture, "- asset-runtime mounting or production import;", "- app-composed asset decode/resource upload or production import;")
+          replace_once(architecture, "- gameplay input/actions;", "- Windows input adapter, product binding map or gameplay action consumers;")
+          replace_section(
+              architecture,
+              "## 8. Contract production order",
+              "## 9. Shared integration paths",
+              """## 8. Contract production order
+
+P1 completed and separately archived the sole producers for:
+
+1. canonical server/domain identifiers and session-scoped handles;
+2. closed v1 `GameEvent` and `GameCommand` envelopes;
+3. immutable verified synthetic-v1 asset runtime handles;
+4. normalized physical input and semantic action/context contracts;
+5. deterministic exact-source Canary Current opcode/dispatch evidence.
+
+P2 is staged in `WAVE_P2_MINIMUM_VISIBLE_WORLD.md` and preserves these next sole producers:
+
+1. `simulation-core` — the only mutable gameplay writer and immutable `RenderSnapshot` producer;
+2. `protocol-canary` — the only Canary gameplay decoder/encoder, after mandatory `bc0068ab…` development-baseline alignment;
+3. `asset-decode` — the only bounded CPU decoded-image producer;
+4. `renderer-resource` — the only generation-fenced GPU resource handle/upload/cache producer;
+5. `input-platform` — the only Windows/winit adapter into `input-actions`;
+6. one serialized visible-world integration owner for `world-renderer` and `apps/client`;
+7. one separate controlled M2 runtime acceptance owner.
+
+Consumers start only from merged producer contracts or explicitly private synthetic fixtures. Synthetic composition remains a partial consumer; M2 is complete only after controlled login -> visible world -> movement/reconciliation -> logout acceptance on an exact named environment.""",
+          )
+
+          matrix = "oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md"
+          replace_once(
+              matrix,
+              "Status cut: `main@6808d8a9dd5a24a29c5ac96fe35bb463fe4da34b` after all five P0 reports and separate lifecycle archives merged.  \nP0 evidence: Canary #140/#150, legacy #141/#149, assets #142/#148, UX/input/audio #143/#147, release/E2E #144/#146.  \nRemediation status: `OTC2-AUD-001` through `OTC2-AUD-004` remain closed within their documented boundaries.  ",
+              "Status cut: `main@5d3dec1037eef508782e369afef8e3b7f1291e6a` after all four P1 contract producers and separate lifecycle archives merged.  \nP1 evidence: Canary source index #154/#180, game-domain #155/#175, asset-runtime #156/#177, input-actions #157/#183.  \nP0 evidence and remediations remain accepted; `OTC2-AUD-001` through `OTC2-AUD-004` remain closed within their documented boundaries.  ",
+          )
+          replacements = {
+              "| Exact post-admission capability inventory | PARTIAL | RELEASE_REQUIRED | P0 pins `blakinio/canary@bc0068ab…`, Canary 3.6.1/client 1525/Current and capability families; deployment equality and generated numeric index missing | P1 CANARY-SOURCE-INDEX | P1/M2 |":
+              "| Exact post-admission capability inventory | PROVEN | RELEASE_REQUIRED | P1 generated 347 exact-source dispatch/send entries for `blakinio/canary@bc0068ab…`, release 3.6.1/client 1525/Current; deployed equality remains unknown | P2 runtime-baseline alignment then controlled staging | P2/M2 |",
+              "| Exact generated opcode/layout/source index | ABSENT | RELEASE_REQUIRED | P0 forbids handwritten tables and defines generator fields/fixtures | P1 CANARY-SOURCE-INDEX | P1 |":
+              "| Exact generated opcode/layout/source index | PROVEN | RELEASE_REQUIRED | deterministic JSON/report records literal opcodes, dispatch phases, feature/build gates and source hashes; it does not invent missing field layouts | preserve generator; P2 Canary gameplay owner consumes read-only evidence | P2/M2 |",
+              "| Exact post-admission bootstrap order fixtures | UNKNOWN | RELEASE_REQUIRED | source family known; controlled trace/fixture execution missing | P1 index then protocol bootstrap | M2 |":
+              "| Exact post-admission bootstrap order fixtures | PARTIAL | RELEASE_REQUIRED | P1 fixture-feasibility metadata exists; provenance-safe field layouts and controlled post-admission execution remain missing | P2 Canary baseline/parser then controlled M2 acceptance | M2 |",
+              "| Map/floor/tile decoding | ABSENT | RELEASE_REQUIRED | source-backed family and package seam accepted | protocol-canary-map after game contract/index | M2 |":
+              "| Map/floor/tile decoding | ABSENT | RELEASE_REQUIRED | merged game events and exact source index exist; runtime source descriptors conflict with the `bc0068ab…` index and field layouts require exact evidence | P2 CANARY-WORLD-PROTOCOL | M2 |",
+              "| Creature/entity add/update/remove decoding | ABSENT | RELEASE_REQUIRED | source-backed family accepted | protocol-canary-entity | M2/M3 |":
+              "| Creature/entity add/update/remove decoding | ABSENT | RELEASE_REQUIRED | merged semantic entity events and source families exist; bounded wire mapping not implemented | P2 CANARY-WORLD-PROTOCOL for M2 subset | M2/M3 |",
+              "| Movement command encoding/acknowledgements | ABSENT | RELEASE_REQUIRED | source family accepted | protocol-canary-movement | M2/M3 |":
+              "| Movement command encoding/acknowledgements | ABSENT | RELEASE_REQUIRED | merged `Step`/`StopMovement` commands and entity-move events exist; exact wire mapping not implemented | P2 CANARY-WORLD-PROTOCOL | M2/M3 |",
+              "| Canonical gameplay IDs/entity handles | ABSENT | RELEASE_REQUIRED | sole-producer invariant accepted | P1 GAME-DOMAIN-CONTRACT | P1 |":
+              "| Canonical gameplay IDs/entity handles | PROVEN | RELEASE_REQUIRED | merged `game-domain` owns bounded non-interchangeable session-scoped IDs/handles | preserve sole producer; P2 consumers | P1/M2 |",
+              "| Closed `GameEvent` envelope | ABSENT | RELEASE_REQUIRED | minimum semantic family derived from P0 | P1 GAME-DOMAIN-CONTRACT | P1 |":
+              "| Closed `GameEvent` envelope | PROVEN | RELEASE_REQUIRED | merged v1 envelope covers bootstrap, tiles, entities, items, resources, containers and session end with generation checks | preserve; P2 protocol/simulation consumers | P1/M2 |",
+              "| Closed `GameCommand` envelope | ABSENT | RELEASE_REQUIRED | minimum semantic family derived from P0 | P1 GAME-DOMAIN-CONTRACT | P1 |":
+              "| Closed `GameCommand` envelope | PROVEN | RELEASE_REQUIRED | merged v1 envelope covers movement, look/use/move-item, attack target and logout with session fencing | preserve; P2 input/protocol consumers | P1/M2 |",
+              "| Single-writer simulation runtime | ABSENT | RELEASE_REQUIRED | architecture and scenario requirements accepted | post-P1 simulation-core | P2 |":
+              "| Single-writer simulation runtime | ABSENT | RELEASE_REQUIRED | P1 semantic events are merged; no authoritative mutable owner exists | P2 SIMULATION-SNAPSHOT | P2/M2 |",
+              "| Immutable render snapshot | ABSENT | RELEASE_REQUIRED | sole-producer requirement accepted | post-P1 simulation/snapshot producer | P2/M2 |":
+              "| Immutable render snapshot | ABSENT | RELEASE_REQUIRED | P1 domain contracts are merged; snapshot public producer remains absent | P2 SIMULATION-SNAPSHOT | P2/M2 |",
+              "| Immutable pack open/verify/index/lookup | ABSENT | RELEASE_REQUIRED | P0 threat model/contract accepted | P1 ASSET-PACK-RUNTIME | P1/M2 |":
+              "| Immutable pack open/verify/index/lookup | SYNTHETIC_ONLY | RELEASE_REQUIRED | merged `asset-runtime` verifies bounded synthetic-v1 bytes/readers and builds a canonical immutable index | P2 ASSET-DECODE consumer; production source separate | P1/M2 |",
+              "| Generation-stable logical asset handles | ABSENT | RELEASE_REQUIRED | P0 runtime requirement accepted | P1 ASSET-PACK-RUNTIME | P1/M2 |":
+              "| Generation-stable logical asset handles | SYNTHETIC_ONLY | RELEASE_REQUIRED | merged pack-generation-fenced handles reject stale lookup across synthetic-v1 runtimes | P2 decode/resource consumers | P1/M2 |",
+              "| Bounded async decode/cache | ABSENT | RELEASE_REQUIRED | P0 package order accepted | post-P1 asset-decode | M2 |":
+              "| Bounded async decode/cache | ABSENT | RELEASE_REQUIRED | verified runtime payload/handle producer exists; CPU image decode/cache is absent | P2 ASSET-DECODE | M2 |",
+              "| RGBA texture upload/resource handles | ABSENT | RELEASE_REQUIRED | no renderer resource integration | renderer-resource | M2 |":
+              "| RGBA texture upload/resource handles | ABSENT | RELEASE_REQUIRED | synthetic `Rgba8` schema and runtime handles exist; no generation-fenced upload/cache producer | P2 RENDERER-RESOURCE after asset-decode | M2 |",
+              "| Render resource cache/handles | ABSENT | RELEASE_REQUIRED | P0 dependencies accepted | renderer-resource after asset handles | M2 |":
+              "| Render resource cache/handles | ABSENT | RELEASE_REQUIRED | renderer device owner and synthetic asset handles exist; resource producer remains absent | P2 RENDERER-RESOURCE | M2 |",
+              "| Normalized physical input state | ABSENT | RELEASE_REQUIRED | P0 contract requirements accepted | P1 INPUT-ACTIONS | P1/M2 |":
+              "| Normalized physical input state | PROVEN | RELEASE_REQUIRED | merged `input-actions` owns bounded framework-neutral key/mouse/pointer/wheel/text/focus/capture/device-loss events | P2 INPUT-PLATFORM adapter | P1/M2 |",
+              "| Semantic actions/contexts/bindings | ABSENT | RELEASE_REQUIRED | P0 precedence/conflict/lifecycle requirements accepted | P1 INPUT-ACTIONS | P1/M2 |":
+              "| Semantic actions/contexts/bindings | PROVEN | RELEASE_REQUIRED | merged deterministic actions/contexts/bindings include precedence, conflicts, repeat and lifecycle; unreachable wheel chords fail explicitly | P2 visible-world binding consumer | P1/M2 |",
+              "| Movement/camera action mapping | ABSENT | RELEASE_REQUIRED | waits for input and game commands | gameplay input feature | M2 |":
+              "| Movement/camera action mapping | ABSENT | RELEASE_REQUIRED | merged semantic input and game commands exist; platform adapter and product binding map are absent | P2 INPUT-PLATFORM then VISIBLE-WORLD-INTEGRATION | M2 |",
+              "| Minimum-visible-world E2E | ABSENT | RELEASE_REQUIRED | exact start/actions/observables defined | P2 vertical slice E2E | M2 |":
+              "| Minimum-visible-world E2E | ABSENT | RELEASE_REQUIRED | P1 producers are merged and P2 staged journey is defined; no composed synthetic or controlled runtime evidence yet | P2 VISIBLE-WORLD-INTEGRATION then CONTROLLED-M2-ACCEPTANCE | M2 |",
+              "These decisions block deployment/release claims, not the bounded synthetic/source P1 contract spine.":
+              "These decisions do not block bounded original synthetic P2 producer work. They block controlled compatibility, M2 completion, deployment and release claims.",
+          }
+          for old, new in replacements.items():
+              replace_once(matrix, old, new)
+          replace_section(
+              matrix,
+              "## 11. Accepted P1 contract spine",
+              "## 12. P0 completion result",
+              """## 11. P1 completion result and accepted P2 wave
+
+P1 is complete:
+
+- all four contract producers and separate lifecycle archives are merged;
+- game-domain is the sole gameplay ID/event/command producer;
+- the Canary source index is deterministic exact-source evidence for `bc0068ab…`, not deployment proof;
+- asset-runtime and input-actions are merged within their synthetic/framework-neutral boundaries;
+- all P1 shared integration leases are released.
+
+Accepted next plan: `WAVE_P2_MINIMUM_VISIBLE_WORLD.md`.
+
+| Stage | Package | Sole responsibility | Launch dependency |
+|---|---|---|---|
+| A | SIMULATION-SNAPSHOT | authoritative mutable state and immutable render snapshots | P1 barrier archive |
+| A | CANARY-WORLD-PROTOCOL | `bc0068ab…` baseline alignment plus bounded M2 decode/encode | P1 barrier archive and exact layout evidence |
+| A | ASSET-DECODE | bounded immutable CPU RGBA decode | P1 barrier archive |
+| A | INPUT-PLATFORM | Windows/winit adapter into normalized physical events | P1 barrier archive |
+| B | RENDERER-RESOURCE | generation-fenced upload plans/resource handles/cache | ASSET-DECODE merge/archive |
+| C | VISIBLE-WORLD-INTEGRATION | serialized synthetic world renderer/app composition and product bindings | all P2 producers merge/archive |
+| D | CONTROLLED-M2-ACCEPTANCE | exact login -> world -> move/reconcile -> logout runtime proof | integration archive plus named owner inputs |
+
+Producer packages may complete only their bounded claims. Synthetic visible-world composition remains `SYNTHETIC_ONLY`; M2 is complete only after controlled acceptance passes on a named exact environment.""",
+          )
+
+          dependency = "oteryn-client/docs/agents/playability/DEPENDENCY_AND_PARALLELISM.md"
+          replace_once(
+              dependency,
+              "Status: programme coordination contract after P0 aggregation.  \nCurrent evidence base: `main@6808d8a9dd5a24a29c5ac96fe35bb463fe4da34b`.  \nAccepted next wave: `WAVE_P1_CONTRACT_SPINE.md`.",
+              "Status: programme coordination contract after P1 aggregation.  \nCurrent evidence base: `main@5d3dec1037eef508782e369afef8e3b7f1291e6a`.  \nAccepted next wave: `WAVE_P2_MINIMUM_VISIBLE_WORLD.md`.",
+          )
+          sole = {
+              "| simulation ownership and snapshot publication | future `simulation-core` producer | world state integration, renderer extraction, UI view models, replay |":
+              "| simulation ownership and render snapshot publication | P2 `simulation-core` | protocol-event integration, world renderer, later UI view models and replay |",
+              "| render snapshot and renderer resource handles | future snapshot/renderer-resource producers | world renderer, effects, minimap, viewport picking |":
+              "| generation-fenced renderer resource handles/upload/cache | P2 `renderer-resource` after merged `asset-decode` | world renderer, effects, minimap, viewport picking |",
+              "| normalized physical input/actions/contexts | `input-actions` | platform adapter, gameplay mapping, UI bindings, hotkeys |":
+              "| normalized physical input/actions/contexts | `input-actions` | P2 `input-platform`, visible-world binding map, later UI bindings/hotkeys |",
+          }
+          for old, new in sole.items():
+              replace_once(dependency, old, new)
+          replace_section(
+              dependency,
+              "## 5. Accepted P1 graph",
+              "## 7. Shared integration lease",
+              """## 5. Completed P1 graph
+
+```text
+P0 aggregation/archive
+  -> CANARY-SOURCE-INDEX #154/#180
+  -> GAME-DOMAIN-CONTRACT #155/#175
+  -> ASSET-PACK-RUNTIME #156/#177
+  -> INPUT-ACTIONS #157/#183
+  -> P1 barrier
+```
+
+All four P1 producers and separate archives are merged on `main@5d3dec1037eef508782e369afef8e3b7f1291e6a`. All P1 shared leases are released.
+
+The P1 source index pins inspected development evidence to `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`. Existing `protocol-canary` runtime descriptors still name older source cuts. This is an explicit development-baseline conflict that the P2 protocol owner must reconcile mechanically before implementing gameplay layouts. It is not deployment proof.
+
+## 6. Accepted staged P2 graph and ownership
+
+```text
+P1 merged contracts
+  |
+  +--> SIMULATION-SNAPSHOT
+  +--> CANARY-WORLD-PROTOCOL (baseline alignment first)
+  +--> ASSET-DECODE
+  +--> INPUT-PLATFORM
+  |
+  ASSET-DECODE archived
+  v
+  RENDERER-RESOURCE
+  |
+  all five producers archived
+  v
+  VISIBLE-WORLD-INTEGRATION
+  |
+  owner inputs + integration archive
+  v
+  CONTROLLED-M2-ACCEPTANCE
+```
+
+Initial maximum concurrency is four workers: simulation, Canary protocol, asset decode and input platform. Renderer-resource starts after asset-decode. Visible-world integration is serialized and alone owns `apps/client/**`. Controlled acceptance is a separate operational task.
+
+### SIMULATION-SNAPSHOT
+
+Exclusive:
+
+```text
+oteryn-client/crates/simulation-core/**
+docs/agents/tasks/active/OTC2-*-playability-p2-simulation-snapshot.md
+```
+
+Sole mutable gameplay writer and immutable `RenderSnapshot` producer. No Canary, GPU, asset, UI or platform types.
+
+### CANARY-WORLD-PROTOCOL
+
+Exclusive:
+
+```text
+oteryn-client/crates/protocol-canary/**
+oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+oteryn-client/tests/integration/canary-world-protocol/**
+docs/agents/tasks/active/OTC2-*-playability-p2-canary-world-protocol.md
+```
+
+First aligns runtime metadata to the generated `bc0068ab…` index while preserving fail-closed real admission, then implements only exactly evidenced M2 bootstrap/map/entity/movement/logout mapping.
+
+### ASSET-DECODE
+
+Exclusive:
+
+```text
+oteryn-client/crates/asset-decode/**
+docs/agents/tasks/active/OTC2-*-playability-p2-asset-decode.md
+```
+
+Sole bounded synthetic-v1 CPU RGBA producer. No loose files, production importer or GPU work.
+
+### RENDERER-RESOURCE
+
+Exclusive:
+
+```text
+oteryn-client/crates/renderer-resource/**
+docs/agents/tasks/active/OTC2-*-playability-p2-renderer-resource.md
+```
+
+Starts after asset-decode. Sole generation-fenced upload/resource/cache producer; no world mutation or draw policy.
+
+### INPUT-PLATFORM
+
+Exclusive:
+
+```text
+oteryn-client/crates/input-platform/**
+docs/agents/tasks/active/OTC2-*-playability-p2-input-platform.md
+```
+
+Sole Windows/winit adapter into `input-actions`; no product keymap or gameplay commands.
+
+### VISIBLE-WORLD-INTEGRATION
+
+Exclusive:
+
+```text
+oteryn-client/crates/world-renderer/**
+oteryn-client/apps/client/**
+oteryn-client/tests/integration/visible-world/**
+oteryn-client/docs/evidence/playability/p2/synthetic-visible-world.md
+docs/agents/tasks/active/OTC2-*-playability-p2-visible-world-integration.md
+```
+
+One serialized partial-consumer owner for world rendering, product movement/logout bindings and original synthetic E2E. It may not claim M2 complete.
+
+### CONTROLLED-M2-ACCEPTANCE
+
+Exclusive:
+
+```text
+oteryn-client/docs/evidence/playability/p2/controlled-m2-acceptance/**
+docs/agents/tasks/active/OTC2-*-playability-p2-controlled-m2-acceptance.md
+```
+
+Runs only with named deployment, disposable identity, asset, Windows/device, privacy and authorization inputs. It proves or falsifies the complete real M2 journey and routes defects to their sole owners.""",
+          )
+          replace_once(dependency, "P1 workers may be granted only the subset listed by their accepted prompt. `apps/client/**`, workflows and PR #23-owned `ACTIVE_WORK.md`, `MODULE_CATALOG.md` and `CHANGELOG.md` are not granted in P1.", "P2 workers may be granted only the subset listed by their accepted prompt. `apps/client/**` is granted only to VISIBLE-WORLD-INTEGRATION. Workflows and PR #23-owned `ACTIVE_WORK.md`, `MODULE_CATALOG.md` and `CHANGELOG.md` are not granted unless a later explicit coordinator decision changes ownership.")
+          replace_once(
+              dependency,
+              "During P1 exclusive-path development:\n\n- source-index tooling/evidence;\n- game-domain crate implementation;\n- asset-runtime crate implementation against current synthetic read-only schema;\n- input-actions crate implementation with no platform/UI/game-domain public dependency.\n\nA worker blocked on the lease may commit a coherent exclusive-path result, mark `integration_ready`, checkpoint one next action and exit. It does not poll.\n\nAfter P1 producers merge, likely safe parallel pairs include:\n\n- Canary map parser and asset decode;\n- world-state and renderer-resource against merged contracts;\n- input platform adapter and audio-core;\n- UI-core and simulation-core when public dependencies are explicit;\n- protocol negative/fuzz harness and renderer benchmark harness.",
+              "During initial P2 exclusive-path development, at most four independent workers may own:\n\n- simulation-core and render snapshot contracts;\n- Canary baseline alignment/gameplay protocol mapping;\n- synthetic-v1 asset decode;\n- Windows/winit input-platform adapter.\n\nA worker blocked on the serialized shared lease may commit a coherent exclusive-path result, mark `integration_ready`, checkpoint one next action and exit. It does not poll.\n\nRenderer-resource starts after asset-decode merges. Visible-world integration starts only after all five producer tasks merge and separately archive. Controlled M2 acceptance starts only after integration archive and named owner inputs.\n\nSafe supporting work includes private deterministic fixtures, parser negative corpora and non-overlapping benchmark harness design; none may publish substitute contracts or claim compatibility.",
+          )
+          replace_section(
+              dependency,
+              "## 10. P1 non-goals",
+              "## 11. Candidate post-P1 graph",
+              """## 10. P2 non-goals
+
+P2 does not authorize:
+
+- broad inventory/container/chat/combat/social/modern-feature implementation;
+- UI framework, settings, audio, minimap, launcher or updater work;
+- production asset importer/signing/redistribution;
+- guessed Canary field layouts or deployed-revision equality;
+- official Tibia service compatibility;
+- legacy runtime dependencies;
+- production activation or release claims.
+
+A-F packages deliver bounded producers/partial consumers. Only controlled M2 acceptance may establish the first playable milestone.""",
+          )
+          replace_section(
+              dependency,
+              "## 11. Candidate post-P1 graph",
+              "## 12. Worker lifecycle",
+              """## 11. Post-P2 planning boundary
+
+Planning only after controlled M2 PASS:
+
+```text
+P2 minimum visible world
+  -> P3 core gameplay: items/containers/chat/combat/UI/audio
+  -> P4 daily-playable product
+  -> P5 selected exact-profile parity
+  -> P6 production hardening/release
+```
+
+No P3 package starts merely because its design is listed. The P2 barrier and controlled acceptance must reconcile exact producer/runtime evidence and select bounded sole owners. Independent non-M2 work requires a separate explicit barrier decision.""",
+          )
+          replace_once(dependency, "The following owner decisions do not block P1 synthetic/source contract work but block deployment or production claims:", "The following owner decisions do not block bounded original synthetic P2 producer work but block controlled M2, deployment or production claims:")
+          PY
+
+          git rm "$WORKFLOW_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/docs/agents/playability/ARCHITECTURE_HANDOFF.md \
+                  oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md \
+                  oteryn-client/docs/agents/playability/DEPENDENCY_AND_PARALLELISM.md
+          git diff --cached --check
+          git commit -m "docs(playability): aggregate P1 and accept staged P2"
+          git push origin HEAD:docs/OTC2-20260803-playability-p1-aggregation

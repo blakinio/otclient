@@ -1,0 +1,15 @@
+[package]
+name = "oteryn-input-actions"
+version = "0.1.0"
+description = "Framework-neutral normalized input and semantic action contracts for Oteryn"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "input-actions"
+
+[lints]
+workspace = true

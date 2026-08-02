@@ -545,20 +545,20 @@ mod tests {
         let encoded = encoded_pack(vec![blob_record(1, "limited", b"1234")?])?;
         let record_limit = RuntimeLimits::new(MAX_PACK_BYTES, 0, MAX_ASSET_BYTES)?;
         assert_eq!(
-            AssetRuntime::open_bytes(generation(1)?, &encoded, record_limit),
-            Err(RuntimeError::TooManyRecords)
+            AssetRuntime::open_bytes(generation(1)?, &encoded, record_limit).err(),
+            Some(RuntimeError::TooManyRecords)
         );
 
         let payload_limit = RuntimeLimits::new(MAX_PACK_BYTES, MAX_RECORDS, 3)?;
         assert_eq!(
-            AssetRuntime::open_bytes(generation(1)?, &encoded, payload_limit),
-            Err(RuntimeError::PayloadTooLarge)
+            AssetRuntime::open_bytes(generation(1)?, &encoded, payload_limit).err(),
+            Some(RuntimeError::PayloadTooLarge)
         );
 
         let byte_limit = RuntimeLimits::new(encoded.len() - 1, MAX_RECORDS, MAX_ASSET_BYTES)?;
         assert_eq!(
-            AssetRuntime::open_bytes(generation(1)?, &encoded, byte_limit),
-            Err(RuntimeError::ObjectTooLarge)
+            AssetRuntime::open_bytes(generation(1)?, &encoded, byte_limit).err(),
+            Some(RuntimeError::ObjectTooLarge)
         );
         Ok(())
     }

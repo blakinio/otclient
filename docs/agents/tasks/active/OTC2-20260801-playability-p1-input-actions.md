@@ -10,7 +10,7 @@ phase: exact-head-validation
 branch: feat/OTC2-20260801-playability-p1-input-actions
 base_branch: main
 created: 2026-08-01T22:28:00+02:00
-updated: 2026-08-02T23:54:00+02:00
+updated: 2026-08-02T23:59:00+02:00
 last_verified_commit: "6f38a3c1c48f79ef51050c46397c33d5ee4ae07b"
 required_base_commit: "3887a0b7369e99ad200990d42a5314f1d5531e97"
 risk: high
@@ -43,11 +43,11 @@ missing_layers:
   - gameplay and UI action consumers
   - app composition and real staging E2E
 invocation_started_at: 2026-08-02T23:54:00+02:00
-last_progress_at: 2026-08-02T23:54:00+02:00
+last_progress_at: 2026-08-02T23:59:00+02:00
 ci_checks_for_current_head: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 3
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
@@ -59,20 +59,20 @@ Implement the framework-neutral normalized input and semantic action/context pro
 # Acceptance
 
 - [x] bounded normalized keyboard, mouse, pointer, wheel, text, focus, capture and device-loss contracts exist without framework/OS types;
-- [x] chords, semantic IDs, contexts, bindings, precedence, repeat and lifecycle are deterministic;
-- [x] conflicts, reserved bindings, stale held state and invalid values fail explicitly;
+- [x] chords, semantic IDs, contexts, bindings, conflicts and lifecycle are deterministic;
+- [x] conflicts, reserved, unreachable and invalid bindings fail explicitly;
 - [x] no widgets, game commands, settings, default keymap or app composition entered the crate;
-- [x] focused rustfmt, strict Clippy and all 11 lifecycle/component tests pass;
+- [ ] focused rustfmt, strict Clippy and all lifecycle/component tests pass on the repaired head;
 - [ ] final exact-head heavy gates pass;
-- [x] ownership, API, architecture and minimal lockfile audits have no open material finding;
+- [x] ownership, API, architecture and minimal lockfile audits have no unresolved material finding;
 - [ ] PR is merged and the task is separately archived.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-02T23:54:00+02:00
-head: cbfe22f50b472b4e2e565ce06fe37b8a272408dd
+updated_at: 2026-08-02T23:59:00+02:00
+head: d92f2f17399c3307ab0103dfbf8f9a7ba03be3e8
 branch: feat/OTC2-20260801-playability-p1-input-actions
 pr: 157
 status: validating
@@ -94,25 +94,32 @@ shared_lease:
 proven:
   - Public API contains no winit, Win32, UI, game-domain, settings or default-keymap types.
   - InputRouter deterministically handles context precedence, repeat, release, focus/capture/device cleanup and ordered output.
-  - Focused run 30764305750 job 91540213774 passed pinned rustfmt, strict Clippy and all 11 tests.
-  - First retained heavy run 30764404973 passed locked metadata and supply-chain job 91540470118, then stopped at rustfmt before compilation.
+  - Focused run 30764305750 job 91540213774 passed pinned rustfmt, strict Clippy and all 11 original tests.
   - Format repair run 30764475580 job 91540644130 applied pinned formatting to the complete crate and re-passed strict focused validation.
   - Cargo.lock adds only local package oteryn-input-actions with no dependencies.
   - Temporary PR 178 is closed without merge with zero final changed files.
+  - Fresh-session static control-flow audit proved composite wheel chords were accepted although InputRouter can emit wheel bindings only as single-atom impulses.
+  - The repaired code introduces stable InvalidWheelChord rejection plus two public-API negative tests for key-plus-wheel and multi-wheel combinations.
 derived:
-  - One final retained heavy attempt is authorized in this fresh execution session after the isolated unrelated app-runtime flake was proven non-deterministic.
-  - This task-record state transition intentionally triggers retained PR workflows without changing the input-actions implementation.
+  - The previous exact-head runs 30768948709 and 30768948791 are superseded by the material audit repair and cannot be merge evidence.
+  - A task-record commit is required to trigger retained workflows on the repaired exact head.
 unknown:
-  - Exact-head retained Rust Client and repository CI outcome on this checkpoint head.
+  - Pinned format, strict Clippy, 13 total tests, workspace heavy gates and repository required CI outcome on the repaired checkpoint head.
 conflicts: []
+audit_findings:
+  - id: INPUT-WHEEL-CHORD-001
+    severity: medium
+    status: repaired_pending_validation
+    evidence: InputChord accepted a wheel atom with other atoms, while InputRouter::process_impulse always constructs a one-wheel-atom chord.
+    repair: reject every wheel chord whose non-modifier input count is not exactly one and cover both unreachable forms through integration tests.
 first_failure:
   marker: retained Rust Client rustfmt
   evidence: run 30764404973 job 91540470054 showed formatting differences only in input-actions/error.rs and semantic.rs.
   causal_hypothesis: the initial harness formatted all files but committed only a subset.
-  repair: pinned Cargo/rustfmt committed the complete crate in 6f38a3c1; focused rustfmt, strict Clippy and tests pass.
+  repair: pinned Cargo/rustfmt committed the complete crate in 6f38a3c1; focused rustfmt, strict Clippy and tests passed before the later audit repair.
 rejected_hypotheses:
   - Relax rustfmt or bypass the retained gate: rejected.
-  - Change router/API semantics: rejected because failure was formatting-only.
+  - Change router/API semantics beyond unreachable wheel validation: rejected as outside the material finding.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p1-input-actions.md
   - oteryn-client/Cargo.toml
@@ -120,21 +127,20 @@ changed_paths:
   - oteryn-client/crates/input-actions/**
 validation:
   - command: focused/component run 30764305750 / job 91540213774
-    result: PASS
-  - command: retained heavy run 30764404973
-    result: FAIL_FORMAT_ONLY
-    evidence: metadata and supply-chain passed; rustfmt isolated two uncommitted formatted files.
+    result: PASS_BEFORE_AUDIT_REPAIR
   - command: format repair run 30764475580 / job 91540644130
-    result: PASS
-    evidence: complete crate rustfmt, strict Clippy and all tests passed.
+    result: PASS_BEFORE_AUDIT_REPAIR
   - command: exact changed-path, API, architecture and lockfile audit
     result: PASS
   - command: second retained heavy run 30764535021 / Windows job 91540801099
     result: FAIL_UNRELATED_TEST
-    evidence: locked metadata, rustfmt, strict workspace Clippy and supply-chain job 91540801090 passed; existing app-runtime shutdown test failed before architecture.
+    evidence: locked metadata, rustfmt, strict workspace Clippy and supply-chain passed; existing app-runtime shutdown test failed before architecture.
   - command: targeted diagnostic run 30764694730 / job 91541216153
     result: PASS
-    evidence: the exact unrelated app-runtime shutdown test passed five consecutive times on the same input-actions head and pinned toolchain, confirming a non-deterministic external failure.
+    evidence: the exact unrelated app-runtime shutdown test passed five consecutive times on the same input-actions implementation and pinned toolchain.
+  - command: independent fresh-session public-contract and router reachability audit
+    result: FINDING_REPAIRED_PENDING_VALIDATION
+    evidence: INPUT-WHEEL-CHORD-001 repaired in error.rs, semantic.rs and tests/chord_validation.rs.
 blockers: []
-next_action: Inspect retained Rust Client and repository CI on this checkpoint head; if green, update PR evidence, mark ready, squash-merge and archive separately.
+next_action: Inspect retained Rust Client and repository CI on the repaired task-record head; if green, update PR exact-head evidence, mark ready, squash-merge and archive separately.
 ```

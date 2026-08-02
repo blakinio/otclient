@@ -4,7 +4,7 @@ status: completed
 related_pr: 181
 implementation_head: 77d6dae8ab405e2faafac74019524081845ecfcb
 merge_commit: b689e18006c08765716822775cd0f0e310104d9c
-archive_pr: pending
+archive_pr: 182
 completed: 2026-08-03T00:31:00+02:00
 owned_paths: []
 ---
@@ -52,10 +52,11 @@ final_ci:
 pull_requests:
   terminal_prs:
     - blakinio/otclient#181 merged as b689e18006c08765716822775cd0f0e310104d9c
+  archive_pr: blakinio/otclient#182
   unresolved_review_threads: 0
 task_archived_or_terminal: true
 ownership_released: true
 blocker: none
 ```
 
-No material finding or blocker remains. The lifecycle-only archive PR becomes the sole related open item until it merges.
+No material finding or blocker remains. PR #182 is the lifecycle-only archive PR and becomes terminal when merged.

@@ -6,6 +6,7 @@ members = [
     "crates/asset-types",
     "crates/diagnostics",
     "crates/foundation",
+    "crates/game-domain",
     "crates/game-session",
     "crates/identity",
     "crates/platform",

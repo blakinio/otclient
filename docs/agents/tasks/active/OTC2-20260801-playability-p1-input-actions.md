@@ -6,11 +6,11 @@ project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p1-input-actions
-phase: rotation-required
+phase: exact-head-validation
 branch: feat/OTC2-20260801-playability-p1-input-actions
 base_branch: main
 created: 2026-08-01T22:28:00+02:00
-updated: 2026-08-02T22:03:00+02:00
+updated: 2026-08-02T23:54:00+02:00
 last_verified_commit: "6f38a3c1c48f79ef51050c46397c33d5ee4ae07b"
 required_base_commit: "3887a0b7369e99ad200990d42a5314f1d5531e97"
 risk: high
@@ -42,8 +42,8 @@ missing_layers:
   - settings persistence and user-configured keymaps
   - gameplay and UI action consumers
   - app composition and real staging E2E
-invocation_started_at: 2026-08-02T21:38:43+02:00
-last_progress_at: 2026-08-02T22:03:00+02:00
+invocation_started_at: 2026-08-02T23:54:00+02:00
+last_progress_at: 2026-08-02T23:54:00+02:00
 ci_checks_for_current_head: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
@@ -71,12 +71,12 @@ Implement the framework-neutral normalized input and semantic action/context pro
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-02T21:57:00+02:00
-head: 6f38a3c1c48f79ef51050c46397c33d5ee4ae07b
+updated_at: 2026-08-02T23:54:00+02:00
+head: cbfe22f50b472b4e2e565ce06fe37b8a272408dd
 branch: feat/OTC2-20260801-playability-p1-input-actions
 pr: 157
 status: validating
-phase: rotation-required
+phase: exact-head-validation
 context_routes:
   - docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md
   - docs/agents/AUTONOMOUS_PROGRAM_CONTINUATION.md
@@ -100,9 +100,10 @@ proven:
   - Cargo.lock adds only local package oteryn-input-actions with no dependencies.
   - Temporary PR 178 is closed without merge with zero final changed files.
 derived:
-  - One final retained heavy attempt is allowed after the isolated formatting repair.
+  - One final retained heavy attempt is authorized in this fresh execution session after the isolated unrelated app-runtime flake was proven non-deterministic.
+  - This task-record state transition intentionally triggers retained PR workflows without changing the input-actions implementation.
 unknown:
-  - A fresh-session final heavy outcome after the unrelated app-runtime flake.
+  - Exact-head retained Rust Client and repository CI outcome on this checkpoint head.
 conflicts: []
 first_failure:
   marker: retained Rust Client rustfmt
@@ -134,7 +135,6 @@ validation:
   - command: targeted diagnostic run 30764694730 / job 91541216153
     result: PASS
     evidence: the exact unrelated app-runtime shutdown test passed five consecutive times on the same input-actions head and pinned toolchain, confirming a non-deterministic external failure.
-blockers:
-  - Two retained heavy attempts were consumed in this session: the first failed only on omitted rustfmt files; the second passed metadata, rustfmt, strict workspace Clippy and supply-chain but hit the unrelated flaky app-runtime shutdown test before architecture.
-next_action: In a fresh execution session, run one exact-head retained heavy gate on the unchanged input-actions implementation head; if green, mark ready, auto-merge and archive separately.
+blockers: []
+next_action: Inspect retained Rust Client and repository CI on this checkpoint head; if green, update PR evidence, mark ready, squash-merge and archive separately.
 ```

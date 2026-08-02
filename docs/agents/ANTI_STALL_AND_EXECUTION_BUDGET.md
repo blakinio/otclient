@@ -95,6 +95,8 @@ stall_warnings: 0
 
 Reset a counter only after the underlying exact head, failure signature, hypothesis, external state, or required-check generation materially changes. A draft-to-ready transition or merge-queue admission that causes GitHub to create a genuinely new required-check set on the same exact SHA is a new check generation. It resets only the terminal-CI generation counter, not unrelated retry, repair, or unchanged-state counters.
 
+Eligible terminal-CI observations increment only `terminal_ci_checks_for_current_generation`. They do not consume `ci_checks_for_current_head` or `unchanged_state_checks`; those ordinary counters remain frozen until the terminal exception ends. All ineligible, ordinary or non-terminal observations continue to use the ordinary counters and limits.
+
 ## CI and external waiting
 
 ### Ordinary CI and external waiting

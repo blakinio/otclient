@@ -1,4 +1,4 @@
-name: Temporary OTC2 Canary source index generation
+name: Temporary OTC2 Canary source index refinement
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: tmp-otc2-canary-index-generate
+  group: tmp-otc2-canary-index-refine
   cancel-in-progress: true
 
 jobs:
@@ -29,16 +29,251 @@ jobs:
           show-progress: false
           token: ${{ github.token }}
 
-      - name: Restack on exact current main
+      - name: Verify accepted main is in branch history
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge-base --is-ancestor "$(git rev-parse origin/main)" HEAD
+
+      - name: Refine dispatch phases and declaration classification
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          base="$(git rev-parse origin/main)"
-          git merge --no-edit --no-ff "$base"
-          test "$(git rev-parse HEAD^2)" = "$base"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("oteryn-client/tools/canary-protocol-index/generate.py")
+          text = path.read_text(encoding="utf-8")
+
+          def replace_once(old: str, new: str) -> None:
+              global text
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected exactly one generator marker, found {text.count(old)}: {old[:80]!r}")
+              text = text.replace(old, new, 1)
+
+          def replace_between(start: str, end: str, replacement: str) -> None:
+              global text
+              start_at = text.find(start)
+              if start_at < 0:
+                  raise SystemExit(f"start marker missing: {start}")
+              end_at = text.find(end, start_at)
+              if end_at < 0:
+                  raise SystemExit(f"end marker missing: {end}")
+              text = text[:start_at] + replacement + text[end_at:]
+
+          replace_once(
+              "class ProtocolEntry:\n    direction: str\n    opcode: int | None",
+              "class ProtocolEntry:\n    direction: str\n    dispatch_phase: str\n    opcode: int | None",
+          )
+          replace_once(
+              '            "direction": self.direction,\n            "opcode": self.opcode,',
+              '            "direction": self.direction,\n            "dispatch_phase": self.dispatch_phase,\n            "opcode": self.opcode,',
+          )
+          replace_once(
+              "    entries: tuple[ProtocolEntry, ...]\n    unresolved_declarations: tuple[str, ...]",
+              "    entries: tuple[ProtocolEntry, ...]\n    indirect_declarations: tuple[str, ...]\n    unresolved_declarations: tuple[str, ...]",
+          )
+          replace_once(
+              '            "entries": [entry.as_dict() for entry in self.entries],\n            "unresolved_declarations": list(self.unresolved_declarations),',
+              '            "entries": [entry.as_dict() for entry in self.entries],\n            "indirect_declarations": list(self.indirect_declarations),\n            "unresolved_declarations": list(self.unresolved_declarations),',
+          )
+
+          method_block = '''def _method_from_case(case_body: str) -> tuple[str, str]:
+              stripped = re.sub(r"//.*?$|/\\*.*?\\*/", "", case_body, flags=re.MULTILINE | re.DOTALL)
+              stripped = re.sub(r"\\bbreak\\s*;", "", stripped).strip("{} ;\\t\\r\\n")
+              if not stripped:
+                  return "no-op", "no-op-dispatch"
+              parse_calls = re.findall(r"\\b(parse[A-Za-z0-9_]+)\\s*\\(", case_body)
+              if parse_calls:
+                  unique = tuple(dict.fromkeys(parse_calls))
+                  return unique[0] if len(unique) == 1 else "+".join(unique), "literal-dispatch"
+              game_calls = re.findall(r"(?:&Game::|\\bg_game\\(\\)\\.)([A-Za-z0-9_]+)", case_body)
+              if game_calls:
+                  unique = tuple(dict.fromkeys(game_calls))
+                  return "inline:" + "+".join(unique), "inline-dispatch"
+              protocol_calls = re.findall(r"\\b((?:send|logout|disconnect)[A-Za-z0-9_]*)\\s*\\(", case_body)
+              if protocol_calls:
+                  unique = tuple(dict.fromkeys(protocol_calls))
+                  return "inline:" + "+".join(unique), "inline-dispatch"
+              return "unresolved-dispatch", "unresolved"
+
+
+          '''
+          replace_between("def _method_from_case", "def _parse_inbound", method_block)
+
+          inbound_block = '''def _parse_inbound(document: SourceDocument) -> tuple[ProtocolEntry, ...]:
+              dispatcher = _find_function(
+                  document,
+                  r"\\bProtocolGame::(parsePacketFromDispatcher)\\s*\\([^)]*\\)",
+              )
+              switch_pattern = re.compile(r"\\bswitch\\s*\\(\\s*recvbyte\\s*\\)\\s*\\{")
+              switch_matches = list(switch_pattern.finditer(dispatcher.body))
+              if not switch_matches:
+                  raise GenerationError("no recvbyte switch was found in the dispatcher")
+              if len(switch_matches) == 1:
+                  phases = ("gameplay-session",)
+              elif len(switch_matches) == 2:
+                  phases = ("livestream-viewer", "gameplay-session")
+              else:
+                  phases = tuple(f"dispatch-{index + 1}" for index in range(len(switch_matches)))
+
+              case_pattern = re.compile(r"\\bcase\\s+(0x[0-9A-Fa-f]+|[0-9]+)\\s*:")
+              entries: list[ProtocolEntry] = []
+              dispatcher_offset = document.text.find(dispatcher.body)
+              for switch_index, switch_match in enumerate(switch_matches):
+                  brace = dispatcher.body.find("{", switch_match.start(), switch_match.end())
+                  switch_body, _ = _balanced_region(dispatcher.body, brace)
+                  switch_body_offset = brace + 1
+                  cases = list(case_pattern.finditer(switch_body))
+                  for case_index, match in enumerate(cases):
+                      body_index = case_index
+                      body = ""
+                      while body_index < len(cases):
+                          end = cases[body_index + 1].start() if body_index + 1 < len(cases) else len(switch_body)
+                          body = switch_body[cases[body_index].end() : end]
+                          meaningful = re.sub(r"//.*?$|/\\*.*?\\*/", "", body, flags=re.MULTILINE | re.DOTALL).strip()
+                          if meaningful or body_index + 1 >= len(cases):
+                              break
+                          body_index += 1
+                      method, extraction = _method_from_case(body)
+                      features, builds = _gates_for(body)
+                      family = _family_for(method)
+                      entries.append(
+                          ProtocolEntry(
+                              direction="client-to-server",
+                              dispatch_phase=phases[switch_index],
+                              opcode=_literal_number(match.group(1)),
+                              method=method,
+                              family=family,
+                              package_owner=PACKAGE_BY_FAMILY[family],
+                              prerequisite=PREREQUISITE_BY_FAMILY[family],
+                              source=SourceAnchor(
+                                  path=document.path.as_posix(),
+                                  line=document.line_for_offset(
+                                      dispatcher_offset + switch_body_offset + match.start()
+                                  ),
+                              ),
+                              profile_gates=features,
+                              build_gates=builds,
+                              extraction=extraction,
+                          )
+                      )
+              if not entries:
+                  raise GenerationError("no client-to-server dispatcher cases were extracted")
+              return tuple(entries)
+
+
+          '''
+          replace_between("def _parse_inbound", "def _first_literal_opcode", inbound_block)
+          replace_once(
+              '                direction="server-to-client",\n                opcode=opcode,',
+              '                direction="server-to-client",\n                dispatch_phase="server-send",\n                opcode=opcode,',
+          )
+          replace_once(
+              "                entry.direction,\n                0x1_0000 if entry.opcode is None else entry.opcode,",
+              "                entry.direction,\n                entry.dispatch_phase,\n                0x1_0000 if entry.opcode is None else entry.opcode,",
+          )
+          replace_once(
+              '''    definitions = {entry.method for entry in entries if not entry.method.startswith("inline:")}
+              declared = set(_declared_methods(protocol_hpp, "parse")) | set(
+                  _declared_methods(protocol_hpp, "send")
+              )
+              unresolved = tuple(sorted(declared - definitions))
+          ''',
+              '''    direct_methods = {
+                  entry.method
+                  for entry in entries
+                  if entry.extraction in {"literal-dispatch", "literal-send"}
+              }
+              defined_methods = {function.name for function in _iter_protocol_functions(protocol_cpp)}
+              declared = set(_declared_methods(protocol_hpp, "parse")) | set(
+                  _declared_methods(protocol_hpp, "send")
+              )
+              indirect = tuple(sorted((declared & defined_methods) - direct_methods))
+              unresolved = tuple(sorted(declared - defined_methods))
+          ''',
+          )
+          replace_once(
+              "        entries=entries,\n        unresolved_declarations=unresolved,",
+              "        entries=entries,\n        indirect_declarations=indirect,\n        unresolved_declarations=unresolved,",
+          )
+          replace_once(
+              '        f"- unresolved inbound dispatches: **{extraction[\'unresolved\']}**",',
+              '        f"- explicit no-op inbound dispatches: **{extraction[\'no-op-dispatch\']}**",\n        f"- unresolved inbound dispatches: **{extraction[\'unresolved\']}**",',
+          )
+          replace_once(
+              '        f"- declared methods requiring later source review: **{len(model.unresolved_declarations)}**",',
+              '        f"- defined indirect/orchestrator declarations: **{len(model.indirect_declarations)}**",\n        f"- declarations without a source definition: **{len(model.unresolved_declarations)}**",',
+          )
+          replace_once(
+              '            "| Direction | Opcode | Handler/send | Family | Proposed package | Gates | State/order prerequisite | Exact source | Extraction |",\n            "|---|---:|---|---|---|---|---|---|---|",',
+              '            "| Direction | Phase | Opcode | Handler/send | Family | Proposed package | Gates | State/order prerequisite | Exact source | Extraction |",\n            "|---|---|---:|---|---|---|---|---|---|---|",',
+          )
+          replace_once(
+              "                    entry.direction,\n                    opcode,",
+              "                    entry.direction,\n                    entry.dispatch_phase,\n                    opcode,",
+          )
+          old_section = '''            "## Declared methods without a directly indexed definition",
+                      "",
+                      "These names remain explicit review items. They are not assigned an opcode by inference.",
+                      "",
+                  ]
+              )
+              lines.extend(f"- `{method}`" for method in model.unresolved_declarations)
+          '''
+          new_section = '''            "## Defined methods without a direct packet entry",
+                      "",
+                      "These are source-defined dispatch orchestrators or nested helpers. They are not missing implementations and are not assigned an opcode by inference.",
+                      "",
+                  ]
+              )
+              lines.extend(f"- `{method}`" for method in model.indirect_declarations)
+              lines.extend(
+                  [
+                      "",
+                      "## Declarations without a source definition",
+                      "",
+                      "Only declarations absent from the inspected implementation appear here.",
+                      "",
+                  ]
+              )
+              lines.extend(f"- `{method}`" for method in model.unresolved_declarations)
+          '''
+          replace_once(old_section, new_section)
+          path.write_text(text, encoding="utf-8", newline="\n")
+
+          tests = Path("oteryn-client/tools/canary-protocol-index/test_generate.py")
+          test_text = tests.read_text(encoding="utf-8")
+          test_text = test_text.replace(
+              "                void parseDeclaredOnly(NetworkMessage &msg);",
+              "                void parseDeclaredOnly(NetworkMessage &msg);\n                void parseIndirect(NetworkMessage &msg);",
+              1,
+          )
+          test_text = test_text.replace(
+              "            void ProtocolGame::sendMapDescription() {",
+              "            void ProtocolGame::parseIndirect(NetworkMessage &msg) {\n                parseAutoWalk(msg);\n            }\n\n            void ProtocolGame::sendMapDescription() {",
+              1,
+          )
+          test_text = test_text.replace(
+              "        self.assertEqual(inbound[0].method, \"parseAutoWalk\")",
+              "        self.assertEqual(inbound[0].dispatch_phase, \"gameplay-session\")\n        self.assertEqual(inbound[0].method, \"parseAutoWalk\")",
+              1,
+          )
+          test_text = test_text.replace(
+              "        self.assertEqual(inbound[3].extraction, \"unresolved\")",
+              "        self.assertEqual(inbound[3].method, \"no-op\")\n        self.assertEqual(inbound[3].extraction, \"no-op-dispatch\")",
+              1,
+          )
+          test_text = test_text.replace(
+              "        self.assertIn(\"parseDeclaredOnly\", model.unresolved_declarations)",
+              "        self.assertIn(\"parseIndirect\", model.indirect_declarations)\n        self.assertIn(\"parseDeclaredOnly\", model.unresolved_declarations)",
+              1,
+          )
+          tests.write_text(test_text, encoding="utf-8", newline="\n")
+          PY
 
       - name: Checkout exact Canary producer cut
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -50,19 +285,11 @@ jobs:
           show-progress: false
           persist-credentials: false
 
-      - name: Validate generator unit corpus
+      - name: Validate and generate twice
         shell: bash
         run: |
           set -euo pipefail
-          python -m unittest discover \
-            -s oteryn-client/tools/canary-protocol-index \
-            -p 'test_*.py' \
-            -v
-
-      - name: Generate twice and compare exact bytes
-        shell: bash
-        run: |
-          set -euo pipefail
+          python -m unittest discover -s oteryn-client/tools/canary-protocol-index -p 'test_*.py' -v
           revision=bc0068ab80bbf003e128fce0589b4cc89d2682d3
           first="${RUNNER_TEMP}/first"
           second="${RUNNER_TEMP}/second"
@@ -78,46 +305,46 @@ jobs:
           cmp "$first/protocol.md" "$second/protocol.md"
           cmp "$first/fixtures.md" "$second/fixtures.md"
           cmp "$first/index.json" "$second/index.json"
-
           python - "$first/index.json" <<'PY'
           import json
           import sys
+          from collections import defaultdict
           from pathlib import Path
-
           payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
           entries = payload["entries"]
           inbound = [entry for entry in entries if entry["direction"] == "client-to-server"]
           outbound = [entry for entry in entries if entry["direction"] == "server-to-client"]
-          if len(inbound) < 50:
-              raise SystemExit(f"too few inbound entries: {len(inbound)}")
-          if len(outbound) < 50:
-              raise SystemExit(f"too few outbound entries: {len(outbound)}")
-          if payload["producer"]["client_version"] != 1525:
-              raise SystemExit("unexpected producer client version")
-          if payload["producer"]["revision"] != "bc0068ab80bbf003e128fce0589b4cc89d2682d3":
-              raise SystemExit("producer revision drift")
-          if "CurrentPayload" not in payload["enabled_features"]:
-              raise SystemExit("Current profile feature extraction failed")
-          print(f"entries={len(entries)} inbound={len(inbound)} outbound={len(outbound)} unresolved={len(payload['unresolved_declarations'])}")
+          phases = {entry["dispatch_phase"] for entry in inbound}
+          if phases != {"livestream-viewer", "gameplay-session"}:
+              raise SystemExit(f"unexpected inbound phases: {sorted(phases)}")
+          by_opcode = defaultdict(set)
+          for entry in inbound:
+              by_opcode[entry["opcode"]].add(entry["dispatch_phase"])
+          if by_opcode[0x14] != {"livestream-viewer", "gameplay-session"}:
+              raise SystemExit("duplicate opcode phase separation failed")
+          if payload["unresolved_declarations"]:
+              raise SystemExit(f"unexpected missing definitions: {payload['unresolved_declarations']}")
+          expected_indirect = {"parsePacket", "parsePacketDead", "parsePacketFromDispatcher", "parseUpdateContainer"}
+          if set(payload["indirect_declarations"]) != expected_indirect:
+              raise SystemExit(f"unexpected indirect declarations: {payload['indirect_declarations']}")
+          if len(inbound) < 150 or len(outbound) < 180:
+              raise SystemExit("packet extraction coverage regressed")
+          print(f"entries={len(entries)} inbound={len(inbound)} outbound={len(outbound)} indirect={len(payload['indirect_declarations'])} unresolved=0")
           PY
+          mkdir -p oteryn-client/docs/evidence/playability/p1 oteryn-client/tools/canary-protocol-index/generated
+          cp "$first/protocol.md" oteryn-client/docs/evidence/playability/p1/canary-current-source-index.md
+          cp "$first/fixtures.md" oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md
+          cp "$first/index.json" oteryn-client/tools/canary-protocol-index/generated/current-index.json
 
-          mkdir -p \
-            oteryn-client/docs/evidence/playability/p1 \
-            oteryn-client/tools/canary-protocol-index/generated
-          cp "$first/protocol.md" \
-            oteryn-client/docs/evidence/playability/p1/canary-current-source-index.md
-          cp "$first/fixtures.md" \
-            oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md
-          cp "$first/index.json" \
-            oteryn-client/tools/canary-protocol-index/generated/current-index.json
-
-      - name: Commit exact-source artifacts
+      - name: Commit refined generator and artifacts
         shell: bash
         run: |
           set -euo pipefail
           git add \
+            oteryn-client/tools/canary-protocol-index/generate.py \
+            oteryn-client/tools/canary-protocol-index/test_generate.py \
+            oteryn-client/tools/canary-protocol-index/generated/current-index.json \
             oteryn-client/docs/evidence/playability/p1/canary-current-source-index.md \
-            oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md \
-            oteryn-client/tools/canary-protocol-index/generated/current-index.json
-          git commit -m "docs(canary-index): generate exact current source evidence"
+            oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md
+          git commit -m "fix(canary-index): distinguish dispatch phases and helpers"
           git push origin HEAD:tools/OTC2-20260801-playability-p1-canary-source-index

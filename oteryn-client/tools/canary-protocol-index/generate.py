@@ -270,6 +270,7 @@ class SourceAnchor:
 @dataclasses.dataclass(frozen=True, order=True)
 class ProtocolEntry:
     direction: str
+    dispatch_phase: str
     opcode: int | None
     method: str
     family: str
@@ -283,6 +284,7 @@ class ProtocolEntry:
     def as_dict(self) -> dict[str, object]:
         return {
             "direction": self.direction,
+            "dispatch_phase": self.dispatch_phase,
             "opcode": self.opcode,
             "opcode_hex": None if self.opcode is None else f"0x{self.opcode:02X}",
             "method": self.method,
@@ -330,6 +332,7 @@ class IndexModel:
     profile_ids: tuple[str, ...]
     source_hashes: tuple[tuple[str, str], ...]
     entries: tuple[ProtocolEntry, ...]
+    indirect_declarations: tuple[str, ...]
     unresolved_declarations: tuple[str, ...]
 
     def as_dict(self) -> dict[str, object]:
@@ -346,6 +349,7 @@ class IndexModel:
             "profile_ids": list(self.profile_ids),
             "source_hashes": dict(self.source_hashes),
             "entries": [entry.as_dict() for entry in self.entries],
+            "indirect_declarations": list(self.indirect_declarations),
             "unresolved_declarations": list(self.unresolved_declarations),
         }
 
@@ -469,6 +473,10 @@ def _gates_for(body: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
 
 
 def _method_from_case(case_body: str) -> tuple[str, str]:
+    stripped = re.sub(r"//.*?$|/\*.*?\*/", "", case_body, flags=re.MULTILINE | re.DOTALL)
+    stripped = re.sub(r"\bbreak\s*;", "", stripped).strip("{} ;\t\r\n")
+    if not stripped:
+        return "no-op", "no-op-dispatch"
     parse_calls = re.findall(r"\b(parse[A-Za-z0-9_]+)\s*\(", case_body)
     if parse_calls:
         unique = tuple(dict.fromkeys(parse_calls))
@@ -489,33 +497,58 @@ def _parse_inbound(document: SourceDocument) -> tuple[ProtocolEntry, ...]:
         document,
         r"\bProtocolGame::(parsePacketFromDispatcher)\s*\([^)]*\)",
     )
+    switch_pattern = re.compile(r"\bswitch\s*\(\s*recvbyte\s*\)\s*\{")
+    switch_matches = list(switch_pattern.finditer(dispatcher.body))
+    if not switch_matches:
+        raise GenerationError("no recvbyte switch was found in the dispatcher")
+    if len(switch_matches) == 1:
+        phases = ("gameplay-session",)
+    elif len(switch_matches) == 2:
+        phases = ("livestream-viewer", "gameplay-session")
+    else:
+        phases = tuple(f"dispatch-{index + 1}" for index in range(len(switch_matches)))
+
     case_pattern = re.compile(r"\bcase\s+(0x[0-9A-Fa-f]+|[0-9]+)\s*:")
-    cases = list(case_pattern.finditer(dispatcher.body))
     entries: list[ProtocolEntry] = []
     dispatcher_offset = document.text.find(dispatcher.body)
-    for index, match in enumerate(cases):
-        end = cases[index + 1].start() if index + 1 < len(cases) else len(dispatcher.body)
-        body = dispatcher.body[match.end() : end]
-        method, extraction = _method_from_case(body)
-        features, builds = _gates_for(body)
-        family = _family_for(method)
-        entries.append(
-            ProtocolEntry(
-                direction="client-to-server",
-                opcode=_literal_number(match.group(1)),
-                method=method,
-                family=family,
-                package_owner=PACKAGE_BY_FAMILY[family],
-                prerequisite=PREREQUISITE_BY_FAMILY[family],
-                source=SourceAnchor(
-                    path=document.path.as_posix(),
-                    line=document.line_for_offset(dispatcher_offset + match.start()),
-                ),
-                profile_gates=features,
-                build_gates=builds,
-                extraction=extraction,
+    for switch_index, switch_match in enumerate(switch_matches):
+        brace = dispatcher.body.find("{", switch_match.start(), switch_match.end())
+        switch_body, _ = _balanced_region(dispatcher.body, brace)
+        switch_body_offset = brace + 1
+        cases = list(case_pattern.finditer(switch_body))
+        for case_index, match in enumerate(cases):
+            body_index = case_index
+            body = ""
+            while body_index < len(cases):
+                end = cases[body_index + 1].start() if body_index + 1 < len(cases) else len(switch_body)
+                body = switch_body[cases[body_index].end() : end]
+                meaningful = re.sub(r"//.*?$|/\*.*?\*/", "", body, flags=re.MULTILINE | re.DOTALL).strip()
+                if meaningful or body_index + 1 >= len(cases):
+                    break
+                body_index += 1
+            method, extraction = _method_from_case(body)
+            features, builds = _gates_for(body)
+            family = _family_for(method)
+            entries.append(
+                ProtocolEntry(
+                    direction="client-to-server",
+                    dispatch_phase=phases[switch_index],
+                    opcode=_literal_number(match.group(1)),
+                    method=method,
+                    family=family,
+                    package_owner=PACKAGE_BY_FAMILY[family],
+                    prerequisite=PREREQUISITE_BY_FAMILY[family],
+                    source=SourceAnchor(
+                        path=document.path.as_posix(),
+                        line=document.line_for_offset(
+                            dispatcher_offset + switch_body_offset + match.start()
+                        ),
+                    ),
+                    profile_gates=features,
+                    build_gates=builds,
+                    extraction=extraction,
+                )
             )
-        )
     if not entries:
         raise GenerationError("no client-to-server dispatcher cases were extracted")
     return tuple(entries)
@@ -544,6 +577,7 @@ def _parse_outbound(document: SourceDocument) -> tuple[ProtocolEntry, ...]:
         entries.append(
             ProtocolEntry(
                 direction="server-to-client",
+                dispatch_phase="server-send",
                 opcode=opcode,
                 method=function.name,
                 family=family,
@@ -642,6 +676,7 @@ def build_model(source_root: Path, producer_revision: str) -> IndexModel:
             inbound + outbound,
             key=lambda entry: (
                 entry.direction,
+                entry.dispatch_phase,
                 0x1_0000 if entry.opcode is None else entry.opcode,
                 entry.method,
                 entry.source.line,
@@ -649,11 +684,17 @@ def build_model(source_root: Path, producer_revision: str) -> IndexModel:
         )
     )
 
-    definitions = {entry.method for entry in entries if not entry.method.startswith("inline:")}
+    direct_methods = {
+        entry.method
+        for entry in entries
+        if entry.direction == "server-to-client" or entry.extraction == "literal-dispatch"
+    }
+    defined_methods = {function.name for function in _iter_protocol_functions(protocol_cpp)}
     declared = set(_declared_methods(protocol_hpp, "parse")) | set(
         _declared_methods(protocol_hpp, "send")
     )
-    unresolved = tuple(sorted(declared - definitions))
+    indirect = tuple(sorted((declared & defined_methods) - direct_methods))
+    unresolved = tuple(sorted(declared - defined_methods))
 
     return IndexModel(
         producer_revision=producer_revision,
@@ -663,6 +704,7 @@ def build_model(source_root: Path, producer_revision: str) -> IndexModel:
         profile_ids=_profile_ids(profile_hpp),
         source_hashes=_source_hashes(documents.values()),
         entries=entries,
+        indirect_declarations=indirect,
         unresolved_declarations=unresolved,
     )
 
@@ -693,10 +735,12 @@ def render_protocol_markdown(model: IndexModel) -> str:
         f"- server-to-client entries: **{directions['server-to-client']}**",
         f"- literal inbound dispatches: **{extraction['literal-dispatch']}**",
         f"- inline inbound dispatches: **{extraction['inline-dispatch']}**",
+        f"- explicit no-op inbound dispatches: **{extraction['no-op-dispatch']}**",
         f"- unresolved inbound dispatches: **{extraction['unresolved']}**",
         f"- literal outbound sends: **{extraction['literal-send']}**",
         f"- sends without a local literal opcode: **{extraction['declared-send-no-literal']}**",
-        f"- declared methods requiring later source review: **{len(model.unresolved_declarations)}**",
+        f"- defined indirect/orchestrator declarations: **{len(model.indirect_declarations)}**",
+        f"- declarations without a source definition: **{len(model.unresolved_declarations)}**",
         "",
         "## Current profile features",
         "",
@@ -717,8 +761,8 @@ def render_protocol_markdown(model: IndexModel) -> str:
             "",
             "## Packet and send index",
             "",
-            "| Direction | Opcode | Handler/send | Family | Proposed package | Gates | State/order prerequisite | Exact source | Extraction |",
-            "|---|---:|---|---|---|---|---|---|---|",
+            "| Direction | Phase | Opcode | Handler/send | Family | Proposed package | Gates | State/order prerequisite | Exact source | Extraction |",
+            "|---|---|---:|---|---|---|---|---|---|---|",
         ]
     )
     for entry in model.entries:
@@ -731,6 +775,7 @@ def render_protocol_markdown(model: IndexModel) -> str:
             + " | ".join(
                 (
                     entry.direction,
+                    entry.dispatch_phase,
                     opcode,
                     f"`{_markdown_escape(entry.method)}`",
                     entry.family,
@@ -746,9 +791,19 @@ def render_protocol_markdown(model: IndexModel) -> str:
     lines.extend(
         [
             "",
-            "## Declared methods without a directly indexed definition",
+            "## Defined methods without a direct packet entry",
             "",
-            "These names remain explicit review items. They are not assigned an opcode by inference.",
+            "These are source-defined dispatch orchestrators or nested helpers. They are not missing implementations and are not assigned an opcode by inference.",
+            "",
+        ]
+    )
+    lines.extend(f"- `{method}`" for method in model.indirect_declarations)
+    lines.extend(
+        [
+            "",
+            "## Declarations without a source definition",
+            "",
+            "Only declarations absent from the inspected implementation appear here.",
             "",
         ]
     )

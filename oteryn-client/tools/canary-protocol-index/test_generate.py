@@ -76,6 +76,7 @@ class GeneratorTests(unittest.TestCase):
                 void parseAutoWalk(NetworkMessage &msg);
                 void parseSay(NetworkMessage &msg);
                 void parseDeclaredOnly(NetworkMessage &msg);
+                void parseIndirect(NetworkMessage &msg);
                 void sendMapDescription();
                 void sendMarketEnter();
                 void sendDeclaredOnly();
@@ -101,6 +102,10 @@ class GeneratorTests(unittest.TestCase):
                     case 0xF1:
                         break;
                 }
+            }
+
+            void ProtocolGame::parseIndirect(NetworkMessage &msg) {
+                parseAutoWalk(msg);
             }
 
             void ProtocolGame::sendMapDescription() {
@@ -131,17 +136,20 @@ class GeneratorTests(unittest.TestCase):
         inbound = [entry for entry in model.entries if entry.direction == "client-to-server"]
         outbound = [entry for entry in model.entries if entry.direction == "server-to-client"]
         self.assertEqual([entry.opcode for entry in inbound], [0x64, 0x96, 0xF0, 0xF1])
+        self.assertEqual(inbound[0].dispatch_phase, "gameplay-session")
         self.assertEqual(inbound[0].method, "parseAutoWalk")
         self.assertEqual(inbound[0].family, "movement")
         self.assertEqual(inbound[1].profile_gates, ("CurrentPayload",))
         self.assertEqual(inbound[2].extraction, "inline-dispatch")
-        self.assertEqual(inbound[3].extraction, "unresolved")
+        self.assertEqual(inbound[3].method, "no-op")
+        self.assertEqual(inbound[3].extraction, "no-op-dispatch")
 
         by_method = {entry.method: entry for entry in outbound}
         self.assertEqual(by_method["sendMapDescription"].opcode, 0x64)
         self.assertEqual(by_method["sendMarketEnter"].opcode, 0xF6)
         self.assertEqual(by_method["sendMarketEnter"].profile_gates, ("MarketPackets",))
         self.assertIsNone(by_method["sendDeclaredOnly"].opcode)
+        self.assertIn("parseIndirect", model.indirect_declarations)
         self.assertIn("parseDeclaredOnly", model.unresolved_declarations)
 
     def test_outputs_are_byte_identical_and_machine_readable(self) -> None:

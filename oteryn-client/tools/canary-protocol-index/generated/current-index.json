@@ -21,22 +21,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "inline-dispatch",
-      "family": "bootstrap",
-      "method": "inline:logout",
-      "opcode": 20,
-      "opcode_hex": "0x14",
-      "package_owner": "protocol-canary-bootstrap",
-      "profile_gates": [],
-      "source": {
-        "line": 1661,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "authenticated session/profile; transport and bootstrap order"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "bootstrap",
       "method": "inline:logout",
@@ -53,6 +38,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "bootstrap",
       "method": "inline:playerReceivePingBack",
@@ -69,22 +55,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "unresolved",
-      "family": "unclassified",
-      "method": "unresolved-dispatch",
-      "opcode": 29,
-      "opcode_hex": "0x1D",
-      "package_owner": "protocol-canary-unclassified-review",
-      "profile_gates": [],
-      "source": {
-        "line": 1664,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "manual source review required before package assignment"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "bootstrap",
       "method": "inline:playerReceivePing",
@@ -101,22 +72,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "inline-dispatch",
-      "family": "bootstrap",
-      "method": "inline:sendPingBack",
-      "opcode": 30,
-      "opcode_hex": "0x1E",
-      "package_owner": "protocol-canary-bootstrap",
-      "profile_gates": [],
-      "source": {
-        "line": 1666,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "authenticated session/profile; transport and bootstrap order"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseStashWithdraw",
@@ -133,6 +89,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseRetrieveDepotSearch",
@@ -149,6 +106,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseCyclopediaMonsterTracker",
@@ -165,6 +123,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parsePartyAnalyzerAction",
@@ -181,6 +140,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseLeaderFinderWindow",
@@ -197,6 +157,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseMemberFinderWindow",
@@ -213,6 +174,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseSetClientOptions",
@@ -229,6 +191,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseExtendedOpcode",
@@ -245,6 +208,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "bootstrap",
       "method": "parsePlayerTyping",
@@ -261,6 +225,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseInventoryImbuements",
@@ -277,6 +242,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseOpenWheel",
@@ -293,6 +259,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseSaveWheel",
@@ -309,6 +276,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "operational",
       "method": "parseClientCheck",
@@ -325,6 +293,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "movement",
       "method": "parseAutoWalk",
@@ -341,6 +310,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerMove",
@@ -357,6 +327,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerMove",
@@ -373,6 +344,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerMove",
@@ -389,6 +361,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerMove",
@@ -405,6 +378,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerStopAutoWalk",
@@ -421,6 +395,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerMove",
@@ -437,6 +412,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerMove",
@@ -453,6 +429,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerMove",
@@ -469,6 +446,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerMove",
@@ -485,6 +463,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseSetVocation",
@@ -501,6 +480,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerTurn",
@@ -517,6 +497,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerTurn",
@@ -533,6 +514,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerTurn",
@@ -549,6 +531,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerTurn",
@@ -565,6 +548,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "map",
       "method": "parseTeleport",
@@ -581,6 +565,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseStartOfflineTraining",
@@ -597,6 +582,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseContainerAction",
@@ -613,6 +599,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseCharacterTradeConfigurationAction",
@@ -629,6 +616,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseHotkeyEquip",
@@ -645,6 +633,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseThrow",
@@ -661,6 +650,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseLookInShop",
@@ -677,6 +667,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parsePlayerBuyOnShop",
@@ -693,6 +684,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parsePlayerSellOnShop",
@@ -709,6 +701,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "economy",
       "method": "inline:playerCloseShop",
@@ -725,6 +718,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseRequestTrade",
@@ -741,6 +735,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseLookInTrade",
@@ -757,6 +752,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "economy",
       "method": "inline:playerAcceptTrade",
@@ -773,6 +769,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "economy",
       "method": "inline:playerCloseTrade",
@@ -789,6 +786,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseFriendSystemAction",
@@ -805,6 +803,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseUseItem",
@@ -821,6 +820,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseUseItemEx",
@@ -837,6 +837,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "entity",
       "method": "parseUseWithCreature",
@@ -853,6 +854,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseRotateItem",
@@ -869,6 +871,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseConfigureShowOffSocket",
@@ -885,6 +888,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseCloseContainer",
@@ -901,6 +905,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseUpArrowContainer",
@@ -917,6 +922,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseTextWindow",
@@ -933,6 +939,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseHouseWindow",
@@ -949,6 +956,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseWrapableItem",
@@ -965,6 +973,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseLookAt",
@@ -981,6 +990,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseLookInBattleList",
@@ -997,6 +1007,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseJoinAggression",
@@ -1013,6 +1024,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseQuickLoot",
@@ -1029,6 +1041,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseLootContainer",
@@ -1045,6 +1058,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseQuickLootBlackWhitelist",
@@ -1061,6 +1075,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseOpenDepotSearch",
@@ -1077,6 +1092,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseCloseDepotSearch",
@@ -1093,6 +1109,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseDepotSearchItemRequest",
@@ -1109,6 +1126,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseOpenParentContainer",
@@ -1125,22 +1143,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "literal-dispatch",
-      "family": "chat",
-      "method": "parseSay",
-      "opcode": 150,
-      "opcode_hex": "0x96",
-      "package_owner": "protocol-canary-chat",
-      "profile_gates": [],
-      "source": {
-        "line": 1669,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "active session; bounded text and authoritative channel identity"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseSay",
@@ -1157,6 +1160,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "chat",
       "method": "inline:playerRequestChannels",
@@ -1173,6 +1177,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseOpenChannel",
@@ -1189,6 +1194,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseCloseChannel",
@@ -1205,6 +1211,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseOpenPrivateChannel",
@@ -1221,6 +1228,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseEditGuildMessage",
@@ -1237,6 +1245,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "operational",
       "method": "parseGetTextForReport",
@@ -1253,6 +1262,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "chat",
       "method": "inline:playerCloseNpcChannel",
@@ -1269,6 +1279,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseSetMonsterPodium",
@@ -1285,6 +1296,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "combat",
       "method": "parseFightModes",
@@ -1301,22 +1313,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "inline-dispatch",
-      "family": "unclassified",
-      "method": "inline:sendCancelTarget",
-      "opcode": 161,
-      "opcode_hex": "0xA1",
-      "package_owner": "protocol-canary-unclassified-review",
-      "profile_gates": [],
-      "source": {
-        "line": 1677,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "manual source review required before package assignment"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "combat",
       "method": "parseAttack",
@@ -1333,6 +1330,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "movement",
       "method": "parseFollow",
@@ -1349,6 +1347,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseInviteToParty",
@@ -1365,6 +1364,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseJoinParty",
@@ -1381,6 +1381,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseRevokePartyInvite",
@@ -1397,6 +1398,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parsePassPartyLeadership",
@@ -1413,6 +1415,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "social",
       "method": "inline:playerLeaveParty",
@@ -1429,6 +1432,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseEnableSharedPartyExperience",
@@ -1445,6 +1449,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "chat",
       "method": "inline:playerCreatePrivateChannel",
@@ -1461,6 +1466,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseChannelInvite",
@@ -1477,6 +1483,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseChannelExclude",
@@ -1493,6 +1500,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseCyclopediaHouseAuction",
@@ -1509,6 +1517,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseSendBosstiary",
@@ -1525,6 +1534,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseSendBosstiarySlots",
@@ -1541,6 +1551,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseBosstiarySlot",
@@ -1557,6 +1568,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseHighscores",
@@ -1573,6 +1585,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseImbuementAction",
@@ -1589,6 +1602,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseWeaponProficiency",
@@ -1605,6 +1619,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseTaskHuntingAction",
@@ -1621,6 +1636,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "movement",
       "method": "inline:playerCancelAttackAndFollow",
@@ -1637,6 +1653,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseForgeEnter",
@@ -1653,6 +1670,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseForgeBrowseHistory",
@@ -1669,6 +1687,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "operational",
       "method": "parseClientDetails",
@@ -1685,6 +1704,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseBossDifficultySelection",
@@ -1701,6 +1721,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseAimAtTarget",
@@ -1717,6 +1738,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseGetTransactionDetails",
@@ -1733,6 +1755,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseExivaRestrictions",
@@ -1749,22 +1772,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "unresolved",
-      "family": "unclassified",
-      "method": "unresolved-dispatch",
-      "opcode": 202,
-      "opcode_hex": "0xCA",
-      "package_owner": "protocol-canary-unclassified-review",
-      "profile_gates": [],
-      "source": {
-        "line": 1672,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "manual source review required before package assignment"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "map",
       "method": "parseBrowseField",
@@ -1781,6 +1789,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "containers",
       "method": "parseSeekInContainer",
@@ -1797,6 +1806,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "items",
       "method": "parseInspectionObject",
@@ -1813,6 +1823,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "player",
       "method": "parseInspectPlayer",
@@ -1829,6 +1840,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "unclassified",
       "method": "inline:sendBlessingWindow",
@@ -1845,6 +1857,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "entity",
       "method": "inline:playerRequestOutfit",
@@ -1861,6 +1874,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "entity",
       "method": "parseSetOutfit",
@@ -1877,6 +1891,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "entity",
       "method": "parseToggleMount",
@@ -1893,6 +1908,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseApplyImbuement",
@@ -1909,6 +1925,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseClearImbuement",
@@ -1925,6 +1942,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseCloseImbuementWindow",
@@ -1941,6 +1959,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "map",
       "method": "parseCyclopediaMapAction",
@@ -1957,6 +1976,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseAddVip",
@@ -1973,6 +1993,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "movement",
       "method": "parseRemoveVip",
@@ -1989,6 +2010,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseEditVip",
@@ -2005,6 +2027,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "social",
       "method": "parseVipGroupActions",
@@ -2021,6 +2044,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseBestiarySendRaces",
@@ -2037,6 +2061,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "entity",
       "method": "parseBestiarySendCreatures",
@@ -2053,6 +2078,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseBestiarysendMonsterData",
@@ -2069,6 +2095,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseSendBuyCharmRune",
@@ -2085,6 +2112,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseCyclopediaCharacterInfo",
@@ -2101,6 +2129,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "operational",
       "method": "parseBugReport",
@@ -2117,6 +2146,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "modern",
       "method": "parseWheelGemAction",
@@ -2133,6 +2163,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseOfferDescription",
@@ -2149,6 +2180,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parsePreyAction",
@@ -2165,6 +2197,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseSetHirelingName",
@@ -2181,6 +2214,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseSendResourceBalance",
@@ -2197,6 +2231,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseGreet",
@@ -2213,6 +2248,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseCoinTransfer",
@@ -2229,6 +2265,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "inline-dispatch",
       "family": "progression",
       "method": "inline:playerShowQuestLog",
@@ -2245,6 +2282,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "progression",
       "method": "parseQuestLine",
@@ -2261,6 +2299,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "operational",
       "method": "parseRuleViolationReport",
@@ -2277,6 +2316,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseGetObjectInfo",
@@ -2293,6 +2333,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseMarketLeave",
@@ -2309,6 +2350,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseMarketBrowse",
@@ -2325,6 +2367,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseMarketCreateOffer",
@@ -2341,6 +2384,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseMarketCancelOffer",
@@ -2357,6 +2401,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseMarketAcceptOffer",
@@ -2373,6 +2418,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "chat",
       "method": "parseModalWindowAnswer",
@@ -2389,6 +2435,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseStoreOpen",
@@ -2405,22 +2452,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "unresolved",
-      "family": "unclassified",
-      "method": "unresolved-dispatch",
-      "opcode": 250,
-      "opcode_hex": "0xFA",
-      "package_owner": "protocol-canary-unclassified-review",
-      "profile_gates": [],
-      "source": {
-        "line": 1680,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "manual source review required before package assignment"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseStoreRequestOffers",
@@ -2437,22 +2469,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "unresolved",
-      "family": "unclassified",
-      "method": "unresolved-dispatch",
-      "opcode": 251,
-      "opcode_hex": "0xFB",
-      "package_owner": "protocol-canary-unclassified-review",
-      "profile_gates": [],
-      "source": {
-        "line": 1681,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "manual source review required before package assignment"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseStoreBuyOffer",
@@ -2469,22 +2486,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "unresolved",
-      "family": "unclassified",
-      "method": "unresolved-dispatch",
-      "opcode": 252,
-      "opcode_hex": "0xFC",
-      "package_owner": "protocol-canary-unclassified-review",
-      "profile_gates": [],
-      "source": {
-        "line": 1682,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "manual source review required before package assignment"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseStoreOpenTransactionHistory",
@@ -2501,38 +2503,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
-      "extraction": "unresolved",
-      "family": "unclassified",
-      "method": "unresolved-dispatch",
-      "opcode": 253,
-      "opcode_hex": "0xFD",
-      "package_owner": "protocol-canary-unclassified-review",
-      "profile_gates": [],
-      "source": {
-        "line": 1683,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "manual source review required before package assignment"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
-      "extraction": "inline-dispatch",
-      "family": "movement",
-      "method": "inline:sendCancelWalk",
-      "opcode": 254,
-      "opcode_hex": "0xFE",
-      "package_owner": "protocol-canary-movement",
-      "profile_gates": [],
-      "source": {
-        "line": 1684,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "economy",
       "method": "parseStoreRequestTransactionHistory",
@@ -2549,6 +2520,7 @@
     {
       "build_gates": [],
       "direction": "client-to-server",
+      "dispatch_phase": "gameplay-session",
       "extraction": "literal-dispatch",
       "family": "unclassified",
       "method": "parseRewardChestCollect",
@@ -2564,7 +2536,195 @@
     },
     {
       "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "inline-dispatch",
+      "family": "bootstrap",
+      "method": "inline:logout",
+      "opcode": 20,
+      "opcode_hex": "0x14",
+      "package_owner": "protocol-canary-bootstrap",
+      "profile_gates": [],
+      "source": {
+        "line": 1661,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "authenticated session/profile; transport and bootstrap order"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "no-op-dispatch",
+      "family": "unclassified",
+      "method": "no-op",
+      "opcode": 29,
+      "opcode_hex": "0x1D",
+      "package_owner": "protocol-canary-unclassified-review",
+      "profile_gates": [],
+      "source": {
+        "line": 1664,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "manual source review required before package assignment"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "inline-dispatch",
+      "family": "bootstrap",
+      "method": "inline:sendPingBack",
+      "opcode": 30,
+      "opcode_hex": "0x1E",
+      "package_owner": "protocol-canary-bootstrap",
+      "profile_gates": [],
+      "source": {
+        "line": 1666,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "authenticated session/profile; transport and bootstrap order"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "literal-dispatch",
+      "family": "chat",
+      "method": "parseSay",
+      "opcode": 150,
+      "opcode_hex": "0x96",
+      "package_owner": "protocol-canary-chat",
+      "profile_gates": [],
+      "source": {
+        "line": 1669,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "active session; bounded text and authoritative channel identity"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "inline-dispatch",
+      "family": "unclassified",
+      "method": "inline:sendCancelTarget",
+      "opcode": 161,
+      "opcode_hex": "0xA1",
+      "package_owner": "protocol-canary-unclassified-review",
+      "profile_gates": [],
+      "source": {
+        "line": 1677,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "manual source review required before package assignment"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "unresolved",
+      "family": "unclassified",
+      "method": "unresolved-dispatch",
+      "opcode": 202,
+      "opcode_hex": "0xCA",
+      "package_owner": "protocol-canary-unclassified-review",
+      "profile_gates": [],
+      "source": {
+        "line": 1672,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "manual source review required before package assignment"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "inline-dispatch",
+      "family": "movement",
+      "method": "inline:sendCancelWalk",
+      "opcode": 250,
+      "opcode_hex": "0xFA",
+      "package_owner": "protocol-canary-movement",
+      "profile_gates": [],
+      "source": {
+        "line": 1680,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "inline-dispatch",
+      "family": "movement",
+      "method": "inline:sendCancelWalk",
+      "opcode": 251,
+      "opcode_hex": "0xFB",
+      "package_owner": "protocol-canary-movement",
+      "profile_gates": [],
+      "source": {
+        "line": 1681,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "inline-dispatch",
+      "family": "movement",
+      "method": "inline:sendCancelWalk",
+      "opcode": 252,
+      "opcode_hex": "0xFC",
+      "package_owner": "protocol-canary-movement",
+      "profile_gates": [],
+      "source": {
+        "line": 1682,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "inline-dispatch",
+      "family": "movement",
+      "method": "inline:sendCancelWalk",
+      "opcode": 253,
+      "opcode_hex": "0xFD",
+      "package_owner": "protocol-canary-movement",
+      "profile_gates": [],
+      "source": {
+        "line": 1683,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "inline-dispatch",
+      "family": "movement",
+      "method": "inline:sendCancelWalk",
+      "opcode": 254,
+      "opcode_hex": "0xFE",
+      "package_owner": "protocol-canary-movement",
+      "profile_gates": [],
+      "source": {
+        "line": 1684,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+    },
+    {
+      "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "bootstrap",
       "method": "sendPendingStateEntered",
@@ -2581,6 +2741,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendEnterWorld",
@@ -2597,6 +2758,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendFYIBox",
@@ -2613,6 +2775,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "bootstrap",
       "method": "sendSessionEndInformation",
@@ -2629,6 +2792,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "operational",
       "method": "sendAllowBugReport",
@@ -2645,6 +2809,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "bootstrap",
       "method": "sendPingBack",
@@ -2661,6 +2826,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "bootstrap",
       "method": "sendLoginChallenge",
@@ -2681,6 +2847,7 @@
         "version >= 862"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "bootstrap",
       "method": "sendReLoginWindow",
@@ -2697,6 +2864,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendOpenStash",
@@ -2713,6 +2881,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendSpecialContainersAvailable",
@@ -2729,6 +2898,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "social",
       "method": "sendLeaderTeamFinder",
@@ -2745,6 +2915,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "social",
       "method": "sendTeamFinderList",
@@ -2761,6 +2932,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "bootstrap",
       "method": "sendClientLoginPreamble",
@@ -2777,6 +2949,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendAttachedEffect",
@@ -2793,6 +2966,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendDetachEffect",
@@ -2809,6 +2983,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendShader",
@@ -2825,6 +3000,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "map",
       "method": "sendMapShader",
@@ -2841,6 +3017,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "bootstrap",
       "method": "sendPlayerTyping",
@@ -2857,6 +3034,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendFeatures",
@@ -2873,6 +3051,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendOTCRFeatures",
@@ -2889,6 +3068,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendWeaponProficiency",
@@ -2905,6 +3085,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendInventoryImbuements",
@@ -2921,6 +3102,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendBosstiaryData",
@@ -2937,6 +3119,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "operational",
       "method": "sendClientCheck",
@@ -2953,6 +3136,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "map",
       "method": "sendMapDescription",
@@ -2969,6 +3153,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "map",
       "method": "sendUpdateTile",
@@ -2993,6 +3178,7 @@
         "version >= 981"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendAddCreature",
@@ -3013,6 +3199,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "map",
       "method": "sendAddTileItem",
@@ -3029,6 +3216,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureEmblem",
@@ -3047,6 +3235,7 @@
         "version >= 953"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureTurn",
@@ -3063,6 +3252,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendUpdateCreature",
@@ -3079,6 +3269,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "map",
       "method": "sendUpdateTileCreature",
@@ -3095,6 +3286,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "map",
       "method": "sendUpdateTileItem",
@@ -3111,6 +3303,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendMoveCreature",
@@ -3129,6 +3322,7 @@
         "version < 984"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendContainer",
@@ -3145,6 +3339,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendCloseContainer",
@@ -3161,6 +3356,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendAddContainerItem",
@@ -3177,6 +3373,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendUpdateContainerItem",
@@ -3193,6 +3390,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "movement",
       "method": "sendRemoveContainerItem",
@@ -3209,6 +3407,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendTakeScreenshot",
@@ -3227,6 +3426,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendItemInspection",
@@ -3243,6 +3443,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendInventoryItem",
@@ -3259,6 +3460,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendShop",
@@ -3275,6 +3477,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendSaleItemList",
@@ -3291,6 +3494,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendCloseShop",
@@ -3307,6 +3511,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendTradeItemRequest",
@@ -3323,6 +3528,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendCloseTrade",
@@ -3339,6 +3545,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendDoubleSoundEffect",
@@ -3355,6 +3562,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendMagicEffect",
@@ -3374,6 +3582,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendSingleSoundEffect",
@@ -3390,6 +3599,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendCipsoft860SpecialTextMessage",
@@ -3406,6 +3616,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "map",
       "method": "sendAmbientSoundEffect",
@@ -3422,6 +3633,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "bootstrap",
       "method": "sendDisableLoginMusic",
@@ -3438,6 +3650,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendDistanceShoot",
@@ -3457,6 +3670,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendMusicSoundEffect",
@@ -3473,6 +3687,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureSquare",
@@ -3489,6 +3704,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendForgingData",
@@ -3505,6 +3721,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendOpenForge",
@@ -3521,6 +3738,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendForgeHistory",
@@ -3537,6 +3755,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendForgeResult",
@@ -3553,6 +3772,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureIcon",
@@ -3569,6 +3789,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendPartyCreatureShowStatus",
@@ -3585,6 +3806,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendPartyCreatureUpdate",
@@ -3601,6 +3823,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "social",
       "method": "sendPartyPlayerMana",
@@ -3617,6 +3840,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "social",
       "method": "sendPartyPlayerVocation",
@@ -3633,6 +3857,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendPlayerVocation",
@@ -3649,6 +3874,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureHealth",
@@ -3665,6 +3891,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendPartyCreatureHealth",
@@ -3681,6 +3908,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureOutfit",
@@ -3699,6 +3927,7 @@
         "version >= 1059"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "movement",
       "method": "sendChangeSpeed",
@@ -3717,6 +3946,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureSkull",
@@ -3733,6 +3963,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendPartyCreatureSkull",
@@ -3749,6 +3980,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureShield",
@@ -3765,6 +3997,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendPartyCreatureShield",
@@ -3781,6 +4014,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureWalkthrough",
@@ -3797,6 +4031,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureHelpers",
@@ -3813,6 +4048,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendDepotItems",
@@ -3829,6 +4065,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureType",
@@ -3845,6 +4082,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendTextWindow",
@@ -3861,6 +4099,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendTextWindow",
@@ -3877,6 +4116,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendHouseWindow",
@@ -3893,6 +4133,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendGameNews",
@@ -3909,6 +4150,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendDepotSearchResultDetail",
@@ -3925,6 +4167,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendCloseDepotSearch",
@@ -3943,6 +4186,7 @@
         "version < 1100"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendBlessingWindow",
@@ -3961,6 +4205,7 @@
         "version < 1100"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "player",
       "method": "sendBlessStatus",
@@ -3979,6 +4224,7 @@
         "version < 1100"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendPremiumTrigger",
@@ -3997,6 +4243,7 @@
         "version < 950"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendBasicData",
@@ -4013,6 +4260,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendIconBakragore",
@@ -4031,6 +4279,7 @@
         "version < 1100"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "player",
       "method": "sendIcons",
@@ -4047,6 +4296,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendCancelTarget",
@@ -4065,6 +4315,7 @@
         "version < 870"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "combat",
       "method": "sendSpellCooldown",
@@ -4081,6 +4332,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "combat",
       "method": "sendSpellGroupCooldown",
@@ -4097,6 +4349,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendUseItemCooldown",
@@ -4113,6 +4366,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "combat",
       "method": "sendFightModes",
@@ -4131,6 +4385,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "player",
       "method": "sendRestingStatus",
@@ -4147,6 +4402,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendChannelMessage",
@@ -4163,6 +4419,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCreatureSay",
@@ -4179,6 +4436,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendPrivateMessage",
@@ -4195,6 +4453,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendToChannel",
@@ -4211,6 +4470,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendChannelsDialog",
@@ -4229,6 +4489,7 @@
         "version >= 910"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendChannel",
@@ -4245,6 +4506,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendOpenPrivateChannel",
@@ -4261,6 +4523,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "player",
       "method": "sendExperienceTracker",
@@ -4277,6 +4540,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendHighscores",
@@ -4293,6 +4557,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendHighscoresNoData",
@@ -4309,6 +4574,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendCreatePrivateChannel",
@@ -4325,6 +4591,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendClosePrivate",
@@ -4341,6 +4608,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendTextMessage",
@@ -4357,6 +4625,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "movement",
       "method": "sendCancelWalk",
@@ -4375,6 +4644,7 @@
         "version < 1100"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendUnjustifiedPoints",
@@ -4393,6 +4663,7 @@
         "version < 1100"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendOpenPvpSituations",
@@ -4409,6 +4680,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendTaskHuntingData",
@@ -4427,6 +4699,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "combat",
       "method": "sendBosstiaryCooldownTimer",
@@ -4443,6 +4716,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "containers",
       "method": "sendLootContainers",
@@ -4459,6 +4733,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendMonkData",
@@ -4478,6 +4753,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendMonsterPodiumWindow",
@@ -4494,6 +4770,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendHouseAuctionMessage",
@@ -4510,6 +4787,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendWeaponProficiencyWindow",
@@ -4526,6 +4804,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendGemAtelierGemRevealed",
@@ -4544,6 +4823,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendHousesInfo",
@@ -4560,6 +4840,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaHouseList",
@@ -4576,6 +4857,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendOutfitWindow",
@@ -4592,6 +4874,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendPodiumWindow",
@@ -4608,6 +4891,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendExivaRestrictions",
@@ -4624,6 +4908,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendUpdateImpactTracker",
@@ -4640,6 +4925,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendUpdateInputAnalyzer",
@@ -4656,6 +4942,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendItemsPrice",
@@ -4672,6 +4959,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendUpdateSupplyTracker",
@@ -4688,6 +4976,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendLootStats",
@@ -4704,6 +4993,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendKillTrackerUpdate",
@@ -4722,6 +5012,7 @@
         "version <= 860"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "social",
       "method": "sendVIP",
@@ -4740,6 +5031,7 @@
         "version < 980"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "social",
       "method": "sendUpdatedVIPStatus",
@@ -4756,6 +5048,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "social",
       "method": "sendVIPGroups",
@@ -4772,6 +5065,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendBestiaryCharms",
@@ -4788,6 +5082,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendBestiaryEntryChanged",
@@ -4804,6 +5099,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterAchievements",
@@ -4820,6 +5116,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterBadges",
@@ -4836,6 +5133,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterBaseInformation",
@@ -4852,6 +5150,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterDefenceStats",
@@ -4868,6 +5167,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterGeneralStats",
@@ -4884,6 +5184,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendCyclopediaCharacterInspection",
@@ -4900,6 +5201,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendCyclopediaCharacterItemSummary",
@@ -4916,6 +5218,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterMiscStats",
@@ -4932,6 +5235,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterNoData",
@@ -4948,6 +5252,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterOffenceStats",
@@ -4964,6 +5269,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "entity",
       "method": "sendCyclopediaCharacterOutfitsMounts",
@@ -4980,6 +5286,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "combat",
       "method": "sendCyclopediaCharacterRecentDeaths",
@@ -4996,6 +5303,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterRecentPvPKills",
@@ -5012,6 +5320,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterStoreSummary",
@@ -5028,6 +5337,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendCyclopediaCharacterTitles",
@@ -5044,6 +5354,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendTutorial",
@@ -5060,6 +5371,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendAddMarker",
@@ -5076,6 +5388,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendBosstiaryEntryChanged",
@@ -5092,6 +5405,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendPreyTimeLeft",
@@ -5108,6 +5422,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "progression",
       "method": "sendPreyData",
@@ -5124,6 +5439,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendPreyPrices",
@@ -5142,6 +5458,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "modern",
       "method": "sendImbuementResult",
@@ -5158,6 +5475,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendMessageDialog",
@@ -5174,6 +5492,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendCharmResourceBalance",
@@ -5192,6 +5511,7 @@
         "version < 1100"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendResourceBalance",
@@ -5211,6 +5531,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendTibiaTime",
@@ -5227,6 +5548,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "unclassified",
       "method": "sendCoinBalance",
@@ -5243,6 +5565,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendChannelEvent",
@@ -5259,6 +5582,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendInventoryIds",
@@ -5275,6 +5599,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendMarketEnter",
@@ -5293,6 +5618,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendMarketLeave",
@@ -5313,6 +5639,7 @@
         "clientVersion >= 1510"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendMarketDetail",
@@ -5329,6 +5656,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendMarketAcceptOffer",
@@ -5345,6 +5673,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "items",
       "method": "sendMarketBrowseItem",
@@ -5361,6 +5690,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendMarketBrowseOwnHistory",
@@ -5377,6 +5707,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendMarketBrowseOwnOffers",
@@ -5393,6 +5724,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "economy",
       "method": "sendMarketCancelOffer",
@@ -5409,6 +5741,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "literal-send",
       "family": "chat",
       "method": "sendModalWindow",
@@ -5425,6 +5758,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "unclassified",
       "method": "sendCharmResourcesBalance",
@@ -5441,6 +5775,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "entity",
       "method": "sendCreatureLight",
@@ -5457,6 +5792,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "modern",
       "method": "sendForgeError",
@@ -5473,6 +5809,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "modern",
       "method": "sendForgeSkillStats",
@@ -5489,6 +5826,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "unclassified",
       "method": "sendLivestreamViewerAppear",
@@ -5505,6 +5843,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "modern",
       "method": "sendOpenWheelWindow",
@@ -5521,6 +5860,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "entity",
       "method": "sendOutfitWindowCustomOTCR",
@@ -5539,6 +5879,7 @@
         "version < 953"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "bootstrap",
       "method": "sendPing",
@@ -5555,6 +5896,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "unclassified",
       "method": "sendPodiumDetails",
@@ -5571,6 +5913,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "map",
       "method": "sendRemoveTileThing",
@@ -5589,6 +5932,7 @@
         "version < 1100"
       ],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "unclassified",
       "method": "sendResourcesBalance",
@@ -5607,6 +5951,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "player",
       "method": "sendSkills",
@@ -5623,6 +5968,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "player",
       "method": "sendStats",
@@ -5639,6 +5985,7 @@
     {
       "build_gates": [],
       "direction": "server-to-client",
+      "dispatch_phase": "server-send",
       "extraction": "declared-send-no-literal",
       "family": "map",
       "method": "sendWorldLight",
@@ -5652,6 +5999,12 @@
       },
       "state_prerequisite": "active session; accepted map geometry and item/entity contracts"
     }
+  ],
+  "indirect_declarations": [
+    "parsePacket",
+    "parsePacketDead",
+    "parsePacketFromDispatcher",
+    "parseUpdateContainer"
   ],
   "producer": {
     "client_version": 1525,
@@ -5678,10 +6031,5 @@
     "src/server/network/protocol/protocolgame.cpp": "af7484cd0c4e1e4e5812ea3b6f1813031687331696001fb74de0be9bd21d5efc",
     "src/server/network/protocol/protocolgame.hpp": "33a97f6c54baa6138555164995c0125141407bd7d7a4e71dd7c0561c0f246beb"
   },
-  "unresolved_declarations": [
-    "parsePacket",
-    "parsePacketDead",
-    "parsePacketFromDispatcher",
-    "parseUpdateContainer"
-  ]
+  "unresolved_declarations": []
 }

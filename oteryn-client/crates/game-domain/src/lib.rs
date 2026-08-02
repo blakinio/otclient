@@ -37,7 +37,7 @@ pub use ids::{
 };
 pub use location::{ObjectLocation, ObjectTarget};
 pub use session::SessionToken;
-pub use text::{BoundedText, MessageText, NameText};
+pub use text::{BoundedText, NameText};
 pub use values::{
     ContainerCapacity, ContainerSlot, Direction, Floor, InventorySlot, ItemCount, ResourceValue,
     StackIndex, TilePosition,
@@ -165,7 +165,10 @@ mod tests {
 
     #[test]
     fn versions_counts_capacities_and_resources_are_checked() -> Result<(), DomainError> {
-        assert_eq!(EnvelopeVersion::try_new(2), Err(DomainError::UnsupportedEnvelopeVersion(2)));
+        assert_eq!(
+            EnvelopeVersion::try_new(2),
+            Err(DomainError::UnsupportedEnvelopeVersion(2))
+        );
         assert_eq!(ItemCount::try_new(0), Err(DomainError::ZeroItemCount));
         assert_eq!(
             ContainerCapacity::try_new(0),

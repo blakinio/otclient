@@ -1,0 +1,113 @@
+name: Temporary P2 Simulation Integration
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/temp-p2-simulation-integration.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p2-simulation-integration
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout simulation branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260803-playability-p2-simulation-snapshot
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Integrate and validate workspace package
+        shell: bash
+        env:
+          EXPECTED_PARENT: 003fccd5319d4a4f0610454f14a067794d8ac236
+          EXPECTED_MAIN: 07cbc0445241e50f439996b59024ca869c1b16cd
+          WORKFLOW_PATH: .github/workflows/temp-p2-simulation-integration.yml
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "feat/OTC2-20260803-playability-p2-simulation-snapshot"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          git merge-base --is-ancestor origin/main HEAD
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('oteryn-client/Cargo.toml')
+          text = root.read_text(encoding='utf-8')
+          needle = '    "crates/game-domain",\n'
+          if text.count(needle) != 1:
+              raise SystemExit('expected exactly one game-domain workspace member')
+          root.write_text(
+              text.replace(needle, needle + '    "crates/simulation-core",\n', 1),
+              encoding='utf-8',
+          )
+          PY
+
+          rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
+          rustup default 1.94.0
+          cd oteryn-client
+          cargo metadata --format-version 1 > /tmp/simulation-metadata.json
+          cargo fmt --all --check
+          cargo clippy -p oteryn-simulation-core --all-targets --locked -- -D warnings
+          cargo test -p oteryn-simulation-core --all-targets --locked
+          cargo run --locked -p oteryn-architecture-check -- workspace .
+          cd ..
+
+          python3 - <<'PY'
+          import subprocess
+
+          diff = subprocess.run(
+              ['git', 'diff', '--unified=0', '--', 'oteryn-client/Cargo.lock'],
+              check=True,
+              text=True,
+              capture_output=True,
+          ).stdout
+          allowed = {
+              '',
+              '[[package]]',
+              'name = "oteryn-simulation-core"',
+              'version = "0.1.0"',
+              'dependencies = [',
+              ' "oteryn-foundation",',
+              ' "oteryn-game-domain",',
+              ']',
+          }
+          additions = []
+          for line in diff.splitlines():
+              if line.startswith('---') or line.startswith('+++'):
+                  continue
+              if line.startswith('-'):
+                  raise SystemExit(f'unexpected Cargo.lock removal: {line}')
+              if line.startswith('+'):
+                  value = line[1:]
+                  additions.append(value)
+                  if value not in allowed:
+                      raise SystemExit(f'unexpected Cargo.lock addition: {line}')
+          required = {
+              '[[package]]',
+              'name = "oteryn-simulation-core"',
+              'version = "0.1.0"',
+              ' "oteryn-foundation",',
+              ' "oteryn-game-domain",',
+          }
+          if not required.issubset(set(additions)):
+              raise SystemExit(f'incomplete local-package lock delta: {additions}')
+          PY
+
+          git rm "$WORKFLOW_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/Cargo.toml oteryn-client/Cargo.lock
+          git diff --cached --check
+          git commit -m "build(simulation): integrate simulation core workspace"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-simulation-snapshot

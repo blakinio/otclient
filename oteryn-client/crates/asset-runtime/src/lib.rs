@@ -219,9 +219,7 @@ impl AssetRuntime {
     }
 
     /// Enumerate canonical handles in ascending asset-ID order.
-    pub fn handles(
-        &self,
-    ) -> impl ExactSizeIterator<Item = AssetHandle> + DoubleEndedIterator + '_ {
+    pub fn handles(&self) -> impl ExactSizeIterator<Item = AssetHandle> + DoubleEndedIterator + '_ {
         self.index
             .iter()
             .map(|entry| AssetHandle::new(self.generation, entry.id))
@@ -397,11 +395,8 @@ mod tests {
             blob_record(7, "second", b"beta")?,
             blob_record(2, "first", b"alpha")?,
         ])?;
-        let runtime = AssetRuntime::open_bytes(
-            generation(11)?,
-            &encoded,
-            RuntimeLimits::schema_v1(),
-        )?;
+        let runtime =
+            AssetRuntime::open_bytes(generation(11)?, &encoded, RuntimeLimits::schema_v1())?;
 
         let ids: Vec<u32> = runtime.handles().map(|handle| handle.id().get()).collect();
         assert_eq!(ids, vec![2, 7]);
@@ -431,22 +426,21 @@ mod tests {
     #[test]
     fn repeated_open_is_deterministic() -> Result<(), Box<dyn std::error::Error>> {
         let encoded = encoded_pack(vec![rgba_record(9)?, blob_record(3, "blob", b"same")?])?;
-        let first = AssetRuntime::open_bytes(
-            generation(4)?,
-            &encoded,
-            RuntimeLimits::schema_v1(),
-        )?;
-        let second = AssetRuntime::open_bytes(
-            generation(4)?,
-            &encoded,
-            RuntimeLimits::schema_v1(),
-        )?;
+        let first = AssetRuntime::open_bytes(generation(4)?, &encoded, RuntimeLimits::schema_v1())?;
+        let second =
+            AssetRuntime::open_bytes(generation(4)?, &encoded, RuntimeLimits::schema_v1())?;
         let first_ids: Vec<_> = first.handles().collect();
         let second_ids: Vec<_> = second.handles().collect();
         assert_eq!(first_ids, second_ids);
         for handle in first_ids {
-            assert_eq!(first.lookup(handle)?.payload(), second.lookup(handle)?.payload());
-            assert_eq!(first.lookup(handle)?.digest(), second.lookup(handle)?.digest());
+            assert_eq!(
+                first.lookup(handle)?.payload(),
+                second.lookup(handle)?.payload()
+            );
+            assert_eq!(
+                first.lookup(handle)?.digest(),
+                second.lookup(handle)?.digest()
+            );
         }
         Ok(())
     }
@@ -454,22 +448,21 @@ mod tests {
     #[test]
     fn stale_and_unknown_handles_fail_closed() -> Result<(), Box<dyn std::error::Error>> {
         let encoded = encoded_pack(vec![blob_record(5, "present", b"data")?])?;
-        let old = AssetRuntime::open_bytes(
-            generation(1)?,
-            &encoded,
-            RuntimeLimits::schema_v1(),
-        )?;
+        let old = AssetRuntime::open_bytes(generation(1)?, &encoded, RuntimeLimits::schema_v1())?;
         let handle = old
             .handle(AssetId::new(5)?)
             .ok_or_else(|| io::Error::other("missing expected handle"))?;
-        let current = AssetRuntime::open_bytes(
-            generation(2)?,
-            &encoded,
-            RuntimeLimits::schema_v1(),
-        )?;
-        assert_eq!(current.lookup(handle), Err(RuntimeError::StaleHandle));
+        let current =
+            AssetRuntime::open_bytes(generation(2)?, &encoded, RuntimeLimits::schema_v1())?;
+        assert_eq!(
+            current.lookup(handle).err(),
+            Some(RuntimeError::StaleHandle)
+        );
         let unknown = AssetHandle::new(generation(2)?, AssetId::new(99)?);
-        assert_eq!(current.lookup(unknown), Err(RuntimeError::UnknownAsset));
+        assert_eq!(
+            current.lookup(unknown).err(),
+            Some(RuntimeError::UnknownAsset)
+        );
         Ok(())
     }
 
@@ -482,39 +475,30 @@ mod tests {
             .checked_sub(1)
             .ok_or_else(|| io::Error::other("empty encoded fixture"))?;
         truncated.truncate(new_length);
-        assert!(AssetRuntime::open_bytes(
-            generation(1)?,
-            &truncated,
-            RuntimeLimits::schema_v1()
-        )
-        .is_err());
+        assert!(
+            AssetRuntime::open_bytes(generation(1)?, &truncated, RuntimeLimits::schema_v1())
+                .is_err()
+        );
 
         let mut trailing = encoded;
         trailing.push(0);
         assert_eq!(
-            AssetRuntime::open_bytes(
-                generation(1)?,
-                &trailing,
-                RuntimeLimits::schema_v1()
-            ),
-            Err(RuntimeError::Asset(AssetError::TrailingBytes))
+            AssetRuntime::open_bytes(generation(1)?, &trailing, RuntimeLimits::schema_v1()).err(),
+            Some(RuntimeError::Asset(AssetError::TrailingBytes))
         );
         Ok(())
     }
 
     #[test]
-    fn unsupported_version_and_digest_corruption_are_rejected(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn unsupported_version_and_digest_corruption_are_rejected()
+    -> Result<(), Box<dyn std::error::Error>> {
         let encoded = encoded_pack(vec![blob_record(1, "versioned", b"payload")?])?;
         let mut unsupported = encoded.clone();
         unsupported[8..10].copy_from_slice(&2u16.to_le_bytes());
         assert_eq!(
-            AssetRuntime::open_bytes(
-                generation(1)?,
-                &unsupported,
-                RuntimeLimits::schema_v1()
-            ),
-            Err(RuntimeError::Asset(AssetError::UnsupportedVersion))
+            AssetRuntime::open_bytes(generation(1)?, &unsupported, RuntimeLimits::schema_v1())
+                .err(),
+            Some(RuntimeError::Asset(AssetError::UnsupportedVersion))
         );
 
         let mut corrupt = encoded;
@@ -523,19 +507,15 @@ mod tests {
             .ok_or_else(|| io::Error::other("empty encoded fixture"))?;
         *final_byte ^= 0xFF;
         assert_eq!(
-            AssetRuntime::open_bytes(
-                generation(1)?,
-                &corrupt,
-                RuntimeLimits::schema_v1()
-            ),
-            Err(RuntimeError::Asset(AssetError::DigestMismatch))
+            AssetRuntime::open_bytes(generation(1)?, &corrupt, RuntimeLimits::schema_v1()).err(),
+            Some(RuntimeError::Asset(AssetError::DigestMismatch))
         );
         Ok(())
     }
 
     #[test]
-    fn duplicate_ids_and_declared_oversize_are_rejected(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn duplicate_ids_and_declared_oversize_are_rejected() -> Result<(), Box<dyn std::error::Error>>
+    {
         let mut duplicate = encoded_pack(vec![
             blob_record(1, "first", b"one")?,
             blob_record(2, "second", b"two")?,
@@ -543,12 +523,8 @@ mod tests {
         let second = second_record_offset(&duplicate)?;
         duplicate[second..second + 4].copy_from_slice(&1u32.to_le_bytes());
         assert_eq!(
-            AssetRuntime::open_bytes(
-                generation(1)?,
-                &duplicate,
-                RuntimeLimits::schema_v1()
-            ),
-            Err(RuntimeError::Asset(AssetError::DuplicateId))
+            AssetRuntime::open_bytes(generation(1)?, &duplicate, RuntimeLimits::schema_v1()).err(),
+            Some(RuntimeError::Asset(AssetError::DuplicateId))
         );
 
         let mut oversized = encoded_pack(vec![blob_record(1, "large", b"one")?])?;
@@ -558,12 +534,8 @@ mod tests {
         oversized[payload_length_offset..payload_length_offset + 4]
             .copy_from_slice(&u32::MAX.to_le_bytes());
         assert_eq!(
-            AssetRuntime::open_bytes(
-                generation(1)?,
-                &oversized,
-                RuntimeLimits::schema_v1()
-            ),
-            Err(RuntimeError::Asset(AssetError::PayloadTooLarge))
+            AssetRuntime::open_bytes(generation(1)?, &oversized, RuntimeLimits::schema_v1()).err(),
+            Some(RuntimeError::Asset(AssetError::PayloadTooLarge))
         );
         Ok(())
     }
@@ -607,29 +579,23 @@ mod tests {
             Err(RuntimeError::InvalidLimits)
         );
         assert_eq!(
-            AssetRuntime::open_reader(
-                generation(1)?,
-                FailingReader,
-                RuntimeLimits::schema_v1()
-            ),
-            Err(RuntimeError::ObjectUnavailable)
+            AssetRuntime::open_reader(generation(1)?, FailingReader, RuntimeLimits::schema_v1())
+                .err(),
+            Some(RuntimeError::ObjectUnavailable)
         );
         Ok(())
     }
 
     #[test]
-    fn debug_output_does_not_expose_metadata_or_payload(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn debug_output_does_not_expose_metadata_or_payload() -> Result<(), Box<dyn std::error::Error>>
+    {
         let encoded = encoded_pack(vec![blob_record(
             1,
             "secret-logical-name",
             b"secret-payload",
         )?])?;
-        let runtime = AssetRuntime::open_bytes(
-            generation(1)?,
-            &encoded,
-            RuntimeLimits::schema_v1(),
-        )?;
+        let runtime =
+            AssetRuntime::open_bytes(generation(1)?, &encoded, RuntimeLimits::schema_v1())?;
         let rendered = format!("{runtime:?}");
         assert!(!rendered.contains("secret-logical-name"));
         assert!(!rendered.contains("secret-payload"));

@@ -34,58 +34,40 @@ jobs:
         shell: pwsh
         run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
 
-      - name: Restack and integrate deterministically
+      - name: Repair focused lint findings
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          base="$(git rev-parse origin/main)"
-          git merge --no-edit --no-ff "$base"
 
           python3 - <<'PY'
           from pathlib import Path
 
-          physical = Path("oteryn-client/crates/input-actions/src/physical.rs")
-          text = physical.read_text(encoding="utf-8")
-          old = "pub fn iter(self) -> impl ExactSizeIterator<Item = Modifier> {"
-          new = "pub fn iter(self) -> impl Iterator<Item = Modifier> {"
-          if old in text:
+          source = Path("oteryn-client/crates/input-actions/src/lib.rs")
+          text = source.read_text(encoding="utf-8")
+          replacements = {
+              "&[chord.clone()]": "std::slice::from_ref(&chord)",
+              "        let stream = vec![": "        let stream = [",
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f"missing expected lint finding: {old}")
               text = text.replace(old, new, 1)
-              physical.write_text(text, encoding="utf-8", newline="\n")
-
-          router = Path("oteryn-client/crates/input-actions/src/router.rs")
-          text = router.read_text(encoding="utf-8")
-          old = "    #[must_use]\n    pub fn process(&mut self, event: &NormalizedInputEvent) -> Vec<ActionEvent> {"
-          new = "    pub fn process(&mut self, event: &NormalizedInputEvent) -> Vec<ActionEvent> {"
-          if old in text:
-              text = text.replace(old, new, 1)
-              router.write_text(text, encoding="utf-8", newline="\n")
-
-          manifest = Path("oteryn-client/Cargo.toml")
-          cargo = manifest.read_text(encoding="utf-8")
-          member = '    "crates/input-actions",\n'
-          if member not in cargo:
-              anchor = '    "crates/game-domain",\n'
-              if anchor not in cargo:
-                  raise SystemExit("workspace game-domain anchor missing")
-              cargo = cargo.replace(anchor, anchor + member, 1)
-              manifest.write_text(cargo, encoding="utf-8", newline="\n")
+          closing = "            NormalizedInputEvent::DeviceLost,\n        ];"
+          if closing not in text:
+              raise SystemExit("synthetic stream closing marker missing")
+          text = text.replace(
+              closing,
+              "            NormalizedInputEvent::DeviceLost,\n        ];",
+              1,
+          )
+          source.write_text(text, encoding="utf-8", newline="\n")
           PY
 
           cargo +1.94.0 fmt --all --manifest-path oteryn-client/Cargo.toml
-          cargo +1.94.0 generate-lockfile --manifest-path oteryn-client/Cargo.toml
-          cargo +1.94.0 update --manifest-path oteryn-client/Cargo.toml -p ipnet --precise 2.12.0
-          cargo +1.94.0 update --manifest-path oteryn-client/Cargo.toml -p libredox --precise 0.1.18
-
-          test "$(git rev-parse HEAD^2)" = "$base"
-          git add \
-            oteryn-client/Cargo.toml \
-            oteryn-client/Cargo.lock \
-            oteryn-client/crates/input-actions/src/physical.rs \
-            oteryn-client/crates/input-actions/src/router.rs
-          git commit -m "build(input): integrate input-actions workspace contract"
+          git add oteryn-client/crates/input-actions/src/lib.rs
+          git commit -m "test(input): satisfy strict focused lints"
           git push origin HEAD:feat/OTC2-20260801-playability-p1-input-actions
 
       - name: Validate focused package

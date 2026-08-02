@@ -177,7 +177,7 @@ impl Modifiers {
     }
 
     /// Enumerate modifiers in stable Shift, Control, Alt, Super order.
-    pub fn iter(self) -> impl ExactSizeIterator<Item = Modifier> {
+    pub fn iter(self) -> impl Iterator<Item = Modifier> {
         [
             Modifier::Shift,
             Modifier::Control,

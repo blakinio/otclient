@@ -1,6 +1,6 @@
 use crate::{
     ActionId, Binding, BindingMap, ButtonState, ContextId, ContextKind, InputAtom, InputChord,
-    InputError, Modifiers, NormalizedInputEvent, RepeatPolicy, MAX_CHORD_INPUTS,
+    InputError, MAX_CHORD_INPUTS, Modifiers, NormalizedInputEvent, RepeatPolicy,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -133,7 +133,6 @@ impl InputRouter {
     }
 
     /// Process one normalized event and return deterministic semantic outputs.
-    #[must_use]
     pub fn process(&mut self, event: &NormalizedInputEvent) -> Vec<ActionEvent> {
         match event {
             NormalizedInputEvent::Key {
@@ -186,8 +185,9 @@ impl InputRouter {
                 self.captured = false;
                 events
             }
-            NormalizedInputEvent::PointerMoved { .. }
-            | NormalizedInputEvent::TextCommitted(_) => Vec::new(),
+            NormalizedInputEvent::PointerMoved { .. } | NormalizedInputEvent::TextCommitted(_) => {
+                Vec::new()
+            }
         }
     }
 
@@ -257,9 +257,7 @@ impl InputRouter {
         }
         self.active_actions
             .iter()
-            .filter(|(chord, active)| {
-                chord.contains(atom) && active.repeat == RepeatPolicy::Allow
-            })
+            .filter(|(chord, active)| chord.contains(atom) && active.repeat == RepeatPolicy::Allow)
             .map(|(_, active)| active.event(ActionPhase::Repeated))
             .collect()
     }
@@ -313,11 +311,7 @@ impl InputRouter {
         self.remove_actions(keys, ActionPhase::Cancelled)
     }
 
-    fn remove_actions(
-        &mut self,
-        keys: Vec<InputChord>,
-        phase: ActionPhase,
-    ) -> Vec<ActionEvent> {
+    fn remove_actions(&mut self, keys: Vec<InputChord>, phase: ActionPhase) -> Vec<ActionEvent> {
         keys.into_iter()
             .filter_map(|key| self.active_actions.remove(&key))
             .map(|active| active.event(phase))

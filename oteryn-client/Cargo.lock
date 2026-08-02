@@ -1530,6 +1530,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "oteryn-input-actions"
+version = "0.1.0"
+
+[[package]]
 name = "oteryn-platform"
 version = "0.1.0"
 dependencies = [

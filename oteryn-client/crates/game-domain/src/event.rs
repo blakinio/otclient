@@ -150,8 +150,7 @@ impl GameEvent {
             Self::EntityAppeared { entity, .. }
             | Self::EntityMoved { entity, .. }
             | Self::EntityRemoved { entity, .. } => entity.ensure_session(session),
-            Self::ItemChanged { item, location, .. }
-            | Self::ItemRemoved { item, location } => {
+            Self::ItemChanged { item, location, .. } | Self::ItemRemoved { item, location } => {
                 item.ensure_session(session)?;
                 location.ensure_session(session)
             }

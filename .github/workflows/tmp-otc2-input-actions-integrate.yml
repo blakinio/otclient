@@ -34,7 +34,7 @@ jobs:
         shell: pwsh
         run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
 
-      - name: Repair focused lint findings
+      - name: Repair focus-loss fixture
         shell: bash
         run: |
           set -euo pipefail
@@ -46,28 +46,22 @@ jobs:
 
           source = Path("oteryn-client/crates/input-actions/src/lib.rs")
           text = source.read_text(encoding="utf-8")
-          replacements = {
-              "&[chord.clone()]": "std::slice::from_ref(&chord)",
-              "        let stream = vec![": "        let stream = [",
-          }
-          for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit(f"missing expected lint finding: {old}")
-              text = text.replace(old, new, 1)
-          closing = "            NormalizedInputEvent::DeviceLost,\n        ];"
-          if closing not in text:
-              raise SystemExit("synthetic stream closing marker missing")
-          text = text.replace(
-              closing,
-              "            NormalizedInputEvent::DeviceLost,\n        ];",
-              1,
-          )
+          old = '''                key_chord(KeyCode::KEY_S)?,
+                action("move.backward")?,'''
+          new = '''                InputChord::new(
+                    Modifiers::one(Modifier::Shift),
+                    vec![InputAtom::Key(KeyCode::KEY_S)],
+                )?,
+                action("move.backward")?,'''
+          if old not in text:
+              raise SystemExit("focus-loss binding fixture marker missing")
+          text = text.replace(old, new, 1)
           source.write_text(text, encoding="utf-8", newline="\n")
           PY
 
           cargo +1.94.0 fmt --all --manifest-path oteryn-client/Cargo.toml
           git add oteryn-client/crates/input-actions/src/lib.rs
-          git commit -m "test(input): satisfy strict focused lints"
+          git commit -m "test(input): align focus-loss chord fixture"
           git push origin HEAD:feat/OTC2-20260801-playability-p1-input-actions
 
       - name: Validate focused package

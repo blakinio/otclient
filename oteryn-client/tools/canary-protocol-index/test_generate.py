@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +13,7 @@ SPEC = importlib.util.spec_from_file_location("canary_protocol_index_generate", 
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError("could not load generator module")
 generator = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = generator
 SPEC.loader.exec_module(generator)
 
 

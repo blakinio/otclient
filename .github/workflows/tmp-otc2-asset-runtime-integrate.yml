@@ -62,8 +62,8 @@ jobs:
 
           marker = "            ),\n            Err(RuntimeError::"
           replacements = text.count(marker)
-          if replacements != 10:
-              raise SystemExit(f"expected 10 runtime-result assertions, found {replacements}")
+          if replacements != 6:
+              raise SystemExit(f"expected 6 runtime-result assertions, found {replacements}")
           text = text.replace(
               marker,
               "            ).err(),\n            Some(RuntimeError::",

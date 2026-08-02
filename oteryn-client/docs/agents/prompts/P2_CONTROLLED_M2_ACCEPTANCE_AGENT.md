@@ -48,10 +48,12 @@ All must be named before runtime execution:
 - exact Identity, Gateway and Canary revisions/configuration/build;
 - approved disposable staging account and credential-handling procedure;
 - approved target world/character and rollback/cleanup owner;
-- approved appearance/asset source or explicit controlled synthetic-visual exception;
+- approved compatible appearance/asset source, provenance/rights boundary and exact runtime-pack identity;
 - supported Windows version/device/GPU/driver and minimum measurement budget;
 - permitted logs/screenshots/metrics and retention/privacy boundary;
 - authorization for any runner, network destination and temporary workflow.
+
+A synthetic-visual controlled run may diagnose technical integration but can never produce `M2_PASS` or a playable/M2 completion claim.
 
 If any required input is absent, checkpoint `BLOCKED` with the exact owner decision. Do not invent or reuse credentials.
 
@@ -109,7 +111,7 @@ This task may mark M2 complete only when every acceptance item passes on the exa
 - exact Gateway directory and character selection succeed;
 - Canary accepts one one-shot credential and enters the named gameplay session;
 - post-admission gameplay stream is parsed without unsupported-layout fallback;
-- bounded floors, tiles, items, local character and basic entities/effects become visibly correct;
+- the approved compatible runtime pack resolves appearances and bounded floors, tiles, items, local character and basic entities/effects become visibly correct;
 - semantic keyboard/mouse movement emits a validated command;
 - server acknowledgement/reconciliation changes the authoritative simulation and visible snapshot;
 - logout/disconnect returns to a safe selection/logged-out terminal state;

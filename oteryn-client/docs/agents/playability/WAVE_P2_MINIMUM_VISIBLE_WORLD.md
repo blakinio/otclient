@@ -251,9 +251,11 @@ Launch prerequisites:
 - A-F merged and separately archived;
 - exact Identity/Gateway/Canary revisions and configurations named;
 - approved disposable staging identity and credential-handling procedure;
-- approved appearance/asset source or a controlled environment explicitly accepting the synthetic visual boundary;
+- approved compatible appearance/asset source with a documented provenance, rights and exact runtime-pack boundary;
 - supported Windows/device matrix and minimum measurement budget named;
 - production/staging authorization recorded under repository policy.
+
+A controlled run that still uses synthetic visual assets may produce partial technical evidence only and can never produce `M2_PASS` or a playable/M2 completion claim.
 
 Acceptance journey:
 
@@ -261,7 +263,7 @@ Acceptance journey:
 2. system-browser OAuth callback completes without secret leakage;
 3. directory and character selection succeed;
 4. Canary accepts one credential and produces the bounded post-admission stream;
-5. world becomes visible with required floors/tiles/items/entities;
+5. the approved compatible runtime pack resolves appearances and the world becomes visibly correct with required floors/tiles/items/entities;
 6. semantic input emits movement command and server reconciliation updates the snapshot;
 7. logout/disconnect returns to a safe terminal selection/logged-out state;
 8. logs, screenshots and metrics contain no credentials/private payloads/proprietary asset bytes.

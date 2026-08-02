@@ -6,13 +6,13 @@ project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p1-input-actions
-phase: exact-head-validation
+phase: current-base-required-ci
 branch: feat/OTC2-20260801-playability-p1-input-actions
 base_branch: main
 created: 2026-08-01T22:28:00+02:00
-updated: 2026-08-03T00:02:00+02:00
-last_verified_commit: "8fd75c11e0bdc1494e2c9d8697849ccacd6a5fa7"
-required_base_commit: "3887a0b7369e99ad200990d42a5314f1d5531e97"
+updated: 2026-08-03T00:40:00+02:00
+last_verified_commit: "3f7feaef3f2a496393c7b541bd5590ed18e259e3"
+required_base_commit: "4ac18a876385a8e5dc97efe474c98fd3df583b0a"
 risk: high
 related_pr: 157
 owned_paths:
@@ -30,7 +30,7 @@ shared_path_lease:
     - oteryn-client/docs/operations/RUST_WORKSPACE.md
   release_condition: exact-head integration validation and merge or explicit rollback
 implementation_authorized: true
-policy_version: 2
+policy_version: 2.1
 task_kind: implementation
 execution_mode: github-only
 context_pressure: high
@@ -42,13 +42,16 @@ missing_layers:
   - settings persistence and user-configured keymaps
   - gameplay and UI action consumers
   - app composition and real staging E2E
-invocation_started_at: 2026-08-02T23:54:00+02:00
-last_progress_at: 2026-08-03T00:02:00+02:00
+invocation_started_at: 2026-08-03T00:39:00+02:00
+last_progress_at: 2026-08-03T00:40:00+02:00
 ci_checks_for_current_head: 0
+ci_check_generation: ready
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 2
-context_reconstruction_attempts: 1
+context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
 
@@ -62,94 +65,91 @@ Implement the framework-neutral normalized input and semantic action/context pro
 - [x] chords, semantic IDs, contexts, bindings, conflicts and lifecycle are deterministic;
 - [x] conflicts, reserved, unreachable and invalid bindings fail explicitly;
 - [x] no widgets, game commands, settings, default keymap or app composition entered the crate;
-- [ ] focused rustfmt, strict Clippy and all lifecycle/component tests pass on the final exact head;
-- [ ] final exact-head heavy gates pass;
+- [x] focused rustfmt, strict Clippy and all lifecycle/component tests passed on implementation head `3f7feaef3f2a496393c7b541bd5590ed18e259e3`;
+- [x] full Rust Client, supply-chain and repository CI passed on that implementation head;
 - [x] ownership, API, architecture and minimal lockfile audits have no unresolved material finding;
+- [ ] current-base required CI passes on the final checkpoint head after governance-only `main` advancement;
 - [ ] PR is merged and the task is separately archived.
+
+## Current-base checkpoint
+
+The implementation head `3f7feaef3f2a496393c7b541bd5590ed18e259e3` passed:
+
+- Rust Client run `30769222634`;
+- Windows job `91553325023`;
+- Supply Chain job `91553325074`;
+- repository CI run `30769222733` and `CI / Required` job `91553474591`;
+- ready-state CI run `30769519720` and `CI / Required` job `91554176973`;
+- independent public-contract audit after repair of `INPUT-WHEEL-CHORD-001`;
+- zero unresolved review threads.
+
+After those checks, `main` advanced only through governance PRs #181 and #182 to `4ac18a876385a8e5dc97efe474c98fd3df583b0a`. A direct merge attempt was correctly rejected because branch protection expected a fresh `CI / Required` context for the current base. No product, workspace, lockfile or input-actions code changed as part of this checkpoint commit; its purpose is to trigger the current-base exact-head checks.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-03T00:02:00+02:00
-head: 8fd75c11e0bdc1494e2c9d8697849ccacd6a5fa7
+updated_at: 2026-08-03T00:40:00+02:00
+implementation_head: 3f7feaef3f2a496393c7b541bd5590ed18e259e3
+current_main: 4ac18a876385a8e5dc97efe474c98fd3df583b0a
 branch: feat/OTC2-20260801-playability-p1-input-actions
 pr: 157
 status: validating
-phase: exact-head-validation
+phase: current-base-required-ci
 context_routes:
   - docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md
   - docs/agents/AUTONOMOUS_PROGRAM_CONTINUATION.md
   - docs/agents/GITHUB_ONLY_EXECUTION.md
   - docs/agents/DELIVERY_COMPLETENESS_AND_CLOSEOUT.md
-  - oteryn-client/docs/agents/playability/ARCHITECTURE_HANDOFF.md
   - oteryn-client/docs/agents/playability/WAVE_P1_CONTRACT_SPINE.md
   - oteryn-client/docs/agents/prompts/P1_INPUT_ACTIONS_AGENT.md
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p1-input-actions.md
   - oteryn-client/crates/input-actions/**
-shared_lease:
-  state: granted
-  integration: exact main 3887a0b7 is in branch history; workspace member and minimal no-dependency lockfile package are present; accepted category `input` covers the crate.
 proven:
-  - Public API contains no winit, Win32, UI, game-domain, settings or default-keymap types.
-  - InputRouter deterministically handles context precedence, repeat, release, focus/capture/device cleanup and ordered output.
-  - Focused run 30764305750 job 91540213774 passed pinned rustfmt, strict Clippy and all 11 original tests.
-  - Format repair run 30764475580 job 91540644130 applied pinned formatting to the complete original crate and re-passed strict focused validation.
-  - Cargo.lock adds only local package oteryn-input-actions with no dependencies.
-  - Temporary PR 178 is closed without merge with zero final changed files.
-  - Fresh-session static control-flow audit proved composite wheel chords were accepted although InputRouter can emit wheel bindings only as single-atom impulses.
-  - The repaired code introduces stable InvalidWheelChord rejection plus two public-API negative tests for key-plus-wheel and multi-wheel combinations.
-  - Superseded Rust Client run 30769122762 passed locked metadata and Supply Chain job 91553062585; Windows job 91553062600 failed only because pinned rustfmt required one import line in the new test.
-  - Commit 8fd75c11 applies exactly the pinned rustfmt output from job 91553062600 without semantic change.
+  - The final implementation code passed full exact-head Rust Client and repository required CI.
+  - Ready-state CI run 30769519720 completed successfully.
+  - The only post-validation base changes were unrelated agent-governance lifecycle changes.
+  - GitHub branch protection requires a new current-base CI / Required context before merge.
+  - Temporary PR 178 is closed without merge and has no retained changes.
+  - Review threads are empty and no material audit finding remains.
 derived:
-  - Runs on heads before 8fd75c11 are supporting evidence only and cannot satisfy final exact-head validation.
-  - This task-record commit is the final intended head trigger; no implementation change is pending unless final CI exposes a new actionable failure.
+  - A task-record-only checkpoint commit is sufficient to trigger current-base validation without rewriting already validated product code.
+  - Product audit and focused/component evidence remain applicable; final merge authority depends on the new exact checkpoint head checks.
 unknown:
-  - Pinned format, strict Clippy, 13 total tests, workspace heavy gates, architecture and repository required CI outcome on the final checkpoint head.
+  - Exact outcome of the newly triggered current-base Rust Client and repository CI runs.
 conflicts: []
 audit_findings:
   - id: INPUT-WHEEL-CHORD-001
     severity: medium
-    status: repaired_pending_validation
-    evidence: InputChord accepted a wheel atom with other atoms, while InputRouter::process_impulse always constructs a one-wheel-atom chord.
-    repair: reject every wheel chord whose non-modifier input count is not exactly one and cover both unreachable forms through integration tests.
+    status: repaired_and_validated
+    evidence: InvalidWheelChord rejects key-plus-wheel and multi-wheel combinations; exact-head focused and full validation passed.
 first_failure:
-  marker: final repaired-head rustfmt
-  evidence: run 30769122762 / Windows job 91553062600 requested a one-line import in tests/chord_validation.rs; metadata and Supply Chain passed.
-  causal_hypothesis: the GitHub contents write used valid Rust formatting that differed from pinned rustfmt 1.94 output.
-  repair: commit 8fd75c11 applies the exact one-line import emitted by the pinned formatter.
+  marker: current-base required status expected
+  evidence: protected merge attempt after main advanced returned required status check CI / Required is expected
+  causal_hypothesis: branch protection invalidated the earlier PR merge context after the base branch advanced
+  repair: push this owned task-record-only checkpoint to trigger a fresh current-base PR validation cycle
 rejected_hypotheses:
-  - Relax rustfmt or bypass the retained gate: rejected.
-  - Rerun unchanged head 1c803c65: rejected because the log contained a deterministic formatting repair.
-  - Change router/API semantics beyond unreachable wheel validation: rejected as outside the material finding.
+  - Bypass or force branch protection: rejected.
+  - Rewrite validated product code without an implementation defect: rejected.
+  - Treat prior current-base-independent checks as sufficient for merge: rejected by live branch protection.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p1-input-actions.md
   - oteryn-client/Cargo.toml
   - oteryn-client/Cargo.lock
   - oteryn-client/crates/input-actions/**
 validation:
-  - command: focused/component run 30764305750 / job 91540213774
-    result: PASS_BEFORE_AUDIT_REPAIR
-  - command: format repair run 30764475580 / job 91540644130
-    result: PASS_BEFORE_AUDIT_REPAIR
-  - command: exact changed-path, API, architecture and lockfile audit
+  - command: Rust Client 30769222634
     result: PASS
-  - command: second retained heavy run 30764535021 / Windows job 91540801099
-    result: FAIL_UNRELATED_TEST
-    evidence: locked metadata, rustfmt, strict workspace Clippy and supply-chain passed; existing app-runtime shutdown test failed before architecture.
-  - command: targeted diagnostic run 30764694730 / job 91541216153
+  - command: repository CI 30769222733
     result: PASS
-    evidence: the exact unrelated app-runtime shutdown test passed five consecutive times on the same input-actions implementation and pinned toolchain.
-  - command: independent fresh-session public-contract and router reachability audit
-    result: FINDING_REPAIRED_PENDING_VALIDATION
-    evidence: INPUT-WHEEL-CHORD-001 repaired in error.rs, semantic.rs and tests/chord_validation.rs.
-  - command: repaired-head Rust Client run 30769122762
-    result: FAIL_FORMAT_ONLY
-    evidence: metadata and Supply Chain passed; Windows job 91553062600 stopped at one deterministic import formatting diff.
-  - command: exact pinned formatting repair
-    result: APPLIED
-    evidence: commit 8fd75c11 matches the formatter output from job 91553062600.
+  - command: ready-state CI 30769519720
+    result: PASS
+  - command: independent final input-actions audit
+    result: PASS
+  - command: current-base exact-head CI after this checkpoint
+    result: NOT_RUN
+    evidence: triggered by this task-record-only commit
 blockers: []
-next_action: Inspect retained Rust Client and repository CI on this final checkpoint head; if green, update PR exact-head evidence, mark ready, squash-merge and archive separately.
+next_action: Observe the newly triggered final exact-head checks under the bounded terminal-CI policy; on PASS verify protected merge, then create and merge the lifecycle-only archive PR.
 ```

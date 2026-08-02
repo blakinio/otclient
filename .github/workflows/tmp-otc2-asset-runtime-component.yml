@@ -1,0 +1,154 @@
+name: Temporary OTC2 asset-runtime component validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - reopened
+      - synchronize
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-otc2-asset-runtime-component
+  cancel-in-progress: true
+
+jobs:
+  component:
+    if: github.head_ref == 'tmp/OTC2-20260801-asset-runtime-integrate'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: "feat/OTC2-20260801-playability-p1-asset-pack-runtime"
+          fetch-depth: 0
+          show-progress: false
+          token: ${{ github.token }}
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+
+      - name: Add compiler round-trip component test
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manifest = Path("oteryn-client/crates/asset-runtime/Cargo.toml")
+          text = manifest.read_text(encoding="utf-8")
+          block = "\n[dev-dependencies]\noteryn-asset-compiler = { version = \"=0.1.0\", path = \"../../tools/asset-compiler\" }\n"
+          if "[dev-dependencies]" not in text:
+              marker = "\n[lints]\n"
+              if marker not in text:
+                  raise SystemExit("asset-runtime lints marker missing")
+              text = text.replace(marker, block + marker, 1)
+              manifest.write_text(text, encoding="utf-8", newline="\n")
+          PY
+
+          mkdir -p oteryn-client/crates/asset-runtime/tests
+          cat > oteryn-client/crates/asset-runtime/tests/compiler_roundtrip.rs <<'RS'
+          use oteryn_asset_compiler::compile_manifest;
+          use oteryn_asset_runtime::{AssetRuntime, PackGeneration, RuntimeLimits};
+          use oteryn_asset_types::AssetId;
+          use std::error::Error;
+          use std::fs;
+          use std::io;
+          use std::path::{Path, PathBuf};
+          use std::sync::atomic::{AtomicU64, Ordering};
+
+          static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(1);
+
+          struct TestDirectory(PathBuf);
+
+          impl TestDirectory {
+              fn create() -> io::Result<Self> {
+                  for _ in 0..100 {
+                      let sequence = NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+                      let path = std::env::temp_dir().join(format!(
+                          "oteryn-asset-runtime-compiler-{}-{sequence}",
+                          std::process::id()
+                      ));
+                      match fs::create_dir(&path) {
+                          Ok(()) => return Ok(Self(path)),
+                          Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                          Err(error) => return Err(error),
+                      }
+                  }
+                  Err(io::Error::new(
+                      io::ErrorKind::AlreadyExists,
+                      "could not allocate unique asset-runtime test directory",
+                  ))
+              }
+
+              fn join(&self, path: impl AsRef<Path>) -> PathBuf {
+                  self.0.join(path)
+              }
+          }
+
+          impl Drop for TestDirectory {
+              fn drop(&mut self) {
+                  let _cleanup_result = fs::remove_dir_all(&self.0);
+              }
+          }
+
+          #[test]
+          fn compiler_output_opens_and_indexes_deterministically() -> Result<(), Box<dyn Error>> {
+              let directory = TestDirectory::create()?;
+              let source = directory.join("source.bin");
+              let manifest = directory.join("manifest.json");
+              let first_output = directory.join("first.pack");
+              let second_output = directory.join("second.pack");
+
+              fs::write(&source, b"project-original synthetic payload")?;
+              fs::write(
+                  &manifest,
+                  r#"{"schema_version":1,"assets":[{"id":7,"kind":"blob","name":"fixture","source":"source.bin","license":"CC0-1.0","provenance":"project-original synthetic fixture"}]}"#,
+              )?;
+
+              let first_report = compile_manifest(&manifest, &first_output)?;
+              let second_report = compile_manifest(&manifest, &second_output)?;
+              let first_bytes = fs::read(&first_output)?;
+              let second_bytes = fs::read(&second_output)?;
+
+              assert_eq!(first_bytes, second_bytes);
+              assert_eq!(first_report.record_count(), 1);
+              assert_eq!(first_report, second_report);
+              assert_eq!(first_report.encoded_bytes(), first_bytes.len());
+
+              let runtime = AssetRuntime::open_bytes(
+                  PackGeneration::new(9)?,
+                  &first_bytes,
+                  RuntimeLimits::schema_v1(),
+              )?;
+              let handle = runtime
+                  .handle(AssetId::new(7)?)
+                  .ok_or_else(|| io::Error::other("compiled asset handle is missing"))?;
+              let view = runtime.lookup(handle)?;
+
+              assert_eq!(runtime.record_count(), 1);
+              assert_eq!(view.metadata().logical_name(), "fixture");
+              assert_eq!(view.payload(), b"project-original synthetic payload");
+              Ok(())
+          }
+          RS
+
+          cargo +1.94.0 fmt --all --manifest-path oteryn-client/Cargo.toml
+          cargo +1.94.0 test --manifest-path oteryn-client/Cargo.toml -p oteryn-asset-runtime
+          cargo +1.94.0 clippy --manifest-path oteryn-client/Cargo.toml -p oteryn-asset-runtime --all-targets -- -D warnings
+          cargo +1.94.0 update --manifest-path oteryn-client/Cargo.toml -p ipnet --precise 2.12.0
+          cargo +1.94.0 update --manifest-path oteryn-client/Cargo.toml -p libredox --precise 0.1.18
+          git add \
+            oteryn-client/Cargo.lock \
+            oteryn-client/crates/asset-runtime/Cargo.toml \
+            oteryn-client/crates/asset-runtime/tests/compiler_roundtrip.rs
+          git commit -m "test(asset-runtime): prove compiler round trip"
+          git push origin HEAD:feat/OTC2-20260801-playability-p1-asset-pack-runtime

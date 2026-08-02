@@ -53,12 +53,14 @@ jobs:
           text = text.replace(old, new, 1)
 
           old = "                end = cases[body_index + 1].start() if body_index + 1 < len(cases) else len(switch_body)"
-          new = """                if body_index + 1 < len(cases):
-                      end = cases[body_index + 1].start()
-                  elif default_match is not None and default_match.start() > cases[body_index].end():
-                      end = default_match.start()
-                  else:
-                      end = len(switch_body)"""
+          new = (
+              "                if body_index + 1 < len(cases):\n"
+              "                    end = cases[body_index + 1].start()\n"
+              "                elif default_match is not None and default_match.start() > cases[body_index].end():\n"
+              "                    end = default_match.start()\n"
+              "                else:\n"
+              "                    end = len(switch_body)"
+          )
           if text.count(old) != 1:
               raise SystemExit(f"last-case marker count: {text.count(old)}")
           text = text.replace(old, new, 1)

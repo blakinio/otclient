@@ -46,15 +46,10 @@ jobs:
 
           source = Path("oteryn-client/crates/input-actions/src/lib.rs")
           text = source.read_text(encoding="utf-8")
-          old = '''                key_chord(KeyCode::KEY_S)?,
-                action("move.backward")?,'''
-          new = '''                InputChord::new(
-                    Modifiers::one(Modifier::Shift),
-                    vec![InputAtom::Key(KeyCode::KEY_S)],
-                )?,
-                action("move.backward")?,'''
-          if old not in text:
-              raise SystemExit("focus-loss binding fixture marker missing")
+          old = "key_chord(KeyCode::KEY_S)?"
+          new = "InputChord::new(Modifiers::one(Modifier::Shift), vec![InputAtom::Key(KeyCode::KEY_S)])?"
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one focus-loss chord marker, found {text.count(old)}")
           text = text.replace(old, new, 1)
           source.write_text(text, encoding="utf-8", newline="\n")
           PY

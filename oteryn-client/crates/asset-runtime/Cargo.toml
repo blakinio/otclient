@@ -1,0 +1,18 @@
+[package]
+name = "oteryn-asset-runtime"
+version = "0.1.0"
+description = "Immutable bounded runtime for Oteryn synthetic-v1 asset packs"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "asset-runtime"
+
+[dependencies]
+oteryn-asset-types = { version = "=0.1.0", path = "../asset-types" }
+
+[lints]
+workspace = true

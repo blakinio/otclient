@@ -54,7 +54,7 @@ Budget exhaustion, ordinary no-progress, retry-limit exhaustion, unchanged pendi
 
 Do not stop, return only a plan, or ask the owner to switch tools merely because Codex or a local terminal is unavailable. Use the GitHub connection for repository operations and GitHub Actions for remote execution and validation on a dedicated branch, within the anti-stall budget.
 
-The owner durably authorizes autonomous merge or auto-merge of the current task's own PR only after the exact final head passes every repository-required gate, independent audit and required E2E; all review threads are resolved; the diff remains within declared ownership; and related PRs are reconciled. Never force or bypass protections.
+The owner durably authorizes protected auto-merge or merge-queue admission for the current task's own PR after the exact final head is frozen and every non-CI gate passes, only when repository protection guarantees that merge cannot occur before all required exact-head checks pass. Direct or manual merge remains authorized only after every required gate passes; all review threads are resolved; the diff remains within declared ownership; and related PRs are reconciled. Never force, bypass or weaken protections.
 
 Merge authority is not production authority. Production deployment, protected-environment approval, production secrets, live data, live payments or capital, live authentication/session mutation, and protected production configuration remain separately unauthorized unless explicitly covered.
 

@@ -65,5 +65,3 @@ impl<const MAX_BYTES: usize> Debug for BoundedText<MAX_BYTES> {
 
 /// Bounded display name used by bootstrap, entity and container events.
 pub type NameText = BoundedText<64>;
-/// Bounded user-visible message reserved for later semantic event extensions.
-pub type MessageText = BoundedText<1024>;

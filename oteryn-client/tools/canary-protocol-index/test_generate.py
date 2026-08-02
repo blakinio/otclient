@@ -152,6 +152,40 @@ class GeneratorTests(unittest.TestCase):
         self.assertIn("parseIndirect", model.indirect_declarations)
         self.assertIn("parseDeclaredOnly", model.unresolved_declarations)
 
+    def test_send_resend_and_grouped_noops_are_classified(self) -> None:
+        source = """
+        void ProtocolGame::parsePacketFromDispatcher(NetworkMessage &msg, uint8_t recvbyte) {
+            switch (recvbyte) {
+                case 0x1E:
+                    sendPingBack();
+                    break;
+                case 0xA1:
+                    sendCancelTarget();
+                    break;
+                case 0xCA:
+                    resendLivestreamViewerContainer(msg);
+                    break;
+                case 0xFA:
+                case 0xFB:
+                    break;
+                default:
+                    sendCancelWalk();
+                    break;
+            }
+        }
+        """
+        document = generator.SourceDocument(
+            path=generator.PROTOCOL_GAME_CPP,
+            text=source,
+            lines=tuple(source.splitlines()),
+        )
+        entries = {entry.opcode: entry for entry in generator._parse_inbound(document)}
+        self.assertEqual(entries[0x1E].method, "inline:sendPingBack")
+        self.assertEqual(entries[0xA1].method, "inline:sendCancelTarget")
+        self.assertEqual(entries[0xCA].method, "inline:resendLivestreamViewerContainer")
+        self.assertEqual(entries[0xFA].extraction, "no-op-dispatch")
+        self.assertEqual(entries[0xFB].extraction, "no-op-dispatch")
+
     def test_outputs_are_byte_identical_and_machine_readable(self) -> None:
         model = generator.build_model(self.root, "abc123")
         first = self.root / "first"

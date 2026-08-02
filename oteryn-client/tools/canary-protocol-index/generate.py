@@ -485,7 +485,7 @@ def _method_from_case(case_body: str) -> tuple[str, str]:
     if game_calls:
         unique = tuple(dict.fromkeys(game_calls))
         return "inline:" + "+".join(unique), "inline-dispatch"
-    protocol_calls = re.findall(r"\b((?:send|logout|disconnect)[A-Za-z0-9_]*)\s*\(", case_body)
+    protocol_calls = re.findall(r"\b((?:(?:re)?send|logout|disconnect)[A-Za-z0-9_]*)\s*\(", case_body)
     if protocol_calls:
         unique = tuple(dict.fromkeys(protocol_calls))
         return "inline:" + "+".join(unique), "inline-dispatch"
@@ -516,11 +516,17 @@ def _parse_inbound(document: SourceDocument) -> tuple[ProtocolEntry, ...]:
         switch_body, _ = _balanced_region(dispatcher.body, brace)
         switch_body_offset = brace + 1
         cases = list(case_pattern.finditer(switch_body))
+        default_match = re.search(r"\bdefault\s*:", switch_body)
         for case_index, match in enumerate(cases):
             body_index = case_index
             body = ""
             while body_index < len(cases):
-                end = cases[body_index + 1].start() if body_index + 1 < len(cases) else len(switch_body)
+                if body_index + 1 < len(cases):
+                    end = cases[body_index + 1].start()
+                elif default_match is not None and default_match.start() > cases[body_index].end():
+                    end = default_match.start()
+                else:
+                    end = len(switch_body)
                 body = switch_body[cases[body_index].end() : end]
                 meaningful = re.sub(r"//.*?$|/\*.*?\*/", "", body, flags=re.MULTILINE | re.DOTALL).strip()
                 if meaningful or body_index + 1 >= len(cases):

@@ -2623,15 +2623,32 @@
       "build_gates": [],
       "direction": "client-to-server",
       "dispatch_phase": "livestream-viewer",
-      "extraction": "unresolved",
-      "family": "unclassified",
-      "method": "unresolved-dispatch",
+      "extraction": "inline-dispatch",
+      "family": "containers",
+      "method": "inline:resendLivestreamViewerContainer",
       "opcode": 202,
       "opcode_hex": "0xCA",
-      "package_owner": "protocol-canary-unclassified-review",
+      "package_owner": "protocol-canary-containers",
       "profile_gates": [],
       "source": {
         "line": 1672,
+        "path": "src/server/network/protocol/protocolgame.cpp"
+      },
+      "state_prerequisite": "active session; item handles, container handles and slot bounds"
+    },
+    {
+      "build_gates": [],
+      "direction": "client-to-server",
+      "dispatch_phase": "livestream-viewer",
+      "extraction": "no-op-dispatch",
+      "family": "unclassified",
+      "method": "no-op",
+      "opcode": 250,
+      "opcode_hex": "0xFA",
+      "package_owner": "protocol-canary-unclassified-review",
+      "profile_gates": [],
+      "source": {
+        "line": 1680,
         "path": "src/server/network/protocol/protocolgame.cpp"
       },
       "state_prerequisite": "manual source review required before package assignment"
@@ -2640,86 +2657,69 @@
       "build_gates": [],
       "direction": "client-to-server",
       "dispatch_phase": "livestream-viewer",
-      "extraction": "inline-dispatch",
-      "family": "movement",
-      "method": "inline:sendCancelWalk",
-      "opcode": 250,
-      "opcode_hex": "0xFA",
-      "package_owner": "protocol-canary-movement",
-      "profile_gates": [],
-      "source": {
-        "line": 1680,
-        "path": "src/server/network/protocol/protocolgame.cpp"
-      },
-      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
-    },
-    {
-      "build_gates": [],
-      "direction": "client-to-server",
-      "dispatch_phase": "livestream-viewer",
-      "extraction": "inline-dispatch",
-      "family": "movement",
-      "method": "inline:sendCancelWalk",
+      "extraction": "no-op-dispatch",
+      "family": "unclassified",
+      "method": "no-op",
       "opcode": 251,
       "opcode_hex": "0xFB",
-      "package_owner": "protocol-canary-movement",
+      "package_owner": "protocol-canary-unclassified-review",
       "profile_gates": [],
       "source": {
         "line": 1681,
         "path": "src/server/network/protocol/protocolgame.cpp"
       },
-      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+      "state_prerequisite": "manual source review required before package assignment"
     },
     {
       "build_gates": [],
       "direction": "client-to-server",
       "dispatch_phase": "livestream-viewer",
-      "extraction": "inline-dispatch",
-      "family": "movement",
-      "method": "inline:sendCancelWalk",
+      "extraction": "no-op-dispatch",
+      "family": "unclassified",
+      "method": "no-op",
       "opcode": 252,
       "opcode_hex": "0xFC",
-      "package_owner": "protocol-canary-movement",
+      "package_owner": "protocol-canary-unclassified-review",
       "profile_gates": [],
       "source": {
         "line": 1682,
         "path": "src/server/network/protocol/protocolgame.cpp"
       },
-      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+      "state_prerequisite": "manual source review required before package assignment"
     },
     {
       "build_gates": [],
       "direction": "client-to-server",
       "dispatch_phase": "livestream-viewer",
-      "extraction": "inline-dispatch",
-      "family": "movement",
-      "method": "inline:sendCancelWalk",
+      "extraction": "no-op-dispatch",
+      "family": "unclassified",
+      "method": "no-op",
       "opcode": 253,
       "opcode_hex": "0xFD",
-      "package_owner": "protocol-canary-movement",
+      "package_owner": "protocol-canary-unclassified-review",
       "profile_gates": [],
       "source": {
         "line": 1683,
         "path": "src/server/network/protocol/protocolgame.cpp"
       },
-      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+      "state_prerequisite": "manual source review required before package assignment"
     },
     {
       "build_gates": [],
       "direction": "client-to-server",
       "dispatch_phase": "livestream-viewer",
-      "extraction": "inline-dispatch",
-      "family": "movement",
-      "method": "inline:sendCancelWalk",
+      "extraction": "no-op-dispatch",
+      "family": "unclassified",
+      "method": "no-op",
       "opcode": 254,
       "opcode_hex": "0xFE",
-      "package_owner": "protocol-canary-movement",
+      "package_owner": "protocol-canary-unclassified-review",
       "profile_gates": [],
       "source": {
         "line": 1684,
         "path": "src/server/network/protocol/protocolgame.cpp"
       },
-      "state_prerequisite": "active session; authoritative map/entity state and current command generation"
+      "state_prerequisite": "manual source review required before package assignment"
     },
     {
       "build_gates": [],

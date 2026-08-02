@@ -15,9 +15,9 @@ This report records literal dispatch/send evidence, source anchors, feature/buil
 - client-to-server entries: **159**
 - server-to-client entries: **188**
 - literal inbound dispatches: **122**
-- inline inbound dispatches: **35**
-- explicit no-op inbound dispatches: **1**
-- unresolved inbound dispatches: **1**
+- inline inbound dispatches: **31**
+- explicit no-op inbound dispatches: **6**
+- unresolved inbound dispatches: **0**
 - literal outbound sends: **174**
 - sends without a local literal opcode: **14**
 - defined indirect/orchestrator declarations: **4**
@@ -211,12 +211,12 @@ This report records literal dispatch/send evidence, source anchors, feature/buil
 | client-to-server | livestream-viewer | `0x1E` | `inline:sendPingBack` | bootstrap | `protocol-canary-bootstrap` | none observed in local body | authenticated session/profile; transport and bootstrap order | `src/server/network/protocol/protocolgame.cpp:1666` | inline-dispatch |
 | client-to-server | livestream-viewer | `0x96` | `parseSay` | chat | `protocol-canary-chat` | none observed in local body | active session; bounded text and authoritative channel identity | `src/server/network/protocol/protocolgame.cpp:1669` | literal-dispatch |
 | client-to-server | livestream-viewer | `0xA1` | `inline:sendCancelTarget` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:1677` | inline-dispatch |
-| client-to-server | livestream-viewer | `0xCA` | `unresolved-dispatch` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:1672` | unresolved |
-| client-to-server | livestream-viewer | `0xFA` | `inline:sendCancelWalk` | movement | `protocol-canary-movement` | none observed in local body | active session; authoritative map/entity state and current command generation | `src/server/network/protocol/protocolgame.cpp:1680` | inline-dispatch |
-| client-to-server | livestream-viewer | `0xFB` | `inline:sendCancelWalk` | movement | `protocol-canary-movement` | none observed in local body | active session; authoritative map/entity state and current command generation | `src/server/network/protocol/protocolgame.cpp:1681` | inline-dispatch |
-| client-to-server | livestream-viewer | `0xFC` | `inline:sendCancelWalk` | movement | `protocol-canary-movement` | none observed in local body | active session; authoritative map/entity state and current command generation | `src/server/network/protocol/protocolgame.cpp:1682` | inline-dispatch |
-| client-to-server | livestream-viewer | `0xFD` | `inline:sendCancelWalk` | movement | `protocol-canary-movement` | none observed in local body | active session; authoritative map/entity state and current command generation | `src/server/network/protocol/protocolgame.cpp:1683` | inline-dispatch |
-| client-to-server | livestream-viewer | `0xFE` | `inline:sendCancelWalk` | movement | `protocol-canary-movement` | none observed in local body | active session; authoritative map/entity state and current command generation | `src/server/network/protocol/protocolgame.cpp:1684` | inline-dispatch |
+| client-to-server | livestream-viewer | `0xCA` | `inline:resendLivestreamViewerContainer` | containers | `protocol-canary-containers` | none observed in local body | active session; item handles, container handles and slot bounds | `src/server/network/protocol/protocolgame.cpp:1672` | inline-dispatch |
+| client-to-server | livestream-viewer | `0xFA` | `no-op` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:1680` | no-op-dispatch |
+| client-to-server | livestream-viewer | `0xFB` | `no-op` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:1681` | no-op-dispatch |
+| client-to-server | livestream-viewer | `0xFC` | `no-op` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:1682` | no-op-dispatch |
+| client-to-server | livestream-viewer | `0xFD` | `no-op` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:1683` | no-op-dispatch |
+| client-to-server | livestream-viewer | `0xFE` | `no-op` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:1684` | no-op-dispatch |
 | server-to-client | server-send | `0x0A` | `sendPendingStateEntered` | bootstrap | `protocol-canary-bootstrap` | none observed in local body | authenticated session/profile; transport and bootstrap order | `src/server/network/protocol/protocolgame.cpp:8502` | literal-send |
 | server-to-client | server-send | `0x0F` | `sendEnterWorld` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:8512` | literal-send |
 | server-to-client | server-send | `0x15` | `sendFYIBox` | unclassified | `protocol-canary-unclassified-review` | none observed in local body | manual source review required before package assignment | `src/server/network/protocol/protocolgame.cpp:8410` | literal-send |

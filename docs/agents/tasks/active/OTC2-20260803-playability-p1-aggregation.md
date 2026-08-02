@@ -10,8 +10,8 @@ phase: final-exact-head-ci
 branch: docs/OTC2-20260803-playability-p1-aggregation
 base_branch: main
 created: 2026-08-03T01:08:02+02:00
-updated: 2026-08-03T01:23:00+02:00
-last_verified_commit: "24fd7eec38603bf9522eb04902fbdc0fec214e39"
+updated: 2026-08-03T01:25:00+02:00
+last_verified_commit: "c97dca667876e47329791cea7c55aac18abbba5d"
 required_base_commit: "5d3dec1037eef508782e369afef8e3b7f1291e6a"
 risk: high
 related_pr: 184
@@ -43,14 +43,14 @@ decomposition_decision: single
 validation_level: heavy
 complete_user_facing_feature: false
 invocation_started_at: 2026-08-03T01:08:02+02:00
-last_progress_at: 2026-08-03T01:23:00+02:00
+last_progress_at: 2026-08-03T01:25:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: final-exact-head
-terminal_ci_wait_started_at: 2026-08-03T01:23:00+02:00
+terminal_ci_wait_started_at: 2026-08-03T01:25:00+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -70,7 +70,9 @@ Merged and separately archived on exact base `main@5d3dec1037eef508782e369afef8e
 
 All P1 shared integration leases are released. Open PRs #23, #48 and #97 own no barrier path.
 
-# Material aggregation finding
+# Material aggregation findings
+
+## `P1-AGG-CANARY-REVISION-001`
 
 The generated P1 Canary source index is pinned to `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`, while the existing `protocol-canary` runtime descriptor still names `95b276db311cf6e9acd58b847f1fb0ca6697b137` and accepted source cut `4b2d6f432d92628c42bde1d95daed6ae0d0eb88f`.
 
@@ -82,6 +84,17 @@ Disposition:
 - the inspected source cut is not treated as the deployed cut without named controlled evidence;
 - field layouts not established by provenance-safe evidence remain explicit `UNKNOWN` and may not be guessed.
 
+## `P1-AGG-M2-ASSET-CLAIM-001`
+
+Fresh acceptance review found that the first P2 wave draft allowed a controlled environment to accept a synthetic visual boundary while still leaving a possible `M2_PASS` interpretation. That would weaken the programme milestone because synthetic assets cannot prove compatible world appearance.
+
+Disposition:
+
+- synthetic visual runs may produce partial technical integration evidence only;
+- `M2_PASS` requires an approved compatible appearance/asset source, documented provenance/rights boundary and exact runtime-pack identity;
+- the approved pack must resolve appearances and the controlled world must become visibly correct;
+- the wave and controlled-acceptance prompt were repaired and re-audited on `c97dca667876e47329791cea7c55aac18abbba5d`.
+
 # Acceptance
 
 - [x] live architecture handoff includes all four merged P1 producers and their exact boundaries;
@@ -89,6 +102,7 @@ Disposition:
 - [x] dependency model replaces the completed P1 graph with an accepted staged P2 graph;
 - [x] P2 preserves one simulation/snapshot producer, one gameplay protocol adapter, one asset decoder, one renderer-resource producer, one platform input adapter and one serialized vertical-slice integration owner;
 - [x] controlled M2 acceptance is a separate owner and cannot be replaced by synthetic composition;
+- [x] synthetic visual evidence cannot produce `M2_PASS`; an approved compatible runtime pack is mandatory;
 - [x] worker packages have non-overlapping exclusive paths and an explicit shared integration lease order;
 - [x] P2 completion remains the real M2 journey: controlled login -> visible world -> semantic movement -> server reconciliation -> safe logout;
 - [x] no P2 worker may claim real compatibility without exact source/fixture/staging evidence;
@@ -100,9 +114,9 @@ Disposition:
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 2
-updated_at: 2026-08-03T01:23:00+02:00
-content_reviewed_head: 24fd7eec38603bf9522eb04902fbdc0fec214e39
+checkpoint_version: 3
+updated_at: 2026-08-03T01:25:00+02:00
+content_reviewed_head: c97dca667876e47329791cea7c55aac18abbba5d
 branch: docs/OTC2-20260803-playability-p1-aggregation
 pr: 184
 status: validating
@@ -124,13 +138,14 @@ proven:
   - Input-actions owns framework-neutral physical and semantic input contracts.
   - P2 is staged as SIMULATION-SNAPSHOT, CANARY-WORLD-PROTOCOL, ASSET-DECODE, RENDERER-RESOURCE, INPUT-PLATFORM, VISIBLE-WORLD-INTEGRATION and CONTROLLED-M2-ACCEPTANCE.
   - Final PR diff contains exactly twelve owned documentation paths and no temporary workflow.
+  - M2 completion requires approved compatible runtime appearances; synthetic visual evidence is partial only.
 derived:
   - Initial safe P2 implementation concurrency is simulation, Canary protocol, asset decode and input platform, with serialized shared integration.
   - Renderer-resource follows asset-decode; visible-world integration follows all five producer archives.
   - Synthetic visible-world integration is a partial consumer and cannot establish M2.
 unknown:
   - exact deployed Canary revision/configuration/build and controlled gameplay fixtures;
-  - approved production asset source/import/redistribution and appearance representation;
+  - approved compatible production/staging appearance source and exact runtime-pack identity;
   - approved staging environment/account and final Windows/performance/privacy budgets.
 conflicts:
   - id: P1-AGG-CANARY-REVISION-001
@@ -138,6 +153,11 @@ conflicts:
     runtime_descriptor: 95b276db311cf6e9acd58b847f1fb0ca6697b137
     historical_accepted_cut: 4b2d6f432d92628c42bde1d95daed6ae0d0eb88f
     disposition: bounded_P2_baseline_alignment_before_gameplay_parser
+audit_findings:
+  - id: P1-AGG-M2-ASSET-CLAIM-001
+    severity: high
+    disposition: repaired_and_revalidated
+    result: synthetic_visual_evidence_cannot_produce_M2_PASS
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p1-aggregation.md
   - oteryn-client/docs/agents/playability/ARCHITECTURE_HANDOFF.md
@@ -160,10 +180,13 @@ validation:
     evidence: temporary trigger run 30772041402; first run 30772003133 failed only on new Markdown trailing whitespace and was causally repaired before commit.
   - command: exact changed-path and retained-workflow review
     result: PASS
-    evidence: PR #184 has twelve authorized documentation paths, zero workflows, additions 1644 and deletions 145 on content-reviewed head.
+    evidence: PR #184 has twelve authorized documentation paths and zero retained workflows.
   - command: architecture/capability/dependency/wave/prompt content audit
     result: PASS
-    evidence: sole producers, claim boundaries, launch dependencies, shared lease order and controlled M2 gate are mutually consistent; zero open material content finding.
+    evidence: sole producers, claim boundaries, launch dependencies, shared lease order and controlled M2 gate are mutually consistent.
+  - command: controlled M2 asset-claim audit repair
+    result: PASS
+    evidence: temporary run 30772143467 / job 91561025436; wave and acceptance prompt now require approved compatible runtime appearances for M2_PASS.
 blockers: []
 next_action: Run final exact-head Rust Client and repository CI, recheck clean reviews and current main, then mark PR ready, protected-merge, create the separate lifecycle archive and only after that launch the first safe P2 producer task.
 ```

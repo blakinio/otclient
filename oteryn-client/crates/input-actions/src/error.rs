@@ -18,7 +18,7 @@ pub enum InputError {
     DeltaOutOfRange,
     /// A wheel event must contain at least one non-zero axis.
     ZeroWheelDelta,
-    /// Wheel delta exceeds the contract range.
+    /// Wheel delta exceeds its contract range.
     WheelDeltaOutOfRange,
     /// Text commit must contain at least one scalar value.
     EmptyText,
@@ -53,6 +53,8 @@ pub enum InputError {
     },
     /// A chord contains the same input more than once.
     DuplicateChordInput,
+    /// A wheel impulse must be the sole non-modifier input in its chord.
+    InvalidWheelChord,
     /// Context identifiers must be unique.
     DuplicateContext,
     /// A binding references a context not declared by the map.
@@ -109,6 +111,9 @@ impl Display for InputError {
             }
             Self::DuplicateChordInput => {
                 formatter.write_str("input chord contains a duplicate input")
+            }
+            Self::InvalidWheelChord => {
+                formatter.write_str("wheel direction must be the sole input in a chord")
             }
             Self::DuplicateContext => formatter.write_str("input context identifier is duplicated"),
             Self::UnknownBindingContext => {

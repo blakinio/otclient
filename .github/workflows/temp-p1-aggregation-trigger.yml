@@ -1,0 +1,59 @@
+name: Temporary P1 Aggregation Patch Trigger
+
+on:
+  pull_request:
+    types: [opened, reopened]
+    paths:
+      - .github/workflows/temp-p1-aggregation-trigger.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p1-aggregation-trigger
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout aggregation branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: docs/OTC2-20260803-playability-p1-aggregation
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Extract and execute the reviewed patch
+        shell: bash
+        env:
+          EXPECTED_PARENT: 6171009970d1b3610af1b77c7e1c821bee9d7729
+          WORKFLOW_PATH: .github/workflows/temp-p1-aggregation-doc-patch.yml
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/temp-p1-aggregation-doc-patch.yml').read_text(encoding='utf-8')
+          marker = '        run: |\n'
+          if source.count(marker) != 1:
+              raise SystemExit('expected exactly one reviewed run block')
+          block = source.split(marker, 1)[1]
+          lines = []
+          for line in block.splitlines():
+              if line.startswith('          '):
+                  lines.append(line[10:])
+              else:
+                  lines.append(line)
+          script = '\n'.join(lines) + '\n'
+          needle = 'git rm "$WORKFLOW_PATH"\n'
+          if script.count(needle) != 1:
+              raise SystemExit('expected one self-removal command')
+          script = script.replace(
+              needle,
+              needle + 'git rm .github/workflows/temp-p1-aggregation-trigger.yml\n',
+              1,
+          )
+          Path('/tmp/p1-aggregation-patch.sh').write_text(script, encoding='utf-8')
+          PY
+          bash /tmp/p1-aggregation-patch.sh

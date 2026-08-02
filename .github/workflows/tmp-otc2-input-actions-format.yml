@@ -1,0 +1,57 @@
+name: Temporary OTC2 input-actions format repair
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - reopened
+      - synchronize
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-otc2-input-actions-format
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: github.head_ref == 'tmp/OTC2-20260801-input-actions-integrate'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: "feat/OTC2-20260801-playability-p1-input-actions"
+          fetch-depth: 0
+          show-progress: false
+          token: ${{ github.token }}
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+
+      - name: Apply complete crate formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cargo +1.94.0 fmt --all --manifest-path oteryn-client/Cargo.toml
+          git add oteryn-client/crates/input-actions
+          if git diff --cached --quiet; then
+            echo "No formatting repair was required"
+          else
+            git commit -m "style(input): apply pinned workspace formatting"
+            git push origin HEAD:feat/OTC2-20260801-playability-p1-input-actions
+          fi
+
+      - name: Validate focused package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.94.0 fmt --all --manifest-path oteryn-client/Cargo.toml -- --check
+          cargo +1.94.0 clippy --manifest-path oteryn-client/Cargo.toml -p oteryn-input-actions --all-targets -- -D warnings
+          cargo +1.94.0 test --manifest-path oteryn-client/Cargo.toml -p oteryn-input-actions

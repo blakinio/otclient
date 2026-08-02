@@ -324,7 +324,10 @@ mod tests {
             )],
             vec![Binding::new(
                 gameplay.clone(),
-                key_chord(KeyCode::KEY_S)?,
+                InputChord::new(
+                    Modifiers::one(Modifier::Shift),
+                    vec![InputAtom::Key(KeyCode::KEY_S)],
+                )?,
                 action("move.backward")?,
                 RepeatPolicy::Ignore,
             )],

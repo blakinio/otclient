@@ -1,18 +1,18 @@
 ---
 task_id: OTC2-20260801-playability-p1-game-domain-contract
-status: implementing
+status: validating
 agent: "P1 game-domain contract worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p1-game-domain-contract
-phase: workspace-integration
+phase: exact-head-validation
 branch: feat/OTC2-20260801-playability-p1-game-domain-contract
 base_branch: main
 created: 2026-08-01T22:26:00+02:00
-updated: 2026-08-02T18:46:01+02:00
-last_verified_commit: "6a952480dccbb7af2042302a9479cdf8caa76c61"
-required_base_commit: "bfa694c988e19b1af427e25c3f97bbac1f2800d7"
+updated: 2026-08-02T19:13:27+02:00
+last_verified_commit: "39d6cbb33ef217e8d867784a18d968aadcc7cbde"
+required_base_commit: "55fec043758e1928fd5d39831322a0c21f47589b"
 risk: high
 related_pr: 155
 owned_paths:
@@ -43,11 +43,11 @@ missing_layers:
   - renderer and UI consumers
   - app composition and real staging E2E
 invocation_started_at: 2026-08-02T18:37:00+02:00
-last_progress_at: 2026-08-02T18:46:01+02:00
+last_progress_at: 2026-08-02T19:13:27+02:00
 ci_checks_for_current_head: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
@@ -76,12 +76,12 @@ This task is an intentionally partial public-contract producer. It does not clai
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-02T18:46:01+02:00
-head: 6a952480dccbb7af2042302a9479cdf8caa76c61
+updated_at: 2026-08-02T19:13:27+02:00
+head: 39d6cbb33ef217e8d867784a18d968aadcc7cbde
 branch: feat/OTC2-20260801-playability-p1-game-domain-contract
 pr: 155
-status: implementing
-phase: workspace-integration
+status: validating
+phase: exact-head-validation
 context_routes:
   - docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md
   - docs/agents/AUTONOMOUS_PROGRAM_CONTINUATION.md
@@ -95,36 +95,46 @@ owned_paths:
   - oteryn-client/crates/game-domain/**
 shared_lease:
   state: granted
-  reason: game-domain is first accepted P1 runtime producer; PRs 154, 156 and 157 still modify only their exclusive task paths and no competing shared lease exists.
-  github_only_validation_note: existing Rust Client workflow validates only root workspace members, so the serialized lease is required to obtain real package and component evidence without adding an unauthorized temporary workflow.
+  reason: game-domain is the first accepted P1 runtime producer; PRs 154, 156 and 157 still modify only their exclusive task paths and no competing shared lease exists.
+  integration: root workspace member and Cargo.lock are present; existing architecture category and game-domain -> foundation edge already covered the package, so no checker or fixture mutation was required.
 proven:
   - P1 aggregation/archive authorize this sole public contract producer.
   - The crate reuses foundation SessionGeneration and introduces no external dependency.
   - Canonical IDs/handles, bounded values, redacted text and closed V1 event/command envelopes are implemented.
-  - Full PR diff review shows only the task and exclusive crate paths before lease grant.
+  - Full PR diff review showed only owned paths before the serialized shared lease.
   - Open P1 worker PRs 154, 156 and 157 have no shared workspace changes.
+  - Cargo 1.94.0 regenerated only oteryn-client/Cargo.lock through temporary coordinator PR 174.
+  - Temporary workflow was removed and PR 174 was closed without merge; its final diff is empty.
 derived:
-  - Root workspace integration is the smallest permitted GitHub-only route to real fmt, Clippy, test and architecture evidence.
+  - A task-record commit after lockfile generation is required to trigger retained pull-request workflows because GITHUB_TOKEN pushes do not recursively trigger Actions.
 unknown:
-  - Compiler and strict Clippy outcome until the integrated branch runs GitHub Actions.
+  - Compiler, formatting, strict Clippy, tests, architecture and supply-chain outcome on the new exact head.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: no execution failure yet; pre-integration static review passed.
+  marker: cargo metadata --locked
+  evidence: retained Rust Client run 30757811461 rejected the stale lockfile before compilation.
+  causal_hypothesis: adding the workspace member without regenerating Cargo.lock left the package graph incomplete.
+  repair: pinned Cargo 1.94.0 generated and committed only Cargo.lock at 39d6cbb33ef217e8d867784a18d968aadcc7cbde.
 rejected_hypotheses:
   - Publish Canary-specific wire types: rejected by protocol-neutral ownership.
   - Add speculative economy, social, UI, renderer or simulation variants: rejected as outside the minimum P1 spine.
-  - Add a temporary workflow: rejected because existing retained workflows can validate after the authorized serialized workspace integration.
+  - Hand-edit Cargo.lock: rejected because the task requires regeneration with pinned Cargo.
+  - Retain or merge the temporary workflow: rejected; PR 174 was terminally closed with an empty final diff.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p1-game-domain-contract.md
+  - oteryn-client/Cargo.toml
+  - oteryn-client/Cargo.lock
   - oteryn-client/crates/game-domain/**
 validation:
   - command: live PR ownership and changed-path review
     result: PASS
-    evidence: PR 155 owns only task plus crates/game-domain; PRs 154, 156 and 157 own only their task paths.
+    evidence: PR 155 owns the task, game-domain and serialized workspace integration; PRs 154, 156 and 157 remain exclusive.
   - command: independent static public API and trust-boundary review
     result: PASS
     evidence: no protocol/socket/simulation/renderer/UI/platform/app types; external text Debug is redacted and stable errors contain lengths/generations only.
+  - command: cargo generate-lockfile with Rust/Cargo 1.94.0
+    result: PASS
+    evidence: temporary run 30758334844; committed lockfile head 39d6cbb33ef217e8d867784a18d968aadcc7cbde; harness removed and PR 174 closed without merge.
 blockers: []
-next_action: Restack PR 155 on exact main bfa694c9, add the leased workspace and architecture integration, then inspect the first exact-head Rust Client CI result.
+next_action: Inspect retained Rust Client and CI workflows on the exact task-record head, isolate the first actionable failure, and apply one targeted repair or proceed to audit when green.
 ```

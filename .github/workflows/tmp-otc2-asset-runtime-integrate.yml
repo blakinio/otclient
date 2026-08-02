@@ -1,0 +1,101 @@
+name: Temporary OTC2 asset-runtime integration
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-otc2-asset-runtime-integrate
+  cancel-in-progress: true
+
+jobs:
+  integrate:
+    if: github.head_ref == 'tmp/OTC2-20260801-asset-runtime-integrate'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: "feat/OTC2-20260801-playability-p1-asset-pack-runtime"
+          fetch-depth: 0
+          show-progress: false
+          token: ${{ github.token }}
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+
+      - name: Restack and integrate deterministically
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          base="$(git rev-parse origin/main)"
+          git merge --no-edit --no-ff "$base"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("oteryn-client/crates/asset-runtime/src/lib.rs")
+          text = source.read_text(encoding="utf-8")
+
+          direct = {
+              "current.lookup(handle), Err(RuntimeError::StaleHandle)":
+                  "current.lookup(handle).err(), Some(RuntimeError::StaleHandle)",
+              "current.lookup(unknown), Err(RuntimeError::UnknownAsset)":
+                  "current.lookup(unknown).err(), Some(RuntimeError::UnknownAsset)",
+          }
+          for old, new in direct.items():
+              if old not in text:
+                  raise SystemExit(f"missing expected assertion: {old}")
+              text = text.replace(old, new, 1)
+
+          marker = "            ),\n            Err(RuntimeError::"
+          replacements = text.count(marker)
+          if replacements != 10:
+              raise SystemExit(f"expected 10 runtime-result assertions, found {replacements}")
+          text = text.replace(
+              marker,
+              "            ).err(),\n            Some(RuntimeError::",
+          )
+          source.write_text(text, encoding="utf-8", newline="\n")
+
+          manifest = Path("oteryn-client/Cargo.toml")
+          cargo = manifest.read_text(encoding="utf-8")
+          member = '    "crates/asset-runtime",\n'
+          if member not in cargo:
+              anchor = '    "crates/asset-types",\n'
+              if anchor not in cargo:
+                  raise SystemExit("workspace asset-types anchor missing")
+              cargo = cargo.replace(anchor, anchor + member, 1)
+              manifest.write_text(cargo, encoding="utf-8", newline="\n")
+          PY
+
+          cargo +1.94.0 fmt --all --manifest-path oteryn-client/Cargo.toml
+          cargo +1.94.0 generate-lockfile --manifest-path oteryn-client/Cargo.toml
+
+          test "$(git rev-parse HEAD^2)" = "$base"
+          git add \
+            oteryn-client/Cargo.toml \
+            oteryn-client/Cargo.lock \
+            oteryn-client/crates/asset-runtime/src/lib.rs
+          git commit -m "build(asset-runtime): integrate workspace contract"
+          git push origin HEAD:feat/OTC2-20260801-playability-p1-asset-pack-runtime
+
+      - name: Validate focused package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.94.0 fmt --all --manifest-path oteryn-client/Cargo.toml -- --check
+          cargo +1.94.0 clippy --manifest-path oteryn-client/Cargo.toml -p oteryn-asset-runtime --all-targets -- -D warnings
+          cargo +1.94.0 test --manifest-path oteryn-client/Cargo.toml -p oteryn-asset-runtime

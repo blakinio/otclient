@@ -10,7 +10,7 @@ repository.workspace = true
 category = "game-domain"
 
 [dependencies]
-oteryn-foundation = { path = "../foundation" }
+oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
 
 [lints]
 workspace = true

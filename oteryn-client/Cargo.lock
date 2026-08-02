@@ -1440,6 +1440,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oteryn-asset-runtime"
+version = "0.1.0"
+dependencies = [
+ "oteryn-asset-compiler",
+ "oteryn-asset-types",
+]
+
+[[package]]
 name = "oteryn-asset-types"
 version = "0.1.0"
 dependencies = [
@@ -1475,6 +1483,13 @@ dependencies = [
 [[package]]
 name = "oteryn-foundation"
 version = "0.1.0"
+
+[[package]]
+name = "oteryn-game-domain"
+version = "0.1.0"
+dependencies = [
+ "oteryn-foundation",
+]
 
 [[package]]
 name = "oteryn-game-session"

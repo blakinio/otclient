@@ -4,7 +4,7 @@ status: completed
 feature_pr: 170
 feature_head: ef2283f486f7311cfcb2ff1680b7332ae8a6e429
 merge_commit: ed9233c9b30e556432a74f07df558e9dd03c4f49
-archive_pr: pending
+archive_pr: 171
 completed: 2026-08-02T12:10:00+02:00
 owned_paths: []
 ---
@@ -13,7 +13,7 @@ owned_paths: []
 
 ## Terminal result
 
-PR #170 merged the mandatory GitHub-only execution contract, root bootstrap routing, local agent routing, and gated autonomous merge/auto-merge authority to `main` as `ed9233c9b30e556432a74f07df558e9dd03c4f49`.
+PR #170 merged the mandatory GitHub-only execution contract, root bootstrap routing, local agent routing, and gated autonomous merge/auto-merge authority to `main` as `ed9233c9b30e556432a74f07df558e9dd03c4f49`. PR #171 archives this terminal record and releases ownership.
 
 ## Closeout
 
@@ -44,7 +44,7 @@ final_ci:
 pull_requests:
   terminal_prs:
     - blakinio/otclient#170 merged as ed9233c9b30e556432a74f07df558e9dd03c4f49
-  archive_pr: pending
+  archive_pr: blakinio/otclient#171
   unresolved_review_threads: 0
 task_archived_or_terminal: true
 ownership_released: true

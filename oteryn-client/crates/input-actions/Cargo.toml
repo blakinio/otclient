@@ -9,7 +9,7 @@ repository.workspace = true
 publish = false
 
 [package.metadata.oteryn]
-category = "input-actions"
+category = "input"
 
 [lints]
 workspace = true

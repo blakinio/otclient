@@ -78,7 +78,10 @@ impl Display for DomainError {
             Self::ZeroIdentifier(kind) => write!(formatter, "{kind} identifier must be non-zero"),
             Self::ZeroTextLimit => formatter.write_str("bounded text limit must be non-zero"),
             Self::TextTooLong { max, actual } => {
-                write!(formatter, "bounded text length {actual} exceeds limit {max}")
+                write!(
+                    formatter,
+                    "bounded text length {actual} exceeds limit {max}"
+                )
             }
             Self::UnsupportedEnvelopeVersion(version) => {
                 write!(formatter, "unsupported gameplay envelope version {version}")

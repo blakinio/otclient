@@ -4,6 +4,7 @@ members = [
     "crates/account-session",
     "crates/app-runtime",
     "crates/asset-types",
+    "crates/asset-runtime",
     "crates/diagnostics",
     "crates/foundation",
     "crates/game-domain",

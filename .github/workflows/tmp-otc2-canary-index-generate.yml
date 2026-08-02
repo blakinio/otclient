@@ -39,32 +39,28 @@ jobs:
 
           path = Path("oteryn-client/tools/canary-protocol-index/generate.py")
           text = path.read_text(encoding="utf-8")
-          old = r'r"\b((?:send|logout|disconnect)[A-Za-z0-9_]*)\s*\(", case_body'
-          new = r'r"\b((?:re?send|logout|disconnect)[A-Za-z0-9_]*)\s*\(", case_body'
+
+          old = 'r"\\b((?:send|logout|disconnect)[A-Za-z0-9_]*)\\s*\\(", case_body'
+          new = 'r"\\b((?:re?send|logout|disconnect)[A-Za-z0-9_]*)\\s*\\(", case_body'
           if text.count(old) != 1:
               raise SystemExit(f"resend regex marker count: {text.count(old)}")
           text = text.replace(old, new, 1)
 
-          old = '''            cases = list(case_pattern.finditer(switch_body))
-                  for case_index, match in enumerate(cases):'''
-          new = '''            cases = list(case_pattern.finditer(switch_body))
-                  default_match = re.search(r"\\bdefault\\s*:", switch_body)
-                  for case_index, match in enumerate(cases):'''
+          old = "        cases = list(case_pattern.finditer(switch_body))\n        for case_index, match in enumerate(cases):"
+          new = "        cases = list(case_pattern.finditer(switch_body))\n        default_match = re.search(r\"\\bdefault\\s*:\", switch_body)\n        for case_index, match in enumerate(cases):"
           if text.count(old) != 1:
-              raise SystemExit("case/default insertion marker missing")
+              raise SystemExit(f"case/default marker count: {text.count(old)}")
           text = text.replace(old, new, 1)
 
-          old = '''                    end = cases[body_index + 1].start() if body_index + 1 < len(cases) else len(switch_body)
-                          body = switch_body[cases[body_index].end() : end]'''
-          new = '''                    if body_index + 1 < len(cases):
-                              end = cases[body_index + 1].start()
-                          elif default_match is not None and default_match.start() > cases[body_index].end():
-                              end = default_match.start()
-                          else:
-                              end = len(switch_body)
-                          body = switch_body[cases[body_index].end() : end]'''
+          old = "                end = cases[body_index + 1].start() if body_index + 1 < len(cases) else len(switch_body)"
+          new = """                if body_index + 1 < len(cases):
+                      end = cases[body_index + 1].start()
+                  elif default_match is not None and default_match.start() > cases[body_index].end():
+                      end = default_match.start()
+                  else:
+                      end = len(switch_body)"""
           if text.count(old) != 1:
-              raise SystemExit("last-case boundary marker missing")
+              raise SystemExit(f"last-case marker count: {text.count(old)}")
           text = text.replace(old, new, 1)
           path.write_text(text, encoding="utf-8", newline="\n")
 
@@ -100,7 +96,7 @@ jobs:
 
           '''
           if test_text.count(marker) != 1:
-              raise SystemExit("test insertion marker missing")
+              raise SystemExit(f"test insertion marker count: {test_text.count(marker)}")
           test_text = test_text.replace(marker, method + marker, 1)
           tests.write_text(test_text, encoding="utf-8", newline="\n")
           PY

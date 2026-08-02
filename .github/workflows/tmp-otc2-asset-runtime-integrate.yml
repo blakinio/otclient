@@ -33,41 +33,19 @@ jobs:
         shell: pwsh
         run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
 
-      - name: Repair tests and minimize lockfile
+      - name: Minimize lockfile
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          source = Path("oteryn-client/crates/asset-runtime/src/lib.rs")
-          text = source.read_text(encoding="utf-8")
-          replacements = {
-              "AssetRuntime::open_bytes(generation(1)?, &encoded, record_limit),\n            Err(RuntimeError::TooManyRecords)":
-                  "AssetRuntime::open_bytes(generation(1)?, &encoded, record_limit).err(),\n            Some(RuntimeError::TooManyRecords)",
-              "AssetRuntime::open_bytes(generation(1)?, &encoded, payload_limit),\n            Err(RuntimeError::PayloadTooLarge)":
-                  "AssetRuntime::open_bytes(generation(1)?, &encoded, payload_limit).err(),\n            Some(RuntimeError::PayloadTooLarge)",
-              "AssetRuntime::open_bytes(generation(1)?, &encoded, byte_limit),\n            Err(RuntimeError::ObjectTooLarge)":
-                  "AssetRuntime::open_bytes(generation(1)?, &encoded, byte_limit).err(),\n            Some(RuntimeError::ObjectTooLarge)",
-          }
-          for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit(f"missing expected assertion: {old}")
-              text = text.replace(old, new, 1)
-          source.write_text(text, encoding="utf-8", newline="\n")
-          PY
-
           cargo +1.94.0 update --manifest-path oteryn-client/Cargo.toml -p ipnet --precise 2.12.0
           cargo +1.94.0 update --manifest-path oteryn-client/Cargo.toml -p libredox --precise 0.1.18
-          cargo +1.94.0 fmt --all --manifest-path oteryn-client/Cargo.toml
-          git add \
-            oteryn-client/Cargo.lock \
-            oteryn-client/crates/asset-runtime/src/lib.rs
-          git commit -m "test(asset-runtime): repair errors and minimize lockfile"
-          git push origin HEAD:feat/OTC2-20260801-playability-p1-asset-pack-runtime
+          git add oteryn-client/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "build(asset-runtime): minimize workspace lockfile"
+            git push origin HEAD:feat/OTC2-20260801-playability-p1-asset-pack-runtime
+          fi
 
       - name: Validate focused package
         shell: bash

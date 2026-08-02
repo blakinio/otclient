@@ -186,7 +186,7 @@ jobs:
               '''    direct_methods = {
                   entry.method
                   for entry in entries
-                  if entry.extraction in {"literal-dispatch", "literal-send"}
+                  if entry.direction == "server-to-client" or entry.extraction == "literal-dispatch"
               }
               defined_methods = {function.name for function in _iter_protocol_functions(protocol_cpp)}
               declared = set(_declared_methods(protocol_hpp, "parse")) | set(

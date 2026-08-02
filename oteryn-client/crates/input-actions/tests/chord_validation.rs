@@ -1,6 +1,4 @@
-use oteryn_input_actions::{
-    InputAtom, InputChord, InputError, KeyCode, Modifiers, WheelDirection,
-};
+use oteryn_input_actions::{InputAtom, InputChord, InputError, KeyCode, Modifiers, WheelDirection};
 
 #[test]
 fn wheel_direction_cannot_be_combined_with_held_inputs() {

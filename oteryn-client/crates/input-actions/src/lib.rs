@@ -11,16 +11,16 @@ mod text;
 
 pub use error::InputError;
 pub use physical::{
-    ButtonState, InputAtom, KeyCode, Modifier, Modifiers, MouseButton, NormalizedInputEvent,
+    ButtonState, InputAtom, KeyCode, MAX_KEY_CODE, MAX_MOUSE_BUTTON, MAX_POINTER_COORDINATE,
+    MAX_POINTER_DELTA, MAX_WHEEL_DELTA, Modifier, Modifiers, MouseButton, NormalizedInputEvent,
     PointerCoordinate, PointerDelta, PointerMotion, PointerPosition, WheelDelta, WheelDirection,
-    MAX_KEY_CODE, MAX_MOUSE_BUTTON, MAX_POINTER_COORDINATE, MAX_POINTER_DELTA, MAX_WHEEL_DELTA,
 };
 pub use router::{ActionEvent, ActionPhase, InputRouter};
 pub use semantic::{
     ActionId, Binding, BindingMap, ContextDefinition, ContextId, ContextKind, InputChord,
-    RepeatPolicy, MAX_CHORD_INPUTS, MAX_IDENTIFIER_BYTES,
+    MAX_CHORD_INPUTS, MAX_IDENTIFIER_BYTES, RepeatPolicy,
 };
-pub use text::{TextCommit, MAX_TEXT_BYTES};
+pub use text::{MAX_TEXT_BYTES, TextCommit};
 
 #[cfg(test)]
 mod tests {
@@ -85,12 +85,7 @@ mod tests {
                     action("text.action")?,
                     RepeatPolicy::Ignore,
                 ),
-                Binding::new(
-                    modal,
-                    chord,
-                    action("modal.action")?,
-                    RepeatPolicy::Ignore,
-                ),
+                Binding::new(modal, chord, action("modal.action")?, RepeatPolicy::Ignore),
             ],
             &[],
         )
@@ -137,8 +132,7 @@ mod tests {
     }
 
     #[test]
-    fn conflicts_reserved_chords_and_unknown_contexts_fail_explicitly(
-    ) -> Result<(), InputError> {
+    fn conflicts_reserved_chords_and_unknown_contexts_fail_explicitly() -> Result<(), InputError> {
         let gameplay = context("gameplay")?;
         let chord = key_chord(KeyCode::KEY_C)?;
         let definition = ContextDefinition::new(gameplay.clone(), ContextKind::Gameplay, 0);
@@ -159,7 +153,7 @@ mod tests {
             Err(InputError::ConflictingBinding)
         );
         assert_eq!(
-            BindingMap::new(vec![definition], vec![first], &[chord.clone()]),
+            BindingMap::new(vec![definition], vec![first], std::slice::from_ref(&chord)),
             Err(InputError::ReservedBinding)
         );
         assert_eq!(
@@ -179,8 +173,7 @@ mod tests {
     }
 
     #[test]
-    fn modal_and_text_contexts_suppress_gameplay_deterministically(
-    ) -> Result<(), Box<dyn Error>> {
+    fn modal_and_text_contexts_suppress_gameplay_deterministically() -> Result<(), Box<dyn Error>> {
         let mut router = InputRouter::new(context_map()?);
         let gameplay = context("gameplay")?;
         let text = context("text")?;
@@ -250,12 +243,7 @@ mod tests {
                     action("low")?,
                     RepeatPolicy::Ignore,
                 ),
-                Binding::new(
-                    high.clone(),
-                    chord,
-                    action("high")?,
-                    RepeatPolicy::Ignore,
-                ),
+                Binding::new(high.clone(), chord, action("high")?, RepeatPolicy::Ignore),
             ],
             &[],
         )?;
@@ -355,20 +343,22 @@ mod tests {
         assert!(router.held_inputs().is_empty());
         assert_eq!(router.modifiers(), Modifiers::NONE);
         assert!(!router.focused());
-        assert!(router
-            .process(&event_key(
-                KeyCode::KEY_S,
-                ButtonState::Pressed,
-                Modifiers::NONE,
-                false,
-            ))
-            .is_empty());
+        assert!(
+            router
+                .process(&event_key(
+                    KeyCode::KEY_S,
+                    ButtonState::Pressed,
+                    Modifiers::NONE,
+                    false,
+                ))
+                .is_empty()
+        );
         Ok(())
     }
 
     #[test]
-    fn capture_loss_cancels_mouse_actions_and_device_loss_clears_everything(
-    ) -> Result<(), Box<dyn Error>> {
+    fn capture_loss_cancels_mouse_actions_and_device_loss_clears_everything()
+    -> Result<(), Box<dyn Error>> {
         let gameplay = context("gameplay")?;
         let mouse_chord = InputChord::new(
             Modifiers::NONE,
@@ -521,19 +511,9 @@ mod tests {
         first.set_context_active(&gameplay, true)?;
         second.set_context_active(&gameplay, true)?;
 
-        let stream = vec![
-            event_key(
-                KeyCode::KEY_W,
-                ButtonState::Pressed,
-                Modifiers::NONE,
-                false,
-            ),
-            event_key(
-                KeyCode::KEY_W,
-                ButtonState::Pressed,
-                Modifiers::NONE,
-                true,
-            ),
+        let stream = [
+            event_key(KeyCode::KEY_W, ButtonState::Pressed, Modifiers::NONE, false),
+            event_key(KeyCode::KEY_W, ButtonState::Pressed, Modifiers::NONE, true),
             event_key(
                 KeyCode::KEY_W,
                 ButtonState::Released,

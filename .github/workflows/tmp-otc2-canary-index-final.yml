@@ -1,0 +1,183 @@
+name: Temporary OTC2 Canary source index final pass
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-otc2-canary-index-final-pass
+  cancel-in-progress: true
+
+jobs:
+  final:
+    if: github.head_ref == 'tmp/OTC2-20260801-canary-index-generate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source-index branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: tools/OTC2-20260801-playability-p1-canary-source-index
+          fetch-depth: 0
+          show-progress: false
+          token: ${{ github.token }}
+
+      - name: Apply final extractor repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("oteryn-client/tools/canary-protocol-index/generate.py")
+          text = path.read_text(encoding="utf-8")
+
+          old = 'r"\\b((?:send|logout|disconnect)[A-Za-z0-9_]*)\\s*\\(", case_body'
+          new = 'r"\\b((?:(?:re)?send|logout|disconnect)[A-Za-z0-9_]*)\\s*\\(", case_body'
+          if text.count(old) != 1:
+              raise SystemExit(f"protocol call marker count: {text.count(old)}")
+          text = text.replace(old, new, 1)
+
+          old = "        cases = list(case_pattern.finditer(switch_body))\n        for case_index, match in enumerate(cases):"
+          new = "        cases = list(case_pattern.finditer(switch_body))\n        default_match = re.search(r\"\\bdefault\\s*:\", switch_body)\n        for case_index, match in enumerate(cases):"
+          if text.count(old) != 1:
+              raise SystemExit(f"default marker count: {text.count(old)}")
+          text = text.replace(old, new, 1)
+
+          old = "                end = cases[body_index + 1].start() if body_index + 1 < len(cases) else len(switch_body)"
+          new = (
+              "                if body_index + 1 < len(cases):\n"
+              "                    end = cases[body_index + 1].start()\n"
+              "                elif default_match is not None and default_match.start() > cases[body_index].end():\n"
+              "                    end = default_match.start()\n"
+              "                else:\n"
+              "                    end = len(switch_body)"
+          )
+          if text.count(old) != 1:
+              raise SystemExit(f"last-case marker count: {text.count(old)}")
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8", newline="\n")
+
+          tests = Path("oteryn-client/tools/canary-protocol-index/test_generate.py")
+          test_text = tests.read_text(encoding="utf-8")
+          marker = "    def test_outputs_are_byte_identical_and_machine_readable(self) -> None:\n"
+          test = '''    def test_send_resend_and_grouped_noops_are_classified(self) -> None:
+                  source = """
+                  void ProtocolGame::parsePacketFromDispatcher(NetworkMessage &msg, uint8_t recvbyte) {
+                      switch (recvbyte) {
+                          case 0x1E:
+                              sendPingBack();
+                              break;
+                          case 0xA1:
+                              sendCancelTarget();
+                              break;
+                          case 0xCA:
+                              resendLivestreamViewerContainer(msg);
+                              break;
+                          case 0xFA:
+                          case 0xFB:
+                              break;
+                          default:
+                              sendCancelWalk();
+                              break;
+                      }
+                  }
+                  """
+                  document = generator.SourceDocument(
+                      path=generator.PROTOCOL_GAME_CPP,
+                      text=source,
+                      lines=tuple(source.splitlines()),
+                  )
+                  entries = {entry.opcode: entry for entry in generator._parse_inbound(document)}
+                  self.assertEqual(entries[0x1E].method, "inline:sendPingBack")
+                  self.assertEqual(entries[0xA1].method, "inline:sendCancelTarget")
+                  self.assertEqual(entries[0xCA].method, "inline:resendLivestreamViewerContainer")
+                  self.assertEqual(entries[0xFA].extraction, "no-op-dispatch")
+                  self.assertEqual(entries[0xFB].extraction, "no-op-dispatch")
+
+          '''
+          if test_text.count(marker) != 1:
+              raise SystemExit(f"test insertion marker count: {test_text.count(marker)}")
+          test_text = test_text.replace(marker, test + marker, 1)
+          tests.write_text(test_text, encoding="utf-8", newline="\n")
+          PY
+
+      - name: Checkout exact Canary producer
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: blakinio/canary
+          ref: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+          path: producer
+          fetch-depth: 1
+          show-progress: false
+          persist-credentials: false
+
+      - name: Test and generate twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s oteryn-client/tools/canary-protocol-index -p 'test_*.py' -v
+          revision=bc0068ab80bbf003e128fce0589b4cc89d2682d3
+          first="${RUNNER_TEMP}/first"
+          second="${RUNNER_TEMP}/second"
+          mkdir -p "$first" "$second"
+          for output in "$first" "$second"; do
+            python oteryn-client/tools/canary-protocol-index/generate.py \
+              --source-root producer \
+              --producer-revision "$revision" \
+              --protocol-output "$output/protocol.md" \
+              --fixture-output "$output/fixtures.md" \
+              --json-output "$output/index.json"
+          done
+          cmp "$first/protocol.md" "$second/protocol.md"
+          cmp "$first/fixtures.md" "$second/fixtures.md"
+          cmp "$first/index.json" "$second/index.json"
+          python - "$first/index.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          inbound = [e for e in payload["entries"] if e["direction"] == "client-to-server"]
+          unresolved = [e for e in inbound if e["extraction"] == "unresolved"]
+          noops = [e for e in inbound if e["extraction"] == "no-op-dispatch"]
+          expected = {
+              ("livestream-viewer", 0x1E): "inline:sendPingBack",
+              ("livestream-viewer", 0xA1): "inline:sendCancelTarget",
+              ("livestream-viewer", 0xCA): "inline:resendLivestreamViewerContainer",
+              ("gameplay-session", 0xCF): "inline:sendBlessingWindow",
+          }
+          actual = {(e["dispatch_phase"], e["opcode"]): e["method"] for e in inbound}
+          if unresolved:
+              raise SystemExit(f"unresolved inbound: {unresolved}")
+          if len(noops) != 6:
+              raise SystemExit(f"expected 6 no-ops, found {len(noops)}")
+          for key, value in expected.items():
+              if actual.get(key) != value:
+                  raise SystemExit(f"unexpected method for {key}: {actual.get(key)!r}")
+          if payload["unresolved_declarations"]:
+              raise SystemExit(f"missing definitions: {payload['unresolved_declarations']}")
+          print(f"entries={len(payload['entries'])} inbound={len(inbound)} noops={len(noops)} unresolved=0")
+          PY
+          mkdir -p oteryn-client/docs/evidence/playability/p1 oteryn-client/tools/canary-protocol-index/generated
+          cp "$first/protocol.md" oteryn-client/docs/evidence/playability/p1/canary-current-source-index.md
+          cp "$first/fixtures.md" oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md
+          cp "$first/index.json" oteryn-client/tools/canary-protocol-index/generated/current-index.json
+
+      - name: Commit final evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add \
+            oteryn-client/tools/canary-protocol-index/generate.py \
+            oteryn-client/tools/canary-protocol-index/test_generate.py \
+            oteryn-client/tools/canary-protocol-index/generated/current-index.json \
+            oteryn-client/docs/evidence/playability/p1/canary-current-source-index.md \
+            oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md
+          git commit -m "fix(canary-index): finalize send and no-op extraction"
+          git push origin HEAD:tools/OTC2-20260801-playability-p1-canary-source-index

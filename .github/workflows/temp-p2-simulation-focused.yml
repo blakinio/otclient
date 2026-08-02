@@ -1,0 +1,75 @@
+name: Temporary P2 Simulation Focused Validation
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/temp-p2-simulation-focused.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p2-simulation-focused
+  cancel-in-progress: false
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout simulation branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260803-playability-p2-simulation-snapshot
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Materialize and validate exclusive package
+        shell: bash
+        env:
+          EXPECTED_PARENT: b088ec65f53e8325e99e610ee0e45175c786b0ce
+          WORKFLOW_PATH: .github/workflows/temp-p2-simulation-focused.yml
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "feat/OTC2-20260803-playability-p2-simulation-snapshot"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+
+          mkdir -p oteryn-client/crates/simulation-core/src
+          python3 - <<'PY'
+          import base64
+          import gzip
+          from pathlib import Path
+
+          payload = "H4sIAP/Ub2oC/+09/ZPTRrK/718hSBVnbwkHyMddaVmohGxy1LsECri8qqO2HGGPWT1syZFkwAf+39/09HxPjywZE3JXbN2FXWlmNNPf09Pd8+WX15IfWMvqVVEWTVvMknVdtdWsWt4s2aat82XyMl+x9TLfJk2x2izztqjKJC/nSbFabdr8xZIlNSvnrE6aMl83V1XbTE6+/PIa/D95dlU0yazOW5bwX9orljQV76A6vqkL/ulkUdVJPpuxdcvmyfPffuIfvHjNyvaifM2W1Zr9dikGe50vN6yZJA/bpChb/p7PJF8ut8msKtu8KJukrJIHeZnX24TPt9q0Tcq/N3vF4BecJKtTMVbeNOLpPx+mCV9cy6ewSmAa6/WymIlF3pxVq3XVFGLB64o/3k5OTjYNSyo+6W05XVSbci6aZtlT1jT8l59YyWrx6MxuCSCczqsVn2SWvTtJ+M8DnDOrH+TrfFa029Q8+jsH75JZD54uqzZNfhADXNR1VafJBV9+u1Ut8a//Kcp5KkbXIEyTAJopByBbPeCTb/FXNQj8/my7Zg/nafIL7/WMveUtHr34PzZr/1EhUHD4J6ypNvWM/QoYSRO5+Ity/oTlDW+knjyrXjH4q81nrx5y8L9Nk2fFkj2WUE1Pdgimpp1nGae5Jf8Sf95wIH3/rGbs53ydJuK3p6y12y5WLW/TsOWCg6VogDzT5EeOw7zlEOctOZK/TL4HBHGSmiGIC9YkrOSYnvFn+QIoj73m+EnytlpxymcAJZsCJidfPOc0U7xmox/Yi81LjpFlVQrErPn3Hud1W+TLi985/H8fX56sNy/47OrNrE2ealb5R7Eq2iZBpK/yt9OWA6DJkk1T/Jul+mkDIJry79d8ltM1q0W7oBkQPawjeMH5aBU+nSkC6ng1bThxmfe7k5NitV7GVgBg5WQpl1lyLvk3qytbNCxF84lqrXt9kQjKbYIXT1i7qTnzPv/NfFM0zbJ/8bHF53+7FEICBMiiqJs2EV8Vn8IvAewXZdLW22nJ3ozEszjEB0C9E/Jx6O/BwD4swPtxcvMecNpm2d59Kijdg889iRP4WbJWysfkPHmuH8PPSEAQZEOWAfdxqaehMk6jTQXTXiBoHrMaeqYdQOsY6UKCLnUA2dEBBJFsLSDb0VSLSNnewLtPJ5CrfkfEhNX78kz/CjQ4egVSFoE95opIgf2d87ligc+T8/PklvcOfmpB9MASozjVi0+Nx2dO791J+NujVyOgEO87Gstp8JjGYdhOISt8IxATPjbw73iHIDYNduMTXI8nEwS/854cQKuk3KxecIldLZJqNtusCy7D31T1cp6IJaIU+OL5atO0U64mLrVUmIG0AtmgwTECvSG4S3CbBTV4MdHtBk3qddEUYNIIyCYSsgmXh1xhiCn2nCGNmR5TpjsOWgM397ixNE8U1ntOWTXvMUnV9KBpAclxhuMLLWe9JyfotMfMRLthZLhmZWLoved8TIcekzKNe8xMW9DS3NkKK10BD1iOz4QbfQmnDTPvodNG3h0yd+whF7BDy+wp2v++2cCn3rKXlWAdPpd58mILU1mCcSaMhwMsMsYxlmjhb5kxj6Ji5JkRmtDwV8naUaamVKXu/YxkqgtHsNrtKCp/aIStmDlFeQ88ySvADJAHHQXzdenV64SaUFt/0qYWCs+HHacIbn6PbqD1vVBGd5bc4Ns6Y4Tf/cv0nqAQYaujHeMZLCXfZHBzhbefXQnC8RQY6DRpsyTn95LrAkXXU6INgQHRw5XGQPgwBjmEwojop5BFthTYEM2E0CDbGGyIhgZZ3a0RYU4Pwbl2t51jjyCwJ2InzXVAPQKgjl1u4zwCzORw24LNtjMg4P4Mpf98VHMDSPzn73lzZfOZsWUeX+UNs7jtlyp5UfGFcHm0ljst3iJ5wThRKsmFNPndm5zDvnz5vWpu6Fk/4v1e5mXyghMciMAl350uYR+/5fAqwA/QJqwBGVM0V2pc3XnNB7f4zu8PUjPn+9DXTEqGvGbhaN+JFu4wxlOC29+Eie0nDCif3KzelICJFjwib/j6OQr48HMlFHjz1JORCCtCMGocfqBstOxP+JQnJT2Qe6Dkc6xbNqcwBN4TzuQB9B+o55Y8k9I0hAgw8gN84DYXDLqFzboDP3j4nXxGdlhVr93WP8MDsilMpmZBhyf4yO0ihPbsKi9fqsbCx4IPiKbB2NA8GPkxEmQtvS2N+wV8q1wxjfsVIz5A7KsuWs48Eg9jXdBWsL/lCChyWX5vG4tubwqdpvdMyCqvHwowl9kcHpN6WPuhJBt5ngyfvrWFs6ir1VQw2kj8l+sy7TYTOszbXaHGQs50VZbulmU+k4BYR3FPs0/XEJppknfJZJLsiLE8viJGs5gpGCZgNKK/y17BEBT3RUcRbBcZwmLJaH/JK5ERHE4ixrCYMxghYNxI/9gMAk4m+nusG4xBsjYxjsfPwTgkv3eNY7F3fLBABuwdMUJ0cbnQNaK0ZqKD2cKCGMcWEsEgrgRxHS070jqOS5c/2k6m5M11Y3M1+JS0Pwk543bWypzsbgsWZacrDRC3tY0k0Ra3Uegd3VB0WH0Er3V0UJxqdZG6N2reKx5QRr7ShtEO9jdEh64v+OwPndaeru/eJ0h+dzcKqOn3bzDsxdFKv8cYFrpp1d89hmRitzvqfnqDZ3Ot2NnZ6v+Ddkc/V3y7UJXFzN4g1QwcevyXWV7XBRrc5sDTOun0be4f2CLnHHz4Pio4QXoipzLafPv1+CwwatRry2Z/WBYwvFnEC8ZhwazjE+0rEjbMxPP5/OviyaMMbZ5z8c/oFnyY8D3x/QNf/Ux/qYc36SVrLe/Rt1/7vqNbtquLt59dMfCLTEv21urY91zEGlL9TNSI+Xw+uj12363ytXCle4+rV9OK8NQr2F+8vcr5itl8vM/NtciL5aZm8c1an20afNx2ZKEBvShebmrb/QebDDgnQ6SYUwXt0Bkbi/q7hCMShALsYW/iUbWwymu+FebohTNg/hZwzuQ5Mg6Lh9Ij62zaHrWURnIBXqjX+bKYgzcKRplt6hremF3sGjwGcjeEbW0fghrywt4Obyf6nbTbCXWcOv0fyO9aXxMkCn9mvv8Cu+68jQcpJUrwOeTz1+C1S94U7VXFlfwb6W2YyFNzj1rcPdALdVqtz8ET9nbG2Fw4BRsbxdbBpwofuFBNXXCp1wTE4HApM949D0zkx4RBAn8Gh5kC21zWrtADDX5m0yVXL5xuO4JOarZgHD3igL5MNuWrsnpTyg05jvdPfIaafWRHQXh0ZzbxAjPoKBJf+UuTzNlsKfTXui44L6kwD3ufr4IUfi4aNLw8OsTxXzCOXrRAIHzE2dMLshTNMjdcwxlIfYcL/qpGRWMozILhrN3ky8yLnyAH0ovjQ+lFm5HUa2qs/jgBI8fBCFhBIxNO4mJDOz26cLGsZtaiYSgVdRLBATSRGAgAD1/M7PAWp6cauCfQqRiYYKjeYKdG2wd4y0PSXuWtcnKCyedgQRtYIy+ayJH1wk7jQ0CIVDFHw8A9HjBapKptySOEFOHVebRpHy2egPHo4egRceogfS/4KAvinpz+T5TqgTmb7vBX5gVI+QLMW4n1bfkkI6KwAon/ptJnu5VAXGPkWdJWeBq91SdC8gC4gGgn/KI6ZwJuE+cUHoTEYYUEB5Cy0I5cB1gGldBQklG7RMAPG4xdImYhgAYPMzsci1qtewAVXSzE/ogFu2yrVmuz78ileIcUHdf7lSAAISg0N4Eu5fQPn5OtpGgH/YXfhIGXuKkCTaakha8d1Pb9x7pa3bUMlnv+Rt6yr6RzcCRc7Jkdgkf5BXGvIk0i0WXcz3XgffHD3QZ7fAVeiAnsqMQe6dpIfzBNrr+Dlzt5NAsmPRe2Oubr+pjapzlrh2HlgkXIHj62FkUO4Rp/KAtTNNDQVRNG01BzF/12tuU539TAX+/Q1ru/uz6OBNaYuQQmG3yf2ldep6xC/m2mOtLg6rDebDMtDZ4KnISPNbO6r3YWgoM+BmrBK0UBWhm80x/YSeM0tEuTd+Kf3XVnOHL5rjE3HUeh6ynEJrQOafjGTDnt9nsXB4fzfRQ5Ohx4XjFUwPZJAIosQQM9SMs2mw5cOUhqet208TR01UITLLV9c7Q1GyPlwIVr4yHCVTHLZCgAPM+WZzEFATc9IEAYA0Mn5VsZMK18WbN8vtWhcQNm4ihqxMdB5HHYLGKqe9BEHBtCOYVBXUG8uHwMgiw6H9/BL2LMUeVnqJtJfc2b9/TiSKceiqOn4vQf14abcD98H7yUfJ+whm/dVaH49/Bdlx1IGHjxOdJhAXKmQBX2PAHX03a7ZpmdJiBPUTfgeTFJBeKpootwu3PgjAxTW9PqtOQHo+d/IdzDHr7LKySIborUpXFlW5wSX9qjrxu57v+n0pcsm7NyPq1FFoVu76dX6JYqIl3lStylkkLEemQXGaeu2/vZH3ZbO3Jdd+hIUZFdtaGLfnDBOAFcF7BbFu9HMTPa430aE1kWCRbSZpKDpF8A+SduGLZGTvjSRgX11gd/lkHqgaeRPJCTbShQBw13rmtZhJLoAwlc4U21nGSdF7V9dNFxYNF1ThEeS9C0K5F1xfJle5V56UEy5aTMgxeKVjoH9U4ctNLFjyU1aPYexw7Y3DlAMFPxDwywcUfMrZ4FrKv3HKBxzxlAUxfhT2T+2s0FF298G2OQj24JEeW47Xeu0COSDz+Hsts7a1DuEIyOs52z0inq+jek+LrZzKq1ioPdyq3+EEfpU8aBAhmKcgRueDaN7872NalxQ2G2oPayz+VGHFStGaRL8e7SDigYd6hwSnZCQNhN/vq7/ZUP8hJOKPn8RWcuPIuycH2VHRraxGDKdC080nad9LQa36W0wJE0l/P/2W4v40j/cDKUEgcJUQf4KuqK+LJwXplDvkbQRMbymJt243VytmiNPhtUaHpaPmOLlr5k+b7iBuUbzI9VVC6TanFBPaaADa053CBYGH5Eiwk279IpVQ3yZi7BIYXy0RErvJ/v9lq2MoQ7S35ls7s+Gu/5GLYG9XA704wkluUe/HTCVzW1IGxP08ezah5BtQIumTYUn82iVG1sRD/3AXIZoFv2cvH90MvgNspFoVvkuZTkmWdfSohytKvmZTxH5qYOSwsav5gRUQ/pn99Ol+mnhnCBbAKS7bZ6gsjyFsDTRzBhe1s0WfANhBO+6zB8ZtVqVbStm00wIPpDNbUnFAtl0dNSnXrNiwwo6OZsaEdOyA9AQM6Ghx1ToU40MNtcx9P1mJRNttbcKPr1J2h37Zon34/xb/mBZ72QKNuGE4vwTIhROULH/LAoBQelonlktx7zM7wZTjBgUn9qpnNMS4t8pKK0dIn2Cwux3im+MQM1FN4gFEKxbeehWkq6cQ3KhovsJbspq2nYB9kDgoyCuLP9ghlT/bOgVkBfsS3SYDLLPUAF7ZOFB3KO5NW6dWqSgKcBdJUvKzvRAZtseoXR1fX0WMhRPX+EBR/jg4jDKcsgFs9tH0Aty7QzJXQXUJyFSUh/Ip3ix671yz1GYJKC26lZYQSjeNo1k66gtGPqEIHDvZpETccotz+Bpj0kXXyhTummYpdpTYlMH0bo6GGXrByNB82ob6b4As/QhsxK+PMGTKl3lvjCajZkQtbY5Ky+E8VtRJ0kKG2DwRviQDwXZpz2qphwJbs6yyMds5rKtEVIZ9RH3DUTkaKb0kkXG1T3pcEtCMacpob3UkHLRdOycoZhSOoUWuU7WqATSzNn2yJWQkRQWA4mDFu1c7t0SaSw4EqosrrCjHVMLCsbDqqp5NyRLQEnL3VxqNF4fP/MTfFgb9uphuq5y40TJwba7wpL5abIXCBUdZW0Aep+ZBUQ0e0mAmAq503PXvzpTM70UDQzsmSp3dJ8l09CdzujBQxv4iz5zK5l4rwJCPrxRiTigg1Q7N3AHkCPuUN3gtZEORe5U1cHW41iV95hruKu9GC2+yh5upld4bDzwpyVNpWJq5ahKUQFKovG1ZosuSCp1d1C7g+IR+rQ49lUmrp48uOXqKMcSfOoAl0DNh0Un6286pxFn3sK9DJkUW7tdC2Uo0znlasCcQg51Ltjz17jdMcp39hPCVs6elv4t6lyPZFgdWfhYWiNdFmY+XgRO2PaklOiTnKukXMJnbjaD1YgRsB/DukeIYKyzM+PtSTKwamwIaTk9ssiJiy1FBADcex3aUuicLvuLEyO4dQDOIvNRm0G+QhwBnjWEdGwL3EXd9qp2S3uPhgOzhpIGHA2AOw+rVZshDbYWOkIbWBBSg5ObkxMR44iz3kEmVw7tw5aVD5bpOu+alexCJBTOaPxGTns7mT/E2eV5CjCL7rV36LbcFU2XVXzYrEdvUcovFfQ0Kg8T07V75FRqnrKJRCr2ylEtI7evyeiQagf/1xLgTuN9sBDrPDE2hE/2teu5x1vHJy14OH0rTHdZTeOcJPtmAKOBJpUoB/KvVh/oyc7upnvQ/hPnO5J0SdCZe+fHUJmnAEgLPb9NE1iFHTNJqHIR3DzYQ0GD95HiOea4CPWECGf9pnhZBmkNfg/bgQPgrODYl36Ehus/TQmwDSJvt6BCHKGgsp6p84pi/8TMuJu3JNg/FIHoVYXDdITmlvlZpcO3QX2JOyBKIQE9xHxvB9OuBykBF8qxlTa4saN5NRa0CDhf5Dglx8mmGCPiJ+ggKXp/TSGMhO40E8Un3Zi1xXCIrpA7sKOK4xPCbLQYAofDyN8WZ2jN9WDfRg+bas/kpjBypHZXGjfRBV+h5zmltCUm9TKUopocjoZ2A1m11Qc4TsxU1f6AxQP4KO96Yo0FrNujrDT37zJxjuYHLdTmiRi5gHB2B6AOHza6izWDLfb55IrBtG6qeMiwXF0++BYlPlpqHIdBjj8Z1Nmd+PdAWoHk08VenpSn1OD6ISyzFLyqYjxCl/NTMyWHwAbLvaYhq9yC4oKqlP1vdGp+i3aEY3ZTpVNQ0FF2e1T11ZE3GkH5LwAuNMIJH2I8pbdlvMHaGG3vpSAgkm0+GOlkqmLS4okeH2QQBJ5TwIte4SRXjcII/3HcGG0J5+cIp6siwIJMbR/J2WJoT3E018MqU2hkEECoD2pLKxChnHPKUY1H1NImBKGcnfRGfLt/6i48lM5P7IRRpifwj/p4Ru/oKIaIWhlC8LgLVq4PWBKSGcnvfxjiGHrGLBTpHZM303q3yNcTebNKb24I4hBuizdEIw0Tl2AYyrXI0phLdTOA0+LqWJAY8KqorAPs1gx4ZSGyG6Ycv9v1+0fmZK1J9KgDBNMPxPVfqIKvJ+OExOsBD3QUOToypIm7/fInjZLSkuFrZ+MJ0UzLYWn6ADrJsisNpgbDzclPrF/eR+BEoQqw3g6iXWQm9mQAPiZ9V/HdjR71UjlWWPvg8GTmJuShsCN59GVD82s7OxLlFrv902rqLr/c0lI38FnvgLO/U6nwtNe0prtaKb9A6Ii5qj7UKe7jSU3uhs6B9box8c/+90ipCIgTLQBIeRuOAEHRMDAgMiDPSRNBE/sOwVPY2RlEZC/yIhGkguNpbIPC0YBpdwh6ChbIIlsd/dv3SfezTHBvv2GUQ8nA3fuRsdYKsbjRNB3UK8LPjVO7p2rHbKuxYUvht2Ltb/gWM9dQXxn4O5svEkP2Vbu4SodS6dIrCvWvB+JyZsNp2q29A1s8nY+524vT1qJKFIboV0jy6varGHxYjBbtO0f0AEifbsbEUY/6bpwzBebYhKWBLgvC9oKhMC1bjb/weZD3O12wxuGYEQdlXqOUboYLTWSAZgOvXvU0g2GGCieunendYHEv2et2xvh87CQMnwADEaOShraQTjBW/FGhHRZFMuWC4/3XbblZ9Oyw7SkpD2Ei/9ZyMsQTZzAdi73yYB9W2ooAgovVjxEk7qbxHcRb7gJoKZd2h1atZdmPZJ2jWjYUOAcsJEcpmR7KNpuZesrXHsNh3rGdxSViQtSZQi3jH+Uf6o7E0d9dZ68RNViCbxlU40fKjwgcXUJGdwYKttFSHwQ40bvnotwb5+bP+VRbK2tgV58rHIRTID8ub67WVazOTuc6Y23wZX8keA0UVQtZMAbN5Jren7KP+kM6PYZZqCSJdXc0Q82GD1apcLsbWNRV2xySinQ1RPu7Y0NB7TKNPZBAysKMPWMvLt0VciFb3EpY9RDgEmH9SMn6q20uOJRuBCBqxMlw7frTXM1ihQIicRgyTSKeCAWVY1EhUUcIwwCA9JwGn3C0bDl/qC0XfdWZ+ciEc+nfRQKhu6nvCXL6sAMmT0Dehtn3KG48dpOpACNewfVwzE7BJleuZ+DjpGtwwyTZNjvREPlAEaPNXaH7VoFYg1CpNhB9GppEOgtVBlNVQfGqJIiAr6dmsHWl1v4nhoWkttJkwa0A46rJDqWwhLPDrGBuip2HyN205reMWwcS3Hgpe6e7tB5XrHcrI4UfwTVvkT+A3PRgCiQkAijmzDP3PdF2VZTJIrwDpf3BPG+d6oDJUED32CYyJs4bOrkMCbrtXigpDP8U6qkYSwDzK1bE3ioo3UMXQ91vKKh5y5OQ0VLXNDOiUr4hCkDlbxPJLwtJLwMpKeTCxL6dC36u+eq2DRpN/nJe/RWp7v4dqhQiaLbRMFtG1hfPJ8tXo6gzsr48mRVzRP4VclNqE7bbLgJnmWnZ/pJxSl6W04XUKdO6kfJlj/p/OGgNdRymGIGdZaZZejN3MO5KgcKv/24rKAMO6gu+DPk+t2ZFh6iKMRI2OUZXNfUVe/BfoxyPZg5PhbDBTaurOdAp2HLyiJd4sRvnGVczE7he7e/TZO/pQn889WdNPkafvW/rut7veXrhJZb8W9XoS/7MS7sLe8m4YsP/kocqIhI3EjREQXor+7YYHDrujpXFzj0b7fD7+usXoV9AxREwv1ggmB8DJueXUY2PjnTypsa0uGeiX3xHFjnUk1Sl1KarjEdnG9mbfE41UrPly7fV2/vzrdlWOP5nq+aVF2Uc8kEt8du4r0+KnRRyomLStG3KtXYB5MeLBQP3Le+ZRX0wTIHYQGDLHt9e7RfEXWk5NqucSer/6N+3EqPDTOiImmOxuLSLHv71q00uXPLT0jc+Yty0as0+Lm9SEM3FhDyRiRust+vjXRhATytHEePG8fd3Z36XjAKnNWGKa9UVywhNZaumeT2nua6EMwYnYIcUq5BM+rkNKj+weTR77RoprmoJ3JEtrpzOFsVDZS+Ipre+cyBfzAHAnr2cJ+ND3kjpcN6ulqJ0xILcJx/HDD0SXfLFJ3ReW/dQBDGdGW1uUO36Zli7cKU5Ht5x05XlJhMBpLLGsfkje6dSnQNERt8QXzvJuEPckPVOpnKyxEhz04WwzlYlKgCWUqUfOWJEjGJqKDZKxPk8LRM2EvFDhG/xmnSJCummXbJhlAZXRvRZ6Qhm2DFjnR/IZPwKk9xvLBk0gZUXnWzS/4olOPt+6c51FNSpRaX26ksnXtEDfT1wRqoaq/IhoH+kfWyzx3rmu9GPuupPgJ6byJ+hpiI5ePb+eoPapa3UM7shPaR03UzCJX3TZp801+S3+mrHT8KGPcnG2aSRDvyIuzC8tbempvd9yMpE1Y5easD1TwWY9dZbKI/UjoQQ2nj3afE1bFNMw6Sb//IjZG3PbnTbzfz/NblRHt64Q8sqa/3LLcPGeZ2MMygrQ+MKQ/M9YWcjimT69qKR9RG33jaCG9s76GMGgYV5j7vhj6ilhG4+EO1zO1B+4WPtAer8XrR808MfSTw/1jw9zXhEdo9DPbYZYIf2UA3AYC6VitIRXmzzhTKpc0wxe2IUvFbTypaQZT+BdKeCLMOQRwjZNzLQv8sO/d8/BgZ0+qmJYOf69/nL6+TdmX8xj/T+47fc/dpQPJBecve9ebxmnsfZL5/86HWexS0pLyZ+DWuO0w708kq0u21/7j4oxJCP3i5twYu99Ygt5t0uDElhBvtgxNV/6ciYOiIcvmvnw/F/gtc8h9lQW5uKxFJi4Eo/o0scOv67xvWhLeYf5rjPDH/gad5YF/u6WJdUqOO/zogMSasx2DHzY0wcSvKaK/ZN3GuYxgqZIo5dIcVc3pl+aqZrutqvpkx/pUNPFW3jR5RzvztYDkj/N8QYvacJlTXFa+G6XTGpz1GIvJzCXY5RAZ0yYGILPgqTb7e7+f6iAsLag11Fvpxrka1bRWOXtrdiEljwR2zlknI+35Ndu0AwuVZmN6g3DGDtJXWd8pFM6i3CIcVJ0gQfivp2YWgmJWU3Xjg4+UM4ZdjLXaUuMAxLQmaqlGsZ0PkBtw9OsUFTiGsYMrewk0HfA+wdQJ7rTm4V8ZHA7yAMOz/9Tnu+hefjRgnyO2xT7jOdDDf/wNPyvONK68AAA=="
+          Path("oteryn-client/crates/simulation-core/src/lib.rs").write_bytes(
+              gzip.decompress(base64.b64decode(payload))
+          )
+
+          root = Path("oteryn-client/Cargo.toml")
+          text = root.read_text(encoding="utf-8")
+          needle = '    "crates/game-domain",\n'
+          if text.count(needle) != 1:
+              raise SystemExit("expected one game-domain workspace member")
+          root.write_text(
+              text.replace(needle, needle + '    "crates/simulation-core",\n', 1),
+              encoding="utf-8",
+          )
+          PY
+
+          rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
+          rustup default 1.94.0
+          cd oteryn-client
+          cargo fmt --manifest-path crates/simulation-core/Cargo.toml
+          cargo clippy -p oteryn-simulation-core --all-targets -- -D warnings
+          cargo test -p oteryn-simulation-core --all-targets
+          cd ..
+
+          git checkout -- oteryn-client/Cargo.toml oteryn-client/Cargo.lock
+          git rm "$WORKFLOW_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/crates/simulation-core/src/lib.rs
+          git diff --cached --check
+          git commit -m "feat(simulation): implement bounded world snapshots"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-simulation-snapshot

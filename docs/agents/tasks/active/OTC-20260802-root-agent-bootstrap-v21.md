@@ -1,21 +1,21 @@
 ---
 task_id: OTC-20260802-root-agent-bootstrap-v21
-status: implementing
+status: validating
 agent: "GPT-5.6 Thinking"
 track: agent-governance
 workstream: root-agent-bootstrap
 parallel_wave: GOVERNANCE-V21
 parallel_lane: ROOT-BOOTSTRAP
-parallel_lane_state: implementing
+parallel_lane_state: validating
 coordinator_task: none
 branch: docs/root-agent-bootstrap-v21-20260802
 base_branch: main
 created: 2026-08-02T08:57:00+02:00
-updated: 2026-08-02T08:57:00+02:00
-last_verified_commit: "74c1ce1c837fc8945888168c6f6f2caf6e87e286"
-required_base_commit: ""
+updated: 2026-08-02T09:03:00+02:00
+last_verified_commit: "e1600bd48e7426c0fa2011ebbd12912b1f998a85"
+required_base_commit: "8f6c96bacef7e99f48f28422d9c7b6c5cb60c4bf"
 risk: low
-related_pr: ""
+related_pr: "#166"
 depends_on: []
 integration_after: []
 owned_paths:

@@ -6,12 +6,12 @@ project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p1-input-actions
-phase: exact-head-validation
+phase: final-heavy-validation
 branch: feat/OTC2-20260801-playability-p1-input-actions
 base_branch: main
 created: 2026-08-01T22:28:00+02:00
-updated: 2026-08-02T21:53:00+02:00
-last_verified_commit: "ce5f9f550df4f1d03c978bbeadced91a35b352f7"
+updated: 2026-08-02T21:57:00+02:00
+last_verified_commit: "6f38a3c1c48f79ef51050c46397c33d5ee4ae07b"
 required_base_commit: "3887a0b7369e99ad200990d42a5314f1d5531e97"
 risk: high
 related_pr: 157
@@ -43,11 +43,11 @@ missing_layers:
   - gameplay and UI action consumers
   - app composition and real staging E2E
 invocation_started_at: 2026-08-02T21:38:43+02:00
-last_progress_at: 2026-08-02T21:53:00+02:00
+last_progress_at: 2026-08-02T21:57:00+02:00
 ci_checks_for_current_head: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
@@ -58,36 +58,25 @@ Implement the framework-neutral normalized input and semantic action/context pro
 
 # Acceptance
 
-- [x] normalized keyboard, mouse, pointer, wheel, text, focus, capture and device-loss contracts exist without winit/Win32 types;
-- [x] physical codes, modifiers, chords, identifiers, contexts, bindings, repeat and semantic lifecycle records are bounded and deterministic;
-- [x] binding conflicts, reserved combinations and unknown contexts fail explicitly;
-- [x] modal/text/gameplay/global precedence is deterministic;
-- [x] focus/capture/device loss and context changes clean held/active state predictably;
-- [x] no widgets, game commands, settings persistence, default product keymap or app composition entered the crate;
-- [x] pinned package rustfmt, strict Clippy and all focused/component tests pass;
-- [ ] exact-head heavy gates pass after serialized integration;
-- [x] exact changed-path, lockfile, API and trust-boundary review has no open material finding;
+- [x] bounded normalized keyboard, mouse, pointer, wheel, text, focus, capture and device-loss contracts exist without framework/OS types;
+- [x] chords, semantic IDs, contexts, bindings, precedence, repeat and lifecycle are deterministic;
+- [x] conflicts, reserved bindings, stale held state and invalid values fail explicitly;
+- [x] no widgets, game commands, settings, default keymap or app composition entered the crate;
+- [x] focused rustfmt, strict Clippy and all 11 lifecycle/component tests pass;
+- [ ] final exact-head heavy gates pass;
+- [x] ownership, API, architecture and minimal lockfile audits have no open material finding;
 - [ ] PR is merged and the task is separately archived.
-
-## Contract invariants
-
-- Adapters provide stable numeric physical positions and bounded values; public contracts expose no framework or OS type.
-- Chords normalize modifier bits and sort unique non-modifier inputs.
-- Modal contexts suppress text/gameplay, text suppresses gameplay, and global remains eligible.
-- Priority, context kind and context identifier break ties deterministically.
-- Press, repeat, release, context invalidation, focus loss, capture loss and device loss emit explicit phases.
-- Committed text is bounded and Debug-redacted.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-02T21:53:00+02:00
-head: ce5f9f550df4f1d03c978bbeadced91a35b352f7
+updated_at: 2026-08-02T21:57:00+02:00
+head: 6f38a3c1c48f79ef51050c46397c33d5ee4ae07b
 branch: feat/OTC2-20260801-playability-p1-input-actions
 pr: 157
 status: validating
-phase: exact-head-validation
+phase: final-heavy-validation
 context_routes:
   - docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md
   - docs/agents/AUTONOMOUS_PROGRAM_CONTINUATION.md
@@ -101,44 +90,44 @@ owned_paths:
   - oteryn-client/crates/input-actions/**
 shared_lease:
   state: granted
-  integration: exact main 3887a0b7 is merged into the branch; workspace member and minimal no-dependency lockfile package are present; existing category `input` covers the crate.
+  integration: exact main 3887a0b7 is in branch history; workspace member and minimal no-dependency lockfile package are present; accepted category `input` covers the crate.
 proven:
-  - Public API contains no winit, Win32, UI, game-domain, settings or default-keymap type.
-  - InputRouter deterministically resolves contexts, repeat and held-state lifecycle.
-  - Original synthetic ordered stream, context precedence, conflict, bounds, repeat, focus, capture, device-loss and redaction tests pass.
-  - Cargo.lock diff contains only local package oteryn-input-actions with no dependencies.
-  - Pinned focused run 30764305750 job 91540213774 passed rustfmt, strict package Clippy and all 11 tests.
+  - Public API contains no winit, Win32, UI, game-domain, settings or default-keymap types.
+  - InputRouter deterministically handles context precedence, repeat, release, focus/capture/device cleanup and ordered output.
+  - Focused run 30764305750 job 91540213774 passed pinned rustfmt, strict Clippy and all 11 tests.
+  - First retained heavy run 30764404973 passed locked metadata and supply-chain job 91540470118, then stopped at rustfmt before compilation.
+  - Format repair run 30764475580 job 91540644130 applied pinned formatting to the complete crate and re-passed strict focused validation.
+  - Cargo.lock adds only local package oteryn-input-actions with no dependencies.
   - Temporary PR 178 is closed without merge with zero final changed files.
 derived:
-  - No architecture checker or fixture mutation is required because the accepted `input` category has no dependency edges for this package.
-  - This checkpoint commit triggers retained PR workflows after GITHUB_TOKEN integration pushes.
+  - One final retained heavy attempt is allowed after the isolated formatting repair.
 unknown:
-  - Locked workspace metadata, full workspace Clippy/tests, architecture, supply-chain and repository required CI outcome on this checkpoint head.
+  - Full workspace Clippy/tests and architecture outcome on the completely formatted head.
 conflicts: []
 first_failure:
-  marker: focused package validation
-  evidence: strict lint identified two test-only allocations, then one fixture pressed Shift+S while binding S.
-  causal_hypothesis: test construction, not router/API behavior, was inconsistent.
-  repair: use `slice::from_ref`, an array stream and a Shift+S binding; focused validation now passes.
+  marker: retained Rust Client rustfmt
+  evidence: run 30764404973 job 91540470054 showed formatting differences only in input-actions/error.rs and semantic.rs.
+  causal_hypothesis: the initial harness formatted all files but committed only a subset.
+  repair: pinned Cargo/rustfmt committed the complete crate in 6f38a3c1; focused rustfmt, strict Clippy and tests pass.
 rejected_hypotheses:
-  - Add platform adapters, settings, UI/game command mapping or a default keymap: rejected as later consumer/product scope.
-  - Add a new architecture category: rejected; existing category `input` is authoritative.
-  - Relax strict lints or change router semantics to accommodate a mismatched fixture: rejected.
+  - Relax rustfmt or bypass the retained gate: rejected.
+  - Change router/API semantics: rejected because failure was formatting-only.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p1-input-actions.md
   - oteryn-client/Cargo.toml
   - oteryn-client/Cargo.lock
   - oteryn-client/crates/input-actions/**
 validation:
-  - command: ownership, API, architecture and minimal lockfile audit
-    result: PASS
-    evidence: ten authorized paths, accepted `input` category, no dependencies, no framework/product leakage.
   - command: focused/component run 30764305750 / job 91540213774
     result: PASS
-    evidence: pinned rustfmt, strict Clippy and 11 lifecycle/stream tests passed.
-  - command: temporary harness cleanup
+  - command: retained heavy run 30764404973
+    result: FAIL_FORMAT_ONLY
+    evidence: metadata and supply-chain passed; rustfmt isolated two uncommitted formatted files.
+  - command: format repair run 30764475580 / job 91540644130
     result: PASS
-    evidence: PR 178 closed without merge with zero final changed files.
+    evidence: complete crate rustfmt, strict Clippy and all tests passed.
+  - command: exact changed-path, API, architecture and lockfile audit
+    result: PASS
 blockers: []
-next_action: Inspect retained Rust Client and repository CI on this checkpoint head, isolate one actionable failure if present, otherwise mark ready, auto-merge and archive separately.
+next_action: Inspect the second and final retained Rust Client and repository CI runs on this checkpoint head; when green, mark ready, auto-merge and archive separately.
 ```

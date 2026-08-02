@@ -3,7 +3,7 @@ task_id: OTC-20260802-anti-stall-budget-v1
 status: completed
 related_pr: 168
 merge_commit: 56ee29c45604269f0f55561ada6120f1dd134f71
-archive_pr: pending
+archive_pr: 169
 completed: 2026-08-02T10:59:00+02:00
 owned_paths: []
 ---
@@ -12,7 +12,7 @@ owned_paths: []
 
 ## Terminal result
 
-PR #168 merged the mandatory anti-stall contract, root bootstrap routing and local agent routing to `main` as `56ee29c45604269f0f55561ada6120f1dd134f71`.
+PR #168 merged the mandatory anti-stall contract, root bootstrap routing and local agent routing to `main` as `56ee29c45604269f0f55561ada6120f1dd134f71`. PR #169 archives this terminal record and releases ownership.
 
 ## Closeout
 
@@ -43,7 +43,7 @@ final_ci:
 pull_requests:
   terminal_prs:
     - blakinio/otclient#168 merged as 56ee29c45604269f0f55561ada6120f1dd134f71
-  archive_pr: pending
+  archive_pr: blakinio/otclient#169
   unresolved_review_threads: 0
 task_archived_or_terminal: true
 ownership_released: true
@@ -61,4 +61,4 @@ max_repair_cycles_per_gate: 3
 max_context_reconstruction_attempts: 1
 ```
 
-No material finding or blocker remains. The archive PR is the sole related PR until it merges.
+No material finding or blocker remains. PR #169 is the sole related PR and becomes terminal when merged.

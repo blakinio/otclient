@@ -50,18 +50,15 @@ impl GameCommand {
     fn ensure_session(&self, session: SessionToken) -> Result<(), DomainError> {
         match self {
             Self::LookAt { target } | Self::Use { target } => target.ensure_session(session),
-            Self::MoveItem {
-                item, from, to, ..
-            } => {
+            Self::MoveItem { item, from, to, .. } => {
                 item.ensure_session(session)?;
                 from.ensure_session(session)?;
                 to.ensure_session(session)
             }
             Self::SetAttackTarget { target } => target.ensure_session(session),
-            Self::Step { .. }
-            | Self::StopMovement
-            | Self::ClearAttackTarget
-            | Self::Logout => Ok(()),
+            Self::Step { .. } | Self::StopMovement | Self::ClearAttackTarget | Self::Logout => {
+                Ok(())
+            }
         }
     }
 }

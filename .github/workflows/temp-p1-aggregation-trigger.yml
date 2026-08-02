@@ -2,7 +2,7 @@ name: Temporary P1 Aggregation Patch Trigger
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
     paths:
       - .github/workflows/temp-p1-aggregation-trigger.yml
 
@@ -27,7 +27,7 @@ jobs:
       - name: Extract and execute the reviewed patch
         shell: bash
         env:
-          EXPECTED_PARENT: 6171009970d1b3610af1b77c7e1c821bee9d7729
+          EXPECTED_PARENT: 1c249f546f55a3b0b66e06885d16e51d56e6ffbd
           WORKFLOW_PATH: .github/workflows/temp-p1-aggregation-doc-patch.yml
         run: |
           set -euo pipefail
@@ -46,14 +46,28 @@ jobs:
               else:
                   lines.append(line)
           script = '\n'.join(lines) + '\n'
-          needle = 'git rm "$WORKFLOW_PATH"\n'
-          if script.count(needle) != 1:
+          remove = 'git rm "$WORKFLOW_PATH"\n'
+          if script.count(remove) != 1:
               raise SystemExit('expected one self-removal command')
           script = script.replace(
-              needle,
-              needle + 'git rm .github/workflows/temp-p1-aggregation-trigger.yml\n',
+              remove,
+              remove + 'git rm .github/workflows/temp-p1-aggregation-trigger.yml\n',
               1,
           )
+          check = 'git diff --cached --check\n'
+          if script.count(check) != 1:
+              raise SystemExit('expected one diff-check command')
+          normalize = (
+              "sed -i 's/[[:space:]]\\+$//' "
+              'oteryn-client/docs/agents/playability/ARCHITECTURE_HANDOFF.md '
+              'oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md '
+              'oteryn-client/docs/agents/playability/DEPENDENCY_AND_PARALLELISM.md\n'
+              'git add oteryn-client/docs/agents/playability/ARCHITECTURE_HANDOFF.md '
+              'oteryn-client/docs/agents/playability/CAPABILITY_MATRIX.md '
+              'oteryn-client/docs/agents/playability/DEPENDENCY_AND_PARALLELISM.md\n'
+              + check
+          )
+          script = script.replace(check, normalize, 1)
           Path('/tmp/p1-aggregation-patch.sh').write_text(script, encoding='utf-8')
           PY
           bash /tmp/p1-aggregation-patch.sh

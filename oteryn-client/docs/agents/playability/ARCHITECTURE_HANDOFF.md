@@ -1,6 +1,6 @@
 # Full-Playability Architecture Handoff
 
-Purpose: compact required architecture context for every future Oteryn Rust client worker.  
+Purpose: compact required architecture context for every future Oteryn Rust client worker.
 Authority: `oteryn-client/docs/architecture/ARCHITECTURE.md`, accepted ADRs, live task ownership and exact Git state override this summary.
 
 ## 1. Product boundary
@@ -31,14 +31,18 @@ The legacy C++/Lua/OTUI client is never a Rust runtime dependency. It is read-on
 | `crates/account-session` | account-session | account generation/lifecycle marker | no bearer persistence |
 | `crates/world-directory` | world-directory | validated worlds/characters and explicit selection | no gameplay-channel inference |
 | `crates/game-session` | game-session | one-shot entry credential/request/result lifecycle | no wire layout |
+| `crates/game-domain` | game-domain | canonical session-scoped gameplay IDs/handles and closed v1 `GameEvent`/`GameCommand` envelopes | no Canary, simulation, renderer, UI or app policy |
 | `crates/platform` | platform | strict Platform ticket/Gateway HTTP boundary | no browser state or game wire |
 | `crates/identity` | identity | OAuth Authorization Code + PKCE transaction | no passwords, UI or game wire |
 | `crates/protocol-core` | protocol-core | bounded wire primitives and parser errors | protocol-neutral only |
 | `crates/transport` | transport | bounded TCP ownership and I/O lifecycle | no domain/UI policy |
-| `crates/protocol-canary` | protocol-canary | exact bounded Current-profile admission mapping | currently stops before map decode |
+| `crates/protocol-canary` | protocol-canary | exact bounded Current-profile admission mapping | stops before gameplay decode; runtime source descriptors must be aligned with the P1 generated `bc0068ab…` index before P2 parser work |
+| `tools/canary-protocol-index` | tool/evidence | deterministic exact-source opcode/dispatch/feature index for inspected Canary Current cut | no wire-layout or deployment-equality claim |
 | `crates/app-runtime` | app-runtime | technical-login orchestration, generations and worker shutdown | no duplicate backend contracts |
 | `crates/renderer` | renderer | window-surface/device ownership boundary | no world rendering yet |
 | `crates/asset-types` | asset-types | synthetic typed asset/pack schema | no runtime mounting |
+| `crates/asset-runtime` | asset-runtime | immutable verified synthetic-v1 pack open/index/lookup and generation-fenced handles | no media decode, GPU upload, loose files or production compatibility |
+| `crates/input-actions` | input-actions | framework-neutral physical events and semantic action/context/binding lifecycle | no platform adapter, default keymap, gameplay mapping, UI or settings |
 | `tools/asset-compiler` | tool | deterministic safe synthetic pack compiler | no production importer/runtime |
 | `apps/client` | app | Windows shell, renderer and technical-login composition | no gameplay/domain/UI framework |
 | `tests/integration/technical-login` | integration-test | fake technical-login E2E | no real deployment proof |
@@ -189,11 +193,11 @@ Merged W7 provides:
 It does not provide:
 
 - map/world packet decoding;
-- authoritative game domain/simulation;
-- asset-runtime mounting or production import;
+- authoritative simulation and immutable render snapshots;
+- app-composed asset decode/resource upload or production import;
 - world rendering;
 - native UI framework or login presentation;
-- gameplay input/actions;
+- Windows input adapter, product binding map or gameplay action consumers;
 - inventory, containers, chat, combat, minimap or audio;
 - reconnect/relog account lifecycle;
 - launcher/updater/production deployment.
@@ -202,17 +206,25 @@ Workers must not relaunch W1-W7 prompts. Extend merged contracts through new bou
 
 ## 8. Contract production order
 
-Before broad gameplay implementation, the coordinator must establish sole producers for:
+P1 completed and separately archived the sole producers for:
 
-1. canonical server/domain identifiers and session-scoped entity handles;
-2. closed `GameEvent` and `GameCommand` envelope/versioning rules;
-3. authoritative simulation ownership and snapshot publication;
-4. render snapshot/resource-handle boundary;
-5. UI view-model and semantic-action boundary;
-6. asset-runtime pack/open/lookup/decode contract;
-7. audio intent and normalized input-action contracts.
+1. canonical server/domain identifiers and session-scoped handles;
+2. closed v1 `GameEvent` and `GameCommand` envelopes;
+3. immutable verified synthetic-v1 asset runtime handles;
+4. normalized physical input and semantic action/context contracts;
+5. deterministic exact-source Canary Current opcode/dispatch evidence.
 
-Consumers start from merged producer contracts or explicit synthetic fixtures. They never publish competing types.
+P2 is staged in `WAVE_P2_MINIMUM_VISIBLE_WORLD.md` and preserves these next sole producers:
+
+1. `simulation-core` — the only mutable gameplay writer and immutable `RenderSnapshot` producer;
+2. `protocol-canary` — the only Canary gameplay decoder/encoder, after mandatory `bc0068ab…` development-baseline alignment;
+3. `asset-decode` — the only bounded CPU decoded-image producer;
+4. `renderer-resource` — the only generation-fenced GPU resource handle/upload/cache producer;
+5. `input-platform` — the only Windows/winit adapter into `input-actions`;
+6. one serialized visible-world integration owner for `world-renderer` and `apps/client`;
+7. one separate controlled M2 runtime acceptance owner.
+
+Consumers start only from merged producer contracts or explicitly private synthetic fixtures. Synthetic composition remains a partial consumer; M2 is complete only after controlled login -> visible world -> movement/reconciliation -> logout acceptance on an exact named environment.
 
 ## 9. Shared integration paths
 

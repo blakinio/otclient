@@ -1,8 +1,8 @@
 # Full-Playability Dependency and Parallelism Model
 
-Status: programme coordination contract after P0 aggregation.  
-Current evidence base: `main@6808d8a9dd5a24a29c5ac96fe35bb463fe4da34b`.  
-Accepted next wave: `WAVE_P1_CONTRACT_SPINE.md`.
+Status: programme coordination contract after P1 aggregation.
+Current evidence base: `main@5d3dec1037eef508782e369afef8e3b7f1291e6a`.
+Accepted next wave: `WAVE_P2_MINIMUM_VISIBLE_WORLD.md`.
 
 This document defines safe concurrency, sole producers, shared-path leases and exact integration order. Maximize independent progress, not simultaneous edits.
 
@@ -69,10 +69,10 @@ A fresh validator session is preferred after coherent implementation. Validation
 |---|---|---|
 | gameplay IDs/session handles/`GameEvent`/`GameCommand` | `game-domain` | Canary adapters, simulation, feature state, UI action mapping, tests |
 | exact Canary source/opcode/layout evidence | `canary-protocol-index` tool/evidence | bounded Canary parser tasks |
-| simulation ownership and snapshot publication | future `simulation-core` producer | world state integration, renderer extraction, UI view models, replay |
-| render snapshot and renderer resource handles | future snapshot/renderer-resource producers | world renderer, effects, minimap, viewport picking |
+| simulation ownership and render snapshot publication | P2 `simulation-core` | protocol-event integration, world renderer, later UI view models and replay |
+| generation-fenced renderer resource handles/upload/cache | P2 `renderer-resource` after merged `asset-decode` | world renderer, effects, minimap, viewport picking |
 | asset pack open/verify/index/lookup handles | `asset-runtime` | decode, renderer/UI/text/audio resource consumers |
-| normalized physical input/actions/contexts | `input-actions` | platform adapter, gameplay mapping, UI bindings, hotkeys |
+| normalized physical input/actions/contexts | `input-actions` | P2 `input-platform`, visible-world binding map, later UI bindings/hotkeys |
 | UI primitives/focus/accessibility | future `ui-core` | auth/selection/inventory/chat/combat/settings UI |
 | common view models/semantic UI actions | future application UI contract producer | concrete feature UI packages |
 | audio intents/categories/device handles | future `audio-core` | gameplay/UI audio features |
@@ -80,83 +80,127 @@ A fresh validator session is preferred after coherent implementation. Validation
 
 Consumers may prepare private fixtures/adapters while waiting, but may not publish substitute public types or claim compatibility.
 
-## 5. Accepted P1 graph
+## 5. Completed P1 graph
 
 ```text
-P0 merged evidence + aggregation/archive
+P0 aggregation/archive
+  -> CANARY-SOURCE-INDEX #154/#180
+  -> GAME-DOMAIN-CONTRACT #155/#175
+  -> ASSET-PACK-RUNTIME #156/#177
+  -> INPUT-ACTIONS #157/#183
+  -> P1 barrier
+```
+
+All four P1 producers and separate archives are merged on `main@5d3dec1037eef508782e369afef8e3b7f1291e6a`. All P1 shared leases are released.
+
+The P1 source index pins inspected development evidence to `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`. Existing `protocol-canary` runtime descriptors still name older source cuts. This is an explicit development-baseline conflict that the P2 protocol owner must reconcile mechanically before implementing gameplay layouts. It is not deployment proof.
+
+## 6. Accepted staged P2 graph and ownership
+
+```text
+P1 merged contracts
   |
-  +--> P1 CANARY-SOURCE-INDEX  (tool/evidence, no workspace lease)
+  +--> SIMULATION-SNAPSHOT
+  +--> CANARY-WORLD-PROTOCOL (baseline alignment first)
+  +--> ASSET-DECODE
+  +--> INPUT-PLATFORM
   |
-  `--> P1 GAME-DOMAIN-CONTRACT (first gameplay public producer)
-          |
-          +-- shared lease released/archive complete
-          v
-      P1 ASSET-PACK-RUNTIME
-          |
-          +-- shared lease released/archive complete
-          v
-      P1 INPUT-ACTIONS
-          |
-          v
-      P1 barrier
+  ASSET-DECODE archived
+  v
+  RENDERER-RESOURCE
+  |
+  all five producers archived
+  v
+  VISIBLE-WORLD-INTEGRATION
+  |
+  owner inputs + integration archive
+  v
+  CONTROLLED-M2-ACCEPTANCE
 ```
 
-Exclusive-path development may overlap. Integration and merge order is exact:
+Initial maximum concurrency is four workers: simulation, Canary protocol, asset decode and input platform. Renderer-resource starts after asset-decode. Visible-world integration is serialized and alone owns `apps/client/**`. Controlled acceptance is a separate operational task.
 
-1. `CANARY-SOURCE-INDEX`;
-2. `GAME-DOMAIN-CONTRACT`;
-3. `ASSET-PACK-RUNTIME`;
-4. `INPUT-ACTIONS`.
-
-The source-index task may merge first because it publishes evidence, not runtime types and requires no root workspace lease. Game-domain must be the first merged gameplay public contract. Asset-runtime and input-actions are independent but serialize root integration.
-
-## 6. P1 package ownership
-
-### CANARY-SOURCE-INDEX
+### SIMULATION-SNAPSHOT
 
 Exclusive:
 
 ```text
-oteryn-client/tools/canary-protocol-index/**
-oteryn-client/docs/evidence/playability/p1/canary-current-source-index.md
-oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md
-docs/agents/tasks/active/OTC2-20260801-playability-p1-canary-source-index.md
+oteryn-client/crates/simulation-core/**
+docs/agents/tasks/active/OTC2-*-playability-p2-simulation-snapshot.md
 ```
 
-No shared lease and no workspace member.
+Sole mutable gameplay writer and immutable `RenderSnapshot` producer. No Canary, GPU, asset, UI or platform types.
 
-### GAME-DOMAIN-CONTRACT
+### CANARY-WORLD-PROTOCOL
 
 Exclusive:
 
 ```text
-oteryn-client/crates/game-domain/**
-docs/agents/tasks/active/OTC2-20260801-playability-p1-game-domain-contract.md
+oteryn-client/crates/protocol-canary/**
+oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+oteryn-client/tests/integration/canary-world-protocol/**
+docs/agents/tasks/active/OTC2-*-playability-p2-canary-world-protocol.md
 ```
 
-First holder of the P1 shared integration lease.
+First aligns runtime metadata to the generated `bc0068ab…` index while preserving fail-closed real admission, then implements only exactly evidenced M2 bootstrap/map/entity/movement/logout mapping.
 
-### ASSET-PACK-RUNTIME
+### ASSET-DECODE
 
 Exclusive:
 
 ```text
-oteryn-client/crates/asset-runtime/**
-docs/agents/tasks/active/OTC2-20260801-playability-p1-asset-pack-runtime.md
+oteryn-client/crates/asset-decode/**
+docs/agents/tasks/active/OTC2-*-playability-p2-asset-decode.md
 ```
 
-Reads `asset-types` and `asset-compiler` but does not edit them. Second shared-lease holder after game-domain merge/archive.
+Sole bounded synthetic-v1 CPU RGBA producer. No loose files, production importer or GPU work.
 
-### INPUT-ACTIONS
+### RENDERER-RESOURCE
 
 Exclusive:
 
 ```text
-oteryn-client/crates/input-actions/**
-docs/agents/tasks/active/OTC2-20260801-playability-p1-input-actions.md
+oteryn-client/crates/renderer-resource/**
+docs/agents/tasks/active/OTC2-*-playability-p2-renderer-resource.md
 ```
 
-Third shared-lease holder after asset-runtime merge/archive.
+Starts after asset-decode. Sole generation-fenced upload/resource/cache producer; no world mutation or draw policy.
+
+### INPUT-PLATFORM
+
+Exclusive:
+
+```text
+oteryn-client/crates/input-platform/**
+docs/agents/tasks/active/OTC2-*-playability-p2-input-platform.md
+```
+
+Sole Windows/winit adapter into `input-actions`; no product keymap or gameplay commands.
+
+### VISIBLE-WORLD-INTEGRATION
+
+Exclusive:
+
+```text
+oteryn-client/crates/world-renderer/**
+oteryn-client/apps/client/**
+oteryn-client/tests/integration/visible-world/**
+oteryn-client/docs/evidence/playability/p2/synthetic-visible-world.md
+docs/agents/tasks/active/OTC2-*-playability-p2-visible-world-integration.md
+```
+
+One serialized partial-consumer owner for world rendering, product movement/logout bindings and original synthetic E2E. It may not claim M2 complete.
+
+### CONTROLLED-M2-ACCEPTANCE
+
+Exclusive:
+
+```text
+oteryn-client/docs/evidence/playability/p2/controlled-m2-acceptance/**
+docs/agents/tasks/active/OTC2-*-playability-p2-controlled-m2-acceptance.md
+```
+
+Runs only with named deployment, disposable identity, asset, Windows/device, privacy and authorization inputs. It proves or falsifies the complete real M2 journey and routes defects to their sole owners.
 
 ## 7. Shared integration lease
 
@@ -179,7 +223,7 @@ oteryn-client/docs/operations/RUST_WORKSPACE.md
 .github/workflows/rust-client.yml
 ```
 
-P1 workers may be granted only the subset listed by their accepted prompt. `apps/client/**`, workflows and PR #23-owned `ACTIVE_WORK.md`, `MODULE_CATALOG.md` and `CHANGELOG.md` are not granted in P1.
+P2 workers may be granted only the subset listed by their accepted prompt. `apps/client/**` is granted only to VISIBLE-WORLD-INTEGRATION. Workflows and PR #23-owned `ACTIVE_WORK.md`, `MODULE_CATALOG.md` and `CHANGELOG.md` are not granted unless a later explicit coordinator decision changes ownership.
 
 Lease procedure:
 
@@ -196,22 +240,18 @@ Manual lockfile conflict resolution, copied fragments, hidden concurrent edits a
 
 ## 8. Work allowed in parallel
 
-During P1 exclusive-path development:
+During initial P2 exclusive-path development, at most four independent workers may own:
 
-- source-index tooling/evidence;
-- game-domain crate implementation;
-- asset-runtime crate implementation against current synthetic read-only schema;
-- input-actions crate implementation with no platform/UI/game-domain public dependency.
+- simulation-core and render snapshot contracts;
+- Canary baseline alignment/gameplay protocol mapping;
+- synthetic-v1 asset decode;
+- Windows/winit input-platform adapter.
 
-A worker blocked on the lease may commit a coherent exclusive-path result, mark `integration_ready`, checkpoint one next action and exit. It does not poll.
+A worker blocked on the serialized shared lease may commit a coherent exclusive-path result, mark `integration_ready`, checkpoint one next action and exit. It does not poll.
 
-After P1 producers merge, likely safe parallel pairs include:
+Renderer-resource starts after asset-decode merges. Visible-world integration starts only after all five producer tasks merge and separately archive. Controlled M2 acceptance starts only after integration archive and named owner inputs.
 
-- Canary map parser and asset decode;
-- world-state and renderer-resource against merged contracts;
-- input platform adapter and audio-core;
-- UI-core and simulation-core when public dependencies are explicit;
-- protocol negative/fuzz harness and renderer benchmark harness.
+Safe supporting work includes private deterministic fixtures, parser negative corpora and non-overlapping benchmark harness design; none may publish substitute contracts or claim compatibility.
 
 ## 9. Work that must remain serialized
 
@@ -226,53 +266,33 @@ Always serialize:
 - cross-repository producer changes and client consumption;
 - release activation/rollback.
 
-## 10. P1 non-goals
+## 10. P2 non-goals
 
-P1 does not authorize:
+P2 does not authorize:
 
-- simulation/world state/snapshots;
-- map/entity/movement gameplay parser implementation;
-- renderer resources/world rendering;
-- UI core/view models/feature screens;
-- audio core/backend/resources;
-- production importers/assets/signing;
-- staging/deployment/account use;
-- launcher/release activation;
-- app composition.
+- broad inventory/container/chat/combat/social/modern-feature implementation;
+- UI framework, settings, audio, minimap, launcher or updater work;
+- production asset importer/signing/redistribution;
+- guessed Canary field layouts or deployed-revision equality;
+- official Tibia service compatibility;
+- legacy runtime dependencies;
+- production activation or release claims.
 
-These require the P1 barrier and their own sole producers.
+A-F packages deliver bounded producers/partial consumers. Only controlled M2 acceptance may establish the first playable milestone.
 
-## 11. Candidate post-P1 graph
+## 11. Post-P2 planning boundary
 
-Planning only:
+Planning only after controlled M2 PASS:
 
 ```text
-merged P1 game-domain + source index + asset runtime + input actions
-  |
-  +--> simulation-core + snapshot contract
-  +--> Canary bootstrap/map/entity/movement bounded parsers
-  +--> asset appearance/decode + renderer-resource
-  +--> platform input adapter
-  +--> ui-core/common view-model/action contracts
-  `--> audio-core
-          |
-          v
-P2 minimum visible world vertical slice
-          |
-          v
-P3 core gameplay
-          |
-          v
-P4 daily-playable product
-          |
-          v
-P5 selected exact-profile parity
-          |
-          v
-P6 production hardening/release
+P2 minimum visible world
+  -> P3 core gameplay: items/containers/chat/combat/UI/audio
+  -> P4 daily-playable product
+  -> P5 selected exact-profile parity
+  -> P6 production hardening/release
 ```
 
-No post-P1 package starts merely because its design is listed here. The P1 barrier must verify producer merges, evidence and ownership.
+No P3 package starts merely because its design is listed. The P2 barrier and controlled acceptance must reconcile exact producer/runtime evidence and select bounded sole owners. Independent non-M2 work requires a separate explicit barrier decision.
 
 ## 12. Worker lifecycle
 
@@ -308,7 +328,7 @@ At every barrier the coordinator:
 
 Oteryn Platform, Gateway and Canary changes remain separate repository tasks. Client workers record exact producer revisions and fail closed when contracts are insufficient.
 
-The following owner decisions do not block P1 synthetic/source contract work but block deployment or production claims:
+The following owner decisions do not block bounded original synthetic P2 producer work but block controlled M2, deployment or production claims:
 
 - exact deployed Canary revision/configuration/build;
 - staging environment/account policy;

@@ -1,8 +1,8 @@
 # Oteryn Rust Client Capability Matrix
 
-Status cut: `main@6808d8a9dd5a24a29c5ac96fe35bb463fe4da34b` after all five P0 reports and separate lifecycle archives merged.  
-P0 evidence: Canary #140/#150, legacy #141/#149, assets #142/#148, UX/input/audio #143/#147, release/E2E #144/#146.  
-Remediation status: `OTC2-AUD-001` through `OTC2-AUD-004` remain closed within their documented boundaries.  
+Status cut: `main@5d3dec1037eef508782e369afef8e3b7f1291e6a` after all four P1 contract producers and separate lifecycle archives merged.
+P1 evidence: Canary source index #154/#180, game-domain #155/#175, asset-runtime #156/#177, input-actions #157/#183.
+P0 evidence and remediations remain accepted; `OTC2-AUD-001` through `OTC2-AUD-004` remain closed within their documented boundaries.
 This is a living planning matrix and scope contract, not a deployment or release claim.
 
 ## Status rules
@@ -64,14 +64,14 @@ Evidence inventory, source declarations or test methodology do not prove deploye
 |---|---|---|---|---|---|
 | Bounded TCP ownership/I/O | PROVEN | RELEASE_REQUIRED | connect/read/write/frame terminal-state tests | preserve | all |
 | Canary challenge/login/admission prefix | SYNTHETIC_ONLY | RELEASE_REQUIRED | source-derived synthetic path through ordered admission | real staging admission | M1 |
-| Exact post-admission capability inventory | PARTIAL | RELEASE_REQUIRED | P0 pins `blakinio/canary@bc0068ab…`, Canary 3.6.1/client 1525/Current and capability families; deployment equality and generated numeric index missing | P1 CANARY-SOURCE-INDEX | P1/M2 |
-| Exact generated opcode/layout/source index | ABSENT | RELEASE_REQUIRED | P0 forbids handwritten tables and defines generator fields/fixtures | P1 CANARY-SOURCE-INDEX | P1 |
-| Exact post-admission bootstrap order fixtures | UNKNOWN | RELEASE_REQUIRED | source family known; controlled trace/fixture execution missing | P1 index then protocol bootstrap | M2 |
-| Map/floor/tile decoding | ABSENT | RELEASE_REQUIRED | source-backed family and package seam accepted | protocol-canary-map after game contract/index | M2 |
-| Creature/entity add/update/remove decoding | ABSENT | RELEASE_REQUIRED | source-backed family accepted | protocol-canary-entity | M2/M3 |
+| Exact post-admission capability inventory | PROVEN | RELEASE_REQUIRED | P1 generated 347 exact-source dispatch/send entries for `blakinio/canary@bc0068ab…`, release 3.6.1/client 1525/Current; deployed equality remains unknown | P2 runtime-baseline alignment then controlled staging | P2/M2 |
+| Exact generated opcode/layout/source index | PROVEN | RELEASE_REQUIRED | deterministic JSON/report records literal opcodes, dispatch phases, feature/build gates and source hashes; it does not invent missing field layouts | preserve generator; P2 Canary gameplay owner consumes read-only evidence | P2/M2 |
+| Exact post-admission bootstrap order fixtures | PARTIAL | RELEASE_REQUIRED | P1 fixture-feasibility metadata exists; provenance-safe field layouts and controlled post-admission execution remain missing | P2 Canary baseline/parser then controlled M2 acceptance | M2 |
+| Map/floor/tile decoding | ABSENT | RELEASE_REQUIRED | merged game events and exact source index exist; runtime source descriptors conflict with the `bc0068ab…` index and field layouts require exact evidence | P2 CANARY-WORLD-PROTOCOL | M2 |
+| Creature/entity add/update/remove decoding | ABSENT | RELEASE_REQUIRED | merged semantic entity events and source families exist; bounded wire mapping not implemented | P2 CANARY-WORLD-PROTOCOL for M2 subset | M2/M3 |
 | Item/appearance/effect/projectile decoding | ABSENT | RELEASE_REQUIRED | source families accepted; approved appearance contract missing | protocol world-visual after assets | M2/M3 |
 | Player stats/skills/conditions decoding | ABSENT | RELEASE_REQUIRED | source family accepted | protocol-canary-player | M3 |
-| Movement command encoding/acknowledgements | ABSENT | RELEASE_REQUIRED | source family accepted | protocol-canary-movement | M2/M3 |
+| Movement command encoding/acknowledgements | ABSENT | RELEASE_REQUIRED | merged `Step`/`StopMovement` commands and entity-move events exist; exact wire mapping not implemented | P2 CANARY-WORLD-PROTOCOL | M2/M3 |
 | Look/use/move-item commands | ABSENT | RELEASE_REQUIRED | source family accepted | protocol-canary-items/interactions | M3 |
 | Attack/follow/combat | ABSENT | RELEASE_REQUIRED | source family accepted | protocol-canary-combat | M3 |
 | Inventory/equipment/container protocol | ABSENT | RELEASE_REQUIRED | source family accepted | protocol-canary-items/containers | M3 |
@@ -88,10 +88,10 @@ Evidence inventory, source declarations or test methodology do not prove deploye
 
 | Capability | State | Release class | Current evidence/boundary | Next owner | Milestone |
 |---|---|---|---|---|---|
-| Canonical gameplay IDs/entity handles | ABSENT | RELEASE_REQUIRED | sole-producer invariant accepted | P1 GAME-DOMAIN-CONTRACT | P1 |
-| Closed `GameEvent` envelope | ABSENT | RELEASE_REQUIRED | minimum semantic family derived from P0 | P1 GAME-DOMAIN-CONTRACT | P1 |
-| Closed `GameCommand` envelope | ABSENT | RELEASE_REQUIRED | minimum semantic family derived from P0 | P1 GAME-DOMAIN-CONTRACT | P1 |
-| Single-writer simulation runtime | ABSENT | RELEASE_REQUIRED | architecture and scenario requirements accepted | post-P1 simulation-core | P2 |
+| Canonical gameplay IDs/entity handles | PROVEN | RELEASE_REQUIRED | merged `game-domain` owns bounded non-interchangeable session-scoped IDs/handles | preserve sole producer; P2 consumers | P1/M2 |
+| Closed `GameEvent` envelope | PROVEN | RELEASE_REQUIRED | merged v1 envelope covers bootstrap, tiles, entities, items, resources, containers and session end with generation checks | preserve; P2 protocol/simulation consumers | P1/M2 |
+| Closed `GameCommand` envelope | PROVEN | RELEASE_REQUIRED | merged v1 envelope covers movement, look/use/move-item, attack target and logout with session fencing | preserve; P2 input/protocol consumers | P1/M2 |
+| Single-writer simulation runtime | ABSENT | RELEASE_REQUIRED | P1 semantic events are merged; no authoritative mutable owner exists | P2 SIMULATION-SNAPSHOT | P2/M2 |
 | World/floor/chunk/tile state | ABSENT | RELEASE_REQUIRED | P0 map scenarios accepted | world-state | M2 |
 | Dynamic creature/entity storage | ABSENT | RELEASE_REQUIRED | P0 entity scenarios accepted | entity-state | M2/M3 |
 | Player state/stats/conditions | ABSENT | RELEASE_REQUIRED | P0 scenarios accepted | player-state | M3 |
@@ -99,7 +99,7 @@ Evidence inventory, source declarations or test methodology do not prove deploye
 | Chat/social state | ABSENT | RELEASE_REQUIRED | chat required M3; broader social later | chat-state/social-state | M3/M4 |
 | Combat/targeting/cooldown state | ABSENT | RELEASE_REQUIRED | P0 core gameplay scenarios accepted | combat-state | M3 |
 | Prediction/reconciliation | ABSENT | RELEASE_REQUIRED | server-authoritative boundary accepted | movement/simulation | M3 |
-| Immutable render snapshot | ABSENT | RELEASE_REQUIRED | sole-producer requirement accepted | post-P1 simulation/snapshot producer | P2/M2 |
+| Immutable render snapshot | ABSENT | RELEASE_REQUIRED | P1 domain contracts are merged; snapshot public producer remains absent | P2 SIMULATION-SNAPSHOT | P2/M2 |
 | UI view models/common semantic UI actions | ABSENT | RELEASE_REQUIRED | P0 decomposition accepted | post-P1 UI/common-action producer | P2/P3 |
 | Audio intents | ABSENT | RELEASE_REQUIRED | P0 requirements accepted | post-P1 audio-core | P3 |
 | Deterministic replayable domain tests | ABSENT | RELEASE_REQUIRED | scenario/evidence catalogue accepted | simulation/replay packages | M2-M6 |
@@ -109,10 +109,10 @@ Evidence inventory, source declarations or test methodology do not prove deploye
 | Capability | State | Release class | Current evidence/boundary | Next owner | Milestone |
 |---|---|---|---|---|---|
 | Synthetic asset schema/compiler | PROVEN | RELEASE_REQUIRED | typed IDs, pack v1, deterministic safe compiler | preserve as test infrastructure | all |
-| Immutable pack open/verify/index/lookup | ABSENT | RELEASE_REQUIRED | P0 threat model/contract accepted | P1 ASSET-PACK-RUNTIME | P1/M2 |
-| Generation-stable logical asset handles | ABSENT | RELEASE_REQUIRED | P0 runtime requirement accepted | P1 ASSET-PACK-RUNTIME | P1/M2 |
-| Bounded async decode/cache | ABSENT | RELEASE_REQUIRED | P0 package order accepted | post-P1 asset-decode | M2 |
-| RGBA texture upload/resource handles | ABSENT | RELEASE_REQUIRED | no renderer resource integration | renderer-resource | M2 |
+| Immutable pack open/verify/index/lookup | SYNTHETIC_ONLY | RELEASE_REQUIRED | merged `asset-runtime` verifies bounded synthetic-v1 bytes/readers and builds a canonical immutable index | P2 ASSET-DECODE consumer; production source separate | P1/M2 |
+| Generation-stable logical asset handles | SYNTHETIC_ONLY | RELEASE_REQUIRED | merged pack-generation-fenced handles reject stale lookup across synthetic-v1 runtimes | P2 decode/resource consumers | P1/M2 |
+| Bounded async decode/cache | ABSENT | RELEASE_REQUIRED | verified runtime payload/handle producer exists; CPU image decode/cache is absent | P2 ASSET-DECODE | M2 |
+| RGBA texture upload/resource handles | ABSENT | RELEASE_REQUIRED | synthetic `Rgba8` schema and runtime handles exist; no generation-fenced upload/cache producer | P2 RENDERER-RESOURCE after asset-decode | M2 |
 | Appearance/sprite/effect metadata | PARTIAL | RELEASE_REQUIRED | P0 identifies required normalized families and exact-profile dependency; approved production representation/source missing | appearance contract after P1/index/owner input | M2 |
 | Real Canary-compatible importer | ABSENT | RELEASE_REQUIRED | P0 importer families/threat boundaries accepted | approved source-family importer | M2-M5 |
 | Production asset provenance/rights | BLOCKED | OWNER_DECISION_NEEDED | rights matrix exists; no approved production source/local-import/redistribution decision | owner/legal | M2/M6 |
@@ -127,7 +127,7 @@ Evidence inventory, source declarations or test methodology do not prove deploye
 | Capability | State | Release class | Current evidence/boundary | Next owner | Milestone |
 |---|---|---|---|---|---|
 | DX12 device/surface lifecycle | PARTIAL | RELEASE_REQUIRED | compile/tests; no named desktop/device-loss evidence | renderer platform acceptance | M2/M4 |
-| Render resource cache/handles | ABSENT | RELEASE_REQUIRED | P0 dependencies accepted | renderer-resource after asset handles | M2 |
+| Render resource cache/handles | ABSENT | RELEASE_REQUIRED | renderer device owner and synthetic asset handles exist; resource producer remains absent | P2 RENDERER-RESOURCE | M2 |
 | Camera/floor visibility extraction | ABSENT | RELEASE_REQUIRED | scenario requirements accepted | world-renderer | M2 |
 | Tile/item/creature sprite batching | ABSENT | RELEASE_REQUIRED | requirements accepted | world-renderer | M2 |
 | Projectiles/effects/animations | ABSENT | RELEASE_REQUIRED | requirements accepted | effects-renderer | M2/M3 |
@@ -165,9 +165,9 @@ Evidence inventory, source declarations or test methodology do not prove deploye
 
 | Capability | State | Release class | Current evidence/boundary | Next owner | Milestone |
 |---|---|---|---|---|---|
-| Normalized physical input state | ABSENT | RELEASE_REQUIRED | P0 contract requirements accepted | P1 INPUT-ACTIONS | P1/M2 |
-| Semantic actions/contexts/bindings | ABSENT | RELEASE_REQUIRED | P0 precedence/conflict/lifecycle requirements accepted | P1 INPUT-ACTIONS | P1/M2 |
-| Movement/camera action mapping | ABSENT | RELEASE_REQUIRED | waits for input and game commands | gameplay input feature | M2 |
+| Normalized physical input state | PROVEN | RELEASE_REQUIRED | merged `input-actions` owns bounded framework-neutral key/mouse/pointer/wheel/text/focus/capture/device-loss events | P2 INPUT-PLATFORM adapter | P1/M2 |
+| Semantic actions/contexts/bindings | PROVEN | RELEASE_REQUIRED | merged deterministic actions/contexts/bindings include precedence, conflicts, repeat and lifecycle; unreachable wheel chords fail explicitly | P2 visible-world binding consumer | P1/M2 |
+| Movement/camera action mapping | ABSENT | RELEASE_REQUIRED | merged semantic input and game commands exist; platform adapter and product binding map are absent | P2 INPUT-PLATFORM then VISIBLE-WORLD-INTEGRATION | M2 |
 | Mouse picking/context actions | ABSENT | RELEASE_REQUIRED | waits for snapshots/UI | viewport interaction | M3 |
 | Drag/drop and capture | ABSENT | RELEASE_REQUIRED | requirements accepted | UI/input integration | M3 |
 | Configurable hotkeys/conflicts | ABSENT | RELEASE_REQUIRED | contract requirements accepted; persistence later | input settings | M3/M4 |
@@ -182,7 +182,7 @@ Evidence inventory, source declarations or test methodology do not prove deploye
 | Capability | State | Release class | Current evidence/boundary | Next owner | Milestone |
 |---|---|---|---|---|---|
 | Controlled staging technical-login runbook | PARTIAL | RELEASE_REQUIRED | P0 evidence contract/scenario exists; environment/account/cut missing | owner/operations then M1 staging task | M1 |
-| Minimum-visible-world E2E | ABSENT | RELEASE_REQUIRED | exact start/actions/observables defined | P2 vertical slice E2E | M2 |
+| Minimum-visible-world E2E | ABSENT | RELEASE_REQUIRED | P1 producers are merged and P2 staged journey is defined; no composed synthetic or controlled runtime evidence yet | P2 VISIBLE-WORLD-INTEGRATION then CONTROLLED-M2-ACCEPTANCE | M2 |
 | Core gameplay scenario suite | ABSENT | RELEASE_REQUIRED | P0 M3 catalogue accepted | P3 E2E | M3 |
 | Multi-hour soak/network-loss scenarios | PARTIAL | RELEASE_REQUIRED | methodology/scenarios accepted; runtime absent | reliability programme | M4/M6 |
 | Launcher/install/repair | ABSENT | RELEASE_REQUIRED | scenario/dependency map accepted | launcher programme | M4/M6 |
@@ -228,20 +228,31 @@ Each later family remains one bounded protocol/domain/UI/scenario package, never
 - telemetry/privacy/support-data policy;
 - signing credentials, release channel, rollback authority and final M5 feature subset.
 
-These decisions block deployment/release claims, not the bounded synthetic/source P1 contract spine.
+These decisions do not block bounded original synthetic P2 producer work. They block controlled compatibility, M2 completion, deployment and release claims.
 
-## 11. Accepted P1 contract spine
+## 11. P1 completion result and accepted P2 wave
 
-P1 plan: `WAVE_P1_CONTRACT_SPINE.md`.
+P1 is complete:
 
-| Order | Package | Public responsibility | State before P1 | Required dependency |
-|---|---|---|---|---|
-| 1 | CANARY-SOURCE-INDEX | deterministic exact-source evidence/fixture metadata; no runtime types | ABSENT | accepted exact source cut |
-| 2 | GAME-DOMAIN-CONTRACT | canonical IDs/handles plus closed `GameEvent`/`GameCommand` | ABSENT | foundation only |
-| 3 | ASSET-PACK-RUNTIME | synthetic-v1 immutable open/verify/index/lookup and logical handles | ABSENT | asset-types/compiler read-only |
-| 4 | INPUT-ACTIONS | normalized physical events and semantic action/context contracts | ABSENT | foundation only |
+- all four contract producers and separate lifecycle archives are merged;
+- game-domain is the sole gameplay ID/event/command producer;
+- the Canary source index is deterministic exact-source evidence for `bc0068ab…`, not deployment proof;
+- asset-runtime and input-actions are merged within their synthetic/framework-neutral boundaries;
+- all P1 shared integration leases are released.
 
-Only one shared integration lease holder may modify workspace/lockfile/architecture paths. Game-domain is the first merged public gameplay contract. Asset-runtime and input-actions are independent producers but integrate serially. No simulation, protocol gameplay parser, UI/audio producer, renderer resource or app composition is authorized in P1.
+Accepted next plan: `WAVE_P2_MINIMUM_VISIBLE_WORLD.md`.
+
+| Stage | Package | Sole responsibility | Launch dependency |
+|---|---|---|---|
+| A | SIMULATION-SNAPSHOT | authoritative mutable state and immutable render snapshots | P1 barrier archive |
+| A | CANARY-WORLD-PROTOCOL | `bc0068ab…` baseline alignment plus bounded M2 decode/encode | P1 barrier archive and exact layout evidence |
+| A | ASSET-DECODE | bounded immutable CPU RGBA decode | P1 barrier archive |
+| A | INPUT-PLATFORM | Windows/winit adapter into normalized physical events | P1 barrier archive |
+| B | RENDERER-RESOURCE | generation-fenced upload plans/resource handles/cache | ASSET-DECODE merge/archive |
+| C | VISIBLE-WORLD-INTEGRATION | serialized synthetic world renderer/app composition and product bindings | all P2 producers merge/archive |
+| D | CONTROLLED-M2-ACCEPTANCE | exact login -> world -> move/reconcile -> logout runtime proof | integration archive plus named owner inputs |
+
+Producer packages may complete only their bounded claims. Synthetic visible-world composition remains `SYNTHETIC_ONLY`; M2 is complete only after controlled acceptance passes on a named exact environment.
 
 ## 12. P0 completion result
 

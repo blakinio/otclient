@@ -28,13 +28,15 @@ optional_reads: []
 
 ## Context checkpoint
 
+Checkpoint structure remains version 1. Policy revision 2 adds `waiting`, `completed`, and `NOT_APPLICABLE` without invalidating existing checkpoints. `ROTATE` is an invocation result, never a task status.
+
 ```yaml
 checkpoint_version: 1
 updated_at: YYYY-MM-DDTHH:MM:SSZ
 head: UNKNOWN
 branch: <task-branch>
 pr: none
-status: investigating
+status: investigating # investigating|implementing|validating|ready|waiting|blocked|completed
 context_routes:
   - none
 owned_paths:
@@ -52,8 +54,8 @@ rejected_hypotheses: []
 changed_paths: []
 validation:
   - command: not-run
-    result: NOT_RUN
-    evidence: none
+    result: NOT_RUN # PASS|FAIL|BLOCKED|NOT_RUN|NOT_APPLICABLE
+    evidence: task not yet implemented # concrete reason required for NOT_APPLICABLE
 blockers: []
 next_action: <exactly one concrete next step>
 ```

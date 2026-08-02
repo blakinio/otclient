@@ -18,7 +18,7 @@ required_base_commit: "8f6c96bacef7e99f48f28422d9c7b6c5cb60c4bf"
 risk: low
 related_pr: "#166"
 merge_commit: "7e3dba19b795dbf3c2944bd41f11ddc710df9ca5"
-archive_pr: "pending"
+archive_pr: "#167"
 depends_on: []
 integration_after: []
 owned_paths: []
@@ -46,7 +46,7 @@ security_evidence:
 
 ## Terminal result
 
-PR #166 merged the mandatory root Codex bootstrap to `main` as `7e3dba19b795dbf3c2944bd41f11ddc710df9ca5`. This archive change removes the active task and releases ownership.
+PR #166 merged the mandatory root Codex bootstrap to `main` as `7e3dba19b795dbf3c2944bd41f11ddc710df9ca5`. PR #167 removes the active task, archives this terminal record and releases ownership.
 
 ## Closeout
 
@@ -80,10 +80,10 @@ pull_requests:
   unresolved_review_threads: 0
   terminal_prs:
     - blakinio/otclient#166 merged as 7e3dba19b795dbf3c2944bd41f11ddc710df9ca5
-  archive_pr: pending
+  archive_pr: blakinio/otclient#167
 task_archived_or_terminal: true
 ownership_released: true
 stale_branches_reconciled: true
 ```
 
-No material finding or blocker remains. The archive PR is the sole intentionally open related PR until it merges.
+No material finding or blocker remains. PR #167 is the sole intentionally open related PR and becomes terminal when merged.

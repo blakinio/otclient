@@ -10,7 +10,7 @@ The absence of Codex or a local terminal is not, by itself, a task blocker. When
 
 This contract never weakens repository safety, ownership, scope, production, credential, secret, deployment, database or data, payment, authentication, protocol, asset, live-capital, or cross-repository restrictions. It is subordinate to `ANTI_STALL_AND_EXECUTION_BUDGET.md`; GitHub-only execution remains bounded, including final required-CI and protected auto-merge waiting.
 
-The repository owner durably authorizes autonomous agents to complete their own task lifecycle through merge or auto-merge only when every merge gate in this contract and the repository is satisfied. Production and other protected live operations remain separately protected.
+The repository owner durably authorizes agents to configure protected auto-merge or merge-queue admission under the preconditions below and to complete their own task lifecycle through actual merge only after every merge gate in this contract and the repository is satisfied. Production and other protected live operations remain separately protected.
 
 ## Authority freeze
 

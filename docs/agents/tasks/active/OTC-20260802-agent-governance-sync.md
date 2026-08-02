@@ -1,11 +1,11 @@
 ---
 task_id: OTC-20260802-agent-governance-sync
-status: implementing
+status: validating
 branch: docs/OTC-20260802-agent-governance-sync
 base_branch: main
 created: 2026-08-02
 updated: 2026-08-02
-related_pr: ""
+related_pr: "172"
 owned_paths:
   - AGENTS.override.md
   - docs/agents/AGENTS.md
@@ -33,19 +33,19 @@ Apply the backward-compatible portfolio governance correction without changing O
 
 ## Acceptance criteria
 
-- Shared status, budget, validation, audit and authority semantics are internally consistent.
-- Checkpoint validation accepts waiting/completed and NOT_APPLICABLE.
-- Exact-head governance checks pass on the final PR head.
+- [x] Shared status, budget, validation, audit and authority semantics are internally consistent.
+- [x] Checkpoint validation accepts waiting/completed and NOT_APPLICABLE.
+- [ ] Exact-head governance checks pass on the final PR head.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-02T12:33:00Z
-head: UNKNOWN
+updated_at: 2026-08-02T13:08:00Z
+head: b7192b89776b027c73fb89ef9714496ba5253d08
 branch: docs/OTC-20260802-agent-governance-sync
-pr: none
-status: implementing
+pr: 172
+status: validating
 context_routes:
   - agent-governance
 owned_paths:
@@ -59,23 +59,33 @@ owned_paths:
   - docs/agents/CONTEXT_HANDOFF.md
   - docs/agents/tasks/TASK_TEMPLATE.md
 proven:
-  - The current governance contract rejects waiting and completed checkpoint states.
-  - The current task-count key conflicts with the documented next-task rule.
+  - The portable governance contract now accepts waiting, completed and NOT_APPLICABLE.
+  - Task status is separated from terminal invocation result.
+  - The anti-stall contract permits at most one additional task after the terminal entry task.
 derived:
-  - Additive accepted values preserve all existing version 1 checkpoints.
+  - Existing valid checkpoint version 1 records remain valid under the additive revision.
 unknown:
-  - Exact governance workflow results on the future PR head.
+  - Exact-head Agent Governance workflow result for PR 172.
 conflicts: []
 first_failure:
   marker: none
   evidence: none
 rejected_hypotheses: []
 changed_paths:
+  - AGENTS.override.md
+  - docs/agents/AGENTS.md
+  - docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md
+  - docs/agents/AUTONOMOUS_PROGRAM_CONTINUATION.md
+  - docs/agents/CONTEXT_HANDOFF.md
+  - docs/agents/DELIVERY_COMPLETENESS_AND_CLOSEOUT.md
+  - docs/agents/GITHUB_ONLY_EXECUTION.md
+  - docs/agents/GOVERNANCE_CONTRACT.json
+  - docs/agents/tasks/TASK_TEMPLATE.md
   - docs/agents/tasks/active/OTC-20260802-agent-governance-sync.md
 validation:
   - command: Agent Governance workflow
     result: NOT_RUN
-    evidence: PR not yet opened
+    evidence: draft PR 172 opened; exact-head checks pending
 blockers: []
-next_action: update the shared governance documents and portable checkpoint contract
+next_action: inspect exact-head workflow results for PR 172 and repair any governance failure
 ```

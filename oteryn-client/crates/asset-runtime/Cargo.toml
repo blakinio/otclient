@@ -14,5 +14,8 @@ category = "asset-runtime"
 [dependencies]
 oteryn-asset-types = { version = "=0.1.0", path = "../asset-types" }
 
+[dev-dependencies]
+oteryn-asset-compiler = { version = "=0.1.0", path = "../../tools/asset-compiler" }
+
 [lints]
 workspace = true

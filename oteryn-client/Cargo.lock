@@ -1443,6 +1443,7 @@ dependencies = [
 name = "oteryn-asset-runtime"
 version = "0.1.0"
 dependencies = [
+ "oteryn-asset-compiler",
  "oteryn-asset-types",
 ]
 

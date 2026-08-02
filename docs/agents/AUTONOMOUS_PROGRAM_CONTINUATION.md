@@ -1,14 +1,14 @@
 # Autonomous Program Continuation Contract
 
 ```yaml
-autonomous_program_contract_version: 2.2
+autonomous_program_contract_version: 2.3
 ```
 
 ## Purpose
 
 One short owner command may drive a long, low-noise foreground programme run. The owner should not have to restart every phase, paste worker prompts, request missing consumers after producer-only work, or clean up abandoned PRs and active tasks.
 
-This contract supplements prompting, evaluation, trust, feature-completeness, closeout, execution, and handoff contracts. Stricter repository safety, authorization, production, ownership, merge, and cross-repository rules prevail. `ANTI_STALL_AND_EXECUTION_BUDGET.md` bounds every invocation.
+This contract supplements prompting, evaluation, trust, feature-completeness, closeout, execution, and handoff contracts. Stricter repository safety, authorization, production, ownership, merge, and cross-repository rules prevail. `ANTI_STALL_AND_EXECUTION_BUDGET.md` bounds every invocation, including the terminal-CI wait exception.
 
 ## Core distinction
 
@@ -75,7 +75,7 @@ Repeat while a safe action is available and the execution budget permits:
 9. **Audit** — use a fresh independent validator to attempt to falsify acceptance.
 10. **Remediate** — repair material findings and rerun affected validation and audit gates.
 11. **E2E** — exercise the real user or system path across the real producer and consumer.
-12. **Final CI** — verify every required check on the exact final head.
+12. **Final CI** — verify every required check on the exact final head and use bounded terminal-CI continuation when eligible.
 13. **Close PRs and reviews** — make every related PR intentionally terminal and resolve review threads.
 14. **Finalize task** — write terminal evidence, set `status: completed`, archive or terminally close the task, and release ownership or leases.
 15. **Review barrier** — refresh dependencies, programme state, and stale related work.
@@ -118,10 +118,28 @@ Checkpoint so work survives context loss, tool failure, rotation, or takeover. A
 
 - continue immediately when `next_action` is safe;
 - return `ROTATE` only when a fresh role or context is safer or required;
-- use `status: waiting` for unchanged external dependencies;
-- keep the owner invocation active only while useful work and budget remain.
+- use `status: waiting` for unchanged external dependencies after any applicable bounded terminal-CI continuation is exhausted or ineligible;
+- keep the owner invocation active only while useful work or eligible bounded terminal-CI completion remains inside the budget.
 
 Do not turn checkpoint cadence into owner-interaction cadence.
+
+## Terminal CI and protected merge continuation
+
+When implementation, audit, E2E and review hygiene for the entry task are complete and the only remaining gate is final required CI, branch protection, protected auto-merge or merge-queue completion, follow the bounded exception in `ANTI_STALL_AND_EXECUTION_BUDGET.md`.
+
+During that exception:
+
+- remain in the same foreground owner invocation;
+- preserve the exact final head;
+- configure authorized auto-merge or merge-queue admission once;
+- respect the terminal wait budget, minimum poll interval and per-generation check cap;
+- recognize draft, ready-state and merge-queue checks as distinct generations only when GitHub creates a new required-check set;
+- do not return `WAITING` solely because eligible required CI remains pending before the bounded limits are exhausted;
+- do not claim background execution when the environment cannot perform a bounded wait or delayed recheck;
+- after success, verify the resulting PR and merge state immediately;
+- after merge, continue directly into mandatory archive/terminal closeout for the same entry task when remaining runtime permits.
+
+A repository-required lifecycle-only archive PR is part of the entry task closeout, not an additional programme task. It must not be created before the implementation merge and must not be used merely to prolong activity.
 
 ## Fresh independent audit
 
@@ -173,15 +191,17 @@ A task may become `completed` only after:
 9. ownership, worktree, and leases are released;
 10. stale branches or indexes are reconciled through approved mechanisms.
 
-Afterwards review the barrier and start at most one additional task when the anti-stall budget allows it.
+Required post-merge archival and ownership release remain part of the same entry task. Afterwards review the barrier and start at most one additional task when the anti-stall budget allows it.
 
 ## Waiting and external events
 
-Do not keep a worker active merely to wait for CI, another task, deployment, an observation window, a scheduled run, or an owner reply.
+Do not keep a worker active merely to wait for another task, deployment, an observation window, a scheduled run, an owner reply, or ordinary non-terminal CI.
 
-Persist exact `status: waiting` evidence and one `next_action`, release the worker or lease where appropriate, and execute other independent work already inside the same task. Start an additional task only under the anti-stall gate. Return when every authorized path is waiting or blocked, or another real stop condition applies.
+Final required exact-head CI, protected auto-merge and merge-queue completion are the sole waiting exception and only under the bounded terminal-CI contract. Persist exact head, check generation, run IDs, counters and one `next_action` when that exception is ineligible or exhausted.
 
-Repeated status polling is not useful work.
+Execute other independent work only when it already belongs to the same declared task and is genuinely useful. Start an additional task only under the anti-stall gate. Return when every authorized path is waiting or blocked, the terminal-CI limit is exhausted, or another real stop condition applies.
+
+Repeated status polling outside the bounded terminal-CI exception is not useful work.
 
 ## Parallel work
 
@@ -201,13 +221,14 @@ Stop when:
 
 - all currently authorized programme work within the invocation budget is complete;
 - no safe `READY` action remains and all remaining work is genuinely waiting or blocked;
+- the eligible terminal-CI time, check or foreground-runtime limit is exhausted;
 - the additional-task allowance has been consumed;
 - a material owner, authority, product, or architecture decision is required;
 - ownership conflict or a safety rule prevents continuation;
 - production, credentials, protected data, irreversible effects, or live capital require separate authorization;
 - context, tool, or environment limits make continuation unsafe;
 - allowed repair attempts failed and the defect requires a fresh isolation phase;
-- an anti-stall limit is reached.
+- another anti-stall limit is reached.
 
 Phase completion, checkpoint, commit, PR creation, green CI, merge, audit, E2E, PR cleanup, task archival, or worker-session end are not stop conditions by themselves.
 
@@ -231,6 +252,7 @@ Do not:
 - skip fresh audit for material work;
 - leave duplicate, superseded, abandoned, or request-only PRs open;
 - leave completed tasks falsely active or ownership claimed;
-- poll indefinitely instead of doing safe work;
+- poll indefinitely or more frequently than the bounded terminal-CI policy permits;
+- classify the required archive closeout of the entry task as an additional READY task;
 - start more than one additional task after the entry task;
 - silently broaden authorization or bypass safety or merge gates.

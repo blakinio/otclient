@@ -1477,6 +1477,13 @@ name = "oteryn-foundation"
 version = "0.1.0"
 
 [[package]]
+name = "oteryn-game-domain"
+version = "0.1.0"
+dependencies = [
+ "oteryn-foundation",
+]
+
+[[package]]
 name = "oteryn-game-session"
 version = "0.1.0"
 dependencies = [

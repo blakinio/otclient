@@ -1,0 +1,123 @@
+name: Temporary OTC2 Canary source index generation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tmp-otc2-canary-index-generate
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    if: github.head_ref == 'tmp/OTC2-20260801-canary-index-generate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source-index task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: "tools/OTC2-20260801-playability-p1-canary-source-index"
+          fetch-depth: 0
+          show-progress: false
+          token: ${{ github.token }}
+
+      - name: Restack on exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          base="$(git rev-parse origin/main)"
+          git merge --no-edit --no-ff "$base"
+          test "$(git rev-parse HEAD^2)" = "$base"
+
+      - name: Checkout exact Canary producer cut
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: blakinio/canary
+          ref: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+          path: producer
+          fetch-depth: 1
+          show-progress: false
+          persist-credentials: false
+
+      - name: Validate generator unit corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover \
+            -s oteryn-client/tools/canary-protocol-index \
+            -p 'test_*.py' \
+            -v
+
+      - name: Generate twice and compare exact bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision=bc0068ab80bbf003e128fce0589b4cc89d2682d3
+          first="${RUNNER_TEMP}/first"
+          second="${RUNNER_TEMP}/second"
+          mkdir -p "$first" "$second"
+          for output in "$first" "$second"; do
+            python oteryn-client/tools/canary-protocol-index/generate.py \
+              --source-root producer \
+              --producer-revision "$revision" \
+              --protocol-output "$output/protocol.md" \
+              --fixture-output "$output/fixtures.md" \
+              --json-output "$output/index.json"
+          done
+          cmp "$first/protocol.md" "$second/protocol.md"
+          cmp "$first/fixtures.md" "$second/fixtures.md"
+          cmp "$first/index.json" "$second/index.json"
+
+          python - "$first/index.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          entries = payload["entries"]
+          inbound = [entry for entry in entries if entry["direction"] == "client-to-server"]
+          outbound = [entry for entry in entries if entry["direction"] == "server-to-client"]
+          if len(inbound) < 50:
+              raise SystemExit(f"too few inbound entries: {len(inbound)}")
+          if len(outbound) < 50:
+              raise SystemExit(f"too few outbound entries: {len(outbound)}")
+          if payload["producer"]["client_version"] != 1525:
+              raise SystemExit("unexpected producer client version")
+          if payload["producer"]["revision"] != "bc0068ab80bbf003e128fce0589b4cc89d2682d3":
+              raise SystemExit("producer revision drift")
+          if "CurrentPayload" not in payload["enabled_features"]:
+              raise SystemExit("Current profile feature extraction failed")
+          print(f"entries={len(entries)} inbound={len(inbound)} outbound={len(outbound)} unresolved={len(payload['unresolved_declarations'])}")
+          PY
+
+          mkdir -p \
+            oteryn-client/docs/evidence/playability/p1 \
+            oteryn-client/tools/canary-protocol-index/generated
+          cp "$first/protocol.md" \
+            oteryn-client/docs/evidence/playability/p1/canary-current-source-index.md
+          cp "$first/fixtures.md" \
+            oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md
+          cp "$first/index.json" \
+            oteryn-client/tools/canary-protocol-index/generated/current-index.json
+
+      - name: Commit exact-source artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add \
+            oteryn-client/docs/evidence/playability/p1/canary-current-source-index.md \
+            oteryn-client/docs/evidence/playability/p1/canary-current-fixture-index.md \
+            oteryn-client/tools/canary-protocol-index/generated/current-index.json
+          git commit -m "docs(canary-index): generate exact current source evidence"
+          git push origin HEAD:tools/OTC2-20260801-playability-p1-canary-source-index

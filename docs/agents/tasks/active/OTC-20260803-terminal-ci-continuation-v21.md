@@ -62,9 +62,41 @@ Governance documentation only. No client code, protocol, assets, workflows, bran
 - [x] require WAITING or ROTATE after the terminal-CI budget is exhausted;
 - [x] align every higher-priority routing document that previously forced an early stop;
 - [ ] pass exact-head repository CI;
-- [ ] complete a fresh contradiction/scope audit.
+- [x] complete a fresh contradiction/scope audit.
 
-## Review findings already repaired
+## Fresh contradiction and scope audit
+
+```yaml
+validator_role: fresh-governance-falsification
+primary_inputs:
+  - task acceptance criteria
+  - complete live PR 181 diff
+  - root and local agent routing hierarchy
+  - anti-stall and GitHub-only merge constraints
+audited_policy_head: ba22376ca111972b882c4f87f64e1f4dbb951b0e
+result: PASS_WITH_REPAIRS
+open_material_findings: 0
+scope:
+  changed_paths: 6
+  unexpected_paths: 0
+  client_code: 0
+  protocol_or_assets: 0
+  workflows_or_branch_protection: 0
+  production_or_external_state: 0
+invariants:
+  ordinary_two_check_limit_preserved: true
+  terminal_wait_time_bounded: true
+  minimum_interval_required: true
+  per_generation_check_cap_required: true
+  time_budget_not_reset_between_generations: true
+  dedicated_terminal_counters: true
+  branch_protection_required: true
+  direct_merge_before_required_ci: forbidden
+  hidden_background_execution: forbidden
+  archive_closeout_is_same_entry_task: true
+```
+
+## Findings repaired
 
 ```yaml
 TERMINAL-CI-001:
@@ -75,20 +107,22 @@ TERMINAL-CI-002:
   severity: medium
   finding: root and local bootstrap still required auto-merge to wait for final CI, conflicting with protected pre-authorization of ready-state checks
   disposition: repaired while preserving direct-merge prohibition and branch protection
+TERMINAL-CI-003:
+  severity: medium
+  finding: GitHub-only purpose text could conflate configuring protected auto-merge with the actual merge gate
+  disposition: repaired by separating pre-CI protected auto-merge admission from post-CI actual merge authority
 ```
 
-## Diff review
+## Validation classification
 
 ```yaml
-implementation_head_before_checkpoint: 64e22a80287ea66c554fd426d099e61e6d238c2c
-changed_paths: 6
-unexpected_paths: 0
-client_protocol_asset_workflow_changes: 0
-ordinary_ci_limit_preserved: true
-terminal_ci_wait_is_bounded: true
-branch_protection_required: true
-direct_merge_before_required_ci: forbidden
-background_execution_claimed: false
+e2e:
+  result: NOT_APPLICABLE
+  reason: documentation-only agent-governance change with no executable client, protocol, asset, workflow or production behavior
+review_threads: 0
+requested_changes: 0
+related_open_prs:
+  - blakinio/otclient#181
 ```
 
 ## Checkpoint
@@ -97,5 +131,7 @@ background_execution_claimed: false
 base: c911e0f6fa7ad6e8824dd5e0e44e154abbbdcbc1
 status: validating
 pr: 181
-next_action: Perform a fresh exact-diff contradiction and scope audit, update the PR evidence, then mark PR #181 ready and validate the exact final head through repository CI.
+audit: PASS_WITH_REPAIRS
+open_material_findings: 0
+next_action: Mark PR #181 ready, validate repository-required CI on the exact final head, then use protected auto-merge only after the trusted-base merge gates permit it.
 ```

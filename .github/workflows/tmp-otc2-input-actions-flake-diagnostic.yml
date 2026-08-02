@@ -1,0 +1,46 @@
+name: Temporary OTC2 input-actions unrelated test diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tmp-otc2-input-actions-flake-diagnostic
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    if: github.head_ref == 'tmp/OTC2-20260801-input-actions-integrate'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: "feat/OTC2-20260801-playability-p1-input-actions"
+          fetch-depth: 1
+          show-progress: false
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install 1.94.0 --profile minimal
+
+      - name: Repeat unrelated failing test
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            echo "diagnostic attempt ${attempt}"
+            cargo +1.94.0 test --manifest-path oteryn-client/Cargo.toml \
+              -p oteryn-app-runtime \
+              shutdown_is_nonblocking_reports_overdue_and_eventually_joins \
+              -- --exact --nocapture
+          done

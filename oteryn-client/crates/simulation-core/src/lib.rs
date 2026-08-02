@@ -38,7 +38,8 @@ impl SimulationLimits {
     ///
     /// # Errors
     ///
-    /// Returns [`SimulationError::ZeroLimit`] for the first zero limit.
+    /// Returns [`SimulationError::ZeroLimit`] for the first zero limit and
+    /// [`SimulationError::LimitTooLarge`] when a value exceeds its hard ceiling.
     pub fn try_new(
         max_tiles: usize,
         max_stack_entries_per_tile: usize,
@@ -350,6 +351,10 @@ pub enum SimulationError {
     },
     /// Two item instances attempted to occupy one non-tile location.
     OccupiedItemLocation(ObjectLocation),
+    /// Active state has no established local player handle.
+    MissingLocalPlayer,
+    /// Active state references a local player entity that is no longer tracked.
+    LocalPlayerMissing(EntityHandle),
     /// A local player handle was declared with a non-player entity kind.
     LocalPlayerKindMismatch(EntityHandle),
 }
@@ -404,6 +409,12 @@ impl Display for SimulationError {
             }
             Self::OccupiedItemLocation(_) => {
                 formatter.write_str("item location is already occupied")
+            }
+            Self::MissingLocalPlayer => {
+                formatter.write_str("active simulation has no local player handle")
+            }
+            Self::LocalPlayerMissing(_) => {
+                formatter.write_str("active simulation lost the local player entity")
             }
             Self::LocalPlayerKindMismatch(_) => {
                 formatter.write_str("local player entity must use player kind")
@@ -818,7 +829,7 @@ impl WorldState {
             } => {
                 self.ensure_world_event(kind)?;
                 self.validate_item_location(*location)?;
-                self.items.insert(
+                self.replace_item(
                     *item,
                     ItemState {
                         item_type: *item_type,
@@ -875,7 +886,7 @@ impl WorldState {
                     slot: *slot,
                 };
                 self.validate_item_location(location)?;
-                self.items.insert(
+                self.replace_item(
                     *item,
                     ItemState {
                         item_type: *item_type,
@@ -936,6 +947,13 @@ impl WorldState {
         )
     }
 
+    fn replace_item(&mut self, item: ItemHandle, state: ItemState) {
+        let location = state.location;
+        self.items
+            .retain(|existing, stored| *existing == item || stored.location != location);
+        self.items.insert(item, state);
+    }
+
     fn validate_item_location(&self, location: ObjectLocation) -> Result<(), SimulationError> {
         if let ObjectLocation::Container { container, slot } = location {
             let stored = self
@@ -954,6 +972,19 @@ impl WorldState {
     }
 
     fn validate(&self, limits: SimulationLimits) -> Result<(), SimulationError> {
+        if self.phase == SimulationPhase::Active {
+            let player = self
+                .local_player
+                .ok_or(SimulationError::MissingLocalPlayer)?;
+            let entity = self
+                .entities
+                .get(&player)
+                .ok_or(SimulationError::LocalPlayerMissing(player))?;
+            if entity.kind != EntityKind::Player {
+                return Err(SimulationError::LocalPlayerKindMismatch(player));
+            }
+        }
+
         enforce_capacity(
             LimitKind::Entities,
             limits.max_entities,
@@ -1408,6 +1439,198 @@ mod tests {
             SimulationLimits::try_new(0, 1, 1, 1, 1, 1),
             Err(SimulationError::ZeroLimit(LimitKind::Tiles))
         );
+    }
+
+    #[test]
+    fn removing_local_player_is_rejected_atomically() -> Result<(), Box<dyn std::error::Error>> {
+        let session = token(9);
+        let player = entity(session, 1)?;
+        let player_position = position(8, 8);
+        let mut simulation = Simulation::new(session, limits()?);
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::BootstrapStarted,
+        )?)?;
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::BootstrapCompleted {
+                player,
+                position: player_position,
+            },
+        )?)?;
+        let before = simulation.clone();
+
+        assert_eq!(
+            simulation.apply(&GameEventEnvelope::v1(
+                session,
+                GameEvent::EntityRemoved {
+                    entity: player,
+                    position: player_position,
+                },
+            )?),
+            Err(SimulationError::LocalPlayerMissing(player))
+        );
+        assert_eq!(simulation, before);
+        Ok(())
+    }
+
+    #[test]
+    fn clearing_local_player_tile_is_rejected_atomically() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let session = token(10);
+        let player = entity(session, 1)?;
+        let player_position = position(9, 9);
+        let mut simulation = Simulation::new(session, limits()?);
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::BootstrapStarted,
+        )?)?;
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::BootstrapCompleted {
+                player,
+                position: player_position,
+            },
+        )?)?;
+        let before = simulation.clone();
+
+        assert_eq!(
+            simulation.apply(&GameEventEnvelope::v1(
+                session,
+                GameEvent::TileCleared {
+                    position: player_position,
+                },
+            )?),
+            Err(SimulationError::LocalPlayerMissing(player))
+        );
+        assert_eq!(simulation, before);
+        Ok(())
+    }
+
+    #[test]
+    fn changed_item_replaces_previous_item_at_location() -> Result<(), Box<dyn std::error::Error>> {
+        let session = token(11);
+        let first = item(session, 1)?;
+        let second = item(session, 2)?;
+        let location = ObjectLocation::Tile {
+            position: position(2, 2),
+            stack: StackIndex::new(1),
+        };
+        let mut simulation = Simulation::new(session, limits()?);
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::BootstrapStarted,
+        )?)?;
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::ItemChanged {
+                item: first,
+                item_type: ItemTypeId::try_new(100)?,
+                count: ItemCount::try_new(1)?,
+                location,
+            },
+        )?)?;
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::ItemChanged {
+                item: second,
+                item_type: ItemTypeId::try_new(101)?,
+                count: ItemCount::try_new(2)?,
+                location,
+            },
+        )?)?;
+
+        assert_eq!(simulation.item_count(), 1);
+        let snapshot = simulation.snapshot()?;
+        assert!(matches!(
+        snapshot.tiles()[0].entries()[0].object(),
+        RenderObject::Item { item, .. } if *item == second
+              ));
+        Ok(())
+    }
+
+    #[test]
+    fn container_slot_change_replaces_previous_item() -> Result<(), Box<dyn std::error::Error>> {
+        let session = token(12);
+        let container = ContainerHandle::new(session, ContainerId::try_new(1)?);
+        let first = item(session, 1)?;
+        let second = item(session, 2)?;
+        let slot = ContainerSlot::new(0);
+        let mut simulation = Simulation::new(session, limits()?);
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::BootstrapStarted,
+        )?)?;
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::ContainerOpened {
+                container,
+                title: NameText::try_new("Bag")?,
+                capacity: ContainerCapacity::try_new(2)?,
+            },
+        )?)?;
+        for object in [first, second] {
+            simulation.apply(&GameEventEnvelope::v1(
+                session,
+                GameEvent::ContainerSlotChanged {
+                    container,
+                    slot,
+                    item: object,
+                    item_type: ItemTypeId::try_new(50)?,
+                    count: ItemCount::try_new(1)?,
+                },
+            )?)?;
+        }
+        assert_eq!(simulation.item_count(), 1);
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::ItemRemoved {
+                item: second,
+                location: ObjectLocation::Container { container, slot },
+            },
+        )?)?;
+        assert_eq!(simulation.item_count(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn entity_capacity_failure_is_atomic() -> Result<(), Box<dyn std::error::Error>> {
+        let session = token(13);
+        let player = entity(session, 1)?;
+        let other = entity(session, 2)?;
+        let constrained = SimulationLimits::try_new(16, 8, 1, 32, 4, 16)?;
+        let mut simulation = Simulation::new(session, constrained);
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::BootstrapStarted,
+        )?)?;
+        simulation.apply(&GameEventEnvelope::v1(
+            session,
+            GameEvent::BootstrapCompleted {
+                player,
+                position: position(1, 1),
+            },
+        )?)?;
+        let before = simulation.clone();
+        assert_eq!(
+            simulation.apply(&GameEventEnvelope::v1(
+                session,
+                GameEvent::EntityAppeared {
+                    entity: other,
+                    kind: EntityKind::Creature,
+                    name: None,
+                    position: position(2, 1),
+                    stack: StackIndex::new(0),
+                },
+            )?),
+            Err(SimulationError::CapacityExceeded {
+                kind: LimitKind::Entities,
+                limit: 1,
+                attempted: 2,
+            })
+        );
+        assert_eq!(simulation, before);
+        Ok(())
     }
 
     #[test]

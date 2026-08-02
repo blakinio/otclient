@@ -1,9 +1,13 @@
 name: Temporary OTC2 game-domain lockfile regeneration
 
 on:
-  push:
+  pull_request:
     branches:
-      - "tmp/OTC2-20260801-game-domain-lockgen"
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 permissions:
   contents: write
@@ -14,6 +18,7 @@ concurrency:
 
 jobs:
   regenerate:
+    if: github.head_ref == 'tmp/OTC2-20260801-game-domain-lockgen'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

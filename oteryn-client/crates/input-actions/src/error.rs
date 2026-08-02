@@ -69,30 +69,51 @@ impl Display for InputError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::ZeroKeyCode => formatter.write_str("physical key code must be non-zero"),
-            Self::KeyCodeOutOfRange => formatter.write_str("physical key code exceeds the contract range"),
+            Self::KeyCodeOutOfRange => {
+                formatter.write_str("physical key code exceeds the contract range")
+            }
             Self::ZeroMouseButton => formatter.write_str("mouse button must be non-zero"),
-            Self::MouseButtonOutOfRange => formatter.write_str("mouse button exceeds the contract range"),
-            Self::CoordinateOutOfRange => formatter.write_str("pointer coordinate exceeds the contract range"),
-            Self::DeltaOutOfRange => formatter.write_str("pointer delta exceeds the contract range"),
+            Self::MouseButtonOutOfRange => {
+                formatter.write_str("mouse button exceeds the contract range")
+            }
+            Self::CoordinateOutOfRange => {
+                formatter.write_str("pointer coordinate exceeds the contract range")
+            }
+            Self::DeltaOutOfRange => {
+                formatter.write_str("pointer delta exceeds the contract range")
+            }
             Self::ZeroWheelDelta => formatter.write_str("wheel delta must contain a non-zero axis"),
-            Self::WheelDeltaOutOfRange => formatter.write_str("wheel delta exceeds the contract range"),
+            Self::WheelDeltaOutOfRange => {
+                formatter.write_str("wheel delta exceeds the contract range")
+            }
             Self::EmptyText => formatter.write_str("text commit must not be empty"),
             Self::TextTooLong { max, actual } => {
                 write!(formatter, "text commit length {actual} exceeds limit {max}")
             }
             Self::EmptyIdentifier => formatter.write_str("semantic identifier must not be empty"),
             Self::IdentifierTooLong { max, actual } => {
-                write!(formatter, "semantic identifier length {actual} exceeds limit {max}")
+                write!(
+                    formatter,
+                    "semantic identifier length {actual} exceeds limit {max}"
+                )
             }
-            Self::InvalidIdentifier => formatter.write_str("semantic identifier contains an invalid character"),
-            Self::InvalidModifierBits => formatter.write_str("modifier bits contain an unknown flag"),
+            Self::InvalidIdentifier => {
+                formatter.write_str("semantic identifier contains an invalid character")
+            }
+            Self::InvalidModifierBits => {
+                formatter.write_str("modifier bits contain an unknown flag")
+            }
             Self::EmptyChord => formatter.write_str("input chord must not be empty"),
             Self::ChordTooLong { max, actual } => {
                 write!(formatter, "input chord length {actual} exceeds limit {max}")
             }
-            Self::DuplicateChordInput => formatter.write_str("input chord contains a duplicate input"),
+            Self::DuplicateChordInput => {
+                formatter.write_str("input chord contains a duplicate input")
+            }
             Self::DuplicateContext => formatter.write_str("input context identifier is duplicated"),
-            Self::UnknownBindingContext => formatter.write_str("binding references an unknown context"),
+            Self::UnknownBindingContext => {
+                formatter.write_str("binding references an unknown context")
+            }
             Self::ConflictingBinding => formatter.write_str("bindings conflict within one context"),
             Self::ReservedBinding => formatter.write_str("binding uses a reserved chord"),
             Self::ContextNotFound => formatter.write_str("input context is not declared"),

@@ -342,13 +342,15 @@ impl BindingMap {
         active: &BTreeSet<ContextId>,
         chord: &InputChord,
     ) -> Option<Binding> {
-        let modal_active = self.contexts.iter().any(|context| {
-            context.kind == ContextKind::Modal && active.contains(&context.id)
-        });
+        let modal_active = self
+            .contexts
+            .iter()
+            .any(|context| context.kind == ContextKind::Modal && active.contains(&context.id));
         let text_active = !modal_active
-            && self.contexts.iter().any(|context| {
-                context.kind == ContextKind::Text && active.contains(&context.id)
-            });
+            && self
+                .contexts
+                .iter()
+                .any(|context| context.kind == ContextKind::Text && active.contains(&context.id));
 
         self.bindings
             .iter()
@@ -378,11 +380,7 @@ impl BindingMap {
             .map(|(_, binding)| binding.clone())
     }
 
-    pub(crate) fn is_context_eligible(
-        &self,
-        active: &BTreeSet<ContextId>,
-        id: &ContextId,
-    ) -> bool {
+    pub(crate) fn is_context_eligible(&self, active: &BTreeSet<ContextId>, id: &ContextId) -> bool {
         let Some(context) = self.context(id) else {
             return false;
         };
@@ -395,9 +393,10 @@ impl BindingMap {
         if modal_active {
             return matches!(context.kind, ContextKind::Modal | ContextKind::Global);
         }
-        let text_active = self.contexts.iter().any(|candidate| {
-            candidate.kind == ContextKind::Text && active.contains(&candidate.id)
-        });
+        let text_active = self
+            .contexts
+            .iter()
+            .any(|candidate| candidate.kind == ContextKind::Text && active.contains(&candidate.id));
         if text_active {
             return matches!(context.kind, ContextKind::Text | ContextKind::Global);
         }

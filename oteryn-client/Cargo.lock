@@ -1574,6 +1574,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oteryn-simulation-core"
+version = "0.1.0"
+dependencies = [
+ "oteryn-foundation",
+ "oteryn-game-domain",
+]
+
+[[package]]
 name = "oteryn-technical-login-integration-tests"
 version = "0.1.0"
 dependencies = [

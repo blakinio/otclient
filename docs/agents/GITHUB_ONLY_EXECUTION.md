@@ -1,16 +1,16 @@
 # GitHub-Only Execution Contract
 
 ```yaml
-github_only_execution_policy_version: 3
+github_only_execution_policy_version: 3.1
 ```
 
 ## Purpose
 
 The absence of Codex or a local terminal is not, by itself, a task blocker. When repository access is available, use the GitHub connection for repository reads and writes and GitHub Actions as the remote execution and validation environment.
 
-This contract never weakens repository safety, ownership, scope, production, credential, secret, deployment, database or data, payment, authentication, protocol, asset, live-capital, or cross-repository restrictions. It is subordinate to `ANTI_STALL_AND_EXECUTION_BUDGET.md`; GitHub-only execution remains bounded.
+This contract never weakens repository safety, ownership, scope, production, credential, secret, deployment, database or data, payment, authentication, protocol, asset, live-capital, or cross-repository restrictions. It is subordinate to `ANTI_STALL_AND_EXECUTION_BUDGET.md`; GitHub-only execution remains bounded, including final required-CI and protected auto-merge waiting.
 
-The repository owner durably authorizes autonomous agents to complete their own task lifecycle through merge or auto-merge only when every merge gate in this contract and the repository is satisfied. Production and other protected live operations remain separately protected.
+The repository owner durably authorizes agents to configure protected auto-merge or merge-queue admission under the preconditions below and to complete their own task lifecycle through actual merge only after every merge gate in this contract and the repository is satisfied. Production and other protected live operations remain separately protected.
 
 ## Authority freeze
 
@@ -60,7 +60,8 @@ A repository task may change sensitive code when its declared scope and reposito
 - Do not expose secrets in logs, artifacts, screenshots, traces, PR comments, or task records.
 - Temporary databases and services must be isolated from production and disposable.
 - A passing workflow is evidence only for the exact commit and configuration it tested.
-- Waiting for Actions is not active work. Follow exact-head check and unchanged-state limits from the anti-stall contract.
+- Waiting for ordinary or non-terminal Actions is not active work. Final required exact-head CI, protected auto-merge and merge-queue completion may remain active only under the bounded terminal-CI exception in `ANTI_STALL_AND_EXECUTION_BUDGET.md`.
+- Eligible terminal-CI observations use the dedicated wait budget, interval and check-generation counters; they do not consume the ordinary two-check counters.
 
 ## Temporary-workflow exact-head rule
 
@@ -76,19 +77,22 @@ A documentation-only commit after a build result may use a narrower exact-head g
 
 ## Autonomous merge and auto-merge authority
 
-An autonomous agent may enable auto-merge, or perform the equivalent final merge when repository settings do not support auto-merge, only for the PR owned by the current task and only after all are true:
+An autonomous agent may enable protected auto-merge or admit its own PR to an authorized merge queue before final required checks finish only when all are true:
 
-- the task record identifies the exact branch, PR, and final head;
-- the final diff is within declared scope and ownership;
-- all required checks pass on the exact final head;
+- the task record identifies the exact branch, PR, and final unchanged head;
+- implementation and every non-CI acceptance gate are complete;
 - independent audit has no open material finding;
 - required E2E passes, or has repository-approved result `NOT_APPLICABLE` with a concrete reason;
-- all review threads are resolved;
+- all review threads are resolved and no requested change remains;
+- the final diff is within declared scope and ownership;
 - every related or superseded PR is intentional and terminal;
 - no temporary workflow or instrumentation remains unless retention is explicitly justified;
+- repository branch protection or merge-queue rules guarantee that merge cannot occur before every required exact-head check passes;
 - merge does not itself approve or perform a protected live operation.
 
-Prefer auto-merge after gates are satisfied. Do not force, bypass, administratively override, or merge before required checks. After merge, archive or terminally close the task and release ownership according to repository policy.
+Enabling auto-merge is not evidence that the PR is merge-ready and does not satisfy final CI. The agent must observe final required CI and resulting merge state under the bounded terminal-CI contract. A direct or manual merge remains forbidden until all required checks pass on the exact final head.
+
+Prefer protected auto-merge after the non-CI gates are satisfied. Do not force, bypass, administratively override, or weaken protections. After merge, archive or terminally close the task and release ownership according to repository policy; a required lifecycle-only archive PR remains part of the same entry task.
 
 ## Production and protected-operation authority
 
@@ -103,11 +107,11 @@ A GitHub-only task may stop only when at least one condition is real and evidenc
 - a required secret, key, certificate, protected environment, or external-infrastructure access is unavailable;
 - the task requires a physical device or system unavailable to permitted runners;
 - a business or architecture decision is required and repository evidence provides no decision criteria;
-- an anti-stall runtime, no-progress, retry, repair-cycle, context-reconstruction, or exact-head check limit is exhausted;
+- an anti-stall runtime, ordinary no-progress, retry, repair-cycle, context-reconstruction, ordinary exact-head check, or bounded terminal-CI limit is exhausted;
 - the next operation would require an unauthorized protected live operation.
 
-When stopping, record the unavailable operation, attempted tool or workflow, received error or restriction, missing permission or resource, collected evidence, nearest safe alternative, current branch, PR, exact head, validation state, checkpoint status, and one `next_action`.
+An ordinary two-check limit is not a stop while the task validly qualifies for the dedicated terminal-CI exception. When stopping, record the unavailable operation or exhausted limit, attempted tool or workflow, received error or restriction, missing permission or resource, collected evidence, nearest safe alternative, current branch, PR, exact head, required-check generation, validation state, checkpoint status, and one `next_action`.
 
 ## Completion report
 
-Use the canonical terminal response from `ANTI_STALL_AND_EXECUTION_BUDGET.md` rather than a competing format. Include changed layers and paths, focused and exact-head validation, audit, E2E, related PR and review state, durable task and ownership state, exact restrictions, and the correct invocation result: `DONE`, `WAITING`, `BLOCKED`, or `ROTATE`.
+Use the canonical terminal response from `ANTI_STALL_AND_EXECUTION_BUDGET.md` rather than a competing format. Include changed layers and paths, focused and exact-head validation, audit, E2E, related PR and review state, durable task and ownership state, exact restrictions, terminal-CI generation and counters when applicable, and the correct invocation result: `DONE`, `WAITING`, `BLOCKED`, or `ROTATE`.

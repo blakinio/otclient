@@ -4,9 +4,9 @@ Before advising the repository owner or writing a prompt for another agent, read
 
 Before substantial implementation, product-facing validation, audit, E2E, PR cleanup, or task closeout, read and follow `DELIVERY_COMPLETENESS_AND_CLOSEOUT.md`. It is mandatory for prompt evaluation discipline, trust and authority boundaries, delivery classification, client/backend or producer/consumer completeness, independent audit, real E2E, exact-head validation, related-PR terminal states, and archival. A worker summary is not terminal evidence.
 
-Before autonomous, long-running, retry-prone, CI-waiting, repair, continuation, or multi-task work, read and follow `ANTI_STALL_AND_EXECUTION_BUDGET.md`. Its runtime, no-progress, CI-check, retry, repair-cycle, context-reconstruction, command-timeout, and additional-task limits are mandatory. Budget exhaustion or unchanged pending state is a real stop condition even when another contract says to continue autonomously.
+Before autonomous, long-running, retry-prone, CI-waiting, repair, continuation, or multi-task work, read and follow `ANTI_STALL_AND_EXECUTION_BUDGET.md`. Its runtime, no-progress, ordinary and terminal-CI check, retry, repair-cycle, context-reconstruction, command-timeout, and additional-task limits are mandatory. Budget exhaustion or unchanged pending state outside the bounded terminal-CI exception is a real stop condition even when another contract says to continue autonomously.
 
-Before treating the absence of Codex or a local terminal as a blocker, read and follow `GITHUB_ONLY_EXECUTION.md`. Use the GitHub connection and GitHub Actions on a dedicated branch, select the smallest proving validation, inspect full failed-job logs, keep repairs bounded, preserve required artifacts, and report an exact technical blocker only after the contract's alternatives are exhausted. Autonomous merge or auto-merge of the current task's own PR is authorized only after every required gate in that contract and this repository passes; protected protocol, asset, production, secret, or environment operations remain unauthorized without separate authority.
+Before treating the absence of Codex or a local terminal as a blocker, read and follow `GITHUB_ONLY_EXECUTION.md`. Use the GitHub connection and GitHub Actions on a dedicated branch, select the smallest proving validation, inspect full failed-job logs, keep repairs bounded, preserve required artifacts, and report an exact technical blocker only after the contract's alternatives are exhausted. Protected auto-merge or merge-queue admission for the current task's own PR may occur after the exact final head is frozen and every non-CI gate passes, only when repository protection guarantees that merge waits for all required exact-head checks. Direct or manual merge remains authorized only after every required gate passes. Protected protocol, asset, production, secret, or environment operations remain unauthorized without separate authority.
 
 ## Authority and state model
 
@@ -34,13 +34,14 @@ Before creating, claiming, resuming, updating, handing off, or closing any task 
 4. New OTClient v2 task IDs should use the `OTC2-` prefix; existing `OTC-` task IDs remain valid for the original project.
 5. Treat the task record and Git or PR state as durable; treat the worker session as disposable.
 6. Execute one bounded phase per session and persist a checkpoint before a long-running or failure-prone operation.
-7. Record anti-stall timestamps and counters required by `ANTI_STALL_AND_EXECUTION_BUDGET.md`.
-8. Do not remain active while waiting for CI, dependencies, external evidence, deployment, or a user reply.
-9. On a blocker or exhausted budget, preserve coherent work, record checkpoint `status`, evidence, blocker, and exactly one `next_action`, then end or rotate the session.
+7. Record anti-stall timestamps and counters required by `ANTI_STALL_AND_EXECUTION_BUDGET.md`, including the dedicated required-check generation and terminal-CI counters when eligible.
+8. Do not remain active while waiting for dependencies, external evidence, deployment, a user reply, or ordinary non-terminal CI. Final required exact-head CI, protected auto-merge and merge-queue completion may remain active only under the bounded terminal-CI exception.
+9. On a blocker, exhausted budget, exhausted terminal-CI exception or other real stop condition, preserve coherent work, record checkpoint `status`, evidence, blocker, and exactly one `next_action`, then end or rotate the session.
 10. Record `execution_mode` and let the worker decide whether Chat/GitHub, Codex, or a permitted runner is appropriate.
 11. At a synchronization barrier, run `python tools/agents/control_room.py --format markdown` and escalate only material decisions.
 12. Do not call a user-facing capability complete while any required backend, client/frontend, integration, or consumer layer is missing.
 13. Before `completed`, require independent audit PASS, required E2E PASS or NOT_APPLICABLE with reason, exact-head required CI PASS, zero unresolved review threads, zero unintentionally open related PRs, terminal task state, and released ownership.
-14. Start at most one additional task after the terminal entry task, only when at least 30 minutes of declared budget remains, no stall warning occurred, and the anti-stall gate permits it.
+14. Treat repository-mandated post-merge archival and ownership release as part of the entry task, not an additional READY task.
+15. Start at most one additional task after the fully terminal entry task, only when at least 30 minutes of declared budget remains, no stall warning occurred, and the anti-stall gate permits it.
 
 These rules supplement the repository root `AGENTS.md`. When rules overlap, follow the more restrictive safety requirement.

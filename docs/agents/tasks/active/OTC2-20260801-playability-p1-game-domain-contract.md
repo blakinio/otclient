@@ -6,13 +6,13 @@ project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p1-game-domain-contract
-phase: exact-head-validation
+phase: final-restacked-validation
 branch: feat/OTC2-20260801-playability-p1-game-domain-contract
 base_branch: main
 created: 2026-08-01T22:26:00+02:00
-updated: 2026-08-02T19:13:27+02:00
-last_verified_commit: "39d6cbb33ef217e8d867784a18d968aadcc7cbde"
-required_base_commit: "55fec043758e1928fd5d39831322a0c21f47589b"
+updated: 2026-08-02T19:28:00+02:00
+last_verified_commit: "d50c3026bb02f582cb59482a4818fdc97cfa9525"
+required_base_commit: "bfa694c988e19b1af427e25c3f97bbac1f2800d7"
 risk: high
 related_pr: 155
 owned_paths:
@@ -43,11 +43,11 @@ missing_layers:
   - renderer and UI consumers
   - app composition and real staging E2E
 invocation_started_at: 2026-08-02T18:37:00+02:00
-last_progress_at: 2026-08-02T19:13:27+02:00
+last_progress_at: 2026-08-02T19:28:00+02:00
 ci_checks_for_current_head: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
@@ -60,28 +60,28 @@ Implement the sole protocol-neutral game-domain public contract producer defined
 
 - [x] canonical generation-scoped gameplay IDs/handles exist;
 - [x] closed/versioned `GameEvent` and `GameCommand` envelopes cover only the minimum shared M2 spine;
-- [x] external identifiers, text, counts, capacities, coordinates and resources are bounded and stale generations fail deterministically by construction and focused negative tests;
+- [x] external identifiers, text, counts, capacities, coordinates and resources are bounded and stale generations fail deterministically;
 - [x] no Canary, socket, simulation, renderer, UI, platform or app dependency leaks into the public API;
-- [ ] package formatting, strict Clippy and focused tests pass;
-- [x] owned-path and public API review passed before the serialized shared lease;
-- [ ] exact-head heavy gates pass after workspace integration;
-- [ ] independent audit has no open material findings;
+- [x] package formatting, strict Clippy and focused tests passed on implementation head `d50c3026`;
+- [x] owned-path and public API review passed;
+- [ ] exact-head heavy gates pass after final restack;
+- [x] independent coordinator audit has no open material finding;
 - [ ] PR is merged and the task is separately archived.
 
 ## Delivery classification
 
-This task is an intentionally partial public-contract producer. It does not claim a playable user-facing feature. The missing producer/consumer layers remain assigned to later waves in `WAVE_P1_CONTRACT_SPINE.md` and the programme charter.
+This task is an intentionally partial P1 public-contract producer. Protocol gameplay producers, simulation/snapshots, renderer/UI consumers, app composition and real staging remain later waves.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-02T19:13:27+02:00
-head: 39d6cbb33ef217e8d867784a18d968aadcc7cbde
+updated_at: 2026-08-02T19:28:00+02:00
+head: def6d60c66c82aec9b901bbb196d3fc4c1e10638
 branch: feat/OTC2-20260801-playability-p1-game-domain-contract
 pr: 155
 status: validating
-phase: exact-head-validation
+phase: final-restacked-validation
 context_routes:
   - docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md
   - docs/agents/AUTONOMOUS_PROGRAM_CONTINUATION.md
@@ -95,46 +95,47 @@ owned_paths:
   - oteryn-client/crates/game-domain/**
 shared_lease:
   state: granted
-  reason: game-domain is the first accepted P1 runtime producer; PRs 154, 156 and 157 still modify only their exclusive task paths and no competing shared lease exists.
-  integration: root workspace member and Cargo.lock are present; existing architecture category and game-domain -> foundation edge already covered the package, so no checker or fixture mutation was required.
+  integration: root workspace member and minimal Cargo.lock entry are present; existing architecture category and game-domain -> foundation edge cover the package.
 proven:
-  - P1 aggregation/archive authorize this sole public contract producer.
-  - The crate reuses foundation SessionGeneration and introduces no external dependency.
-  - Canonical IDs/handles, bounded values, redacted text and closed V1 event/command envelopes are implemented.
-  - Full PR diff review showed only owned paths before the serialized shared lease.
-  - Open P1 worker PRs 154, 156 and 157 have no shared workspace changes.
-  - Cargo 1.94.0 regenerated only oteryn-client/Cargo.lock through temporary coordinator PR 174.
-  - Temporary workflow was removed and PR 174 was closed without merge; its final diff is empty.
+  - Canonical IDs/handles, bounded values, redacted text and closed V1 event/command envelopes are implemented with no external dependency.
+  - Cargo.lock diff contains only the new local oteryn-game-domain package.
+  - Exact implementation head d50c3026 passed Rust Client run 30758572871 and repository CI run 30758572912.
+  - Windows job 91524949710 passed locked metadata, rustfmt, strict Clippy, all workspace tests and architecture validation; Supply Chain job 91524949688 passed.
+  - Ready-for-review CI run 30758722450 and CI / Required job 91525459029 passed.
+  - PR comments, submitted reviews and unresolved review threads were clean before closeout.
+  - Temporary coordinator PR 174 is closed without merge with zero final changed files.
+  - Exact main bfa694c9 was merged into the task branch by isolated run 30758891031, producing def6d60c.
 derived:
-  - A task-record commit after lockfile generation is required to trigger retained pull-request workflows because GITHUB_TOKEN pushes do not recursively trigger Actions.
+  - One final synchronize-triggered exact-head gate is required after the restack checkpoint commit.
 unknown:
-  - Compiler, formatting, strict Clippy, tests, architecture and supply-chain outcome on the new exact head.
+  - Final exact-head gate outcome after this checkpoint commit.
 conflicts: []
 first_failure:
   marker: cargo metadata --locked
-  evidence: retained Rust Client run 30757811461 rejected the stale lockfile before compilation.
-  causal_hypothesis: adding the workspace member without regenerating Cargo.lock left the package graph incomplete.
-  repair: pinned Cargo 1.94.0 generated and committed only Cargo.lock at 39d6cbb33ef217e8d867784a18d968aadcc7cbde.
+  evidence: run 30757811461 rejected a stale lockfile.
+  repair: pinned Cargo 1.94.0 regenerated the lockfile; unrelated indirect movement was restored with Cargo.
 rejected_hypotheses:
-  - Publish Canary-specific wire types: rejected by protocol-neutral ownership.
-  - Add speculative economy, social, UI, renderer or simulation variants: rejected as outside the minimum P1 spine.
-  - Hand-edit Cargo.lock: rejected because the task requires regeneration with pinned Cargo.
-  - Retain or merge the temporary workflow: rejected; PR 174 was terminally closed with an empty final diff.
+  - Publish Canary-specific or speculative future contracts: rejected by protocol-neutral minimum-spine ownership.
+  - Hand-edit Cargo.lock or bypass branch protection: rejected.
+  - Merge from a stale base: rejected; exact main bfa694c9 is now the second parent of def6d60c.
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260801-playability-p1-game-domain-contract.md
   - oteryn-client/Cargo.toml
   - oteryn-client/Cargo.lock
   - oteryn-client/crates/game-domain/**
 validation:
-  - command: live PR ownership and changed-path review
+  - command: Rust Client run 30758572871
     result: PASS
-    evidence: PR 155 owns the task, game-domain and serialized workspace integration; PRs 154, 156 and 157 remain exclusive.
-  - command: independent static public API and trust-boundary review
+    evidence: Windows 91524949710 and Supply Chain 91524949688 passed.
+  - command: repository CI runs 30758572912 and 30758722450
     result: PASS
-    evidence: no protocol/socket/simulation/renderer/UI/platform/app types; external text Debug is redacted and stable errors contain lengths/generations only.
-  - command: cargo generate-lockfile with Rust/Cargo 1.94.0
+    evidence: CI / Required jobs 91525092757 and 91525459029 passed.
+  - command: exact changed-path, public API, trust-boundary and review audit
     result: PASS
-    evidence: temporary run 30758334844; committed lockfile head 39d6cbb33ef217e8d867784a18d968aadcc7cbde; harness removed and PR 174 closed without merge.
+    evidence: fourteen authorized paths, minimal lockfile diff, no material finding or unresolved review state.
+  - command: temporary exact-main restack run 30758891031
+    result: PASS
+    evidence: main bfa694c9 merged into task head def6d60c; harness removed and PR 174 closed with empty final diff.
 blockers: []
-next_action: Inspect retained Rust Client and CI workflows on the exact task-record head, isolate the first actionable failure, and apply one targeted repair or proceed to audit when green.
+next_action: Inspect Rust Client and repository CI on the new checkpoint head, mark ready, allow required ready-for-review CI to pass, then auto-merge and archive the task separately.
 ```

@@ -183,11 +183,7 @@ mod tests {
     #[test]
     fn duplicate_or_out_of_order_message_fails_closed() -> Result<(), Box<dyn Error>> {
         let (mut state, current) = state(10);
-        decode_current_pending_state_entered(
-            &[OPCODE_PENDING_STATE_ENTERED],
-            &mut state,
-            current,
-        )?;
+        decode_current_pending_state_entered(&[OPCODE_PENDING_STATE_ENTERED], &mut state, current)?;
 
         assert_eq!(
             decode_current_pending_state_entered(
@@ -231,9 +227,7 @@ mod tests {
                     && entry.contains("\"method\": \"sendPendingStateEntered\"")
                     && entry.contains(&opcode_fragment)
                     && entry.contains("\"line\": 8502")
-                    && entry.contains(
-                        "\"path\": \"src/server/network/protocol/protocolgame.cpp\"",
-                    )
+                    && entry.contains("\"path\": \"src/server/network/protocol/protocolgame.cpp\"")
             });
         assert!(entry_exists, "missing exact pending-state producer entry");
     }

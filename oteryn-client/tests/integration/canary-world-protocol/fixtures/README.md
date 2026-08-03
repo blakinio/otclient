@@ -9,13 +9,13 @@ Provenance:
 - generated index: `oteryn-canary-source-index-v1`
 - source file: `src/server/network/protocol/protocolgame.cpp`
 - local-player producer: Current/non-legacy local branch of `sendAddCreature`, source body beginning after `sendAllowBugReport`
+- remote-player producer: Current/non-legacy non-local branch of `sendAddCreature` plus `AddCreature`
 - pending-state producer: `sendPendingStateEntered`, source line 8502
 - enter-world producer: `sendEnterWorld`, source line 8512
 - session-end producer: `sendSessionEndInformation`, source line 2932
 - session-end enum: `src/server/server_definitions.hpp::SessionEndInformations`
 
 The fixtures contain no credential, session key, private capture, proprietary asset byte or copied producer implementation body. The local-player values and store URL are original synthetic field values used only to exercise the proven Current layout; the URL is never exposed by the decoder. Unknown session-end reason `0x01`, invalid login precision, zero identity and trailing data are negative cases and must fail closed.
-
 
 Tile-clear fixtures prove only the complete Current absent-tile branch of
 `sendUpdateTile`: opcode `0x69`, position encoded as `u16le/u16le/u8`, marker
@@ -27,7 +27,6 @@ player initialization and before pending-state: `sendAllowBugReport` emits fixed
 `1A 00`, followed by `sendTibiaTime` as `EF + two opaque u8 clock components`.
 The synthetic clock bytes are not retained and no world-light state is inferred.
 
-
 Local-player-only map fixture proves one complete source-reachable Current
 bootstrap branch: opcode `0x64`, authoritative local position, exact surface
 floor traversal and skip markers, one item-free tile containing only the
@@ -35,3 +34,12 @@ ordinary unknown local player, and the complete fixed-width Current player
 creature payload. The synthetic name, appearance, clock, coordinates and
 status values are invented. No item catalogue bytes or private capture are
 included.
+
+Remote-player appearance proves one complete source-reachable post-bootstrap
+branch: opcode `0x6A`, synthetic position and stack, unknown-creature marker,
+zero known-cache eviction id, a distinct synthetic entity id and the complete
+ordinary Current player payload. The decoder emits only a session-fenced
+`EntityAppeared` event; health, outfit, light, icon, vocation and other Canary
+wire values are consumed but do not escape the adapter. Known-cache eviction,
+known creatures, hidden-health, summon, monster, NPC, invisible-outfit and OTCR
+branches remain explicitly unsupported.

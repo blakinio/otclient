@@ -6,3 +6,4 @@
 *.ot* eol=lf 
 *.cpp eol=lf 
 *.h   eol=lf 
+oteryn-client/tools/canary-protocol-index/generated/*.json text eol=lf

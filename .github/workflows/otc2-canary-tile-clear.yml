@@ -64,7 +64,17 @@ jobs:
           '''
           if old not in text:
               raise SystemExit("replace_once precondition block not found")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
+          text = text.replace(old, new, 1)
+          status_with_spaces = (
+              "Status: local-player identity/order and known session-end slices are merged; "
+              "the complete absent-tile update branch is under exact-head validation while "
+              "the parent remains blocked on non-empty map/world layouts and general identity "
+              "resolution.  "
+          )
+          if text.count(status_with_spaces) != 1:
+              raise SystemExit("generated evidence status whitespace anchor not found exactly once")
+          text = text.replace(status_with_spaces, status_with_spaces.rstrip(), 1)
+          path.write_text(text, encoding="utf-8", newline="\n")
           '@ | python -
           python $script
 

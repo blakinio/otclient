@@ -1,7 +1,7 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: local-player identity, pending-state, enter-world order and known session-end slices are merged; the parent producer remains blocked on complete map/world layouts and general identity resolution.  
-Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.  
+Status: local-player identity/order and known session-end slices are merged; the complete absent-tile update branch is under exact-head validation while the parent remains blocked on non-empty map/world layouts and general identity resolution.
+Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.
 Consumer boundary: `oteryn-client/crates/protocol-canary`.
 
 ## Claim boundary
@@ -134,19 +134,57 @@ known_session_end: PASS
 unknown_session_end: PASS_REJECTED
 ```
 
+## Proven absent-tile update branch
+
+The exact Current `ProtocolGame::sendUpdateTile` producer writes opcode `0x69`
+and `NetworkMessage::addPosition`, which is exactly `x:u16le`, `y:u16le`,
+`z:u8`. When the producer tile pointer is absent it writes fixed marker `0x01`
+and terminator `0xFF`; no `GetTileDescription`, item writer or creature writer
+is invoked.
+
+```yaml
+logical_message:
+  opcode_u8: 0x69
+  x_u16_le: canonical_tile_x
+  y_u16_le: canonical_tile_y
+  z_u8: canonical_floor
+  absent_tile_marker_u8: 0x01
+  terminator_u8: 0xFF
+prerequisite: current_session_after_enter_world
+output: GameEventEnvelope::v1(GameEvent::TileCleared)
+state_mutation: none
+nested_writer_dependency: none
+```
+
+The decoder rejects every truncated prefix, wrong opcode, wrong marker,
+wrong terminator, oversize, trailing data, stale/pre-enter-world state and a
+terminal session. Synthetic fixtures contain coordinates only.
+
 ## Inbound readiness matrix
 
 | Required family | Classification | Exact current evidence and missing contract |
 |---|---|---|
 | session bootstrap | `PARTIAL` | Local identity `0x17`, pending-state `0x0A` and enter-world `0x0F` are proven and implemented in exact order. Complete map-description position/body remains required before `BootstrapCompleted`. |
 | map description | `UNKNOWN` | `GetMapDescription` delegates to floor/tile iteration, skip markers and nested item/creature writers. Complete Current branches, terminators, bounds and appearance dependencies are not normalized as one accepted layout. |
-| tile and stack updates | `PARTIAL` | Outer opcodes/positions are visible, but nested tile descriptions and stack-only identity ownership remain incomplete. |
+| tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch is implemented as `TileCleared`. Non-empty tile descriptions and stack-only identity ownership remain incomplete. |
 | creature/entity appearance | `UNKNOWN` | Known-creature cache branches, removals, outfit/light/skull/type/feature fields and nested bounds remain incomplete. |
 | movement and reconciliation | `PARTIAL` | Local-player, teleport, floor-transition, map-strip, remote-visible and remove/add branches are incomplete. Position plus stack does not prove a domain handle. |
 | removal | `PARTIAL` | Remove-tile messages expose position and stack index, not a protocol-neutral item/entity handle. Mapping without authoritative state would guess identity. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and known values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain explicitly unknown and rejected. |
 
-No partial map, tile, entity, movement or removal decoder is implemented. No parser mutates simulation state.
+No partial map, entity, movement or removal decoder is implemented. The tile decoder accepts only the complete absent-tile branch and no parser mutates simulation state.
+
+## Active empty-tile validation
+
+```yaml
+branch: feat/OTC2-20260803-canary-tile-clear
+base: 6eb1d3c4421ca32170fe4ca703001e953a2eb58a
+source_revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+source_methods: [ProtocolGame::sendUpdateTile, NetworkMessage::addPosition]
+new_decoder: decode_current_empty_tile_update
+negative_matrix: [truncated, wrong_opcode, wrong_marker, wrong_terminator, oversized, trailing, stale, pre_enter_world, terminal]
+validation: focused_workflow_running
+```
 
 ## Terminal bootstrap identity validation
 

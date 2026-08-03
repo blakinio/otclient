@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: validating
+status: blocked
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: unknown-player-appearance
-branch: feat/OTC2-20260803-canary-unknown-player-appearance
+phase: item-catalogue-and-stack-identity-blocker
+branch: main
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T23:30:00+02:00
-required_base_commit: "ed355c66c305a4f7a42962bcc692194145626371"
+updated: 2026-08-04T00:12:00+02:00
+required_base_commit: "6b3efb75131f0ee1b9ce1779aa3ef7eaa1a536a2"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -34,243 +34,185 @@ decomposition_decision: phased
 validation_level: heavy
 complete_user_facing_feature: false
 missing_layers:
-  - complete provenance-safe Current non-empty map/tile/item/creature layouts
-  - complete movement/removal branch layouts
-  - accepted general position/stack-to-domain-handle identity-resolution ownership contract
+  - authoritative Current item-type metadata and complete AddItem branch contract
+  - accepted caller-owned position-and-stack-to-domain-handle resolver contract
+  - complete known-creature cache, non-player, hidden-health and extension branches
+  - complete movement map-strip and removal reconciliation families
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-03T23:30:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: unknown-player-appearance-focused
+last_progress_at: 2026-08-04T00:10:31+02:00
+ci_checks_for_current_head: 4
+ci_check_generation: unknown-player-appearance-terminal
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 4
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 4
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
 
 # Goal
 
-Reconcile pinned Canary Current evidence with the Rust client while preserving fail-closed real admission. Implement only protocol families whose complete byte layout, feature gates, order and semantic ownership are proven without inference.
+Reconcile pinned Canary Current evidence with the Rust client while preserving fail-closed real admission. Implement only inbound protocol families whose complete byte layout, ordering, feature gates, bounds and semantic ownership are proven without inference.
 
-# Merged bounded protocol slices
+# Terminal result of the completed phase
+
+The post-merge Windows newline repair is terminal, the historical `Cargo.lock` lease is released, and the parent task now contains the following merged provenance-safe inbound slices:
 
 ```yaml
 source_repository: blakinio/canary
 source_revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
-outbound_commands:
-  logout: 0x14
-  step_8_directions: [0x65, 0x66, 0x67, 0x68, 0x6A, 0x6B, 0x6C, 0x6D]
-  stop_movement: 0x69
-inbound_bootstrap_order:
-  local_player_initialization_0x17:
-    output: session_fenced_EntityHandle
-  allow_bug_report_0x1A:
-    layout: [opcode_0x1A, fixed_permission_0x00]
-    output: caller_owned_order_state_only
-  tibia_time_0xEF:
-    layout: [opcode_0xEF, clock_component_u8, clock_component_u8]
-    output: caller_owned_order_state_only
-  pending_state_0x0A:
-    prerequisites: [local_player_identity, allow_bug_report, tibia_time]
-    output: GameEvent::BootstrapStarted
-  enter_world_0x0F:
-    prerequisites: [local_player_identity, pending_state]
-    output: caller_owned_order_state_only
-  bootstrap_completed_emitted: true
-unknown_remote_player_appearance_0x6A:
-  prerequisite: completed_current_bootstrap
-  accepted_branch: unknown_ordinary_player_with_zero_cache_eviction
-  bounds: [floor_0_through_15, stack_0_through_9, name_max_30, icons_max_3]
-  output: GameEvent::EntityAppeared
-  retained_wire_fields: [entity_id, name, position, stack]
-session_end_0x18:
-  accepted_values: [0x00, 0x02]
-  unknown_values_rejected: [0x01, 0x03]
-empty_tile_update_0x69:
-  layout: [opcode_u8, x_u16_le, y_u16_le, z_u8, marker_0x01, terminator_0xFF]
-  prerequisite: current_session_after_bootstrap_completed
-  output: GameEvent::TileCleared
-  caller_state_mutation: false
-```
-
-All accepted boundaries are bounded, session-fenced, trailing-data rejecting and state-atomic. Raw producer creature IDs, clock values, store configuration and capability values do not escape the adapter. No parser mutates simulation state.
-
-# Completed login side-preamble phase
-
-The pinned Current local-player producer calls the following complete messages before pending-state:
-
-```yaml
-order:
-  - local_player_initialization_0x17
-  - allow_bug_report_0x1A_0x00
-  - tibia_time_0xEF_two_u8
-  - pending_state_0x0A
-  - enter_world_0x0F
-new_decoders:
-  - decode_current_allow_bug_report
-  - decode_current_tibia_time
-retained_protocol_values: none
-emitted_game_events: none
-simulation_mutation: false
-```
-
-The fixed bug-report payload must be `0x00`. The two clock bytes are structurally consumed and deliberately discarded because protocol-canary does not own world-light simulation. Wrong order, wrong opcode, wrong fixed byte, truncation, oversize, stale session, duplicate use, terminal state and trailing data fail without advancing state.
-
-# Phase integration
-
-```yaml
-registration_pr: 233
-registration_merge: 4fefec3ab3a1b6401cd3b89b6e0bb1dbcb2ce2a7
-historical_product_pr: 234
-historical_product_head: 292755649226bd36422bf941afba5281a6713af7
-runner_repair_pr: 235
-runner_repair_merge: 29bc427a6f5c43218c8e2b1d6542cebb8499e5ad
-restacked_product_pr: 236
-restacked_product_head: 524c99598e49120fab7c6eff3fb00634e0a5d8b8
-implementation_merge: 03cf57fca8f251e4b47fc1aefd56c67b6a788110
-cleanup_pr: 237
-cleanup_merge: 2f9ddc7fe9747740a42eebfaac677a1a49599f3c
-changed_product_paths: 8
-temporary_workflows_remaining: 0
-temporary_scripts_remaining: 0
+profile: ProtocolProfileId::Current
+network_message_max_bytes: 65500
+real_admission: RealAdmissionUnavailable
 shared_path_lease: []
+merged_slices:
+  local_player_initialization_0x17: session_fenced_local_EntityHandle
+  allow_bug_report_0x1A: fixed_0x00_order_only
+  tibia_time_0xEF: two_u8_consumed_and_discarded
+  pending_state_0x0A: GameEvent::BootstrapStarted
+  enter_world_0x0F: order_only
+  local_player_only_map_0x64: GameEvent::BootstrapCompleted
+  absent_tile_update_0x69: GameEvent::TileCleared
+  unknown_remote_player_add_0x6A: GameEvent::EntityAppeared
+  session_end_0x18: GameEvent::SessionEnded
 ```
 
-PR #234 was closed without merge after focused validation because its historical merge base exposed the temporary workflow in the product diff. PR #236 restacked the exact validated task/product/evidence/fixture blobs on current main and contained no workflow or patch-script change. PR #237 removed the one temporary runner.
+All accepted slices are bounded, session-fenced, reject trailing data, fail atomically and do not mutate simulation state. Canary-only capability, clock, appearance, health, direction, light, speed, icon, skull, party, guild, vocation, speech, inspection and walkability fields do not escape the adapter boundary.
 
-# Validation and audit
+# Unknown ordinary remote-player appearance
+
+The completed phase proves and implements only this exact Current/non-legacy producer branch:
 
 ```yaml
-focused_windows_validation:
-  run: 30837572720
-  job: 91766409598
-  rust: 1.94.0
-  locked_metadata: PASS
-  formatting: PASS
-  strict_package_clippy: PASS
-  protocol_canary_tests: 48_PASS
-  architecture_tests: PASS
-  architecture_workspace_policy: PASS
-restacked_exact_head_validation:
-  head: 524c99598e49120fab7c6eff3fb00634e0a5d8b8
-  rust_client_run: 30837930784
-  windows_job: 91767570065
-  supply_chain_job: 91767570180
-  repository_ready_ci_run: 30838016884
-  repository_required_job: 91768642943
-  result: PASS
-cleanup_validation:
-  repository_ci_run: 30838418308
-  repository_required_job: 91769507878
-  result: PASS
-fresh_audit:
-  review_id: 4847048515
-  critical_open: 0
-  high_open: 0
-  material_medium_open: 0
-unresolved_review_threads: 0
-e2e:
-  result: NOT_APPLICABLE
-  reason: The isolated decoder consumes already decrypted and deframed logical messages and has no reachable real transport, simulation composition or user journey.
+opcode: 0x6A
+position: [x_u16_le, y_u16_le, z_u8]
+floor_bound: 0_through_15
+stack_bound: 0_through_9
+creature_marker_u16_le: 0x61
+known_cache_eviction_id_u32_le: 0
+entity_id: nonzero_and_distinct_from_local_player
+entity_type: ordinary_player
+name_bound_bytes: 30
+icon_count_bound: 3
+output: GameEventEnvelope::v1(GameEvent::EntityAppeared)
+retained_fields: [entity_id, name, position, stack]
 ```
 
-# Bounded map-source findings
-
-The pinned producer establishes these outer boundaries:
-
-```yaml
-sendMapDescription:
-  opcode: 0x64
-  prefix: local_player_position_u16le_u16le_u8
-  viewport: 18_by_14
-GetMapDescription:
-  surface_floors: 7_down_to_0
-  underground_floor_window: z_minus_2_through_z_plus_2_clamped
-  empty_run_encoding: [skip_u8, 0xFF]
-```
-
-A completely empty initial viewport is not source-reachable: the local player has already been placed on a tile before `sendMapDescription`, and `GetTileDescription` serializes creatures. The smallest reachable bootstrap map therefore still depends on `GetTileDescription` and `AddCreature`. Implementing a synthetic all-empty bootstrap decoder would accept a state the pinned producer cannot emit and is forbidden.
-
-The complete non-empty family still delegates to:
-
-```yaml
-- GetFloorDescription
-- GetTileDescription
-- AddItem
-- AddCreature
-- knownCreatureSet eviction and known/unknown branches
-- outfit, light, skull, type and feature-gated fields
-- item subtype, tier, animation and custom-attribute branches
-```
-
-Local movement also appends map strips through `GetMapDescription`; remote movement and removal expose positions and stack indices but do not by themselves prove protocol-neutral domain handles.
+The implementation rejects known marker `0x62`, nonzero cache eviction, local identity reuse, hidden health, summon, monster, NPC, invisible/zero-looktype and OTCR extension branches. The fixture is original synthetic logical-message data and contains no credential, session key, private capture, deployed configuration, proprietary asset byte or copied producer implementation body.
 
 # Inbound readiness matrix
 
 | Family | Classification | Durable decision |
 |---|---|---|
-| session bootstrap | `PARTIAL` | Exact order through local identity, bug-report permission, Tibia time, pending-state and enter-world plus one complete item-free local-player map emits `BootstrapCompleted`; general map admission remains incomplete. |
-| map description | `PARTIAL` | One complete item-free local-player-only `0x64` branch is implemented. General non-empty tiles remain blocked by authoritative item metadata and broader creature/cache branches. |
+| session bootstrap | `PARTIAL` | Exact order through local identity, bug-report permission, Tibia time, pending-state, enter-world and one item-free local-player map is implemented. General map admission remains incomplete. |
+| map description | `PARTIAL` | One complete item-free local-player-only `0x64` branch is implemented. General non-empty tiles require authoritative item metadata and broader creature/cache branches. |
 | tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch emits `TileCleared`. Non-empty tile bodies and authoritative stack identity remain blocked. |
 | creature/entity appearance | `PARTIAL` | One complete post-bootstrap `0x6A` unknown ordinary remote-player branch with zero cache eviction emits `EntityAppeared`. Known/cache-eviction, hidden, summon, monster, NPC, invisible and OTCR branches remain unsupported. |
-| movement and reconciliation | `PARTIAL` | Local steps append map strips; remote `0x6D` and remove/add branches still require authoritative identity and stack ownership. |
-| removal | `PARTIAL` | Position plus stack index cannot be converted to a protocol-neutral item/entity handle without caller-owned world state. |
+| movement and reconciliation | `BLOCKED` | Local movement appends general map strips. Remote movement exposes positions and stack indices but no accepted protocol-neutral handle resolver exists. |
+| removal | `BLOCKED` | Position plus stack index cannot be converted to an authoritative `EntityHandle` or item handle without caller-owned world state. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain rejected. |
 
-Real admission remains `RealAdmissionUnavailable` before network I/O. No map-body, creature, item, movement or removal parser is partially admitted.
+No partial unsupported family is admitted. Unknown subfamilies fail closed.
 
+# Exact blocker normalization
 
-# Active local-player-only map bootstrap
+## Authoritative item metadata
 
-The pinned source permits one complete initial-map branch without item-catalogue
-decoding: an existing item-free tile containing only the ordinary local player.
-The branch consumes the complete unknown-player payload, exact `18 x 14`
-surface traversal and all skip markers.
+`AddItem` is not a fixed-width wire family. Its complete Current layout branches on authoritative item-type and runtime instance metadata, including subtype/count, fluid or splash subtype, tier, animation phase, custom attributes and profile features. The protocol adapter does not own the producer's item catalogue. Decoding a general tile or map body without that authoritative dependency would require guessing message length or branch selection and is forbidden.
 
-```yaml
-opcode: 0x64
-position: [x_u16_le, y_u16_le, z_u8]
-accepted_floor: source_valid_0_through_15
-accepted_tiles: exactly_one_local_player_tile
-accepted_items: none
-accepted_creatures: exactly_one_unknown_ordinary_local_player
-identity: must_match_session_local_player_from_0x17
-output: GameEvent::BootstrapCompleted
-simulation_mutation: false
-general_map_claim: false
-```
+## Position/stack identity resolution
 
-Other tiles, every item branch, known creatures, non-player creature types,
-health-hidden players, zero-looktype outfits and extra contents remain rejected.
+Remote movement and removal messages provide positions and stack indices. The merged protocol-neutral contracts require session-fenced domain handles. No accepted caller-owned resolver contract currently maps a position/stack observation to an authoritative entity or item handle without letting partial decoding mutate world state. Therefore movement and removal remain blocked rather than emitting guessed identities.
 
+## Remaining creature branches
 
-# Unknown ordinary remote-player appearance
+The known-creature cache transition, nonzero eviction, non-player types, hidden-health, summon, invisible outfit and OTCR extension branches are not normalized as complete accepted families. They remain `UNKNOWN` and unimplemented.
 
-The exact pinned `sendAddCreature` and `AddCreature` source proves one bounded
-post-bootstrap entity branch that does not require ownership of the producer's
-known-creature cache: opcode `0x6A`, canonical position, stack below ten,
-unknown marker `0x61`, zero eviction id, a distinct non-zero player id and the
-complete Current ordinary-player payload.
+# Validation
 
 ```yaml
-accepted_opcode: 0x6A
-accepted_marker: 0x61
-accepted_cache_eviction: 0
-accepted_entity_type: player
-accepted_stack: 0_through_9
-accepted_floor: 0_through_15
-output: GameEvent::EntityAppeared
-simulation_mutation: false
-unsupported: [known_0x62, nonzero_eviction, hidden, summon, monster, npc, invisible, otcr]
+implementation_pr: 248
+implementation_head: 70aeb1e2754a20b090422e435401ecb0b2f6e93e
+implementation_merge: 26d5ed87552afe9b71245ba75fbb93fa66b2bc68
+focused_windows:
+  workflow: OTC2 Canary Unknown Player Appearance
+  run: 30857235344
+  job: 91830964717
+  result: PASS
+  rust: 1.94.0
+  locked_metadata: PASS
+  formatting: PASS
+  strict_package_clippy: PASS
+  protocol_canary_tests: 57_PASS
+  architecture_tests: PASS
+  architecture_workspace_policy: PASS
+exact_head_rust_client:
+  run: 30857235341
+  windows_job: 91830984449
+  supply_chain_job: 91830984426
+  result: PASS
+exact_head_repository_ci:
+  run: 30857235601
+  required_job: 91831301928
+  result: PASS
+cleanup_pr: 249
+cleanup_head: be83f3caf7444293defc7cdeee8b8b11f3a747bc
+cleanup_merge: 6b3efb75131f0ee1b9ce1779aa3ef7eaa1a536a2
+cleanup_repository_ci:
+  run: 30857557281
+  required_job: 91832219075
+  result: PASS
+temporary_workflows_remaining: 0
+temporary_scripts_remaining: 0
+shared_path_lease: []
 ```
 
-The original synthetic fixture contains no capture, secret or proprietary asset
-byte. Canary-only status and appearance fields are consumed but do not escape
-the adapter.
+# Independent audit
+
+```yaml
+validator: fresh_exact_head_falsification_audit
+review_id: 4848922295
+reviewed_head: 70aeb1e2754a20b090422e435401ecb0b2f6e93e
+critical_open: 0
+high_open: 0
+material_medium_open: 0
+unresolved_review_threads: 0
+fixture_provenance: PASS
+fixture_sanitization: PASS
+dependency_direction: PASS
+negative_case_behavior: PASS
+```
+
+The cleanup PR received a separate workflow-only audit with zero material findings.
+
+# PR hygiene
+
+```yaml
+188: merged
+190: merged_terminal_newline_repair
+240: merged_local_player_only_map
+241: merged_then_removed_local_map_runner
+242: merged_unknown_player_runner_registration
+243: closed_unmerged_duplicate
+244: closed_unmerged_superseded_after_restack
+245: merged_guarded_restack_repair
+246: merged_exit_and_identity_repair
+247: closed_unmerged_duplicate
+248: merged_unknown_player_implementation
+249: merged_temporary_runner_cleanup
+open_related_prs: 0
+unresolved_review_threads: 0
+```
+
+# E2E disposition
+
+```yaml
+result: NOT_APPLICABLE
+reason: This package is an isolated producer adapter over already decrypted and deframed synthetic logical messages. It owns no real transport, admission, simulation mutation, renderer or reachable user journey.
+```
 
 # P2 barrier
 
@@ -284,24 +226,28 @@ visible_world_integration: not_ready
 controlled_m2_acceptance: not_ready
 ```
 
-The parent Canary producer remains incomplete, retains exclusive ownership of `protocol-canary` and holds no shared-path lease. Visible World Integration cannot start until the Canary producer is genuinely complete and separately archived.
+The parent Canary task remains active and blocked. It retains exclusive `protocol-canary` ownership, holds no shared-path lease and cannot claim general Canary compatibility, M2 completion or visible-world completion.
 
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 24
-updated_at: 2026-08-03T23:30:00+02:00
-observed_main: ed355c66c305a4f7a42962bcc692194145626371
-status: validating
-phase: unknown-player-appearance
-implemented_bootstrap_order: [local_player_0x17, allow_bug_report_0x1A, tibia_time_0xEF, pending_state_0x0A, enter_world_0x0F, local_player_only_map_0x64]
-active_branch: feat/OTC2-20260803-canary-unknown-player-appearance
-active_layout: unknown_ordinary_remote_player_add_0x6A
-validation: focused_workflow_running
+checkpoint_version: 25
+updated_at: 2026-08-04T00:12:00+02:00
+observed_main: 6b3efb75131f0ee1b9ce1779aa3ef7eaa1a536a2
+status: blocked
+phase: item-catalogue-and-stack-identity-blocker
+active_branch: none
+last_merged_phase: unknown_ordinary_remote_player_add_0x6A
+implementation_pr: 248
+implementation_merge: 26d5ed87552afe9b71245ba75fbb93fa66b2bc68
+cleanup_pr: 249
+cleanup_merge: 6b3efb75131f0ee1b9ce1779aa3ef7eaa1a536a2
+validation: terminal_pass
+fresh_audit: zero_open_material_findings
 shared_path_lease: []
 ownership:
-  protocol_canary: retained_by_active_parent_task
+  protocol_canary: retained_by_active_blocked_parent_task
   shared_paths: released
-blocker: General AddItem decoding requires authoritative item-type branch metadata; movement and removal provide position/stack without an accepted protocol-neutral handle resolver; known/cache-eviction and non-player creature branches remain incomplete.
-next_action: Validate and merge the unknown ordinary remote-player appearance, then terminally normalize the remaining item-catalogue and position/stack identity blockers without inference.
+blocker: General AddItem decoding requires authoritative item-type and runtime branch metadata, while movement/removal require an accepted caller-owned position-and-stack-to-domain-handle resolver; known/cache-eviction and non-player creature branches remain incomplete.
+next_action: Merge an accepted authoritative item-decoding dependency and caller-owned stack-identity resolver contract, then resume the complete non-empty map, movement and removal families without inference.
 ```

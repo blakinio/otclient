@@ -47,3 +47,5 @@ jobs:
           Path('/tmp/p2-canary-phase-finalizer.sh').write_text('\n'.join(lines) + '\n', encoding='utf-8')
           PY
           bash /tmp/p2-canary-phase-finalizer.sh
+
+# Retriggered after the ready-marker commit raced ahead of the phase trigger.

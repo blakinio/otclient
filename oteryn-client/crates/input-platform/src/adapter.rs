@@ -1,8 +1,8 @@
 use crate::InputPlatformError;
 use oteryn_input_actions::{
     ButtonState, InputError, KeyCode, MAX_POINTER_COORDINATE, MAX_POINTER_DELTA, MAX_TEXT_BYTES,
-    MAX_WHEEL_DELTA, Modifiers, MouseButton, NormalizedInputEvent, PointerCoordinate,
-    PointerDelta, PointerMotion, PointerPosition, TextCommit, WheelDelta,
+    MAX_WHEEL_DELTA, Modifiers, MouseButton, NormalizedInputEvent, PointerCoordinate, PointerDelta,
+    PointerMotion, PointerPosition, TextCommit, WheelDelta,
 };
 
 const WHEEL_LINE_UNITS: f64 = 120.0;
@@ -371,7 +371,10 @@ impl InputPlatformAdapter {
             None => zero_motion()?,
         };
         self.pointer_position = Some(position);
-        Ok(vec![NormalizedInputEvent::PointerMoved { position, motion }])
+        Ok(vec![NormalizedInputEvent::PointerMoved {
+            position,
+            motion,
+        }])
     }
 
     fn process_pointer_motion(
@@ -386,7 +389,10 @@ impl InputPlatformAdapter {
             .pointer_position
             .ok_or(InputPlatformError::RelativeMotionUnavailable)?;
         let motion = PointerMotion::new(normalize_delta(x)?, normalize_delta(y)?);
-        Ok(vec![NormalizedInputEvent::PointerMoved { position, motion }])
+        Ok(vec![NormalizedInputEvent::PointerMoved {
+            position,
+            motion,
+        }])
     }
 
     fn process_wheel(
@@ -413,10 +419,7 @@ impl InputPlatformAdapter {
         }])
     }
 
-    fn process_text(
-        &self,
-        text: &str,
-    ) -> Result<Vec<NormalizedInputEvent>, InputPlatformError> {
+    fn process_text(&self, text: &str) -> Result<Vec<NormalizedInputEvent>, InputPlatformError> {
         if !self.focused {
             return Ok(Vec::new());
         }
@@ -513,12 +516,7 @@ fn normalize_coordinate(value: f64) -> Result<PointerCoordinate, InputPlatformEr
 }
 
 fn normalize_delta(value: f64) -> Result<PointerDelta, InputPlatformError> {
-    let value = normalize_axis(
-        value,
-        1.0,
-        MAX_POINTER_DELTA,
-        InputError::DeltaOutOfRange,
-    )?;
+    let value = normalize_axis(value, 1.0, MAX_POINTER_DELTA, InputError::DeltaOutOfRange)?;
     PointerDelta::new(value).map_err(InputPlatformError::from)
 }
 
@@ -555,9 +553,7 @@ fn bounded_or_rebased_motion(
 ) -> Result<PointerMotion, InputPlatformError> {
     let x = i64::from(current.x().get()) - i64::from(previous.x().get());
     let y = i64::from(current.y().get()) - i64::from(previous.y().get());
-    if x.unsigned_abs() > MAX_POINTER_DELTA as u64
-        || y.unsigned_abs() > MAX_POINTER_DELTA as u64
-    {
+    if x.unsigned_abs() > MAX_POINTER_DELTA as u64 || y.unsigned_abs() > MAX_POINTER_DELTA as u64 {
         return zero_motion();
     }
     Ok(PointerMotion::new(

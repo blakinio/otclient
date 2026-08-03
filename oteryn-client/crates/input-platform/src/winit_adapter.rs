@@ -279,7 +279,10 @@ mod tests {
     #[test]
     fn stable_keyboard_subset_uses_usb_hid_usage_codes() {
         assert_eq!(physical_key_code(PhysicalKey::Code(KeyCode::KeyA)), Some(4));
-        assert_eq!(physical_key_code(PhysicalKey::Code(KeyCode::KeyW)), Some(26));
+        assert_eq!(
+            physical_key_code(PhysicalKey::Code(KeyCode::KeyW)),
+            Some(26)
+        );
         assert_eq!(
             physical_key_code(PhysicalKey::Code(KeyCode::ArrowUp)),
             Some(82)
@@ -289,9 +292,7 @@ mod tests {
             Some(224)
         );
         assert_eq!(
-            physical_key_code(PhysicalKey::Unidentified(
-                NativeKeyCode::Unidentified
-            )),
+            physical_key_code(PhysicalKey::Unidentified(NativeKeyCode::Unidentified)),
             None
         );
     }

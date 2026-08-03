@@ -2,8 +2,9 @@ use super::adapter::{PlatformButtonState, PlatformEvent, PlatformWheelUnit};
 use super::{InputPlatformAdapter, InputPlatformError};
 use oteryn_input_actions::{
     ActionEvent, ActionId, ActionPhase, Binding, BindingMap, ButtonState, ContextDefinition,
-    ContextId, ContextKind, InputAtom, InputChord, InputError, InputRouter, KeyCode, Modifier,
-    Modifiers, MouseButton, NormalizedInputEvent, RepeatPolicy, WheelDirection, MAX_TEXT_BYTES,
+    ContextId, ContextKind, InputAtom, InputChord, InputError, InputRouter, KeyCode,
+    MAX_TEXT_BYTES, Modifier, Modifiers, MouseButton, NormalizedInputEvent, RepeatPolicy,
+    WheelDirection,
 };
 use std::error::Error;
 
@@ -15,10 +16,7 @@ fn context(value: &str) -> Result<ContextId, InputError> {
     ContextId::new(value.to_owned())
 }
 
-fn process_all(
-    router: &mut InputRouter,
-    events: &[NormalizedInputEvent],
-) -> Vec<ActionEvent> {
+fn process_all(router: &mut InputRouter, events: &[NormalizedInputEvent]) -> Vec<ActionEvent> {
     let mut output = Vec::new();
     for event in events {
         output.extend(router.process(event));
@@ -62,10 +60,7 @@ fn router_with_key_mouse_and_wheel() -> Result<InputRouter, InputError> {
             ),
             Binding::new(
                 gameplay.clone(),
-                InputChord::new(
-                    Modifiers::NONE,
-                    vec![InputAtom::Wheel(WheelDirection::Up)],
-                )?,
+                InputChord::new(Modifiers::NONE, vec![InputAtom::Wheel(WheelDirection::Up)])?,
                 action("wheel.up")?,
                 RepeatPolicy::Ignore,
             ),
@@ -103,10 +98,7 @@ fn keyboard_and_non_ime_text_are_distinct_events() -> Result<(), Box<dyn Error>>
         }
         other => assert!(matches!(other, NormalizedInputEvent::Key { .. })),
     }
-    assert!(matches!(
-        &events[1],
-        NormalizedInputEvent::TextCommitted(_)
-    ));
+    assert!(matches!(&events[1], NormalizedInputEvent::TextCommitted(_)));
     let debug = format!("{:?}", events[1]);
     assert!(!debug.contains("private-marker"));
     assert!(debug.contains("bytes"));
@@ -223,8 +215,8 @@ fn side_specific_modifier_transitions_override_stale_snapshots() -> Result<(), B
     let mut adapter = InputPlatformAdapter::new();
     adapter.process_platform_event(PlatformEvent::Modifiers { bits: 0 })?;
 
-    let left_pressed = adapter
-        .process_platform_event(key_event(225, PlatformButtonState::Pressed))?;
+    let left_pressed =
+        adapter.process_platform_event(key_event(225, PlatformButtonState::Pressed))?;
     match &left_pressed[0] {
         NormalizedInputEvent::Key { modifiers, .. } => {
             assert_eq!(*modifiers, Modifiers::one(Modifier::Shift));
@@ -233,8 +225,8 @@ fn side_specific_modifier_transitions_override_stale_snapshots() -> Result<(), B
     }
 
     adapter.process_platform_event(key_event(229, PlatformButtonState::Pressed))?;
-    let left_released = adapter
-        .process_platform_event(key_event(225, PlatformButtonState::Released))?;
+    let left_released =
+        adapter.process_platform_event(key_event(225, PlatformButtonState::Released))?;
     match &left_released[0] {
         NormalizedInputEvent::Key { modifiers, .. } => {
             assert_eq!(*modifiers, Modifiers::one(Modifier::Shift));
@@ -242,8 +234,8 @@ fn side_specific_modifier_transitions_override_stale_snapshots() -> Result<(), B
         other => assert!(matches!(other, NormalizedInputEvent::Key { .. })),
     }
 
-    let right_released = adapter
-        .process_platform_event(key_event(229, PlatformButtonState::Released))?;
+    let right_released =
+        adapter.process_platform_event(key_event(229, PlatformButtonState::Released))?;
     match &right_released[0] {
         NormalizedInputEvent::Key { modifiers, .. } => {
             assert_eq!(*modifiers, Modifiers::NONE);
@@ -257,10 +249,8 @@ fn side_specific_modifier_transitions_override_stale_snapshots() -> Result<(), B
 #[test]
 fn pointer_values_are_bounded_and_large_jumps_rebase() -> Result<(), Box<dyn Error>> {
     let mut adapter = InputPlatformAdapter::new();
-    let first = adapter.process_platform_event(PlatformEvent::PointerPosition {
-        x: 10.4,
-        y: 20.6,
-    })?;
+    let first =
+        adapter.process_platform_event(PlatformEvent::PointerPosition { x: 10.4, y: 20.6 })?;
     match &first[0] {
         NormalizedInputEvent::PointerMoved { position, motion } => {
             assert_eq!(position.x().get(), 10);
@@ -271,10 +261,8 @@ fn pointer_values_are_bounded_and_large_jumps_rebase() -> Result<(), Box<dyn Err
         other => assert!(matches!(other, NormalizedInputEvent::PointerMoved { .. })),
     }
 
-    let second = adapter.process_platform_event(PlatformEvent::PointerPosition {
-        x: 15.0,
-        y: 19.0,
-    })?;
+    let second =
+        adapter.process_platform_event(PlatformEvent::PointerPosition { x: 15.0, y: 19.0 })?;
     match &second[0] {
         NormalizedInputEvent::PointerMoved { motion, .. } => {
             assert_eq!(motion.x().get(), 5);
@@ -297,10 +285,8 @@ fn pointer_values_are_bounded_and_large_jumps_rebase() -> Result<(), Box<dyn Err
     }
 
     adapter.set_capture_state(true)?;
-    let relative = adapter.process_platform_event(PlatformEvent::PointerMotion {
-        x: 4.4,
-        y: -3.6,
-    })?;
+    let relative =
+        adapter.process_platform_event(PlatformEvent::PointerMotion { x: 4.4, y: -3.6 })?;
     match &relative[0] {
         NormalizedInputEvent::PointerMoved { position, motion } => {
             assert_eq!(position.x().get(), 200_000);
@@ -390,10 +376,7 @@ fn ime_commit_is_bounded_and_never_reclassified_as_a_key() -> Result<(), Box<dyn
 
     let commit = adapter.process_platform_event(PlatformEvent::TextCommit("private-ime"))?;
     assert_eq!(commit.len(), 1);
-    assert!(matches!(
-        &commit[0],
-        NormalizedInputEvent::TextCommitted(_)
-    ));
+    assert!(matches!(&commit[0], NormalizedInputEvent::TextCommitted(_)));
     assert!(!format!("{:?}", commit[0]).contains("private-ime"));
 
     let oversized = "x".repeat(MAX_TEXT_BYTES + 1);
@@ -446,8 +429,8 @@ fn focus_loss_clears_router_state_and_is_duplicate_safe() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn capture_loss_clears_mouse_actions_and_lifecycle_order_is_explicit()
--> Result<(), Box<dyn Error>> {
+fn capture_loss_clears_mouse_actions_and_lifecycle_order_is_explicit() -> Result<(), Box<dyn Error>>
+{
     let mut adapter = InputPlatformAdapter::new();
     let mut router = router_with_key_mouse_and_wheel()?;
 
@@ -494,8 +477,8 @@ fn capture_loss_clears_mouse_actions_and_lifecycle_order_is_explicit()
 }
 
 #[test]
-fn device_loss_cancels_all_router_state_without_a_device_identifier()
--> Result<(), Box<dyn Error>> {
+fn device_loss_cancels_all_router_state_without_a_device_identifier() -> Result<(), Box<dyn Error>>
+{
     let mut adapter = InputPlatformAdapter::new();
     let mut router = router_with_key_mouse_and_wheel()?;
     let key = adapter.process_platform_event(key_event(

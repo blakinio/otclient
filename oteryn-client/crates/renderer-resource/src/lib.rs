@@ -80,13 +80,13 @@ impl ResourceLimits {
     #[must_use]
     pub const fn synthetic_v1() -> Self {
         Self {
-            max_entries: NonZeroUsize::new(MAX_CACHE_ENTRIES).expect("non-zero constant"),
+            max_entries: NonZeroUsize::new(MAX_CACHE_ENTRIES).unwrap_or(NonZeroUsize::MIN),
             max_total_device_bytes: NonZeroUsize::new(MAX_CACHE_DEVICE_BYTES)
-                .expect("non-zero constant"),
+                .unwrap_or(NonZeroUsize::MIN),
             max_single_texture_bytes: NonZeroUsize::new(MAX_DECODED_RGBA8_BYTES)
-                .expect("non-zero constant"),
+                .unwrap_or(NonZeroUsize::MIN),
             max_upload_plan_bytes: NonZeroUsize::new(MAX_UPLOAD_PLAN_BYTES)
-                .expect("non-zero constant"),
+                .unwrap_or(NonZeroUsize::MIN),
         }
     }
 

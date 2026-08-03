@@ -1,0 +1,48 @@
+name: Temporary P2 Canary Command Trigger
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/temp-p2-canary-command-trigger.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p2-canary-command-trigger
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Canary protocol branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260803-playability-p2-canary-world-protocol
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Execute reviewed command validation
+        shell: bash
+        env:
+          EXPECTED_PARENT: ${{ github.event.before }}
+          PATCH_WORKFLOW: .github/workflows/temp-p2-canary-command-focused.yml
+          TRIGGER_WORKFLOW: .github/workflows/temp-p2-canary-command-trigger.yml
+        run: |
+          set -euo pipefail
+          test "$(git diff --name-only HEAD^..HEAD)" = "$TRIGGER_WORKFLOW"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/temp-p2-canary-command-focused.yml').read_text(encoding='utf-8')
+          marker = '        run: |\n'
+          if source.count(marker) != 1:
+              raise SystemExit('expected exactly one reviewed command block')
+          block = source.split(marker, 1)[1]
+          lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
+          Path('/tmp/p2-canary-command.sh').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+          bash /tmp/p2-canary-command.sh

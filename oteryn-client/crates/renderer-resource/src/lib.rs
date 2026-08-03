@@ -47,13 +47,13 @@ impl DeviceGeneration {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TextureFormat {
     /// Four normalized color channels in red, green, blue and alpha order.
-    Rgba8UnormSrgb,
+    Rgba8Unorm,
 }
 
 impl TextureFormat {
     const fn bytes_per_pixel(self) -> usize {
         match self {
-            Self::Rgba8UnormSrgb => RGBA8_BYTES_PER_PIXEL,
+            Self::Rgba8Unorm => RGBA8_BYTES_PER_PIXEL,
         }
     }
 }
@@ -61,7 +61,7 @@ impl TextureFormat {
 impl Display for TextureFormat {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            Self::Rgba8UnormSrgb => "rgba8-unorm-srgb",
+            Self::Rgba8Unorm => "rgba8-unorm",
         })
     }
 }
@@ -245,7 +245,7 @@ impl TextureUploadPlan {
         decoded: &DecodedRgba8,
         limits: ResourceLimits,
     ) -> Result<Self, ResourceError> {
-        let format = TextureFormat::Rgba8UnormSrgb;
+        let format = TextureFormat::Rgba8Unorm;
         let width =
             usize::try_from(decoded.width()).map_err(|_| ResourceError::ArithmeticOverflow)?;
         let height =
@@ -988,6 +988,7 @@ mod tests {
         let plan = TextureUploadPlan::new(handle, &decoded, ResourceLimits::synthetic_v1())?;
         let descriptor = plan.descriptor();
 
+        assert_eq!(descriptor.format(), TextureFormat::Rgba8Unorm);
         assert_eq!(descriptor.source_row_pitch_bytes(), 12);
         assert_eq!(descriptor.upload_row_pitch_bytes(), 256);
         assert_eq!(descriptor.source_byte_len(), 24);

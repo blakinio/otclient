@@ -246,7 +246,8 @@ impl TextureUploadPlan {
         limits: ResourceLimits,
     ) -> Result<Self, ResourceError> {
         let format = TextureFormat::Rgba8UnormSrgb;
-        let width = usize::try_from(decoded.width()).map_err(|_| ResourceError::ArithmeticOverflow)?;
+        let width =
+            usize::try_from(decoded.width()).map_err(|_| ResourceError::ArithmeticOverflow)?;
         let height =
             usize::try_from(decoded.height()).map_err(|_| ResourceError::ArithmeticOverflow)?;
         if width == 0 || height == 0 {
@@ -274,7 +275,8 @@ impl TextureUploadPlan {
             return Err(ResourceError::TextureBytesLimitExceeded);
         }
 
-        let upload_row_pitch_bytes = align_up(source_row_pitch_bytes, COPY_BYTES_PER_ROW_ALIGNMENT)?;
+        let upload_row_pitch_bytes =
+            align_up(source_row_pitch_bytes, COPY_BYTES_PER_ROW_ALIGNMENT)?;
         let upload_byte_len = upload_row_pitch_bytes
             .checked_mul(height)
             .ok_or(ResourceError::ArithmeticOverflow)?;
@@ -865,7 +867,7 @@ fn align_up(value: usize, alignment: usize) -> Result<usize, ResourceError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oteryn_asset_decode::{decode_rgba8, DecodeLimits};
+    use oteryn_asset_decode::{DecodeLimits, decode_rgba8};
     use oteryn_asset_runtime::{AssetRuntime, RuntimeLimits};
     use oteryn_asset_types::{AssetId, AssetKind, AssetMetadata, AssetPack, AssetRecord};
     use std::io;
@@ -940,8 +942,8 @@ mod tests {
             "CC0-1.0".to_owned(),
             "project-original synthetic fixture".to_owned(),
         )?;
-        let encoded = AssetPack::new(vec![AssetRecord::new(metadata, vec![fill; byte_len])?])?
-            .encode()?;
+        let encoded =
+            AssetPack::new(vec![AssetRecord::new(metadata, vec![fill; byte_len])?])?.encode()?;
         let generation = PackGeneration::new(generation_value)?;
         let runtime = AssetRuntime::open_bytes(generation, &encoded, RuntimeLimits::schema_v1())?;
         let handle = runtime
@@ -1015,7 +1017,10 @@ mod tests {
 
         assert_eq!(third.evicted_entries(), 1);
         assert!(cache.resolve(first.handle()).is_ok());
-        assert_eq!(cache.resolve(second.handle()).err(), Some(ResourceError::MissingResource));
+        assert_eq!(
+            cache.resolve(second.handle()).err(),
+            Some(ResourceError::MissingResource)
+        );
         assert!(cache.resolve(third.handle()).is_ok());
         assert_eq!(cache.sink.destroyed, 1);
         assert_eq!(cache.entry_count(), 2);
@@ -1065,7 +1070,10 @@ mod tests {
             sink,
         );
 
-        assert_eq!(cache.acquire(asset, &decoded).err(), Some(ResourceError::UploadFailed));
+        assert_eq!(
+            cache.acquire(asset, &decoded).err(),
+            Some(ResourceError::UploadFailed)
+        );
         assert_eq!(cache.entry_count(), 0);
         assert_eq!(cache.accounted_device_bytes(), 0);
         assert_eq!(cache.sink.uploads, 0);
@@ -1082,7 +1090,10 @@ mod tests {
         let first = cache.acquire(asset_a, &decoded_a)?;
         let second = cache.acquire(asset_b, &decoded_b)?;
         assert_eq!(second.evicted_entries(), 1);
-        assert_eq!(cache.resolve(first.handle()).err(), Some(ResourceError::MissingResource));
+        assert_eq!(
+            cache.resolve(first.handle()).err(),
+            Some(ResourceError::MissingResource)
+        );
         assert_eq!(cache.accounted_device_bytes(), 8);
 
         let report = cache.clear();

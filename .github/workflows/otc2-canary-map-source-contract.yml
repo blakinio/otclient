@@ -1,0 +1,292 @@
+name: OTC2 Canary Map Source Contract
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260803-playability-p2-canary-map-description
+
+permissions:
+  contents: write
+
+concurrency:
+  group: otc2-canary-map-source-contract
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout client branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260803-playability-p2-canary-map-description
+          fetch-depth: 0
+
+      - name: Checkout exact Canary source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: blakinio/canary
+          ref: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+          path: canary-source
+          fetch-depth: 1
+
+      - name: Extract exact source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+          from pathlib import Path
+          import hashlib
+          import re
+
+          root = Path("canary-source")
+          revision = "bc0068ab80bbf003e128fce0589b4cc89d2682d3"
+          cpp = root / "src/server/network/protocol/protocolgame.cpp"
+          if not cpp.exists():
+              raise SystemExit("pinned protocolgame.cpp missing")
+          cpp_text = cpp.read_text(encoding="utf-8")
+
+          files = [p for p in root.rglob("*") if p.is_file() and p.suffix in {".h", ".hpp", ".cpp", ".cc", ".cxx"}]
+
+          def line_number(text: str, offset: int) -> int:
+              return text.count("\n", 0, offset) + 1
+
+          def find_unique_literal(name: str) -> tuple[str, int, str]:
+              patterns = [
+                  re.compile(rf"^\s*#\s*define\s+{re.escape(name)}\s+([^\s/]+)", re.M),
+                  re.compile(rf"^\s*(?:inline\s+)?(?:static\s+)?constexpr\s+[^;=]+\b{re.escape(name)}\s*=\s*([^;]+);", re.M),
+                  re.compile(rf"^\s*(?:static\s+)?const\s+[^;=]+\b{re.escape(name)}\s*=\s*([^;]+);", re.M),
+              ]
+              matches: list[tuple[str, int, str]] = []
+              for path in files:
+                  text = path.read_text(encoding="utf-8", errors="replace")
+                  for pattern in patterns:
+                      for match in pattern.finditer(text):
+                          matches.append((str(path.relative_to(root)), line_number(text, match.start()), match.group(1).strip()))
+              unique = sorted(set(matches))
+              if len(unique) != 1:
+                  occurrences = []
+                  for path in files:
+                      text = path.read_text(encoding="utf-8", errors="replace")
+                      for match in re.finditer(re.escape(name), text):
+                          occurrences.append(f"{path.relative_to(root)}:{line_number(text, match.start())}")
+                  raise SystemExit(f"{name}: expected one definition, found {unique}; occurrences={occurrences[:30]}")
+              return unique[0]
+
+          def extract_function(text: str, signature: str) -> tuple[int, str]:
+              start = text.find(signature)
+              if start < 0:
+                  raise SystemExit(f"missing function signature: {signature}")
+              brace = text.find("{", start)
+              if brace < 0:
+                  raise SystemExit(f"missing function body: {signature}")
+              depth = 0
+              in_string = False
+              escaped = False
+              for index in range(brace, len(text)):
+                  char = text[index]
+                  if in_string:
+                      if escaped:
+                          escaped = False
+                      elif char == "\\":
+                          escaped = True
+                      elif char == '"':
+                          in_string = False
+                      continue
+                  if char == '"':
+                      in_string = True
+                  elif char == "{":
+                      depth += 1
+                  elif char == "}":
+                      depth -= 1
+                      if depth == 0:
+                          return line_number(text, start), text[start:index + 1]
+              raise SystemExit(f"unterminated function: {signature}")
+
+          constants = {}
+          for name in [
+              "MAP_MAX_CLIENT_VIEW_PORT_X",
+              "MAP_MAX_CLIENT_VIEW_PORT_Y",
+              "MAP_INIT_SURFACE_LAYER",
+              "MAP_LAYER_VIEW_LIMIT",
+              "MAP_MAX_LAYERS",
+          ]:
+              constants[name] = find_unique_literal(name)
+
+          network_candidates = []
+          for path in files:
+              text = path.read_text(encoding="utf-8", errors="replace")
+              for signature in ["addPosition(const Position", "addPosition(Position"]:
+                  offset = text.find(signature)
+                  if offset >= 0:
+                      network_candidates.append((path, text, offset))
+          if len(network_candidates) != 1:
+              raise SystemExit(f"expected one addPosition definition/declaration candidate, got {[str(x[0]) for x in network_candidates]}")
+          position_path, position_text, position_offset = network_candidates[0]
+          position_line = line_number(position_text, position_offset)
+          position_context = "\n".join(position_text.splitlines()[position_line - 1:position_line + 12])
+          required_position_writes = ["pos.x", "pos.y", "pos.z"]
+          if not all(value in position_context for value in required_position_writes):
+              raise SystemExit(f"addPosition body is not complete near {position_path}:{position_line}\n{position_context}")
+
+          functions = [
+              "void ProtocolGame::sendMapDescription(const Position &pos)",
+              "void ProtocolGame::GetMapDescription(",
+              "void ProtocolGame::GetFloorDescription(",
+              "void ProtocolGame::GetTileDescription(",
+              "void ProtocolGame::AddItem(NetworkMessage &msg, uint16_t id, uint8_t count, uint8_t tier) const",
+              "void ProtocolGame::AddItem(NetworkMessage &msg, const std::shared_ptr<Item> &item)",
+              "void ProtocolGame::AddCreature(",
+              "void ProtocolGame::AddOutfit(",
+              "void ProtocolGame::addCreatureIcon(",
+              "void ProtocolGame::RemoveTileThing(",
+              "void ProtocolGame::sendMoveCreature(",
+          ]
+          extracted = []
+          for signature in functions:
+              line, body = extract_function(cpp_text, signature)
+              extracted.append((signature, line, hashlib.sha256(body.encode()).hexdigest(), body))
+
+          creature_header = root / "src/creatures/creatures_definitions.hpp"
+          creature_text = creature_header.read_text(encoding="utf-8")
+          creature_match = re.search(r"enum CreatureType_t\s*:\s*uint8_t\s*\{(?P<body>.*?)\};", creature_text, re.S)
+          if not creature_match:
+              raise SystemExit("CreatureType_t enum not found")
+          creature_values = dict(re.findall(r"(CREATURETYPE_[A-Z_]+)\s*=\s*(\d+)", creature_match.group("body")))
+          required_creatures = {
+              "CREATURETYPE_PLAYER": "0",
+              "CREATURETYPE_MONSTER": "1",
+              "CREATURETYPE_NPC": "2",
+              "CREATURETYPE_SUMMON_PLAYER": "3",
+              "CREATURETYPE_SUMMON_OTHERS": "4",
+              "CREATURETYPE_HIDDEN": "5",
+          }
+          if creature_values != required_creatures:
+              raise SystemExit(f"unexpected CreatureType_t values: {creature_values}")
+
+          container_header = root / "src/enums/container_type.hpp"
+          container_text = container_header.read_text(encoding="utf-8")
+          container_match = re.search(r"enum class ContainerSpecial_t\s*:\s*uint8_t\s*\{(?P<body>.*?)\};", container_text, re.S)
+          if not container_match:
+              raise SystemExit("ContainerSpecial_t enum not found")
+          container_values = dict(re.findall(r"([A-Za-z]+)\s*=\s*(\d+)", container_match.group("body")))
+          required_containers = {
+              "None": "0",
+              "LootContainer": "1",
+              "ContentCounter": "2",
+              "LootHighlight": "4",
+              "Obtain": "8",
+              "Manager": "9",
+              "QuiverLoot": "11",
+          }
+          if container_values != required_containers:
+              raise SystemExit(f"unexpected ContainerSpecial_t values: {container_values}")
+
+          for needle in [
+              "msg.addByte(0x64)",
+              "msg.addPosition(player->getPosition())",
+              "if (++count == 10)",
+              "msg.add<uint16_t>(0x61)",
+              "msg.add<uint16_t>(0x62)",
+              "msg.addByte(skip)",
+              "msg.addByte(0xFF)",
+          ]:
+              if needle not in cpp_text:
+                  raise SystemExit(f"required map source anchor missing: {needle}")
+
+          report = []
+          report.append("# Canary Current map source contract\n")
+          report.append(f"Producer: `blakinio/canary@{revision}`.\n")
+          report.append("This report is mechanically extracted from the pinned producer source. It is source-shape evidence, not deployed-runtime equality or permission to infer omitted metadata.\n")
+          report.append("## Fixed constants\n")
+          report.append("| Constant | Exact expression | Source |\n|---|---:|---|")
+          for name, (path, line, expression) in constants.items():
+              report.append(f"| `{name}` | `{expression}` | `{path}:{line}` |")
+          report.append("\n## Position encoding\n")
+          report.append(f"`NetworkMessage::addPosition` is defined at `{position_path.relative_to(root)}:{position_line}` and writes `x`, `y`, then `z` using the producer's typed add helpers.\n")
+          report.append("```cpp")
+          report.append(position_context.strip())
+          report.append("```\n")
+          report.append("## Map traversal and tile boundaries\n")
+          report.append("- map description starts with opcode `0x64`, then the local-player position;")
+          report.append("- the viewport dimensions are derived exclusively from the fixed constants above;")
+          report.append("- surface floors are traversed from `MAP_INIT_SURFACE_LAYER` down to zero; underground floors use the bounded `±MAP_LAYER_VIEW_LIMIT` range;")
+          report.append("- each floor iterates `x` outer and `y` inner, applying the producer's floor offset;")
+          report.append("- empty runs use `(skip_u8, 0xFF)`; `0xFF,0xFF` flushes a full 255-position run;")
+          report.append("- each non-empty tile contains at most ten emitted objects in ground, top-item, visible-creature, down-item order;")
+          report.append("- on the local-player tile, stack slot nine is reserved when necessary so the local player remains represented.\n")
+          report.append("## Creature discriminators\n")
+          report.append("| Value | Meaning |\n|---:|---|")
+          for name, value in required_creatures.items():
+              report.append(f"| `{value}` | `{name}` |")
+          report.append("\nUnknown creatures use marker `0x61` and carry removed-known id, creature id, type/name and the full appearance/lifecycle payload. Known creatures use marker `0x62` and carry the stable creature id before the shared tail.\n")
+          report.append("## Item metadata dependency\n")
+          report.append("Every item starts with `u16` item type id, but the remaining width is selected by producer-side item metadata. A safe decoder therefore requires an explicit immutable caller-supplied wire metadata catalogue. The catalogue must describe only layout-affecting flags: stackable, splash/fluid, container, podium, upgrade classification, expiry, wear-out and wrap-kit. It must not embed asset bytes or infer item semantics.\n")
+          report.append("Container special values: " + ", ".join(f"`{k}={v}`" for k, v in required_containers.items()) + ".\n")
+          report.append("## Identity ownership decision\n")
+          report.append("- creature ids are authoritative producer ids and map directly to session-fenced `EntityHandle` values;")
+          report.append("- map item instances carry no producer instance id, so the protocol adapter must allocate bounded session-local opaque item handles while maintaining an authoritative `(position, stack) -> handle` table;")
+          report.append("- the table is protocol normalization state only: it resolves later position/stack movement and removal messages and emits immutable `GameEvent` envelopes; simulation remains the sole mutable gameplay-world writer;")
+          report.append("- tile replacement clears prior location mappings before assigning new handles; state changes commit only after the complete logical message validates;")
+          report.append("- allocator/table capacity exhaustion fails closed.\n")
+          report.append("## Function fingerprints\n")
+          report.append("| Function | Source line | SHA-256 of exact body |\n|---|---:|---|")
+          for signature, line, digest, _ in extracted:
+              report.append(f"| `{signature}` | `{line}` | `{digest}` |")
+          report.append("\n## Remaining implementation boundary\n")
+          report.append("This evidence is sufficient to implement a bounded full-map logical-message decoder when supplied a validated layout-only item catalogue. It does not by itself prove all incremental movement/removal opcodes, deployed Canary equality, transport admission, production appearances or M2.\n")
+
+          evidence = Path("oteryn-client/docs/evidence/playability/p2/canary-current-map-source-contract.md")
+          evidence.parent.mkdir(parents=True, exist_ok=True)
+          evidence.write_text("\n".join(report), encoding="utf-8", newline="\n")
+
+          task = Path("docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md")
+          task_text = task.read_text(encoding="utf-8")
+          replacements = {
+              "status: blocked": "status: investigating",
+              "phase: inbound-map-layout-and-general-identity-blocker": "phase: current-map-source-contract-and-decoder",
+              "branch: docs/OTC2-20260803-canary-map-layout-closeout": "branch: feat/OTC2-20260803-playability-p2-canary-map-description",
+              'required_base_commit: "d5ec7f14cd51b913c727901e0a2589976f6d7d8c"': 'required_base_commit: "9e7fc6e322a4e4a0f252080590400cf4eaf0923b"',
+          }
+          for old, new in replacements.items():
+              if old in task_text:
+                  task_text = task_text.replace(old, new, 1)
+              elif new not in task_text:
+                  raise SystemExit(f"task anchor missing: {old}")
+          owned_anchor = "  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md\n"
+          new_owned = "  - oteryn-client/docs/evidence/playability/p2/canary-current-map-source-contract.md\n"
+          if new_owned not in task_text:
+              if task_text.count(owned_anchor) != 1:
+                  raise SystemExit("task evidence ownership anchor is not unique")
+              task_text = task_text.replace(owned_anchor, owned_anchor + new_owned)
+          task_text = task_text.replace("updated: 2026-08-03T16:25:00+02:00", "updated: 2026-08-03T17:58:00+02:00", 1)
+          task_text += """
+
+# Resumed map-source phase
+
+A new bounded source-normalization pass at the same pinned producer revision mechanically proved the outer full-map traversal, skip encoding, ten-object tile ordering, creature discriminators, position encoding and layout-affecting item metadata branches. Durable evidence is recorded in `oteryn-client/docs/evidence/playability/p2/canary-current-map-source-contract.md`.
+
+The accepted identity owner is the protocol adapter: producer creature ids map directly to session-fenced entity handles, while item instances without producer ids receive bounded session-local opaque handles in an authoritative position/stack table. This state only resolves wire identity and emits immutable domain events; it does not own simulation state.
+
+Implementation remains limited to complete layouts backed by the explicit caller-supplied layout-only item catalogue. Unknown metadata and every incomplete incremental family remain fail-closed.
+"""
+          task.write_text(task_text, encoding="utf-8", newline="\n")
+          PY
+
+      - name: Verify evidence and self-remove
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'MAP_MAX_CLIENT_VIEW_PORT_X' oteryn-client/docs/evidence/playability/p2/canary-current-map-source-contract.md
+          grep -q 'authoritative `(position, stack) -> handle` table' oteryn-client/docs/evidence/playability/p2/canary-current-map-source-contract.md
+          git rm .github/workflows/otc2-canary-map-source-contract.yml
+          git add \
+            docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md \
+            oteryn-client/docs/evidence/playability/p2/canary-current-map-source-contract.md
+          git diff --cached --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "docs(protocol-canary): prove Current map source contract"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-canary-map-description

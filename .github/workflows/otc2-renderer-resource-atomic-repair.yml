@@ -1,0 +1,157 @@
+name: OTC2 Renderer Resource Atomic Repair
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260803-playability-p2-renderer-resource
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260803-playability-p2-renderer-resource
+          fetch-depth: 0
+      - name: Repair transactional upload and lockfile drift
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("oteryn-client/crates/renderer-resource/src/lib.rs")
+          text = source.read_text(encoding="utf-8")
+
+          old = '''        let handle = self.preview_next_handle()?;
+          let texture = self
+              .sink
+              .upload(&plan)
+              .map_err(|_| ResourceError::UploadFailed)?;
+          let tick = self.take_access_tick()?;
+          self.next_slot = self
+              .next_slot
+              .checked_add(1)
+              .ok_or(ResourceError::ArithmeticOverflow)?;
+          self.next_serial = self
+              .next_serial
+              .checked_add(1)
+              .ok_or(ResourceError::ArithmeticOverflow)?;
+          self.accounted_device_bytes = self
+              .accounted_device_bytes
+              .checked_add(required_bytes)
+              .ok_or(ResourceError::ArithmeticOverflow)?;
+          self.entries.push(CacheEntry {
+'''
+          new = '''        let handle = self.preview_next_handle()?;
+          let tick = self.access_tick;
+          let next_access_tick = self
+              .access_tick
+              .checked_add(1)
+              .ok_or(ResourceError::ArithmeticOverflow)?;
+          let next_slot = self
+              .next_slot
+              .checked_add(1)
+              .ok_or(ResourceError::ArithmeticOverflow)?;
+          let next_serial = self
+              .next_serial
+              .checked_add(1)
+              .ok_or(ResourceError::ArithmeticOverflow)?;
+          let accounted_device_bytes = self
+              .accounted_device_bytes
+              .checked_add(required_bytes)
+              .ok_or(ResourceError::ArithmeticOverflow)?;
+          let texture = self
+              .sink
+              .upload(&plan)
+              .map_err(|_| ResourceError::UploadFailed)?;
+          self.access_tick = next_access_tick;
+          self.next_slot = next_slot;
+          self.next_serial = next_serial;
+          self.accounted_device_bytes = accounted_device_bytes;
+          self.entries.push(CacheEntry {
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one acquire mutation block, found {text.count(old)}")
+          text = text.replace(old, new)
+
+          old_assert = '''        assert_eq!(cache.resolve(first.handle())?.texture().byte_len, 16);
+          Ok(())
+'''
+          new_assert = '''        let resolved = cache.resolve(first.handle())?;
+          assert_eq!(resolved.texture().id, 1);
+          assert_eq!(resolved.texture().byte_len, 16);
+          Ok(())
+'''
+          if text.count(old_assert) != 1:
+              raise SystemExit(f"expected one fake texture assertion anchor, found {text.count(old_assert)}")
+          text = text.replace(old_assert, new_assert)
+
+          test_anchor = '''    #[test]
+    fn memory_pressure_evicts_before_upload_and_clear_is_exact() -> Result<(), Box<dyn Error>> {
+'''
+          test = '''    #[test]
+    fn pre_upload_counter_failure_is_atomic() -> Result<(), Box<dyn Error>> {
+        let (_runtime, asset, decoded) = fixture(9, 1, 1, 1, 9)?;
+        let mut cache = cache(asset.generation(), ResourceLimits::synthetic_v1())?;
+        cache.access_tick = u64::MAX;
+
+        assert_eq!(
+            cache.acquire(asset, &decoded).err(),
+            Some(ResourceError::ArithmeticOverflow)
+        );
+        assert_eq!(cache.sink.uploads, 0);
+        assert_eq!(cache.entry_count(), 0);
+        assert_eq!(cache.accounted_device_bytes(), 0);
+        Ok(())
+    }
+
+'''
+          if text.count(test_anchor) != 1:
+              raise SystemExit(f"expected one test insertion anchor, found {text.count(test_anchor)}")
+          text = text.replace(test_anchor, test + test_anchor)
+          source.write_text(text, encoding="utf-8", newline="\n")
+
+          lock = Path("oteryn-client/Cargo.lock")
+          lock_text = lock.read_text(encoding="utf-8")
+          lock_replacements = {
+              '''name = "ipnet"
+version = "2.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a756c3fac73139e83f14c2d742155dd2b78d3ee56597b419a0579b7bdd6dd78"''':
+              '''name = "ipnet"
+version = "2.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"''',
+              '''name = "libredox"
+version = "0.1.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2026a5056764a10b2bf5d56488cba40da507f5493a6a429340e2004d9ed085fa"''':
+              '''name = "libredox"
+version = "0.1.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c943259e342f1e06ff2da7a83eabdfe7f92ce10262688dbf1895ff0b3e6e4652"''',
+          }
+          for old_lock, new_lock in lock_replacements.items():
+              if lock_text.count(old_lock) != 1:
+                  raise SystemExit(f"expected one lock drift anchor: {old_lock.splitlines()[0:2]}")
+              lock_text = lock_text.replace(old_lock, new_lock)
+          lock.write_text(lock_text, encoding="utf-8", newline="\n")
+          PY
+          cd oteryn-client
+          cargo fmt --all
+          cargo metadata --locked --format-version 1 > /dev/null
+          cargo test -p oteryn-renderer-resource --all-targets
+          cargo clippy -p oteryn-renderer-resource --all-targets -- -D warnings
+      - name: Remove workflow and persist repair
+        run: |
+          git rm .github/workflows/otc2-renderer-resource-atomic-repair.yml
+          git add oteryn-client/Cargo.lock oteryn-client/crates/renderer-resource/src/lib.rs
+          git diff --cached --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "fix(renderer-resource): make upload commit atomic"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-renderer-resource

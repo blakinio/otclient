@@ -1,6 +1,6 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: local-player identity/order, known session-end slices and the complete absent-tile update branch are merged. The parent producer remains blocked on non-empty map/world layouts and general identity resolution.
+Status: local-player identity, known session-end and absent-tile slices are merged; exact login side-preamble order is under validation while the parent remains blocked on non-empty map/world layouts and general identity resolution.
 
 Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.
 
@@ -43,7 +43,33 @@ step_north_west: 0x6D
 
 `encode_current_development_command` accepts only a Current session-fenced merged `GameCommandEnvelope`, emits one byte for this subset and performs no network I/O.
 
-## Proven bootstrap identity and order
+
+## Proven login side-preamble order
+
+The pinned Current local-player producer calls these complete logical messages
+between local identity and pending-state:
+
+```yaml
+allow_bug_report:
+  producer: sendAllowBugReport
+  logical_message: [0x1A, 0x00]
+  retained_output: none
+tibia_time:
+  producer: sendTibiaTime
+  logical_message: [0xEF, hour_component_u8, minute_component_u8]
+  retained_output: none
+ordering:
+  after: local_player_initialization_0x17
+  before: pending_state_0x0A
+state_mutation: caller_owned_order_only
+simulation_mutation: false
+```
+
+Clock components are structurally validated and intentionally discarded because
+the protocol adapter does not own world-light simulation. Wrong order, fixed
+permission byte, opcode, truncation, oversize and trailing data fail atomically.
+
+## Proven pending-state and enter-world order
 
 The exact Current/non-legacy local branch of `ProtocolGame::sendAddCreature` provides the complete `0x17` local-player initialization layout. The decoder validates all fixed and profile-gated fields but retains only a non-zero producer creature ID normalized to a session-fenced `EntityHandle`.
 
@@ -54,8 +80,8 @@ local_player_initialization:
   discarded: [server_beat, speed_formula, capability_bytes, store_url, store_coin_packet, exiva_flag]
 pending_state:
   opcode: 0x0A
-  prerequisite: local_player_identity
-  output: GameEvent::BootstrapStarted
+  prerequisites: [local_player_identity, allow_bug_report, tibia_time]
+  output: GameEventEnvelope::v1(GameEvent::BootstrapStarted)
 enter_world:
   opcode: 0x0F
   prerequisites: [local_player_identity, pending_state]
@@ -174,3 +200,15 @@ e2e:
 Complete provenance-safe Current non-empty map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract remain unavailable after bounded normalization.
 
 The next safe phase must normalize `GetMapDescription -> GetFloorDescription -> GetTileDescription -> AddItem/AddCreature` as one complete Current family, including feature gates, collection bounds, skip terminators and authoritative identity ownership. Missing fields or ownership must not be inferred.
+
+## Active login side-preamble validation
+
+```yaml
+branch: feat/OTC2-20260803-canary-login-preamble
+base: 4fefec3ab3a1b6401cd3b89b6e0bb1dbcb2ce2a7
+registration_pr: 233
+source_revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+source_methods: [sendAllowBugReport, sendTibiaTime]
+new_decoders: [decode_current_allow_bug_report, decode_current_tibia_time]
+validation: focused_workflow_running
+```

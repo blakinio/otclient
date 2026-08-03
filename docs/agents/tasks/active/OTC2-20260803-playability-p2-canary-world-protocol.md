@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: blocked
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: non-empty-map-layout-and-general-identity-blocker
-branch: docs/OTC2-20260803-canary-tile-clear-closeout
+phase: login-side-preamble-normalization
+branch: feat/OTC2-20260803-canary-login-preamble
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T18:35:00+02:00
-required_base_commit: "f88a6ac21b078dc1d79cdcddfc1f05ffa1589235"
+updated: 2026-08-03T19:20:00+02:00
+required_base_commit: "4fefec3ab3a1b6401cd3b89b6e0bb1dbcb2ce2a7"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -40,15 +40,15 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T10:16:00+02:00
-last_progress_at: 2026-08-03T18:35:00+02:00
+last_progress_at: 2026-08-03T19:20:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: tile-clear-closeout
+ci_check_generation: login-preamble-focused
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 3
+unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 6
-context_reconstruction_attempts: 3
+repair_cycles_for_current_gate: 0
+context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
 
@@ -68,8 +68,14 @@ outbound_commands:
 inbound_bootstrap_order:
   local_player_initialization_0x17:
     output: session_fenced_EntityHandle
+  allow_bug_report_0x1A:
+    fixed_payload: 0x00
+    output: caller_owned_order_state_only
+  tibia_time_0xEF:
+    payload: [opaque_u8, opaque_u8]
+    output: caller_owned_order_state_only
   pending_state_0x0A:
-    prerequisite: local_player_identity
+    prerequisites: [local_player_identity, allow_bug_report, tibia_time]
     output: GameEvent::BootstrapStarted
   enter_world_0x0F:
     prerequisites: [local_player_identity, pending_state]
@@ -153,6 +159,23 @@ e2e:
 
 No partial non-empty map, entity, movement or removal decoder is implemented. No parser mutates simulation state. Real admission remains `RealAdmissionUnavailable` before network I/O.
 
+
+# Active login side-preamble phase
+
+The complete Current producer order immediately following local identity is:
+
+```yaml
+local_player_initialization: 0x17
+allow_bug_report: [0x1A, 0x00]
+tibia_time: [0xEF, hour_component_u8, minute_component_u8]
+pending_state: 0x0A
+enter_world: 0x0F
+```
+
+This phase adds no gameplay event, world-clock state, simulation mutation,
+transport framing, admission change or map claim. It only rejects bootstrap
+sequences that omit or reorder the two proven logical messages.
+
 # P2 barrier
 
 ```yaml
@@ -170,21 +193,20 @@ The Visible World Integration task requires all five prerequisite producers to b
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 20
-updated_at: 2026-08-03T18:35:00+02:00
-observed_main: f88a6ac21b078dc1d79cdcddfc1f05ffa1589235
-status: blocked
-phase: non-empty-map-layout-and-general-identity-blocker
-implemented_bootstrap_order: [local_player_0x17, pending_state_0x0A, enter_world_0x0F]
-implemented_tile_branch: empty_tile_update_0x69
-implementation_pr: 230
-implementation_merge: fe0e74bb1df56ad10aac39eef93c9132c09e2407
-cleanup_pr: 231
-cleanup_merge: f88a6ac21b078dc1d79cdcddfc1f05ffa1589235
+checkpoint_version: 21
+updated_at: 2026-08-03T19:20:00+02:00
+observed_main: 4fefec3ab3a1b6401cd3b89b6e0bb1dbcb2ce2a7
+status: validating
+phase: login-side-preamble-normalization
+active_branch: feat/OTC2-20260803-canary-login-preamble
+active_layouts: [allow_bug_report_0x1A, tibia_time_0xEF]
+registration_pr: 233
+validation: focused_workflow_running
+implemented_bootstrap_order: [local_player_0x17, allow_bug_report_0x1A, tibia_time_0xEF, pending_state_0x0A, enter_world_0x0F]
 shared_path_lease: []
 ownership:
-  protocol_canary: retained_by_blocked_parent_task
+  protocol_canary: retained_by_active_parent_task
   shared_paths: released
-blocker: Complete provenance-safe Current non-empty map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract are unavailable after bounded normalization.
-next_action: Normalize `GetMapDescription -> GetFloorDescription -> GetTileDescription -> AddItem/AddCreature` as one complete Current family with all feature gates, collection bounds, skip terminators and authoritative identity ownership; do not infer missing fields or ownership.
+blocker: Complete provenance-safe Current non-empty map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract remain unavailable.
+next_action: Validate and merge exact login side-preamble order, remove its temporary runner, then continue complete nested map writer normalization without inferring fields or ownership.
 ```

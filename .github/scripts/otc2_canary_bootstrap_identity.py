@@ -97,14 +97,33 @@ text = replace_once(
 
 text = replace_once(
     text,
+    "    fn oversized_pending_state_input_fails_without_advancing_order() {\n"
+    "        let (mut state, current) = state(9);\n"
     "        let input = vec![OPCODE_PENDING_STATE_ENTERED; CANARY_NETWORK_MESSAGE_MAX_BYTES + 1];\n\n"
-    "        assert_eq!(\n"
-    "            decode_current_pending_state_entered(&input, &mut state, current),\n",
+    "        assert_eq!(\n",
+    "    fn oversized_pending_state_input_fails_without_advancing_order(\n"
+    "    ) -> Result<(), Box<dyn Error>> {\n"
+    "        let (mut state, current) = state(9);\n"
     "        let input = vec![OPCODE_PENDING_STATE_ENTERED; CANARY_NETWORK_MESSAGE_MAX_BYTES + 1];\n"
-    "        initialize_local_player(&mut state, current).expect(\"synthetic local identity\");\n\n"
-    "        assert_eq!(\n"
-    "            decode_current_pending_state_entered(&input, &mut state, current),\n",
-    "oversized pending initialization",
+    "        initialize_local_player(&mut state, current)?;\n\n"
+    "        assert_eq!(\n",
+    "oversized pending signature",
+)
+
+text = replace_once(
+    text,
+    "        assert!(!state.pending_state_entered());\n"
+    "        assert!(!state.session_ended());\n"
+    "    }\n\n"
+    "    #[test]\n"
+    "    fn duplicate_pending_state_message_fails_closed() -> Result<(), Box<dyn Error>> {\n",
+    "        assert!(!state.pending_state_entered());\n"
+    "        assert!(!state.session_ended());\n"
+    "        Ok(())\n"
+    "    }\n\n"
+    "    #[test]\n"
+    "    fn duplicate_pending_state_message_fails_closed() -> Result<(), Box<dyn Error>> {\n",
+    "oversized pending result",
 )
 
 text = replace_once(
@@ -138,13 +157,13 @@ task = task_path.read_text(encoding="utf-8")
 task = replace_once(
     task,
     "repair_cycles_for_current_gate: 1\n",
-    "repair_cycles_for_current_gate: 2\n",
+    "repair_cycles_for_current_gate: 3\n",
     "repair count",
 )
 task = replace_once(
     task,
     "validation: focused_workflow_running\n",
-    "validation: exact_source_order_repair_running\n",
+    "validation: exact_source_order_fail_fast_repair_running\n",
     "validation checkpoint",
 )
 task_path.write_text(task, encoding="utf-8", newline="\n")

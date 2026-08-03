@@ -1584,6 +1584,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "oteryn-renderer-resource"
+version = "0.1.0"
+dependencies = [
+ "oteryn-asset-decode",
+ "oteryn-asset-runtime",
+ "oteryn-asset-types",
+ "oteryn-foundation",
+]
+
+[[package]]
 name = "oteryn-simulation-core"
 version = "0.1.0"
 dependencies = [

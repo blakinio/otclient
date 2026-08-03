@@ -1,20 +1,20 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: implementing
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: post-merge-windows-repair
+phase: post-merge-windows-repair-ci
 branch: fix/OTC2-20260803-canary-index-lf
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T09:05:00+02:00
+updated: 2026-08-03T09:07:00+02:00
 required_base_commit: "9db7ad54d636ec5fefbfc40515c66343cc2786f5"
 risk: high
 related_pr: 188
-repair_pr: null
+repair_pr: 190
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -42,7 +42,7 @@ missing_layers:
   - platform input adapter and product binding map
   - visible-world app composition and controlled M2 E2E
 invocation_started_at: 2026-08-03T08:24:00+02:00
-last_progress_at: 2026-08-03T09:05:00+02:00
+last_progress_at: 2026-08-03T09:07:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: windows-newline-repair
 terminal_ci_wait_started_at: null
@@ -67,8 +67,8 @@ Reconcile the Canary Current development runtime descriptor with the merged gene
 - Windows metadata, formatting and workspace Clippy passed for PR #188;
 - Windows workspace tests exposed one cross-platform fixture failure after merge because Git checkout converted generated JSON line endings to CRLF;
 - the failure is isolated to test fixture line-ending normalization and does not change command encoding or admission behavior;
-- the repair branch adds an explicit LF checkout rule for generated Canary JSON evidence;
-- the Cargo.lock lease remains held until the repair passes, merges and the continuation checkpoint releases it;
+- repair PR #190 adds an explicit LF checkout rule for generated Canary JSON evidence;
+- the Cargo.lock lease remains held until repair PR #190 passes, merges and the continuation checkpoint releases it;
 - real wire admission remains fail-closed before network I/O.
 
 # Acceptance
@@ -105,17 +105,19 @@ Source declarations, opcodes and dispatch phases prove source shape only. They d
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 6
-updated_at: 2026-08-03T09:05:00+02:00
+checkpoint_version: 7
+updated_at: 2026-08-03T09:07:00+02:00
 base: 9db7ad54d636ec5fefbfc40515c66343cc2786f5
 branch: fix/OTC2-20260803-canary-index-lf
 implementation_pr:
   number: 188
   state: merged
   merge_commit: 9db7ad54d636ec5fefbfc40515c66343cc2786f5
-repair_pr: null
-status: implementing
-phase: post-merge-windows-repair
+repair_pr:
+  number: 190
+  state: open
+status: validating
+phase: post-merge-windows-repair-ci
 validated_before_merge:
   focused_run_id: 30791628885
   focused_job_id: 91616196561
@@ -142,22 +144,29 @@ repair:
   change: enforce LF for oteryn-client/tools/canary-protocol-index/generated/*.json
   product_behavior_changed: false
   credentials_or_private_data_changed: false
+  pr: 190
 fresh_audit:
-  result: PASS_WITH_REPAIR_REQUIRED
+  result: PASS_WITH_REPAIR_VALIDATION_PENDING
+  validator: fresh_connector_audit_role
   material_product_findings_open: 0
   ci_portability_findings_open: 1
   finding:
     id: P2-CANARY-WINDOWS-EOL-001
     severity: high
     disposition: repair_implemented_validation_pending
+  repair_diff:
+    expected_paths:
+      - .gitattributes
+      - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+    product_code_changed: false
 e2e:
   result: NOT_APPLICABLE
   reason: This bounded producer phase performs no network transmission and has no reachable application consumer; controlled visible-world E2E belongs to the later P2 integration task.
 shared_path_lease:
   path: oteryn-client/Cargo.lock
   holder: OTC2-20260803-playability-p2-canary-world-protocol
-  release_condition: repair merge followed by immediate continuation checkpoint on current main
+  release_condition: repair PR 190 merge followed by immediate continuation checkpoint on current main
 repair_cycles_for_current_gate: 1
 blockers: []
-next_action: Open the focused repair PR, run exact-head Windows workspace, Supply Chain and repository CI, audit the final two-file repair diff, protected-merge it, then release the Cargo.lock lease and continue the parent task at inbound layout normalization.
+next_action: Observe exact-head Windows workspace, Supply Chain and repository CI for repair PR 190, complete the final two-file audit, protected-merge it, then release the Cargo.lock lease and continue the parent task at inbound layout normalization.
 ```

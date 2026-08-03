@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   normalize-and-validate:
-    if: github.event_name == 'push' || github.head_ref == 'feat/OTC2-20260803-canary-bootstrap-identity'
+    if: github.event_name == 'push' || github.head_ref == 'feat/OTC2-20260803-canary-bootstrap-identity' || github.head_ref == 'ci/OTC2-20260803-canary-bootstrap-identity-execute'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:

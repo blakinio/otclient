@@ -1543,6 +1543,14 @@ name = "oteryn-input-actions"
 version = "0.1.0"
 
 [[package]]
+name = "oteryn-input-platform"
+version = "0.1.0"
+dependencies = [
+ "oteryn-input-actions",
+ "winit",
+]
+
+[[package]]
 name = "oteryn-platform"
 version = "0.1.0"
 dependencies = [

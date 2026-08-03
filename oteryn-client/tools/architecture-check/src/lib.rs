@@ -36,6 +36,7 @@ const KNOWN_CATEGORIES: &[&str] = &[
     "ui-core",
     "ui-runtime",
     "input",
+    "input-platform",
     "audio",
     "asset-types",
     "asset-decode",
@@ -67,6 +68,7 @@ const PRODUCT_CATEGORIES: &[&str] = &[
     "ui-core",
     "ui-runtime",
     "input",
+    "input-platform",
     "audio",
     "asset-types",
     "asset-runtime",
@@ -245,6 +247,7 @@ fn allowed_normal_edge(source: &str, target: &str) -> bool {
                 | "extension-api"
         ),
         "input" => matches!(target, "foundation" | "settings" | "diagnostics"),
+        "input-platform" => target == "input",
         "audio" => matches!(
             target,
             "foundation" | "asset-types" | "asset-runtime" | "settings" | "diagnostics"
@@ -820,6 +823,45 @@ mod renderer_resource_policy_tests {
         ));
         assert!(!dependency_allowed(
             "asset-decode",
+            "renderer",
+            DependencyKind::Normal
+        ));
+    }
+}
+
+#[cfg(test)]
+mod input_platform_policy_tests {
+    use super::*;
+
+    #[test]
+    fn input_platform_dependency_edges_are_narrow() {
+        assert!(dependency_allowed(
+            "input-platform",
+            "input",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "input",
+            "input-platform",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "input-platform",
+            "foundation",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "input-platform",
+            "platform",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "input-platform",
+            "runtime",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "input-platform",
             "renderer",
             DependencyKind::Normal
         ));

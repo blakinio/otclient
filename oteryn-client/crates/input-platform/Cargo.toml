@@ -1,0 +1,21 @@
+[package]
+name = "oteryn-input-platform"
+version = "0.1.0"
+description = "Bounded Windows and winit physical-input adapter for Oteryn"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "input-platform"
+
+[dependencies]
+oteryn-input-actions = { version = "=0.1.0", path = "../input-actions" }
+
+[target.'cfg(windows)'.dependencies]
+winit = "=0.30.13"
+
+[lints]
+workspace = true

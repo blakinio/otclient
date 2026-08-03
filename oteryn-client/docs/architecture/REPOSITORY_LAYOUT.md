@@ -59,6 +59,7 @@ oteryn-client/
 │   ├── ui-core/
 │   ├── ui-runtime/
 │   ├── input/
+│   ├── input-platform/
 │   ├── audio/
 │   ├── asset-types/
 │   ├── asset-runtime/
@@ -141,7 +142,8 @@ oteryn-client/
 | `renderer-resource` | checked immutable RGBA8 upload plans, process/device/asset-generation-fenced handles and bounded deterministic cache lifecycle | world state, draw ordering, protocol, input, UI, filesystem acquisition or CPU media decode |
 | `ui-core` | primitives, layout, input routing, accessibility | inventory/chat specifics |
 | `ui-runtime` | view-model binding, panel registry, persistence | protocol bytes |
-| `input` | devices, bindings, contexts and semantic actions | direct socket writes |
+| `input` | framework-neutral normalized physical events, contexts, bindings and semantic actions | native windowing types, global hooks, background capture or direct socket writes |
+| `input-platform` | bounded Windows/winit physical-event normalization into the merged `input` contract | product keymaps, gameplay commands, UI actions, native identifier retention, global hooks or application composition |
 | `audio` | devices, mixing and voices | game authority |
 | `asset-types` | IDs, pack schemas and metadata | filesystem policy |
 | `asset-runtime` | verified pack mounting and streaming | source conversion |
@@ -244,6 +246,9 @@ renderer-resource
 ├── asset-runtime
 └── foundation
 
+input-platform
+└── input
+
 test-support (tool category)
 ├── diagnostics
 └── foundation
@@ -252,7 +257,7 @@ foundation
 └── Rust standard library and separately reviewed non-product dependencies only
 ```
 
-`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. `identity` may depend on the strict `platform` producer boundary and merged ENTRY contracts, but those lower crates must never depend back on Identity. The current `apps/client` shell depends on foundation/diagnostics, the exact windowing library and the bounded `renderer` crate for concrete Windows composition. Renderer depends only on foundation plus its exact GPU dependencies and owns no feature, protocol, asset or UI service. `renderer-resource` is a backend-neutral renderer-category producer over `asset-decode`, `asset-runtime` and foundation; it owns no device, world or draw policy. `asset-decode` is a dedicated bounded decode category and depends only on the merged asset runtime and schema crates in production; its compiler dependency is test-only.
+`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. `identity` may depend on the strict `platform` producer boundary and merged ENTRY contracts, but those lower crates must never depend back on Identity. The current `apps/client` shell depends on foundation/diagnostics, the exact windowing library and the bounded `renderer` crate for concrete Windows composition. Renderer depends only on foundation plus its exact GPU dependencies and owns no feature, protocol, asset or UI service. `renderer-resource` is a backend-neutral renderer-category producer over `asset-decode`, `asset-runtime` and foundation; it owns no device, world or draw policy. `input-platform` is a dedicated platform-input category producer over the merged framework-neutral `input` contract and owns no product keymap, command, UI action or application lifecycle. `asset-decode` is a dedicated bounded decode category and depends only on the merged asset runtime and schema crates in production; its compiler dependency is test-only.
 
 ## 6. Cargo workspace policy
 

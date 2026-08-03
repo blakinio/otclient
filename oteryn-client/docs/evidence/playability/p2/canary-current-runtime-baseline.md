@@ -1,6 +1,6 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: bounded session-end inbound implementation is validating on task `OTC2-20260803-playability-p2-canary-world-protocol`.  
+Status: bounded pending-state and known session-end inbound families are merged; the parent task is blocked on complete remaining layouts and identity resolution.  
 Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.  
 Consumer boundary: `oteryn-client/crates/protocol-canary`.
 
@@ -140,22 +140,23 @@ Original synthetic hexadecimal fixtures live under `oteryn-client/tests/integrat
 
 | Required family | Classification | Exact current evidence and missing contract |
 |---|---|---|
-| session bootstrap | `PARTIAL` | `sendPendingStateEntered` is `PROVEN` and implemented. `sendEnterWorld` is a proven one-byte `0x0F` layout at line 8512, but it carries neither local-player identity nor position required by `GameEvent::BootstrapCompleted`; semantic completion remains `BLOCKED` rather than guessed. |
+| session bootstrap | `PARTIAL` | `sendPendingStateEntered` is `PROVEN` and implemented. `sendEnterWorld` is a proven one-byte `0x0F` layout at line 8512, but it carries neither local-player identity nor position required by `GameEvent::BootstrapCompleted`; semantic completion is `BLOCKED`. |
 | map description | `UNKNOWN` | `sendMapDescription` delegates to `GetMapDescription`, floor/tile iteration, skip markers and nested item/creature writers. Complete Current branches, terminators, collection bounds and appearance dependencies have not been normalized into one accepted layout. |
 | tile and stack updates | `PARTIAL` | Outer opcodes/positions for update/add/remove paths are visible, but tile descriptions contain nested variable writers and stack-only operations do not prove a domain item/entity handle without authoritative state. |
 | creature/entity appearance | `UNKNOWN` | `sendAddCreature`, `sendUpdateTileCreature` and `AddCreature` depend on known-creature cache branches, removals, outfit/light/skull/type/feature fields and nested bounds not yet proven as one complete Current layout. |
 | movement and reconciliation | `PARTIAL` | `sendMoveCreature` has local-player, teleport, floor-transition, map-strip, remote-visible and remove/add branches. Direct `0x6D` movement identifies the source by position/stack rather than a domain handle, so complete deterministic normalization requires an accepted identity-resolution contract and every branch layout. |
-| removal | `PARTIAL` | remove-tile messages expose position and stack index, not a protocol-neutral item/entity handle. Mapping without authoritative state would guess identity and is forbidden. |
+| removal | `PARTIAL` | Remove-tile messages expose position and stack index, not a protocol-neutral item/entity handle. Mapping without authoritative state would guess identity and is forbidden. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and known values `0x00`/`0x02` are `PROVEN` and implemented; source values `0x01`/`0x03` remain explicitly `UNKNOWN` and rejected. |
 
 No map, tile, entity, movement or removal payload is implemented from this matrix. Partial decoding cannot mutate simulation state.
 
-## Validation checkpoint
+## Terminal validation checkpoint
 
 ```yaml
-status: exact_head_validation_pending
-branch: feat/OTC2-20260803-canary-session-end-inbound
-pr: 196
+status: bounded_family_merged_parent_blocked
+implementation_pr: 196
+implementation_head: a2ea69ea3801df0bbba20caaf6ab7d8677b52bb7
+merge_commit: ceb24e22fc19305cb10c7ea29f7f16928def2a04
 product_code_scope:
   - bounded session-fenced logical-message parsing
   - original sanitized positive and negative fixtures
@@ -166,16 +167,42 @@ gameplay_layouts_implemented:
   outbound: [step_8_directions, stop_movement, logout]
   inbound: [pending_state_entered, session_end_known_codes]
 session_end_negative_matrix:
-  truncated: pending
-  unknown_opcode: pending
-  trailing_data: pending
-  oversized: pending
-  unknown_reason: pending
-  invalid_order_or_duplicate: pending
-  stale_session: pending
+  truncated: PASS
+  unknown_opcode: PASS
+  trailing_data: PASS
+  oversized: PASS
+  unknown_reason: PASS
+  invalid_order_or_duplicate: PASS
+  stale_session: PASS
+validation:
+  repaired_format_generation:
+    rust_client_run: 30798587290
+    windows_job: 91637729025
+    result: REPAIRED
+  exact_head_rust_client_run: 30798845230
+  exact_head_windows_job: 91638521494
+  exact_head_supply_chain_job: 91638521428
+  locked_metadata: PASS
+  formatting: PASS
+  clippy: PASS
+  workspace_tests: PASS
+  architecture: PASS
+  supply_chain: PASS
+  repository_ci_run: 30798845350
+  repository_required_job: 91638983873
+  repository_ci: PASS
+  ready_state_ci_run: 30799161107
+  ready_state_required_job: 91639989636
+  ready_state_ci: PASS
 audit:
-  result: pending_exact_final_diff
-blockers:
-  - complete provenance-safe map/entity/movement/removal layouts and identity-resolution contracts
-next_action: Complete focused and exact-head validation and fresh audit for PR 196, then merge the bounded family and persist the remaining provenance blocker.
+  result: PASS
+  validator: fresh_connector_audit_role
+  review_id: 4842339967
+  open_critical_high_material_medium: 0
+e2e:
+  result: NOT_APPLICABLE
+  reason: The isolated producer consumes already decrypted and deframed logical messages and has no reachable application or real transport composition.
+shared_path_lease: []
+blocker: Complete provenance-safe Current map/entity/movement/removal layouts and an accepted position/stack-to-domain-handle identity-resolution ownership contract are unavailable at the pinned revision after bounded evidence normalization.
+next_action: Obtain and accept one complete pinned remaining-family layout plus its identity-resolution contract, then resume the same parent task without inferring missing fields or ownership.
 ```

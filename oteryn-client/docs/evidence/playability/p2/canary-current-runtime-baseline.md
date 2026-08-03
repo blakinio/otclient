@@ -1,14 +1,16 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: local-player identity/order and known session-end slices are merged; the complete absent-tile update branch is under exact-head validation while the parent remains blocked on non-empty map/world layouts and general identity resolution.
+Status: local-player identity/order, known session-end slices and the complete absent-tile update branch are merged. The parent producer remains blocked on non-empty map/world layouts and general identity resolution.
+
 Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.
+
 Consumer boundary: `oteryn-client/crates/protocol-canary`.
 
 ## Claim boundary
 
-This document aligns a **development source baseline** only. It does not prove that any deployed Identity, Gateway or Canary instance runs this revision, configuration, build, feature set, framing/security mode or gameplay ordering.
+This document aligns a development source baseline only. It does not prove that a deployed Identity, Gateway or Canary instance runs this revision, configuration, build, feature set, framing/security mode or gameplay order.
 
-Real Canary admission remains fail-closed. No credential, session key, private packet capture, proprietary asset byte or copied producer implementation body is stored here. The parser consumes already decrypted and deframed logical messages only and does not own simulation, rendering, transport or application composition.
+Real Canary admission remains fail-closed. No credential, session key, private packet capture, proprietary asset byte or copied producer implementation body is stored here. The parser consumes already decrypted and deframed logical messages and does not own simulation, rendering, transport or application composition.
 
 ## Normalized source profile
 
@@ -19,15 +21,12 @@ revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
 server_release: 3.6.1
 client_version: 1525
 profile: ProtocolProfileId::Current
-enabled_feature_required_here: LoginSpeedFormula
 network_message_max_bytes: 65500
 ```
 
-Exact indexed source hashes remain recorded by the generated descriptor in `oteryn-protocol-canary`. Historical runtime revisions remain historical evidence only.
+Exact indexed source hashes remain published by the immutable Current profile descriptor in `oteryn-protocol-canary`.
 
 ## Supported outbound development subset
-
-Exact dispatch establishes ten no-payload client-to-server commands:
 
 ```yaml
 logout: 0x14
@@ -42,54 +41,23 @@ step_south_west: 0x6C
 step_north_west: 0x6D
 ```
 
-`encode_current_development_command` accepts only a Current session-fenced merged `GameCommandEnvelope`, emits exactly one byte for this subset and performs no network I/O.
+`encode_current_development_command` accepts only a Current session-fenced merged `GameCommandEnvelope`, emits one byte for this subset and performs no network I/O.
 
-## Proven local-player initialization
+## Proven bootstrap identity and order
 
-The exact Current/non-legacy local branch of `ProtocolGame::sendAddCreature` precedes pending-state, enter-world and map description. At client version 1525 with `LoginSpeedFormula` enabled, the logical message is:
-
-```yaml
-opcode_u8: 0x17
-player_id_u32_le: non_zero
-server_beat_u16_le: opaque
-speed_formula_components: 3
-each_speed_component:
-  precision_u8: 3
-  scaled_value_u32_le: opaque
-pvp_framing_change_u8: 0
-expert_mode_u8: 0
-store_url: u16_length_plus_opaque_bytes
-store_coin_packet_u16_le: opaque
-exiva_enabled_u8: boolean
-```
-
-The decoder validates the complete structure but retains only:
+The exact Current/non-legacy local branch of `ProtocolGame::sendAddCreature` provides the complete `0x17` local-player initialization layout. The decoder validates all fixed and profile-gated fields but retains only a non-zero producer creature ID normalized to a session-fenced `EntityHandle`.
 
 ```yaml
-output: EntityHandle
-session_fenced: true
-raw_creature_id_escape: false
-timing_or_speed_configuration_retained: false
-store_configuration_retained: false
-emitted_game_event: none
-simulation_mutation: false
-```
-
-A zero player ID, stale session, duplicate/out-of-order message, wrong opcode, bad precision, non-zero fixed capability byte, invalid boolean, truncation, oversize and trailing data fail without changing state.
-
-## Proven pending-state and enter-world order
-
-```yaml
+local_player_initialization:
+  opcode: 0x17
+  retained: session_fenced_EntityHandle
+  discarded: [server_beat, speed_formula, capability_bytes, store_url, store_coin_packet, exiva_flag]
 pending_state:
-  producer: sendPendingStateEntered
   opcode: 0x0A
-  payload_bytes: 0
   prerequisite: local_player_identity
-  output: GameEventEnvelope::v1(GameEvent::BootstrapStarted)
+  output: GameEvent::BootstrapStarted
 enter_world:
-  producer: sendEnterWorld
   opcode: 0x0F
-  payload_bytes: 0
   prerequisites: [local_player_identity, pending_state]
   output: caller_owned_order_state_only
 bootstrap_completed:
@@ -97,50 +65,25 @@ bootstrap_completed:
   missing_required_value: validated_map_position
 ```
 
-Every boundary is session-fenced, bounded, trailing-data rejecting and state-atomic. Enter-world cannot fabricate the `EntityHandle + Position` pair required by `GameEvent::BootstrapCompleted`.
+These boundaries are bounded, session-fenced, trailing-data rejecting and state-atomic. Invalid precision, fixed fields, boolean, zero identity, truncation, oversize, stale session, duplicates and impossible order fail closed.
 
 ## Proven session-end boundary
 
-The exact producer emits opcode `0x18`, one `SessionEndInformations` byte and then disconnects. The inspected call sites prove:
+The producer emits opcode `0x18`, one `SessionEndInformations` byte and disconnects.
 
 ```yaml
 0x00: SESSION_END_LOGOUT
 0x02: SESSION_END_FORCECLOSE
-0x01: UNKNOWN
-0x03: UNKNOWN
+0x01: UNKNOWN_REJECTED
+0x03: UNKNOWN_REJECTED
+semantic_output: GameEvent::SessionEnded(ServerClosed)
 ```
 
-Only `0x00` and `0x02` are accepted. Both normalize conservatively to `GameEvent::SessionEnded { reason: ServerClosed }`; unknown values fail closed. The isolated decoder lacks caller-owned command history sufficient to prove `Requested`.
-
-## Fixture provenance
-
-Original synthetic hexadecimal fixtures under `oteryn-client/tests/integration/canary-world-protocol/fixtures/` represent already decrypted logical messages. The local-player values and `synthetic://store` string are invented test values. Fixtures contain no credential, session key, private capture, deployed store configuration, proprietary asset byte or producer body.
-
-Positive/negative coverage includes:
-
-```yaml
-local_player_initialization: PASS
-bad_login_precision: PASS
-zero_identity: PASS
-trailing_identity_data: PASS
-enter_world: PASS
-pending_without_identity: PASS_REJECTED
-wrong_opcode: PASS_REJECTED
-truncation: PASS_REJECTED
-oversize: PASS_REJECTED
-stale_session: PASS_REJECTED
-duplicate_or_impossible_order: PASS_REJECTED
-known_session_end: PASS
-unknown_session_end: PASS_REJECTED
-```
+The conservative semantic reason is required because this isolated decoder has no caller-owned outbound-command history sufficient to prove `Requested`.
 
 ## Proven absent-tile update branch
 
-The exact Current `ProtocolGame::sendUpdateTile` producer writes opcode `0x69`
-and `NetworkMessage::addPosition`, which is exactly `x:u16le`, `y:u16le`,
-`z:u8`. When the producer tile pointer is absent it writes fixed marker `0x01`
-and terminator `0xFF`; no `GetTileDescription`, item writer or creature writer
-is invoked.
+`ProtocolGame::sendUpdateTile` writes opcode `0x69` and calls `NetworkMessage::addPosition`, whose exact layout is `x:u16le`, `y:u16le`, `z:u8`. When the tile pointer is absent, the producer writes fixed marker `0x01` followed by terminator `0xFF` and does not call any nested writer.
 
 ```yaml
 logical_message:
@@ -152,19 +95,35 @@ logical_message:
   terminator_u8: 0xFF
 prerequisite: current_session_after_enter_world
 output: GameEventEnvelope::v1(GameEvent::TileCleared)
-state_mutation: none
+caller_state_mutation: false
 nested_writer_dependency: none
 ```
 
-The decoder rejects every truncated prefix, wrong opcode, wrong marker,
-wrong terminator, oversize, trailing data, stale/pre-enter-world state and a
-terminal session. Synthetic fixtures contain coordinates only.
+`decode_current_empty_tile_update` rejects:
+
+```yaml
+- every truncated prefix
+- wrong opcode
+- wrong absent-tile marker
+- wrong terminator
+- oversized input
+- trailing data
+- stale session
+- pre-enter-world order
+- terminal session
+```
+
+The non-empty branch is not partially parsed because it invokes `GetTileDescription`, `AddItem`, `AddCreature` and feature-dependent variable writers.
+
+## Fixture provenance
+
+All hexadecimal fixtures under `oteryn-client/tests/integration/canary-world-protocol/fixtures/` are original synthetic already-decrypted logical messages. Coordinates, identity values and `synthetic://store` are invented test values. Fixtures contain no credential, session key, private capture, deployed configuration, producer body or proprietary asset.
 
 ## Inbound readiness matrix
 
 | Required family | Classification | Exact current evidence and missing contract |
 |---|---|---|
-| session bootstrap | `PARTIAL` | Local identity `0x17`, pending-state `0x0A` and enter-world `0x0F` are proven and implemented in exact order. Complete map-description position/body remains required before `BootstrapCompleted`. |
+| session bootstrap | `PARTIAL` | Local identity `0x17`, pending-state `0x0A` and enter-world `0x0F` are implemented in exact order. A complete map-description position/body remains required before `BootstrapCompleted`. |
 | map description | `UNKNOWN` | `GetMapDescription` delegates to floor/tile iteration, skip markers and nested item/creature writers. Complete Current branches, terminators, bounds and appearance dependencies are not normalized as one accepted layout. |
 | tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch is implemented as `TileCleared`. Non-empty tile descriptions and stack-only identity ownership remain incomplete. |
 | creature/entity appearance | `UNKNOWN` | Known-creature cache branches, removals, outfit/light/skull/type/feature fields and nested bounds remain incomplete. |
@@ -172,46 +131,38 @@ terminal session. Synthetic fixtures contain coordinates only.
 | removal | `PARTIAL` | Remove-tile messages expose position and stack index, not a protocol-neutral item/entity handle. Mapping without authoritative state would guess identity. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and known values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain explicitly unknown and rejected. |
 
-No partial map, entity, movement or removal decoder is implemented. The tile decoder accepts only the complete absent-tile branch and no parser mutates simulation state.
+No partial non-empty map, entity, movement or removal decoder is implemented. The tile decoder accepts only the complete absent-tile branch. No parser mutates simulation state.
 
-## Active empty-tile validation
-
-```yaml
-branch: feat/OTC2-20260803-canary-tile-clear
-base: 6eb1d3c4421ca32170fe4ca703001e953a2eb58a
-source_revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
-source_methods: [ProtocolGame::sendUpdateTile, NetworkMessage::addPosition]
-new_decoder: decode_current_empty_tile_update
-negative_matrix: [truncated, wrong_opcode, wrong_marker, wrong_terminator, oversized, trailing, stale, pre_enter_world, terminal]
-validation: focused_workflow_running
-```
-
-## Terminal bootstrap identity validation
+## Empty-tile terminal validation
 
 ```yaml
-focused_product_head: ec34134aee42fd687f4f195025362189e49c9dbc
-focused_run: 30820529534
-focused_job: 91709031623
+focused_product_head: 6bfaea45187176e7b956cb49aefbcf16523cc045
+focused_run: 30831813507
+focused_job: 91747353789
 focused_result: PASS
-protocol_canary_tests: 39_PASS
-restacked_head: 0690084045c5dc70b6632a424c9c6ede2cc20b62
-implementation_pr: 220
-implementation_merge: 1c820ff6b87f8459bc300e5baeed0e395b6147c8
-restacked_rust_client_run: 30821884378
-restacked_windows_job: 91713561582
-restacked_supply_chain_job: 91713561705
-restacked_repository_ci_run: 30821887730
-restacked_repository_required_job: 91713897019
+focused_protocol_canary_tests: 45_PASS
+superseded_product_pr: 224
+restacked_head: 8c6436aa8d87eead0a0f6f6d8592cd0ba3043aaf
+implementation_pr: 230
+implementation_merge: fe0e74bb1df56ad10aac39eef93c9132c09e2407
+rust_client_run: 30832279785
+windows_job: 91748896392
+supply_chain_job: 91748896261
+repository_ci_run: 30832280429
+repository_required_job: 91749201719
 restacked_validation: PASS
-fresh_product_audit_review: 4844933812
-fresh_restack_audit_review: 4845040720
-open_critical_high_material_medium: 0
-temporary_runner_cleanup_pr: 221
-temporary_runner_cleanup_merge: d6ac5c89a378d58ef4bdbd7ba0e5a61f686e4e0a
-cleanup_repository_ci_run: 30822271162
-cleanup_required_job: 91715246698
+fresh_audit_review: 4846369910
+open_critical: 0
+open_high: 0
+open_material_medium: 0
+unresolved_review_threads: 0
+cleanup_pr: 231
+cleanup_merge: f88a6ac21b078dc1d79cdcddfc1f05ffa1589235
+cleanup_repository_ci_run: 30832756476
+cleanup_required_job: 91750747579
 cleanup_validation: PASS
 temporary_workflows_remaining: 0
+temporary_scripts_remaining: 0
 shared_path_lease: []
 e2e:
   result: NOT_APPLICABLE
@@ -220,6 +171,6 @@ e2e:
 
 ## Remaining blocker
 
-Complete provenance-safe Current map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract are unavailable after bounded normalization of the pinned revision.
+Complete provenance-safe Current non-empty map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract remain unavailable after bounded normalization.
 
-The next safe phase is one complete pinned map-description layout including nested writer gates, bounds and authoritative identity ownership. Missing fields or ownership must not be inferred.
+The next safe phase must normalize `GetMapDescription -> GetFloorDescription -> GetTileDescription -> AddItem/AddCreature` as one complete Current family, including feature gates, collection bounds, skip terminators and authoritative identity ownership. Missing fields or ownership must not be inferred.

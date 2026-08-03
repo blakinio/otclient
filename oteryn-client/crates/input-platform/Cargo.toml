@@ -1,0 +1,36 @@
+[package]
+name = "oteryn-input-platform"
+version = "0.1.0"
+description = "Bounded Windows and winit physical-input adapter for Oteryn"
+edition = "2024"
+rust-version = "1.94"
+license = "MIT"
+repository = "https://github.com/blakinio/otclient"
+publish = false
+
+[package.metadata.oteryn]
+category = "input"
+
+[dependencies]
+oteryn-input-actions = { version = "=0.1.0", path = "../input-actions" }
+
+[target.'cfg(windows)'.dependencies]
+winit = "=0.30.13"
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+dbg_macro = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unwrap_used = "deny"
+
+# Exclusive-path development is intentionally standalone until the serialized
+# workspace/lockfile lease reaches Input Platform. Remove this nested workspace
+# marker when the crate is integrated into the parent workspace under that lease.
+[workspace]

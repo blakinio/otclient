@@ -62,18 +62,23 @@ jobs:
                   raise SystemExit(f"{label}: expected exactly one anchor, found {count}")
               return text.replace(old, new, 1)
           '''
-          if old not in text:
-              raise SystemExit("replace_once precondition block not found")
-          text = text.replace(old, new, 1)
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("replace_once block is neither original nor repaired")
+
           status_with_spaces = (
               "Status: local-player identity/order and known session-end slices are merged; "
               "the complete absent-tile update branch is under exact-head validation while "
               "the parent remains blocked on non-empty map/world layouts and general identity "
               "resolution.  "
           )
-          if text.count(status_with_spaces) != 1:
-              raise SystemExit("generated evidence status whitespace anchor not found exactly once")
-          text = text.replace(status_with_spaces, status_with_spaces.rstrip(), 1)
+          status_without_spaces = status_with_spaces.rstrip()
+          if text.count(status_with_spaces) == 1:
+              text = text.replace(status_with_spaces, status_without_spaces, 1)
+          elif text.count(status_without_spaces) != 1:
+              raise SystemExit("generated evidence status is neither original nor repaired")
+
           path.write_text(text, encoding="utf-8", newline="\n")
           '@ | python -
           python $script

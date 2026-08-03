@@ -1,0 +1,49 @@
+name: Temporary P2 Canary Phase Finalizer Trigger
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/temp-p2-canary-phase-finalizer-trigger.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p2-canary-phase-finalizer-trigger
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Canary protocol branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260803-playability-p2-canary-world-protocol
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Execute reviewed phase finalizer
+        shell: bash
+        env:
+          EXPECTED_PARENT: ${{ github.event.before }}
+          EXPECTED_MAIN: f1a5a1873dbb9ce164aefed7537d5c3004eeb696
+          FINALIZER_WORKFLOW: .github/workflows/temp-p2-canary-phase-finalizer.yml
+          TRIGGER_WORKFLOW: .github/workflows/temp-p2-canary-phase-finalizer-trigger.yml
+        run: |
+          set -euo pipefail
+          test "$(git diff --name-only HEAD^..HEAD)" = "$TRIGGER_WORKFLOW"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/temp-p2-canary-phase-finalizer.yml').read_text(encoding='utf-8')
+          marker = '        run: |\n'
+          if source.count(marker) != 1:
+              raise SystemExit('expected exactly one reviewed finalizer block')
+          block = source.split(marker, 1)[1]
+          lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
+          Path('/tmp/p2-canary-phase-finalizer.sh').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+          bash /tmp/p2-canary-phase-finalizer.sh

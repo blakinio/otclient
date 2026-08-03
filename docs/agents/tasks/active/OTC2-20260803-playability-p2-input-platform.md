@@ -1,16 +1,16 @@
 ---
 task_id: OTC2-20260803-playability-p2-input-platform
-status: implementing
+status: validating
 agent: "P2 Windows/winit physical-input adapter producer"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-input-platform
-phase: restack-and-workspace-integration
+phase: exact-head-validation-and-audit
 branch: feat/OTC2-20260803-playability-p2-input-platform
 base_branch: main
 created: 2026-08-03T10:15:00+02:00
-updated: 2026-08-03T13:20:00+02:00
+updated: 2026-08-03T13:40:00+02:00
 required_base_commit: "8a3ce18f8fe98c5654ac3ce36c098404bdfc3343"
 risk: medium
 related_prs: [195, 200, 201]
@@ -25,6 +25,7 @@ shared_path_lease:
     - oteryn-client/Cargo.lock
     - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
     - oteryn-client/tools/architecture-check/src/lib.rs
+temporary_validation_paths: []
 implementation_authorized: true
 policy_version: 2
 prompting_standard_version: 2.1
@@ -47,14 +48,14 @@ feature_scope:
   completion_claim: partial_producer
 dependent_downstream_package: playability-p2-visible-world-integration
 invocation_started_at: 2026-08-03T10:15:00+02:00
-last_progress_at: 2026-08-03T13:20:00+02:00
+last_progress_at: 2026-08-03T13:40:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: integration-bootstrap
+ci_check_generation: exact-head-final
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 2
 stall_warnings: 0
 ---
@@ -63,21 +64,13 @@ stall_warnings: 0
 
 Implement the sole bounded Windows/winit adapter into the merged `oteryn-input-actions` physical-event contract without product bindings, gameplay commands, application composition, global hooks, background capture, device fingerprinting or secret input logging.
 
-# Live state
-
-- exact current `main`: `8a3ce18f8fe98c5654ac3ce36c098404bdfc3343`;
-- Asset Decode implementation/archive PRs #194/#199 are merged;
-- Renderer Resource implementation/archive PRs #200/#201 are merged and all of their ownership and shared leases are released;
-- Canary protocol remains independently provenance-blocked without a shared lease;
-- this existing task and PR #195 are the sole Input Platform owner;
-- no competing shared-path lease exists;
-- Input Platform is fifth in the accepted P2 serialized integration order and now holds the workspace/category/lockfile lease.
-
-# Exclusive implementation candidate
+# Terminal implementation candidate
 
 ```yaml
 crate: oteryn-input-platform
-implementation_code_head: 0e4578dc9c1f8e2a083e18407a2c968cf5c0be1a
+exclusive_code_head: 0e4578dc9c1f8e2a083e18407a2c968cf5c0be1a
+integrated_product_head: df8e8bd833f1a3b7395b03bda8dd13470754458a
+base: 8a3ce18f8fe98c5654ac3ce36c098404bdfc3343
 public_success_output: Vec<oteryn_input_actions::NormalizedInputEvent>
 public_error: InputPlatformError
 physical_identity: explicit_usb_hid_keyboard_usage_subset
@@ -95,17 +88,31 @@ background_input: ignored
 raw_text_logging: false
 native_device_identifier_retention: false
 global_hook: none
+architecture_category: input-platform
+normal_dependency_edges: [input-platform_to_input]
 ```
 
-# Source audit before integration
+# Completed integration
 
-- all numeric normalization rejects non-finite and out-of-range values before integer conversion;
-- text errors expose lengths only; merged `TextCommit` debug output is payload-redacted;
+- branch is restacked on exact current main containing archived Asset Decode and Renderer Resource producers;
+- the standalone nested workspace marker is removed and workspace package/lint inheritance is active;
+- `oteryn-input-platform` is a parent workspace member;
+- `Cargo.lock` adds only the new local package entry and retains existing registry packages;
+- a dedicated `input-platform` category permits only `input-platform -> input` and prevents reverse, runtime, renderer, platform or foundation edges;
+- repository layout documents the native-adapter responsibility and one-way dependency;
+- all temporary integration and validation workflows/scripts are removed;
+- generated Rust target metadata is absent from the diff.
+
+# Source and lifecycle audit
+
+- numeric normalization rejects non-finite and out-of-range values before integer conversion;
+- errors expose text lengths only; raw text and native identifiers are not logged or retained;
 - unsupported controls reset merged held state instead of aliasing or stranding releases;
-- focus loss emits capture loss first when required and clears modifiers/pointer/IME state;
-- relative motion requires focus, capture and a validated absolute baseline;
-- winit output/native identifiers do not cross the public boundary;
-- no product binding or command mapping is present.
+- focus loss emits capture loss first when required and clears modifiers, pointer baseline and IME state;
+- relative motion requires focus, confirmed capture and a validated absolute baseline;
+- synthetic keyboard events and all unfocused background input are ignored;
+- winit/Win32 types do not cross the normalized output boundary;
+- no product binding, command mapping, UI action or application ownership is present.
 
 # Acceptance
 
@@ -114,13 +121,13 @@ global_hook: none
 - [x] modifiers, pointer, wheel and text values are deterministic and bounded;
 - [x] unsupported controls and lifecycle losses clear merged router state;
 - [x] no raw secret logging, global hook, background capture or device fingerprinting exists;
-- [ ] restack on exact current main;
-- [ ] replace the standalone nested workspace marker with parent workspace inheritance;
-- [ ] add the crate to the parent workspace and exact lockfile without registry drift;
-- [ ] add narrow `input -> input` architecture policy and repository-layout documentation;
-- [ ] pinned format, focused/component tests and strict package Clippy pass;
-- [ ] exact-head Windows workspace, architecture, Supply Chain and repository CI pass;
-- [ ] fresh independent audit has zero open critical, high or material-medium findings;
+- [x] exact-main restack and parent-workspace integration are complete;
+- [x] lockfile integration has no registry source/checksum drift;
+- [x] dedicated one-way architecture category and policy tests are complete;
+- [x] pinned formatting, focused/component tests, strict package Clippy and workspace architecture validation passed before product commit;
+- [ ] retained exact-head Windows metadata, workspace Clippy/tests, architecture and Supply Chain pass;
+- [ ] retained exact-head repository CI passes;
+- [ ] fresh exact-final-diff audit has zero open critical, high or material-medium findings;
 - [ ] PR #195 protected-merges;
 - [ ] task archives separately and all ownership/leases release.
 
@@ -131,21 +138,43 @@ This is a physical-input `partial_producer`. It owns no product keymap, gameplay
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 5
-status: implementing
-phase: restack-and-workspace-integration
+checkpoint_version: 6
+status: validating
+phase: exact-head-validation-and-audit
 observed_main: 8a3ce18f8fe98c5654ac3ce36c098404bdfc3343
 branch: feat/OTC2-20260803-playability-p2-input-platform
-implementation_code_head: 0e4578dc9c1f8e2a083e18407a2c968cf5c0be1a
-checkpoint_head_before_resume: 16f9df4ec7df98bde61dc9c9c65ec2f2a9be55c6
+exclusive_code_head: 0e4578dc9c1f8e2a083e18407a2c968cf5c0be1a
+integrated_product_head: df8e8bd833f1a3b7395b03bda8dd13470754458a
 implementation_pr: 195_open_draft
-renderer_resource:
-  implementation_pr: 200_merged
-  archive_pr: 201_merged
-  archive_merge: 8a3ce18f8fe98c5654ac3ce36c098404bdfc3343
+changed_paths:
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-input-platform.md
+  - oteryn-client/Cargo.lock
+  - oteryn-client/Cargo.toml
+  - oteryn-client/crates/input-platform/Cargo.toml
+  - oteryn-client/crates/input-platform/src/adapter.rs
+  - oteryn-client/crates/input-platform/src/error.rs
+  - oteryn-client/crates/input-platform/src/lib.rs
+  - oteryn-client/crates/input-platform/src/tests.rs
+  - oteryn-client/crates/input-platform/src/winit_adapter.rs
+  - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
+  - oteryn-client/tools/architecture-check/src/lib.rs
+focused_validation:
+  result: PASS
+  producer_commit: df8e8bd833f1a3b7395b03bda8dd13470754458a
+  commands:
+    - cargo fmt --all
+    - cargo metadata --locked --format-version 1
+    - cargo clippy -p oteryn-input-platform --all-targets -- -D warnings
+    - cargo test -p oteryn-input-platform --all-targets
+    - cargo test -p oteryn-architecture-check --all-targets
+    - cargo run -p oteryn-architecture-check -- workspace .
+exact_head_validation: pending
+fresh_audit: pending
+e2e:
+  result: NOT_APPLICABLE
+  reason: Physical-input producer has no product bindings, application composition or reachable interactive Windows journey.
 shared_path_lease:
-  state: held
-  paths: [oteryn-client/Cargo.toml, oteryn-client/Cargo.lock, oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md, oteryn-client/tools/architecture-check/src/lib.rs]
+  state: held_until_terminal_merge_and_archive
 blockers: []
-next_action: Merge exact main into the branch, integrate the crate minimally, run focused/component validation, then retain exact-head CI and a fresh independent audit before protected merge and separate archive.
+next_action: Complete retained exact-head validation, run a fresh falsification audit, remediate material findings, then protected-merge and archive before releasing all Input Platform ownership and leases.
 ```

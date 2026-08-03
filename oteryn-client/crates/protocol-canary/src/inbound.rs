@@ -50,6 +50,23 @@ impl CanaryInboundBootstrapState {
     pub const fn session_ended(self) -> bool {
         self.session_ended
     }
+
+    /// Decode one exact Current terminal session-end logical message.
+    ///
+    /// This public method keeps the wire-specific parser behind the already
+    /// exported session-fenced state type rather than exposing raw reason bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same fail-closed errors as
+    /// [`decode_current_session_end_information`].
+    pub fn decode_session_end_information(
+        &mut self,
+        input: &[u8],
+        current: SessionGeneration,
+    ) -> Result<GameEventEnvelope, CanaryInboundError> {
+        decode_current_session_end_information(input, self, current)
+    }
 }
 
 /// Stable failure returned by the bounded Current inbound decoder.
@@ -308,8 +325,7 @@ mod tests {
         ] {
             let (mut state, current) = state(generation);
             let input = parse_hex_fixture(fixture)?;
-            let envelope =
-                decode_current_session_end_information(&input, &mut state, current)?;
+            let envelope = state.decode_session_end_information(&input, current)?;
 
             assert_eq!(
                 envelope.event(),
@@ -340,7 +356,7 @@ mod tests {
         ] {
             let (mut state, _) = state(22);
             assert_eq!(
-                decode_current_session_end_information(input, &mut state, current),
+                state.decode_session_end_information(input, current),
                 Err(CanaryInboundError::Protocol(ProtocolError::new(expected)))
             );
             assert!(!state.session_ended());
@@ -354,7 +370,7 @@ mod tests {
         let input = vec![OPCODE_SESSION_END_INFORMATION; CANARY_NETWORK_MESSAGE_MAX_BYTES + 1];
 
         assert_eq!(
-            decode_current_session_end_information(&input, &mut state, current),
+            state.decode_session_end_information(&input, current),
             Err(CanaryInboundError::Protocol(ProtocolError::new(
                 ProtocolErrorKind::Oversized
             )))
@@ -368,7 +384,7 @@ mod tests {
         let pending = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
 
         let (mut before_pending, current) = state(24);
-        decode_current_session_end_information(&session_end, &mut before_pending, current)?;
+        before_pending.decode_session_end_information(&session_end, current)?;
         assert_eq!(
             decode_current_pending_state_entered(&pending, &mut before_pending, current),
             Err(CanaryInboundError::InvalidOrder)
@@ -376,7 +392,7 @@ mod tests {
 
         let (mut after_pending, current) = state(25);
         decode_current_pending_state_entered(&pending, &mut after_pending, current)?;
-        decode_current_session_end_information(&session_end, &mut after_pending, current)?;
+        after_pending.decode_session_end_information(&session_end, current)?;
         assert!(after_pending.pending_state_entered());
         assert!(after_pending.session_ended());
         Ok(())
@@ -386,19 +402,15 @@ mod tests {
     fn duplicate_or_stale_session_end_fails_closed() -> Result<(), Box<dyn Error>> {
         let input = parse_hex_fixture(SESSION_END_FORCE_CLOSE_FIXTURE)?;
         let (mut ended, current) = state(26);
-        decode_current_session_end_information(&input, &mut ended, current)?;
+        ended.decode_session_end_information(&input, current)?;
         assert_eq!(
-            decode_current_session_end_information(&input, &mut ended, current),
+            ended.decode_session_end_information(&input, current),
             Err(CanaryInboundError::InvalidOrder)
         );
 
         let (mut stale, _) = state(27);
         assert!(matches!(
-            decode_current_session_end_information(
-                &input,
-                &mut stale,
-                SessionGeneration::new(28),
-            ),
+            stale.decode_session_end_information(&input, SessionGeneration::new(28)),
             Err(CanaryInboundError::Domain(DomainError::StaleSession { .. }))
         ));
         assert!(!stale.session_ended());

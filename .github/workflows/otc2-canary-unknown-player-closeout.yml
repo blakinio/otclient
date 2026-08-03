@@ -1,0 +1,50 @@
+name: OTC2 Canary Unknown Player Closeout
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+
+concurrency:
+  group: otc2-canary-unknown-player-closeout
+  cancel-in-progress: false
+
+jobs:
+  apply-closeout:
+    if: github.head_ref == 'docs/OTC2-20260803-canary-unknown-player-closeout'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact closeout branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: docs/OTC2-20260803-canary-unknown-player-closeout
+          fetch-depth: 0
+
+      - name: Apply and persist durable closeout
+        shell: bash
+        run: |
+          set -euo pipefail
+          script=.github/scripts/otc2_canary_unknown_player_closeout.py
+          if [[ ! -f "$script" ]]; then
+            echo "Unknown-player closeout already applied."
+            exit 0
+          fi
+          python3 "$script"
+          rm "$script"
+          git add -A -- \
+            .github/scripts \
+            docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md \
+            oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs(task): close unknown-player appearance phase'
+          git push origin HEAD:docs/OTC2-20260803-canary-unknown-player-closeout

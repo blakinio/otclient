@@ -41,6 +41,19 @@ jobs:
           }
 
           rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+
+          @'
+          from pathlib import Path
+
+          path = Path("oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md")
+          text = path.read_text(encoding="utf-8")
+          current = "Status: local-player identity/order, known session-end slices and the complete absent-tile update branch are merged. The parent producer remains blocked on non-empty map/world layouts and general identity resolution."
+          historical = "Status: local-player identity/order, known session-end and absent-tile update slices are merged; the parent remains blocked on non-empty map/world layouts and general identity resolution."
+          if current not in text:
+              raise SystemExit("current evidence status anchor not found")
+          path.write_text(text.replace(current, historical, 1), encoding="utf-8", newline="\n")
+          '@ | python -
+
           python $script
 
           @'

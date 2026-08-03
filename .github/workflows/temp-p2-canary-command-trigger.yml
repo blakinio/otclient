@@ -1,6 +1,6 @@
 name: Temporary P2 Canary Command Trigger
 
-# Activates the staged direct finalizer block from command-focused.yml.
+# Activates the staged direct finalizer after the focused compile repair.
 on:
   pull_request:
     types: [synchronize]

@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: validating
+status: blocked
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: login-side-preamble-normalization
-branch: feat/OTC2-20260803-canary-login-preamble
+phase: non-empty-map-layout-and-general-identity-blocker
+branch: docs/OTC2-20260803-canary-login-preamble-closeout
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T19:20:00+02:00
-required_base_commit: "4fefec3ab3a1b6401cd3b89b6e0bb1dbcb2ce2a7"
+updated: 2026-08-03T19:52:00+02:00
+required_base_commit: "2f9ddc7fe9747740a42eebfaac677a1a49599f3c"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -39,22 +39,22 @@ missing_layers:
   - accepted general position/stack-to-domain-handle identity-resolution ownership contract
   - product binding map and visible-world composition
   - controlled real M2 acceptance
-invocation_started_at: 2026-08-03T10:16:00+02:00
-last_progress_at: 2026-08-03T19:20:00+02:00
+invocation_started_at: 2026-08-03T19:01:00+02:00
+last_progress_at: 2026-08-03T19:52:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: login-preamble-focused
+ci_check_generation: login-preamble-closeout
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 0
+repair_cycles_for_current_gate: 2
+context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
 
 # Goal
 
-Reconcile pinned Canary Current evidence with the Rust client while preserving fail-closed real admission. Implement only gameplay mappings whose complete byte layout, feature gates, order and semantic ownership are proven without inference.
+Reconcile pinned Canary Current evidence with the Rust client while preserving fail-closed real admission. Implement only protocol families whose complete byte layout, feature gates, order and semantic ownership are proven without inference.
 
 # Merged bounded protocol slices
 
@@ -69,10 +69,10 @@ inbound_bootstrap_order:
   local_player_initialization_0x17:
     output: session_fenced_EntityHandle
   allow_bug_report_0x1A:
-    fixed_payload: 0x00
+    layout: [opcode_0x1A, fixed_permission_0x00]
     output: caller_owned_order_state_only
   tibia_time_0xEF:
-    payload: [opaque_u8, opaque_u8]
+    layout: [opcode_0xEF, clock_component_u8, clock_component_u8]
     output: caller_owned_order_state_only
   pending_state_0x0A:
     prerequisites: [local_player_identity, allow_bug_report, tibia_time]
@@ -91,51 +91,78 @@ empty_tile_update_0x69:
   caller_state_mutation: false
 ```
 
-The empty-tile branch is complete and independent of `GetTileDescription`, `AddItem`, `AddCreature` and position/stack identity resolution. The non-empty branch remains unsupported because it invokes variable nested writers.
+All accepted boundaries are bounded, session-fenced, trailing-data rejecting and state-atomic. Raw producer creature IDs, clock values, store configuration and capability values do not escape the adapter. No parser mutates simulation state.
 
-# Empty-tile phase integration
+# Completed login side-preamble phase
+
+The pinned Current local-player producer calls the following complete messages before pending-state:
 
 ```yaml
-focused_product_head: 6bfaea45187176e7b956cb49aefbcf16523cc045
-superseded_product_pr: 224
-restacked_head: 8c6436aa8d87eead0a0f6f6d8592cd0ba3043aaf
-implementation_pr: 230
-implementation_merge: fe0e74bb1df56ad10aac39eef93c9132c09e2407
-cleanup_pr: 231
-cleanup_merge: f88a6ac21b078dc1d79cdcddfc1f05ffa1589235
-changed_product_paths: 9
+order:
+  - local_player_initialization_0x17
+  - allow_bug_report_0x1A_0x00
+  - tibia_time_0xEF_two_u8
+  - pending_state_0x0A
+  - enter_world_0x0F
+new_decoders:
+  - decode_current_allow_bug_report
+  - decode_current_tibia_time
+retained_protocol_values: none
+emitted_game_events: none
+simulation_mutation: false
+```
+
+The fixed bug-report payload must be `0x00`. The two clock bytes are structurally consumed and deliberately discarded because protocol-canary does not own world-light simulation. Wrong order, wrong opcode, wrong fixed byte, truncation, oversize, stale session, duplicate use, terminal state and trailing data fail without advancing state.
+
+# Phase integration
+
+```yaml
+registration_pr: 233
+registration_merge: 4fefec3ab3a1b6401cd3b89b6e0bb1dbcb2ce2a7
+historical_product_pr: 234
+historical_product_head: 292755649226bd36422bf941afba5281a6713af7
+runner_repair_pr: 235
+runner_repair_merge: 29bc427a6f5c43218c8e2b1d6542cebb8499e5ad
+restacked_product_pr: 236
+restacked_product_head: 524c99598e49120fab7c6eff3fb00634e0a5d8b8
+implementation_merge: 03cf57fca8f251e4b47fc1aefd56c67b6a788110
+cleanup_pr: 237
+cleanup_merge: 2f9ddc7fe9747740a42eebfaac677a1a49599f3c
+changed_product_paths: 8
 temporary_workflows_remaining: 0
 temporary_scripts_remaining: 0
 shared_path_lease: []
 ```
 
-PR #224 was closed without merge after focused validation because its historical merge base exposed the temporary workflow in the diff. PR #230 restacked the exact product blobs on current `main` and contained only the nine allowed task/product/evidence/fixture paths. PR #231 removed the temporary runner.
+PR #234 was closed without merge after focused validation because its historical merge base exposed the temporary workflow in the product diff. PR #236 restacked the exact validated task/product/evidence/fixture blobs on current main and contained no workflow or patch-script change. PR #237 removed the one temporary runner.
 
 # Validation and audit
 
 ```yaml
-focused_validation:
-  run: 30831813507
-  job: 91747353789
+focused_windows_validation:
+  run: 30837572720
+  job: 91766409598
+  rust: 1.94.0
   locked_metadata: PASS
   formatting: PASS
   strict_package_clippy: PASS
-  protocol_canary_tests: 45_PASS
-  architecture: PASS
+  protocol_canary_tests: 48_PASS
+  architecture_tests: PASS
+  architecture_workspace_policy: PASS
 restacked_exact_head_validation:
-  head: 8c6436aa8d87eead0a0f6f6d8592cd0ba3043aaf
-  rust_client_run: 30832279785
-  windows_job: 91748896392
-  supply_chain_job: 91748896261
-  repository_ci_run: 30832280429
-  repository_required_job: 91749201719
+  head: 524c99598e49120fab7c6eff3fb00634e0a5d8b8
+  rust_client_run: 30837930784
+  windows_job: 91767570065
+  supply_chain_job: 91767570180
+  repository_ready_ci_run: 30838016884
+  repository_required_job: 91768642943
   result: PASS
 cleanup_validation:
-  repository_ci_run: 30832756476
-  repository_required_job: 91750747579
+  repository_ci_run: 30838418308
+  repository_required_job: 91769507878
   result: PASS
 fresh_audit:
-  review_id: 4846369910
+  review_id: 4847048515
   critical_open: 0
   high_open: 0
   material_medium_open: 0
@@ -145,36 +172,50 @@ e2e:
   reason: The isolated decoder consumes already decrypted and deframed logical messages and has no reachable real transport, simulation composition or user journey.
 ```
 
+# Bounded map-source findings
+
+The pinned producer establishes these outer boundaries:
+
+```yaml
+sendMapDescription:
+  opcode: 0x64
+  prefix: local_player_position_u16le_u16le_u8
+  viewport: 18_by_14
+GetMapDescription:
+  surface_floors: 7_down_to_0
+  underground_floor_window: z_minus_2_through_z_plus_2_clamped
+  empty_run_encoding: [skip_u8, 0xFF]
+```
+
+A completely empty initial viewport is not source-reachable: the local player has already been placed on a tile before `sendMapDescription`, and `GetTileDescription` serializes creatures. The smallest reachable bootstrap map therefore still depends on `GetTileDescription` and `AddCreature`. Implementing a synthetic all-empty bootstrap decoder would accept a state the pinned producer cannot emit and is forbidden.
+
+The complete non-empty family still delegates to:
+
+```yaml
+- GetFloorDescription
+- GetTileDescription
+- AddItem
+- AddCreature
+- knownCreatureSet eviction and known/unknown branches
+- outfit, light, skull, type and feature-gated fields
+- item subtype, tier, animation and custom-attribute branches
+```
+
+Local movement also appends map strips through `GetMapDescription`; remote movement and removal expose positions and stack indices but do not by themselves prove protocol-neutral domain handles.
+
 # Inbound readiness matrix
 
 | Family | Classification | Durable decision |
 |---|---|---|
-| session bootstrap | `PARTIAL` | Local identity `0x17`, pending-state `0x0A` and enter-world `0x0F` are implemented in exact order. A complete map description remains required before `BootstrapCompleted`. |
-| map description | `UNKNOWN` | Floor/tile iteration and skip markers are visible, but complete nested item/creature writers, bounds and feature branches are not normalized as one accepted Current layout. |
-| tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch is implemented as `TileCleared`. The non-empty branch and stack identity remain blocked. |
-| creature/entity appearance | `UNKNOWN` | Known-creature cache branches, removals, appearance fields, gates and nested bounds remain incomplete. |
-| movement and reconciliation | `PARTIAL` | Local/remote/teleport/floor/map-strip branches remain incomplete; position plus stack does not prove a domain handle. |
-| removal | `PARTIAL` | Position plus stack index cannot be converted to a protocol-neutral handle without authoritative state ownership. |
-| session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain unknown and rejected. |
+| session bootstrap | `PARTIAL` | Exact order through local identity, bug-report permission, Tibia time, pending-state and enter-world is implemented. A complete map description remains required before `BootstrapCompleted`. |
+| map description | `UNKNOWN` | Outer viewport/floor/skip structure is proven, but the reachable initial map necessarily contains the local creature and therefore depends on complete nested item/creature writers. |
+| tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch emits `TileCleared`. Non-empty tile bodies and authoritative stack identity remain blocked. |
+| creature/entity appearance | `UNKNOWN` | Known/unknown creature branches, cache eviction, appearance fields, feature gates and collection bounds are not yet normalized as one complete family. |
+| movement and reconciliation | `PARTIAL` | Local steps append map strips; remote `0x6D` and remove/add branches still require authoritative identity and stack ownership. |
+| removal | `PARTIAL` | Position plus stack index cannot be converted to a protocol-neutral item/entity handle without caller-owned world state. |
+| session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain rejected. |
 
-No partial non-empty map, entity, movement or removal decoder is implemented. No parser mutates simulation state. Real admission remains `RealAdmissionUnavailable` before network I/O.
-
-
-# Active login side-preamble phase
-
-The complete Current producer order immediately following local identity is:
-
-```yaml
-local_player_initialization: 0x17
-allow_bug_report: [0x1A, 0x00]
-tibia_time: [0xEF, hour_component_u8, minute_component_u8]
-pending_state: 0x0A
-enter_world: 0x0F
-```
-
-This phase adds no gameplay event, world-clock state, simulation mutation,
-transport framing, admission change or map claim. It only rejects bootstrap
-sequences that omit or reorder the two proven logical messages.
+Real admission remains `RealAdmissionUnavailable` before network I/O. No map-body, creature, item, movement or removal parser is partially admitted.
 
 # P2 barrier
 
@@ -188,25 +229,26 @@ visible_world_integration: not_ready
 controlled_m2_acceptance: not_ready
 ```
 
-The Visible World Integration task requires all five prerequisite producers to be merged and separately archived. This parent Canary producer remains incomplete, retains exclusive `protocol-canary` ownership and holds no shared-path lease.
+The parent Canary producer remains incomplete, retains exclusive ownership of `protocol-canary` and holds no shared-path lease. Visible World Integration cannot start until the Canary producer is genuinely complete and separately archived.
 
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 21
-updated_at: 2026-08-03T19:20:00+02:00
-observed_main: 4fefec3ab3a1b6401cd3b89b6e0bb1dbcb2ce2a7
-status: validating
-phase: login-side-preamble-normalization
-active_branch: feat/OTC2-20260803-canary-login-preamble
-active_layouts: [allow_bug_report_0x1A, tibia_time_0xEF]
-registration_pr: 233
-validation: focused_workflow_running
+checkpoint_version: 22
+updated_at: 2026-08-03T19:52:00+02:00
+observed_main: 2f9ddc7fe9747740a42eebfaac677a1a49599f3c
+status: blocked
+phase: non-empty-map-layout-and-general-identity-blocker
 implemented_bootstrap_order: [local_player_0x17, allow_bug_report_0x1A, tibia_time_0xEF, pending_state_0x0A, enter_world_0x0F]
+implemented_tile_branch: empty_tile_update_0x69
+implementation_pr: 236
+implementation_merge: 03cf57fca8f251e4b47fc1aefd56c67b6a788110
+cleanup_pr: 237
+cleanup_merge: 2f9ddc7fe9747740a42eebfaac677a1a49599f3c
 shared_path_lease: []
 ownership:
-  protocol_canary: retained_by_active_parent_task
+  protocol_canary: retained_by_blocked_parent_task
   shared_paths: released
-blocker: Complete provenance-safe Current non-empty map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract remain unavailable.
-next_action: Validate and merge exact login side-preamble order, remove its temporary runner, then continue complete nested map writer normalization without inferring fields or ownership.
+blocker: Complete provenance-safe Current non-empty map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract remain unavailable after bounded normalization.
+next_action: Normalize `GetMapDescription -> GetFloorDescription -> GetTileDescription -> AddItem/AddCreature` as one complete Current family with all feature gates, collection bounds, skip terminators, known-creature cache transitions and authoritative identity ownership; do not infer missing fields or ownership.
 ```

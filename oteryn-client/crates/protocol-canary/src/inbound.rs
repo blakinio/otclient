@@ -1,4 +1,4 @@
-use crate::CANARY_INPUT_MESSAGE_MAX_BYTES;
+use crate::CANARY_NETWORK_MESSAGE_MAX_BYTES;
 use oteryn_foundation::SessionGeneration;
 use oteryn_game_domain::{DomainError, GameEvent, GameEventEnvelope, SessionToken};
 use oteryn_protocol_core::{BoundedReader, ProtocolError, ProtocolErrorKind, TrailingDataPolicy};
@@ -77,7 +77,7 @@ pub fn decode_current_pending_state_entered(
 
     session.ensure_current(current)?;
 
-    let mut reader = BoundedReader::new(input, CANARY_INPUT_MESSAGE_MAX_BYTES)?;
+    let mut reader = BoundedReader::new(input, CANARY_NETWORK_MESSAGE_MAX_BYTES)?;
     let opcode = reader.read_u8()?;
     if opcode != OPCODE_PENDING_STATE_ENTERED {
         return Err(ProtocolError::new(ProtocolErrorKind::UnknownValue).into());
@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn oversized_input_fails_without_advancing_order() {
         let (session, current) = session(9);
-        let input = vec![OPCODE_PENDING_STATE_ENTERED; CANARY_INPUT_MESSAGE_MAX_BYTES + 1];
+        let input = vec![OPCODE_PENDING_STATE_ENTERED; CANARY_NETWORK_MESSAGE_MAX_BYTES + 1];
         let mut state = CanaryInboundBootstrapState::AwaitingPendingStateEntered;
 
         assert_eq!(

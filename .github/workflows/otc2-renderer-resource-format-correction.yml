@@ -1,0 +1,74 @@
+name: OTC2 Renderer Resource Format Correction
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260803-playability-p2-renderer-resource
+
+permissions:
+  contents: write
+
+concurrency:
+  group: otc2-renderer-resource-format-correction
+  cancel-in-progress: false
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260803-playability-p2-renderer-resource
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+
+      - name: Remove unproven color-space assumption
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("oteryn-client/crates/renderer-resource/src/lib.rs")
+          text = path.read_text(encoding="utf-8")
+          if "Rgba8UnormSrgb" not in text:
+              raise SystemExit("expected the unproven sRGB format variant")
+          text = text.replace("Rgba8UnormSrgb", "Rgba8Unorm")
+          text = text.replace("rgba8-unorm-srgb", "rgba8-unorm")
+          anchor = "        assert_eq!(descriptor.source_row_pitch_bytes(), 12);\n"
+          assertion = "        assert_eq!(descriptor.format(), TextureFormat::Rgba8Unorm);\n"
+          if assertion not in text:
+              if text.count(anchor) != 1:
+                  raise SystemExit("texture-format assertion anchor is not unique")
+              text = text.replace(anchor, assertion + anchor)
+          path.write_text(text, encoding="utf-8", newline="\n")
+          PY
+
+      - name: Validate corrected contract
+        working-directory: oteryn-client
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup override set 1.94.0
+          cargo fmt --all
+          cargo metadata --locked --format-version 1 > /dev/null
+          cargo test -p oteryn-renderer-resource --all-targets
+          cargo clippy -p oteryn-renderer-resource --all-targets -- -D warnings
+          cargo test -p oteryn-architecture-check --all-targets
+          cargo run -p oteryn-architecture-check -- workspace .
+
+      - name: Self-remove and persist correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/otc2-renderer-resource-format-correction.yml
+          git add oteryn-client/crates/renderer-resource/src/lib.rs
+          git diff --cached --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "fix(renderer-resource): preserve raw RGBA8 color semantics"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-renderer-resource

@@ -61,6 +61,7 @@ oteryn-client/
 │   ├── audio/
 │   ├── asset-types/
 │   ├── asset-runtime/
+│   ├── asset-decode/
 │   ├── settings/
 │   ├── diagnostics/
 │   ├── extension-api/
@@ -142,6 +143,7 @@ oteryn-client/
 | `audio` | devices, mixing and voices | game authority |
 | `asset-types` | IDs, pack schemas and metadata | filesystem policy |
 | `asset-runtime` | verified pack mounting and streaming | source conversion |
+| `asset-decode` | checked synthetic-v1 RGBA8 CPU normalization from generation-fenced runtime handles into immutable owned bytes | filesystem paths, loose-file or production import, GPU upload, renderer caches, network, application composition or asset rights decisions |
 | `settings` | typed schemas, scopes and migrations | credentials |
 | `diagnostics` | metrics, tracing, redaction and replay hooks | authoritative game state |
 | `extension-api` | stable capability-limited guest ABI | host implementation details |
@@ -225,6 +227,10 @@ protocol-oteryn
 ├── game-domain contracts
 └── foundation when a generic primitive is required
 
+asset-decode
+├── asset-runtime
+└── asset-types
+
 renderer
 ├── render-types
 ├── asset-runtime
@@ -239,7 +245,7 @@ foundation
 └── Rust standard library and separately reviewed non-product dependencies only
 ```
 
-`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. `identity` may depend on the strict `platform` producer boundary and merged ENTRY contracts, but those lower crates must never depend back on Identity. The current `apps/client` shell depends on foundation/diagnostics, the exact windowing library and the bounded `renderer` crate for concrete Windows composition. Renderer depends only on foundation plus its exact GPU dependencies and owns no feature, protocol, asset or UI service.
+`foundation` must not depend on application, platform, domain, protocol, renderer, UI, assets, diagnostics or feature crates. `game-domain`, `world-storage` and `render-types` must remain usable in tests without launching a window, GPU, network or async runtime. `test-support` may compose lower contracts only for deterministic tests and must not be linked as a product service. `identity` may depend on the strict `platform` producer boundary and merged ENTRY contracts, but those lower crates must never depend back on Identity. The current `apps/client` shell depends on foundation/diagnostics, the exact windowing library and the bounded `renderer` crate for concrete Windows composition. Renderer depends only on foundation plus its exact GPU dependencies and owns no feature, protocol, asset or UI service. `asset-decode` is categorized as a bounded runtime service and depends only on the merged asset runtime and schema crates in production; its compiler dependency is test-only.
 
 ## 6. Cargo workspace policy
 

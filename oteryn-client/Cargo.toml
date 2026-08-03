@@ -3,6 +3,7 @@ members = [
     "apps/client",
     "crates/account-session",
     "crates/app-runtime",
+    "crates/asset-decode",
     "crates/asset-types",
     "crates/asset-runtime",
     "crates/diagnostics",

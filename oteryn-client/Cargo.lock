@@ -1440,6 +1440,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "oteryn-asset-decode"
+version = "0.1.0"
+dependencies = [
+ "oteryn-asset-compiler",
+ "oteryn-asset-runtime",
+ "oteryn-asset-types",
+]
+
+[[package]]
 name = "oteryn-asset-runtime"
 version = "0.1.0"
 dependencies = [

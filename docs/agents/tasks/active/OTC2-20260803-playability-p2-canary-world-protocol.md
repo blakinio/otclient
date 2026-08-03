@@ -46,7 +46,7 @@ terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 1
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 2
 stall_warnings: 0
 ---
@@ -196,7 +196,7 @@ new_contracts:
     opcode: 0x0F
     output: caller_owned_order_state
     bootstrap_completed_emitted: false
-validation: focused_workflow_running
+validation: exact_source_order_fail_fast_repair_running
 p2_barrier:
   simulation_snapshot: archived
   asset_decode: archived

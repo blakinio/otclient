@@ -274,7 +274,11 @@ pub fn decode_current_pending_state_entered(
     current: SessionGeneration,
 ) -> Result<GameEventEnvelope, CanaryInboundError> {
     state.session.ensure_current(current)?;
-    if state.pending_state_entered || state.session_ended {
+    if state.local_player.is_none()
+        || state.pending_state_entered
+        || state.enter_world_received
+        || state.session_ended
+    {
         return Err(CanaryInboundError::InvalidOrder);
     }
 
@@ -397,11 +401,34 @@ mod tests {
             .collect()
     }
 
+    fn initialize_local_player(
+        state: &mut CanaryInboundBootstrapState,
+        current: SessionGeneration,
+    ) -> Result<(), Box<dyn Error>> {
+        let input = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
+        state.decode_local_player_initialization(&input, current)?;
+        Ok(())
+    }
+
+    #[test]
+    fn pending_state_requires_local_player_identity() -> Result<(), Box<dyn Error>> {
+        let (mut state, current) = state(6);
+        let input = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
+        assert_eq!(
+            decode_current_pending_state_entered(&input, &mut state, current),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+        assert_eq!(state.local_player(), None);
+        assert!(!state.pending_state_entered());
+        Ok(())
+    }
+
     #[test]
     fn exact_pending_state_fixture_emits_bootstrap_started() -> Result<(), Box<dyn Error>> {
         let (mut state, current) = state(7);
         let session = state.session();
         let input = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
+        initialize_local_player(&mut state, current)?;
 
         let envelope = decode_current_pending_state_entered(&input, &mut state, current)?;
 
@@ -425,6 +452,7 @@ mod tests {
             ),
         ] {
             let (mut state, _) = state(8);
+            initialize_local_player(&mut state, current)?;
             assert_eq!(
                 decode_current_pending_state_entered(input, &mut state, current),
                 Err(CanaryInboundError::Protocol(ProtocolError::new(expected)))
@@ -436,9 +464,10 @@ mod tests {
     }
 
     #[test]
-    fn oversized_pending_state_input_fails_without_advancing_order() {
+    fn oversized_pending_state_input_fails_without_advancing_order() -> Result<(), Box<dyn Error>> {
         let (mut state, current) = state(9);
         let input = vec![OPCODE_PENDING_STATE_ENTERED; CANARY_NETWORK_MESSAGE_MAX_BYTES + 1];
+        initialize_local_player(&mut state, current)?;
 
         assert_eq!(
             decode_current_pending_state_entered(&input, &mut state, current),
@@ -448,12 +477,14 @@ mod tests {
         );
         assert!(!state.pending_state_entered());
         assert!(!state.session_ended());
+        Ok(())
     }
 
     #[test]
     fn duplicate_pending_state_message_fails_closed() -> Result<(), Box<dyn Error>> {
         let (mut state, current) = state(10);
         let input = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
+        initialize_local_player(&mut state, current)?;
         decode_current_pending_state_entered(&input, &mut state, current)?;
 
         assert_eq!(
@@ -558,6 +589,7 @@ mod tests {
         );
 
         let (mut after_pending, current) = state(25);
+        initialize_local_player(&mut after_pending, current)?;
         decode_current_pending_state_entered(&pending, &mut after_pending, current)?;
         after_pending.decode_session_end_information(&session_end, current)?;
         assert!(after_pending.pending_state_entered());

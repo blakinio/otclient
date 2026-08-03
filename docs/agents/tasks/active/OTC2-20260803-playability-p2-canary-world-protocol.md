@@ -13,7 +13,7 @@ created: 2026-08-03T02:04:00+02:00
 updated: 2026-08-04T00:12:00+02:00
 required_base_commit: "6b3efb75131f0ee1b9ce1779aa3ef7eaa1a536a2"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -139,8 +139,8 @@ implementation_head: 70aeb1e2754a20b090422e435401ecb0b2f6e93e
 implementation_merge: 26d5ed87552afe9b71245ba75fbb93fa66b2bc68
 focused_windows:
   workflow: OTC2 Canary Unknown Player Appearance
-  run: 30857235344
-  job: 91830964717
+  run: 30857020465
+  job: 91830290527
   result: PASS
   rust: 1.94.0
   locked_metadata: PASS
@@ -174,7 +174,7 @@ shared_path_lease: []
 
 ```yaml
 validator: fresh_exact_head_falsification_audit
-review_id: 4848922295
+review_id: 4848927049
 reviewed_head: 70aeb1e2754a20b090422e435401ecb0b2f6e93e
 critical_open: 0
 high_open: 0

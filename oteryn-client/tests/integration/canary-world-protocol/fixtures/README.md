@@ -16,8 +16,16 @@ Provenance:
 
 The fixtures contain no credential, session key, private capture, proprietary asset byte or copied producer implementation body. The local-player values and store URL are original synthetic field values used only to exercise the proven Current layout; the URL is never exposed by the decoder. Unknown session-end reason `0x01`, invalid login precision, zero identity and trailing data are negative cases and must fail closed.
 
-
 Tile-clear fixtures prove only the complete Current absent-tile branch of
 `sendUpdateTile`: opcode `0x69`, position encoded as `u16le/u16le/u8`, marker
 `0x01` and terminator `0xFF`. Wrong marker, wrong terminator and trailing data
 are negative cases. Coordinates are synthetic and no map contents are copied.
+
+Validation checkpoint:
+
+- focused Windows runner: `30831813507`, job `91747353789`, PASS;
+- pinned Rust 1.94 formatting and strict package Clippy: PASS;
+- protocol-canary package tests: 45 PASS;
+- architecture tests and workspace dependency policy: PASS;
+- exact current-main restack parent: `9ce5f2992889d4a780c5fb1d16566a3fbc59e14c`;
+- restacked product commit before this checkpoint: `aaed93ff323d31ab9ae3e41be9ce67aff841f0ae`.

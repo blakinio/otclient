@@ -70,12 +70,17 @@ jobs:
 
       - name: Apply exact bootstrap identity phase
         shell: pwsh
-        run: python .github/scripts/otc2_canary_bootstrap_identity.py
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          python .github/scripts/otc2_canary_bootstrap_identity.py
 
       - name: Validate focused producer and architecture
         working-directory: oteryn-client
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           $env:CARGO_TARGET_DIR = Join-Path $env:RUNNER_TEMP "oteryn-target"
           rustup override set 1.94.0
           cargo fmt --all
@@ -88,25 +93,21 @@ jobs:
       - name: Remove temporary files and persist validated phase
         shell: pwsh
         run: |
-          Remove-Item .github/workflows/otc2-canary-bootstrap-identity.yml
-          Remove-Item .github/scripts/otc2_canary_bootstrap_identity.py
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          if (Test-Path .github/scripts/otc2_canary_bootstrap_identity.py) {
+            Remove-Item .github/scripts/otc2_canary_bootstrap_identity.py
+          }
           if (Test-Path .github/scripts/otc2_canary_bootstrap_identity_trigger.txt) {
             Remove-Item .github/scripts/otc2_canary_bootstrap_identity_trigger.txt
           }
-          git add `
-            .github/workflows/otc2-canary-bootstrap-identity.yml `
-            .github/scripts/otc2_canary_bootstrap_identity.py `
-            .github/scripts/otc2_canary_bootstrap_identity_trigger.txt `
+          git add -A -- `
+            .github/scripts `
             docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md `
             oteryn-client/crates/protocol-canary/src/inbound.rs `
             oteryn-client/crates/protocol-canary/src/lib.rs `
             oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md `
-            oteryn-client/tests/integration/canary-world-protocol/fixtures/README.md `
-            oteryn-client/tests/integration/canary-world-protocol/fixtures/local-player-initialization.hex `
-            oteryn-client/tests/integration/canary-world-protocol/fixtures/local-player-bad-precision.hex `
-            oteryn-client/tests/integration/canary-world-protocol/fixtures/local-player-zero-id.hex `
-            oteryn-client/tests/integration/canary-world-protocol/fixtures/local-player-trailing.hex `
-            oteryn-client/tests/integration/canary-world-protocol/fixtures/enter-world.hex
+            oteryn-client/tests/integration/canary-world-protocol/fixtures
           git diff --cached --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

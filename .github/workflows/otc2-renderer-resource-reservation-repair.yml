@@ -1,0 +1,100 @@
+name: OTC2 Renderer Resource Reservation Repair
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260803-playability-p2-renderer-resource
+
+permissions:
+  contents: write
+
+concurrency:
+  group: otc2-renderer-resource-reservation-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260803-playability-p2-renderer-resource
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+
+      - name: Move metadata reservation before eviction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("oteryn-client/crates/renderer-resource/src/lib.rs")
+          text = path.read_text(encoding="utf-8")
+          reserve = '''        self.entries
+              .try_reserve(1)
+              .map_err(|_| ResourceError::AllocationFailed)?;
+
+          '''
+          if text.count(reserve) != 1:
+              raise SystemExit("metadata reservation block is not unique")
+          text = text.replace(reserve, "", 1)
+          anchor = '''        if required_bytes > self.limits.max_total_device_bytes() {
+              return Err(ResourceError::TextureBytesLimitExceeded);
+          }
+
+          '''
+          if text.count(anchor) != 1:
+              raise SystemExit("pre-eviction insertion anchor is not unique")
+          text = text.replace(anchor, anchor + reserve, 1)
+          text = text.replace(
+              "A device reset attempted to reuse the current generation.",
+              "A device reset attempted to reuse or regress the current generation.",
+          )
+          text = text.replace(
+              "A pack reset attempted to reuse the current generation.",
+              "A pack reset attempted to reuse or regress the current generation.",
+          )
+          text = text.replace(
+              "replacement device generation must differ from the current generation",
+              "replacement device generation must advance beyond the current generation",
+          )
+          text = text.replace(
+              "replacement asset-pack generation must differ from the current generation",
+              "replacement asset-pack generation must advance beyond the current generation",
+          )
+          before_while = text.index("        let mut evicted_entries = 0_usize;")
+          reservation = text.index("        self.entries\n            .try_reserve(1)")
+          if reservation > before_while:
+              raise SystemExit("metadata reservation still occurs after eviction begins")
+          path.write_text(text, encoding="utf-8", newline="\n")
+          PY
+
+      - name: Validate exact repair
+        working-directory: oteryn-client
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup override set 1.94.0
+          cargo fmt --all
+          cargo metadata --locked --format-version 1 > /dev/null
+          cargo test -p oteryn-renderer-resource --all-targets
+          cargo clippy -p oteryn-renderer-resource --all-targets -- -D warnings
+          cargo test -p oteryn-architecture-check --all-targets
+          cargo run -p oteryn-architecture-check -- workspace .
+
+      - name: Self-remove and persist repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/otc2-renderer-resource-reservation-repair.yml
+          git add oteryn-client/crates/renderer-resource/src/lib.rs
+          git diff --cached --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "fix(renderer-resource): reserve metadata before eviction"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-renderer-resource

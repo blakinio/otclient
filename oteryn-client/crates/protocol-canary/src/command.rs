@@ -128,7 +128,7 @@ mod tests {
         command: GameCommand,
     ) -> Result<GameCommandEnvelope, Box<dyn Error>> {
         Ok(GameCommandEnvelope::v1(
-            SessionToken::new(SessionGeneration::try_new(generation)?),
+            SessionToken::new(SessionGeneration::new(generation)),
             command,
         )?)
     }
@@ -147,7 +147,7 @@ mod tests {
         ] {
             let encoded = encode_current_development_command(
                 envelope(7, GameCommand::Step { direction })?,
-                SessionGeneration::try_new(7)?,
+                SessionGeneration::new(7),
             )?;
             assert_eq!(encoded.opcode(), opcode);
             assert_eq!(encoded.as_bytes(), &[opcode]);
@@ -164,7 +164,7 @@ mod tests {
             assert_eq!(
                 encode_current_development_command(
                     envelope(8, command)?,
-                    SessionGeneration::try_new(8)?,
+                    SessionGeneration::new(8),
                 )?
                 .as_bytes(),
                 &[opcode]
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(
             encode_current_development_command(
                 envelope(9, command)?,
-                SessionGeneration::try_new(9)?,
+                SessionGeneration::new(9),
             ),
             Err(CanaryCommandError::UnsupportedCommand(command))
         );
@@ -191,7 +191,7 @@ mod tests {
         assert!(matches!(
             encode_current_development_command(
                 envelope(10, GameCommand::Logout)?,
-                SessionGeneration::try_new(11)?,
+                SessionGeneration::new(11),
             ),
             Err(CanaryCommandError::Domain(_))
         ));
@@ -221,7 +221,10 @@ mod tests {
                 .nth(1)
                 .and_then(|suffix| suffix.split("    },").next())
                 .unwrap_or("");
-            assert!(entry.contains(&method_fragment), "missing {opcode:#04X} {method}");
+            assert!(
+                entry.contains(&method_fragment),
+                "missing {opcode:#04X} {method}"
+            );
             assert!(entry.contains("\"direction\": \"client-to-server\""));
             assert!(entry.contains("\"dispatch_phase\": \"gameplay-session\""));
         }

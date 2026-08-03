@@ -6,11 +6,11 @@ project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-renderer-resource
-phase: exact-head-validation-and-audit
+phase: final-checkpoint-validation
 branch: feat/OTC2-20260803-playability-p2-renderer-resource
 base_branch: main
 created: 2026-08-03T12:24:00+02:00
-updated: 2026-08-03T13:03:00+02:00
+updated: 2026-08-03T13:09:00+02:00
 required_base_commit: "1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2"
 risk: medium
 related_prs: [200]
@@ -52,10 +52,10 @@ blocks:
   - OTC2-20260803-playability-p2-input-platform
   - OTC2-20260803-playability-p2-visible-world-integration
 invocation_started_at: 2026-08-03T12:20:00+02:00
-last_progress_at: 2026-08-03T13:03:00+02:00
+last_progress_at: 2026-08-03T13:09:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: exact-head-final
-terminal_ci_wait_started_at: 2026-08-03T13:03:00+02:00
+ci_check_generation: final-doc-checkpoint
+terminal_ci_wait_started_at: 2026-08-03T13:09:00+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
@@ -79,7 +79,7 @@ Produce the smallest bounded renderer-resource contract for P2: immutable checke
 # Implemented contract
 
 - `TextureUploadPlan` revalidates immutable `DecodedRgba8` layout and owns zero-filled, 256-byte-row-aligned upload bytes.
-- `TextureFormat::Rgba8Unorm` preserves the accepted raw RGBA8 contract without inventing an unproven sRGB transfer function.
+- `TextureFormat::Rgba8Unorm` preserves the accepted raw RGBA8 contract without inventing an unproven transfer function.
 - Hard limits bound live entries, logical device bytes, one texture and one upload-plan allocation.
 - `TextureHandle` fences process, monotonically increasing device and asset-pack generations plus opaque slot/serial identity.
 - `ResourceCache` coalesces duplicate generation-fenced assets and performs deterministic least-recently-used eviction.
@@ -93,9 +93,28 @@ Produce the smallest bounded renderer-resource contract for P2: immutable checke
 
 The previous coarse `runtime` category for `oteryn-asset-decode` would require unsafe `renderer -> runtime`. The lease-scoped repair introduces a closed `asset-decode` category, permits only `asset-decode -> asset-runtime|asset-types` and `renderer -> asset-decode`, keeps `app/runtime -> asset-decode` forbidden, and changes no Asset Decode API or behavior.
 
-# Validation checkpoint
+# Validation
 
-Four bounded repair cycles addressed Clippy mechanics, post-upload accounting atomicity, monotonic generation/failure semantics and the final unproven color-space assumption. Self-removing focused generations ran pinned formatting, package tests, strict package Clippy, architecture-check tests and workspace architecture validation before final product head `563507cb6af1afd6fb727bec8cd662e9c0a38a67`. This checkpoint commit starts the retained exact-head validation generation.
+Focused self-removing validation generations passed pinned formatting, package tests, strict package Clippy, architecture-check tests and workspace architecture validation for final product head `563507cb6af1afd6fb727bec8cd662e9c0a38a67`.
+
+Retained exact-head validation for checkpoint `adb328e970eb1f447c2944ac53148d88d64486db` passed:
+
+- Rust Client run `30808021612`;
+- Windows workspace job `91667850020`: locked metadata, formatting, workspace Clippy, workspace tests and architecture PASS;
+- Supply Chain job `91667850089`: PASS;
+- repository CI run `30808021738`, required job `91668068449`: PASS.
+
+# Fresh falsification audit
+
+A fresh direct audit of the exact eight-path diff checked layout arithmetic, allocation timing, immutable ownership, payload-redacted formatting, duplicate coalescing, LRU accounting, committed pressure-eviction semantics, process/device/pack fencing, monotonic resets, frame-path behavior, lockfile delta and dependency direction.
+
+Resolved findings:
+
+- `P2-RENDERER-RESOURCE-ATOMICITY-001`: all internal fallible counters and metadata reservation complete before sink upload;
+- `P2-RENDERER-RESOURCE-GENERATION-001`: device and pack replacements reject equal or lower generations;
+- `P2-RENDERER-RESOURCE-COLORSPACE-001`: raw synthetic RGBA8 remains color-space neutral as `Rgba8Unorm`.
+
+Open material findings: **0**.
 
 # Acceptance
 
@@ -111,9 +130,9 @@ Four bounded repair cycles addressed Clippy mechanics, post-upload accounting at
 - [x] workspace/category/lockfile integration is minimal and lease-scoped;
 - [x] lockfile diff contains only the new local package entry;
 - [x] narrow architecture category and dependency direction are covered by policy tests;
-- [ ] retained exact-head Windows metadata, formatting, workspace Clippy/tests, architecture and Supply Chain pass;
-- [ ] retained exact-head repository CI passes;
-- [ ] fresh independent API/hot-path/resource-lifecycle audit has zero open material finding;
+- [x] exact-head Windows workspace, Supply Chain and repository CI pass;
+- [x] fresh audit has zero open material finding;
+- [ ] final documentation checkpoint exact-head CI passes;
 - [ ] implementation PR merges;
 - [ ] task archives separately and all ownership/leases release.
 
@@ -124,12 +143,13 @@ This is a synthetic-v1 partial producer. It creates no real GPU device, draw pas
 # Checkpoint
 
 ```yaml
-checkpoint_version: 6
+checkpoint_version: 7
 status: validating
-phase: exact-head-validation-and-audit
+phase: final-checkpoint-validation
 base: 1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2
 branch: feat/OTC2-20260803-playability-p2-renderer-resource
 final_product_head: 563507cb6af1afd6fb727bec8cd662e9c0a38a67
+validated_checkpoint_head: adb328e970eb1f447c2944ac53148d88d64486db
 pr: 200
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-renderer-resource.md
@@ -140,30 +160,24 @@ changed_paths:
   - oteryn-client/crates/renderer-resource/src/lib.rs
   - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
   - oteryn-client/tools/architecture-check/src/lib.rs
-focused_validation:
+focused_validation: PASS
+exact_head_validation:
+  head: adb328e970eb1f447c2944ac53148d88d64486db
+  rust_client_run: 30808021612
+  windows_job: 91667850020
+  supply_chain_job: 91667850089
+  repository_ci_run: 30808021738
+  required_job: 91668068449
   result: PASS
-  final_product_commit: 563507cb6af1afd6fb727bec8cd662e9c0a38a67
-  commands:
-    - cargo fmt --all
-    - cargo metadata --locked --format-version 1
-    - cargo test -p oteryn-renderer-resource --all-targets
-    - cargo clippy -p oteryn-renderer-resource --all-targets -- -D warnings
-    - cargo test -p oteryn-architecture-check --all-targets
-    - cargo run -p oteryn-architecture-check -- workspace .
-resolved_audit_findings:
-  - id: P2-RENDERER-RESOURCE-ATOMICITY-001
-    result: counters and metadata reservation preflight before sink upload
-  - id: P2-RENDERER-RESOURCE-GENERATION-001
-    result: device and pack generations must advance monotonically
-  - id: P2-RENDERER-RESOURCE-COLORSPACE-001
-    result: raw RGBA8 remains unorm without an unproven sRGB claim
-exact_head_validation: pending
-fresh_audit: pending
+fresh_audit:
+  result: PASS
+  validator: fresh_connector_audit_role
+  material_findings_open: 0
 e2e:
   result: NOT_APPLICABLE
   reason: Backend-neutral producer has no reachable real GPU device, application or world composition.
 shared_path_lease:
   state: held_until_terminal_merge_and_archive
 blockers: []
-next_action: Complete retained exact-head validation, run a fresh falsification audit, then merge and archive this task before releasing the Input Platform integration lease.
+next_action: Validate this final documentation checkpoint, then protected-merge PR 200 and merge a separate lifecycle archive before releasing the Input Platform integration lease.
 ```

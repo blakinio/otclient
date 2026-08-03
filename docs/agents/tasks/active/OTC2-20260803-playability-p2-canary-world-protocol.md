@@ -1,22 +1,23 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: implementing
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: pending-state-inbound
+phase: pending-state-terminal-ci
 branch: feat/OTC2-20260803-canary-pending-state-inbound
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T09:18:00+02:00
+updated: 2026-08-03T09:36:00+02:00
 required_base_commit: "3e88bf21db7dfea1066a1b6729946da282c2e283"
 risk: high
 related_prs:
   - 188
   - 190
   - 191
+  - 192
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -42,10 +43,10 @@ missing_layers:
   - platform input adapter and product binding map
   - visible-world app composition and controlled M2 E2E
 invocation_started_at: 2026-08-03T08:24:00+02:00
-last_progress_at: 2026-08-03T09:18:00+02:00
+last_progress_at: 2026-08-03T09:36:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pending-state-implementation
-terminal_ci_wait_started_at: null
+ci_check_generation: pending-state-final-exact-head
+terminal_ci_wait_started_at: 2026-08-03T09:36:00+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
@@ -58,7 +59,7 @@ stall_warnings: 0
 
 Reconcile Canary Current evidence with the Rust client while preserving fail-closed real admission, and implement only bounded gameplay mappings whose complete layouts, gates and ordering can be established without inference.
 
-# Completed phase
+# Completed phases
 
 - Current baseline and bounded outbound movement/stop/logout encoder merged in PR #188;
 - Windows generated-index LF repair merged in PR #190;
@@ -90,11 +91,9 @@ producer_order:
     - sendMapDescription
 semantic_mapping:
   event: GameEvent::BootstrapStarted
-  classification: derived_from_exact_pending-state_boundary
-consumer_precondition: caller explicitly awaits pending-state-entered
+  classification: derived_from_exact_pending-state-boundary
+consumer_precondition: session-fenced bootstrap state explicitly awaits pending-state-entered
 ```
-
-The exact source emits only opcode `0x0A`; the call site establishes that it occurs after Tibia time and immediately before enter-world/map bootstrap for version `>= 980`. The Current profile is version `1525` and is not the legacy protocol. The parser will not infer any adjacent packet layout.
 
 # Acceptance
 
@@ -109,43 +108,74 @@ The exact source emits only opcode `0x0A`; the call site establishes that it occ
 
 ## Pending-state inbound phase
 
-- [ ] exact one-byte `0x0A` layout is represented without adjacent-packet inference;
-- [ ] parser consumes an already decrypted/deframed logical message only;
-- [ ] parser emits only a current-session `GameEventEnvelope::v1(GameEvent::BootstrapStarted)`;
-- [ ] explicit bootstrap order state advances only after successful complete parsing;
-- [ ] empty, wrong-opcode, trailing, oversized, duplicate/out-of-order and stale-session input fail closed;
-- [ ] generated-index drift test proves direction, phase, family, method, opcode and source anchor;
-- [ ] parser owns no transport, simulation, renderer, asset, input, UI or application state;
-- [ ] focused format, strict Clippy, package tests and architecture validation pass;
-- [ ] fresh exact-diff audit has zero open material finding;
-- [ ] exact-head Windows workspace, Supply Chain and repository CI pass;
+- [x] exact one-byte `0x0A` layout is represented without adjacent-packet inference;
+- [x] parser consumes an already decrypted/deframed logical message only;
+- [x] parser emits only `GameEventEnvelope::v1(GameEvent::BootstrapStarted)` for the current session;
+- [x] bootstrap order state owns its `SessionToken` and advances only after complete success;
+- [x] empty, wrong-opcode, trailing, oversized, duplicate/out-of-order and stale-session input fail closed;
+- [x] generated-index drift test proves direction, phase, family, method, opcode and source anchor;
+- [x] parser owns no transport, simulation, renderer, asset, input, UI or application state;
+- [x] pinned format, workspace Clippy, workspace tests, architecture and Supply Chain pass;
+- [x] fresh exact-diff audit has zero open material finding;
+- [ ] final checkpoint exact-head Windows workspace, Supply Chain and repository CI pass;
 - [ ] bounded phase protected-merges and task continues to the next proven inbound family.
 
 # Claim boundary
 
-The packet body is exactly one opcode byte. The semantic mapping to `BootstrapStarted` is a Rust-domain interpretation of the producer's pending-state boundary, not a claim that any deployed server revision matches the inspected source. No real network admission, framing, encryption, map layout, entity layout or neighboring bootstrap packet is authorized by this phase.
+The packet body is exactly one opcode byte. The semantic mapping to `BootstrapStarted` is a Rust-domain interpretation of the producer pending-state boundary, not a claim that any deployed server matches the inspected source. No real network admission, framing, encryption, map layout, entity layout or neighboring bootstrap packet is authorized by this phase.
 
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 9
-updated_at: 2026-08-03T09:18:00+02:00
+checkpoint_version: 10
+updated_at: 2026-08-03T09:36:00+02:00
 base: 3e88bf21db7dfea1066a1b6729946da282c2e283
 branch: feat/OTC2-20260803-canary-pending-state-inbound
-status: implementing
-phase: pending-state-inbound
+pr: 192
+status: validating
+phase: pending-state-terminal-ci
+validated_implementation_head: e745f1ede79d6a1e70857c5e7e4fdd2fa267445d
 proven:
-  - generated index records server-to-client bootstrap sendPendingStateEntered at opcode 0x0A and source line 8502
-  - exact producer method writes only 0x0A when player exists and oldProtocol is false
-  - exact login call site invokes it for version >= 980 after sendTibiaTime and before sendEnterWorld and sendMapDescription
-  - Current development profile is version 1525 and non-legacy
-  - GameEvent vocabulary already contains BootstrapStarted and GameEventEnvelope session fencing
-  - protocol-core provides bounded reads and trailing-data rejection
+  - exact source and generated index establish the complete one-byte 0x0A layout and source anchor
+  - exact call site establishes version gate and order between Tibia time and enter-world/map bootstrap
+  - bootstrap order state is fenced to one SessionToken and rejects reuse after relog
+  - only BootstrapStarted is emitted and real admission remains fail-closed
+  - all negative cases leave state unchanged except successful completion
+validation:
+  rust_client_run: 30794151809
+  windows_job: 91623840188
+  cargo_metadata_locked: PASS
+  cargo_fmt: PASS
+  workspace_clippy: PASS
+  workspace_tests: PASS
+  architecture: PASS
+  supply_chain_job: 91623840192
+  supply_chain: PASS
+  repository_ci_run: 30794152312
+  repository_ci: PASS
+fresh_audit:
+  result: PASS
+  validator: fresh_connector_audit_role
+  material_findings_open: 0
+  resolved_findings:
+    - id: P2-CANARY-INBOUND-BOUND-001
+      disposition: use CANARY_NETWORK_MESSAGE_MAX_BYTES for server-to-client input
+    - id: P2-CANARY-INBOUND-SESSION-001
+      disposition: order state owns and validates SessionToken
+  inspected:
+    - exact source and generated-index evidence
+    - public API and dependency direction
+    - state mutation and error precedence
+    - malformed, duplicate and stale-session negatives
+    - real-admission, secret and private-fixture boundaries
+e2e:
+  result: NOT_APPLICABLE
+  reason: This isolated decoder consumes no real transport and has no reachable application composition; controlled visible-world E2E remains a later P2 integration gate.
+shared_path_lease: []
 unknown:
   - deployed Canary revision and configuration
-  - framing/encryption/admission transcript
+  - framing, encryption and admission transcript
   - layouts of enter-world, map-description and all other inbound families
-shared_path_lease: []
 blockers: []
-next_action: Implement one isolated pending-state decoder and exhaustive negative tests inside protocol-canary, update evidence, then run retained exact-head validation and fresh audit.
+next_action: Observe retained exact-head CI for this final checkpoint, mark PR 192 ready, enable protected auto-merge, verify merge, then write the mandatory continuation checkpoint for the next fully proven inbound family.
 ```

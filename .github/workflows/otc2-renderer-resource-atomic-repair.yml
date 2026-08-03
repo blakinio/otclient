@@ -1,4 +1,4 @@
-name: OTC2 Renderer Resource Atomic Repair
+name: OTC2 Renderer Resource Complete Repair
 
 on:
   push:
@@ -8,31 +8,47 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: otc2-renderer-resource-complete-repair
+  cancel-in-progress: false
+
 jobs:
   repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout exact branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: feat/OTC2-20260803-playability-p2-renderer-resource
           fetch-depth: 0
-      - name: Repair transactional upload, generation ordering and lockfile drift
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+
+      - name: Apply bounded source and architecture repairs
         run: |
           python - <<'PY'
           from pathlib import Path
 
+          def replace_or_verify(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count == 1:
+                  return text.replace(old, new)
+              if count == 0 and new in text:
+                  return text
+              raise SystemExit(f"{label}: expected one old anchor or an existing repair, found {count}")
+
           source = Path("oteryn-client/crates/renderer-resource/src/lib.rs")
           text = source.read_text(encoding="utf-8")
+          text = replace_or_verify(
+              text,
+              "    pub const fn synthetic_v1() -> Self {",
+              "    pub fn synthetic_v1() -> Self {",
+              "synthetic limits constructor",
+          )
 
-          const_old = "    pub const fn synthetic_v1() -> Self {"
-          const_new = "    pub fn synthetic_v1() -> Self {"
-          if text.count(const_old) != 1:
-              raise SystemExit(f"expected one synthetic_v1 const anchor, found {text.count(const_old)}")
-          text = text.replace(const_old, const_new)
-
-          old = '''        let handle = self.preview_next_handle()?;
+          old_acquire = '''        let handle = self.preview_next_handle()?;
           let texture = self
               .sink
               .upload(&plan)
@@ -52,7 +68,7 @@ jobs:
               .ok_or(ResourceError::ArithmeticOverflow)?;
           self.entries.push(CacheEntry {
 '''
-          new = '''        let handle = self.preview_next_handle()?;
+          new_acquire = '''        let handle = self.preview_next_handle()?;
           let tick = self.access_tick;
           let next_access_tick = self
               .access_tick
@@ -70,6 +86,9 @@ jobs:
               .accounted_device_bytes
               .checked_add(required_bytes)
               .ok_or(ResourceError::ArithmeticOverflow)?;
+          self.entries
+              .try_reserve(1)
+              .map_err(|_| ResourceError::AllocationFailed)?;
           let texture = self
               .sink
               .upload(&plan)
@@ -80,34 +99,76 @@ jobs:
           self.accounted_device_bytes = accounted_device_bytes;
           self.entries.push(CacheEntry {
 '''
-          if text.count(old) != 1:
-              raise SystemExit(f"expected one acquire mutation block, found {text.count(old)}")
-          text = text.replace(old, new)
+          text = replace_or_verify(text, old_acquire, new_acquire, "atomic acquire")
 
-          for old_condition, new_condition in [
-              ("        if new_generation == self.device_generation {", "        if new_generation <= self.device_generation {"),
-              ("        if new_generation == self.pack_generation {", "        if new_generation <= self.pack_generation {"),
-          ]:
-              if text.count(old_condition) != 1:
-                  raise SystemExit(f"expected one generation condition: {old_condition!r}")
-              text = text.replace(old_condition, new_condition)
+          text = replace_or_verify(
+              text,
+              "        if new_generation == self.device_generation {",
+              "        if new_generation <= self.device_generation {",
+              "monotonic device generation",
+          )
+          text = replace_or_verify(
+              text,
+              "        if new_generation == self.pack_generation {",
+              "        if new_generation <= self.pack_generation {",
+              "monotonic pack generation",
+          )
 
-          old_assert = '''        assert_eq!(cache.resolve(first.handle())?.texture().byte_len, 16);
+          text = replace_or_verify(
+              text,
+              '''        assert_eq!(cache.resolve(first.handle())?.texture().byte_len, 16);
           Ok(())
-'''
-          new_assert = '''        let resolved = cache.resolve(first.handle())?;
+''',
+              '''        let resolved = cache.resolve(first.handle())?;
           assert_eq!(resolved.texture().id, 1);
           assert_eq!(resolved.texture().byte_len, 16);
           Ok(())
-'''
-          if text.count(old_assert) != 1:
-              raise SystemExit(f"expected one fake texture assertion anchor, found {text.count(old_assert)}")
-          text = text.replace(old_assert, new_assert)
+''',
+              "fake texture identity assertion",
+          )
+          text = replace_or_verify(
+              text,
+              '''        let mut sink = FakeSink::default();
+          sink.fail_next = true;
+''',
+              '''        let sink = FakeSink {
+              fail_next: true,
+              ..FakeSink::default()
+          };
+''',
+              "fake sink initializer",
+          )
 
-          test_anchor = '''    #[test]
+          if "    AllocationFailed,\n" not in text:
+              text = replace_or_verify(
+                  text,
+                  '''    /// Checked layout, counter or accounting arithmetic overflowed.
+    ArithmeticOverflow,
+''',
+                  '''    /// Checked layout, counter or accounting arithmetic overflowed.
+    ArithmeticOverflow,
+    /// A bounded cache metadata reservation failed before sink upload.
+    AllocationFailed,
+''',
+                  "allocation error enum",
+              )
+              text = replace_or_verify(
+                  text,
+                  '''            Self::ArithmeticOverflow => "renderer resource arithmetic overflowed",
+            Self::TextureBytesLimitExceeded => "texture exceeds the device-memory limit",
+''',
+                  '''            Self::ArithmeticOverflow => "renderer resource arithmetic overflowed",
+            Self::AllocationFailed => "renderer resource metadata allocation failed",
+            Self::TextureBytesLimitExceeded => "texture exceeds the device-memory limit",
+''',
+                  "allocation error display",
+              )
+
+          if "fn pre_upload_counter_failure_is_atomic()" not in text:
+              anchor = '''    #[test]
     fn memory_pressure_evicts_before_upload_and_clear_is_exact() -> Result<(), Box<dyn Error>> {
 '''
-          test = '''    #[test]
+              test = '''    #[test]
     fn pre_upload_counter_failure_is_atomic() -> Result<(), Box<dyn Error>> {
         let (_runtime, asset, decoded) = fixture(9, 1, 1, 1, 9)?;
         let mut cache = cache(asset.generation(), ResourceLimits::synthetic_v1())?;
@@ -124,17 +185,17 @@ jobs:
     }
 
 '''
-          if text.count(test_anchor) != 1:
-              raise SystemExit(f"expected one test insertion anchor, found {text.count(test_anchor)}")
-          text = text.replace(test_anchor, test + test_anchor)
+              if text.count(anchor) != 1:
+                  raise SystemExit("atomicity test: expected one insertion anchor")
+              text = text.replace(anchor, test + anchor)
 
-          old_reset = '''        assert_eq!(
+          reset_old = '''        assert_eq!(
             cache.replace_pack(cache.pack_generation()).err(),
             Some(ResourceError::PackGenerationNotAdvanced)
         );
         Ok(())
 '''
-          new_reset = '''        assert_eq!(
+          reset_new = '''        assert_eq!(
             cache.replace_pack(cache.pack_generation()).err(),
             Some(ResourceError::PackGenerationNotAdvanced)
         );
@@ -149,14 +210,67 @@ jobs:
         );
         Ok(())
 '''
-          if text.count(old_reset) != 1:
-              raise SystemExit(f"expected one reset-test anchor, found {text.count(old_reset)}")
-          text = text.replace(old_reset, new_reset)
+          text = replace_or_verify(text, reset_old, reset_new, "monotonic generation tests")
           source.write_text(text, encoding="utf-8", newline="\n")
+
+          asset_manifest = Path("oteryn-client/crates/asset-decode/Cargo.toml")
+          manifest = asset_manifest.read_text(encoding="utf-8")
+          manifest = replace_or_verify(
+              manifest,
+              'category = "runtime"',
+              'category = "asset-decode"',
+              "asset-decode category",
+          )
+          asset_manifest.write_text(manifest, encoding="utf-8", newline="\n")
+
+          policy_path = Path("oteryn-client/tools/architecture-check/src/lib.rs")
+          policy = policy_path.read_text(encoding="utf-8")
+          if '    "asset-decode",\n' not in policy:
+              category_anchor = '''    "asset-types",
+    "asset-runtime",
+'''
+              if policy.count(category_anchor) != 2:
+                  raise SystemExit("architecture categories: expected known and product anchors")
+              policy = policy.replace(
+                  category_anchor,
+                  '''    "asset-types",
+    "asset-decode",
+    "asset-runtime",
+''',
+              )
+          policy = replace_or_verify(
+              policy,
+              '''                | "asset-types"
+                | "asset-runtime"
+                | "settings"
+''',
+              '''                | "asset-types"
+                | "asset-decode"
+                | "asset-runtime"
+                | "settings"
+''',
+              "renderer decode edge",
+          )
+          decode_arm = '''        "asset-decode" => matches!(target, "asset-types" | "asset-runtime"),
+'''
+          if decode_arm not in policy:
+              arm_anchor = '''        "asset-types" => target == "foundation",
+        "asset-runtime" => matches!(
+'''
+              if policy.count(arm_anchor) != 1:
+                  raise SystemExit("asset-decode policy arm: expected one insertion anchor")
+              policy = policy.replace(
+                  arm_anchor,
+                  '''        "asset-types" => target == "foundation",
+        "asset-decode" => matches!(target, "asset-types" | "asset-runtime"),
+        "asset-runtime" => matches!(
+''',
+              )
+          policy_path.write_text(policy, encoding="utf-8", newline="\n")
 
           lock = Path("oteryn-client/Cargo.lock")
           lock_text = lock.read_text(encoding="utf-8")
-          lock_replacements = {
+          replacements = {
               '''name = "ipnet"
 version = "2.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -174,23 +288,35 @@ version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c943259e342f1e06ff2da7a83eabdfe7f92ce10262688dbf1895ff0b3e6e4652"''',
           }
-          for old_lock, new_lock in lock_replacements.items():
-              if lock_text.count(old_lock) != 1:
-                  raise SystemExit(f"expected one lock drift anchor: {old_lock.splitlines()[0:2]}")
-              lock_text = lock_text.replace(old_lock, new_lock)
+          for old_lock, new_lock in replacements.items():
+              if old_lock in lock_text:
+                  lock_text = lock_text.replace(old_lock, new_lock)
+              elif new_lock not in lock_text:
+                  raise SystemExit(f"lock drift: missing accepted anchors for {old_lock.splitlines()[0:2]}")
           lock.write_text(lock_text, encoding="utf-8", newline="\n")
           PY
-          cd oteryn-client
+
+      - name: Validate exact repair
+        working-directory: oteryn-client
+        run: |
+          rustup override set 1.94.0
           cargo fmt --all
           cargo metadata --locked --format-version 1 > /dev/null
           cargo test -p oteryn-renderer-resource --all-targets
           cargo clippy -p oteryn-renderer-resource --all-targets -- -D warnings
+          cargo test -p oteryn-architecture-check --all-targets
+          cargo run -p oteryn-architecture-check -- workspace .
+
       - name: Remove workflow and persist repair
         run: |
           git rm .github/workflows/otc2-renderer-resource-atomic-repair.yml
-          git add oteryn-client/Cargo.lock oteryn-client/crates/renderer-resource/src/lib.rs
+          git add \
+            oteryn-client/Cargo.lock \
+            oteryn-client/crates/asset-decode/Cargo.toml \
+            oteryn-client/crates/renderer-resource/src/lib.rs \
+            oteryn-client/tools/architecture-check/src/lib.rs
           git diff --cached --check
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git commit -m "fix(renderer-resource): enforce atomic monotonic lifecycle"
+          git commit -m "fix(renderer-resource): make lifecycle and architecture integration atomic"
           git push origin HEAD:feat/OTC2-20260803-playability-p2-renderer-resource

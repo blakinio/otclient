@@ -10,8 +10,8 @@ phase: protected-merge
 branch: feat/OTC2-20260803-playability-p2-asset-decode
 base_branch: main
 created: 2026-08-03T10:16:00+02:00
-updated: 2026-08-03T11:11:00+02:00
-required_base_commit: "ceb24e22fc19305cb10c7ea29f7f16928def2a04"
+updated: 2026-08-03T11:20:00+02:00
+required_base_commit: "c5270fccce2e56cde408f80857d95422e759cc4f"
 risk: medium
 related_prs:
   - 194
@@ -50,10 +50,10 @@ blocks:
   - OTC2-20260803-playability-p2-visible-world-integration
   - OTC2-20260803-playability-p2-controlled-m2-acceptance
 invocation_started_at: 2026-08-03T10:16:00+02:00
-last_progress_at: 2026-08-03T11:11:00+02:00
+last_progress_at: 2026-08-03T11:20:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: final-checkpoint
-terminal_ci_wait_started_at: 2026-08-03T11:11:00+02:00
+ci_check_generation: final-current-main-checkpoint
+terminal_ci_wait_started_at: 2026-08-03T11:20:00+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
@@ -68,7 +68,7 @@ Consume verified, generation-fenced synthetic-v1 `asset-runtime` records and pro
 
 # Final producer result
 
-The `oteryn-asset-decode` runtime package now provides:
+The `oteryn-asset-decode` runtime package provides:
 
 - `decode_rgba8(&AssetRuntime, AssetHandle, DecodeLimits)` with no filesystem-path input;
 - synthetic-v1 `AssetKind::Rgba8` normalization only, with explicit opaque `Blob` rejection;
@@ -93,29 +93,20 @@ Run `30798884308`, job `91638642610`: PASS.
 - architecture dependency direction;
 - bounded lockfile generation and temporary-workflow self-removal.
 
-## Restacked exact implementation head
+## Exact implementation validation
 
-Head `f594acbde5cf5a1335e37cbd356ddca8825eb52c`, directly based on `main@ceb24e22fc19305cb10c7ea29f7f16928def2a04`:
+Head `f594acbde5cf5a1335e37cbd356ddca8825eb52c` passed:
 
 - Rust Client run `30799757159`;
-- Windows workspace job `91641423237`: PASS;
-- Supply Chain job `91641423243`: PASS;
-- repository CI run `30799757355`, required job `91642080158`: PASS.
+- Windows workspace job `91641423237`;
+- Supply Chain job `91641423243`;
+- repository CI run `30799757355`, required job `91642080158`.
 
-The final checkpoint commit changes only this durable task record and must receive its own retained required-check generation before protected merge.
+The documentation checkpoint `fc7aaeefcb570cd634341a56e2685c3fc74ebe32` also passed Rust Client run `30800298386` and repository CI run `30800298580`. While those checks ran, `main` advanced only in Canary-owned documentation paths to `c5270fccce2e56cde408f80857d95422e759cc4f`. The producer was rebuilt as one exact six-path commit on that current base (`f72d776483b705683949b7afc899aa912ae227ab`). This final task checkpoint requires one retained exact-head generation before merge.
 
 # Fresh final audit
 
-A fresh exact-diff falsification audit checked:
-
-- public API trust boundary and accepted schema/kind;
-- stale-generation handling;
-- checked arithmetic and allocation timing;
-- exact payload length and output ownership;
-- Debug/Display redaction;
-- absence of production filesystem/network/GPU/global-cache behavior;
-- six-path inventory, architecture category and dependency direction;
-- lockfile delta of one existing-local package and zero new registry packages.
+A fresh exact-diff falsification audit checked public API trust boundaries, schema/kind/generation fences, checked arithmetic, allocation timing, exact byte length, owned output, formatting redaction, production dependency direction, lockfile delta, changed-path inventory and absence of production filesystem/network/GPU/global-cache behavior.
 
 Result: PASS. Open material findings: 0. Durable validator review: PR #194 review `4842447042`.
 
@@ -137,7 +128,7 @@ Result: PASS. Open material findings: 0. Durable validator review: PR #194 revie
 - [x] shared integration occurred only under the recorded lease;
 - [x] exact implementation-head Windows workspace, Supply Chain and repository CI pass;
 - [x] fresh independent audit has zero open material findings;
-- [ ] final checkpoint required checks pass;
+- [ ] current-main final checkpoint required checks pass;
 - [ ] implementation merge, separate archive merge and ownership release.
 
 # Integration delta
@@ -156,28 +147,33 @@ This task delivers only a bounded synthetic-v1 CPU RGBA8 producer. It does not d
 # Checkpoint
 
 ```yaml
-checkpoint_version: 6
+checkpoint_version: 7
 status: ready
 phase: protected-merge
-base: ceb24e22fc19305cb10c7ea29f7f16928def2a04
+base: c5270fccce2e56cde408f80857d95422e759cc4f
 branch: feat/OTC2-20260803-playability-p2-asset-decode
 pr: 194
 restack_pr:
   number: 197
   state: merged
-  commit: 80cbbaee8da9125cb4f3a623f43560907e15c1a7
-validated_implementation_head: f594acbde5cf5a1335e37cbd356ddca8825eb52c
+current_main_restack_head: f72d776483b705683949b7afc899aa912ae227ab
 focused_validation:
   run: 30798884308
   job: 91638642610
   result: PASS
   tests: 9
-exact_head_validation:
+validated_implementation:
+  head: f594acbde5cf5a1335e37cbd356ddca8825eb52c
   rust_client_run: 30799757159
   windows_job: 91641423237
   supply_chain_job: 91641423243
   repository_ci_run: 30799757355
   repository_required_job: 91642080158
+  result: PASS
+validated_checkpoint:
+  head: fc7aaeefcb570cd634341a56e2685c3fc74ebe32
+  rust_client_run: 30800298386
+  repository_ci_run: 30800298580
   result: PASS
 fresh_audit:
   validator_review: 4842447042
@@ -192,5 +188,5 @@ shared_path_lease:
 lease_holder: OTC2-20260803-playability-p2-asset-decode
 temporary_workflow_retained: false
 blockers: []
-next_action: Merge PR #194 after the final checkpoint required checks pass, then create and merge the separate lifecycle archive.
+next_action: Merge PR #194 after the current-main final checkpoint required checks pass, then create and merge the separate lifecycle archive.
 ```

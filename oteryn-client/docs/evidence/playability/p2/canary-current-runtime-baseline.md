@@ -1,6 +1,6 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: bounded pending-state inbound implementation in progress on task `OTC2-20260803-playability-p2-canary-world-protocol`.  
+Status: bounded pending-state inbound phase validated on task `OTC2-20260803-playability-p2-canary-world-protocol`.  
 Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.  
 Consumer boundary: `oteryn-client/crates/protocol-canary`.
 
@@ -128,7 +128,7 @@ order:
     - sendMapDescription
 ```
 
-The Current development profile is client version `1525` and non-legacy. `decode_current_pending_state_entered` therefore consumes one already decrypted and deframed logical message only when the caller explicitly owns `AwaitingPendingStateEntered`. It rejects empty, wrong-opcode, trailing, oversized, duplicate/out-of-order and stale-session input. On success it advances the caller-owned order state and emits a current-session `GameEventEnvelope::v1(GameEvent::BootstrapStarted)`.
+The Current development profile is client version `1525` and non-legacy. `decode_current_pending_state_entered` consumes one already decrypted and deframed logical message through a caller-owned bootstrap state that is itself fenced to one `SessionToken`. A relogged generation cannot reuse the state. The decoder rejects empty, wrong-opcode, trailing, oversized, duplicate/out-of-order and stale-session input. On success it advances only that session-owned order state and emits `GameEventEnvelope::v1(GameEvent::BootstrapStarted)`.
 
 The semantic event is a domain interpretation of the exact producer pending-state boundary. It does not claim that a deployed runtime matches this source or that the adjacent enter-world/map layouts are known.
 
@@ -139,7 +139,8 @@ The semantic event is a domain interpretation of the exact producer pending-stat
 ## Validation checkpoint
 
 ```yaml
-status: implementation_pending_validation
+status: exact_head_validation_passed
+validated_head: e745f1ede79d6a1e70857c5e7e4fdd2fa267445d
 product_code_scope:
   - non-secret development descriptor metadata
   - generated-index drift tests
@@ -152,13 +153,34 @@ gameplay_layouts_implemented:
   outbound: [step_8_directions, stop_movement, logout]
   inbound: [pending_state_entered]
 pending_state_negative_matrix:
-  - truncated
-  - unknown_opcode
-  - trailing_data
-  - oversized
-  - invalid_order_or_duplicate
-  - stale_session
+  truncated: PASS
+  unknown_opcode: PASS
+  trailing_data: PASS
+  oversized: PASS
+  invalid_order_or_duplicate: PASS
+  stale_session: PASS
+validation:
+  rust_client_run: 30794151809
+  windows_job: 91623840188
+  cargo_metadata_locked: PASS
+  cargo_fmt: PASS
+  workspace_clippy: PASS
+  workspace_tests: PASS
+  architecture: PASS
+  supply_chain_job: 91623840192
+  supply_chain: PASS
+  repository_ci_run: 30794152312
+  repository_ci: PASS
+fresh_audit:
+  result: PASS
+  validator: fresh_connector_audit_role
+  material_findings_open: 0
+  resolved_findings:
+    - id: P2-CANARY-INBOUND-BOUND-001
+      disposition: use server-to-client network-message ceiling
+    - id: P2-CANARY-INBOUND-SESSION-001
+      disposition: bootstrap order state owns and validates SessionToken
 blockers:
   - complete provenance-safe layouts and fixtures for all remaining inbound families
-next_action: Run pinned format, strict package Clippy, package tests and architecture validation, then perform a fresh exact-diff audit and exact-head Windows CI before merge.
+next_action: Run retained exact-head CI for the final evidence/task checkpoint, then protected-merge this bounded family and continue to the next fully proven inbound layout.
 ```

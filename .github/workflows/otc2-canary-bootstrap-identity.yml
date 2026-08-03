@@ -67,3 +67,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "feat(protocol-canary): normalize bootstrap identity boundaries"
           git push origin HEAD:feat/OTC2-20260803-canary-bootstrap-identity
+
+# trigger: 1

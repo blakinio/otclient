@@ -36,7 +36,7 @@ jobs:
         shell: pwsh
         run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
 
-      - name: Disambiguate exact task anchors
+      - name: Normalize exact task checkpoint prerequisites
         shell: pwsh
         run: |
           @'
@@ -44,14 +44,27 @@ jobs:
 
           path = Path("docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md")
           text = path.read_text(encoding="utf-8")
-          status = "status: blocked\n"
-          phase = "phase: inbound-provenance-and-identity-contract-blocker\n"
-          if text.count(status) != 2:
-              raise SystemExit(f"task status precondition: expected 2, found {text.count(status)}")
-          if text.count(phase) != 2:
-              raise SystemExit(f"task phase precondition: expected 2, found {text.count(phase)}")
-          text = text.replace(status, "status: validating\n", 1)
-          text = text.replace(phase, "phase: bootstrap-identity-and-enter-world-normalization\n", 1)
+          blocked_status = "status: blocked\n"
+          validating_status = "status: validating\n"
+          blocked_phase = "phase: inbound-provenance-and-identity-contract-blocker\n"
+          validating_phase = "phase: bootstrap-identity-and-enter-world-normalization\n"
+
+          blocked_status_count = text.count(blocked_status)
+          if blocked_status_count == 2:
+              text = text.replace(blocked_status, validating_status, 1)
+          elif blocked_status_count != 0 or text.count(validating_status) < 2:
+              raise SystemExit(
+                  f"task status precondition: blocked={blocked_status_count}, validating={text.count(validating_status)}"
+              )
+
+          blocked_phase_count = text.count(blocked_phase)
+          if blocked_phase_count == 2:
+              text = text.replace(blocked_phase, validating_phase, 1)
+          elif blocked_phase_count != 0 or text.count(validating_phase) < 2:
+              raise SystemExit(
+                  f"task phase precondition: blocked={blocked_phase_count}, validating={text.count(validating_phase)}"
+              )
+
           path.write_text(text, encoding="utf-8", newline="\n")
           '@ | python -
 
@@ -97,5 +110,5 @@ jobs:
           git diff --cached --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "feat(protocol-canary): normalize bootstrap identity boundaries"
+          git commit -m "fix(protocol-canary): enforce exact bootstrap source order"
           git push origin HEAD:feat/OTC2-20260803-canary-bootstrap-identity

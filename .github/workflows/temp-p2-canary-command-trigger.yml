@@ -1,6 +1,6 @@
 name: Temporary P2 Canary Command Trigger
 
-# Activates the staged direct finalizer after the focused compile repair.
+# Activates the staged direct finalizer after restacking on current main.
 on:
   pull_request:
     types: [synchronize]
@@ -32,6 +32,7 @@ jobs:
           EXPECTED_PARENT: ${{ github.event.before }}
           PATCH_WORKFLOW: .github/workflows/temp-p2-canary-command-focused.yml
           TRIGGER_WORKFLOW: .github/workflows/temp-p2-canary-command-trigger.yml
+          CURRENT_MAIN: 9c11addcb8c2d4002f3ff167a6a7cbbbe2c605e4
         run: |
           set -euo pipefail
           test "$(git diff --name-only HEAD^..HEAD)" = "$TRIGGER_WORKFLOW"
@@ -44,6 +45,11 @@ jobs:
               raise SystemExit('expected exactly one reviewed command block')
           block = source.split(marker, 1)[1]
           lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
-          Path('/tmp/p2-canary-command.sh').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          script = '\n'.join(lines) + '\n'
+          script = script.replace(
+              'EXPECTED_MAIN=f1a5a1873dbb9ce164aefed7537d5c3004eeb696',
+              'EXPECTED_MAIN=9c11addcb8c2d4002f3ff167a6a7cbbbe2c605e4',
+          )
+          Path('/tmp/p2-canary-command.sh').write_text(script, encoding='utf-8')
           PY
           bash /tmp/p2-canary-command.sh

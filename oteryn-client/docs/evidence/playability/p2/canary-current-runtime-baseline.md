@@ -1,6 +1,6 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: alignment in progress on task `OTC2-20260803-playability-p2-canary-world-protocol`.  
+Status: Windows line-ending repair validation pending on task `OTC2-20260803-playability-p2-canary-world-protocol`.  
 Evidence cut: generated P1 artifact from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.  
 Consumer boundary: `oteryn-client/crates/protocol-canary`.
 
@@ -87,6 +87,18 @@ The `protocol-canary` package tests include the versioned generated JSON as read
 
 A generator/artifact change must therefore update the descriptor, this evidence record and tests together in an explicitly reviewed task.
 
+## Cross-platform checkout contract
+
+Windows exact-head run `30791877711`, job `91616943625`, proved that the generated JSON was converted to CRLF by checkout while the source-index section assertions intentionally use canonical LF delimiters. Metadata, formatting and workspace Clippy passed before the single drift test failed.
+
+Repair PR `#190` adds this scoped repository rule:
+
+```gitattributes
+oteryn-client/tools/canary-protocol-index/generated/*.json text eol=lf
+```
+
+The rule changes neither generated content nor product behavior. It makes the immutable evidence bytes consumed by `include_str!` identical on Windows and Linux.
+
 ## Supported outbound M2 command subset
 
 Exact producer dispatch at revision `bc0068ab…` establishes ten client-to-server gameplay-session commands with no payload:
@@ -115,7 +127,7 @@ Inbound bootstrap, map, entity and reconciliation layouts therefore remain `UNKN
 ## Validation checkpoint
 
 ```yaml
-status: focused_validation_passed
+status: windows_repair_validation_pending
 product_code_scope:
   - non-secret development descriptor metadata
   - generated-index drift tests
@@ -126,13 +138,19 @@ credentials_or_private_payloads_added: false
 gameplay_layouts_implemented:
   outbound: [step_8_directions, stop_movement, logout]
   inbound: []
-focused_validation:
-  cargo_fmt: PASS
-  strict_clippy: PASS
-  package_tests: PASS
-  architecture: PASS
+validated_before_repair:
+  focused_cargo_fmt: PASS
+  focused_strict_clippy: PASS
+  focused_package_tests: PASS_18_OF_18
+  focused_architecture: PASS
+  repository_ci: PASS
+  supply_chain: PASS
+repair_validation:
+  windows_workspace: PENDING
+  repository_ci: PENDING
+  supply_chain: PENDING
 blockers:
   - complete provenance-safe inbound bootstrap, map, entity and reconciliation layouts
   - original sanitized positive and negative fixtures for each inbound family
-next_action: Run retained exact-head repository CI, then protected-merge this bounded phase and release the lockfile lease before continuing inbound evidence normalization.
+next_action: Validate repair PR 190 on exact-head Windows workspace and retained repository CI, then merge it and release the Cargo.lock lease before continuing inbound layout normalization.
 ```

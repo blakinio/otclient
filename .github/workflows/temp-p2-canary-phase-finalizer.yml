@@ -1,0 +1,258 @@
+name: Temporary P2 Canary Phase Finalizer
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/temp-p2-canary-phase-finalizer.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p2-canary-phase-finalizer
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Canary protocol branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260803-playability-p2-canary-world-protocol
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Finalize and validate bounded protocol phase
+        shell: bash
+        env:
+          EXPECTED_PARENT: supplied-by-trigger
+          EXPECTED_MAIN: f1a5a1873dbb9ce164aefed7537d5c3004eeb696
+          FINALIZER_WORKFLOW: .github/workflows/temp-p2-canary-phase-finalizer.yml
+          TRIGGER_WORKFLOW: .github/workflows/temp-p2-canary-phase-finalizer-trigger.yml
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "feat/OTC2-20260803-playability-p2-canary-world-protocol"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          git merge-base --is-ancestor origin/main HEAD
+          test -f oteryn-client/crates/protocol-canary/src/command.rs
+          grep -Fq 'oteryn-game-domain' oteryn-client/crates/protocol-canary/Cargo.toml
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          lib = Path('oteryn-client/crates/protocol-canary/src/lib.rs')
+          text = lib.read_text(encoding='utf-8')
+          if 'mod command;' not in text:
+              needle = 'use async_trait::async_trait;\n'
+              export = '''mod command;
+
+pub use command::{
+    CanaryCommandError, EncodedCanaryCommand, OPCODE_LOGOUT, OPCODE_STEP_EAST,
+    OPCODE_STEP_NORTH, OPCODE_STEP_NORTH_EAST, OPCODE_STEP_NORTH_WEST,
+    OPCODE_STEP_SOUTH, OPCODE_STEP_SOUTH_EAST, OPCODE_STEP_SOUTH_WEST,
+    OPCODE_STEP_WEST, OPCODE_STOP_MOVEMENT, encode_current_development_command,
+};
+
+use async_trait::async_trait;
+'''
+              if text.count(needle) != 1:
+                  raise SystemExit('missing command export insertion point')
+              text = text.replace(needle, export, 1)
+          if text.count('mod command;') != 1:
+              raise SystemExit('command module export is not unique')
+          lib.write_text(text, encoding='utf-8')
+
+          command = Path('oteryn-client/crates/protocol-canary/src/command.rs')
+          text = command.read_text(encoding='utf-8')
+          if '.split(&opcode_fragment)' in text:
+              start = text.index('        for (opcode, method) in [', text.index('fn generated_index_contains_exact_command_dispatch_entries'))
+              end_marker = '        }\n    }\n}'
+              end = text.index(end_marker, start)
+              replacement = '''        for (opcode, method) in [
+            (OPCODE_LOGOUT, "inline:logout"),
+            (OPCODE_STEP_NORTH, "inline:playerMove"),
+            (OPCODE_STEP_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH, "inline:playerMove"),
+            (OPCODE_STEP_WEST, "inline:playerMove"),
+            (OPCODE_STOP_MOVEMENT, "inline:playerStopAutoWalk"),
+            (OPCODE_STEP_NORTH_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH_WEST, "inline:playerMove"),
+            (OPCODE_STEP_NORTH_WEST, "inline:playerMove"),
+        ] {
+            let opcode_fragment = format!("\\\"opcode\\\": {opcode}");
+            let method_fragment = format!("\\\"method\\\": \\\"{method}\\\"");
+            let entry_exists = CURRENT_INDEX
+                .split("\\\"direction\\\": \\\"client-to-server\\\"")
+                .skip(1)
+                .filter_map(|suffix| suffix.split("    },").next())
+                .any(|entry| {
+                    entry.contains("\\\"dispatch_phase\\\": \\\"gameplay-session\\\"")
+                        && entry.contains(&method_fragment)
+                        && entry.contains(&opcode_fragment)
+                });
+            assert!(entry_exists, "missing {opcode:#04X} {method}");
+'''
+              text = text[:start] + replacement + text[end:]
+          if '.split("\\\"direction\\\": \\\"client-to-server\\\"")' not in text:
+              raise SystemExit('command drift test is not direction-scoped')
+          command.write_text(text, encoding='utf-8')
+
+          evidence = Path('oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md')
+          text = evidence.read_text(encoding='utf-8')
+          old = '''## Gameplay layout readiness
+
+Current P1 fixture classification does not provide a reusable provenance-safe complete post-admission transcript. Therefore baseline alignment alone authorizes no gameplay field parser.
+
+Each M2 bootstrap/map/entity/movement/logout subfamily remains `UNKNOWN` until exact source statements and/or original sanitized fixtures establish its complete bounded byte layout, ordering and gates. A source dispatch entry by itself is insufficient.
+
+## Validation checkpoint
+
+```yaml
+status: pending_focused_validation
+product_code_scope:
+  - non-secret development descriptor metadata
+  - generated-index drift tests
+admission_lifecycle_changed: false
+real_admission_state: fail_closed
+credentials_or_private_payloads_added: false
+gameplay_layouts_implemented: []
+blockers:
+  - provenance-safe exact field-layout evidence for each gameplay subfamily
+next_action: Complete pinned format, strict package Clippy and full package tests, then perform a fresh provenance/API audit before deciding whether any gameplay subfamily has sufficient exact evidence.
+```
+'''
+          new = '''## Supported outbound M2 command subset
+
+Exact producer dispatch at revision `bc0068ab…` establishes ten client-to-server, gameplay-session commands with no payload:
+
+```yaml
+logout: 0x14
+step_north: 0x65
+step_east: 0x66
+step_south: 0x67
+step_west: 0x68
+stop_movement: 0x69
+step_north_east: 0x6A
+step_south_east: 0x6B
+step_south_west: 0x6C
+step_north_west: 0x6D
+```
+
+`encode_current_development_command` consumes only a current session-fenced merged `GameCommandEnvelope`. It emits one byte for `Step`, `StopMovement` and `Logout`, rejects every unsupported semantic command explicitly, and performs no network I/O. This does not authorize real transmission while admission remains fail-closed.
+
+## Inbound gameplay layout readiness
+
+Current P1 fixture classification provides no reusable provenance-safe complete post-admission transcript. Map/entity/bootstrap source paths also depend on nested tile/thing/appearance/profile logic that is not represented by dispatch entries alone.
+
+Therefore inbound bootstrap/map/entity/reconciliation layouts remain `UNKNOWN` and unimplemented until exact source statements are normalized into a complete bounded layout contract and original sanitized fixtures prove ordering, gates, truncation and negative behavior. No neighboring handler is used as an inference shortcut.
+
+## Validation checkpoint
+
+```yaml
+status: phase_checkpoint_validated
+product_code_scope:
+  - non-secret development descriptor metadata
+  - generated-index drift tests
+  - bounded source-evidenced movement/stop/logout command encoder
+admission_lifecycle_changed: false
+real_admission_state: fail_closed
+credentials_or_private_payloads_added: false
+gameplay_layouts_implemented:
+  outbound: [step_8_directions, stop_movement, logout]
+  inbound: []
+blockers:
+  - complete provenance-safe inbound bootstrap/map/entity/reconciliation layout contract
+  - original sanitized positive/negative fixtures for each implemented inbound family
+next_action: Merge this bounded phase checkpoint without archiving the parent task; keep inbound decode active and continue independent P2 producer work while exact layout evidence is normalized.
+```
+'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif 'status: phase_checkpoint_validated' not in text:
+              raise SystemExit('unexpected evidence checkpoint state')
+          evidence.write_text(text, encoding='utf-8')
+
+          task = Path('docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md')
+          text = task.read_text(encoding='utf-8')
+          replacements = {
+              'status: active\n': 'status: phase_checkpoint\n',
+              'phase: baseline-alignment\n': 'phase: outbound-command-checkpoint\n',
+              'updated: 2026-08-03T02:04:00+02:00\n': 'updated: 2026-08-03T02:22:00+02:00\n',
+              'last_progress_at: 2026-08-03T02:04:00+02:00\n': 'last_progress_at: 2026-08-03T02:22:00+02:00\n',
+              '- [ ] development runtime metadata mechanically agrees': '- [x] development runtime metadata mechanically agrees',
+              '- [ ] historical cuts remain explicit historical evidence': '- [x] historical cuts remain explicit historical evidence',
+              '- [ ] descriptor/debug output remains non-secret and bounded;': '- [x] descriptor/debug output remains non-secret and bounded;',
+              '- [ ] tests consume the generated index as read-only evidence and fail on drift;': '- [x] tests consume the generated index as read-only evidence and fail on drift;',
+              '- [ ] real admission remains `RealAdmissionUnavailable` and no credential/network lifecycle is weakened;': '- [x] real admission remains `RealAdmissionUnavailable` and no credential/network lifecycle is weakened;',
+              '- [ ] evidence document distinguishes inspected development baseline from deployed runtime equality;': '- [x] evidence document distinguishes inspected development baseline from deployed runtime equality;',
+              '- [ ] focused format, strict Clippy and complete package tests pass;': '- [x] focused format, strict Clippy and complete package tests pass;',
+              '- [ ] fresh source-provenance/trust/API audit has zero open material finding.': '- [x] fresh source-provenance/trust/API audit has zero open material finding.',
+              '- [ ] exact provenance-safe source/fixture evidence is classified per required M2 family;': '- [x] exact provenance-safe source/fixture evidence is classified per required M2 family;',
+              '- [ ] unsupported field layouts remain explicit `UNKNOWN` and are not guessed;': '- [x] unsupported field layouts remain explicit `UNKNOWN` and are not guessed;',
+              '- [ ] only exactly supported bootstrap/map/entity/movement/logout decode/encode families enter the package;': '- [x] only the exactly supported outbound movement/stop/logout family enters this phase; inbound families remain unimplemented;',
+          }
+          for old, new in replacements.items():
+              if old in text:
+                  text = text.replace(old, new, 1)
+              elif new not in text:
+                  raise SystemExit(f'unexpected task state for {old!r}')
+          old_next = 'next_action: Open the draft PR, inspect exact generated-index metadata and source hashes, then implement and validate development baseline alignment exclusively within protocol-canary and the P2 evidence document before considering any gameplay layout.'
+          new_next = 'next_action: Run final exact-head workspace and repository CI for this bounded phase PR; after protected merge keep the parent task active for inbound layout normalization, release the shared lockfile lease, and continue the next independent READY P2 producer.'
+          if old_next in text:
+              text = text.replace(old_next, new_next, 1)
+          task.write_text(text, encoding='utf-8')
+          PY
+
+          rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
+          rustup default 1.94.0
+          cd oteryn-client
+          cargo metadata --format-version 1 > /tmp/canary-phase-metadata.json
+          cargo fmt --all
+          cargo clippy -p oteryn-protocol-canary --all-targets --locked -- -D warnings
+          cargo test -p oteryn-protocol-canary --all-targets --locked
+          cargo run --locked -p oteryn-architecture-check -- workspace .
+          cd ..
+
+          python3 - <<'PY'
+          import subprocess
+          diff = subprocess.run(
+              ['git', 'diff', 'origin/main', '--unified=0', '--', 'oteryn-client/Cargo.lock'],
+              check=True,
+              text=True,
+              capture_output=True,
+          ).stdout
+          additions = []
+          removals = []
+          for line in diff.splitlines():
+              if line.startswith('---') or line.startswith('+++'):
+                  continue
+              if line.startswith('+'):
+                  additions.append(line[1:])
+              elif line.startswith('-'):
+                  removals.append(line[1:])
+          if removals:
+              raise SystemExit(f'unexpected Cargo.lock removals: {removals}')
+          if additions != [' "oteryn-game-domain",']:
+              raise SystemExit(f'unexpected Cargo.lock additions: {additions}')
+          PY
+
+          git rm -f --ignore-unmatch \
+            .github/workflows/temp-p2-canary-baseline.yml \
+            .github/workflows/temp-p2-canary-baseline-trigger.yml \
+            .github/workflows/temp-p2-canary-command-focused.yml \
+            .github/workflows/temp-p2-canary-command-trigger.yml \
+            .github/workflows/temp-p2-canary-command-integration.yml \
+            .github/workflows/temp-p2-canary-command-integration-trigger.yml \
+            "$FINALIZER_WORKFLOW" "$TRIGGER_WORKFLOW"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat(protocol-canary): finalize bounded Current command phase"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-canary-world-protocol

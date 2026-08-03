@@ -21,6 +21,15 @@ mod synthetic;
 #[cfg(test)]
 mod tests;
 
+mod command;
+
+pub use command::{
+    CanaryCommandError, EncodedCanaryCommand, OPCODE_LOGOUT, OPCODE_STEP_EAST, OPCODE_STEP_NORTH,
+    OPCODE_STEP_NORTH_EAST, OPCODE_STEP_NORTH_WEST, OPCODE_STEP_SOUTH, OPCODE_STEP_SOUTH_EAST,
+    OPCODE_STEP_SOUTH_WEST, OPCODE_STEP_WEST, OPCODE_STOP_MOVEMENT,
+    encode_current_development_command,
+};
+
 /// Exact generated-source revision selected as the Current development baseline.
 pub const CANARY_CURRENT_REVISION: &str = "bc0068ab80bbf003e128fce0589b4cc89d2682d3";
 /// Runtime descriptor revision used before the P2 generated-index alignment.

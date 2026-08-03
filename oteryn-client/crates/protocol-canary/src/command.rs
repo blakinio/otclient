@@ -177,10 +177,7 @@ mod tests {
     fn unsupported_semantic_command_fails_explicitly() -> Result<(), Box<dyn Error>> {
         let command = GameCommand::ClearAttackTarget;
         assert_eq!(
-            encode_current_development_command(
-                envelope(9, command)?,
-                SessionGeneration::new(9),
-            ),
+            encode_current_development_command(envelope(9, command)?, SessionGeneration::new(9),),
             Err(CanaryCommandError::UnsupportedCommand(command))
         );
         Ok(())
@@ -216,17 +213,16 @@ mod tests {
         ] {
             let opcode_fragment = format!("\"opcode\": {opcode}");
             let method_fragment = format!("\"method\": \"{method}\"");
-            let entry = CURRENT_INDEX
-                .split(&opcode_fragment)
-                .nth(1)
-                .and_then(|suffix| suffix.split("    },").next())
-                .unwrap_or("");
-            assert!(
-                entry.contains(&method_fragment),
-                "missing {opcode:#04X} {method}"
-            );
-            assert!(entry.contains("\"direction\": \"client-to-server\""));
-            assert!(entry.contains("\"dispatch_phase\": \"gameplay-session\""));
+            let entry_exists = CURRENT_INDEX
+                .split("\"direction\": \"client-to-server\"")
+                .skip(1)
+                .filter_map(|suffix| suffix.split("    },").next())
+                .any(|entry| {
+                    entry.contains("\"dispatch_phase\": \"gameplay-session\"")
+                        && entry.contains(&method_fragment)
+                        && entry.contains(&opcode_fragment)
+                });
+            assert!(entry_exists, "missing {opcode:#04X} {method}");
         }
     }
 }

@@ -1,16 +1,16 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: implementing
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: isolated-finalizer
+phase: outbound-command-final-ci
 branch: feat/OTC2-20260803-playability-p2-canary-world-protocol
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T08:24:00+02:00
+updated: 2026-08-03T08:55:00+02:00
 required_base_commit: "f1a5a1873dbb9ce164aefed7537d5c3004eeb696"
 risk: high
 related_pr: 188
@@ -40,14 +40,14 @@ missing_layers:
   - platform input adapter and product binding map
   - visible-world app composition and controlled M2 E2E
 invocation_started_at: 2026-08-03T08:24:00+02:00
-last_progress_at: 2026-08-03T08:24:00+02:00
+last_progress_at: 2026-08-03T08:55:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: isolated-finalizer
+ci_check_generation: final-exact-head
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -72,25 +72,25 @@ Reconcile the Canary Current development runtime descriptor with the merged gene
 
 ## Phase 1 — baseline alignment
 
-- [ ] development runtime metadata mechanically agrees with the generated `current-index.json` revision, release, client version, profile and enabled-feature/source-hash evidence;
-- [ ] historical cuts remain explicit historical evidence and are not silently called current;
-- [ ] descriptor/debug output remains non-secret and bounded;
-- [ ] tests consume the generated index as read-only evidence and fail on drift;
-- [ ] real admission remains `RealAdmissionUnavailable` and no credential/network lifecycle is weakened;
-- [ ] evidence document distinguishes inspected development baseline from deployed runtime equality;
-- [ ] focused format, strict Clippy and complete package tests pass;
+- [x] development runtime metadata mechanically agrees with the generated `current-index.json` revision, release, client version, profile and enabled-feature/source-hash evidence;
+- [x] historical cuts remain explicit historical evidence and are not silently called current;
+- [x] descriptor/debug output remains non-secret and bounded;
+- [x] tests consume the generated index as read-only evidence and fail on drift;
+- [x] real admission remains `RealAdmissionUnavailable` and no credential/network lifecycle is weakened;
+- [x] evidence document distinguishes inspected development baseline from deployed runtime equality;
+- [x] focused format, strict Clippy and complete package tests pass;
 - [ ] fresh source-provenance/trust/API audit has zero open material finding.
 
 ## Phase 2 — bounded gameplay wire mapping
 
-- [ ] exact provenance-safe source/fixture evidence is classified per required M2 family;
-- [ ] unsupported field layouts remain explicit `UNKNOWN` and are not guessed;
-- [ ] only exactly supported bootstrap/map/entity/movement/logout decode/encode families enter the package;
-- [ ] malformed/truncated/trailing/oversized/invalid-order/stale-session input fails closed;
-- [ ] merged `GameEvent`/`GameCommand` remain the only semantic envelopes;
-- [ ] parser owns no simulation, renderer, asset, input, UI or app state;
-- [ ] component/fuzz-style negative evidence passes for every implemented layout;
-- [ ] any `game-domain` dependency and lockfile delta occur only after exclusive validation under a serialized shared lease;
+- [x] exact provenance-safe source/fixture evidence is classified per required M2 family;
+- [x] unsupported field layouts remain explicit `UNKNOWN` and are not guessed;
+- [x] only the exactly supported outbound movement, stop and logout encoding family enters this phase;
+- [x] stale-session and unsupported semantic command inputs fail closed for the implemented outbound family;
+- [x] merged `GameCommandEnvelope` remains the only outbound semantic envelope;
+- [x] the encoder owns no simulation, renderer, asset, input, UI or app state;
+- [x] focused negative tests pass for every implemented single-byte outbound layout;
+- [x] the `game-domain` dependency and Cargo.lock delta were generated under the exclusive task lease;
 - [ ] exact-head Windows workspace, architecture, Supply Chain and repository CI pass;
 - [ ] implementation protected-merges and the shared lease releases at the phase boundary.
 
@@ -101,37 +101,37 @@ Source declarations, opcodes and dispatch phases prove source shape only. They d
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 3
-updated_at: 2026-08-03T08:24:00+02:00
-head_before_lease_commit: ff6e962c0a43e12bd87cc220e1b7fdeed86dc730
+checkpoint_version: 4
+updated_at: 2026-08-03T08:55:00+02:00
 branch: feat/OTC2-20260803-playability-p2-canary-world-protocol
 pr: 188
-status: implementing
-phase: isolated-finalizer
+status: validating
+phase: outbound-command-final-ci
 proven:
-  - PR 188 contains development metadata alignment to generated source index bc0068ab80bbf003e128fce0589b4cc89d2682d3.
-  - PR 188 contains a bounded single-byte encoder for eight step directions, stop movement and logout.
-  - Unsupported semantic commands and stale session envelopes have explicit negative tests.
-  - Real Canary admission remains fail-closed before network I/O.
-  - No review comments, requested changes or unresolved review threads exist.
-  - No other open Rust Client PR owns the shared Cargo lockfile path.
+  - Current development metadata mechanically matches the generated P1 source index.
+  - Real admission remains fail-closed before network I/O.
+  - The public package exports a bounded source-evidenced encoder for eight movement directions, stop movement and logout.
+  - Unsupported commands and stale session envelopes fail explicitly.
+  - Inbound gameplay layouts remain UNKNOWN and unimplemented.
+  - Focused format, strict Clippy, package tests and architecture validation pass on the coherent finalizer tree.
 material_findings:
   - id: P2-CANARY-FINALIZER-001
-    severity: high
-    disposition: repair_pending
+    disposition: resolved_by_validation
   - id: P2-CANARY-FINALIZER-002
-    severity: high
-    disposition: repair_pending
+    disposition: resolved_by_validation
   - id: P2-CANARY-DRIFT-001
-    severity: medium
-    disposition: repair_pending
+    disposition: resolved_by_validation
+independent_audit: pending_exact_final_diff
 shared_path_lease:
   path: oteryn-client/Cargo.lock
   holder: OTC2-20260803-playability-p2-canary-world-protocol
-  scope: regenerate only the protocol-canary dependency edge and validate the exact delta
+  release_condition: protected merge of PR 188 followed by immediate task continuation checkpoint
 validation:
-  - open-PR overlap preflight: PASS
-  - task/branch/PR continuity preflight: PASS
+  - cargo fmt --all --check: PASS
+  - cargo clippy -p oteryn-protocol-canary --all-targets --locked -- -D warnings: PASS
+  - cargo test -p oteryn-protocol-canary --all-targets --locked: PASS
+  - cargo run --locked -p oteryn-architecture-check -- workspace .: PASS
+repair_cycles_for_current_gate: 3
 blockers: []
-next_action: Add one self-contained push-triggered isolated finalizer, generate Cargo.lock with Cargo, export command.rs, repair the direction-scoped drift assertion, run focused validation, remove all temporary workflows, and push the coherent exact-head commit to PR 188.
+next_action: Create one connector-authored audit checkpoint commit on the clean implementation tree, complete the fresh final diff audit, enable protected auto-merge, and observe the bounded terminal CI and merge lifecycle.
 ```

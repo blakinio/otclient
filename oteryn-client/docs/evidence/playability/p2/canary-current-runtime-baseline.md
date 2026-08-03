@@ -87,24 +87,52 @@ The `protocol-canary` package tests include the versioned generated JSON as read
 
 A generator/artifact change must therefore update the descriptor, this evidence record and tests together in an explicitly reviewed task.
 
-## Gameplay layout readiness
+## Supported outbound M2 command subset
 
-Current P1 fixture classification does not provide a reusable provenance-safe complete post-admission transcript. Therefore baseline alignment alone authorizes no gameplay field parser.
+Exact producer dispatch at revision `bc0068ab…` establishes ten client-to-server gameplay-session commands with no payload:
 
-Each M2 bootstrap/map/entity/movement/logout subfamily remains `UNKNOWN` until exact source statements and/or original sanitized fixtures establish its complete bounded byte layout, ordering and gates. A source dispatch entry by itself is insufficient.
+```yaml
+logout: 0x14
+step_north: 0x65
+step_east: 0x66
+step_south: 0x67
+step_west: 0x68
+stop_movement: 0x69
+step_north_east: 0x6A
+step_south_east: 0x6B
+step_south_west: 0x6C
+step_north_west: 0x6D
+```
+
+`encode_current_development_command` consumes only a current session-fenced merged `GameCommandEnvelope`. It emits one byte for `Step`, `StopMovement` and `Logout`, rejects every unsupported semantic command explicitly, and performs no network I/O. Real transmission remains unauthorized while admission is fail-closed.
+
+## Inbound gameplay layout readiness
+
+Current P1 fixture classification provides no reusable provenance-safe complete post-admission transcript. Map, entity and bootstrap paths depend on nested tile, thing, appearance and profile logic that dispatch entries alone do not define.
+
+Inbound bootstrap, map, entity and reconciliation layouts therefore remain `UNKNOWN` and unimplemented until complete bounded source contracts and original sanitized positive and negative fixtures prove ordering, gates and truncation behavior.
 
 ## Validation checkpoint
 
 ```yaml
-status: pending_focused_validation
+status: focused_validation_passed
 product_code_scope:
   - non-secret development descriptor metadata
   - generated-index drift tests
+  - bounded source-evidenced movement, stop and logout command encoder
 admission_lifecycle_changed: false
 real_admission_state: fail_closed
 credentials_or_private_payloads_added: false
-gameplay_layouts_implemented: []
+gameplay_layouts_implemented:
+  outbound: [step_8_directions, stop_movement, logout]
+  inbound: []
+focused_validation:
+  cargo_fmt: PASS
+  strict_clippy: PASS
+  package_tests: PASS
+  architecture: PASS
 blockers:
-  - provenance-safe exact field-layout evidence for each gameplay subfamily
-next_action: Complete pinned format, strict package Clippy and full package tests, then perform a fresh provenance/API audit before deciding whether any gameplay subfamily has sufficient exact evidence.
+  - complete provenance-safe inbound bootstrap, map, entity and reconciliation layouts
+  - original sanitized positive and negative fixtures for each inbound family
+next_action: Run retained exact-head repository CI, then protected-merge this bounded phase and release the lockfile lease before continuing inbound evidence normalization.
 ```

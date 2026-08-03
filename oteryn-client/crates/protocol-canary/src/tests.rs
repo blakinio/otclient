@@ -103,6 +103,35 @@ fn exact_profile_metadata_and_unknown_profile_are_closed() {
     assert_eq!(CURRENT_PROFILE.release(), "3.6.1");
     assert_eq!(CURRENT_PROFILE.identifier(), "current");
     assert_eq!(CURRENT_PROFILE.client_version(), 1525);
+    assert_eq!(
+        CURRENT_PROFILE.source_index_schema(),
+        CANARY_SOURCE_INDEX_SCHEMA
+    );
+    assert_eq!(
+        CURRENT_PROFILE.source_repository(),
+        CANARY_SOURCE_INDEX_REPOSITORY
+    );
+    assert_eq!(
+        CURRENT_PROFILE.source_profile(),
+        CANARY_SOURCE_INDEX_PROFILE
+    );
+    assert_eq!(
+        CURRENT_PROFILE.source_entry_count(),
+        CANARY_SOURCE_INDEX_ENTRY_COUNT
+    );
+    assert_eq!(
+        CURRENT_PROFILE.client_to_server_entry_count(),
+        CANARY_SOURCE_INDEX_CLIENT_TO_SERVER_COUNT
+    );
+    assert_eq!(
+        CURRENT_PROFILE.server_to_client_entry_count(),
+        CANARY_SOURCE_INDEX_SERVER_TO_CLIENT_COUNT
+    );
+    assert_eq!(
+        CURRENT_PROFILE.enabled_features(),
+        &CANARY_CURRENT_ENABLED_FEATURES
+    );
+    assert_eq!(CURRENT_PROFILE.source_files(), &CANARY_CURRENT_SOURCE_FILES);
     assert_eq!(CURRENT_PROFILE.max_network_message_bytes(), 65_500);
     assert_eq!(CURRENT_PROFILE.max_input_message_bytes(), 4_096);
     assert_eq!(CURRENT_PROFILE.max_character_name_bytes(), 30);
@@ -111,6 +140,99 @@ fn exact_profile_metadata_and_unknown_profile_are_closed() {
         select_profile("unknown"),
         Err(CanaryAdmissionOutcome::ProtocolMismatch)
     );
+}
+
+fn json_section<'a>(source: &'a str, start: &str, end: &str) -> Option<&'a str> {
+    source
+        .split_once(start)
+        .and_then(|(_, rest)| rest.split_once(end))
+        .map(|(section, _)| section)
+}
+
+#[test]
+fn generated_source_index_matches_current_profile() -> Result<(), Box<dyn Error>> {
+    const CURRENT_INDEX: &str =
+        include_str!("../../../tools/canary-protocol-index/generated/current-index.json");
+
+    let producer = json_section(CURRENT_INDEX, "\"producer\": {", "},\n  \"profile_ids\"")
+        .ok_or("generated source index has no producer metadata")?;
+    for exact in [
+        format!("\"client_version\": {}", CANARY_CURRENT_CLIENT_VERSION),
+        format!("\"profile\": \"{}\"", CANARY_SOURCE_INDEX_PROFILE),
+        format!("\"repository\": \"{}\"", CANARY_SOURCE_INDEX_REPOSITORY),
+        format!("\"revision\": \"{}\"", CANARY_CURRENT_REVISION),
+        format!("\"server_release\": \"{}\"", CANARY_RELEASE),
+    ] {
+        assert!(
+            producer.contains(&exact),
+            "missing producer metadata: {exact}"
+        );
+    }
+
+    assert!(CURRENT_INDEX.contains(&format!("\"schema\": \"{}\"", CANARY_SOURCE_INDEX_SCHEMA)));
+    assert_eq!(
+        CURRENT_INDEX
+            .matches("\"direction\": \"client-to-server\"")
+            .count(),
+        CANARY_SOURCE_INDEX_CLIENT_TO_SERVER_COUNT
+    );
+    assert_eq!(
+        CURRENT_INDEX
+            .matches("\"direction\": \"server-to-client\"")
+            .count(),
+        CANARY_SOURCE_INDEX_SERVER_TO_CLIENT_COUNT
+    );
+    assert_eq!(
+        CANARY_SOURCE_INDEX_CLIENT_TO_SERVER_COUNT + CANARY_SOURCE_INDEX_SERVER_TO_CLIENT_COUNT,
+        CANARY_SOURCE_INDEX_ENTRY_COUNT
+    );
+
+    let features = json_section(
+        CURRENT_INDEX,
+        "\"enabled_features\": [",
+        "],\n  \"entries\"",
+    )
+    .ok_or("generated source index has no enabled feature list")?;
+    assert_eq!(
+        features
+            .lines()
+            .filter(|line| line.trim_start().starts_with('"'))
+            .count(),
+        CANARY_CURRENT_ENABLED_FEATURES.len()
+    );
+    for feature in CANARY_CURRENT_ENABLED_FEATURES {
+        assert!(
+            features.contains(&format!("\"{feature}\"")),
+            "missing generated feature: {feature}"
+        );
+    }
+
+    let hashes = json_section(
+        CURRENT_INDEX,
+        "\"source_hashes\": {",
+        "},\n  \"unresolved_declarations\"",
+    )
+    .ok_or("generated source index has no source hash map")?;
+    assert_eq!(
+        hashes
+            .lines()
+            .filter(|line| line.trim_start().starts_with('"'))
+            .count(),
+        CANARY_CURRENT_SOURCE_FILES.len()
+    );
+    for source in CANARY_CURRENT_SOURCE_FILES {
+        let exact = format!("\"{}\": \"{}\"", source.path(), source.sha256());
+        assert!(hashes.contains(&exact), "missing source hash: {exact}");
+        assert_eq!(source.sha256().len(), 64);
+        assert!(
+            source
+                .sha256()
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        );
+    }
+    assert!(CURRENT_INDEX.contains("\"unresolved_declarations\": []"));
+    Ok(())
 }
 
 #[test]

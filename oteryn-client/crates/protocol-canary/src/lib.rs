@@ -21,10 +21,43 @@ mod synthetic;
 #[cfg(test)]
 mod tests;
 
-/// Exact read-only Canary revision selected by this evidence cut.
-pub const CANARY_CURRENT_REVISION: &str = "95b276db311cf6e9acd58b847f1fb0ca6697b137";
-/// Revision at which the accepted W7 protocol source cut was established.
+/// Exact generated-source revision selected as the Current development baseline.
+pub const CANARY_CURRENT_REVISION: &str = "bc0068ab80bbf003e128fce0589b4cc89d2682d3";
+/// Runtime descriptor revision used before the P2 generated-index alignment.
+pub const CANARY_PREVIOUS_RUNTIME_REVISION: &str = "95b276db311cf6e9acd58b847f1fb0ca6697b137";
+/// Historical source cut accepted before the generated P1 index existed.
 pub const CANARY_ACCEPTED_SOURCE_CUT: &str = "4b2d6f432d92628c42bde1d95daed6ae0d0eb88f";
+/// Generated source-index schema consumed as read-only development evidence.
+pub const CANARY_SOURCE_INDEX_SCHEMA: &str = "oteryn-canary-source-index-v1";
+/// Repository named by the generated source-index producer metadata.
+pub const CANARY_SOURCE_INDEX_REPOSITORY: &str = "blakinio/canary";
+/// Producer profile expression recorded by the generated source index.
+pub const CANARY_SOURCE_INDEX_PROFILE: &str = "ProtocolProfileId::Current";
+/// Total exact dispatch/source entries in the generated index.
+pub const CANARY_SOURCE_INDEX_ENTRY_COUNT: usize = 347;
+/// Client-to-server entries in the generated index.
+pub const CANARY_SOURCE_INDEX_CLIENT_TO_SERVER_COUNT: usize = 159;
+/// Server-to-client entries in the generated index.
+pub const CANARY_SOURCE_INDEX_SERVER_TO_CLIENT_COUNT: usize = 188;
+/// Exact enabled feature declarations at the selected source revision.
+pub const CANARY_CURRENT_ENABLED_FEATURES: [&str; 16] = [
+    "CurrentPayload",
+    "CustomMonkPackets",
+    "GameEventPayload",
+    "GraphicalEffectSourceByte",
+    "ImbuementWindow",
+    "LoginSpeedFormula",
+    "MarketPackets",
+    "MemorialPackets",
+    "ModernLoginSideSystems",
+    "OfficialSkillWheelPayload",
+    "OfficialSoulSealsPackets",
+    "OfficialTaskboardPackets",
+    "OfficialVocationSpecificPlayerData",
+    "OfficialWeaponProficiencyPayload",
+    "PlayerDataLevelPercentU16",
+    "ResourceBalancePackets",
+];
 /// Exact Canary release identifier at the selected revision.
 pub const CANARY_RELEASE: &str = "3.6.1";
 /// Exact Current client/protocol version at the selected revision.
@@ -38,6 +71,65 @@ pub const CANARY_INPUT_MESSAGE_MAX_BYTES: usize = 4_096;
 /// Canary's explicit player-name byte limit.
 pub const CANARY_CHARACTER_NAME_MAX_BYTES: usize = 30;
 
+/// Exact non-secret SHA-256 evidence for one indexed producer source file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CanarySourceFile {
+    path: &'static str,
+    sha256: &'static str,
+}
+
+impl CanarySourceFile {
+    /// Create one immutable source-file evidence record.
+    #[must_use]
+    pub const fn new(path: &'static str, sha256: &'static str) -> Self {
+        Self { path, sha256 }
+    }
+
+    /// Return the repository-relative producer source path.
+    #[must_use]
+    pub const fn path(self) -> &'static str {
+        self.path
+    }
+
+    /// Return the lowercase SHA-256 digest of the exact source bytes.
+    #[must_use]
+    pub const fn sha256(self) -> &'static str {
+        self.sha256
+    }
+}
+
+/// Exact producer source path/hash evidence recorded by the generated index.
+pub const CANARY_CURRENT_SOURCE_FILES: [CanarySourceFile; 7] = [
+    CanarySourceFile::new(
+        "src/core.hpp",
+        "6e665eb99b62049c78b84d142eea070913b74699c2c40448d1473e3bcd211ce6",
+    ),
+    CanarySourceFile::new(
+        "src/server/network/protocol/protocol_port_utils.hpp",
+        "3a39e0693cdea574f6decc5a061c715b3b1573e82791696cd681b46243e70505",
+    ),
+    CanarySourceFile::new(
+        "src/server/network/protocol/protocol_profile.cpp",
+        "69d2d4193e721b83805031108825a5f3bf30ae4e5e46c27729ea5493ea6d33df",
+    ),
+    CanarySourceFile::new(
+        "src/server/network/protocol/protocol_profile.hpp",
+        "7cbb7ac6d16b6f7eb74201d00fc60ccd6d098e862814164efa45596392ff4a58",
+    ),
+    CanarySourceFile::new(
+        "src/server/network/protocol/protocol_session_hint.hpp",
+        "3b84362af14d7909b37c6b8adf61d941987cb59729090c295841866488a2d2db",
+    ),
+    CanarySourceFile::new(
+        "src/server/network/protocol/protocolgame.cpp",
+        "af7484cd0c4e1e4e5812ea3b6f1813031687331696001fb74de0be9bd21d5efc",
+    ),
+    CanarySourceFile::new(
+        "src/server/network/protocol/protocolgame.hpp",
+        "33a97f6c54baa6138555164995c0125141407bd7d7a4e71dd7c0561c0f246beb",
+    ),
+];
+
 /// Exact non-secret Current-profile source descriptor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CurrentProfileDescriptor {
@@ -45,6 +137,14 @@ pub struct CurrentProfileDescriptor {
     release: &'static str,
     identifier: &'static str,
     client_version: u16,
+    source_index_schema: &'static str,
+    source_repository: &'static str,
+    source_profile: &'static str,
+    source_entry_count: usize,
+    client_to_server_entry_count: usize,
+    server_to_client_entry_count: usize,
+    enabled_features: &'static [&'static str],
+    source_files: &'static [CanarySourceFile],
     max_network_message_bytes: usize,
     max_input_message_bytes: usize,
     max_character_name_bytes: usize,
@@ -75,6 +175,54 @@ impl CurrentProfileDescriptor {
         self.client_version
     }
 
+    /// Return the generated source-index schema.
+    #[must_use]
+    pub const fn source_index_schema(self) -> &'static str {
+        self.source_index_schema
+    }
+
+    /// Return the repository named by the source-index producer metadata.
+    #[must_use]
+    pub const fn source_repository(self) -> &'static str {
+        self.source_repository
+    }
+
+    /// Return the producer profile expression recorded by the source index.
+    #[must_use]
+    pub const fn source_profile(self) -> &'static str {
+        self.source_profile
+    }
+
+    /// Return the total generated dispatch/source entry count.
+    #[must_use]
+    pub const fn source_entry_count(self) -> usize {
+        self.source_entry_count
+    }
+
+    /// Return the generated client-to-server entry count.
+    #[must_use]
+    pub const fn client_to_server_entry_count(self) -> usize {
+        self.client_to_server_entry_count
+    }
+
+    /// Return the generated server-to-client entry count.
+    #[must_use]
+    pub const fn server_to_client_entry_count(self) -> usize {
+        self.server_to_client_entry_count
+    }
+
+    /// Return the exact enabled feature declarations.
+    #[must_use]
+    pub const fn enabled_features(self) -> &'static [&'static str] {
+        self.enabled_features
+    }
+
+    /// Return exact producer source path/SHA-256 evidence.
+    #[must_use]
+    pub const fn source_files(self) -> &'static [CanarySourceFile] {
+        self.source_files
+    }
+
     /// Return the server's bounded network-message size.
     #[must_use]
     pub const fn max_network_message_bytes(self) -> usize {
@@ -100,6 +248,14 @@ pub const CURRENT_PROFILE: CurrentProfileDescriptor = CurrentProfileDescriptor {
     release: CANARY_RELEASE,
     identifier: CANARY_CURRENT_PROFILE_IDENTIFIER,
     client_version: CANARY_CURRENT_CLIENT_VERSION,
+    source_index_schema: CANARY_SOURCE_INDEX_SCHEMA,
+    source_repository: CANARY_SOURCE_INDEX_REPOSITORY,
+    source_profile: CANARY_SOURCE_INDEX_PROFILE,
+    source_entry_count: CANARY_SOURCE_INDEX_ENTRY_COUNT,
+    client_to_server_entry_count: CANARY_SOURCE_INDEX_CLIENT_TO_SERVER_COUNT,
+    server_to_client_entry_count: CANARY_SOURCE_INDEX_SERVER_TO_CLIENT_COUNT,
+    enabled_features: &CANARY_CURRENT_ENABLED_FEATURES,
+    source_files: &CANARY_CURRENT_SOURCE_FILES,
     max_network_message_bytes: CANARY_NETWORK_MESSAGE_MAX_BYTES,
     max_input_message_bytes: CANARY_INPUT_MESSAGE_MAX_BYTES,
     max_character_name_bytes: CANARY_CHARACTER_NAME_MAX_BYTES,

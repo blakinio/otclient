@@ -319,7 +319,6 @@ mod tests {
             (30, 0x00),
             (31, 0x08),
             (32, 0x00),
-            (33, 0x00),
             (45, 0x04),
             (49, 0x01),
             (52, 0xFE),
@@ -467,7 +466,7 @@ replacements = [
     ),
     (
         "    pub const fn enter_world_received(self) -> bool {\n        self.enter_world_received\n    }\n\n",
-        "    pub const fn enter_world_received(self) -> bool {\n        self.enter_world_received\n    }\n\n    /// Return whether a complete initial map established the local position.\n    #[must_use]\n    pub const fn bootstrap_completed(self) -> bool {\n        self.bootstrap_completed\n    }\n\n    pub(crate) fn mark_bootstrap_completed(&mut self) {\n        self.bootstrap_completed = true;\n    }\n\n",
+        "    pub const fn enter_world_received(self) -> bool {\n        self.enter_world_received\n    }\n\n    /// Return whether a complete initial map established the local position.\n    #[must_use]\n    pub const fn bootstrap_completed(self) -> bool {\n        self.bootstrap_completed\n    }\n\n    pub(crate) const fn mark_bootstrap_completed(&mut self) {\n        self.bootstrap_completed = true;\n    }\n\n",
         "bootstrap state accessors",
     ),
 ]

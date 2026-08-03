@@ -1,11 +1,8 @@
 name: Temporary P2 Canary Isolated Finalizer
 
 on:
-  push:
-    branches:
-      - feat/OTC2-20260803-playability-p2-canary-world-protocol
-    paths:
-      - .github/workflows/temp-p2-canary-isolated-finalizer.yml
+  pull_request:
+    types: [ready_for_review]
 
 permissions:
   contents: write
@@ -29,7 +26,7 @@ jobs:
       - name: Repair, validate and commit coherent phase
         shell: bash
         env:
-          EXPECTED_PARENT: ${{ github.event.before }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
           EXPECTED_MAIN: f1a5a1873dbb9ce164aefed7537d5c3004eeb696
           BRANCH: feat/OTC2-20260803-playability-p2-canary-world-protocol
           TASK: docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
@@ -37,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git branch --show-current)" = "$BRANCH"
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git fetch --no-tags origin main
           test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
           git merge-base --is-ancestor origin/main HEAD
@@ -172,8 +169,8 @@ next_action: Run retained exact-head repository CI, then protected-merge this bo
           text = task.read_text(encoding='utf-8')
           text = text.replace('status: implementing\n', 'status: validating\n', 1)
           text = text.replace('phase: isolated-finalizer\n', 'phase: outbound-command-final-ci\n', 1)
-          text = text.replace('updated: 2026-08-03T08:24:00+02:00\n', 'updated: 2026-08-03T08:28:00+02:00\n', 1)
-          text = text.replace('last_progress_at: 2026-08-03T08:24:00+02:00\n', 'last_progress_at: 2026-08-03T08:28:00+02:00\n', 1)
+          text = text.replace('updated: 2026-08-03T08:24:00+02:00\n', 'updated: 2026-08-03T08:31:00+02:00\n', 1)
+          text = text.replace('last_progress_at: 2026-08-03T08:24:00+02:00\n', 'last_progress_at: 2026-08-03T08:31:00+02:00\n', 1)
           text = text.replace('ci_check_generation: isolated-finalizer\n', 'ci_check_generation: final-exact-head\n', 1)
           checks = {
               '- [ ] development runtime metadata mechanically agrees': '- [x] development runtime metadata mechanically agrees',
@@ -201,7 +198,7 @@ next_action: Run retained exact-head repository CI, then protected-merge this bo
 
 ```yaml
 checkpoint_version: 4
-updated_at: 2026-08-03T08:28:00+02:00
+updated_at: 2026-08-03T08:31:00+02:00
 branch: feat/OTC2-20260803-playability-p2-canary-world-protocol
 pr: 188
 status: validating

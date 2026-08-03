@@ -10,7 +10,7 @@ phase: exact-head-validation-and-audit
 branch: feat/OTC2-20260803-playability-p2-renderer-resource
 base_branch: main
 created: 2026-08-03T12:24:00+02:00
-updated: 2026-08-03T13:00:00+02:00
+updated: 2026-08-03T13:03:00+02:00
 required_base_commit: "1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2"
 risk: medium
 related_prs: [200]
@@ -52,14 +52,14 @@ blocks:
   - OTC2-20260803-playability-p2-input-platform
   - OTC2-20260803-playability-p2-visible-world-integration
 invocation_started_at: 2026-08-03T12:20:00+02:00
-last_progress_at: 2026-08-03T13:00:00+02:00
+last_progress_at: 2026-08-03T13:03:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: exact-head-final
-terminal_ci_wait_started_at: null
+terminal_ci_wait_started_at: 2026-08-03T13:03:00+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 3
+repair_cycles_for_current_gate: 4
 context_reconstruction_attempts: 2
 stall_warnings: 0
 ---
@@ -79,6 +79,7 @@ Produce the smallest bounded renderer-resource contract for P2: immutable checke
 # Implemented contract
 
 - `TextureUploadPlan` revalidates immutable `DecodedRgba8` layout and owns zero-filled, 256-byte-row-aligned upload bytes.
+- `TextureFormat::Rgba8Unorm` preserves the accepted raw RGBA8 contract without inventing an unproven sRGB transfer function.
 - Hard limits bound live entries, logical device bytes, one texture and one upload-plan allocation.
 - `TextureHandle` fences process, monotonically increasing device and asset-pack generations plus opaque slot/serial identity.
 - `ResourceCache` coalesces duplicate generation-fenced assets and performs deterministic least-recently-used eviction.
@@ -86,7 +87,7 @@ Produce the smallest bounded renderer-resource contract for P2: immutable checke
 - Capacity and memory pressure commit bounded evictions before upload; this documented behavior remains deterministic if the sink then fails.
 - `resolve` performs no allocation, decode, filesystem, network or blocking I/O.
 - Device/pack replacement, stale handles/assets, missing resources and sink failures return stable payload-redacted errors.
-- Fake-sink tests cover row padding, coalescing, eviction, pressure-plus-upload-failure, generation fencing, pre-upload arithmetic failure, reset and memory accounting.
+- Fake-sink tests cover row padding and format, coalescing, eviction, pressure-plus-upload-failure, generation fencing, pre-upload arithmetic failure, reset and memory accounting.
 
 # Architecture integration
 
@@ -94,12 +95,13 @@ The previous coarse `runtime` category for `oteryn-asset-decode` would require u
 
 # Validation checkpoint
 
-Three bounded repair cycles were used. Self-removing focused generations ran pinned formatting, package tests, strict package Clippy, architecture-check tests and workspace architecture validation before product commits `1615249a9781db2d253f57ce568a9e481fe59e47` and `d978fdb8cb1e56d258bfd488813490dd2bbb864d`. This human-authored checkpoint is the retained exact-head validation generation.
+Four bounded repair cycles addressed Clippy mechanics, post-upload accounting atomicity, monotonic generation/failure semantics and the final unproven color-space assumption. Self-removing focused generations ran pinned formatting, package tests, strict package Clippy, architecture-check tests and workspace architecture validation before final product head `563507cb6af1afd6fb727bec8cd662e9c0a38a67`. This checkpoint commit starts the retained exact-head validation generation.
 
 # Acceptance
 
 - [x] stable handles fence process, device and asset-pack generations;
 - [x] RGBA8 descriptors and immutable upload plans validate dimensions, row pitch, 256-byte alignment, byte counts and checked arithmetic;
+- [x] raw RGBA8 color semantics remain neutral and explicit;
 - [x] configured upload/device memory limits are explicit and bounded;
 - [x] duplicate asset requests coalesce deterministically;
 - [x] cache entry/memory accounting and deterministic least-recently-used eviction are bounded;
@@ -122,12 +124,12 @@ This is a synthetic-v1 partial producer. It creates no real GPU device, draw pas
 # Checkpoint
 
 ```yaml
-checkpoint_version: 5
+checkpoint_version: 6
 status: validating
 phase: exact-head-validation-and-audit
 base: 1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2
 branch: feat/OTC2-20260803-playability-p2-renderer-resource
-implementation_head_before_checkpoint: d978fdb8cb1e56d258bfd488813490dd2bbb864d
+final_product_head: 563507cb6af1afd6fb727bec8cd662e9c0a38a67
 pr: 200
 changed_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-renderer-resource.md
@@ -140,7 +142,7 @@ changed_paths:
   - oteryn-client/tools/architecture-check/src/lib.rs
 focused_validation:
   result: PASS
-  final_product_commit: d978fdb8cb1e56d258bfd488813490dd2bbb864d
+  final_product_commit: 563507cb6af1afd6fb727bec8cd662e9c0a38a67
   commands:
     - cargo fmt --all
     - cargo metadata --locked --format-version 1
@@ -148,6 +150,13 @@ focused_validation:
     - cargo clippy -p oteryn-renderer-resource --all-targets -- -D warnings
     - cargo test -p oteryn-architecture-check --all-targets
     - cargo run -p oteryn-architecture-check -- workspace .
+resolved_audit_findings:
+  - id: P2-RENDERER-RESOURCE-ATOMICITY-001
+    result: counters and metadata reservation preflight before sink upload
+  - id: P2-RENDERER-RESOURCE-GENERATION-001
+    result: device and pack generations must advance monotonically
+  - id: P2-RENDERER-RESOURCE-COLORSPACE-001
+    result: raw RGBA8 remains unorm without an unproven sRGB claim
 exact_head_validation: pending
 fresh_audit: pending
 e2e:

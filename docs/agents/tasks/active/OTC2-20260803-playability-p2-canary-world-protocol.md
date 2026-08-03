@@ -1,17 +1,17 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: validating
+status: ready
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: pending-state-terminal-ci
-branch: feat/OTC2-20260803-canary-pending-state-inbound
+phase: next-inbound-family-evidence
+branch: docs/OTC2-20260803-canary-pending-state-closeout
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T09:36:00+02:00
-required_base_commit: "3e88bf21db7dfea1066a1b6729946da282c2e283"
+updated: 2026-08-03T09:46:00+02:00
+required_base_commit: "ee4ce5fa6da70ccd49c492ea4c6406694197d68d"
 risk: high
 related_prs:
   - 188
@@ -43,10 +43,10 @@ missing_layers:
   - platform input adapter and product binding map
   - visible-world app composition and controlled M2 E2E
 invocation_started_at: 2026-08-03T08:24:00+02:00
-last_progress_at: 2026-08-03T09:36:00+02:00
+last_progress_at: 2026-08-03T09:46:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: pending-state-final-exact-head
-terminal_ci_wait_started_at: 2026-08-03T09:36:00+02:00
+ci_check_generation: next-inbound-evidence
+terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
@@ -57,17 +57,21 @@ stall_warnings: 0
 
 # Goal
 
-Reconcile Canary Current evidence with the Rust client while preserving fail-closed real admission, and implement only bounded gameplay mappings whose complete layouts, gates and ordering can be established without inference.
+Reconcile Canary Current evidence with the Rust client while preserving fail-closed real admission, and implement only bounded gameplay mappings whose complete layouts, gates, ordering and semantic envelopes can be established without inference.
 
 # Completed phases
 
 - Current baseline and bounded outbound movement/stop/logout encoder merged in PR #188;
 - Windows generated-index LF repair merged in PR #190;
 - outbound lifecycle closeout and Cargo.lock lease release merged in PR #191;
-- exact-head Windows workspace, architecture, Supply Chain and repository CI passed;
-- real wire admission remains fail-closed before network I/O.
+- pending-state-entered inbound decoder merged in PR #192 as `ee4ce5fa6da70ccd49c492ea4c6406694197d68d`;
+- exact-head Windows workspace, architecture and Supply Chain passed for the final PR #192 head;
+- general repository CI passed on the exact implementation head before the documentation/evidence checkpoint;
+- the final documentation/evidence checkpoint general CI generation was cancelled by the protected auto-merge transition, while the retained Rust exact-head workflow completed successfully;
+- real wire admission remains fail-closed before network I/O;
+- no shared-path lease is held.
 
-# Active bounded inbound family
+# Completed pending-state family
 
 ```yaml
 family: bootstrap_pending_state_entered
@@ -75,24 +79,13 @@ direction: server_to_client
 opcode: 0x0A
 producer_method: sendPendingStateEntered
 producer_revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
-producer_source: src/server/network/protocol/protocolgame.cpp
-producer_opcode_line: 8502
 wire_layout:
   bytes: [0x0A]
   payload_bytes: 0
-producer_gates:
-  - player exists
-  - oldProtocol is false
-  - login bootstrap version is at least 980
-producer_order:
-  after: sendTibiaTime
-  before:
-    - sendEnterWorld
-    - sendMapDescription
 semantic_mapping:
   event: GameEvent::BootstrapStarted
-  classification: derived_from_exact_pending-state-boundary
-consumer_precondition: session-fenced bootstrap state explicitly awaits pending-state-entered
+order_state: session_fenced
+result: merged
 ```
 
 # Acceptance
@@ -117,65 +110,67 @@ consumer_precondition: session-fenced bootstrap state explicitly awaits pending-
 - [x] parser owns no transport, simulation, renderer, asset, input, UI or application state;
 - [x] pinned format, workspace Clippy, workspace tests, architecture and Supply Chain pass;
 - [x] fresh exact-diff audit has zero open material finding;
-- [ ] final checkpoint exact-head Windows workspace, Supply Chain and repository CI pass;
-- [ ] bounded phase protected-merges and task continues to the next proven inbound family.
+- [x] bounded phase protected-merged and the task continues.
+
+## Remaining inbound programme
+
+- [ ] identify the next family whose complete wire layout, gates, ordering and existing `GameEvent` semantic mapping are all proven;
+- [ ] leave source-complete packets unimplemented when no accepted domain event exists;
+- [ ] normalize complete map/entity/bootstrap layouts and original sanitized negative fixtures;
+- [ ] reach controlled visible-world integration without weakening real admission.
 
 # Claim boundary
 
-The packet body is exactly one opcode byte. The semantic mapping to `BootstrapStarted` is a Rust-domain interpretation of the producer pending-state boundary, not a claim that any deployed server matches the inspected source. No real network admission, framing, encryption, map layout, entity layout or neighboring bootstrap packet is authorized by this phase.
+The pending-state packet body is exactly one opcode byte. Its mapping to `BootstrapStarted` is a Rust-domain interpretation of the exact producer boundary, not a claim that a deployed server matches the inspected source. No real network admission, framing, encryption, map layout, entity layout or neighboring bootstrap packet is authorized by this phase.
 
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 10
-updated_at: 2026-08-03T09:36:00+02:00
-base: 3e88bf21db7dfea1066a1b6729946da282c2e283
-branch: feat/OTC2-20260803-canary-pending-state-inbound
-pr: 192
-status: validating
-phase: pending-state-terminal-ci
-validated_implementation_head: e745f1ede79d6a1e70857c5e7e4fdd2fa267445d
-proven:
-  - exact source and generated index establish the complete one-byte 0x0A layout and source anchor
-  - exact call site establishes version gate and order between Tibia time and enter-world/map bootstrap
-  - bootstrap order state is fenced to one SessionToken and rejects reuse after relog
-  - only BootstrapStarted is emitted and real admission remains fail-closed
-  - all negative cases leave state unchanged except successful completion
+checkpoint_version: 11
+updated_at: 2026-08-03T09:46:00+02:00
+base: ee4ce5fa6da70ccd49c492ea4c6406694197d68d
+branch: docs/OTC2-20260803-canary-pending-state-closeout
+status: ready
+phase: next-inbound-family-evidence
+terminal_pr:
+  number: 192
+  state: merged
+  merge_commit: ee4ce5fa6da70ccd49c492ea4c6406694197d68d
 validation:
-  rust_client_run: 30794151809
-  windows_job: 91623840188
-  cargo_metadata_locked: PASS
-  cargo_fmt: PASS
-  workspace_clippy: PASS
-  workspace_tests: PASS
-  architecture: PASS
-  supply_chain_job: 91623840192
-  supply_chain: PASS
-  repository_ci_run: 30794152312
-  repository_ci: PASS
+  implementation_head: e745f1ede79d6a1e70857c5e7e4fdd2fa267445d
+  implementation_rust_client_run: 30794151809
+  implementation_windows_job: 91623840188
+  implementation_repository_ci_run: 30794152312
+  implementation_repository_ci: PASS
+  final_checkpoint_head: 9c71de1b9e7d5500d36ef6eea6c8147a6aca4dc4
+  final_rust_client_run: 30794506470
+  final_windows_job: 91624972972
+  final_windows_workspace: PASS
+  final_supply_chain_job: 91624973079
+  final_supply_chain: PASS
+  final_repository_ci_run: 30794506696
+  final_repository_ci: CANCELLED_DURING_AUTO_MERGE_TRANSITION
 fresh_audit:
   result: PASS
   validator: fresh_connector_audit_role
   material_findings_open: 0
   resolved_findings:
     - id: P2-CANARY-INBOUND-BOUND-001
-      disposition: use CANARY_NETWORK_MESSAGE_MAX_BYTES for server-to-client input
+      disposition: use CANARY_NETWORK_MESSAGE_MAX_BYTES
     - id: P2-CANARY-INBOUND-SESSION-001
-      disposition: order state owns and validates SessionToken
-  inspected:
-    - exact source and generated-index evidence
-    - public API and dependency direction
-    - state mutation and error precedence
-    - malformed, duplicate and stale-session negatives
-    - real-admission, secret and private-fixture boundaries
+      disposition: bootstrap order state owns and validates SessionToken
 e2e:
   result: NOT_APPLICABLE
-  reason: This isolated decoder consumes no real transport and has no reachable application composition; controlled visible-world E2E remains a later P2 integration gate.
+  reason: The isolated decoder consumes no real transport and has no reachable application composition; controlled visible-world E2E remains a later P2 integration gate.
+pr_hygiene:
+  open_related_phase_prs: 0
+  unresolved_review_threads: 0
+  requested_changes: 0
 shared_path_lease: []
 unknown:
   - deployed Canary revision and configuration
   - framing, encryption and admission transcript
-  - layouts of enter-world, map-description and all other inbound families
+  - complete layouts and semantic mappings of remaining inbound families
 blockers: []
-next_action: Observe retained exact-head CI for this final checkpoint, mark PR 192 ready, enable protected auto-merge, verify merge, then write the mandatory continuation checkpoint for the next fully proven inbound family.
+next_action: Inspect the exact source and generated index for candidate server-to-client families, then select one only when the entire layout, gates, ordering and an accepted existing GameEvent mapping are all proven; otherwise record it as evidence-only UNKNOWN without implementation.
 ```

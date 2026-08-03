@@ -1,7 +1,7 @@
 # Mandatory Agent Bootstrap
 
 ```yaml
-agent_bootstrap_policy_revision: 2.1
+agent_bootstrap_policy_revision: 2.2
 ```
 
 This root bootstrap may be loaded automatically by Codex or another agent runtime. It supplements and never weakens system, developer, owner, repository-allowlist, safety, production, credential, data, payment, authentication, protocol, asset, live-capital, deployment, merge, or cross-repository restrictions.
@@ -13,9 +13,10 @@ Before planning, editing, creating or resuming a task, creating a branch or PR, 
 3. Read `docs/agents/DELIVERY_COMPLETENESS_AND_CLOSEOUT.md` for delivery classification, outcome verification, independent audit, E2E, exact-head CI, PR hygiene, archival, and ownership release.
 4. Read `docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md` before autonomous, long-running, retry-prone, CI-waiting, repair, continuation, or multi-task work.
 5. Read `docs/agents/GITHUB_ONLY_EXECUTION.md` whenever Codex or a local terminal is unavailable, unsuitable, or would otherwise be treated as a blocker.
-6. For a start, resume, continuation, autonomous-programme, or multi-task request, read `docs/agents/AUTONOMOUS_PROGRAM_CONTINUATION.md` before acting.
-7. Inspect the authoritative active task checkpoint, live branch/head, related PRs, reviews, CI, ownership, dependencies, and current repository state. Do not reconstruct available state from chat history or ask the owner to repeat it.
-8. If a required bootstrap document is missing or materially conflicts with live repository safety, stop and report the exact conflict.
+6. For a start, resume, continuation, autonomous-programme, scheduled, CI-waiting or multi-task request, read `docs/agents/AUTONOMOUS_PROGRAM_CONTINUATION.md` before acting.
+7. For every autonomous, scheduled, CI-waiting, merge or closeout invocation, read `docs/agents/TERMINAL_CI_AND_COMMUNICATION_OVERRIDE.md` before acting.
+8. Inspect the authoritative active task checkpoint, live branch/head, related PRs, reviews, CI, ownership, dependencies, and current repository state. Do not reconstruct available state from chat history or ask the owner to repeat it.
+9. If a required bootstrap document is missing or materially conflicts with live repository safety, stop and report the exact conflict.
 
 ## Authority freeze
 
@@ -46,6 +47,8 @@ Autonomous continuation is always bounded. Default to 60 minutes per foreground 
 
 Final required exact-head CI, protected auto-merge and merge-queue completion may use the dedicated terminal-CI exception only after implementation, audit, E2E and review hygiene are complete and no other gate remains. The exception is capped at 45 minutes, requires at least three minutes between unchanged checks, permits at most 12 checks per materially new required-check generation, uses dedicated counters rather than the ordinary two-check counters, and never resets its time budget across draft, ready-state or merge-queue generations on the same head.
 
+Auto-merge availability is not required. When repository auto-merge is unavailable, the owner invocation may remain active under the same bounded exception and perform a direct squash merge only after every repository-required check passes on the exact unchanged head. Force, bypass and administrative override remain forbidden.
+
 The active task at invocation entry, or the first selected `READY` task when none is active, is the entry task. Required post-merge archive closeout and ownership release remain part of that same entry task. After it becomes fully terminal, at most one additional task may be started in the same invocation, and only when at least 30 minutes remains and no stall warning occurred.
 
 Budget exhaustion, ordinary no-progress, retry-limit exhaustion, unchanged pending ordinary state, exhausted terminal-CI limits, or an unsafe context/tool limit is a real stop condition. Persist exact durable state and return the correct invocation result.
@@ -54,9 +57,15 @@ Budget exhaustion, ordinary no-progress, retry-limit exhaustion, unchanged pendi
 
 Do not stop, return only a plan, or ask the owner to switch tools merely because Codex or a local terminal is unavailable. Use the GitHub connection for repository operations and GitHub Actions for remote execution and validation on a dedicated branch, within the anti-stall budget.
 
-The owner durably authorizes protected auto-merge or merge-queue admission for the current task's own PR after the exact final head is frozen and every non-CI gate passes, only when repository protection guarantees that merge cannot occur before all required exact-head checks pass. Direct or manual merge remains authorized only after every required gate passes; all review threads are resolved; the diff remains within declared ownership; and related PRs are reconciled. Never force, bypass or weaken protections.
+The owner durably authorizes protected auto-merge or merge-queue admission for the current task's own PR after the exact final head is frozen and every non-CI gate passes, only when repository protection guarantees that merge cannot occur before all required exact-head checks pass. Direct squash merge remains authorized only after every required gate passes; all review threads are resolved; the diff remains within declared ownership; and related PRs are reconciled. Never force, bypass or weaken protections.
 
 Merge authority is not production authority. Production deployment, protected-environment approval, production secrets, live data, live payments or capital, live authentication/session mutation, and protected production configuration remain separately unauthorized unless explicitly covered.
+
+## Terminal-only communication
+
+Autonomous and scheduled invocations use `user_communication: terminal_only`. `low_noise` maps to terminal-only unless the owner explicitly requests live progress. Do not narrate preflight, reads, tools, commits, PRs, phase changes, CI observations, merges, archival, handoffs or next-task selection. Persist detail in durable project state and send one compact final report at a real stop condition. Interrupt earlier only for a required owner decision, new authorization, safety concern, unresolved ownership conflict, material scope approval or required owner action.
+
+`docs/agents/TERMINAL_CI_AND_COMMUNICATION_OVERRIDE.md` is the controlling specialization for terminal-CI and user-communication conflicts. It does not weaken higher-priority safety or authorization rules.
 
 ## Completion baseline
 

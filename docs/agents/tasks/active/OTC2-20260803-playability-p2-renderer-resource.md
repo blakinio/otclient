@@ -6,11 +6,11 @@ project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-renderer-resource
-phase: focused-repair-and-validation
+phase: focused-repair-and-architecture-integration
 branch: feat/OTC2-20260803-playability-p2-renderer-resource
 base_branch: main
 created: 2026-08-03T12:24:00+02:00
-updated: 2026-08-03T12:40:00+02:00
+updated: 2026-08-03T12:44:00+02:00
 required_base_commit: "1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2"
 risk: medium
 related_prs:
@@ -25,6 +25,8 @@ shared_path_lease:
     - oteryn-client/Cargo.toml
     - oteryn-client/Cargo.lock
     - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
+    - oteryn-client/crates/asset-decode/Cargo.toml
+    - oteryn-client/tools/architecture-check/src/lib.rs
 temporary_validation_path:
   - .github/workflows/otc2-renderer-resource-atomic-repair.yml
 implementation_authorized: true
@@ -53,9 +55,9 @@ blocks:
   - OTC2-20260803-playability-p2-input-platform
   - OTC2-20260803-playability-p2-visible-world-integration
 invocation_started_at: 2026-08-03T12:20:00+02:00
-last_progress_at: 2026-08-03T12:40:00+02:00
+last_progress_at: 2026-08-03T12:44:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: atomic-repair
+ci_check_generation: complete-repair
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -72,11 +74,11 @@ Produce the smallest bounded renderer-resource contract for P2: immutable checke
 # Live preflight
 
 - `main@1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2` archives the completed Asset Decode producer.
-- Asset Decode implementation PR #194 and archive PR #199 are merged; its shared lease and ownership are released.
+- Asset Decode implementation PR #194 and archive PR #199 are merged; its original shared lease and ownership are released.
 - Canary protocol remains independently blocked and holds no shared path.
 - Input Platform PR #195 is draft, owns only `crates/input-platform/**` plus its task, and has not requested the shared lease.
 - No renderer-resource task or PR existed before this producer was claimed.
-- This task is fourth in the accepted P2 shared integration order and therefore holds the serialized workspace/category/lockfile lease.
+- This task is fourth in the accepted P2 shared integration order and therefore holds the serialized integration lease.
 - Draft implementation PR #200 owns this task branch.
 
 # Current implementation
@@ -89,9 +91,13 @@ Produce the smallest bounded renderer-resource contract for P2: immutable checke
 - device/pack replacement and sink failure are explicit and payload-redacted;
 - fake-sink component tests exercise padding, coalescing, eviction, generation fencing, failure, reset and accounting.
 
+# Proven integration defect
+
+The merged Asset Decode producer declared the coarse `runtime` architecture category because no dedicated decode category existed. The accepted Renderer Resource dependency on immutable `DecodedRgba8` would therefore require the broad and unsafe category edge `renderer -> runtime`. The narrow repair is to introduce `asset-decode` as a closed category, permit only `asset-decode -> asset-runtime|asset-types` and `renderer -> asset-decode`, and recategorize only `oteryn-asset-decode`. No Asset Decode API or behavior changes.
+
 # Repair checkpoint
 
-The first focused Clippy generation exposed only bounded source mechanics: prohibited constant `expect` calls and one test initializer. These were repaired. A fresh audit then identified a post-upload counter-failure window that could leave a sink-owned texture outside cache accounting. The temporary push workflow preflights all fallible counters before upload, adds an atomicity fixture, restores unrelated lockfile drift, runs format/tests/strict Clippy, self-removes and commits only the bounded repair.
+The first focused Clippy generation exposed prohibited constant `expect` calls and one test initializer. These were repaired. A fresh audit then identified a post-upload counter-failure window that could leave a sink-owned texture outside cache accounting. The self-removing repair preflights all fallible counters before upload, adds an atomicity fixture, restores unrelated lockfile drift, applies the narrow architecture category repair, runs format/tests/strict Clippy/architecture and commits only the bounded repair.
 
 # Acceptance
 
@@ -105,7 +111,7 @@ The first focused Clippy generation exposed only bounded source mechanics: prohi
 - [x] fake-sink tests cover upload, coalescing, eviction, stale generations and device loss;
 - [x] workspace/lockfile/layout integration is minimal and lease-scoped;
 - [ ] focused formatting, strict Clippy and package/component tests pass after atomic repair;
-- [ ] architecture dependency direction is accepted without a broad policy exception;
+- [ ] narrow architecture category and dependency direction pass;
 - [ ] exact-head Windows, Supply Chain and repository CI pass;
 - [ ] fresh independent API/hot-path/resource-lifecycle audit has zero material findings;
 - [ ] implementation merges, task archives separately and all ownership/leases release.
@@ -117,16 +123,22 @@ This is a synthetic-v1 partial producer. It creates no real GPU device, draw pas
 # Checkpoint
 
 ```yaml
-checkpoint_version: 2
+checkpoint_version: 3
 status: implementing
-phase: focused-repair-and-validation
+phase: focused-repair-and-architecture-integration
 base: 1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2
 branch: feat/OTC2-20260803-playability-p2-renderer-resource
 pr: 200
 shared_path_lease:
   state: held
-  paths: [oteryn-client/Cargo.toml, oteryn-client/Cargo.lock, oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md]
+  paths:
+    - oteryn-client/Cargo.toml
+    - oteryn-client/Cargo.lock
+    - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
+    - oteryn-client/crates/asset-decode/Cargo.toml
+    - oteryn-client/tools/architecture-check/src/lib.rs
 temporary_validation_path: .github/workflows/otc2-renderer-resource-atomic-repair.yml
+architecture_repair: dedicated asset-decode category with narrow inbound/outbound edges
 blockers: []
-next_action: Complete the self-removing atomic repair, then prove the narrow architecture edge and run exact-head validation.
+next_action: Complete the self-removing atomic and architecture repair, then run exact-head validation and a fresh falsification audit.
 ```

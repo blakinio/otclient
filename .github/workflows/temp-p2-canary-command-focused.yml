@@ -1,0 +1,161 @@
+name: Temporary P2 Canary Command Focused Validation
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/temp-p2-canary-command-focused.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p2-canary-command-focused
+  cancel-in-progress: false
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Canary protocol branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260803-playability-p2-canary-world-protocol
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Patch exports and validate bounded command encoder
+        shell: bash
+        env:
+          EXPECTED_PARENT: supplied-by-trigger
+          PATCH_WORKFLOW: .github/workflows/temp-p2-canary-command-focused.yml
+          TRIGGER_WORKFLOW: .github/workflows/temp-p2-canary-command-trigger.yml
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "feat/OTC2-20260803-playability-p2-canary-world-protocol"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          lib = Path('oteryn-client/crates/protocol-canary/src/lib.rs')
+          text = lib.read_text(encoding='utf-8')
+          needle = 'use async_trait::async_trait;\n'
+          export = '''mod command;
+
+pub use command::{
+    CanaryCommandError, EncodedCanaryCommand, OPCODE_LOGOUT, OPCODE_STEP_EAST,
+    OPCODE_STEP_NORTH, OPCODE_STEP_NORTH_EAST, OPCODE_STEP_NORTH_WEST,
+    OPCODE_STEP_SOUTH, OPCODE_STEP_SOUTH_EAST, OPCODE_STEP_SOUTH_WEST,
+    OPCODE_STEP_WEST, OPCODE_STOP_MOVEMENT, encode_current_development_command,
+};
+
+use async_trait::async_trait;
+'''
+          if text.count(needle) != 1:
+              raise SystemExit('expected one async_trait import insertion point')
+          lib.write_text(text.replace(needle, export, 1), encoding='utf-8')
+
+          command = Path('oteryn-client/crates/protocol-canary/src/command.rs')
+          text = command.read_text(encoding='utf-8')
+          old = '''        for (opcode, method) in [
+            (OPCODE_LOGOUT, "inline:logout"),
+            (OPCODE_STEP_NORTH, "inline:playerMove"),
+            (OPCODE_STEP_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH, "inline:playerMove"),
+            (OPCODE_STEP_WEST, "inline:playerMove"),
+            (OPCODE_STOP_MOVEMENT, "inline:playerStopAutoWalk"),
+            (OPCODE_STEP_NORTH_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH_WEST, "inline:playerMove"),
+            (OPCODE_STEP_NORTH_WEST, "inline:playerMove"),
+        ] {
+            let opcode_fragment = format!("\\\"opcode\\\": {opcode}");
+            let method_fragment = format!("\\\"method\\\": \\\"{method}\\\"");
+            let entry = CURRENT_INDEX
+                .split(&opcode_fragment)
+                .nth(1)
+                .and_then(|suffix| suffix.split("    },").next())
+                .unwrap_or("");
+            assert!(entry.contains(&method_fragment), "missing {opcode:#04X} {method}");
+            assert!(entry.contains("\\\"direction\\\": \\\"client-to-server\\\"") );
+            assert!(entry.contains("\\\"dispatch_phase\\\": \\\"gameplay-session\\\"") );
+        }
+'''
+          if text.count(old) != 1:
+              # rustfmt has not run yet, so accept the exact source without spaces before closing parens.
+              old = '''        for (opcode, method) in [
+            (OPCODE_LOGOUT, "inline:logout"),
+            (OPCODE_STEP_NORTH, "inline:playerMove"),
+            (OPCODE_STEP_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH, "inline:playerMove"),
+            (OPCODE_STEP_WEST, "inline:playerMove"),
+            (OPCODE_STOP_MOVEMENT, "inline:playerStopAutoWalk"),
+            (OPCODE_STEP_NORTH_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH_WEST, "inline:playerMove"),
+            (OPCODE_STEP_NORTH_WEST, "inline:playerMove"),
+        ] {
+            let opcode_fragment = format!("\\\"opcode\\\": {opcode}");
+            let method_fragment = format!("\\\"method\\\": \\\"{method}\\\"");
+            let entry = CURRENT_INDEX
+                .split(&opcode_fragment)
+                .nth(1)
+                .and_then(|suffix| suffix.split("    },").next())
+                .unwrap_or("");
+            assert!(entry.contains(&method_fragment), "missing {opcode:#04X} {method}");
+            assert!(entry.contains("\\\"direction\\\": \\\"client-to-server\\\""));
+            assert!(entry.contains("\\\"dispatch_phase\\\": \\\"gameplay-session\\\""));
+        }
+'''
+          new = '''        for (opcode, method) in [
+            (OPCODE_LOGOUT, "inline:logout"),
+            (OPCODE_STEP_NORTH, "inline:playerMove"),
+            (OPCODE_STEP_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH, "inline:playerMove"),
+            (OPCODE_STEP_WEST, "inline:playerMove"),
+            (OPCODE_STOP_MOVEMENT, "inline:playerStopAutoWalk"),
+            (OPCODE_STEP_NORTH_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH_EAST, "inline:playerMove"),
+            (OPCODE_STEP_SOUTH_WEST, "inline:playerMove"),
+            (OPCODE_STEP_NORTH_WEST, "inline:playerMove"),
+        ] {
+            let opcode_fragment = format!("\\\"opcode\\\": {opcode}");
+            let method_fragment = format!("\\\"method\\\": \\\"{method}\\\"");
+            let entry_exists = CURRENT_INDEX
+                .split("\\\"direction\\\": \\\"client-to-server\\\"")
+                .skip(1)
+                .filter_map(|suffix| suffix.split("    },").next())
+                .any(|entry| {
+                    entry.contains("\\\"dispatch_phase\\\": \\\"gameplay-session\\\"")
+                        && entry.contains(&method_fragment)
+                        && entry.contains(&opcode_fragment)
+                });
+            assert!(entry_exists, "missing {opcode:#04X} {method}");
+        }
+'''
+          if text.count(old) != 1:
+              raise SystemExit('expected one generated-index command test block')
+          command.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+          rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
+          rustup default 1.94.0
+          cd oteryn-client
+          cargo metadata --format-version 1 > /tmp/canary-command-metadata.json
+          cargo fmt --all
+          cargo clippy -p oteryn-protocol-canary --all-targets --locked -- -D warnings
+          cargo test -p oteryn-protocol-canary --all-targets --locked
+          cargo run --locked -p oteryn-architecture-check -- workspace .
+          cd ..
+
+          git checkout -- oteryn-client/Cargo.lock
+          git rm "$PATCH_WORKFLOW" "$TRIGGER_WORKFLOW"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/crates/protocol-canary/src/lib.rs \
+                  oteryn-client/crates/protocol-canary/src/command.rs
+          git diff --cached --check
+          git commit -m "feat(protocol-canary): encode bounded movement commands"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-canary-world-protocol

@@ -1,0 +1,47 @@
+name: Temporary P2 Canary Baseline Trigger
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/temp-p2-canary-baseline-trigger.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p2-canary-baseline-trigger
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Canary protocol branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260803-playability-p2-canary-world-protocol
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Execute reviewed baseline alignment
+        shell: bash
+        env:
+          EXPECTED_PARENT: 5eb3086f9f7bead980f42724350670ac4998a22f
+          PATCH_WORKFLOW: .github/workflows/temp-p2-canary-baseline.yml
+          TRIGGER_WORKFLOW: .github/workflows/temp-p2-canary-baseline-trigger.yml
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/workflows/temp-p2-canary-baseline.yml').read_text(encoding='utf-8')
+          marker = '        run: |\n'
+          if source.count(marker) != 1:
+              raise SystemExit('expected exactly one reviewed baseline block')
+          block = source.split(marker, 1)[1]
+          lines = [line[10:] if line.startswith('          ') else line for line in block.splitlines()]
+          Path('/tmp/p2-canary-baseline.sh').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+          bash /tmp/p2-canary-baseline.sh

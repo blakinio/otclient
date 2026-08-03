@@ -10,17 +10,10 @@ phase: inbound-provenance-and-identity-contract-blocker
 branch: docs/OTC2-20260803-canary-session-end-closeout
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T11:01:00+02:00
+updated: 2026-08-03T11:03:00+02:00
 required_base_commit: "ceb24e22fc19305cb10c7ea29f7f16928def2a04"
 risk: high
-related_prs:
-  - 188
-  - 190
-  - 191
-  - 192
-  - 193
-  - 196
-  - 198
+related_prs: [188, 190, 191, 192, 193, 196, 198]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -47,9 +40,9 @@ missing_layers:
   - platform input adapter and product binding map
   - visible-world app composition and controlled M2 E2E
 invocation_started_at: 2026-08-03T10:16:00+02:00
-last_progress_at: 2026-08-03T11:00:35+02:00
+last_progress_at: 2026-08-03T11:03:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: closeout-pr-198
+ci_check_generation: closeout-terminal
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -65,16 +58,16 @@ Reconcile Canary Current evidence with the Rust client while preserving fail-clo
 
 # Completed phases
 
-- Current baseline and bounded outbound movement/stop/logout encoder merged in PR #188;
-- Windows generated-index LF repair merged in PR #190;
-- outbound lifecycle closeout and `Cargo.lock` lease release merged in PR #191;
-- pending-state-entered inbound decoder merged in PR #192;
-- pending-state continuation checkpoint merged in PR #193;
-- bounded session-end inbound decoder and original sanitized fixtures merged in PR #196 as `ceb24e22fc19305cb10c7ea29f7f16928def2a04`;
-- exact-head Windows workspace, Clippy, tests, architecture, Supply Chain and repository CI passed;
-- fresh exact-final-diff audit has zero open critical, high or material-medium findings;
-- real wire admission remains fail-closed before network I/O;
-- no shared-path lease is held.
+- PR #188 merged the Current baseline and bounded outbound movement/stop/logout encoder.
+- PR #190 merged the Windows generated-index LF repair.
+- PR #191 recorded outbound closeout and released the `Cargo.lock` lease.
+- PR #192 merged the pending-state-entered inbound decoder.
+- PR #193 persisted the pending-state continuation checkpoint.
+- PR #196 merged the bounded session-end inbound decoder and sanitized fixtures as `ceb24e22fc19305cb10c7ea29f7f16928def2a04`.
+- Exact-head locked metadata, formatting, Clippy, workspace tests, architecture, Supply Chain and repository CI passed.
+- Fresh exact-final-diff audit found zero open critical, high or material-medium findings.
+- Real wire admission remains fail-closed before network I/O.
+- No shared-path lease is held.
 
 # Completed session-end family
 
@@ -91,9 +84,7 @@ wire_layout:
 accepted_values:
   0x00: SESSION_END_LOGOUT
   0x02: SESSION_END_FORCECLOSE
-unknown_values:
-  - 0x01
-  - 0x03
+unknown_values: [0x01, 0x03]
 semantic_mapping:
   accepted_values: GameEvent::SessionEnded(ServerClosed)
   rationale: isolated decoder has no proven caller-owned command history for Requested
@@ -102,20 +93,19 @@ order_state:
   terminal_before_or_after_pending_state: true
   duplicate_end_rejected: true
 result: merged
-merge_commit: ceb24e22fc19305cb10c7ea29f7f16928def2a04
 ```
 
-Original sanitized logical-message fixtures are stored under `oteryn-client/tests/integration/canary-world-protocol/fixtures/`. They contain no credential, session key, private capture, proprietary asset byte or copied producer implementation body.
+Original logical-message fixtures under `oteryn-client/tests/integration/canary-world-protocol/fixtures/` are synthetic and sanitized. They contain no credential, session key, private capture, proprietary asset byte or copied producer body.
 
 # Inbound readiness matrix
 
 | Family | Classification | Durable decision |
 |---|---|---|
-| session bootstrap | `PARTIAL` | `sendPendingStateEntered` is `PROVEN` and implemented. `sendEnterWorld` is exact one-byte `0x0F`, but cannot supply the player handle and position required by `BootstrapCompleted`; semantic completion is `BLOCKED`. |
+| session bootstrap | `PARTIAL` | `sendPendingStateEntered` is `PROVEN` and implemented. Exact one-byte `sendEnterWorld` cannot supply the player handle and position required by `BootstrapCompleted`; semantic completion is `BLOCKED`. |
 | map description | `UNKNOWN` | Nested floor/tile/item/creature writers, branches, skip terminators and bounds are not normalized as one complete Current layout. |
 | tile and stack updates | `PARTIAL` | Outer opcodes and positions are visible; nested tile bodies and stack-only identity resolution remain incomplete. |
 | creature/entity appearance | `UNKNOWN` | Known-creature cache branches, removals, appearance fields, feature gates and nested bounds are incomplete. |
-| movement and reconciliation | `PARTIAL` | Local/remote/teleport/floor/map-strip branches are not normalized completely; position plus stack does not prove a domain handle. |
+| movement and reconciliation | `PARTIAL` | Local/remote/teleport/floor/map-strip branches are incomplete; position plus stack does not prove a domain handle. |
 | removal | `PARTIAL` | Position plus stack index cannot be converted to a protocol-neutral handle without an accepted authoritative identity-resolution contract. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are `PROVEN` and implemented; `0x01`/`0x03` remain `UNKNOWN` and fail closed. |
 
@@ -123,31 +113,18 @@ No partial map, tile, entity, movement or removal decoder is implemented. No par
 
 # Acceptance
 
-## Completed baseline, outbound and repair phases
+## Completed
 
 - [x] generated-index metadata and public descriptor mechanically agree;
 - [x] historical cuts remain explicit historical evidence;
 - [x] real admission remains `RealAdmissionUnavailable`;
 - [x] outbound movement/stop/logout encoding is session-fenced and source-evidenced;
-- [x] PR #190 is merged and the newline failure is mechanically explained;
-- [x] exact-head Windows workspace, architecture, Supply Chain and repository CI passed;
-- [x] the `Cargo.lock` lease is released.
-
-## Completed pending-state inbound phase
-
-- [x] exact one-byte `0x0A` layout is represented without adjacent-packet inference;
-- [x] parser emits only `GameEventEnvelope::v1(GameEvent::BootstrapStarted)`;
-- [x] malformed, duplicate/out-of-order and stale-session input fails closed;
-- [x] exact-head validation and fresh audit passed;
-- [x] bounded phase merged.
-
-## Completed session-end inbound phase
-
-- [x] generated index and exact producer body prove opcode, one-byte reason layout and terminal disconnect;
-- [x] exact enum definition proves numeric values and unknown values remain explicit;
+- [x] PR #190 is merged and the Windows newline failure is mechanically explained;
+- [x] the `Cargo.lock` lease is released;
+- [x] pending-state parsing is bounded, session-fenced and fail-closed;
+- [x] session-end opcode, width, known values and terminal effect are proven;
 - [x] only `0x00` and `0x02` are accepted; `0x01` and `0x03` fail closed;
 - [x] raw Canary reason bytes do not escape the adapter;
-- [x] parser is session-fenced, terminal and state-atomic;
 - [x] truncation, wrong opcode, trailing, oversized, unknown reason, duplicate end and stale session are covered;
 - [x] positive and negative fixtures are original and sanitized;
 - [x] focused and exact-head package/workspace validation passed;
@@ -162,7 +139,7 @@ No partial map, tile, entity, movement or removal decoder is implemented. No par
 
 # Stop condition
 
-The bounded normalization pass exhausted the currently accepted evidence without establishing complete Current map/entity/movement/removal layouts or an accepted owner for position/stack-to-domain-handle identity resolution. Guessing those contracts is forbidden. The parent task therefore remains active but blocked; it is not archived and exclusive protocol ownership is not released. No shared lease is retained.
+The bounded normalization pass exhausted the accepted evidence without establishing complete Current map/entity/movement/removal layouts or an accepted owner for position/stack-to-domain-handle identity resolution. Guessing those contracts is forbidden. The parent task remains active but blocked; it is not archived and exclusive protocol ownership is not released. No shared lease is retained.
 
 # Claim boundary
 
@@ -171,20 +148,15 @@ This producer consumes already decrypted and deframed logical messages only. It 
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 14
-updated_at: 2026-08-03T11:01:00+02:00
+checkpoint_version: 15
+updated_at: 2026-08-03T11:03:00+02:00
 base: ceb24e22fc19305cb10c7ea29f7f16928def2a04
-branch: docs/OTC2-20260803-canary-session-end-closeout
 status: blocked
 phase: inbound-provenance-and-identity-contract-blocker
-implementation_pr:
-  number: 196
-  state: merged
+implementation:
+  pr: 196
   head: a2ea69ea3801df0bbba20caaf6ab7d8677b52bb7
   merge_commit: ceb24e22fc19305cb10c7ea29f7f16928def2a04
-closeout_pr:
-  number: 198
-  state: draft
 validation:
   repaired_generation:
     head: 8078a56411991ceb869f8965faf75bd3527e3db9
@@ -209,13 +181,10 @@ validation:
   ready_state_ci_run: 30799161107
   ready_state_required_job: 91639989636
   ready_state_ci: PASS
-  closeout_head: pending
-  closeout_ci: pending
 fresh_audit:
   result: PASS
   validator: fresh_connector_audit_role
   review_id: 4842339967
-  material_findings_open: 0
   critical_open: 0
   high_open: 0
   material_medium_open: 0
@@ -223,14 +192,7 @@ e2e:
   result: NOT_APPLICABLE
   reason: The isolated producer consumes already decrypted and deframed logical messages and has no reachable application or real transport composition; controlled visible-world E2E belongs to later P2 integration and acceptance tasks.
 pr_hygiene:
-  related_terminal_prs:
-    188: merged
-    190: merged
-    191: merged
-    192: merged
-    193: merged
-    196: merged
-  closeout_pr_198: validating
+  merged_prs: [188, 190, 191, 192, 193, 196]
   unresolved_review_threads: 0
   requested_changes: 0
 shared_path_lease: []

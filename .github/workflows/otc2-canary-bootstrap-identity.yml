@@ -68,4 +68,4 @@ jobs:
           git commit -m "feat(protocol-canary): normalize bootstrap identity boundaries"
           git push origin HEAD:feat/OTC2-20260803-canary-bootstrap-identity
 
-# trigger: 1
+# trigger: 2

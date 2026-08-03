@@ -1,0 +1,23 @@
+[package]
+name = "oteryn-renderer-resource"
+version = "0.1.0"
+description = "Bounded generation-fenced renderer resource lifecycle for Oteryn"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "renderer"
+
+[dependencies]
+oteryn-asset-decode = { version = "=0.1.0", path = "../asset-decode" }
+oteryn-asset-runtime = { version = "=0.1.0", path = "../asset-runtime" }
+oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+
+[dev-dependencies]
+oteryn-asset-types = { version = "=0.1.0", path = "../asset-types" }
+
+[lints]
+workspace = true

@@ -7,13 +7,40 @@ use std::fmt::{Display, Formatter};
 /// Canary Current server opcode for the pending-state-entered bootstrap boundary.
 pub const OPCODE_PENDING_STATE_ENTERED: u8 = 0x0A;
 
-/// Explicit caller-owned order state for the bounded pending-state decoder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CanaryInboundBootstrapState {
-    /// The caller has completed the preceding bootstrap steps and expects `0x0A`.
+enum CanaryInboundBootstrapStage {
     AwaitingPendingStateEntered,
-    /// The exact pending-state boundary was accepted for this session.
     PendingStateEntered,
+}
+
+/// Session-fenced caller-owned order state for the bounded bootstrap decoder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CanaryInboundBootstrapState {
+    session: SessionToken,
+    stage: CanaryInboundBootstrapStage,
+}
+
+impl CanaryInboundBootstrapState {
+    /// Start one Current bootstrap sequence for the supplied session.
+    #[must_use]
+    pub const fn new(session: SessionToken) -> Self {
+        Self {
+            session,
+            stage: CanaryInboundBootstrapStage::AwaitingPendingStateEntered,
+        }
+    }
+
+    /// Return the session token that owns this bootstrap sequence.
+    #[must_use]
+    pub const fn session(self) -> SessionToken {
+        self.session
+    }
+
+    /// Return whether the pending-state boundary was already accepted.
+    #[must_use]
+    pub const fn pending_state_entered(self) -> bool {
+        matches!(self.stage, CanaryInboundBootstrapStage::PendingStateEntered)
+    }
 }
 
 /// Stable failure returned by the bounded Current inbound bootstrap decoder.
@@ -21,7 +48,7 @@ pub enum CanaryInboundBootstrapState {
 pub enum CanaryInboundError {
     /// The logical message violated the exact bounded wire layout.
     Protocol(ProtocolError),
-    /// The session envelope was stale or otherwise invalid.
+    /// The session envelope or bootstrap owner was stale.
     Domain(DomainError),
     /// The caller did not explicitly await this bootstrap boundary.
     InvalidOrder,
@@ -55,27 +82,26 @@ impl From<DomainError> for CanaryInboundError {
 
 /// Decode the exact Current `sendPendingStateEntered` logical message.
 ///
-/// The caller must pass one already decrypted and deframed logical message and
-/// must explicitly own the bootstrap order state. The accepted source layout is
-/// exactly one byte (`0x0A`) with no payload. Success emits only the shared
-/// session-fenced [`GameEvent::BootstrapStarted`] envelope.
+/// The caller must pass one already decrypted and deframed logical message. The
+/// bootstrap order state owns its session token, so it cannot be reused after a
+/// relog without failing the current-generation check. The accepted source
+/// layout is exactly one byte (`0x0A`) with no payload. Success emits only the
+/// shared session-fenced [`GameEvent::BootstrapStarted`] envelope.
 ///
 /// # Errors
 ///
-/// Rejects invalid order, stale sessions, empty or oversized input, an unknown
-/// opcode and every trailing byte. The order state advances only after complete
-/// parsing and semantic envelope validation succeed.
+/// Rejects invalid order, stale bootstrap state, empty or oversized input, an
+/// unknown opcode and every trailing byte. The order state advances only after
+/// complete parsing and semantic envelope validation succeed.
 pub fn decode_current_pending_state_entered(
     input: &[u8],
     state: &mut CanaryInboundBootstrapState,
-    session: SessionToken,
     current: SessionGeneration,
 ) -> Result<GameEventEnvelope, CanaryInboundError> {
-    if *state != CanaryInboundBootstrapState::AwaitingPendingStateEntered {
+    state.session.ensure_current(current)?;
+    if state.stage != CanaryInboundBootstrapStage::AwaitingPendingStateEntered {
         return Err(CanaryInboundError::InvalidOrder);
     }
-
-    session.ensure_current(current)?;
 
     let mut reader = BoundedReader::new(input, CANARY_NETWORK_MESSAGE_MAX_BYTES)?;
     let opcode = reader.read_u8()?;
@@ -84,9 +110,9 @@ pub fn decode_current_pending_state_entered(
     }
     reader.finish(TrailingDataPolicy::Reject)?;
 
-    let envelope = GameEventEnvelope::v1(session, GameEvent::BootstrapStarted)?;
+    let envelope = GameEventEnvelope::v1(state.session, GameEvent::BootstrapStarted)?;
     envelope.ensure_current(current)?;
-    *state = CanaryInboundBootstrapState::PendingStateEntered;
+    state.stage = CanaryInboundBootstrapStage::PendingStateEntered;
     Ok(envelope)
 }
 
@@ -95,32 +121,34 @@ mod tests {
     use super::*;
     use std::error::Error;
 
-    fn session(generation: u64) -> (SessionToken, SessionGeneration) {
+    fn state(generation: u64) -> (CanaryInboundBootstrapState, SessionGeneration) {
         let generation = SessionGeneration::new(generation);
-        (SessionToken::new(generation), generation)
+        (
+            CanaryInboundBootstrapState::new(SessionToken::new(generation)),
+            generation,
+        )
     }
 
     #[test]
     fn exact_pending_state_message_emits_bootstrap_started() -> Result<(), Box<dyn Error>> {
-        let (session, current) = session(7);
-        let mut state = CanaryInboundBootstrapState::AwaitingPendingStateEntered;
+        let (mut state, current) = state(7);
+        let session = state.session();
 
         let envelope = decode_current_pending_state_entered(
             &[OPCODE_PENDING_STATE_ENTERED],
             &mut state,
-            session,
             current,
         )?;
 
         assert_eq!(envelope.session(), session);
         assert_eq!(envelope.event(), &GameEvent::BootstrapStarted);
-        assert_eq!(state, CanaryInboundBootstrapState::PendingStateEntered);
+        assert!(state.pending_state_entered());
         Ok(())
     }
 
     #[test]
     fn malformed_inputs_fail_without_advancing_order() {
-        let (session, current) = session(8);
+        let (_, current) = state(8);
         for (input, expected) in [
             (&[][..], ProtocolErrorKind::Truncated),
             (&[0x0F][..], ProtocolErrorKind::UnknownValue),
@@ -129,71 +157,63 @@ mod tests {
                 ProtocolErrorKind::TrailingData,
             ),
         ] {
-            let mut state = CanaryInboundBootstrapState::AwaitingPendingStateEntered;
+            let (mut state, _) = state(8);
             assert_eq!(
-                decode_current_pending_state_entered(input, &mut state, session, current),
+                decode_current_pending_state_entered(input, &mut state, current),
                 Err(CanaryInboundError::Protocol(ProtocolError::new(expected)))
             );
-            assert_eq!(
-                state,
-                CanaryInboundBootstrapState::AwaitingPendingStateEntered
-            );
+            assert!(!state.pending_state_entered());
         }
     }
 
     #[test]
     fn oversized_input_fails_without_advancing_order() {
-        let (session, current) = session(9);
+        let (mut state, current) = state(9);
         let input = vec![OPCODE_PENDING_STATE_ENTERED; CANARY_NETWORK_MESSAGE_MAX_BYTES + 1];
-        let mut state = CanaryInboundBootstrapState::AwaitingPendingStateEntered;
 
         assert_eq!(
-            decode_current_pending_state_entered(&input, &mut state, session, current),
+            decode_current_pending_state_entered(&input, &mut state, current),
             Err(CanaryInboundError::Protocol(ProtocolError::new(
                 ProtocolErrorKind::Oversized
             )))
         );
-        assert_eq!(
-            state,
-            CanaryInboundBootstrapState::AwaitingPendingStateEntered
-        );
+        assert!(!state.pending_state_entered());
     }
 
     #[test]
-    fn duplicate_or_out_of_order_message_fails_closed() {
-        let (session, current) = session(10);
-        let mut state = CanaryInboundBootstrapState::PendingStateEntered;
+    fn duplicate_or_out_of_order_message_fails_closed() -> Result<(), Box<dyn Error>> {
+        let (mut state, current) = state(10);
+        decode_current_pending_state_entered(
+            &[OPCODE_PENDING_STATE_ENTERED],
+            &mut state,
+            current,
+        )?;
 
         assert_eq!(
             decode_current_pending_state_entered(
                 &[OPCODE_PENDING_STATE_ENTERED],
                 &mut state,
-                session,
                 current,
             ),
             Err(CanaryInboundError::InvalidOrder)
         );
-        assert_eq!(state, CanaryInboundBootstrapState::PendingStateEntered);
+        assert!(state.pending_state_entered());
+        Ok(())
     }
 
     #[test]
-    fn stale_session_fails_before_parsing_or_state_change() {
-        let (session, _) = session(11);
-        let mut state = CanaryInboundBootstrapState::AwaitingPendingStateEntered;
+    fn stale_bootstrap_state_fails_before_parsing_or_state_change() {
+        let (mut state, _) = state(11);
 
         assert!(matches!(
             decode_current_pending_state_entered(
                 &[OPCODE_PENDING_STATE_ENTERED],
                 &mut state,
-                session,
                 SessionGeneration::new(12),
             ),
             Err(CanaryInboundError::Domain(DomainError::StaleSession { .. }))
         ));
-        assert_eq!(
-            state,
-            CanaryInboundBootstrapState::AwaitingPendingStateEntered
-        );
+        assert!(!state.pending_state_entered());
     }
 
     #[test]

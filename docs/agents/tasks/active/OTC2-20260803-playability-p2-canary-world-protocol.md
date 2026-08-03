@@ -6,14 +6,14 @@ project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: local-player-only-map-bootstrap
-branch: feat/OTC2-20260803-canary-local-player-map
+phase: unknown-player-appearance
+branch: feat/OTC2-20260803-canary-unknown-player-appearance
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T20:25:00+02:00
-required_base_commit: "2f0bff09cd9f5a9acf2629d7ba080e98d3f5f1ad"
+updated: 2026-08-03T23:30:00+02:00
+required_base_commit: "ed355c66c305a4f7a42962bcc692194145626371"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -40,9 +40,9 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-03T20:25:00+02:00
+last_progress_at: 2026-08-03T23:30:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: local-player-map-focused
+ci_check_generation: unknown-player-appearance-focused
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -80,7 +80,13 @@ inbound_bootstrap_order:
   enter_world_0x0F:
     prerequisites: [local_player_identity, pending_state]
     output: caller_owned_order_state_only
-  bootstrap_completed_emitted: false
+  bootstrap_completed_emitted: true
+unknown_remote_player_appearance_0x6A:
+  prerequisite: completed_current_bootstrap
+  accepted_branch: unknown_ordinary_player_with_zero_cache_eviction
+  bounds: [floor_0_through_15, stack_0_through_9, name_max_30, icons_max_3]
+  output: GameEvent::EntityAppeared
+  retained_wire_fields: [entity_id, name, position, stack]
 session_end_0x18:
   accepted_values: [0x00, 0x02]
   unknown_values_rejected: [0x01, 0x03]
@@ -207,10 +213,10 @@ Local movement also appends map strips through `GetMapDescription`; remote movem
 
 | Family | Classification | Durable decision |
 |---|---|---|
-| session bootstrap | `PARTIAL` | Exact order through local identity, bug-report permission, Tibia time, pending-state and enter-world is implemented. A complete map description remains required before `BootstrapCompleted`. |
-| map description | `UNKNOWN` | Outer viewport/floor/skip structure is proven, but the reachable initial map necessarily contains the local creature and therefore depends on complete nested item/creature writers. |
+| session bootstrap | `PARTIAL` | Exact order through local identity, bug-report permission, Tibia time, pending-state and enter-world plus one complete item-free local-player map emits `BootstrapCompleted`; general map admission remains incomplete. |
+| map description | `PARTIAL` | One complete item-free local-player-only `0x64` branch is implemented. General non-empty tiles remain blocked by authoritative item metadata and broader creature/cache branches. |
 | tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch emits `TileCleared`. Non-empty tile bodies and authoritative stack identity remain blocked. |
-| creature/entity appearance | `UNKNOWN` | Known/unknown creature branches, cache eviction, appearance fields, feature gates and collection bounds are not yet normalized as one complete family. |
+| creature/entity appearance | `PARTIAL` | One complete post-bootstrap `0x6A` unknown ordinary remote-player branch with zero cache eviction emits `EntityAppeared`. Known/cache-eviction, hidden, summon, monster, NPC, invisible and OTCR branches remain unsupported. |
 | movement and reconciliation | `PARTIAL` | Local steps append map strips; remote `0x6D` and remove/add branches still require authoritative identity and stack ownership. |
 | removal | `PARTIAL` | Position plus stack index cannot be converted to a protocol-neutral item/entity handle without caller-owned world state. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain rejected. |
@@ -241,6 +247,31 @@ general_map_claim: false
 Other tiles, every item branch, known creatures, non-player creature types,
 health-hidden players, zero-looktype outfits and extra contents remain rejected.
 
+
+# Unknown ordinary remote-player appearance
+
+The exact pinned `sendAddCreature` and `AddCreature` source proves one bounded
+post-bootstrap entity branch that does not require ownership of the producer's
+known-creature cache: opcode `0x6A`, canonical position, stack below ten,
+unknown marker `0x61`, zero eviction id, a distinct non-zero player id and the
+complete Current ordinary-player payload.
+
+```yaml
+accepted_opcode: 0x6A
+accepted_marker: 0x61
+accepted_cache_eviction: 0
+accepted_entity_type: player
+accepted_stack: 0_through_9
+accepted_floor: 0_through_15
+output: GameEvent::EntityAppeared
+simulation_mutation: false
+unsupported: [known_0x62, nonzero_eviction, hidden, summon, monster, npc, invisible, otcr]
+```
+
+The original synthetic fixture contains no capture, secret or proprietary asset
+byte. Canary-only status and appearance fields are consumed but do not escape
+the adapter.
+
 # P2 barrier
 
 ```yaml
@@ -258,19 +289,19 @@ The parent Canary producer remains incomplete, retains exclusive ownership of `p
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 23
-updated_at: 2026-08-03T20:25:00+02:00
-observed_main: 2f0bff09cd9f5a9acf2629d7ba080e98d3f5f1ad
+checkpoint_version: 24
+updated_at: 2026-08-03T23:30:00+02:00
+observed_main: ed355c66c305a4f7a42962bcc692194145626371
 status: validating
-phase: local-player-only-map-bootstrap
-implemented_bootstrap_order: [local_player_0x17, allow_bug_report_0x1A, tibia_time_0xEF, pending_state_0x0A, enter_world_0x0F]
-active_branch: feat/OTC2-20260803-canary-local-player-map
-active_layout: local_player_only_initial_map_0x64
+phase: unknown-player-appearance
+implemented_bootstrap_order: [local_player_0x17, allow_bug_report_0x1A, tibia_time_0xEF, pending_state_0x0A, enter_world_0x0F, local_player_only_map_0x64]
+active_branch: feat/OTC2-20260803-canary-unknown-player-appearance
+active_layout: unknown_ordinary_remote_player_add_0x6A
 validation: focused_workflow_running
 shared_path_lease: []
 ownership:
   protocol_canary: retained_by_active_parent_task
   shared_paths: released
-blocker: General non-empty map/item/creature layouts and position/stack identity ownership remain incomplete outside this narrow item-free local-player branch.
-next_action: Validate and merge the local-player-only map bootstrap, then resume full AddItem and general AddCreature normalization without inference.
+blocker: General AddItem decoding requires authoritative item-type branch metadata; movement and removal provide position/stack without an accepted protocol-neutral handle resolver; known/cache-eviction and non-player creature branches remain incomplete.
+next_action: Validate and merge the unknown ordinary remote-player appearance, then terminally normalize the remaining item-catalogue and position/stack identity blockers without inference.
 ```

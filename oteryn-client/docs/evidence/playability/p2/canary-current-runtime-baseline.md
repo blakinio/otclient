@@ -270,3 +270,20 @@ controlled_m2_acceptance: not_ready
 Complete provenance-safe Current non-empty map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract remain unavailable after bounded normalization of the pinned revision.
 
 The next safe phase is the complete `GetMapDescription -> GetFloorDescription -> GetTileDescription -> AddItem/AddCreature` family, including every Current feature gate, collection bound, skip terminator, known-creature cache transition and authoritative identity owner. Missing fields or ownership must not be inferred.
+
+
+## Unknown ordinary remote-player appearance
+
+Source classification: `PROVEN` for one narrow Current/non-legacy branch at
+`blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.
+
+The producer emits `0x6A + Position + stack_u8` for a non-local creature below
+stack index ten. `AddCreature` then emits unknown marker `0x61`, an optional
+known-cache eviction id, entity id, type/name and the complete appearance/status
+tail. The implemented branch requires eviction id zero and ordinary player type,
+consumes the full payload and emits only `GameEvent::EntityAppeared` with a
+session-fenced handle, bounded name, position and stack.
+
+Known marker `0x62`, nonzero eviction, hidden health, summon, monster, NPC,
+invisible/zero-looktype and OTCR branches remain `UNKNOWN` and fail closed. The
+fixture is original synthetic data without credentials, captures or assets.

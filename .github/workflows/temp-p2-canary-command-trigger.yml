@@ -1,5 +1,6 @@
 name: Temporary P2 Canary Command Trigger
 
+# Activates the staged direct finalizer block from command-focused.yml.
 on:
   pull_request:
     types: [synchronize]
@@ -16,7 +17,7 @@ concurrency:
 jobs:
   trigger:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout Canary protocol branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1

@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: blocked
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: inbound-map-layout-and-general-identity-blocker
-branch: docs/OTC2-20260803-canary-bootstrap-identity-closeout
+phase: empty-tile-update-normalization
+branch: feat/OTC2-20260803-canary-tile-clear
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T16:25:00+02:00
-required_base_commit: "d6ac5c89a378d58ef4bdbd7ba0e5a61f686e4e0a"
+updated: 2026-08-03T18:10:00+02:00
+required_base_commit: "6eb1d3c4421ca32170fe4ca703001e953a2eb58a"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -40,9 +40,9 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T10:16:00+02:00
-last_progress_at: 2026-08-03T16:25:00+02:00
+last_progress_at: 2026-08-03T18:10:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: bootstrap-identity-closeout
+ci_check_generation: empty-tile-focused
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 2
@@ -164,13 +164,32 @@ e2e:
 |---|---|---|
 | session bootstrap | `PARTIAL` | Local-player identity `0x17`, pending-state `0x0A` and enter-world `0x0F` are proven and implemented in exact order. Complete map-description position/body remains required before `BootstrapCompleted`. |
 | map description | `UNKNOWN` | Floor/tile iteration, skip markers and nested item/creature writers are not normalized as one complete Current layout. |
-| tile and stack updates | `PARTIAL` | Outer opcodes and positions are visible; nested tile bodies and authoritative stack identity remain incomplete. |
+| tile and stack updates | `PARTIAL` | The complete absent-tile `0x69` branch is being normalized to `TileCleared`; nested non-empty tile bodies and authoritative stack identity remain incomplete. |
 | creature/entity appearance | `UNKNOWN` | Known-creature cache branches, removals, appearance fields, gates and nested bounds are incomplete. |
 | movement and reconciliation | `PARTIAL` | Local/remote/teleport/floor/map-strip branches remain incomplete; position plus stack does not prove a domain handle. |
 | removal | `PARTIAL` | Position plus stack index cannot be converted to a protocol-neutral handle without authoritative state ownership. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain unknown and rejected. |
 
 No partial map, tile, entity, movement or removal decoder is implemented. No parser mutates simulation state. Real admission remains `RealAdmissionUnavailable` before network I/O.
+
+# Active empty-tile update phase
+
+The pinned Current source proves one complete tile branch that is independent of
+`GetTileDescription`, `AddItem`, `AddCreature` and stack identity:
+
+```yaml
+producer: ProtocolGame::sendUpdateTile
+opcode: 0x69
+position: [x_u16_le, y_u16_le, z_u8]
+absent_tile_branch: [0x01, 0xFF]
+prerequisite: current_session_after_enter_world
+semantic_output: GameEvent::TileCleared
+nested_writer_dependency: none
+simulation_mutation: false
+```
+
+The non-empty branch remains blocked because it invokes nested variable writers.
+This phase does not claim map bootstrap completion or relax real admission.
 
 # P2 barrier
 
@@ -193,12 +212,15 @@ The bounded source/evidence pass now proves local bootstrap identity and order, 
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 18
-updated_at: 2026-08-03T16:25:00+02:00
-observed_main: d6ac5c89a378d58ef4bdbd7ba0e5a61f686e4e0a
-status: blocked
-phase: inbound-map-layout-and-general-identity-blocker
+checkpoint_version: 19
+updated_at: 2026-08-03T18:10:00+02:00
+observed_main: 6eb1d3c4421ca32170fe4ca703001e953a2eb58a
+status: validating
+phase: empty-tile-update-normalization
 implemented_bootstrap_order: [local_player_0x17, pending_state_0x0A, enter_world_0x0F]
+active_branch: feat/OTC2-20260803-canary-tile-clear
+active_layout: empty_tile_update_0x69
+validation: focused_workflow_running
 implementation_pr: 220
 implementation_merge: 1c820ff6b87f8459bc300e5baeed0e395b6147c8
 cleanup_pr: 221
@@ -208,5 +230,5 @@ ownership:
   protocol_canary: retained_by_blocked_parent_task
   shared_paths: released
 blocker: Complete provenance-safe Current map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract are unavailable at the pinned revision after bounded normalization.
-next_action: Obtain and accept one complete pinned map-description layout plus its nested writer bounds and authoritative identity-resolution contract, then resume this same task without inferring fields or ownership.
+next_action: Validate and merge the complete absent-tile update branch, then resume non-empty map/tile writer normalization without inferring fields or ownership.
 ```

@@ -38,6 +38,7 @@ const KNOWN_CATEGORIES: &[&str] = &[
     "input",
     "audio",
     "asset-types",
+    "asset-decode",
     "asset-runtime",
     "settings",
     "diagnostics",
@@ -221,6 +222,7 @@ fn allowed_normal_edge(source: &str, target: &str) -> bool {
             "foundation"
                 | "render-types"
                 | "asset-types"
+                | "asset-decode"
                 | "asset-runtime"
                 | "settings"
                 | "diagnostics"
@@ -248,6 +250,7 @@ fn allowed_normal_edge(source: &str, target: &str) -> bool {
             "foundation" | "asset-types" | "asset-runtime" | "settings" | "diagnostics"
         ),
         "asset-types" => target == "foundation",
+        "asset-decode" => matches!(target, "asset-types" | "asset-runtime"),
         "asset-runtime" => matches!(
             target,
             "foundation" | "asset-types" | "settings" | "diagnostics"
@@ -782,4 +785,43 @@ fn visit_cycle(
     stack.pop();
     permanent.insert(node.to_owned());
     None
+}
+
+#[cfg(test)]
+mod renderer_resource_policy_tests {
+    use super::*;
+
+    #[test]
+    fn asset_decode_category_edges_are_narrow() {
+        assert!(dependency_allowed(
+            "renderer",
+            "asset-decode",
+            DependencyKind::Normal
+        ));
+        assert!(dependency_allowed(
+            "asset-decode",
+            "asset-runtime",
+            DependencyKind::Normal
+        ));
+        assert!(dependency_allowed(
+            "asset-decode",
+            "asset-types",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "runtime",
+            "asset-decode",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "app",
+            "asset-decode",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "asset-decode",
+            "renderer",
+            DependencyKind::Normal
+        ));
+    }
 }

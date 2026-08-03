@@ -9,7 +9,7 @@ repository.workspace = true
 publish = false
 
 [package.metadata.oteryn]
-category = "runtime"
+category = "asset-decode"
 
 [dependencies]
 oteryn-asset-runtime = { version = "=0.1.0", path = "../asset-runtime" }

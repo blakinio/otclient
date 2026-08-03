@@ -78,7 +78,7 @@ pub struct ResourceLimits {
 impl ResourceLimits {
     /// Return the accepted bounded synthetic-v1 limits.
     #[must_use]
-    pub const fn synthetic_v1() -> Self {
+    pub fn synthetic_v1() -> Self {
         Self {
             max_entries: NonZeroUsize::new(MAX_CACHE_ENTRIES).unwrap_or(NonZeroUsize::MIN),
             max_total_device_bytes: NonZeroUsize::new(MAX_CACHE_DEVICE_BYTES)
@@ -499,6 +499,8 @@ pub enum ResourceError {
     InvalidImageLayout,
     /// Checked layout, counter or accounting arithmetic overflowed.
     ArithmeticOverflow,
+    /// A bounded cache metadata reservation failed before sink upload.
+    AllocationFailed,
     /// One texture exceeds the configured logical device-byte bound.
     TextureBytesLimitExceeded,
     /// One padded upload plan exceeds its configured allocation bound.
@@ -528,6 +530,7 @@ impl Display for ResourceError {
             Self::InvalidLimits => "renderer resource limits are invalid",
             Self::InvalidImageLayout => "decoded RGBA8 image layout is inconsistent",
             Self::ArithmeticOverflow => "renderer resource arithmetic overflowed",
+            Self::AllocationFailed => "renderer resource metadata allocation failed",
             Self::TextureBytesLimitExceeded => "texture exceeds the device-memory limit",
             Self::UploadBytesLimitExceeded => "texture upload plan exceeds the allocation limit",
             Self::StaleAssetGeneration => "asset belongs to a stale pack generation",
@@ -683,23 +686,34 @@ impl<S: TextureUploadSink> ResourceCache<S> {
         }
 
         let handle = self.preview_next_handle()?;
+        let tick = self.access_tick;
+        let next_access_tick = self
+            .access_tick
+            .checked_add(1)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_slot = self
+            .next_slot
+            .checked_add(1)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let next_serial = self
+            .next_serial
+            .checked_add(1)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        let accounted_device_bytes = self
+            .accounted_device_bytes
+            .checked_add(required_bytes)
+            .ok_or(ResourceError::ArithmeticOverflow)?;
+        self.entries
+            .try_reserve(1)
+            .map_err(|_| ResourceError::AllocationFailed)?;
         let texture = self
             .sink
             .upload(&plan)
             .map_err(|_| ResourceError::UploadFailed)?;
-        let tick = self.take_access_tick()?;
-        self.next_slot = self
-            .next_slot
-            .checked_add(1)
-            .ok_or(ResourceError::ArithmeticOverflow)?;
-        self.next_serial = self
-            .next_serial
-            .checked_add(1)
-            .ok_or(ResourceError::ArithmeticOverflow)?;
-        self.accounted_device_bytes = self
-            .accounted_device_bytes
-            .checked_add(required_bytes)
-            .ok_or(ResourceError::ArithmeticOverflow)?;
+        self.access_tick = next_access_tick;
+        self.next_slot = next_slot;
+        self.next_serial = next_serial;
+        self.accounted_device_bytes = accounted_device_bytes;
         self.entries.push(CacheEntry {
             asset,
             handle,
@@ -745,7 +759,7 @@ impl<S: TextureUploadSink> ResourceCache<S> {
         &mut self,
         new_generation: DeviceGeneration,
     ) -> Result<ResetReport, ResourceError> {
-        if new_generation == self.device_generation {
+        if new_generation <= self.device_generation {
             return Err(ResourceError::DeviceGenerationNotAdvanced);
         }
         let report = self.clear_entries();
@@ -762,7 +776,7 @@ impl<S: TextureUploadSink> ResourceCache<S> {
         &mut self,
         new_generation: PackGeneration,
     ) -> Result<ResetReport, ResourceError> {
-        if new_generation == self.pack_generation {
+        if new_generation <= self.pack_generation {
             return Err(ResourceError::PackGenerationNotAdvanced);
         }
         let report = self.clear_entries();
@@ -998,7 +1012,9 @@ mod tests {
         assert_eq!(cache.sink.uploads, 1);
         assert_eq!(cache.entry_count(), 1);
         assert_eq!(cache.accounted_device_bytes(), 16);
-        assert_eq!(cache.resolve(first.handle())?.texture().byte_len, 16);
+        let resolved = cache.resolve(first.handle())?;
+        assert_eq!(resolved.texture().id, 1);
+        assert_eq!(resolved.texture().byte_len, 16);
         Ok(())
     }
 
@@ -1060,8 +1076,10 @@ mod tests {
     #[test]
     fn sink_failure_is_stable_and_does_not_create_accounting() -> Result<(), Box<dyn Error>> {
         let (_runtime, asset, decoded) = fixture(6, 1, 1, 1, 6)?;
-        let mut sink = FakeSink::default();
-        sink.fail_next = true;
+        let sink = FakeSink {
+            fail_next: true,
+            ..FakeSink::default()
+        };
         let mut cache = ResourceCache::new(
             ProcessGeneration::new(8),
             DeviceGeneration::new(1)?,
@@ -1077,6 +1095,22 @@ mod tests {
         assert_eq!(cache.entry_count(), 0);
         assert_eq!(cache.accounted_device_bytes(), 0);
         assert_eq!(cache.sink.uploads, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn pre_upload_counter_failure_is_atomic() -> Result<(), Box<dyn Error>> {
+        let (_runtime, asset, decoded) = fixture(9, 1, 1, 1, 9)?;
+        let mut cache = cache(asset.generation(), ResourceLimits::synthetic_v1())?;
+        cache.access_tick = u64::MAX;
+
+        assert_eq!(
+            cache.acquire(asset, &decoded).err(),
+            Some(ResourceError::ArithmeticOverflow)
+        );
+        assert_eq!(cache.sink.uploads, 0);
+        assert_eq!(cache.entry_count(), 0);
+        assert_eq!(cache.accounted_device_bytes(), 0);
         Ok(())
     }
 
@@ -1120,6 +1154,15 @@ mod tests {
         );
         assert_eq!(
             cache.replace_pack(cache.pack_generation()).err(),
+            Some(ResourceError::PackGenerationNotAdvanced)
+        );
+        cache.replace_device(DeviceGeneration::new(2)?)?;
+        assert_eq!(
+            cache.replace_device(DeviceGeneration::new(1)?).err(),
+            Some(ResourceError::DeviceGenerationNotAdvanced)
+        );
+        assert_eq!(
+            cache.replace_pack(PackGeneration::new(7)?).err(),
             Some(ResourceError::PackGenerationNotAdvanced)
         );
         Ok(())

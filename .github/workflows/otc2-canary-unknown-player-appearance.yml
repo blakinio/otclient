@@ -34,15 +34,23 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main:refs/remotes/origin/main
+
+          $PSNativeCommandUseErrorActionPreference = $false
           git merge-base --is-ancestor origin/main HEAD
-          if ($LASTEXITCODE -eq 0) {
+          $ancestorExit = $LASTEXITCODE
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          if ($ancestorExit -eq 0) {
             Write-Host "Product branch already contains current main."
             exit 0
           }
-          if ($LASTEXITCODE -ne 1) {
+          if ($ancestorExit -ne 1) {
             throw "Unable to determine whether product branch contains current main."
           }
+
           git rebase origin/main
           git push --force-with-lease origin HEAD:feat/OTC2-20260803-canary-unknown-player-appearance
           Write-Host "Product branch restacked; synchronized validation will run on the new exact head."

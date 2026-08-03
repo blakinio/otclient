@@ -117,24 +117,24 @@ jobs:
           text = replace_or_verify(
               text,
               '''        assert_eq!(cache.resolve(first.handle())?.texture().byte_len, 16);
-          Ok(())
+        Ok(())
 ''',
               '''        let resolved = cache.resolve(first.handle())?;
-          assert_eq!(resolved.texture().id, 1);
-          assert_eq!(resolved.texture().byte_len, 16);
-          Ok(())
+        assert_eq!(resolved.texture().id, 1);
+        assert_eq!(resolved.texture().byte_len, 16);
+        Ok(())
 ''',
               "fake texture identity assertion",
           )
           text = replace_or_verify(
               text,
               '''        let mut sink = FakeSink::default();
-          sink.fail_next = true;
+        sink.fail_next = true;
 ''',
               '''        let sink = FakeSink {
-              fail_next: true,
-              ..FakeSink::default()
-          };
+            fail_next: true,
+            ..FakeSink::default()
+        };
 ''',
               "fake sink initializer",
           )
@@ -225,32 +225,38 @@ jobs:
 
           policy_path = Path("oteryn-client/tools/architecture-check/src/lib.rs")
           policy = policy_path.read_text(encoding="utf-8")
-          if '    "asset-decode",\n' not in policy:
-              category_anchor = '''    "asset-types",
+          known_start = policy.index("const KNOWN_CATEGORIES")
+          product_start = policy.index("const PRODUCT_CATEGORIES")
+          known_block = policy[known_start:product_start]
+          known_block = replace_or_verify(
+              known_block,
+              '''    "asset-types",
     "asset-runtime",
-'''
-              if policy.count(category_anchor) != 2:
-                  raise SystemExit("architecture categories: expected known and product anchors")
-              policy = policy.replace(
-                  category_anchor,
-                  '''    "asset-types",
+''',
+              '''    "asset-types",
     "asset-decode",
     "asset-runtime",
 ''',
-              )
-          policy = replace_or_verify(
-              policy,
+              "known asset-decode category",
+          )
+          policy = policy[:known_start] + known_block + policy[product_start:]
+
+          renderer_start = policy.index('        "renderer" => matches!(')
+          renderer_end = policy.index('        "ui-core" => matches!(', renderer_start)
+          renderer_block = policy[renderer_start:renderer_end]
+          renderer_block = replace_or_verify(
+              renderer_block,
               '''                | "asset-types"
                 | "asset-runtime"
-                | "settings"
 ''',
               '''                | "asset-types"
                 | "asset-decode"
                 | "asset-runtime"
-                | "settings"
 ''',
-              "renderer decode edge",
+              "renderer asset-decode edge",
           )
+          policy = policy[:renderer_start] + renderer_block + policy[renderer_end:]
+
           decode_arm = '''        "asset-decode" => matches!(target, "asset-types" | "asset-runtime"),
 '''
           if decode_arm not in policy:
@@ -266,6 +272,49 @@ jobs:
         "asset-runtime" => matches!(
 ''',
               )
+
+          if "fn asset_decode_category_edges_are_narrow()" not in policy:
+              policy += '''
+
+#[cfg(test)]
+mod renderer_resource_policy_tests {
+    use super::*;
+
+    #[test]
+    fn asset_decode_category_edges_are_narrow() {
+        assert!(dependency_allowed(
+            "renderer",
+            "asset-decode",
+            DependencyKind::Normal
+        ));
+        assert!(dependency_allowed(
+            "asset-decode",
+            "asset-runtime",
+            DependencyKind::Normal
+        ));
+        assert!(dependency_allowed(
+            "asset-decode",
+            "asset-types",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "runtime",
+            "asset-decode",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "app",
+            "asset-decode",
+            DependencyKind::Normal
+        ));
+        assert!(!dependency_allowed(
+            "asset-decode",
+            "renderer",
+            DependencyKind::Normal
+        ));
+    }
+}
+'''
           policy_path.write_text(policy, encoding="utf-8", newline="\n")
 
           lock = Path("oteryn-client/Cargo.lock")

@@ -22,12 +22,17 @@ mod synthetic;
 mod tests;
 
 mod command;
+mod inbound;
 
 pub use command::{
     CanaryCommandError, EncodedCanaryCommand, OPCODE_LOGOUT, OPCODE_STEP_EAST, OPCODE_STEP_NORTH,
     OPCODE_STEP_NORTH_EAST, OPCODE_STEP_NORTH_WEST, OPCODE_STEP_SOUTH, OPCODE_STEP_SOUTH_EAST,
     OPCODE_STEP_SOUTH_WEST, OPCODE_STEP_WEST, OPCODE_STOP_MOVEMENT,
     encode_current_development_command,
+};
+pub use inbound::{
+    CanaryInboundBootstrapState, CanaryInboundError, OPCODE_PENDING_STATE_ENTERED,
+    decode_current_pending_state_entered,
 };
 
 /// Exact generated-source revision selected as the Current development baseline.

@@ -1,7 +1,7 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: Windows line-ending repair validation pending on task `OTC2-20260803-playability-p2-canary-world-protocol`.  
-Evidence cut: generated P1 artifact from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.  
+Status: bounded pending-state inbound phase validated on task `OTC2-20260803-playability-p2-canary-world-protocol`.  
+Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.  
 Consumer boundary: `oteryn-client/crates/protocol-canary`.
 
 ## Claim boundary
@@ -10,7 +10,7 @@ This document aligns a **development source baseline** only. It does not prove t
 
 Real Canary admission remains fail-closed in the Rust client. No credential, session key, private packet capture, proprietary asset byte or producer implementation body is stored here.
 
-An opcode, dispatch phase, method name and source anchor prove only source-level dispatch shape. They do not establish field layout. Unsupported layouts remain explicit `UNKNOWN` and must not be inferred from adjacent handlers.
+An opcode, dispatch phase, method name and source anchor prove only source-level dispatch shape unless an exact producer body and call site are also inspected. Unsupported layouts remain explicit `UNKNOWN` and are never inferred from adjacent handlers.
 
 ## Normalized generated-index evidence
 
@@ -62,7 +62,7 @@ src/server/network/protocol/protocolgame.cpp: af7484cd0c4e1e4e5812ea3b6f18130316
 src/server/network/protocol/protocolgame.hpp: 33a97f6c54baa6138555164995c0125141407bd7d7a4e71dd7c0561c0f246beb
 ```
 
-## Revision reconciliation
+## Revision and checkout contracts
 
 The pre-P2 runtime descriptor named:
 
@@ -71,37 +71,11 @@ previous_runtime_revision: 95b276db311cf6e9acd58b847f1fb0ca6697b137
 historical_accepted_source_cut: 4b2d6f432d92628c42bde1d95daed6ae0d0eb88f
 ```
 
-P2 changes the development descriptor revision to the generated P1 index revision and preserves both older values only as explicit historical evidence. No deployed-equality claim is created.
-
-## Mechanical drift contract
-
-The `protocol-canary` package tests include the versioned generated JSON as read-only compile-time test evidence and verify:
-
-- schema, repository, revision, release, producer profile and client version;
-- total and direction counts;
-- the exact 16 enabled feature declarations;
-- all seven exact source path/SHA-256 pairs;
-- empty unresolved declarations;
-- consistency between the JSON and the public non-secret `CURRENT_PROFILE` descriptor;
-- continued fail-closed real admission.
-
-A generator/artifact change must therefore update the descriptor, this evidence record and tests together in an explicitly reviewed task.
-
-## Cross-platform checkout contract
-
-Windows exact-head run `30791877711`, job `91616943625`, proved that the generated JSON was converted to CRLF by checkout while the source-index section assertions intentionally use canonical LF delimiters. Metadata, formatting and workspace Clippy passed before the single drift test failed.
-
-Repair PR `#190` adds this scoped repository rule:
-
-```gitattributes
-oteryn-client/tools/canary-protocol-index/generated/*.json text eol=lf
-```
-
-The rule changes neither generated content nor product behavior. It makes the immutable evidence bytes consumed by `include_str!` identical on Windows and Linux.
+P2 changes the development descriptor revision to the generated P1 index revision and preserves both older values only as historical evidence. PR #190 enforces LF checkout for the generated JSON so compile-time drift evidence is byte-stable on Windows and Linux.
 
 ## Supported outbound M2 command subset
 
-Exact producer dispatch at revision `bc0068ab…` establishes ten client-to-server gameplay-session commands with no payload:
+Exact producer dispatch establishes ten client-to-server gameplay-session commands with no payload:
 
 ```yaml
 logout: 0x14
@@ -116,41 +90,97 @@ step_south_west: 0x6C
 step_north_west: 0x6D
 ```
 
-`encode_current_development_command` consumes only a current session-fenced merged `GameCommandEnvelope`. It emits one byte for `Step`, `StopMovement` and `Logout`, rejects every unsupported semantic command explicitly, and performs no network I/O. Real transmission remains unauthorized while admission is fail-closed.
+`encode_current_development_command` consumes only a current session-fenced merged `GameCommandEnvelope`. It emits one byte for the supported subset, rejects unsupported semantic commands explicitly, and performs no network I/O.
 
-## Inbound gameplay layout readiness
+## Supported inbound pending-state boundary
 
-Current P1 fixture classification provides no reusable provenance-safe complete post-admission transcript. Map, entity and bootstrap paths depend on nested tile, thing, appearance and profile logic that dispatch entries alone do not define.
+The generated index records this exact producer entry:
 
-Inbound bootstrap, map, entity and reconciliation layouts therefore remain `UNKNOWN` and unimplemented until complete bounded source contracts and original sanitized positive and negative fixtures prove ordering, gates and truncation behavior.
+```yaml
+direction: server-to-client
+dispatch_phase: server-send
+family: bootstrap
+method: sendPendingStateEntered
+opcode: 0x0A
+source:
+  path: src/server/network/protocol/protocolgame.cpp
+  line: 8502
+```
+
+The exact producer method establishes the complete logical-message layout:
+
+```yaml
+bytes: [0x0A]
+payload_bytes: 0
+producer_method_gates:
+  - player exists
+  - oldProtocol is false
+```
+
+The exact login call site establishes the bounded ordering and version gate:
+
+```yaml
+version_gate: version >= 980
+order:
+  after: sendTibiaTime
+  before:
+    - sendEnterWorld
+    - sendMapDescription
+```
+
+The Current development profile is client version `1525` and non-legacy. `decode_current_pending_state_entered` consumes one already decrypted and deframed logical message through a caller-owned bootstrap state that is itself fenced to one `SessionToken`. A relogged generation cannot reuse the state. The decoder rejects empty, wrong-opcode, trailing, oversized, duplicate/out-of-order and stale-session input. On success it advances only that session-owned order state and emits `GameEventEnvelope::v1(GameEvent::BootstrapStarted)`.
+
+The semantic event is a domain interpretation of the exact producer pending-state boundary. It does not claim that a deployed runtime matches this source or that the adjacent enter-world/map layouts are known.
+
+## Remaining inbound readiness
+
+`sendEnterWorld`, map description, entity appearance, movement reconciliation and every other inbound family remain `UNKNOWN`. They require their own complete source layouts, feature/build gates, ordering evidence and original sanitized positive/negative fixtures before implementation.
 
 ## Validation checkpoint
 
 ```yaml
-status: windows_repair_validation_pending
+status: exact_head_validation_passed
+validated_head: e745f1ede79d6a1e70857c5e7e4fdd2fa267445d
 product_code_scope:
   - non-secret development descriptor metadata
   - generated-index drift tests
-  - bounded source-evidenced movement, stop and logout command encoder
+  - bounded movement, stop and logout command encoder
+  - bounded pending-state-entered decoder
 admission_lifecycle_changed: false
 real_admission_state: fail_closed
 credentials_or_private_payloads_added: false
 gameplay_layouts_implemented:
   outbound: [step_8_directions, stop_movement, logout]
-  inbound: []
-validated_before_repair:
-  focused_cargo_fmt: PASS
-  focused_strict_clippy: PASS
-  focused_package_tests: PASS_18_OF_18
-  focused_architecture: PASS
-  repository_ci: PASS
+  inbound: [pending_state_entered]
+pending_state_negative_matrix:
+  truncated: PASS
+  unknown_opcode: PASS
+  trailing_data: PASS
+  oversized: PASS
+  invalid_order_or_duplicate: PASS
+  stale_session: PASS
+validation:
+  rust_client_run: 30794151809
+  windows_job: 91623840188
+  cargo_metadata_locked: PASS
+  cargo_fmt: PASS
+  workspace_clippy: PASS
+  workspace_tests: PASS
+  architecture: PASS
+  supply_chain_job: 91623840192
   supply_chain: PASS
-repair_validation:
-  windows_workspace: PENDING
-  repository_ci: PENDING
-  supply_chain: PENDING
+  repository_ci_run: 30794152312
+  repository_ci: PASS
+fresh_audit:
+  result: PASS
+  validator: fresh_connector_audit_role
+  material_findings_open: 0
+  resolved_findings:
+    - id: P2-CANARY-INBOUND-BOUND-001
+      disposition: use server-to-client network-message ceiling
+    - id: P2-CANARY-INBOUND-SESSION-001
+      disposition: bootstrap order state owns and validates SessionToken
 blockers:
-  - complete provenance-safe inbound bootstrap, map, entity and reconciliation layouts
-  - original sanitized positive and negative fixtures for each inbound family
-next_action: Validate repair PR 190 on exact-head Windows workspace and retained repository CI, then merge it and release the Cargo.lock lease before continuing inbound layout normalization.
+  - complete provenance-safe layouts and fixtures for all remaining inbound families
+next_action: Run retained exact-head CI for the final evidence/task checkpoint, then protected-merge this bounded family and continue to the next fully proven inbound layout.
 ```

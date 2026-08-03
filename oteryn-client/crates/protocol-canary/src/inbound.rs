@@ -350,7 +350,10 @@ mod tests {
                 &[OPCODE_SESSION_END_INFORMATION][..],
                 ProtocolErrorKind::Truncated,
             ),
-            (&[0x19, SESSION_END_LOGOUT][..], ProtocolErrorKind::UnknownValue),
+            (
+                &[0x19, SESSION_END_LOGOUT][..],
+                ProtocolErrorKind::UnknownValue,
+            ),
             (&unknown_reason[..], ProtocolErrorKind::UnknownValue),
             (&trailing[..], ProtocolErrorKind::TrailingData),
         ] {
@@ -437,12 +440,7 @@ mod tests {
         ));
     }
 
-    fn generated_index_contains_entry(
-        family: &str,
-        method: &str,
-        opcode: u8,
-        line: u32,
-    ) -> bool {
+    fn generated_index_contains_entry(family: &str, method: &str, opcode: u8, line: u32) -> bool {
         const CURRENT_INDEX: &str =
             include_str!("../../../tools/canary-protocol-index/generated/current-index.json");
         let family_fragment = format!("\"family\": \"{family}\"");

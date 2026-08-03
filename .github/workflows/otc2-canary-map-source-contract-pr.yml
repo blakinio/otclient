@@ -1,0 +1,59 @@
+name: OTC2 Canary Map Source Contract PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: otc2-canary-map-source-contract-pr
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260803-playability-p2-canary-map-description
+          fetch-depth: 0
+
+      - name: Checkout exact Canary source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          repository: blakinio/canary
+          ref: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+          path: canary-source
+          fetch-depth: 1
+
+      - name: Execute registered extraction program
+        shell: bash
+        run: |
+          set -euo pipefail
+          awk '/^          python - <<.PY./ {capture=1; next} capture && /^          PY$/ {exit} capture {sub(/^          /, ""); print}' \
+            .github/workflows/otc2-canary-map-source-contract.yml > /tmp/extract_map_contract.py
+          test -s /tmp/extract_map_contract.py
+          python /tmp/extract_map_contract.py
+          grep -q 'MAP_MAX_CLIENT_VIEW_PORT_X' oteryn-client/docs/evidence/playability/p2/canary-current-map-source-contract.md
+
+      - name: Remove temporary paths and persist evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm \
+            .github/workflows/otc2-canary-map-source-contract.yml \
+            .github/workflows/otc2-canary-map-source-contract-pr.yml \
+            oteryn-client/tests/integration/canary-world-protocol/.map-source-contract-trigger
+          git add \
+            docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md \
+            oteryn-client/docs/evidence/playability/p2/canary-current-map-source-contract.md
+          git diff --cached --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "docs(protocol-canary): prove Current map source contract"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-canary-map-description

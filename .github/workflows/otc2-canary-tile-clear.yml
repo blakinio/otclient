@@ -64,19 +64,26 @@ jobs:
           '''
           if old not in text:
               raise SystemExit("replace_once precondition block not found")
-          text = text.replace(old, new, 1)
-          status_with_spaces = (
-              "Status: local-player identity/order and known session-end slices are merged; "
-              "the complete absent-tile update branch is under exact-head validation while "
-              "the parent remains blocked on non-empty map/world layouts and general identity "
-              "resolution.  "
-          )
-          if text.count(status_with_spaces) != 1:
-              raise SystemExit("generated evidence status whitespace anchor not found exactly once")
-          text = text.replace(status_with_spaces, status_with_spaces.rstrip(), 1)
-          path.write_text(text, encoding="utf-8", newline="\n")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8", newline="\n")
           '@ | python -
           python $script
+
+          @'
+          from pathlib import Path
+
+          paths = [
+              Path("docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md"),
+              Path("oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md"),
+              Path("oteryn-client/tests/integration/canary-world-protocol/fixtures/README.md"),
+          ]
+          for path in paths:
+              text = path.read_text(encoding="utf-8")
+              had_terminal_newline = text.endswith("\n")
+              normalized = "\n".join(line.rstrip() for line in text.splitlines())
+              if had_terminal_newline:
+                  normalized += "\n"
+              path.write_text(normalized, encoding="utf-8", newline="\n")
+          '@ | python -
 
           Push-Location oteryn-client
           $env:CARGO_TARGET_DIR = Join-Path $env:RUNNER_TEMP "oteryn-target"

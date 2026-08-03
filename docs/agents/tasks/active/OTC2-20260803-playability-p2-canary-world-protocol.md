@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: active
+status: ready
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: baseline-alignment
+phase: finalizer-isolation-required
 branch: feat/OTC2-20260803-playability-p2-canary-world-protocol
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T02:04:00+02:00
+updated: 2026-08-03T08:08:59+02:00
 required_base_commit: "f1a5a1873dbb9ce164aefed7537d5c3004eeb696"
 risk: high
-related_pr: null
+related_pr: 188
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -38,16 +38,16 @@ missing_layers:
   - asset decode and renderer resources
   - platform input adapter and product binding map
   - visible-world app composition and controlled M2 E2E
-invocation_started_at: 2026-08-03T02:04:00+02:00
-last_progress_at: 2026-08-03T02:04:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: baseline-exclusive
+invocation_started_at: 2026-08-03T07:57:00+02:00
+last_progress_at: 2026-08-03T08:08:59+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: finalizer-isolation
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 2
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 0
+repair_cycles_for_current_gate: 3
+context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
 
@@ -100,36 +100,50 @@ Source declarations, opcodes and dispatch phases prove source shape only. They d
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 1
-updated_at: 2026-08-03T02:04:00+02:00
-head: pending_task_commit
+checkpoint_version: 2
+updated_at: 2026-08-03T08:08:59+02:00
+head_before_checkpoint: fc4e1740362e4a8e00e7088d7c2156bef34fbb08
 branch: feat/OTC2-20260803-playability-p2-canary-world-protocol
-pr: null
-status: active
-phase: baseline-alignment
+pr: 188
+status: ready
+phase: finalizer-isolation-required
 proven:
-  - The archived P1 barrier authorizes this sole protocol producer.
-  - Current runtime descriptor and generated P1 index name different inspected revisions.
-  - Existing admission lifecycle is fail-closed for real wire use.
-  - Architecture already permits protocol-canary -> game-domain when a later lease is granted.
-derived:
-  - Baseline alignment can be completed without adding a dependency or changing admission lifecycle.
-  - Gameplay mapping may proceed only per-family after exact field-layout evidence is proven.
-unknown:
-  - exact deployed Canary revision/configuration/build;
-  - provenance-safe complete M2 gameplay field layouts and fixtures;
-  - controlled post-admission ordering evidence.
-conflicts:
-  - id: P1-AGG-CANARY-REVISION-001
-    generated_index: bc0068ab80bbf003e128fce0589b4cc89d2682d3
-    runtime_descriptor: 95b276db311cf6e9acd58b847f1fb0ca6697b137
-    historical_accepted_cut: 4b2d6f432d92628c42bde1d95daed6ae0d0eb88f
-    disposition: mandatory_mechanical_development_baseline_alignment
-changed_paths:
-  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+  - PR 188 contains development metadata alignment to generated source index bc0068ab80bbf003e128fce0589b4cc89d2682d3.
+  - PR 188 contains a bounded single-byte encoder for eight step directions, stop movement and logout.
+  - Unsupported semantic commands and stale session envelopes have explicit negative tests.
+  - Real Canary admission remains fail-closed before network I/O.
+  - No review comments, requested changes or unresolved review threads exist.
+material_findings:
+  - id: P2-CANARY-FINALIZER-001
+    severity: high
+    evidence: oteryn-client/crates/protocol-canary/Cargo.toml adds oteryn-game-domain while oteryn-client/Cargo.lock lacks the corresponding package dependency entry.
+    impact: cargo metadata --locked and required Rust Client CI fail.
+    disposition: open
+  - id: P2-CANARY-FINALIZER-002
+    severity: high
+    evidence: command.rs exists but lib.rs does not yet declare and re-export the command module.
+    impact: the bounded encoder is not part of the public package build and its unit tests are not compiled by the crate.
+    disposition: open
+  - id: P2-CANARY-DRIFT-001
+    severity: medium
+    evidence: generated-index command test selects the first matching opcode before constraining direction and dispatch phase.
+    impact: a duplicate server-to-client opcode could satisfy or invalidate the assertion incorrectly.
+    disposition: repair prepared in the reviewed finalizer but not committed
+execution_history:
+  - cycle: 1
+    head: 820ec0dab017898d3c19a7a27a6efff3f609c5b5
+    result: finalizer rejected a stale trigger-parent race
+  - cycle: 2
+    head: b8f347bdd98c51f5dc638833ac008554a58a1708
+    result: trigger bootstrap repaired, but no executable finalizer check was created for the new head
+  - cycle: 3
+    head: fc4e1740362e4a8e00e7088d7c2156bef34fbb08
+    result: direct self-finalizer workflow was prepared, but no executable finalizer check was created for the new head
 validation:
-  - command: live barrier/archive/ownership/architecture preflight
-    result: PASS
-blockers: []
-next_action: Open the draft PR, inspect exact generated-index metadata and source hashes, then implement and validate development baseline alignment exclusively within protocol-canary and the P2 evidence document before considering any gameplay layout.
+  - required Windows CI on 0dd5397624dab678591a9bc1c526a3df501b32e6: FAIL at cargo metadata --locked due to Cargo.lock drift
+  - independent static provenance/trust/API audit: FAIL with two open high findings and one open medium finding above
+  - E2E: NOT_APPLICABLE for this isolated non-network contract-producer phase; controlled playable-client E2E belongs to later P2 integration and acceptance tasks
+repair_cycles_for_current_gate: 3
+blocker: Current invocation exhausted the maximum three repair cycles for the finalizer gate; repository policy requires a fresh isolation phase rather than another trigger variation.
+next_action: In a fresh session, execute one new bounded finalizer isolation path that does not reuse the pull_request synchronize trigger chain, generates Cargo.lock with Cargo, exports command.rs from lib.rs, applies the direction-scoped drift test, runs fmt/Clippy/tests/architecture, removes all temporary workflows, and commits the coherent result to PR 188.
 ```

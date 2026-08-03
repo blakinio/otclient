@@ -6,12 +6,12 @@ project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: outbound-command-final-ci
+phase: terminal-exact-head-ci
 branch: feat/OTC2-20260803-playability-p2-canary-world-protocol
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T08:55:00+02:00
-required_base_commit: "f1a5a1873dbb9ce164aefed7537d5c3004eeb696"
+updated: 2026-08-03T08:56:00+02:00
+required_base_commit: "9c11addcb8c2d4002f3ff167a6a7cbbbe2c605e4"
 risk: high
 related_pr: 188
 owned_paths:
@@ -29,25 +29,25 @@ execution_mode: github-only
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
-user_communication: low_noise
+user_communication: terminal_only
 context_pressure: high
 decomposition_decision: phased
 validation_level: heavy
 complete_user_facing_feature: false
 missing_layers:
-  - exact provenance-safe M2 gameplay field layouts and bounded fixtures
+  - exact provenance-safe M2 inbound gameplay field layouts and bounded fixtures
   - asset decode and renderer resources
   - platform input adapter and product binding map
   - visible-world app composition and controlled M2 E2E
 invocation_started_at: 2026-08-03T08:24:00+02:00
-last_progress_at: 2026-08-03T08:55:00+02:00
+last_progress_at: 2026-08-03T08:56:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: final-exact-head
-terminal_ci_wait_started_at: null
+terminal_ci_wait_started_at: 2026-08-03T08:56:00+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 3
+repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -56,17 +56,17 @@ stall_warnings: 0
 
 Reconcile the Canary Current development runtime descriptor with the merged generated P1 source index, preserving fail-closed real admission, then implement only those bounded M2 bootstrap/map/entity/movement/logout mappings whose exact field layouts can be established from provenance-safe evidence.
 
-# Proven launch state
+# Proven launch and current state
 
 - P1 aggregation implementation #184 and archive #185 are merged;
 - P2 simulation/snapshot implementation #186 and archive #187 are merged;
-- current exact base is `main@f1a5a1873dbb9ce164aefed7537d5c3004eeb696`;
-- all prior shared integration leases were released before this task;
+- current exact base is `main@9c11addcb8c2d4002f3ff167a6a7cbbbe2c605e4`;
+- the branch was restacked on the current governance-only base without workspace conflict;
 - current open PR inventory has no other Rust Client PR touching `oteryn-client/Cargo.lock`;
-- this task exclusively leases `oteryn-client/Cargo.lock` for the bounded finalizer;
+- this task exclusively leases `oteryn-client/Cargo.lock` through the bounded phase merge;
 - architecture category `protocol-canary` permits the `game-domain` dependency;
 - generated P1 index is pinned to `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`, release 3.6.1, client 1525, profile `current`;
-- real wire admission is intentionally fail-closed and must remain so.
+- real wire admission remains fail-closed before network I/O.
 
 # Acceptance
 
@@ -79,7 +79,7 @@ Reconcile the Canary Current development runtime descriptor with the merged gene
 - [x] real admission remains `RealAdmissionUnavailable` and no credential/network lifecycle is weakened;
 - [x] evidence document distinguishes inspected development baseline from deployed runtime equality;
 - [x] focused format, strict Clippy and complete package tests pass;
-- [ ] fresh source-provenance/trust/API audit has zero open material finding.
+- [x] fresh source-provenance/trust/API audit has zero open material finding.
 
 ## Phase 2 — bounded gameplay wire mapping
 
@@ -96,42 +96,69 @@ Reconcile the Canary Current development runtime descriptor with the merged gene
 
 ## Claim boundary
 
-Source declarations, opcodes and dispatch phases prove source shape only. They do not prove deployed revision, configuration, ordering, field layout or compatibility. Missing exact layout evidence blocks that subfamily; it never authorizes inference from neighboring handlers.
+Source declarations, opcodes and dispatch phases prove source shape only. They do not prove deployed revision, configuration, ordering, inbound field layout or compatibility. Missing exact layout evidence blocks that subfamily; it never authorizes inference from neighboring handlers.
 
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 4
-updated_at: 2026-08-03T08:55:00+02:00
+checkpoint_version: 5
+updated_at: 2026-08-03T08:56:00+02:00
+base: 9c11addcb8c2d4002f3ff167a6a7cbbbe2c605e4
+audited_implementation_head: 2ffdac893a7a451cd5c9eab4addf161da629885b
 branch: feat/OTC2-20260803-playability-p2-canary-world-protocol
 pr: 188
 status: validating
-phase: outbound-command-final-ci
+phase: terminal-exact-head-ci
 proven:
   - Current development metadata mechanically matches the generated P1 source index.
   - Real admission remains fail-closed before network I/O.
   - The public package exports a bounded source-evidenced encoder for eight movement directions, stop movement and logout.
   - Unsupported commands and stale session envelopes fail explicitly.
   - Inbound gameplay layouts remain UNKNOWN and unimplemented.
-  - Focused format, strict Clippy, package tests and architecture validation pass on the coherent finalizer tree.
-material_findings:
-  - id: P2-CANARY-FINALIZER-001
-    disposition: resolved_by_validation
-  - id: P2-CANARY-FINALIZER-002
-    disposition: resolved_by_validation
-  - id: P2-CANARY-DRIFT-001
-    disposition: resolved_by_validation
-independent_audit: pending_exact_final_diff
+  - Cargo.lock has exactly one dependency-edge addition for oteryn-game-domain under the exclusive lease.
+  - The clean audited diff contains only the task record, Cargo.lock, protocol-canary manifest/source/tests and the P2 evidence record.
+focused_validation:
+  run_id: 30791628885
+  job_id: 91616196561
+  cargo_fmt: PASS
+  strict_clippy: PASS
+  package_tests: PASS_18_OF_18
+  architecture: PASS
+fresh_audit:
+  result: PASS
+  independent_validator: fresh_connector_audit_role
+  material_findings_open: 0
+  scope:
+    - exact clean diff against current main
+    - public API and dependency direction
+    - source-index provenance and claim boundaries
+    - stale-session and unsupported-command negatives
+    - real-admission fail-closed lifecycle
+    - secrets, private fixtures and generated artifact hygiene
+  resolved_findings:
+    - id: P2-CANARY-FINALIZER-001
+      disposition: resolved_by_export_and_locked_validation
+    - id: P2-CANARY-FINALIZER-002
+      disposition: resolved_by_cargo_generated_lockfile
+    - id: P2-CANARY-DRIFT-001
+      disposition: resolved_by_direction_scoped_index_assertion
+    - id: P2-CANARY-CACHE-001
+      disposition: resolved_by_removing_target_cache_artifacts
+  open_findings: []
+e2e:
+  result: NOT_APPLICABLE
+  reason: This bounded producer phase performs no network transmission and has no reachable application consumer; controlled visible-world E2E belongs to the later P2 integration task.
+review_hygiene:
+  unresolved_review_threads: 0
+  requested_changes: 0
 shared_path_lease:
   path: oteryn-client/Cargo.lock
   holder: OTC2-20260803-playability-p2-canary-world-protocol
-  release_condition: protected merge of PR 188 followed by immediate task continuation checkpoint
-validation:
-  - cargo fmt --all --check: PASS
-  - cargo clippy -p oteryn-protocol-canary --all-targets --locked -- -D warnings: PASS
-  - cargo test -p oteryn-protocol-canary --all-targets --locked: PASS
-  - cargo run --locked -p oteryn-architecture-check -- workspace .: PASS
-repair_cycles_for_current_gate: 3
+  release_condition: protected merge of PR 188 followed by an immediate continuation checkpoint on current main
+terminal_ci:
+  generation: final-exact-head
+  wait_started_at: 2026-08-03T08:56:00+02:00
+  checks: 0
 blockers: []
-next_action: Create one connector-authored audit checkpoint commit on the clean implementation tree, complete the fresh final diff audit, enable protected auto-merge, and observe the bounded terminal CI and merge lifecycle.
+next_action: Observe retained exact-head Rust Client and repository CI for this audit-checkpoint head, configure protected auto-merge once, then verify merge and immediately release the lockfile lease while keeping the parent task active for inbound layout normalization.
 ```

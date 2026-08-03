@@ -23,6 +23,7 @@ mod tests;
 
 mod command;
 mod inbound;
+mod tile;
 
 pub use command::{
     CanaryCommandError, EncodedCanaryCommand, OPCODE_LOGOUT, OPCODE_STEP_EAST, OPCODE_STEP_NORTH,
@@ -35,6 +36,7 @@ pub use inbound::{
     OPCODE_LOCAL_PLAYER_INITIALIZATION, OPCODE_PENDING_STATE_ENTERED, decode_current_enter_world,
     decode_current_local_player_initialization, decode_current_pending_state_entered,
 };
+pub use tile::{OPCODE_TILE_UPDATE, decode_current_empty_tile_update};
 
 /// Exact generated-source revision selected as the Current development baseline.
 pub const CANARY_CURRENT_REVISION: &str = "bc0068ab80bbf003e128fce0589b4cc89d2682d3";

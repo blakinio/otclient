@@ -1,6 +1,6 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: bounded pending-state and known session-end inbound families are merged; the parent task is blocked on complete remaining layouts and identity resolution.  
+Status: local-player identity and enter-world bootstrap normalization are under exact-head validation; pending-state and known session-end families remain merged.  
 Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.  
 Consumer boundary: `oteryn-client/crates/protocol-canary`.
 
@@ -83,6 +83,43 @@ step_north_west: 0x6D
 
 `encode_current_development_command` consumes only a Current session-fenced merged `GameCommandEnvelope`. It emits one byte for the supported subset, rejects unsupported semantic commands explicitly and performs no network I/O.
 
+## Proven local-player identity and enter-world boundaries
+
+The exact Current/non-legacy local-player branch of `sendAddCreature` precedes
+`sendPendingStateEntered`, `sendEnterWorld` and `sendMapDescription`. At client
+version 1525 with `LoginSpeedFormula` enabled, its first logical message has the
+complete structural layout:
+
+```yaml
+local_player_initialization:
+  opcode_u8: 0x17
+  player_id_u32_le: non_zero
+  server_beat_u16_le: opaque_timing_value
+  speed_formula_components: 3
+  each_speed_component:
+    precision_u8: 3
+    scaled_value_u32_le: opaque_tuning_value
+  pvp_framing_change_u8: 0
+  expert_mode_u8: 0
+  store_url: u16_length_plus_opaque_bytes
+  store_coin_packet_u16_le: opaque_configuration_value
+  exiva_enabled_u8: boolean
+semantic_normalization:
+  retained: session_fenced_EntityHandle
+  discarded: timing_speed_store_and_capability_values
+  emitted_event: none
+```
+
+`sendEnterWorld` is exactly one byte `0x0F`. The caller-owned bootstrap state
+accepts it only after local-player identity and pending-state entry. It records
+order but emits no `BootstrapCompleted`, because position remains absent until a
+complete map-description family is validated. This closes local identity
+ownership without partially mutating simulation or exposing Canary-specific
+configuration fields.
+
+Original synthetic fixtures use invented field values and a synthetic store URL;
+no producer body, private capture, credential or deployed configuration is copied.
+
 ## Proven inbound pending-state boundary
 
 The generated index and exact producer body establish:
@@ -140,7 +177,7 @@ Original synthetic hexadecimal fixtures live under `oteryn-client/tests/integrat
 
 | Required family | Classification | Exact current evidence and missing contract |
 |---|---|---|
-| session bootstrap | `PARTIAL` | `sendPendingStateEntered` is `PROVEN` and implemented. `sendEnterWorld` is a proven one-byte `0x0F` layout at line 8512, but it carries neither local-player identity nor position required by `GameEvent::BootstrapCompleted`; semantic completion is `BLOCKED`. |
+| session bootstrap | `PARTIAL` | Current local-player `0x17` identity, pending-state `0x0A` and enter-world `0x0F` are `PROVEN` and normalized in exact source order. The map-description position and complete nested map body remain required before `GameEvent::BootstrapCompleted`; semantic completion is `BLOCKED`. |
 | map description | `UNKNOWN` | `sendMapDescription` delegates to `GetMapDescription`, floor/tile iteration, skip markers and nested item/creature writers. Complete Current branches, terminators, collection bounds and appearance dependencies have not been normalized into one accepted layout. |
 | tile and stack updates | `PARTIAL` | Outer opcodes/positions for update/add/remove paths are visible, but tile descriptions contain nested variable writers and stack-only operations do not prove a domain item/entity handle without authoritative state. |
 | creature/entity appearance | `UNKNOWN` | `sendAddCreature`, `sendUpdateTileCreature` and `AddCreature` depend on known-creature cache branches, removals, outfit/light/skull/type/feature fields and nested bounds not yet proven as one complete Current layout. |
@@ -149,6 +186,25 @@ Original synthetic hexadecimal fixtures live under `oteryn-client/tests/integrat
 | session end/logout | `PARTIAL` | Exact `0x18` layout and known values `0x00`/`0x02` are `PROVEN` and implemented; source values `0x01`/`0x03` remain explicitly `UNKNOWN` and rejected. |
 
 No map, tile, entity, movement or removal payload is implemented from this matrix. Partial decoding cannot mutate simulation state.
+
+## Active bootstrap identity validation phase
+
+```yaml
+phase: bootstrap-identity-and-enter-world-normalization
+branch: feat/OTC2-20260803-canary-bootstrap-identity
+base: c91a5872a66cd9a31add2f3f1efc79ceefe7d150
+new_layouts:
+  - current_local_player_initialization_0x17
+  - enter_world_0x0F_order_boundary
+identity_contract:
+  owner: caller_owned_CanaryInboundBootstrapState
+  mapping: nonzero_Canary_creature_id_to_session_fenced_EntityHandle
+  raw_id_escape: false
+  map_stack_identity: unresolved
+simulation_mutation: false
+real_admission_changed: false
+validation: running
+```
 
 ## Terminal validation checkpoint
 

@@ -16,7 +16,7 @@ jobs:
   integrate:
     name: Integrate, validate, self-remove
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout exact branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -24,121 +24,65 @@ jobs:
           ref: feat/OTC2-20260803-playability-p2-input-platform
           fetch-depth: 0
 
-      - name: Install pinned Rust toolchain
-        shell: pwsh
-        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
-
-      - name: Apply minimal serialized integration
+      - name: Verify exact restack and install pinned Rust
         shell: pwsh
         run: |
-          @'
-          from pathlib import Path
+          git fetch origin main
+          if ((git rev-parse origin/main) -ne "8a3ce18f8fe98c5654ac3ce36c098404bdfc3343") {
+            throw "main moved after the serialized lease was claimed"
+          }
+          git merge-base --is-ancestor origin/main HEAD
+          if ($LASTEXITCODE -ne 0) {
+            throw "input-platform branch is not restacked on exact main"
+          }
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
 
-          root = Path("oteryn-client/Cargo.toml")
-          text = root.read_text(encoding="utf-8")
-          member = '    "crates/input-platform",\n'
-          if member not in text:
-              anchor = '    "crates/input-actions",\n'
-              if text.count(anchor) != 1:
-                  raise SystemExit("input-actions workspace anchor is not unique")
-              text = text.replace(anchor, anchor + member)
-          root.write_text(text, encoding="utf-8", newline="\n")
+      - name: Apply bounded workspace and architecture integration
+        shell: pwsh
+        run: python .github/scripts/otc2_input_platform_integrate.py
 
-          manifest = Path("oteryn-client/crates/input-platform/Cargo.toml")
-          text = manifest.read_text(encoding="utf-8")
-          marker = '''
-          # Exclusive-path development is intentionally standalone until the serialized
-          # workspace/lockfile lease reaches Input Platform. Remove this nested workspace
-          # marker when the crate is integrated into the parent workspace under that lease.
-          [workspace]
-          '''
-          if marker in text:
-              text = text.replace(marker, "")
-          elif "\n[workspace]\n" in text:
-              text = text.replace("\n[workspace]\n", "\n")
-          if "[workspace]" in text:
-              raise SystemExit("standalone workspace marker remains")
-          manifest.write_text(text, encoding="utf-8", newline="\n")
-
-          layout = Path("oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md")
-          text = layout.read_text(encoding="utf-8")
-          if "│   ├── input-platform/\n" not in text:
-              anchor = "│   ├── input/\n"
-              if text.count(anchor) != 1:
-                  raise SystemExit("input tree anchor is not unique")
-              text = text.replace(anchor, anchor + "│   ├── input-platform/\n")
-          row = "| `input-platform` | bounded Windows/winit physical-event normalization into framework-neutral input contracts | product bindings, gameplay commands, global hooks, background capture, device fingerprinting or application composition |\n"
-          if row not in text:
-              anchor = "| `input` | devices, bindings, contexts and semantic actions | direct socket writes |\n"
-              if text.count(anchor) != 1:
-                  raise SystemExit("input responsibility anchor is not unique")
-              text = text.replace(anchor, anchor + row)
-          dependency = '''
-          input-platform
-          └── input-actions
-
-          '''
-          if dependency not in text:
-              anchor = '''renderer-resource
-          ├── asset-decode
-          ├── asset-runtime
-          └── foundation
-
-          '''
-              if text.count(anchor) != 1:
-                  raise SystemExit("dependency insertion anchor is not unique")
-              text = text.replace(anchor, anchor + dependency)
-          layout.write_text(text, encoding="utf-8", newline="\n")
-
-          task = Path("docs/agents/tasks/active/OTC2-20260803-playability-p2-input-platform.md")
-          text = task.read_text(encoding="utf-8")
-          text = text.replace("status: waiting", "status: validating", 1)
-          text = text.replace(
-              "phase: exclusive-implementation-complete-awaiting-renderer-resource-archive",
-              "phase: shared-integration-and-focused-validation",
-              1,
-          )
-          text = text.replace('required_base_commit: "d18b618fc68c0e67598be10dee6f1d0119bc8aa8"', 'required_base_commit: "8a3ce18f8fe98c5654ac3ce36c098404bdfc3343"', 1)
-          text = text.replace("shared_path_lease: []", '''shared_path_lease:
-            holder: OTC2-20260803-playability-p2-input-platform
-            state: held
-            paths:
-              - oteryn-client/Cargo.toml
-              - oteryn-client/Cargo.lock
-              - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md''', 1)
-          task.write_text(text, encoding="utf-8", newline="\n")
-          '@ | python -
-
-      - name: Select pinned toolchain and generate lock
+      - name: Validate focused, component and architecture contracts
         working-directory: oteryn-client
         shell: pwsh
         run: |
           rustup override set 1.94.0
-          cargo metadata --format-version 1 | Out-Null
-
-      - name: Validate focused package and architecture
-        working-directory: oteryn-client
-        shell: pwsh
-        run: |
-          cargo fmt -p oteryn-input-platform
+          cargo fmt --all
+          cargo metadata --locked --format-version 1 | Out-Null
           cargo clippy -p oteryn-input-platform --all-targets -- -D warnings
           cargo test -p oteryn-input-platform --all-targets
+          cargo test -p oteryn-architecture-check --all-targets
           cargo run -p oteryn-architecture-check -- workspace .
 
-      - name: Verify bounded paths and persist integration
+      - name: Verify exact lockfile scope
+        shell: pwsh
+        run: |
+          git diff --check origin/main -- oteryn-client/Cargo.lock
+          @'
+          import subprocess
+
+          diff = subprocess.check_output(
+              ["git", "diff", "--unified=0", "origin/main", "--", "oteryn-client/Cargo.lock"],
+              text=True,
+          )
+          if 'name = "oteryn-input-platform"' not in diff:
+              raise SystemExit("missing local input-platform lock entry")
+          changed = [
+              line
+              for line in diff.splitlines()
+              if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
+          ]
+          if any("source =" in line or "checksum =" in line for line in changed):
+              raise SystemExit("registry source or checksum drift detected")
+          '@ | python -
+
+      - name: Remove temporary files and persist integration
         shell: pwsh
         run: |
           Remove-Item .github/workflows/otc2-input-platform-integration.yml
-          git add `
-            .github/workflows/otc2-input-platform-integration.yml `
-            docs/agents/tasks/active/OTC2-20260803-playability-p2-input-platform.md `
-            oteryn-client/Cargo.toml `
-            oteryn-client/Cargo.lock `
-            oteryn-client/crates/input-platform/Cargo.toml `
-            oteryn-client/crates/input-platform/src `
-            oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
+          Remove-Item .github/scripts/otc2_input_platform_integrate.py
+          git add --all
           git diff --cached --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "build(input-platform): integrate and validate Windows adapter"
+          git commit -m "feat(input-platform): integrate bounded Windows adapter"
           git push origin HEAD:feat/OTC2-20260803-playability-p2-input-platform

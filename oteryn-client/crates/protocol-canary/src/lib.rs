@@ -23,6 +23,7 @@ mod tests;
 
 mod command;
 mod inbound;
+mod map;
 mod tile;
 
 pub use command::{
@@ -38,6 +39,7 @@ pub use inbound::{
     decode_current_local_player_initialization, decode_current_pending_state_entered,
     decode_current_tibia_time,
 };
+pub use map::{OPCODE_MAP_DESCRIPTION, decode_current_local_player_only_map};
 pub use tile::{OPCODE_TILE_UPDATE, decode_current_empty_tile_update};
 
 /// Exact generated-source revision selected as the Current development baseline.

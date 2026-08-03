@@ -19,7 +19,7 @@ const TILE_DESCRIPTION_TERMINATOR: u8 = 0xFF;
 ///
 /// # Errors
 ///
-/// Rejects stale or pre-enter-world state, terminal sessions, truncation,
+/// Rejects stale or pre-bootstrap state, terminal sessions, truncation,
 /// oversize, wrong opcode/markers and every trailing byte.
 pub fn decode_current_empty_tile_update(
     input: &[u8],
@@ -27,7 +27,7 @@ pub fn decode_current_empty_tile_update(
     current: SessionGeneration,
 ) -> Result<GameEventEnvelope, CanaryInboundError> {
     state.session().ensure_current(current)?;
-    if !state.enter_world_received() || state.session_ended() {
+    if !state.bootstrap_completed() || state.session_ended() {
         return Err(CanaryInboundError::InvalidOrder);
     }
 
@@ -58,6 +58,7 @@ pub fn decode_current_empty_tile_update(
 mod tests {
     use super::*;
     use crate::inbound::decode_current_pending_state_entered;
+    use crate::map::decode_current_local_player_only_map;
     use oteryn_game_domain::{DomainError, SessionToken};
     use std::error::Error;
     use std::num::ParseIntError;
@@ -75,6 +76,9 @@ mod tests {
     );
     const ENTER_WORLD_FIXTURE: &str =
         include_str!("../../../tests/integration/canary-world-protocol/fixtures/enter-world.hex");
+    const LOCAL_PLAYER_ONLY_MAP_FIXTURE: &str = include_str!(
+        "../../../tests/integration/canary-world-protocol/fixtures/local-player-only-map.hex"
+    );
     const TILE_CLEAR_FIXTURE: &str =
         include_str!("../../../tests/integration/canary-world-protocol/fixtures/tile-clear.hex");
     const TILE_CLEAR_WRONG_MARKER_FIXTURE: &str = include_str!(
@@ -94,7 +98,7 @@ mod tests {
             .collect()
     }
 
-    fn ready_state(
+    fn entered_state(
         generation: u64,
     ) -> Result<(CanaryInboundBootstrapState, SessionGeneration), Box<dyn Error>> {
         let current = SessionGeneration::new(generation);
@@ -109,6 +113,15 @@ mod tests {
         decode_current_pending_state_entered(&pending, &mut state, current)?;
         let enter = parse_hex_fixture(ENTER_WORLD_FIXTURE)?;
         state.decode_enter_world(&enter, current)?;
+        Ok((state, current))
+    }
+
+    fn ready_state(
+        generation: u64,
+    ) -> Result<(CanaryInboundBootstrapState, SessionGeneration), Box<dyn Error>> {
+        let (mut state, current) = entered_state(generation)?;
+        let map = parse_hex_fixture(LOCAL_PLAYER_ONLY_MAP_FIXTURE)?;
+        decode_current_local_player_only_map(&map, &mut state, current)?;
         Ok((state, current))
     }
 
@@ -182,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn tile_clear_requires_enter_world_and_current_session() -> Result<(), Box<dyn Error>> {
+    fn tile_clear_requires_completed_bootstrap_and_current_session() -> Result<(), Box<dyn Error>> {
         let current = SessionGeneration::new(44);
         let state = CanaryInboundBootstrapState::new(SessionToken::new(current));
         let input = parse_hex_fixture(TILE_CLEAR_FIXTURE)?;
@@ -191,7 +204,13 @@ mod tests {
             Err(CanaryInboundError::InvalidOrder)
         );
 
-        let (ready, actual) = ready_state(45)?;
+        let (entered, entered_current) = entered_state(45)?;
+        assert_eq!(
+            decode_current_empty_tile_update(&input, &entered, entered_current),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+
+        let (ready, actual) = ready_state(46)?;
         assert_eq!(
             decode_current_empty_tile_update(
                 &input,

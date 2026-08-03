@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: blocked
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: non-empty-map-layout-and-general-identity-blocker
-branch: docs/OTC2-20260803-canary-login-preamble-closeout
+phase: local-player-only-map-bootstrap
+branch: feat/OTC2-20260803-canary-local-player-map
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T19:52:00+02:00
-required_base_commit: "2f9ddc7fe9747740a42eebfaac677a1a49599f3c"
+updated: 2026-08-03T20:25:00+02:00
+required_base_commit: "2f0bff09cd9f5a9acf2629d7ba080e98d3f5f1ad"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -40,9 +40,9 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-03T19:52:00+02:00
+last_progress_at: 2026-08-03T20:25:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: login-preamble-closeout
+ci_check_generation: local-player-map-focused
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -86,7 +86,7 @@ session_end_0x18:
   unknown_values_rejected: [0x01, 0x03]
 empty_tile_update_0x69:
   layout: [opcode_u8, x_u16_le, y_u16_le, z_u8, marker_0x01, terminator_0xFF]
-  prerequisite: current_session_after_enter_world
+  prerequisite: current_session_after_bootstrap_completed
   output: GameEvent::TileCleared
   caller_state_mutation: false
 ```
@@ -217,6 +217,30 @@ Local movement also appends map strips through `GetMapDescription`; remote movem
 
 Real admission remains `RealAdmissionUnavailable` before network I/O. No map-body, creature, item, movement or removal parser is partially admitted.
 
+
+# Active local-player-only map bootstrap
+
+The pinned source permits one complete initial-map branch without item-catalogue
+decoding: an existing item-free tile containing only the ordinary local player.
+The branch consumes the complete unknown-player payload, exact `18 x 14`
+surface traversal and all skip markers.
+
+```yaml
+opcode: 0x64
+position: [x_u16_le, y_u16_le, z_u8]
+accepted_floor: source_valid_0_through_15
+accepted_tiles: exactly_one_local_player_tile
+accepted_items: none
+accepted_creatures: exactly_one_unknown_ordinary_local_player
+identity: must_match_session_local_player_from_0x17
+output: GameEvent::BootstrapCompleted
+simulation_mutation: false
+general_map_claim: false
+```
+
+Other tiles, every item branch, known creatures, non-player creature types,
+health-hidden players, zero-looktype outfits and extra contents remain rejected.
+
 # P2 barrier
 
 ```yaml
@@ -234,21 +258,19 @@ The parent Canary producer remains incomplete, retains exclusive ownership of `p
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 22
-updated_at: 2026-08-03T19:52:00+02:00
-observed_main: 2f9ddc7fe9747740a42eebfaac677a1a49599f3c
-status: blocked
-phase: non-empty-map-layout-and-general-identity-blocker
+checkpoint_version: 23
+updated_at: 2026-08-03T20:25:00+02:00
+observed_main: 2f0bff09cd9f5a9acf2629d7ba080e98d3f5f1ad
+status: validating
+phase: local-player-only-map-bootstrap
 implemented_bootstrap_order: [local_player_0x17, allow_bug_report_0x1A, tibia_time_0xEF, pending_state_0x0A, enter_world_0x0F]
-implemented_tile_branch: empty_tile_update_0x69
-implementation_pr: 236
-implementation_merge: 03cf57fca8f251e4b47fc1aefd56c67b6a788110
-cleanup_pr: 237
-cleanup_merge: 2f9ddc7fe9747740a42eebfaac677a1a49599f3c
+active_branch: feat/OTC2-20260803-canary-local-player-map
+active_layout: local_player_only_initial_map_0x64
+validation: focused_workflow_running
 shared_path_lease: []
 ownership:
-  protocol_canary: retained_by_blocked_parent_task
+  protocol_canary: retained_by_active_parent_task
   shared_paths: released
-blocker: Complete provenance-safe Current non-empty map/tile/item/creature layouts, remaining movement/removal branches and an accepted general position/stack-to-domain-handle identity-resolution ownership contract remain unavailable after bounded normalization.
-next_action: Normalize `GetMapDescription -> GetFloorDescription -> GetTileDescription -> AddItem/AddCreature` as one complete Current family with all feature gates, collection bounds, skip terminators, known-creature cache transitions and authoritative identity ownership; do not infer missing fields or ownership.
+blocker: General non-empty map/item/creature layouts and position/stack identity ownership remain incomplete outside this narrow item-free local-player branch.
+next_action: Validate and merge the local-player-only map bootstrap, then resume full AddItem and general AddCreature normalization without inference.
 ```

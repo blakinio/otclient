@@ -17,7 +17,8 @@ implementation_head: "5bb2bc08132656086cf621321a33f622e81fb8f3"
 merge_commit: "0f2b71f2d8fbaf54582013dba66d2b41a97ae543"
 related_prs:
   - 200
-archive_pr: pending
+  - 201
+archive_pr: 201
 policy_version: 2.1
 prompting_standard_version: 2.1
 task_kind: implementation
@@ -87,7 +88,7 @@ Review threads: zero unresolved. Lockfile delta: one local package, no registry 
 
 # Lifecycle
 
-Implementation PR #200 protected-merged as `0f2b71f2d8fbaf54582013dba66d2b41a97ae543`. The separate lifecycle archive removes the active task record and releases all exclusive ownership and shared-path leases. Input Platform becomes the next serialized P2 integration owner.
+Implementation PR #200 protected-merged as `0f2b71f2d8fbaf54582013dba66d2b41a97ae543`. Lifecycle archive PR #201 removes the active task record and releases all exclusive ownership and shared-path leases. Input Platform becomes the next serialized P2 integration owner.
 
 # E2E
 

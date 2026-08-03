@@ -29,6 +29,24 @@ jobs:
           ref: feat/OTC2-20260803-canary-unknown-player-appearance
           fetch-depth: 0
 
+      - name: Restack product on current main when required
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          git fetch origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor origin/main HEAD
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Product branch already contains current main."
+            exit 0
+          }
+          if ($LASTEXITCODE -ne 1) {
+            throw "Unable to determine whether product branch contains current main."
+          }
+          git rebase origin/main
+          git push --force-with-lease origin HEAD:feat/OTC2-20260803-canary-unknown-player-appearance
+          Write-Host "Product branch restacked; synchronized validation will run on the new exact head."
+
       - name: Apply validate and persist unknown-player appearance
         shell: pwsh
         run: |

@@ -9,7 +9,7 @@ repository.workspace = true
 publish = false
 
 [package.metadata.oteryn]
-category = "input"
+category = "input-platform"
 
 [dependencies]
 oteryn-input-actions = { version = "=0.1.0", path = "../input-actions" }

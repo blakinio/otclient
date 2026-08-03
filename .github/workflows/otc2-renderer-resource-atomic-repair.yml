@@ -172,7 +172,7 @@ checksum = "2026a5056764a10b2bf5d56488cba40da507f5493a6a429340e2004d9ed085fa"'''
               '''name = "libredox"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c943259e3421e06ff2da7a83eabdfe7f92ce10262688dbf1895ff0b3e6e4652"''',
+checksum = "c943259e342f1e06ff2da7a83eabdfe7f92ce10262688dbf1895ff0b3e6e4652"''',
           }
           for old_lock, new_lock in lock_replacements.items():
               if lock_text.count(old_lock) != 1:

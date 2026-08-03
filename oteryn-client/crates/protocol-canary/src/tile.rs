@@ -65,6 +65,11 @@ mod tests {
     const LOCAL_PLAYER_INITIALIZATION_FIXTURE: &str = include_str!(
         "../../../tests/integration/canary-world-protocol/fixtures/local-player-initialization.hex"
     );
+    const ALLOW_BUG_REPORT_FIXTURE: &str = include_str!(
+        "../../../tests/integration/canary-world-protocol/fixtures/allow-bug-report.hex"
+    );
+    const TIBIA_TIME_FIXTURE: &str =
+        include_str!("../../../tests/integration/canary-world-protocol/fixtures/tibia-time.hex");
     const PENDING_STATE_ENTERED_FIXTURE: &str = include_str!(
         "../../../tests/integration/canary-world-protocol/fixtures/pending-state-entered.hex"
     );
@@ -96,6 +101,10 @@ mod tests {
         let mut state = CanaryInboundBootstrapState::new(SessionToken::new(current));
         let local = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
         state.decode_local_player_initialization(&local, current)?;
+        let permission = parse_hex_fixture(ALLOW_BUG_REPORT_FIXTURE)?;
+        state.decode_allow_bug_report(&permission, current)?;
+        let time = parse_hex_fixture(TIBIA_TIME_FIXTURE)?;
+        state.decode_tibia_time(&time, current)?;
         let pending = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
         decode_current_pending_state_entered(&pending, &mut state, current)?;
         let enter = parse_hex_fixture(ENTER_WORLD_FIXTURE)?;

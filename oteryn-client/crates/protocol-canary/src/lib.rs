@@ -32,9 +32,11 @@ pub use command::{
     encode_current_development_command,
 };
 pub use inbound::{
-    CanaryInboundBootstrapState, CanaryInboundError, OPCODE_ENTER_WORLD,
-    OPCODE_LOCAL_PLAYER_INITIALIZATION, OPCODE_PENDING_STATE_ENTERED, decode_current_enter_world,
+    CanaryInboundBootstrapState, CanaryInboundError, OPCODE_ALLOW_BUG_REPORT, OPCODE_ENTER_WORLD,
+    OPCODE_LOCAL_PLAYER_INITIALIZATION, OPCODE_PENDING_STATE_ENTERED, OPCODE_TIBIA_TIME,
+    decode_current_allow_bug_report, decode_current_enter_world,
     decode_current_local_player_initialization, decode_current_pending_state_entered,
+    decode_current_tibia_time,
 };
 pub use tile::{OPCODE_TILE_UPDATE, decode_current_empty_tile_update};
 

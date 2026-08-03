@@ -21,3 +21,8 @@ Tile-clear fixtures prove only the complete Current absent-tile branch of
 `sendUpdateTile`: opcode `0x69`, position encoded as `u16le/u16le/u8`, marker
 `0x01` and terminator `0xFF`. Wrong marker, wrong terminator and trailing data
 are negative cases. Coordinates are synthetic and no map contents are copied.
+
+Login side-preamble fixtures prove the exact pinned Current order after local
+player initialization and before pending-state: `sendAllowBugReport` emits fixed
+`1A 00`, followed by `sendTibiaTime` as `EF + two opaque u8 clock components`.
+The synthetic clock bytes are not retained and no world-light state is inferred.

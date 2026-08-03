@@ -1,0 +1,2 @@
+executor=OTC2-20260803-canary-bootstrap-identity
+revision=1

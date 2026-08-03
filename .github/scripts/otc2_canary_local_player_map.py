@@ -1,4 +1,647 @@
-import base64
-import zlib
+from pathlib import Path
+import re
 
-exec(zlib.decompress(base64.b64decode("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")))
+MAP_RS = '''use crate::inbound::{CanaryInboundBootstrapState, CanaryInboundError};
+use crate::{CANARY_CHARACTER_NAME_MAX_BYTES, CANARY_NETWORK_MESSAGE_MAX_BYTES};
+use oteryn_foundation::SessionGeneration;
+use oteryn_game_domain::{Floor, GameEvent, GameEventEnvelope, TilePosition};
+use oteryn_protocol_core::{BoundedReader, ProtocolError, ProtocolErrorKind, TrailingDataPolicy};
+
+/// Canary Current server opcode for the initial map description.
+pub const OPCODE_MAP_DESCRIPTION: u8 = 0x64;
+
+const MAP_WIDTH: usize = 18;
+const MAP_HEIGHT: usize = 14;
+const MAP_TILES_PER_FLOOR: usize = MAP_WIDTH * MAP_HEIGHT;
+const MAP_MAX_LAYERS: u8 = 16;
+const MAP_SURFACE_LAYER: u8 = 7;
+const MAP_LAYER_VIEW_LIMIT: u8 = 2;
+const LOCAL_PLAYER_X_OFFSET: usize = 8;
+const LOCAL_PLAYER_Y_OFFSET: usize = 6;
+const LOCAL_PLAYER_TILE_ORDINAL: usize =
+    LOCAL_PLAYER_X_OFFSET * MAP_HEIGHT + LOCAL_PLAYER_Y_OFFSET;
+const UNKNOWN_CREATURE_MARKER: u16 = 0x61;
+const CREATURE_TYPE_PLAYER: u8 = 0;
+const MAX_CREATURE_ICONS: u8 = 3;
+const CREATURE_MARK_UNMARKED: u8 = 0xFF;
+const CREATURE_INSPECTION_NONE: u8 = 0;
+
+/// Decode one complete, source-reachable Current initial-map branch.
+///
+/// This deliberately narrow branch accepts an `18 x 14` map description whose
+/// only existing tile is the local-player tile, with no ground or items and one
+/// ordinary unknown-player creature matching the identity established by
+/// opcode `0x17`. The complete Current unknown-player payload and every
+/// surrounding map skip marker are consumed. Success emits only
+/// [`GameEvent::BootstrapCompleted`].
+///
+/// General non-empty tiles remain unsupported because `AddItem` length depends
+/// on the authoritative item catalogue and other creature branches require
+/// additional identity/cache semantics.
+///
+/// # Errors
+///
+/// Rejects stale or impossible order, duplicate bootstrap, invalid floor/map
+/// geometry, malformed skip runs, item/extra-tile markers, a non-local creature,
+/// unsupported creature branches, invalid fixed fields, truncation, oversize
+/// and every trailing byte. State advances only after semantic envelope
+/// validation succeeds.
+pub fn decode_current_local_player_only_map(
+    input: &[u8],
+    state: &mut CanaryInboundBootstrapState,
+    current: SessionGeneration,
+) -> Result<GameEventEnvelope, CanaryInboundError> {
+    state.session().ensure_current(current)?;
+    if !state.enter_world_received() || state.session_ended() || state.bootstrap_completed() {
+        return Err(CanaryInboundError::InvalidOrder);
+    }
+    let player = state
+        .local_player()
+        .ok_or(CanaryInboundError::InvalidOrder)?;
+
+    let mut reader = BoundedReader::new(input, CANARY_NETWORK_MESSAGE_MAX_BYTES)?;
+    expect_u8(&mut reader, OPCODE_MAP_DESCRIPTION)?;
+    let x = reader.read_u16_le()?;
+    let y = reader.read_u16_le()?;
+    let z = reader.read_u8()?;
+    let (preceding_tiles, following_tiles) = local_player_map_geometry(z)?;
+
+    consume_missing_tiles(&mut reader, preceding_tiles, -1)?;
+    if reader.read_u16_le()? != UNKNOWN_CREATURE_MARKER || reader.read_u32_le()? != 0 {
+        return Err(unknown_value().into());
+    }
+    if reader.read_u32_le()? != player.id().get() {
+        return Err(unknown_value().into());
+    }
+    expect_u8(&mut reader, CREATURE_TYPE_PLAYER)?;
+
+    let name = reader.read_u16_string(CANARY_CHARACTER_NAME_MAX_BYTES)?;
+    if name.is_empty() {
+        return Err(unknown_value().into());
+    }
+
+    let health_percent = reader.read_u8()?;
+    if !(1..=100).contains(&health_percent) {
+        return Err(unknown_value().into());
+    }
+    if reader.read_u8()? > 7 {
+        return Err(unknown_value().into());
+    }
+
+    let look_type = reader.read_u16_le()?;
+    if look_type == 0 {
+        return Err(unknown_value().into());
+    }
+    let _outfit_colors_and_addons = reader.read_exact(5)?;
+
+    let look_mount = reader.read_u16_le()?;
+    if look_mount != 0 {
+        let _mount_colors = reader.read_exact(4)?;
+    }
+
+    let _light_level = reader.read_u8()?;
+    let _light_color = reader.read_u8()?;
+    let _step_speed = reader.read_u16_le()?;
+
+    let icon_count = reader.read_u8()?;
+    if icon_count > MAX_CREATURE_ICONS {
+        return Err(unknown_value().into());
+    }
+    for _ in 0..icon_count {
+        let _serialized_icon = reader.read_u8()?;
+        let _icon_category = reader.read_u8()?;
+        let _icon_count = reader.read_u16_le()?;
+    }
+
+    let _skull = reader.read_u8()?;
+    let _party_shield = reader.read_u8()?;
+    let _guild_emblem = reader.read_u8()?;
+
+    expect_u8(&mut reader, CREATURE_TYPE_PLAYER)?;
+    let _vocation = reader.read_u8()?;
+    let _speech_bubble = reader.read_u8()?;
+    expect_u8(&mut reader, CREATURE_MARK_UNMARKED)?;
+    expect_u8(&mut reader, CREATURE_INSPECTION_NONE)?;
+    if !matches!(reader.read_u8()?, 0 | 1) {
+        return Err(unknown_value().into());
+    }
+
+    consume_missing_tiles(&mut reader, following_tiles, 0)?;
+    reader.finish(TrailingDataPolicy::Reject)?;
+
+    let position = TilePosition::new(x, y, Floor::new(z));
+    let envelope = GameEventEnvelope::v1(
+        state.session(),
+        GameEvent::BootstrapCompleted { player, position },
+    )?;
+    envelope.ensure_current(current)?;
+    state.mark_bootstrap_completed();
+    Ok(envelope)
+}
+
+fn local_player_map_geometry(z: u8) -> Result<(usize, usize), ProtocolError> {
+    if z >= MAP_MAX_LAYERS {
+        return Err(unknown_value());
+    }
+
+    let (floor_count, local_floor_index) = if z <= MAP_SURFACE_LAYER {
+        (
+            usize::from(MAP_SURFACE_LAYER + 1),
+            usize::from(MAP_SURFACE_LAYER - z),
+        )
+    } else {
+        let first = z.saturating_sub(MAP_LAYER_VIEW_LIMIT);
+        let last = z
+            .saturating_add(MAP_LAYER_VIEW_LIMIT)
+            .min(MAP_MAX_LAYERS - 1);
+        (
+            usize::from(last - first + 1),
+            usize::from(z - first),
+        )
+    };
+
+    let total_tiles = floor_count
+        .checked_mul(MAP_TILES_PER_FLOOR)
+        .ok_or_else(arithmetic_overflow)?;
+    let preceding_tiles = local_floor_index
+        .checked_mul(MAP_TILES_PER_FLOOR)
+        .and_then(|value| value.checked_add(LOCAL_PLAYER_TILE_ORDINAL))
+        .ok_or_else(arithmetic_overflow)?;
+    let following_tiles = total_tiles
+        .checked_sub(
+            preceding_tiles
+                .checked_add(1)
+                .ok_or_else(arithmetic_overflow)?,
+        )
+        .ok_or_else(arithmetic_overflow)?;
+    Ok((preceding_tiles, following_tiles))
+}
+
+fn consume_missing_tiles(
+    reader: &mut BoundedReader<'_>,
+    missing_tiles: usize,
+    initial_skip: i16,
+) -> Result<(), ProtocolError> {
+    let mut skip = initial_skip;
+    for _ in 0..missing_tiles {
+        if skip == 0xFE {
+            expect_u8(reader, 0xFF)?;
+            expect_u8(reader, 0xFF)?;
+            skip = -1;
+        } else {
+            skip += 1;
+        }
+    }
+
+    if skip >= 0 {
+        let encoded_skip =
+            u8::try_from(skip).map_err(|_| ProtocolError::new(ProtocolErrorKind::InvalidLength))?;
+        expect_u8(reader, encoded_skip)?;
+        expect_u8(reader, 0xFF)?;
+    }
+    Ok(())
+}
+
+fn expect_u8(reader: &mut BoundedReader<'_>, expected: u8) -> Result<(), ProtocolError> {
+    if reader.read_u8()? == expected {
+        Ok(())
+    } else {
+        Err(unknown_value())
+    }
+}
+
+const fn unknown_value() -> ProtocolError {
+    ProtocolError::new(ProtocolErrorKind::UnknownValue)
+}
+
+const fn arithmetic_overflow() -> ProtocolError {
+    ProtocolError::new(ProtocolErrorKind::ArithmeticOverflow)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::inbound::decode_current_pending_state_entered;
+    use oteryn_game_domain::{DomainError, SessionToken};
+    use std::error::Error;
+    use std::num::ParseIntError;
+
+    const LOCAL_PLAYER_INITIALIZATION_FIXTURE: &str = include_str!(
+        "../../../tests/integration/canary-world-protocol/fixtures/local-player-initialization.hex"
+    );
+    const ALLOW_BUG_REPORT_FIXTURE: &str = include_str!(
+        "../../../tests/integration/canary-world-protocol/fixtures/allow-bug-report.hex"
+    );
+    const TIBIA_TIME_FIXTURE: &str =
+        include_str!("../../../tests/integration/canary-world-protocol/fixtures/tibia-time.hex");
+    const PENDING_STATE_ENTERED_FIXTURE: &str = include_str!(
+        "../../../tests/integration/canary-world-protocol/fixtures/pending-state-entered.hex"
+    );
+    const ENTER_WORLD_FIXTURE: &str =
+        include_str!("../../../tests/integration/canary-world-protocol/fixtures/enter-world.hex");
+    const LOCAL_PLAYER_ONLY_MAP_FIXTURE: &str = include_str!(
+        "../../../tests/integration/canary-world-protocol/fixtures/local-player-only-map.hex"
+    );
+
+    fn parse_hex_fixture(input: &str) -> Result<Vec<u8>, ParseIntError> {
+        input
+            .split_whitespace()
+            .map(|token| u8::from_str_radix(token, 16))
+            .collect()
+    }
+
+    fn ready_state(
+        generation: u64,
+    ) -> Result<(CanaryInboundBootstrapState, SessionGeneration), Box<dyn Error>> {
+        let current = SessionGeneration::new(generation);
+        let mut state = CanaryInboundBootstrapState::new(SessionToken::new(current));
+        state.decode_local_player_initialization(
+            &parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?,
+            current,
+        )?;
+        state.decode_allow_bug_report(&parse_hex_fixture(ALLOW_BUG_REPORT_FIXTURE)?, current)?;
+        state.decode_tibia_time(&parse_hex_fixture(TIBIA_TIME_FIXTURE)?, current)?;
+        decode_current_pending_state_entered(
+            &parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?,
+            &mut state,
+            current,
+        )?;
+        state.decode_enter_world(&parse_hex_fixture(ENTER_WORLD_FIXTURE)?, current)?;
+        Ok((state, current))
+    }
+
+    #[test]
+    fn exact_local_player_only_map_completes_bootstrap() -> Result<(), Box<dyn Error>> {
+        let (mut state, current) = ready_state(60)?;
+        let player = state.local_player().ok_or("missing local player")?;
+        let input = parse_hex_fixture(LOCAL_PLAYER_ONLY_MAP_FIXTURE)?;
+        let envelope = decode_current_local_player_only_map(&input, &mut state, current)?;
+
+        assert_eq!(envelope.session(), state.session());
+        assert_eq!(
+            envelope.event(),
+            &GameEvent::BootstrapCompleted {
+                player,
+                position: TilePosition::new(0x1234, 0x5678, Floor::new(7)),
+            }
+        );
+        assert!(state.bootstrap_completed());
+        Ok(())
+    }
+
+    #[test]
+    fn every_truncated_prefix_fails_atomically() -> Result<(), Box<dyn Error>> {
+        let input = parse_hex_fixture(LOCAL_PLAYER_ONLY_MAP_FIXTURE)?;
+        for length in 0..input.len() {
+            let (mut state, current) = ready_state(61)?;
+            assert_eq!(
+                decode_current_local_player_only_map(&input[..length], &mut state, current),
+                Err(CanaryInboundError::Protocol(ProtocolError::new(
+                    ProtocolErrorKind::Truncated,
+                )))
+            );
+            assert!(!state.bootstrap_completed());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn closed_map_and_creature_fields_fail_closed() -> Result<(), Box<dyn Error>> {
+        let original = parse_hex_fixture(LOCAL_PLAYER_ONLY_MAP_FIXTURE)?;
+        let mutations = [
+            (0, 0x63),
+            (5, 0x10),
+            (6, 0x74),
+            (8, 0x62),
+            (10, 0x01),
+            (14, 0x05),
+            (18, 0x01),
+            (30, 0x00),
+            (31, 0x08),
+            (32, 0x00),
+            (33, 0x00),
+            (45, 0x04),
+            (49, 0x01),
+            (52, 0xFE),
+            (53, 0x01),
+            (54, 0x02),
+            (55, 0xFE),
+        ];
+
+        for (index, value) in mutations {
+            let mut input = original.clone();
+            input[index] = value;
+            let (mut state, current) = ready_state(62)?;
+            assert_eq!(
+                decode_current_local_player_only_map(&input, &mut state, current),
+                Err(CanaryInboundError::Protocol(ProtocolError::new(
+                    ProtocolErrorKind::UnknownValue,
+                )))
+            );
+            assert!(!state.bootstrap_completed());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_utf8_and_trailing_data_fail_closed() -> Result<(), Box<dyn Error>> {
+        let original = parse_hex_fixture(LOCAL_PLAYER_ONLY_MAP_FIXTURE)?;
+
+        let mut invalid_utf8 = original.clone();
+        invalid_utf8[21] = 0xFF;
+        let (mut utf8_state, utf8_current) = ready_state(63)?;
+        assert_eq!(
+            decode_current_local_player_only_map(
+                &invalid_utf8,
+                &mut utf8_state,
+                utf8_current,
+            ),
+            Err(CanaryInboundError::Protocol(ProtocolError::new(
+                ProtocolErrorKind::InvalidUtf8,
+            )))
+        );
+        assert!(!utf8_state.bootstrap_completed());
+
+        let mut trailing = original;
+        trailing.push(0);
+        let (mut trailing_state, trailing_current) = ready_state(64)?;
+        assert_eq!(
+            decode_current_local_player_only_map(
+                &trailing,
+                &mut trailing_state,
+                trailing_current,
+            ),
+            Err(CanaryInboundError::Protocol(ProtocolError::new(
+                ProtocolErrorKind::TrailingData,
+            )))
+        );
+        assert!(!trailing_state.bootstrap_completed());
+        Ok(())
+    }
+
+    #[test]
+    fn oversized_and_invalid_order_inputs_are_rejected() -> Result<(), Box<dyn Error>> {
+        let (mut state, current) = ready_state(65)?;
+        let oversized = vec![0; CANARY_NETWORK_MESSAGE_MAX_BYTES + 1];
+        assert_eq!(
+            decode_current_local_player_only_map(&oversized, &mut state, current),
+            Err(CanaryInboundError::Protocol(ProtocolError::new(
+                ProtocolErrorKind::Oversized,
+            )))
+        );
+
+        let input = parse_hex_fixture(LOCAL_PLAYER_ONLY_MAP_FIXTURE)?;
+        let before_enter = SessionGeneration::new(66);
+        let mut before_state =
+            CanaryInboundBootstrapState::new(SessionToken::new(before_enter));
+        assert_eq!(
+            decode_current_local_player_only_map(&input, &mut before_state, before_enter),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+
+        let (mut stale_state, actual) = ready_state(67)?;
+        assert_eq!(
+            decode_current_local_player_only_map(
+                &input,
+                &mut stale_state,
+                SessionGeneration::new(actual.get() + 1),
+            ),
+            Err(CanaryInboundError::Domain(DomainError::StaleSession {
+                expected: SessionGeneration::new(actual.get() + 1),
+                actual,
+            }))
+        );
+
+        let (mut terminal_state, terminal_current) = ready_state(68)?;
+        terminal_state.decode_session_end_information(&[0x18, 0x00], terminal_current)?;
+        assert_eq!(
+            decode_current_local_player_only_map(
+                &input,
+                &mut terminal_state,
+                terminal_current,
+            ),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_map_bootstrap_is_rejected() -> Result<(), Box<dyn Error>> {
+        let input = parse_hex_fixture(LOCAL_PLAYER_ONLY_MAP_FIXTURE)?;
+        let (mut state, current) = ready_state(69)?;
+        decode_current_local_player_only_map(&input, &mut state, current)?;
+        assert_eq!(
+            decode_current_local_player_only_map(&input, &mut state, current),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+        Ok(())
+    }
+}
+'''
+FIXTURE = '''64 34 12 78 56 07 75 FF
+61 00 00 00 00 00 04 03 02 01 00
+09 00 53 79 6E 74 68 65 74 69 63
+64 02 80 00 01 02 03 04 00 00 00
+07 D7 DC 00 00 00 00 00 00 01 00 FF 00 01
+FF FF FF FF FF FF FF FF FF FF FF FF FF FF 69 FF
+'''
+
+root = Path(".")
+inbound_path = root / "oteryn-client/crates/protocol-canary/src/inbound.rs"
+lib_path = root / "oteryn-client/crates/protocol-canary/src/lib.rs"
+task_path = root / "docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md"
+evidence_path = root / "oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md"
+fixture_dir = root / "oteryn-client/tests/integration/canary-world-protocol/fixtures"
+
+inbound = inbound_path.read_text(encoding="utf-8")
+replacements = [
+    (
+        "    enter_world_received: bool,\n    session_ended: bool,\n",
+        "    enter_world_received: bool,\n    bootstrap_completed: bool,\n    session_ended: bool,\n",
+        "bootstrap state field",
+    ),
+    (
+        "            enter_world_received: false,\n            session_ended: false,\n",
+        "            enter_world_received: false,\n            bootstrap_completed: false,\n            session_ended: false,\n",
+        "bootstrap state constructor",
+    ),
+    (
+        "    pub const fn enter_world_received(self) -> bool {\n        self.enter_world_received\n    }\n\n",
+        "    pub const fn enter_world_received(self) -> bool {\n        self.enter_world_received\n    }\n\n    /// Return whether a complete initial map established the local position.\n    #[must_use]\n    pub const fn bootstrap_completed(self) -> bool {\n        self.bootstrap_completed\n    }\n\n    pub(crate) fn mark_bootstrap_completed(&mut self) {\n        self.bootstrap_completed = true;\n    }\n\n",
+        "bootstrap state accessors",
+    ),
+]
+for old, new, label in replacements:
+    count = inbound.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected exactly one anchor, found {count}")
+    inbound = inbound.replace(old, new, 1)
+inbound_path.write_text(inbound, encoding="utf-8", newline="\n")
+
+lib = lib_path.read_text(encoding="utf-8")
+for old, new, label in [
+    ("mod inbound;\nmod tile;\n", "mod inbound;\nmod map;\nmod tile;\n", "map module"),
+    (
+        "pub use tile::{OPCODE_TILE_UPDATE, decode_current_empty_tile_update};\n",
+        "pub use map::{OPCODE_MAP_DESCRIPTION, decode_current_local_player_only_map};\npub use tile::{OPCODE_TILE_UPDATE, decode_current_empty_tile_update};\n",
+        "map export",
+    ),
+]:
+    count = lib.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected exactly one anchor, found {count}")
+    lib = lib.replace(old, new, 1)
+lib_path.write_text(lib, encoding="utf-8", newline="\n")
+
+(root / "oteryn-client/crates/protocol-canary/src/map.rs").write_text(
+    MAP_RS, encoding="utf-8", newline="\n"
+)
+(fixture_dir / "local-player-only-map.hex").write_text(
+    FIXTURE, encoding="utf-8", newline="\n"
+)
+
+readme_path = fixture_dir / "README.md"
+readme = readme_path.read_text(encoding="utf-8")
+append = """
+
+Local-player-only map fixture proves one complete source-reachable Current
+bootstrap branch: opcode `0x64`, authoritative local position, exact surface
+floor traversal and skip markers, one item-free tile containing only the
+ordinary unknown local player, and the complete fixed-width Current player
+creature payload. The synthetic name, appearance, clock, coordinates and
+status values are invented. No item catalogue bytes or private capture are
+included.
+"""
+if "Local-player-only map fixture proves" not in readme:
+    readme += append
+readme_path.write_text(readme, encoding="utf-8", newline="\n")
+
+task = task_path.read_text(encoding="utf-8")
+updates = [
+    (r"^status: blocked$", "status: validating"),
+    (r"^phase: .*$", "phase: local-player-only-map-bootstrap"),
+    (r"^branch: .*$", "branch: feat/OTC2-20260803-canary-local-player-map"),
+    (r"^updated: .*$", "updated: 2026-08-03T20:25:00+02:00"),
+    (r'^required_base_commit: ".*"$', 'required_base_commit: "2f0bff09cd9f5a9acf2629d7ba080e98d3f5f1ad"'),
+    (r"^last_progress_at: .*$", "last_progress_at: 2026-08-03T20:25:00+02:00"),
+    (r"^ci_check_generation: .*$", "ci_check_generation: local-player-map-focused"),
+]
+for pattern, replacement in updates:
+    task, count = re.subn(pattern, replacement, task, count=1, flags=re.MULTILINE)
+    if count != 1:
+        raise SystemExit(f"task anchor not found: {pattern}")
+task = task.replace(
+    "related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237]",
+    "related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240]",
+    1,
+)
+active = """
+# Active local-player-only map bootstrap
+
+The pinned source permits one complete initial-map branch without item-catalogue
+decoding: an existing item-free tile containing only the ordinary local player.
+The branch consumes the complete unknown-player payload, exact `18 x 14`
+surface traversal and all skip markers.
+
+```yaml
+opcode: 0x64
+position: [x_u16_le, y_u16_le, z_u8]
+accepted_floor: source_valid_0_through_15
+accepted_tiles: exactly_one_local_player_tile
+accepted_items: none
+accepted_creatures: exactly_one_unknown_ordinary_local_player
+identity: must_match_session_local_player_from_0x17
+output: GameEvent::BootstrapCompleted
+simulation_mutation: false
+general_map_claim: false
+```
+
+Other tiles, every item branch, known creatures, non-player creature types,
+health-hidden players, zero-looktype outfits and extra contents remain rejected.
+
+"""
+if "# Active local-player-only map bootstrap" not in task:
+    task = task.replace("# P2 barrier\n", active + "# P2 barrier\n", 1)
+checkpoint = """# Durable checkpoint
+
+```yaml
+checkpoint_version: 23
+updated_at: 2026-08-03T20:25:00+02:00
+observed_main: 2f0bff09cd9f5a9acf2629d7ba080e98d3f5f1ad
+status: validating
+phase: local-player-only-map-bootstrap
+implemented_bootstrap_order: [local_player_0x17, allow_bug_report_0x1A, tibia_time_0xEF, pending_state_0x0A, enter_world_0x0F]
+active_branch: feat/OTC2-20260803-canary-local-player-map
+active_layout: local_player_only_initial_map_0x64
+validation: focused_workflow_running
+shared_path_lease: []
+ownership:
+  protocol_canary: retained_by_active_parent_task
+  shared_paths: released
+blocker: General non-empty map/item/creature layouts and position/stack identity ownership remain incomplete outside this narrow item-free local-player branch.
+next_action: Validate and merge the local-player-only map bootstrap, then resume full AddItem and general AddCreature normalization without inference.
+```
+"""
+task, count = re.subn(
+    r"# Durable checkpoint\n\n```yaml\n.*?\n```\n?\Z",
+    checkpoint,
+    task,
+    count=1,
+    flags=re.DOTALL,
+)
+if count != 1:
+    raise SystemExit("durable checkpoint anchor not found")
+task_path.write_text(task, encoding="utf-8", newline="\n")
+
+evidence = evidence_path.read_text(encoding="utf-8")
+status_pattern = r"^Status: .*$"
+status_replacement = (
+    "Status: local-player identity, login side-preamble, session-end and absent-tile slices "
+    "are merged; one source-reachable item-free local-player map bootstrap is under exact validation."
+)
+evidence, count = re.subn(
+    status_pattern, status_replacement, evidence, count=1, flags=re.MULTILINE
+)
+if count != 1:
+    raise SystemExit("evidence status anchor not found")
+section = """
+## Active item-free local-player map validation
+
+The pinned source permits an existing tile to contain a creature list without
+ground or items. `GetTileDescription` then emits the ordinary unknown-player
+branch. For an initial surface map at synthetic position `(0x1234, 0x5678, 7)`,
+the local tile is ordinal 118 in the first `18 x 14` floor and the complete
+message has deterministic leading and trailing skip runs.
+
+```yaml
+opcode: 0x64
+viewport: 18_by_14
+surface_floors: 7_down_to_0
+leading_missing_tiles: 118
+leading_marker: [0x75, 0xFF]
+tile_contents:
+  ground: none
+  items: none
+  creatures: [ordinary_unknown_local_player]
+unknown_player:
+  marker_u16_le: 0x61
+  removed_known_u32_le: 0
+  id: must_match_0x17_local_identity
+  bounded_name: consumed_not_exposed
+  outfit_branch: non_zero_looktype
+  icon_count_max: 3
+  final_fixed_fields: [mark_0xFF, inspection_0x00]
+trailing_missing_tiles: 1897
+trailing_markers: [seven_FF_FF_pairs, 0x69_0xFF]
+output: GameEvent::BootstrapCompleted
+general_map_or_item_support: false
+```
+
+The decoder rejects every item, extra tile/creature, known-creature marker,
+non-local identity, unsupported player branch, malformed RLE marker, impossible
+order, truncation, oversize and trailing data.
+
+"""
+if "## Active item-free local-player map validation" not in evidence:
+    evidence = evidence.replace("## Fixture provenance\n", section + "## Fixture provenance\n", 1)
+evidence_path.write_text(evidence, encoding="utf-8", newline="\n")

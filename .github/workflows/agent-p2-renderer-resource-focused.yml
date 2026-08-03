@@ -1,0 +1,76 @@
+name: P2 Renderer Resource Focused
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/agent-p2-renderer-resource-focused.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: p2-renderer-resource-focused
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Lock, focused validation, self-remove
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260803-playability-p2-renderer-resource
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy
+
+      - name: Select pinned Rust toolchain
+        working-directory: oteryn-client
+        run: rustup override set 1.94.0
+
+      - name: Generate local workspace lock entry
+        working-directory: oteryn-client
+        run: cargo metadata --format-version 1 > /dev/null
+
+      - name: Apply focused formatting
+        working-directory: oteryn-client
+        run: cargo fmt -p oteryn-renderer-resource
+
+      - name: Run strict focused Clippy
+        working-directory: oteryn-client
+        run: cargo clippy -p oteryn-renderer-resource --all-targets -- -D warnings
+
+      - name: Run focused and component tests
+        working-directory: oteryn-client
+        run: cargo test -p oteryn-renderer-resource --all-targets
+
+      - name: Verify bounded generated diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          changed="$(git status --short | awk '{print $2}' | sort)"
+          expected_lock='oteryn-client/Cargo.lock'
+          expected_both=$'oteryn-client/Cargo.lock\noteryn-client/crates/renderer-resource/src/lib.rs'
+          if [ "$changed" != "$expected_lock" ] && [ "$changed" != "$expected_both" ]; then
+            printf 'unexpected generated paths:\n%s\n' "$changed"
+            exit 1
+          fi
+          grep -q 'name = "oteryn-renderer-resource"' oteryn-client/Cargo.lock
+
+      - name: Commit focused output and remove harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/agent-p2-renderer-resource-focused.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/Cargo.lock oteryn-client/crates/renderer-resource/src/lib.rs .github/workflows/agent-p2-renderer-resource-focused.yml
+          git diff --cached --check
+          git commit -m "build(renderer-resource): finalize focused integration"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-renderer-resource

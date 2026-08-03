@@ -1,0 +1,22 @@
+[package]
+name = "oteryn-asset-decode"
+version = "0.1.0"
+description = "Bounded CPU RGBA8 normalization for verified Oteryn synthetic assets"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[package.metadata.oteryn]
+category = "runtime"
+
+[dependencies]
+oteryn-asset-runtime = { version = "=0.1.0", path = "../asset-runtime" }
+oteryn-asset-types = { version = "=0.1.0", path = "../asset-types" }
+
+[dev-dependencies]
+oteryn-asset-compiler = { version = "=0.1.0", path = "../../tools/asset-compiler" }
+
+[lints]
+workspace = true

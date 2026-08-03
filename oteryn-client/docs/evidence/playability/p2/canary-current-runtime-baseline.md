@@ -101,7 +101,7 @@ logical_message:
   z_u8: canonical_floor
   absent_tile_marker_u8: 0x01
   terminator_u8: 0xFF
-prerequisite: current_session_after_enter_world
+prerequisite: current_session_after_bootstrap_completed
 output: GameEventEnvelope::v1(GameEvent::TileCleared)
 caller_state_mutation: false
 nested_writer_dependency: none

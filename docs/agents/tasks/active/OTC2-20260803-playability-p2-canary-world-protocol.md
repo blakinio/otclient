@@ -86,7 +86,7 @@ session_end_0x18:
   unknown_values_rejected: [0x01, 0x03]
 empty_tile_update_0x69:
   layout: [opcode_u8, x_u16_le, y_u16_le, z_u8, marker_0x01, terminator_0xFF]
-  prerequisite: current_session_after_enter_world
+  prerequisite: current_session_after_bootstrap_completed
   output: GameEvent::TileCleared
   caller_state_mutation: false
 ```

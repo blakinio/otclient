@@ -283,7 +283,7 @@ evidence = evidence_path.read_text(encoding="utf-8")
 evidence = replace_once(
     evidence,
     "Status: local-player identity, pending-state, enter-world order and known session-end slices are merged; the parent producer remains blocked on complete map/world layouts and general identity resolution.  ",
-    "Status: local-player identity/order and known session-end slices are merged; the complete absent-tile update branch is under exact-head validation while the parent remains blocked on non-empty map/world layouts and general identity resolution.  ",
+    "Status: local-player identity/order and known session-end slices are merged; the complete absent-tile update branch is under exact-head validation while the parent remains blocked on non-empty map/world layouts and general identity resolution.",
     "evidence status",
 )
 evidence = replace_once(

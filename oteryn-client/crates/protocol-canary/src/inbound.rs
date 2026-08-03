@@ -9,6 +9,10 @@ use std::fmt::{Display, Formatter};
 
 /// Canary Current server opcode for local-player initialization.
 pub const OPCODE_LOCAL_PLAYER_INITIALIZATION: u8 = 0x17;
+/// Canary Current server opcode for the fixed bug-report permission boundary.
+pub const OPCODE_ALLOW_BUG_REPORT: u8 = 0x1A;
+/// Canary Current server opcode for the two-byte world-clock boundary.
+pub const OPCODE_TIBIA_TIME: u8 = 0xEF;
 /// Canary Current server opcode for the pending-state-entered bootstrap boundary.
 pub const OPCODE_PENDING_STATE_ENTERED: u8 = 0x0A;
 /// Canary Current server opcode for the enter-world bootstrap boundary.
@@ -26,6 +30,8 @@ const SESSION_END_FORCE_CLOSE: u8 = 0x02;
 pub struct CanaryInboundBootstrapState {
     session: SessionToken,
     local_player: Option<EntityHandle>,
+    allow_bug_report_received: bool,
+    tibia_time_received: bool,
     pending_state_entered: bool,
     enter_world_received: bool,
     session_ended: bool,
@@ -38,6 +44,8 @@ impl CanaryInboundBootstrapState {
         Self {
             session,
             local_player: None,
+            allow_bug_report_received: false,
+            tibia_time_received: false,
             pending_state_entered: false,
             enter_world_received: false,
             session_ended: false,
@@ -54,6 +62,44 @@ impl CanaryInboundBootstrapState {
     #[must_use]
     pub const fn local_player(self) -> Option<EntityHandle> {
         self.local_player
+    }
+
+    /// Return whether the fixed bug-report permission packet was accepted.
+    #[must_use]
+    pub const fn allow_bug_report_received(self) -> bool {
+        self.allow_bug_report_received
+    }
+
+    /// Return whether the login world-clock packet was accepted.
+    #[must_use]
+    pub const fn tibia_time_received(self) -> bool {
+        self.tibia_time_received
+    }
+
+    /// Decode the exact Current fixed bug-report permission logical message.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same fail-closed errors as [`decode_current_allow_bug_report`].
+    pub fn decode_allow_bug_report(
+        &mut self,
+        input: &[u8],
+        current: SessionGeneration,
+    ) -> Result<(), CanaryInboundError> {
+        decode_current_allow_bug_report(input, self, current)
+    }
+
+    /// Decode the exact Current login world-clock logical message.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same fail-closed errors as [`decode_current_tibia_time`].
+    pub fn decode_tibia_time(
+        &mut self,
+        input: &[u8],
+        current: SessionGeneration,
+    ) -> Result<(), CanaryInboundError> {
+        decode_current_tibia_time(input, self, current)
     }
 
     /// Return whether the pending-state boundary was already accepted.
@@ -181,6 +227,8 @@ pub fn decode_current_local_player_initialization(
 ) -> Result<EntityHandle, CanaryInboundError> {
     state.session.ensure_current(current)?;
     if state.local_player.is_some()
+        || state.allow_bug_report_received
+        || state.tibia_time_received
         || state.pending_state_entered
         || state.enter_world_received
         || state.session_ended
@@ -219,6 +267,80 @@ pub fn decode_current_local_player_initialization(
     player.ensure_session(state.session)?;
     state.local_player = Some(player);
     Ok(player)
+}
+
+/// Decode the exact Current `sendAllowBugReport` logical message.
+///
+/// The pinned non-legacy producer emits exactly `0x1A 0x00` immediately after
+/// local-player initialization. The fixed payload byte enables the client-side
+/// report action. The decoder retains no capability value and advances only
+/// caller-owned bootstrap order.
+///
+/// # Errors
+///
+/// Rejects stale or impossible order, wrong opcode/fixed byte, truncation,
+/// oversize and every trailing byte. State changes only after full validation.
+pub fn decode_current_allow_bug_report(
+    input: &[u8],
+    state: &mut CanaryInboundBootstrapState,
+    current: SessionGeneration,
+) -> Result<(), CanaryInboundError> {
+    state.session.ensure_current(current)?;
+    if state.local_player.is_none()
+        || state.allow_bug_report_received
+        || state.tibia_time_received
+        || state.pending_state_entered
+        || state.enter_world_received
+        || state.session_ended
+    {
+        return Err(CanaryInboundError::InvalidOrder);
+    }
+
+    let mut reader = BoundedReader::new(input, CANARY_NETWORK_MESSAGE_MAX_BYTES)?;
+    if reader.read_u8()? != OPCODE_ALLOW_BUG_REPORT || reader.read_u8()? != 0 {
+        return Err(ProtocolError::new(ProtocolErrorKind::UnknownValue).into());
+    }
+    reader.finish(TrailingDataPolicy::Reject)?;
+    state.allow_bug_report_received = true;
+    Ok(())
+}
+
+/// Decode the exact Current `sendTibiaTime` logical message.
+///
+/// The pinned producer emits opcode `0xEF`, followed by two opaque `u8` clock
+/// components derived from its caller-owned light-hour value. The components
+/// are validated structurally but are not retained or exposed because this
+/// adapter does not own world-light simulation.
+///
+/// # Errors
+///
+/// Rejects stale or impossible order, wrong opcode, truncation, oversize and
+/// every trailing byte. State changes only after full validation.
+pub fn decode_current_tibia_time(
+    input: &[u8],
+    state: &mut CanaryInboundBootstrapState,
+    current: SessionGeneration,
+) -> Result<(), CanaryInboundError> {
+    state.session.ensure_current(current)?;
+    if state.local_player.is_none()
+        || !state.allow_bug_report_received
+        || state.tibia_time_received
+        || state.pending_state_entered
+        || state.enter_world_received
+        || state.session_ended
+    {
+        return Err(CanaryInboundError::InvalidOrder);
+    }
+
+    let mut reader = BoundedReader::new(input, CANARY_NETWORK_MESSAGE_MAX_BYTES)?;
+    if reader.read_u8()? != OPCODE_TIBIA_TIME {
+        return Err(ProtocolError::new(ProtocolErrorKind::UnknownValue).into());
+    }
+    let _hour_component = reader.read_u8()?;
+    let _minute_component = reader.read_u8()?;
+    reader.finish(TrailingDataPolicy::Reject)?;
+    state.tibia_time_received = true;
+    Ok(())
 }
 
 /// Decode the exact Current `sendEnterWorld` logical message.
@@ -275,6 +397,8 @@ pub fn decode_current_pending_state_entered(
 ) -> Result<GameEventEnvelope, CanaryInboundError> {
     state.session.ensure_current(current)?;
     if state.local_player.is_none()
+        || !state.allow_bug_report_received
+        || !state.tibia_time_received
         || state.pending_state_entered
         || state.enter_world_received
         || state.session_ended
@@ -353,6 +477,11 @@ mod tests {
     use std::error::Error;
     use std::num::ParseIntError;
 
+    const ALLOW_BUG_REPORT_FIXTURE: &str = include_str!(
+        "../../../tests/integration/canary-world-protocol/fixtures/allow-bug-report.hex"
+    );
+    const TIBIA_TIME_FIXTURE: &str =
+        include_str!("../../../tests/integration/canary-world-protocol/fixtures/tibia-time.hex");
     const PENDING_STATE_ENTERED_FIXTURE: &str = include_str!(
         "../../../tests/integration/canary-world-protocol/fixtures/pending-state-entered.hex"
     );
@@ -401,12 +530,107 @@ mod tests {
             .collect()
     }
 
-    fn initialize_local_player(
+    fn initialize_login_side_preamble(
         state: &mut CanaryInboundBootstrapState,
         current: SessionGeneration,
     ) -> Result<(), Box<dyn Error>> {
-        let input = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
-        state.decode_local_player_initialization(&input, current)?;
+        let local = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
+        state.decode_local_player_initialization(&local, current)?;
+        let permission = parse_hex_fixture(ALLOW_BUG_REPORT_FIXTURE)?;
+        state.decode_allow_bug_report(&permission, current)?;
+        let time = parse_hex_fixture(TIBIA_TIME_FIXTURE)?;
+        state.decode_tibia_time(&time, current)?;
+        Ok(())
+    }
+
+    #[test]
+    fn exact_login_side_preamble_advances_only_order_state() -> Result<(), Box<dyn Error>> {
+        let (mut state, current) = state(5);
+        let local = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
+        let permission = parse_hex_fixture(ALLOW_BUG_REPORT_FIXTURE)?;
+        let time = parse_hex_fixture(TIBIA_TIME_FIXTURE)?;
+
+        state.decode_local_player_initialization(&local, current)?;
+        state.decode_allow_bug_report(&permission, current)?;
+        assert!(state.allow_bug_report_received());
+        assert!(!state.tibia_time_received());
+        state.decode_tibia_time(&time, current)?;
+
+        assert!(state.allow_bug_report_received());
+        assert!(state.tibia_time_received());
+        assert!(!state.pending_state_entered());
+        assert!(!state.enter_world_received());
+        Ok(())
+    }
+
+    #[test]
+    fn login_side_preamble_rejects_wrong_order_and_malformed_fields() -> Result<(), Box<dyn Error>>
+    {
+        let local = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
+        let permission = parse_hex_fixture(ALLOW_BUG_REPORT_FIXTURE)?;
+        let time = parse_hex_fixture(TIBIA_TIME_FIXTURE)?;
+        let (mut state, current) = state(6);
+
+        assert_eq!(
+            state.decode_allow_bug_report(&permission, current),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+        state.decode_local_player_initialization(&local, current)?;
+        assert_eq!(
+            state.decode_tibia_time(&time, current),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+        assert_eq!(
+            state.decode_allow_bug_report(&[OPCODE_ALLOW_BUG_REPORT, 0x01], current),
+            Err(CanaryInboundError::Protocol(ProtocolError::new(
+                ProtocolErrorKind::UnknownValue,
+            )))
+        );
+        assert!(!state.allow_bug_report_received());
+        state.decode_allow_bug_report(&permission, current)?;
+
+        for (input, expected) in [
+            (&[][..], ProtocolErrorKind::Truncated),
+            (&[OPCODE_TIBIA_TIME][..], ProtocolErrorKind::Truncated),
+            (&[OPCODE_TIBIA_TIME, 0x0C][..], ProtocolErrorKind::Truncated),
+            (&[0xEE, 0x0C, 0x22][..], ProtocolErrorKind::UnknownValue),
+            (
+                &[OPCODE_TIBIA_TIME, 0x0C, 0x22, 0x00][..],
+                ProtocolErrorKind::TrailingData,
+            ),
+        ] {
+            assert_eq!(
+                state.decode_tibia_time(input, current),
+                Err(CanaryInboundError::Protocol(ProtocolError::new(expected)))
+            );
+            assert!(!state.tibia_time_received());
+        }
+        state.decode_tibia_time(&time, current)?;
+        assert_eq!(
+            state.decode_tibia_time(&time, current),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pending_state_requires_complete_login_side_preamble() -> Result<(), Box<dyn Error>> {
+        let local = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
+        let permission = parse_hex_fixture(ALLOW_BUG_REPORT_FIXTURE)?;
+        let pending = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
+        let (mut state, current) = state(7);
+
+        state.decode_local_player_initialization(&local, current)?;
+        assert_eq!(
+            decode_current_pending_state_entered(&pending, &mut state, current),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+        state.decode_allow_bug_report(&permission, current)?;
+        assert_eq!(
+            decode_current_pending_state_entered(&pending, &mut state, current),
+            Err(CanaryInboundError::InvalidOrder)
+        );
+        assert!(!state.pending_state_entered());
         Ok(())
     }
 
@@ -428,7 +652,7 @@ mod tests {
         let (mut state, current) = state(7);
         let session = state.session();
         let input = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
-        initialize_local_player(&mut state, current)?;
+        initialize_login_side_preamble(&mut state, current)?;
 
         let envelope = decode_current_pending_state_entered(&input, &mut state, current)?;
 
@@ -452,7 +676,7 @@ mod tests {
             ),
         ] {
             let (mut state, _) = state(8);
-            initialize_local_player(&mut state, current)?;
+            initialize_login_side_preamble(&mut state, current)?;
             assert_eq!(
                 decode_current_pending_state_entered(input, &mut state, current),
                 Err(CanaryInboundError::Protocol(ProtocolError::new(expected)))
@@ -467,7 +691,7 @@ mod tests {
     fn oversized_pending_state_input_fails_without_advancing_order() -> Result<(), Box<dyn Error>> {
         let (mut state, current) = state(9);
         let input = vec![OPCODE_PENDING_STATE_ENTERED; CANARY_NETWORK_MESSAGE_MAX_BYTES + 1];
-        initialize_local_player(&mut state, current)?;
+        initialize_login_side_preamble(&mut state, current)?;
 
         assert_eq!(
             decode_current_pending_state_entered(&input, &mut state, current),
@@ -484,7 +708,7 @@ mod tests {
     fn duplicate_pending_state_message_fails_closed() -> Result<(), Box<dyn Error>> {
         let (mut state, current) = state(10);
         let input = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
-        initialize_local_player(&mut state, current)?;
+        initialize_login_side_preamble(&mut state, current)?;
         decode_current_pending_state_entered(&input, &mut state, current)?;
 
         assert_eq!(
@@ -589,7 +813,7 @@ mod tests {
         );
 
         let (mut after_pending, current) = state(25);
-        initialize_local_player(&mut after_pending, current)?;
+        initialize_login_side_preamble(&mut after_pending, current)?;
         decode_current_pending_state_entered(&pending, &mut after_pending, current)?;
         after_pending.decode_session_end_information(&session_end, current)?;
         assert!(after_pending.pending_state_entered());
@@ -691,6 +915,8 @@ mod tests {
     fn exact_bootstrap_order_reaches_enter_world_without_claiming_completion()
     -> Result<(), Box<dyn Error>> {
         let local = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
+        let permission = parse_hex_fixture(ALLOW_BUG_REPORT_FIXTURE)?;
+        let time = parse_hex_fixture(TIBIA_TIME_FIXTURE)?;
         let pending = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
         let enter = parse_hex_fixture(ENTER_WORLD_FIXTURE)?;
         let (mut state, current) = state(36);
@@ -700,6 +926,8 @@ mod tests {
             Err(CanaryInboundError::InvalidOrder)
         );
         state.decode_local_player_initialization(&local, current)?;
+        state.decode_allow_bug_report(&permission, current)?;
+        state.decode_tibia_time(&time, current)?;
         decode_current_pending_state_entered(&pending, &mut state, current)?;
         state.decode_enter_world(&enter, current)?;
 
@@ -716,10 +944,9 @@ mod tests {
 
     #[test]
     fn malformed_enter_world_does_not_advance_order() -> Result<(), Box<dyn Error>> {
-        let local = parse_hex_fixture(LOCAL_PLAYER_INITIALIZATION_FIXTURE)?;
-        let pending = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
         let (mut state, current) = state(37);
-        state.decode_local_player_initialization(&local, current)?;
+        initialize_login_side_preamble(&mut state, current)?;
+        let pending = parse_hex_fixture(PENDING_STATE_ENTERED_FIXTURE)?;
         decode_current_pending_state_entered(&pending, &mut state, current)?;
 
         for (input, expected) in [

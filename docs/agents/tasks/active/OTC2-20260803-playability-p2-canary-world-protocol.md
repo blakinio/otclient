@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: blocked
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: inbound-provenance-and-identity-contract-blocker
-branch: docs/OTC2-20260803-canary-p2-barrier-refresh
+phase: bootstrap-identity-and-enter-world-normalization
+branch: feat/OTC2-20260803-canary-bootstrap-identity
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T13:58:00+02:00
-required_base_commit: "bf764ee5c3cb546f5507fc1fbb2b7cad79a00cd0"
+updated: 2026-08-03T14:55:00+02:00
+required_base_commit: "c91a5872a66cd9a31add2f3f1efc79ceefe7d150"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 194, 195, 196, 198, 199, 200, 201, 202]
+related_prs: [188, 190, 191, 192, 193, 194, 195, 196, 198, 199, 200, 201, 202, 203]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -39,9 +39,9 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T10:16:00+02:00
-last_progress_at: 2026-08-03T13:58:00+02:00
+last_progress_at: 2026-08-03T14:55:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: blocker-refresh
+ci_check_generation: bootstrap-identity-focused
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 1
@@ -54,6 +54,29 @@ stall_warnings: 0
 # Goal
 
 Reconcile Canary Current evidence with the Rust client while preserving fail-closed real admission, and implement only bounded gameplay mappings whose complete layouts, gates, ordering and semantic envelopes can be established without inference.
+
+# Active bootstrap identity phase
+
+Exact source review established two complete Current bootstrap layouts that do
+not require map inference:
+
+```yaml
+local_player_initialization:
+  source: ProtocolGame::sendAddCreature local-player branch
+  opcode: 0x17
+  result: normalize nonzero creature id to session-fenced EntityHandle
+  retained_configuration: none
+enter_world:
+  source: ProtocolGame::sendEnterWorld
+  bytes: [0x0F]
+  prerequisite: local identity plus pending-state boundary
+  result: caller-owned order transition only
+bootstrap_completed: not_emitted_without_validated_map_position
+```
+
+This phase does not relax real admission, parse map contents, mutate simulation,
+add a domain event or claim M2. General position/stack identity resolution remains
+unresolved; only the producer-supplied local creature id is normalized.
 
 # Completed protocol slices
 
@@ -153,36 +176,38 @@ e2e:
 
 # Stop condition
 
-The accepted evidence at the pinned source revision remains unchanged. It does not establish complete Current map/entity/movement/removal layouts or an accepted owner for position/stack-to-domain-handle identity resolution. Guessing either contract is forbidden. The parent task remains active and blocked; it is not archived and exclusive protocol ownership remains held. No shared lease is retained.
+The exact source now establishes local-player identity and enter-world order without inference, so those bounded transitions are being validated. Complete Current map/entity/movement/removal layouts and general position/stack-to-domain-handle identity resolution remain unavailable. The parent task stays active, exclusive protocol ownership remains held and no shared lease is retained.
 
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 16
-updated_at: 2026-08-03T13:58:00+02:00
-observed_main: bf764ee5c3cb546f5507fc1fbb2b7cad79a00cd0
-status: blocked
-phase: inbound-provenance-and-identity-contract-blocker
-unchanged_state_check: 1
-protocol_implementation:
-  pr: 196
-  head: a2ea69ea3801df0bbba20caaf6ab7d8677b52bb7
-  merge_commit: ceb24e22fc19305cb10c7ea29f7f16928def2a04
+checkpoint_version: 17
+updated_at: 2026-08-03T14:55:00+02:00
+observed_main: c91a5872a66cd9a31add2f3f1efc79ceefe7d150
+status: validating
+phase: bootstrap-identity-and-enter-world-normalization
+branch: feat/OTC2-20260803-canary-bootstrap-identity
+new_contracts:
+  local_player_identity:
+    opcode: 0x17
+    output: session_fenced_EntityHandle
+    raw_configuration_retained: false
+  enter_world:
+    opcode: 0x0F
+    output: caller_owned_order_state
+    bootstrap_completed_emitted: false
+validation: focused_workflow_running
 p2_barrier:
   simulation_snapshot: archived
   asset_decode: archived
   renderer_resource: archived
   input_platform: archived
-  canary_world_protocol: blocked_not_archived
+  canary_world_protocol: active_validating
   visible_world_integration: not_ready
-  controlled_m2_acceptance: not_ready
-pr_hygiene:
-  unresolved_review_threads: 0
-  requested_changes: 0
 shared_path_lease: []
 ownership:
-  protocol_canary: retained_by_blocked_parent_task
+  protocol_canary: retained_by_parent_task
   shared_paths: released
-blocker: Complete provenance-safe Current map/entity/movement/removal layouts and an accepted position/stack-to-domain-handle identity-resolution ownership contract are unavailable at the pinned revision after bounded evidence normalization.
-next_action: Obtain and accept one complete pinned remaining-family layout plus its identity-resolution contract, then resume this same task; do not infer missing fields or ownership.
+remaining_blocker: Complete provenance-safe Current map/entity/movement/removal layouts and general position/stack-to-domain-handle identity resolution remain unavailable.
+next_action: Validate and merge the exact local-player/enter-world phase, then resume full map-description normalization without inferring nested fields.
 ```

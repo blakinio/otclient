@@ -42,4 +42,6 @@ ordinary Current player payload. The decoder emits only a session-fenced
 `EntityAppeared` event; health, outfit, light, icon, vocation and other Canary
 wire values are consumed but do not escape the adapter. Known-cache eviction,
 known creatures, hidden-health, summon, monster, NPC, invisible-outfit and OTCR
-branches remain explicitly unsupported.
+branches remain explicitly unsupported. Positive, truncation, stale-session,
+terminal-state, invalid-field, invalid-UTF-8, oversized and trailing-data cases
+are exercised by the package tests.

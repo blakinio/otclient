@@ -26,3 +26,12 @@ Login side-preamble fixtures prove the exact pinned Current order after local
 player initialization and before pending-state: `sendAllowBugReport` emits fixed
 `1A 00`, followed by `sendTibiaTime` as `EF + two opaque u8 clock components`.
 The synthetic clock bytes are not retained and no world-light state is inferred.
+
+
+Local-player-only map fixture proves one complete source-reachable Current
+bootstrap branch: opcode `0x64`, authoritative local position, exact surface
+floor traversal and skip markers, one item-free tile containing only the
+ordinary unknown local player, and the complete fixed-width Current player
+creature payload. The synthetic name, appearance, clock, coordinates and
+status values are invented. No item catalogue bytes or private capture are
+included.

@@ -1,6 +1,6 @@
 # Canary Current P2 Development Runtime Baseline
 
-Status: local-player identity, login side-preamble order, known session-end and absent-tile update slices are merged. The parent producer remains blocked on reachable non-empty map/world layouts and general identity resolution.
+Status: local-player identity, login side-preamble, session-end and absent-tile slices are merged; one source-reachable item-free local-player map bootstrap is under exact validation.
 
 Evidence cut: generated P1 artifact and exact source from `blakinio/canary@bc0068ab80bbf003e128fce0589b4cc89d2682d3`.
 
@@ -147,6 +147,43 @@ knownCreatureSet:
 ```
 
 Local-player movement cannot be isolated from this family because ordinary steps append directional map strips through `GetMapDescription`; teleport and floor transitions also request complete map bodies. Remote movement/removal packets expose position and stack index but do not independently prove protocol-neutral item/entity handles.
+
+
+## Active item-free local-player map validation
+
+The pinned source permits an existing tile to contain a creature list without
+ground or items. `GetTileDescription` then emits the ordinary unknown-player
+branch. For an initial surface map at synthetic position `(0x1234, 0x5678, 7)`,
+the local tile is ordinal 118 in the first `18 x 14` floor and the complete
+message has deterministic leading and trailing skip runs.
+
+```yaml
+opcode: 0x64
+viewport: 18_by_14
+surface_floors: 7_down_to_0
+leading_missing_tiles: 118
+leading_marker: [0x75, 0xFF]
+tile_contents:
+  ground: none
+  items: none
+  creatures: [ordinary_unknown_local_player]
+unknown_player:
+  marker_u16_le: 0x61
+  removed_known_u32_le: 0
+  id: must_match_0x17_local_identity
+  bounded_name: consumed_not_exposed
+  outfit_branch: non_zero_looktype
+  icon_count_max: 3
+  final_fixed_fields: [mark_0xFF, inspection_0x00]
+trailing_missing_tiles: 1897
+trailing_markers: [seven_FF_FF_pairs, 0x69_0xFF]
+output: GameEvent::BootstrapCompleted
+general_map_or_item_support: false
+```
+
+The decoder rejects every item, extra tile/creature, known-creature marker,
+non-local identity, unsupported player branch, malformed RLE marker, impossible
+order, truncation, oversize and trailing data.
 
 ## Fixture provenance
 

@@ -34,6 +34,7 @@ pub struct CanaryInboundBootstrapState {
     tibia_time_received: bool,
     pending_state_entered: bool,
     enter_world_received: bool,
+    bootstrap_completed: bool,
     session_ended: bool,
 }
 
@@ -48,6 +49,7 @@ impl CanaryInboundBootstrapState {
             tibia_time_received: false,
             pending_state_entered: false,
             enter_world_received: false,
+            bootstrap_completed: false,
             session_ended: false,
         }
     }
@@ -112,6 +114,16 @@ impl CanaryInboundBootstrapState {
     #[must_use]
     pub const fn enter_world_received(self) -> bool {
         self.enter_world_received
+    }
+
+    /// Return whether a complete initial map established the local position.
+    #[must_use]
+    pub const fn bootstrap_completed(self) -> bool {
+        self.bootstrap_completed
+    }
+
+    pub(crate) const fn mark_bootstrap_completed(&mut self) {
+        self.bootstrap_completed = true;
     }
 
     /// Decode the exact Current local-player initialization logical message.

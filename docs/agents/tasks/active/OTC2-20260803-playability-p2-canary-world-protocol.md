@@ -10,7 +10,7 @@ phase: inbound-provenance-and-identity-contract-blocker
 branch: docs/OTC2-20260803-canary-session-end-closeout
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-03T10:57:00+02:00
+updated: 2026-08-03T11:01:00+02:00
 required_base_commit: "ceb24e22fc19305cb10c7ea29f7f16928def2a04"
 risk: high
 related_prs:
@@ -20,6 +20,7 @@ related_prs:
   - 192
   - 193
   - 196
+  - 198
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -46,11 +47,11 @@ missing_layers:
   - platform input adapter and product binding map
   - visible-world app composition and controlled M2 E2E
 invocation_started_at: 2026-08-03T10:16:00+02:00
-last_progress_at: 2026-08-03T10:56:19+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: session-end-terminal
+last_progress_at: 2026-08-03T11:00:35+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: closeout-pr-198
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 2
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
@@ -170,8 +171,8 @@ This producer consumes already decrypted and deframed logical messages only. It 
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 13
-updated_at: 2026-08-03T10:57:00+02:00
+checkpoint_version: 14
+updated_at: 2026-08-03T11:01:00+02:00
 base: ceb24e22fc19305cb10c7ea29f7f16928def2a04
 branch: docs/OTC2-20260803-canary-session-end-closeout
 status: blocked
@@ -181,6 +182,9 @@ implementation_pr:
   state: merged
   head: a2ea69ea3801df0bbba20caaf6ab7d8677b52bb7
   merge_commit: ceb24e22fc19305cb10c7ea29f7f16928def2a04
+closeout_pr:
+  number: 198
+  state: draft
 validation:
   repaired_generation:
     head: 8078a56411991ceb869f8965faf75bd3527e3db9
@@ -205,6 +209,8 @@ validation:
   ready_state_ci_run: 30799161107
   ready_state_required_job: 91639989636
   ready_state_ci: PASS
+  closeout_head: pending
+  closeout_ci: pending
 fresh_audit:
   result: PASS
   validator: fresh_connector_audit_role
@@ -224,6 +230,7 @@ pr_hygiene:
     192: merged
     193: merged
     196: merged
+  closeout_pr_198: validating
   unresolved_review_threads: 0
   requested_changes: 0
 shared_path_lease: []

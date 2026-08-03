@@ -11,6 +11,7 @@ category = "protocol-canary"
 
 [dependencies]
 oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+oteryn-game-domain = { version = "=0.1.0", path = "../game-domain" }
 oteryn-game-session = { version = "=0.1.0", path = "../game-session" }
 oteryn-protocol-core = { version = "=0.1.0", path = "../protocol-core" }
 oteryn-transport = { version = "=0.1.0", path = "../transport" }

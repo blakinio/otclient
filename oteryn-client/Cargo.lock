@@ -1554,6 +1554,7 @@ version = "0.1.0"
 dependencies = [
  "oteryn-account-session",
  "oteryn-foundation",
+ "oteryn-game-domain",
  "oteryn-game-session",
  "oteryn-protocol-core",
  "oteryn-transport",

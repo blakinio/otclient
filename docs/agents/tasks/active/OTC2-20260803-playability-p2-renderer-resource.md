@@ -1,20 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-renderer-resource
-status: implementing
+status: validating
 agent: "P2 renderer resource producer"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-renderer-resource
-phase: focused-repair-and-architecture-integration
+phase: exact-head-validation-and-audit
 branch: feat/OTC2-20260803-playability-p2-renderer-resource
 base_branch: main
 created: 2026-08-03T12:24:00+02:00
-updated: 2026-08-03T12:44:00+02:00
+updated: 2026-08-03T12:55:00+02:00
 required_base_commit: "1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2"
 risk: medium
-related_prs:
-  - 200
+related_prs: [200]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-renderer-resource.md
   - oteryn-client/crates/renderer-resource/**
@@ -27,8 +26,7 @@ shared_path_lease:
     - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
     - oteryn-client/crates/asset-decode/Cargo.toml
     - oteryn-client/tools/architecture-check/src/lib.rs
-temporary_validation_path:
-  - .github/workflows/otc2-renderer-resource-atomic-repair.yml
+temporary_validation_path: []
 implementation_authorized: true
 policy_version: 2.1
 prompting_standard_version: 2.1
@@ -49,20 +47,19 @@ feature_scope:
   integration_required: true
   e2e_required: false
   completion_claim: partial_producer
-depends_on:
-  - OTC2-20260803-playability-p2-asset-decode
+depends_on: [OTC2-20260803-playability-p2-asset-decode]
 blocks:
   - OTC2-20260803-playability-p2-input-platform
   - OTC2-20260803-playability-p2-visible-world-integration
 invocation_started_at: 2026-08-03T12:20:00+02:00
-last_progress_at: 2026-08-03T12:44:00+02:00
+last_progress_at: 2026-08-03T12:55:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: complete-repair
+ci_check_generation: exact-head-final
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 2
 stall_warnings: 0
 ---
@@ -71,33 +68,32 @@ stall_warnings: 0
 
 Produce the smallest bounded renderer-resource contract for P2: immutable checked RGBA8 upload plans, generation-fenced logical handles and deterministic bounded cache/device-loss lifecycle. The crate owns no world state, draw policy, protocol, input, UI, filesystem acquisition or CPU media decode.
 
-# Live preflight
+# Live state
 
-- `main@1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2` archives the completed Asset Decode producer.
-- Asset Decode implementation PR #194 and archive PR #199 are merged; its original shared lease and ownership are released.
+- `main@1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2` contains the merged and archived Asset Decode producer.
+- PR #200 is the only Renderer Resource implementation PR.
 - Canary protocol remains independently blocked and holds no shared path.
-- Input Platform PR #195 is draft, owns only `crates/input-platform/**` plus its task, and has not requested the shared lease.
-- No renderer-resource task or PR existed before this producer was claimed.
-- This task is fourth in the accepted P2 shared integration order and therefore holds the serialized integration lease.
-- Draft implementation PR #200 owns this task branch.
+- Input Platform PR #195 remains draft and owns no shared path while this serialized lease is held.
+- No temporary workflow or request-only script remains in the PR diff.
 
-# Current implementation
+# Implemented contract
 
-- backend-neutral `TextureUploadPlan` revalidates immutable `DecodedRgba8` layout and owns zero-padded 256-byte-aligned upload bytes;
-- hard limits bound entries, logical device bytes, one texture and one upload plan;
-- `TextureHandle` fences process, device and asset-pack generations plus opaque slot/serial identity;
-- caller-visible acquisition coalesces duplicate generation-fenced assets and uses deterministic least-recently-used eviction;
-- resource resolution performs no allocation, decode, filesystem, network or blocking I/O;
-- device/pack replacement and sink failure are explicit and payload-redacted;
-- fake-sink component tests exercise padding, coalescing, eviction, generation fencing, failure, reset and accounting.
+- `TextureUploadPlan` revalidates immutable `DecodedRgba8` layout and owns zero-filled, 256-byte-row-aligned upload bytes.
+- Hard limits bound live entries, logical device bytes, one texture and one upload-plan allocation.
+- `TextureHandle` fences process, monotonically increasing device and asset-pack generations plus opaque slot/serial identity.
+- `ResourceCache` coalesces duplicate generation-fenced asset requests and performs deterministic least-recently-used eviction.
+- All fallible counters and cache metadata reservation complete before sink upload; sink failure cannot create an untracked resource or false accounting.
+- `resolve` performs no allocation, decode, filesystem, network or blocking I/O.
+- Device/pack replacement, stale handles/assets, missing resources and sink failures return stable payload-redacted errors.
+- Fake-sink tests cover row padding, coalescing, eviction, generation fencing, sink failure, pre-upload arithmetic failure, reset and memory accounting.
 
-# Proven integration defect
+# Architecture integration
 
-The merged Asset Decode producer declared the coarse `runtime` architecture category because no dedicated decode category existed. The accepted Renderer Resource dependency on immutable `DecodedRgba8` would therefore require the broad and unsafe category edge `renderer -> runtime`. The narrow repair is to introduce `asset-decode` as a closed category, permit only `asset-decode -> asset-runtime|asset-types` and `renderer -> asset-decode`, and recategorize only `oteryn-asset-decode`. No Asset Decode API or behavior changes.
+The previous coarse `runtime` category for `oteryn-asset-decode` would require unsafe `renderer -> runtime`. The lease-scoped repair introduces a closed `asset-decode` category, permits only `asset-decode -> asset-runtime|asset-types` and `renderer -> asset-decode`, keeps `app/runtime -> asset-decode` forbidden, and changes no Asset Decode API or behavior.
 
-# Repair checkpoint
+# Validation checkpoint
 
-The first focused Clippy generation exposed prohibited constant `expect` calls and one test initializer. These were repaired. A fresh audit then identified a post-upload counter-failure window that could leave a sink-owned texture outside cache accounting. The self-removing repair preflights all fallible counters before upload, adds an atomicity fixture, restores unrelated lockfile drift, applies the narrow architecture category repair, runs format/tests/strict Clippy/architecture and commits only the bounded repair.
+The self-removing repair generation completed pinned formatting, focused package tests, strict package Clippy, architecture-check tests and workspace architecture validation before producing commit `1615249a9781db2d253f57ce568a9e481fe59e47`. The retained exact-head CI generation is triggered by this human-authored checkpoint commit and is the source of final validation truth.
 
 # Acceptance
 
@@ -106,39 +102,58 @@ The first focused Clippy generation exposed prohibited constant `expect` calls a
 - [x] configured upload/device memory limits are explicit and bounded;
 - [x] duplicate asset requests coalesce deterministically;
 - [x] cache entry/memory accounting and deterministic least-recently-used eviction are bounded;
-- [x] unknown/stale handles, stale assets, device loss/recreation and sink failure have stable results;
+- [x] stale/unknown handles, stale assets, device loss/recreation and sink failure have stable results;
 - [x] frame lookup performs no filesystem access, decode, allocation or blocking I/O;
-- [x] fake-sink tests cover upload, coalescing, eviction, stale generations and device loss;
-- [x] workspace/lockfile/layout integration is minimal and lease-scoped;
-- [ ] focused formatting, strict Clippy and package/component tests pass after atomic repair;
-- [ ] narrow architecture category and dependency direction pass;
-- [ ] exact-head Windows, Supply Chain and repository CI pass;
-- [ ] fresh independent API/hot-path/resource-lifecycle audit has zero material findings;
-- [ ] implementation merges, task archives separately and all ownership/leases release.
+- [x] fake-sink component tests cover required lifecycle and negative cases;
+- [x] workspace/category/lockfile integration is minimal and lease-scoped;
+- [x] lockfile diff contains only the new local package entry;
+- [x] narrow architecture category and dependency direction are covered by policy tests;
+- [ ] retained exact-head Windows metadata, formatting, workspace Clippy/tests, architecture and Supply Chain pass;
+- [ ] retained exact-head repository CI passes;
+- [ ] fresh independent API/hot-path/resource-lifecycle audit has zero open material finding;
+- [ ] implementation PR merges;
+- [ ] task archives separately and all ownership/leases release.
 
 # Claim boundary
 
-This is a synthetic-v1 partial producer. It creates no real GPU device, draw pass, world renderer, production appearance importer, visible-world or M2 completion claim. E2E is `NOT_APPLICABLE` because the public package is a backend-neutral resource lifecycle producer validated with a deterministic fake upload sink.
+This is a synthetic-v1 partial producer. It creates no real GPU device, draw pass, world renderer, production appearance importer, visible-world or M2 completion claim. E2E is `NOT_APPLICABLE` because this backend-neutral resource-lifecycle producer has no reachable real device, application or world composition.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 3
-status: implementing
-phase: focused-repair-and-architecture-integration
+checkpoint_version: 4
+status: validating
+phase: exact-head-validation-and-audit
 base: 1d7f80e3dadc8c71ad06dab2f7cfad5c7ad361b2
 branch: feat/OTC2-20260803-playability-p2-renderer-resource
+implementation_head_before_checkpoint: 1615249a9781db2d253f57ce568a9e481fe59e47
 pr: 200
+changed_paths:
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-renderer-resource.md
+  - oteryn-client/Cargo.lock
+  - oteryn-client/Cargo.toml
+  - oteryn-client/crates/asset-decode/Cargo.toml
+  - oteryn-client/crates/renderer-resource/Cargo.toml
+  - oteryn-client/crates/renderer-resource/src/lib.rs
+  - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
+  - oteryn-client/tools/architecture-check/src/lib.rs
+focused_validation:
+  result: PASS
+  producer_commit: 1615249a9781db2d253f57ce568a9e481fe59e47
+  commands:
+    - cargo fmt --all
+    - cargo metadata --locked --format-version 1
+    - cargo test -p oteryn-renderer-resource --all-targets
+    - cargo clippy -p oteryn-renderer-resource --all-targets -- -D warnings
+    - cargo test -p oteryn-architecture-check --all-targets
+    - cargo run -p oteryn-architecture-check -- workspace .
+exact_head_validation: pending
+fresh_audit: pending
+e2e:
+  result: NOT_APPLICABLE
+  reason: Backend-neutral producer has no reachable real GPU device, application or world composition.
 shared_path_lease:
-  state: held
-  paths:
-    - oteryn-client/Cargo.toml
-    - oteryn-client/Cargo.lock
-    - oteryn-client/docs/architecture/REPOSITORY_LAYOUT.md
-    - oteryn-client/crates/asset-decode/Cargo.toml
-    - oteryn-client/tools/architecture-check/src/lib.rs
-temporary_validation_path: .github/workflows/otc2-renderer-resource-atomic-repair.yml
-architecture_repair: dedicated asset-decode category with narrow inbound/outbound edges
+  state: held_until_terminal_merge_and_archive
 blockers: []
-next_action: Complete the self-removing atomic and architecture repair, then run exact-head validation and a fresh falsification audit.
+next_action: Complete retained exact-head validation, run a fresh falsification audit, remediate material findings, then merge and archive this task before releasing the Input Platform integration lease.
 ```

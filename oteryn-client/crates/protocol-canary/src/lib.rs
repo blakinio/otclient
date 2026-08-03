@@ -31,8 +31,9 @@ pub use command::{
     encode_current_development_command,
 };
 pub use inbound::{
-    CanaryInboundBootstrapState, CanaryInboundError, OPCODE_PENDING_STATE_ENTERED,
-    decode_current_pending_state_entered,
+    CanaryInboundBootstrapState, CanaryInboundError, OPCODE_ENTER_WORLD,
+    OPCODE_LOCAL_PLAYER_INITIALIZATION, OPCODE_PENDING_STATE_ENTERED, decode_current_enter_world,
+    decode_current_local_player_initialization, decode_current_pending_state_entered,
 };
 
 /// Exact generated-source revision selected as the Current development baseline.

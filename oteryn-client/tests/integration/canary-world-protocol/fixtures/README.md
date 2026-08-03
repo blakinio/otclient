@@ -8,8 +8,10 @@ Provenance:
 - producer revision: `bc0068ab80bbf003e128fce0589b4cc89d2682d3`
 - generated index: `oteryn-canary-source-index-v1`
 - source file: `src/server/network/protocol/protocolgame.cpp`
+- local-player producer: Current/non-legacy local branch of `sendAddCreature`, source body beginning after `sendAllowBugReport`
 - pending-state producer: `sendPendingStateEntered`, source line 8502
+- enter-world producer: `sendEnterWorld`, source line 8512
 - session-end producer: `sendSessionEndInformation`, source line 2932
 - session-end enum: `src/server/server_definitions.hpp::SessionEndInformations`
 
-The fixtures contain no credential, session key, private capture, proprietary asset byte or copied producer implementation body. Unknown session-end reason `0x01` and trailing data are negative cases and must fail closed.
+The fixtures contain no credential, session key, private capture, proprietary asset byte or copied producer implementation body. The local-player values and store URL are original synthetic field values used only to exercise the proven Current layout; the URL is never exposed by the decoder. Unknown session-end reason `0x01`, invalid login precision, zero identity and trailing data are negative cases and must fail closed.

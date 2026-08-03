@@ -540,10 +540,10 @@ impl Display for ResourceError {
                 "texture handle belongs to a stale asset-pack generation"
             }
             Self::DeviceGenerationNotAdvanced => {
-                "replacement device generation must differ from the current generation"
+                "replacement device generation must advance beyond the current generation"
             }
             Self::PackGenerationNotAdvanced => {
-                "replacement asset-pack generation must differ from the current generation"
+                "replacement asset-pack generation must advance beyond the current generation"
             }
             Self::UploadFailed => "renderer upload sink rejected the texture plan",
             Self::MissingResource => "renderer resource is unavailable",
@@ -644,8 +644,10 @@ impl<S: TextureUploadSink> ResourceCache<S> {
     /// # Errors
     ///
     /// Rejects stale asset generations, invalid images, exhausted checked
-    /// counters and sink upload failures. Capacity and memory pressure evict the
-    /// deterministic least-recently-used entry before upload.
+    /// counters and sink upload failures. Capacity and memory pressure commit
+    /// deterministic least-recently-used evictions before sink upload so the
+    /// configured resident-device budget is never exceeded. If that upload then
+    /// fails, those already committed evictions remain in effect.
     pub fn acquire(
         &mut self,
         asset: AssetHandle,
@@ -754,7 +756,7 @@ impl<S: TextureUploadSink> ResourceCache<S> {
     ///
     /// # Errors
     ///
-    /// Rejects an unchanged generation.
+    /// Rejects a generation that is unchanged or lower.
     pub fn replace_device(
         &mut self,
         new_generation: DeviceGeneration,
@@ -771,7 +773,7 @@ impl<S: TextureUploadSink> ResourceCache<S> {
     ///
     /// # Errors
     ///
-    /// Rejects an unchanged generation.
+    /// Rejects a generation that is unchanged or lower.
     pub fn replace_pack(
         &mut self,
         new_generation: PackGeneration,
@@ -1095,6 +1097,29 @@ mod tests {
         assert_eq!(cache.entry_count(), 0);
         assert_eq!(cache.accounted_device_bytes(), 0);
         assert_eq!(cache.sink.uploads, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn upload_failure_after_pressure_preserves_bounded_eviction() -> Result<(), Box<dyn Error>> {
+        let (_runtime_a, asset_a, decoded_a) = fixture(10, 1, 1, 1, 1)?;
+        let (_runtime_b, asset_b, decoded_b) = fixture(10, 2, 1, 1, 2)?;
+        let limits = ResourceLimits::new(1, 4, 4, 256)?;
+        let mut cache = cache(asset_a.generation(), limits)?;
+        let first = cache.acquire(asset_a, &decoded_a)?;
+        cache.sink.fail_next = true;
+
+        assert_eq!(
+            cache.acquire(asset_b, &decoded_b).err(),
+            Some(ResourceError::UploadFailed)
+        );
+        assert_eq!(
+            cache.resolve(first.handle()).err(),
+            Some(ResourceError::MissingResource)
+        );
+        assert_eq!(cache.entry_count(), 0);
+        assert_eq!(cache.accounted_device_bytes(), 0);
+        assert_eq!(cache.sink.destroyed, 1);
         Ok(())
     }
 

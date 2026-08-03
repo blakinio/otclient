@@ -1,0 +1,84 @@
+name: Temporary P2 Canary Command Integration
+
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - .github/workflows/temp-p2-canary-command-integration.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-p2-canary-command-integration
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout Canary protocol branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: feat/OTC2-20260803-playability-p2-canary-world-protocol
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Integrate local dependency and validate phase checkpoint
+        shell: bash
+        env:
+          EXPECTED_PARENT: supplied-by-trigger
+          EXPECTED_MAIN: f1a5a1873dbb9ce164aefed7537d5c3004eeb696
+          PATCH_WORKFLOW: .github/workflows/temp-p2-canary-command-integration.yml
+          TRIGGER_WORKFLOW: .github/workflows/temp-p2-canary-command-integration-trigger.yml
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "feat/OTC2-20260803-playability-p2-canary-world-protocol"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN"
+          git merge-base --is-ancestor origin/main HEAD
+          test ! -e .github/workflows/temp-p2-canary-command-focused.yml
+          test ! -e .github/workflows/temp-p2-canary-command-trigger.yml
+          grep -Fq 'mod command;' oteryn-client/crates/protocol-canary/src/lib.rs
+          grep -Fq 'encode_current_development_command' oteryn-client/crates/protocol-canary/src/lib.rs
+
+          rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
+          rustup default 1.94.0
+          cd oteryn-client
+          cargo metadata --format-version 1 > /tmp/canary-command-metadata.json
+          cargo fmt --all --check
+          cargo clippy -p oteryn-protocol-canary --all-targets --locked -- -D warnings
+          cargo test -p oteryn-protocol-canary --all-targets --locked
+          cargo run --locked -p oteryn-architecture-check -- workspace .
+          cd ..
+
+          python3 - <<'PY'
+          import subprocess
+
+          diff = subprocess.run(
+              ['git', 'diff', '--unified=0', '--', 'oteryn-client/Cargo.lock'],
+              check=True,
+              text=True,
+              capture_output=True,
+          ).stdout
+          additions = []
+          for line in diff.splitlines():
+              if line.startswith('---') or line.startswith('+++'):
+                  continue
+              if line.startswith('-'):
+                  raise SystemExit(f'unexpected Cargo.lock removal: {line}')
+              if line.startswith('+'):
+                  additions.append(line[1:])
+          if additions != [' "oteryn-game-domain",']:
+              raise SystemExit(f'unexpected Cargo.lock additions: {additions}')
+          PY
+
+          git rm "$PATCH_WORKFLOW" "$TRIGGER_WORKFLOW"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/Cargo.lock
+          git diff --cached --check
+          git commit -m "build(protocol-canary): integrate game domain command contract"
+          git push origin HEAD:feat/OTC2-20260803-playability-p2-canary-world-protocol

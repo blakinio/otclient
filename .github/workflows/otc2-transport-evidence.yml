@@ -1,0 +1,62 @@
+name: OTC2 Transport Evidence
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260804-tokio-transport
+    paths:
+      - oteryn-client/crates/transport/**
+      - .github/workflows/otc2-transport-evidence.yml
+
+permissions:
+  contents: write
+
+jobs:
+  windows-evidence:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260804-tokio-transport
+          show-progress: false
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          $output = rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt --target x86_64-pc-windows-msvc 2>&1
+          if ($LASTEXITCODE -ne 0) { throw ($output -join "`n") }
+          rustup default 1.94.0 | Out-Null
+          rustc --version
+          cargo --version
+
+      - name: Format task sources
+        working-directory: oteryn-client
+        run: cargo fmt --all
+
+      - name: Lint transport with blocking baseline
+        working-directory: oteryn-client
+        run: cargo clippy -p oteryn-transport --all-targets --features blocking-baseline -- -D warnings
+
+      - name: Test transport with blocking baseline
+        working-directory: oteryn-client
+        run: cargo test -p oteryn-transport --features blocking-baseline
+
+      - name: Run comparative release evidence
+        working-directory: oteryn-client
+        run: cargo run -p oteryn-transport --example transport_evidence --features blocking-baseline --release
+
+      - name: Commit canonical formatting
+        shell: pwsh
+        run: |
+          if (-not (git diff --quiet -- oteryn-client)) {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add oteryn-client
+            git commit -m "style(rust): format transport evidence harness"
+            git push origin HEAD:feat/OTC2-20260804-tokio-transport
+          }

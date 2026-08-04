@@ -460,3 +460,24 @@ e2e:
   result: NOT_APPLICABLE
   reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
 ```
+
+
+## Unknown non-player current-main restack
+
+```yaml
+pr: 261
+current_base: 133388d61b787fb1829d740d0a1db581dccc3c4e
+validated_product_head: f913e5ff5e4813e7ec2590122fc2ee3224aa901f
+restack_head_before_metadata: 3253268c94ff1e05ff8bbcba12b3713c7336d28e
+new_governance_read:
+  - oteryn-client/AGENTS.md
+  - oteryn-client/docs/architecture/ARCHITECTURE.md
+  - oteryn-client/docs/architecture/decisions/ADR-001-dual-protocol-selection-and-async-transport.md
+  - oteryn-client/docs/architecture/PROTOCOL_BOUNDARY.md
+  - oteryn-client/docs/architecture/DUAL_PROTOCOL_EXECUTION_PLAN.md
+  - oteryn-client/docs/agents/PROGRAM.md
+  - oteryn-client/docs/agents/WORKSTREAMS.md
+adapter_isolation: PASS
+changed_runtime_semantics_after_product_validation: false
+final_exact_head_ci: pending
+```

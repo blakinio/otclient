@@ -10,8 +10,8 @@ phase: unknown-nonplayer-appearance-terminal-ci
 branch: feat/OTC2-20260804-canary-unknown-nonplayer-appearance
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-04T12:31:00+02:00
-required_base_commit: "644df4c93a19840886cc7544b830df0de24f4524"
+updated: 2026-08-04T12:47:00+02:00
+required_base_commit: "133388d61b787fb1829d740d0a1db581dccc3c4e"
 risk: high
 related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254, 256, 258, 261]
 owned_paths:
@@ -41,7 +41,7 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-04T12:31:00+02:00
+last_progress_at: 2026-08-04T12:47:00+02:00
 ci_checks_for_current_head: 3
 ci_check_generation: unknown-nonplayer-appearance-final-exact-head
 terminal_ci_wait_started_at: null
@@ -341,14 +341,14 @@ The parent Canary task remains active and blocked. It retains exclusive `protoco
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 36
-updated_at: 2026-08-04T12:31:00+02:00
-observed_main: 644df4c93a19840886cc7544b830df0de24f4524
+checkpoint_version: 37
+updated_at: 2026-08-04T12:47:00+02:00
+observed_main: 133388d61b787fb1829d740d0a1db581dccc3c4e
 status: validating
 phase: unknown-nonplayer-appearance-terminal-ci
 active_branch: feat/OTC2-20260804-canary-unknown-nonplayer-appearance
 pr: 261
-base: 644df4c93a19840886cc7544b830df0de24f4524
+base: 133388d61b787fb1829d740d0a1db581dccc3c4e
 validated_product_head: f913e5ff5e4813e7ec2590122fc2ee3224aa901f
 changed_paths:
   - oteryn-client/crates/protocol-canary/src/lib.rs
@@ -407,21 +407,23 @@ recovery:
   generation: 3
   session_id: OTC2-20260804T1043+0200-nonplayer
   session_started_at: 2026-08-04T12:10:00+02:00
-  checkpointed_at: 2026-08-04T12:31:00+02:00
-  last_progress_at: 2026-08-04T12:31:00+02:00
-  phase: unknown-nonplayer-appearance-terminal-ci
-  exact_head: f913e5ff5e4813e7ec2590122fc2ee3224aa901f
+  checkpointed_at: 2026-08-04T12:47:00+02:00
+  last_progress_at: 2026-08-04T12:47:00+02:00
+  phase: unknown-nonplayer-appearance-current-main-restack
+  exact_head: 3253268c94ff1e05ff8bbcba12b3713c7336d28e
   pull_request: 261
-  active_operation: final exact-head CI, protected merge and blocked-parent reconciliation
+  active_operation: exact-head CI, protected merge and blocked-parent reconciliation on current main
   external_run_ids:
     - 30899069326
     - 30899073315
-  operation_started_at: 2026-08-04T12:31:00+02:00
-  wait_deadline_at: 2026-08-04T13:16:00+02:00
-  check_generation: unknown-nonplayer-appearance-final-exact-head
-  checks_used: 2
+    - 30899539987
+    - 30899539187
+  operation_started_at: 2026-08-04T12:47:00+02:00
+  wait_deadline_at: 2026-08-04T13:32:00+02:00
+  check_generation: unknown-nonplayer-appearance-current-main
+  checks_used: 4
   status: ready
   safe_to_resume: true
-  resume_condition: Merge PR 261 only after the validation-record head passes all exact-head required checks; otherwise preserve the precise failure.
-  next_action: Reconcile PR 261 terminal state, then continue the parent task from its remaining item, summon and hidden/extension blockers.
+  resume_condition: Merge PR 261 only after the final restacked head passes all required checks; otherwise preserve the precise failure.
+  next_action: Reconcile PR 261 terminal state, then continue the active parent task from its remaining item, nonzero-eviction, hidden, summon and extension blockers.
 ```

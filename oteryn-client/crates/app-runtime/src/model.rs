@@ -83,6 +83,8 @@ pub enum RuntimeError {
     WorkerSpawn(WorkerKind),
     /// A named worker panicked or could not be joined.
     WorkerJoin(WorkerKind),
+    /// The application-owned Tokio runtime could not be constructed.
+    RuntimeUnavailable,
     /// A second authentication worker was requested.
     AuthenticationAlreadyActive,
     /// A second connection worker was requested.
@@ -113,6 +115,9 @@ impl Display for RuntimeError {
             Self::Entry(failure) => Display::fmt(failure, formatter),
             Self::WorkerSpawn(kind) => write!(formatter, "{kind} worker could not be started"),
             Self::WorkerJoin(kind) => write!(formatter, "{kind} worker did not finish cleanly"),
+            Self::RuntimeUnavailable => {
+                formatter.write_str("application Tokio runtime could not be created")
+            }
             Self::AuthenticationAlreadyActive => {
                 formatter.write_str("one authentication attempt is already active")
             }
@@ -141,6 +146,7 @@ impl Error for RuntimeError {
             Self::Entry(failure) => Some(failure),
             Self::WorkerSpawn(_)
             | Self::WorkerJoin(_)
+            | Self::RuntimeUnavailable
             | Self::AuthenticationAlreadyActive
             | Self::ConnectionAlreadyActive
             | Self::NoActiveAttempt

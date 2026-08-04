@@ -388,6 +388,44 @@ fn partial_io_timeout_and_eof_are_typed_without_truncation() -> Result<(), Box<d
 }
 
 #[test]
+fn partial_progress_cannot_extend_total_read_or_write_deadlines() -> Result<(), Box<dyn Error>> {
+    runtime()?.block_on(async {
+        let (mut client, mut server) = tokio::io::duplex(1);
+        let slow_writer = tokio::spawn(async move {
+            for byte in [1_u8, 2, 3] {
+                server.write_all(&[byte]).await?;
+                sleep(Duration::from_millis(8)).await;
+            }
+            Ok::<(), io::Error>(())
+        });
+        let mut received = [0_u8; 3];
+        assert_eq!(
+            test_read_exact(&mut client, &mut received, Duration::from_millis(12)).await,
+            Err(TransportError::new(TransportErrorKind::Timeout))
+        );
+        slow_writer.abort();
+        let _joined = slow_writer.await;
+
+        let (mut client, mut server) = tokio::io::duplex(1);
+        let slow_reader = tokio::spawn(async move {
+            let mut byte = [0_u8; 1];
+            for _ in 0..4 {
+                server.read_exact(&mut byte).await?;
+                sleep(Duration::from_millis(8)).await;
+            }
+            Ok::<(), io::Error>(())
+        });
+        assert_eq!(
+            test_write_all(&mut client, &[1, 2, 3, 4], Duration::from_millis(12)).await,
+            Err(TransportError::new(TransportErrorKind::Timeout))
+        );
+        slow_reader.abort();
+        let _joined = slow_reader.await;
+        Ok::<(), Box<dyn Error>>(())
+    })
+}
+
+#[test]
 fn shutdown_with_queued_work_and_repeated_cycles_leave_no_session_task()
 -> Result<(), Box<dyn Error>> {
     runtime()?.block_on(async {

@@ -680,22 +680,25 @@ async fn read_exact_deadline<R>(
 where
     R: AsyncRead + Unpin,
 {
-    let mut offset = 0;
-    while offset < buffer.len() {
-        let result = timeout(deadline, reader.read(&mut buffer[offset..])).await;
-        let read = match result {
-            Ok(Ok(0)) => {
-                return Err(TransportError::new(TransportErrorKind::ConnectionLost));
-            }
-            Ok(Ok(read)) => read,
-            Ok(Err(error)) => return Err(classify_read_error(&error)),
-            Err(_elapsed) => return Err(TransportError::new(TransportErrorKind::Timeout)),
-        };
-        offset = offset
-            .checked_add(read)
-            .ok_or_else(|| TransportError::new(TransportErrorKind::ResourceExhausted))?;
-    }
-    Ok(())
+    let operation = async {
+        let mut offset = 0;
+        while offset < buffer.len() {
+            let read = match reader.read(&mut buffer[offset..]).await {
+                Ok(0) => {
+                    return Err(TransportError::new(TransportErrorKind::ConnectionLost));
+                }
+                Ok(read) => read,
+                Err(error) => return Err(classify_read_error(&error)),
+            };
+            offset = offset
+                .checked_add(read)
+                .ok_or_else(|| TransportError::new(TransportErrorKind::ResourceExhausted))?;
+        }
+        Ok(())
+    };
+    timeout(deadline, operation)
+        .await
+        .map_err(|_elapsed| TransportError::new(TransportErrorKind::Timeout))?
 }
 
 async fn write_all_deadline<W>(
@@ -706,22 +709,25 @@ async fn write_all_deadline<W>(
 where
     W: AsyncWrite + Unpin,
 {
-    let mut offset = 0;
-    while offset < buffer.len() {
-        let result = timeout(deadline, writer.write(&buffer[offset..])).await;
-        let written = match result {
-            Ok(Ok(0)) => {
-                return Err(TransportError::new(TransportErrorKind::ConnectionLost));
-            }
-            Ok(Ok(written)) => written,
-            Ok(Err(error)) => return Err(classify_write_error(&error)),
-            Err(_elapsed) => return Err(TransportError::new(TransportErrorKind::Timeout)),
-        };
-        offset = offset
-            .checked_add(written)
-            .ok_or_else(|| TransportError::new(TransportErrorKind::ResourceExhausted))?;
-    }
-    Ok(())
+    let operation = async {
+        let mut offset = 0;
+        while offset < buffer.len() {
+            let written = match writer.write(&buffer[offset..]).await {
+                Ok(0) => {
+                    return Err(TransportError::new(TransportErrorKind::ConnectionLost));
+                }
+                Ok(written) => written,
+                Err(error) => return Err(classify_write_error(&error)),
+            };
+            offset = offset
+                .checked_add(written)
+                .ok_or_else(|| TransportError::new(TransportErrorKind::ResourceExhausted))?;
+        }
+        Ok(())
+    };
+    timeout(deadline, operation)
+        .await
+        .map_err(|_elapsed| TransportError::new(TransportErrorKind::Timeout))?
 }
 
 async fn connect_with_deadline<F, T>(

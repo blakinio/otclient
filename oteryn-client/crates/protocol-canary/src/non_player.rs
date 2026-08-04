@@ -1,5 +1,6 @@
 use crate::CANARY_NETWORK_MESSAGE_MAX_BYTES;
 use crate::inbound::{CanaryInboundBootstrapState, CanaryInboundError};
+use crate::outfit::decode_current_non_otcr_outfit;
 use crate::tile::OPCODE_ADD_TILE_THING;
 use oteryn_foundation::SessionGeneration;
 use oteryn_game_domain::{
@@ -19,23 +20,23 @@ const MAP_MAX_LAYERS: u8 = 16;
 const CREATURE_MARK_UNMARKED: u8 = 0xFF;
 const CREATURE_INSPECTION_NONE: u8 = 0;
 
-/// Decode one complete Current unknown visible monster, player-owned monster
+/// Decode one complete Current unknown monster, player-owned monster
 /// summon or NPC appearance.
 ///
 /// The accepted producer branch is exactly opcode `0x6A`, one canonical
 /// position, a visible stack index, unknown-creature marker `0x61`, zero cache
 /// eviction, one non-local entity id, a header type of monster (`1`) or NPC
-/// (`2`), one non-empty domain-bounded name and the complete visible common
-/// payload. A normal monster or NPC repeats its header type in the final type
-/// field. A source-reachable monster with a player master keeps monster type in
-/// the header, is rewritten to player-summon type (`3`) in the final field and
+/// (`2`), one non-empty domain-bounded name and the complete common payload. A
+/// normal monster or NPC repeats its header type in the final type field. A
+/// source-reachable monster with a player master keeps monster type in the
+/// header, is rewritten to player-summon type (`3`) in the final field and
 /// appends one nonzero master id.
 ///
 /// The adapter never creates, mutates or infers the producer's known-creature
 /// cache and does not expose the Canary-only master relationship. It emits only
-/// protocol-neutral [`GameEvent::EntityAppeared`] state. Hidden health,
-/// invisible outfits, direct summon header types, nonzero eviction, extension
-/// payloads and every trailing byte remain rejected.
+/// protocol-neutral [`GameEvent::EntityAppeared`] state. Hidden health, direct
+/// summon header types, nonzero eviction, extension payloads and every trailing
+/// byte remain rejected.
 ///
 /// # Errors
 ///
@@ -76,7 +77,7 @@ pub fn decode_current_unknown_remote_non_player_appearance(
         return Err(unknown_value().into());
     }
 
-    parse_visible_non_player_payload(&mut reader, header_type)?;
+    parse_non_player_payload(&mut reader, header_type)?;
     reader.finish(TrailingDataPolicy::Reject)?;
 
     let entity = EntityHandle::new(state.session(), EntityId::try_new(entity_id)?);
@@ -94,20 +95,14 @@ pub fn decode_current_unknown_remote_non_player_appearance(
     Ok(envelope)
 }
 
-fn parse_visible_non_player_payload(
+fn parse_non_player_payload(
     reader: &mut BoundedReader<'_>,
     header_type: u8,
 ) -> Result<(), CanaryInboundError> {
     if !(1..=100).contains(&reader.read_u8()?) || reader.read_u8()? > 7 {
         return Err(unknown_value().into());
     }
-    if reader.read_u16_le()? == 0 {
-        return Err(unknown_value().into());
-    }
-    let _outfit_colors_and_addons = reader.read_exact(5)?;
-    if reader.read_u16_le()? != 0 {
-        let _mount_colors = reader.read_exact(4)?;
-    }
+    decode_current_non_otcr_outfit(reader)?;
 
     let _light_level = reader.read_u8()?;
     let _light_color = reader.read_u8()?;

@@ -1,4 +1,5 @@
 use crate::inbound::{CanaryInboundBootstrapState, CanaryInboundError};
+use crate::outfit::decode_current_non_otcr_outfit;
 use crate::{CANARY_CHARACTER_NAME_MAX_BYTES, CANARY_NETWORK_MESSAGE_MAX_BYTES};
 use oteryn_foundation::SessionGeneration;
 use oteryn_game_domain::{
@@ -29,7 +30,7 @@ impl CanaryInboundBootstrapState {
     /// encoded as opcode `0x6A`, position, stack index below ten, unknown marker
     /// `0x61`, zero known-cache eviction id and the complete Current ordinary
     /// player payload. Known creatures, cache eviction, hidden health, summons,
-    /// monsters, NPCs, invisible outfits and OTCR extensions remain rejected.
+    /// monsters, NPCs, unsupported OTCR outfit extensions remain rejected.
     ///
     /// # Errors
     ///
@@ -145,15 +146,7 @@ pub fn decode_current_unknown_remote_player_appearance(
     if !(1..=100).contains(&reader.read_u8()?) || reader.read_u8()? > 7 {
         return Err(unknown_value().into());
     }
-
-    if reader.read_u16_le()? == 0 {
-        return Err(unknown_value().into());
-    }
-    let _outfit_colors_and_addons = reader.read_exact(5)?;
-
-    if reader.read_u16_le()? != 0 {
-        let _mount_colors = reader.read_exact(4)?;
-    }
+    decode_current_non_otcr_outfit(&mut reader)?;
 
     let _light_level = reader.read_u8()?;
     let _light_color = reader.read_u8()?;

@@ -1,5 +1,6 @@
 use crate::CANARY_NETWORK_MESSAGE_MAX_BYTES;
 use crate::inbound::{CanaryInboundBootstrapState, CanaryInboundError};
+use crate::outfit::decode_current_non_otcr_outfit;
 use crate::tile::OPCODE_ADD_TILE_THING;
 use oteryn_foundation::SessionGeneration;
 use oteryn_game_domain::{
@@ -20,13 +21,13 @@ const CREATURE_INSPECTION_NONE: u8 = 0;
 ///
 /// The accepted producer branch is exactly opcode `0x6A`, one position, one
 /// visible stack index, known-creature marker `0x62`, one non-local entity id
-/// and the complete visible ordinary-player common payload. The known branch
+/// and the complete ordinary-player common payload. The known branch
 /// carries no name and omits the unknown-branch guild emblem, so success emits
 /// [`GameEvent::EntityAppeared`] with `name: None`.
 ///
 /// This adapter does not create, mutate or infer a known-creature cache entry.
-/// Hidden health, invisible outfits, summons, monsters, NPCs, extensions and
-/// every trailing byte remain rejected.
+/// Hidden health, summons, monsters, NPCs, extensions and every trailing byte
+/// remain rejected.
 ///
 /// # Errors
 ///
@@ -58,7 +59,7 @@ pub fn decode_current_known_remote_player_appearance(
         return Err(unknown_value().into());
     }
 
-    parse_visible_ordinary_player_payload(&mut reader)?;
+    parse_ordinary_player_payload(&mut reader)?;
     reader.finish(TrailingDataPolicy::Reject)?;
 
     let entity = EntityHandle::new(state.session(), EntityId::try_new(entity_id)?);
@@ -76,19 +77,11 @@ pub fn decode_current_known_remote_player_appearance(
     Ok(envelope)
 }
 
-fn parse_visible_ordinary_player_payload(
-    reader: &mut BoundedReader<'_>,
-) -> Result<(), CanaryInboundError> {
+fn parse_ordinary_player_payload(reader: &mut BoundedReader<'_>) -> Result<(), CanaryInboundError> {
     if !(1..=100).contains(&reader.read_u8()?) || reader.read_u8()? > 7 {
         return Err(unknown_value().into());
     }
-    if reader.read_u16_le()? == 0 {
-        return Err(unknown_value().into());
-    }
-    let _outfit_colors_and_addons = reader.read_exact(5)?;
-    if reader.read_u16_le()? != 0 {
-        let _mount_colors = reader.read_exact(4)?;
-    }
+    decode_current_non_otcr_outfit(reader)?;
 
     let _light_level = reader.read_u8()?;
     let _light_color = reader.read_u8()?;

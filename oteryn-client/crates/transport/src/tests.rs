@@ -20,9 +20,7 @@ impl FrameBoundary for U16TotalLength {
 
     fn complete_frame_len(&self, header: &[u8]) -> Result<usize, TransportError> {
         if header.len() != 2 {
-            return Err(TransportError::new(
-                TransportErrorKind::InvalidFrameLength,
-            ));
+            return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
         }
         Ok(usize::from(u16::from_le_bytes([header[0], header[1]])))
     }
@@ -37,9 +35,7 @@ impl FrameBoundary for TerminalBoundary {
     }
 
     fn complete_frame_len(&self, _header: &[u8]) -> Result<usize, TransportError> {
-        Err(TransportError::new(
-            TransportErrorKind::InvalidFrameLength,
-        ))
+        Err(TransportError::new(TransportErrorKind::InvalidFrameLength))
     }
 }
 
@@ -67,13 +63,7 @@ fn config() -> Result<TransportConfig, TransportConfigError> {
 fn configuration_retains_limits_and_explicit_queue_bounds() -> Result<(), Box<dyn Error>> {
     let over = Duration::from_secs(31);
     assert_eq!(
-        TransportConfig::new(
-            over,
-            Duration::from_secs(1),
-            Duration::from_secs(1),
-            1,
-            1,
-        ),
+        TransportConfig::new(over, Duration::from_secs(1), Duration::from_secs(1), 1, 1,),
         Err(TransportConfigError::TimeoutTooLarge)
     );
     assert_eq!(
@@ -116,11 +106,7 @@ fn full_duplex_loopback_preserves_frames_and_joins() -> Result<(), Box<dyn Error
             &cancellation.token(),
         )
         .await?;
-        session.try_send(
-            generation,
-            OutboundPriority::Gameplay,
-            vec![5, 0, 1, 2, 3],
-        )?;
+        session.try_send(generation, OutboundPriority::Gameplay, vec![5, 0, 1, 2, 3])?;
 
         let frame = timeout(Duration::from_secs(2), async {
             loop {
@@ -178,11 +164,7 @@ fn stale_generation_and_oversized_outbound_are_rejected_before_io() -> Result<()
             Err(TransportError::new(TransportErrorKind::StaleSession))
         );
         assert_eq!(
-            session.try_send(
-                generation,
-                OutboundPriority::Gameplay,
-                vec![0_u8; 129],
-            ),
+            session.try_send(generation, OutboundPriority::Gameplay, vec![0_u8; 129],),
             Err(TransportError::new(TransportErrorKind::FrameTooLarge))
         );
 
@@ -379,12 +361,7 @@ fn partial_io_timeout_and_eof_are_typed_without_truncation() -> Result<(), Box<d
             server.read_exact(&mut received).await?;
             Ok::<[u8; 5], io::Error>(received)
         });
-        test_write_all(
-            &mut client,
-            &[9, 8, 7, 6, 5],
-            Duration::from_secs(1),
-        )
-        .await?;
+        test_write_all(&mut client, &[9, 8, 7, 6, 5], Duration::from_secs(1)).await?;
         assert_eq!(reader.await??, [9, 8, 7, 6, 5]);
 
         let (mut client, _server) = tokio::io::duplex(1);
@@ -437,11 +414,7 @@ fn shutdown_with_queued_work_and_repeated_cycles_leave_no_session_task()
                 &cancellation.token(),
             )
             .await?;
-            session.try_send(
-                generation,
-                OutboundPriority::Background,
-                vec![2, 0],
-            )?;
+            session.try_send(generation, OutboundPriority::Background, vec![2, 0])?;
             session.close();
             let summary = timeout(Duration::from_secs(1), session.join()).await??;
             assert_eq!(summary.generation(), generation);

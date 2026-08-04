@@ -174,9 +174,7 @@ impl TransportSession {
     ) -> Result<Self, TransportError> {
         let header_len = boundary.header_len();
         if header_len == 0 || header_len > MAX_FRAME_HEADER_BYTES {
-            return Err(TransportError::new(
-                TransportErrorKind::InvalidFrameLength,
-            ));
+            return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
         }
 
         let stream = connect_with_deadline(
@@ -270,9 +268,7 @@ impl TransportSession {
             return Err(TransportError::new(TransportErrorKind::InvalidState));
         }
         if bytes.is_empty() {
-            return Err(TransportError::new(
-                TransportErrorKind::InvalidFrameLength,
-            ));
+            return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
         }
         if bytes.len() > self.config.max_outbound_frame_bytes() {
             return Err(TransportError::new(TransportErrorKind::FrameTooLarge));
@@ -655,36 +651,23 @@ where
 {
     let header_len = boundary.header_len();
     if header_len == 0 || header_len > MAX_FRAME_HEADER_BYTES {
-        return Err(TransportError::new(
-            TransportErrorKind::InvalidFrameLength,
-        ));
+        return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
     }
     let mut header = vec![0_u8; header_len];
     read_exact_deadline(reader, &mut header, config.read_timeout()).await?;
     let complete_len = boundary
         .complete_frame_len(&header)
         .map_err(|_error| TransportError::new(TransportErrorKind::ProtocolTerminal))?;
-    validate_complete_frame_len(
-        header_len,
-        complete_len,
-        config.max_inbound_frame_bytes(),
-    )?;
+    validate_complete_frame_len(header_len, complete_len, config.max_inbound_frame_bytes())?;
 
     let mut frame = Vec::new();
     frame
         .try_reserve_exact(complete_len)
-        .map_err(|_allocation_error| {
-            TransportError::new(TransportErrorKind::ResourceExhausted)
-        })?;
+        .map_err(|_allocation_error| TransportError::new(TransportErrorKind::ResourceExhausted))?;
     frame.resize(complete_len, 0);
     frame[..header_len].copy_from_slice(&header);
     if complete_len > header_len {
-        read_exact_deadline(
-            reader,
-            &mut frame[header_len..],
-            config.read_timeout(),
-        )
-        .await?;
+        read_exact_deadline(reader, &mut frame[header_len..], config.read_timeout()).await?;
     }
     Ok(frame)
 }

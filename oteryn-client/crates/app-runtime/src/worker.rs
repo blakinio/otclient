@@ -6,7 +6,10 @@ use oteryn_game_session::{
 };
 use oteryn_world_directory::AccountDirectorySnapshot;
 use std::fmt::{self, Debug, Formatter};
-use std::thread::JoinHandle;
+use std::sync::mpsc::Receiver;
+use std::thread::JoinHandle as ThreadJoinHandle;
+use tokio::runtime::Runtime;
+use tokio::task::JoinHandle as TokioJoinHandle;
 
 pub(crate) type IdentityOutput = (
     AccountSessionId,
@@ -57,7 +60,7 @@ impl Debug for WorkerEvent {
 pub(crate) struct OwnedWorker {
     pub(crate) kind: WorkerKind,
     pub(crate) cancellation: CancellationSource,
-    pub(crate) handle: JoinHandle<WorkerEvent>,
+    pub(crate) handle: ThreadJoinHandle<WorkerEvent>,
 }
 
 impl OwnedWorker {
@@ -73,5 +76,36 @@ impl OwnedWorker {
         self.handle
             .join()
             .map_err(|_panic_payload| RuntimeError::WorkerJoin(self.kind))
+    }
+}
+
+pub(crate) struct OwnedTokioWorker {
+    pub(crate) kind: WorkerKind,
+    pub(crate) cancellation: CancellationSource,
+    pub(crate) handle: TokioJoinHandle<()>,
+    pub(crate) event_rx: Receiver<WorkerEvent>,
+}
+
+impl OwnedTokioWorker {
+    pub(crate) fn cancel(&self) {
+        let _changed = self.cancellation.cancel();
+    }
+
+    pub(crate) fn is_finished(&self) -> bool {
+        self.handle.is_finished()
+    }
+
+    pub(crate) fn join(self, runtime: &Runtime) -> Result<WorkerEvent, RuntimeError> {
+        runtime
+            .block_on(self.handle)
+            .map_err(|_join_error| RuntimeError::WorkerJoin(self.kind))?;
+        self.event_rx
+            .recv()
+            .map_err(|_receive_error| RuntimeError::WorkerJoin(self.kind))
+    }
+
+    pub(crate) fn abort_and_join(self, runtime: &Runtime) {
+        self.handle.abort();
+        drop(runtime.block_on(self.handle));
     }
 }

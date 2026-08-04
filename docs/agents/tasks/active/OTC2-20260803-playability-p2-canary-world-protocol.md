@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: blocked
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: item-catalogue-and-local-map-strip-blocker
-branch: main
+phase: known-player-appearance-terminal-ci
+branch: feat/OTC2-20260804-canary-known-player-appearance
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-04T08:53:00+02:00
-required_base_commit: "14e2718b7ff046b0620d5c838429cef81aa6d340"
+updated: 2026-08-04T11:08:00+02:00
+required_base_commit: "694314af9162b4e435d4b269dbec6ebe7b0a83e4"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254, 256]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -36,16 +36,16 @@ complete_user_facing_feature: false
 missing_layers:
   - authoritative Current item-type metadata and complete AddItem branch contract
   - authoritative item-instance identity for generic removal and replacement
-  - complete known-creature cache, non-player, hidden-health and extension branches
+  - nonzero known-cache eviction, non-player, hidden-health and extension branches
   - complete local-player appended map-strip reconciliation
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-04T08:53:00+02:00
+last_progress_at: 2026-08-04T11:08:00+02:00
 ci_checks_for_current_head: 3
-ci_check_generation: entity-reconciliation-closeout-restack-exact-head
+ci_check_generation: known-player-appearance-final-exact-head
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 5
+terminal_ci_checks_for_current_generation: 2
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
@@ -110,7 +110,7 @@ The implementation rejects known marker `0x62`, nonzero cache eviction, local id
 | session bootstrap | `PARTIAL` | Exact order through local identity, bug-report permission, Tibia time, pending-state, enter-world and one item-free local-player map is implemented. General map admission remains incomplete. |
 | map description | `PARTIAL` | One complete item-free local-player-only `0x64` branch is implemented. General non-empty tiles require authoritative item metadata and broader creature/cache branches. |
 | tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch emits `TileCleared`. Non-empty tile bodies and authoritative stack identity remain blocked. |
-| creature/entity appearance | `PARTIAL` | One complete post-bootstrap `0x6A` unknown ordinary remote-player branch with zero cache eviction emits `EntityAppeared`. Known/cache-eviction, hidden, summon, monster, NPC, invisible and OTCR branches remain unsupported. |
+| creature/entity appearance | `PARTIAL` | Complete post-bootstrap `0x6A` ordinary-player branches are implemented for unknown identity with zero cache eviction and known identity marker `0x62`. Nonzero eviction, hidden, summon, monster, NPC, invisible and OTCR branches remain unsupported. |
 | movement and reconciliation | `PARTIAL` | The complete remote non-teleport `0x6D` layout is implemented behind a read-only caller-owned resolver that supplies the session-fenced entity and destination stack. Local-player movement and appended map strips remain blocked. |
 | removal | `PARTIAL` | The complete remote-entity `0x6C` layout is implemented behind a read-only caller-owned resolver. Item removal and local-player teleport/map-reset branches remain unsupported. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain rejected. |
@@ -155,6 +155,42 @@ validation:
 
 Local-player movement is excluded because its producer branch appends map strips. Generic item removal is excluded because this phase does not own or infer item identity. General map and tile decoding remain blocked by authoritative item metadata.
 
+# Known ordinary remote-player appearance continuation
+
+The pinned Current producer proves a second complete ordinary-player `sendAddCreature` family that does not require item metadata or mutable cache ownership:
+
+```yaml
+source_revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+branch: feat/OTC2-20260804-canary-known-player-appearance
+pr: 256
+opcode: 0x6A
+position: [x_u16_le, y_u16_le, z_u8]
+stack_bound: 0_through_9
+known_marker_u16_le: 0x62
+entity_id: nonzero_and_distinct_from_local_player
+known_header_omits: [cache_eviction_id, entity_type, name]
+common_payload:
+  health: 1_through_100
+  direction: 0_through_7
+  visible_outfit: required
+  guild_emblem: omitted_for_known_branch
+  final_entity_type: ordinary_player
+output: GameEventEnvelope::v1(GameEvent::EntityAppeared)
+output_name: null
+cache_mutation: false
+shared_path_lease: []
+validation:
+  product_head: e952aea38ce93d873b0303556164e3f7a118f1d5
+  rust_client_run: 30894575347
+  windows_job: 91944323324
+  supply_chain_job: 91944323203
+  repository_ci_run: 30894574150
+  repository_required_job: 91944797163
+  result: PASS
+```
+
+The adapter accepts the wire-carried session-fenced entity identity but does not create, mutate or infer the producer's known-creature cache. Hidden health, invisible outfits, summons, monsters, NPCs, nonzero eviction and OTCR extensions remain rejected.
+
 # Exact blocker normalization
 
 ## Authoritative item metadata
@@ -167,7 +203,7 @@ Merged PR `#252` now provides a read-only caller-owned resolver for complete rem
 
 ## Remaining creature branches
 
-The known-creature cache transition, nonzero eviction, non-player types, hidden-health, summon, invisible outfit and OTCR extension branches are not normalized as complete accepted families. They remain `UNKNOWN` and unimplemented.
+The complete known ordinary-player appearance branch is staged in this phase. Nonzero cache eviction, non-player types, hidden-health, summon, invisible outfit and OTCR extension branches are not normalized as complete accepted families. They remain `UNKNOWN` and unimplemented.
 
 # Validation
 
@@ -269,49 +305,43 @@ The parent Canary task remains active and blocked. It retains exclusive `protoco
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 29
-updated_at: 2026-08-04T08:48:00+02:00
-observed_main: 14e2718b7ff046b0620d5c838429cef81aa6d340
-status: blocked
-phase: item-catalogue-and-local-map-strip-blocker
-active_branch: none
-implementation_pr: 252
-implementation_head: 41cfd39b847911d708429b8e23d4d17f9c1dc417
-implementation_merge: d41a8155547d197ee18f9f390091f32ee3e64af6
-closeout_pr: 254
-merged_slice:
-  remote_entity_movement_0x6D: complete
-  remote_entity_removal_0x6C: complete_entity_only
-  caller_owned_resolver: complete_read_only_contract
+checkpoint_version: 31
+updated_at: 2026-08-04T11:08:00+02:00
+observed_main: 694314af9162b4e435d4b269dbec6ebe7b0a83e4
+status: validating
+phase: known-player-appearance-terminal-ci
+active_branch: feat/OTC2-20260804-canary-known-player-appearance
+pr: 256
+base: 694314af9162b4e435d4b269dbec6ebe7b0a83e4
+validated_product_head: e952aea38ce93d873b0303556164e3f7a118f1d5
+changed_paths:
+  - oteryn-client/crates/protocol-canary/src/lib.rs
+  - oteryn-client/crates/protocol-canary/src/known_player.rs
+  - oteryn-client/crates/protocol-canary/src/known_player/tests.rs
+  - oteryn-client/tests/integration/canary-world-protocol/fixtures/known-remote-player-appearance.hex
+  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+implementation:
+  known_remote_player_appearance_0x6A_0x62: complete
+  cache_mutation: false
 validation:
-  product_head:
-    sha: daa7e5b09c06551a6f4ad94a69d00cbf65319133
-    rust_client_run: 30883311792
-    windows_job: 91909062725
-    supply_chain_job: 91909062730
-    repository_ci_run: 30883312109
-    repository_required_job: 91909281559
-    result: PASS
-  exact_final_head:
-    sha: 41cfd39b847911d708429b8e23d4d17f9c1dc417
-    rust_client_run: 30883672329
-    windows_job: 91910151945
-    supply_chain_job: 91910151992
-    repository_ci_run: 30883672401
-    repository_required_job: 91910412579
-    result: PASS
-  ready_state:
-    repository_ci_run: 30883947811
-    repository_required_job: 91911322995
-    result: PASS
-  closeout_restack_head:
-    sha: 9d82234af1c23c2748984f613e8eab2fa89396da
-    rust_client_run: 30885320351
-    repository_ci_run: 30885320455
+  rust_client:
+    run: 30894575347
+    windows_job: 91944323324
+    supply_chain_job: 91944323203
+    locked_metadata: PASS
+    formatting: PASS
+    strict_workspace_clippy: PASS
+    workspace_tests: PASS
+    architecture: PASS
+    supply_chain: PASS
+  repository_ci:
+    run: 30894574150
+    required_job: 91944797163
     result: PASS
 fresh_audit:
-  exact_head: 41cfd39b847911d708429b8e23d4d17f9c1dc417
-  comment_id: 5175281373
+  exact_head: e952aea38ce93d873b0303556164e3f7a118f1d5
+  comment_id: 5176900934
   result: PASS
   critical_open: 0
   high_open: 0
@@ -320,19 +350,14 @@ fresh_audit:
 e2e:
   result: NOT_APPLICABLE
   reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
-pr_hygiene:
-  implementation_pr_252: merged
-  implementation_merge: d41a8155547d197ee18f9f390091f32ee3e64af6
-  open_related_prs: 0
-  unresolved_review_threads: 0
 temporary_workflows_remaining: 0
 temporary_scripts_remaining: 0
 shared_path_lease: []
 ownership:
-  protocol_canary: retained_by_active_blocked_parent_task
+  protocol_canary: retained
   shared_paths: released
-blocker: General AddItem/non-empty map decoding still requires authoritative Current item-type and runtime branch metadata; local-player movement requires complete appended map-strip decoding; known/cache-eviction and non-player creature branches remain incomplete.
-next_action: Merge an accepted authoritative Current item-decoding dependency, then resume complete non-empty map/tile and local-player movement map-strip families without inference.
+remaining_blocker: General AddItem/non-empty map decoding still requires authoritative Current item metadata; local-player movement requires complete map strips; nonzero cache eviction and non-player creature branches remain incomplete.
+next_action: Run final exact-head CI for the validation checkpoint, mark PR 256 ready, protected-merge it, then persist the active blocked parent state and continue to the next complete source-proven family.
 ```
 
 ## Recovery checkpoint
@@ -340,24 +365,24 @@ next_action: Merge an accepted authoritative Current item-decoding dependency, t
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
-  session_id: OTC2-20260804T0754+0200-canary-continuation
-  session_started_at: 2026-08-04T07:54:00+02:00
-  checkpointed_at: 2026-08-04T08:48:00+02:00
-  last_progress_at: 2026-08-04T08:48:00+02:00
-  phase: entity-reconciliation-closeout-restack
-  exact_head: 9d82234af1c23c2748984f613e8eab2fa89396da
-  pull_request: 254
-  active_operation: protected closeout merge reconciliation
+  generation: 2
+  session_id: OTC2-20260804T1043+0200-known-player
+  session_started_at: 2026-08-04T10:43:00+02:00
+  checkpointed_at: 2026-08-04T11:08:00+02:00
+  last_progress_at: 2026-08-04T11:08:00+02:00
+  phase: known-player-appearance-terminal-ci
+  exact_head: e952aea38ce93d873b0303556164e3f7a118f1d5
+  pull_request: 256
+  active_operation: final exact-head CI, protected merge and blocked-parent reconciliation
   external_run_ids:
-    - 30885320351
-    - 30885320455
-  operation_started_at: 2026-08-04T08:48:00+02:00
-  wait_deadline_at: 2026-08-04T09:33:00+02:00
-  check_generation: closeout-restack-validation-record
-  checks_used: 5
+    - 30894575347
+    - 30894574150
+  operation_started_at: 2026-08-04T11:08:00+02:00
+  wait_deadline_at: 2026-08-04T11:53:00+02:00
+  check_generation: known-player-appearance-final-exact-head
+  checks_used: 2
   status: ready
   safe_to_resume: true
-  resume_condition: Reconcile the final validation-record head of PR 254; merge only after its exact-head required checks pass, otherwise preserve the precise failure.
-  next_action: Reconcile PR 254 terminal state, then retain the parent task at the authoritative item-catalogue and local-map-strip blocker.
+  resume_condition: Merge PR 256 only after the validation-record head passes all exact-head required checks; otherwise preserve the precise failure.
+  next_action: Reconcile PR 256 terminal state, then continue the parent task from its remaining item and non-player creature blockers.
 ```

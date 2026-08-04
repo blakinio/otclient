@@ -23,6 +23,7 @@ mod tests;
 
 mod command;
 mod inbound;
+mod known_player;
 mod map;
 mod reconciliation;
 mod tile;
@@ -40,6 +41,7 @@ pub use inbound::{
     decode_current_local_player_initialization, decode_current_pending_state_entered,
     decode_current_tibia_time,
 };
+pub use known_player::decode_current_known_remote_player_appearance;
 pub use map::{OPCODE_MAP_DESCRIPTION, decode_current_local_player_only_map};
 pub use reconciliation::{
     CanaryEntityReconciliationResolver, CanaryReconciliationError, OPCODE_MOVE_CREATURE,

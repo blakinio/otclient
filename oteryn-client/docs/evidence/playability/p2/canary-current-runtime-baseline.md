@@ -322,3 +322,42 @@ final_closeout_exact_head_ci:
   repository_ci_run: 30885320455
   result: PASS
 ```
+
+
+## Known ordinary remote-player appearance
+
+Status: exact product validation passed on `e952aea38ce93d873b0303556164e3f7a118f1d5` / PR `#256`; final validation-record CI pending.
+
+Pinned producer revision `bc0068ab80bbf003e128fce0589b4cc89d2682d3` proves that the known `AddCreature` branch writes marker `0x62` and the creature id, then the common appearance payload. Unlike the unknown branch, it writes no cache-eviction id, entity type or name in the header and omits guild emblem from the common payload.
+
+The staged decoder accepts only a visible ordinary remote player with health `1..=100`, direction `0..=7`, nonzero outfit, at most three icons, final player type, unmarked state, no inspection and a closed walkthrough flag. It emits `EntityAppeared` with the wire-carried session-fenced entity and `name: None`. It never mutates or infers the producer cache.
+
+The synthetic fixture and negative mutations cover every truncated prefix, wrong marker, hidden health, invalid direction, wrong final type, local/zero identity, stale/pre-bootstrap state and trailing data. No credential, private capture, proprietary asset or deployed configuration is included.
+
+
+## Known ordinary remote-player appearance validation
+
+```yaml
+product_head: e952aea38ce93d873b0303556164e3f7a118f1d5
+rust_client:
+  run: 30894575347
+  windows_job: 91944323324
+  supply_chain_job: 91944323203
+  locked_metadata: PASS
+  formatting: PASS
+  strict_workspace_clippy: PASS
+  workspace_tests: PASS
+  architecture: PASS
+  supply_chain: PASS
+repository_ci:
+  run: 30894574150
+  required_job: 91944797163
+  result: PASS
+fresh_audit:
+  comment_id: 5176900934
+  result: PASS
+  critical_high_material_medium_open: 0
+e2e:
+  result: NOT_APPLICABLE
+  reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
+```

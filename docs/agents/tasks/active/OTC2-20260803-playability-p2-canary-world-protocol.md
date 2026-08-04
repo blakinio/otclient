@@ -10,8 +10,8 @@ phase: item-catalogue-and-local-map-strip-blocker
 branch: main
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-04T08:31:00+02:00
-required_base_commit: "d41a8155547d197ee18f9f390091f32ee3e64af6"
+updated: 2026-08-04T08:48:00+02:00
+required_base_commit: "14e2718b7ff046b0620d5c838429cef81aa6d340"
 risk: high
 related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254]
 owned_paths:
@@ -35,13 +35,13 @@ validation_level: heavy
 complete_user_facing_feature: false
 missing_layers:
   - authoritative Current item-type metadata and complete AddItem branch contract
-  - accepted caller-owned position-and-stack-to-domain-handle resolver contract
+  - authoritative item-instance identity for generic removal and replacement
   - complete known-creature cache, non-player, hidden-health and extension branches
-  - complete movement map-strip and removal reconciliation families
+  - complete local-player appended map-strip reconciliation
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-04T08:31:00+02:00
+last_progress_at: 2026-08-04T08:48:00+02:00
 ci_checks_for_current_head: 3
 ci_check_generation: entity-reconciliation-merged
 terminal_ci_wait_started_at: null
@@ -163,7 +163,7 @@ Local-player movement is excluded because its producer branch appends map strips
 
 ## Position/stack identity resolution
 
-Remote movement and removal messages provide positions and stack indices. The merged protocol-neutral contracts require session-fenced domain handles. No accepted caller-owned resolver contract currently maps a position/stack observation to an authoritative entity or item handle without letting partial decoding mutate world state. Therefore movement and removal remain blocked rather than emitting guessed identities.
+Merged PR `#252` now provides a read-only caller-owned resolver for complete remote entity movement and entity-only removal. It supplies session-fenced entity identity and destination ordering only after bounded parsing succeeds, without mutating simulation. Generic item removal remains blocked because no authoritative item-instance resolver exists, and local-player movement remains blocked because its producer branch appends map-strip payloads whose general tile/item families are incomplete.
 
 ## Remaining creature branches
 
@@ -269,9 +269,9 @@ The parent Canary task remains active and blocked. It retains exclusive `protoco
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 28
-updated_at: 2026-08-04T08:31:00+02:00
-observed_main: d41a8155547d197ee18f9f390091f32ee3e64af6
+checkpoint_version: 29
+updated_at: 2026-08-04T08:48:00+02:00
+observed_main: 14e2718b7ff046b0620d5c838429cef81aa6d340
 status: blocked
 phase: item-catalogue-and-local-map-strip-blocker
 active_branch: none
@@ -328,4 +328,32 @@ ownership:
   shared_paths: released
 blocker: General AddItem/non-empty map decoding still requires authoritative Current item-type and runtime branch metadata; local-player movement requires complete appended map-strip decoding; known/cache-eviction and non-player creature branches remain incomplete.
 next_action: Merge an accepted authoritative Current item-decoding dependency, then resume complete non-empty map/tile and local-player movement map-strip families without inference.
+```
+
+## Recovery checkpoint
+
+```yaml
+recovery:
+  policy_version: 1
+  generation: 1
+  session_id: OTC2-20260804T0754+0200-canary-continuation
+  session_started_at: 2026-08-04T07:54:00+02:00
+  checkpointed_at: 2026-08-04T08:48:00+02:00
+  last_progress_at: 2026-08-04T08:48:00+02:00
+  phase: entity-reconciliation-closeout-restack
+  exact_head: 52942db86c6172974b4e5e80009c662f51ebb058
+  pull_request: 254
+  active_operation: protected closeout restack, exact-head CI and merge reconciliation
+  external_run_ids:
+    - 30884273540
+    - 30884273648
+    - 30884558259
+  operation_started_at: 2026-08-04T08:48:00+02:00
+  wait_deadline_at: 2026-08-04T09:33:00+02:00
+  check_generation: closeout-restack-current-main
+  checks_used: 0
+  status: ready
+  safe_to_resume: true
+  resume_condition: Reconcile PR 254 against current main; merge only after its exact-head required checks pass, otherwise preserve the precise failure.
+  next_action: Reconcile PR 254 terminal state, then retain the parent task at the authoritative item-catalogue and local-map-strip blocker.
 ```

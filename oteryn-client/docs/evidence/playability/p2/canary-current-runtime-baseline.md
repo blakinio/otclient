@@ -303,3 +303,18 @@ remaining_blockers:
   - complete local-player appended map-strip decoding
   - complete known/cache-eviction and non-player creature branches
 ```
+
+
+## Closeout restack on current governance base
+
+```yaml
+closeout_pr: 254
+restacked_base: 14e2718b7ff046b0620d5c838429cef81aa6d340
+pre_checkpoint_head: 52942db86c6172974b4e5e80009c662f51ebb058
+changed_runtime_paths: []
+changed_closeout_paths:
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+product_validation_reused_from_exact_implementation_heads: true
+final_closeout_exact_head_ci: pending
+```

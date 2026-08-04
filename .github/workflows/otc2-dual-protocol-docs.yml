@@ -9,8 +9,52 @@ permissions:
   contents: write
 
 jobs:
-  registered-trigger:
+  apply-product-payload:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Confirm branch workflow registration
-        run: echo "The product branch supplies the bounded documentation application job."
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/OTC2-20260804-dual-protocol-architecture
+          fetch-depth: 0
+
+      - name: Execute bounded product-branch payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PYEXEC'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/otc2-dual-protocol-docs.yml')
+          lines = workflow.read_text(encoding='utf-8').splitlines()
+          try:
+              start = next(i for i, line in enumerate(lines) if line.strip() == "python - <<'PY'") + 1
+              end = next(i for i in range(start, len(lines)) if lines[i].strip() == 'PY')
+          except StopIteration as error:
+              raise SystemExit('product branch workflow does not contain the bounded Python payload') from error
+
+          payload_lines = []
+          for line in lines[start:end]:
+              if line.startswith('          '):
+                  payload_lines.append(line[10:])
+              else:
+                  payload_lines.append(line)
+          payload = '\n'.join(payload_lines) + '\n'
+          exec(compile(payload, str(workflow), 'exec'), {'__name__': '__main__'})
+          PYEXEC
+
+          git diff --check
+          test -f oteryn-client/docs/architecture/decisions/ADR-001-dual-protocol-selection-and-async-transport.md
+          test ! -e .github/workflows/otc2-dual-protocol-docs.yml
+          grep -q 'Production selection is represented conceptually' oteryn-client/docs/architecture/PROTOCOL_BOUNDARY.md
+          grep -q 'retains ASIO' docs/agents/CROSS_REPO_CONTRACTS.md
+
+      - name: Persist documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "docs(architecture): define dual protocol target [docs-applied]"
+          git push origin HEAD:docs/OTC2-20260804-dual-protocol-architecture

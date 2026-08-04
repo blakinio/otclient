@@ -1,4 +1,4 @@
-use crate::worker::{OwnedWorker, WorkerEvent};
+use crate::worker::{OwnedTokioWorker, OwnedWorker, WorkerEvent};
 use crate::{RuntimeError, RuntimeSnapshot, ShutdownProgress, TechnicalSelection, WorkerKind};
 use oteryn_account_session::AccountSessionId;
 use oteryn_foundation::{CancellationSource, CancellationToken, Moment, MonotonicClock};
@@ -9,16 +9,21 @@ use oteryn_game_session::{
 use oteryn_world_directory::AccountDirectorySnapshot;
 use std::collections::VecDeque;
 use std::fmt::{self, Debug, Formatter};
+use std::future::Future;
 use std::sync::Arc;
+use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::time::Duration;
+use tokio::runtime::{Builder as TokioRuntimeBuilder, Runtime as TokioRuntime};
 
 /// Maximum retained non-secret lifecycle transitions.
 pub const MAX_RUNTIME_HISTORY: usize = 32;
 /// Bound after which shutdown reports an overdue worker while retaining ownership.
 pub const SHUTDOWN_OVERDUE_AFTER: Duration = Duration::from_secs(31);
+/// Fixed worker count for the application-owned network runtime.
+pub const TOKIO_RUNTIME_WORKER_THREADS: usize = 2;
 
-/// Deterministic owner of one authentication and one connection worker.
+/// Deterministic owner of one authentication worker and one Tokio connection task.
 pub struct TechnicalLoginRuntime {
     clock: Arc<dyn MonotonicClock>,
     lifecycle: Option<EntryLifecycle>,
@@ -29,7 +34,8 @@ pub struct TechnicalLoginRuntime {
     active_attempt: Option<GameEntryAttemptId>,
     selection: Option<TechnicalSelection>,
     identity_worker: Option<OwnedWorker>,
-    connection_worker: Option<OwnedWorker>,
+    connection_worker: Option<OwnedTokioWorker>,
+    tokio_runtime: Option<TokioRuntime>,
     history: VecDeque<EntryPhase>,
     shutdown_started: Option<Moment>,
 }

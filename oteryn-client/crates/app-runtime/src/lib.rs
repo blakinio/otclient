@@ -10,4 +10,6 @@ pub use model::{RuntimeError, RuntimeSnapshot, ShutdownProgress, TechnicalSelect
 pub use runtime::{MAX_RUNTIME_HISTORY, SHUTDOWN_OVERDUE_AFTER, TechnicalLoginRuntime};
 
 #[cfg(test)]
+mod runtime_tokio_tests;
+#[cfg(test)]
 mod tests;

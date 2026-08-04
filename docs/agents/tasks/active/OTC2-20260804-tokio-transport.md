@@ -79,10 +79,10 @@ context_growth: stable
 context_score: 10
 estimate_confidence: high
 invocation_started_at: 2026-08-04T15:04:00Z
-last_progress_at: 2026-08-04T16:37:00Z
-ci_checks_for_current_head: 0
-ci_check_generation: terminal-1
-terminal_ci_wait_started_at: 2026-08-04T16:37:00Z
+last_progress_at: 2026-08-04T18:20:00Z
+ci_checks_for_current_head: 2
+ci_check_generation: terminal-current-main-4
+terminal_ci_wait_started_at: 2026-08-04T18:20:00Z
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
@@ -107,7 +107,7 @@ Replace the production Rust-client blocking game transport with an application-o
 - [x] TCP_NODELAY, current frame limits, Gateway/Game Session behavior and protocol-canary public behavior remain compatible.
 - [x] Deterministic tests cover full-duplex I/O, partial I/O, connect/read/write deadlines, cancellation during connect/read/backpressured write, reset/EOF classification, saturation, ordering, priority, replacement isolation and joined shutdown.
 - [x] Comparative bounded evidence records queue latency, throughput, process CPU time, allocation/backpressure proxies, slow-consumer behavior and shutdown latency without claiming lower physical RTT.
-- [ ] Exact-head workspace CI and the deterministic technical-login E2E suite pass on the final documentation-clean head.
+- [ ] Exact-head workspace CI and the deterministic technical-login E2E suite pass on the final current-main checkpoint head.
 - [x] Independent diff audit has no open critical, high or material-medium finding and no unresolved review thread.
 - [ ] The implementation PR merges, the task archives and every lease releases.
 
@@ -117,7 +117,7 @@ This task does not change Platform, Game Gateway, Otheryn, OAuth, ticket behavio
 
 # Concurrency
 
-The native protocol contract and correspondence work merged through PRs #265 and #267 without runtime overlap. Current-main Canary PRs #268 and #269 touch producer-specific gameplay/task paths and do not overlap the Tokio implementation. Legacy PR #23 is stale and waiting for visual approval; its old shared-index lease is expired. This package makes only narrow current catalogue/changelog and accepted-ADR status additions and does not mutate PR #23 or its feature paths.
+The native protocol contract and correspondence work merged through PRs #265 and #267 without runtime overlap. Current-main Canary work touches producer-specific gameplay/task paths and does not overlap the Tokio implementation. Legacy PR #23 is stale and waiting for visual approval; its old shared-index lease is expired. This package makes only narrow current catalogue/changelog and accepted-ADR status additions and does not mutate PR #23 or its feature paths.
 
 # Independent audit
 
@@ -172,26 +172,31 @@ physical_rtt_claim: false
 ```yaml
 recovery:
   policy_version: 1
-  generation: 3
+  generation: 4
   session_id: 20260804T150400Z-tokio-transport
   session_started_at: 2026-08-04T15:04:00Z
-  checkpointed_at: 2026-08-04T16:37:00Z
-  last_progress_at: 2026-08-04T16:37:00Z
+  checkpointed_at: 2026-08-04T18:20:00Z
+  last_progress_at: 2026-08-04T18:20:00Z
   phase: terminal-ci
-  observed_clean_head: 7a490d3417db6d7fd90824202f7323e0138542fc
+  observed_current_main: 8002e2b51d9f0ba825f788815d814aed5101c925
+  synchronized_parent_head: 92e7d2d77b48733946caaa86511e8be950a8536c
+  prior_exact_green_head: fbd442348dee034abbc2326f96013a16edaa582b
   code_evidence_head: 6543e9dd69ac537e4d8bdbed6431fd51504c3dc7
   pull_request: 266
-  active_operation: final exact-head workspace and repository CI after task checkpoint
+  active_operation: final exact-head CI after current-main synchronization and checkpoint refresh
   external_run_ids:
     - 30929681775
-  operation_started_at: 2026-08-04T16:37:00Z
+    - 30930746953
+    - 30930747500
+  operation_started_at: 2026-08-04T18:20:00Z
   wait_deadline_at: null
-  check_generation: terminal-1
+  check_generation: terminal-current-main-4
   checks_used: 0
   status: active
   safe_to_resume: true
-  resume_condition: PR #266 remains open, mergeable and ownership remains non-conflicting
-  next_action: require all final-head workflows, mark the PR ready, merge it, then archive this task from current main and release every lease
+  auto_merge_enabled: true
+  resume_condition: PR #266 remains open and current-main compatible
+  next_action: require the new exact-head Rust Client and CI workflows; auto-merge when green; then archive this task from current main and release every lease
 ```
 
 # Evidence log
@@ -204,5 +209,6 @@ recovery:
 - Deterministic tests cover partial I/O, total connect/read/write deadlines, EOF and reset classification, malformed and oversized framing, protocol-terminal errors, inbound/outbound saturation, cancellation during a backpressured write, control priority, gameplay FIFO/priority, stale generations, external cancellation and repeated joined shutdown cycles.
 - A runtime test records that connection admission executes on `oteryn-network`, not the caller/application thread.
 - Windows evidence run `30929681775` passed focused format, strict all-target Clippy, transport tests and release-mode separate-process measurement before committing the raw and interpreted evidence.
+- Exact synchronized head `fbd442348dee034abbc2326f96013a16edaa582b` passed Rust Client run `30930746953` and repository CI run `30930747500` before `main` advanced again.
 - Earlier terminal-wait failures were repaired by separating peer/deadline `wait` from caller-initiated close-and-`join`; later audit found and repaired partial-progress deadline resetting before terminal CI.
 - No Platform, Gateway, Otheryn, protocol-canary wire, Game Session schema, OAuth, ticket or native-protocol product path is modified by PR #266.

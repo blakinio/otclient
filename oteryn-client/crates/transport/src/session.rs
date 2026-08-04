@@ -318,7 +318,7 @@ impl TransportSession {
     pub fn close(&mut self) {
         if !self.close_requested {
             self.close_requested = true;
-            drop(self.cancel_tx.send(true));
+            let _ = self.cancel_tx.send(true);
         }
     }
 
@@ -420,7 +420,7 @@ async fn run_session(
         None => Err(TransportError::new(TransportErrorKind::TaskFailed)),
     };
     let clean_shutdown_requested = *cancel_tx.borrow();
-    drop(cancel_tx.send(true));
+    let _ = cancel_tx.send(true);
 
     let mut terminal = first_result;
     while let Some(result) = tasks.join_next().await {
@@ -443,7 +443,7 @@ async fn run_session(
     }
 
     let terminal_error = terminal.as_ref().err().map(|error| error.kind());
-    drop(status_tx.send(SessionStatus::closed(terminal_error)));
+    let _ = status_tx.send(SessionStatus::closed(terminal_error));
     let summary = SessionSummary {
         generation,
         metrics: metrics.snapshot(),

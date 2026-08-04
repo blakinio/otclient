@@ -1,0 +1,172 @@
+name: OTC2 Audit Coverage Repair
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260804-tokio-transport
+    paths:
+      - .github/workflows/otc2-audit-coverage-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260804-tokio-transport
+          show-progress: false
+
+      - name: Add write-cancellation reset and per-mode evidence coverage
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          session_path = Path("oteryn-client/crates/transport/src/session.rs")
+          session = session_path.read_text(encoding="utf-8")
+          session = session.replace(
+              "    use std::future::pending;\n",
+              "    use std::error::Error;\n    use std::future::pending;\n",
+              1,
+          )
+          marker = '''    #[test]
+              fn outbound_saturation_is_explicit_and_counted() {
+          '''
+          tests = '''    #[tokio::test(flavor = "current_thread")]
+              async fn cancellation_interrupts_a_backpressured_write()
+              -> Result<(), Box<dyn Error>> {
+                  let (client, _server) = tokio::io::duplex(1);
+                  let config = TransportConfig::new(
+                      Duration::from_secs(1),
+                      Duration::from_secs(1),
+                      Duration::from_secs(1),
+                      128,
+                      128,
+                  )?;
+                  let (gameplay_tx, gameplay_rx) = mpsc::channel(1);
+                  let (_background_tx, background_rx) = mpsc::channel(1);
+                  let (cancel_tx, cancel_rx) = watch::channel(false);
+                  let metrics = Arc::new(TransportMetrics::default());
+                  let writer = tokio::spawn(writer_loop(
+                      client,
+                      config,
+                      gameplay_rx,
+                      background_rx,
+                      cancel_rx,
+                      metrics,
+                  ));
+                  gameplay_tx
+                      .send(OutboundFrame {
+                          bytes: vec![7_u8; 128],
+                      })
+                      .await?;
+                  sleep(Duration::from_millis(5)).await;
+                  let _changed = cancel_tx.send(true);
+                  let joined = timeout(Duration::from_millis(100), writer).await?;
+                  let result = joined?;
+                  assert_eq!(
+                      result,
+                      Err(TransportError::new(TransportErrorKind::Cancelled))
+                  );
+                  Ok(())
+              }
+
+              #[test]
+              fn connection_reset_is_terminally_classified() {
+                  let reset = io::Error::from(io::ErrorKind::ConnectionReset);
+                  assert_eq!(
+                      classify_read_error(&reset),
+                      TransportError::new(TransportErrorKind::ConnectionLost)
+                  );
+                  assert_eq!(
+                      classify_write_error(&reset),
+                      TransportError::new(TransportErrorKind::ConnectionLost)
+                  );
+              }
+
+          '''
+          if session.count(marker) != 1:
+              raise SystemExit("session audit coverage marker mismatch")
+          session_path.write_text(session.replace(marker, tests + marker, 1), encoding="utf-8")
+
+          evidence_path = Path("oteryn-client/crates/transport/examples/transport_evidence.rs")
+          evidence = evidence_path.read_text(encoding="utf-8")
+          old_run = '''    pub fn run() -> Result<(), Box<dyn Error>> {
+                  let blocking = blocking_evidence()?;
+                  let tokio = tokio_evidence()?;
+                  print_evidence("blocking", &blocking);
+                  print_evidence("tokio", &tokio);
+                  println!("scope=deterministic_loopback_queue_and_scheduler_evidence");
+                  println!("physical_rtt_claim=false");
+                  Ok(())
+              }
+          '''
+          new_run = '''    pub fn run(mode: Option<&str>) -> Result<(), Box<dyn Error>> {
+                  match mode {
+                      None | Some("all") => {
+                          let blocking = blocking_evidence()?;
+                          let tokio = tokio_evidence()?;
+                          print_evidence("blocking", &blocking);
+                          print_evidence("tokio", &tokio);
+                      }
+                      Some("blocking") => {
+                          let blocking = blocking_evidence()?;
+                          print_evidence("blocking", &blocking);
+                      }
+                      Some("tokio") => {
+                          let tokio = tokio_evidence()?;
+                          print_evidence("tokio", &tokio);
+                      }
+                      Some(_unsupported) => {
+                          return Err("expected evidence mode: all, blocking or tokio".into());
+                      }
+                  }
+                  println!("scope=deterministic_loopback_queue_and_scheduler_evidence");
+                  println!("physical_rtt_claim=false");
+                  Ok(())
+              }
+          '''
+          if evidence.count(old_run) != 1:
+              raise SystemExit("evidence run block mismatch")
+          evidence = evidence.replace(old_run, new_run, 1)
+          old_main = '''#[cfg(feature = "blocking-baseline")]
+          fn main() -> Result<(), Box<dyn std::error::Error>> {
+              enabled::run()
+          }
+          '''
+          new_main = '''#[cfg(feature = "blocking-baseline")]
+          fn main() -> Result<(), Box<dyn std::error::Error>> {
+              let mode = std::env::args().nth(1);
+              enabled::run(mode.as_deref())
+          }
+          '''
+          if evidence.count(old_main) != 1:
+              raise SystemExit("evidence main block mismatch")
+          evidence_path.write_text(evidence.replace(old_main, new_main, 1), encoding="utf-8")
+          PY
+
+      - name: Install pinned Rust tools
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt
+          rustup default 1.94.0
+
+      - name: Format and validate focused package
+        working-directory: oteryn-client
+        run: |
+          cargo fmt --all
+          cargo clippy -p oteryn-transport --all-targets --features blocking-baseline -- -D warnings
+          cargo test -p oteryn-transport --features blocking-baseline
+          cargo run -p oteryn-transport --example transport_evidence --features blocking-baseline --release -- blocking
+          cargo run -p oteryn-transport --example transport_evidence --features blocking-baseline --release -- tokio
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/crates/transport/src/session.rs oteryn-client/crates/transport/examples/transport_evidence.rs
+          git commit -m "test(transport): complete cancellation and reset coverage"
+          git push origin HEAD:feat/OTC2-20260804-tokio-transport

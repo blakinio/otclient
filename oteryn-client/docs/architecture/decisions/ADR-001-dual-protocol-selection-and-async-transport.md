@@ -44,6 +44,12 @@ Tokio is a client execution decision, not a wire protocol and not a server requi
 
 The current synchronous transport remains valid until the dedicated migration package passes comparative tests and exact-head validation. This ADR does not claim that Tokio is already implemented or that it reduces physical network RTT.
 
+### Implementation status
+
+Implementation package `blakinio/otclient#266` realizes the transport portion of this decision with exact Tokio `1.51.4` and an application-owned runtime. It provides protocol-neutral bounded inbound, gameplay and background queues, independent reader/writer ownership, explicit connect/read/write/idle deadlines, cancellation that cannot be trapped behind data traffic, generation fencing, typed terminal failures, bounded frame allocation, non-secret queue metrics and deterministic joined shutdown.
+
+The former synchronous TCP implementation is retained only behind the `blocking-baseline` test/evidence feature. The package preserves Identity, Game Gateway, Game Session and `protocol-canary` public and wire contracts. It does not create `protocol-oteryn`, implement automatic selection, change Otheryn networking or claim lower physical network RTT.
+
 ### Server-advertised selection
 
 Production selection uses a typed policy:

@@ -1,5 +1,5 @@
-use crate::inbound::{CanaryInboundBootstrapState, CanaryInboundError};
 use crate::CANARY_NETWORK_MESSAGE_MAX_BYTES;
+use crate::inbound::{CanaryInboundBootstrapState, CanaryInboundError};
 use oteryn_foundation::SessionGeneration;
 use oteryn_game_domain::{
     DomainError, EntityHandle, Floor, GameEvent, GameEventEnvelope, StackIndex, TilePosition,
@@ -86,8 +86,9 @@ impl Display for CanaryReconciliationError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Inbound(error) => Display::fmt(error, formatter),
-            Self::IdentityUnavailable => formatter
-                .write_str("caller-owned world state could not resolve the Canary entity"),
+            Self::IdentityUnavailable => {
+                formatter.write_str("caller-owned world state could not resolve the Canary entity")
+            }
             Self::LocalPlayerUnsupported => formatter
                 .write_str("local-player Canary movement or removal requires map reconciliation"),
             Self::InvalidDestinationStack => formatter
@@ -365,9 +366,7 @@ mod tests {
         Ok((state, current))
     }
 
-    fn resolver(
-        state: &CanaryInboundBootstrapState,
-    ) -> Result<SyntheticResolver, DomainError> {
+    fn resolver(state: &CanaryInboundBootstrapState) -> Result<SyntheticResolver, DomainError> {
         Ok(SyntheticResolver {
             entity: EntityHandle::new(state.session(), EntityId::try_new(0x0203_0405)?),
             from: TilePosition::new(0x1235, 0x5679, Floor::new(7)),
@@ -467,15 +466,9 @@ mod tests {
             ))
         );
 
-        let invalid_stack =
-            parse_hex_fixture(REMOTE_ENTITY_REMOVAL_INVALID_STACK_FIXTURE)?;
+        let invalid_stack = parse_hex_fixture(REMOTE_ENTITY_REMOVAL_INVALID_STACK_FIXTURE)?;
         assert_eq!(
-            decode_current_remote_entity_removal(
-                &invalid_stack,
-                &state,
-                current,
-                &resolver,
-            ),
+            decode_current_remote_entity_removal(&invalid_stack, &state, current, &resolver,),
             Err(CanaryReconciliationError::Inbound(
                 CanaryInboundError::Protocol(ProtocolError::new(ProtocolErrorKind::UnknownValue)),
             ))
@@ -485,12 +478,7 @@ mod tests {
             0x6D, 0x35, 0x12, 0x79, 0x56, 0x07, 0x01, 0x35, 0x12, 0x79, 0x56, 0x07,
         ];
         assert_eq!(
-            decode_current_remote_entity_movement(
-                &same_position,
-                &state,
-                current,
-                &resolver,
-            ),
+            decode_current_remote_entity_movement(&same_position, &state, current, &resolver,),
             Err(CanaryReconciliationError::Inbound(
                 CanaryInboundError::Protocol(ProtocolError::new(ProtocolErrorKind::UnknownValue)),
             ))
@@ -510,21 +498,11 @@ mod tests {
             ..base
         };
         assert_eq!(
-            decode_current_remote_entity_movement(
-                &movement,
-                &state,
-                current,
-                &unresolved,
-            ),
+            decode_current_remote_entity_movement(&movement, &state, current, &unresolved,),
             Err(CanaryReconciliationError::IdentityUnavailable)
         );
         assert_eq!(
-            decode_current_remote_entity_removal(
-                &removal,
-                &state,
-                current,
-                &unresolved,
-            ),
+            decode_current_remote_entity_removal(&removal, &state, current, &unresolved,),
             Err(CanaryReconciliationError::IdentityUnavailable)
         );
 
@@ -546,12 +524,7 @@ mod tests {
             ..base
         };
         assert_eq!(
-            decode_current_remote_entity_movement(
-                &movement,
-                &state,
-                current,
-                &invalid_destination,
-            ),
+            decode_current_remote_entity_movement(&movement, &state, current, &invalid_destination,),
             Err(CanaryReconciliationError::InvalidDestinationStack)
         );
 
@@ -589,10 +562,7 @@ mod tests {
         let initial_generation = SessionGeneration::new(86);
         let initial = CanaryInboundBootstrapState::new(SessionToken::new(initial_generation));
         let unresolved = SyntheticResolver {
-            entity: EntityHandle::new(
-                initial.session(),
-                EntityId::try_new(0x0203_0405)?,
-            ),
+            entity: EntityHandle::new(initial.session(), EntityId::try_new(0x0203_0405)?),
             ..resolver
         };
         assert_eq!(

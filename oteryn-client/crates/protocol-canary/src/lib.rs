@@ -42,9 +42,9 @@ pub use inbound::{
 };
 pub use map::{OPCODE_MAP_DESCRIPTION, decode_current_local_player_only_map};
 pub use reconciliation::{
-    CanaryEntityReconciliationResolver, CanaryReconciliationError,
-    OPCODE_MOVE_CREATURE, OPCODE_REMOVE_TILE_THING, ResolvedCanaryEntityMovement,
-    decode_current_remote_entity_movement, decode_current_remote_entity_removal,
+    CanaryEntityReconciliationResolver, CanaryReconciliationError, OPCODE_MOVE_CREATURE,
+    OPCODE_REMOVE_TILE_THING, ResolvedCanaryEntityMovement, decode_current_remote_entity_movement,
+    decode_current_remote_entity_removal,
 };
 pub use tile::{OPCODE_TILE_UPDATE, decode_current_empty_tile_update};
 

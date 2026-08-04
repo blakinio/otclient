@@ -15,6 +15,7 @@ impl TechnicalLoginRuntime {
             selection: None,
             identity_worker: None,
             connection_worker: None,
+            tokio_runtime: None,
             history,
             shutdown_started: None,
         }
@@ -100,19 +101,22 @@ impl TechnicalLoginRuntime {
         }
     }
 
-    /// Move the complete producer-owned lifecycle into one admission worker.
+    /// Move the complete producer-owned lifecycle into one Tokio admission task.
     ///
-    /// This matches the Canary producer boundary: application code never
-    /// receives `AdmissionCredential`. The closure returns the lifecycle it
-    /// consumed together with its typed result.
-    pub fn start_connection<F>(&mut self, operation: F) -> Result<(), RuntimeError>
+    /// The application owns the runtime. The future may create transport
+    /// sessions and child tasks, while the event loop only polls completion.
+    /// Application code never receives `AdmissionCredential`.
+    pub fn start_connection<F, Fut>(&mut self, operation: F) -> Result<(), RuntimeError>
     where
         F: FnOnce(
                 EntryLifecycle,
                 GameEntryAttemptId,
                 CancellationToken,
                 Arc<dyn MonotonicClock>,
-            ) -> (EntryLifecycle, Result<SessionEntered, EntryFailure>)
+            ) -> Fut
+            + Send
+            + 'static,
+        Fut: Future<Output = (EntryLifecycle, Result<SessionEntered, EntryFailure>)>
             + Send
             + 'static,
     {
@@ -129,37 +133,49 @@ impl TechnicalLoginRuntime {
             return Err(EntryFailure::for_kind(EntryFailureKind::InvariantViolation).into());
         }
 
+        self.ensure_tokio_runtime()?;
         let attempt_id = self.active_attempt.ok_or(RuntimeError::NoActiveAttempt)?;
         let lifecycle = self.lifecycle.take().ok_or(RuntimeError::NoActiveAttempt)?;
         let cancellation = CancellationSource::new();
         let token = cancellation.token();
         let clock = Arc::clone(&self.clock);
-        let handle = thread::Builder::new()
-            .name(format!("oteryn-connection-{}", attempt_id.get()))
-            .spawn(move || {
-                let (lifecycle, result) = operation(lifecycle, attempt_id, token, clock);
-                WorkerEvent::Connection {
+        let (event_tx, event_rx) = sync_channel(1);
+        let handle = {
+            let runtime = self
+                .tokio_runtime
+                .as_ref()
+                .ok_or(RuntimeError::RuntimeUnavailable)?;
+            runtime.spawn(async move {
+                let (lifecycle, result) = operation(lifecycle, attempt_id, token, clock).await;
+                drop(event_tx.send(WorkerEvent::Connection {
                     attempt_id,
                     lifecycle,
                     result,
-                }
-            });
+                }));
+            })
+        };
+        self.connection_worker = Some(OwnedTokioWorker {
+            kind: WorkerKind::Connection,
+            cancellation,
+            handle,
+            event_rx,
+        });
+        self.record_phase(EntryPhase::Connecting);
+        Ok(())
+    }
 
-        match handle {
-            Ok(handle) => {
-                self.connection_worker = Some(OwnedWorker {
-                    kind: WorkerKind::Connection,
-                    cancellation,
-                    handle,
-                });
-                self.record_phase(EntryPhase::Connecting);
-                Ok(())
-            }
-            Err(_error) => {
-                self.lifecycle = Some(EntryLifecycle::new());
-                self.set_failure(EntryFailure::for_kind(EntryFailureKind::TransportFailure));
-                Err(RuntimeError::WorkerSpawn(WorkerKind::Connection))
-            }
+    fn ensure_tokio_runtime(&mut self) -> Result<(), RuntimeError> {
+        if self.tokio_runtime.is_some() {
+            return Ok(());
         }
+        let runtime = TokioRuntimeBuilder::new_multi_thread()
+            .worker_threads(TOKIO_RUNTIME_WORKER_THREADS)
+            .thread_name("oteryn-network")
+            .enable_io()
+            .enable_time()
+            .build()
+            .map_err(|_error| RuntimeError::RuntimeUnavailable)?;
+        self.tokio_runtime = Some(runtime);
+        Ok(())
     }
 }

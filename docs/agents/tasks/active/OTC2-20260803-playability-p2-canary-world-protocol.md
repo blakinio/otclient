@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: blocked
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: item-catalogue-and-stack-identity-blocker
-branch: main
+phase: entity-reconciliation-terminal-ci
+branch: feat/OTC2-20260803-canary-entity-reconciliation
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-04T00:12:00+02:00
-required_base_commit: "6b3efb75131f0ee1b9ce1779aa3ef7eaa1a536a2"
+updated: 2026-08-04T08:22:00+02:00
+required_base_commit: "2a7a179633bb345dc4013563967a89f4fc47d233"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -41,14 +41,14 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-04T00:10:31+02:00
-ci_checks_for_current_head: 4
-ci_check_generation: unknown-player-appearance-terminal
+last_progress_at: 2026-08-04T08:22:00+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: entity-reconciliation-final-exact-head
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 4
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 4
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
@@ -111,11 +111,49 @@ The implementation rejects known marker `0x62`, nonzero cache eviction, local id
 | map description | `PARTIAL` | One complete item-free local-player-only `0x64` branch is implemented. General non-empty tiles require authoritative item metadata and broader creature/cache branches. |
 | tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch emits `TileCleared`. Non-empty tile bodies and authoritative stack identity remain blocked. |
 | creature/entity appearance | `PARTIAL` | One complete post-bootstrap `0x6A` unknown ordinary remote-player branch with zero cache eviction emits `EntityAppeared`. Known/cache-eviction, hidden, summon, monster, NPC, invisible and OTCR branches remain unsupported. |
-| movement and reconciliation | `BLOCKED` | Local movement appends general map strips. Remote movement exposes positions and stack indices but no accepted protocol-neutral handle resolver exists. |
-| removal | `BLOCKED` | Position plus stack index cannot be converted to an authoritative `EntityHandle` or item handle without caller-owned world state. |
+| movement and reconciliation | `PARTIAL` | The complete remote non-teleport `0x6D` layout is implemented behind a read-only caller-owned resolver that supplies the session-fenced entity and destination stack. Local-player movement and appended map strips remain blocked. |
+| removal | `PARTIAL` | The complete remote-entity `0x6C` layout is implemented behind a read-only caller-owned resolver. Item removal and local-player teleport/map-reset branches remain unsupported. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain rejected. |
 
 No partial unsupported family is admitted. Unknown subfamilies fail closed.
+
+# Caller-owned entity reconciliation continuation
+
+The pinned producer proves two complete field layouts that can be normalized without owning world state when the caller supplies a read-only authoritative observation resolver:
+
+```yaml
+source_revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+branch: feat/OTC2-20260803-canary-entity-reconciliation
+pr: 252
+remote_entity_movement:
+  opcode: 0x6D
+  layout: [old_position_u16_u16_u8, old_stack_u8, new_position_u16_u16_u8]
+  source_branch: non_local_non_teleport_creature_visible_at_old_and_new_position
+  resolver_output: [session_fenced_entity_handle, destination_stack]
+  event: GameEvent::EntityMoved
+remote_entity_removal:
+  opcode: 0x6C
+  layout: [position_u16_u16_u8, stack_u8]
+  accepted_object: caller_resolved_non_local_entity
+  event: GameEvent::EntityRemoved
+resolver_contract:
+  ownership: caller
+  access: read_only
+  malformed_input_invocation: forbidden
+  simulation_mutation: false
+  unresolved_or_ambiguous: fail_closed
+shared_path_lease: []
+validation:
+  exact_product_head: daa7e5b09c06551a6f4ad94a69d00cbf65319133
+  rust_client_run: 30883311792
+  windows_job: 91909062725
+  supply_chain_job: 91909062730
+  repository_ci_run: 30883312109
+  repository_required_job: 91909281559
+  result: PASS
+```
+
+Local-player movement is excluded because its producer branch appends map strips. Generic item removal is excluded because this phase does not own or infer item identity. General map and tile decoding remain blocked by authoritative item metadata.
 
 # Exact blocker normalization
 
@@ -231,23 +269,60 @@ The parent Canary task remains active and blocked. It retains exclusive `protoco
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 25
-updated_at: 2026-08-04T00:12:00+02:00
-observed_main: 6b3efb75131f0ee1b9ce1779aa3ef7eaa1a536a2
-status: blocked
-phase: item-catalogue-and-stack-identity-blocker
-active_branch: none
-last_merged_phase: unknown_ordinary_remote_player_add_0x6A
-implementation_pr: 248
-implementation_merge: 26d5ed87552afe9b71245ba75fbb93fa66b2bc68
-cleanup_pr: 249
-cleanup_merge: 6b3efb75131f0ee1b9ce1779aa3ef7eaa1a536a2
-validation: terminal_pass
-fresh_audit: zero_open_material_findings
+checkpoint_version: 27
+updated_at: 2026-08-04T08:22:00+02:00
+observed_main: 2a7a179633bb345dc4013563967a89f4fc47d233
+status: validating
+phase: entity-reconciliation-terminal-ci
+active_branch: feat/OTC2-20260803-canary-entity-reconciliation
+pr: 252
+base: 2a7a179633bb345dc4013563967a89f4fc47d233
+validated_product_head: daa7e5b09c06551a6f4ad94a69d00cbf65319133
+changed_paths:
+  - oteryn-client/crates/protocol-canary/src/lib.rs
+  - oteryn-client/crates/protocol-canary/src/reconciliation.rs
+  - oteryn-client/tests/integration/canary-world-protocol/fixtures/remote-entity-movement.hex
+  - oteryn-client/tests/integration/canary-world-protocol/fixtures/remote-entity-movement-trailing.hex
+  - oteryn-client/tests/integration/canary-world-protocol/fixtures/remote-entity-removal.hex
+  - oteryn-client/tests/integration/canary-world-protocol/fixtures/remote-entity-removal-invalid-stack.hex
+  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+implementation:
+  remote_entity_movement_0x6D: complete
+  remote_entity_removal_0x6C: complete
+  caller_owned_resolver: complete_read_only_contract
+validation:
+  rust_client:
+    run: 30883311792
+    windows_job: 91909062725
+    supply_chain_job: 91909062730
+    locked_metadata: PASS
+    formatting: PASS
+    strict_workspace_clippy: PASS
+    workspace_tests: PASS
+    architecture: PASS
+    supply_chain: PASS
+  repository_ci:
+    run: 30883312109
+    required_job: 91909281559
+    result: PASS
+fresh_audit:
+  exact_head: daa7e5b09c06551a6f4ad94a69d00cbf65319133
+  comment_id: 5175281373
+  result: PASS
+  critical_open: 0
+  high_open: 0
+  material_medium_open: 0
+  unresolved_review_threads: 0
+e2e:
+  result: NOT_APPLICABLE
+  reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
+temporary_workflows_remaining: 0
+temporary_scripts_remaining: 0
 shared_path_lease: []
 ownership:
-  protocol_canary: retained_by_active_blocked_parent_task
+  protocol_canary: retained
   shared_paths: released
-blocker: General AddItem decoding requires authoritative item-type and runtime branch metadata, while movement/removal require an accepted caller-owned position-and-stack-to-domain-handle resolver; known/cache-eviction and non-player creature branches remain incomplete.
-next_action: Merge an accepted authoritative item-decoding dependency and caller-owned stack-identity resolver contract, then resume the complete non-empty map, movement and removal families without inference.
+remaining_blocker: General AddItem decoding still requires authoritative item-type and runtime branch metadata; local-player movement requires complete map-strip decoding.
+next_action: Run final exact-head CI for this validation checkpoint, mark PR 252 ready, protected-merge it, then persist post-merge blocked parent state with no shared lease.
 ```

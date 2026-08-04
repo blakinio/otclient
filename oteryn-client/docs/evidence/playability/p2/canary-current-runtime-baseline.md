@@ -226,3 +226,47 @@ controlled_m2_acceptance: not_ready
 ```
 
 The next safe action is to merge an accepted authoritative item-decoding dependency and caller-owned stack-identity resolver contract. Until then the parent task retains exclusive `protocol-canary` ownership, holds no shared lease and remains blocked rather than archived.
+
+
+## Read-only entity reconciliation slice
+
+Status: exact product validation passed on `daa7e5b09c06551a6f4ad94a69d00cbf65319133` / PR `#252`; final checkpoint CI pending.
+
+Pinned producer revision `bc0068ab80bbf003e128fce0589b4cc89d2682d3` proves:
+
+- remote non-teleport creature movement uses `0x6D + old Position + old stack u8 + new Position` when the creature is not the local player and both positions are visible;
+- `RemoveTileThing` emits `0x6C + Position + stack u8` only for stack positions below ten;
+- local-player movement appends map-strip payloads and is not part of this slice;
+- `0x6C` remains generic at the producer, so this slice admits only a non-local entity resolved by caller-owned authoritative state.
+
+The adapter introduces a read-only resolver contract using only protocol-neutral `TilePosition`, `StackIndex` and session-fenced `EntityHandle` values. Resolution happens after full bounded parsing and trailing-data rejection. Unknown, ambiguous, local-player, stale-session and invalid destination-stack outcomes fail closed. No resolver method may mutate simulation, and no Canary appearance, cache, item or map-strip field crosses the adapter boundary.
+
+Original synthetic fixtures cover positive movement/removal, every truncated prefix, trailing movement data and an invalid removal stack. They contain no credentials, private captures, deployed configuration, proprietary assets or copied producer implementation bodies.
+
+
+## Entity reconciliation validation
+
+```yaml
+product_head: daa7e5b09c06551a6f4ad94a69d00cbf65319133
+rust_client:
+  run: 30883311792
+  windows_job: 91909062725
+  supply_chain_job: 91909062730
+  locked_metadata: PASS
+  formatting: PASS
+  strict_workspace_clippy: PASS
+  workspace_tests: PASS
+  architecture: PASS
+  supply_chain: PASS
+repository_ci:
+  run: 30883312109
+  required_job: 91909281559
+  result: PASS
+fresh_audit:
+  comment_id: 5175281373
+  result: PASS
+  critical_high_material_medium_open: 0
+e2e:
+  result: NOT_APPLICABLE
+  reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
+```

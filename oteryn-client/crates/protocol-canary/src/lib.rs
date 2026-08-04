@@ -24,6 +24,7 @@ mod tests;
 mod command;
 mod inbound;
 mod map;
+mod reconciliation;
 mod tile;
 
 pub use command::{
@@ -40,6 +41,11 @@ pub use inbound::{
     decode_current_tibia_time,
 };
 pub use map::{OPCODE_MAP_DESCRIPTION, decode_current_local_player_only_map};
+pub use reconciliation::{
+    CanaryEntityReconciliationResolver, CanaryReconciliationError, OPCODE_MOVE_CREATURE,
+    OPCODE_REMOVE_TILE_THING, ResolvedCanaryEntityMovement, decode_current_remote_entity_movement,
+    decode_current_remote_entity_removal,
+};
 pub use tile::{OPCODE_TILE_UPDATE, decode_current_empty_tile_update};
 
 /// Exact generated-source revision selected as the Current development baseline.

@@ -61,11 +61,16 @@ impl TechnicalLoginRuntime {
         if self
             .connection_worker
             .as_ref()
-            .is_some_and(OwnedWorker::is_finished)
+            .is_some_and(OwnedTokioWorker::is_finished)
             && let Some(worker) = self.connection_worker.take()
         {
             let kind = worker.kind;
-            match worker.join() {
+            let event = worker.join(
+                self.tokio_runtime
+                    .as_ref()
+                    .ok_or(RuntimeError::RuntimeUnavailable)?,
+            );
+            match event {
                 Ok(WorkerEvent::Connection { lifecycle, .. }) => {
                     self.lifecycle = Some(lifecycle);
                 }
@@ -92,7 +97,12 @@ impl TechnicalLoginRuntime {
         }
         if let Some(worker) = self.connection_worker.take() {
             let kind = worker.kind;
-            match worker.join() {
+            let event = worker.join(
+                self.tokio_runtime
+                    .as_ref()
+                    .ok_or(RuntimeError::RuntimeUnavailable)?,
+            );
+            match event {
                 Ok(WorkerEvent::Connection { lifecycle, .. }) => {
                     self.lifecycle = Some(lifecycle);
                 }
@@ -116,6 +126,12 @@ impl TechnicalLoginRuntime {
         self.failure = None;
         self.entered = None;
         Ok(())
+    }
+
+    fn shutdown_tokio_runtime(&mut self) {
+        if let Some(runtime) = self.tokio_runtime.take() {
+            runtime.shutdown_timeout(Duration::from_secs(1));
+        }
     }
 
     fn record_phase(&mut self, phase: EntryPhase) {

@@ -56,7 +56,7 @@ pub enum TransportErrorKind {
 /// Stable transport error that never includes endpoints, bytes or credentials.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TransportError {
-    kind: TransportErrorKind,
+    pub(crate) kind: TransportErrorKind,
 }
 
 impl TransportError {

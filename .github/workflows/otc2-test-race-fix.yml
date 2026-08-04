@@ -1,0 +1,138 @@
+name: OTC2 Test Race Fix
+
+on:
+  push:
+    branches:
+      - "feat/OTC2-20260804-tokio-transport"
+    paths:
+      - ".github/workflows/otc2-test-race-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: "feat/OTC2-20260804-tokio-transport"
+          show-progress: false
+
+      - name: Apply deterministic terminal-wait repairs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          session = Path("oteryn-client/crates/transport/src/session.rs")
+          source = session.read_text(encoding="utf-8")
+          old = '''    /// Cancel and join the complete reader/writer/supervisor tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns the terminal transport failure or a task-join failure.
+    pub async fn join(mut self) -> Result<SessionSummary, TransportError> {
+        self.close();
+        let Some(supervisor) = self.supervisor.take() else {
+            return Err(TransportError::new(TransportErrorKind::InvalidState));
+        };
+        supervisor
+            .await
+            .map_err(|_join_error| TransportError::new(TransportErrorKind::TaskFailed))?
+    }
+'''
+          new = '''    /// Wait for a peer, deadline, cancellation or protocol failure to terminate
+    /// the complete reader/writer/supervisor tree without requesting shutdown.
+    ///
+    /// # Errors
+    ///
+    /// Returns the terminal transport failure or a task-join failure.
+    pub async fn wait(mut self) -> Result<SessionSummary, TransportError> {
+        let Some(supervisor) = self.supervisor.take() else {
+            return Err(TransportError::new(TransportErrorKind::InvalidState));
+        };
+        supervisor
+            .await
+            .map_err(|_join_error| TransportError::new(TransportErrorKind::TaskFailed))?
+    }
+
+    /// Cancel and join the complete reader/writer/supervisor tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns the terminal transport failure or a task-join failure.
+    pub async fn join(mut self) -> Result<SessionSummary, TransportError> {
+        self.close();
+        self.wait().await
+    }
+'''
+          if source.count(old) != 1:
+              raise SystemExit("session join block did not match exactly")
+          session.write_text(source.replace(old, new), encoding="utf-8")
+
+          tests = Path("oteryn-client/crates/transport/src/tests.rs")
+          source = tests.read_text(encoding="utf-8")
+          old = '''            socket.write_all(&[5, 0, 9, 8, 7]).await?;
+            socket.flush().await?;
+            Ok::<(), io::Error>(())
+'''
+          new = '''            socket.write_all(&[5, 0, 9, 8, 7]).await?;
+            socket.flush().await?;
+            let mut shutdown_probe = [0_u8; 1];
+            let _bytes = socket.read(&mut shutdown_probe).await?;
+            Ok::<(), io::Error>(())
+'''
+          if source.count(old) != 1:
+              raise SystemExit("full-duplex server block did not match exactly")
+          source = source.replace(old, new)
+          old = '''        server.await??;
+        session.close();
+        let summary = session.join().await?;
+        assert_eq!(summary.generation(), generation);
+        assert_eq!(summary.metrics().inbound_frames, 1);
+'''
+          new = '''        session.close();
+        let summary = session.join().await?;
+        server.await??;
+        assert_eq!(summary.generation(), generation);
+        assert_eq!(summary.metrics().inbound_frames, 1);
+'''
+          if source.count(old) != 1:
+              raise SystemExit("full-duplex shutdown order did not match exactly")
+          source = source.replace(old, new)
+          if source.count("let result = session.join().await;") != 1:
+              raise SystemExit("malformed wait call did not match exactly")
+          source = source.replace("let result = session.join().await;", "let result = session.wait().await;")
+          old = '''        assert_eq!(
+            session.join().await,
+            Err(TransportError::new(TransportErrorKind::IdleTimeout))
+        );
+'''
+          new = '''        assert_eq!(
+            session.wait().await,
+            Err(TransportError::new(TransportErrorKind::IdleTimeout))
+        );
+'''
+          if source.count(old) != 1:
+              raise SystemExit("idle wait call did not match exactly")
+          tests.write_text(source.replace(old, new), encoding="utf-8")
+          PY
+
+      - name: Install pinned formatter
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+          rustup default 1.94.0
+
+      - name: Format workspace
+        working-directory: oteryn-client
+        run: cargo fmt --all
+
+      - name: Commit repairs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/crates/transport/src/session.rs oteryn-client/crates/transport/src/tests.rs
+          git commit -m "test(transport): await terminal outcomes deterministically"
+          git push origin HEAD:feat/OTC2-20260804-tokio-transport

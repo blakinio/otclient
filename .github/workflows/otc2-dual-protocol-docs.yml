@@ -1,0 +1,16 @@
+name: OTC2 Dual Protocol Architecture Docs
+
+on:
+  push:
+    branches:
+      - docs/OTC2-20260804-dual-protocol-architecture
+
+permissions:
+  contents: write
+
+jobs:
+  registered-trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm branch workflow registration
+        run: echo "The product branch supplies the bounded documentation application job."

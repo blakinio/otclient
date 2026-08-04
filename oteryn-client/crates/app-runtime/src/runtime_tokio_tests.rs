@@ -71,16 +71,18 @@ fn poll_until(
 }
 
 #[test]
-fn connection_admission_runs_on_named_tokio_worker_not_caller_thread()
--> Result<(), Box<dyn Error>> {
+fn connection_admission_runs_on_named_tokio_worker_not_caller_thread() -> Result<(), Box<dyn Error>>
+{
     let clock: Arc<dyn MonotonicClock> = Arc::new(ManualClock::new(Moment::ZERO));
     let mut runtime = TechnicalLoginRuntime::new(clock);
     runtime.start_authentication(selection()?, |_attempt, _cancellation| {
         Ok((
             AccountSessionId::new(33)
                 .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
-            directory().map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
-            credential().map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            directory()
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
+            credential()
+                .map_err(|_| EntryFailure::for_kind(EntryFailureKind::InvariantViolation))?,
         ))
     })?;
     poll_until(&mut runtime, EntryPhase::CredentialReady)?;

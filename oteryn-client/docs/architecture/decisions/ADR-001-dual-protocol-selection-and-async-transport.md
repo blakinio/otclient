@@ -42,7 +42,7 @@ The target client async I/O runtime is Tokio. A separate implementation package 
 
 Tokio is a client execution decision, not a wire protocol and not a server requirement. Both adapters use the same transport boundary unless a later accepted ADR proves that a native Oteryn transport needs a different implementation.
 
-The current synchronous transport remains valid until the dedicated migration package passes comparative tests and exact-head validation. This ADR does not claim that Tokio is already implemented or that it reduces physical network RTT.
+The synchronous transport remained valid until the dedicated migration package passed comparative tests and exact-head validation. The decision itself did not claim that Tokio was already implemented or that it reduces physical network RTT; the implementation-status section below records the authorized package separately.
 
 ### Implementation status
 

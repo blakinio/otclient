@@ -125,7 +125,7 @@ fn closed_fields_and_trailing_data_fail_closed() -> Result<(), Box<dyn Error>> {
     );
 
     let mut invalid_type = fixture.clone();
-    invalid_type[30] = 1;
+    invalid_type[31] = 1;
     assert_eq!(
         decode_current_known_remote_player_appearance(&invalid_type, &state, current),
         Err(CanaryInboundError::Protocol(unknown_value()))

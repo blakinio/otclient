@@ -322,3 +322,14 @@ final_closeout_exact_head_ci:
   repository_ci_run: 30885320455
   result: PASS
 ```
+
+
+## Known ordinary remote-player appearance
+
+Status: implementation validation pending on `feat/OTC2-20260804-canary-known-player-appearance` / PR `#256`.
+
+Pinned producer revision `bc0068ab80bbf003e128fce0589b4cc89d2682d3` proves that the known `AddCreature` branch writes marker `0x62` and the creature id, then the common appearance payload. Unlike the unknown branch, it writes no cache-eviction id, entity type or name in the header and omits guild emblem from the common payload.
+
+The staged decoder accepts only a visible ordinary remote player with health `1..=100`, direction `0..=7`, nonzero outfit, at most three icons, final player type, unmarked state, no inspection and a closed walkthrough flag. It emits `EntityAppeared` with the wire-carried session-fenced entity and `name: None`. It never mutates or infers the producer cache.
+
+The synthetic fixture and negative mutations cover every truncated prefix, wrong marker, hidden health, invalid direction, wrong final type, local/zero identity, stale/pre-bootstrap state and trailing data. No credential, private capture, proprietary asset or deployed configuration is included.

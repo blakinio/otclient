@@ -7,10 +7,25 @@ These instructions apply to every path under `oteryn-client/` and supplement the
 - Build a greenfield first-party client in Rust.
 - Do not implement a line-by-line port of OTClient.
 - Do not preserve C++ globals, Lua/OTUI compatibility or legacy module APIs merely because they exist.
-- Canary is the first compatibility adapter. Oteryn is the target ecosystem and future native protocol owner.
+- `protocol-canary` is the exact compatibility adapter and remains independently supported.
+- `protocol-oteryn` is the preferred future native adapter after a coordinated Otheryn server contract exists.
+- The two protocol adapters must not wrap, translate through or depend on one another.
+- Both adapters map to the same protocol-neutral `GameCommand` and `GameEvent` contracts.
+- The target client async I/O runtime is Tokio, introduced by a separate measured transport package. Do not claim it is already implemented while the synchronous worker transport remains in production code.
+- Tokio is a client runtime decision. It does not require replacing the Otheryn C++ server's ASIO networking and does not by itself lower physical RTT.
+- Production protocol selection uses authoritative server-advertised capabilities and `Auto` preference for native Oteryn. Canary is selected only when explicitly advertised and supported.
+- Manual `ForceCanary` or `ForceOteryn` modes are development/test diagnostics, not unrestricted player settings.
+- One game-entry attempt and session bind exactly one adapter. Do not switch in-session or silently downgrade after credential handoff, authentication failure, ticket consumption, protocol violation or partial admission.
+- Oteryn is the target ecosystem and native protocol owner.
 - The engine and game domain must remain independent of both Canary and Oteryn wire formats.
 - A world channel is a parallel gameplay instance selected at login or relog, not a network stream.
 - Channel change happens through relog. Seamless in-game channel migration is out of scope unless a later ADR explicitly changes this.
+
+Normative protocol/runtime documents:
+
+- `docs/architecture/decisions/ADR-001-dual-protocol-selection-and-async-transport.md`;
+- `docs/architecture/PROTOCOL_BOUNDARY.md`;
+- `docs/architecture/DUAL_PROTOCOL_EXECUTION_PLAN.md`.
 
 ## 2. Mandatory read order
 
@@ -19,11 +34,12 @@ Before any implementation task:
 1. repository root `AGENTS.md`;
 2. this file;
 3. `docs/architecture/ARCHITECTURE.md`;
-4. the architecture document owning the changed area;
-5. `docs/agents/PROGRAM.md` and `docs/agents/WORKSTREAMS.md`;
-6. all active Rust-client task records and open PRs;
-7. the latest relevant audits and ADRs;
-8. source, tests and contracts for the exact work package.
+4. for transport, protocol, gameplay-session or player-action work, ADR-001, `PROTOCOL_BOUNDARY.md` and `DUAL_PROTOCOL_EXECUTION_PLAN.md` completely;
+5. the architecture document owning the changed area;
+6. `docs/agents/PROGRAM.md` and `docs/agents/WORKSTREAMS.md`;
+7. all active Rust-client task records and open PRs;
+8. the latest relevant audits and ADRs;
+9. source, tests and contracts for the exact work package.
 
 Do not rely on chat history as source of truth.
 
@@ -87,9 +103,14 @@ apps
 
 Protocol adapters depend on domain contracts, never the reverse.
 
+The protocol-neutral transport/session supervisor is shared by both adapters. It must not own gameplay opcodes or protocol-selection product policy.
+
 Forbidden examples:
 
 - `game-domain -> protocol-canary`;
+- `game-domain -> protocol-oteryn`;
+- `protocol-oteryn -> protocol-canary`;
+- `protocol-canary -> protocol-oteryn`;
 - `renderer -> inventory feature`;
 - `ui-core -> market feature`;
 - `assets -> Oteryn Identity`;
@@ -109,6 +130,10 @@ Architecture tests must enforce crate dependency direction once the workspace ex
 - UI consumes view models/signals, not protocol packets.
 - The server remains authoritative for game state and action validity.
 - Secrets never enter logs, crash payloads, replay files or extension APIs.
+- TCP write completion must never be reported as authoritative gameplay success.
+- Stale-session queued commands must never reach a replacement session.
+- Spell, item, loot, trade and chat commands must not be silently dropped or reordered.
+- Movement prediction is reversible and reconciled by server events; combat, resources, loot and inventory are never predicted as authoritative outcomes.
 
 ## 8. Modules and extensions
 
@@ -127,15 +152,40 @@ Any change involving wire fields, identifiers, feature negotiation, authenticati
 - fixtures or runtime evidence on both sides;
 - updates to the relevant cross-repository contract.
 
+Native Oteryn protocol work uses coordination ID `OTS-20260804-native-protocol-selection` unless a later accepted programme supersedes it.
+
+Before creating `protocol-oteryn` code, agents must establish linked client/server tasks defining exact framing, schema/versioning, capability advertisement, action sequencing/results, authoritative ordering, snapshot/delta/reconciliation, limits and rollout.
+
+A client-only task cannot authorize Otheryn server implementation. A server-only task cannot claim Rust-client compatibility without exact consumer evidence.
+
 Record uncertainty; never invent Canary or Oteryn behavior.
 
-## 10. Validation
+## 10. Player-action authority
+
+The client creates semantic intent for movement, attack, follow, spells, item use, item movement, loot, chat and logout.
+
+The Otheryn server remains authoritative for:
+
+- movement legality, collision, speed and final position;
+- target validity, combat timing, damage, healing and conditions;
+- spell knowledge, resources, cooldowns, range and line of sight;
+- item identity, ownership, quantity, location and capacity;
+- corpse ownership, quick-loot rules and every item transfer;
+- economy, random outcomes and persistence.
+
+The client may provide reversible visual feedback and pending states. It must not send or commit claimed damage, mana consumption, loot acquisition or completed inventory mutation.
+
+For Canary, use only source-proven commands and observable result events. Do not invent acknowledgements or server ticks. Native Oteryn may add explicit action IDs and accepted/rejected/delayed/effect-observed results through the coordinated contract.
+
+## 11. Validation
 
 Validation is proportional to the changed layer:
 
 - docs: links, paths, consistency and complete diff review;
 - domain: unit/property tests and deterministic replay cases;
-- protocol: golden, malformed, truncated and fuzz cases;
+- transport/Tokio: partial I/O, simultaneous read/write, deadlines, cancellation, queue saturation, no starvation, deterministic shutdown, no task leakage and comparative performance evidence;
+- protocol: golden, malformed, truncated, downgrade-negative and fuzz cases;
+- protocol selection: supported pair, unsupported pair, contradictory advertisement, force-mode isolation, no post-credential fallback and session-binding tests;
 - renderer: benchmark scenes, frame-time evidence and visual snapshots;
 - UI: interaction, DPI, resolution and accessibility checks;
 - assets/updater: signatures, hashes, path traversal, rollback and clean install;
@@ -143,12 +193,14 @@ Validation is proportional to the changed layer:
 
 Never claim runtime, performance, server or platform compatibility without evidence from the exact tested revision.
 
-## 11. Architecture changes
+## 12. Architecture changes
 
 A change to a stable boundary requires an ADR. Do not silently alter:
 
 - the greenfield Rust decision;
-- protocol-adapter isolation;
+- independent Canary/Oteryn adapter isolation;
+- server-advertised native-preferred selection;
+- one-session adapter binding and downgrade resistance;
 - world-channel login/relog semantics;
 - identity and one-shot ticket invariants;
 - renderer snapshot boundary;

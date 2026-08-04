@@ -4,6 +4,8 @@ use std::time::Duration;
 
 /// Largest complete frame accepted by the transport boundary.
 pub const MAX_SUPPORTED_FRAME_BYTES: usize = u16::MAX as usize;
+/// Largest connect, read, write or idle deadline accepted by the contract.
+pub const MAX_IO_TIMEOUT: Duration = Duration::from_secs(30);
 /// Largest framing header accepted before protocol-specific validation.
 pub const MAX_FRAME_HEADER_BYTES: usize = 32;
 /// Largest queue capacity accepted by one transport session.
@@ -20,6 +22,8 @@ pub const DEFAULT_BACKGROUND_QUEUE_CAPACITY: usize = 16;
 pub enum TransportConfigError {
     /// At least one timeout was zero.
     ZeroTimeout,
+    /// At least one timeout exceeded [`MAX_IO_TIMEOUT`].
+    TimeoutTooLarge,
     /// At least one frame-size bound was zero or unsupported.
     InvalidFrameLimit,
     /// At least one queue capacity was zero or unsupported.
@@ -30,6 +34,9 @@ impl Display for TransportConfigError {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::ZeroTimeout => formatter.write_str("transport timeout must be non-zero"),
+            Self::TimeoutTooLarge => {
+                formatter.write_str("transport timeout exceeds the 30-second limit")
+            }
             Self::InvalidFrameLimit => formatter.write_str("transport frame limit is invalid"),
             Self::InvalidQueueCapacity => {
                 formatter.write_str("transport queue capacity is invalid")
@@ -62,7 +69,7 @@ impl TransportConfig {
     ///
     /// # Errors
     ///
-    /// Rejects zero timeouts and zero or unsupported frame limits.
+    /// Rejects zero or over-30-second timeouts and zero or unsupported frame limits.
     pub fn new(
         connect_timeout: Duration,
         read_timeout: Duration,
@@ -92,7 +99,7 @@ impl TransportConfig {
     ///
     /// # Errors
     ///
-    /// Rejects a zero duration.
+    /// Rejects zero or over-30-second durations.
     pub fn with_idle_timeout(mut self, idle_timeout: Duration) -> Result<Self, TransportConfigError> {
         validate_timeout(idle_timeout)?;
         self.idle_timeout = idle_timeout;
@@ -177,6 +184,8 @@ impl TransportConfig {
 fn validate_timeout(timeout: Duration) -> Result<(), TransportConfigError> {
     if timeout.is_zero() {
         Err(TransportConfigError::ZeroTimeout)
+    } else if timeout > MAX_IO_TIMEOUT {
+        Err(TransportConfigError::TimeoutTooLarge)
     } else {
         Ok(())
     }

@@ -11,6 +11,7 @@ use oteryn_protocol_core::{BoundedReader, ProtocolError, ProtocolErrorKind, Trai
 const UNKNOWN_CREATURE_MARKER: u16 = 0x61;
 const CREATURE_TYPE_MONSTER: u8 = 1;
 const CREATURE_TYPE_NPC: u8 = 2;
+const CREATURE_TYPE_PLAYER_SUMMON: u8 = 3;
 const MAX_ENTITY_NAME_BYTES: usize = 64;
 const MAX_CREATURE_ICONS: u8 = 3;
 const MAX_TILE_STACK_INDEX: u8 = 9;
@@ -18,25 +19,30 @@ const MAP_MAX_LAYERS: u8 = 16;
 const CREATURE_MARK_UNMARKED: u8 = 0xFF;
 const CREATURE_INSPECTION_NONE: u8 = 0;
 
-/// Decode one complete Current unknown ordinary monster or NPC appearance.
+/// Decode one complete Current unknown visible monster, player-owned monster
+/// summon or NPC appearance.
 ///
 /// The accepted producer branch is exactly opcode `0x6A`, one canonical
 /// position, a visible stack index, unknown-creature marker `0x61`, zero cache
 /// eviction, one non-local entity id, a header type of monster (`1`) or NPC
 /// (`2`), one non-empty domain-bounded name and the complete visible common
-/// payload. The final type must equal the header type, which rejects player
-/// summons and every other rewritten or extended creature family.
+/// payload. A normal monster or NPC repeats its header type in the final type
+/// field. A source-reachable monster with a player master keeps monster type in
+/// the header, is rewritten to player-summon type (`3`) in the final field and
+/// appends one nonzero master id.
 ///
 /// The adapter never creates, mutates or infers the producer's known-creature
-/// cache. It emits only protocol-neutral [`GameEvent::EntityAppeared`] state.
-/// Hidden health, invisible outfits, player/summon types, nonzero eviction,
-/// extension payloads and every trailing byte remain rejected.
+/// cache and does not expose the Canary-only master relationship. It emits only
+/// protocol-neutral [`GameEvent::EntityAppeared`] state. Hidden health,
+/// invisible outfits, direct summon header types, nonzero eviction, extension
+/// payloads and every trailing byte remain rejected.
 ///
 /// # Errors
 ///
 /// Rejects stale, pre-bootstrap or terminal state; local or zero identity;
-/// invalid floor, stack, name, health, direction, outfit, icon, type, mark,
-/// inspection or walkthrough fields; truncation, oversize and trailing data.
+/// invalid floor, stack, name, health, direction, outfit, icon, type, master,
+/// mark, inspection or walkthrough fields; truncation, oversize and trailing
+/// data.
 pub fn decode_current_unknown_remote_non_player_appearance(
     input: &[u8],
     state: &CanaryInboundBootstrapState,
@@ -119,7 +125,7 @@ fn parse_visible_non_player_payload(
     let _skull = reader.read_u8()?;
     let _party_shield = reader.read_u8()?;
     let _guild_emblem = reader.read_u8()?;
-    expect_u8(reader, header_type)?;
+    parse_final_type(reader, header_type)?;
     let _speech_bubble = reader.read_u8()?;
     expect_u8(reader, CREATURE_MARK_UNMARKED)?;
     expect_u8(reader, CREATURE_INSPECTION_NONE)?;
@@ -127,6 +133,25 @@ fn parse_visible_non_player_payload(
         return Err(unknown_value().into());
     }
     Ok(())
+}
+
+fn parse_final_type(
+    reader: &mut BoundedReader<'_>,
+    header_type: u8,
+) -> Result<(), CanaryInboundError> {
+    let final_type = reader.read_u8()?;
+    match (header_type, final_type) {
+        (CREATURE_TYPE_MONSTER, CREATURE_TYPE_MONSTER) | (CREATURE_TYPE_NPC, CREATURE_TYPE_NPC) => {
+            Ok(())
+        }
+        (CREATURE_TYPE_MONSTER, CREATURE_TYPE_PLAYER_SUMMON) => {
+            if reader.read_u32_le()? == 0 {
+                return Err(unknown_value().into());
+            }
+            Ok(())
+        }
+        _ => Err(unknown_value().into()),
+    }
 }
 
 fn entity_kind(creature_type: u8) -> Result<EntityKind, CanaryInboundError> {

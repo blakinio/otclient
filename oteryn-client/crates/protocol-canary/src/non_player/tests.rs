@@ -27,6 +27,13 @@ const UNKNOWN_MONSTER_APPEARANCE_FIXTURE: &str = include_str!(
 const UNKNOWN_NPC_APPEARANCE_FIXTURE: &str = include_str!(
     "../../../../tests/integration/canary-world-protocol/fixtures/unknown-npc-appearance.hex"
 );
+const UNKNOWN_PLAYER_SUMMON_APPEARANCE_FIXTURE: &str = "
+6A 37 12 79 56 07 03
+61 00 00 00 00 00 07 04 03 02 01
+04 00 57 6F 6C 66
+64 02 80 00 01 02 03 04 00 00 00
+07 D7 DC 00 00 00 00 00 03 04 03 02 01 00 FF 00 01
+";
 
 fn parse_hex_fixture(input: &str) -> Result<Vec<u8>, ParseIntError> {
     input
@@ -103,11 +110,33 @@ fn exact_unknown_npc_emits_npc_appearance() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn every_truncated_prefix_is_rejected() -> Result<(), Box<dyn Error>> {
+fn exact_player_owned_monster_summon_emits_creature_appearance() -> Result<(), Box<dyn Error>> {
     let (state, current) = ready_state(102)?;
+    let envelope = decode_current_unknown_remote_non_player_appearance(
+        &parse_hex_fixture(UNKNOWN_PLAYER_SUMMON_APPEARANCE_FIXTURE)?,
+        &state,
+        current,
+    )?;
+    assert_eq!(
+        envelope.event(),
+        &GameEvent::EntityAppeared {
+            entity: EntityHandle::new(state.session(), EntityId::try_new(0x0203_0407)?),
+            kind: EntityKind::Creature,
+            name: Some(NameText::try_new("Wolf")?),
+            position: TilePosition::new(0x1237, 0x5679, Floor::new(7)),
+            stack: StackIndex::new(3),
+        }
+    );
+    Ok(())
+}
+
+#[test]
+fn every_truncated_prefix_is_rejected() -> Result<(), Box<dyn Error>> {
+    let (state, current) = ready_state(103)?;
     for fixture in [
         UNKNOWN_MONSTER_APPEARANCE_FIXTURE,
         UNKNOWN_NPC_APPEARANCE_FIXTURE,
+        UNKNOWN_PLAYER_SUMMON_APPEARANCE_FIXTURE,
     ] {
         let appearance = parse_hex_fixture(fixture)?;
         for length in 0..appearance.len() {
@@ -128,7 +157,7 @@ fn every_truncated_prefix_is_rejected() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn header_payload_and_trailing_branches_fail_closed() -> Result<(), Box<dyn Error>> {
-    let (state, current) = ready_state(103)?;
+    let (state, current) = ready_state(104)?;
     let fixture = parse_hex_fixture(UNKNOWN_MONSTER_APPEARANCE_FIXTURE)?;
 
     let mut known_marker = fixture.clone();
@@ -149,6 +178,13 @@ fn header_payload_and_trailing_branches_fail_closed() -> Result<(), Box<dyn Erro
     player_header[17] = 0;
     assert_eq!(
         decode_current_unknown_remote_non_player_appearance(&player_header, &state, current),
+        Err(CanaryInboundError::Protocol(unknown_value()))
+    );
+
+    let mut direct_summon_header = fixture.clone();
+    direct_summon_header[17] = CREATURE_TYPE_PLAYER_SUMMON;
+    assert_eq!(
+        decode_current_unknown_remote_non_player_appearance(&direct_summon_header, &state, current,),
         Err(CanaryInboundError::Protocol(unknown_value()))
     );
 
@@ -174,10 +210,14 @@ fn header_payload_and_trailing_branches_fail_closed() -> Result<(), Box<dyn Erro
         Err(CanaryInboundError::Protocol(unknown_value()))
     );
 
-    let mut summon_rewrite = fixture.clone();
-    summon_rewrite[42] = 3;
+    let mut unsupported_final_type = fixture.clone();
+    unsupported_final_type[42] = 4;
     assert_eq!(
-        decode_current_unknown_remote_non_player_appearance(&summon_rewrite, &state, current),
+        decode_current_unknown_remote_non_player_appearance(
+            &unsupported_final_type,
+            &state,
+            current,
+        ),
         Err(CanaryInboundError::Protocol(unknown_value()))
     );
 
@@ -193,8 +233,29 @@ fn header_payload_and_trailing_branches_fail_closed() -> Result<(), Box<dyn Erro
 }
 
 #[test]
+fn summon_master_failures_are_rejected() -> Result<(), Box<dyn Error>> {
+    let (state, current) = ready_state(105)?;
+    let fixture = parse_hex_fixture(UNKNOWN_PLAYER_SUMMON_APPEARANCE_FIXTURE)?;
+
+    let mut zero_master = fixture.clone();
+    zero_master[44..48].copy_from_slice(&0_u32.to_le_bytes());
+    assert_eq!(
+        decode_current_unknown_remote_non_player_appearance(&zero_master, &state, current),
+        Err(CanaryInboundError::Protocol(unknown_value()))
+    );
+
+    let mut wrong_header = fixture;
+    wrong_header[17] = CREATURE_TYPE_NPC;
+    assert_eq!(
+        decode_current_unknown_remote_non_player_appearance(&wrong_header, &state, current),
+        Err(CanaryInboundError::Protocol(unknown_value()))
+    );
+    Ok(())
+}
+
+#[test]
 fn identity_name_state_and_bounds_fail_closed() -> Result<(), Box<dyn Error>> {
-    let (state, current) = ready_state(104)?;
+    let (state, current) = ready_state(106)?;
     let fixture = parse_hex_fixture(UNKNOWN_MONSTER_APPEARANCE_FIXTURE)?;
 
     let mut local = fixture.clone();
@@ -245,7 +306,7 @@ fn identity_name_state_and_bounds_fail_closed() -> Result<(), Box<dyn Error>> {
         Err(CanaryInboundError::Domain(DomainError::StaleSession { .. }))
     ));
 
-    let initial_generation = SessionGeneration::new(105);
+    let initial_generation = SessionGeneration::new(107);
     let initial = CanaryInboundBootstrapState::new(SessionToken::new(initial_generation));
     assert_eq!(
         decode_current_unknown_remote_non_player_appearance(&fixture, &initial, initial_generation,),

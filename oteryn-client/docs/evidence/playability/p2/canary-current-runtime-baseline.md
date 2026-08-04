@@ -230,7 +230,7 @@ The next safe action is to merge an accepted authoritative item-decoding depende
 
 ## Read-only entity reconciliation slice
 
-Status: exact product validation passed on `daa7e5b09c06551a6f4ad94a69d00cbf65319133` / PR `#252`; final checkpoint CI pending.
+Status: entity reconciliation slice merged as `d41a8155547d197ee18f9f390091f32ee3e64af6`; parent protocol task remains blocked on authoritative item metadata and local-player map strips.
 
 Pinned producer revision `bc0068ab80bbf003e128fce0589b4cc89d2682d3` proves:
 
@@ -269,4 +269,56 @@ fresh_audit:
 e2e:
   result: NOT_APPLICABLE
   reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
+```
+
+
+## Entity reconciliation post-merge closeout
+
+```yaml
+implementation_pr: 252
+implementation_head: 41cfd39b847911d708429b8e23d4d17f9c1dc417
+implementation_merge: d41a8155547d197ee18f9f390091f32ee3e64af6
+closeout_pr: 254
+final_exact_head_validation:
+  rust_client_run: 30883672329
+  windows_job: 91910151945
+  supply_chain_job: 91910151992
+  repository_ci_run: 30883672401
+  repository_required_job: 91910412579
+  result: PASS
+ready_state_validation:
+  repository_ci_run: 30883947811
+  repository_required_job: 91911322995
+  result: PASS
+fresh_audit:
+  comment_id: 5175281373
+  result: PASS
+  material_findings_open: 0
+temporary_workflows_remaining: 0
+temporary_scripts_remaining: 0
+shared_path_lease: []
+parent_task_status: blocked
+remaining_blockers:
+  - authoritative Current item-type and runtime AddItem branch metadata
+  - complete local-player appended map-strip decoding
+  - complete known/cache-eviction and non-player creature branches
+```
+
+
+## Closeout restack on current governance base
+
+```yaml
+closeout_pr: 254
+restacked_base: 14e2718b7ff046b0620d5c838429cef81aa6d340
+pre_checkpoint_head: 52942db86c6172974b4e5e80009c662f51ebb058
+changed_runtime_paths: []
+changed_closeout_paths:
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+product_validation_reused_from_exact_implementation_heads: true
+final_closeout_exact_head_ci:
+  head: 9d82234af1c23c2748984f613e8eab2fa89396da
+  rust_client_run: 30885320351
+  repository_ci_run: 30885320455
+  result: PASS
 ```

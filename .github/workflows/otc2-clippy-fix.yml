@@ -1,0 +1,59 @@
+name: OTC2 Clippy Fix
+
+on:
+  push:
+    branches:
+      - "feat/OTC2-20260804-tokio-transport"
+    paths:
+      - ".github/workflows/otc2-clippy-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: "feat/OTC2-20260804-tokio-transport"
+          show-progress: false
+
+      - name: Apply exact Clippy repairs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("oteryn-client/crates/transport/src/session.rs")
+          source = path.read_text(encoding="utf-8")
+          replacements = {
+              "drop(self.cancel_tx.send(true));": "let _ = self.cancel_tx.send(true);",
+              "drop(cancel_tx.send(true));": "let _ = cancel_tx.send(true);",
+              "drop(status_tx.send(SessionStatus::closed(terminal_error)));": "let _ = status_tx.send(SessionStatus::closed(terminal_error));",
+          }
+          for old, new in replacements.items():
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one occurrence of {old!r}, found {count}")
+              source = source.replace(old, new)
+          path.write_text(source, encoding="utf-8")
+          PY
+
+      - name: Install pinned formatter
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal --component rustfmt
+          rustup default 1.94.0
+
+      - name: Format workspace
+        working-directory: oteryn-client
+        run: cargo fmt --all
+
+      - name: Commit repairs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/crates/transport/src/session.rs
+          git commit -m "fix(transport): satisfy strict Clippy result handling"
+          git push origin HEAD:feat/OTC2-20260804-tokio-transport

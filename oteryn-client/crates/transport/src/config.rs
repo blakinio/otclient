@@ -100,7 +100,10 @@ impl TransportConfig {
     /// # Errors
     ///
     /// Rejects zero or over-30-second durations.
-    pub fn with_idle_timeout(mut self, idle_timeout: Duration) -> Result<Self, TransportConfigError> {
+    pub fn with_idle_timeout(
+        mut self,
+        idle_timeout: Duration,
+    ) -> Result<Self, TransportConfigError> {
         validate_timeout(idle_timeout)?;
         self.idle_timeout = idle_timeout;
         Ok(self)

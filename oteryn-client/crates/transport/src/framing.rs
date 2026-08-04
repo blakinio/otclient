@@ -63,9 +63,7 @@ pub(crate) fn validate_complete_frame_len(
     max_frame_bytes: usize,
 ) -> Result<(), TransportError> {
     if header_len == 0 || complete_len < header_len {
-        return Err(TransportError::new(
-            TransportErrorKind::InvalidFrameLength,
-        ));
+        return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
     }
     if complete_len > max_frame_bytes {
         return Err(TransportError::new(TransportErrorKind::FrameTooLarge));

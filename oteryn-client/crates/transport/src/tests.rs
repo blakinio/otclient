@@ -20,9 +20,7 @@ impl FrameBoundary for U16TotalLength {
 
     fn complete_frame_len(&self, header: &[u8]) -> Result<usize, TransportError> {
         if header.len() != 2 {
-            return Err(TransportError::new(
-                TransportErrorKind::InvalidFrameLength,
-            ));
+            return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
         }
         Ok(usize::from(u16::from_le_bytes([header[0], header[1]])))
     }
@@ -93,11 +91,7 @@ fn full_duplex_loopback_preserves_frames_and_joins() -> Result<(), Box<dyn Error
             &cancellation.token(),
         )
         .await?;
-        session.try_send(
-            generation,
-            OutboundPriority::Gameplay,
-            vec![5, 0, 1, 2, 3],
-        )?;
+        session.try_send(generation, OutboundPriority::Gameplay, vec![5, 0, 1, 2, 3])?;
 
         let frame = timeout(Duration::from_secs(2), async {
             loop {

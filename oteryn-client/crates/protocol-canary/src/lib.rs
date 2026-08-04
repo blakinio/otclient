@@ -17,6 +17,8 @@ use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 
 #[cfg(test)]
+mod invisible_outfit_tests;
+#[cfg(test)]
 mod synthetic;
 #[cfg(test)]
 mod tests;
@@ -26,6 +28,7 @@ mod inbound;
 mod known_player;
 mod map;
 mod non_player;
+mod outfit;
 mod reconciliation;
 mod tile;
 

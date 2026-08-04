@@ -1,0 +1,164 @@
+name: OTC2 CPU Evidence
+
+on:
+  push:
+    branches:
+      - feat/OTC2-20260804-tokio-transport
+    paths:
+      - .github/workflows/otc2-cpu-evidence.yml
+
+permissions:
+  contents: write
+
+jobs:
+  windows-cpu-evidence:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: never
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: feat/OTC2-20260804-tokio-transport
+          show-progress: false
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          $output = rustup toolchain install 1.94.0 --profile minimal --component clippy,rustfmt --target x86_64-pc-windows-msvc 2>&1
+          if ($LASTEXITCODE -ne 0) { throw ($output -join "`n") }
+          rustup default 1.94.0 | Out-Null
+
+      - name: Validate and build release harness
+        working-directory: oteryn-client
+        shell: pwsh
+        run: |
+          cargo fmt --all --check
+          if ($LASTEXITCODE -ne 0) { throw "cargo fmt failed" }
+          cargo clippy -p oteryn-transport --all-targets --features blocking-baseline -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw "cargo clippy failed" }
+          cargo test -p oteryn-transport --features blocking-baseline
+          if ($LASTEXITCODE -ne 0) { throw "transport tests failed" }
+          cargo build -p oteryn-transport --example transport_evidence --features blocking-baseline --release
+          if ($LASTEXITCODE -ne 0) { throw "release evidence build failed" }
+
+      - name: Capture separate blocking and Tokio CPU time
+        working-directory: oteryn-client
+        shell: pwsh
+        run: |
+          $raw = "docs/research/transport/OTC2_TOKIO_TRANSPORT_EVIDENCE_RAW.txt"
+          $exe = (Resolve-Path "target/release/examples/transport_evidence.exe").Path
+          $temp = Join-Path $env:RUNNER_TEMP "otc2-transport-evidence"
+          New-Item -ItemType Directory -Force -Path $temp | Out-Null
+          @(
+            "run_id=$env:GITHUB_RUN_ID",
+            "job=$env:GITHUB_JOB",
+            "source_sha=$env:GITHUB_SHA",
+            "runner_os=$env:RUNNER_OS",
+            "runner_arch=$env:RUNNER_ARCH",
+            "rustc=$(rustc --version)",
+            "cargo=$(cargo --version)",
+            "workload.frame_bytes=64",
+            "workload.latency_samples=200",
+            "workload.burst_frames=1000"
+          ) | Set-Content -Path $raw -Encoding utf8
+
+          foreach ($mode in @("blocking", "tokio")) {
+            $stdout = Join-Path $temp "$mode.stdout.txt"
+            $stderr = Join-Path $temp "$mode.stderr.txt"
+            $process = Start-Process -FilePath $exe -ArgumentList $mode -NoNewWindow -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+            $process.Refresh()
+            if ($process.ExitCode -ne 0) {
+              $details = Get-Content $stderr -Raw
+              throw "$mode evidence failed with exit code $($process.ExitCode): $details"
+            }
+            Get-Content $stdout | Add-Content -Path $raw -Encoding utf8
+            "$mode.cpu_time_ms=$([math]::Round($process.TotalProcessorTime.TotalMilliseconds, 3))" | Add-Content -Path $raw -Encoding utf8
+          }
+
+      - name: Render bounded evidence report
+        working-directory: oteryn-client
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+
+          raw_path = Path("docs/research/transport/OTC2_TOKIO_TRANSPORT_EVIDENCE_RAW.txt")
+          values = {}
+          for line in raw_path.read_text(encoding="utf-8-sig").splitlines():
+              if "=" in line:
+                  key, value = line.split("=", 1)
+                  values[key.strip()] = value.strip()
+
+          def integer(key):
+              return int(values[key])
+
+          def number(key):
+              return float(values[key])
+
+          throughput_ratio = number("tokio.burst_frames_per_second") / number("blocking.burst_frames_per_second")
+          cpu_ratio = number("tokio.cpu_time_ms") / number("blocking.cpu_time_ms") if number("blocking.cpu_time_ms") else 0.0
+          report = f'''# OTC2 Tokio transport evidence
+
+          ## Scope
+
+          This evidence compares the retained blocking transport baseline with the new bounded Tokio transport on the same deterministic Windows loopback workload. It measures application queue, scheduler and process CPU behavior only. It does not measure or claim lower physical, Internet, Gateway or game-server round-trip time.
+
+          ## Reproduction
+
+          - Source SHA: `{values["source_sha"]}`
+          - GitHub Actions run: `{values["run_id"]}`
+          - Job: `{values["job"]}`
+          - Runner: {values["runner_os"]}, {values["runner_arch"]}
+          - Rust: `{values["rustc"]}`
+          - Cargo: `{values["cargo"]}`
+          - Tokio: exact `1.51.4`
+          - Frame size: {values["workload.frame_bytes"]} bytes
+          - Sequential latency samples per path: {values["workload.latency_samples"]}
+          - Pipelined burst per path: {values["workload.burst_frames"]} frames
+          - Raw output: `OTC2_TOKIO_TRANSPORT_EVIDENCE_RAW.txt`
+
+          The same job passed canonical formatting, strict transport Clippy with all targets and `blocking-baseline`, and the complete focused transport test suite before recording the measurements. Each release-mode path ran in its own process; `TotalProcessorTime` is the process user-plus-kernel CPU time reported by Windows for that path.
+
+          ## Results
+
+          | Measure | Blocking baseline | Tokio transport | Interpretation |
+          |---|---:|---:|---|
+          | Loopback queue latency p50 | {integer("blocking.queue_latency_us.p50")} µs | {integer("tokio.queue_latency_us.p50")} µs | Exact result for this single hosted-runner sample |
+          | Loopback queue latency p95 | {integer("blocking.queue_latency_us.p95")} µs | {integer("tokio.queue_latency_us.p95")} µs | Exact result for this single hosted-runner sample |
+          | Loopback queue latency p99 | {integer("blocking.queue_latency_us.p99")} µs | {integer("tokio.queue_latency_us.p99")} µs | Exact result for this single hosted-runner sample |
+          | Pipelined burst throughput | {number("blocking.burst_frames_per_second"):.2f} frames/s | {number("tokio.burst_frames_per_second"):.2f} frames/s | Tokio {throughput_ratio:.2f}× the blocking sequential baseline in this bounded workload |
+          | Process CPU time | {number("blocking.cpu_time_ms"):.3f} ms | {number("tokio.cpu_time_ms"):.3f} ms | Tokio/blocking CPU ratio {cpu_ratio:.2f}× for separate complete harness processes |
+          | Joined shutdown | {integer("blocking.shutdown_us")} µs | {integer("tokio.shutdown_us")} µs | Tokio includes supervisor and child-task joining |
+          | Queue high-water | not applicable | {integer("tokio.queue_high_water")} frames | Observed across burst and slow-consumer cases |
+          | Queue-full rejections | not applicable | {integer("tokio.queue_full")} | No silent loss; overflow remains typed and counted |
+          | Slow-consumer cancellation | not applicable | {integer("tokio.slow_consumer_cancel_us")} µs | Cancellation remained bounded while the inbound queue was saturated |
+
+          ## Allocation and backpressure proxy
+
+          Stable allocator-internal telemetry is not available from the shared hosted runner without adding platform-specific unsafe instrumentation. The reproducible allocation/backpressure proxy is therefore the configured finite capacities, validated frame-size-before-allocation rule, observed queue high-water mark and explicit queue-full counter:
+
+          - every directional queue has a configured finite capacity;
+          - inbound allocation occurs only after validating the complete frame length;
+          - burst and slow-consumer high-water are recorded without unbounded growth;
+          - saturation retains bounded cancellation and joined shutdown;
+          - queue overflow is a typed error and metric, never silent loss.
+
+          ## Conclusion
+
+          The evidence supports the implementation objective: Tokio enables bounded full-duplex pipelining, typed backpressure and deterministic cancellation/shutdown without changing the physical network. These figures are evidence for this exact CI host, workload and commit only, not a production latency or CPU forecast.
+          '''
+          lines = [line[10:] if line.startswith("          ") else line for line in report.splitlines()]
+          Path("docs/research/transport/OTC2_TOKIO_TRANSPORT_EVIDENCE.md").write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+          '@ | python -
+
+      - name: Commit CPU evidence only
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add oteryn-client/docs/research/transport/OTC2_TOKIO_TRANSPORT_EVIDENCE_RAW.txt oteryn-client/docs/research/transport/OTC2_TOKIO_TRANSPORT_EVIDENCE.md
+          git commit -m "perf(transport): record per-path Windows CPU evidence"
+          git push origin HEAD:feat/OTC2-20260804-tokio-transport

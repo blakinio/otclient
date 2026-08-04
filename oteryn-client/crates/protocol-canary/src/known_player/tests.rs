@@ -85,11 +85,7 @@ fn every_truncated_prefix_is_rejected() -> Result<(), Box<dyn Error>> {
     let appearance = parse_hex_fixture(KNOWN_REMOTE_PLAYER_APPEARANCE_FIXTURE)?;
     for length in 0..appearance.len() {
         assert_eq!(
-            decode_current_known_remote_player_appearance(
-                &appearance[..length],
-                &state,
-                current,
-            ),
+            decode_current_known_remote_player_appearance(&appearance[..length], &state, current,),
             Err(CanaryInboundError::Protocol(ProtocolError::new(
                 ProtocolErrorKind::Truncated,
             )))
@@ -175,11 +171,7 @@ fn local_zero_stale_and_prebootstrap_identity_fail_closed() -> Result<(), Box<dy
     let initial_generation = SessionGeneration::new(94);
     let initial = CanaryInboundBootstrapState::new(SessionToken::new(initial_generation));
     assert_eq!(
-        decode_current_known_remote_player_appearance(
-            &fixture,
-            &initial,
-            initial_generation,
-        ),
+        decode_current_known_remote_player_appearance(&fixture, &initial, initial_generation,),
         Err(CanaryInboundError::InvalidOrder)
     );
     Ok(())

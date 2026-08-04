@@ -54,11 +54,26 @@ mod enabled {
         slow_consumer_cancel_us: Option<u128>,
     }
 
-    pub fn run() -> Result<(), Box<dyn Error>> {
-        let blocking = blocking_evidence()?;
-        let tokio = tokio_evidence()?;
-        print_evidence("blocking", &blocking);
-        print_evidence("tokio", &tokio);
+    pub fn run(mode: Option<&str>) -> Result<(), Box<dyn Error>> {
+        match mode {
+            None | Some("all") => {
+                let blocking = blocking_evidence()?;
+                let tokio = tokio_evidence()?;
+                print_evidence("blocking", &blocking);
+                print_evidence("tokio", &tokio);
+            }
+            Some("blocking") => {
+                let blocking = blocking_evidence()?;
+                print_evidence("blocking", &blocking);
+            }
+            Some("tokio") => {
+                let tokio = tokio_evidence()?;
+                print_evidence("tokio", &tokio);
+            }
+            Some(_unsupported) => {
+                return Err("expected evidence mode: all, blocking or tokio".into());
+            }
+        }
         println!("scope=deterministic_loopback_queue_and_scheduler_evidence");
         println!("physical_rtt_claim=false");
         Ok(())
@@ -370,5 +385,6 @@ mod enabled {
 
 #[cfg(feature = "blocking-baseline")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    enabled::run()
+    let mode = std::env::args().nth(1);
+    enabled::run(mode.as_deref())
 }

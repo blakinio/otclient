@@ -820,6 +820,7 @@ where
 mod internal_tests {
     use super::*;
     use oteryn_foundation::CancellationSource;
+    use std::error::Error;
     use std::future::pending;
 
     #[tokio::test(flavor = "current_thread")]
@@ -915,6 +916,57 @@ mod internal_tests {
         assert_eq!(first.map(|frame| frame.bytes), Ok(vec![1]));
         assert_eq!(second.map(|frame| frame.bytes), Ok(vec![2]));
         assert_eq!(third.map(|frame| frame.bytes), Ok(vec![9]));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn cancellation_interrupts_a_backpressured_write() -> Result<(), Box<dyn Error>> {
+        let (client, _server) = tokio::io::duplex(1);
+        let config = TransportConfig::new(
+            Duration::from_secs(1),
+            Duration::from_secs(1),
+            Duration::from_secs(1),
+            128,
+            128,
+        )?;
+        let (gameplay_tx, gameplay_rx) = mpsc::channel(1);
+        let (_background_tx, background_rx) = mpsc::channel(1);
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let metrics = Arc::new(TransportMetrics::default());
+        let writer = tokio::spawn(writer_loop(
+            client,
+            config,
+            gameplay_rx,
+            background_rx,
+            cancel_rx,
+            metrics,
+        ));
+        gameplay_tx
+            .send(OutboundFrame {
+                bytes: vec![7_u8; 128],
+            })
+            .await?;
+        sleep(Duration::from_millis(5)).await;
+        let _changed = cancel_tx.send(true);
+        let joined = timeout(Duration::from_millis(100), writer).await?;
+        let result = joined?;
+        assert_eq!(
+            result,
+            Err(TransportError::new(TransportErrorKind::Cancelled))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn connection_reset_is_terminally_classified() {
+        let reset = io::Error::from(io::ErrorKind::ConnectionReset);
+        assert_eq!(
+            classify_read_error(&reset),
+            TransportError::new(TransportErrorKind::ConnectionLost)
+        );
+        assert_eq!(
+            classify_write_error(&reset),
+            TransportError::new(TransportErrorKind::ConnectionLost)
+        );
     }
 
     #[test]

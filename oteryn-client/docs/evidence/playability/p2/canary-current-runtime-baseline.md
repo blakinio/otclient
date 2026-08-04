@@ -326,7 +326,7 @@ final_closeout_exact_head_ci:
 
 ## Known ordinary remote-player appearance
 
-Status: exact product validation passed on `e952aea38ce93d873b0303556164e3f7a118f1d5` / PR `#256`; final validation-record CI pending.
+Status: known ordinary remote-player appearance merged as `804f793bac199f1d9c4ca2d5f7ade984801984ee`; the parent task remains active and blocked on item metadata, local map strips and remaining creature branches.
 
 Pinned producer revision `bc0068ab80bbf003e128fce0589b4cc89d2682d3` proves that the known `AddCreature` branch writes marker `0x62` and the creature id, then the common appearance payload. Unlike the unknown branch, it writes no cache-eviction id, entity type or name in the header and omits guild emblem from the common payload.
 
@@ -360,4 +360,64 @@ fresh_audit:
 e2e:
   result: NOT_APPLICABLE
   reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
+```
+
+
+## Known ordinary remote-player post-merge closeout
+
+```yaml
+implementation_pr: 256
+implementation_head: 1128242ffd225c8e3c3db3e6da447817d02baa55
+implementation_merge: 804f793bac199f1d9c4ca2d5f7ade984801984ee
+closeout_pr: 258
+exact_final_head_validation:
+  rust_client_run: 30895233392
+  windows_job: 91946458850
+  supply_chain_job: 91946458966
+  repository_ci_run: 30895233866
+  repository_required_job: 91946738204
+  result: PASS
+ready_state_validation:
+  repository_ci_run: 30895644663
+  repository_required_job: 91948000133
+  result: PASS
+fresh_audit:
+  comment_id: 5176900934
+  result: PASS
+  material_findings_open: 0
+temporary_workflows_remaining: 0
+temporary_scripts_remaining: 0
+shared_path_lease: []
+parent_task_status: blocked
+remaining_blockers:
+  - authoritative Current item-type and runtime AddItem branch metadata
+  - authoritative item-instance identity for generic removal and replacement
+  - complete local-player appended map strips
+  - nonzero cache eviction, hidden/invisible and non-player creature appearance branches
+```
+
+
+## Known-player closeout current-main restack
+
+```yaml
+closeout_pr: 258
+restacked_base: 9a0bd3c4da8f9f503c3cfafb9a2ca0d722a83638
+pre_checkpoint_head: a4bef4989878d99e13805caa4d1d8575d803ba79
+changed_runtime_paths: []
+changed_closeout_paths:
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+exact_head_validation: pending
+```
+
+
+## Known-player closeout final current-main replay
+
+```yaml
+closeout_pr: 258
+base: 33da70afd159d9b9963e6e9d80398c298b26ff5d
+final_diff_paths:
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+exact_head_validation: pending
 ```

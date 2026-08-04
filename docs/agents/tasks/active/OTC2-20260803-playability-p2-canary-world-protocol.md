@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: validating
+status: blocked
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: known-player-appearance-terminal-ci
-branch: feat/OTC2-20260804-canary-known-player-appearance
+phase: item-catalogue-and-nonplayer-appearance-blocker
+branch: main
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-04T11:08:00+02:00
-required_base_commit: "694314af9162b4e435d4b269dbec6ebe7b0a83e4"
+updated: 2026-08-04T11:54:00+02:00
+required_base_commit: "33da70afd159d9b9963e6e9d80398c298b26ff5d"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254, 256]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254, 256, 258]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -41,9 +41,9 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-04T11:08:00+02:00
+last_progress_at: 2026-08-04T11:54:00+02:00
 ci_checks_for_current_head: 3
-ci_check_generation: known-player-appearance-final-exact-head
+ci_check_generation: known-player-appearance-merged
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 2
 unchanged_state_checks: 0
@@ -203,7 +203,7 @@ Merged PR `#252` now provides a read-only caller-owned resolver for complete rem
 
 ## Remaining creature branches
 
-The complete known ordinary-player appearance branch is staged in this phase. Nonzero cache eviction, non-player types, hidden-health, summon, invisible outfit and OTCR extension branches are not normalized as complete accepted families. They remain `UNKNOWN` and unimplemented.
+The complete known ordinary-player appearance branch was merged in PR `#256`. Nonzero cache eviction, non-player types, hidden-health, summon, invisible outfit and OTCR extension branches are not normalized as complete accepted families. They remain `UNKNOWN` and unimplemented.
 
 # Validation
 
@@ -305,42 +305,42 @@ The parent Canary task remains active and blocked. It retains exclusive `protoco
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 31
-updated_at: 2026-08-04T11:08:00+02:00
-observed_main: 694314af9162b4e435d4b269dbec6ebe7b0a83e4
-status: validating
-phase: known-player-appearance-terminal-ci
-active_branch: feat/OTC2-20260804-canary-known-player-appearance
-pr: 256
-base: 694314af9162b4e435d4b269dbec6ebe7b0a83e4
-validated_product_head: e952aea38ce93d873b0303556164e3f7a118f1d5
-changed_paths:
-  - oteryn-client/crates/protocol-canary/src/lib.rs
-  - oteryn-client/crates/protocol-canary/src/known_player.rs
-  - oteryn-client/crates/protocol-canary/src/known_player/tests.rs
-  - oteryn-client/tests/integration/canary-world-protocol/fixtures/known-remote-player-appearance.hex
-  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
-  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
-implementation:
+checkpoint_version: 34
+updated_at: 2026-08-04T11:54:00+02:00
+observed_main: 33da70afd159d9b9963e6e9d80398c298b26ff5d
+status: blocked
+phase: item-catalogue-and-nonplayer-appearance-blocker
+active_branch: none
+implementation_pr: 256
+implementation_head: 1128242ffd225c8e3c3db3e6da447817d02baa55
+implementation_merge: 804f793bac199f1d9c4ca2d5f7ade984801984ee
+closeout_pr: 258
+merged_slice:
   known_remote_player_appearance_0x6A_0x62: complete
   cache_mutation: false
 validation:
-  rust_client:
-    run: 30894575347
+  product_head:
+    sha: e952aea38ce93d873b0303556164e3f7a118f1d5
+    rust_client_run: 30894575347
     windows_job: 91944323324
     supply_chain_job: 91944323203
-    locked_metadata: PASS
-    formatting: PASS
-    strict_workspace_clippy: PASS
-    workspace_tests: PASS
-    architecture: PASS
-    supply_chain: PASS
-  repository_ci:
-    run: 30894574150
-    required_job: 91944797163
+    repository_ci_run: 30894574150
+    repository_required_job: 91944797163
+    result: PASS
+  exact_final_head:
+    sha: 1128242ffd225c8e3c3db3e6da447817d02baa55
+    rust_client_run: 30895233392
+    windows_job: 91946458850
+    supply_chain_job: 91946458966
+    repository_ci_run: 30895233866
+    repository_required_job: 91946738204
+    result: PASS
+  ready_state:
+    repository_ci_run: 30895644663
+    repository_required_job: 91948000133
     result: PASS
 fresh_audit:
-  exact_head: e952aea38ce93d873b0303556164e3f7a118f1d5
+  exact_head: 1128242ffd225c8e3c3db3e6da447817d02baa55
   comment_id: 5176900934
   result: PASS
   critical_open: 0
@@ -350,14 +350,18 @@ fresh_audit:
 e2e:
   result: NOT_APPLICABLE
   reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
+pr_hygiene:
+  implementation_pr_256: merged
+  implementation_merge: 804f793bac199f1d9c4ca2d5f7ade984801984ee
+  unresolved_review_threads: 0
 temporary_workflows_remaining: 0
 temporary_scripts_remaining: 0
 shared_path_lease: []
 ownership:
-  protocol_canary: retained
+  protocol_canary: retained_by_active_blocked_parent_task
   shared_paths: released
-remaining_blocker: General AddItem/non-empty map decoding still requires authoritative Current item metadata; local-player movement requires complete map strips; nonzero cache eviction and non-player creature branches remain incomplete.
-next_action: Run final exact-head CI for the validation checkpoint, mark PR 256 ready, protected-merge it, then persist the active blocked parent state and continue to the next complete source-proven family.
+blocker: General AddItem/non-empty map decoding still requires authoritative Current item metadata; local-player movement requires complete appended map strips; nonzero cache eviction, hidden/invisible and non-player creature branches remain incomplete.
+next_action: Prove and implement the next complete zero-eviction non-player appearance family if its exact numeric type and complete payload are source-supported; otherwise retain the item-catalogue blocker without inference.
 ```
 
 ## Recovery checkpoint
@@ -368,21 +372,19 @@ recovery:
   generation: 2
   session_id: OTC2-20260804T1043+0200-known-player
   session_started_at: 2026-08-04T10:43:00+02:00
-  checkpointed_at: 2026-08-04T11:08:00+02:00
-  last_progress_at: 2026-08-04T11:08:00+02:00
-  phase: known-player-appearance-terminal-ci
-  exact_head: e952aea38ce93d873b0303556164e3f7a118f1d5
-  pull_request: 256
-  active_operation: final exact-head CI, protected merge and blocked-parent reconciliation
-  external_run_ids:
-    - 30894575347
-    - 30894574150
-  operation_started_at: 2026-08-04T11:08:00+02:00
-  wait_deadline_at: 2026-08-04T11:53:00+02:00
-  check_generation: known-player-appearance-final-exact-head
-  checks_used: 2
+  checkpointed_at: 2026-08-04T11:54:00+02:00
+  last_progress_at: 2026-08-04T11:54:00+02:00
+  phase: known-player-closeout-final-exact-head
+  exact_head: pending_validation_record
+  pull_request: 258
+  active_operation: exact-head CI and protected closeout merge
+  external_run_ids: []
+  operation_started_at: 2026-08-04T11:54:00+02:00
+  wait_deadline_at: 2026-08-04T12:34:00+02:00
+  check_generation: known-player-closeout-final-exact-head
+  checks_used: 0
   status: ready
   safe_to_resume: true
-  resume_condition: Merge PR 256 only after the validation-record head passes all exact-head required checks; otherwise preserve the precise failure.
-  next_action: Reconcile PR 256 terminal state, then continue the parent task from its remaining item and non-player creature blockers.
+  resume_condition: Merge PR 258 only after all required checks pass on the exact final head.
+  next_action: Reconcile PR 258 terminal state, then continue with the next source-proven non-player appearance family.
 ```

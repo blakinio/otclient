@@ -101,12 +101,30 @@ impl TechnicalLoginRuntime {
         }
     }
 
+    /// Preserve the existing synchronous admission contract while executing it
+    /// on the application-owned Tokio runtime rather than an OS worker thread.
+    pub fn start_connection<F>(&mut self, operation: F) -> Result<(), RuntimeError>
+    where
+        F: FnOnce(
+                EntryLifecycle,
+                GameEntryAttemptId,
+                CancellationToken,
+                Arc<dyn MonotonicClock>,
+            ) -> (EntryLifecycle, Result<SessionEntered, EntryFailure>)
+            + Send
+            + 'static,
+    {
+        self.start_connection_async(move |lifecycle, attempt_id, token, clock| async move {
+            operation(lifecycle, attempt_id, token, clock)
+        })
+    }
+
     /// Move the complete producer-owned lifecycle into one Tokio admission task.
     ///
     /// The application owns the runtime. The future may create transport
     /// sessions and child tasks, while the event loop only polls completion.
     /// Application code never receives `AdmissionCredential`.
-    pub fn start_connection<F, Fut>(&mut self, operation: F) -> Result<(), RuntimeError>
+    pub fn start_connection_async<F, Fut>(&mut self, operation: F) -> Result<(), RuntimeError>
     where
         F: FnOnce(
                 EntryLifecycle,

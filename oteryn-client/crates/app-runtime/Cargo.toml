@@ -14,6 +14,7 @@ oteryn-account-session = { version = "=0.1.0", path = "../account-session" }
 oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
 oteryn-game-session = { version = "=0.1.0", path = "../game-session" }
 oteryn-world-directory = { version = "=0.1.0", path = "../world-directory" }
+tokio.workspace = true
 
 [lints]
 workspace = true

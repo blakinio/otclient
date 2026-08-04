@@ -17,10 +17,15 @@ impl TechnicalLoginRuntime {
         if self
             .connection_worker
             .as_ref()
-            .is_some_and(OwnedWorker::is_finished)
+            .is_some_and(OwnedTokioWorker::is_finished)
             && let Some(worker) = self.connection_worker.take()
         {
-            self.apply_event(worker.join()?)?;
+            let event = worker.join(
+                self.tokio_runtime
+                    .as_ref()
+                    .ok_or(RuntimeError::RuntimeUnavailable)?,
+            )?;
+            self.apply_event(event)?;
             progressed = true;
         }
         Ok(progressed)
@@ -87,6 +92,7 @@ impl TechnicalLoginRuntime {
             return Ok(ShutdownProgress::Pending(kind));
         }
         self.finish_closing()?;
+        self.shutdown_tokio_runtime();
         Ok(ShutdownProgress::Complete)
     }
 

@@ -8,7 +8,7 @@ track: greenfield-rust
 branch: docs/OTC2-20260804-platform-gateway-protocol-plan
 base_branch: main
 created: 2026-08-04T16:01:00+02:00
-updated: 2026-08-04T16:18:00+02:00
+updated: 2026-08-04T16:24:00+02:00
 risk: medium
 related_prs: [263]
 depends_on:
@@ -54,7 +54,7 @@ Correct the dual-protocol roadmap so it explicitly reuses the already delivered 
 - [x] Package A Tokio remains independently launchable now.
 - [x] A three-repository contract task is independently launchable now without implementing speculative wire bytes.
 - [x] Two complete reusable prompts are stored under `oteryn-client/docs/agents/prompts/`.
-- [ ] Documentation validation, exact-head CI, review, merge, archive and lease release pass.
+- [ ] Current merge-ref revalidation passes, PR merges, task archives and leases release.
 
 # Proven baseline
 
@@ -74,24 +74,34 @@ Correct the dual-protocol roadmap so it explicitly reuses the already delivered 
 
 # Scope audit
 
-Current PR #263 changes exactly six documentation/task/prompt paths. It changes no Rust source, Cargo manifest/lockfile, workflow, packet layout, authentication runtime, Platform/Gateway runtime, Otheryn runtime, asset or production state.
+PR #263 changes exactly six documentation/task/prompt paths. It changes no Rust source, Cargo manifest/lockfile, workflow, packet layout, authentication runtime, Platform/Gateway runtime, Otheryn runtime, asset or production state.
 
-# Validation plan
+# Validation
 
-- verify every relative link and referenced repository path;
-- review complete changed-file list and diff;
-- check current-versus-target statements against named Platform/Gateway contract evidence;
-- check package dependencies and launchability claims for contradictions;
-- run exact-head repository CI;
-- perform fresh independent documentation/security review;
-- require zero unresolved review threads before merge.
+Exact product head before this merge-ref checkpoint: `7a434338a00152e63393fa5167c83d854f41bcce`.
+
+- repository CI run `30917797793`: PASS;
+- required job `92020788439`: PASS;
+- Rust Client run `30917797133`: PASS;
+- Windows formatting, strict Clippy, workspace tests and architecture policy: PASS;
+- supply-chain check: PASS;
+- exact changed paths: six expected files;
+- branch before checkpoint: 7 commits ahead, 0 behind;
+- full path/role/version/downgrade/current-versus-target review: PASS;
+- material findings: 0;
+- unresolved review threads: 0;
+- E2E: `NOT_APPLICABLE` — documentation only.
+
+GitHub recalculated the synthetic PR merge ref after ready-for-review transition and temporarily reported required status `CI / Required` as expected even though the exact product head passed. This checkpoint creates one final synchronize generation. Do not change PR metadata or branch content again before merge.
 
 # Context checkpoint
 
 ```yaml
-phase: exact-head-validation
+phase: merge-ref-revalidation
 status: validating
 pull_request: 263
-exact_head_before_checkpoint: 9edb31f2b7c71ea3f4c9194a71872c8444f669f3
-next_action: Validate the final documentation head, update the PR description with exact evidence, mark ready, merge after required checks, then archive the task and release leases.
+previous_validated_head: 7a434338a00152e63393fa5167c83d854f41bcce
+repository_ci_run: 30917797793
+rust_client_run: 30917797133
+next_action: Observe the synchronize-generation checks on the resulting head and merge PR #263 without further metadata or content changes only when required checks are green, mergeability is true and review threads remain zero.
 ```

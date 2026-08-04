@@ -1,6 +1,6 @@
 # Canary Current player-owned monster summon appearance
 
-Status: focused implementation validation and fresh audit passed for PR `#268`; current-main exact-head validation remains pending.
+Status: merged through PR `#268`.
 
 ## Source provenance
 
@@ -12,7 +12,7 @@ consumer_repository: blakinio/otclient
 consumer_path: oteryn-client/crates/protocol-canary
 ```
 
-At the pinned producer revision, `Monster::getType()` returns monster type `1`. `ProtocolGame::AddCreature` writes that type in the unknown `0x61` header. After the common payload, it rewrites a monster with a player master to final type `3` and appends the master identity. Therefore the admitted source-reachable branch is:
+At the pinned producer revision, `Monster::getType()` returns monster type `1`. `ProtocolGame::AddCreature` writes that type in the unknown `0x61` header. After the common payload, it rewrites a monster with a player master to final type `3` and appends the master identity.
 
 ```yaml
 opcode: 0x6A
@@ -39,30 +39,26 @@ Direct header types `3` and `4`, zero master identity, hidden health, invisible 
 
 The positive summon message is an original inline synthetic already-decrypted logical message. Its coordinates, entity identity, master identity, name and appearance bytes are invented test values. It contains no credentials, private capture, deployed configuration, proprietary assets or copied producer implementation body.
 
-## Focused validation
+## Validation and audit
 
 ```yaml
-validated_head: 029782e9246a6a3e5f9663214053b2f302902c15
-rust_client_run: 30927430884
-windows_job: 92053432011
-supply_chain_job: 92053432190
-repository_ci_run: 30927437588
-repository_required_job: 92053819757
-locked_metadata: PASS
-formatting: PASS
-strict_workspace_clippy: PASS
-workspace_tests: PASS
-architecture_policy: PASS
-supply_chain: PASS
-repository_required_ci: PASS
-result: PASS
-```
-
-## Fresh audit
-
-```yaml
-audit_comment: 5181653994
-audited_head: 029782e9246a6a3e5f9663214053b2f302902c15
+focused_head: 029782e9246a6a3e5f9663214053b2f302902c15
+focused_rust_client_run: 30927430884
+focused_windows_job: 92053432011
+focused_supply_chain_job: 92053432190
+focused_repository_ci_run: 30927437588
+focused_repository_required_job: 92053819757
+exact_final_head: 392883490dc7a66cfd05094b7bd5af1e58118efa
+exact_final_base: b6a76a264c9c1cc62d063fba3c968d1b8582ef8c
+exact_rust_client_run: 30928206240
+exact_windows_job: 92056006376
+exact_supply_chain_job: 92056006319
+exact_repository_ci_run: 30928203871
+exact_repository_required_job: 92056360956
+ready_state_repository_ci_run: 30928649446
+ready_state_repository_required_job: 92057728494
+focused_audit_comment: 5181653994
+exact_final_audit_comment: 5181748881
 critical_open: 0
 high_open: 0
 material_medium_open: 0
@@ -70,13 +66,13 @@ unresolved_review_threads: 0
 result: PASS
 ```
 
-## Finalization
+## Merge
 
 ```yaml
-current_main: b6a76a264c9c1cc62d063fba3c968d1b8582ef8c
-exact_final_head: pending_clean_restack
-exact_final_ci: pending
-protected_merge: pending
+implementation_pr: 268
+implementation_merge: 85f3b91ab19114e0b4fd2f1259c7f28a66ea977e
+temporary_workflows_remaining: 0
+temporary_scripts_remaining: 0
 ```
 
 ## Claim boundary

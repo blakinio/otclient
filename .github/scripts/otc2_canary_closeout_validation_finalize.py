@@ -73,7 +73,8 @@ task = task.replace(
 )
 TASK.write_text(task, encoding="utf-8", newline="\n")
 
-evidence = EVIDENCE.read_text(encoding="utf-8")nevidence = evidence.replace(
+evidence = EVIDENCE.read_text(encoding="utf-8")
+evidence = evidence.replace(
     "final_closeout_exact_head_ci: pending",
     f"final_closeout_exact_head_ci:\n  head: {VALIDATED_HEAD}\n  rust_client_run: {RUST_RUN}\n  repository_ci_run: {CI_RUN}\n  result: PASS",
     1,

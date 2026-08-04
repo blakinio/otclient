@@ -1,0 +1,41 @@
+run_id=30928282581
+job=windows-evidence
+source_sha=e4a3b1d8c3ec602a29770031b394e34b2668a5fa
+runner_os=Windows
+runner_arch=X64
+rustc=rustc 1.94.0 (4a4ef493e 2026-03-02)
+cargo=cargo 1.94.0 (85eff7c80 2026-01-15)
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling windows-link v0.2.1
+   Compiling windows-sys v0.61.2
+   Compiling bytes v1.12.1
+   Compiling pin-project-lite v0.2.17
+   Compiling oteryn-foundation v0.1.0 (D:\a\otclient\otclient\oteryn-client\crates\foundation)
+   Compiling syn v3.0.3
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling tokio-macros v2.7.2
+   Compiling tokio v1.51.4
+   Compiling oteryn-transport v0.1.0 (D:\a\otclient\otclient\oteryn-client\crates\transport)
+    Finished `release` profile [optimized] target(s) in 17.95s
+     Running `target\release\examples\transport_evidence.exe`
+blocking.queue_latency_us.p50=43
+blocking.queue_latency_us.p95=54
+blocking.queue_latency_us.p99=65
+blocking.burst_frames_per_second=22907.88
+blocking.shutdown_us=58
+blocking.queue_high_water=not_applicable
+blocking.queue_full=not_applicable
+blocking.slow_consumer_cancel_us=not_applicable
+tokio.queue_latency_us.p50=43
+tokio.queue_latency_us.p95=58
+tokio.queue_latency_us.p99=82
+tokio.burst_frames_per_second=103215.15
+tokio.shutdown_us=130
+tokio.queue_high_water=978
+tokio.queue_full=0
+tokio.slow_consumer_cancel_us=16259
+scope=deterministic_loopback_queue_and_scheduler_evidence
+physical_rtt_claim=false

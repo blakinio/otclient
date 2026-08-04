@@ -409,3 +409,15 @@ changed_closeout_paths:
   - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
 exact_head_validation: pending
 ```
+
+
+## Known-player closeout final current-main replay
+
+```yaml
+closeout_pr: 258
+base: 33da70afd159d9b9963e6e9d80398c298b26ff5d
+final_diff_paths:
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+exact_head_validation: pending
+```

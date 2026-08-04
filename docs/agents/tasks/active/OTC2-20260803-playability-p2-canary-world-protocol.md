@@ -10,8 +10,8 @@ phase: item-catalogue-and-nonplayer-appearance-blocker
 branch: main
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-04T11:36:00+02:00
-required_base_commit: "9a0bd3c4da8f9f503c3cfafb9a2ca0d722a83638"
+updated: 2026-08-04T11:54:00+02:00
+required_base_commit: "33da70afd159d9b9963e6e9d80398c298b26ff5d"
 risk: high
 related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254, 256, 258]
 owned_paths:
@@ -41,7 +41,7 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-04T11:36:00+02:00
+last_progress_at: 2026-08-04T11:54:00+02:00
 ci_checks_for_current_head: 3
 ci_check_generation: known-player-appearance-merged
 terminal_ci_wait_started_at: null
@@ -305,9 +305,9 @@ The parent Canary task remains active and blocked. It retains exclusive `protoco
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 33
-updated_at: 2026-08-04T11:36:00+02:00
-observed_main: 9a0bd3c4da8f9f503c3cfafb9a2ca0d722a83638
+checkpoint_version: 34
+updated_at: 2026-08-04T11:54:00+02:00
+observed_main: 33da70afd159d9b9963e6e9d80398c298b26ff5d
 status: blocked
 phase: item-catalogue-and-nonplayer-appearance-blocker
 active_branch: none
@@ -372,19 +372,19 @@ recovery:
   generation: 2
   session_id: OTC2-20260804T1043+0200-known-player
   session_started_at: 2026-08-04T10:43:00+02:00
-  checkpointed_at: 2026-08-04T11:36:00+02:00
-  last_progress_at: 2026-08-04T11:36:00+02:00
-  phase: known-player-closeout-current-main-restack
-  exact_head: a4bef4989878d99e13805caa4d1d8575d803ba79
+  checkpointed_at: 2026-08-04T11:54:00+02:00
+  last_progress_at: 2026-08-04T11:54:00+02:00
+  phase: known-player-closeout-final-exact-head
+  exact_head: pending_validation_record
   pull_request: 258
-  active_operation: exact-head closeout validation and protected merge on current main
+  active_operation: exact-head CI and protected closeout merge
   external_run_ids: []
-  operation_started_at: 2026-08-04T11:36:00+02:00
-  wait_deadline_at: 2026-08-04T12:16:00+02:00
-  check_generation: known-player-closeout-current-main
+  operation_started_at: 2026-08-04T11:54:00+02:00
+  wait_deadline_at: 2026-08-04T12:34:00+02:00
+  check_generation: known-player-closeout-final-exact-head
   checks_used: 0
   status: ready
   safe_to_resume: true
-  resume_condition: Merge PR 258 only after its restacked exact head passes all required checks.
-  next_action: Reconcile PR 258 terminal state, then inspect the next complete non-player appearance family.
+  resume_condition: Merge PR 258 only after all required checks pass on the exact final head.
+  next_action: Reconcile PR 258 terminal state, then continue with the next source-proven non-player appearance family.
 ```

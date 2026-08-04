@@ -1,19 +1,19 @@
 ---
 task_id: OTC2-20260803-playability-p2-canary-world-protocol
-status: blocked
+status: validating
 agent: "P2 Canary world protocol worker"
 project_lane: otclient-v2
 lane: otclient-v2
 track: greenfield-rust
 workstream: playability-p2-canary-world-protocol
-phase: item-catalogue-and-nonplayer-appearance-blocker
-branch: main
+phase: unknown-nonplayer-appearance-terminal-ci
+branch: feat/OTC2-20260804-canary-unknown-nonplayer-appearance
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-04T11:54:00+02:00
-required_base_commit: "33da70afd159d9b9963e6e9d80398c298b26ff5d"
+updated: 2026-08-04T12:47:00+02:00
+required_base_commit: "133388d61b787fb1829d740d0a1db581dccc3c4e"
 risk: high
-related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254, 256, 258]
+related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254, 256, 258, 261]
 owned_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/crates/protocol-canary/**
@@ -36,14 +36,14 @@ complete_user_facing_feature: false
 missing_layers:
   - authoritative Current item-type metadata and complete AddItem branch contract
   - authoritative item-instance identity for generic removal and replacement
-  - nonzero known-cache eviction, non-player, hidden-health and extension branches
+  - nonzero known-cache eviction, hidden-health, summon and extension branches
   - complete local-player appended map-strip reconciliation
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-04T11:54:00+02:00
+last_progress_at: 2026-08-04T12:47:00+02:00
 ci_checks_for_current_head: 3
-ci_check_generation: known-player-appearance-merged
+ci_check_generation: unknown-nonplayer-appearance-final-exact-head
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 2
 unchanged_state_checks: 0
@@ -110,7 +110,7 @@ The implementation rejects known marker `0x62`, nonzero cache eviction, local id
 | session bootstrap | `PARTIAL` | Exact order through local identity, bug-report permission, Tibia time, pending-state, enter-world and one item-free local-player map is implemented. General map admission remains incomplete. |
 | map description | `PARTIAL` | One complete item-free local-player-only `0x64` branch is implemented. General non-empty tiles require authoritative item metadata and broader creature/cache branches. |
 | tile and stack updates | `PARTIAL` | The complete absent-tile `0x69 + position + 0x01 + 0xFF` branch emits `TileCleared`. Non-empty tile bodies and authoritative stack identity remain blocked. |
-| creature/entity appearance | `PARTIAL` | Complete post-bootstrap `0x6A` ordinary-player branches are implemented for unknown identity with zero cache eviction and known identity marker `0x62`. Nonzero eviction, hidden, summon, monster, NPC, invisible and OTCR branches remain unsupported. |
+| creature/entity appearance | `PARTIAL` | Complete ordinary-player branches are merged. This phase stages the complete unknown zero-eviction visible monster/NPC `0x61` subfamily. Nonzero eviction, hidden, summon, invisible and OTCR branches remain unsupported. |
 | movement and reconciliation | `PARTIAL` | The complete remote non-teleport `0x6D` layout is implemented behind a read-only caller-owned resolver that supplies the session-fenced entity and destination stack. Local-player movement and appended map strips remain blocked. |
 | removal | `PARTIAL` | The complete remote-entity `0x6C` layout is implemented behind a read-only caller-owned resolver. Item removal and local-player teleport/map-reset branches remain unsupported. |
 | session end/logout | `PARTIAL` | Exact `0x18` layout and values `0x00`/`0x02` are implemented; `0x01`/`0x03` remain rejected. |
@@ -190,6 +190,42 @@ validation:
 ```
 
 The adapter accepts the wire-carried session-fenced entity identity but does not create, mutate or infer the producer's known-creature cache. Hidden health, invisible outfits, summons, monsters, NPCs, nonzero eviction and OTCR extensions remain rejected.
+
+# Unknown ordinary monster and NPC continuation
+
+Pinned Current source proves a complete zero-eviction unknown non-player subfamily without item metadata or cache mutation:
+
+```yaml
+source_revision: bc0068ab80bbf003e128fce0589b4cc89d2682d3
+branch: feat/OTC2-20260804-canary-unknown-nonplayer-appearance
+pr: 261
+opcode: 0x6A
+marker_u16_le: 0x61
+cache_eviction_u32_le: 0
+accepted_header_types:
+  monster: 1
+  npc: 2
+name_bound: protocol_neutral_NameText_64_bytes
+health: 1_through_100
+visible_outfit: required
+final_type: must_equal_header_type
+rejected_types: [player_0, summon_player_3, summon_others_4, hidden_5]
+outputs:
+  monster: GameEvent::EntityAppeared(EntityKind::Creature)
+  npc: GameEvent::EntityAppeared(EntityKind::NonPlayerCharacter)
+cache_mutation: false
+shared_path_lease: []
+validation:
+  product_head: f913e5ff5e4813e7ec2590122fc2ee3224aa901f
+  rust_client_run: 30899069326
+  windows_job: 91958836539
+  supply_chain_job: 91958836582
+  repository_ci_run: 30899073315
+  repository_required_job: 91959144109
+  result: PASS
+```
+
+For monsters with a player master, the producer rewrites the final type to summon-player and appends a master id. Requiring final type equality rejects that branch atomically. Hidden health, zero outfit, nonzero eviction and extensions remain fail-closed.
 
 # Exact blocker normalization
 
@@ -305,43 +341,46 @@ The parent Canary task remains active and blocked. It retains exclusive `protoco
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 34
-updated_at: 2026-08-04T11:54:00+02:00
-observed_main: 33da70afd159d9b9963e6e9d80398c298b26ff5d
-status: blocked
-phase: item-catalogue-and-nonplayer-appearance-blocker
-active_branch: none
-implementation_pr: 256
-implementation_head: 1128242ffd225c8e3c3db3e6da447817d02baa55
-implementation_merge: 804f793bac199f1d9c4ca2d5f7ade984801984ee
-closeout_pr: 258
-merged_slice:
-  known_remote_player_appearance_0x6A_0x62: complete
+checkpoint_version: 37
+updated_at: 2026-08-04T12:47:00+02:00
+observed_main: 133388d61b787fb1829d740d0a1db581dccc3c4e
+status: validating
+phase: unknown-nonplayer-appearance-terminal-ci
+active_branch: feat/OTC2-20260804-canary-unknown-nonplayer-appearance
+pr: 261
+base: 133388d61b787fb1829d740d0a1db581dccc3c4e
+validated_product_head: f913e5ff5e4813e7ec2590122fc2ee3224aa901f
+changed_paths:
+  - oteryn-client/crates/protocol-canary/src/lib.rs
+  - oteryn-client/crates/protocol-canary/src/non_player.rs
+  - oteryn-client/crates/protocol-canary/src/non_player/tests.rs
+  - oteryn-client/tests/integration/canary-world-protocol/fixtures/unknown-monster-appearance.hex
+  - oteryn-client/tests/integration/canary-world-protocol/fixtures/unknown-npc-appearance.hex
+  - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
+  - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
+implementation:
+  unknown_monster_appearance_0x6A_0x61_type_1: complete
+  unknown_npc_appearance_0x6A_0x61_type_2: complete
+  cache_eviction: zero_only
   cache_mutation: false
 validation:
-  product_head:
-    sha: e952aea38ce93d873b0303556164e3f7a118f1d5
-    rust_client_run: 30894575347
-    windows_job: 91944323324
-    supply_chain_job: 91944323203
-    repository_ci_run: 30894574150
-    repository_required_job: 91944797163
-    result: PASS
-  exact_final_head:
-    sha: 1128242ffd225c8e3c3db3e6da447817d02baa55
-    rust_client_run: 30895233392
-    windows_job: 91946458850
-    supply_chain_job: 91946458966
-    repository_ci_run: 30895233866
-    repository_required_job: 91946738204
-    result: PASS
-  ready_state:
-    repository_ci_run: 30895644663
-    repository_required_job: 91948000133
+  rust_client:
+    run: 30899069326
+    windows_job: 91958836539
+    supply_chain_job: 91958836582
+    locked_metadata: PASS
+    formatting: PASS
+    strict_workspace_clippy: PASS
+    workspace_tests: PASS
+    architecture: PASS
+    supply_chain: PASS
+  repository_ci:
+    run: 30899073315
+    required_job: 91959144109
     result: PASS
 fresh_audit:
-  exact_head: 1128242ffd225c8e3c3db3e6da447817d02baa55
-  comment_id: 5176900934
+  exact_head: f913e5ff5e4813e7ec2590122fc2ee3224aa901f
+  comment_id: 5177542802
   result: PASS
   critical_open: 0
   high_open: 0
@@ -350,18 +389,14 @@ fresh_audit:
 e2e:
   result: NOT_APPLICABLE
   reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
-pr_hygiene:
-  implementation_pr_256: merged
-  implementation_merge: 804f793bac199f1d9c4ca2d5f7ade984801984ee
-  unresolved_review_threads: 0
 temporary_workflows_remaining: 0
 temporary_scripts_remaining: 0
 shared_path_lease: []
 ownership:
-  protocol_canary: retained_by_active_blocked_parent_task
+  protocol_canary: retained
   shared_paths: released
-blocker: General AddItem/non-empty map decoding still requires authoritative Current item metadata; local-player movement requires complete appended map strips; nonzero cache eviction, hidden/invisible and non-player creature branches remain incomplete.
-next_action: Prove and implement the next complete zero-eviction non-player appearance family if its exact numeric type and complete payload are source-supported; otherwise retain the item-catalogue blocker without inference.
+remaining_blocker: General AddItem/non-empty map decoding still requires authoritative Current item metadata; local-player movement requires complete map strips; nonzero eviction, hidden/invisible, summon and extension branches remain incomplete.
+next_action: Run final exact-head CI for the validation checkpoint, mark PR 261 ready, protected-merge it, then persist the active blocked parent state and continue to the next complete source-proven family.
 ```
 
 ## Recovery checkpoint
@@ -369,22 +404,26 @@ next_action: Prove and implement the next complete zero-eviction non-player appe
 ```yaml
 recovery:
   policy_version: 1
-  generation: 2
-  session_id: OTC2-20260804T1043+0200-known-player
-  session_started_at: 2026-08-04T10:43:00+02:00
-  checkpointed_at: 2026-08-04T11:54:00+02:00
-  last_progress_at: 2026-08-04T11:54:00+02:00
-  phase: known-player-closeout-final-exact-head
-  exact_head: pending_validation_record
-  pull_request: 258
-  active_operation: exact-head CI and protected closeout merge
-  external_run_ids: []
-  operation_started_at: 2026-08-04T11:54:00+02:00
-  wait_deadline_at: 2026-08-04T12:34:00+02:00
-  check_generation: known-player-closeout-final-exact-head
-  checks_used: 0
+  generation: 3
+  session_id: OTC2-20260804T1043+0200-nonplayer
+  session_started_at: 2026-08-04T12:10:00+02:00
+  checkpointed_at: 2026-08-04T12:47:00+02:00
+  last_progress_at: 2026-08-04T12:47:00+02:00
+  phase: unknown-nonplayer-appearance-current-main-restack
+  exact_head: 3253268c94ff1e05ff8bbcba12b3713c7336d28e
+  pull_request: 261
+  active_operation: exact-head CI, protected merge and blocked-parent reconciliation on current main
+  external_run_ids:
+    - 30899069326
+    - 30899073315
+    - 30899539987
+    - 30899539187
+  operation_started_at: 2026-08-04T12:47:00+02:00
+  wait_deadline_at: 2026-08-04T13:32:00+02:00
+  check_generation: unknown-nonplayer-appearance-current-main
+  checks_used: 4
   status: ready
   safe_to_resume: true
-  resume_condition: Merge PR 258 only after all required checks pass on the exact final head.
-  next_action: Reconcile PR 258 terminal state, then continue with the next source-proven non-player appearance family.
+  resume_condition: Merge PR 261 only after the final restacked head passes all required checks; otherwise preserve the precise failure.
+  next_action: Reconcile PR 261 terminal state, then continue the active parent task from its remaining item, nonzero-eviction, hidden, summon and extension blockers.
 ```

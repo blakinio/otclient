@@ -25,6 +25,7 @@ mod command;
 mod inbound;
 mod known_player;
 mod map;
+mod non_player;
 mod reconciliation;
 mod tile;
 
@@ -43,6 +44,7 @@ pub use inbound::{
 };
 pub use known_player::decode_current_known_remote_player_appearance;
 pub use map::{OPCODE_MAP_DESCRIPTION, decode_current_local_player_only_map};
+pub use non_player::decode_current_unknown_remote_non_player_appearance;
 pub use reconciliation::{
     CanaryEntityReconciliationResolver, CanaryReconciliationError, OPCODE_MOVE_CREATURE,
     OPCODE_REMOVE_TILE_THING, ResolvedCanaryEntityMovement, decode_current_remote_entity_movement,

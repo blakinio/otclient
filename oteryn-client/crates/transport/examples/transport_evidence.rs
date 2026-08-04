@@ -163,11 +163,7 @@ mod enabled {
                 let mut samples = Vec::with_capacity(LATENCY_SAMPLES);
                 for _ in 0..LATENCY_SAMPLES {
                     let started = Instant::now();
-                    transport.try_send(
-                        generation,
-                        OutboundPriority::Gameplay,
-                        frame.clone(),
-                    )?;
+                    transport.try_send(generation, OutboundPriority::Gameplay, frame.clone())?;
                     let response = receive_one(&mut transport).await?;
                     if response.bytes() != frame {
                         return Err("Tokio loopback response mismatch".into());
@@ -177,11 +173,7 @@ mod enabled {
 
                 let burst_started = Instant::now();
                 for _ in 0..BURST_FRAMES {
-                    transport.try_send(
-                        generation,
-                        OutboundPriority::Gameplay,
-                        frame.clone(),
-                    )?;
+                    transport.try_send(generation, OutboundPriority::Gameplay, frame.clone())?;
                 }
                 for _ in 0..BURST_FRAMES {
                     let response = receive_one(&mut transport).await?;
@@ -280,9 +272,7 @@ mod enabled {
         ))
     }
 
-    async fn receive_one(
-        transport: &mut TransportSession,
-    ) -> Result<InboundFrame, Box<dyn Error>> {
+    async fn receive_one(transport: &mut TransportSession) -> Result<InboundFrame, Box<dyn Error>> {
         timeout(Duration::from_secs(2), async {
             loop {
                 if let Some(frame) = transport.try_recv()? {
@@ -295,10 +285,7 @@ mod enabled {
         .map_err(Into::into)
     }
 
-    fn echo_blocking(
-        stream: &mut BlockingStream,
-        frames: usize,
-    ) -> Result<(), std::io::Error> {
+    fn echo_blocking(stream: &mut BlockingStream, frames: usize) -> Result<(), std::io::Error> {
         let mut frame = [0_u8; FRAME_BYTES];
         for _ in 0..frames {
             stream.read_exact(&mut frame)?;

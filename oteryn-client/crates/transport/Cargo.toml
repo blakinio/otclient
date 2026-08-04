@@ -9,8 +9,12 @@ repository.workspace = true
 [package.metadata.oteryn]
 category = "transport"
 
+[features]
+blocking-baseline = []
+
 [dependencies]
 oteryn-foundation = { version = "=0.1.0", path = "../foundation" }
+tokio.workspace = true
 
 [lints]
 workspace = true

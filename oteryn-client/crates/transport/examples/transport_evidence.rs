@@ -36,9 +36,7 @@ mod enabled {
 
         fn complete_frame_len(&self, header: &[u8]) -> Result<usize, TransportError> {
             if header.len() != 2 {
-                return Err(TransportError::new(
-                    TransportErrorKind::InvalidFrameLength,
-                ));
+                return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
             }
             Ok(usize::from(u16::from_le_bytes([header[0], header[1]])))
         }
@@ -231,8 +229,18 @@ mod enabled {
             }
             stream.flush().await?;
             let mut shutdown_probe = [0_u8; 1];
-            let _bytes = stream.read(&mut shutdown_probe).await?;
-            Ok::<(), std::io::Error>(())
+            match stream.read(&mut shutdown_probe).await {
+                Ok(_bytes) => Ok::<(), std::io::Error>(()),
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::BrokenPipe
+                    ) =>
+                {
+                    Ok(())
+                }
+                Err(error) => Err(error),
+            }
         });
         let cancellation = CancellationSource::new();
         let config = TransportConfig::new(
@@ -256,8 +264,13 @@ mod enabled {
         let metrics = transport.metrics();
         let cancel_started = Instant::now();
         let _changed = cancellation.cancel();
-        let terminal = timeout(Duration::from_secs(1), transport.wait()).await??;
-        drop(terminal);
+        match timeout(Duration::from_secs(1), transport.wait()).await? {
+            Err(error) if error.kind() == TransportErrorKind::Cancelled => {}
+            Ok(_summary) => {
+                return Err("slow-consumer transport unexpectedly closed cleanly".into());
+            }
+            Err(error) => return Err(error.into()),
+        }
         let cancel_us = cancel_started.elapsed().as_micros();
         server.await??;
         Ok((

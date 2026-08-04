@@ -421,3 +421,42 @@ final_diff_paths:
   - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
 exact_head_validation: pending
 ```
+
+
+## Unknown ordinary monster and NPC appearance
+
+Status: exact product validation passed on `f913e5ff5e4813e7ec2590122fc2ee3224aa901f` / PR `#261`; final validation-record CI pending.
+
+Pinned producer revision `bc0068ab80bbf003e128fce0589b4cc89d2682d3` defines creature types player `0`, monster `1`, NPC `2`, player summon `3`, other summon `4` and hidden `5`. The unknown `AddCreature` header carries type and name after marker `0x61`, eviction id and entity id. The Current common payload writes a second final type; a monster with a player master is rewritten to summon-player and gains a master id.
+
+The staged decoder accepts only zero eviction, visible health, nonzero outfit, header/final type equality for monster or NPC, at most three icons and the closed Current tail. It emits a session-fenced `EntityAppeared` as `Creature` or `NonPlayerCharacter`, retains a domain-bounded name and never mutates the producer cache.
+
+Synthetic monster and NPC fixtures plus negative mutations cover every truncated prefix, known marker, nonzero eviction, player header, hidden health, invalid direction, invisible outfit, summon rewrite, local/zero identity, empty name, invalid floor/stack, stale/pre-bootstrap state and trailing data. No credential, private capture, proprietary asset or deployed configuration is included.
+
+
+## Unknown ordinary monster and NPC validation
+
+```yaml
+product_head: f913e5ff5e4813e7ec2590122fc2ee3224aa901f
+rust_client:
+  run: 30899069326
+  windows_job: 91958836539
+  supply_chain_job: 91958836582
+  locked_metadata: PASS
+  formatting: PASS
+  strict_workspace_clippy: PASS
+  workspace_tests: PASS
+  architecture: PASS
+  supply_chain: PASS
+repository_ci:
+  run: 30899073315
+  required_job: 91959144109
+  result: PASS
+fresh_audit:
+  comment_id: 5177542802
+  result: PASS
+  critical_high_material_medium_open: 0
+e2e:
+  result: NOT_APPLICABLE
+  reason: Isolated producer adapter over already decrypted and deframed logical messages; no real transport, admission, simulation mutation, renderer or reachable user journey.
+```

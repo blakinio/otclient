@@ -5,6 +5,7 @@ use crate::{
     TransportError, TransportErrorKind,
 };
 use oteryn_foundation::{CancellationToken, SessionGeneration};
+use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -29,6 +30,13 @@ impl SessionStatus {
     const fn connected() -> Self {
         Self {
             state: ConnectionState::Connected,
+            terminal_error: None,
+        }
+    }
+
+    const fn closing() -> Self {
+        Self {
+            state: ConnectionState::Closing,
             terminal_error: None,
         }
     }
@@ -64,6 +72,8 @@ pub struct TransportMetricsSnapshot {
     pub inbound_bytes: u64,
     /// Complete outbound bytes written to the socket.
     pub outbound_bytes: u64,
+    /// Outbound frames rejected because a bounded queue was full.
+    pub outbound_queue_full: u64,
     /// Highest observed inbound queue occupancy.
     pub inbound_queue_high_water: usize,
     /// Highest observed gameplay queue occupancy.
@@ -78,6 +88,7 @@ struct TransportMetrics {
     outbound_frames: AtomicU64,
     inbound_bytes: AtomicU64,
     outbound_bytes: AtomicU64,
+    outbound_queue_full: AtomicU64,
     inbound_depth: AtomicUsize,
     gameplay_depth: AtomicUsize,
     background_depth: AtomicUsize,
@@ -93,6 +104,7 @@ impl TransportMetrics {
             outbound_frames: self.outbound_frames.load(Ordering::Acquire),
             inbound_bytes: self.inbound_bytes.load(Ordering::Acquire),
             outbound_bytes: self.outbound_bytes.load(Ordering::Acquire),
+            outbound_queue_full: self.outbound_queue_full.load(Ordering::Acquire),
             inbound_queue_high_water: self.inbound_high_water.load(Ordering::Acquire),
             gameplay_queue_high_water: self.gameplay_high_water.load(Ordering::Acquire),
             background_queue_high_water: self.background_high_water.load(Ordering::Acquire),
@@ -139,6 +151,7 @@ pub struct TransportSession {
     background_tx: mpsc::Sender<OutboundFrame>,
     inbound_rx: mpsc::Receiver<InboundFrame>,
     cancel_tx: watch::Sender<bool>,
+    status_tx: watch::Sender<SessionStatus>,
     status_rx: watch::Receiver<SessionStatus>,
     supervisor: Option<JoinHandle<Result<SessionSummary, TransportError>>>,
     metrics: Arc<TransportMetrics>,
@@ -161,27 +174,17 @@ impl TransportSession {
     ) -> Result<Self, TransportError> {
         let header_len = boundary.header_len();
         if header_len == 0 || header_len > MAX_FRAME_HEADER_BYTES {
-            return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
-        }
-        if cancellation.is_cancelled() {
-            return Err(TransportError::new(TransportErrorKind::Cancelled));
+            return Err(TransportError::new(
+                TransportErrorKind::InvalidFrameLength,
+            ));
         }
 
-        let connect = TcpStream::connect(endpoint);
-        tokio::pin!(connect);
-        let stream = tokio::select! {
-            biased;
-            () = observe_cancellation(cancellation) => {
-                return Err(TransportError::new(TransportErrorKind::Cancelled));
-            }
-            result = timeout(config.connect_timeout(), &mut connect) => {
-                match result {
-                    Ok(Ok(stream)) => stream,
-                    Ok(Err(error)) => return Err(classify_connect_error(&error)),
-                    Err(_elapsed) => return Err(TransportError::new(TransportErrorKind::Timeout)),
-                }
-            }
-        };
+        let stream = connect_with_deadline(
+            TcpStream::connect(endpoint),
+            config.connect_timeout(),
+            cancellation,
+        )
+        .await?;
         stream
             .set_nodelay(true)
             .map_err(|error| classify_connect_error(&error))?;
@@ -194,6 +197,8 @@ impl TransportSession {
         let metrics = Arc::new(TransportMetrics::default());
         let supervisor_metrics = Arc::clone(&metrics);
         let supervisor_cancel = cancel_tx.clone();
+        let supervisor_status = status_tx.clone();
+        let external_cancellation = cancellation.clone();
         let supervisor = tokio::spawn(run_session(
             stream,
             generation,
@@ -204,7 +209,8 @@ impl TransportSession {
             inbound_tx,
             cancel_rx,
             supervisor_cancel,
-            status_tx,
+            supervisor_status,
+            external_cancellation,
             supervisor_metrics,
         ));
 
@@ -215,6 +221,7 @@ impl TransportSession {
             background_tx,
             inbound_rx,
             cancel_tx,
+            status_tx,
             status_rx,
             supervisor: Some(supervisor),
             metrics,
@@ -263,7 +270,9 @@ impl TransportSession {
             return Err(TransportError::new(TransportErrorKind::InvalidState));
         }
         if bytes.is_empty() {
-            return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
+            return Err(TransportError::new(
+                TransportErrorKind::InvalidFrameLength,
+            ));
         }
         if bytes.len() > self.config.max_outbound_frame_bytes() {
             return Err(TransportError::new(TransportErrorKind::FrameTooLarge));
@@ -276,12 +285,14 @@ impl TransportSession {
                 frame,
                 &self.metrics.gameplay_depth,
                 &self.metrics.gameplay_high_water,
+                &self.metrics.outbound_queue_full,
             ),
             OutboundPriority::Background => enqueue(
                 &self.background_tx,
                 frame,
                 &self.metrics.background_depth,
                 &self.metrics.background_high_water,
+                &self.metrics.outbound_queue_full,
             ),
         }
     }
@@ -316,8 +327,12 @@ impl TransportSession {
 
     /// Request cancellation through the dedicated bounded control state.
     pub fn close(&mut self) {
-        if !self.close_requested {
-            self.close_requested = true;
+        if self.close_requested {
+            return;
+        }
+        self.close_requested = true;
+        if self.status().state() == ConnectionState::Connected {
+            let _ = self.status_tx.send(SessionStatus::closing());
             let _ = self.cancel_tx.send(true);
         }
     }
@@ -330,19 +345,31 @@ impl TransportSession {
             .is_none_or(tokio::task::JoinHandle::is_finished)
     }
 
-    /// Cancel and join the complete reader/writer/supervisor tree.
+    /// Wait for a peer, deadline, external cancellation or protocol failure.
+    ///
+    /// This method does not request shutdown. Use [`Self::join`] for a
+    /// caller-initiated deterministic close.
     ///
     /// # Errors
     ///
     /// Returns the terminal transport failure or a task-join failure.
-    pub async fn join(mut self) -> Result<SessionSummary, TransportError> {
-        self.close();
+    pub async fn wait(mut self) -> Result<SessionSummary, TransportError> {
         let Some(supervisor) = self.supervisor.take() else {
             return Err(TransportError::new(TransportErrorKind::InvalidState));
         };
         supervisor
             .await
             .map_err(|_join_error| TransportError::new(TransportErrorKind::TaskFailed))?
+    }
+
+    /// Cancel and join the complete reader/writer/supervisor tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns a terminal transport failure or a task-join failure.
+    pub async fn join(mut self) -> Result<SessionSummary, TransportError> {
+        self.close();
+        self.wait().await
     }
 }
 
@@ -363,6 +390,7 @@ fn enqueue(
     frame: OutboundFrame,
     depth: &AtomicUsize,
     high_water: &AtomicUsize,
+    queue_full: &AtomicU64,
 ) -> Result<(), TransportError> {
     let current_depth = depth.fetch_add(1, Ordering::AcqRel).saturating_add(1);
     match sender.try_send(frame) {
@@ -372,6 +400,7 @@ fn enqueue(
         }
         Err(mpsc::error::TrySendError::Full(_frame)) => {
             depth.fetch_sub(1, Ordering::AcqRel);
+            queue_full.fetch_add(1, Ordering::AcqRel);
             Err(TransportError::new(TransportErrorKind::QueueFull))
         }
         Err(mpsc::error::TrySendError::Closed(_frame)) => {
@@ -393,6 +422,7 @@ async fn run_session(
     cancel_rx: watch::Receiver<bool>,
     cancel_tx: watch::Sender<bool>,
     status_tx: watch::Sender<SessionStatus>,
+    external_cancellation: CancellationToken,
     metrics: Arc<TransportMetrics>,
 ) -> Result<SessionSummary, TransportError> {
     let (reader, writer) = stream.into_split();
@@ -411,9 +441,10 @@ async fn run_session(
         config,
         gameplay_rx,
         background_rx,
-        cancel_rx,
+        cancel_rx.clone(),
         Arc::clone(&metrics),
     ));
+    tasks.spawn(cancellation_loop(external_cancellation, cancel_rx));
 
     let first_result = match tasks.join_next().await {
         Some(result) => classify_join_result(result),
@@ -425,7 +456,7 @@ async fn run_session(
     let mut terminal = first_result;
     while let Some(result) = tasks.join_next().await {
         let child_result = classify_join_result(result);
-        if terminal.is_ok() || terminal == Err(TransportError::new(TransportErrorKind::Cancelled)) {
+        if terminal.is_ok() {
             terminal = child_result;
         }
     }
@@ -455,6 +486,25 @@ fn classify_join_result(
     result: Result<Result<(), TransportError>, tokio::task::JoinError>,
 ) -> Result<(), TransportError> {
     result.map_err(|_join_error| TransportError::new(TransportErrorKind::TaskFailed))?
+}
+
+async fn cancellation_loop(
+    external_cancellation: CancellationToken,
+    mut cancel_rx: watch::Receiver<bool>,
+) -> Result<(), TransportError> {
+    tokio::select! {
+        biased;
+        changed = cancel_rx.changed() => {
+            if changed.is_err() || *cancel_rx.borrow() {
+                Ok(())
+            } else {
+                Err(TransportError::new(TransportErrorKind::InvalidState))
+            }
+        }
+        () = observe_cancellation(&external_cancellation) => {
+            Err(TransportError::new(TransportErrorKind::Cancelled))
+        }
+    }
 }
 
 async fn reader_loop<R>(
@@ -531,45 +581,67 @@ where
     W: AsyncWrite + Unpin,
 {
     loop {
-        let frame = tokio::select! {
+        let frame = receive_next_frame(
+            &mut gameplay_rx,
+            &mut background_rx,
+            &mut cancel_rx,
+            metrics.as_ref(),
+        )
+        .await?;
+        let frame_len = frame.bytes.len();
+        let result = tokio::select! {
             biased;
             changed = cancel_rx.changed() => {
                 if changed.is_err() || *cancel_rx.borrow() {
-                    drop(writer.shutdown().await);
+                    let _ = timeout(config.write_timeout(), writer.shutdown()).await;
                     return Err(TransportError::new(TransportErrorKind::Cancelled));
                 }
                 continue;
             }
-            frame = gameplay_rx.recv() => {
-                match frame {
-                    Some(frame) => {
-                        metrics.gameplay_depth.fetch_sub(1, Ordering::AcqRel);
-                        frame
-                    }
-                    None => {
-                        return Err(TransportError::new(TransportErrorKind::InvalidState));
-                    }
-                }
-            }
-            frame = background_rx.recv() => {
-                match frame {
-                    Some(frame) => {
-                        metrics.background_depth.fetch_sub(1, Ordering::AcqRel);
-                        frame
-                    }
-                    None => {
-                        return Err(TransportError::new(TransportErrorKind::InvalidState));
-                    }
-                }
-            }
+            result = write_all_deadline(&mut writer, &frame.bytes, config.write_timeout()) => result,
         };
-        let frame_len = frame.bytes.len();
-        write_all_deadline(&mut writer, &frame.bytes, config.write_timeout()).await?;
+        result?;
         metrics.outbound_frames.fetch_add(1, Ordering::AcqRel);
         metrics.outbound_bytes.fetch_add(
             u64::try_from(frame_len).unwrap_or(u64::MAX),
             Ordering::AcqRel,
         );
+    }
+}
+
+async fn receive_next_frame(
+    gameplay_rx: &mut mpsc::Receiver<OutboundFrame>,
+    background_rx: &mut mpsc::Receiver<OutboundFrame>,
+    cancel_rx: &mut watch::Receiver<bool>,
+    metrics: &TransportMetrics,
+) -> Result<OutboundFrame, TransportError> {
+    tokio::select! {
+        biased;
+        changed = cancel_rx.changed() => {
+            if changed.is_err() || *cancel_rx.borrow() {
+                Err(TransportError::new(TransportErrorKind::Cancelled))
+            } else {
+                Err(TransportError::new(TransportErrorKind::InvalidState))
+            }
+        }
+        frame = gameplay_rx.recv() => {
+            match frame {
+                Some(frame) => {
+                    metrics.gameplay_depth.fetch_sub(1, Ordering::AcqRel);
+                    Ok(frame)
+                }
+                None => Err(TransportError::new(TransportErrorKind::InvalidState)),
+            }
+        }
+        frame = background_rx.recv() => {
+            match frame {
+                Some(frame) => {
+                    metrics.background_depth.fetch_sub(1, Ordering::AcqRel);
+                    Ok(frame)
+                }
+                None => Err(TransportError::new(TransportErrorKind::InvalidState)),
+            }
+        }
     }
 }
 
@@ -583,23 +655,36 @@ where
 {
     let header_len = boundary.header_len();
     if header_len == 0 || header_len > MAX_FRAME_HEADER_BYTES {
-        return Err(TransportError::new(TransportErrorKind::InvalidFrameLength));
+        return Err(TransportError::new(
+            TransportErrorKind::InvalidFrameLength,
+        ));
     }
     let mut header = vec![0_u8; header_len];
     read_exact_deadline(reader, &mut header, config.read_timeout()).await?;
     let complete_len = boundary
         .complete_frame_len(&header)
         .map_err(|_error| TransportError::new(TransportErrorKind::ProtocolTerminal))?;
-    validate_complete_frame_len(header_len, complete_len, config.max_inbound_frame_bytes())?;
+    validate_complete_frame_len(
+        header_len,
+        complete_len,
+        config.max_inbound_frame_bytes(),
+    )?;
 
     let mut frame = Vec::new();
     frame
         .try_reserve_exact(complete_len)
-        .map_err(|_allocation_error| TransportError::new(TransportErrorKind::ResourceExhausted))?;
+        .map_err(|_allocation_error| {
+            TransportError::new(TransportErrorKind::ResourceExhausted)
+        })?;
     frame.resize(complete_len, 0);
     frame[..header_len].copy_from_slice(&header);
     if complete_len > header_len {
-        read_exact_deadline(reader, &mut frame[header_len..], config.read_timeout()).await?;
+        read_exact_deadline(
+            reader,
+            &mut frame[header_len..],
+            config.read_timeout(),
+        )
+        .await?;
     }
     Ok(frame)
 }
@@ -654,6 +739,33 @@ where
             .ok_or_else(|| TransportError::new(TransportErrorKind::ResourceExhausted))?;
     }
     Ok(())
+}
+
+async fn connect_with_deadline<F, T>(
+    connect: F,
+    deadline: Duration,
+    cancellation: &CancellationToken,
+) -> Result<T, TransportError>
+where
+    F: Future<Output = io::Result<T>>,
+{
+    if cancellation.is_cancelled() {
+        return Err(TransportError::new(TransportErrorKind::Cancelled));
+    }
+    tokio::pin!(connect);
+    tokio::select! {
+        biased;
+        () = observe_cancellation(cancellation) => {
+            Err(TransportError::new(TransportErrorKind::Cancelled))
+        }
+        result = timeout(deadline, &mut connect) => {
+            match result {
+                Ok(Ok(value)) => Ok(value),
+                Ok(Err(error)) => Err(classify_connect_error(&error)),
+                Err(_elapsed) => Err(TransportError::new(TransportErrorKind::Timeout)),
+            }
+        }
+    }
 }
 
 async fn observe_cancellation(cancellation: &CancellationToken) {
@@ -713,4 +825,133 @@ where
     W: AsyncWrite + Unpin,
 {
     write_all_deadline(writer, buffer, deadline).await
+}
+
+#[cfg(test)]
+mod internal_tests {
+    use super::*;
+    use oteryn_foundation::CancellationSource;
+    use std::future::pending;
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn connect_deadline_and_cancellation_are_deterministic() {
+        let timeout_source = CancellationSource::new();
+        let timed_out = connect_with_deadline(
+            pending::<io::Result<()>>(),
+            Duration::from_millis(5),
+            &timeout_source.token(),
+        )
+        .await;
+        assert_eq!(
+            timed_out,
+            Err(TransportError::new(TransportErrorKind::Timeout))
+        );
+
+        let cancelled_source = CancellationSource::new();
+        let token = cancelled_source.token();
+        let cancel = tokio::spawn(async move {
+            tokio::task::yield_now().await;
+            let _changed = cancelled_source.cancel();
+        });
+        let cancelled =
+            connect_with_deadline(pending::<io::Result<()>>(), Duration::from_secs(1), &token)
+                .await;
+        assert_eq!(
+            cancelled,
+            Err(TransportError::new(TransportErrorKind::Cancelled))
+        );
+        assert!(cancel.await.is_ok());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn gameplay_priority_is_fifo_and_precedes_background() {
+        let (gameplay_tx, mut gameplay_rx) = mpsc::channel(4);
+        let (background_tx, mut background_rx) = mpsc::channel(4);
+        let (_cancel_tx, mut cancel_rx) = watch::channel(false);
+        let metrics = TransportMetrics::default();
+
+        assert!(
+            enqueue(
+                &background_tx,
+                OutboundFrame { bytes: vec![9] },
+                &metrics.background_depth,
+                &metrics.background_high_water,
+                &metrics.outbound_queue_full,
+            )
+            .is_ok()
+        );
+        assert!(
+            enqueue(
+                &gameplay_tx,
+                OutboundFrame { bytes: vec![1] },
+                &metrics.gameplay_depth,
+                &metrics.gameplay_high_water,
+                &metrics.outbound_queue_full,
+            )
+            .is_ok()
+        );
+        assert!(
+            enqueue(
+                &gameplay_tx,
+                OutboundFrame { bytes: vec![2] },
+                &metrics.gameplay_depth,
+                &metrics.gameplay_high_water,
+                &metrics.outbound_queue_full,
+            )
+            .is_ok()
+        );
+
+        let first = receive_next_frame(
+            &mut gameplay_rx,
+            &mut background_rx,
+            &mut cancel_rx,
+            &metrics,
+        )
+        .await;
+        let second = receive_next_frame(
+            &mut gameplay_rx,
+            &mut background_rx,
+            &mut cancel_rx,
+            &metrics,
+        )
+        .await;
+        let third = receive_next_frame(
+            &mut gameplay_rx,
+            &mut background_rx,
+            &mut cancel_rx,
+            &metrics,
+        )
+        .await;
+
+        assert_eq!(first.map(|frame| frame.bytes), Ok(vec![1]));
+        assert_eq!(second.map(|frame| frame.bytes), Ok(vec![2]));
+        assert_eq!(third.map(|frame| frame.bytes), Ok(vec![9]));
+    }
+
+    #[test]
+    fn outbound_saturation_is_explicit_and_counted() {
+        let (tx, _rx) = mpsc::channel(1);
+        let metrics = TransportMetrics::default();
+        let first = enqueue(
+            &tx,
+            OutboundFrame { bytes: vec![1] },
+            &metrics.gameplay_depth,
+            &metrics.gameplay_high_water,
+            &metrics.outbound_queue_full,
+        );
+        let second = enqueue(
+            &tx,
+            OutboundFrame { bytes: vec![2] },
+            &metrics.gameplay_depth,
+            &metrics.gameplay_high_water,
+            &metrics.outbound_queue_full,
+        );
+        assert!(first.is_ok());
+        assert_eq!(
+            second,
+            Err(TransportError::new(TransportErrorKind::QueueFull))
+        );
+        assert_eq!(metrics.snapshot().outbound_queue_full, 1);
+        assert_eq!(metrics.snapshot().gameplay_queue_high_water, 1);
+    }
 }

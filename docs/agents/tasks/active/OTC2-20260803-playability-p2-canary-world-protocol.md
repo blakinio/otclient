@@ -10,7 +10,7 @@ phase: item-catalogue-and-local-map-strip-blocker
 branch: main
 base_branch: main
 created: 2026-08-03T02:04:00+02:00
-updated: 2026-08-04T08:48:00+02:00
+updated: 2026-08-04T08:53:00+02:00
 required_base_commit: "14e2718b7ff046b0620d5c838429cef81aa6d340"
 risk: high
 related_prs: [188, 190, 191, 192, 193, 196, 198, 203, 204, 219, 220, 221, 222, 223, 224, 225, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 254]
@@ -41,11 +41,11 @@ missing_layers:
   - product binding map and visible-world composition
   - controlled real M2 acceptance
 invocation_started_at: 2026-08-03T19:01:00+02:00
-last_progress_at: 2026-08-04T08:48:00+02:00
+last_progress_at: 2026-08-04T08:53:00+02:00
 ci_checks_for_current_head: 3
-ci_check_generation: entity-reconciliation-merged
+ci_check_generation: entity-reconciliation-closeout-restack-exact-head
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 5
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
@@ -304,6 +304,11 @@ validation:
     repository_ci_run: 30883947811
     repository_required_job: 91911322995
     result: PASS
+  closeout_restack_head:
+    sha: 9d82234af1c23c2748984f613e8eab2fa89396da
+    rust_client_run: 30885320351
+    repository_ci_run: 30885320455
+    result: PASS
 fresh_audit:
   exact_head: 41cfd39b847911d708429b8e23d4d17f9c1dc417
   comment_id: 5175281373
@@ -341,19 +346,18 @@ recovery:
   checkpointed_at: 2026-08-04T08:48:00+02:00
   last_progress_at: 2026-08-04T08:48:00+02:00
   phase: entity-reconciliation-closeout-restack
-  exact_head: 52942db86c6172974b4e5e80009c662f51ebb058
+  exact_head: 9d82234af1c23c2748984f613e8eab2fa89396da
   pull_request: 254
-  active_operation: protected closeout restack, exact-head CI and merge reconciliation
+  active_operation: protected closeout merge reconciliation
   external_run_ids:
-    - 30884273540
-    - 30884273648
-    - 30884558259
+    - 30885320351
+    - 30885320455
   operation_started_at: 2026-08-04T08:48:00+02:00
   wait_deadline_at: 2026-08-04T09:33:00+02:00
-  check_generation: closeout-restack-current-main
-  checks_used: 0
+  check_generation: closeout-restack-validation-record
+  checks_used: 5
   status: ready
   safe_to_resume: true
-  resume_condition: Reconcile PR 254 against current main; merge only after its exact-head required checks pass, otherwise preserve the precise failure.
+  resume_condition: Reconcile the final validation-record head of PR 254; merge only after its exact-head required checks pass, otherwise preserve the precise failure.
   next_action: Reconcile PR 254 terminal state, then retain the parent task at the authoritative item-catalogue and local-map-strip blocker.
 ```

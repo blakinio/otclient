@@ -316,5 +316,9 @@ changed_closeout_paths:
   - docs/agents/tasks/active/OTC2-20260803-playability-p2-canary-world-protocol.md
   - oteryn-client/docs/evidence/playability/p2/canary-current-runtime-baseline.md
 product_validation_reused_from_exact_implementation_heads: true
-final_closeout_exact_head_ci: pending
+final_closeout_exact_head_ci:
+  head: 9d82234af1c23c2748984f613e8eab2fa89396da
+  rust_client_run: 30885320351
+  repository_ci_run: 30885320455
+  result: PASS
 ```

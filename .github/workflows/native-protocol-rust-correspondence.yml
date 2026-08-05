@@ -28,14 +28,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Verify single native identity
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
-          grep -Fq 'family = oteryn' "$CORRESPONDENCE"
-          grep -Fq 'native_protocol_version = 1' "$CORRESPONDENCE"
-          grep -Fq 'independent `protocol-oteryn`' "$CORRESPONDENCE"
-          ! grep -Fq 'PENDING_' "$CORRESPONDENCE"
-          ! grep -Fq 'oteryn.native.v1' "$CORRESPONDENCE"
+          import os
+          from pathlib import Path
+
+          text = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          for required in (
+              "family = oteryn",
+              "native_protocol_version = 1",
+              "independent `protocol-oteryn`",
+          ):
+              assert required in text, required
+          for forbidden in ("PENDING_", "oteryn.native.v1"):
+              assert forbidden not in text, forbidden
 
   security:
     name: Audit 2 - security and immutable binding
@@ -43,13 +49,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Verify fail-closed selection and credential boundaries
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
-          grep -Fq 'adapter binding is immutable' "$CORRESPONDENCE"
-          grep -Fq 'Game Login Ticket goes only to Gateway' "$CORRESPONDENCE"
-          grep -Fq 'Game Session credential goes only to the selected Otheryn endpoint' "$CORRESPONDENCE"
-          grep -Fq 'requires a fresh Identity flow and ticket' "$CORRESPONDENCE"
+          import os
+          from pathlib import Path
+
+          text = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          for required in (
+              "adapter binding is immutable",
+              "Game Login Ticket goes only to Gateway",
+              "Game Session credential goes only to the selected Otheryn endpoint",
+              "requires a fresh Identity flow and ticket",
+          ):
+              assert required in text, required
 
   parser:
     name: Audit 3 - parser state and limits
@@ -57,14 +69,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Verify framing, snapshot and bounded parser obligations
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
-          grep -Fq 'unsigned 32-bit big-endian framing' "$CORRESPONDENCE"
-          grep -Fq 'frame/message `<=1 MiB`' "$CORRESPONDENCE"
-          grep -Fq 'complete snapshot `<=16 MiB`' "$CORRESPONDENCE"
-          grep -Fq 'one bounded resync' "$CORRESPONDENCE"
-          grep -Fq 'no reconnect command replay' "$CORRESPONDENCE"
+          import os
+          from pathlib import Path
+
+          text = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          for required in (
+              "unsigned 32-bit big-endian framing",
+              "frame/message `<=1 MiB`",
+              "complete snapshot `<=16 MiB`",
+              "one bounded resync",
+              "no reconnect command replay",
+          ):
+              assert required in text, required
 
   canary:
     name: Audit 4 - Canary isolation and changed paths
@@ -76,18 +94,29 @@ jobs:
       - name: Verify documentation-only boundary and Canary isolation
         env:
           BASE_REF: ${{ github.base_ref }}
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
-          base=$(git merge-base HEAD "origin/$BASE_REF")
-          changed=$(git diff --name-only "$base" HEAD)
-          printf '%s\n' "$changed"
-          if printf '%s\n' "$changed" | grep -E '^oteryn-client/(crates|src)/|protocol-canary'; then
-            echo 'Runtime or protocol-canary path changed in correspondence PR' >&2
-            exit 1
-          fi
-          grep -Fq '`protocol-canary` remains the independent source-proven compatibility adapter' "$CORRESPONDENCE"
-          grep -Fq 'must not depend on, translate through or reuse Canary compatibility-profile machinery' "$CORRESPONDENCE"
+          import os
+          import subprocess
+          from pathlib import Path
+
+          base = subprocess.check_output(
+              ["git", "merge-base", "HEAD", f"origin/{os.environ['BASE_REF']}"],
+              text=True,
+          ).strip()
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", base, "HEAD"],
+              text=True,
+          ).splitlines()
+          forbidden = [
+              path for path in changed
+              if path.startswith(("oteryn-client/crates/", "oteryn-client/src/"))
+              or "protocol-canary" in path
+          ]
+          assert not forbidden, forbidden
+          text = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          assert "`protocol-canary` remains the independent source-proven compatibility adapter" in text
+          assert "must not depend on, translate through or reuse Canary compatibility-profile machinery" in text
 
   provenance:
     name: Audit 5 - provenance rollout and production gate
@@ -95,11 +124,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Verify immutable provenance and disabled production
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
-          grep -Fq "$PLATFORM_MERGE" "$CORRESPONDENCE"
-          grep -Fq "$OTHERYN_MERGE" "$CORRESPONDENCE"
-          grep -Fq "$SCHEMA_SHA" "$CORRESPONDENCE"
-          grep -Fq 'production_activation_authorized: false' "$TASK"
-          grep -Fq 'Rollback removes native from fresh offers/advertisement' "$CORRESPONDENCE"
+          import os
+          from pathlib import Path
+
+          correspondence = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          task = Path(os.environ["TASK"]).read_text(encoding="utf-8")
+          for required in (
+              os.environ["PLATFORM_MERGE"],
+              os.environ["OTHERYN_MERGE"],
+              os.environ["SCHEMA_SHA"],
+              "Rollback removes native from fresh offers/advertisement",
+          ):
+              assert required in correspondence, required
+          assert "production_activation_authorized: false" in task

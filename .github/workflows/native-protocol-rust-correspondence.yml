@@ -1,0 +1,141 @@
+name: Native protocol Rust correspondence
+
+on:
+  pull_request:
+    paths:
+      - oteryn-client/docs/architecture/OTERYN_NATIVE_PROTOCOL_CORRESPONDENCE.md
+      - oteryn-client/docs/agents/tasks/active/OTC2-20260805-native-protocol-single-version-completion.md
+      - .github/workflows/native-protocol-rust-correspondence.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-protocol-rust-correspondence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CORRESPONDENCE: oteryn-client/docs/architecture/OTERYN_NATIVE_PROTOCOL_CORRESPONDENCE.md
+  TASK: oteryn-client/docs/agents/tasks/active/OTC2-20260805-native-protocol-single-version-completion.md
+  PLATFORM_MERGE: c0b8703d326a04b43ae8e06f6192b0cb91c859b7
+  OTHERYN_MERGE: 92bd106a92a8c3622de85099e2152db5b8cf2bde
+  SCHEMA_SHA: 9c67f19525400fb9890d2a3541ceb6d02eb955061540ad39ca1c1d891c06eba9
+
+jobs:
+  architecture:
+    name: Audit 1 - architecture and identity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify single native identity
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+
+          text = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          for required in (
+              "family = oteryn",
+              "native_protocol_version = 1",
+              "independent `protocol-oteryn`",
+          ):
+              assert required in text, required
+          for forbidden in ("PENDING_", "oteryn.native.v1"):
+              assert forbidden not in text, forbidden
+
+  security:
+    name: Audit 2 - security and immutable binding
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify fail-closed selection and credential boundaries
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+
+          text = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          for required in (
+              "adapter binding is immutable",
+              "Game Login Ticket goes only to Gateway",
+              "Game Session credential goes only to the selected Otheryn endpoint",
+              "requires a fresh Identity flow and ticket",
+          ):
+              assert required in text, required
+
+  parser:
+    name: Audit 3 - parser state and limits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify framing, snapshot and bounded parser obligations
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+
+          text = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          for required in (
+              "unsigned 32-bit big-endian framing",
+              "frame/message `<=1 MiB`",
+              "complete snapshot `<=16 MiB`",
+              "one bounded resync",
+              "no reconnect command replay",
+          ):
+              assert required in text, required
+
+  canary:
+    name: Audit 4 - Canary isolation and changed paths
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Verify documentation-only boundary and Canary isolation
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        shell: python
+        run: |
+          import os
+          import subprocess
+          from pathlib import Path
+
+          base = subprocess.check_output(
+              ["git", "merge-base", "HEAD", f"origin/{os.environ['BASE_REF']}"],
+              text=True,
+          ).strip()
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", base, "HEAD"],
+              text=True,
+          ).splitlines()
+          forbidden = [
+              path for path in changed
+              if path.startswith(("oteryn-client/crates/", "oteryn-client/src/"))
+              or "protocol-canary" in path
+          ]
+          assert not forbidden, forbidden
+          text = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          assert "`protocol-canary` remains the independent source-proven compatibility adapter" in text
+          assert "must not depend on, translate through or reuse Canary compatibility-profile machinery" in text
+
+  provenance:
+    name: Audit 5 - provenance rollout and production gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify immutable provenance and disabled production
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+
+          correspondence = Path(os.environ["CORRESPONDENCE"]).read_text(encoding="utf-8")
+          task = Path(os.environ["TASK"]).read_text(encoding="utf-8")
+          for required in (
+              os.environ["PLATFORM_MERGE"],
+              os.environ["OTHERYN_MERGE"],
+              os.environ["SCHEMA_SHA"],
+              "Rollback removes native from fresh offers/advertisement",
+          ):
+              assert required in correspondence, required
+          assert "production_activation_authorized: false" in task

@@ -4,11 +4,9 @@ Coordination ID: `OTS-20260804-native-protocol-selection`
 Canonical Platform contract: `blakinio/Oteryn-Platform/docs/contracts/OTERYN_NATIVE_GAMEPLAY_PROTOCOL_CONTRACT.md`  
 Canonical contract/schema revision: `2` / `2`  
 Canonical schema SHA-256: `9c67f19525400fb9890d2a3541ceb6d02eb955061540ad39ca1c1d891c06eba9`  
-Canonical merged Platform revision: `PENDING_PLATFORM_PR_540_MERGE`  
+Canonical merged Platform revision: `c0b8703d326a04b43ae8e06f6192b0cb91c859b7`  
 Otheryn correspondence: `blakinio/Otheryn/docs/contracts/OTERYN_NATIVE_GAMEPLAY_PROTOCOL_CORRESPONDENCE.md`  
-Canonical merged Otheryn correspondence revision: `PENDING_OTHERYN_PR_365_MERGE`  
-Candidate Platform head reviewed by this draft: `19a9b3a27d2b00d4dfb8fd83ebf24dec15233b91`  
-Candidate Otheryn correspondence head reviewed by this draft: `82cf07773e8a1e20d90d80a6868b786bffe8a118`
+Canonical merged Otheryn correspondence revision: `92bd106a92a8c3622de85099e2152db5b8cf2bde`
 
 ## Status
 
@@ -16,7 +14,7 @@ Contract correspondence only. This PR adds no dependency, crate, runtime, transp
 
 `protocol-canary` remains the independent source-proven compatibility adapter. Native Oteryn is a separate family with exactly `family = oteryn` and `native_protocol_version = 1`. It must not depend on, translate through or reuse Canary compatibility-profile machinery.
 
-There is no native profile field, alias, placeholder, enum, catalogue, registry, factory, ordering, selector or force-profile mode. This draft must not merge until the exact Platform and Otheryn merge commits replace both pending markers and their candidate heads are verified as ancestors.
+There is no native profile field, alias, placeholder, enum, catalogue, registry, factory, ordering, selector or force-profile mode. This correspondence is pinned to the immutable merged Platform and Otheryn revisions above.
 
 ## Normative adoption
 

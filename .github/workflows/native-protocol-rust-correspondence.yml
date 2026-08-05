@@ -74,10 +74,12 @@ jobs:
         with:
           fetch-depth: 0
       - name: Verify documentation-only boundary and Canary isolation
+        env:
+          BASE_REF: ${{ github.base_ref }}
         shell: bash
         run: |
           set -euo pipefail
-          base=$(git merge-base HEAD origin/${{ github.base_ref }})
+          base=$(git merge-base HEAD "origin/$BASE_REF")
           changed=$(git diff --name-only "$base" HEAD)
           printf '%s\n' "$changed"
           if printf '%s\n' "$changed" | grep -E '^oteryn-client/(crates|src)/|protocol-canary'; then

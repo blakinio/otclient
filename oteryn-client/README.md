@@ -1,67 +1,27 @@
-# Oteryn Client
+# Oteryn Client — moved to Oteryn-v2
 
-Status: architecture and audit phase  
-Primary implementation language: Rust  
-Initial desktop target: Windows  
-First game-server compatibility target: Canary  
-Long-term game-server target: Oteryn
+**Status: HISTORICAL / NON-CANONICAL**
 
-`oteryn-client/` is the isolated home of the new first-party Oteryn game client. It is a greenfield product, not a line-by-line rewrite of the current C++/Lua/OTUI client.
+The first-party Rust Oteryn client is no longer developed from this repository.
 
-The existing repository roots `src/`, `modules/`, `mods/`, `data/` and the existing CMake build remain the legacy client. They may be inspected for verified behavior, protocol evidence, asset metadata and regression scenarios, but the Rust client must not link them, execute their Lua/OTUI modules, include their headers or inherit their global-state architecture.
+Canonical destination:
 
-Legacy maintenance routes are preserved in repository-root `docs/architecture/LEGACY_OTCLIENT_ARCHITECTURE.md` and `docs/agents/LEGACY_OTCLIENT_WORKSTREAMS.md`.
+- repository: `blakinio/Oteryn-v2`;
+- client path: `apps/client`;
+- atomic destination cutover: `blakinio/Oteryn-v2#50`;
+- canonical destination merge: `78988f72a80cc904aa9176ae850c50d4efa0b0f0` (`feat(rust): perform atomic client cutover (#50)`);
+- frozen source snapshot used by the cutover: `blakinio/otclient@c923ad8a1dff17b4933a6110931b0823cec2c590`.
 
-## Product contract
+## Source-marker rule
 
-The client must provide:
+`oteryn-client/**` in `blakinio/otclient` is retained only as historical source, migration/provenance evidence and a behavioral reference for the completed cutover.
 
-- Oteryn Identity login through Authorization Code + PKCE in the system browser;
-- no collection or transmission of the user's main Oteryn password to a game server;
-- account, character, world and gameplay-channel selection;
-- a one-shot game-session handoff scoped to the selected character, world and channel;
-- login to Canary through a compatibility adapter during the migration period;
-- later login to native Oteryn game services through a separate adapter;
-- relog from one gameplay channel to another by closing the current game session and creating a new one;
-- a high-performance data-oriented runtime, modern GPU renderer and native Rust UI;
-- signed and verified updates and asset packs;
-- deterministic testing, replay and profiling support.
+Do not start, continue or merge new Oteryn v2 Rust-client implementation here. All new Oteryn v2 client, server, shared Rust, protocol, content and tooling work belongs in `blakinio/Oteryn-v2` under that repository's current architecture and governance.
 
-A gameplay channel means a parallel instance of one world, such as `Channel 1`, `Channel 2` and `Channel 3`. It is selected during login or relog. It is not a network multiplexing stream.
+The historical code and documents in this subtree may describe earlier Canary compatibility, dual-protocol or pre-cutover plans. Those descriptions are not the canonical Oteryn v2 architecture after the migration and must not be used to revive a second product line.
 
-## Start here
+## What remains in this repository
 
-1. Read the repository root `AGENTS.md`.
-2. Read `oteryn-client/AGENTS.md`.
-3. Read `docs/architecture/ARCHITECTURE.md`.
-4. Read `docs/architecture/REPOSITORY_LAYOUT.md`.
-5. Read `docs/agents/PROGRAM.md` and `docs/agents/WORKSTREAMS.md`.
-6. Inspect the live task records and open pull requests before claiming work.
+The legacy OTClient roots such as `src/`, `modules/`, `mods/`, `data/` and their separately governed tasks remain part of `blakinio/otclient` and are unaffected by this Rust-client cutover marker.
 
-The first implementation work is blocked by the foundation audit defined in `docs/agents/AUDIT_PLAN.md`. The audit may create documentation, fixtures inventories and benchmark plans, but it must not bootstrap production crates or choose protocol facts without evidence.
-
-## Planned top-level structure
-
-```text
-oteryn-client/
-├── AGENTS.md
-├── README.md
-├── Cargo.toml                    # created after the audit gate
-├── Cargo.lock
-├── rust-toolchain.toml
-├── apps/
-├── crates/
-├── features/
-├── tools/
-├── contracts/
-├── assets/
-├── tests/
-├── benches/
-└── docs/
-```
-
-The complete planned tree and dependency rules are normative in `docs/architecture/REPOSITORY_LAYOUT.md`.
-
-## Current phase
-
-This directory initially contains architecture and agent-operating documents only. Creating placeholder crates before the audit is intentionally prohibited: empty abstractions would appear authoritative before the Canary protocol, asset legality, target hardware and feature inventory are verified.
+For historical inspection of the Rust client immediately before cutover, use commit `c923ad8a1dff17b4933a6110931b0823cec2c590` and the repository Git history rather than treating this subtree as an active development target.

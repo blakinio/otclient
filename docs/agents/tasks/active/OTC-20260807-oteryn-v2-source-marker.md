@@ -54,20 +54,24 @@ Complete the source-only closeout required by the accepted Oteryn v2 client cuto
 - [x] `oteryn-client/README.md` clearly marks the subtree moved/non-canonical and points to the exact destination.
 - [x] `oteryn-client/AGENTS.md` blocks new Oteryn v2 implementation in this repository and redirects future agents to the canonical destination.
 - [x] Historical source and provenance remain available in this repository history and pinned source snapshot.
-- [ ] Full changed-file review contains only the declared documentation/task paths.
+- [x] Full changed-file review contains only the declared documentation/task paths.
 - [ ] Required exact-head GitHub checks pass.
 - [ ] No unresolved review threads or requested changes remain.
 - [ ] PR is squash-merged through normal branch protection.
 - [ ] Task is archived in the required post-merge lifecycle change.
 
+## Validation checkpoint
+
+- changed paths: exactly `docs/agents/tasks/active/OTC-20260807-oteryn-v2-source-marker.md`, `oteryn-client/AGENTS.md`, and `oteryn-client/README.md`;
+- full diff review: `PASS`;
+- runtime/component/E2E: `NOT_APPLICABLE` — source-marker documentation only;
+- external repository writes: none;
+- production changes: none.
+
 ## Claim boundary
 
 This task is source-only cutover closeout. It does not change the canonical Oteryn-v2 architecture, implement `protocol-oteryn`, modify the migrated destination client, alter legacy OTClient runtime behavior or authorize production deployment.
 
-## Validation checkpoint
-
-The marker documents now replace the stale active-development entry points in the frozen source subtree. The next gate is complete PR diff/path review followed by exact-head repository CI and review-thread verification.
-
 ## Next action
 
-Review PR #274 changed files and full diff, then mark ready and merge only after required exact-head checks pass.
+Mark PR #274 ready, verify required exact-head CI and review threads, then squash-merge only on PASS.

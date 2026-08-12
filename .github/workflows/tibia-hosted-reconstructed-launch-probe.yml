@@ -1,0 +1,195 @@
+name: Tibia hosted reconstructed client launch probe
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260727-tibia-linux-runner-analysis
+    paths:
+      - .github/workflows/tibia-hosted-reconstructed-launch-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-probe-home
+      TIBIA_PACKAGE_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      TIBIA_BASE_URL: https://static.tibia.com/launcher/tibiaclient-linux-current
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install no-OCR runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl dbus-x11 file iproute2 procps proxychains4 x11-utils xdotool xvfb \
+            libasound2t64 libatk1.0-0 libatspi2.0-0 libcups2 libdbus-1-3 libdrm2 libegl1 libfontconfig1 \
+            libfreetype6 libgbm1 libgl1 libglx0 libgtk-3-0 libnspr4 libnss3 libopengl0 libpulse0 libvulkan1 \
+            libx11-6 libx11-xcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 libxcb-shm0 libxcb-sync1 \
+            libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxcomposite1 libxdamage1 libxi6 \
+            libxkbcommon-x11-0 libxrandr2 libxrender1 libxtst6 mesa-vulkan-drivers vulkan-tools
+          command -v tesseract >/dev/null 2>&1 && { echo FORBIDDEN_OCR_BINARY_PRESENT=true; exit 1; } || true
+          echo OCR_BINARY_ABSENT=true
+
+      - name: Establish WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          root=/tmp/warp
+          mkdir -p "$root/bin" "$root/state" /tmp/tibia-package /tmp/tibia-probe "$HOME"
+          chmod 700 "$root" "$root/state" /tmp/tibia-probe "$HOME"
+          cd "$root/bin"
+          curl -fL --retry 3 -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          chmod 755 wgcf
+          curl -fL --retry 3 -o wireproxy.tar.gz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tar.gz' | sha256sum -c -
+          mkdir extract; tar -xzf wireproxy.tar.gz -C extract
+          cp "$(find extract -type f -name wireproxy -print -quit)" wireproxy; chmod 755 wireproxy
+          cd "$root/state"
+          "$root/bin/wgcf" register --accept-tos >/dev/null
+          "$root/bin/wgcf" generate >/dev/null
+          chmod 600 wgcf-account.toml wgcf-profile.conf
+          cat >wireproxy.conf <<EOF
+          WGConfig = $root/state/wgcf-profile.conf
+
+          [Socks5]
+          BindAddress = 127.0.0.1:25344
+          EOF
+          "$root/bin/wireproxy" -n -c wireproxy.conf
+          nohup "$root/bin/wireproxy" -c wireproxy.conf >/tmp/tibia-probe/wireproxy.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/tibia-probe/warp.trace 2>/dev/null && break
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' /tmp/tibia-probe/warp.trace
+          echo WARP_VERIFIED=true
+          cat >/tmp/tibia-probe/proxychains.conf <<'EOF'
+          strict_chain
+          proxy_dns
+          quiet_mode
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 25344
+          EOF
+
+      - name: Fetch manifest and reconstruct exact package
+        shell: bash
+        env:
+          TIBIA_MANIFEST: /tmp/tibia-package/package.json
+          TIBIA_PACKAGE_OUT: /home/runner/tibia-probe-home/.local/share/CipSoft GmbH/Tibia/packages/Tibia
+          TIBIA_SOCKS: 127.0.0.1:25344
+          TIBIA_DOWNLOAD_WORKERS: '8'
+        run: |
+          set -Eeuo pipefail
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL --retry 3 -A "$ua" -e "$TIBIA_BASE_URL/package.json" \
+            -H 'Accept: */*' "$TIBIA_BASE_URL/package.json" -o /tmp/tibia-package/package.json
+          python3 - <<'PY'
+          import json,os,pathlib
+          d=json.loads(pathlib.Path('/tmp/tibia-package/package.json').read_text())
+          assert d.get('version') == os.environ['TIBIA_PACKAGE_VERSION']
+          PY
+          mkdir -p "$TIBIA_PACKAGE_OUT"
+          python3 .github/scripts/tibia-package-reconstruct.py
+          c="$TIBIA_PACKAGE_OUT/bin/client"
+          [[ "$(stat -c %s "$c")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$c" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo EXACT_CLIENT_READY=true
+
+      - name: Probe minimal launch variants safely
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pkg="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$pkg/bin/client"
+          lvp=$(find /usr/share/vulkan/icd.d -maxdepth 1 -type f -name 'lvp_icd*.json' -print -quit)
+          [[ -n "$lvp" ]]
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/tibia-probe/xvfb.log 2>&1 </dev/null &
+          for _ in $(seq 1 20); do xdpyinfo -display :99 >/dev/null 2>&1 && break; sleep 1; done
+          xdpyinfo -display :99 >/dev/null
+
+          echo LDD_MISSING_BEGIN
+          ldd "$client" 2>/dev/null | awk '/not found/{print $1}' | head -30 || true
+          echo LDD_MISSING_END
+
+          run_variant() {
+            local name="$1" mode="$2"
+            pkill -x client 2>/dev/null || true
+            sleep 1
+            : >"/tmp/tibia-probe/${name}.log"
+            cd "$pkg"
+            case "$mode" in
+              minimal)
+                nohup env DISPLAY=:99 HOME="$HOME" VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp" LIBGL_ALWAYS_SOFTWARE=1 \
+                  proxychains4 -f /tmp/tibia-probe/proxychains.conf "$client" >"/tmp/tibia-probe/${name}.log" 2>&1 </dev/null &
+                ;;
+              dbus)
+                nohup dbus-run-session -- env DISPLAY=:99 HOME="$HOME" VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp" LIBGL_ALWAYS_SOFTWARE=1 \
+                  proxychains4 -f /tmp/tibia-probe/proxychains.conf "$client" >"/tmp/tibia-probe/${name}.log" 2>&1 </dev/null &
+                ;;
+              bundled)
+                qt=$(find "$pkg" -type f -name libQt6WebEngineQuick.so.6 -print -quit)
+                libdir=$(dirname "$qt")
+                nohup env DISPLAY=:99 HOME="$HOME" LD_LIBRARY_PATH="$libdir" VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp" LIBGL_ALWAYS_SOFTWARE=1 \
+                  proxychains4 -f /tmp/tibia-probe/proxychains.conf "$client" >"/tmp/tibia-probe/${name}.log" 2>&1 </dev/null &
+                ;;
+            esac
+            for _ in $(seq 1 30); do pgrep -x client >/dev/null && break; sleep 0.2; done
+            pid=$(pgrep -x client | head -n1 || true)
+            if [[ -z "$pid" ]]; then
+              echo "VARIANT_${name}_SPAWNED=false"
+              return 1
+            fi
+            echo "VARIANT_${name}_SPAWNED=true"
+            sleep 12
+            if kill -0 "$pid" 2>/dev/null; then
+              best=''; best_area=0; bw=0; bh=0
+              for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
+                geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
+                width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p'); height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+                [[ -n "$width" && -n "$height" ]] || continue
+                area=$((width*height)); if ((area>best_area)); then best=$w; best_area=$area; bw=$width; bh=$height; fi
+              done
+              echo "VARIANT_${name}_ALIVE=true"
+              echo "VARIANT_${name}_WINDOW=${bw}x${bh}"
+              if [[ -n "$best" && "$bw" == 1020 && "$bh" == 650 ]]; then
+                printf '%s\n' "$name" >/tmp/tibia-probe/winner
+                return 0
+              fi
+            fi
+            echo "VARIANT_${name}_ALIVE=false"
+            echo "VARIANT_${name}_SAFE_LOG_BEGIN"
+            sed -E '/(token|password|account|session|cookie|authorization|bearer)/Id' "/tmp/tibia-probe/${name}.log" | tail -60
+            echo "VARIANT_${name}_SAFE_LOG_END"
+            return 1
+          }
+
+          if run_variant MINIMAL minimal; then
+            echo CLIENT_LAUNCH_VARIANT=MINIMAL
+            exit 0
+          fi
+          if run_variant DBUS dbus; then
+            echo CLIENT_LAUNCH_VARIANT=DBUS
+            exit 0
+          fi
+          if run_variant BUNDLED bundled; then
+            echo CLIENT_LAUNCH_VARIANT=BUNDLED
+            exit 0
+          fi
+          echo ALL_CLIENT_LAUNCH_VARIANTS_FAILED=true
+          exit 1

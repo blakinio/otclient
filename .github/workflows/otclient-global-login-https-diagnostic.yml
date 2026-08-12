@@ -72,7 +72,7 @@ jobs:
           python3 - <<'PY'
           import json, os, pathlib, subprocess
           email=os.environ['TIBIA_TEST_EMAIL']; password=os.environ['TIBIA_TEST_PASSWORD']; url=os.environ['LOGIN_URL']
-          payload=json.dumps({'email':email,'password':password,'stayloggedin':True,'type':'login','clientversion':1532}, separators=(',',':'))
+          payload=json.dumps({'email':email,'password':password,'stayloggedin':True,'type':'login','clientversion':'15.32'}, separators=(',',':'))
           body=pathlib.Path('/tmp/login-body.json')
           cp=subprocess.run([
               'curl','--socks5-hostname','127.0.0.1:25344','--compressed','-sS','--connect-timeout','15','--max-time','60',

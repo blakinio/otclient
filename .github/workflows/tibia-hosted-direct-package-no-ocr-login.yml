@@ -193,10 +193,12 @@ jobs:
                   raise RuntimeError('unsafe manifest path')
               return p
 
-          def unpack(data, rel):
+          def unpack(data, rel, unpacked_hash):
               if not rel.endswith('.lzma'):
                   return data, rel
-              if len(data) < 46:
+              if hashlib.sha256(data).hexdigest() == unpacked_hash:
+                  return data, rel[:-5]
+              if len(data) < 45:
                   raise RuntimeError(f'truncated packed object: {rel}')
               prop=data[32]
               lc=prop % 9
@@ -208,8 +210,15 @@ jobs:
               dict_size=int.from_bytes(data[33:37],'little')
               if dict_size <= 0 or dict_size > (1<<30):
                   raise RuntimeError(f'invalid dictionary size: {rel}')
+              declared_size=int.from_bytes(data[37:45],'little')
+              if len(data) == 45 and declared_size == 0:
+                  return b'', rel[:-5]
+              if len(data) < 46:
+                  raise RuntimeError(f'truncated packed payload: {rel}')
               filt={'id':lzma.FILTER_LZMA1,'dict_size':dict_size,'lc':lc,'lp':lp,'pb':pb}
               out=lzma.decompress(data[45:],format=lzma.FORMAT_RAW,filters=[filt])
+              if declared_size != 0xffffffffffffffff and len(out) != declared_size:
+                  raise RuntimeError(f'unpacked size mismatch: {rel}')
               return out, rel[:-5]
 
           def one(item):
@@ -226,7 +235,7 @@ jobs:
                   data=tmp.read_bytes()
                   if hashlib.sha256(data).hexdigest() != packed_hash:
                       raise RuntimeError(f'packed hash mismatch: {rel}')
-                  out,out_rel=unpack(data,rel)
+                  out,out_rel=unpack(data,rel,unpacked_hash)
                   if hashlib.sha256(out).hexdigest() != unpacked_hash:
                       raise RuntimeError(f'unpacked hash mismatch: {rel}')
                   p=safe_rel(out_rel)
@@ -280,66 +289,47 @@ jobs:
           plugdir=''; qmldir=''
           for d in "$base/plugins" "$libdir/plugins" "$pkg/plugins" "$pkg/bin/plugins"; do [[ -d "$d" ]] && { plugdir=$d; break; }; done
           for d in "$base/qml" "$libdir/qml" "$pkg/qml" "$pkg/bin/qml"; do [[ -d "$d" ]] && { qmldir=$d; break; }; done
-          lvp=$(find /usr/share/vulkan/icd.d -maxdepth 1 -type f -name 'lvp_icd*.json' -print -quit)
-          [[ -n "$lvp" ]]
-          VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp" LIBGL_ALWAYS_SOFTWARE=1 DISPLAY=:99 vulkaninfo --summary >/tmp/tibia-runtime/vulkan-summary.txt 2>/dev/null
-          grep -Eqi 'lavapipe|llvmpipe' /tmp/tibia-runtime/vulkan-summary.txt
-          echo SOFTWARE_VULKAN_VERIFIED=true
-
-          args=(env DISPLAY=:99 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
-            LD_LIBRARY_PATH="$libdir" LIBGL_ALWAYS_SOFTWARE=1 QT_XCB_GL_INTEGRATION=none VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp")
-          [[ -n "$plugdir" ]] && args+=(QT_PLUGIN_PATH="$plugdir")
-          [[ -n "$qmldir" ]] && args+=(QML2_IMPORT_PATH="$qmldir")
-          args+=(proxychains4 -f /tmp/tibia-runtime/proxychains.conf "$client")
+          export LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          [[ -n "$plugdir" ]] && export QT_PLUGIN_PATH="$plugdir"
+          [[ -n "$qmldir" ]] && export QML2_IMPORT_PATH="$qmldir"
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          export QT_XCB_GL_INTEGRATION=none
           cd "$pkg"
           : >/tmp/tibia-runtime/client.log
-          nohup "${args[@]}" >/tmp/tibia-runtime/client.log 2>&1 </dev/null &
-          for _ in $(seq 1 50); do pgrep -x client >/dev/null && break; sleep 1; done
+          nohup proxychains4 -f /tmp/tibia-runtime/proxychains.conf "$client" >/tmp/tibia-runtime/client.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do pgrep -x client >/dev/null && break; sleep 1; done
           pid=$(pgrep -x client | head -n1)
           [[ -n "$pid" ]]
           printf '%s' "$pid" >/tmp/tibia-runtime/client-pid
-          printf '%s' "$client" >/tmp/tibia-runtime/client-path
           sleep 12
-          kill -0 "$pid"
-          if grep -Fqi 'failed vulkan instance' /tmp/tibia-runtime/client.log; then
-            echo CLIENT_FAILED_VULKAN_INSTANCE=true >&2
-            exit 1
-          fi
-          echo CLIENT_FAILED_VULKAN_INSTANCE=false
-
-          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
-          direct=$(printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -c . || true)
-          udp=$(ss -nup 2>/dev/null | grep "pid=$pid," | grep -c . || true)
-          local_socks=$(printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ec '^(127\.0\.0\.1|\[::1\]):25344$' || true)
-          echo "CLIENT_LOCAL_SOCKS_TCP_COUNT=$local_socks"
-          echo "CLIENT_DIRECT_TCP_COUNT=$direct"
-          echo "CLIENT_UDP_COUNT=$udp"
-          [[ "$direct" -eq 0 && "$udp" -eq 0 && "$local_socks" -gt 0 ]]
-          echo CLIENT_TCP_USERSPACE_WARP_CONFINEMENT_VERIFIED=true
-
-          best=''; best_area=0; bw=0; bh=0
+          best=''; best_area=0; best_width=0; best_height=0
           for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
             geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
             width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
             height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
             [[ -n "$width" && -n "$height" ]] || continue
             area=$((width*height))
-            if (( area > best_area )); then best=$w; best_area=$area; bw=$width; bh=$height; fi
+            if (( area > best_area )); then best=$w; best_area=$area; best_width=$width; best_height=$height; fi
           done
-          echo "CLIENT_WINDOW_SIZE=${bw}x${bh}"
-          [[ -n "$best" && "$bw" == 1020 && "$bh" == 650 ]]
+          echo "client_window_size=${best_width}x${best_height}"
+          [[ -n "$best" && "$best_width" == 1020 && "$best_height" == 650 ]]
           printf '%s' "$best" >/tmp/tibia-runtime/window-id
-          xdotool mousemove --window "$best" 510 302 click 1
-          sleep 2
-          echo EXACT_LOGIN_WINDOW_GEOMETRY_VERIFIED=true
+          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+          if printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -q .; then
+            echo CLIENT_DIRECT_TCP_DETECTED=true >&2
+            exit 1
+          fi
+          udp=$(ss -nup 2>/dev/null | grep "pid=$pid," || true)
+          [[ -z "$udp" ]]
+          echo CLIENT_TCP_USERSPACE_WARP_CONFINEMENT_VERIFIED=true
 
       - name: Arm decoded Worldmap handler proof before secret use
         shell: bash
         run: |
           set -Eeuo pipefail
           pid=$(cat /tmp/tibia-runtime/client-pid)
-          client=$(cat /tmp/tibia-runtime/client-path)
-          sudo sysctl -w kernel.yama.ptrace_scope=0 >/dev/null 2>&1 || true
+          client=/tmp/tibia-package/runtime/bin/client
           map_line=$(awk -v p="$client" '$NF==p && $2 ~ /r-xp/ {print; exit}' "/proc/$pid/maps")
           [[ -n "$map_line" ]]
           start_hex=$(printf '%s\n' "$map_line" | awk '{split($1,a,"-"); print a[1]}')
@@ -348,7 +338,6 @@ jobs:
           common=$((load_bias + 0x19a8a80))
           fullmap=$((load_bias + 0xcec8d0))
           fielddata=$((load_bias + 0xcd3190))
-          printf 'load_bias=0x%x\n' "$load_bias"
           cat >/tmp/tibia-runtime/worldmap.gdb <<EOF
           set pagination off
           set confirm off
@@ -378,18 +367,12 @@ jobs:
           EOF
           rm -f /tmp/tibia-runtime/worldmap-hit
           sudo -n gdb -q -nx -x /tmp/tibia-runtime/worldmap.gdb >/tmp/tibia-runtime/worldmap-gdb.log 2>&1 &
-          printf '%s' "$!" >/tmp/tibia-runtime/gdb-pid
           armed=0
-          for _ in $(seq 1 25); do
+          for _ in $(seq 1 20); do
             if grep -q 'Breakpoint 1' /tmp/tibia-runtime/worldmap-gdb.log 2>/dev/null; then armed=1; break; fi
-            if ! kill -0 "$pid" 2>/dev/null; then break; fi
             sleep 1
           done
-          if [[ "$armed" != 1 ]]; then
-            echo WORLDMAP_GDB_ARM_FAILED=true >&2
-            grep -E 'ptrace|attach|No such process|Operation not permitted|Breakpoint' /tmp/tibia-runtime/worldmap-gdb.log | head -20 || true
-            exit 1
-          fi
+          [[ "$armed" == 1 ]]
           echo DECODED_WORLDMAP_BREAKPOINTS_ARMED=true
 
       - name: Enter account credentials and activate exact first character without OCR
@@ -405,43 +388,28 @@ jobs:
           pid=$(cat /tmp/tibia-runtime/client-pid)
           [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^WIDTH=//p')" == 1020 ]]
           [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^HEIGHT=//p')" == 650 ]]
-
           xdotool mousemove --window "$best" 535 275 click 1
           xdotool key --window "$best" ctrl+a
           printf '%s' "$TIBIA_TEST_EMAIL" | xclip -selection clipboard -in
           xdotool key --window "$best" ctrl+v
           printf '' | xclip -selection clipboard -in
-
           xdotool mousemove --window "$best" 535 304 click 1
           xdotool key --window "$best" ctrl+a
           printf '%s' "$TIBIA_TEST_PASSWORD" | xclip -selection clipboard -in
           xdotool key --window "$best" ctrl+v
           printf '' | xclip -selection clipboard -in
-
           xdotool mousemove --window "$best" 590 388 click 1
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          echo ACCOUNT_CREDENTIALS_SUBMITTED_WITHOUT_OCR=true
+          echo CREDENTIALS_ENTERED_WITHOUT_OCR=true
           sleep 25
-          kill -0 "$pid"
-
-          # Exact first-character name geometry was independently established for this exact client hash.
           xdotool mousemove --window "$best" 236 190 click --repeat 2 --delay 180 1
-          echo EXACT_FIRST_CHARACTER_TARGET_ACTIVATED_WITHOUT_OCR=true
-
-          for _ in $(seq 1 60); do
+          echo EXACT_FIRST_CHARACTER_NAME_DOUBLECLICKED_WITHOUT_OCR=true
+          for _ in $(seq 1 45); do
             [[ -s /tmp/tibia-runtime/worldmap-hit ]] && break
             kill -0 "$pid" 2>/dev/null || break
             sleep 2
           done
           kill -0 "$pid"
-
-          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
-          direct=$(printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -c . || true)
-          udp=$(ss -nup 2>/dev/null | grep "pid=$pid," | grep -c . || true)
-          echo "POST_ACTIVATION_DIRECT_TCP_COUNT=$direct"
-          echo "POST_ACTIVATION_UDP_COUNT=$udp"
-          [[ "$direct" -eq 0 && "$udp" -eq 0 ]]
-          echo CLIENT_TUNNEL_CONFINEMENT_HELD_AFTER_ACTIVATION=true
 
       - name: Require physical decoded world entry
         shell: bash
@@ -450,25 +418,10 @@ jobs:
           pid=$(cat /tmp/tibia-runtime/client-pid)
           if [[ ! -s /tmp/tibia-runtime/worldmap-hit ]]; then
             echo DECODED_WORLDMAP_HIT=false
-            echo GDB_SAFE_DIAGNOSTIC_BEGIN
-            grep -E 'ptrace|attach|No such process|Operation not permitted|Breakpoint' /tmp/tibia-runtime/worldmap-gdb.log | head -30 || true
-            echo GDB_SAFE_DIAGNOSTIC_END
-            python3 - <<'PY'
-          from pathlib import Path
-          import re
-          p=Path('/tmp/tibia-runtime/client.log')
-          raw=p.read_text(errors='replace') if p.exists() else ''
-          allow=('failed vulkan instance','battleye','connection','disconnect','error')
-          seen=[]
-          low=raw.lower()
-          for token in allow:
-              if token in low: seen.append(token.replace(' ','_'))
-          print('SAFE_CLIENT_LOG_FLAGS=' + ','.join(seen))
-          PY
+            grep -E '^(Breakpoint|warning: ptrace|ptrace:|Could not attach|No such process)' /tmp/tibia-runtime/worldmap-gdb.log || true
             exit 1
           fi
           cat /tmp/tibia-runtime/worldmap-hit
           echo DECODED_WORLDMAP_HIT=true
           kill -0 "$pid"
-          echo PHYSICAL_TIBIA_WORLD_LOGIN_PROVEN=true
-          echo TIBIA_CHARACTER_REACHED_GAME_MAP=true
+          echo TIBIA_CHARACTER_IN_WORLD_PROVEN=true

@@ -1,6 +1,9 @@
 name: Tibia bounded worldmap walk
 
 on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-worldmap-walk.yml]
   workflow_dispatch:
 
 permissions:

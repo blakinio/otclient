@@ -6,7 +6,6 @@ on:
       - ci/OTC-20260727-tibia-linux-runner-analysis
     paths:
       - .github/workflows/tibia-linux-runner-analysis.yml
-      - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
   workflow_dispatch:
 
 permissions:
@@ -343,16 +342,20 @@ jobs:
           [[ -n "$best" && -n "$pid" ]]
           [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^WIDTH=//p')" == 1020 ]]
           [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^HEIGHT=//p')" == 650 ]]
-          xdotool type --help 2>&1 | grep -q -- '--file'
 
+          export WINDOWID="$best"
           xdotool mousemove --window "$best" 535 275 click 1
           xdotool key --window "$best" ctrl+a
-          printf '%s' "$TIBIA_TEST_EMAIL" | xdotool type --window "$best" --delay 3 --file -
+          xdotool - <<'XDO_EMAIL'
+          type --window $WINDOWID --delay 3 "$TIBIA_TEST_EMAIL"
+          XDO_EMAIL
           xdotool mousemove --window "$best" 535 304 click 1
           xdotool key --window "$best" ctrl+a
-          printf '%s' "$TIBIA_TEST_PASSWORD" | xdotool type --window "$best" --delay 3 --file -
+          xdotool - <<'XDO_PASSWORD'
+          type --window $WINDOWID --delay 3 "$TIBIA_TEST_PASSWORD"
+          XDO_PASSWORD
           xdotool mousemove --window "$best" 590 388 click 1
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD WINDOWID
           echo CREDENTIALS_ENTERED_WITHOUT_OCR=true
 
           sleep 25

@@ -74,6 +74,26 @@ jobs:
       packages: read
     uses: ./.github/workflows/reusable-build-windows.yml
 
+  otclient-global-login-probe:
+    name: OTClient Tibia Global Login Probe
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 48 && github.head_ref == 'ci/OTC-20260727-tibia-linux-runner-analysis'
+    runs-on: [self-hosted, oteryn-staging]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout exact probe source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Run bounded Global login probe
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        shell: bash
+        run: bash .github/scripts/otclient-global-login-probe.sh
+
   required:
     name: CI / Required
     if: always()

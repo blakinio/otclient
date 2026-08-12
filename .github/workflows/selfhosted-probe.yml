@@ -1,0 +1,33 @@
+name: Self-hosted OTClient Probe
+
+on:
+  push:
+    branches:
+      - ai/selfhosted-otclient-probe
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 5
+    steps:
+      - name: Host and runtime inventory
+        shell: bash
+        run: |
+          set -u
+          echo "hostname=$(hostname)"
+          echo "user=$(id -un)"
+          echo "kernel=$(uname -a)"
+          echo "pwd=$(pwd)"
+          echo "--- processes ---"
+          ps -eo pid,comm,args | grep -Ei 'tibia|otclient|xvfb|x11vnc|vnc' | grep -v grep || true
+          echo "--- docker containers ---"
+          if command -v docker >/dev/null 2>&1; then
+            docker ps -a --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}' | grep -Ei 'tibia|otclient|ots|warp' || true
+          else
+            echo 'docker=unavailable'
+          fi
+          echo "--- likely paths ---"
+          find /volume1 /opt /srv /home /tmp -maxdepth 4 \( -iname '*tibia*' -o -iname '*otclient*' -o -iname '*warp*' \) -print 2>/dev/null | head -n 200 || true

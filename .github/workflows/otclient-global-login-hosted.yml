@@ -139,32 +139,138 @@ jobs:
           if os.getenv('OTCLIENT_GLOBAL_LOGIN_PROBE') == '1' then
             if Services.clientAssets then Services.clientAssets.enabled = false end
             local function mark(s) g_logger.info('[GLOBAL_PROBE] ' .. s) end
+            local completed = false
+
             connect(g_game, {
-              onGameStart=function() mark('GAME_START=true') end,
+              onGameStart=function()
+                completed = true
+                mark('GAME_START=true')
+                scheduleEvent(function() g_app.exit() end, 1500)
+              end,
               onLoginError=function() mark('GAME_LOGIN_ERROR=true') end,
               onConnectionError=function() mark('GAME_CONNECTION_ERROR=true') end,
               onSessionEnd=function() mark('GAME_SESSION_END=true') end
             })
-            local success=EnterGame.loginSuccess
-            EnterGame.loginSuccess=function(requestId,characters,session)
-              mark('HTTP_LOGIN_SUCCESS=true'); success(requestId,characters,session)
+
+            local success = EnterGame.loginSuccess
+            EnterGame.loginSuccess = function(requestId, jsonSession, jsonWorlds, jsonCharacters)
+              mark('HTTP_LOGIN_SUCCESS=true')
+              success(requestId, jsonSession, jsonWorlds, jsonCharacters)
               scheduleEvent(function()
-                if CharacterList and CharacterList.doLogin then mark('CHARACTER_LOGIN_ATTEMPT=true'); CharacterList.doLogin()
-                else mark('CHARACTER_LIST_UNAVAILABLE=true') end
-              end,1000)
+                if CharacterList and CharacterList.doLogin then
+                  mark('CHARACTER_LOGIN_ATTEMPT=true')
+                  CharacterList.doLogin()
+                else
+                  mark('CHARACTER_LIST_UNAVAILABLE=true')
+                end
+              end, 1000)
             end
-            local failed=EnterGame.loginFailed
-            EnterGame.loginFailed=function(requestId,msg,result) mark('HTTP_LOGIN_FAILED=true'); failed(requestId,msg,result) end
+
+            local failed = EnterGame.loginFailed
+            EnterGame.loginFailed = function(requestId, msg, result)
+              mark('HTTP_LOGIN_FAILED=true')
+              failed(requestId, msg, result)
+            end
+
+            EnterGame.tryHttpLogin = function(clientVersion, httpLogin)
+              g_game.setClientVersion(clientVersion)
+              g_game.setProtocolVersion(g_game.getClientProtocolVersion(clientVersion))
+              g_game.chooseRsa(G.host)
+
+              if not modules.game_things.isLoaded() then
+                mark('THINGS_NOT_LOADED=true')
+                return
+              end
+
+              local rawAssetVersion = g_resources.readFileContents('/data/things/1532/assets.json.sha256') or ''
+              local assetVersion = rawAssetVersion:match('([0-9a-fA-F]+)') or ''
+              if #assetVersion ~= 64 then
+                mark('ASSET_VERSION_INVALID=true')
+                return
+              end
+
+              G.requestId = 1
+              HTTP.timeout = 30
+              local payload = {
+                email = G.account,
+                password = G.password,
+                stayloggedin = false,
+                type = 'login',
+                clientversion = '15.32.df7b29',
+                clienttype = 2,
+                assetversion = assetVersion
+              }
+
+              mark('HTTP_LOGIN_REQUEST=true')
+              HTTP.post('https://www.tibia.com/clientservices/loginservice.php', payload, function(message, err)
+                payload = nil
+                if err then
+                  mark('HTTP_LOGIN_TRANSPORT_ERROR=true')
+                  return
+                end
+
+                local ok, response = pcall(json.decode, message or '')
+                message = nil
+                if not ok or type(response) ~= 'table' then
+                  mark('HTTP_LOGIN_PARSE_ERROR=true')
+                  return
+                end
+                if response.errorCode and tonumber(response.errorCode) ~= 0 then
+                  mark('HTTP_LOGIN_REJECTED=true')
+                  response = nil
+                  return
+                end
+                if type(response.session) ~= 'table' or type(response.playdata) ~= 'table' or
+                   type(response.playdata.worlds) ~= 'table' or type(response.playdata.characters) ~= 'table' then
+                  mark('HTTP_LOGIN_SHAPE_INVALID=true')
+                  response = nil
+                  return
+                end
+
+                mark('HTTP_LOGIN_RESPONSE_VALID=true')
+                local jsonSession = json.encode(response.session)
+                local jsonWorlds = json.encode(response.playdata.worlds)
+                local jsonCharacters = json.encode(response.playdata.characters)
+                response = nil
+                EnterGame.loginSuccess(G.requestId, jsonSession, jsonWorlds, jsonCharacters)
+                jsonSession = nil
+                jsonWorlds = nil
+                jsonCharacters = nil
+              end, false)
+            end
+
             scheduleEvent(function()
-              local email=os.getenv('TIBIA_TEST_EMAIL') or ''; local password=os.getenv('TIBIA_TEST_PASSWORD') or ''
+              local email=os.getenv('TIBIA_TEST_EMAIL') or ''
+              local password=os.getenv('TIBIA_TEST_PASSWORD') or ''
               if email=='' or password=='' then mark('SECRET_GATE_FAILED=true'); return end
-              EnterGame.setDefaultServer('https://www.tibia.com/clientservices/loginservice.php',443,1532)
-              local a=rootWidget:recursiveGetChildById('accountNameTextEdit'); local p=rootWidget:recursiveGetChildById('accountPasswordTextEdit'); local h=rootWidget:recursiveGetChildById('httpLoginBox'); local stay=rootWidget:recursiveGetChildById('stayLoggedBox')
+
+              EnterGame.setDefaultServer('https://www.tibia.com/clientservices/loginservice.php', 443, 1532)
+              local a=rootWidget:recursiveGetChildById('accountNameTextEdit')
+              local p=rootWidget:recursiveGetChildById('accountPasswordTextEdit')
+              local h=rootWidget:recursiveGetChildById('httpLoginBox')
+              local stay=rootWidget:recursiveGetChildById('stayLoggedBox')
+              local remember=rootWidget:recursiveGetChildById('rememberEmailBox')
+              local autologin=rootWidget:recursiveGetChildById('autoLoginBox')
               if not a or not p or not h then mark('LOGIN_WIDGETS_UNAVAILABLE=true'); return end
-              a:setText(email); p:setText(password); h:setChecked(true); if stay then stay:setChecked(false) end
-              email=nil; password=nil; mark('LOGIN_START=true'); EnterGame.doLogin()
-            end,1500)
-            scheduleEvent(function() if not g_game.isOnline() then mark('PROBE_TIMEOUT=true'); g_app.exit() end end,90000)
+
+              a:setText(email)
+              p:setText(password)
+              h:setChecked(false)
+              if stay then stay:setChecked(false) end
+              if remember then remember:setChecked(false) end
+              if autologin then autologin:setChecked(false) end
+              email=nil
+              password=nil
+              mark('LOGIN_START=true')
+              EnterGame.doLogin()
+            end, 1500)
+
+            scheduleEvent(function()
+              if not completed and not g_game.isOnline() then
+                mark('PROBE_TIMEOUT=true')
+                g_app.exit()
+              end
+            end, 90000)
           end
           LUA
           chmod 644 "$PROBE_ROOT/runtime/init.lua"
@@ -197,6 +303,7 @@ jobs:
             "$OTCLIENT_IMAGE" sleep infinity >/dev/null
           docker exec otclient-global-hosted bash -lc 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y --no-install-recommends proxychains4 xvfb x11-utils procps iproute2 >/dev/null'
           docker exec otclient-global-hosted bash -lc '! command -v tesseract >/dev/null 2>&1'
+          echo OCR_BINARY_ABSENT=true
           : >"$PROBE_ROOT/runtime/otclient.stdout.log"
           docker exec otclient-global-hosted bash -lc 'nohup Xvfb :100 -screen 0 1280x800x24 -nolisten tcp >/probe/runtime/xvfb.log 2>&1 </dev/null &'
           for _ in $(seq 1 30); do docker exec otclient-global-hosted xdpyinfo -display :100 >/dev/null 2>&1 && break; sleep 1; done
@@ -222,8 +329,9 @@ jobs:
             exit 0
           fi
           echo OTCLIENT_TIBIA_GLOBAL_LOGIN_PROVEN=false
-          if grep -q '\[GLOBAL_PROBE\] HTTP_LOGIN_SUCCESS=true' "$PROBE_ROOT/runtime/otclient.stdout.log"; then echo FAILURE_STAGE=after_http_login_before_game_start
-          elif grep -q '\[GLOBAL_PROBE\] HTTP_LOGIN_FAILED=true' "$PROBE_ROOT/runtime/otclient.stdout.log"; then echo FAILURE_STAGE=http_login_rejected
-          elif grep -q '\[GLOBAL_PROBE\] LOGIN_START=true' "$PROBE_ROOT/runtime/otclient.stdout.log"; then echo FAILURE_STAGE=http_login_no_success_callback
+          if grep -q '\[GLOBAL_PROBE\] HTTP_LOGIN_RESPONSE_VALID=true' "$PROBE_ROOT/runtime/otclient.stdout.log"; then echo FAILURE_STAGE=after_http_login_before_game_start
+          elif grep -q '\[GLOBAL_PROBE\] HTTP_LOGIN_REJECTED=true' "$PROBE_ROOT/runtime/otclient.stdout.log"; then echo FAILURE_STAGE=http_login_rejected
+          elif grep -q '\[GLOBAL_PROBE\] HTTP_LOGIN_TRANSPORT_ERROR=true' "$PROBE_ROOT/runtime/otclient.stdout.log"; then echo FAILURE_STAGE=http_login_transport
+          elif grep -q '\[GLOBAL_PROBE\] LOGIN_START=true' "$PROBE_ROOT/runtime/otclient.stdout.log"; then echo FAILURE_STAGE=http_login_no_valid_response
           else echo FAILURE_STAGE=before_login_start; fi
           exit 1

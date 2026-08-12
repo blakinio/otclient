@@ -83,6 +83,6 @@ Do not add `-v` unless the state and work volumes are intentionally being delete
 
 ## Security boundary
 
-The stack does not mount `/var/run/docker.sock`, does not run privileged, drops Linux capabilities and enables `no-new-privileges`. If a future workflow genuinely requires Docker builds, add that capability as a separate reviewed change rather than broadening these runners by default.
+The stack does not mount `/var/run/docker.sock` and does not run privileged. It drops the default Linux capability set, adds back only `CHOWN`, `SETUID` and `SETGID` so the root bootstrap can initialize named-volume ownership and then immediately drops to the unprivileged `runner` user, and enables `no-new-privileges`. If a future workflow genuinely requires Docker builds, add that capability as a separate reviewed change rather than broadening these runners by default.
 
 The state volumes contain GitHub runner registration state and the work volumes can contain repository material and job leftovers. Treat both as private NAS data.

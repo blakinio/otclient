@@ -81,8 +81,9 @@ jobs:
           base=os.environ['ASSET_BASE'].rstrip('/')
           out=pathlib.Path(os.environ['PROBE_ROOT'])/'things/1532'
           out.mkdir(parents=True,exist_ok=True)
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
           def get(url,path):
-              subprocess.run(['curl','--socks5-hostname','127.0.0.1:25344','-fsSL','--retry','3','--retry-all-errors','--connect-timeout','15','--max-time','180',url,'-o',str(path)],check=True)
+              subprocess.run(['curl','--socks5-hostname','127.0.0.1:25344','--compressed','-fL','--retry','3','--retry-all-errors','--connect-timeout','15','--max-time','180','-A',ua,'-e',url,'-H','Accept: */*','-H','Accept-Language: en-US,en;q=0.9','-H','Cache-Control: no-cache',url,'-o',str(path)],check=True)
           mp=pathlib.Path('/tmp/otclient-assets.json'); get(base+'/assets.json',mp); doc=json.loads(mp.read_text())
           rows=[]
           def walk(v):

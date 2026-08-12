@@ -28,8 +28,9 @@ jobs:
           nohup "$r/bin/wireproxy" -c w.conf >/tmp/wp.log 2>&1 </dev/null &
           for _ in $(seq 1 30); do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/t 2>/dev/null && break; sleep 2; done
           grep -Eq '^warp=(on|plus)$' /tmp/t
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
           u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
-          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' -e "$u" -H 'Accept: */*' "$u" -o /tmp/c/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A "$ua" -e "$u" -H 'Accept: */*' "$u" -o /tmp/c/client.lzma
           echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  /tmp/c/client.lzma' | sha256sum -c -
           python3 - <<'PY'
           import hashlib,lzma,pathlib
@@ -38,22 +39,27 @@ jobs:
           assert hashlib.sha256(o).hexdigest()=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'; pathlib.Path('/tmp/c/client').write_bytes(o)
           PY
           echo OFFICIAL_CLIENT_SHA256_VERIFIED=true
+          for spec in \
+            'https://static.tibia.com/launcher/tibiaclient-linux-current/package.json /tmp/c/package.json' \
+            'https://static.tibia.com/launcher/assets-current/assets.json /tmp/c/assets.json'; do
+            set -- $spec; curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A "$ua" -e "$1" -H 'Accept: */*' "$1" -o "$2"
+          done
 
-      - name: Emit bounded request-key inventory
+      - name: Emit bounded request and metadata inventory
         shell: bash
         run: |
           set -Eeuo pipefail
           strings -a -t x -n 4 /tmp/c/client >/tmp/client.strings
           echo LOGIN_REQUEST_TERMS_BEGIN
-          grep -Ei 'loginservice|staylogged|client.?version|client.?build|version.?string|build.?version|authenticator|account.?password|account.?name|session.?key|user.?agent|content.?type|client.?identifier|client.?id|machine.?id|device.?id|product.?version|release.?version|protocol.?version' /tmp/client.strings | head -n 600 || true
+          grep -Ei 'loginservice|staylogged|client.?version|client.?build|version.?string|build.?version|authenticator|account.?password|account.?name|session.?key|client.?type|operating.?system|asset.?version|client.?identifier|client.?id|product.?version|release.?version|protocol.?version' /tmp/client.strings | head -n 600 || true
           echo LOGIN_REQUEST_TERMS_END
           python3 - <<'PY'
-          import re
+          import json,re,pathlib
           rows=[]
           for line in open('/tmp/client.strings',errors='replace'):
               m=re.match(r'^\s*([0-9a-fA-F]+)\s+(.*)$',line.rstrip('\n'))
               if m: rows.append((int(m.group(1),16),m.group(2)))
-          for label,needle,radius in [('LOGIN_SERVICE','loginservice',4096),('CLIENTVERSION','clientversion',4096),('STAYLOGGEDIN','stayloggedin',4096)]:
+          for label,needle,radius in [('CLIENTVERSION','clientversion',4096),('CLIENTTYPE','clienttype',2048),('OPERATINGSYSTEM','operatingsystem',2048),('ASSETVERSION','assetversion',2048)]:
               print('NEAR_'+label+'_BEGIN')
               anchors=[o for o,s in rows if needle in s.lower()]
               seen=set()
@@ -62,4 +68,20 @@ jobs:
                       if abs(o-a)<=radius and (o,s) not in seen:
                           seen.add((o,s)); print(f'{o:x} {s}')
               print('NEAR_'+label+'_END')
+          def walk(v,path=''):
+              if isinstance(v,dict):
+                  for k,x in v.items():
+                      p=f'{path}.{k}' if path else str(k)
+                      if isinstance(x,(str,int,float,bool)) and re.search(r'(version|client|asset|platform|operating|system|build|release|type)',str(k),re.I):
+                          s=str(x)
+                          if len(s)<=160: print('META '+p+'='+s)
+                      else: walk(x,p)
+              elif isinstance(v,list):
+                  for i,x in enumerate(v[:50]): walk(x,f'{path}[{i}]')
+          for fn in ('package.json','assets.json'):
+              print('METADATA_'+fn.upper().replace('.','_')+'_BEGIN')
+              doc=json.loads((pathlib.Path('/tmp/c')/fn).read_text())
+              if isinstance(doc,dict): print('TOP_LEVEL_KEYS='+','.join(sorted(map(str,doc.keys()))))
+              walk(doc)
+              print('METADATA_'+fn.upper().replace('.','_')+'_END')
           PY

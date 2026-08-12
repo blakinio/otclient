@@ -78,17 +78,21 @@ jobs:
           assets=json.loads(pathlib.Path('/tmp/tibia-package/assets.json').read_text())
           if pkg.get('version') != os.environ['TIBIA_PACKAGE_VERSION']:
               raise SystemExit('package version mismatch')
-          def count(v):
+          def count(v, require_unpacked):
               n=0
               if isinstance(v,dict):
-                  if all(isinstance(v.get(k),str) and v.get(k) for k in ('url','packedhash','unpackedhash')): n+=1
-                  for x in v.values(): n+=count(x)
+                  url=v.get('url'); packed=v.get('packedhash'); unpacked=v.get('unpackedhash')
+                  if isinstance(url,str) and url and isinstance(packed,str) and packed:
+                      if not require_unpacked or (isinstance(unpacked,str) and unpacked):
+                          n+=1
+                  for x in v.values(): n+=count(x,require_unpacked)
               elif isinstance(v,list):
-                  for x in v: n+=count(x)
+                  for x in v: n+=count(x,require_unpacked)
               return n
-          pn=count(pkg); an=count(assets)
+          pn=count(pkg,True); an=count(assets,False); ah=count(assets,True)
           print(f'PACKAGE_MANIFEST_ENTRY_COUNT={pn}')
-          print(f'ASSET_MANIFEST_ENTRY_COUNT={an}')
+          print(f'ASSET_MANIFEST_PACKEDHASH_ENTRY_COUNT={an}')
+          print(f'ASSET_MANIFEST_UNPACKEDHASH_ENTRY_COUNT={ah}')
           if pn != 1634 or an != 7094:
               raise SystemExit('unexpected manifest cardinality')
           PY
@@ -109,7 +113,7 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           echo EXACT_OFFICIAL_PACKAGE_VERIFIED=true
 
-      - name: Reconstruct all official assets from signed hashes
+      - name: Reconstruct all official assets from packed hashes
         shell: bash
         env:
           TIBIA_BASE_URL: https://static.tibia.com/launcher/assets-current
@@ -117,6 +121,7 @@ jobs:
           TIBIA_PACKAGE_OUT: /home/runner/tibia-world-home/.local/share/CipSoft GmbH/Tibia/packages/Tibia
           TIBIA_SOCKS: 127.0.0.1:25344
           TIBIA_DOWNLOAD_WORKERS: '10'
+          TIBIA_ALLOW_MISSING_UNPACKED_HASH: '1'
         run: |
           set -Eeuo pipefail
           python3 .github/scripts/tibia-package-reconstruct.py

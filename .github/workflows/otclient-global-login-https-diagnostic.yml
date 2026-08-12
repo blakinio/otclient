@@ -73,7 +73,7 @@ jobs:
           import json, os, pathlib, subprocess
           email=os.environ['TIBIA_TEST_EMAIL']; password=os.environ['TIBIA_TEST_PASSWORD']; url=os.environ['LOGIN_URL']
           payload=json.dumps({'email':email,'password':password,'stayloggedin':True,'type':'login'}, separators=(',',':'))
-          body=pathlib.Path('/tmp/login-body.json'); meta=pathlib.Path('/tmp/login-meta.txt')
+          body=pathlib.Path('/tmp/login-body.json')
           cp=subprocess.run([
               'curl','--socks5-hostname','127.0.0.1:25344','--compressed','-sS','--connect-timeout','15','--max-time','60',
               '-A','Mozilla/5.0','-H','Content-Type: application/json','-H','Accept: */*',
@@ -96,7 +96,12 @@ jobs:
           print('JSON_RESPONSE=true')
           print('TOP_LEVEL_KEYS='+','.join(sorted(str(k) for k in doc.keys())))
           if 'errorCode' in doc: print('ERROR_CODE='+str(doc.get('errorCode')))
-          print('HAS_ERROR_MESSAGE='+str(bool(doc.get('errorMessage'))).lower())
+          msg=str(doc.get('errorMessage') or '')
+          if email: msg=msg.replace(email,'***')
+          if password: msg=msg.replace(password,'***')
+          msg=' '.join(msg.split())[:300]
+          print('ERROR_MESSAGE_SANITIZED='+msg)
+          print('HAS_ERROR_MESSAGE='+str(bool(msg)).lower())
           print('HAS_SESSION='+str('session' in doc).lower())
           play=doc.get('playdata') if isinstance(doc.get('playdata'),dict) else {}
           print('HAS_PLAYDATA='+str(bool(play)).lower())

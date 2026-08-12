@@ -72,7 +72,10 @@ jobs:
           python3 - <<'PY'
           import json, os, pathlib, subprocess
           email=os.environ['TIBIA_TEST_EMAIL']; password=os.environ['TIBIA_TEST_PASSWORD']; url=os.environ['LOGIN_URL']
-          payload=json.dumps({'email':email,'password':password,'stayloggedin':True,'type':'login','clientversion':'15.32'}, separators=(',',':'))
+          sha_url='https://static.tibia.com/launcher/assets-current/assets.json.sha256'
+          av=subprocess.run(['curl','--socks5-hostname','127.0.0.1:25344','--compressed','-fsSL','--connect-timeout','15','--max-time','60','-A','Mozilla/5.0',sha_url],text=True,capture_output=True,check=True).stdout.strip().split()[0]
+          print('ASSET_VERSION_LENGTH='+str(len(av)))
+          payload=json.dumps({'email':email,'password':password,'stayloggedin':True,'type':'login','clientversion':'15.32.df7b29','clienttype':2,'assetversion':av}, separators=(',',':'))
           body=pathlib.Path('/tmp/login-body.json')
           cp=subprocess.run([
               'curl','--socks5-hostname','127.0.0.1:25344','--compressed','-sS','--connect-timeout','15','--max-time','60',
@@ -81,32 +84,23 @@ jobs:
           ], text=True, capture_output=True)
           print('CURL_EXIT_CODE='+str(cp.returncode))
           if cp.returncode != 0:
-              print('TRANSPORT_FAILURE=true')
-              raise SystemExit(1)
+              print('TRANSPORT_FAILURE=true'); raise SystemExit(1)
           lines=cp.stdout.splitlines(); status=lines[0] if lines else ''; ctype=lines[1] if len(lines)>1 else ''
-          print('HTTPS_STATUS='+status)
-          print('CONTENT_TYPE='+ctype.split(';',1)[0])
+          print('HTTPS_STATUS='+status); print('CONTENT_TYPE='+ctype.split(';',1)[0])
           raw=body.read_text(errors='replace')
-          try:
-              doc=json.loads(raw)
+          try: doc=json.loads(raw)
           except Exception:
-              print('JSON_RESPONSE=false')
-              print('BODY_BYTES='+str(len(raw.encode())))
-              raise SystemExit(1)
-          print('JSON_RESPONSE=true')
-          print('TOP_LEVEL_KEYS='+','.join(sorted(str(k) for k in doc.keys())))
+              print('JSON_RESPONSE=false'); print('BODY_BYTES='+str(len(raw.encode()))); raise SystemExit(1)
+          print('JSON_RESPONSE=true'); print('TOP_LEVEL_KEYS='+','.join(sorted(str(k) for k in doc.keys())))
           if 'errorCode' in doc: print('ERROR_CODE='+str(doc.get('errorCode')))
           msg=str(doc.get('errorMessage') or '')
           if email: msg=msg.replace(email,'***')
           if password: msg=msg.replace(password,'***')
           msg=' '.join(msg.split())[:300]
           print('ERROR_MESSAGE_SANITIZED='+msg)
-          print('HAS_ERROR_MESSAGE='+str(bool(msg)).lower())
-          print('HAS_SESSION='+str('session' in doc).lower())
+          print('HAS_ERROR_MESSAGE='+str(bool(msg)).lower()); print('HAS_SESSION='+str('session' in doc).lower())
           play=doc.get('playdata') if isinstance(doc.get('playdata'),dict) else {}
-          print('HAS_PLAYDATA='+str(bool(play)).lower())
-          print('HAS_CHARACTERS='+str('characters' in play).lower())
-          print('HAS_WORLDS='+str('worlds' in play).lower())
+          print('HAS_PLAYDATA='+str(bool(play)).lower()); print('HAS_CHARACTERS='+str('characters' in play).lower()); print('HAS_WORLDS='+str('worlds' in play).lower())
           if status != '200': raise SystemExit(1)
           if doc.get('errorCode') not in (None,0): raise SystemExit(2)
           if 'session' not in doc or 'playdata' not in doc: raise SystemExit(3)

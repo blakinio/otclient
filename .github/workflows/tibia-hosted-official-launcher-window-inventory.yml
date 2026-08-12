@@ -1,0 +1,98 @@
+name: Tibia hosted official launcher window inventory
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-official-launcher-window-inventory.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-launcher-inventory-home
+    steps:
+      - name: Install no-OCR graphical runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl dbus-x11 mesa-utils proxychains4 x11-utils xdotool xvfb \
+            libasound2t64 libatk1.0-0 libatspi2.0-0 libcups2 libdbus-1-3 libdrm2 libegl1 libfontconfig1 libfreetype6 libgbm1 \
+            libgl1 libglx0 libgtk-3-0 libnspr4 libnss3 libopengl0 libpulse0 libvulkan1 libx11-6 libx11-xcb1 libxcb-cursor0 \
+            libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 \
+            libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxcomposite1 libxdamage1 libxi6 \
+            libxkbcommon-x11-0 libxrandr2 libxrender1 libxtst6 mesa-vulkan-drivers vulkan-tools
+          ! command -v tesseract >/dev/null 2>&1
+          echo OCR_BINARY_ABSENT=true
+
+      - name: Establish WARP and fetch official launcher
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r=/tmp/w; mkdir -p "$r/bin" "$r/state" /tmp/bootstrap "$HOME"; cd "$r/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c -
+          mkdir x; tar -xzf wp.tgz -C x; cp "$(find x -type f -name wireproxy -print -quit)" wireproxy; chmod 755 wgcf wireproxy
+          cd "$r/state"; "$r/bin/wgcf" register --accept-tos >/dev/null; "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" >w.conf
+          nohup "$r/bin/wireproxy" -c w.conf >/tmp/wp.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/t 2>/dev/null && break; sleep 2; done
+          grep -Eq '^warp=(on|plus)$' /tmp/t
+          cat >/tmp/proxychains.conf <<'EOF'
+          strict_chain
+          proxy_dns
+          quiet_mode
+          localnet 127.0.0.0/255.0.0.0
+          localnet ::1/128
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 25344
+          EOF
+          cd /tmp/bootstrap
+          u=https://static.tibia.com/download/tibia.x64.tar.gz
+          proxychains4 -f /tmp/proxychains.conf curl --compressed -fL --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o tibia.tgz
+          tar xfz tibia.tgz
+          test -x Tibia/Tibia
+
+      - name: Launch and inventory X11 windows and process names
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          export LIBGL_ALWAYS_SOFTWARE=1 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" XDG_CACHE_HOME="$HOME/.cache"
+          mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/xvfb.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do xdpyinfo -display :99 >/dev/null 2>&1 && break; sleep 1; done
+          glxinfo -B | grep -q 'OpenGL renderer string: llvmpipe'
+          cd /tmp/bootstrap/Tibia
+          nohup dbus-run-session -- proxychains4 -f /tmp/proxychains.conf ./Tibia >/tmp/launcher.log 2>&1 </dev/null &
+          wrapper=$!
+          sleep 20
+          echo PROCESS_INVENTORY_BEGIN
+          ps -eo pid=,ppid=,comm= | awk '$3 ~ /Tibia|tibia|QtWebEngine|chrome|zygote|sandbox|Battle|battle|BE/ {print}' | head -n 100
+          echo PROCESS_INVENTORY_END
+          echo WINDOW_INVENTORY_BEGIN
+          xwininfo -root -tree 2>/dev/null | sed -E 's/0x[0-9a-f]+/0xID/g' | head -n 250
+          echo WINDOW_INVENTORY_END
+          echo XDOTOL_WINDOW_BEGIN
+          for w in $(xdotool search --onlyvisible --name '.*' 2>/dev/null || true); do
+            name=$(xdotool getwindowname "$w" 2>/dev/null || true)
+            geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
+            width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
+            height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+            [[ -n "$width" && -n "$height" ]] || continue
+            safe=$(printf '%s' "$name" | tr -cd 'A-Za-z0-9 _.,:+()[]{}_-')
+            printf 'WINDOW title=%s size=%sx%s\n' "$safe" "$width" "$height"
+          done | sort -u | head -n 120
+          echo XDOTOL_WINDOW_END
+          echo LAUNCHER_SAFE_LOG_BEGIN
+          grep -Ei 'fatal|error|failed|vulkan|glx|egl|xcb|display|qt|sandbox|update|package|launcher' /tmp/launcher.log | tail -n 100 || true
+          echo LAUNCHER_SAFE_LOG_END

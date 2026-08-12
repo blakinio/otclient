@@ -1,0 +1,139 @@
+name: Tibia hosted semantic AT-SPI no-OCR world entry v9
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260727-tibia-linux-runner-analysis
+    paths:
+      - .github/workflows/tibia-hosted-atspi-no-ocr-world-v9.yml
+      - .github/scripts/tibia-atspi-controller.py
+      - .github/scripts/tibia-hosted-atspi-launch.sh
+      - .github/scripts/tibia-hosted-semantic-world-proof.sh
+      - .github/scripts/tibia-hosted-no-ocr-runtime.sh
+      - .github/scripts/tibia-package-reconstruct.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  world-entry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-world-home
+      TIBIA_PACKAGE_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      TIBIA_BASE_URL: https://static.tibia.com/launcher/tibiaclient-linux-current
+      TIBIA_ASSET_BASE_URL: https://static.tibia.com/launcher/assets-current
+
+    steps:
+      - name: Check out operational helpers
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install runtime and semantic accessibility with OCR forbidden
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            at-spi2-core ca-certificates curl dbus-x11 gdb gir1.2-atspi-2.0 iproute2 procps proxychains4 \
+            python3-gi python3-pyatspi x11-utils xdotool xvfb \
+            libasound2t64 libatk1.0-0 libatspi2.0-0 libcups2 libdbus-1-3 libdrm2 libegl1 libfontconfig1 \
+            libfreetype6 libgbm1 libgl1 libglx0 libgtk-3-0 libnspr4 libnss3 libopengl0 libpulse0 libvulkan1 \
+            libx11-6 libx11-xcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 libxcb-shm0 libxcb-sync1 \
+            libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxcomposite1 libxdamage1 libxi6 \
+            libxkbcommon-x11-0 libxrandr2 libxrender1 libxtst6 mesa-vulkan-drivers vulkan-tools
+          command -v tesseract >/dev/null 2>&1 && { echo FORBIDDEN_OCR_BINARY_PRESENT=true; exit 1; } || true
+          /usr/bin/python3 -c 'import pyatspi; print("PYATSPI_IMPORT_VERIFIED=true")'
+          chmod +x .github/scripts/tibia-hosted-no-ocr-runtime.sh .github/scripts/tibia-package-reconstruct.py \
+            .github/scripts/tibia-hosted-atspi-launch.sh .github/scripts/tibia-hosted-semantic-world-proof.sh \
+            .github/scripts/tibia-atspi-controller.py
+          echo OCR_BINARY_ABSENT=true
+
+      - name: Establish verified changed WARP egress
+        shell: bash
+        run: .github/scripts/tibia-hosted-no-ocr-runtime.sh warp
+
+      - name: Fetch exact package and asset manifests through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p /tmp/tibia-package
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+          fetch() {
+            local url="$1" out="$2"
+            curl --socks5-hostname 127.0.0.1:25344 --http1.1 --compressed -fL \
+              --retry 5 --retry-all-errors --retry-delay 1 --connect-timeout 20 --max-time 300 \
+              -A "$ua" -e "$url" -H 'Accept: */*' "$url" -o "$out"
+          }
+          fetch "$TIBIA_BASE_URL/package.json" /tmp/tibia-package/package.json
+          fetch "$TIBIA_ASSET_BASE_URL/assets.json" /tmp/tibia-package/assets.json
+          /usr/bin/python3 - <<'PY'
+          import json,os,pathlib
+          pkg=json.loads(pathlib.Path('/tmp/tibia-package/package.json').read_text()); assets=json.loads(pathlib.Path('/tmp/tibia-package/assets.json').read_text())
+          if pkg.get('version') != os.environ['TIBIA_PACKAGE_VERSION']: raise SystemExit('version mismatch')
+          def count(v, require_unpacked):
+              n=0
+              if isinstance(v,dict):
+                  if isinstance(v.get('url'),str) and v.get('url') and isinstance(v.get('packedhash'),str) and v.get('packedhash'):
+                      if not require_unpacked or (isinstance(v.get('unpackedhash'),str) and v.get('unpackedhash')): n+=1
+                  for x in v.values(): n+=count(x,require_unpacked)
+              elif isinstance(v,list):
+                  for x in v: n+=count(x,require_unpacked)
+              return n
+          pn=count(pkg,True); an=count(assets,False)
+          print(f'PACKAGE_MANIFEST_ENTRY_COUNT={pn}'); print(f'ASSET_MANIFEST_PACKEDHASH_ENTRY_COUNT={an}')
+          if pn != 1634 or an != 7094: raise SystemExit('manifest cardinality changed')
+          PY
+
+      - name: Reconstruct exact official package
+        shell: bash
+        env:
+          TIBIA_MANIFEST: /tmp/tibia-package/package.json
+          TIBIA_PACKAGE_OUT: /home/runner/tibia-world-home/.local/share/CipSoft GmbH/Tibia/packages/Tibia
+          TIBIA_SOCKS: 127.0.0.1:25344
+          TIBIA_DOWNLOAD_WORKERS: '6'
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$TIBIA_PACKAGE_OUT"
+          /usr/bin/python3 .github/scripts/tibia-package-reconstruct.py
+          c="$TIBIA_PACKAGE_OUT/bin/client"
+          [[ "$(stat -c %s "$c")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$c" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo EXACT_OFFICIAL_PACKAGE_VERIFIED=true
+
+      - name: Preserve all official runtime asset cache objects
+        shell: bash
+        env:
+          TIBIA_BASE_URL: https://static.tibia.com/launcher/assets-current
+          TIBIA_MANIFEST: /tmp/tibia-package/assets.json
+          TIBIA_PACKAGE_OUT: /home/runner/tibia-world-home/.local/share/CipSoft GmbH/Tibia/packages/Tibia
+          TIBIA_SOCKS: 127.0.0.1:25344
+          TIBIA_DOWNLOAD_WORKERS: '10'
+          TIBIA_ALLOW_MISSING_UNPACKED_HASH: '1'
+        run: |
+          set -Eeuo pipefail
+          /usr/bin/python3 .github/scripts/tibia-package-reconstruct.py
+          root="$TIBIA_PACKAGE_OUT"
+          [[ -s "$root/assets/catalog-content.json" && -s "$root/sounds/catalog-sound.json" ]]
+          sub=$(find "$root/assets" -maxdepth 1 -type f -name 'subarea-*.bmp.lzma' | wc -l)
+          echo "PACKED_SUBAREA_FILE_COUNT=$sub"
+          (( sub > 0 ))
+          echo PACKED_ASSET_RUNTIME_LAYOUT_VERIFIED=true
+
+      - name: Launch exact client with AT-SPI semantics and no debugger
+        shell: bash
+        run: .github/scripts/tibia-hosted-atspi-launch.sh
+
+      - name: Semantic login character activation and decoded map proof
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: .github/scripts/tibia-hosted-semantic-world-proof.sh

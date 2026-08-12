@@ -1,12 +1,9 @@
-name: Tibia Linux package analysis
+name: Tibia Linux no-OCR login proof
 
 on:
   push:
     branches:
       - ci/OTC-20260727-tibia-linux-runner-analysis
-  pull_request:
-    branches:
-      - main
     paths:
       - .github/workflows/tibia-linux-runner-analysis.yml
       - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
@@ -19,208 +16,416 @@ concurrency:
   group: tibia-linux-runner-analysis
   cancel-in-progress: true
 
+env:
+  CONTAINER_NAME: otclient-tibia-login-analysis
+  STATE_ROOT: /var/lib/oteryn-staging-state/tibia-linux-analysis
+  EXPECTED_CLIENT_SIZE: '51965216'
+  EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+
 jobs:
-  install-and-analyze:
-    name: Install and analyze on Synology
+  login-no-ocr:
+    name: Attempt official Tibia login without OCR
     runs-on: [self-hosted, oteryn-staging]
-    timeout-minutes: 45
+    timeout-minutes: 25
 
     steps:
-      - name: Verify isolated runner prerequisites
+      - name: Verify runner and snapshot canonical staging
         shell: bash
         run: |
-          set -euo pipefail
-          docker version
-          docker info --format 'Docker={{.ServerVersion}} Architecture={{.Architecture}} OS={{.OperatingSystem}}'
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == "oteryn-synology-staging" ]]
+          docker version >/dev/null
+          docker ps -a --filter 'label=com.docker.compose.project=oteryn-staging' --format '{{.ID}}\t{{.Names}}' | sort >/tmp/oteryn-before.tsv
+          test -s /tmp/oteryn-before.tsv
+          echo EXACT_RUNNER_VERIFIED=true
 
-      - name: Download, install and statically analyze Linux client
+      - name: Fail closed unless test secrets are available
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          if [[ -z "$TIBIA_TEST_EMAIL" || -z "$TIBIA_TEST_PASSWORD" ]]; then
+            echo TIBIA_TEST_SECRETS_AVAILABLE=false
+            exit 1
+          fi
+          echo TIBIA_TEST_SECRETS_AVAILABLE=true
+
+      - name: Create or verify only the task-owned analysis container
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
+          if docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+            [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER_NAME")" == "otclient" ]]
+            [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.purpose" }}' "$CONTAINER_NAME")" == "tibia-login-no-ocr" ]]
+            [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME")" == "OTC-20260727-tibia-linux-runner-analysis" ]]
+            [[ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/analysis"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME")" == "$STATE_ROOT" ]]
+            if [[ "$(docker inspect --format '{{.State.Status}}' "$CONTAINER_NAME")" != "running" ]]; then
+              docker start "$CONTAINER_NAME" >/dev/null
+            fi
+          else
+            docker run --rm \
+              --mount type=bind,src=/var/lib/oteryn-staging-state,dst=/host \
+              ubuntu:24.04 \
+              bash -lc 'mkdir -p /host/tibia-linux-analysis'
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              --network bridge \
+              --label com.blakinio.owner=otclient \
+              --label com.blakinio.purpose=tibia-login-no-ocr \
+              --label com.blakinio.task=OTC-20260727-tibia-linux-runner-analysis \
+              --mount "type=bind,src=$STATE_ROOT,dst=/analysis" \
+              ubuntu:24.04 \
+              sleep infinity >/dev/null
+          fi
+          [[ "$(docker inspect --format '{{.State.Status}}' "$CONTAINER_NAME")" == "running" ]]
+          echo OWNED_CONTAINER_VERIFIED=true
 
-          readonly state_root='/var/lib/oteryn-staging-state/tibia-linux-analysis'
+      - name: Install bounded runtime dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker exec -i "$CONTAINER_NAME" bash <<'INNER'
+          set -Eeuo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            bash ca-certificates coreutils curl dbus-x11 file findutils gawk grep iproute2 \
+            libdbus-1-3 libegl1 libfontconfig1 libfreetype6 libgl1 libglx0 libopengl0 \
+            libx11-6 libx11-xcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 \
+            libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 \
+            libxi6 libxkbcommon-x11-0 libxrender1 libxtst6 procps proxychains4 sed tar xdotool xvfb
+          command -v xdotool >/dev/null
+          command -v proxychains4 >/dev/null
+          if command -v tesseract >/dev/null 2>&1; then
+            echo FORBIDDEN_OCR_BINARY_PRESENT=true >&2
+            exit 1
+          fi
+          echo OCR_BINARY_ABSENT=true
+          INNER
 
-          docker run --rm \
-            --name tibia-linux-runner-analysis \
-            --network bridge \
-            --mount "type=bind,src=${state_root},dst=/analysis" \
-            ubuntu:24.04 \
-            bash -lc '
-              set -euo pipefail
-              export DEBIAN_FRONTEND=noninteractive
+      - name: Materialize and verify the exact researched official client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker exec -i "$CONTAINER_NAME" bash <<'INNER'
+          set -Eeuo pipefail
+          export HOME=/analysis/current/home
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export DISPLAY=:99
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export QT_XCB_GL_INTEGRATION=none
+          mkdir -p /analysis/current/download /analysis/current/home /analysis/current/runtime
+          chmod 700 /analysis/current/runtime
 
-              apt-get update
-              apt-get install -y --no-install-recommends \
-                bash \
-                binutils \
-                ca-certificates \
-                coreutils \
-                curl \
-                dbus-x11 \
-                file \
-                findutils \
-                fonts-dejavu-core \
-                grep \
-                libdbus-1-3 \
-                libegl1 \
-                libfontconfig1 \
-                libfreetype6 \
-                libgl1 \
-                libglx0 \
-                libopengl0 \
-                libx11-6 \
-                libx11-xcb1 \
-                libxcb-cursor0 \
-                libxcb-glx0 \
-                libxcb-icccm4 \
-                libxcb-image0 \
-                libxcb-keysyms1 \
-                libxcb-randr0 \
-                libxcb-render-util0 \
-                libxcb-render0 \
-                libxcb-shape0 \
-                libxcb-shm0 \
-                libxcb-sync1 \
-                libxcb-util1 \
-                libxcb-xfixes0 \
-                libxcb-xinerama0 \
-                libxcb-xkb1 \
-                libxi6 \
-                libxkbcommon-x11-0 \
-                libxrender1 \
-                libxtst6 \
-                procps \
-                sed \
-                tar \
-                util-linux \
-                xvfb
+          expected_sha='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          expected_size='51965216'
+          client=$(find "$HOME" -type f -path '*/packages/Tibia/bin/client' -perm -111 -print -quit 2>/dev/null || true)
+          have_expected=false
+          if [[ -n "$client" ]]; then
+            actual_sha=$(sha256sum "$client" | awk '{print $1}')
+            actual_size=$(stat -c %s "$client")
+            if [[ "$actual_sha" == "$expected_sha" && "$actual_size" == "$expected_size" ]]; then
+              have_expected=true
+            fi
+          fi
 
-              rm -rf /analysis/current
-              mkdir -p /analysis/current/download /analysis/current/home /analysis/current/report
+          if [[ "$have_expected" != true ]]; then
+            archive=/analysis/current/download/tibia.x64.tar.gz
+            rm -rf /analysis/current/download/Tibia
+            curl --fail --location --retry 5 --retry-delay 3 \
+              -A 'Mozilla/5.0 (X11; Linux x86_64)' \
+              -e 'https://www.tibia.com/' \
+              -o "$archive" https://static.tibia.com/download/tibia.x64.tar.gz
+            tar -xzf "$archive" -C /analysis/current/download
+            launcher=/analysis/current/download/Tibia/Tibia
+            [[ -x "$launcher" ]]
 
-              readonly archive=/analysis/current/download/tibia.x64.tar.gz
-              readonly source_url=https://static.tibia.com/download/tibia.x64.tar.gz
+            pkill -f '^Xvfb :99' 2>/dev/null || true
+            nohup Xvfb :99 -screen 0 1280x800x24 >/analysis/current/runtime/xvfb.log 2>&1 </dev/null &
+            sleep 2
+            nohup dbus-run-session -- "$launcher" >/analysis/current/runtime/launcher.log 2>&1 </dev/null &
+            launcher_pid=$!
+            sleep 10
 
-              curl --fail --location --retry 5 --retry-delay 3 \
-                --output "${archive}" \
-                "${source_url}"
-
-              sha256sum "${archive}" > /analysis/current/report/launcher-archive.sha256
-              tar -tzf "${archive}" > /analysis/current/report/launcher-archive-files.txt
-              tar -xzf "${archive}" -C /analysis/current/download
-
-              readonly launcher=/analysis/current/download/Tibia/Tibia
-              test -x "${launcher}"
-
-              {
-                printf "source_url=%s\n" "${source_url}"
-                printf "analysis_utc=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-                printf "container_arch=%s\n" "$(uname -m)"
-                file "${launcher}"
-                sha256sum "${launcher}"
-              } > /analysis/current/report/launcher-summary.txt
-
-              set +e
-              HOME=/analysis/current/home \
-              XDG_DATA_HOME=/analysis/current/home/.local/share \
-              XDG_CONFIG_HOME=/analysis/current/home/.config \
-              LIBGL_ALWAYS_SOFTWARE=1 \
-              QT_XCB_GL_INTEGRATION=none \
-              dbus-run-session -- \
-                xvfb-run -a -s "-screen 0 1280x800x24" \
-                "${launcher}" \
-                > /analysis/current/report/launcher-stdout.log \
-                2> /analysis/current/report/launcher-stderr.log &
-              launcher_pid=$!
-              set -e
-
-              client_path=""
-              for _ in $(seq 1 150); do
-                client_path="$(find /analysis/current/home -type f -path "*/packages/*/bin/client" -perm -111 -print -quit 2>/dev/null || true)"
-                if [ -n "${client_path}" ]; then
-                  break
-                fi
-                if ! kill -0 "${launcher_pid}" 2>/dev/null; then
-                  break
-                fi
-                sleep 10
-              done
-
-              if kill -0 "${launcher_pid}" 2>/dev/null; then
-                sleep 20
-                kill "${launcher_pid}" 2>/dev/null || true
-                sleep 3
-                kill -9 "${launcher_pid}" 2>/dev/null || true
+            for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
+              geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
+              width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
+              height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+              [[ -n "$width" && -n "$height" ]] || continue
+              if (( width < 1000 || height < 650 )); then
+                xdotool mousemove --window "$w" 400 193 click 1 || true
               fi
-              wait "${launcher_pid}" 2>/dev/null || true
+            done
 
-              find /analysis/current/home -type f -printf "%s\t%p\n" \
-                | sort -n \
-                > /analysis/current/report/installed-files.tsv
-
-              find /analysis/current/home -type f \
-                \( -name package.json -o -name assets.json -o -name tibiametadata.json \) \
-                -print \
-                > /analysis/current/report/metadata-files.txt
-
-              client_path="$(find /analysis/current/home -type f -path "*/packages/*/bin/client" -perm -111 -print -quit 2>/dev/null || true)"
-
-              {
-                printf "analysis_utc=%s\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-                printf "state_path=%s\n" "/var/lib/oteryn-staging-state/tibia-linux-analysis/current"
-                printf "launcher_archive_sha256=%s\n" "$(cut -d " " -f1 /analysis/current/report/launcher-archive.sha256)"
-
-                if [ -z "${client_path}" ]; then
-                  printf "game_client_found=no\n"
-                  printf "result=Launcher did not install a separate packages/*/bin/client during this run.\n"
-                else
-                  printf "game_client_found=yes\n"
-                  printf "game_client_path=%s\n" "${client_path}"
-                  printf "game_client_size=%s\n" "$(stat -c %s "${client_path}")"
-                  printf "game_client_sha256=%s\n" "$(sha256sum "${client_path}" | cut -d " " -f1)"
-                  printf "game_client_file="
-                  file -b "${client_path}"
-
-                  printf "\n[ELF header]\n"
-                  readelf -h "${client_path}" || true
-
-                  printf "\n[Dynamic dependencies]\n"
-                  readelf -d "${client_path}" | grep -E "NEEDED|RPATH|RUNPATH" || true
-
-                  printf "\n[Selected indicators]\n"
-                  strings -a -n 5 "${client_path}" \
-                    | grep -Ei "battleye|beclient|beservice|protected|unprotected|loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin|--battleye" \
-                    | sort -u \
-                    | head -n 1000 \
-                    || true
+            for _ in $(seq 1 90); do
+              client=$(find "$HOME" -type f -path '*/packages/Tibia/bin/client' -perm -111 -print -quit 2>/dev/null || true)
+              if [[ -n "$client" ]]; then
+                actual_sha=$(sha256sum "$client" | awk '{print $1}')
+                actual_size=$(stat -c %s "$client")
+                if [[ "$actual_sha" == "$expected_sha" && "$actual_size" == "$expected_size" ]]; then
+                  break
                 fi
-              } > /analysis/current/report/analysis-report.txt
+              fi
+              sleep 2
+            done
+            kill "$launcher_pid" 2>/dev/null || true
+          fi
 
-              chmod -R a+rX /analysis/current
-            '
+          client=$(find "$HOME" -type f -path '*/packages/Tibia/bin/client' -perm -111 -print -quit 2>/dev/null || true)
+          [[ -n "$client" ]]
+          actual_sha=$(sha256sum "$client" | awk '{print $1}')
+          actual_size=$(stat -c %s "$client")
+          echo "client_size=$actual_size"
+          echo "client_sha256=$actual_sha"
+          if [[ "$actual_sha" != "$expected_sha" || "$actual_size" != "$expected_size" ]]; then
+            echo CLIENT_IDENTITY_MISMATCH=true >&2
+            exit 1
+          fi
+          printf '%s' "$client" >/analysis/current/runtime/client-path
+          echo EXACT_CLIENT_IDENTITY_VERIFIED=true
+          INNER
 
-      - name: Print text-only analysis report
+      - name: Materialize pinned userspace WARP tooling
         shell: bash
         run: |
-          set -euo pipefail
-          readonly state_root='/var/lib/oteryn-staging-state/tibia-linux-analysis'
+          set -Eeuo pipefail
+          docker exec -i "$CONTAINER_NAME" bash <<'INNER'
+          set -Eeuo pipefail
+          root=/analysis/current/runtime/userspace-warp
+          mkdir -p "$root/bin" "$root/state"
+          chmod 700 "$root" "$root/state"
+          cd "$root/bin"
+          curl -fL --retry 3 --connect-timeout 10 \
+            -o wgcf \
+            https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          chmod 755 wgcf
+          curl -fL --retry 3 --connect-timeout 10 \
+            -o wireproxy.tar.gz \
+            https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tar.gz' | sha256sum -c -
+          rm -rf wireproxy-extract
+          mkdir wireproxy-extract
+          tar -xzf wireproxy.tar.gz -C wireproxy-extract
+          wp=$(find wireproxy-extract -type f -name wireproxy -print -quit)
+          [[ -n "$wp" ]]
+          cp "$wp" wireproxy
+          chmod 755 wireproxy
+          echo PINNED_WARP_TOOLING_VERIFIED=true
+          INNER
 
-          docker run --rm \
-            --mount "type=bind,src=${state_root},dst=/analysis,readonly" \
-            alpine:3.22 \
-            sh -lc '
-              echo "===== analysis-report.txt ====="
-              cat /analysis/current/report/analysis-report.txt
-              echo
-              echo "===== launcher-summary.txt ====="
-              cat /analysis/current/report/launcher-summary.txt
-              echo
-              echo "===== metadata-files.txt ====="
-              cat /analysis/current/report/metadata-files.txt || true
-              echo
-              echo "===== launcher stderr tail ====="
-              tail -n 200 /analysis/current/report/launcher-stderr.log || true
-              echo
-              echo "===== launcher stdout tail ====="
-              tail -n 200 /analysis/current/report/launcher-stdout.log || true
-            '
+      - name: Establish changed userspace WARP egress
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker exec -i "$CONTAINER_NAME" bash <<'INNER'
+          set -Eeuo pipefail
+          root=/analysis/current/runtime/userspace-warp
+          bin="$root/bin"
+          state="$root/state"
+          cd "$state"
+          if [[ ! -s wgcf-account.toml ]]; then
+            "$bin/wgcf" register --accept-tos >/dev/null
+          fi
+          chmod 600 wgcf-account.toml
+          "$bin/wgcf" generate >/dev/null
+          chmod 600 wgcf-profile.conf
+          cat >wireproxy.conf <<EOF
+          WGConfig = $state/wgcf-profile.conf
+
+          [Socks5]
+          BindAddress = 127.0.0.1:25344
+          EOF
+          chmod 600 wireproxy.conf
+          "$bin/wireproxy" -n -c "$state/wireproxy.conf"
+          pkill -f '/wireproxy .*wireproxy.conf' 2>/dev/null || true
+          nohup "$bin/wireproxy" -c "$state/wireproxy.conf" >"$root/wireproxy.log" 2>&1 </dev/null &
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/warp-trace 2>/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          [[ "$ready" == 1 ]]
+          baseline=$(curl -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
+          warp_ip=$(sed -n 's/^ip=//p' /tmp/warp-trace)
+          warp_state=$(sed -n 's/^warp=//p' /tmp/warp-trace)
+          [[ -n "$baseline" && -n "$warp_ip" && "$baseline" != "$warp_ip" ]]
+          [[ "$warp_state" == on || "$warp_state" == plus ]]
+          echo USERSPACE_WARP_EGRESS_VERIFIED=true
+          grep -E '^(loc|warp)=' /tmp/warp-trace
+          cat >/analysis/current/runtime/proxychains-tibia.conf <<'EOF'
+          strict_chain
+          proxy_dns
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 25344
+          EOF
+          proxy_ip=$(proxychains4 -f /analysis/current/runtime/proxychains-tibia.conf curl -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
+          [[ "$proxy_ip" == "$warp_ip" ]]
+          echo PROXYCHAINS_WARP_EGRESS_VERIFIED=true
+          INNER
+
+      - name: Launch exact client through WARP and prove TCP confinement
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker exec -i "$CONTAINER_NAME" bash <<'INNER'
+          set -Eeuo pipefail
+          export DISPLAY=:99 HOME=/analysis/current/home
+          client=$(cat /analysis/current/runtime/client-path)
+          pkg=$(dirname "$(dirname "$client")")
+          cfg=/analysis/current/runtime/proxychains-tibia.conf
+          [[ -x "$client" && -f "$cfg" ]]
+          pkill -f 'packages/Tibia/bin/client' 2>/dev/null || true
+          pgrep -f '^Xvfb :99' >/dev/null || nohup Xvfb :99 -screen 0 1280x800x24 >/analysis/current/runtime/xvfb.log 2>&1 </dev/null &
+          sleep 2
+          cd "$pkg"
+          : >/analysis/current/runtime/client-proxychains.log
+          nohup proxychains4 -f "$cfg" "$client" >/analysis/current/runtime/client-proxychains.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            pgrep -f 'packages/Tibia/bin/client' >/dev/null && break
+            sleep 1
+          done
+          pid=$(pgrep -f 'packages/Tibia/bin/client' | head -n1)
+          [[ -n "$pid" ]]
+          sleep 10
+          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+          if printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -q .; then
+            echo CLIENT_DIRECT_TCP_DETECTED=true >&2
+            exit 1
+          fi
+          printf '%s\n' "$sockets" | awk '{print $5}' | grep -Eq '^(127\.0\.0\.1|\[::1\]):25344$'
+          echo CLIENT_TCP_USERSPACE_WARP_CONFINEMENT_VERIFIED=true
+
+          best=''; best_area=0; best_width=0; best_height=0
+          for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
+            geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
+            width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
+            height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+            [[ -n "$width" && -n "$height" ]] || continue
+            area=$((width*height))
+            if (( area > best_area )); then
+              best=$w; best_area=$area; best_width=$width; best_height=$height
+            fi
+          done
+          [[ -n "$best" && "$best_width" == 1020 && "$best_height" == 650 ]]
+          xdotool mousemove --window "$best" 510 302 click 1
+          sleep 2
+          printf '%s' "$best" >/analysis/current/runtime/tibia-window-id
+          printf '%s' "$pid" >/analysis/current/runtime/tibia-pid
+          echo EXACT_LOGIN_WINDOW_GEOMETRY_VERIFIED=true
+          INNER
+
+      - name: Enter credentials and activate first character without OCR
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          docker exec -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD -i "$CONTAINER_NAME" bash <<'INNER'
+          set +x
+          set -Eeuo pipefail
+          export DISPLAY=:99 HOME=/analysis/current/home
+          best=$(cat /analysis/current/runtime/tibia-window-id)
+          pid=$(cat /analysis/current/runtime/tibia-pid)
+          [[ -n "$best" && -n "$pid" ]]
+          [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^WIDTH=//p')" == 1020 ]]
+          [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^HEIGHT=//p')" == 650 ]]
+          xdotool type --help 2>&1 | grep -q -- '--file'
+
+          xdotool mousemove --window "$best" 535 275 click 1
+          xdotool key --window "$best" ctrl+a
+          printf '%s' "$TIBIA_TEST_EMAIL" | xdotool type --window "$best" --delay 3 --file -
+          xdotool mousemove --window "$best" 535 304 click 1
+          xdotool key --window "$best" ctrl+a
+          printf '%s' "$TIBIA_TEST_PASSWORD" | xdotool type --window "$best" --delay 3 --file -
+          xdotool mousemove --window "$best" 590 388 click 1
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo CREDENTIALS_ENTERED_WITHOUT_OCR=true
+
+          sleep 25
+          before_lines=$(wc -l </analysis/current/runtime/client-proxychains.log)
+          printf '%s' "$before_lines" >/analysis/current/runtime/proxy-log-before-character
+
+          # Exact client hash and 1020x650 geometry were verified above. The first
+          # character row interior is activated by a bounded double-click; there is
+          # no screenshot, OCR, text recognition, or character-name extraction.
+          xdotool mousemove --window "$best" 400 214 click --repeat 2 --delay 180 1
+          echo FIRST_CHARACTER_ROW_DOUBLECLICKED=true
+          sleep 30
+
+          kill -0 "$pid"
+          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+          if printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -q .; then
+            echo CLIENT_DIRECT_TCP_DETECTED_AFTER_LOGIN=true >&2
+            exit 1
+          fi
+          echo CLIENT_DIRECT_TCP_DETECTED_AFTER_LOGIN=false
+          echo CLIENT_PROCESS_ALIVE_AFTER_CHARACTER_ACTIVATION=true
+          INNER
+
+      - name: Prove post-activation game-server transport without image text
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker exec -i "$CONTAINER_NAME" python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          log = Path('/analysis/current/runtime/client-proxychains.log')
+          before_path = Path('/analysis/current/runtime/proxy-log-before-character')
+          if not log.exists() or not before_path.exists():
+              raise SystemExit('missing bounded proxy evidence')
+          lines = log.read_text(errors='replace').splitlines()
+          before = int(before_path.read_text().strip() or '0')
+          post = lines[before:]
+          ok_lines = [line for line in post if re.search(r'\bOK\b', line, re.I)]
+          ports = set()
+          for line in ok_lines:
+              for m in re.finditer(r':([0-9]{1,5})(?=\D|$)', line):
+                  port = int(m.group(1))
+                  if 1 <= port <= 65535 and port not in {25344, 443}:
+                      ports.add(port)
+          print(f'POST_ACTIVATION_PROXY_LINE_COUNT={len(post)}')
+          print(f'POST_ACTIVATION_PROXY_OK_COUNT={len(ok_lines)}')
+          print('POST_ACTIVATION_NON_HTTPS_TARGET_PORTS=' + ','.join(map(str, sorted(ports))))
+          proven = bool(ports)
+          print(f'GAME_SERVER_PROXY_CONNECTION_PROVEN={str(proven).lower()}')
+          if not proven:
+              raise SystemExit('no successful post-activation non-HTTPS proxied target observed')
+          PY
+
+      - name: Leave successful session online and verify owned runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER_NAME")" == "otclient" ]]
+          [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.purpose" }}' "$CONTAINER_NAME")" == "tibia-login-no-ocr" ]]
+          [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME")" == "OTC-20260727-tibia-linux-runner-analysis" ]]
+          docker exec "$CONTAINER_NAME" pgrep -f 'packages/Tibia/bin/client' >/dev/null
+          echo TIBIA_SESSION_LEFT_RUNNING=true
+
+      - name: Verify canonical staging unchanged
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker ps -a --filter 'label=com.docker.compose.project=oteryn-staging' --format '{{.ID}}\t{{.Names}}' | sort >/tmp/oteryn-after.tsv
+          if [[ -f /tmp/oteryn-before.tsv ]]; then
+            diff -u /tmp/oteryn-before.tsv /tmp/oteryn-after.tsv
+          fi
+          if docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+            docker inspect --format 'analysis_name={{.Name}} status={{.State.Status}} owner={{ index .Config.Labels "com.blakinio.owner" }} purpose={{ index .Config.Labels "com.blakinio.purpose" }} task={{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME"
+          fi

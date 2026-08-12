@@ -19,7 +19,7 @@ Provide one durable pipeline that can turn separately authorized decoded officia
 ### PROVEN repository/runtime evidence
 
 - PR #48 is the live OTClient-owned official-client operational task and owns its runtime workflows/scripts.
-- PR #48 task evidence records official Linux client `15.32.df7b29` and the already decoded Worldmap boundary, including the common ordered map routine `0x19a8a80`.
+- PR #48 task evidence records official Linux client `15.32.df7b29` and the already decoded Worldmap boundary, including common ordered map routine `0x19a8a80`.
 - PR #277 preserves the earlier official-client runtime handover without adding proprietary material.
 - Current reconstruction tooling is isolated from those operational paths and consumes only neutralized evidence.
 
@@ -40,10 +40,11 @@ These unknowns are intentionally not filled from chat memory or numerical resemb
 Input records contain only:
 
 ```text
+exact client_version
 (x, y, z) -> ordered client content IDs + bounded provenance
 ```
 
-Repeated observations of the same coordinate are merged only when their ordered contents agree. Distinct observed variants make the tile `CONFLICT`.
+Each observation requires non-empty `source` and `capture_id` provenance. Repeated observations of the same coordinate are merged only when their ordered contents agree. Distinct observed variants make the tile `CONFLICT`.
 
 ### 2. Appearance classification
 
@@ -54,23 +55,26 @@ A separate versioned appearance catalog assigns proven roles to client IDs:
 - `dynamic`, `creature`, `npc` — observed dynamic presence, excluded from static OTBM output by default;
 - `unknown` — unresolved and export-blocking.
 
-The tool does not encode a proprietary flag-name/offset interpretation. An adapter may be added only after exact current-version evidence proves the mapping from official appearance metadata to these neutral roles.
+Every catalog entry requires an evidence reference. Contradictory semantic combinations are rejected. The tool does not encode a proprietary flag-name/offset interpretation. An adapter may be added only after exact current-version evidence proves the mapping from official appearance metadata to these neutral roles.
 
 ### 3. Client ID -> OTB ID mapping
 
 Mapping is a separate explicit evidence set:
 
 ```text
-client appearance ID -> OTB/server item ID
+client_version + target otb_version
+client appearance ID -> OTB/server item ID + evidence
 ```
 
-No identity mapping is assumed. A missing mapping produces `UNMAPPED_ID` and blocks OTBM planning.
+No identity mapping is assumed. A missing mapping produces `UNMAPPED_ID` and blocks OTBM planning. Observation, catalog and mapping client versions must match exactly.
 
 ### 4. Static tile normalization
 
 For each unambiguous observation the pipeline produces:
 
 ```text
+client_version
+otb_version
 position
 ground_client_id
 ground_otb_id
@@ -88,6 +92,7 @@ Exactly one proven ground candidate is required for a normal exportable tile.
 Every reference is normalized independently to:
 
 ```text
+source + otb_version
 (x,y,z) -> ground_otb_id + ordered static_otb_ids
 ```
 
@@ -97,9 +102,9 @@ Planned comparison sources:
 2. Renemap export;
 3. TibiaMaps-derived normalized reference where legally/technically available.
 
-No source wins by default. Differences remain source-specific evidence.
+No source wins by default. Differences remain source-specific evidence. Duplicate reference coordinates and OTB-version mismatches are rejected.
 
-Comparator statuses:
+Comparator statuses include:
 
 - `MATCH`;
 - `NOT_OBSERVED`;
@@ -108,15 +113,19 @@ Comparator statuses:
 - `CONTENT_MISMATCH`;
 - `STACK_ORDER_MISMATCH`;
 - `UNMAPPED_ID`;
+- `UNKNOWN_ROLE`;
+- `GROUND_UNRESOLVED`;
 - `CONFLICT`.
 
-This allows later reporting such as: observed official-client tile matches CrystalServer but differs from Renemap, or is absent from one reference.
+Unresolved tile status is propagated before equality checks, so an unknown element can no longer be hidden by an accidental apparent match.
 
 ### 6. OTBM-ready plan
 
-The current tool emits a neutral OTBM plan rather than binary OTBM bytes. Export is globally fail-closed when any included tile is unresolved. An exportable plan contains only:
+The current tool emits a neutral OTBM plan rather than binary OTBM bytes. Export is globally fail-closed when any included tile is unresolved or the snapshot is empty. An exportable plan contains only:
 
 ```text
+client_version
+otb_version
 position
 ground_otb_id
 ordered static_otb_ids
@@ -126,7 +135,7 @@ A binary OTBM writer is a later mechanical consumer of this already validated pl
 
 ## Environment/static elements coverage
 
-Once appearance role and OTB mappings exist, the same tile observation supports reconstruction of:
+Once appearance-role and OTB mappings exist, the same tile observation supports reconstruction of:
 
 - floor/ground;
 - borders;
@@ -134,7 +143,7 @@ Once appearance role and OTB mappings exist, the same tile observation supports 
 - doors;
 - trees, rocks, furniture and decorations;
 - containers and static/interactable items represented in the tile contents;
-- stack order for the observed static contents;
+- stack order for observed static contents;
 - multiple z-levels as separately observed coordinates.
 
 Dynamic entities are deliberately separated from static geometry.
@@ -156,7 +165,7 @@ candidate respawn interval
 confirmed spawn definition
 ```
 
-Respawn radius/count/timing require repeated observations across time and must carry confidence/evidence rather than being written directly from one sighting.
+Respawn radius/count/timing require repeated observations across time and must carry evidence rather than being written directly from one sighting.
 
 ## Reference comparison policy
 
@@ -185,29 +194,49 @@ Repository artifacts must contain only neutralized IDs/coordinates and synthetic
 
 ## Implemented files
 
-- `tools/tibia_worldmap_reconstruction/pipeline.py` — validation, deterministic merge, classification, ID translation, comparison and fail-closed OTBM planning;
+- `tools/tibia_worldmap_reconstruction/pipeline.py` — validation, version/evidence fencing, deterministic merge, classification, ID translation, comparison and fail-closed OTBM planning;
 - `tools/tibia_worldmap_reconstruction/cli.py` — `reconstruct`, `compare`, `plan-otbm` commands;
 - `tools/tibia_worldmap_reconstruction/README.md` — schemas and operator contract;
 - `tests/tools/tibia_worldmap_reconstruction/test_pipeline.py` — focused synthetic pipeline coverage.
 
 ## Validation evidence
 
-A local sandbox prototype using the same implementation content passed:
+The exact Git blobs for the implementation and test file were matched against the locally executed copies:
+
+```text
+pipeline.py  7fe70d87bcaa2ae97168b3d4db92ee55fc91547a
+test file    4a83061528d4eaffbdfcca0c3bb01b5ebf2594d7
+```
+
+Focused validation:
 
 ```text
 PYTHONPATH=. python3 tests/tools/tibia_worldmap_reconstruction/test_pipeline.py
-......
-Ran 6 tests
+............
+Ran 12 tests
 OK
+
+python3 -m py_compile tools/tibia_worldmap_reconstruction/pipeline.py tools/tibia_worldmap_reconstruction/cli.py
+PASS
 ```
 
-The exact files committed to Git must still be fetched/checked and exercised again before terminal completion, followed by the live repository PR check graph.
+Synthetic CLI E2E:
+
+```text
+reconstruct -> compare -> plan-otbm
+snapshot tile status: OK
+diff status: MATCH
+plan exportable: true
+PASS
+```
+
+The first six-test implementation exposed a self-review defect: unresolved appearance content could be omitted from static comparison and accidentally produce `MATCH`. The current implementation fixes that by propagating any non-`OK` tile status before equality comparison and adds version/evidence fences. No owner-funded AI review was used.
 
 ## Remaining real-world inputs
 
 Tooling is prepared. Real reconstruction requires two evidence producers, neither of which may be guessed inside this task:
 
-1. `observations.json` from a bounded decoded Worldmap capture owned/coordinated with PR #48;
+1. `observations.json` from a bounded decoded Worldmap capture owned/coordinated with PR #48 or a separately authorized successor;
 2. current-version appearance-role + client-to-OTB mapping evidence.
 
 Once those are supplied, the existing CLI can generate a normalized snapshot, source-specific diffs and an OTBM-ready plan immediately.

@@ -1,0 +1,325 @@
+name: Tibia hosted no-OCR login attempt v3
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260727-tibia-linux-runner-analysis
+    paths:
+      - .github/workflows/tibia-hosted-no-ocr-login-v3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  login-no-ocr:
+    name: Try real Tibia login through WARP without OCR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-home
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+
+    steps:
+      - name: Verify secrets exist without exposing them
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          echo TIBIA_TEST_SECRETS_AVAILABLE=true
+
+      - name: Install graphical and proxy runtime without OCR
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl dbus-x11 file iproute2 procps proxychains4 tar x11-utils xdotool xvfb \
+            libasound2t64 libdbus-1-3 libegl1 libfontconfig1 libfreetype6 libgl1 libglx0 \
+            libnss3 libopengl0 libx11-6 libx11-xcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-render0 \
+            libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 \
+            libxcb-xkb1 libxi6 libxkbcommon-x11-0 libxrender1 libxtst6
+          command -v xdpyinfo >/dev/null
+          command -v xdotool >/dev/null
+          command -v proxychains4 >/dev/null
+          if command -v tesseract >/dev/null 2>&1; then
+            echo FORBIDDEN_OCR_BINARY_PRESENT=true >&2
+            exit 1
+          fi
+          echo OCR_BINARY_ABSENT=true
+
+      - name: Establish pinned userspace Cloudflare WARP before Tibia bootstrap
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p /tmp/tibia-runtime/userspace-warp/bin /tmp/tibia-runtime/userspace-warp/state
+          root=/tmp/tibia-runtime/userspace-warp
+          chmod 700 /tmp/tibia-runtime "$root" "$root/state"
+          cd "$root/bin"
+
+          curl -fL --retry 3 --connect-timeout 10 -o wgcf \
+            https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          chmod 755 wgcf
+
+          curl -fL --retry 3 --connect-timeout 10 -o wireproxy.tar.gz \
+            https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tar.gz' | sha256sum -c -
+          mkdir -p extract
+          tar -xzf wireproxy.tar.gz -C extract
+          wp=$(find extract -type f -name wireproxy -print -quit)
+          [[ -n "$wp" ]]
+          cp "$wp" wireproxy
+          chmod 755 wireproxy
+
+          cd "$root/state"
+          "$root/bin/wgcf" register --accept-tos >/dev/null
+          chmod 600 wgcf-account.toml
+          "$root/bin/wgcf" generate >/dev/null
+          chmod 600 wgcf-profile.conf
+          cat >wireproxy.conf <<EOF
+          WGConfig = $root/state/wgcf-profile.conf
+
+          [Socks5]
+          BindAddress = 127.0.0.1:25344
+          EOF
+          chmod 600 wireproxy.conf
+          "$root/bin/wireproxy" -n -c wireproxy.conf
+          nohup "$root/bin/wireproxy" -c wireproxy.conf >"$root/wireproxy.log" 2>&1 </dev/null &
+
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/warp-trace 2>/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          [[ "$ready" == 1 ]]
+          direct_ip=$(curl -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
+          warp_ip=$(sed -n 's/^ip=//p' /tmp/warp-trace)
+          warp_state=$(sed -n 's/^warp=//p' /tmp/warp-trace)
+          [[ -n "$direct_ip" && -n "$warp_ip" && "$direct_ip" != "$warp_ip" ]]
+          [[ "$warp_state" == on || "$warp_state" == plus ]]
+          grep -E '^(loc|warp)=' /tmp/warp-trace
+          echo USERSPACE_WARP_EGRESS_VERIFIED=true
+
+          cat >/tmp/tibia-runtime/proxychains.conf <<'EOF'
+          strict_chain
+          proxy_dns
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 25344
+          EOF
+          proxy_ip=$(proxychains4 -f /tmp/tibia-runtime/proxychains.conf curl -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
+          [[ "$proxy_ip" == "$warp_ip" ]]
+          echo PROXYCHAINS_WARP_EGRESS_VERIFIED=true
+
+      - name: Start isolated X display and download official launcher through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$HOME" /tmp/tibia-bootstrap
+          chmod 700 "$HOME"
+          nohup Xvfb :99 -screen 0 1280x800x24 >/tmp/tibia-runtime/xvfb.log 2>&1 </dev/null &
+          for _ in $(seq 1 20); do
+            if xdpyinfo -display :99 >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          xdpyinfo -display :99 >/dev/null
+
+          cd /tmp/tibia-bootstrap
+          proxychains4 -f /tmp/tibia-runtime/proxychains.conf \
+            curl -fL --retry 3 --retry-delay 2 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' \
+            -e 'https://www.tibia.com/' \
+            https://static.tibia.com/download/tibia.x64.tar.gz \
+            -o tibia.x64.tar.gz
+          test -s tibia.x64.tar.gz
+          tar xfz tibia.x64.tar.gz
+          test -x Tibia/Tibia
+          echo OFFICIAL_LAUNCHER_MATERIALIZED_THROUGH_WARP=true
+
+      - name: Materialize exact official game package through WARP without image recognition
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_CACHE_HOME="$HOME/.cache"
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export QT_XCB_GL_INTEGRATION=none
+          mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+
+          cd /tmp/tibia-bootstrap/Tibia
+          nohup dbus-run-session -- proxychains4 -f /tmp/tibia-runtime/proxychains.conf ./Tibia >/tmp/tibia-runtime/launcher.log 2>&1 </dev/null &
+          launcher_pid=$!
+
+          launcher_window=''
+          for _ in $(seq 1 30); do
+            launcher_window=$(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null | head -n1 || true)
+            [[ -n "$launcher_window" ]] && break
+            sleep 1
+          done
+          [[ -n "$launcher_window" ]]
+          sleep 5
+          geom=$(xdotool getwindowgeometry --shell "$launcher_window")
+          width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
+          height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+          echo "launcher_window_size=${width}x${height}"
+          if (( width >= 1000 && height >= 650 )); then
+            echo UNEXPECTED_LAUNCHER_GEOMETRY=true >&2
+            exit 1
+          fi
+          xdotool mousemove --window "$launcher_window" 400 193 click 1
+          echo LAUNCHER_DOWNLOAD_TILE_ACTIVATED=true
+
+          client=''
+          for _ in $(seq 1 120); do
+            client=$(find "$HOME" -type f -path '*/packages/Tibia/bin/client' -perm -111 -print -quit 2>/dev/null || true)
+            if [[ -n "$client" ]]; then
+              actual_sha=$(sha256sum "$client" | awk '{print $1}')
+              actual_size=$(stat -c %s "$client")
+              if [[ "$actual_sha" == "$EXPECTED_CLIENT_SHA256" && "$actual_size" == "$EXPECTED_CLIENT_SIZE" ]]; then
+                break
+              fi
+            fi
+            sleep 2
+          done
+
+          kill "$launcher_pid" 2>/dev/null || true
+          [[ -n "$client" ]]
+          actual_sha=$(sha256sum "$client" | awk '{print $1}')
+          actual_size=$(stat -c %s "$client")
+          echo "client_size=$actual_size"
+          echo "client_sha256=$actual_sha"
+          [[ "$actual_sha" == "$EXPECTED_CLIENT_SHA256" ]]
+          [[ "$actual_size" == "$EXPECTED_CLIENT_SIZE" ]]
+          printf '%s' "$client" >/tmp/tibia-runtime/client-path
+          echo EXACT_CLIENT_IDENTITY_VERIFIED=true
+
+      - name: Launch exact client only through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export QT_XCB_GL_INTEGRATION=none
+          client=$(cat /tmp/tibia-runtime/client-path)
+          pkg=$(dirname "$(dirname "$client")")
+          cd "$pkg"
+          : >/tmp/tibia-runtime/client-proxychains.log
+          nohup proxychains4 -f /tmp/tibia-runtime/proxychains.conf "$client" >/tmp/tibia-runtime/client-proxychains.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do pgrep -f 'packages/Tibia/bin/client' >/dev/null && break; sleep 1; done
+          pid=$(pgrep -f 'packages/Tibia/bin/client' | head -n1)
+          [[ -n "$pid" ]]
+          sleep 10
+
+          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+          if printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -q .; then
+            echo CLIENT_DIRECT_TCP_DETECTED=true >&2
+            exit 1
+          fi
+          printf '%s\n' "$sockets" | awk '{print $5}' | grep -Eq '^(127\.0\.0\.1|\[::1\]):25344$'
+          echo CLIENT_TCP_USERSPACE_WARP_CONFINEMENT_VERIFIED=true
+
+          best=''; best_area=0; best_width=0; best_height=0
+          for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
+            geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
+            width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
+            height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+            [[ -n "$width" && -n "$height" ]] || continue
+            area=$((width*height))
+            if (( area > best_area )); then
+              best=$w; best_area=$area; best_width=$width; best_height=$height
+            fi
+          done
+          echo "client_window_size=${best_width}x${best_height}"
+          [[ -n "$best" && "$best_width" == 1020 && "$best_height" == 650 ]]
+          xdotool mousemove --window "$best" 510 302 click 1
+          sleep 2
+          printf '%s' "$best" >/tmp/tibia-runtime/window-id
+          printf '%s' "$pid" >/tmp/tibia-runtime/client-pid
+          echo EXACT_LOGIN_WINDOW_GEOMETRY_VERIFIED=true
+
+      - name: Enter credentials and activate first character without OCR
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          best=$(cat /tmp/tibia-runtime/window-id)
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^WIDTH=//p')" == 1020 ]]
+          [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^HEIGHT=//p')" == 650 ]]
+
+          export WINDOWID="$best"
+          xdotool mousemove --window "$best" 535 275 click 1
+          xdotool key --window "$best" ctrl+a
+          xdotool - <<'XDO_EMAIL'
+          type --window $WINDOWID --delay 3 "$TIBIA_TEST_EMAIL"
+          XDO_EMAIL
+          xdotool mousemove --window "$best" 535 304 click 1
+          xdotool key --window "$best" ctrl+a
+          xdotool - <<'XDO_PASSWORD'
+          type --window $WINDOWID --delay 3 "$TIBIA_TEST_PASSWORD"
+          XDO_PASSWORD
+          xdotool mousemove --window "$best" 590 388 click 1
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD WINDOWID
+          echo CREDENTIALS_ENTERED_WITHOUT_OCR=true
+
+          sleep 25
+          before=$(wc -l </tmp/tibia-runtime/client-proxychains.log)
+          printf '%s' "$before" >/tmp/tibia-runtime/log-before-character
+          xdotool mousemove --window "$best" 400 214 click --repeat 2 --delay 180 1
+          echo FIRST_CHARACTER_ROW_DOUBLECLICKED_WITHOUT_OCR=true
+          sleep 25
+
+          kill -0 "$pid"
+          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+          if printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -q .; then
+            echo CLIENT_DIRECT_TCP_DETECTED_AFTER_LOGIN=true >&2
+            exit 1
+          fi
+          echo CLIENT_DIRECT_TCP_DETECTED_AFTER_LOGIN=false
+          echo CLIENT_PROCESS_ALIVE_AFTER_CHARACTER_ACTIVATION=true
+
+      - name: Prove or reject post-character transport without screen text
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          lines = Path('/tmp/tibia-runtime/client-proxychains.log').read_text(errors='replace').splitlines()
+          before = int(Path('/tmp/tibia-runtime/log-before-character').read_text().strip() or '0')
+          post = lines[before:]
+          ok = [line for line in post if re.search(r'\bOK\b', line, re.I)]
+          targets = []
+          for line in ok:
+              m = re.search(r'((?:\d{1,3}\.){3}\d{1,3}|[A-Za-z0-9.-]+):([0-9]{1,5})', line)
+              if m:
+                  targets.append((m.group(1), int(m.group(2))))
+          ports = sorted({p for _, p in targets if p not in {25344, 443}})
+          distinct_443 = sorted({host for host, p in targets if p == 443})
+          print(f'POST_CHARACTER_PROXY_LINE_COUNT={len(post)}')
+          print(f'POST_CHARACTER_PROXY_OK_COUNT={len(ok)}')
+          print('POST_CHARACTER_NON_HTTPS_PORTS=' + ','.join(map(str, ports)))
+          print(f'POST_CHARACTER_DISTINCT_443_TARGET_COUNT={len(distinct_443)}')
+          if ports:
+              print('GAME_SERVER_NON_HTTPS_TRANSPORT_PROVEN=true')
+          else:
+              print('GAME_SERVER_NON_HTTPS_TRANSPORT_PROVEN=false')
+              raise SystemExit('no post-character non-HTTPS transport; semantic world entry not proven')
+          PY

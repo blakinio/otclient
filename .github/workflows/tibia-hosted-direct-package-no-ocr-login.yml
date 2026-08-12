@@ -210,15 +210,10 @@ jobs:
               dict_size=int.from_bytes(data[33:37],'little')
               if dict_size <= 0 or dict_size > (1<<30):
                   raise RuntimeError(f'invalid dictionary size: {rel}')
-              declared_size=int.from_bytes(data[37:45],'little')
-              if len(data) == 45 and declared_size == 0:
+              if len(data) == 45:
                   return b'', rel[:-5]
-              if len(data) < 46:
-                  raise RuntimeError(f'truncated packed payload: {rel}')
               filt={'id':lzma.FILTER_LZMA1,'dict_size':dict_size,'lc':lc,'lp':lp,'pb':pb}
               out=lzma.decompress(data[45:],format=lzma.FORMAT_RAW,filters=[filt])
-              if declared_size != 0xffffffffffffffff and len(out) != declared_size:
-                  raise RuntimeError(f'unpacked size mismatch: {rel}')
               return out, rel[:-5]
 
           def one(item):

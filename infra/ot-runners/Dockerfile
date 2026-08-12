@@ -10,6 +10,7 @@ RUN apt-get update \
         cmake \
         curl \
         git \
+        gosu \
         jq \
         ninja-build \
         pkg-config \
@@ -22,6 +23,5 @@ RUN chmod 0755 /home/runner/ot-runner-entrypoint.sh \
     && mkdir -p /runner-state /home/runner/_work \
     && chown -R runner:runner /runner-state /home/runner/_work
 
-USER runner
 WORKDIR /home/runner
 ENTRYPOINT ["/home/runner/ot-runner-entrypoint.sh"]

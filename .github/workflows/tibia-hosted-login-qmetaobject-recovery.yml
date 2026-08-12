@@ -18,7 +18,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends binutils curl python3-pyelftools
+          sudo apt-get install -y --no-install-recommends binutils curl python3-capstone python3-pyelftools
           r=/tmp/w; mkdir -p "$r/bin" "$r/state" /tmp/c; cd "$r/bin"
           curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
           echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
@@ -39,16 +39,19 @@ jobs:
           f={'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}; out=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[f])
           assert len(out)==51965216 and hashlib.sha256(out).hexdigest()=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
           pathlib.Path('/tmp/c/client').write_bytes(out)
+          print('OFFICIAL_CLIENT_SHA256_VERIFIED=true')
           PY
 
-      - name: Learn QMetaObject field layout from proven Worldmap control and recover target classes
+      - name: Recover exact target QMetaObjects and dispatch tables
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
           from pathlib import Path
           from elftools.elf.elffile import ELFFile
-          import struct, subprocess, re
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86_const import X86_OP_MEM, X86_OP_REG, X86_REG_RIP
+          import struct, subprocess
 
           client=Path('/tmp/c/client'); raw=client.read_bytes()
           WORLD_QMETA=0x3087800
@@ -57,30 +60,22 @@ jobs:
           WORLD_STATIC=0xdf2a60
           WORLD_CLASS='tibia::worldmap::TWorldmapProtocolMessageHandler'
           TARGETS={
-              'tibia::gamewindow::TCharacterSelectionController': {'required':['onCharacterSelectionConfirmed','requestCharacterLogin']},
-              'tibia::authentication::TGameserverLoginProcessController': {'required':['onStartGameServerLoginStateEntered','onConnectClientToGameserver','onAbortConnectClientToGameserver']},
-              'tibia::client::TAntiCheatController': {'required':[]},
-              'tibia::game::TGameserverGameSession': {'required':['connectToGameSession','onGameSessionConnected']},
+              'tibia::gamewindow::TCharacterSelectionController',
+              'tibia::authentication::TGameserverLoginProcessController',
+              'tibia::client::TAntiCheatController',
+              'tibia::game::TGameserverGameSession',
           }
+
           with client.open('rb') as f:
               elf=ELFFile(f)
-              secs=[]
-              for s in elf.iter_sections():
-                  secs.append((s.name,int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags'])))
+              secs=[(s.name,int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags'])) for s in elf.iter_sections()]
 
           def va_to_off(va):
               for n,o,z,v,fl in secs:
                   if v<=va<v+z: return o+(va-v),n
               raise ValueError(f'VA 0x{va:x} unmapped')
-          def off_to_va(off):
-              for n,o,z,v,fl in secs:
-                  if o<=off<o+z: return v+(off-o),n
-              return None,None
-          def mapped(va):
-              return any(v<=va<v+z for _,_,z,v,_ in secs)
-          def executable(va):
-              return any((fl&0x4) and v<=va<v+z for _,_,z,v,fl in secs)
-          def qword_va(va): return struct.unpack_from('<Q',raw,va_to_off(va)[0])[0]
+          def mapped(va): return any(v<=va<v+z for _,_,z,v,_ in secs)
+          def executable(va): return any((fl&0x4) and v<=va<v+z for _,_,z,v,fl in secs)
           def u32_va(va): return struct.unpack_from('<I',raw,va_to_off(va)[0])[0]
           def i32_va(va): return struct.unpack_from('<i',raw,va_to_off(va)[0])[0]
 
@@ -89,7 +84,6 @@ jobs:
           field_hits={}
           for delta in range(0,0x80,8):
               val=struct.unpack_from('<Q',raw,qoff+delta)[0]
-              print(f'WORLD_QWORD delta=0x{delta:x} value=0x{val:x} mapped={mapped(val)} executable={executable(val)}')
               if val==WORLD_STRING: field_hits['string']=delta
               if val==WORLD_META: field_hits['meta']=delta
               if val==WORLD_STATIC: field_hits['static']=delta
@@ -98,12 +92,10 @@ jobs:
               raise SystemExit(f'Could not learn complete QMetaObject layout: {field_hits}')
 
           def parse_meta(string_va,meta_va):
-              try:
-                  hdr=[u32_va(meta_va+i*4) for i in range(14)]
+              try: hdr=[u32_va(meta_va+i*4) for i in range(14)]
               except Exception: return None
               revision,class_idx,ci_count,ci_data,method_count,method_data,prop_count,prop_data,enum_count,enum_data,ctor_count,ctor_data,flags,signal_count=hdr
-              if revision>20 or method_count>512 or method_data>65536 or class_idx>4096 or signal_count>method_count:
-                  return None
+              if revision>20 or method_count>512 or method_data>65536 or class_idx>4096 or signal_count>method_count: return None
               try:
                   def qstr(idx):
                       entry=string_va+idx*8
@@ -116,26 +108,21 @@ jobs:
                   for idx in range(method_count):
                       base=meta_va+(method_data+idx*6)*4
                       row=[u32_va(base+k*4) for k in range(6)]
-                      name=qstr(row[0])
-                      methods.append((idx,name,row))
-                  return {'header':hdr,'class':cls,'methods':methods,'qstr':qstr}
-              except Exception:
-                  return None
+                      methods.append((idx,qstr(row[0]),row))
+                  return {'header':hdr,'class':cls,'methods':methods}
+              except Exception: return None
 
           control=parse_meta(WORLD_STRING,WORLD_META)
           if not control or control['class']!=WORLD_CLASS:
               raise SystemExit(f'Worldmap control failed: {None if not control else control["class"]!r}')
-          print(f'CONTROL_CLASS={control["class"]}')
+          print('CONTROL_CLASS='+control['class'])
           print('CONTROL_METHODS='+','.join(f'{i}:{n}' for i,n,_ in control['methods']))
           print('CONTROL_QMETAOBJECT_END')
 
-          # Scan writable/readonly data sections at qword alignment for structures whose
-          # learned string/meta/static slots form a valid Qt metaobject and decode a target class.
           max_field=max(field_hits.values())
           found={}
           print('TARGET_QMETAOBJECT_SCAN_BEGIN')
           for sec,off,size,va,flags in secs:
-              # Skip executable code and tiny sections; QMetaObject lives in mapped data.
               if flags&0x4 or size<max_field+8: continue
               for rel in range(0,size-max_field-7,8):
                   cand_va=va+rel
@@ -147,47 +134,63 @@ jobs:
                   if not mapped(string_va) or not mapped(meta_va) or not executable(static_va): continue
                   parsed=parse_meta(string_va,meta_va)
                   if not parsed or parsed['class'] not in TARGETS: continue
-                  cls=parsed['class']
-                  methods=[n for _,n,_ in parsed['methods']]
-                  req=TARGETS[cls]['required']
-                  if req and not all(x in methods for x in req):
-                      print(f'REJECT class={cls} qmeta=0x{cand_va:x} missing_required=true methods={methods}')
-                      continue
-                  key=(cand_va,string_va,meta_va,static_va)
-                  if key in found.setdefault(cls,set()): continue
-                  found[cls].add(key)
+                  cls=parsed['class']; key=(cand_va,string_va,meta_va,static_va)
+                  if key in found.setdefault(cls,{}): continue
+                  found[cls][key]=parsed
                   print(f'FOUND class={cls} qmeta=0x{cand_va:x} section={sec} string=0x{string_va:x} meta=0x{meta_va:x} static_metacall=0x{static_va:x}')
                   print('  METHODS='+','.join(f'{i}:{n}' for i,n,_ in parsed['methods']))
                   print('  HEADER='+' '.join(map(str,parsed['header'])))
           print('TARGET_QMETAOBJECT_SCAN_END')
 
-          missing=[x for x in TARGETS if not found.get(x)]
+          missing=sorted(TARGETS-set(found))
           if missing:
               print('MISSING_TARGET_CLASSES='+','.join(missing))
-          else:
-              print('ALL_TARGET_QMETAOBJECTS_FOUND=true')
+              raise SystemExit('target QMetaObject recovery incomplete')
+          print('ALL_TARGET_QMETAOBJECTS_FOUND=true')
 
-          # Emit bounded disassembly of unique recovered static_metacall functions and
-          # identify compare/jump-table candidates. No runtime modification is performed.
-          print('STATIC_METACALL_DISASSEMBLY_BEGIN')
-          unique=[]
-          for cls,rows in found.items():
-              for q,s,m,st in rows:
-                  if st not in unique: unique.append(st)
-          for st in unique:
-              print(f'STATIC_METACALL=0x{st:x}')
-              txt=subprocess.check_output(['objdump','-d','-C',f'--start-address={st}',f'--stop-address={st+0x900}',str(client)],text=True,errors='replace')
-              lines=txt.splitlines()
-              for line in lines[:500]: print('  '+line)
-              # Surface bounded candidate indirect jump tables from RIP-relative jmp instructions.
-              for line in lines:
-                  mm=re.search(r'^\s*([0-9a-f]+):.*\bjmp\s+\*([^#]+)#\s*([0-9a-fx]+)',line)
-                  if mm: print('  INDIRECT_JMP='+line.strip())
-          print('STATIC_METACALL_DISASSEMBLY_END')
-
-          # Fail only if the two critical login/selection controllers were not recovered.
-          critical=['tibia::gamewindow::TCharacterSelectionController','tibia::authentication::TGameserverLoginProcessController']
-          if any(not found.get(x) for x in critical):
-              raise SystemExit('critical QMetaObject recovery incomplete')
+          md=Cs(CS_ARCH_X86,CS_MODE_64); md.detail=True
+          print('METHOD_DISPATCH_RECOVERY_BEGIN')
+          for cls in sorted(found):
+              for (qmeta,string_va,meta_va,st),parsed in sorted(found[cls].items()):
+                  method_count=len(parsed['methods'])
+                  off,_=va_to_off(st)
+                  code=raw[off:off+0x180]
+                  insns=list(md.disasm(code,st))
+                  candidates=[]
+                  for idx,ins in enumerate(insns):
+                      if ins.mnemonic!='lea' or len(ins.operands)<2 or ins.operands[0].type!=X86_OP_REG or ins.operands[1].type!=X86_OP_MEM: continue
+                      mem=ins.operands[1].mem
+                      if mem.base!=X86_REG_RIP: continue
+                      base_reg=ins.operands[0].reg
+                      table=ins.address+ins.size+mem.disp
+                      used=False
+                      for later in insns[idx+1:idx+7]:
+                          for op in later.operands:
+                              if op.type==X86_OP_MEM and op.mem.base==base_reg and op.mem.scale==4:
+                                  used=True
+                      if not used: continue
+                      try:
+                          targets=[]
+                          for mi in range(method_count):
+                              target=table+i32_va(table+mi*4)
+                              targets.append(target)
+                          score=sum(1 for target in targets if executable(target))
+                          candidates.append((score,table,targets))
+                      except Exception: pass
+                  candidates.sort(reverse=True)
+                  print(f'DISPATCH class={cls} static_metacall=0x{st:x} method_count={method_count}')
+                  if candidates and candidates[0][0]==method_count:
+                      score,table,targets=candidates[0]
+                      print(f'  JUMP_TABLE=0x{table:x} EXECUTABLE_TARGETS={score}/{method_count}')
+                      for (mi,name,_),target in zip(parsed['methods'],targets):
+                          print(f'  METHOD_TARGET index={mi} name={name} target=0x{target:x}')
+                  else:
+                      best=candidates[0][0] if candidates else 0
+                      print(f'  JUMP_TABLE_NOT_PROVEN best_executable_targets={best}/{method_count}')
+                  txt=subprocess.check_output(['objdump','-d','-C',f'--start-address={st}',f'--stop-address={st+0x300}',str(client)],text=True,errors='replace')
+                  print('  DISASSEMBLY_BEGIN')
+                  for line in txt.splitlines()[:220]: print('    '+line)
+                  print('  DISASSEMBLY_END')
+          print('METHOD_DISPATCH_RECOVERY_END')
           print('CRITICAL_LOGIN_QMETAOBJECTS_RECOVERED=true')
           PY

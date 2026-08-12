@@ -67,7 +67,11 @@ jobs:
         run: |
           set -Eeuo pipefail
           mkdir -p /tmp/pkgmeta
-          curl --socks5-hostname 127.0.0.1:25344 -fsSL "$TIBIA_BASE_URL/package.json" -o /tmp/pkgmeta/package.json
+          browser_ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+          pkgurl="$TIBIA_BASE_URL/package.json"
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL --retry 2 --connect-timeout 15 --max-time 180 \
+            -A "$browser_ua" -e "$pkgurl" -H 'Accept: */*' -H 'Accept-Language: en-US,en;q=0.9' -H 'Cache-Control: no-cache' \
+            "$pkgurl" -o /tmp/pkgmeta/package.json
           python3 - <<'PY'
           import concurrent.futures,hashlib,json,lzma,os,pathlib,subprocess,tempfile,urllib.parse
           d=json.loads(pathlib.Path('/tmp/pkgmeta/package.json').read_text()); rows=[]
@@ -79,7 +83,7 @@ jobs:
               for x in v: walk(x)
           walk(d); e={r:(p,u) for r,p,u in rows}
           root=pathlib.Path(os.environ['HOME'])/'.local/share/CipSoft GmbH/Tibia/packages/Tibia'; root.mkdir(parents=True,exist_ok=True)
-          base=os.environ['TIBIA_BASE_URL'].rstrip('/')
+          base=os.environ['TIBIA_BASE_URL'].rstrip('/'); ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
           def safe(r):
             p=pathlib.PurePosixPath(r)
             if p.is_absolute() or '..' in p.parts: raise RuntimeError('unsafe path')
@@ -97,13 +101,13 @@ jobs:
             r,(ph,uh)=it; safe(r); u=base+'/'+urllib.parse.quote(r,safe='/._-~')
             with tempfile.NamedTemporaryFile(delete=False) as t: n=t.name
             try:
-              subprocess.run(['curl','--socks5-hostname','127.0.0.1:25344','-fsSL',u,'-o',n],check=True)
+              subprocess.run(['curl','--socks5-hostname','127.0.0.1:25344','--compressed','-fL','--retry','2','--connect-timeout','15','--max-time','300','-A',ua,'-e',u,'-H','Accept: */*','-H','Accept-Language: en-US,en;q=0.9','-H','Cache-Control: no-cache',u,'-o',n],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
               b=pathlib.Path(n).read_bytes()
               if hashlib.sha256(b).hexdigest()!=ph: raise RuntimeError('packed hash '+r)
               o,rr=unpack(b,r,uh)
               if hashlib.sha256(o).hexdigest()!=uh: raise RuntimeError('unpacked hash '+r)
               p=root.joinpath(*safe(rr).parts); p.parent.mkdir(parents=True,exist_ok=True); p.write_bytes(o)
-              if p.parts and 'bin' in p.parts: p.chmod(0o755)
+              if 'bin' in p.parts: p.chmod(0o755)
             finally: pathlib.Path(n).unlink(missing_ok=True)
           with concurrent.futures.ThreadPoolExecutor(max_workers=8) as x: list(x.map(one,sorted(e.items())))
           c=root/'bin/client'; assert hashlib.sha256(c.read_bytes()).hexdigest()==os.environ['EXPECTED_CLIENT_SHA256']; print('COMPLETE_PACKAGE_AT_OFFICIAL_PATH=true')

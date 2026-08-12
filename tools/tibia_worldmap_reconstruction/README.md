@@ -15,7 +15,7 @@ bounded live observations
   -> OTBM-ready plan
 ```
 
-The helper never guesses a ground, item role or OTB ID. Any conflict or missing semantic mapping blocks the OTBM plan.
+The helper never guesses a ground, item role or OTB ID. Any conflict, version mismatch or missing semantic mapping blocks the relevant stage.
 
 ## Observation schema
 
@@ -24,6 +24,7 @@ Schema: `otclient.worldmap.observation.v1`
 ```json
 {
   "schema": "otclient.worldmap.observation.v1",
+  "client_version": "15.32.df7b29",
   "observations": [
     {
       "position": {"x": 32000, "y": 32001, "z": 7},
@@ -34,7 +35,7 @@ Schema: `otclient.worldmap.observation.v1`
 }
 ```
 
-`contents` preserves the order observed in the decoded field message. IDs are client-side appearance/content IDs until an explicit mapping proves otherwise.
+`contents` preserves the order observed in the decoded field message. IDs are client-side appearance/content IDs until an explicit mapping proves otherwise. Every observation requires bounded provenance and the exact client version.
 
 ## Appearance-role catalog
 
@@ -43,17 +44,18 @@ Schema: `otclient.worldmap.appearance-catalog.v1`
 ```json
 {
   "schema": "otclient.worldmap.appearance-catalog.v1",
+  "client_version": "15.32.df7b29",
   "appearances": [
-    {"client_id": 100, "roles": ["ground"]},
-    {"client_id": 200, "roles": ["border", "static"]},
-    {"client_id": 900, "roles": ["creature", "dynamic"]}
+    {"client_id": 100, "roles": ["ground"], "evidence": "verified appearance metadata reference"},
+    {"client_id": 200, "roles": ["border", "static"], "evidence": "verified appearance metadata reference"},
+    {"client_id": 900, "roles": ["creature", "dynamic"], "evidence": "verified appearance metadata reference"}
   ]
 }
 ```
 
-Allowed roles are `ground`, `border`, `static`, `dynamic`, `creature`, `npc`, and `unknown`.
+Allowed roles are `ground`, `border`, `static`, `dynamic`, `creature`, `npc`, and `unknown`. Contradictory combinations such as `ground + creature`, `static + dynamic`, or `unknown + anything` are rejected.
 
-Role assignment must come from separately verified appearance metadata or equivalent producer evidence. The helper intentionally contains no hard-coded assertion that a proprietary field name, offset or numeric value has a particular meaning.
+Role assignment must come from separately verified appearance metadata or equivalent producer evidence. Every entry requires a non-empty `evidence` string. The helper intentionally contains no hard-coded assertion that a proprietary field name, offset or numeric value has a particular meaning.
 
 ## OTB mapping
 
@@ -62,14 +64,16 @@ Schema: `otclient.worldmap.otb-mapping.v1`
 ```json
 {
   "schema": "otclient.worldmap.otb-mapping.v1",
+  "client_version": "15.32.df7b29",
+  "otb_version": "target-otb-version",
   "mappings": [
-    {"client_id": 100, "otb_id": 1100},
-    {"client_id": 200, "otb_id": 1200}
+    {"client_id": 100, "otb_id": 1100, "evidence": "verified mapping source"},
+    {"client_id": 200, "otb_id": 1200, "evidence": "verified mapping source"}
   ]
 }
 ```
 
-Mappings are version-sensitive evidence. A client ID is never assumed to equal an OTB/server ID.
+Mappings are version-sensitive evidence. Every mapping requires explicit evidence. A client ID is never assumed to equal an OTB/server ID, and the observation/catalog/mapping client versions must match exactly.
 
 ## Reference map
 
@@ -78,6 +82,8 @@ Schema: `otclient.worldmap.reference.v1`
 ```json
 {
   "schema": "otclient.worldmap.reference.v1",
+  "source": "crystalserver",
+  "otb_version": "target-otb-version",
   "tiles": [
     {
       "position": {"x": 32000, "y": 32001, "z": 7},
@@ -88,7 +94,7 @@ Schema: `otclient.worldmap.reference.v1`
 }
 ```
 
-CrystalServer, Renemap and TibiaMaps must each be normalized independently into this schema. Keep source identity/provenance outside the tile payload or in a surrounding evidence manifest; disagreement between sources is evidence, not permission to pick one silently.
+CrystalServer, Renemap and TibiaMaps must each be normalized independently into this schema. Their source identities stay explicit. Duplicate coordinates are rejected, and the reference OTB version must match the reconstructed snapshot.
 
 ## Commands
 
@@ -111,7 +117,22 @@ python -m tools.tibia_worldmap_reconstruction.cli plan-otbm \
   --output otbm-plan.json
 ```
 
-`plan-otbm` emits only a neutral export plan. It does not write the binary OTBM container yet. The plan is exportable only if every included tile has one proven ground and all static IDs are mapped.
+`plan-otbm` emits only a neutral export plan. It does not write the binary OTBM container yet. The plan is exportable only when at least one tile exists, every included tile has one proven ground, all static IDs are mapped and no unresolved/conflicting state remains.
+
+## Comparator statuses
+
+The comparator preserves unresolved states instead of accidentally reporting a match. It may report:
+
+- `MATCH`;
+- `NOT_OBSERVED`;
+- `REFERENCE_MISSING`;
+- `GROUND_MISMATCH`;
+- `CONTENT_MISMATCH`;
+- `STACK_ORDER_MISMATCH`;
+- `UNMAPPED_ID`;
+- `UNKNOWN_ROLE`;
+- `GROUND_UNRESOLVED`;
+- `CONFLICT`.
 
 ## Dynamic entities and spawns
 
@@ -125,4 +146,4 @@ Focused test command:
 PYTHONPATH=. python3 tests/tools/tibia_worldmap_reconstruction/test_pipeline.py
 ```
 
-The tests cover successful reconstruction/comparison/OTBM planning, conflicting captures, unresolved ground, unmapped IDs, stack-order differences and unknown appearance roles.
+The focused suite covers successful reconstruction/comparison/OTBM planning, conflicting captures, unresolved ground, unmapped IDs, stack-order differences, unknown appearance roles, malformed/missing provenance, contradictory roles, conflicting mappings, client/OTB version mismatches and empty-plan rejection.

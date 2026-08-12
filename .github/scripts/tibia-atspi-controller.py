@@ -1,272 +1,153 @@
 #!/usr/bin/env python3
-"""Control the official Tibia login UI through AT-SPI semantics, never OCR.
+"""Control official Tibia UI through AT-SPI semantics; never OCR.
 
-The script never prints accessible text except fixed allow-listed UI markers.
-Secrets are read from environment and passed only to EditableText.setTextContents.
-Authenticated account/character strings are never emitted.
+Only fixed allow-listed UI markers/counters are printed. Secrets and account /
+character strings are never emitted.
 """
 from __future__ import annotations
-
-import os
-import sys
-import time
-
+import os, subprocess, sys, time
 import pyatspi
 
 
-def children(obj):
+def children(o):
+    try: return [o.getChildAtIndex(i) for i in range(o.childCount)]
+    except Exception: return []
+
+
+def walk(root, limit=5000):
+    stack=[root]; seen=0
+    while stack and seen < limit:
+        o=stack.pop(); seen+=1; yield o; stack.extend(reversed(children(o)))
+
+
+def name(o):
+    try: return (o.name or '').strip()
+    except Exception: return ''
+
+
+def role(o):
+    try: return (o.getRoleName() or '').lower()
+    except Exception: return ''
+
+
+def actions(o):
     try:
-        return [obj.getChildAtIndex(i) for i in range(obj.childCount)]
-    except Exception:
-        return []
+        a=o.queryAction(); return a if a.nActions else None
+    except Exception: return None
 
 
-def walk(root, max_nodes=5000):
-    stack=[root]
-    seen=0
-    while stack and seen < max_nodes:
-        obj=stack.pop()
-        seen += 1
-        yield obj
+def app_now():
+    d=pyatspi.Registry.getDesktop(0)
+    for i in range(d.childCount):
         try:
-            stack.extend(reversed(children(obj)))
-        except Exception:
-            pass
-
-
-def role_name(obj):
-    try:
-        return (obj.getRoleName() or '').lower()
-    except Exception:
-        return ''
-
-
-def safe_name(obj):
-    try:
-        return (obj.name or '').strip()
-    except Exception:
-        return ''
-
-
-def action_names(obj):
-    try:
-        a=obj.queryAction()
-        return [(i,(a.getName(i) or '').lower()) for i in range(a.nActions)]
-    except Exception:
-        return []
-
-
-def find_tibia_app():
-    desk=pyatspi.Registry.getDesktop(0)
-    apps=[]
-    for i in range(desk.childCount):
-        try:
-            app=desk.getChildAtIndex(i)
-            name=safe_name(app).lower()
-            if 'tibia' in name:
-                apps.append(app)
-        except Exception:
-            pass
-    return apps[0] if apps else None
+            a=d.getChildAtIndex(i)
+            if 'tibia' in name(a).lower(): return a
+        except Exception: pass
+    return None
 
 
 def wait_app(timeout=30):
     end=time.time()+timeout
     while time.time()<end:
-        app=find_tibia_app()
-        if app is not None:
-            return app
-        time.sleep(0.5)
+        a=app_now()
+        if a is not None: return a
+        time.sleep(.5)
     raise RuntimeError('Tibia AT-SPI application not found')
 
 
-def editable_nodes(app):
+def edits(app):
     out=[]
-    for obj in walk(app):
-        try:
-            obj.queryEditableText()
-        except Exception:
-            continue
-        r=role_name(obj)
-        if any(x in r for x in ('text','entry','password')) or r:
-            out.append(obj)
-    return out
-
-
-def marker_flags(app):
-    account=False; login=False; select=False; character=False
-    editable=0; buttons=0; actionable=0
-    roles={}
-    for obj in walk(app):
-        r=role_name(obj)
-        roles[r]=roles.get(r,0)+1
-        n=safe_name(obj).lower()
-        if n in {'account','account login'}: account=True
-        if n == 'login': login=True
-        if n == 'select character': select=True
-        if n == 'character': character=True
-        try:
-            obj.queryEditableText(); editable += 1
-        except Exception:
-            pass
-        acts=action_names(obj)
-        if acts:
-            actionable += 1
-            if 'button' in r or 'push' in r:
-                buttons += 1
-    print(f'ATSPI_EDITABLE_COUNT={editable}', flush=True)
-    print(f'ATSPI_ACTIONABLE_COUNT={actionable}', flush=True)
-    print(f'ATSPI_BUTTON_COUNT={buttons}', flush=True)
-    print(f'ATSPI_ACCOUNT_MARKER={str(account).lower()}', flush=True)
-    print(f'ATSPI_LOGIN_MARKER={str(login).lower()}', flush=True)
-    print(f'ATSPI_SELECT_CHARACTER_MARKER={str(select).lower()}', flush=True)
-    print(f'ATSPI_CHARACTER_HEADER_MARKER={str(character).lower()}', flush=True)
-    return {'account':account,'login':login,'select':select,'character':character,'editable':editable}
-
-
-def invoke_named_action(app, allowed_names):
-    allowed={x.lower() for x in allowed_names}
-    for obj in walk(app):
-        n=safe_name(obj).lower()
-        if n not in allowed:
-            continue
-        try:
-            a=obj.queryAction()
-            if a.nActions:
-                ok=a.doAction(0)
-                print('ATSPI_NAMED_ACTION_INVOKED=true', flush=True)
-                return bool(ok) or True
-        except Exception:
-            pass
-    return False
-
-
-def set_login_fields(app, email, password):
-    edits=editable_nodes(app)
-    print(f'ATSPI_LOGIN_EDITABLE_CANDIDATES={len(edits)}', flush=True)
-    if len(edits) < 2:
-        return False
-    # Prefer top-to-bottom screen order when component extents are available.
+    for o in walk(app):
+        try: o.queryEditableText(); out.append(o)
+        except Exception: pass
     def key(o):
         try:
-            c=o.queryComponent(); ext=c.getExtents(pyatspi.DESKTOP_COORDS)
-            return (ext.y,ext.x)
-        except Exception:
-            return (10**9,10**9)
-    edits.sort(key=key)
-    chosen=edits[:2]
-    vals=[email,password]
-    for obj,val in zip(chosen,vals):
-        try:
-            e=obj.queryEditableText()
-            e.setTextContents(val)
-        except Exception as exc:
-            raise RuntimeError('AT-SPI EditableText set failed') from exc
-    print('ATSPI_EMAIL_SET=true', flush=True)
-    print('ATSPI_PASSWORD_SET=true', flush=True)
-    return True
+            e=o.queryComponent().getExtents(pyatspi.DESKTOP_COORDS); return (e.y,e.x)
+        except Exception: return (10**9,10**9)
+    out.sort(key=key); return out
 
 
-def activate_first_character_semantic(app):
-    # Prefer actionable objects in the body under a Select Character state.
-    candidates=[]
-    for obj in walk(app):
-        r=role_name(obj)
-        acts=action_names(obj)
-        if not acts:
-            continue
-        try:
-            c=obj.queryComponent(); ext=c.getExtents(pyatspi.DESKTOP_COORDS)
-            x,y,w,h=ext.x,ext.y,ext.width,ext.height
-        except Exception:
-            continue
-        # Same bounded central list region as the proven 1020x650 dialog, but
-        # the activation is semantic AT-SPI action, not pixel clicking.
-        if 120 <= x <= 650 and 130 <= y <= 330 and w > 20 and h > 5:
-            n=safe_name(obj).lower()
-            # Avoid known headers/buttons; never print any remaining name.
-            if n in {'select character','character','status','login','cancel','ok'}:
-                continue
-            candidates.append((y,x,obj))
-    candidates.sort(key=lambda t:(t[0],t[1]))
-    print(f'ATSPI_CHARACTER_ACTION_CANDIDATES={len(candidates)}', flush=True)
-    for _,_,obj in candidates:
-        try:
-            a=obj.queryAction()
-            if a.nActions:
-                a.doAction(0)
-                print('ATSPI_FIRST_CHARACTER_ACTION_INVOKED=true', flush=True)
-                return True
-        except Exception:
-            continue
+def flags(app):
+    vals={'account':False,'login':False,'select':False,'character':False}; ed=act=0
+    for o in walk(app):
+        n=name(o).lower()
+        if n in {'account','account login'}: vals['account']=True
+        if n=='login': vals['login']=True
+        if n=='select character': vals['select']=True
+        if n=='character': vals['character']=True
+        try: o.queryEditableText(); ed+=1
+        except Exception: pass
+        if actions(o): act+=1
+    print(f'ATSPI_EDITABLE_COUNT={ed}',flush=True)
+    print(f'ATSPI_ACTIONABLE_COUNT={act}',flush=True)
+    for k,v in vals.items(): print(f'ATSPI_{k.upper()}_MARKER={str(v).lower()}',flush=True)
+    vals['editable']=ed; return vals
+
+
+def invoke(app, allowed):
+    allowed={x.lower() for x in allowed}
+    for o in walk(app):
+        if name(o).lower() not in allowed: continue
+        a=actions(o)
+        if a:
+            a.doAction(0); print('ATSPI_NAMED_ACTION_INVOKED=true',flush=True); return True
     return False
+
+
+def wait_select(timeout=40):
+    end=time.time()+timeout
+    while time.time()<end:
+        a=wait_app(3); f=flags(a)
+        if f['select'] or f['character']:
+            print('ATSPI_SELECT_CHARACTER_PROVEN=true',flush=True); return a
+        time.sleep(1)
+    return None
+
+
+def semantic_character(app):
+    candidates=[]
+    for o in walk(app):
+        a=actions(o)
+        if not a: continue
+        try: e=o.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
+        except Exception: continue
+        if 120 <= e.x <= 650 and 130 <= e.y <= 330 and e.width>20 and e.height>5:
+            if name(o).lower() not in {'select character','character','status','login','cancel','ok'}:
+                candidates.append((e.y,e.x,o))
+    candidates.sort(key=lambda x:(x[0],x[1]))
+    print(f'ATSPI_CHARACTER_ACTION_CANDIDATES={len(candidates)}',flush=True)
+    if not candidates: return False
+    a=actions(candidates[0][2]); a.doAction(0)
+    print('ATSPI_FIRST_CHARACTER_ACTION_INVOKED=true',flush=True); return True
 
 
 def main():
-    mode=sys.argv[1] if len(sys.argv)>1 else 'inspect'
-    app=wait_app()
-    flags=marker_flags(app)
-    if mode == 'inspect':
-        if flags['editable'] < 1:
-            raise SystemExit(3)
-        print('ATSPI_SEMANTIC_UI_AVAILABLE=true')
+    mode=sys.argv[1] if len(sys.argv)>1 else 'inspect'; app=wait_app(); f=flags(app)
+    if mode=='inspect':
+        print(f'ATSPI_SEMANTIC_UI_AVAILABLE={str(f["editable"]>0).lower()}'); raise SystemExit(0 if f['editable'] else 3)
+    if mode=='login':
+        email=os.environ.get('TIBIA_TEST_EMAIL',''); password=os.environ.get('TIBIA_TEST_PASSWORD','')
+        if not email or not password: raise SystemExit(2)
+        if len(edits(app))<2:
+            invoke(app,{'login','account login'}); time.sleep(2); app=wait_app(); flags(app)
+        es=edits(app); print(f'ATSPI_LOGIN_EDITABLE_CANDIDATES={len(es)}',flush=True)
+        if len(es)<2: raise SystemExit(4)
+        es[0].queryEditableText().setTextContents(email); es[1].queryEditableText().setTextContents(password)
+        print('ATSPI_EMAIL_SET=true',flush=True); print('ATSPI_PASSWORD_SET=true',flush=True)
+        del email,password
+        if invoke(app,{'login'}): print('ATSPI_LOGIN_ACTION=true',flush=True)
+        else:
+            try: es[1].queryComponent().grabFocus()
+            except Exception: pass
+            subprocess.run(['xdotool','key','Return'],check=True); print('ATSPI_LOGIN_ENTER_FALLBACK=true',flush=True)
+        if wait_select() is None: raise SystemExit(5)
         return
-    if mode != 'login':
-        raise SystemExit('unknown mode')
+    if mode=='character':
+        app=wait_select(5)
+        if app is None: raise SystemExit(5)
+        if not semantic_character(app):
+            print('ATSPI_CHARACTER_ACTION_UNAVAILABLE=true',flush=True); raise SystemExit(6)
+        return
+    raise SystemExit(2)
 
-    email=os.environ.get('TIBIA_TEST_EMAIL','')
-    password=os.environ.get('TIBIA_TEST_PASSWORD','')
-    if not email or not password:
-        raise SystemExit('missing secrets')
-
-    # Some builds expose a landing Login action before fields; invoke only the
-    # allow-listed semantic name, then rescan. If fields already exist, skip it.
-    if len(editable_nodes(app)) < 2:
-        invoke_named_action(app, {'login','account login'})
-        time.sleep(2)
-        app=wait_app()
-        marker_flags(app)
-
-    if not set_login_fields(app,email,password):
-        raise SystemExit(4)
-    del email, password
-
-    if not invoke_named_action(app, {'login'}):
-        # Focus the password field and use Enter as semantic keyboard fallback.
-        edits=editable_nodes(app)
-        if len(edits) >= 2:
-            edits.sort(key=lambda o: (o.queryComponent().getExtents(pyatspi.DESKTOP_COORDS).y,
-                                      o.queryComponent().getExtents(pyatspi.DESKTOP_COORDS).x))
-            try:
-                edits[1].queryComponent().grabFocus()
-            except Exception:
-                pass
-        import subprocess
-        subprocess.run(['xdotool','key','Return'],check=True)
-        print('ATSPI_LOGIN_ENTER_FALLBACK=true', flush=True)
-    else:
-        print('ATSPI_LOGIN_ACTION=true', flush=True)
-
-    # Wait for Select Character semantic marker; never emit its child text.
-    deadline=time.time()+35
-    selected=False
-    while time.time()<deadline:
-        app=wait_app(3)
-        flags=marker_flags(app)
-        if flags['select'] or flags['character']:
-            print('ATSPI_SELECT_CHARACTER_PROVEN=true', flush=True)
-            selected=True
-            break
-        time.sleep(1)
-    if not selected:
-        raise SystemExit(5)
-
-    if not activate_first_character_semantic(app):
-        # Character row action may not be exposed; signal caller for a bounded
-        # coordinate fallback only after Select Character was semantically proven.
-        print('ATSPI_CHARACTER_ACTION_UNAVAILABLE=true', flush=True)
-        raise SystemExit(6)
-
-
-if __name__ == '__main__':
-    main()
+if __name__=='__main__': main()

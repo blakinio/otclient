@@ -1,0 +1,46 @@
+name: Tibia hosted assets manifest probe
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-assets-manifest-probe.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - shell: bash
+        run: |
+          set -Eeuo pipefail
+          r=/tmp/w; mkdir -p "$r/bin" "$r/state"; cd "$r/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c -
+          mkdir x; tar -xzf wp.tgz -C x; cp "$(find x -type f -name wireproxy -print -quit)" wireproxy; chmod 755 wgcf wireproxy
+          cd "$r/state"; "$r/bin/wgcf" register --accept-tos >/dev/null; "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" > w.conf
+          nohup "$r/bin/wireproxy" -c w.conf >/tmp/wp.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/t 2>/dev/null && break; sleep 2; done
+          grep -q '^warp=on$' /tmp/t
+          u=https://static.tibia.com/launcher/assets-current/assets.json
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A "$ua" -e "$u" -H 'Accept: */*' "$u" -o /tmp/a.json
+          python3 - <<'PY'
+          import json,pathlib
+          d=json.loads(pathlib.Path('/tmp/a.json').read_text()); print('TOP_TYPE='+type(d).__name__)
+          if isinstance(d,dict): print('TOP_KEYS='+','.join(sorted(d.keys())))
+          rows=[]
+          def w(v):
+            if isinstance(v,dict):
+              if isinstance(v.get('url'),str): rows.append((v.get('url'),v.get('packedhash'),v.get('unpackedhash')))
+              for x in v.values(): w(x)
+            elif isinstance(v,list):
+              for x in v: w(x)
+          w(d); print('URL_ENTRY_COUNT='+str(len(rows)))
+          for r in rows[:30]: print('ENTRY='+'|'.join('' if x is None else str(x) for x in r))
+          PY

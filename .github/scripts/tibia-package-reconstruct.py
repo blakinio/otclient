@@ -3,8 +3,8 @@
 
 Package entries are accepted only when both packedhash and unpackedhash verify.
 The official assets-current manifest omits unpackedhash for most entries; that
-mode must be opted into explicitly and still requires every downloaded packed
-object to match its manifest packedhash before deterministic decoding.
+mode must be opted into explicitly. Such entries are runtime cache objects and
+must remain byte-for-byte at their manifest path (including .lzma suffix).
 """
 from __future__ import annotations
 
@@ -55,75 +55,64 @@ def lzma_filter_from_header(data: bytes, header_off: int) -> dict[str, int]:
     return {"id": lzma.FILTER_LZMA1, "dict_size": dict_size, "lc": lc, "lp": lp, "pb": pb}
 
 
-def lzma_raw_from_header(data: bytes, header_off: int, require_eof: bool = True) -> bytes:
+def lzma_raw_from_header(data: bytes, header_off: int) -> bytes:
     filt = lzma_filter_from_header(data, header_off)
-    payload = data[header_off + 13 :]
-    if require_eof:
-        return lzma.decompress(payload, format=lzma.FORMAT_RAW, filters=[filt])
-    dec = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=[filt])
-    return dec.decompress(payload)
+    return lzma.decompress(data[header_off + 13 :], format=lzma.FORMAT_RAW, filters=[filt])
 
 
 def decode_object(data: bytes, rel: str, expected_hash: str | None) -> tuple[bytes, str, str]:
-    """Return (unpacked bytes, output relative path, transform name)."""
+    """Return (bytes to write, output relative path, transform name)."""
+    # assets-current entries without unpackedhash are consumed by the client
+    # in their exact packed representation/path. The packedhash was already
+    # verified by fetch_one; do not strip .lzma or decode them.
+    if expected_hash is None:
+        if not ALLOW_MISSING_UNPACKED:
+            raise RuntimeError(f"unpackedhash missing outside explicit assets mode: {rel}")
+        return data, rel, "packedhash-preserved"
+
     out_rel = rel[:-5] if rel.endswith(".lzma") else rel
+    if digest(data) == expected_hash:
+        return data, out_rel, "identity"
 
-    if expected_hash:
-        if digest(data) == expected_hash:
-            return data, out_rel, "identity"
+    if rel.endswith(".lzma") and len(data) >= 45:
+        try:
+            out = lzma_raw_from_header(data, 32)
+            if digest(out) == expected_hash:
+                return out, out_rel, "cipsoft-envelope"
+        except lzma.LZMAError:
+            pass
 
-        if rel.endswith(".lzma") and len(data) >= 45:
+    candidates: list[tuple[str, bytes]] = []
+    for off in (0, 32):
+        if off < len(data):
+            candidates.append((f"tail-{off}", data[off:]))
             try:
-                out = lzma_raw_from_header(data, 32)
-                if digest(out) == expected_hash:
-                    return out, out_rel, "cipsoft-envelope"
+                candidates.append((f"alone-{off}", lzma.decompress(data[off:], format=lzma.FORMAT_ALONE)))
             except lzma.LZMAError:
                 pass
 
-        candidates: list[tuple[str, bytes]] = []
-        for off in (0, 32):
-            if off < len(data):
-                candidates.append((f"tail-{off}", data[off:]))
-                try:
-                    candidates.append((f"alone-{off}", lzma.decompress(data[off:], format=lzma.FORMAT_ALONE)))
-                except lzma.LZMAError:
-                    pass
-
-        if rel.endswith(".lzma"):
-            stop = min(64, max(0, len(data) - 13))
-            for off in range(stop + 1):
-                try:
-                    out = lzma_raw_from_header(data, off)
-                except lzma.LZMAError:
-                    continue
-                candidates.append((f"embedded-header-{off}", out))
-
-        if expected_hash == digest(b""):
-            candidates.append(("manifest-empty", b""))
-
-        seen: set[str] = set()
-        for name, out in candidates:
-            h = digest(out)
-            if h in seen:
+    if rel.endswith(".lzma"):
+        stop = min(64, max(0, len(data) - 13))
+        for off in range(stop + 1):
+            try:
+                out = lzma_raw_from_header(data, off)
+            except lzma.LZMAError:
                 continue
-            seen.add(h)
-            if h == expected_hash:
-                return out, out_rel, name
+            candidates.append((f"embedded-header-{off}", out))
 
-        raise RuntimeError(f"no hash-verified unpack transform for {rel}; packed_size={len(data)}")
+    if expected_hash == digest(b""):
+        candidates.append(("manifest-empty", b""))
 
-    # assets-current packed-hash-only mode: packed bytes were already verified.
-    if not ALLOW_MISSING_UNPACKED:
-        raise RuntimeError(f"unpackedhash missing outside explicit assets mode: {rel}")
-    if not rel.endswith(".lzma"):
-        return data, out_rel, "packedhash-identity"
-    if len(data) < 45:
-        raise RuntimeError(f"short CipSoft asset envelope: {rel}; packed_size={len(data)}")
-    try:
-        out = lzma_raw_from_header(data, 32, require_eof=False)
-    except lzma.LZMAError as exc:
-        raise RuntimeError(f"CipSoft asset decode failed: {rel}") from exc
-    return out, out_rel, "packedhash-cipsoft-envelope"
+    seen: set[str] = set()
+    for name, out in candidates:
+        h = digest(out)
+        if h in seen:
+            continue
+        seen.add(h)
+        if h == expected_hash:
+            return out, out_rel, name
+
+    raise RuntimeError(f"no hash-verified unpack transform for {rel}; packed_size={len(data)}")
 
 
 def collect_entries(doc: object) -> dict[str, tuple[str, str | None]]:
@@ -188,14 +177,14 @@ def fetch_one(item: tuple[str, tuple[str, str | None]]) -> tuple[int, int, str, 
         packed = tmp.read_bytes()
         if digest(packed) != packed_hash:
             raise RuntimeError(f"packed hash mismatch: {rel}")
-        unpacked, out_rel, transform = decode_object(packed, rel, unpacked_hash)
+        written, out_rel, transform = decode_object(packed, rel, unpacked_hash)
         p = safe_rel(out_rel)
         target = OUT.joinpath(*p.parts)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(unpacked)
+        target.write_bytes(written)
         if p.parts and p.parts[0] == "bin":
             target.chmod(0o755)
-        return len(packed), len(unpacked), transform, unpacked_hash is not None
+        return len(packed), len(written), transform, unpacked_hash is not None
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -206,16 +195,16 @@ def main() -> None:
     if not entries:
         raise SystemExit("manifest has no file entries")
     OUT.mkdir(parents=True, exist_ok=True)
-    packed_total = unpacked_total = done = unpacked_hash_count = 0
+    packed_total = written_total = done = unpacked_hash_count = 0
     transforms: dict[str, int] = {}
     items = sorted(entries.items())
     with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as ex:
         futures = [ex.submit(fetch_one, item) for item in items]
         try:
             for f in concurrent.futures.as_completed(futures):
-                packed, unpacked, transform, had_unpacked_hash = f.result()
+                packed, written, transform, had_unpacked_hash = f.result()
                 packed_total += packed
-                unpacked_total += unpacked
+                written_total += written
                 done += 1
                 unpacked_hash_count += int(had_unpacked_hash)
                 transforms[transform] = transforms.get(transform, 0) + 1
@@ -227,7 +216,7 @@ def main() -> None:
             raise
     print(f"PACKAGE_FILES_RECONSTRUCTED={done}")
     print(f"PACKAGE_PACKED_BYTES_VERIFIED={packed_total}")
-    print(f"PACKAGE_UNPACKED_BYTES_WRITTEN={unpacked_total}")
+    print(f"PACKAGE_BYTES_WRITTEN={written_total}")
     print(f"PACKAGE_UNPACKED_HASH_VERIFIED_COUNT={unpacked_hash_count}")
     print(f"PACKAGE_PACKED_HASH_ONLY_COUNT={done-unpacked_hash_count}")
     for name, count in sorted(transforms.items()):

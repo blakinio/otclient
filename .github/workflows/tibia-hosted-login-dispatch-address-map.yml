@@ -1,0 +1,132 @@
+name: Tibia hosted login dispatch address map
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-login-dispatch-address-map.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  map:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Install static analysis support
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends binutils curl python3-capstone python3-pyelftools
+
+      - name: Fetch and decode exact client through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r=/tmp/w; mkdir -p "$r/bin" "$r/state" /tmp/c; cd "$r/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c -
+          mkdir x; tar -xzf wp.tgz -C x; cp "$(find x -type f -name wireproxy -print -quit)" wireproxy; chmod 755 wgcf wireproxy
+          cd "$r/state"; "$r/bin/wgcf" register --accept-tos >/dev/null; "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" >w.conf
+          nohup "$r/bin/wireproxy" -c w.conf >/tmp/wp.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/t 2>/dev/null && break; sleep 2; done
+          grep -Eq '^warp=(on|plus)$' /tmp/t
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' -e "$u" -H 'Accept: */*' "$u" -o /tmp/c/client.lzma
+          echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  /tmp/c/client.lzma' | sha256sum -c -
+          python3 - <<'PY'
+          import hashlib,lzma,pathlib
+          b=pathlib.Path('/tmp/c/client.lzma').read_bytes(); q=b[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
+          f={'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}; o=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[f])
+          assert hashlib.sha256(o).hexdigest()=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          pathlib.Path('/tmp/c/client').write_bytes(o)
+          PY
+
+      - name: Find string VAs and executable RIP-relative references
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from elftools.elf.elffile import ELFFile
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86_const import X86_OP_MEM, X86_REG_RIP
+
+          client=Path('/tmp/c/client')
+          targets=[
+            'onCharacterSelectionConfirmed',
+            'requestCharacterLogin',
+            'onStartGameServerLoginStateEntered',
+            'onConnectClientToGameserver',
+            'onAbortConnectClientToGameserver',
+            'connectClientToGameserverWithExistingCredentials',
+            'connectToGameSession',
+            'onGameSessionConnected',
+            'onGameLoginSuccessful',
+            'onLoginAbortedStateEntered',
+            'onLoginFailedStateEntered',
+            'tibia::authentication::TGameserverLoginProcessController',
+            'tibia::gamewindow::TCharacterSelectionController',
+            'tibia::client::TAntiCheatController',
+            'tibia::game::TGameserverGameSession',
+          ]
+          raw=client.read_bytes()
+          with client.open('rb') as f:
+            elf=ELFFile(f)
+            sections=[]
+            exec_sections=[]
+            for s in elf.iter_sections():
+              off=int(s['sh_offset']); size=int(s['sh_size']); va=int(s['sh_addr'])
+              sections.append((s.name,off,size,va))
+              if int(s['sh_flags']) & 0x4 and size:
+                exec_sections.append((s.name,off,size,va))
+          def off_to_va(off):
+            for n,o,z,v in sections:
+              if o<=off<o+z: return v+(off-o),n
+            return None,None
+          string_vas={}
+          print('STRING_VA_MAP_BEGIN')
+          for t in targets:
+            needle=t.encode()+b'\x00'
+            poss=[]; start=0
+            while True:
+              p=raw.find(needle,start)
+              if p<0: break
+              va,sec=off_to_va(p); poss.append((va,sec,p)); start=p+1
+            string_vas[t]=[x[0] for x in poss if x[0] is not None]
+            print('TARGET='+t+' VAS='+','.join(f'0x{v:x}' for v,_,__ in poss if v is not None)+' SECTIONS='+','.join(str(s) for _,s,__ in poss if s))
+          print('STRING_VA_MAP_END')
+
+          md=Cs(CS_ARCH_X86,CS_MODE_64); md.detail=True
+          wanted={v:t for t,vs in string_vas.items() for v in vs}
+          refs={t:[] for t in targets}
+          for sec,off,size,base in exec_sections:
+            code=raw[off:off+size]
+            for ins in md.disasm(code,base):
+              for op in ins.operands:
+                if op.type==X86_OP_MEM and op.mem.base==X86_REG_RIP:
+                  dest=ins.address+ins.size+op.mem.disp
+                  if dest in wanted:
+                    refs[wanted[dest]].append((ins.address,sec,ins.mnemonic,ins.op_str))
+          print('EXEC_XREF_MAP_BEGIN')
+          for t in targets:
+            rs=refs[t]
+            print('TARGET='+t+' XREF_COUNT='+str(len(rs))+' XREFS='+','.join(f'0x{a:x}' for a,_,__,___ in rs[:64]))
+            for a,s,m,o in rs[:16]: print(f'  XREF target={t} at=0x{a:x} section={s} insn={m} {o}')
+          print('EXEC_XREF_MAP_END')
+
+          # Bounded disassembly around every unique executable xref. These are observation candidates only.
+          addrs=sorted({a for rs in refs.values() for a,_,__,___ in rs})
+          print('BOUNDED_XREF_DISASSEMBLY_BEGIN')
+          import subprocess
+          for a in addrs[:96]:
+            lo=max(0,a-0x70); hi=a+0x90
+            out=subprocess.check_output(['objdump','-d','-C',f'--start-address={lo}',f'--stop-address={hi}',str(client)],text=True,errors='replace')
+            print(f'BLOCK_XREF=0x{a:x}')
+            print(out)
+          print('BOUNDED_XREF_DISASSEMBLY_END')
+          PY

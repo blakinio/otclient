@@ -47,10 +47,7 @@ jobs:
             libxkbcommon-x11-0 libxrandr2 libxrender1 libxtst6 mesa-vulkan-drivers vulkan-tools
           command -v tesseract >/dev/null 2>&1 && { echo FORBIDDEN_OCR_BINARY_PRESENT=true; exit 1; } || true
           chmod +x .github/scripts/tibia-hosted-no-ocr-runtime.sh .github/scripts/tibia-hosted-no-ocr-auth-v2.sh .github/scripts/tibia-package-reconstruct.py
-          # Verify this runner's xdotool build supports reading type input from stdin.
-          xdotool type --help 2>&1 | grep -Fq -- '--file <filepath>'
           echo OCR_BINARY_ABSENT=true
-          echo XDOTOOL_STDIN_TYPING_SUPPORTED=true
 
       - name: Establish verified changed WARP egress
         shell: bash

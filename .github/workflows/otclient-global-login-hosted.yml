@@ -32,7 +32,14 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          direct_ip=$(curl -fsS --retry 5 --retry-all-errors --connect-timeout 10 --max-time 30 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
+          direct_ip=''
+          for endpoint in https://api.ipify.org https://icanhazip.com; do
+            candidate=$(curl -fsS --retry 5 --retry-all-errors --connect-timeout 10 --max-time 30 "$endpoint" 2>/dev/null | tr -d '\r\n ' || true)
+            if [[ "$candidate" =~ ^[0-9A-Fa-f:.]+$ ]]; then
+              direct_ip="$candidate"
+              break
+            fi
+          done
           [[ -n "$direct_ip" ]]
           r=/tmp/otclient-warp
           mkdir -p "$r/bin" "$r/state" "$PROBE_ROOT/runtime" "$PROBE_ROOT/home" "$PROBE_ROOT/things/1532"

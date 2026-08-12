@@ -47,18 +47,19 @@ jobs:
           echo LOGIN_REQUEST_TERMS_BEGIN
           grep -Ei 'loginservice|staylogged|client.?version|client.?build|version.?string|build.?version|authenticator|account.?password|account.?name|session.?key|user.?agent|content.?type|client.?identifier|client.?id|machine.?id|device.?id|product.?version|release.?version|protocol.?version' /tmp/client.strings | head -n 600 || true
           echo LOGIN_REQUEST_TERMS_END
-          echo NEAR_LOGIN_SERVICE_BEGIN
           python3 - <<'PY'
           import re
           rows=[]
           for line in open('/tmp/client.strings',errors='replace'):
               m=re.match(r'^\s*([0-9a-fA-F]+)\s+(.*)$',line.rstrip('\n'))
               if m: rows.append((int(m.group(1),16),m.group(2)))
-          anchors=[o for o,s in rows if 'loginservice' in s.lower()]
-          seen=set()
-          for a in anchors:
-              for o,s in rows:
-                  if abs(o-a)<=4096 and (o,s) not in seen:
-                      seen.add((o,s)); print(f'{o:x} {s}')
+          for label,needle,radius in [('LOGIN_SERVICE','loginservice',4096),('CLIENTVERSION','clientversion',4096),('STAYLOGGEDIN','stayloggedin',4096)]:
+              print('NEAR_'+label+'_BEGIN')
+              anchors=[o for o,s in rows if needle in s.lower()]
+              seen=set()
+              for a in anchors:
+                  for o,s in rows:
+                      if abs(o-a)<=radius and (o,s) not in seen:
+                          seen.add((o,s)); print(f'{o:x} {s}')
+              print('NEAR_'+label+'_END')
           PY
-          echo NEAR_LOGIN_SERVICE_END

@@ -14,13 +14,14 @@ import os
 from pathlib import Path, PurePosixPath
 import subprocess
 import tempfile
+import time
 import urllib.parse
 
 MANIFEST = Path(os.environ.get("TIBIA_MANIFEST", "/tmp/tibia-package/package.json"))
 OUT = Path(os.environ.get("TIBIA_PACKAGE_OUT", "/tmp/tibia-package/runtime"))
 BASE = os.environ["TIBIA_BASE_URL"].rstrip("/")
 SOCKS = os.environ.get("TIBIA_SOCKS", "127.0.0.1:25344")
-WORKERS = int(os.environ.get("TIBIA_DOWNLOAD_WORKERS", "8"))
+WORKERS = int(os.environ.get("TIBIA_DOWNLOAD_WORKERS", "6"))
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
 
 
@@ -56,12 +57,9 @@ def decode_verified(data: bytes, rel: str, expected_hash: str) -> tuple[bytes, s
     """Return (unpacked bytes, output relative path, verified transform name)."""
     out_rel = rel[:-5] if rel.endswith(".lzma") else rel
 
-    # Some manifest objects may already be stored in their final representation.
     if digest(data) == expected_hash:
         return data, out_rel, "identity"
 
-    # CipSoft's normal packed object envelope: 32-byte prefix + 13-byte
-    # LZMA-alone header + raw LZMA stream. The exact client uses this shape.
     if rel.endswith(".lzma") and len(data) >= 46:
         try:
             out = lzma_raw_from_header(data, 32)
@@ -70,8 +68,6 @@ def decode_verified(data: bytes, rel: str, expected_hash: str) -> tuple[bytes, s
         except lzma.LZMAError:
             pass
 
-    # Very small package entries use compact representations. Accept only a
-    # candidate that independently reproduces the signed manifest hash.
     candidates: list[tuple[str, bytes]] = []
     for off in (0, 32):
         if off < len(data):
@@ -82,8 +78,6 @@ def decode_verified(data: bytes, rel: str, expected_hash: str) -> tuple[bytes, s
                 pass
 
     if rel.endswith(".lzma"):
-        # Bounded scan for an embedded LZMA-alone header. This is not heuristic
-        # acceptance: the output must match unpackedhash exactly.
         stop = min(64, max(0, len(data) - 13))
         for off in range(stop + 1):
             try:
@@ -139,12 +133,27 @@ def fetch_one(item: tuple[str, tuple[str, str]]) -> tuple[int, int, str]:
         tmp = Path(tf.name)
     try:
         cmd = [
-            "curl", "--socks5-hostname", SOCKS, "--compressed", "-fL", "--retry", "3",
-            "--connect-timeout", "15", "--max-time", "300", "-A", UA, "-e", url,
+            "curl", "--socks5-hostname", SOCKS, "--http1.1", "--compressed", "-fL",
+            "--retry", "4", "--retry-all-errors", "--retry-delay", "1",
+            "--connect-timeout", "20", "--max-time", "300", "-A", UA, "-e", url,
             "-H", "Accept: */*", "-H", "Accept-Language: en-US,en;q=0.9",
             "-H", "Cache-Control: no-cache", url, "-o", str(tmp),
         ]
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        last_error: subprocess.CalledProcessError | None = None
+        for attempt in range(1, 7):
+            tmp.write_bytes(b"")
+            try:
+                subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                last_error = None
+                break
+            except subprocess.CalledProcessError as exc:
+                last_error = exc
+                if attempt == 6:
+                    break
+                time.sleep(min(2 ** attempt, 12))
+        if last_error is not None:
+            raise RuntimeError(f"download failed after bounded retries: {rel}") from last_error
+
         packed = tmp.read_bytes()
         if digest(packed) != packed_hash:
             raise RuntimeError(f"packed hash mismatch: {rel}")

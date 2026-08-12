@@ -1,0 +1,264 @@
+name: Tibia hosted structural login trace
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-login-structural-trace.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-complete-home
+      PACKAGE_BASE: https://static.tibia.com/launcher/tibiaclient-linux-current
+      ASSET_BASE: https://static.tibia.com/launcher/assets-current
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+      TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+    steps:
+      - name: Checkout exact probe source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Extract proven v4 runtime steps
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends python3-yaml
+          python3 - <<'PY'
+          import pathlib,yaml
+          p=pathlib.Path('.github/workflows/tibia-hosted-complete-assets-no-ocr-login-v4.yml')
+          doc=yaml.safe_load(p.read_text())
+          steps=doc['jobs']['world-entry']['steps']
+          out=pathlib.Path('/tmp/tibia-v4-steps'); out.mkdir(parents=True,exist_ok=True)
+          wanted={
+            'Install strict no-OCR runtime':'01-install.sh',
+            'Establish pinned userspace WARP':'02-warp.sh',
+            'Reconstruct official package and preserve packed runtime assets':'03-runtime.sh',
+            'Start exact client through WARP':'04-start.sh',
+            'Login and activate first character without OCR':'06-login.sh',
+            'Require physical decoded world entry':'07-require.sh',
+          }
+          seen=set()
+          for step in steps:
+            name=step.get('name')
+            if name in wanted:
+              run=step.get('run')
+              if not isinstance(run,str): raise SystemExit(f'missing run for {name}')
+              path=out/wanted[name]; path.write_text(run); path.chmod(0o700); seen.add(name)
+          missing=set(wanted)-seen
+          if missing: raise SystemExit('missing source steps: '+','.join(sorted(missing)))
+          print('PROVEN_V4_STEPS_EXTRACTED=true')
+          PY
+
+      - name: Reconstruct and start exact official client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for s in 01-install.sh 02-warp.sh 03-runtime.sh 04-start.sh; do
+            /usr/bin/bash --noprofile --norc -e -o pipefail "/tmp/tibia-v4-steps/$s"
+          done
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          kill -0 "$pid"
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo EXACT_CURRENT_CLIENT_RUNNING=true
+
+      - name: Arm structural login and Worldmap trace
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo sysctl -w kernel.yama.ptrace_scope=0 >/tmp/tibia-runtime/ptrace-sysctl.log 2>&1 || true
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          line=$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')
+          [[ -n "$line" ]]
+          start_hex=$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')
+          offset_hex=$(printf '%s\n' "$line" | awk '{print $3}')
+          bias=$((16#$start_hex-16#$offset_hex))
+          printf 'LOAD_BIAS=0x%x\n' "$bias"
+          addr() { printf '0x%x' $((bias+$1)); }
+          full=$(addr 0xcec8d0)
+          field=$(addr 0xcd3190)
+          char_confirm=$(addr 0xd47130)
+          start_gs=$(addr 0xcfb122)
+          login_failed=$(addr 0xcfb404)
+          login_aborted=$(addr 0xcfaea7)
+          gs_connected=$(addr 0xcfa0e0)
+          gs_secondary=$(addr 0xcfa110)
+          gs_disconnected=$(addr 0xcfa150)
+          client_existing=$(addr 0xd06660)
+          client_connect=$(addr 0xd06810)
+          client_abort=$(addr 0xd067b0)
+          session_connected=$(addr 0xd066e0)
+          gameclient_static=$(addr 0xd06260)
+          igamesession_static=$(addr 0xd26400)
+          : >/tmp/tibia-runtime/login-trace
+          cat >/tmp/tibia-runtime/structural-trace.gdb <<EOF
+          set pagination off
+          set confirm off
+          attach $pid
+          break *$full
+          commands 1
+            silent
+            shell printf 'FULLMAP_HANDLER_HIT\n' >>/tmp/tibia-runtime/login-trace
+            shell printf 'FULLMAP_HANDLER_HIT=true\n' >/tmp/tibia-runtime/worldmap-hit
+            disable 1
+            continue
+          end
+          break *$field
+          commands 2
+            silent
+            shell printf 'FIELDDATA_HANDLER_HIT\n' >>/tmp/tibia-runtime/login-trace
+            shell printf 'FIELDDATA_HANDLER_HIT=true\n' >/tmp/tibia-runtime/worldmap-hit
+            disable 2
+            continue
+          end
+          break *$char_confirm
+          commands 3
+            silent
+            shell printf 'CHARACTER_SELECTION_CONFIRMED\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$start_gs
+          commands 4
+            silent
+            shell printf 'START_GAMESERVER_LOGIN_STATE_ENTERED\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$login_failed
+          commands 5
+            silent
+            shell printf 'LOGIN_FAILED_STATE_ENTERED\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$login_aborted
+          commands 6
+            silent
+            shell printf 'LOGIN_ABORTED_STATE_ENTERED\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$gs_connected
+          commands 7
+            silent
+            shell printf 'GAMESERVER_TCP_CONNECTED\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$gs_secondary
+          commands 8
+            silent
+            shell printf 'GAMESERVER_TCP_SECONDARY_CONNECTED\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$gs_disconnected
+          commands 9
+            silent
+            shell printf 'GAMESERVER_TCP_DISCONNECTED\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$client_existing
+          commands 10
+            silent
+            shell printf 'CLIENT_CONNECT_EXISTING_CREDENTIALS\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$client_connect
+          commands 11
+            silent
+            shell printf 'CLIENT_CONNECT_GAMESERVER\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$client_abort
+          commands 12
+            silent
+            shell printf 'CLIENT_ABORT_GAMESERVER_CONNECT\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$session_connected
+          commands 13
+            silent
+            shell printf 'GAME_SESSION_CONNECTED\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$gameclient_static if \$esi==0 && \$edx==29
+          commands 14
+            silent
+            shell printf 'GAME_SESSION_LOGIN_SUCCESSFUL\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          break *$igamesession_static if \$esi==0 && \$edx==6
+          commands 15
+            silent
+            shell printf 'WORLD_ENTERED_SIGNAL\n' >>/tmp/tibia-runtime/login-trace
+            continue
+          end
+          echo STRUCTURAL_TRACE_ARMED=true\n
+          continue
+          EOF
+          rm -f /tmp/tibia-runtime/worldmap-hit /tmp/tibia-runtime/trace-gdb.log
+          gdb -q -nx -x /tmp/tibia-runtime/structural-trace.gdb >/tmp/tibia-runtime/trace-gdb.log 2>&1 &
+          printf '%s' "$!" >/tmp/tibia-runtime/gdb-pid
+          armed=0
+          for _ in $(seq 1 30); do
+            if grep -q 'STRUCTURAL_TRACE_ARMED=true' /tmp/tibia-runtime/trace-gdb.log 2>/dev/null; then armed=1; break; fi
+            kill -0 "$(cat /tmp/tibia-runtime/gdb-pid)" 2>/dev/null || break
+            sleep 1
+          done
+          if [[ "$armed" != 1 ]]; then
+            grep -E 'ptrace|Operation not permitted|Could not attach|Cannot access memory|Cannot insert breakpoint|No such process|Breakpoint|warning:' /tmp/tibia-runtime/trace-gdb.log | tail -n 160 || true
+            exit 1
+          fi
+          echo STRUCTURAL_LOGIN_TRACE_ARMED=true
+
+      - name: Execute proven no-OCR login activation
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          /usr/bin/bash --noprofile --norc -e -o pipefail /tmp/tibia-v4-steps/06-login.sh
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo STRUCTURAL_LOGIN_TRACE_BEGIN
+          cat /tmp/tibia-runtime/login-trace || true
+          echo STRUCTURAL_LOGIN_TRACE_END
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          kill -0 "$pid"
+          echo CLIENT_ALIVE_AFTER_STRUCTURAL_TRACE=true
+
+      - name: Classify world entry and last structural transition
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          echo STRUCTURAL_LOGIN_TRACE_FINAL_BEGIN
+          cat /tmp/tibia-runtime/login-trace || true
+          echo STRUCTURAL_LOGIN_TRACE_FINAL_END
+          last=$(tail -n1 /tmp/tibia-runtime/login-trace 2>/dev/null || true)
+          echo "LAST_STRUCTURAL_LOGIN_EVENT=${last:-NONE}"
+          if [[ -s /tmp/tibia-runtime/worldmap-hit ]]; then
+            cat /tmp/tibia-runtime/worldmap-hit
+            echo STRUCTURAL_IN_GAME=true
+            echo PHYSICAL_TIBIA_WORLD_LOGIN_PROVEN=true
+            kill -0 "$pid"
+            exit 0
+          fi
+          echo STRUCTURAL_IN_GAME=false
+          failed_assets=$(grep -c 'Failed to load asset' /tmp/tibia-runtime/client.log 2>/dev/null || true)
+          echo "FAILED_ASSET_LOAD_COUNT=$failed_assets"
+          tcp=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+          udp=$(ss -nup 2>/dev/null | grep "pid=$pid," || true)
+          direct=$(printf '%s\n' "$tcp" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -c . || true)
+          local=$(printf '%s\n' "$tcp" | awk '{print $5}' | grep -Ec '^(127\.0\.0\.1|\[::1\]):25344$' || true)
+          echo "ACTIVE_LOCAL_SOCKS_COUNT=$local"
+          echo "ACTIVE_DIRECT_TCP_COUNT=$direct"
+          echo "ACTIVE_UDP_COUNT=$(printf '%s\n' "$udp" | grep -c . || true)"
+          [[ "$direct" == 0 ]]
+          kill -0 "$pid"
+          exit 1

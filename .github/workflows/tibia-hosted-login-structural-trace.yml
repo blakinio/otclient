@@ -44,8 +44,6 @@ jobs:
             'Establish pinned userspace WARP':'02-warp.sh',
             'Reconstruct official package and preserve packed runtime assets':'03-runtime.sh',
             'Start exact client through WARP':'04-start.sh',
-            'Login and activate first character without OCR':'06-login.sh',
-            'Require physical decoded world entry':'07-require.sh',
           }
           seen=set()
           for step in steps:
@@ -56,7 +54,7 @@ jobs:
               path=out/wanted[name]; path.write_text(run); path.chmod(0o700); seen.add(name)
           missing=set(wanted)-seen
           if missing: raise SystemExit('missing source steps: '+','.join(sorted(missing)))
-          print('PROVEN_V4_STEPS_EXTRACTED=true')
+          print('PROVEN_V4_RUNTIME_STEPS_EXTRACTED=true')
           PY
 
       - name: Reconstruct and start exact official client
@@ -218,13 +216,35 @@ jobs:
           fi
           echo STRUCTURAL_LOGIN_TRACE_ARMED=true
 
-      - name: Execute proven no-OCR login activation
+      - name: Execute proven no-OCR login and character activation geometry
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
-          /usr/bin/bash --noprofile --norc -e -o pipefail /tmp/tibia-v4-steps/06-login.sh
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          window=$(cat /tmp/tibia-runtime/client-window)
+          xdotool windowactivate --sync "$window" 2>/dev/null || true
+          xdotool mousemove --window "$window" 535 275 click 1
+          xdotool key --window "$window" ctrl+a
+          xdotool type --window "$window" --delay 3 -- "$TIBIA_TEST_EMAIL"
+          xdotool mousemove --window "$window" 535 304 click 1
+          xdotool key --window "$window" ctrl+a
+          xdotool type --window "$window" --delay 3 -- "$TIBIA_TEST_PASSWORD"
+          xdotool mousemove --window "$window" 590 388 click 1
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo ACCOUNT_LOGIN_SUBMITTED_WITHOUT_OCR=true
+          sleep 25
+          xdotool mousemove --window "$window" 285 193 click 1
+          sleep 0.4
+          xdotool key --window "$window" Return
+          echo FIRST_CHARACTER_RETURN_ACTIVATION_SENT=true
+          sleep 3
+          xdotool mousemove --window "$window" 285 193 click --repeat 2 --delay 160 1
+          echo FIRST_CHARACTER_DOUBLECLICK_FALLBACK_SENT=true
+          for _ in $(seq 1 100); do
+            [[ -s /tmp/tibia-runtime/worldmap-hit ]] && break
+            sleep 1
+          done
           echo STRUCTURAL_LOGIN_TRACE_BEGIN
           cat /tmp/tibia-runtime/login-trace || true
           echo STRUCTURAL_LOGIN_TRACE_END

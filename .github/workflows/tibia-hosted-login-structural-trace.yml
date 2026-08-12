@@ -222,7 +222,7 @@ jobs:
           set +x
           set -Eeuo pipefail
           [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
-          window=$(cat /tmp/tibia-runtime/client-window)
+          window=$(cat /tmp/tibia-runtime/window-id)
           xdotool windowactivate --sync "$window" 2>/dev/null || true
           xdotool mousemove --window "$window" 535 275 click 1
           xdotool key --window "$window" ctrl+a

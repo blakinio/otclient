@@ -1,3 +1,4 @@
+import copy
 import unittest
 
 from tools.tibia_worldmap_reconstruction.pipeline import (
@@ -66,8 +67,11 @@ class ReconstructionTests(unittest.TestCase):
             ],
         }
 
+    def valid_snapshot(self):
+        return reconstruct(self.observations([100, 200, 300, 900]), self.catalog, self.mapping)
+
     def test_full_pipeline_match(self):
-        snapshot = reconstruct(self.observations([100, 200, 300, 900]), self.catalog, self.mapping)
+        snapshot = self.valid_snapshot()
         tile = snapshot["tiles"][0]
         self.assertEqual("OK", tile["status"])
         self.assertEqual(CLIENT_VERSION, snapshot["client_version"])
@@ -77,9 +81,7 @@ class ReconstructionTests(unittest.TestCase):
         self.assertEqual([200, 300], tile["static_client_ids"])
         self.assertEqual([1200, 1300], tile["static_otb_ids"])
         self.assertEqual([900], tile["dynamic_client_ids"])
-
-        diff = compare(snapshot, self.reference())
-        self.assertEqual("MATCH", diff["diffs"][0]["status"])
+        self.assertEqual("MATCH", compare(snapshot, self.reference())["diffs"][0]["status"])
         plan = build_otbm_plan(snapshot)
         self.assertTrue(plan["exportable"])
         self.assertEqual(1, len(plan["tiles"]))
@@ -185,6 +187,51 @@ class ReconstructionTests(unittest.TestCase):
         plan = build_otbm_plan(snapshot)
         self.assertFalse(plan["exportable"])
         self.assertEqual("NO_TILES", plan["blockers"][0]["reason"])
+
+    def test_malformed_snapshot_static_ids_fail_closed_in_compare_and_plan(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["static_otb_ids"] = "1200,1300"
+        with self.assertRaises(ReconstructionError):
+            compare(snapshot, self.reference())
+        with self.assertRaises(ReconstructionError):
+            build_otbm_plan(snapshot)
+
+    def test_malformed_snapshot_ground_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["ground_otb_id"] = "1100"
+        with self.assertRaises(ReconstructionError):
+            build_otbm_plan(snapshot)
+
+    def test_forged_ok_snapshot_with_unmapped_ids_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["unmapped_client_ids"] = [999]
+        with self.assertRaises(ReconstructionError):
+            build_otbm_plan(snapshot)
+
+    def test_forged_ok_snapshot_without_ground_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["ground_otb_id"] = None
+        with self.assertRaises(ReconstructionError):
+            compare(snapshot, self.reference())
+
+    def test_unknown_snapshot_status_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["status"] = "MATCH"
+        with self.assertRaises(ReconstructionError):
+            build_otbm_plan(snapshot)
+
+    def test_duplicate_snapshot_coordinates_fail_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"].append(copy.deepcopy(snapshot["tiles"][0]))
+        with self.assertRaises(ReconstructionError):
+            compare(snapshot, self.reference())
+
+    def test_invalid_reference_item_type_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        reference = self.reference()
+        reference["tiles"][0]["static_otb_ids"] = [1200, True]
+        with self.assertRaises(ReconstructionError):
+            compare(snapshot, reference)
 
 
 if __name__ == "__main__":

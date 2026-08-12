@@ -1,0 +1,423 @@
+name: Tibia hosted direct-package no-OCR world entry v2
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260727-tibia-linux-runner-analysis
+    paths:
+      - .github/workflows/tibia-hosted-direct-package-no-ocr-login-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  world-entry:
+    name: Reconstruct exact client, enter world, hit Worldmap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-direct-home
+      TIBIA_PACKAGE_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_PACKED_CLIENT_SHA256: 496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b
+      TIBIA_BASE_URL: https://static.tibia.com/launcher/tibiaclient-linux-current
+
+    steps:
+      - name: Check out hash-verified reconstruction helper
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install bounded runtime without OCR
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ca-certificates curl dbus-x11 file gdb iproute2 procps proxychains4 x11-utils xclip xdotool xvfb \
+            libasound2t64 libatk1.0-0 libatspi2.0-0 libcups2 libdbus-1-3 libdrm2 libegl1 libfontconfig1 \
+            libfreetype6 libgbm1 libgl1 libglx0 libgtk-3-0 libnspr4 libnss3 libopengl0 libpulse0 libvulkan1 \
+            libx11-6 libx11-xcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 libxcb-shm0 libxcb-sync1 \
+            libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxcomposite1 libxdamage1 libxi6 \
+            libxkbcommon-x11-0 libxrandr2 libxrender1 libxtst6 mesa-vulkan-drivers vulkan-tools
+          for cmd in curl gdb proxychains4 xdpyinfo xclip xdotool Xvfb vulkaninfo; do command -v "$cmd" >/dev/null; done
+          test -f .github/scripts/tibia-package-reconstruct.py
+          if command -v tesseract >/dev/null 2>&1; then
+            echo FORBIDDEN_OCR_BINARY_PRESENT=true >&2
+            exit 1
+          fi
+          echo OCR_BINARY_ABSENT=true
+
+      - name: Establish pinned userspace WARP and prove changed egress
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          root=/tmp/tibia-warp
+          mkdir -p "$root/bin" "$root/state" /tmp/tibia-runtime "$HOME"
+          chmod 700 "$root" "$root/state" /tmp/tibia-runtime "$HOME"
+          cd "$root/bin"
+          curl -fL --retry 3 --connect-timeout 10 -o wgcf \
+            https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          chmod 755 wgcf
+          curl -fL --retry 3 --connect-timeout 10 -o wireproxy.tar.gz \
+            https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tar.gz' | sha256sum -c -
+          mkdir extract
+          tar -xzf wireproxy.tar.gz -C extract
+          cp "$(find extract -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wireproxy
+          cd "$root/state"
+          "$root/bin/wgcf" register --accept-tos >/dev/null
+          "$root/bin/wgcf" generate >/dev/null
+          chmod 600 wgcf-account.toml wgcf-profile.conf
+          cat >wireproxy.conf <<EOF
+          WGConfig = $root/state/wgcf-profile.conf
+
+          [Socks5]
+          BindAddress = 127.0.0.1:25344
+          EOF
+          chmod 600 wireproxy.conf
+          "$root/bin/wireproxy" -n -c wireproxy.conf
+          nohup "$root/bin/wireproxy" -c wireproxy.conf >"$root/wireproxy.log" 2>&1 </dev/null &
+
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/tibia-runtime/warp.trace 2>/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          [[ "$ready" == 1 ]]
+          direct_ip=$(curl -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
+          warp_ip=$(sed -n 's/^ip=//p' /tmp/tibia-runtime/warp.trace)
+          warp_state=$(sed -n 's/^warp=//p' /tmp/tibia-runtime/warp.trace)
+          [[ -n "$direct_ip" && -n "$warp_ip" && "$direct_ip" != "$warp_ip" ]]
+          [[ "$warp_state" == on || "$warp_state" == plus ]]
+          grep -E '^(loc|warp)=' /tmp/tibia-runtime/warp.trace
+          echo USERSPACE_WARP_EGRESS_VERIFIED=true
+
+          cat >/tmp/tibia-runtime/proxychains.conf <<'EOF'
+          strict_chain
+          proxy_dns
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 25344
+          EOF
+          proxy_ip=$(proxychains4 -f /tmp/tibia-runtime/proxychains.conf curl -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace 2>/tmp/tibia-runtime/proxy-smoke.log | sed -n 's/^ip=//p')
+          [[ "$proxy_ip" == "$warp_ip" ]]
+          echo PROXYCHAINS_WARP_EGRESS_VERIFIED=true
+
+      - name: Fetch and verify exact official manifest through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p /tmp/tibia-package
+          browser_ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+          fetch() {
+            local url="$1" out="$2"
+            curl --socks5-hostname 127.0.0.1:25344 --compressed -fL --retry 3 --connect-timeout 15 --max-time 180 \
+              -A "$browser_ua" -e "$url" -H 'Accept: */*' -H 'Accept-Language: en-US,en;q=0.9' \
+              -H 'Cache-Control: no-cache' "$url" -o "$out"
+          }
+          fetch "$TIBIA_BASE_URL/package.json.version" /tmp/tibia-package/package.json.version
+          observed_version=$(tr -d '\r\n[:space:]' </tmp/tibia-package/package.json.version)
+          echo "OBSERVED_PACKAGE_VERSION=$observed_version"
+          [[ "$observed_version" == "$TIBIA_PACKAGE_VERSION" ]]
+          fetch "$TIBIA_BASE_URL/package.json" /tmp/tibia-package/package.json
+          python3 - <<'PY'
+          import json, os, pathlib
+          doc=json.loads(pathlib.Path('/tmp/tibia-package/package.json').read_text())
+          if doc.get('version') != os.environ['TIBIA_PACKAGE_VERSION']:
+              raise SystemExit('package version mismatch')
+          rows=[]
+          def walk(v):
+              if isinstance(v,dict):
+                  if all(isinstance(v.get(k),str) and v.get(k) for k in ('url','packedhash','unpackedhash')):
+                      rows.append((v['url'],v['packedhash'].lower(),v['unpackedhash'].lower()))
+                  for x in v.values(): walk(x)
+              elif isinstance(v,list):
+                  for x in v: walk(x)
+          walk(doc)
+          entries={r[0]:r[1:] for r in rows}
+          packed,unpacked=entries.get('bin/client.lzma',(None,None))
+          if packed != os.environ['EXPECTED_PACKED_CLIENT_SHA256'] or unpacked != os.environ['EXPECTED_CLIENT_SHA256']:
+              raise SystemExit('client manifest identity changed')
+          print(f'PACKAGE_FILE_ENTRY_COUNT={len(entries)}')
+          print('PACKAGE_CLIENT_MANIFEST_IDENTITY_VERIFIED=true')
+          PY
+
+      - name: Reconstruct complete exact package with hash-verified transforms
+        shell: bash
+        env:
+          TIBIA_MANIFEST: /tmp/tibia-package/package.json
+          TIBIA_PACKAGE_OUT: /home/runner/tibia-direct-home/.local/share/CipSoft GmbH/Tibia/packages/Tibia
+          TIBIA_SOCKS: 127.0.0.1:25344
+          TIBIA_DOWNLOAD_WORKERS: '8'
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$TIBIA_PACKAGE_OUT"
+          python3 .github/scripts/tibia-package-reconstruct.py
+          client="$TIBIA_PACKAGE_OUT/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          qt=$(find "$TIBIA_PACKAGE_OUT" -type f -name libQt6WebEngineQuick.so.6 -print -quit 2>/dev/null || true)
+          [[ -n "$qt" ]]
+          echo EXACT_CLIENT_IDENTITY_VERIFIED=true
+          echo COMPLETE_BUNDLED_RUNTIME_RECONSTRUCTED=true
+
+      - name: Launch exact client normally through WARP without debugger
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_CACHE_HOME="$HOME/.cache"
+          mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/tibia-runtime/xvfb.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do xdpyinfo -display :99 >/dev/null 2>&1 && break; sleep 1; done
+          xdpyinfo -display :99 >/dev/null
+
+          pkg="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$pkg/bin/client"
+          qt=$(find "$pkg" -type f -name libQt6WebEngineQuick.so.6 -print -quit)
+          libdir=$(dirname "$qt")
+          base=$(dirname "$libdir")
+          plugdir=''; qmldir=''
+          for d in "$base/plugins" "$libdir/plugins" "$pkg/plugins" "$pkg/bin/plugins"; do [[ -d "$d" ]] && { plugdir=$d; break; }; done
+          for d in "$base/qml" "$libdir/qml" "$pkg/qml" "$pkg/bin/qml"; do [[ -d "$d" ]] && { qmldir=$d; break; }; done
+          lvp=$(find /usr/share/vulkan/icd.d -maxdepth 1 -type f -name 'lvp_icd*.json' -print -quit)
+          [[ -n "$lvp" ]]
+          VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp" LIBGL_ALWAYS_SOFTWARE=1 DISPLAY=:99 \
+            vulkaninfo --summary >/tmp/tibia-runtime/vulkan-summary.txt 2>/dev/null
+          grep -Eqi 'lavapipe|llvmpipe' /tmp/tibia-runtime/vulkan-summary.txt
+          echo SOFTWARE_VULKAN_VERIFIED=true
+
+          args=(env DISPLAY=:99 HOME="$HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CACHE_HOME="$XDG_CACHE_HOME" \
+            LD_LIBRARY_PATH="$libdir" LIBGL_ALWAYS_SOFTWARE=1 QT_XCB_GL_INTEGRATION=none VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp")
+          [[ -n "$plugdir" ]] && args+=(QT_PLUGIN_PATH="$plugdir")
+          [[ -n "$qmldir" ]] && args+=(QML2_IMPORT_PATH="$qmldir")
+          args+=(proxychains4 -f /tmp/tibia-runtime/proxychains.conf "$client")
+          cd "$pkg"
+          : >/tmp/tibia-runtime/client.log
+          nohup "${args[@]}" >/tmp/tibia-runtime/client.log 2>&1 </dev/null &
+          for _ in $(seq 1 50); do pgrep -x client >/dev/null && break; sleep 0.5; done
+          pid=$(pgrep -x client | head -n1)
+          [[ -n "$pid" ]]
+          printf '%s' "$pid" >/tmp/tibia-runtime/client-pid
+          printf '%s' "$client" >/tmp/tibia-runtime/client-path
+          sleep 10
+          kill -0 "$pid"
+          if grep -Fqi 'failed vulkan instance' /tmp/tibia-runtime/client.log; then
+            echo CLIENT_FAILED_VULKAN_INSTANCE=true >&2
+            exit 1
+          fi
+          echo CLIENT_FAILED_VULKAN_INSTANCE=false
+
+          best=''; best_area=0; bw=0; bh=0
+          for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
+            geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
+            width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
+            height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+            [[ -n "$width" && -n "$height" ]] || continue
+            area=$((width*height))
+            if (( area > best_area )); then best=$w; best_area=$area; bw=$width; bh=$height; fi
+          done
+          echo "CLIENT_WINDOW_SIZE=${bw}x${bh}"
+          [[ -n "$best" && "$bw" == 1020 && "$bh" == 650 ]]
+          printf '%s' "$best" >/tmp/tibia-runtime/window-id
+
+          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+          direct=$(printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -c . || true)
+          udp=$(ss -nup 2>/dev/null | grep "pid=$pid," | grep -c . || true)
+          local_socks=$(printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ec '^(127\.0\.0\.1|\[::1\]):25344$' || true)
+          echo "PRELOGIN_LOCAL_SOCKS_TCP_COUNT=$local_socks"
+          echo "PRELOGIN_DIRECT_TCP_COUNT=$direct"
+          echo "PRELOGIN_UDP_COUNT=$udp"
+          [[ "$direct" -eq 0 && "$udp" -eq 0 && "$local_socks" -gt 0 ]]
+          echo CLIENT_TCP_USERSPACE_WARP_CONFINEMENT_VERIFIED=true
+
+          # Fresh HOME starts at the account landing screen. This fixed click opens Account Login.
+          xdotool windowactivate --sync "$best" 2>/dev/null || true
+          xdotool mousemove --window "$best" 510 302 click 1
+          sleep 2
+          echo ACCOUNT_LOGIN_CONTROL_ACTIVATED_BY_FIXED_GEOMETRY=true
+
+      - name: Submit credentials and enter first character without OCR
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          best=$(cat /tmp/tibia-runtime/window-id)
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^WIDTH=//p')" == 1020 ]]
+          [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^HEIGHT=//p')" == 650 ]]
+
+          xdotool mousemove --window "$best" 535 275 click 1
+          xdotool key --window "$best" ctrl+a
+          printf '%s' "$TIBIA_TEST_EMAIL" | xclip -selection clipboard -in
+          xdotool key --window "$best" ctrl+v
+          printf '' | xclip -selection clipboard -in
+          xdotool mousemove --window "$best" 535 304 click 1
+          xdotool key --window "$best" ctrl+a
+          printf '%s' "$TIBIA_TEST_PASSWORD" | xclip -selection clipboard -in
+          xdotool key --window "$best" ctrl+v
+          printf '' | xclip -selection clipboard -in
+          xdotool mousemove --window "$best" 590 388 click 1
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo ACCOUNT_LOGIN_SUBMITTED_WITHOUT_OCR=true
+
+          # Fresh no-OCR timing derived from the independently successful exact-client run:
+          # Select Character became actionable about two seconds after Login submit.
+          sleep 4
+          before_lines=$(wc -l </tmp/tibia-runtime/client.log)
+          printf '%s' "$before_lines" >/tmp/tibia-runtime/log-before-character
+          xdotool mousemove --window "$best" 285 193 click 1
+          sleep 0.4
+          xdotool key --window "$best" Return
+          echo FIRST_CHARACTER_RETURN_ACTIVATION_SENT=true
+          sleep 3
+          xdotool mousemove --window "$best" 285 193 click --repeat 2 --delay 160 1
+          echo FIRST_CHARACTER_DOUBLECLICK_SENT=true
+
+          # Give the official client enough time to complete its transition before debugger attachment.
+          sustained=0; max_local=0; direct_seen=0; udp_seen=0; consecutive=0
+          for _ in $(seq 1 20); do
+            sleep 1
+            kill -0 "$pid"
+            tcp_rows=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+            udp_rows=$(ss -nup 2>/dev/null | grep "pid=$pid," || true)
+            local_count=$(printf '%s\n' "$tcp_rows" | awk '$5 ~ /127\.0\.0\.1:25344$/ || $5 ~ /\[::1\]:25344$/ {n++} END{print n+0}')
+            total_count=$(printf '%s\n' "$tcp_rows" | grep -c . || true)
+            direct_count=$((total_count-local_count))
+            udp_count=$(printf '%s\n' "$udp_rows" | grep -c . || true)
+            (( local_count > max_local )) && max_local=$local_count || true
+            (( direct_count > 0 )) && direct_seen=1 || true
+            (( udp_count > 0 )) && udp_seen=1 || true
+            if (( local_count >= 2 )); then consecutive=$((consecutive+1)); else consecutive=0; fi
+            if (( consecutive >= 6 )); then sustained=1; break; fi
+          done
+          echo "POST_ACTIVATION_LOCAL_SOCKS_MAX=$max_local"
+          echo "POST_ACTIVATION_DIRECT_TCP_SEEN=$direct_seen"
+          echo "POST_ACTIVATION_UDP_SEEN=$udp_seen"
+          echo "POST_ACTIVATION_SUSTAINED_TUNNELED_SESSION=$sustained"
+          [[ "$direct_seen" -eq 0 && "$udp_seen" -eq 0 ]]
+          (( sustained == 1 ))
+
+          # Sanitize proxy log to counts/ports only; no remote addresses or names are emitted.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('/tmp/tibia-runtime/client.log')
+          lines=p.read_text(errors='replace').splitlines() if p.exists() else []
+          before=int(Path('/tmp/tibia-runtime/log-before-character').read_text().strip() or '0')
+          post=lines[before:]
+          ports=[]
+          for line in post:
+              if 'proxychains' not in line.lower() and 'strict chain' not in line.lower():
+                  continue
+              for m in re.finditer(r':([0-9]{2,5})(?=\D|$)',line):
+                  n=int(m.group(1))
+                  if 1 <= n <= 65535: ports.append(n)
+          uniq=sorted(set(ports))
+          print(f'POST_ACTIVATION_PROXY_EVENT_LINES={len(post)}')
+          print('POST_ACTIVATION_PROXY_PORTS=' + ','.join(map(str,uniq)))
+          print('POST_ACTIVATION_NON_HTTPS_PORT_PRESENT=' + str(any(p not in {443,25344} for p in uniq)).lower())
+          PY
+
+      - name: Attach only after transition and require decoded Worldmap hit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          client=$(cat /tmp/tibia-runtime/client-path)
+          best=$(cat /tmp/tibia-runtime/window-id)
+          kill -0 "$pid"
+          sudo sysctl -w kernel.yama.ptrace_scope=0 >/dev/null 2>&1 || true
+
+          map_line=$(awk -v p="$client" '$NF==p && $2 ~ /r-xp/ {print; exit}' "/proc/$pid/maps")
+          [[ -n "$map_line" ]]
+          start_hex=$(printf '%s\n' "$map_line" | awk '{split($1,a,"-"); print a[1]}')
+          offset_hex=$(printf '%s\n' "$map_line" | awk '{print $3}')
+          load_bias=$((16#$start_hex - 16#$offset_hex))
+          common=$((load_bias + 0x19a8a80))
+          fielddata=$((load_bias + 0xcd3190))
+          printf 'PIE_LOAD_BIAS=0x%x\n' "$load_bias"
+
+          cat >/tmp/tibia-runtime/worldmap.gdb <<EOF
+          set pagination off
+          set confirm off
+          set print thread-events off
+          attach $pid
+          break *$common
+          commands 1
+            silent
+            shell printf 'COMMON_MAP_DATA_HIT=true\\n' > /tmp/tibia-runtime/worldmap-hit
+            detach
+            quit
+          end
+          break *$fielddata
+          commands 2
+            silent
+            shell printf 'FIELDDATA_HANDLER_HIT=true\\n' > /tmp/tibia-runtime/worldmap-hit
+            detach
+            quit
+          end
+          continue
+          EOF
+          rm -f /tmp/tibia-runtime/worldmap-hit
+          sudo -n gdb -q -nx -x /tmp/tibia-runtime/worldmap.gdb >/tmp/tibia-runtime/worldmap-gdb.log 2>&1 &
+          gdbpid=$!
+          armed=0
+          for _ in $(seq 1 25); do
+            if grep -Eq 'Breakpoint (1|2)' /tmp/tibia-runtime/worldmap-gdb.log 2>/dev/null; then armed=1; break; fi
+            if ! kill -0 "$gdbpid" 2>/dev/null; then break; fi
+            sleep 0.2
+          done
+          if [[ "$armed" != 1 ]]; then
+            echo POST_ENTRY_GDB_ARM_FAILED=true >&2
+            grep -E 'ptrace|attach|No such process|Operation not permitted|Breakpoint' /tmp/tibia-runtime/worldmap-gdb.log | head -20 || true
+            exit 1
+          fi
+          echo POST_ENTRY_WORLDMAP_BREAKPOINT_ARMED=true
+
+          # A bounded one-tile attempt should produce directional/FieldData map work when in the game world.
+          for key in Right Left Up Down; do
+            xdotool key --window "$best" "$key" || true
+            for _ in $(seq 1 10); do
+              [[ -s /tmp/tibia-runtime/worldmap-hit ]] && break 2
+              sleep 0.2
+            done
+          done
+
+          if [[ ! -s /tmp/tibia-runtime/worldmap-hit ]]; then
+            echo DECODED_WORLDMAP_HIT=false
+            echo GDB_SAFE_DIAGNOSTIC_BEGIN
+            grep -E 'ptrace|attach|No such process|Operation not permitted|Breakpoint' /tmp/tibia-runtime/worldmap-gdb.log | head -30 || true
+            echo GDB_SAFE_DIAGNOSTIC_END
+            exit 1
+          fi
+          cat /tmp/tibia-runtime/worldmap-hit
+          echo DECODED_WORLDMAP_HIT=true
+          kill -0 "$pid"
+
+          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+          direct=$(printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -c . || true)
+          udp=$(ss -nup 2>/dev/null | grep "pid=$pid," | grep -c . || true)
+          echo "FINAL_DIRECT_TCP_COUNT=$direct"
+          echo "FINAL_UDP_COUNT=$udp"
+          [[ "$direct" -eq 0 && "$udp" -eq 0 ]]
+          echo PHYSICAL_TIBIA_WORLD_LOGIN_PROVEN=true
+          echo TIBIA_CHARACTER_REACHED_GAME_MAP=true
+          echo STRICT_NO_OCR_WORLD_ENTRY_PROVEN=true

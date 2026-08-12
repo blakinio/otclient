@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
 import json
+from typing import Any
 
 OBS_SCHEMA = "otclient.worldmap.observation.v1"
 CATALOG_SCHEMA = "otclient.worldmap.appearance-catalog.v1"
@@ -14,6 +14,7 @@ OTBM_PLAN_SCHEMA = "otclient.worldmap.otbm-plan.v1"
 ALLOWED_ROLES = {"ground", "border", "static", "dynamic", "creature", "npc", "unknown"}
 DYNAMIC_ROLES = {"dynamic", "creature", "npc"}
 STATIC_ROLES = {"static", "border"}
+SNAPSHOT_STATUSES = {"OK", "CONFLICT", "GROUND_UNRESOLVED", "UNKNOWN_ROLE", "UNMAPPED_ID"}
 
 
 class ReconstructionError(ValueError):
@@ -26,6 +27,20 @@ def _require_int(value: Any, name: str, *, minimum: int = 0, maximum: int | None
     if value < minimum or (maximum is not None and value > maximum):
         raise ReconstructionError(f"{name} out of range")
     return value
+
+
+def _require_optional_int(
+    value: Any, name: str, *, minimum: int = 0, maximum: int | None = None
+) -> int | None:
+    if value is None:
+        return None
+    return _require_int(value, name, minimum=minimum, maximum=maximum)
+
+
+def _require_int_list(value: Any, name: str, *, maximum: int = 0xFFFFFFFF) -> list[int]:
+    if not isinstance(value, list):
+        raise ReconstructionError(f"{name} must be an array")
+    return [_require_int(v, f"{name}[{i}]", maximum=maximum) for i, v in enumerate(value)]
 
 
 def _require_nonempty_str(value: Any, name: str) -> str:
@@ -60,19 +75,13 @@ def validate_observations(doc: Any) -> tuple[str, list[dict[str, Any]]]:
         if not isinstance(record, dict):
             raise ReconstructionError(f"observations[{index}] must be an object")
         pos = _position(record.get("position"))
-        contents = record.get("contents")
-        if not isinstance(contents, list):
-            raise ReconstructionError(f"observations[{index}].contents must be an array")
-        normalized_contents = [
-            _require_int(v, f"observations[{index}].contents[{i}]", maximum=0xFFFFFFFF)
-            for i, v in enumerate(contents)
-        ]
+        contents = _require_int_list(record.get("contents"), f"observations[{index}].contents")
         provenance = record.get("provenance")
         if not isinstance(provenance, dict):
             raise ReconstructionError(f"observations[{index}].provenance must be an object")
         _require_nonempty_str(provenance.get("source"), f"observations[{index}].provenance.source")
         _require_nonempty_str(provenance.get("capture_id"), f"observations[{index}].provenance.capture_id")
-        out.append({"position": pos, "contents": normalized_contents, "provenance": provenance})
+        out.append({"position": pos, "contents": contents, "provenance": provenance})
     return client_version, out
 
 
@@ -136,8 +145,7 @@ def reconstruct(observations_doc: Any, catalog_doc: Any, mapping_doc: Any) -> di
     observation_version, observations = validate_observations(observations_doc)
     catalog_version, catalog = validate_catalog(catalog_doc)
     mapping_version, otb_version, mapping = validate_mapping(mapping_doc)
-    versions = {observation_version, catalog_version, mapping_version}
-    if len(versions) != 1:
+    if len({observation_version, catalog_version, mapping_version}) != 1:
         raise ReconstructionError(
             "client_version mismatch between observations, appearance catalog and OTB mapping"
         )
@@ -174,14 +182,14 @@ def reconstruct(observations_doc: Any, catalog_doc: Any, mapping_doc: Any) -> di
             roles = catalog.get(client_id)
             if not roles or roles == {"unknown"}:
                 unknown_roles.append(client_id)
-                continue
-            if "ground" in roles:
+            elif "ground" in roles:
                 ground_candidates.append(client_id)
-                continue
-            if roles & DYNAMIC_ROLES:
+            elif roles & DYNAMIC_ROLES:
                 dynamic_ids.append(client_id)
-                continue
-            static_ids.append(client_id)
+            elif roles & STATIC_ROLES:
+                static_ids.append(client_id)
+            else:
+                unknown_roles.append(client_id)
 
         tile["dynamic_client_ids"] = dynamic_ids
         tile["unknown_role_client_ids"] = unknown_roles
@@ -206,7 +214,6 @@ def reconstruct(observations_doc: Any, catalog_doc: Any, mapping_doc: Any) -> di
             else:
                 tile["static_otb_ids"].append(otb_id)
         tile["unmapped_client_ids"] = list(dict.fromkeys(tile["unmapped_client_ids"]))
-
         if tile["status"] == "OK" and tile["unmapped_client_ids"]:
             tile["status"] = "UNMAPPED_ID"
         tiles.append(tile)
@@ -217,6 +224,87 @@ def reconstruct(observations_doc: Any, catalog_doc: Any, mapping_doc: Any) -> di
         "otb_version": otb_version,
         "tiles": tiles,
     }
+
+
+def validate_snapshot(doc: Any) -> tuple[str, str, dict[str, dict[str, Any]]]:
+    if not isinstance(doc, dict) or doc.get("schema") != SNAPSHOT_SCHEMA:
+        raise ReconstructionError(f"snapshot schema must be {SNAPSHOT_SCHEMA}")
+    client_version = _require_nonempty_str(doc.get("client_version"), "snapshot.client_version")
+    otb_version = _require_nonempty_str(doc.get("otb_version"), "snapshot.otb_version")
+    tiles = doc.get("tiles")
+    if not isinstance(tiles, list):
+        raise ReconstructionError("snapshot tiles must be an array")
+
+    out: dict[str, dict[str, Any]] = {}
+    for index, tile in enumerate(tiles):
+        if not isinstance(tile, dict):
+            raise ReconstructionError(f"snapshot tiles[{index}] must be an object")
+        pos = _position(tile.get("position"))
+        key = _key(pos)
+        if key in out:
+            raise ReconstructionError(f"duplicate snapshot coordinate {key}")
+        status = tile.get("status")
+        if not isinstance(status, str) or status not in SNAPSHOT_STATUSES:
+            raise ReconstructionError(f"snapshot tiles[{index}].status is unsupported")
+
+        variants_raw = tile.get("observed_variants")
+        if not isinstance(variants_raw, list):
+            raise ReconstructionError(f"snapshot tiles[{index}].observed_variants must be an array")
+        variants = [
+            _require_int_list(v, f"snapshot tiles[{index}].observed_variants[{i}]")
+            for i, v in enumerate(variants_raw)
+        ]
+        ground_client_id = _require_optional_int(
+            tile.get("ground_client_id"), f"snapshot tiles[{index}].ground_client_id", maximum=0xFFFFFFFF
+        )
+        ground_otb_id = _require_optional_int(
+            tile.get("ground_otb_id"), f"snapshot tiles[{index}].ground_otb_id", maximum=0xFFFFFFFF
+        )
+        static_client_ids = _require_int_list(
+            tile.get("static_client_ids"), f"snapshot tiles[{index}].static_client_ids"
+        )
+        static_otb_ids = _require_int_list(
+            tile.get("static_otb_ids"), f"snapshot tiles[{index}].static_otb_ids"
+        )
+        dynamic_client_ids = _require_int_list(
+            tile.get("dynamic_client_ids"), f"snapshot tiles[{index}].dynamic_client_ids"
+        )
+        unmapped_client_ids = _require_int_list(
+            tile.get("unmapped_client_ids"), f"snapshot tiles[{index}].unmapped_client_ids"
+        )
+        unknown_role_client_ids = _require_int_list(
+            tile.get("unknown_role_client_ids"), f"snapshot tiles[{index}].unknown_role_client_ids"
+        )
+
+        if status == "OK":
+            if ground_client_id is None or ground_otb_id is None:
+                raise ReconstructionError(f"snapshot tiles[{index}] OK tile requires mapped ground")
+            if unmapped_client_ids or unknown_role_client_ids:
+                raise ReconstructionError(f"snapshot tiles[{index}] OK tile cannot contain unresolved IDs")
+            if len(static_client_ids) != len(static_otb_ids):
+                raise ReconstructionError(f"snapshot tiles[{index}] static client/OTB lengths differ")
+            if len(variants) != 1:
+                raise ReconstructionError(f"snapshot tiles[{index}] OK tile requires one observed variant")
+        elif status == "CONFLICT" and len(variants) < 2:
+            raise ReconstructionError(f"snapshot tiles[{index}] CONFLICT requires multiple variants")
+        elif status == "UNMAPPED_ID" and not unmapped_client_ids:
+            raise ReconstructionError(f"snapshot tiles[{index}] UNMAPPED_ID requires unresolved mappings")
+        elif status == "UNKNOWN_ROLE" and not unknown_role_client_ids:
+            raise ReconstructionError(f"snapshot tiles[{index}] UNKNOWN_ROLE requires unknown IDs")
+
+        out[key] = {
+            "position": {"x": pos[0], "y": pos[1], "z": pos[2]},
+            "status": status,
+            "observed_variants": variants,
+            "ground_client_id": ground_client_id,
+            "ground_otb_id": ground_otb_id,
+            "static_client_ids": static_client_ids,
+            "static_otb_ids": static_otb_ids,
+            "dynamic_client_ids": dynamic_client_ids,
+            "unmapped_client_ids": unmapped_client_ids,
+            "unknown_role_client_ids": unknown_role_client_ids,
+        }
+    return client_version, otb_version, out
 
 
 def validate_reference(doc: Any) -> tuple[str, str, dict[str, dict[str, Any]]]:
@@ -236,38 +324,18 @@ def validate_reference(doc: Any) -> tuple[str, str, dict[str, dict[str, Any]]]:
         if key in out:
             raise ReconstructionError(f"duplicate reference coordinate {key}")
         ground = _require_int(
-            tile.get("ground_otb_id"),
-            f"reference tiles[{index}].ground_otb_id",
-            maximum=0xFFFFFFFF,
+            tile.get("ground_otb_id"), f"reference tiles[{index}].ground_otb_id", maximum=0xFFFFFFFF
         )
-        items = tile.get("static_otb_ids")
-        if not isinstance(items, list):
-            raise ReconstructionError(f"reference tiles[{index}].static_otb_ids must be an array")
-        norm_items = [
-            _require_int(v, f"reference tiles[{index}].static_otb_ids", maximum=0xFFFFFFFF)
-            for v in items
-        ]
-        out[key] = {"ground_otb_id": ground, "static_otb_ids": norm_items}
+        items = _require_int_list(tile.get("static_otb_ids"), f"reference tiles[{index}].static_otb_ids")
+        out[key] = {"ground_otb_id": ground, "static_otb_ids": items}
     return source, otb_version, out
 
 
 def compare(snapshot_doc: Any, reference_doc: Any) -> dict[str, Any]:
-    if not isinstance(snapshot_doc, dict) or snapshot_doc.get("schema") != SNAPSHOT_SCHEMA:
-        raise ReconstructionError(f"snapshot schema must be {SNAPSHOT_SCHEMA}")
-    snapshot_otb_version = _require_nonempty_str(snapshot_doc.get("otb_version"), "snapshot.otb_version")
+    _, snapshot_otb_version, observed = validate_snapshot(snapshot_doc)
     source, reference_otb_version, ref = validate_reference(reference_doc)
     if snapshot_otb_version != reference_otb_version:
         raise ReconstructionError("otb_version mismatch between snapshot and reference")
-
-    observed: dict[str, dict[str, Any]] = {}
-    for tile in snapshot_doc.get("tiles", []):
-        if not isinstance(tile, dict):
-            raise ReconstructionError("snapshot tiles must be objects")
-        pos = _position(tile.get("position"))
-        key = _key(pos)
-        if key in observed:
-            raise ReconstructionError(f"duplicate snapshot coordinate {key}")
-        observed[key] = tile
 
     coordinates = sorted(set(ref) | set(observed), key=lambda s: tuple(map(int, s.split(","))))
     diffs: list[dict[str, Any]] = []
@@ -278,13 +346,13 @@ def compare(snapshot_doc: Any, reference_doc: Any) -> dict[str, Any]:
             status = "NOT_OBSERVED"
         elif expected is None:
             status = "REFERENCE_MISSING"
-        elif tile.get("status") != "OK":
-            status = str(tile.get("status") or "CONFLICT")
-        elif tile.get("ground_otb_id") != expected["ground_otb_id"]:
+        elif tile["status"] != "OK":
+            status = tile["status"]
+        elif tile["ground_otb_id"] != expected["ground_otb_id"]:
             status = "GROUND_MISMATCH"
-        elif tile.get("static_otb_ids") == expected["static_otb_ids"]:
+        elif tile["static_otb_ids"] == expected["static_otb_ids"]:
             status = "MATCH"
-        elif sorted(tile.get("static_otb_ids", [])) == sorted(expected["static_otb_ids"]):
+        elif sorted(tile["static_otb_ids"]) == sorted(expected["static_otb_ids"]):
             status = "STACK_ORDER_MISMATCH"
         else:
             status = "CONTENT_MISMATCH"
@@ -298,37 +366,22 @@ def compare(snapshot_doc: Any, reference_doc: Any) -> dict[str, Any]:
 
 
 def build_otbm_plan(snapshot_doc: Any) -> dict[str, Any]:
-    if not isinstance(snapshot_doc, dict) or snapshot_doc.get("schema") != SNAPSHOT_SCHEMA:
-        raise ReconstructionError(f"snapshot schema must be {SNAPSHOT_SCHEMA}")
-    client_version = _require_nonempty_str(snapshot_doc.get("client_version"), "snapshot.client_version")
-    otb_version = _require_nonempty_str(snapshot_doc.get("otb_version"), "snapshot.otb_version")
+    client_version, otb_version, tiles = validate_snapshot(snapshot_doc)
     blockers: list[dict[str, Any]] = []
     export_tiles: list[dict[str, Any]] = []
-    tiles = snapshot_doc.get("tiles")
-    if not isinstance(tiles, list):
-        raise ReconstructionError("snapshot tiles must be an array")
     if not tiles:
         blockers.append({"position": None, "reason": "NO_TILES"})
 
-    for tile in tiles:
-        if not isinstance(tile, dict):
-            raise ReconstructionError("snapshot tiles must be objects")
-        pos = _position(tile.get("position"))
-        status = tile.get("status")
-        if status != "OK":
-            blockers.append({"position": _key(pos), "reason": status or "CONFLICT"})
-            continue
-        if tile.get("ground_otb_id") is None:
-            blockers.append({"position": _key(pos), "reason": "GROUND_UNRESOLVED"})
-            continue
-        if tile.get("unmapped_client_ids"):
-            blockers.append({"position": _key(pos), "reason": "UNMAPPED_ID"})
+    for key in sorted(tiles, key=lambda s: tuple(map(int, s.split(",")))):
+        tile = tiles[key]
+        if tile["status"] != "OK":
+            blockers.append({"position": key, "reason": tile["status"]})
             continue
         export_tiles.append(
             {
-                "position": {"x": pos[0], "y": pos[1], "z": pos[2]},
+                "position": dict(tile["position"]),
                 "ground_otb_id": tile["ground_otb_id"],
-                "static_otb_ids": list(tile.get("static_otb_ids", [])),
+                "static_otb_ids": list(tile["static_otb_ids"]),
             }
         )
 

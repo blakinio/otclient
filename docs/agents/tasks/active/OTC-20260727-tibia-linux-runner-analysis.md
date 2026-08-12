@@ -2,7 +2,7 @@
 
 ## Status
 
-`blocked_on_execution_environment` — the no-OCR login path is implemented and test credentials are available in `blakinio/otclient`, but the repository currently has no verified execution path that can both obtain/run the official Linux client and use the required trusted/tunneled egress.
+`active_hosted_direct_package_login` — the previous hosted-runner launcher blocker has been narrowed: the official launcher archive can be fetched through verified WARP with the established request shape, but the launcher itself does not create a usable X11 window on GitHub-hosted Ubuntu. The current execution path therefore bypasses the launcher and reconstructs the exact official package directly from CipSoft package metadata before attempting a no-OCR login/world entry.
 
 This is an operational research task. Do not merge temporary workflows as product code. Do not commit/upload proprietary CipSoft bytes, credentials, account/character data, cookies, session material, authenticated screenshots, or recovery material.
 
@@ -15,7 +15,7 @@ Attempt a real official-client login/world entry **without OCR/Tesseract/image-t
 - Repository: `blakinio/otclient`
 - Branch: `ci/OTC-20260727-tibia-linux-runner-analysis`
 - PR: `#48` (draft operational PR)
-- Session: `chatgpt-20260812-1802-no-ocr-login`
+- Session: `chatgpt-20260812-no-ocr-world-entry`
 - Separate active runtime `blakinio/Oteryn-Platform@ops/oteryn-tibia-client-analysis-20260811` is read-only evidence for this task. Its `oteryn-tibia-client-analysis` container/state must not be mutated or reused.
 - Canonical `oteryn-staging` Compose services remain strictly out of scope.
 
@@ -26,86 +26,84 @@ Owned task paths:
 - `.github/workflows/tibia-hosted-no-ocr-login.yml`
 - `.github/workflows/tibia-hosted-no-ocr-login-v2.yml`
 - `.github/workflows/tibia-hosted-no-ocr-login-v3.yml`
+- `.github/workflows/tibia-hosted-no-ocr-login-v4.yml`
+- `.github/workflows/tibia-hosted-download-shape-probe.yml`
+- `.github/workflows/tibia-hosted-launcher-runtime-probe.yml`
+- `.github/workflows/tibia-hosted-direct-package-no-ocr-login.yml`
 - `docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md`
 
-The three hosted-login workflows are temporary failed-probe scaffolding and must be removed before terminal closeout after their run IDs are retained here.
+Temporary hosted-login/probe workflows are operational scaffolding and must be removed before terminal closeout after their run/job IDs are retained here.
 
 ## PROVEN — no-OCR preparation
 
 - `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` are both non-empty GitHub Actions secrets in `blakinio/otclient`: run `31616821899`, job `94181592919`, SUCCESS. The job emitted only boolean presence markers; values remained GitHub-masked and were not persisted.
-- The dedicated `otclient` self-hosted workflow contains no Tesseract/OCR/image-to-text success path and fails closed unless the expected runner, owned-container labels, exact client identity, WARP egress, and actual TCP confinement all pass before credential entry.
+- Tesseract/OCR is explicitly absent from the strict no-OCR execution path and success is not accepted from image text.
 - The researched official Linux executable evidence cut is client `15.32.df7b29`, size `51,965,216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
+- Packed `bin/client.lzma` identity from the signed package metadata is SHA-256 `496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b`; its CipSoft envelope carries an LZMA-alone header beginning at offset 32 and raw compressed data from offset 45.
 - Reusable decoded-world boundary from read-only Oteryn evidence: FullMap `0xcec8d0`, FieldData `0xcd3190`, Create `0xcecc70`, Change `0xcecf40`, Delete `0xcd4e20`, common ordered map routine `0x19a8a80`.
 
-## PROVEN — hosted-runner attempts
+## PROVEN — hosted runner network/download path
 
-All three hosted attempts stopped **before any credential entry**.
+- Earlier direct requests to `https://static.tibia.com/download/tibia.x64.tar.gz` returned HTTP 403.
+- Run `31619229063`, job `94189552673`, proved the established browser-compatible request shape through pinned userspace WARP can download the official launcher archive successfully: size `29,477,141`, SHA-256 `04a87c...60ea7`; direct remained blocked while WARP succeeded.
+- The same WARP path proves `warp=on`, changed public egress, and can be consumed through `proxychains4`/SOCKS5 at `127.0.0.1:25344`.
+- Do not brute-force public proxies or weaken the egress/secret boundary.
 
-1. Run `31617222584`, job `94182946084`: secret gate passed and `OCR_BINARY_ABSENT=true`; failed because `xdpyinfo` was not installed.
-2. Run `31617541307`, job `94184007303`: added X11 tooling; Xvfb worked; official Linux launcher archive request to `static.tibia.com/download/tibia.x64.tar.gz` returned HTTP 403 after retries.
-3. Run `31617769586`, job `94184760079`: pinned `wgcf 2.2.32` and `wireproxy 1.1.3` hashes passed, Cloudflare trace showed `warp=on`, changed egress and `PROXYCHAINS_WARP_EGRESS_VERIFIED=true`; the same official launcher archive still returned HTTP 403 through the WARP SOCKS path.
+## PROVEN — hosted launcher failure is not the package-download blocker
 
-Therefore GitHub-hosted `ubuntu-24.04` is not currently a viable bootstrap path for the official Linux launcher. Do not brute-force alternate public proxies or weaken the egress/secret boundary.
+- Run `31619497616`, job `94190454924`, advanced the full no-OCR workflow through secret availability, WARP setup, and official launcher download but failed before credential entry while waiting for a usable launcher X11 window/runtime materialization.
+- Run `31619835423`, job `94191588183`, isolated launcher behavior: the downloaded official launcher did not yield a usable visible `Tibia` window on the GitHub-hosted Xvfb environment, both directly and through proxychains-localnet.
+- Therefore the current hosted strategy bypasses launcher UI completely instead of adding OCR or more guessed launcher clicks.
 
-## PROVEN / INFERENCE — self-hosted runner availability
+## Read-only cross-repository bootstrap evidence
 
-- Current `otclient` run `31616469972`, job `94180403029`, has remained `queued` with no job steps.
-- Historical run `30223131080`, job `89848906511`, on the same `otclient` branch likewise completed `cancelled` with `steps=null` after remaining unable to execute.
-- Direct repository runner enumeration through the available GitHub integration returns HTTP 403, so runner assignment cannot be inspected directly.
+Completed `Oteryn-Platform` analysis established the package layout needed to reconstruct the exact official runtime without copying proprietary bytes between repositories/runners:
 
-**INFERENCE (high confidence):** the live `oteryn-synology-staging` runner that executes `Oteryn-Platform` work is not registered/authorized for `blakinio/otclient`. Merely waiting for Oteryn jobs to finish is therefore not a reliable execution plan.
+- package metadata endpoint: `https://static.tibia.com/launcher/tibiaclient-linux-current/package.json` with `package.json.version` as the version marker;
+- package file entries carry `url`, `packedhash`, and `unpackedhash`;
+- example packed object URL: `https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma`;
+- the exact current executable was reconstructed by verifying the packed hash, decoding the custom 32-byte-prefix + LZMA-alone envelope, and verifying the unpacked hash/size;
+- this evidence is read-only input. No Oteryn container/state is reused or mutated by this task.
 
-## Read-only cross-repository facts relevant to the blocker
+## Read-only cross-repository world-entry findings
 
-From completed `Oteryn-Platform` runs on the actual Synology runtime:
-
-- WARP userspace egress and real Tibia TCP confinement are proven there.
-- Account credentials now succeed far enough to reach `Select Character`; prior row/OK and row-double-click attempts did not prove game-world entry and returned to the account-login state, with no proven decoded-map event.
-- Renderer diagnostic run `31617864838`, job `94185070113`, proved Xvfb/GLX responds, direct rendering is available through software `llvmpipe`, OpenGL core 3+ is available, but Vulkan initialization fails and client logs contain a sanitized `failed vulkan instance` signature. This is a possible factor, not proof of the world-entry failure.
-- Generic runtime/account warning evidence suggests a recovery/setup/create-character condition may exist, but it is not yet proven to be the reason existing-character world entry fails. Do not create, expose, or alter recovery/security material without an explicit authority path.
+The separate Synology investigation has authenticated the account and reached `Select Character`, but still has not proven world entry. Its latest durable evidence places that failure locally before an Internet-family game-session connect, and has excluded wrong credentials, obvious wrong-row selection, WARP failure, proxychains alone, root execution alone, and missing Vulkan alone as sufficient explanations. This task does not modify that runtime; the hosted environment is intentionally an independent execution path.
 
 ## Safety invariants
 
 - Never use OCR/Tesseract/image-to-text for this task's login or success proof.
 - Never expose secret values in command argv, logs, screenshots, repository files, artifacts, or chat.
-- Never log in from the ordinary household/public egress; require verified changed tunnel egress first.
+- Never log in from ordinary/direct egress; require verified changed WARP egress first.
 - Never touch canonical staging or the separately owned Oteryn analysis container/state.
-- Do not accept a pixel/window change alone as successful world entry. Prefer a decoded Worldmap handler hit or an equivalently semantic runtime event.
+- Do not accept a pixel/window change alone as successful world entry. Prefer a decoded Worldmap handler/common-routine hit or an equivalently semantic runtime event.
 - Leave the character idle if world entry is proven; no gameplay actions are authorized by this task.
 
 ## Validation record
 
 ```yaml
-updated_at: 2026-08-12T18:40:00+02:00
-branch_head_before_checkpoint: 877d1b3e9b4d2da14b01228e388989f724b46e29
+updated_at: 2026-08-12T19:05:00+02:00
+branch_head_before_checkpoint: de8833721f2bcf5f0b80837d7faca3b222e74e9f
 pr: 48
-status: blocked_on_execution_environment
+status: active_hosted_direct_package_login
 secret_gate:
   run: 31616821899
   job: 94181592919
   result: PASS
-hosted_attempts:
-  - run: 31617222584
-    job: 94182946084
-    result: FAIL_PRE_CREDENTIAL
-    blocker: missing_xdpyinfo
-  - run: 31617541307
-    job: 94184007303
-    result: FAIL_PRE_CREDENTIAL
-    blocker: official_launcher_http_403
-  - run: 31617769586
-    job: 94184760079
-    result: FAIL_PRE_CREDENTIAL
-    blocker: official_launcher_http_403_even_after_verified_warp
-self_hosted_attempt:
-  run: 31616469972
-  job: 94180403029
-  state_at_checkpoint: queued_no_steps
-historical_self_hosted_evidence:
-  run: 30223131080
-  job: 89848906511
-  result: cancelled_no_steps
+download_shape_probe:
+  run: 31619229063
+  job: 94189552673
+  result: PASS_WARP
+full_hosted_v4:
+  run: 31619497616
+  job: 94190454924
+  result: FAIL_PRE_CREDENTIAL
+  blocker: launcher_window_or_runtime_materialization
+launcher_runtime_probe:
+  run: 31619835423
+  job: 94191588183
+  result: FAIL
+  blocker: no_usable_launcher_x11_window
 safe_to_resume: true
 ```
 
-`next_action`: make a trusted self-hosted runner with the `oteryn-staging` capability available to `blakinio/otclient` (or provide an equivalent trusted runner already authorized for this repository); then rerun the exact no-OCR workflow and accept success only from tunneled semantic/runtime world-entry evidence.
+`next_action`: reconstruct the complete `15.32.df7b29` package directly from the official package manifest on the GitHub-hosted runner through verified WARP; launch the exact client without OCR; inject the existing Actions secrets; activate the deterministic first-character target; accept success only on a decoded Worldmap runtime hit and keep all credential/account data out of logs/artifacts.

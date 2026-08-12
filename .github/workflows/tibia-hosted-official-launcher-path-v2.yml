@@ -1,0 +1,141 @@
+name: Tibia hosted official launcher path v2
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-official-launcher-path-v2.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  launcher:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-launcher-home
+    steps:
+      - name: Install full no-OCR graphical runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ca-certificates curl dbus-x11 file iproute2 mesa-utils procps proxychains4 tar x11-utils xdotool xvfb \
+            libasound2t64 libatk1.0-0 libatspi2.0-0 libcups2 libdbus-1-3 libdrm2 libegl1 libfontconfig1 libfreetype6 libgbm1 \
+            libgl1 libglx0 libgtk-3-0 libnspr4 libnss3 libopengl0 libpulse0 libvulkan1 libx11-6 libx11-xcb1 libxcb-cursor0 \
+            libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 \
+            libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxcomposite1 libxdamage1 libxi6 \
+            libxkbcommon-x11-0 libxrandr2 libxrender1 libxtst6 mesa-vulkan-drivers vulkan-tools
+          ! command -v tesseract >/dev/null 2>&1
+          echo OCR_BINARY_ABSENT=true
+
+      - name: Establish WARP and fetch official launcher
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          direct_ip=$(curl -fsS --retry 5 --retry-all-errors --max-time 30 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
+          r=/tmp/warp; mkdir -p "$r/bin" "$r/state" /tmp/tibia-bootstrap /tmp/tibia-runtime "$HOME"; chmod 700 "$r" "$r/state" "$HOME"
+          cd "$r/bin"
+          curl -fsSL --retry 3 --retry-all-errors -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL --retry 3 --retry-all-errors -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c -
+          mkdir x; tar -xzf wp.tgz -C x; cp "$(find x -type f -name wireproxy -print -quit)" wireproxy; chmod 755 wgcf wireproxy
+          cd "$r/state"; "$r/bin/wgcf" register --accept-tos >/dev/null; "$r/bin/wgcf" generate >/dev/null
+          chmod 600 wgcf-account.toml wgcf-profile.conf
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" >wireproxy.conf
+          nohup "$r/bin/wireproxy" -c wireproxy.conf >/tmp/tibia-runtime/wireproxy.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do curl --socks5-hostname 127.0.0.1:25344 -fsS --retry 2 --retry-all-errors --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/tibia-runtime/warp.trace 2>/dev/null && break; sleep 2; done
+          grep -Eq '^warp=(on|plus)$' /tmp/tibia-runtime/warp.trace
+          warp_ip=$(sed -n 's/^ip=//p' /tmp/tibia-runtime/warp.trace); [[ -n "$warp_ip" && "$warp_ip" != "$direct_ip" ]]
+          echo WARP_CHANGED_EGRESS_VERIFIED=true
+          cat >/tmp/tibia-runtime/proxychains.conf <<'EOF'
+          strict_chain
+          proxy_dns
+          quiet_mode
+          localnet 127.0.0.0/255.0.0.0
+          localnet ::1/128
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 25344
+          EOF
+          cd /tmp/tibia-bootstrap
+          url=https://static.tibia.com/download/tibia.x64.tar.gz
+          proxychains4 -f /tmp/tibia-runtime/proxychains.conf curl --compressed -fL --retry 3 --retry-all-errors --connect-timeout 15 --max-time 300 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36' -e "$url" \
+            -H 'Accept: */*' -H 'Accept-Language: en-US,en;q=0.9' -H 'Cache-Control: no-cache' "$url" -o tibia.x64.tar.gz
+          tar xfz tibia.x64.tar.gz
+          test -x Tibia/Tibia
+          echo OFFICIAL_LAUNCHER_READY=true
+
+      - name: Start launcher with functional software GLX and trigger game tile
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" XDG_CACHE_HOME="$HOME/.cache"
+          export LIBGL_ALWAYS_SOFTWARE=1 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/tibia-runtime/xvfb.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do xdpyinfo -display :99 >/dev/null 2>&1 && break; sleep 1; done
+          glxinfo -B | grep -q 'OpenGL renderer string: llvmpipe'
+          cd /tmp/tibia-bootstrap/Tibia
+          : >/tmp/tibia-runtime/launcher.log
+          nohup dbus-run-session -- proxychains4 -f /tmp/tibia-runtime/proxychains.conf ./Tibia >/tmp/tibia-runtime/launcher.log 2>&1 </dev/null &
+          wrapper=$!
+          wid=''
+          for _ in $(seq 1 30); do
+            wid=$(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null | head -n1 || true)
+            [[ -n "$wid" ]] && break
+            sleep 1
+          done
+          if [[ -z "$wid" ]]; then
+            echo OFFICIAL_LAUNCHER_WINDOW=false
+            echo SAFE_LAUNCHER_LOG_BEGIN
+            grep -Ei 'fatal|error|failed|vulkan|glx|egl|xcb|display|qt|sandbox' /tmp/tibia-runtime/launcher.log | tail -n 80 || true
+            echo SAFE_LAUNCHER_LOG_END
+            exit 1
+          fi
+          geom=$(xdotool getwindowgeometry --shell "$wid")
+          width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p'); height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+          echo "OFFICIAL_LAUNCHER_WINDOW=${width}x${height}"
+          echo OFFICIAL_LAUNCHER_WINDOW=true
+          xdotool windowactivate --sync "$wid" 2>/dev/null || true
+          xdotool mousemove --window "$wid" 400 193 click 1
+          echo OFFICIAL_LAUNCHER_TILE_CLICKED=true
+          client=''
+          for _ in $(seq 1 240); do
+            client=$(find "$HOME" -type f -path '*/packages/Tibia/bin/client' -perm -111 -print -quit 2>/dev/null || true)
+            if [[ -n "$client" ]] && pgrep -x client >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          if ! pgrep -x client >/dev/null 2>&1; then
+            # After a completed download the same tile becomes the start action.
+            xdotool mousemove --window "$wid" 400 193 click 1
+            echo OFFICIAL_LAUNCHER_TILE_SECOND_STATE_CLICKED=true
+            for _ in $(seq 1 60); do pgrep -x client >/dev/null 2>&1 && break; sleep 1; done
+          fi
+          pid=$(pgrep -x client | head -n1 || true)
+          if [[ -z "$pid" ]]; then
+            echo CLIENT_STARTED_BY_OFFICIAL_LAUNCHER=false
+            echo SAFE_LAUNCHER_LOG_BEGIN
+            grep -Ei 'fatal|error|failed|vulkan|glx|egl|xcb|display|qt|sandbox|launch|client' /tmp/tibia-runtime/launcher.log | tail -n 100 || true
+            echo SAFE_LAUNCHER_LOG_END
+            exit 1
+          fi
+          echo CLIENT_STARTED_BY_OFFICIAL_LAUNCHER=true
+          ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status)
+          echo "CLIENT_PARENT_COMM=$(cat /proc/$ppid/comm 2>/dev/null | tr -cd 'A-Za-z0-9_.-')"
+          if pgrep -afi 'battleye|beservice|bedaisy' >/dev/null 2>&1; then echo BATTLEYE_NAMED_PROCESS_PRESENT=true; else echo BATTLEYE_NAMED_PROCESS_PRESENT=false; fi
+          sleep 12
+          kill -0 "$pid"
+          game=''; area=0; gw=0; gh=0
+          for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
+            g=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true); x=$(printf '%s\n' "$g"|sed -n 's/^WIDTH=//p'); y=$(printf '%s\n' "$g"|sed -n 's/^HEIGHT=//p'); [[ -n "$x" && -n "$y" ]] || continue
+            a=$((x*y)); if ((a>area)); then game=$w; area=$a; gw=$x; gh=$y; fi
+          done
+          echo "LARGEST_TIBIA_WINDOW=${gw}x${gh}"
+          [[ -n "$game" && "$gw" == 1020 && "$gh" == 650 ]]
+          echo OFFICIAL_LAUNCHER_GAME_WINDOW_VERIFIED=true

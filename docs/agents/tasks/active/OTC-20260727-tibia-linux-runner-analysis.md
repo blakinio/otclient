@@ -147,3 +147,30 @@ safe_to_resume: true
 ```
 
 `next_action`: use the already-proven Worldmap Qt metaobject (`qmetaobject=0x3087800`, `stringdata=0x1cd8a54`, `metadata=0x1cd8820`, `static_metacall=0xdf2a60`) as a representation control to recover the exact Qt metadata/static dispatch for `TCharacterSelectionController` and `TGameserverLoginProcessController`; then run a strict no-OCR observational trace that records only which login callbacks fire after deterministic character activation while keeping FullMap/FieldData as the success gate. Do not modify any callback result or security decision.
+
+## Recovery checkpoint
+
+```yaml
+recovery:
+  policy_version: 1
+  generation: 1
+  session_id: chatgpt-20260812-2259-otclient-global-probe
+  session_started_at: 2026-08-12T22:59:00+02:00
+  checkpointed_at: 2026-08-12T23:06:00+02:00
+  last_progress_at: 2026-08-12T23:06:00+02:00
+  phase: bounded_otclient_global_login_probe
+  exact_head: 427f6c707a530f859e647eccf09401ff2cccde01
+  pull_request: 48
+  active_operation: prepare isolated OTClient Global login workflow
+  external_run_ids: []
+  operation_started_at: null
+  wait_deadline_at: 2026-08-12T23:26:00+02:00
+  check_generation: operational_probe
+  checks_used: 0
+  status: active
+  safe_to_resume: true
+  resume_condition: task branch remains exclusively owned and self-hosted oteryn-staging runner remains available
+  next_action: create and execute an isolated OTClient 15.32 Global login probe using existing test secrets through verified WARP; stop at any anti-cheat/security rejection without bypass
+```
+
+Owner instruction on 2026-08-12 explicitly requests a real login attempt with this repository's OTClient. This bounded phase may use the task-owned self-hosted runner, task-owned isolated container/state, existing `TIBIA_TEST_EMAIL`/`TIBIA_TEST_PASSWORD` Actions secrets, and official runtime assets as transient test inputs. Secret values, session keys, character/account data, and proprietary assets remain forbidden from logs, artifacts, repository content, and chat.

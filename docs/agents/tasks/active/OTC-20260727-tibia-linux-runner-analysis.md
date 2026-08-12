@@ -2,219 +2,204 @@
 
 ## Status
 
-`active_qmeta_dispatch_recovery` — strict no-OCR hosted execution reconstructs the complete current official Linux runtime, and the current HTTPS login identity bundle is now proven valid through verified WARP. A previous QMetaObject recovery run also recovered the exact `TCharacterSelectionController` metadata and found the `TGameserverLoginProcessController`/`TGameserverGameSession` QMetaObjects, but rejected the latter two only because the workflow encoded incorrect required-method assumptions. The next bounded phase is to correct that static-analysis filter, recover all exact Qt static dispatch metadata, and then use those current-version observation points for a strict no-OCR login/world-entry trace.
+`waiting_qmeta_dispatch_probe` — current HTTPS account login is structurally valid through verified WARP, and the old QMetaObject “recovery incomplete” conclusion has been disproven. A corrected path-scoped static recovery run is now executing on the exact official client. This invocation has consumed the repository's two ordinary observations for that exact run/head, so the task is checkpointed as waiting instead of polling.
 
-This is an operational research task. Do not merge temporary workflows as product code. Do not commit/upload proprietary CipSoft bytes, credentials, account/character data, cookies, session material, authenticated screenshots, recovery material, or WARP account/profile material.
+This is an operational research task. Temporary `.github/workflows/tibia-*` files are evidence scaffolding, not product code. Do not commit/upload proprietary CipSoft bytes, credentials, account/character data, cookies, session material, authenticated screenshots, recovery material, or WARP profile/account material.
 
 ## Objective
 
-Attempt a real official-client login/world entry **without OCR/Tesseract/image-to-text**, with credentials injected only from GitHub Actions secrets, changed WARP egress proven before secret use, Tibia TCP confined to that tunnel, and success accepted only from non-image runtime/protocol evidence.
+Reach and prove official-client world entry **without OCR/Tesseract/image-to-text**, using only the existing authorized test-account Actions secrets through verified changed WARP egress, and accept success only from decoded runtime/protocol state such as Worldmap/GameState evidence.
 
 ## Ownership
 
 - Repository: `blakinio/otclient`
 - Branch: `ci/OTC-20260727-tibia-linux-runner-analysis`
-- PR: `#48` (draft operational PR)
-- Session: `chatgpt-20260813-otclient-tibia-re`
-- Separate `blakinio/Oteryn-Platform@ops/oteryn-tibia-client-analysis-20260811` runtime is read-only evidence. Its container/state must not be mutated or reused.
-- Canonical `oteryn-staging` Compose services remain strictly out of scope.
+- PR: `#48` draft operational PR
+- Programme: `OTCLIENT-TIBIA-RE`
+- Current session: `chatgpt-20260813-otclient-tibia-re`
+- `blakinio/Oteryn-Platform@ops/oteryn-tibia-client-analysis-20260811`: read-only evidence only
+- canonical `oteryn-staging`: out of scope
 
-Current owned operational paths include the task record plus temporary `.github/workflows/tibia-*` probes on this task branch. These workflows are evidence scaffolding and must be removed before terminal closeout after exact run/job IDs are retained here.
+## PROVEN
 
-## PROVEN — strict no-OCR boundary and exact client
+### Exact current official Linux client
 
-- `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` are non-empty Actions secrets in `blakinio/otclient`: run `31616821899`, job `94181592919`, SUCCESS. Only boolean presence was emitted; values were neither logged nor persisted.
-- Strict execution explicitly fails if a Tesseract binary is present; current no-OCR runs emit `OCR_BINARY_ABSENT=true`.
-- Exact official Linux client cut: version `15.32.df7b29`, executable size `51,965,216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
+- Version: `15.32.df7b29`.
+- Executable size: `51,965,216` bytes.
+- Executable SHA-256: `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
 - Packed `bin/client.lzma` SHA-256: `496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b`.
-- Reusable decoded Worldmap offsets from read-only evidence: FullMap `0xcec8d0`, FieldData `0xcd3190`, Create `0xcecc70`, Change `0xcecf40`, Delete `0xcd4e20`, common ordered map routine `0x19a8a80`.
+- Current package manifest: `1634` package entries.
+- Current `assets-current/assets.json`: `7094` asset entries.
+- Correct full runtime reconstruction retains packed manifest paths when no `unpackedhash` exists; run `31626946078`, job `94215664628` reconstructed the corrected runtime including `209` packed minimap subarea objects and reported `FAILED_ASSET_LOAD_COUNT=0`.
 
-## PROVEN — complete official runtime reconstruction
+### Strict no-OCR/WARP boundary
 
-- Current package manifest contains exactly `1634` package entries.
-- Official `assets-current/assets.json` contains exactly `7094` asset entries: run `31625032514`, job `94209116428`, SUCCESS.
-- Package objects with `unpackedhash` are decoded and verified against both packed and unpacked SHA-256.
-- Asset entries without `unpackedhash` must remain at their exact packed manifest path. This is required for runtime files such as `assets/subarea-*.bmp.lzma`; decoding/removing the `.lzma` suffix was a prior reconstruction bug.
-- Run `31626946078`, job `94215664628`, reconstructed the corrected complete runtime with `209` packed minimap subarea objects and subsequently reported `FAILED_ASSET_LOAD_COUNT=0`.
-- Earlier package-only SIGABRT was conclusively caused by missing separate runtime catalogs `assets/catalog-content.json` and `sounds/catalog-sound.json`, not by account credentials or Worldmap hooks.
-- Do not reintroduce `QT_XCB_GL_INTEGRATION=none`; diagnostics proved that override disables required GLX/EGL behavior. Software Mesa/llvmpipe plus lavapipe is the valid hosted renderer path.
+- `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` are present as Actions secrets: run `31616821899`, job `94181592919`; only boolean presence was emitted.
+- No-OCR executions fail if Tesseract exists and report `OCR_BINARY_ABSENT=true`.
+- Login experiments verify changed WARP egress before secret use.
+- The best complete-runtime attempt, run `31626946078`, job `94215664628`, had `DECODED_WORLDMAP_HIT=false`, `FAILED_ASSET_LOAD_COUNT=0`, `POST_ACTIVATION_DIRECT_TCP_COUNT=0`, `POST_ACTIVATION_UDP_COUNT=0`, with the client alive after deterministic first-character activation.
+- Therefore that failure occurs before normal Internet-family game-server connection setup.
 
-## PROVEN — best strict no-OCR world-entry attempt
+### Current HTTPS login identity bundle
 
-Run `31626946078`, job `94215664628` (`tibia-hosted-complete-assets-no-ocr-login-v4.yml`):
+Run `31647827166`, job `94285373954`, exact branch head `c951f148b883fffc39d105daf39cf9c7561da095`:
 
-- verified changed WARP egress before secret use;
-- reconstructed all `1634 + 7094` official runtime entries with strict hashes;
-- exact client started and remained alive in an exact `1020x650` window;
-- direct TCP outside local WARP SOCKS and UDP were absent before login;
-- `kernel.yama.ptrace_scope` was changed from `1` to `0` for observation only;
-- exact FullMap and FieldData breakpoints were armed before credentials;
-- account login was submitted and the previously established deterministic first-character target was activated without OCR;
-- final result: `DECODED_WORLDMAP_HIT=false`, `FAILED_ASSET_LOAD_COUNT=0`, `POST_ACTIVATION_DIRECT_TCP_COUNT=0`, `POST_ACTIVATION_UDP_COUNT=0`;
-- client remained alive during the bounded observation window.
+- request identity used `clientversion=15.32.df7b29`, `clienttype=2`, current 64-character `assets.json.sha256` as `assetversion`;
+- endpoint returned HTTP `200`, JSON content;
+- safe structural response keys: `devicecookie,loginemail,playdata,session,trusteddevice`;
+- `HAS_ERROR_MESSAGE=false`;
+- `HAS_SESSION=true`, `HAS_PLAYDATA=true`, `HAS_CHARACTERS=true`, `HAS_WORLDS=true`;
+- `HTTPS_LOGIN_RESPONSE_VALID=true`.
 
-**FACT:** the remaining failure occurs before normal Internet-family game-server connection setup. Repeating WARP, Vulkan, root/non-root, package-layout, asset-layout, or blind click changes without new evidence is not justified.
+No credential, session, cookie, character, or world values were logged. This proves current credentials and the login-service identity bundle are valid through WARP; it does not prove world entry.
 
-## PROVEN — current HTTPS login identity bundle
+### Worldmap structural starting points
 
-Run `31647827166`, job `94285373954` (`otclient-global-login-https-diagnostic.yml`) on branch head `c951f148b883fffc39d105daf39cf9c7561da095`:
+Read-only/current-version evidence for this exact client cut includes:
 
-- verified changed WARP egress before secret use;
-- used exact current request identity `clientversion=15.32.df7b29`, `clienttype=2`, and the current 64-character `assets.json.sha256` value as `assetversion`;
-- login endpoint returned `HTTPS_STATUS=200`, `CONTENT_TYPE=application/json`, `JSON_RESPONSE=true`;
-- safe structural response inventory reported top-level keys `devicecookie,loginemail,playdata,session,trusteddevice`;
-- `HAS_ERROR_MESSAGE=false`, `HAS_SESSION=true`, `HAS_PLAYDATA=true`, `HAS_CHARACTERS=true`, `HAS_WORLDS=true`;
-- final marker `HTTPS_LOGIN_RESPONSE_VALID=true`.
+- FullMap `0xcec8d0`;
+- FieldData `0xcd3190`;
+- Create `0xcecc70`;
+- Change `0xcecf40`;
+- Delete `0xcd4e20`;
+- common ordered map routine `0x19a8a80`;
+- Worldmap QMetaObject `0x3087800`;
+- Worldmap string data `0x1cd8a54`;
+- Worldmap metadata `0x1cd8820`;
+- Worldmap static metacall `0xdf2a60`.
 
-No credential, cookie, session, character, world, or other sensitive value was emitted or persisted. This proves the test credentials and current login-service identity bundle are valid through WARP; it does **not** prove game-world entry.
+### Login/selection static inventory
 
-## PROVEN — official launcher is not currently a viable hosted execution path
+Run `31627802861`, job `94218675614`, identified exact-client classes including:
 
-- Earlier hosted launcher attempts failed to produce a usable X11 window.
-- `tibia-hosted-official-launcher-window-inventory.yml`, run `31628168080`, job `94219884203`, proved there was no hidden alternate-title launcher window: after launch, the relevant process inventory was empty and the X11 root had zero children.
-- `tibia-hosted-kernel-warp-official-launcher.yml`, run `31628361566`, job `94220527259`, repeated with native kernel WireGuard WARP and **without** proxychains/`LD_PRELOAD`. WARP and software GLX were valid, but the launcher still exited before any GUI child/process appeared; safe launcher log filtering produced no actionable error.
-- Therefore `proxychains`/`LD_PRELOAD` is excluded as a sufficient explanation for hosted launcher non-start. Direct exact-client execution remains the only working hosted GUI path.
+- `tibia::authentication::TGameserverLoginProcessController`;
+- `tibia::gamewindow::TCharacterSelectionController`;
+- `tibia::client::TAntiCheatController`;
+- `tibia::game::TGameserverGameSession`;
+- `tibia::network::TGameserverNetworkPacketConnection`;
+- `tibia::network::TGameserverTCPConnection`.
 
-## PROVEN — local login dispatch names available in the exact client
+Run `31628008127`, job `94219354880`, mapped Qt method-name string VAs including:
 
-Static no-secret inventory run `31627802861`, job `94218675614`, identified current exact-client types and method names needed for observational tracing:
+- `onCharacterSelectionConfirmed=0x1ca3e65`;
+- `requestCharacterLogin=0x1ca3d0d`;
+- `onStartGameServerLoginStateEntered=0x1c8bd7a`;
+- `onConnectClientToGameserver=0x1c8bdff`;
+- `onAbortConnectClientToGameserver=0x1c8bbc8`.
 
-- `tibia::authentication::TGameserverLoginProcessController`
-- `tibia::gamewindow::TCharacterSelectionController`
-- `tibia::client::TAntiCheatController`
-- `tibia::game::TGameserverGameSession`
-- `tibia::network::TGameserverNetworkPacketConnection`
-- `tibia::network::TGameserverTCPConnection`
-- `onCharacterSelectionConfirmed`
-- `requestCharacterLogin`
-- `onStartGameServerLoginStateEntered`
-- `onConnectClientToGameserver`
-- `onAbortConnectClientToGameserver`
-- `connectClientToGameserverWithExistingCredentials`
-- `connectToGameSession`
-- `onGameSessionConnected`
-- `onGameLoginSuccessful`
-- `onLoginAbortedStateEntered`
-- `onLoginFailedStateEntered`
-- `onNetworkError`
+The strings have no ordinary executable RIP-relative xrefs because they are Qt metadata. Earlier guessed code centers from nearby type strings are rejected as runtime breakpoint addresses.
 
-Run `31628008127`, job `94219354880`, mapped the corresponding Qt method-name string VAs, including `onCharacterSelectionConfirmed=0x1ca3e65`, `requestCharacterLogin=0x1ca3d0d`, `onStartGameServerLoginStateEntered=0x1c8bd7a`, `onConnectClientToGameserver=0x1c8bdff`, and `onAbortConnectClientToGameserver=0x1c8bbc8`. These strings have no ordinary executable RIP-relative xrefs because they participate in Qt metadata rather than normal direct string use.
+### QMetaObject recovery
 
-The first guessed function centers derived from nearby type-string xrefs were **not** proven Qt metaobject functions: relocation and raw-qword scans found no matching qmeta/vtable representation. Do not use those guesses as runtime breakpoints.
+Run `31629211661`, job `94223374658`, was workflow `FAIL` but produced valid structural evidence:
 
-## PROVEN — Qt metaobject recovery and corrected hypothesis
+- QMetaObject fields learned from Worldmap: `string=0x8`, `meta=0x10`, `static=0x18`.
+- `tibia::worldmap::TWorldmapProtocolMessageHandler` decoded with map/event method inventory.
+- `TCharacterSelectionController`: QMetaObject `0x2f656a0`, string data `0x1ca3b34`, metadata `0x1ca36e0`, static metacall `0xd46550`; method index `0=requestCharacterLogin`, index `11=onCharacterSelectionConfirmed`, 26 methods total.
+- `TAntiCheatController`: QMetaObject `0x30768c0`, string data `0x1c92cc0`, metadata `0x1c92c20`, static metacall `0xcf39e0`.
+- `TGameserverLoginProcessController` QMetaObject was structurally found at `0x30cdc60`; its actual Qt methods are `connected`, `disconnected`, `connectionError`, `onGameserverTCPConnectionConnected`, `onGameserverTCPConnectionSecondaryConnected`, `onGameserverTCPConnectionDisconnected`.
+- `TGameserverGameSession` QMetaObject was structurally found; its actual Qt methods are `onCharacterConfigurationLoaded`, `onGameReadyForSecondaryConnection`, `onClientCheckTimerElapsed`.
 
-Run `31629211661`, job `94223374658` (`tibia-hosted-login-qmetaobject-recovery.yml`) was marked workflow `FAIL`, but its static evidence is materially successful:
+**DISPROVEN:** `critical QMetaObject recovery incomplete`. The old workflow rejected valid class hits only because it incorrectly required non-metaobject methods on those QMetaObjects.
 
-- the proven Worldmap control established QMetaObject field offsets `string=0x8`, `meta=0x10`, `static=0x18`;
-- control class `tibia::worldmap::TWorldmapProtocolMessageHandler` decoded with methods `publishGameAction`, `handleFullMapMessage`, directional/floor map handlers, `handleFieldDataMessage`, create/change/delete map handlers, ambient light and Tibia time;
-- `TCharacterSelectionController` was recovered at QMetaObject `0x2f656a0`, string data `0x1ca3b34`, metadata `0x1ca36e0`, static metacall `0xd46550`;
-- its methods include `requestCharacterLogin` at method index `0` and `onCharacterSelectionConfirmed` at method index `11`, plus the complete 26-method inventory emitted by the run;
-- `TAntiCheatController` was recovered at QMetaObject `0x30768c0`, string data `0x1c92cc0`, metadata `0x1c92c20`, static metacall `0xcf39e0`;
-- a `TGameserverLoginProcessController` QMetaObject was structurally found at `0x30cdc60`, with actual Qt methods `connected`, `disconnected`, `connectionError`, `onGameserverTCPConnectionConnected`, `onGameserverTCPConnectionSecondaryConnected`, `onGameserverTCPConnectionDisconnected`;
-- a `TGameserverGameSession` QMetaObject was structurally found with actual Qt methods `onCharacterConfigurationLoaded`, `onGameReadyForSecondaryConnection`, `onClientCheckTimerElapsed`.
+### Hosted launcher
 
-The run failed only because the workflow incorrectly required `onStartGameServerLoginStateEntered`/`onConnectClientToGameserver`/`onAbortConnectClientToGameserver` to be methods of the `TGameserverLoginProcessController` QMetaObject and similarly required non-metaobject methods for `TGameserverGameSession`.
+Runs `31628168080`/job `94219884203` and `31628361566`/job `94220527259` proved the official launcher produces no usable hosted GUI/process even with native kernel WARP and without proxychains/`LD_PRELOAD`. Direct exact-client execution remains the working hosted GUI path.
 
-**DISPROVEN:** “critical QMetaObject recovery is incomplete.” The recovery mechanism found the critical classes; the acceptance filter was wrong. The next static experiment must accept the class identity and actual decoded method table as evidence instead of enforcing those rejected method-name assumptions.
+## REJECTED / DO NOT REPEAT
 
-## Read-only cross-repository facts
-
-The separate Synology investigation independently reaches authenticated `Select Character` and observes the same immediate return before AF_INET/AF_INET6 connection setup. It has already excluded wrong credentials, WARP failure, proxychains alone, root execution alone, missing Vulkan alone, and obvious row-selection geometry as sufficient explanations. This task may reuse those facts only as read-only evidence; no Oteryn runtime/state is shared.
+- wrong credentials as the current login blocker — disproven by valid HTTPS login response;
+- missing package/assets catalogs — corrected and `FAILED_ASSET_LOAD_COUNT=0`;
+- WARP failure — changed egress is verified;
+- proxychains alone, root alone, missing Vulkan alone, package-layout changes, blind click/row-geometry changes — no longer justified without new evidence;
+- `QT_XCB_GL_INTEGRATION=none` — known bad; software Mesa/llvmpipe + lavapipe is the valid hosted renderer path;
+- guessed Qt function centers from type-string xrefs — not structurally proven;
+- rerunning QMetaObject recovery with the old required-method filter — hypothesis is invalidated.
 
 ## Safety invariants
 
-- Never use OCR/Tesseract/image-to-text for this task's login or success proof.
-- Never expose secret values in command argv, logs, screenshots, repository files, artifacts, or chat.
-- Never log in from ordinary/direct egress; require verified changed WARP egress first.
-- Never touch canonical staging or the separately owned Oteryn analysis runtime.
-- Do not accept a pixel/window change alone as successful world entry; require a decoded Worldmap semantic runtime hit or equivalent game-world protocol state.
-- Debugging/trace breakpoints are observational only. Do not patch return values, skip security checks, alter branch decisions, suppress anti-cheat, or otherwise bypass local security enforcement.
-- If a security/anti-cheat requirement is proven as the blocker, stop at that supported-environment authority boundary instead of bypassing it.
-- Leave the character idle if world entry is proven; no gameplay actions are authorized in this active task.
+- No OCR/Tesseract/image-to-text for login or success proof.
+- Never expose secret values in argv, logs, screenshots, repository files, artifacts, or chat.
+- Never log in from ordinary/direct egress; verify changed WARP egress first.
+- Never mutate canonical staging or the separately owned Oteryn analysis runtime.
+- Pixel/window changes are not world-entry evidence; require decoded Worldmap/GameState/protocol evidence.
+- Breakpoints/tracing are observational only for this task: do not modify callback results, branch decisions, security decisions, or client/server state through the debugger.
+- Leave the character idle if world entry is proven; gameplay actions are not authorized in this active task.
 
-## Validation record
+## Current experiment
 
 ```yaml
-updated_at: 2026-08-13T01:06:00+02:00
-branch_head_before_checkpoint: c951f148b883fffc39d105daf39cf9c7561da095
+experiment_id: OTC48-QMETA-002
+objective: recover exact current-version Qt dispatch metadata for the login/selection classes
+hypothesis: the previous run recovered the classes but failed only because of invalid required-method assumptions
+preconditions:
+  client_version: 15.32.df7b29
+  binary_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  secrets_required: false
+  warp_required_for_client_fetch: true
+action: path-scoped push workflow tibia-hosted-login-qmetaobject-recovery.yml
+expected_structural_evidence:
+  - all four target QMetaObjects recovered by exact class identity
+  - exact qmeta/string/meta/static_metacall values
+  - actual method tables
+  - static-metacall dispatch/jump-table candidates where structurally derivable
+abort_conditions:
+  - exact client hash mismatch
+  - target class absent from current binary
+  - analysis cannot validate Worldmap QMetaObject control
+rollback_or_recovery: preserve prior proven evidence and update hypothesis; no runtime mutation
+external_run_id: 31649792368
+workflow_head: 691f4e865dcdd800f7bd3fb129d0929e63c33da7
+observed_structural_evidence: pending
+result: INCONCLUSIVE
+```
+
+## Validation / anti-stall state
+
+```yaml
+updated_at: 2026-08-13T01:10:00+02:00
 pr: 48
-status: active_qmeta_dispatch_recovery
-secret_gate:
-  run: 31616821899
-  job: 94181592919
-  result: PASS
-assets_manifest_probe:
-  run: 31625032514
-  job: 94209116428
-  result: PASS
-best_strict_no_ocr_world_entry:
-  run: 31626946078
-  job: 94215664628
-  result: FAIL_BEFORE_GAME_SERVER_CONNECT
-  decoded_worldmap_hit: false
-  failed_asset_load_count: 0
-  post_activation_direct_tcp_count: 0
-  post_activation_udp_count: 0
-hosted_launcher_window_inventory:
-  run: 31628168080
-  job: 94219884203
-  result: NO_GUI_PROCESS_OR_WINDOW
-hosted_launcher_kernel_warp:
-  run: 31628361566
-  job: 94220527259
-  result: NO_GUI_PROCESS_OR_WINDOW
-login_symbol_inventory:
-  run: 31627802861
-  job: 94218675614
-  result: PASS
-login_string_va_map:
-  run: 31628008127
-  job: 94219354880
-  result: PASS
-qmetaobject_recovery:
-  run: 31629211661
-  job: 94223374658
-  workflow_result: FAIL_DUE_TO_INVALID_REQUIRED_METHOD_ASSUMPTIONS
-  structural_recovery: PASS
-https_login_identity_bundle:
-  run: 31647827166
-  job: 94285373954
-  result: PASS
-  has_session: true
-  has_playdata: true
-  has_characters: true
-  has_worlds: true
+branch_head: 691f4e865dcdd800f7bd3fb129d0929e63c33da7
+status: waiting
+invocation_started_at: 2026-08-13T01:02:00+02:00
+last_progress_at: 2026-08-13T01:08:47+02:00
+ordinary_ci_observations_for_qmeta_head: 2
+qmeta_run:
+  id: 31649792368
+  first_observation: queued
+  second_observation: in_progress
+  conclusion: pending
 safe_to_resume: true
 ```
 
-`next_action`: correct the task-owned `tibia-hosted-login-qmetaobject-recovery.yml` acceptance filter so it preserves every target class recovered from the exact current binary, emits the exact QMetaObject/string/metadata/static-metacall addresses and actual method tables for `TCharacterSelectionController`, `TGameserverLoginProcessController`, `TGameserverGameSession`, and `TAntiCheatController`, and disassembles their static metacalls without requiring rejected method-name assumptions. Then use the recovered current-version dispatch evidence to design the smallest strict no-OCR observational login trace. Do not modify callback results or security decisions.
+`next_action`: after run `31649792368` reaches a terminal state, inspect it once in a fresh continuation session. If successful, persist the exact QMetaObject/static-metacall/method-target evidence and construct the smallest strict no-OCR **observational** login trace using those current-version dispatch points with FullMap/FieldData as the success gate. If it fails, inspect the failed job log, isolate the first actionable error, and repair only with a new evidence-based hypothesis.
 
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 2
+  generation: 3
   session_id: chatgpt-20260813-0106-otclient-tibia-re
   session_started_at: 2026-08-13T01:02:00+02:00
-  checkpointed_at: 2026-08-13T01:06:00+02:00
-  last_progress_at: 2026-08-13T01:06:00+02:00
+  checkpointed_at: 2026-08-13T01:10:00+02:00
+  last_progress_at: 2026-08-13T01:08:47+02:00
   phase: qmeta_dispatch_recovery
-  exact_head: c951f148b883fffc39d105daf39cf9c7561da095
+  exact_head: 691f4e865dcdd800f7bd3fb129d0929e63c33da7
   pull_request: 48
-  active_operation: correct and execute QMetaObject recovery workflow
+  active_operation: GitHub Actions run 31649792368
   external_run_ids:
+    - 31649792368
     - 31647827166
     - 31629211661
-  operation_started_at: null
-  wait_deadline_at: 2026-08-13T01:26:00+02:00
+  operation_started_at: 2026-08-13T01:08:47+02:00
+  wait_deadline_at: null
   check_generation: qmeta-recovery-v2
-  checks_used: 0
-  status: ready
+  checks_used: 2
+  status: waiting
   safe_to_resume: true
-  resume_condition: PR #48 branch remains the live owner and the exact client SHA remains e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-  next_action: update only tibia-hosted-login-qmetaobject-recovery.yml to remove invalid required-method filtering and execute the resulting path-scoped push workflow
+  resume_condition: run 31649792368 is terminal and PR #48 remains the live owner
+  next_action: inspect terminal run 31649792368 once, classify structural evidence, and continue from the exact result
 ```
 
-Owner instruction on 2026-08-13 invokes `OTCLIENT-TIBIA-RE` autonomously and explicitly resolves the alias through `docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md`. This bounded active task may use its existing authorized test-account GitHub Actions secrets only through already-authorized workflow/runtime mechanisms after verified WARP, and may use official runtime assets as transient test inputs. Secret values, session keys, character/account data, and proprietary assets remain forbidden from logs, artifacts, repository content, and chat.
+Owner instruction on 2026-08-13 invokes `OTCLIENT-TIBIA-RE` autonomously and resolves the alias through `docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md`. Existing test-account secrets may be used only through the already-authorized workflow/runtime mechanisms after verified WARP; their values and all sensitive session/account data remain forbidden from durable evidence.

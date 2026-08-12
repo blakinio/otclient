@@ -1,0 +1,110 @@
+name: Tibia hosted kernel-WARP official launcher
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-kernel-warp-official-launcher.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  launcher:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-kernel-warp-home
+    steps:
+      - name: Install no-OCR graphical and WireGuard runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl dbus-x11 iproute2 mesa-utils wireguard-tools x11-utils xdotool xvfb \
+            libasound2t64 libatk1.0-0 libatspi2.0-0 libcups2 libdbus-1-3 libdrm2 libegl1 libfontconfig1 libfreetype6 libgbm1 \
+            libgl1 libglx0 libgtk-3-0 libnspr4 libnss3 libopengl0 libpulse0 libvulkan1 libx11-6 libx11-xcb1 libxcb-cursor0 \
+            libxcb-glx0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 \
+            libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 libxcomposite1 libxdamage1 libxi6 \
+            libxkbcommon-x11-0 libxrandr2 libxrender1 libxtst6 mesa-vulkan-drivers vulkan-tools
+          ! command -v tesseract >/dev/null 2>&1
+          echo OCR_BINARY_ABSENT=true
+
+      - name: Establish native kernel WARP route
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          direct_ip=$(curl -fsS --retry 5 --retry-all-errors --max-time 30 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
+          [[ -n "$direct_ip" ]]
+          mkdir -p /tmp/wgcf && cd /tmp/wgcf
+          curl -fsSL --retry 3 --retry-all-errors -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          chmod 755 wgcf
+          ./wgcf register --accept-tos >/dev/null
+          ./wgcf generate >/dev/null
+          chmod 600 wgcf-account.toml wgcf-profile.conf
+          # wg-quick DNS hooks are unnecessary for this ephemeral runner and can require resolvconf.
+          sed '/^DNS =/d' wgcf-profile.conf >/tmp/warp.conf
+          sudo install -m 600 /tmp/warp.conf /etc/wireguard/warp.conf
+          sudo wg-quick up warp
+          sudo wg show warp
+          ready=0
+          for _ in $(seq 1 20); do
+            if curl -fsS --retry 2 --retry-all-errors --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/warp.trace 2>/dev/null; then ready=1; break; fi
+            sleep 2
+          done
+          [[ "$ready" == 1 ]]
+          warp_state=$(sed -n 's/^warp=//p' /tmp/warp.trace)
+          warp_ip=$(sed -n 's/^ip=//p' /tmp/warp.trace)
+          grep -E '^(loc|warp)=' /tmp/warp.trace
+          [[ "$warp_state" == on || "$warp_state" == plus ]]
+          [[ -n "$warp_ip" && "$warp_ip" != "$direct_ip" ]]
+          echo NATIVE_KERNEL_WARP_CHANGED_EGRESS=true
+
+      - name: Fetch and start official launcher without LD_PRELOAD
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p /tmp/bootstrap "$HOME"
+          cd /tmp/bootstrap
+          u=https://static.tibia.com/download/tibia.x64.tar.gz
+          curl --compressed -fL --retry 3 --retry-all-errors --connect-timeout 15 --max-time 300 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o tibia.tgz
+          tar xfz tibia.tgz
+          test -x Tibia/Tibia
+          export LIBGL_ALWAYS_SOFTWARE=1 VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          export XDG_CONFIG_HOME="$HOME/.config" XDG_DATA_HOME="$HOME/.local/share" XDG_CACHE_HOME="$HOME/.cache"
+          mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/xvfb.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do xdpyinfo -display :99 >/dev/null 2>&1 && break; sleep 1; done
+          glxinfo -B | grep -q 'OpenGL renderer string: llvmpipe'
+          cd Tibia
+          : >/tmp/launcher.log
+          nohup dbus-run-session -- ./Tibia >/tmp/launcher.log 2>&1 </dev/null &
+          parent=$!
+          sleep 15
+          echo PROCESS_INVENTORY_BEGIN
+          ps -eo pid=,ppid=,comm= | awk '$3 ~ /Tibia|tibia|QtWebEngine|chrome|zygote|sandbox|Battle|battle|BE/ {print}' | head -n 100
+          echo PROCESS_INVENTORY_END
+          echo WINDOW_INVENTORY_BEGIN
+          xwininfo -root -tree 2>/dev/null | sed -E 's/0x[0-9a-f]+/0xID/g' | head -n 150
+          echo WINDOW_INVENTORY_END
+          win=''; best_area=0; bw=0; bh=0
+          for w in $(xdotool search --onlyvisible --name '.*' 2>/dev/null || true); do
+            geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
+            width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p'); height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
+            [[ -n "$width" && -n "$height" ]] || continue
+            area=$((width*height)); (( area>best_area )) && { win=$w; best_area=$area; bw=$width; bh=$height; }
+          done
+          echo "LARGEST_LAUNCHER_WINDOW=${bw}x${bh}"
+          if [[ -z "$win" || "$best_area" -le 1024000 ]]; then
+            echo OFFICIAL_LAUNCHER_VISIBLE=false
+            echo SAFE_LAUNCHER_LOG_BEGIN
+            grep -Ei 'fatal|error|failed|vulkan|glx|egl|xcb|display|qt|sandbox|update|package|launcher' /tmp/launcher.log | tail -n 120 || true
+            echo SAFE_LAUNCHER_LOG_END
+            exit 1
+          fi
+          title=$(xdotool getwindowname "$win" 2>/dev/null | tr -cd 'A-Za-z0-9 _.,:+()[]{}_-')
+          echo "OFFICIAL_LAUNCHER_TITLE=$title"
+          echo OFFICIAL_LAUNCHER_VISIBLE=true

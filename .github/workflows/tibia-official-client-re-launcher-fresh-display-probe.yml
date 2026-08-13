@@ -1,0 +1,103 @@
+name: Track A launcher fresh-display probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-fresh-display-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_WARP_PORT: '25354'
+      PROBE_DISPLAY: ':97'
+    steps:
+      - name: Launch official launcher on fresh isolated X display
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$(id -u)" == 0 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          work="$state/fresh-display/run-$GITHUB_RUN_ID"
+          home="$work/home"; tmp="$work/tmp"; runtime_dir="$work/runtime-dir"; unpack="$work/unpacked"
+          mkdir -p "$home" "$tmp" "$runtime_dir" "$unpack"
+          chmod 700 "$work" "$home" "$tmp" "$runtime_dir"
+
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+
+          [[ ! -e /tmp/.X11-unix/X97 ]]
+          private_xvfb="$state/runtime/Xvfb-track-a"
+          [[ -x "$private_xvfb" ]]
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$root/usr/share/X11/xkb" nohup "$private_xvfb" "$PROBE_DISPLAY" -screen 0 1280x800x24 -xkbdir "$root/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset >"$work/xvfb.log" 2>&1 </dev/null &
+          xvfb_pid=$!
+          trap 'kill "$xvfb_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 30); do [[ -e /tmp/.X11-unix/X97 ]] && break; sleep .2; done
+          [[ -e /tmp/.X11-unix/X97 ]]
+          echo TRACK_A_FRESH_DISPLAY_READY=true
+
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          [[ -n "$proxy_lib" ]]
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          workdir="$(dirname "$launcher")"
+          cd "$workdir"
+          rc=0
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_RUNTIME_DIR="$runtime_dir" TMPDIR="$tmp" DISPLAY="$PROBE_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            timeout 90s "$launcher" >"$work/launcher.log" 2>&1 || rc=$?
+          echo TRACK_A_FRESH_DISPLAY_LAUNCHER_RC="$rc"
+          if grep -Fq 'Application is already running' "$work/launcher.log"; then
+            echo TRACK_A_FRESH_DISPLAY_SINGLETON_BLOCKED=true
+          else
+            echo TRACK_A_FRESH_DISPLAY_SINGLETON_BLOCKED=false
+          fi
+          child="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          if [[ -s "$child" ]]; then
+            echo TRACK_A_FRESH_DISPLAY_CHILD_PRESENT=true
+            echo TRACK_A_FRESH_DISPLAY_CHILD_SHA256="$(sha256sum "$child" | awk '{print $1}')"
+            echo TRACK_A_FRESH_DISPLAY_CHILD_SIZE="$(stat -c %s "$child")"
+          else
+            echo TRACK_A_FRESH_DISPLAY_CHILD_PRESENT=false
+          fi
+          tail -n 120 "$work/launcher.log" | sed 's/^/TRACK_A_FRESH_DISPLAY_LOG=/' || true
+          echo TRACK_A_FRESH_DISPLAY_PROBE_COMPLETE=true

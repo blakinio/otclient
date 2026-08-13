@@ -71,8 +71,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T14:41:00+02:00
-head: a4c21ddeef3eafdb738011f1897b4dc9a8f6d517
+updated_at: 2026-08-13T14:47:00+02:00
+head: 801d2c35c
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -91,11 +91,12 @@ proven:
   - run 31700834510 job 94449297810 proved isolated native-Linux Track A state at /work/_otclient_tibia_re_state with display :98 and WARP port 25354
   - the live Track A namespace has no owned client, Xvfb, or wireproxy PID marker
   - the current runner image has bash curl and python3 but lacks file gdb proxychains4 socat xdotool and Xvfb
+  - run 31700967902 job 94449744345 proved WARP ownership and current official client SHA e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 derived:
   - a fresh main-based Track A task and PR are required for discoverable continuation
 unknown:
-  - exact current official-client binary identity on the runner
   - current structural session state
+  - whether six missing runner tools can run from an isolated unprivileged Track A toolroot without changing the shared runner image
 conflicts:
   - canonical preferred runner labels differ from the currently reported legacy label set
 first_failure:
@@ -106,6 +107,7 @@ rejected_hypotheses:
 changed_paths:
   - .github/workflows/tibia-official-client-re-identity.yml
   - .github/workflows/tibia-official-client-re-live-state.yml
+  - .github/workflows/tibia-official-client-re-toolroot.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
 validation:
   - command: live main governance and PR/runner preflight
@@ -114,7 +116,10 @@ validation:
   - command: Track A official-client RE live state run 31700834510 job 94449297810
     result: PASS
     evidence: isolated namespace proven; no owned runtime processes; six required tools absent
+  - command: Track A official Linux client identity run 31700967902 job 94449744345
+    result: PASS
+    evidence: isolated WARP ready; current client size 51965216 and SHA e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 blockers:
   - runner image lacks file gdb proxychains4 socat xdotool and Xvfb for launch/instrumentation phases
-next_action: complete run 31700967902 to verify current official Linux client SHA through isolated Track A WARP, then select a repository-owned dependency path without touching Track B
+next_action: prepare and validate an unprivileged Track A toolroot for the six missing binaries without altering the shared runner image or Track B runtime
 ```

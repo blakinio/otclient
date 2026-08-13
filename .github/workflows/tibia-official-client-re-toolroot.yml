@@ -1,0 +1,69 @@
+name: Track A official-client RE toolroot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-toolroot.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-toolroot
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: [otclient, synology]
+    timeout-minutes: 15
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Build isolated Track A user-space toolroot
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          root="$state/toolroot"
+          debs="$state/cache/toolroot-debs"
+          mkdir -p "$root" "$debs"
+          chmod 700 "$state" "$root" "$debs"
+
+          cd "$debs"
+          packages=(file gdb proxychains4 socat xdotool xvfb)
+          for package in "${packages[@]}"; do
+            apt-get download "$package"
+          done
+          for archive in ./*.deb; do
+            dpkg-deb -x "$archive" "$root"
+          done
+
+          required=(file gdb proxychains4 socat xdotool Xvfb)
+          missing=0
+          for tool in "${required[@]}"; do
+            candidate="$(find "$root/usr/bin" "$root/usr/sbin" -maxdepth 1 -type f -name "$tool" -print -quit 2>/dev/null || true)"
+            if [[ -z "$candidate" ]]; then
+              echo TRACK_A_TOOLROOT_MISSING_BINARY="$tool"
+              missing=$((missing+1))
+              continue
+            fi
+            echo TRACK_A_TOOLROOT_BINARY="$tool"
+            unresolved="$(LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" ldd "$candidate" 2>/dev/null | awk '/not found/{print $1}' | paste -sd, - || true)"
+            if [[ -n "$unresolved" ]]; then
+              echo "TRACK_A_TOOLROOT_UNRESOLVED_${tool^^}=$unresolved"
+            fi
+          done
+          echo TRACK_A_TOOLROOT_MISSING_BINARY_COUNT="$missing"
+          [[ "$missing" == 0 ]]
+          printf 'PATH=%s\nLD_LIBRARY_PATH=%s\n' \
+            "$root/usr/bin:$root/usr/sbin" \
+            "$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" \
+            >"$root/track-a-toolroot.env"
+          chmod 600 "$root/track-a-toolroot.env"
+          echo TRACK_A_USERSPACE_TOOLROOT_PREPARED=true

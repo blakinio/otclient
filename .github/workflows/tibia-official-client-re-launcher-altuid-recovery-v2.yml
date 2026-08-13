@@ -1,0 +1,110 @@
+name: Track A official launcher alternate-UID recovery v2
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-altuid-recovery-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Recover current package under isolated uid
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$(id -u)" == 0 ]]
+          command -v setpriv >/dev/null
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
+          kill -0 "$xvfb_pid"
+          echo TRACK_A_ALTUID_PREREQUISITES_VERIFIED=true
+
+          work="/tmp/track-a-altuid-$GITHUB_RUN_ID"
+          home="$work/home"
+          unpack="$work/unpacked"
+          mkdir -p "$home" "$unpack"
+          chmod 755 "$work" "$home" "$unpack"
+          tarball="$work/tibia.x64.tar.gz"
+          url='https://static.tibia.com/download/tibia.x64.tar.gz'
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 -A 'Mozilla/5.0 (X11; Linux x86_64)' "$url" -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          chmod -R a+rX "$unpack"
+          proxy_src="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          [[ -n "$proxy_src" ]]
+          proxy_lib="$work/libproxychains.so.4"
+          cp "$proxy_src" "$proxy_lib"
+          chmod 755 "$proxy_lib"
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          chmod 644 "$proxy_conf"
+          chown -R 65534:65534 "$home"
+          log="$work/launcher.log"
+          touch "$log"; chown 65534:65534 "$log"
+          workdir="$(dirname "$launcher")"
+          setpriv --reuid=65534 --regid=65534 --clear-groups env -u RUNNER_TRACKING_ID \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$home" XDG_DATA_HOME="$home/.local/share" \
+            DISPLAY="$TRACK_DISPLAY" PATH="/usr/bin:/bin" LD_LIBRARY_PATH="$workdir:$workdir/lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$launcher" >"$log" 2>&1 </dev/null &
+          launcher_pid=$!
+          echo TRACK_A_ALTUID_LAUNCHER_STARTED=true
+          child="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          last=''; stable=0
+          for _ in $(seq 1 180); do
+            if [[ -s "$child" ]]; then
+              sha="$(sha256sum "$child" | awk '{print $1}')"
+              if [[ "$sha" == "$last" ]]; then stable=$((stable+1)); else stable=0; last="$sha"; fi
+              (( stable >= 3 )) && break
+            fi
+            sleep 2
+          done
+          if [[ ! -s "$child" || $stable -lt 3 ]]; then
+            echo TRACK_A_ALTUID_RECOVERY_FAILED=true
+            tail -n 100 "$log" | sed 's/^/TRACK_A_ALTUID_LAUNCHER_LOG=/' || true
+            exit 1
+          fi
+          echo TRACK_A_ALTUID_CLIENT_SHA256="$(sha256sum "$child" | awk '{print $1}')"
+          echo TRACK_A_ALTUID_CLIENT_SIZE="$(stat -c %s "$child")"
+          python3 - "$child" <<'PY'
+          import pathlib,re,sys
+          b=pathlib.Path(sys.argv[1]).read_bytes(); v=[]
+          for m in re.finditer(rb'15\.[0-9]{2}(?:\.[A-Za-z0-9]+)?',b):
+              s=m.group().decode('ascii','ignore')
+              if s not in v:v.append(s)
+          print('TRACK_A_ALTUID_CLIENT_VERSION_STRINGS='+','.join(v[:20]))
+          PY
+          echo TRACK_A_ALTUID_RECOVERY_COMPLETE=true

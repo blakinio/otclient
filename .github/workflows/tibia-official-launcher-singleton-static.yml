@@ -40,10 +40,10 @@ jobs:
           [[ -x "$launcher" ]]
           echo TRACK_A_LAUNCHER_STATIC_SHA256="$(sha256sum "$launcher" | awk '{print $1}')"
           echo TRACK_A_LAUNCHER_STATIC_SIZE="$(stat -c %s "$launcher")"
-          file "$launcher" | sed 's/^/TRACK_A_LAUNCHER_FILE=/'
+          readelf -h "$launcher" | grep -E 'Class:|Type:|Machine:' | sed 's/^/TRACK_A_LAUNCHER_ELF=/' || true
           echo TRACK_A_LAUNCHER_SINGLETON_STRINGS_BEGIN=true
-          strings -a -t x "$launcher" | grep -Ei -C 8 'Application is already running|single.?application|single.?instance|QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|lock.?file|server.?name|local.?socket' | head -n 400 | sed 's/^/TRACK_A_LAUNCHER_STRING=/' || true
+          strings -a -t x "$launcher" | grep -Ei -C 10 'Application is already running|single.?application|single.?instance|QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|lock.?file|server.?name|local.?socket|shared.?memory|semaphore' | head -n 500 | sed 's/^/TRACK_A_LAUNCHER_STRING=/' || true
           echo TRACK_A_LAUNCHER_SINGLETON_IMPORTS_BEGIN=true
-          objdump -T "$launcher" 2>/dev/null | grep -Ei 'QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|QLockFile|flock|fcntl|sem_|shm_|socket|bind|connect' | head -n 300 | sed 's/^/TRACK_A_LAUNCHER_IMPORT=/' || true
+          objdump -T "$launcher" 2>/dev/null | grep -Ei 'QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|QLockFile|flock|fcntl|sem_|shm_|socket|bind|connect' | head -n 400 | sed 's/^/TRACK_A_LAUNCHER_IMPORT=/' || true
           readelf -d "$launcher" | grep NEEDED | sed 's/^/TRACK_A_LAUNCHER_NEEDED=/' || true
           echo TRACK_A_LAUNCHER_SINGLETON_STATIC_COMPLETE=true

@@ -134,6 +134,7 @@ jobs:
           [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
 
           export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
+          export MAGICK_CONFIGURE_PATH="$toolroot/etc/ImageMagick-6"
           resolve_window() {
             local w geometry width height best='' best_area=0 area
             for _ in $(seq 1 80); do
@@ -191,7 +192,7 @@ jobs:
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
             before="$evidence/login-before.png"
             after="$evidence/login-after.png"
-            "$toolroot/usr/bin/import-im6.q16" -window "$window" "$before"
+            "$toolroot/usr/bin/import-im6.q16" -window "$window" "png:$before"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
             "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
             printf '%s' "$TIBIA_TEST_EMAIL" | "$toolroot/usr/bin/xclip" -selection clipboard -in -loops 1 -silent &
@@ -213,8 +214,8 @@ jobs:
               sleep 0.5
               window="$(resolve_window || true)"
               [[ -n "$window" ]] || continue
-              "$toolroot/usr/bin/import-im6.q16" -window "$window" "$after"
-              changed="$("$toolroot/usr/bin/compare-im6.q16" -metric AE "$before" "$after" null: 2>&1 || true)"
+              "$toolroot/usr/bin/import-im6.q16" -window "$window" "png:$after"
+              changed="$("$toolroot/usr/bin/compare-im6.q16" -metric AE "png:$before" "png:$after" null: 2>&1 || true)"
               [[ "$changed" =~ ^[0-9]+$ ]] || continue
               if (( changed > 45000 )); then transition=1; break; fi
             done

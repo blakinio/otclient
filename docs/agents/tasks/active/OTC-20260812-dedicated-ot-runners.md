@@ -15,7 +15,9 @@ Provide dedicated Synology-hosted GitHub Actions runners for OTClient and OTS wo
 
 owned_paths:
 - infra/ot-runners/**
+- .github/workflows/otclient-runner-synology-migrate.yml
 - docs/agents/tasks/active/OTC-20260812-dedicated-ot-runners.md
+- docs/agents/reports/OTCLIENT-20260813-synology-runner-live-deploy-attempt.md
 
 modules_touched: []
 reuses:
@@ -81,10 +83,11 @@ build_target: base
 - [x] The OTClient service has a dedicated Tibia-RE image target rather than broadening the OTS runtime.
 - [x] The OTClient image installs the runtime/debug dependencies required by the current official-client programme at image-build time.
 - [x] The deployment documentation defines the canonical OTCLIENT-TIBIA-RE runner selector and persistent state path.
-- [x] No Docker socket or privileged mode is introduced.
+- [x] No Docker socket or privileged mode is introduced into the new dedicated runner.
 - [x] `docker compose config` and both Docker build targets pass on a real Docker engine for exact implementation head `e97cf8be1b2a8c63cecc39e07d0347830b874d5f`.
 - [x] Temporary image-validation workflow was removed after its evidence run.
 - [x] Workflow-free repository CI passed on head `5f76d213d859c2a8838ac5b8740865ef6afaf1ab`.
+- [x] A bounded one-time Synology migration workflow was created and dispatched from this repository.
 - [ ] Updated `otclient-runner` is deployed on Synology and registers `synology-otclient-01` with `tibia-re`.
 - [ ] A PR #48 canonical probe is accepted by that runner and proves writable persistent state without touching `/var/lib/oteryn-staging-state/**`.
 - [ ] `synology-ots-01` remains available in `blakinio/Otheryn` after the stack update.
@@ -120,7 +123,53 @@ The job completed all steps successfully, including `docker compose config`, bui
 
 The temporary validation workflow was removed after this proof. Workflow-free final code/docs head `5f76d213d859c2a8838ac5b8740865ef6afaf1ab` passed repository CI run `31679760916`, including `CI / Required` job `94383401816`.
 
-Target-NAS registration proof is still required because GitHub repository runner inventory cannot be read by the current integration (`403 Resource not accessible by integration`).
+## Live deployment attempt — 2026-08-13
+
+A one-time infrastructure-only migration workflow was added on this same task branch in commit:
+
+```text
+19b567e993bd72432f75572a0be3f214e4db787d
+```
+
+It targets `[self-hosted, oteryn-staging]` only as a migration control plane to reach the Synology Docker socket. It does **not** execute Tibia or any programme experiment there. It deploys only the new OTClient runner stack, keeps token values out of logs/Git, and requires GitHub to report `synology-otclient-01` online with `self-hosted,Linux,X64,otclient,synology,tibia-re` before success.
+
+Exact migration attempt:
+
+```yaml
+workflow: One-time Synology OTClient runner migration
+run: 31686590850
+job: 94403975354
+head: 19b567e993bd72432f75572a0be3f214e4db787d
+observations: 2
+status: queued
+conclusion: null
+```
+
+Per anti-stall policy no further polling of that unchanged pending state was performed.
+
+Independent broad self-hosted evidence from PR #281 also remains queued:
+
+```yaml
+workflow: Self-hosted OTClient Probe
+run: 31643425060
+head: 91ef11ee8ad02df8c60f9c4f17b1e1ec3d3c6c0e
+selector: self-hosted
+status: queued
+created_at: 2026-08-12T21:38:10Z
+```
+
+This proves the deployment failure is not just a wrong `oteryn-staging` label: `blakinio/otclient` currently has no available self-hosted runner capable of accepting even the broad probe.
+
+The canonical PR #48 bootstrap also remains queued:
+
+```yaml
+run: 31679097113
+job: 94380204633
+selector: [self-hosted, otclient, synology]
+status: queued
+```
+
+Detailed provenance is persisted in `docs/agents/reports/OTCLIENT-20260813-synology-runner-live-deploy-attempt.md`.
 
 ## Durable state
 
@@ -129,22 +178,30 @@ PROVEN:
 - the runner stack is repository-scoped and independent of Oteryn Platform/Freqtrade infrastructure;
 - the declarative OTClient runner has a Tibia-RE-specific image target and label;
 - the OTClient Tibia-RE image and Compose configuration build/validate successfully on a real Docker engine;
-- the temporary validation workflow was removed and workflow-free repository CI is green on the last implementation head;
-- PR #48 has a consumer migration path that does not require Docker or an Oteryn container.
+- the temporary validation workflow was removed and workflow-free repository CI is green on the last validated implementation head;
+- PR #48 has a consumer migration path that does not require Docker or an Oteryn container;
+- the repository-owned migration workflow was actually dispatched;
+- no currently available self-hosted runner accepts either the specific migration job or the broad PR #281 probe.
 
 DERIVED:
-- after Synology rebuild/recreate, new official-client experiments can execute directly inside `synology-otclient-01` and keep durable runtime state in the runner work volume.
+- after Synology rebuild/recreate, new official-client experiments can execute directly inside `synology-otclient-01` and keep durable runtime state in the runner work volume;
+- deployment cannot currently be driven through GitHub Actions until some authorized execution channel to the Synology host is restored.
 
 UNKNOWN:
-- whether the target NAS has deployed the updated PR #280 stack;
-- whether the target runner currently has the new `tibia-re` label;
-- whether OTS remains available after redeploy.
+- whether the Synology Docker host itself is powered on/reachable;
+- why all repository self-hosted runners are currently offline/unregistered;
+- whether `/volume1/docker/ot-runners/.env` already exists on the NAS;
+- whether OTS remains available after eventual redeploy.
 
 WAITING_ON:
-- authorized deployment/recreate of the updated stack on the Synology Docker host;
+- an authorized execution channel to the Synology Docker host: either any existing repository self-hosted runner comes online or direct NAS/SSH execution becomes available;
+- deployment/recreate of the reviewed PR #280 stack;
 - runner acceptance proof from PR #48.
 
 BLOCKER:
-- final deployment to the Synology Docker host cannot be performed through the currently available GitHub connector; no authorized NAS/SSH execution tool is available in this session.
+- current ChatGPT environment exposes no SSH/Synology connector;
+- GitHub integration cannot administer repository runner inventory/secrets (`403`);
+- migration run `31686590850` cannot start because no self-hosted runner is currently available;
+- broad PR #281 `runs-on: self-hosted` run `31643425060` is also queued, independently confirming the absence of an available repository self-hosted execution path.
 
-next_action: deploy/recreate the PR #280 stack on Synology, verify `synology-otclient-01` registers with `tibia-re`, then reconcile PR #48 run `31679097113` (or a fresh exact-head equivalent) once and prove persistent OTClient state plus zero active Oteryn runtime dependency
+next_action: restore one authorized Synology execution path, execute the already-reviewed PR #280 stack, require `synology-otclient-01` online with `tibia-re`, then immediately reconcile PR #48 bootstrap and continue structural login/world-entry proof on that runner

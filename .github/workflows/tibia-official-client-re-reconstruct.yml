@@ -44,7 +44,6 @@ jobs:
           [[ -n "$pid" && -r "/proc/$pid/environ" ]]
           tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker"
           kill -0 "$pid"
-          ss -lntH "sport = :$TRACK_WARP_PORT" | grep -q .
           curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
             https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
           echo TRACK_A_WARP_OWNERSHIP_VERIFIED=true

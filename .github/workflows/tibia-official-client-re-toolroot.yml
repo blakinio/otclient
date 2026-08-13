@@ -38,25 +38,20 @@ jobs:
 
           apt_opts=(
             -o "Dir::State::lists=$aptroot/lists"
+            -o "Dir::State::status=$aptroot/status"
             -o "Dir::Cache::archives=$aptroot/archives"
             -o APT::Get::List-Cleanup=0
           )
+          touch "$aptroot/status"
           apt-get "${apt_opts[@]}" update
 
           cd "$debs"
-          # Keep the toolroot self-contained. apt-get download does not resolve
-          # dependencies, so list the direct runtime libraries observed on the
-          # pinned Ubuntu noble runner image explicitly.
-          packages=(
-            file gdb proxychains4 socat xdotool xvfb
-            libmagic1t64 libpython3.12 libbabeltrace1 libbabeltrace-ctf1
-            libipt2 libmpfr6 libsource-highlight4t64 libdebuginfod1t64
-            libxdo3 libgl1 libpixman-1-0 libxfont2 libssl3t64 libwrap0
-          )
-          for package in "${packages[@]}"; do
-            apt-get "${apt_opts[@]}" download "$package"
-          done
-          for archive in ./*.deb; do
+          packages=(file gdb proxychains4 socat xdotool xvfb)
+          # An empty private dpkg status makes APT resolve and download the
+          # complete dependency closure without installing into the runner.
+          apt-get "${apt_opts[@]}" --download-only --no-install-recommends \
+            install "${packages[@]}"
+          for archive in "$aptroot"/archives/*.deb; do
             dpkg-deb -x "$archive" "$root"
           done
 

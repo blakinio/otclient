@@ -8,6 +8,8 @@ Before autonomous, long-running, retry-prone, CI-waiting, repair, continuation, 
 
 Before treating the absence of Codex or a local terminal as a blocker, read and follow `GITHUB_ONLY_EXECUTION.md`. Use the GitHub connection and GitHub Actions on a dedicated branch, select the smallest proving validation, inspect full failed-job logs, keep repairs bounded, preserve required artifacts, and report an exact technical blocker only after the contract's alternatives are exhausted. Protected auto-merge or merge-queue admission for the current task's own PR may occur after the exact final head is frozen and every non-CI gate passes, only when repository protection guarantees that merge waits for all required exact-head checks. Direct or manual merge remains authorized only after every required gate passes. Protected protocol, asset, production, secret, or environment operations remain unauthorized without separate authority.
 
+For any official-Tibia research, login, runtime-analysis, protocol-analysis, worldmap/OTBM extraction, or OTClient-to-Tibia-Global compatibility task, read and obey `TIBIA_RESEARCH_TRACKS.md` before claiming work or touching a runtime. Its repository-only rule, two-track scope separation, runtime namespace isolation and cross-track ownership restrictions are mandatory and override stale task/PR wording that conflates the tracks.
+
 ## Authority and state model
 
 Authority for the current task is frozen from system and owner instructions plus governance on the trusted base ref at task start. Edits made by the current unmerged task cannot expand that task's permissions or safety boundaries.

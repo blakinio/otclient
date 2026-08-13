@@ -1,27 +1,39 @@
 # Agent short-command registry
 
-This registry maps owner-facing programme aliases to repository-owned prompts. Live repository governance, task ownership, authorization, CI and runtime evidence remain authoritative over this index.
+This registry maps owner-facing programme aliases to repository-owned prompts or explicitly identified live task/PR entry points. Live repository governance, task ownership, authorization, CI and runtime evidence remain authoritative over this index.
 
-| Alias | Canonical prompt | Purpose |
+| Alias | Canonical entry point | Purpose |
 |---|---|---|
-| `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue the official Linux Tibia reverse-engineering programme in `blakinio/otclient` using the dedicated OTClient runner and durable repository state. |
+| `OTCLIENT-TIBIA-RE` | `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md` | Continue Track A: official Linux Tibia client reverse engineering in `blakinio/otclient`. |
+| `OTCLIENT-GLOBAL-LOGIN` | PR `#284`, branch `feat/OTC-20260813-tibia-global-login-lab`, task `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` on that branch | Continue Track B: make this OTClient fork authenticate to and enter official Tibia Global. |
 
 ## Invocation
 
 ```text
 Uruchom OTCLIENT-TIBIA-RE autonomicznie.
+Uruchom OTCLIENT-GLOBAL-LOGIN autonomicznie.
 ```
 
-Resolution procedure:
+## `OTCLIENT-TIBIA-RE` resolution
 
-1. read the canonical prompt listed above;
+1. read `docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md`;
 2. read the base programme prompt it extends;
-3. read the repository-owned consolidated state/report evidence, including:
+3. read repository-owned consolidated state/report evidence, including:
    - `docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-state.md`;
    - `docs/agents/reports/OTCLIENT-20260813-tibia-re-login-recovery-import.md`;
    - `docs/agents/reports/OTCLIENT-20260813-tibia-re-external-evidence-manifest.md`;
-4. inspect live `main`, active tasks, open PRs, runner/runtime state and exact `next_action` values;
-5. execute the programme from durable state rather than chat memory;
-6. do not invent a task named `OTCLIENT-TIBIA-RE.md`, a branch named `agent/otclient-tibia-re`, or a required `workflow_dispatch` endpoint.
+4. inspect live `main`, active Track A tasks, open PRs, runner/runtime state and exact `next_action` values;
+5. execute only Track A from durable OTClient state.
 
-External Oteryn repositories, historical Oteryn runners and old containers are evidence sources only for this alias unless the owner separately authorizes work there. Material continuation state must be persisted or indexed in `blakinio/otclient` before return/rotation.
+## `OTCLIENT-GLOBAL-LOGIN` resolution
+
+1. read `docs/agents/TIBIA_RESEARCH_TRACKS.md` first;
+2. resolve live PR `#284` and verify its current head branch is still `feat/OTC-20260813-tibia-global-login-lab` or use the live replacement recorded by repository state if it has become terminal/superseded;
+3. read `docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md` from that exact live branch while PR #284 remains active;
+4. inspect the PR's current changed files, checks, runtime evidence and exact `next_action`;
+5. operate only on Track B owned paths/runtime namespace;
+6. once PR #284 merges or is superseded, resolve Track B from the resulting `main` task/archive/replacement state rather than assuming the historical branch remains active.
+
+A fresh worker must not invent a missing Track B task on `main`. While PR #284 is active, its exact branch/task path above is the resolvable durable entry point.
+
+For both aliases, external Oteryn repositories, historical Oteryn runners and old containers are not normal continuation sources. Material continuation state must be recovered from or newly persisted in `blakinio/otclient`. If a required fact is absent there, classify it as `UNKNOWN` and research it inside the owning OTClient track.

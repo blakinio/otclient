@@ -10,7 +10,7 @@ phase: consolidation
 branch: docs/OTC-20260813-tibia-re-canonical-runtime
 base_branch: main
 created: 2026-08-13T09:41:00+02:00
-updated: 2026-08-13T09:52:00+02:00
+updated: 2026-08-13T09:56:00+02:00
 risk: medium
 related_pr: "#285"
 owned_paths:
@@ -47,15 +47,20 @@ feature_scope:
 
 Make `blakinio/otclient` the single canonical repository and coordination surface for `OTCLIENT-TIBIA-RE`, with the dedicated repository runner (`synology-otclient-01`, selector `[self-hosted, otclient, synology]`) as the only active live-experiment target after migration. Preserve Oteryn-Platform work only as imported read-only historical evidence.
 
+# Owner persistence directive
+
+All new material work for this programme must be persisted or indexed in `blakinio/otclient` before return/rotation. Nothing required for continuation may live only in chat, local scratch space, transient runner state, an external repository or an unreferenced workflow artifact/log. Large artifacts may remain outside Git when required, but their exact provenance and semantic result must be indexed from this repository.
+
 # Acceptance inventory
 
 - [x] A repository-owned short-command registry resolves `OTCLIENT-TIBIA-RE` without relying on chat memory.
 - [x] The canonical wrapper prompt loads the original programme prompt but overrides runtime ownership to `blakinio/otclient` and the dedicated OTClient runner.
 - [x] The wrapper explicitly forbids treating `oteryn-staging`, `oteryn-synology-staging`, or `oteryn-tibia-client-analysis` as active execution targets for new programme work.
+- [x] The wrapper explicitly requires every material finding/result/checkpoint/next action to be persisted or indexed in `blakinio/otclient` before return/rotation.
 - [x] A consolidated report records material external Oteryn evidence required for continuation, including exact run/job/commit identifiers and claim boundaries.
 - [x] Current OTClient work inventory is recorded: PR #48 runtime, #279 OTBM pipeline, #280 runner infrastructure, #283 stable bridge.
 - [x] Current unknowns and canonical continuation order are recorded.
-- [x] Prompt routing was evaluated against positive, negative, boundary, stale-state and injection-style cases: 12/12 PASS.
+- [x] Prompt routing was evaluated against positive, negative, boundary, stale-state, persistence and injection-style cases: 13/13 PASS.
 - [x] No external repository is mutated.
 - [x] No Codex, OpenAI API quota, user token or owner-funded AI service is used.
 - [ ] Exact-head repository CI and PR diff/review hygiene are terminal before merge.
@@ -76,7 +81,8 @@ PROVEN:
 - master programme prompt is already on `main` at `docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md`.
 - PR #48, #279, #280 and #283 are all in `blakinio/otclient` and contain the active implementation/runtime work.
 - historical Oteryn worldmap/action evidence was read from `blakinio/Oteryn-Platform` and consolidated without mutating the external repository.
-- canonical wrapper evaluation passed 12/12 documented cases.
+- canonical wrapper evaluation passed 13/13 documented cases.
+- owner explicitly requires all future material programme work to be saved in `blakinio/otclient`; this requirement is now encoded in the canonical wrapper and task.
 
 DERIVED:
 - after #280 deployment and #48 runner acceptance proof, future workers no longer need to query Oteryn-Platform merely to recover normal programme state.
@@ -91,16 +97,16 @@ UNKNOWN:
 
 # Prompt evaluation
 
-`docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-prompt-eval.md` compares the canonical wrapper against the unchanged base programme prompt and records 12/12 passing routing/safety/continuation cases. The candidate removes active-runtime ambiguity without weakening structural evidence, SHA fencing, recovery, durable-state, OTBM or owner-funded-AI constraints.
+`docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-prompt-eval.md` compares the canonical wrapper against the unchanged base programme prompt and records 13/13 passing routing/safety/persistence/continuation cases. The candidate removes active-runtime ambiguity and requires repository persistence without weakening structural evidence, SHA fencing, recovery, OTBM or owner-funded-AI constraints.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 2
+checkpoint_version: 3
 status: validating
 branch: docs/OTC-20260813-tibia-re-canonical-runtime
 pr: 285
-head_before_checkpoint: 5accd2e1183db172035be0257483522088eede5b
+head_before_checkpoint: 9fe7ad92a769ea6cbf033b603678fc7e461c622a
 base_head: 05450748daca8344d9555638b638e98b6dc3abc7
 related_prs:
   runtime: 48
@@ -108,8 +114,8 @@ related_prs:
   runner: 280
   bridge: 283
 prompt_eval:
-  cases: 12
-  passed: 12
+  cases: 13
+  passed: 13
 blockers: []
 next_action: verify PR #285 full diff and exact-head CI; merge the documentation routing layer if clean, while runner deployment/runtime acceptance continues in #280/#48
 ```

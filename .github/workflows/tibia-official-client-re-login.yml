@@ -189,6 +189,9 @@ jobs:
           if [[ "$LOGIN_ATTEMPT" -ge 1 ]]; then
             window="$(resolve_window)"
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+            before="$evidence/login-before.png"
+            after="$evidence/login-after.png"
+            "$toolroot/usr/bin/import-im6.q16" -window "$window" "$before"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
             "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
             printf '%s' "$TIBIA_TEST_EMAIL" | "$toolroot/usr/bin/xclip" -selection clipboard -in -loops 1 -silent &
@@ -205,7 +208,20 @@ jobs:
             wait "$clip_pid"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
             unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-            sleep 8
+            transition=0; changed=0
+            for _ in $(seq 1 60); do
+              sleep 0.5
+              window="$(resolve_window || true)"
+              [[ -n "$window" ]] || continue
+              "$toolroot/usr/bin/import-im6.q16" -window "$window" "$after"
+              changed="$("$toolroot/usr/bin/compare-im6.q16" -metric AE "$before" "$after" null: 2>&1 || true)"
+              [[ "$changed" =~ ^[0-9]+$ ]] || continue
+              if (( changed > 45000 )); then transition=1; break; fi
+            done
+            echo TRACK_A_LOGIN_TRANSITION_CHANGED_PIXELS="$changed"
+            echo TRACK_A_LOGIN_TRANSITION_PROVEN="$transition"
+            rm -f -- "$before" "$after"
+            [[ "$transition" == 1 ]]
             window="$(resolve_window)"
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 285 193 click 1

@@ -76,6 +76,7 @@ def main() -> None:
     full, empty, unknown, delta, transition, action = records
     require(full["record_type"] == "tile_snapshot" and full["completeness"] == "FULL", "missing FULL snapshot")
     validate_position(full.get("position"), "FULL position")
+    require(isinstance(full.get("things"), list) and full["things"], "FULL must contain a non-empty complete stack")
     require([thing["stack_position"] for thing in full["things"]] == [0, 1], "FULL stack ordering changed")
     for index, thing in enumerate(full["things"]):
         validate_thing(thing, f"FULL thing {index}")
@@ -94,6 +95,7 @@ def main() -> None:
             require("thing" not in change, "delete must not fabricate a thing")
         else:
             validate_thing(change.get("thing"), f"delta {change['operation']}")
+            require(change["thing"]["stack_position"] == change["stack_position"], "delta thing stack_position must match enclosing change")
 
     require(transition["record_type"] == "transition_event" and transition.get("evidence") == "decoded_state", "transition evidence changed")
     validate_position(transition.get("before_position"), "transition before_position")

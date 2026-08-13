@@ -59,8 +59,8 @@ cleanup.
 
 ## Acceptance inventory
 
-- [ ] Live Track A namespace is proven isolated on the dedicated runner.
-- [ ] Exact current official Linux client version, size and SHA are verified.
+- [x] Live Track A namespace is proven isolated on the dedicated runner.
+- [x] Exact current official Linux client version, size and SHA are verified.
 - [ ] Official client is reconstructed and launched normally through verified WARP.
 - [ ] Login recovery consumes secrets only in the approved Actions step and does not persist them.
 - [ ] `IN_GAME` is proven from decoded structural state, not OCR/pixels/sockets.
@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T14:47:00+02:00
-head: 801d2c35c
+updated_at: 2026-08-13T14:54:00+02:00
+head: 85cd4f0b9
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -94,22 +94,26 @@ proven:
   - the live Track A namespace has no owned client, Xvfb, or wireproxy PID marker
   - the current runner image has bash curl and python3 but lacks file gdb proxychains4 socat xdotool and Xvfb
   - run 31700967902 job 94449744345 proved WARP ownership and current official client SHA e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  - run 31701968002 job 94453042070 revalidated the isolated Track A namespace on head 9fbc65a3e
+  - required CI run 31701972404 passed on head 9fbc65a3e
 derived:
   - a fresh main-based Track A task and PR are required for discoverable continuation
 unknown:
   - current structural session state
-  - whether six missing runner tools can run from an isolated unprivileged Track A toolroot after refreshing private package indexes
+  - whether the complete APT dependency closure runs from the isolated Track A toolroot
+  - exact reconstructed runtime file count and byte size
 conflicts:
   - canonical preferred runner labels differ from the currently reported legacy label set
 first_failure:
-  marker: private toolroot package download had no apt package index
-  evidence: run 31701102595 job 94450191425 failed with Unable to locate package file
+  marker: initial reconstruction probe required absent ss binary
+  evidence: run 31701967974 job 94453057997 stopped before downloads at ss command not found; exact PID/marker/curl ownership checks remain
 rejected_hypotheses:
   - continue mutating closed PR 48 as active ownership: rejected by live PR state and current main governance
 changed_paths:
   - .github/scripts/tibia-official-client-re-reconstruct.py
   - .github/workflows/tibia-official-client-re-identity.yml
   - .github/workflows/tibia-official-client-re-live-state.yml
+  - .github/workflows/tibia-official-client-re-reconstruct.yml
   - .github/workflows/tibia-official-client-re-toolroot.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - tests/tools/test_tibia_official_client_re_reconstruct.py
@@ -129,7 +133,16 @@ validation:
   - command: Track A official-client RE toolroot run 31701102595 job 94450191425
     result: FAIL
     evidence: legacy runner apt lists are absent; retry uses private Track A lists/cache
+  - command: Track A official-client RE toolroot run 31701470178 job 94451400940
+    result: FAIL
+    evidence: private apt indexes succeeded; direct packages alone left runtime libraries unresolved and socat undiscovered
+  - command: Track A official-client RE toolroot run 31701967968 job 94453042031
+    result: FAIL
+    evidence: explicit dependency candidate libpython3.12 is unavailable on noble; replacement uses APT-resolved closure with private empty dpkg status
+  - command: Track A official Linux client reconstruction run 31701967974 job 94453057997
+    result: FAIL
+    evidence: stopped before download because ss is absent; redundant ss check removed after exact Track A PID, environment marker and WARP curl checks
 blockers:
-  - toolroot run 31701102595 failed because the legacy runner image has no usable apt package index; no shared system mutation was attempted
-next_action: refresh apt indexes under the private Track A cache and retry the unprivileged toolroot without altering the shared runner image or Track B runtime
+  - latest toolroot run 31702126645 and reconstruction run 31702126665 are queued for synology-otclient-01; no unrelated job is cancelled
+next_action: reconcile runs 31702126645 and 31702126665, persist exact results, then launch the verified official native-Linux client under Track A display :98 and process marker
 ```

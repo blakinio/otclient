@@ -24,6 +24,30 @@ if text.count(old_stdin) != 1:
     raise SystemExit(f"expected exactly one handoff docker-exec stdin site, found {text.count(old_stdin)}")
 text = text.replace(old_stdin, new_stdin, 1)
 
+old_asset_marker = "echo LAB_RUNTIME_ASSET_IDENTIFIER_LENGTH=64\n"
+new_asset_marker = old_asset_marker + r'''docker exec -i "$CONTAINER" python3 - <<'PY_STATICDATA'
+from pathlib import Path
+
+path = Path('/otclient/modules/game_things/things.lua')
+text = path.read_text(encoding='utf-8')
+old = ''' + '"""' + '''        if not g_things.loadStaticData(filePath) then
+            errorList[#errorList + 1] = "Couldn't load staticdata"
+        end
+''' + '"""' + '''
+new = ''' + '"""' + '''        -- Track B 15.32 lab: staticdata is probed explicitly below, but its
+        -- known parser failure must not reset client/protocol version before
+        -- the game-login packet can be tested with valid appearances.
+''' + '"""' + '''
+if text.count(old) != 1:
+    raise SystemExit(f'expected one staticdata fatal gate, found {text.count(old)}')
+path.write_text(text.replace(old, new, 1), encoding='utf-8')
+PY_STATICDATA
+echo LAB_STATICDATA_FATAL_GATE_BYPASSED=true
+'''
+if text.count(old_asset_marker) != 1:
+    raise SystemExit(f"expected exactly one runtime asset marker, found {text.count(old_asset_marker)}")
+text = text.replace(old_asset_marker, new_asset_marker, 1)
+
 # Product support remains capped at 1525. Keep all 1532 compatibility work
 # inside the isolated lab. The normal game_things listener resets the client
 # version to zero when 15.32 staticdata fails, so disconnect only that listener
@@ -31,10 +55,6 @@ text = text.replace(old_stdin, new_stdin, 1)
 # connected and still configure the normal OTClient feature set.
 old_version = '    g_game.setClientVersion(1532)\n'
 new_version = (
-    "    if ThingsLoaderController then\n"
-    "      ThingsLoaderController:terminate()\n"
-    "      mark('GAME_THINGS_CONTROLLER_TERMINATED_FOR_LAB=true')\n"
-    "    end\n"
     '    g_gameConfig.setLastSupportedVersion(1532)\n'
     "    mark('CLIENT_VERSION_LIMIT_OVERRIDE=true')\n"
     "    if g_game.getClientVersion()==1532 then\n"

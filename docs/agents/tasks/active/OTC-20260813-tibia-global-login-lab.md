@@ -386,6 +386,15 @@ but the loader function is local and the real registration is controller-owned.
 The lab now terminates only `ThingsLoaderController` before changing versions,
 then performs its explicit appearances/staticdata probes itself.
 
+Run `31701555318`, job `94451677203`, exact head
+`2e6c604c095b54a42bc9ea10ab405bdab3da62bd`, proved the controller symbol is
+not visible across the sandboxed module boundary; versions again became zero
+and no client bytes were sent. The next lab-only runtime patch removes only the
+fatal staticdata error-list addition from the container copy of
+`game_things/things.lua`. The explicit parser probe remains and still reports
+`STATICDATA_LOAD_FAILED`, while successful appearances can keep version 1532
+alive for the game-login experiment.
+
 # Evidence classification
 
 PROVEN:
@@ -438,14 +447,14 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with the task-local things controller event disconnected through its actual controller lifecycle, then verify effective versions and classify the exchange.
+Run the canonical E2E with the lab runtime staticdata fatal gate bypassed, verify effective versions remain 1532, and classify the exchange.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:45:00Z
-head: ffbc7e50644d57f75baa2a08041e62077368da61
+updated_at: 2026-08-13T12:51:00Z
+head: 2e6c604c095b54a42bc9ea10ab405bdab3da62bd
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -460,7 +469,7 @@ proven:
 derived:
   - first remaining boundary is the official 15.32 initial game-login packet identity/framing
 unknown:
-  - whether disconnecting the actual ThingsLoaderController preserves client/protocol version 1532 through login construction
+  - whether bypassing only the lab runtime staticdata fatal gate preserves client/protocol version 1532 through login construction
 conflicts:
   - none
 first_failure:
@@ -481,5 +490,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E after terminating the lab-owned ThingsLoaderController event lifecycle and verify effective versions plus aggregate direction markers
+next_action: run the exact-head canonical E2E with the lab runtime staticdata fatal gate bypassed and verify effective versions plus aggregate direction markers
 ```

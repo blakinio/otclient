@@ -49,6 +49,16 @@ jobs:
           trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "TRACK_A_LOGIN_FAILURE_RC=$rc"; for log in "$evidence/vulkaninfo.txt" "$state/runtime/xvfb.log" "$state/runtime/client.log"; do if [[ -f "$log" ]]; then echo "TRACK_A_LOG_BEGIN=$(basename "$log")"; tail -n 80 "$log"; echo "TRACK_A_LOG_END=$(basename "$log")"; fi; done; fi' EXIT
 
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+            [[ -r "/proc/$pid/environ" ]]
+            tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker"
+            [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+            kill "$pid"
+            for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
+            ! kill -0 "$pid" 2>/dev/null
+            pid=''
+            echo TRACK_A_OWNED_STALE_CLIENT_STOPPED=true
+          fi
           if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
             warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid")"
             [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
@@ -181,14 +191,14 @@ jobs:
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
             "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
-            printf '%s' "$TIBIA_TEST_EMAIL" | "$toolroot/usr/bin/xclip" -selection clipboard -in -loops 1 &
+            printf '%s' "$TIBIA_TEST_EMAIL" | "$toolroot/usr/bin/xclip" -selection clipboard -in -loops 1 -silent &
             clip_pid=$!
             sleep 0.2
             "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+v
             wait "$clip_pid"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
             "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
-            printf '%s' "$TIBIA_TEST_PASSWORD" | "$toolroot/usr/bin/xclip" -selection clipboard -in -loops 1 &
+            printf '%s' "$TIBIA_TEST_PASSWORD" | "$toolroot/usr/bin/xclip" -selection clipboard -in -loops 1 -silent &
             clip_pid=$!
             sleep 0.2
             "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+v

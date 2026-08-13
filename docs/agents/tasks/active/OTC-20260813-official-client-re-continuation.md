@@ -73,7 +73,7 @@ cleanup.
 ```yaml
 checkpoint_version: 2
 updated_at: 2026-08-13T15:52:00+02:00
-head: c77dbe3e914a202dd8a2ecdbac072da04de34a1a
+head: 402d3605b2b0c669ad332ce0a6b8f81148dd6971
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -164,6 +164,9 @@ validation:
   - command: python -m unittest tests.tools.test_tibia_official_client_re_reconstruct tests.tools.test_tibia_official_client_re_xwd_diff
     result: PASS
     evidence: six tests passed after adding the auth trace workflow change.
+  - command: Track A structural login run 31716923856 job 94503872080
+    result: INCONCLUSIVE_FOR_PRELOGIN_GDB_TRACE
+    evidence: the version-pinned trace armed before credential input, but emitted no state label and the pixel transition remained 1846 < 45000. Repository-owned recovery evidence says a pre-login GDB attach changes Qt/UI timing, so this run does not establish that the submit handler was not reached; the trace is disabled before the next live attempt.
 blockers: []
-next_action: run the same pinned pixel baseline with the version-specific GDB auth-state trace armed before credential input; use its safe state labels to identify the first reached login outcome before attempting any further input variation
+next_action: run one bounded no-GDB submit variant: send Return after the proven field mutations, then use the exact historical button coordinate only if the same changed-pixel threshold did not transition; record the chosen method and retain the structural IN_GAME gate
 ```

@@ -199,11 +199,10 @@ jobs:
             "$toolroot/usr/bin/xdotool" getmouselocation --shell | awk -F= '/^X=/{x=$2} /^Y=/{y=$2} END { print x "," y }'
           }
 
-          # The pixel threshold above is only a regression detector.  This
-          # trace uses the version-pinned client control-flow offsets to tell
-          # whether the exact submit reaches authentication and which state it
-          # reaches; it never records credential values or image contents.
-          if [[ -w /proc/sys/kernel/yama/ptrace_scope ]]; then printf '0\n' >/proc/sys/kernel/yama/ptrace_scope; fi
+          # The fixed offsets are retained as version-pinned research leads,
+          # but are deliberately not armed before login: historical evidence
+          # shows that an early GDB attach itself changes Qt/UI timing.
+          if false; then
           line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
           [[ -n "$line" ]]
           start="$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')"
@@ -317,6 +316,7 @@ jobs:
           for _ in $(seq 1 30); do grep -q 'AUTH_STRUCTURAL_TRACE_ARMED=true' "$auth_gdb_log" 2>/dev/null && break; sleep 0.5; done
           grep -q 'AUTH_STRUCTURAL_TRACE_ARMED=true' "$auth_gdb_log"
           echo TRACK_A_AUTH_TRACE_ARMED=true
+          fi
 
           read -r initial_local initial_direct initial_udp < <(socket_state)
           read -r io_before_read io_before_write < <(process_io)
@@ -344,11 +344,21 @@ jobs:
             typed_changed="$(python3 -c 'import pathlib,sys; a=pathlib.Path(sys.argv[1]).read_bytes(); b=pathlib.Path(sys.argv[2]).read_bytes(); print(sum(x != y for x,y in zip(a,b)) + abs(len(a)-len(b)))' "$before" "$typed")"
             echo TRACK_A_CREDENTIAL_FIELDS_CHANGED_BYTES="$typed_changed"
             [[ "$typed_changed" -gt 100 ]]
-            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
-            echo TRACK_A_LOGIN_CLICK_POINTER="$(pointer_location)"
+            "$toolroot/usr/bin/xdotool" key --window "$window" Return
+            echo TRACK_A_LOGIN_RETURN_SENT=true
             unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-            transition=0; changed=0; submit_local_max="$initial_local"
+            sleep 4
+            "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$after"
+            changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$before" "$after")"
+            transition=0; submit_method=return; submit_local_max="$initial_local"
+            [[ "$changed" =~ ^[0-9]+$ ]] && (( changed > 45000 )) && transition=1 || true
+            if [[ "$transition" == 0 ]]; then
+              "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
+              echo TRACK_A_LOGIN_CLICK_POINTER="$(pointer_location)"
+              submit_method=button_fallback
+            fi
             for _ in $(seq 1 60); do
+              [[ "$transition" == 1 ]] && break
               sleep 0.5
               read -r submit_local submit_direct submit_udp < <(socket_state)
               [[ "$submit_direct" == 0 && "$submit_udp" == 0 ]]
@@ -362,14 +372,11 @@ jobs:
             done
             echo TRACK_A_LOGIN_TRANSITION_CHANGED_PIXELS="$changed"
             echo TRACK_A_LOGIN_TRANSITION_PROVEN="$transition"
+            echo TRACK_A_LOGIN_SUBMIT_METHOD="$submit_method"
             read -r io_after_read io_after_write < <(process_io)
             echo TRACK_A_LOGIN_SUBMIT_LOCAL_SOCKS_MAX="$submit_local_max"
             echo TRACK_A_LOGIN_SUBMIT_READ_DELTA="$((io_after_read - io_before_read))"
             echo TRACK_A_LOGIN_SUBMIT_WRITE_DELTA="$((io_after_write - io_before_write))"
-            echo TRACK_A_AUTH_TRACE_BEGIN
-            cat "$auth_trace"
-            echo TRACK_A_AUTH_TRACE_END
-            echo "TRACK_A_LAST_AUTH_EVENT=$(tail -n1 "$auth_trace" 2>/dev/null || true)"
             rm -f -- "$before" "$after" "$typed"
             [[ "$transition" == 1 ]]
             window="$(resolve_window)"

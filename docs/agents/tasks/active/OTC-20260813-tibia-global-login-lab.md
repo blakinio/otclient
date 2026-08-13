@@ -428,6 +428,13 @@ including `world`. The classifier is now phrase-based, emits one or more
 specific detail categories, and explicitly emits `UNCLASSIFIED` when none
 matches; it still never prints the server text.
 
+Run `31705239981`, job `94464032351`, exact head
+`06b8ab5b6ff41ba68ddd2b82bbc138ec9c8574b6`, reproduced the 230/148-byte
+exchange but none of the narrow phrases matched. The next classifier preserves
+the already-proven word relationship without content by emitting only
+client+world, client+connect and client+denied booleans plus total message
+length. No text or hash is exported.
+
 # Evidence classification
 
 PROVEN:
@@ -486,8 +493,8 @@ Run the canonical E2E with fixed non-secret login-error category markers and con
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T13:25:00Z
-head: cf5ab7b4383b25360743c5274d830d6db02a2b7e
+updated_at: 2026-08-13T13:36:00Z
+head: 06b8ab5b6ff41ba68ddd2b82bbc138ec9c8574b6
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -502,7 +509,7 @@ proven:
 derived:
   - first remaining boundary is the server-returned game-login rejection category
 unknown:
-  - exact phrase-based non-secret detail category of the server GAME_LOGIN_ERROR response
+  - exact non-secret client/world/connect/denied relationship in the server GAME_LOGIN_ERROR response
 conflicts:
   - none
 first_failure:
@@ -522,5 +529,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with phrase-based login-error detail markers and continue from the returned category
+next_action: run the exact-head canonical E2E with relational login-error markers and continue from the returned relationship
 ```

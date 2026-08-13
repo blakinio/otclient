@@ -233,6 +233,13 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
       mark('GAME_LOGIN_ERROR=true')
       local lowered=string.lower(tostring(errorText or ''))
       local classified=false
+      local hasClient=lowered:find('client',1,true)~=nil
+      local hasWorld=lowered:find('world',1,true)~=nil
+      local hasConnect=lowered:find('connect',1,true)~=nil
+      local hasCannot=lowered:find('cannot',1,true)~=nil or lowered:find("can't",1,true)~=nil or lowered:find('not allowed',1,true)~=nil
+      if hasClient and hasWorld then mark('GAME_LOGIN_ERROR_RELATION_CLIENT_WORLD=true'); classified=true end
+      if hasClient and hasConnect then mark('GAME_LOGIN_ERROR_RELATION_CLIENT_CONNECT=true'); classified=true end
+      if hasClient and hasCannot then mark('GAME_LOGIN_ERROR_RELATION_CLIENT_DENIED=true'); classified=true end
       if lowered:find('only clients',1,true) or lowered:find('client version',1,true) or lowered:find('protocol version',1,true) or lowered:find('client needs update',1,true) or lowered:find('update your client',1,true) or lowered:find('unsupported client',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_CLIENT_VERSION=true'); classified=true end
       if lowered:find('session key',1,true) or lowered:find('session expired',1,true) or lowered:find('authentication token',1,true) or lowered:find('authenticator token',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_SESSION_AUTH=true'); classified=true end
       if lowered:find('account name',1,true) or lowered:find('account password',1,true) or lowered:find('invalid account',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_ACCOUNT_AUTH=true'); classified=true end
@@ -240,6 +247,7 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
       if lowered:find('world is offline',1,true) or lowered:find('world is currently',1,true) or lowered:find('world does not exist',1,true) or lowered:find('world unavailable',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_WORLD=true'); classified=true end
       if lowered:find('battleye',1,true) or lowered:find('client integrity',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_INTEGRITY=true'); classified=true end
       if not classified then mark('GAME_LOGIN_ERROR_DETAIL_UNCLASSIFIED=true') end
+      mark('GAME_LOGIN_ERROR_TEXT_LENGTH='..tostring(#lowered))
       lowered=nil
     end,
     onConnectionError=function(_, code)
@@ -343,7 +351,7 @@ for _ in $(seq 1 300); do
 done
 
 docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z0-9_-]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
-docker exec "$CONTAINER" bash -lc "grep -oE '\[TIBIA_GLOBAL_LAB\] (CLIENT_VERSION_VALUE|PROTOCOL_VERSION_VALUE)=[0-9]+' /lab/runtime/otclient.stdout.log | sort -u || true"
+docker exec "$CONTAINER" bash -lc "grep -oE '\[TIBIA_GLOBAL_LAB\] (CLIENT_VERSION_VALUE|PROTOCOL_VERSION_VALUE|GAME_LOGIN_ERROR_TEXT_LENGTH)=[0-9]+' /lab/runtime/otclient.stdout.log | sort -u || true"
 if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.granted; then
   echo LAB_GAME_SOCKS_FORWARD_GRANTED=true
 else

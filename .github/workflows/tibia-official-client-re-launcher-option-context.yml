@@ -1,0 +1,39 @@
+name: Track A launcher startup option context
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-option-context.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      LAUNCHER_SHA256: a5fc6e8ee8246868263c438539a54ea045bd048a1bea45f968fc2f498b682ca0
+    steps:
+      - name: Print bounded startup-option string block
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          launcher="$state/launcher-recovery/isolated-31741562880/unpacked/Tibia/Tibia"
+          [[ "$(sha256sum "$launcher" | awk '{print $1}')" == "$LAUNCHER_SHA256" ]]
+          python3 - "$launcher" <<'PY'
+          import pathlib,re,sys
+          data=pathlib.Path(sys.argv[1]).read_bytes()
+          lo=0xc7980; hi=0xc7d20
+          rows=[]
+          for m in re.finditer(rb'[ -~]{2,}',data[lo:hi]):
+              rows.append((lo+m.start(),m.group().decode('ascii','replace')[:260]))
+          print('TRACK_A_STARTUP_OPTION_STRING_COUNT='+str(len(rows)))
+          for off,s in rows: print(f'TRACK_A_STARTUP_OPTION_STRING=0x{off:x}|{s}')
+          print('TRACK_A_STARTUP_OPTION_CONTEXT_COMPLETE=true')
+          PY

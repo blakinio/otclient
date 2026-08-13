@@ -7,7 +7,7 @@ import tempfile
 import threading
 import unittest
 
-from tools.tibia_runtime_bridge.ipc_client import BridgeClientError, request
+from tools.tibia_runtime_bridge.ipc_client import BridgeClientError, request, session_status
 from tools.tibia_runtime_bridge.launcher import BridgeConfigError, build_env, load_profile, sha256_file
 
 
@@ -37,7 +37,6 @@ class ProfileTests(unittest.TestCase):
             directory = Path(raw)
             profile = load_profile(self.write_profile(directory, self.profile()))
             env = build_env(profile, directory / "bridge.so", directory / "bridge.sock", {"LD_PRELOAD": "/x.so"})
-            self.assertEqual("/tmp", str(Path("/tmp")))
             self.assertEqual(f"{directory / 'bridge.so'}:/x.so", env["LD_PRELOAD"])
             self.assertEqual(str(directory / "bridge.sock"), env["OTCLIENT_TIBIA_RE_SOCKET"])
             self.assertIn("player_protocol_handler,1234,tibia::game::TPlayerProtocolMessageHandler", env["OTCLIENT_TIBIA_RE_TARGETS"])
@@ -77,21 +76,22 @@ class ProfileTests(unittest.TestCase):
 
 
 class IpcClientTests(unittest.TestCase):
-    def run_server(self, path: Path, response: bytes) -> threading.Thread:
+    def run_server_responses(self, path: Path, responses: list[bytes]) -> threading.Thread:
         ready = threading.Event()
 
         def serve() -> None:
             server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
                 server.bind(str(path))
-                server.listen(1)
+                server.listen(max(1, len(responses)))
                 ready.set()
-                conn, _ = server.accept()
-                try:
-                    conn.recv(4096)
-                    conn.sendall(response)
-                finally:
-                    conn.close()
+                for response in responses:
+                    conn, _ = server.accept()
+                    try:
+                        conn.recv(4096)
+                        conn.sendall(response)
+                    finally:
+                        conn.close()
             finally:
                 server.close()
 
@@ -99,6 +99,9 @@ class IpcClientTests(unittest.TestCase):
         thread.start()
         self.assertTrue(ready.wait(2))
         return thread
+
+    def run_server(self, path: Path, response: bytes) -> threading.Thread:
+        return self.run_server_responses(path, [response])
 
     def test_ping_response(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -116,6 +119,36 @@ class IpcClientTests(unittest.TestCase):
             try:
                 result = request(path, "DISCOVER player_protocol_handler")
                 self.assertEqual(1, result["validated_hits"])
+            finally:
+                thread.join(2)
+
+    def test_session_status_candidate_requires_all_markers(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "bridge.sock"
+            responses = [
+                b'{"ok":true,"target":"player_protocol_handler","vptr_hits":1,"validated_hits":1}\n',
+                b'{"ok":true,"target":"gameserver_game_session","vptr_hits":1,"validated_hits":1}\n',
+                b'{"ok":true,"target":"worldmap_handler","vptr_hits":1,"validated_hits":1}\n',
+            ]
+            thread = self.run_server_responses(path, responses)
+            try:
+                result = session_status(path)
+                self.assertTrue(result["in_game_candidate"])
+                self.assertEqual("DERIVED_UNTIL_LIVE_CORRELATION", result["evidence_level"])
+            finally:
+                thread.join(2)
+
+    def test_session_status_false_when_marker_absent(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "bridge.sock"
+            responses = [
+                b'{"ok":true,"target":"player_protocol_handler","vptr_hits":0,"validated_hits":0}\n',
+                b'{"ok":true,"target":"gameserver_game_session","vptr_hits":1,"validated_hits":1}\n',
+                b'{"ok":true,"target":"worldmap_handler","vptr_hits":1,"validated_hits":1}\n',
+            ]
+            thread = self.run_server_responses(path, responses)
+            try:
+                self.assertFalse(session_status(path)["in_game_candidate"])
             finally:
                 thread.join(2)
 

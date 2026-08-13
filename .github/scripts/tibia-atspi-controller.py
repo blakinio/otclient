@@ -8,6 +8,9 @@ from __future__ import annotations
 import os, subprocess, sys, time
 import pyatspi
 
+# Runtime continuation marker: retrigger semantic world-entry validation on the
+# current Track A branch after dedicated runner recovery.
+
 
 def children(o):
     try: return [o.getChildAtIndex(i) for i in range(o.childCount)]

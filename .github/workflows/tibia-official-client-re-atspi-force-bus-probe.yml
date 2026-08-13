@@ -18,7 +18,7 @@ jobs:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
     steps:
-      - name: Force accessibility bus without GSettings
+      - name: Force accessibility bus with private schemas
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -26,6 +26,8 @@ jobs:
           root="$state/toolroot"
           lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          schema="$root/usr/share/glib-2.0/schemas"
+          [[ -s "$schema/gschemas.compiled" ]]
           launcher="$(find "$root" -type f -name at-spi-bus-launcher -print -quit)"
           [[ -n "$launcher" ]]
           mapfile -t info < <(PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-daemon" --session --fork --print-address=1 --print-pid=1)
@@ -36,7 +38,8 @@ jobs:
           cleanup() { [[ -z "$atspi_pid" ]] || kill "$atspi_pid" 2>/dev/null || true; kill "$dbus_pid" 2>/dev/null || true; }
           trap cleanup EXIT
           echo TRACK_A_SESSION_DBUS_READY=true
-          PATH="$path" LD_LIBRARY_PATH="$lib" "$launcher" --launch-immediately --a11y=1 >/tmp/track-a-atspi-force.log 2>&1 &
+          PATH="$path" LD_LIBRARY_PATH="$lib" XDG_DATA_DIRS="$root/usr/share:/usr/share" GSETTINGS_SCHEMA_DIR="$schema" \
+            "$launcher" --launch-immediately --a11y=1 >/tmp/track-a-atspi-force.log 2>&1 &
           atspi_pid=$!
           for _ in $(seq 1 30); do
             if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --session --print-reply \

@@ -39,7 +39,7 @@ jobs:
             [[ -n "$exe" ]] || continue
             [[ "$(basename "$exe")" == Tibia ]] || continue
             case "$exe" in
-              "$state"/update-canonical/*/unpacked/Tibia/Tibia|"$state"/launcher-recovery/*/unpacked/Tibia/Tibia)
+              "$state"/update-canonical/*/unpacked/Tibia/Tibia|"$state"/launcher-recovery/*/unpacked/Tibia/Tibia|"$state"/update-after-running/*/unpacked/Tibia/Tibia)
                 ;;
               *)
                 echo "TRACK_A_STALE_LAUNCHER_SKIPPED_NONSCOPED=true"
@@ -49,6 +49,7 @@ jobs:
             pid="${proc##*/}"
             found=$((found+1))
             echo "TRACK_A_STALE_LAUNCHER_VERIFIED_PID=$pid"
+            echo "TRACK_A_STALE_LAUNCHER_VERIFIED_EXE=$exe"
             kill -TERM "$pid"
             for _ in $(seq 1 50); do
               kill -0 "$pid" 2>/dev/null || break

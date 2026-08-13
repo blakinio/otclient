@@ -2,9 +2,10 @@
 
 ## Scope
 
-Candidate:
+Candidate routing surfaces:
 
 ```text
+docs/agents/SHORT_COMMANDS.md
 docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
 ```
 
@@ -14,7 +15,7 @@ Baseline:
 docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
 ```
 
-The candidate extends rather than replaces the baseline. This evaluation checks whether the wrapper removes runtime/repository ambiguity without weakening the base programme's evidence, recovery, safety or completion contracts.
+The candidate extends rather than replaces the baseline. This evaluation checks whether the wrapper/registry remove runtime/repository ambiguity and route imported evidence without weakening the base programme's evidence, recovery, safety or completion contracts.
 
 ## Cases
 
@@ -33,10 +34,11 @@ The candidate extends rather than replaces the baseline. This evaluation checks 
 | context rotation | worker context becomes too large | persist durable task/checkpoint and continue from Git; no chat-memory dependency | PASS |
 | OTBM/bridge lanes | #279/#283 exist | reuse current owners/tools rather than create parallel pipelines/bridges | PASS |
 | mandatory persistence | worker obtains a material finding, failure, runtime result or next action | persist it in `blakinio/otclient` before return/rotation; large external artifacts must be indexed by exact evidence reference | PASS |
+| historical login recovery | fresh worker needs the known successful non-OCR login recipe | read the repository-owned imported recovery report before querying/depending on Oteryn; treat geometry as exact-version/layout evidence and pixels only as bootstrap aid | PASS |
 
 ## Baseline comparison
 
-The baseline already correctly establishes `blakinio/otclient` as the writable repository and external Oteryn repositories as read-only evidence. However, it intentionally lists historical runner/container leads and requires live revalidation. After the dedicated OTClient runner work existed, that left an avoidable routing ambiguity for a fresh worker.
+The baseline already correctly establishes `blakinio/otclient` as the writable repository and external Oteryn repositories as read-only evidence. However, it intentionally lists historical runner/container leads and requires live revalidation. After the dedicated OTClient runner and imported recovery evidence existed, that left avoidable routing/retrieval ambiguity for a fresh worker.
 
 The candidate narrows only that ambiguity and strengthens durable persistence:
 
@@ -45,6 +47,7 @@ active repository -> blakinio/otclient
 active runtime -> dedicated OTClient runner
 external Oteryn runtime -> read-only historical evidence
 material work -> persisted/indexed in blakinio/otclient before return/rotation
+historical login recipe -> repository-owned imported evidence, exact-version gated
 ```
 
 It does not weaken:
@@ -60,13 +63,14 @@ It does not weaken:
 
 ## Negative checks
 
-The wrapper contains no rule that:
+The candidate contains no rule that:
 
 - grants external repository write authority;
 - permits Codex/API quota use;
 - treats runner availability as proof of `IN_GAME`;
-- treats socket/network deltas as authoritative movement;
-- copies historical PIDs/PIE/heap addresses into current runtime;
+- treats socket/network deltas or pixel changes as authoritative movement/world state;
+- copies historical PIDs/PIE/heap/window addresses into current runtime;
+- treats historical fixed-coordinate geometry as current without exact client/layout revalidation;
 - claims complete OTBM/global-map coverage;
 - allows fallback to an unrelated self-hosted runner;
 - permits material continuation state to remain only in chat or transient runner storage.
@@ -74,11 +78,11 @@ The wrapper contains no rule that:
 ## Outcome
 
 ```yaml
-cases: 13
-passed: 13
+cases: 14
+passed: 14
 failed: 0
 candidate_status: PASS
-rollback: remove SHORT_COMMANDS alias entry and canonical wrapper; the unchanged base programme prompt remains on main
+rollback: remove SHORT_COMMANDS alias entry and canonical wrapper/import routing; the unchanged base programme prompt remains on main
 ```
 
-The wrapper is suitable for repository routing once its exact references and PR state are verified.
+The canonical routing is suitable once exact references and PR state are verified.

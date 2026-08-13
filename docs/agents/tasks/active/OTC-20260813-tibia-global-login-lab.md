@@ -11,7 +11,7 @@ phase: recovery-validation
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T18:35:00+02:00
+updated: 2026-08-13T18:55:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -552,6 +552,22 @@ bounded heavy attempt is exhausted. The failure-stage classifier now maps this
 outcome directly to `full_client_version_call_failed`, and the next action is a
 network-free binding test/repair before another E2E is authorized.
 
+Run `31722078520`, jobs `94521255896` and `94522602196`, exact head
+`b196c5019a682ebdeb4a4dfba7cf762a5757e0a2`, was automatically selected by the
+PR path filter after the focused binding test commit. The exact Linux build,
+isolated bootstrap, WARP transport, HTTP login and tmpfs handoff passed. The
+runtime again emitted `FULL_CLIENT_VERSION_CALL_FAILED=true` before character
+login with zero bytes in either direction. This is a reproduction of the
+binding defect, not new protocol evidence. CI run `31722078961` passed, but its
+scope detector skipped the C++ test build; that run does not prove the new
+binding test executed.
+
+The focused test now invokes the actual `Client::registerLuaFunctions()`
+registration and performs setter/getter readback without network access. The
+repair replaces only the two full-version member-pointer bindings with explicit
+static Lua functions using value-semantics `std::string`; the existing
+`GameConfig` storage and login-packet selection contract are unchanged.
+
 # Evidence classification
 
 PROVEN:
@@ -604,19 +620,19 @@ UNKNOWN:
 
 # Next action
 
-Add a network-free focused Lua binding test that invokes the registered
-`g_gameConfig.setClientVersionString()` and verifies getter readback, then fix
-the binding defect before authorizing another native-Linux E2E.
+Validate the explicit value-semantics Lua registration on the exact Linux head,
+then run one bounded canonical native-Linux E2E and classify full-version
+readback before using directional bytes or server opcode evidence.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T16:35:00Z
+updated_at: 2026-08-13T16:55:00Z
 track: otclient-global-login
 track_alias: OTCLIENT-GLOBAL-LOGIN
-head: 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
-last_e2e_head: 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
+head: b196c5019a682ebdeb4a4dfba7cf762a5757e0a2
+last_e2e_head: b196c5019a682ebdeb4a4dfba7cf762a5757e0a2
 recovery_base_head: 27418b03ee787f049b2e89b14ccc29b50701428f
 base_main: dc18f795bf13cee37a115164da56a452aaa14f02
 branch: feat/OTC-20260813-tibia-global-login-lab
@@ -638,6 +654,7 @@ proven:
   - run 31706716385/job 94469029667 structurally returned opcode 0x14 with a client+world relationship at exact head 0ee27024357913cfe4d0fca2214a609b86339b01
   - run 31712081913/job 94487558014 reached HANDOFF_CONSUMED and VERSION_CONFIG_BEGIN on exact native Linux head 2b184f882a0a873ce55bdff281c5be7e6dd1f6f0
   - run 31719826179/job 94513846464 emitted FULL_CLIENT_VERSION_CALL_FAILED before character login with zero bytes in both directions on exact native Linux head 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
+  - run 31722078520/job 94522602196 reproduced FULL_CLIENT_VERSION_CALL_FAILED before character login with zero bytes in both directions on exact native Linux head b196c5019a682ebdeb4a4dfba7cf762a5757e0a2
 derived:
   - the prior =false pcall marker cannot classify the setter boundary because the exporter emits only =true categories
   - the current blocker is the Lua/C++ full-version setter binding, not game protocol, WARP, proxy, or official endpoint reachability
@@ -648,7 +665,7 @@ conflicts:
   - none
 first_failure:
   marker: FULL_CLIENT_VERSION_CALL_FAILED=true
-  evidence: run 31719826179/job 94513846464 at 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
+  evidence: run 31722078520/job 94522602196 at b196c5019a682ebdeb4a4dfba7cf762a5757e0a2
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
@@ -671,6 +688,6 @@ validation:
     result: PASS
     evidence: LAB_1532_INJECTOR_RENDER_CHECK=true; executes the full inner module patch against the verified 1525 source shape with no container, secret, or network access
 blockers:
-  - the bounded heavy attempt is exhausted after run 31719826179 classified the Lua/C++ setter call failure
-next_action: add a network-free focused Lua binding test for setClientVersionString plus getter readback and repair that binding before authorizing another native-Linux E2E
+  - local CMake and Docker are unavailable; exact Linux compilation and runtime validation must use repository CI
+next_action: validate the explicit value-semantics full-version Lua registration on exact Linux head, then run one bounded canonical native-Linux E2E and classify readback before protocol interpretation
 ```

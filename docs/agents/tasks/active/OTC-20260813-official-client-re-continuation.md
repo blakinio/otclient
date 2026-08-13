@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T14:54:00+02:00
-head: 85cd4f0b9
+updated_at: 2026-08-13T15:03:00+02:00
+head: 6c17e329d
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -139,10 +139,13 @@ validation:
   - command: Track A official-client RE toolroot run 31701967968 job 94453042031
     result: FAIL
     evidence: explicit dependency candidate libpython3.12 is unavailable on noble; replacement uses APT-resolved closure with private empty dpkg status
+  - command: Track A official-client RE toolroot run 31702126645 job 94453574980
+    result: FAIL
+    evidence: APT resolved 148 packages and 86.9 MB without system installation, then awaited confirmation; head 6c17e329d adds noninteractive --yes
   - command: Track A official Linux client reconstruction run 31701967974 job 94453057997
     result: FAIL
     evidence: stopped before download because ss is absent; redundant ss check removed after exact Track A PID, environment marker and WARP curl checks
 blockers:
-  - latest toolroot run 31702126645 and reconstruction run 31702126665 are queued for synology-otclient-01; no unrelated job is cancelled
-next_action: reconcile runs 31702126645 and 31702126665, persist exact results, then launch the verified official native-Linux client under Track A display :98 and process marker
+  - reconstruction run 31702126665 is actively downloading and hash-verifying the official runtime on synology-otclient-01; toolroot run 31702528574 is queued behind it
+next_action: reconcile active reconstruction run 31702126665 and queued toolroot run 31702528574, persist exact results, then launch the verified official native-Linux client under Track A display :98 and process marker
 ```

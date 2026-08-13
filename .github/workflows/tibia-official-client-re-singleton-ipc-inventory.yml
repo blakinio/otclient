@@ -1,0 +1,105 @@
+name: Track A old-client singleton IPC inventory
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-singleton-ipc-inventory.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      OLD_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Map IPC owned by exact Track A old client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$OLD_CLIENT_SHA256" ]]
+          kill -0 "$pid"
+          echo TRACK_A_SINGLETON_OWNER_PID="$pid"
+          echo TRACK_A_SINGLETON_OWNER_VERIFIED=true
+
+          python3 - "$pid" <<'PY'
+          import os,pathlib,re,sys
+          pid=sys.argv[1]
+          sockets=set()
+          for fd in pathlib.Path('/proc',pid,'fd').iterdir():
+              try: target=os.readlink(fd)
+              except OSError: continue
+              m=re.fullmatch(r'socket:\[(\d+)\]',target)
+              if m: sockets.add(m.group(1))
+          unix=[]
+          try: rows=pathlib.Path('/proc/net/unix').read_text().splitlines()[1:]
+          except OSError: rows=[]
+          for row in rows:
+              parts=row.split()
+              if len(parts) < 7: continue
+              inode=parts[6]
+              if inode not in sockets: continue
+              path=parts[7] if len(parts)>7 else '(unnamed)'
+              unix.append((inode,path))
+          print('TRACK_A_CLIENT_SOCKET_FD_COUNT='+str(len(sockets)))
+          print('TRACK_A_CLIENT_UNIX_SOCKET_COUNT='+str(len(unix)))
+          for inode,path in unix:
+              safe=path.replace('\x00','@')
+              print('TRACK_A_CLIENT_UNIX_SOCKET='+safe)
+
+          maps=pathlib.Path('/proc',pid,'maps').read_text(errors='replace').splitlines()
+          shm=[]
+          for line in maps:
+              if '/dev/shm/' in line or 'SYSV' in line or 'memfd:' in line:
+                  tail=line.split(maxsplit=5)[-1] if len(line.split(maxsplit=5))==6 else line
+                  if tail not in shm: shm.append(tail)
+          print('TRACK_A_CLIENT_SHARED_MAPPING_COUNT='+str(len(shm)))
+          for item in shm[:50]: print('TRACK_A_CLIENT_SHARED_MAPPING='+item)
+          PY
+
+          uid="$(id -u)"
+          echo TRACK_A_RUNNER_UID="$uid"
+          for dir in /tmp /dev/shm "/run/user/$uid"; do
+            [[ -d "$dir" ]] || continue
+            find "$dir" -maxdepth 2 -user "$uid" \
+              \( -iname '*tibia*' -o -iname '*cipsoft*' -o -iname '*qipc*' -o -iname '*qt*single*' -o -iname '*single*' \) \
+              -printf 'TRACK_A_SINGLETON_CANDIDATE=%p|mode=%m|type=%y\n' 2>/dev/null | head -n 100 || true
+          done
+
+          python3 - "$pid" <<'PY'
+          import pathlib,sys
+          pid=int(sys.argv[1])
+          for name in ('shm','sem','msg'):
+              p=pathlib.Path('/proc/sysvipc')/name
+              if not p.exists(): continue
+              lines=p.read_text().splitlines()
+              if not lines: continue
+              hdr=lines[0].split()
+              print('TRACK_A_SYSVIPC_'+name.upper()+'_ROWS='+str(max(0,len(lines)-1)))
+              for line in lines[1:]:
+                  vals=line.split()
+                  row=dict(zip(hdr,vals))
+                  if str(pid) in {row.get('cpid',''),row.get('lpid','')}:
+                      key=row.get('key','?'); ident=row.get(name+'id',row.get('shmid',row.get('semid',row.get('msqid','?'))))
+                      print('TRACK_A_CLIENT_SYSVIPC_'+name.upper()+'=key:'+key+',id:'+ident)
+          PY
+          echo TRACK_A_SINGLETON_IPC_INVENTORY_COMPLETE=true

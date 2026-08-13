@@ -12,6 +12,7 @@ STATE_VOLUME=otclient-tibia-global-login-state
 RUNTIME_VOLUME=otclient-tibia-global-login-runtime
 IMAGE=otclient-tibia-global-login-lab-runtime:local
 TASK=OTC-20260813-tibia-global-login-lab
+CLIENT_VERSION_STRING=15.32.df7b29
 
 docker volume inspect "$STATE_VOLUME" >/dev/null
 docker image inspect "$IMAGE" >/dev/null
@@ -29,7 +30,10 @@ docker run -d --name "$CONTAINER" --network bridge --user root \
 asset_count=$(docker exec "$CONTAINER" bash -lc 'find /lab/state/things/1532 -maxdepth 1 -type f | wc -l')
 [[ "$asset_count" -ge 5088 ]]
 docker exec "$CONTAINER" bash -lc 'test -s /lab/state/things/1532/catalog-content.json; rm -rf /otclient/data/things/1532; mkdir -p /otclient/data/things/1532; cp -a /lab/state/things/1532/. /otclient/data/things/1532/'
+ASSET_VERSION=$(docker exec "$CONTAINER" bash -lc "awk 'NR==1{print \$1}' /lab/state/things/1532/assets.json.sha256")
+[[ "$ASSET_VERSION" =~ ^[0-9a-fA-F]{64}$ ]]
 echo LAB_REUSED_VERIFIED_ASSETS=true
+echo LAB_ASSET_VERSION_READY=true
 
 docker exec "$CONTAINER" bash -lc '
 set -Eeuo pipefail
@@ -65,6 +69,7 @@ cp init.lua /tmp/lab-init.lua
 cat >>/tmp/lab-init.lua <<'LUA'
 if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
   if Services and Services.clientAssets then Services.clientAssets.enabled = false end
+  if HTTP then HTTP.timeout = 30 end
   local function mark(s) g_logger.info('[TIBIA_GLOBAL_LAB] ' .. s) end
   connect(g_game, {
     onGameStart=function() mark('GAME_START=true') end,
@@ -73,41 +78,59 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     onSessionEnd=function() mark('GAME_SESSION_END=true') end,
     onUpdateNeeded=function() mark('GAME_UPDATE_NEEDED=true') end
   })
-  local success=EnterGame.loginSuccess
-  EnterGame.loginSuccess=function(requestId,jsonSession,jsonWorlds,jsonCharacters)
-    mark('HTTP_LOGIN_SUCCESS=true')
-    success(requestId,jsonSession,jsonWorlds,jsonCharacters)
-    scheduleEvent(function()
-      if CharacterList and CharacterList.doLogin then
-        mark('CHARACTER_LOGIN_ATTEMPT=true')
-        CharacterList.doLogin()
-      else
-        mark('CHARACTER_LIST_UNAVAILABLE=true')
-      end
-    end,1000)
-  end
-  local failed=EnterGame.loginFailed
-  EnterGame.loginFailed=function(requestId,msg,result)
-    mark('HTTP_LOGIN_FAILED=true')
-    failed(requestId,msg,result)
-  end
   scheduleEvent(function()
     local email=os.getenv('TIBIA_TEST_EMAIL') or ''
     local password=os.getenv('TIBIA_TEST_PASSWORD') or ''
+    local assetversion=os.getenv('TIBIA_ASSET_VERSION') or ''
+    local clientversion=os.getenv('TIBIA_CLIENT_VERSION_STRING') or ''
     if email=='' or password=='' then mark('SECRET_GATE_FAILED=true'); return end
-    EnterGame.setDefaultServer('https://www.tibia.com/clientservices/loginservice.php',443,1532)
-    local a=rootWidget:recursiveGetChildById('accountNameTextEdit')
-    local p=rootWidget:recursiveGetChildById('accountPasswordTextEdit')
-    local h=rootWidget:recursiveGetChildById('httpLoginBox')
-    local stay=rootWidget:recursiveGetChildById('stayLoggedBox')
-    if not a or not p or not h then mark('LOGIN_WIDGETS_UNAVAILABLE=true'); return end
-    a:setText(email); p:setText(password); h:setChecked(false); if stay then stay:setChecked(false) end
-    email=nil; password=nil
-    mark('LOGIN_START=true')
-    EnterGame.doLogin()
+    if assetversion=='' or clientversion=='' then mark('IDENTIFIER_GATE_FAILED=true'); return end
+
+    G.account=email
+    G.password=password
+    G.host='https://www.tibia.com/clientservices/loginservice.php'
+    G.port=443
+    G.clientVersion=1532
+    G.requestId=1
+    g_game.setClientVersion(1532)
+    g_game.setProtocolVersion(g_game.getClientProtocolVersion(1532))
+
+    local payload={
+      email=email,
+      password=password,
+      stayloggedin=true,
+      type='login',
+      clientversion=clientversion,
+      clienttype=2,
+      assetversion=assetversion
+    }
+    email=nil
+    password=nil
+    mark('HTTP_LOGIN_START=true')
+    HTTP.postJSON('https://www.tibia.com/clientservices/loginservice.php', payload, function(response, err)
+      payload=nil
+      if err then mark('HTTP_TRANSPORT_ERROR=true'); return end
+      if type(response)~='table' then mark('HTTP_RESPONSE_INVALID=true'); return end
+      if response.errorCode and tonumber(response.errorCode)~=0 then mark('HTTP_LOGIN_REJECTED=true'); return end
+      if type(response.session)~='table' or type(response.playdata)~='table' or type(response.playdata.worlds)~='table' or type(response.playdata.characters)~='table' then
+        mark('HTTP_RESPONSE_INCOMPLETE=true')
+        return
+      end
+      mark('HTTP_LOGIN_SUCCESS=true')
+      EnterGame.loginSuccess(1, json.encode(response.session), json.encode(response.playdata.worlds), json.encode(response.playdata.characters))
+      response=nil
+      scheduleEvent(function()
+        if CharacterList and CharacterList.doLogin then
+          mark('CHARACTER_LOGIN_ATTEMPT=true')
+          CharacterList.doLogin()
+        else
+          mark('CHARACTER_LIST_UNAVAILABLE=true')
+        end
+      end,1000)
+    end)
     scheduleEvent(function()
       if not g_game.isOnline() then mark('PROBE_TIMEOUT=true'); g_app.exit() end
-    end,60000)
+    end,90000)
   end,1500)
 end
 LUA
@@ -120,8 +143,9 @@ docker exec "$CONTAINER" xdpyinfo -display :100 >/dev/null
 
 docker exec -d -e DISPLAY=:100 -e HOME=/lab/state/home -e LIBGL_ALWAYS_SOFTWARE=1 \
   -e OTCLIENT_TIBIA_GLOBAL_LAB=1 -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD \
+  -e TIBIA_ASSET_VERSION="$ASSET_VERSION" -e TIBIA_CLIENT_VERSION_STRING="$CLIENT_VERSION_STRING" \
   "$CONTAINER" bash -lc 'cd /otclient && exec proxychains4 -f /lab/runtime/proxychains.conf ./otclient >>/lab/runtime/otclient.stdout.log 2>&1'
-unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD ASSET_VERSION
 
 client_started=false
 for _ in $(seq 1 60); do
@@ -131,7 +155,7 @@ done
 echo "LAB_OTCLIENT_PROCESS_STARTED=$client_started"
 [[ "$client_started" == true ]]
 
-for _ in $(seq 1 500); do
+for _ in $(seq 1 600); do
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log && break
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] PROBE_TIMEOUT=true' /lab/runtime/otclient.stdout.log && break
   docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' >/dev/null 2>&1 || break
@@ -150,9 +174,12 @@ fi
 if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log; then echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=true; exit 0; fi
 
 echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=false
-if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_SUCCESS=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=after_http_login_before_game_start
-elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_FAILED=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=http_login_rejected
-elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] LOGIN_START=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=http_login_no_success_callback
-elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] LOGIN_WIDGETS_UNAVAILABLE=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=login_widgets_unavailable
-else echo FAILURE_STAGE=before_login_start; fi
+if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] CHARACTER_LOGIN_ATTEMPT=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=after_character_login_before_game_start
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_SUCCESS=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=after_http_login_before_character_login
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_REJECTED=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=http_login_rejected
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_TRANSPORT_ERROR=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=http_transport_error
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_RESPONSE_INVALID=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=http_response_invalid
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_RESPONSE_INCOMPLETE=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=http_response_incomplete
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_START=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=http_login_no_callback
+else echo FAILURE_STAGE=before_http_login; fi
 exit 1

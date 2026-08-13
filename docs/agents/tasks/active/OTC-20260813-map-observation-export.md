@@ -10,7 +10,7 @@ branch: docs/OTC-20260813-map-observation-export
 base_branch: main
 start_sha: dc18f795bf13cee37a115164da56a452aaa14f02
 created: 2026-08-13T22:24:00+02:00
-updated: 2026-08-13T20:44:36Z
+updated: 2026-08-13T20:48:59Z
 risk: medium
 related_pr: 291
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
@@ -106,8 +106,8 @@ Owner-funded Codex/API quota is forbidden unless the owner explicitly authorizes
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T20:44:36Z
-head: f7cb399b583497acba6f85998db38b42dd2e3d2a
+updated_at: 2026-08-13T20:48:59Z
+head: c799a1bb38fc93a349255919fd1fb84820aefb64
 branch: docs/OTC-20260813-map-observation-export
 pr: 291
 status: validating
@@ -123,6 +123,7 @@ proven:
   - PR #291 owns only the P0 task and contract paths; PR #284 owns no overlapping path.
   - The repository-local JSONL corpus deterministically covers FULL, EMPTY, UNKNOWN, PARTIAL, transition, and navigation-result shapes.
   - The fixture validator passes and rejects collapsed UNKNOWN/EMPTY, unordered stacks, fabricated delete things, non-canonical JSON, and secret-shaped field names.
+  - PR #291 review thread PRRT_kwDOTVmdjs6ZE1qI is resolved on the pushed contract head.
 derived:
   - Repository-local fixture authority resolves the open review concern without reading or depending on an external repository.
 unknown:
@@ -130,8 +131,8 @@ unknown:
 conflicts:
   - The original P0 text made external acceptance implementation-blocking, conflicting with TIBIA_RESEARCH_TRACKS repository-only coordination.
 first_failure:
-  marker: external-fixture-acceptance dependency
-  evidence: unresolved PR #291 review thread PRRT_kwDOTVmdjs6ZE1qI
+  marker: exact-head validation pending
+  evidence: contract commit c799a1bb38fc93a349255919fd1fb84820aefb64 is pushed to PR #291
 rejected_hypotheses:
   - External repository acceptance is required for local P0: contradicted by TIBIA_RESEARCH_TRACKS.md repository-only rule and the PR review finding.
 changed_paths:
@@ -148,6 +149,6 @@ validation:
     result: PASS
     evidence: working-tree P0 diff has no whitespace errors
 blockers:
-  - P0 requires final diff review and exact-head PR validation before it can be merged; P1 must not start on this unmerged contract.
-next_action: Review the complete P0 diff, commit and push the validated contract/fixture repair to PR #291, then resolve the addressed review thread and observe its exact-head checks.
+  - P0 requires exact-head PR validation before it can be merged; P1 must not start on this unmerged contract.
+next_action: Observe the exact-head checks for the pushed P0 checkpoint and, if they pass, complete the required documentation audit and merge closeout before considering P1.
 ```

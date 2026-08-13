@@ -1,0 +1,50 @@
+name: Track A AT-SPI toolroot extension
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-atspi-toolroot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Extend Track A toolroot with semantic accessibility libraries
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          root="$state/toolroot"
+          aptroot="$state/cache/atspi-apt"
+          mkdir -p "$root" "$aptroot/lists/partial" "$aptroot/archives/partial"
+          chmod 700 "$root" "$aptroot" "$aptroot/lists" "$aptroot/archives"
+          : >"$aptroot/status"
+          apt_opts=(
+            -o "Dir::State::lists=$aptroot/lists"
+            -o "Dir::State::status=$aptroot/status"
+            -o "Dir::Cache::archives=$aptroot/archives"
+            -o APT::Get::List-Cleanup=0
+          )
+          apt-get "${apt_opts[@]}" update
+          apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install \
+            at-spi2-core python3-pyatspi python3-gi gir1.2-atspi-2.0
+          for archive in "$aptroot"/archives/*.deb; do
+            dpkg-deb -x "$archive" "$root"
+          done
+          py_path="$root/usr/lib/python3/dist-packages"
+          gi_path="$root/usr/lib/x86_64-linux-gnu/girepository-1.0:$root/usr/lib/girepository-1.0"
+          PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" \
+            LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" \
+            python3 -c 'import pyatspi; print("TRACK_A_PYATSPI_READY=true")'
+          launcher="$(find "$root" -type f -name at-spi-bus-launcher -print -quit)"
+          echo TRACK_A_ATSPI_BUS_LAUNCHER_READY="$([[ -n "$launcher" ]] && echo true || echo false)"
+          [[ -n "$launcher" ]]

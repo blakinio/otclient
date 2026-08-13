@@ -1,0 +1,55 @@
+name: Track A live tunneled session sockets
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-session-sockets.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 2
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Count live owned client sockets only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          python3 - "$pid" "$TRACK_WARP_PORT" <<'PY'
+import os,pathlib,sys
+pid,port=sys.argv[1],int(sys.argv[2]); inodes=set()
+for fd in pathlib.Path('/proc',pid,'fd').iterdir():
+    try:t=os.readlink(fd)
+    except OSError:continue
+    if t.startswith('socket:['):inodes.add(t[8:-1])
+local=direct=udp=0
+for name,is_udp in [('tcp',False),('tcp6',False),('udp',True),('udp6',True)]:
+    try:rows=pathlib.Path('/proc',pid,'net',name).read_text().splitlines()[1:]
+    except OSError:continue
+    for row in rows:
+        c=row.split()
+        if len(c)<10 or c[9] not in inodes:continue
+        rp=int(c[2].rsplit(':',1)[1],16)
+        if is_udp:udp+=1
+        elif c[3]=='01':
+            if rp==port:local+=1
+            else:direct+=1
+print(f'TRACK_A_LOCAL_SOCKS_ESTABLISHED={local}')
+print(f'TRACK_A_DIRECT_ESTABLISHED={direct}')
+print(f'TRACK_A_UDP_SOCKET_COUNT={udp}')
+PY

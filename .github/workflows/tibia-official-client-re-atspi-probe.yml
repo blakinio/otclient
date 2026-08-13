@@ -1,0 +1,42 @@
+name: Track A accessibility capability probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-atspi-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Probe existing Track A accessibility tooling
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          root="$state/toolroot"
+          echo TRACK_A_SYSTEM_DBUS_DAEMON="$([[ -x /usr/bin/dbus-daemon ]] && echo true || echo false)"
+          echo TRACK_A_TOOLROOT_DBUS_DAEMON="$([[ -x "$root/usr/bin/dbus-daemon" ]] && echo true || echo false)"
+          if python3 -c 'import pyatspi' >/dev/null 2>&1; then
+            echo TRACK_A_SYSTEM_PYATSPI=true
+          else
+            echo TRACK_A_SYSTEM_PYATSPI=false
+          fi
+          if PYTHONPATH="$root/usr/lib/python3/dist-packages" \
+             GI_TYPELIB_PATH="$root/usr/lib/x86_64-linux-gnu/girepository-1.0:$root/usr/lib/girepository-1.0" \
+             LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" \
+             python3 -c 'import pyatspi' >/dev/null 2>&1; then
+            echo TRACK_A_TOOLROOT_PYATSPI=true
+          else
+            echo TRACK_A_TOOLROOT_PYATSPI=false
+          fi
+          echo TRACK_A_ATSPI_BUS_LAUNCHER="$([[ -x "$root/usr/libexec/at-spi-bus-launcher" || -x /usr/libexec/at-spi-bus-launcher ]] && echo true || echo false)"

@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:12:00+02:00
-head: 756c3d0fc9834b2ca0085384365422d767e9c17d
+updated_at: 2026-08-13T15:15:00+02:00
+head: 0b02d719d92e469464260f9112b487c4857f9530
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -101,8 +101,8 @@ unknown:
   - whether the exact historically proven explicit coordinate sequence transitions this isolated runtime from Account Login to Select Character
   - decoded current-world records and authoritative player position
 first_failure:
-  marker: exact same-SHA coordinate baseline returned no login-form transition after explicit Login-button click
-  evidence: run 31713902095 job 94493601193 passed owned process/WARP/lavapipe/window-focus gates, executed explicit email click, explicit password click and explicit Login click; credential fields changed but transition was 4174, below required >45000, with no increase beyond two local SOCKS connections
+  marker: no valid failure classification yet for the versioned successful input implementation
+  evidence: run 31714150143 job 94494444800 proved click coordinates, but used global key/type delivery and 12ms delay rather than the historical workflow's --window key/type delivery and 3ms delay
 rejected_hypotheses:
   - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
   - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
@@ -130,6 +130,9 @@ validation:
   - command: Track A structural login run 31713902095 job 94493601193
     result: FAIL_FOR_LOGIN_TRANSITION
     evidence: faithful explicit coordinate baseline plus non-secret telemetry; transition 4174 < 45000; local SOCKS max stayed 2; process I/O deltas are non-attributable due rendering
+  - command: Track A structural login run 31714150143 job 94494444800
+    result: INCONCLUSIVE_FOR_VERSIONED_BASELINE
+    evidence: pointer coordinates exactly matched the three historical coordinates, but key/type delivery differed from the versioned successful workflow
 blockers: []
-next_action: repeat the exact explicit-coordinate baseline unchanged with root-pointer coordinates recorded after each click; compare the observed click locations against the currently resolved 1020x650 Tibia window before proposing any new login mechanism
+next_action: execute the repository-versioned successful input implementation exactly: windowactivate, explicit three coordinate clicks, xdotool key --window/type --window with 3ms delay, then the historical transition and character-selection gates
 ```

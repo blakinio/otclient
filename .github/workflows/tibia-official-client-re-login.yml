@@ -197,20 +197,18 @@ jobs:
           if [[ "$LOGIN_ATTEMPT" -ge 1 ]]; then
             window="$(resolve_window)"
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
-            "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
-            [[ "$("$toolroot/usr/bin/xdotool" getwindowfocus)" == "$window" ]]
             before="$evidence/login-before.xwd"
             after="$evidence/login-after.xwd"
             typed="$evidence/login-typed.xwd"
             "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$before"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
             echo TRACK_A_EMAIL_CLICK_POINTER="$(pointer_location)"
-            "$toolroot/usr/bin/xdotool" key ctrl+a
-            "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_EMAIL"
+            "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
+            "$toolroot/usr/bin/xdotool" type --window "$window" --delay 3 -- "$TIBIA_TEST_EMAIL"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
             echo TRACK_A_PASSWORD_CLICK_POINTER="$(pointer_location)"
-            "$toolroot/usr/bin/xdotool" key ctrl+a
-            "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_PASSWORD"
+            "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
+            "$toolroot/usr/bin/xdotool" type --window "$window" --delay 3 -- "$TIBIA_TEST_PASSWORD"
             "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$typed"
             typed_changed="$(python3 -c 'import pathlib,sys; a=pathlib.Path(sys.argv[1]).read_bytes(); b=pathlib.Path(sys.argv[2]).read_bytes(); print(sum(x != y for x,y in zip(a,b)) + abs(len(a)-len(b)))' "$before" "$typed")"
             echo TRACK_A_CREDENTIAL_FIELDS_CHANGED_BYTES="$typed_changed"

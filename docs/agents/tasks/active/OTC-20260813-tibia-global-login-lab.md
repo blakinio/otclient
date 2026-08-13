@@ -349,6 +349,13 @@ version-1532 packet with a 64-character pre-RSA asset identifier, the next run
 records the public numeric client/protocol versions immediately before
 `loginWorld()` to determine whether failed staticdata loading mutates them.
 
+Run `31699999084`, job `94446584260`, exact head
+`4251aa83e826e71991f47f03807a1f688c875a9d`, reproduced 144 client bytes to
+zero server bytes. The numeric markers were emitted inside the container, but
+the wrapper exported only `=true` markers. The harness now exports only the two
+strictly named public numeric version markers; no payload/session field is
+matched.
+
 # Evidence classification
 
 PROVEN:
@@ -408,8 +415,8 @@ Run the canonical E2E with public numeric client/protocol version markers immedi
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:24:00Z
-head: 4a830036f1d404bc8b3126cb042f1c1ffab85f3b
+updated_at: 2026-08-13T12:32:00Z
+head: 4251aa83e826e71991f47f03807a1f688c875a9d
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating

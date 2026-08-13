@@ -331,6 +331,7 @@ for _ in $(seq 1 300); do
 done
 
 docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z0-9_-]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
+docker exec "$CONTAINER" bash -lc "grep -oE '\[TIBIA_GLOBAL_LAB\] (CLIENT_VERSION_VALUE|PROTOCOL_VERSION_VALUE)=[0-9]+' /lab/runtime/otclient.stdout.log | sort -u || true"
 if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.granted; then
   echo LAB_GAME_SOCKS_FORWARD_GRANTED=true
 else

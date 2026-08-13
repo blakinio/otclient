@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260813-map-observation-export
-status: investigating
-agent: ChatGPT
+status: validating
+agent: Codex
 project_lane: otclient
 lane: otclient
 task_kind: contract-producer
@@ -10,13 +10,15 @@ branch: docs/OTC-20260813-map-observation-export
 base_branch: main
 start_sha: dc18f795bf13cee37a115164da56a452aaa14f02
 created: 2026-08-13T22:24:00+02:00
-updated: 2026-08-13T22:24:00+02:00
+updated: 2026-08-13T20:44:36Z
 risk: medium
-related_pr: null
+related_pr: 291
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
 owned_paths:
   - docs/agents/tasks/active/OTC-20260813-map-observation-export.md
   - docs/agents/contracts/MAP_OBSERVATION_V1.md
+  - docs/agents/contracts/fixtures/map_observation_v1/**
+  - tools/agents/validate_map_observation_v1_fixtures.py
 modules_touched:
   - map-observation-contract
 reuses:
@@ -25,8 +27,7 @@ reuses:
   - src/client/protocolgameparse.cpp
   - docs/agents/TIBIA_RESEARCH_TRACKS.md
   - docs/agents/CROSS_REPO_CONTRACTS.md
-cross_repo_tasks:
-  - OTH-20260813-world-reconstruction-navigation
+cross_repo_tasks: []
 execution_mode: chat-github
 decomposition_decision: split
 ---
@@ -35,7 +36,7 @@ decomposition_decision: split
 
 ## Objective
 
-Define the producer side of a versioned, non-secret observation contract that can export semantic map facts from the native Linux `blakinio/otclient` to the OTBM Atlas consumer under shared coordination ID `OTS-20260813-world-reconstruction-navigation`.
+Define the producer side of a versioned, non-secret observation contract that can export semantic map facts from the native Linux `blakinio/otclient` as local artifacts under shared coordination ID `OTS-20260813-world-reconstruction-navigation`.
 
 This P0 task is contract/documentation only. It does not take over Track B PR #284, does not touch its live runtime namespace, and does not implement client steering or map capture yet.
 
@@ -44,7 +45,7 @@ This P0 task is contract/documentation only. It does not take over Track B PR #2
 - This project is not Track A and does not analyze/control the official client.
 - Any future live proof using `blakinio/otclient` against Tibia Global must remain inside the Track B native-Linux boundary and must first resolve current Track B ownership from live state.
 - P0 may use stable repository-owned OTClient source facts but not another track's transient PID, container, port, display, state directory or session.
-- Cross-repository sharing is limited to the promoted versioned contract and non-secret observation artifacts.
+- Per `TIBIA_RESEARCH_TRACKS.md`, P0 keeps its fixture authority and acceptance in `blakinio/otclient`; no external repository is read, written, or made a dependency.
 
 ## Producer contract requirements
 
@@ -80,14 +81,20 @@ P1 must avoid duplicating packet parsing and must remain read-only with respect 
 
 ## Acceptance inventory
 
-- [ ] `MAP_OBSERVATION_V1.md` defines field semantics and forbidden data.
-- [ ] Producer/consumer shared ID is exactly `OTS-20260813-world-reconstruction-navigation`.
-- [ ] Contract distinguishes full snapshots, deltas, transitions and action results.
-- [ ] Completeness semantics prevent UNKNOWN -> EMPTY corruption.
-- [ ] Identity semantics prevent client ID -> OTBM/server ID guessing.
-- [ ] Contract contains no credential/session secret material.
-- [ ] Future live implementation is explicitly gated on current Track B ownership and native Linux runtime rules.
-- [ ] Otheryn consumer task is linked by exact task ID.
+- [x] `MAP_OBSERVATION_V1.md` defines field semantics and forbidden data.
+- [x] Producer shared ID is exactly `OTS-20260813-world-reconstruction-navigation`.
+- [x] Contract distinguishes full snapshots, deltas, transitions and action results.
+- [x] Completeness semantics prevent UNKNOWN -> EMPTY corruption.
+- [x] Identity semantics prevent client ID -> OTBM/server ID guessing.
+- [x] Contract contains no credential/session secret material.
+- [x] Deterministic local JSONL fixtures cover the version-1 record shapes and negative invariants.
+- [x] Future live implementation is explicitly gated on current Track B ownership and native Linux runtime rules.
+
+## Future cross-repository evidence (not P0 acceptance)
+
+- A separately authorized external consumer may demonstrate compatible ingestion
+  after an explicit scope decision. That work cannot become a Track B runtime or
+  contract dependency under the current repository-only research boundary.
 
 ## Codex routing
 
@@ -99,19 +106,48 @@ Owner-funded Codex/API quota is forbidden unless the owner explicitly authorizes
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T22:24:00+02:00
-status: investigating
+updated_at: 2026-08-13T20:44:36Z
+head: f7cb399b583497acba6f85998db38b42dd2e3d2a
 branch: docs/OTC-20260813-map-observation-export
+pr: 291
+status: validating
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
+context_routes:
+  - repository-local P0 contract and fixture corpus
+owned_paths:
+  - docs/agents/tasks/active/OTC-20260813-map-observation-export.md
+  - docs/agents/contracts/MAP_OBSERVATION_V1.md
+  - docs/agents/contracts/fixtures/map_observation_v1/**
+  - tools/agents/validate_map_observation_v1_fixtures.py
 proven:
-  - Current OTClient source has semantic Map/Tile state and existing pathfinding primitives.
-  - Track B PR #284 does not own this P0 task's planned documentation paths.
-  - TIBIA_RESEARCH_TRACKS requires live OTClient-to-Global work to stay inside Track B and forbids sharing transient runtime ownership.
+  - PR #291 owns only the P0 task and contract paths; PR #284 owns no overlapping path.
+  - The repository-local JSONL corpus deterministically covers FULL, EMPTY, UNKNOWN, PARTIAL, transition, and navigation-result shapes.
+  - The fixture validator passes and rejects collapsed UNKNOWN/EMPTY, unordered stacks, fabricated delete things, non-canonical JSON, and secret-shaped field names.
 derived:
-  - A versioned file/artifact contract is the lowest-coupling safe first integration boundary with Otheryn.
+  - Repository-local fixture authority resolves the open review concern without reading or depending on an external repository.
 unknown:
-  - Final physical encoding beyond deterministic readable P0 fixtures.
-conflicts: []
-blockers: []
-next_action: Finalize MAP_OBSERVATION_V1.md and merge this P0 contract before any producer implementation begins.
+  - External consumer ingestion is not evidenced in this repository and is not part of this Track B contract gate.
+conflicts:
+  - The original P0 text made external acceptance implementation-blocking, conflicting with TIBIA_RESEARCH_TRACKS repository-only coordination.
+first_failure:
+  marker: external-fixture-acceptance dependency
+  evidence: unresolved PR #291 review thread PRRT_kwDOTVmdjs6ZE1qI
+rejected_hypotheses:
+  - External repository acceptance is required for local P0: contradicted by TIBIA_RESEARCH_TRACKS.md repository-only rule and the PR review finding.
+changed_paths:
+  - docs/agents/contracts/MAP_OBSERVATION_V1.md
+  - docs/agents/contracts/fixtures/map_observation_v1/README.md
+  - docs/agents/contracts/fixtures/map_observation_v1/records.jsonl
+  - docs/agents/tasks/active/OTC-20260813-map-observation-export.md
+  - tools/agents/validate_map_observation_v1_fixtures.py
+validation:
+  - command: python tools/agents/validate_map_observation_v1_fixtures.py
+    result: PASS
+    evidence: six-record deterministic corpus validated locally
+  - command: git diff --check
+    result: PASS
+    evidence: working-tree P0 diff has no whitespace errors
+blockers:
+  - P0 requires final diff review and exact-head PR validation before it can be merged; P1 must not start on this unmerged contract.
+next_action: Review the complete P0 diff, commit and push the validated contract/fixture repair to PR #291, then resolve the addressed review thread and observe its exact-head checks.
 ```

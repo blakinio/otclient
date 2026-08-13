@@ -50,14 +50,15 @@ All `position` values are absolute coordinates: `x` and `y` are integers and
 
 | Completeness | Required representation | Meaning |
 | --- | --- | --- |
-| `FULL` | `things` is present | The ordered array is the complete observed tile stack. |
+| `FULL` | `things` is present and non-empty | The ordered array is the complete observed non-empty tile stack. |
 | `EMPTY` | `things: []` | The producer explicitly decoded an empty tile. |
 | `PARTIAL` | invalid for a snapshot | Incremental knowledge must use `tile_delta`. |
 | `UNKNOWN` | `things` is absent | The producer has no complete tile assertion. |
 
-The absence of a record is always `UNKNOWN`; it is never `EMPTY`. An explicit
-`UNKNOWN` snapshot is permitted to carry `unknown_reason`, but it must not
-carry `things`.
+A `FULL` snapshot with `things: []` is invalid; an explicitly decoded empty tile
+must use `EMPTY`. The absence of a record is always `UNKNOWN`; it is never
+`EMPTY`. An explicit `UNKNOWN` snapshot is permitted to carry `unknown_reason`,
+but it must not carry `things`.
 
 ## Ordered things and raw identity
 
@@ -97,6 +98,9 @@ as creatures rather than silently treating them as static map content.
 and an explicit `stack_position`.
 
 - `add` and `change` require `thing`.
+- For `add` and `change`, `thing.stack_position` must equal the enclosing
+  `change.stack_position`; disagreement is invalid rather than a precedence
+  rule.
 - `delete` forbids `thing`.
 - A delta is not evidence of the unmentioned stack entries and must not be
   promoted to `FULL` by a producer or consumer.

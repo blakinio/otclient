@@ -48,6 +48,53 @@ jobs:
           chmod 700 "$state/evidence" "$evidence"
           trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "TRACK_A_LOGIN_FAILURE_RC=$rc"; if [[ -f "$state/runtime/client.log" ]]; then echo TRACK_A_CLIENT_LOG_BEGIN=true; tail -n 80 "$state/runtime/client.log"; echo TRACK_A_CLIENT_LOG_END=true; fi; fi' EXIT
 
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+            warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid")"
+            [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+            tr '\0' '\n' <"/proc/$warp_pid/environ" | grep -Fxq "$marker"
+            kill -0 "$warp_pid"
+            curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
+              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+
+            xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+            if [[ -z "$xvfb_pid" ]] || ! kill -0 "$xvfb_pid" 2>/dev/null || [[ ! -e /tmp/.X11-unix/X98 ]]; then
+              private_xvfb="$state/runtime/Xvfb-track-a"
+              [[ -x "$private_xvfb" ]]
+              cd "$toolroot/usr/bin"
+              env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+                PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \
+                XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
+                nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
+                -xkbdir "$toolroot/usr/share/X11/xkb" -nolisten tcp -noreset \
+                >"$state/runtime/xvfb.log" 2>&1 </dev/null &
+              xvfb_pid=$!
+              printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"
+              for _ in $(seq 1 30); do [[ -e /tmp/.X11-unix/X98 ]] && break; kill -0 "$xvfb_pid"; sleep 1; done
+              [[ -e /tmp/.X11-unix/X98 ]]
+            else
+              [[ -r "/proc/$xvfb_pid/environ" ]]
+              tr '\0' '\n' <"/proc/$xvfb_pid/environ" | grep -Fxq "$marker"
+            fi
+
+            proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
+            vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
+            proxy_conf="$state/config/proxychains.conf"
+            [[ -n "$proxy_lib" && -n "$vk_icd" && -s "$proxy_conf" ]]
+            cd "$runtime"
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+              HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
+              LD_LIBRARY_PATH="$runtime/lib:$tool_lib" \
+              LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$toolroot/usr/lib/x86_64-linux-gnu/dri" \
+              VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
+              LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+              nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
+            pid=$!
+            printf '%s\n' "$pid" >"$state/runtime/client.pid"
+            chmod 600 "$state/runtime/client.pid" "$state/runtime/xvfb.pid"
+            sleep 12
+          fi
+
           echo TRACK_A_CLIENT_PID_FILE_PRESENT="$([[ -s "$state/runtime/client.pid" ]] && echo true || echo false)"
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid")"
           echo TRACK_A_CLIENT_PID="$pid"

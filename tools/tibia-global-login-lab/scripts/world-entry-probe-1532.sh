@@ -9,6 +9,7 @@ trap cleanup EXIT
 
 python3 - "$src" "$tmp" <<'PY'
 from pathlib import Path
+import re
 import sys
 
 src = Path(sys.argv[1])
@@ -27,6 +28,7 @@ text = text.replace(old_stdin, new_stdin, 1)
 old_asset_marker = "echo LAB_RUNTIME_ASSET_IDENTIFIER_LENGTH=64\n"
 new_asset_marker = old_asset_marker + r'''docker exec -i "$CONTAINER" python3 - <<'PY_STATICDATA'
 from pathlib import Path
+import re
 
 path = Path('/otclient/modules/game_things/things.lua')
 text = path.read_text(encoding='utf-8')
@@ -45,11 +47,10 @@ elif new not in text:
 
 game_path = Path('/otclient/modules/gamelib/game.lua')
 game_text = game_path.read_text(encoding='utf-8')
-supported_clients_tail = '    1520, 1521, 1522, 1523, 1524, 1525\\n}'
-supported_clients_replacement = '    1520, 1521, 1522, 1523, 1524, 1525, 1532\\n}'
-if game_text.count(supported_clients_tail) == 1:
-    game_path.write_text(game_text.replace(supported_clients_tail, supported_clients_replacement, 1), encoding='utf-8')
-elif supported_clients_replacement not in game_text:
+supported_client_end = re.compile(r'(?m)(?P<version>\\b1525)(?P<closing>\\s*\\n})')
+if len(supported_client_end.findall(game_text)) == 1:
+    game_path.write_text(supported_client_end.sub(r'\\g<version>, 1532\\g<closing>', game_text, count=1), encoding='utf-8')
+elif re.search(r'(?m)\\b1525, 1532\\s*\\n}', game_text) is None:
     raise SystemExit('expected original or already-patched supported-client tail')
 PY_STATICDATA
 echo LAB_STATICDATA_FATAL_GATE_BYPASSED=true

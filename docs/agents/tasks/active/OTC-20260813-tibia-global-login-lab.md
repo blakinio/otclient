@@ -11,7 +11,7 @@ phase: recovery-validation
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T18:05:00+02:00
+updated: 2026-08-13T18:20:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -518,6 +518,17 @@ produced. This is a reproducible harness defect, not a setter or protocol
 classification; the injector now has a render check that reproduces the exact
 transformation locally before the one valid bounded E2E retry.
 
+Run `31718980508`, job `94511106360`, exact head
+`d112e8a642530f4ab8dba068cc7cd12584e0b2f7`, passed the exact native-Linux
+build, isolated bootstrap, WARP transport and HTTP login, but again did **not**
+start OTClient. The repaired injector reached its version-list guard, which
+assumed that the `1520` sequence began the final list line; the verified source
+has `1500` and `1520` entries on that same line. No full-version, directional,
+callback, or opcode marker exists from this run. The guard now matches the one
+terminal `1525` entry plus its closing brace, and its complete inner container
+patch is executed against an offline copy of the verified module shape before
+the next E2E.
+
 # Evidence classification
 
 PROVEN:
@@ -570,19 +581,20 @@ UNKNOWN:
 
 # Next action
 
-Run exactly one canonical native-Linux E2E on the validated injector-repair
-head; classify the required full-version marker outcome, then use directional
-bytes and structural opcode/callback evidence only if configuration succeeded.
+Run exactly one canonical native-Linux E2E on the regex-validated injector
+repair head; classify the required full-version marker outcome, then use
+directional bytes and structural opcode/callback evidence only if configuration
+succeeded.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T16:00:00Z
+updated_at: 2026-08-13T16:20:00Z
 track: otclient-global-login
 track_alias: OTCLIENT-GLOBAL-LOGIN
-head: 281a9d47491f064138b29dbe8ce450411cbb88a0
-last_e2e_head: 281a9d47491f064138b29dbe8ce450411cbb88a0
+head: d112e8a642530f4ab8dba068cc7cd12584e0b2f7
+last_e2e_head: d112e8a642530f4ab8dba068cc7cd12584e0b2f7
 recovery_base_head: 27418b03ee787f049b2e89b14ccc29b50701428f
 base_main: dc18f795bf13cee37a115164da56a452aaa14f02
 branch: feat/OTC-20260813-tibia-global-login-lab
@@ -611,8 +623,8 @@ unknown:
 conflicts:
   - none
 first_failure:
-  marker: LAB_1532 injector SyntaxError before OTClient launch
-  evidence: run 31717603954/job 94507702845 at 281a9d47491f064138b29dbe8ce450411cbb88a0
+  marker: LAB_1532 injector supported-client tail guard before OTClient launch
+  evidence: run 31718980508/job 94511106360 at d112e8a642530f4ab8dba068cc7cd12584e0b2f7
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
@@ -633,8 +645,8 @@ validation:
     evidence: injector-repair checkpoint schema validated locally; the next E2E remains pending
   - command: bash -n tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh plus local injected-render execution
     result: PASS
-    evidence: LAB_1532_INJECTOR_RENDER_CHECK=true; no container, secret, or network access used
+    evidence: LAB_1532_INJECTOR_RENDER_CHECK=true; executes the full inner module patch against the verified 1525 source shape with no container, secret, or network access
 blockers:
-  - run 31717603954/job 94507702845 stopped in the lab injector before OTClient launch; its failure is non-protocol and repaired locally
-next_action: run exactly one canonical native-Linux E2E on the validated injector-repair head and classify the full-version marker outcome before any protocol-layout change
+  - runs 31717603954/job 94507702845 and 31718980508/job 94511106360 stopped in the lab injector before OTClient launch; neither is setter or protocol evidence
+next_action: run exactly one canonical native-Linux E2E on the regex-validated injector repair head and classify the full-version marker outcome before any protocol-layout change
 ```

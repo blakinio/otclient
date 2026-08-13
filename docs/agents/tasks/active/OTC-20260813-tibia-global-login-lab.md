@@ -297,6 +297,31 @@ experiment keeps challenge-first disabled, restores those existing
 version-derived features, and records only aggregate directional byte lengths,
 never payloads.
 
+Run `31697097942`, job `94437261305`, exact head
+`05ba7696579a82601034959430243eca12aeb4c2`, completed the restored
+non-challenge framing experiment. The forward granted the SOCKS request and
+OTClient sent a 143-byte first packet, but the endpoint returned zero bytes:
+
+```text
+FEATURE_CHALLENGE_FIRST_REJECTED=true
+FEATURE_CLIENT_VERSION=true
+FEATURE_LOGIN_PENDING=true
+FEATURE_PROTOCOL_CHECKSUM=true
+LOGIN_PACKET_FEATURES_LAB_RESTORED=true
+SESSION_KEY_FEATURE=true
+LAB_GAME_FORWARD_CLIENT_BYTES=true
+LAB_GAME_FORWARD_CLIENT_LENGTH=143
+LAB_GAME_FORWARD_SERVER_BYTES=false
+LAB_GAME_FORWARD_SERVER_LENGTH=0
+LAB_OTCLIENT_DIRECT_TCP_COUNT=0
+```
+
+This disproves the missing legacy feature set as the sole cause. Source review
+then found that `g_game.chooseRsa()` advertises the Linux OS id because the lab
+runs in a Linux container, although official Tibia 15.32 has no native Linux
+client. The next bounded experiment keeps the proven non-challenge framing and
+advertises the official Windows OS id after selecting the CipSoft RSA key.
+
 # Evidence classification
 
 PROVEN:
@@ -320,6 +345,7 @@ DISPROVEN:
 - official 15.32 appearances parser incompatibility;
 - unavailable `synology-otclient-01` runner as the current blocker.
 - challenge-first behavior on the current official game endpoint: run `31695992918` produced neither client nor server bytes after the granted TCP connection.
+- the missing encryption/checksum/client-version/login-pending/sequenced feature set as the sole no-response cause: run `31697097942` sent 143 client bytes and received zero server bytes after restoring them.
 
 UNKNOWN:
 - whether `g_game.loginWorld()` with appearances-only state reaches a game-server TCP/session callback;
@@ -341,9 +367,50 @@ UNKNOWN:
 - [ ] Prove first game-server connection/callback after appearances-only login attempt.
 - [ ] Prove `GAME_START=true` or persist the exact post-login protocol incompatibility.
 - [ ] After `GAME_START`, prove authoritative local-player/position/world state and leave character idle.
-- [ ] Make PR #48 intentionally terminal as superseded once all reusable evidence is ported.
+- [x] Keep PR #48 as historical evidence only; it is not the canonical implementation lane and does not supersede PR #284.
 - [ ] Run final exact-head audit/CI and closeout only when the runtime objective is terminal.
 
 # Next action
 
-Run the canonical E2E with challenge-first disabled, restored version-derived login packet features, and aggregate direction lengths. Continue from the first server callback/bytes or exact no-response packet boundary.
+Run the canonical E2E with the official Windows OS id lab override and classify the first game-server exchange from the aggregate direction markers.
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-08-13T14:19:00Z
+head: 05ba7696579a82601034959430243eca12aeb4c2
+branch: feat/OTC-20260813-tibia-global-login-lab
+pr: 284
+status: validating
+context_routes:
+  - official-Tibia game login via synology-otclient-01
+owned_paths:
+  - tools/tibia-global-login-lab/**
+  - .github/workflows/tibia-global-login-lab.yml
+  - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
+proven:
+  - run 31697097942/job 94437261305 sent 143 client bytes and received zero server bytes after SOCKS grant
+derived:
+  - first remaining boundary is the official 15.32 initial game-login packet identity/framing
+unknown:
+  - whether advertising the official Windows OS id yields a server response
+conflicts:
+  - none
+first_failure:
+  marker: LAB_GAME_FORWARD_SERVER_BYTES=false
+  evidence: run 31697097942/job 94437261305 at 05ba7696579a82601034959430243eca12aeb4c2
+rejected_hypotheses:
+  - challenge-first: run 31695992918 produced zero bytes in both directions
+  - missing restored legacy login features alone: run 31697097942 still received zero server bytes
+changed_paths:
+  - tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh
+  - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
+validation:
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md --require-checkpoint
+    result: PASS
+    evidence: checkpoint schema validated locally before commit
+blockers:
+  - none
+next_action: run the exact-head canonical E2E with the official Windows OS id lab override and classify aggregate direction markers
+```

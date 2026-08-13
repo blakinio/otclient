@@ -101,7 +101,8 @@ status: fixed
 repair_commits:
   - d0c30b9218c15c359e5de7e901882ca7243b31b2
   - bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
-verification: pending exact-head focused test execution and repository CI
+verification:
+  - run 31653654639 job 94303192632 PASS
 ```
 
 Repair:
@@ -121,20 +122,23 @@ baseline_before_fresh_audit:
   syntax: PASS
   synthetic_e2e: PASS
   repository_ci_run: 31632613373 PASS
-  note: superseded as final evidence by the fresh-audit repair head
+  note: superseded as final evidence by the fresh-audit repair
 fresh_audit_repair:
   pipeline_commit: d0c30b9218c15c359e5de7e901882ca7243b31b2
-  final_test_commit: bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
-  regression_test_count_expected: 19
-  focused_tests: pending exact repaired-file execution
-  syntax: pending exact repaired-file execution
-  synthetic_e2e: pending repaired-head execution
+  regression_commit: bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
+  validation_workflow_head: 9f5c69391d656d1b65c7f29b21f205d3360c12e3
+  validation_run: 31653654639
+  validation_job: 94303192632
+  focused_tests: PASS_19_OF_19
+  syntax: PASS
+  synthetic_e2e: PASS
+  synthetic_marker: SYNTHETIC_RECONSTRUCT_COMPARE_PLAN_PASS=true
+  temporary_validation_workflow_removed_by: e447a31431b675effeb419892a35d7f22e5d321d
 pr: 279
-pr_exact_head: bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
-pr_exact_head_ci:
-  run: 31652857197
-  result: running
+final_required_ci: pending on the final head after this checkpoint
 ```
+
+The temporary validation workflow is no longer in the branch. The validation run remains supporting exact-code evidence; repository-required final CI must still pass on the final workflow-free head.
 
 No Codex or owner-funded AI/API quota was used.
 
@@ -146,21 +150,22 @@ No Codex or owner-funded AI/API quota was used.
 ## Checkpoint
 
 ```yaml
-checkpoint_version: 3
-updated_at: 2026-08-13T02:05:00+02:00
-base_head_at_start: 9e68388c5dff5d803f2a7025ba138e7cdfdf0d3f
+checkpoint_version: 4
+updated_at: 2026-08-13T02:15:00+02:00
 branch: feat/OTC-20260812-worldmap-reconstruction
 pr: 279
-head: bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
 status: validating
 proven:
-  - non-overlapping ownership against PR #48 and PR #277
-  - fresh audit found OTC279-AUD-001 and the repaired head contains a fail-closed snapshot validator plus seven regressions
+  - fail-closed snapshot validation repair is implemented
+  - focused repaired suite passed 19/19
+  - Python syntax validation passed
+  - synthetic CLI reconstruct -> compare -> plan-otbm E2E passed
+  - temporary validation workflow was removed
 unknown:
-  - repaired-head focused test and synthetic-E2E result
-  - repaired-head final required CI result
+  - final required repository CI result on the workflow-free final head
+  - independent fresh-context closeout audit availability
   - real appearance classifications and OTB mappings
 conflicts: []
 blockers: []
-next_action: validate the exact repaired head with the 19 focused tests, syntax and synthetic E2E, then reconcile exact-head CI and complete PR lifecycle only if all gates pass
+next_action: verify final exact-head repository CI, then complete fresh-context audit/PR hygiene and merge only if every closeout gate passes
 ```

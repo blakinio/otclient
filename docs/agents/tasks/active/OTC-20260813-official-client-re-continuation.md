@@ -71,8 +71,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T13:55:00+02:00
-head: dc18f795bf13cee37a115164da56a452aaa14f02
+updated_at: 2026-08-13T14:41:00+02:00
+head: a4c21ddeef3eafdb738011f1897b4dc9a8f6d517
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -88,26 +88,33 @@ proven:
   - current main defines Track A as official native Linux client only and isolates Track B mutable runtime
   - PR 48 is closed without merge and is no longer the active ownership source
   - synology-otclient-01 is online with live labels otclient and synology
+  - run 31700834510 job 94449297810 proved isolated native-Linux Track A state at /work/_otclient_tibia_re_state with display :98 and WARP port 25354
+  - the live Track A namespace has no owned client, Xvfb, or wireproxy PID marker
+  - the current runner image has bash curl and python3 but lacks file gdb proxychains4 socat xdotool and Xvfb
 derived:
   - a fresh main-based Track A task and PR are required for discoverable continuation
 unknown:
-  - live Track A state directory and process state on the runner
   - exact current official-client binary identity on the runner
   - current structural session state
 conflicts:
   - canonical preferred runner labels differ from the currently reported legacy label set
 first_failure:
-  marker: none
-  evidence: live revalidation has not yet run in the new isolated namespace
+  marker: direct runner image lacks six dependencies required for client launch and instrumentation
+  evidence: run 31700834510 job 94449297810 emitted TRACK_A_MISSING_TOOL_COUNT=6
 rejected_hypotheses:
   - continue mutating closed PR 48 as active ownership: rejected by live PR state and current main governance
 changed_paths:
+  - .github/workflows/tibia-official-client-re-identity.yml
+  - .github/workflows/tibia-official-client-re-live-state.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
 validation:
   - command: live main governance and PR/runner preflight
     result: PASS
     evidence: main dc18f795, PR 48 closed, runner 21 online
+  - command: Track A official-client RE live state run 31700834510 job 94449297810
+    result: PASS
+    evidence: isolated namespace proven; no owned runtime processes; six required tools absent
 blockers:
-  - none
-next_action: publish the isolated Track A task and run a non-invasive live namespace and dependency probe on synology-otclient-01
+  - runner image lacks file gdb proxychains4 socat xdotool and Xvfb for launch/instrumentation phases
+next_action: complete run 31700967902 to verify current official Linux client SHA through isolated Track A WARP, then select a repository-owned dependency path without touching Track B
 ```

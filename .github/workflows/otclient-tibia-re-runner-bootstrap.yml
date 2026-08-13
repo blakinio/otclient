@@ -1,0 +1,41 @@
+name: OTClient Tibia RE runner bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: [self-hosted, oteryn-staging]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify runner and Docker
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RUNNER_NAME=${RUNNER_NAME:-unknown}"
+          uname -a
+          docker version
+          docker info >/dev/null
+      - name: Recreate isolated OTClient Tibia RE container
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=otclient-tibia-re
+          state=/var/lib/oteryn-staging-state/tibia-linux-analysis
+          mkdir -p "$state"
+          docker rm -f "$name" >/dev/null 2>&1 || true
+          docker run -d \
+            --name "$name" \
+            --restart unless-stopped \
+            --init \
+            -v "$state:/state" \
+            -w /state \
+            ubuntu:24.04 \
+            sleep infinity
+          docker inspect "$name" --format '{{.Name}} {{.State.Status}} {{.Config.Image}}'
+          docker exec "$name" sh -lc 'uname -a; id; test -w /state'

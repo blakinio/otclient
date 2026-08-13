@@ -9,14 +9,17 @@ related_pr: "#279"
 owned_paths:
   - docs/agents/tasks/active/OTC-20260812-worldmap-reconstruction.md
   - docs/agents/reports/OTC-20260812-worldmap-reconstruction.md
+  - docs/agents/MODULE_CATALOG.md
   - tools/tibia_worldmap_reconstruction/**
   - tests/tools/tibia_worldmap_reconstruction/**
+modules_touched: []
 reuses:
   - PR #48 runtime/login evidence and official-client package reconstruction helpers as read-only evidence
   - repository-owned OTCLIENT-TIBIA-RE canonical evidence imports
 depends_on:
   - PR #48 only for future real official-client capture; this task does not edit PR #48 paths
 blocks: []
+cross_repository_tasks: []
 ---
 
 # OTC-20260812 — Worldmap reconstruction tooling
@@ -72,6 +75,7 @@ The E2E for this task is the neutral repository pipeline: observation -> classif
 11. Synthetic tests cover success plus malformed/missing provenance, conflicting observations/mappings/roles, missing ground, unmapped IDs, stack order, version mismatches, forged/inconsistent `OK` state, bad snapshot types/statuses, duplicate snapshot coordinates and malformed reference arrays.
 12. Documentation defines CrystalServer, Renemap and TibiaMaps as independent normalized references; disagreements remain evidence rather than silent precedence.
 13. Snapshot validation is explicitly bounded to schema/internal consistency; an arbitrary self-consistent snapshot is not treated as authenticated proof of mapping provenance.
+14. The reusable pipeline is registered in `docs/agents/MODULE_CATALOG.md` so later agents reuse rather than duplicate it.
 
 ## Evidence boundaries
 
@@ -81,6 +85,7 @@ The E2E for this task is the neutral repository pipeline: observation -> classif
 - PR #48 is open/draft on `ci/OTC-20260727-tibia-linux-runner-analysis` and owns its operational workflows/scripts/task record.
 - PR #48 and the canonical OTCLIENT-TIBIA-RE reports preserve official-client identity, decoded Worldmap evidence and strict no-OCR/WARP boundaries.
 - no existing appearance/OTB reconstruction helper was found before adding this task-scoped utility.
+- a current open-PR/code search found no explicit competing `MODULE_CATALOG.md` ownership before the narrow catalogue update; the reusable worldmap pipeline is now registered there.
 
 ### UNKNOWN / requires later evidence
 
@@ -189,7 +194,7 @@ second_audit_repair:
   synthetic_marker: SYNTHETIC_RECONSTRUCT_COMPARE_PLAN_PASS=true
   temporary_validation_workflow_removed_by: 4e03c5b7ed6578af9fbfd2cdeb240acb8e109c1f
 pr: 279
-final_required_ci: pending on final workflow-free documentation/code head
+final_required_ci: pending on final workflow-free documentation/catalog/code head
 ```
 
 No Codex or owner-funded AI/API quota was used. All material work is persisted in `blakinio/otclient`.
@@ -202,8 +207,8 @@ No Codex or owner-funded AI/API quota was used. All material work is persisted i
 ## Checkpoint
 
 ```yaml
-checkpoint_version: 5
-updated_at: 2026-08-13T10:15:00+02:00
+checkpoint_version: 6
+updated_at: 2026-08-13T10:25:00+02:00
 branch: feat/OTC-20260812-worldmap-reconstruction
 pr: 279
 status: validating
@@ -214,8 +219,9 @@ proven:
   - synthetic CLI reconstruct -> compare -> plan-otbm E2E passed
   - snapshot trust/provenance boundary is documented without overclaiming authentication
   - temporary second-audit validation workflow was removed
+  - reusable pipeline is registered in MODULE_CATALOG after an overlap search found no competing explicit ownership
 unknown:
-  - final required repository CI result on the final workflow-free head
+  - final required repository CI result on the final workflow-free documentation/catalog/code head
   - real appearance classifications and OTB mappings
   - real official-client capture integration inputs
 conflicts: []

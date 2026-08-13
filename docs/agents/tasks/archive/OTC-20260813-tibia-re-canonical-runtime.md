@@ -147,7 +147,7 @@ Deterministic outcome verification on merged `main` confirmed:
 - the canonical wrapper and all imported evidence reports exist in `blakinio/otclient`;
 - the persistence directive is encoded in the wrapper;
 - external Oteryn runtime paths are explicitly non-canonical for new active work;
-- implementation merge `89f62b00859f614a9adc1f2fbaf418f61f6950c2` is the current canonical source for this routing package.
+- implementation merge `89f62b00859f614a9adc1f2fbaf418f61f6950c2` is the canonical source for this routing package.
 
 ## Implementation validation and review
 
@@ -171,9 +171,24 @@ Review findings addressed before merge:
 
 All PR #285 review threads were resolved before its merge.
 
+## Owner-funded AI / automatic review boundary
+
+The worker did not intentionally invoke Codex, OpenAI API, paid AI review, `@codex review`, or any owner credential/quota for implementation or validation. However, the repository has an automatic Codex Review integration configured for ready PRs, and opening PR #286 as non-draft caused an automatic `chatgpt-codex-connector` review to appear without a separate worker request.
+
+```yaml
+intentional_owner_funded_ai_invocations_by_worker: 0
+automatic_repository_codex_review_observed: true
+automatic_review_pr: 286
+automatic_review_state: COMMENTED
+quota_or_cost_effect: UNKNOWN
+further_codex_review_requests_by_worker: forbidden_without_explicit_owner_authorization
+```
+
+This automatic review supplied the archive closeout finding above, but it is not being used to broaden authority or as a substitute for the fresh-context validator role. Future work must avoid deliberately triggering additional Codex reviews while the owner's no-owner-funded-AI restriction remains in force.
+
 ## Archive-PR validation
 
-Archive PR #286 exact pre-remediation head `8514efe359ae743bb661008b46b9ec2ecc8c8e51` passed CI run `31682022891`, including `CI / Required` job `94389645880`. That run is supporting evidence only because this audit/E2E remediation changes the archive head; final required CI must pass again on the exact final archive head before merge.
+Archive PR #286 exact pre-remediation head `8514efe359ae743bb661008b46b9ec2ecc8c8e51` passed CI run `31682022891`, including `CI / Required` job `94389645880`. That run is supporting evidence only because this audit/E2E/remediation disclosure changes the archive head; final required CI must pass again on the exact final archive head before merge.
 
 ## Related programme lanes after closeout
 
@@ -225,7 +240,8 @@ closeout:
       - blakinio/otclient#280
       - blakinio/otclient#283
   external_repository_writes: none
-  owner_funded_ai_usage_by_task_implementation: none
+  intentional_owner_funded_ai_invocations_by_worker: 0
+  automatic_repository_codex_review_observed: true
   behavioral_prompt_trials: NOT_RUN
   manual_prompt_scenario_matrix: 14_cases_reviewed
   repository_outcome_verification: PASS
@@ -236,4 +252,4 @@ closeout:
 
 ## Next archive action
 
-Wait only for final exact-head archive CI after this audit/E2E remediation, resolve the existing archive review thread if the final diff satisfies it, and merge PR #286. After that this archive has no remaining action; programme continuation stays with #48/#279/#280/#283.
+Wait only for final exact-head archive CI after this audit/E2E/remediation disclosure, resolve the existing archive review thread if the final diff satisfies it, and merge PR #286. After that this archive has no remaining action; programme continuation stays with #48/#279/#280/#283.

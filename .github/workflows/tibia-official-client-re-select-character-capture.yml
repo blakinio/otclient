@@ -1,0 +1,55 @@
+name: Track A capture character selection window
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-select-character-capture.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Login only to character selection and capture window
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set -Eeuo pipefail
+          src=.github/scripts/tibia-official-client-re-autonomous-world-login.sh
+          tmp="$RUNNER_TEMP/track-a-select-capture.sh"
+          awk '/# Historical first-character activation/{exit} {print}' "$src" > "$tmp"
+          cat >> "$tmp" <<'EOF'
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/track-a-select"
+          window="$(resolve_window)"
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$GITHUB_WORKSPACE/artifacts/track-a-select/select-character.xwd"
+          echo TRACK_A_SELECT_CHARACTER_CAPTURED=true
+          EOF
+          bash "$tmp"
+      - name: Upload character selection capture
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-select-character
+          path: artifacts/track-a-select/select-character.xwd
+          if-no-files-found: error
+          retention-days: 1

@@ -30,13 +30,16 @@ jobs:
           warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
           [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
           grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          root="$state/toolroot"
           work="$state/launcher-help/run-$GITHUB_RUN_ID"; mkdir -p "$work/unpacked" "$work/home"
           curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --max-time 120 --retry 3 --retry-all-errors \
             https://static.tibia.com/download/tibia.x64.tar.gz -o "$work/tibia.x64.tar.gz"
           tar -xzf "$work/tibia.x64.tar.gz" -C "$work/unpacked"
           launcher="$work/unpacked/Tibia/Tibia"
           [[ -x "$launcher" ]]
-          "$launcher" --help >"$work/help.txt" 2>&1 || rc=$?
+          workdir="$(dirname "$launcher")"
+          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          HOME="$work/home" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" "$launcher" --help >"$work/help.txt" 2>&1 || rc=$?
           echo TRACK_A_LAUNCHER_HELP_RC="${rc:-0}"
           sed 's/^/TRACK_A_LAUNCHER_HELP=/' "$work/help.txt" | head -n 200
           echo TRACK_A_LAUNCHER_HELP_COMPLETE=true

@@ -88,7 +88,7 @@ jobs:
               PATH="$tool_path:/usr/bin:/bin" LD_LIBRARY_PATH="$tool_lib" \
               XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
               nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
-              -nolisten tcp -noreset \
+              -xkbdir "$toolroot/usr/share/X11/xkb" -nolisten tcp -noreset \
               >"$state/runtime/xvfb.log" 2>&1 </dev/null &
             xvfb_pid=$!
             printf '%s\n' "$xvfb_pid" >"$xvfb_pid_file"

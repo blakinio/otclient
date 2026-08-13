@@ -1,0 +1,165 @@
+name: Tibia hosted CV-bootstrap structural world
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-cv-bootstrap-structural-world.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  world:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-cv-structural-home
+      PACKAGE_BASE: https://static.tibia.com/launcher/tibiaclient-linux-current
+      ASSET_BASE: https://static.tibia.com/launcher/assets-current
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+      TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Reconstruct and start exact client normally
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends python3-yaml imagemagick
+          python3 - <<'PY'
+          import pathlib,yaml
+          doc=yaml.safe_load(pathlib.Path('.github/workflows/tibia-hosted-complete-assets-no-ocr-login-v4.yml').read_text())
+          steps=doc['jobs']['world-entry']['steps'];out=pathlib.Path('/tmp/v4');out.mkdir(parents=True,exist_ok=True)
+          wanted={
+            'Install strict no-OCR runtime':'01.sh','Establish pinned userspace WARP':'02.sh',
+            'Reconstruct official package and preserve packed runtime assets':'03.sh','Start exact client through WARP':'04.sh'}
+          seen=set()
+          for step in steps:
+            if step.get('name') in wanted:
+              p=out/wanted[step['name']];p.write_text(step['run']);p.chmod(0o700);seen.add(step['name'])
+          if set(wanted)-seen:raise SystemExit('missing proven bootstrap step')
+          PY
+          for s in 01.sh 02.sh 03.sh 04.sh;do /usr/bin/bash --noprofile --norc -e -o pipefail "/tmp/v4/$s";done
+          pid=$(cat /tmp/tibia-runtime/client-pid);kill -0 "$pid"
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo NORMAL_EXACT_CLIENT_READY=true
+
+      - name: CV bootstrap login and first character without OCR
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          resolve() {
+            local w g wi he best='' area=0 a
+            for _ in $(seq 1 80);do
+              best='';area=0
+              for w in $(xdotool search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null||true);do
+                xwininfo -id "$w" >/dev/null 2>&1||continue
+                g=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null||true);wi=$(printf '%s\n' "$g"|sed -n 's/^WIDTH=//p');he=$(printf '%s\n' "$g"|sed -n 's/^HEIGHT=//p');[[ -n "$wi" && -n "$he" ]]||continue
+                a=$((wi*he));if ((a>area));then best=$w;area=$a;fi
+              done
+              if [[ -n "$best" ]];then g=$(xdotool getwindowgeometry --shell "$best");wi=$(printf '%s\n' "$g"|sed -n 's/^WIDTH=//p');he=$(printf '%s\n' "$g"|sed -n 's/^HEIGHT=//p');[[ "$wi" == 1020 && "$he" == 650 ]]&&{ echo "$best";return 0;};fi
+              sleep 0.5
+            done;return 1
+          }
+          w=$(resolve);[[ -n "$w" ]];sleep 5
+          import -display :99 -window "$w" /tmp/login-before.png
+          xdotool windowactivate --sync "$w" 2>/dev/null||true
+          xdotool mousemove --window "$w" 535 275 click 1;xdotool key --window "$w" ctrl+a;xdotool type --window "$w" --delay 3 -- "$TIBIA_TEST_EMAIL"
+          xdotool mousemove --window "$w" 535 304 click 1;xdotool key --window "$w" ctrl+a;xdotool type --window "$w" --delay 3 -- "$TIBIA_TEST_PASSWORD"
+          xdotool mousemove --window "$w" 590 388 click 1
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          transitioned=0;ae=0
+          for _ in $(seq 1 35);do
+            sleep 1
+            current=$(resolve||true);[[ -n "$current" ]]||continue
+            import -display :99 -window "$current" /tmp/login-after.png
+            ae=$(compare -metric AE /tmp/login-before.png /tmp/login-after.png null: 2>&1||true);ae=${ae%%.*};[[ "$ae" =~ ^[0-9]+$ ]]||ae=0
+            if ((ae>45000));then transitioned=1;w=$current;break;fi
+          done
+          echo LOGIN_BOOTSTRAP_CHANGED_PIXELS=$ae
+          echo LOGIN_BOOTSTRAP_TRANSITION=$transitioned
+          ((transitioned==1))
+          w=$(resolve);xdotool windowactivate --sync "$w" 2>/dev/null||true
+          xdotool mousemove --window "$w" 285 193 click 1;sleep 0.4;xdotool key --window "$w" Return
+          sleep 3
+          w=$(resolve||true);if [[ -n "$w" ]];then xdotool mousemove --window "$w" 285 193 click --repeat 2 --delay 160 1||true;fi
+          sustained=0;maxlocal=0;consecutive=0;directseen=0;udpseen=0
+          for _ in $(seq 1 60);do
+            sleep 1;pid=$(pgrep -x client|tail -n1||true);[[ -n "$pid" ]]||continue
+            tcp=$(ss -ntp 2>/dev/null|grep "pid=$pid,"||true);udp=$(ss -nup 2>/dev/null|grep "pid=$pid,"||true)
+            localc=$(printf '%s\n' "$tcp"|awk '$5~/127\.0\.0\.1:25344$/||$5~/\[::1\]:25344$/{n++}END{print n+0}');total=$(printf '%s\n' "$tcp"|grep -c .||true);direct=$((total-localc));uc=$(printf '%s\n' "$udp"|grep -c .||true)
+            ((localc>maxlocal))&&maxlocal=$localc||true;((direct>0))&&directseen=1||true;((uc>0))&&udpseen=1||true
+            if ((localc>0));then consecutive=$((consecutive+1));else consecutive=0;fi
+            if ((consecutive>=6));then sustained=1;break;fi
+          done
+          echo WORLD_BOOTSTRAP_LOCAL_SOCKS_MAX=$maxlocal
+          echo WORLD_BOOTSTRAP_DIRECT_SEEN=$directseen
+          echo WORLD_BOOTSTRAP_UDP_SEEN=$udpseen
+          echo WORLD_BOOTSTRAP_SUSTAINED=$sustained
+          [[ "$directseen" == 0 && "$udpseen" == 0 ]];((sustained==1));echo "$pid">/tmp/tibia-runtime/client-pid
+          sleep 6
+          w=$(resolve);import -display :99 -window "$w" /tmp/world-before.png;convert /tmp/world-before.png -crop 620x390+190+90 /tmp/view-before.png
+          xdotool key --window "$w" Right;sleep 2
+          w=$(resolve);import -display :99 -window "$w" /tmp/world-after.png;convert /tmp/world-after.png -crop 620x390+190+90 /tmp/view-after.png
+          moveae=$(compare -metric AE /tmp/view-before.png /tmp/view-after.png null: 2>&1||true);moveae=${moveae%%.*};[[ "$moveae" =~ ^[0-9]+$ ]]||moveae=0
+          echo WORLD_BOOTSTRAP_VIEWPORT_CHANGED=$moveae
+          ((moveae>1000))
+          xdotool key --window "$w" Left;sleep 2
+          echo WORLD_BOOTSTRAP_ACTION_PROVEN=true
+          rm -f /tmp/*.png
+
+      - name: Attach after bootstrap and prove decoded world structurally
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo sysctl -w kernel.yama.ptrace_scope=0 >/dev/null 2>&1||true
+          pid=$(cat /tmp/tibia-runtime/client-pid);kill -0 "$pid"
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          line=$(grep -F "$client" "/proc/$pid/maps"|awk '$2~/r-xp/{print;exit}');[[ -n "$line" ]]
+          start=$(printf '%s\n' "$line"|awk '{split($1,a,"-");print a[1]}');off=$(printf '%s\n' "$line"|awk '{print $3}');bias=$((16#$start-16#$off));printf 'ATTACH_PIE_BASE=0x%x\n' "$bias"
+          cat >/tmp/tibia-runtime/postworld.gdb <<EOF
+          set pagination off
+          set confirm off
+          attach $pid
+          python
+          import gdb,struct,os
+          inf=gdb.selected_inferior();out='/tmp/tibia-runtime/postworld-records';open(out,'w').close()
+          class B(gdb.Breakpoint):
+            def __init__(self):super().__init__('*0x%x'%($bias+0x19a8ea3));self.n=0
+            def stop(self):
+              try:
+                rsp=int(gdb.parse_and_eval('\$rsp'));order=int(gdb.parse_and_eval('\$rbp'))&0xffffffff
+                x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))
+                if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                  self.n+=1;open(out,'a').write('%d\n'%self.n)
+                  if self.n>=8:open('/tmp/tibia-runtime/postworld-hit','w').write('DECODED_MAP_RECORD_COUNT=%d\n'%self.n);self.enabled=False
+              except Exception:pass
+              return False
+          B();gdb.write('POSTWORLD_MAP_BREAKPOINT_READY=true\n')
+          end
+          continue
+          EOF
+          rm -f /tmp/tibia-runtime/postworld-hit /tmp/tibia-runtime/postworld-gdb.log
+          gdb -q -nx -x /tmp/tibia-runtime/postworld.gdb >/tmp/tibia-runtime/postworld-gdb.log 2>&1 & echo $! >/tmp/tibia-runtime/postworld-gdb-pid
+          for _ in $(seq 1 30);do grep -q 'POSTWORLD_MAP_BREAKPOINT_READY=true' /tmp/tibia-runtime/postworld-gdb.log 2>/dev/null&&break;sleep 0.5;done
+          grep -q 'POSTWORLD_MAP_BREAKPOINT_READY=true' /tmp/tibia-runtime/postworld-gdb.log
+          w='';for _ in $(seq 1 30);do w=$(xdotool search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null|head -n1||true);[[ -n "$w" ]]&&break;sleep 0.5;done;[[ -n "$w" ]]
+          xdotool key --window "$w" Right||true;sleep 2;w=$(xdotool search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null|head -n1||true);[[ -n "$w" ]]&&xdotool key --window "$w" Left||true
+          for _ in $(seq 1 20);do [[ -s /tmp/tibia-runtime/postworld-hit ]]&&break;sleep 1;done
+          count=$(wc -l </tmp/tibia-runtime/postworld-records 2>/dev/null||echo 0);echo POSTWORLD_DECODED_RECORD_COUNT=$count
+          [[ "$count" -ge 8 && -s /tmp/tibia-runtime/postworld-hit ]];cat /tmp/tibia-runtime/postworld-hit
+          tcp=$(ss -ntp 2>/dev/null|grep "pid=$pid,"||true);udp=$(ss -nup 2>/dev/null|grep "pid=$pid,"||true);localc=$(printf '%s\n' "$tcp"|awk '$5~/127\.0\.0\.1:25344$/||$5~/\[::1\]:25344$/{n++}END{print n+0}');total=$(printf '%s\n' "$tcp"|grep -c .||true);direct=$((total-localc));uc=$(printf '%s\n' "$udp"|grep -c .||true)
+          echo FINAL_LOCAL_SOCKS_COUNT=$localc;echo FINAL_DIRECT_TCP_COUNT=$direct;echo FINAL_UDP_COUNT=$uc;[[ "$direct" == 0 && "$uc" == 0 ]];kill -0 "$pid"
+          echo STRUCTURAL_IN_GAME=true
+          echo PHYSICAL_TIBIA_WORLD_LOGIN_PROVEN=true

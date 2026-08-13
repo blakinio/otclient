@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:24:00+02:00
-head: e91c519c8b19f497ca5191ad2551ea780a390df8
+updated_at: 2026-08-13T15:27:00+02:00
+head: f7816be246ee646d4e5c4765b3c5ddd55758c8ff
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -102,7 +102,7 @@ unknown:
   - decoded current-world records and authoritative player position
 first_failure:
   marker: exact versioned input sequence does not transition either persistent or fresh Track A client home after Login click
-  evidence: run 31714821056 job 94496738127 used a fresh temporary HOME/XDG config directory and versioned input delivery; transition 4813 < 45000 and local SOCKS stayed at 3; run 31715045843 did not reach the baseline because the marker pipeline tr|grep raised SIGPIPE
+  evidence: run 31715206847 job 94498079465 used fresh HOME/XDG state, historical 1280x800 display and five-second stabilization, plus versioned input delivery; transition 4483 < 45000 and local SOCKS stayed at 2
 rejected_hypotheses:
   - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
   - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
@@ -142,6 +142,9 @@ validation:
   - command: Track A structural login run 31715045843 job 94497518892
     result: INVALID_PRELOGIN_VALIDATION
     evidence: fresh-home 1280x800 attempt stopped at the owned-client marker pipeline because tr|grep returned SIGPIPE under pipefail; no secrets were injected
+  - command: Track A structural login run 31715206847 job 94498079465
+    result: FAIL_FOR_DISPLAY_ALIGNED_BASELINE
+    evidence: pipe-safe marker checks; fresh HOME/XDG; historical display/timing; versioned input delivery; transition 4483 < 45000; no structural IN_GAME claim
 blockers: []
-next_action: replace marker tr|grep pipelines with NUL-safe direct grep and rerun the same fresh-home 1280x800 baseline with the five-second stabilization interval
+next_action: preserve fresh HOME/XDG, historical display/timing and input sequence, but launch through the private proxychains4 wrapper as in the versioned successful workflow rather than manually setting LD_PRELOAD
 ```

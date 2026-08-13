@@ -10,10 +10,23 @@ Version 1 is read-only and fail-closed:
 2. The launcher injects `otclient-tibia-runtime-bridge.so` with `LD_PRELOAD`; it does not modify the installed client files.
 3. `bridge.cpp` discovers the executable PIE base at runtime, binds a mode-`0600` Unix-domain socket, and accepts only bounded local commands.
 4. `PING` reports bridge health.
-5. `DISCOVER <target>` executes on the client's Qt event-loop thread, scans only readable/writable mappings of the current process for the profile's exact primary-vptr value, and validates candidate QObject-compatible instances by Qt class name.
-6. `ipc_client.py` provides a bounded JSON client for the socket.
+5. `DISCOVER <target>` executes on the client's Qt event-loop thread, scans only readable/writable mappings of the current process for the profile's exact primary-vptr value, applies an object-layout plausibility gate, and validates candidate QObject-compatible instances by Qt class name.
+6. `session-status` combines three structural discoveries into a deliberately non-terminal `in_game_candidate` result.
+7. `ipc_client.py` provides a bounded JSON client for the socket.
 
-The first committed profile is fenced to official Linux client `15.32.df7b29` with SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`. Its `player_protocol_handler` vptr offset is evidence for that hash only. A client update requires a new verified profile; do not copy the offset forward.
+The first committed profile is fenced to official Linux client `15.32.df7b29` with SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`. Its primary-vptr offsets were resolved from exact-binary ELF relocation/typeinfo evidence in `OTCLIENT-TIBIA-RE` run `31654434331`; they are evidence for that hash only. A client update requires a new verified profile. Never copy an offset forward without rediscovery.
+
+Current profiled targets are:
+
+| Target | Primary vptr offset | Expected Qt class |
+|---|---:|---|
+| `player_protocol_handler` | `0x308a008` | `tibia::game::TPlayerProtocolMessageHandler` |
+| `worldmap_handler` | `0x30871d8` | `tibia::worldmap::TWorldmapProtocolMessageHandler` |
+| `gameserver_game_session` | `0x3078ba0` | `tibia::game::TGameserverGameSession` |
+| `player_data` | `0x308ca70` | `tibia::game::TPlayerData` |
+| `container_storage` | `0x308a1a0` | `tibia::container::TContainerStorage` |
+| `creature_storage` | `0x308d078` | `tibia::creatures::TCreatureStorage` |
+| `game_client` | `0x3076908` | `tibia::client::TGameClient` |
 
 ## Build
 
@@ -49,9 +62,18 @@ Networking/tunnelling remains owned by the caller/runtime task. The bridge does 
 ```sh
 python3 tools/tibia_runtime_bridge/ipc_client.py --socket /tmp/otclient-tibia-re.sock ping
 python3 tools/tibia_runtime_bridge/ipc_client.py --socket /tmp/otclient-tibia-re.sock discover player_protocol_handler
+python3 tools/tibia_runtime_bridge/ipc_client.py --socket /tmp/otclient-tibia-re.sock session-status
 ```
 
 `DISCOVER` returns counts and validated class names, not durable runtime addresses. A target may legitimately have zero hits while logged out or before its subsystem exists.
+
+`session-status` currently requires validated instances of all three:
+
+- `player_protocol_handler`;
+- `gameserver_game_session`;
+- `worldmap_handler`.
+
+If all are present it returns `in_game_candidate=true` with evidence level `DERIVED_UNTIL_LIVE_CORRELATION`. This is intentionally **not** the final `session.is_in_game()` contract. It may be promoted only after a current OTClient-owned live world session correlates these three markers with independently decoded Worldmap/protocol state and also proves their disappearance or replacement across logout/restart.
 
 ## Evidence boundary
 
@@ -60,13 +82,14 @@ Already proven by the programme's exact-client integration evidence:
 - a temporary preload helper can load into this exact client;
 - a helper worker can queue work onto the real Qt application thread;
 - the client remains alive during repeated queued scans;
-- QCoreApplication child traversal is insufficient for game-handler discovery.
+- QCoreApplication child traversal is insufficient for game-handler discovery;
+- exact-binary relocation/typeinfo analysis resolves the profiled primary vptrs listed above.
 
 This durable implementation adds exact-hash fencing, owner-only local IPC and profile-vptr discovery. It does **not** yet claim:
 
 - current `IN_GAME` status;
 - authoritative player position;
-- successful discovery of the player protocol handler in a live world session;
+- successful discovery of the player protocol handler in a current OTClient-owned live world session;
 - any gameplay write/action through the bridge;
 - compatibility with any client hash other than an explicitly validated profile.
 

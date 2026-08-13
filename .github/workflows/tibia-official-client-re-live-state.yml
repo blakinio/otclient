@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   inspect:
-    runs-on: [otclient, synology]
+    runs-on: ${{ fromJSON('["otclient", "synology"]') }}
     timeout-minutes: 10
     env:
       TRACK_ID: official-client-re

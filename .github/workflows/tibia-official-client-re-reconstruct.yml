@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   reconstruct:
-    runs-on: [otclient, synology]
+    runs-on: ${{ fromJSON('["otclient", "synology"]') }}
     timeout-minutes: 60
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state

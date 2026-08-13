@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   identity:
-    runs-on: [otclient, synology]
+    runs-on: ${{ fromJSON('["otclient", "synology"]') }}
     timeout-minutes: 15
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
@@ -71,7 +71,7 @@ jobs:
             printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:%s\n' \
               "$root/state/wgcf-profile.conf" "$TRACK_WARP_PORT" >wireproxy.conf
             chmod 600 wireproxy.conf
-            RUNNER_TRACKING_ID= OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
               nohup "$root/bin/wireproxy" -c "$root/state/wireproxy.conf" >"$root/wireproxy.log" 2>&1 </dev/null &
             pid=$!
             printf '%s\n' "$pid" >"$pid_file"

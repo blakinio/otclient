@@ -3,41 +3,39 @@ set -Eeuo pipefail
 set +x
 
 : "${RUNNER_NAME:?RUNNER_NAME is required}"
-: "${RUNNER_WORKSPACE:?RUNNER_WORKSPACE is required}"
 : "${TIBIA_TEST_EMAIL:?TIBIA_TEST_EMAIL is required}"
 : "${TIBIA_TEST_PASSWORD:?TIBIA_TEST_PASSWORD is required}"
 
 [[ "$RUNNER_NAME" == "synology-otclient-01" ]]
 command -v docker >/dev/null
 
-LAB_ROOT="${RUNNER_WORKSPACE}/_otclient-labs/tibia-global-login"
-STATE_ROOT="${LAB_ROOT}/state"
-RUNTIME_ROOT="${LAB_ROOT}/runtime"
-THINGS_ROOT="${STATE_ROOT}/things/1532"
 CONTAINER="otclient-tibia-global-login-lab"
+STATE_VOLUME="otclient-tibia-global-login-state"
+RUNTIME_VOLUME="otclient-tibia-global-login-runtime"
 IMAGE="ghcr.io/blakinio/otclient:latest"
 TASK="OTC-20260813-tibia-global-login-lab"
 ASSET_BASE="https://static.tibia.com/launcher/assets-current"
-LOGIN_URL="https://www.tibia.com/clientservices/loginservice.php"
-CLIENT_VERSION_NUMBER="1532"
 CLIENT_VERSION_STRING="15.32.df7b29"
 
-mkdir -p "$STATE_ROOT" "$RUNTIME_ROOT" "$THINGS_ROOT" "$STATE_ROOT/home"
-chmod 700 "$LAB_ROOT" "$STATE_ROOT" "$RUNTIME_ROOT" "$STATE_ROOT/home"
+for volume in "$STATE_VOLUME" "$RUNTIME_VOLUME"; do
+  docker volume inspect "$volume" >/dev/null
+  owner=$(docker volume inspect --format '{{ index .Labels "com.blakinio.owner" }}' "$volume")
+  task=$(docker volume inspect --format '{{ index .Labels "com.blakinio.task" }}' "$volume")
+  [[ "$owner" == "otclient" && "$task" == "$TASK" ]]
+done
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   timeout 240 docker pull "$IMAGE" >/dev/null
 fi
 
-# Materialize only the current catalog files required by OTClient. Nothing is uploaded.
 docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 docker run -d --name "$CONTAINER" --network bridge --user root \
   --label com.blakinio.owner=otclient \
   --label com.blakinio.repository=blakinio/otclient \
   --label com.blakinio.task="$TASK" \
   --label com.blakinio.purpose=tibia-global-login-lab \
-  --mount "type=bind,src=$STATE_ROOT,dst=/lab/state" \
-  --mount "type=bind,src=$RUNTIME_ROOT,dst=/lab/runtime" \
+  --mount "type=volume,src=$STATE_VOLUME,dst=/lab/state" \
+  --mount "type=volume,src=$RUNTIME_VOLUME,dst=/lab/runtime" \
   "$IMAGE" sleep infinity >/dev/null
 
 owner=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER")
@@ -55,6 +53,7 @@ docker exec "$CONTAINER" bash -lc '
   ! command -v tesseract >/dev/null 2>&1
 '
 
+# Fetch and verify only the current catalog files required by OTClient.
 docker exec -e ASSET_BASE="$ASSET_BASE" -i "$CONTAINER" python3 - <<'PY'
 import hashlib,json,lzma,os,pathlib,subprocess,tempfile,urllib.parse
 base=os.environ['ASSET_BASE'].rstrip('/')
@@ -105,11 +104,16 @@ print('LAB_ASSET_FILE_COUNT='+str(len(wanted)))
 print('LAB_ASSETS_READY=true')
 PY
 
-ASSET_VERSION=$(tr -d '\r\n ' < "$THINGS_ROOT/assets.json.sha256")
+ASSET_VERSION=$(docker exec "$CONTAINER" bash -lc "tr -d '\\r\\n ' </lab/state/things/1532/assets.json.sha256")
 [[ -n "$ASSET_VERSION" ]]
 
-cp init.lua "$RUNTIME_ROOT/init.lua"
-cat >>"$RUNTIME_ROOT/init.lua" <<'LUA'
+# Keep proprietary asset bytes transient in the lab container/volume only.
+docker exec "$CONTAINER" bash -lc 'rm -rf /otclient/data/things/1532 && mkdir -p /otclient/data/things/1532 && cp -a /lab/state/things/1532/. /otclient/data/things/1532/'
+
+docker cp init.lua "$CONTAINER:/lab/runtime/init.lua"
+docker exec "$CONTAINER" bash -lc 'cp /lab/runtime/init.lua /otclient/init.lua && chmod 600 /lab/runtime/init.lua'
+
+docker exec "$CONTAINER" bash -lc "cat >>/otclient/init.lua <<'LUA'
 if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
   if Services and Services.clientAssets then Services.clientAssets.enabled = false end
   if HTTP then HTTP.timeout = 20 end
@@ -136,16 +140,7 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     G.requestId=1
     g_game.setClientVersion(1532)
     g_game.setProtocolVersion(g_game.getClientProtocolVersion(1532))
-    local payload={
-      email=email,
-      password=password,
-      stayloggedin=false,
-      type='login',
-      clientversion=clientversion,
-      clienttype=2,
-      assetversion=assetversion,
-      devicecookie=''
-    }
+    local payload={email=email,password=password,stayloggedin=false,type='login',clientversion=clientversion,clienttype=2,assetversion=assetversion,devicecookie=''}
     email=nil; password=nil
     mark('HTTP_LOGIN_START=true')
     HTTP.postJSON('https://www.tibia.com/clientservices/loginservice.php', payload, function(response, err)
@@ -153,54 +148,21 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
       if err then mark('HTTP_TRANSPORT_ERROR=true'); return end
       if type(response)~='table' then mark('HTTP_RESPONSE_INVALID=true'); return end
       if response.errorCode and tonumber(response.errorCode)~=0 then mark('HTTP_LOGIN_REJECTED=true'); return end
-      if type(response.session)~='table' or type(response.playdata)~='table' or type(response.playdata.worlds)~='table' or type(response.playdata.characters)~='table' then
-        mark('HTTP_RESPONSE_INCOMPLETE=true'); return
-      end
+      if type(response.session)~='table' or type(response.playdata)~='table' or type(response.playdata.worlds)~='table' or type(response.playdata.characters)~='table' then mark('HTTP_RESPONSE_INCOMPLETE=true'); return end
       mark('HTTP_LOGIN_SUCCESS=true')
       EnterGame.loginSuccess(1, json.encode(response.session), json.encode(response.playdata.worlds), json.encode(response.playdata.characters))
       response=nil
       scheduleEvent(function()
-        if CharacterList and CharacterList.doLogin then
-          mark('CHARACTER_LOGIN_ATTEMPT=true')
-          CharacterList.doLogin()
-        else
-          mark('CHARACTER_LIST_UNAVAILABLE=true')
-        end
+        if CharacterList and CharacterList.doLogin then mark('CHARACTER_LOGIN_ATTEMPT=true'); CharacterList.doLogin()
+        else mark('CHARACTER_LIST_UNAVAILABLE=true') end
       end,1000)
     end)
   end,1500)
-  scheduleEvent(function()
-    if not g_game.isOnline() then mark('PROBE_TIMEOUT=true'); g_app.exit() end
-  end,70000)
+  scheduleEvent(function() if not g_game.isOnline() then mark('PROBE_TIMEOUT=true'); g_app.exit() end end,70000)
 end
-LUA
-chmod 600 "$RUNTIME_ROOT/init.lua"
+LUA"
 
-docker rm -f "$CONTAINER" >/dev/null
-docker run -d --name "$CONTAINER" --network bridge --user root \
-  --label com.blakinio.owner=otclient \
-  --label com.blakinio.repository=blakinio/otclient \
-  --label com.blakinio.task="$TASK" \
-  --label com.blakinio.purpose=tibia-global-login-lab \
-  --mount "type=bind,src=$STATE_ROOT,dst=/lab/state" \
-  --mount "type=bind,src=$RUNTIME_ROOT,dst=/lab/runtime" \
-  --mount "type=bind,src=$RUNTIME_ROOT/init.lua,dst=/otclient/init.lua,readonly" \
-  --mount "type=bind,src=$THINGS_ROOT,dst=/otclient/data/things/1532,readonly" \
-  "$IMAGE" sleep infinity >/dev/null
-
-docker exec "$CONTAINER" bash -lc '
-  export DEBIAN_FRONTEND=noninteractive
-  missing=0
-  for cmd in Xvfb xdpyinfo pgrep ss; do command -v "$cmd" >/dev/null 2>&1 || missing=1; done
-  if [[ "$missing" -eq 1 ]]; then
-    apt-get update -qq
-    apt-get install -y --no-install-recommends xvfb x11-utils procps iproute2 ca-certificates >/dev/null
-  fi
-  ! command -v tesseract >/dev/null 2>&1
-'
-
-: >"$RUNTIME_ROOT/otclient.stdout.log"
-docker exec "$CONTAINER" bash -lc 'nohup Xvfb :100 -screen 0 1280x800x24 -nolisten tcp >/lab/runtime/xvfb.log 2>&1 </dev/null &'
+docker exec "$CONTAINER" bash -lc ': >/lab/runtime/otclient.stdout.log; nohup Xvfb :100 -screen 0 1280x800x24 -nolisten tcp >/lab/runtime/xvfb.log 2>&1 </dev/null &'
 for _ in $(seq 1 30); do docker exec "$CONTAINER" xdpyinfo -display :100 >/dev/null 2>&1 && break; sleep 1; done
 docker exec "$CONTAINER" xdpyinfo -display :100 >/dev/null
 
@@ -217,29 +179,29 @@ docker exec -d \
 unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD ASSET_VERSION
 
 for _ in $(seq 1 160); do
-  grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' "$RUNTIME_ROOT/otclient.stdout.log" && break
-  grep -q '\[TIBIA_GLOBAL_LAB\] PROBE_TIMEOUT=true' "$RUNTIME_ROOT/otclient.stdout.log" && break
-  grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_REJECTED=true' "$RUNTIME_ROOT/otclient.stdout.log" && break
-  grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_TRANSPORT_ERROR=true' "$RUNTIME_ROOT/otclient.stdout.log" && break
+  docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log && break
+  docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] PROBE_TIMEOUT=true' /lab/runtime/otclient.stdout.log && break
+  docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_REJECTED=true' /lab/runtime/otclient.stdout.log && break
+  docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_TRANSPORT_ERROR=true' /lab/runtime/otclient.stdout.log && break
   docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' >/dev/null 2>&1 || break
   sleep 0.5
 done
 
-grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z_]*=true' "$RUNTIME_ROOT/otclient.stdout.log" | sort -u || true
+docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z_]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
 
-if grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' "$RUNTIME_ROOT/otclient.stdout.log"; then
+if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log; then
   echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=true
   exit 0
 fi
 
 echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=false
-if grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_SUCCESS=true' "$RUNTIME_ROOT/otclient.stdout.log"; then
+if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_SUCCESS=true' /lab/runtime/otclient.stdout.log; then
   echo FAILURE_STAGE=after_http_login_before_game_start
-elif grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_REJECTED=true' "$RUNTIME_ROOT/otclient.stdout.log"; then
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_REJECTED=true' /lab/runtime/otclient.stdout.log; then
   echo FAILURE_STAGE=http_login_rejected
-elif grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_TRANSPORT_ERROR=true' "$RUNTIME_ROOT/otclient.stdout.log"; then
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_TRANSPORT_ERROR=true' /lab/runtime/otclient.stdout.log; then
   echo FAILURE_STAGE=http_transport
-elif grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_START=true' "$RUNTIME_ROOT/otclient.stdout.log"; then
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_START=true' /lab/runtime/otclient.stdout.log; then
   echo FAILURE_STAGE=http_login_no_callback
 else
   echo FAILURE_STAGE=before_http_login

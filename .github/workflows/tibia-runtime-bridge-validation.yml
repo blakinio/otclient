@@ -1,0 +1,103 @@
+name: Tibia runtime bridge validation
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-runtime-bridge-validation.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-bridge-validation-home
+      PACKAGE_BASE: https://static.tibia.com/launcher/tibiaclient-linux-current
+      ASSET_BASE: https://static.tibia.com/launcher/assets-current
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Checkout runtime evidence branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact durable bridge branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: feat/OTC-20260813-tibia-runtime-bridge
+          path: bridge-src
+          persist-credentials: false
+
+      - name: Focused Python tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=bridge-src python3 bridge-src/tests/tools/tibia_runtime_bridge/test_bridge.py
+          python3 -m py_compile bridge-src/tools/tibia_runtime_bridge/launcher.py bridge-src/tools/tibia_runtime_bridge/ipc_client.py
+
+      - name: Standalone Qt bridge build with warnings denied
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config qt6-base-dev python3-yaml socat
+          cmake -S bridge-src/tools/tibia_runtime_bridge -B /tmp/tibia-bridge-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/tibia-bridge-build --parallel 2
+          test -s /tmp/tibia-bridge-build/otclient-tibia-runtime-bridge.so
+          echo BRIDGE_STANDALONE_BUILD_PASS=true
+
+      - name: Reconstruct exact runtime through task WARP path
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import pathlib,yaml
+          doc=yaml.safe_load(pathlib.Path('.github/workflows/tibia-hosted-complete-assets-no-ocr-login-v4.yml').read_text())
+          steps=doc['jobs']['world-entry']['steps'];out=pathlib.Path('/tmp/v4');out.mkdir(parents=True,exist_ok=True)
+          wanted={'Install strict no-OCR runtime':'01.sh','Establish pinned userspace WARP':'02.sh','Reconstruct official package and preserve packed runtime assets':'03.sh'}
+          seen=set()
+          for step in steps:
+            if step.get('name') in wanted:
+              p=out/wanted[step['name']];p.write_text(step['run']);p.chmod(0o700);seen.add(step['name'])
+          if set(wanted)-seen:raise SystemExit('missing runtime bootstrap steps')
+          PY
+          for s in 01.sh 02.sh 03.sh;do /usr/bin/bash --noprofile --norc -e -o pipefail "/tmp/v4/$s";done
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo EXACT_BRIDGE_VALIDATION_RUNTIME_READY=true
+
+      - name: Exact-client no-credential bridge E2E
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/tibia-runtime/xvfb-bridge.log 2>&1 </dev/null &
+          for _ in $(seq 1 30);do xdpyinfo -display :99 >/dev/null 2>&1&&break;sleep 1;done
+          xdpyinfo -display :99 >/dev/null
+          pkg="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia";client="$pkg/bin/client";cd "$pkg"
+          socket=/tmp/tibia-runtime/durable-bridge.sock
+          rm -f "$socket" /tmp/tibia-runtime/bridge-launch.log
+          lvp=$(find /usr/share/vulkan/icd.d -maxdepth 1 -type f -name 'lvp_icd*.json' -print -quit);[[ -f "$lvp" ]]
+          nohup env VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp" LIBGL_ALWAYS_SOFTWARE=1 \
+            proxychains4 -f /tmp/tibia-runtime/proxychains.conf \
+            python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/launcher.py" \
+              --profile "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json" \
+              --helper /tmp/tibia-bridge-build/otclient-tibia-runtime-bridge.so \
+              --socket "$socket" \
+              "$client" >/tmp/tibia-runtime/bridge-launch.log 2>&1 </dev/null &
+          launcher_pid=$!;echo "$launcher_pid">/tmp/tibia-runtime/bridge-launcher-pid
+          for _ in $(seq 1 160);do [[ -S "$socket" ]]&&break;sleep 0.1;done
+          [[ -S "$socket" ]]
+          mode=$(stat -c '%a' "$socket");echo BRIDGE_SOCKET_MODE=$mode;[[ "$mode" == 600 ]]
+          ping=$(python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/ipc_client.py" --socket "$socket" ping)
+          echo BRIDGE_PING_JSON_BEGIN;printf '%s\n' "$ping";echo BRIDGE_PING_JSON_END
+          printf '%s' "$ping"|python3 -c 'import json,sys;d=json.load(sys.stdin);assert d["ok"] is True and d["main_base_resolved"] is True'
+          discovery=$(python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/ipc_client.py" --socket "$socket" discover player_protocol_handler)
+          echo BRIDGE_DISCOVERY_JSON_BEGIN;printf '%s\n' "$discovery";echo BRIDGE_DISCOVERY_JSON_END
+          printf '%s' "$discovery"|python3 -c 'import json,sys;d=json.load(sys.stdin);assert d["ok"] is True and d["target"]=="player_protocol_handler" and isinstance(d["vptr_hits"],int) and isinstance(d["validated_hits"],int)'
+          client_pid=$(pgrep -x client|head -n1);[[ -n "$client_pid" ]];kill -0 "$client_pid"
+          echo EXACT_CLIENT_BRIDGE_E2E_PASS=true
+          echo BRIDGE_PLAYER_PROTOCOL_VALIDATED_HITS=$(printf '%s' "$discovery"|python3 -c 'import json,sys;print(json.load(sys.stdin)["validated_hits"])')

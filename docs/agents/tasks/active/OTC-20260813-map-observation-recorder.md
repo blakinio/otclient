@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-map-observation-recorder
-status: implementing
+status: waiting
 agent: Codex
 project_lane: otclient
 lane: otclient
@@ -12,7 +12,7 @@ branch: feat/OTC-20260813-map-observation-recorder
 base_branch: main
 start_sha: 005158b5b9bf25fe77bd5fc10813a6388a072836
 created: 2026-08-13T21:14:46Z
-updated: 2026-08-13T21:47:00Z
+updated: 2026-08-13T21:56:00Z
 risk: medium
 related_pr: 292
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
@@ -100,11 +100,11 @@ map-observation-recorder-output: /absolute/local/path/observations.jsonl
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T21:47:00Z
-head: c171a0a5bc5afaf9021cbfe2f671d86cd78aa6c3
+updated_at: 2026-08-13T21:56:00Z
+head: 373297e0516f1083a8dbbcb7a024ecaa64e90fda
 branch: feat/OTC-20260813-map-observation-recorder
 pr: 292
-status: validating
+status: waiting
 context_routes:
   - P1 local recorder implementation
 owned_paths:
@@ -122,6 +122,8 @@ proven:
   - The repository provides nlohmann::ordered_json and an existing map unit-test target with tile builders.
   - PR #292 is a draft P1 implementation PR, based on the merged P0 head.
   - The configured Windows test preset currently fails while vcpkg builds OpenAL before any P1 translation unit is compiled: OpenAL 1.25.1 emits C3889 under MSVC 14.52.
+  - The configured Linux test preset in Ubuntu WSL fails while vcpkg builds ALSA before any P1 translation unit is compiled because `autoconf`, `autoconf-archive`, `automake`, and `libtoolize` are absent.
+  - CI run 31747079596 passed all required jobs on 373297e0516f1083a8dbbcb7a024ecaa64e90fda, but its `Build - Windows` job was intentionally skipped; it is not C++ build evidence.
 derived:
   - The recorder can attach after existing decoded-state mutations without reparsing packet contents.
   - A bounded deferred JSONL queue avoids filesystem writes in the parser mutation handlers.
@@ -153,7 +155,15 @@ validation:
   - command: `cmake --preset windows-tests && cmake --build --preset windows-tests --target otclient_tile_order_tests && ctest --preset windows-tests -R MapObservationRecorder`
     result: BLOCKED
     evidence: vcpkg OpenAL 1.25.1 C3889 under MSVC 14.52, before configuration generated the target.
+  - command: `VCPKG_ROOT=/home/mole/vcpkg cmake --preset linux-tests` in Ubuntu WSL
+    result: BLOCKED
+    evidence: vcpkg ALSA requires missing autoconf, autoconf-archive, automake, and libtoolize before configuration generated the target.
+  - command: GitHub Actions CI run 31747079596 on 373297e0516f1083a8dbbcb7a024ecaa64e90fda
+    result: PASS_WITH_LIMITATION
+    evidence: required static/syntax jobs passed; `Build - Windows` was skipped.
 blockers:
   - The required Windows test preset cannot currently compile the repository's OpenAL dependency with the sole installed MSVC toolchain.
-next_action: Run the configured `linux-tests` preset in the available Ubuntu WSL environment, using its native vcpkg installation, then inspect the focused recorder result.
+  - The available Ubuntu WSL environment lacks the system tools required for the configured Linux test preset's ALSA dependency.
+  - Native-Linux Track B runtime E2E remains unavailable because PR #284 owns the only known runtime namespace.
+next_action: Re-run the focused P1 target with a supported configured toolchain after the repository owner provides a non-conflicting native test environment with its declared dependencies installed.
 ```

@@ -13,6 +13,7 @@ runtime_platform: native_linux_only
 owned_paths:
   - .github/workflows/tibia-official-client-re-*.yml
   - .github/scripts/tibia-official-client-re-*
+  - tests/tools/test_tibia_official_client_re_*.py
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/**
 modules_touched:
@@ -82,6 +83,7 @@ context_routes:
 owned_paths:
   - .github/workflows/tibia-official-client-re-*.yml
   - .github/scripts/tibia-official-client-re-*
+  - tests/tools/test_tibia_official_client_re_*.py
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/**
 proven:
@@ -105,10 +107,12 @@ first_failure:
 rejected_hypotheses:
   - continue mutating closed PR 48 as active ownership: rejected by live PR state and current main governance
 changed_paths:
+  - .github/scripts/tibia-official-client-re-reconstruct.py
   - .github/workflows/tibia-official-client-re-identity.yml
   - .github/workflows/tibia-official-client-re-live-state.yml
   - .github/workflows/tibia-official-client-re-toolroot.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
+  - tests/tools/test_tibia_official_client_re_reconstruct.py
 validation:
   - command: live main governance and PR/runner preflight
     result: PASS
@@ -119,6 +123,9 @@ validation:
   - command: Track A official Linux client identity run 31700967902 job 94449744345
     result: PASS
     evidence: isolated WARP ready; current client size 51965216 and SHA e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  - command: python -m unittest tests.tools.test_tibia_official_client_re_reconstruct
+    result: PASS
+    evidence: four path/hash-policy tests pass
 blockers:
   - runner image lacks file gdb proxychains4 socat xdotool and Xvfb for launch/instrumentation phases
 next_action: prepare and validate an unprivileged Track A toolroot for the six missing binaries without altering the shared runner image or Track B runtime

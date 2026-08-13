@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T12:28:00+02:00
+updated: 2026-08-13T12:36:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -193,6 +193,29 @@ now terminates only its prior `Xvfb :100`, removes only that display's stale
 lock/socket, starts a fresh server, and emits `LAB_XVFB_READY` plus
 `FAILURE_STAGE=xvfb_not_ready` on bounded readiness failure.
 
+Run `31690800069`, job `94417408594`, exact head
+`f3b261e53540028783cd8fe8e3aca006897a16e0`, proved the Xvfb repair and OTClient
+startup. The first downstream boundary was the missing `GameSessionKey` feature:
+
+```text
+LAB_XVFB_READY=true
+LAB_OTCLIENT_PROCESS_STARTED=true
+APPEARANCES_LOAD_OK=true
+HANDOFF_CONSUMED=true
+SESSION_KEY_FEATURE_MISSING=true
+LAB_OTCLIENT_DIRECT_TCP_COUNT=0
+FAILURE_STAGE=session_key_feature_missing
+```
+
+`modules/game_features/features.lua` declares `GameSessionKey` for every client
+version at or above 1074, so the isolated 15.32 wrapper now restores that
+version-derived feature when the normal initialization sequence leaves it
+unset. The override is lab-only and emits
+`SESSION_KEY_FEATURE_LAB_OVERRIDE=true`; production feature defaults remain
+unchanged. Fast Checks also identified the repository validator's missing
+knowledge of the already-working `otclient` and `synology` self-hosted runner
+labels, now declared in `.github/actionlint.yaml`.
+
 # Evidence classification
 
 PROVEN:
@@ -241,4 +264,4 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E on the Xvfb-reset head. If the appearances-only login reaches `SESSION_KEY_FEATURE`, `CHARACTER_LOGIN_ATTEMPT`, game TCP or any `GAME_*` callback, continue from the first exact downstream marker. If Xvfb still fails, inspect only `/lab/runtime/xvfb.log` and repair that deterministic lab boundary; do not re-open HTTP authentication or the proven appearances path.
+Run the canonical E2E with the lab-only session-key feature restoration. Continue from the first exact game TCP or `GAME_*` callback, or persist the exact protocol boundary if the official 15.32 game server rejects the current login packet.

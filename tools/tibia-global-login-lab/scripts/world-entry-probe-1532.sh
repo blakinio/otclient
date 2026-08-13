@@ -40,6 +40,10 @@ new_version = (
     "    mark('CLIENT_VERSION_LIMIT_OVERRIDE=true')\n"
     '    g_game.setClientVersion(1532)\n'
     "    mark('CLIENT_VERSION_ACCEPTED=true')\n"
+    "    if not g_game.getFeature(GameSessionKey) then\n"
+    "      g_game.enableFeature(GameSessionKey)\n"
+    "      mark('SESSION_KEY_FEATURE_LAB_OVERRIDE=true')\n"
+    "    end\n"
     "    local thingsPath=resolvepath('/data/things/1532/')\n"
     "    local appearancesCall,appearancesResult=pcall(function() return g_things.loadAppearances(thingsPath) end)\n"
     "    if appearancesCall and appearancesResult then mark('APPEARANCES_LOAD_OK=true') else mark('APPEARANCES_LOAD_FAILED=true') end\n"

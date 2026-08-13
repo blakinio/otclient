@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T13:18:00+02:00
+updated: 2026-08-13T13:22:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -269,6 +269,13 @@ loading. The lab now forces a feature rebuild through `0 -> 1532` after
 disconnecting only the things autoloader and records the critical login packet,
 challenge, checksum, authenticator, and pending-login flags.
 
+Run `31694372776`, job `94428653933`, exact head
+`0cdbcf127cecb0237bd329b69e5e7bbd09f689cf`, still sent client bytes and received
+no server bytes; none of the critical normal feature markers appeared. The next
+bounded falsification explicitly enables only `GameChallengeOnLogin`: server
+bytes would prove challenge-first behavior, while no bytes in either direction
+would reject that handshake variant for this endpoint.
+
 # Evidence classification
 
 PROVEN:
@@ -317,4 +324,4 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with a deterministic full 15.32 feature rebuild. Use critical feature markers and byte direction to distinguish the expected challenge path from an invalid modern login packet, then continue from the first callback or exact handshake boundary.
+Run the canonical E2E with the isolated challenge-first override and direction-only markers. Keep the override only if server bytes prove the handshake; otherwise remove it and persist the rejected hypothesis.

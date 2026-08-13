@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-tibia-runtime-bridge
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: otclient
@@ -10,9 +10,9 @@ phase: stable-bridge-v1
 branch: feat/OTC-20260813-tibia-runtime-bridge
 base_branch: main
 created: 2026-08-13T02:20:00+02:00
-updated: 2026-08-13T02:20:00+02:00
+updated: 2026-08-13T08:18:00+02:00
 risk: medium
-related_pr: none
+related_pr: "#283"
 owned_paths:
   - docs/agents/tasks/active/OTC-20260813-tibia-runtime-bridge.md
   - tools/tibia_runtime_bridge/**
@@ -20,7 +20,7 @@ owned_paths:
 reuses:
   - PR #48 exact-client runtime evidence as read-only producer evidence
   - OTCLIENT-TIBIA-RE Phase 9 preload/Qt proof from run 31653375069 job 94302324521
-  - same-hash TPlayerProtocolMessageHandler vptr lead 0x308a008 from read-only Oteryn evidence
+  - relocation-aware exact-binary vptr proof from run 31654434331 job 94305639119
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -43,66 +43,138 @@ feature_scope:
 
 Implement the smallest reusable non-GDB runtime bridge for the exact official Linux Tibia client: an `LD_PRELOAD` helper that executes work on the client's Qt event loop, exposes a local Unix-domain IPC endpoint, dynamically computes the executable PIE base, and discovers semantically profiled runtime objects without permanent modification of CipSoft files.
 
-# Scope
+# Current implementation
 
-The first durable slice exposes only read/health operations:
+The durable bridge is implemented in PR #283 and remains read-only/fail-closed:
 
-- `PING` / health;
-- exact executable identity fencing performed by the launcher;
-- PIE-base discovery inside the client process;
-- profile-driven vptr target resolution;
-- current-process readable/writable memory scan;
-- Qt metaobject class validation for discovered QObject-compatible targets;
-- `DISCOVER player_protocol_handler` over local Unix-domain IPC.
+- exact SHA-256/version profile fencing in `launcher.py`;
+- `LD_PRELOAD` helper with runtime PIE-base discovery;
+- owner-only Unix socket (`0600`);
+- bounded JSON IPC client;
+- `PING` and `DISCOVER <target>` operations;
+- Qt-sensitive discovery marshalled to the real Qt event-loop thread;
+- current-process readable/writable memory scan for exact profiled vptr values;
+- Qt class-name validation for QObject-compatible hits;
+- derived `session-status` candidate requiring `player_protocol_handler`, `gameserver_game_session`, and `worldmap_handler` simultaneously;
+- relocation-aware ELF resolver (`resolver.py`) to recover primary vptrs for a new exact binary instead of copying old offsets forward.
 
-No gameplay action is part of this first bridge slice. Live write/action operations are added only after a current OTClient-owned `IN_GAME` session and authoritative before/after state proof exist.
+No gameplay write/action command is part of this bridge slice. Write operations stay gated on a current OTClient-owned structural `IN_GAME` session and authoritative before/after state proof.
+
+# Exact profile evidence — PROVEN
+
+Relocation-aware run `31654434331`, job `94305639119`, passed and recovered primary vptrs for the exact SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`:
+
+```text
+TPlayerProtocolMessageHandler  0x308a008
+TWorldmapProtocolMessageHandler 0x30871d8
+TGameserverGameSession         0x3078ba0
+TGameSessionBase               0x3084648
+IGameSession                   0x30841c0
+TPlayerData                    0x308ca70
+TContainerStorage              0x308a1a0
+TCreatureStorage               0x308d078
+TGameClient                    0x3076908
+```
+
+The committed profile currently exposes seven resolver targets: player protocol handler, worldmap handler, gameserver game session, player data, container storage, creature storage, and game client. Every target is fenced to the exact client hash and cites run `31654434331` as evidence.
+
+# Integration validation — PROVEN for head 39ff79ac44a0a1010b4bcc8b8e3617525353df7e
+
+Run `31654701845`, job `94306484551`, completed successfully on exact bridge head `39ff79ac44a0a1010b4bcc8b8e3617525353df7e`:
+
+```text
+EXACT_BRIDGE_HEAD_VERIFIED=true
+11 focused tests: PASS
+BRIDGE_STANDALONE_BUILD_PASS=true
+COMPLETE_OFFICIAL_RUNTIME_LAYOUT_VERIFIED=true
+EXACT_BRIDGE_VALIDATION_RUNTIME_READY=true
+BRIDGE_SOCKET_MODE=600
+EXACT_CLIENT_BRIDGE_E2E_PASS=true
+```
+
+The exact official client remained alive, `PING` resolved the main PIE base, and all seven `DISCOVER` queries returned structurally valid JSON. In the logged-out no-credential state the three session markers correctly returned zero hits and `session-status` returned:
+
+```yaml
+in_game_candidate: false
+evidence_level: DERIVED_UNTIL_LIVE_CORRELATION
+```
+
+This is positive fail-closed behavior, not proof that the markers will be present in a live world session.
+
+# Current head and validation gap
+
+```yaml
+pr: 283
+branch: feat/OTC-20260813-tibia-runtime-bridge
+current_head: 89e13819e6f53026b831b7e8e4c8fab228d1626c
+state: draft_open_mergeable
+```
+
+The current head is newer than the fully successful integration head because it adds the durable relocation resolver and additional tests. Therefore a final exact-head validation is still required before merge/completion claims.
 
 # Acceptance inventory
 
-- [ ] Launcher refuses a client whose SHA-256 differs from the selected profile.
-- [ ] Profile includes exact client version/hash and semantic target metadata; raw offsets are version-fenced rather than treated as permanent constants.
-- [ ] Helper loads without permanently modifying the installed client.
-- [ ] Helper discovers the main PIE base dynamically.
-- [ ] IPC server binds only a local Unix socket with owner-only permissions.
-- [ ] IPC `PING` works independently of game state.
-- [ ] `DISCOVER player_protocol_handler` scans only readable/writable current-process mappings and validates an exact profiled vptr plus expected Qt class name when an object is present.
-- [ ] Qt-sensitive discovery executes on the real client event-loop thread via queued/blocking invocation.
-- [ ] Unsupported commands/targets fail closed.
-- [ ] Unit tests cover profile parsing/hash fencing and IPC client framing.
-- [ ] Exact-client integration proves helper load, local IPC and Qt-thread discovery path without credentials.
-- [ ] No Codex, owner-funded AI/API quota, credentials or proprietary client bytes are committed.
+- [x] Launcher rejects unprofiled/mismatched client identity by exact SHA-256.
+- [x] Profile carries exact client version/hash and version-fenced semantic targets.
+- [x] Helper loads without permanent CipSoft file modification.
+- [x] Helper resolves main PIE base dynamically.
+- [x] IPC binds an owner-only Unix socket (`0600`).
+- [x] IPC `PING` works independently of game state.
+- [x] `DISCOVER` scans only current-process readable/writable mappings and validates expected Qt class names when hits exist.
+- [x] Qt-sensitive discovery runs on the real Qt event-loop thread.
+- [x] Unsupported commands/targets fail closed.
+- [x] Focused tests cover profile/hash fencing, IPC framing, and session-status logic.
+- [x] Exact-client no-credential E2E proved helper load and IPC on head `39ff79ac...`.
+- [x] Relocation-aware primary-vptr recovery is implemented and backed by exact-binary evidence.
+- [ ] Repeat focused/build/exact-client validation on current head `89e13819...`.
+- [ ] Correlate `session-status` markers with a current OTClient-owned structural live world session.
+- [ ] Prove authoritative player position and one reversible before/after action before adding write APIs.
 
 # Evidence boundary
 
-## PROVEN producer evidence
+## PROVEN
 
-- exact client `15.32.df7b29`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`;
-- temporary preload proof run `31653375069`, job `94302324521`: constructor loaded, `QCoreApplication` found, `QMetaObject::invokeMethod(... Qt::QueuedConnection)` succeeded, eight real Qt-loop scans executed and the client remained alive;
-- QCoreApplication child traversal found no target Tibia handler objects;
-- same-hash read-only evidence identifies a live `TPlayerProtocolMessageHandler` primary vptr at `PIE + 0x308a008`.
+- exact client `15.32.df7b29`, historical researched SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`;
+- temporary preload proof run `31653375069`, job `94302324521` established real Qt event-loop execution without credentials;
+- QCoreApplication child traversal is insufficient for handler discovery;
+- relocation-aware resolver recovered nine exact-binary primary vptrs;
+- durable bridge head `39ff79ac...` passed focused tests, standalone Qt build and exact-client no-credential E2E;
+- logged-out session markers resolve to zero hits and fail closed.
 
-## UNKNOWN until this task proves it
+## DERIVED
 
-- whether profile-vptr memory scanning finds a target in logged-out state;
-- whether a discovered vptr hit is QObject-compatible and reports the expected class;
-- current in-game target object lifecycle/reacquisition after logout/restart;
-- all write/action bridge semantics.
+- `session-status` is a structural candidate only; it becomes authoritative `IN_GAME` evidence only after live correlation with independently proven decoded world state.
 
-# Checkpoint
+## UNKNOWN
+
+- current upstream `tibiaclient-linux-current` SHA after the later failed identity-download probe;
+- live-session marker lifecycle and reacquisition after login/logout/restart;
+- authoritative player position through the bridge;
+- all gameplay write/action semantics.
+
+# Durable checkpoint
 
 ```yaml
-checkpoint_version: 1
-updated_at: 2026-08-13T02:20:00+02:00
-head: 05450748daca8344d9555638b638e98b6dc3abc7
+checkpoint_version: 2
+updated_at: 2026-08-13T08:18:00+02:00
 branch: feat/OTC-20260813-tibia-runtime-bridge
-pr: none
-status: implementing
+pr: 283
+head: 89e13819e6f53026b831b7e8e4c8fab228d1626c
+status: validating
 proven:
-  - no overlapping open runtime-bridge PR was found before branch creation
-  - branch was created from current main 05450748daca8344d9555638b638e98b6dc3abc7
-  - temporary Phase 9 preload proof established real Qt event-loop execution
+  - durable read-only LD_PRELOAD/Qt/Unix-IPC bridge implemented
+  - exact-hash fencing and dynamic PIE-base discovery implemented
+  - relocation-aware vptr resolver proven on exact researched binary
+  - seven exact-profile discovery targets persisted
+  - head 39ff79ac passed 11 tests, standalone Qt build, complete runtime bootstrap and exact-client no-credential E2E
+  - logged-out session-status fails closed with zero marker hits
 unknown:
-  - implementation and validation result
+  - current-head 89e13819 exact validation result
+  - current upstream official-client hash
+  - live structural session marker correlation
+  - authoritative position and before/after actions
 blockers: []
-next_action: implement profile-fenced launcher, preload helper, IPC client and focused tests, then validate with synthetic tests and exact-client no-credential integration
+next_action: validate exact current head 89e13819; independently restore a structurally proven live world session, correlate session-status, then prove authoritative position and one reversible movement transition before any write API is added
 ```
+
+No Codex or owner-funded AI/API quota was used.

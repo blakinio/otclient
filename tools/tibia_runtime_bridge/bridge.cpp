@@ -145,6 +145,13 @@ std::vector<Region> readWritableRegions()
     return regions;
 }
 
+bool inRegion(const std::vector<Region>& regions, const std::uintptr_t address)
+{
+    return std::any_of(regions.begin(), regions.end(), [&](const Region& region) {
+        return region.begin <= address && address < region.end;
+    });
+}
+
 std::vector<std::uintptr_t> findVptrHits(const std::uintptr_t expectedVptr)
 {
     constexpr std::size_t chunkSize = 1024 * 1024;
@@ -153,9 +160,10 @@ std::vector<std::uintptr_t> findVptrHits(const std::uintptr_t expectedVptr)
         return {};
     }
 
+    const auto regions = readWritableRegions();
     std::vector<std::uintptr_t> hits;
-    std::vector<unsigned char> buffer(chunkSize + sizeof(std::uintptr_t));
-    for (const auto region : readWritableRegions()) {
+    std::vector<unsigned char> buffer(chunkSize);
+    for (const auto region : regions) {
         std::uintptr_t cursor = region.begin;
         while (cursor < region.end) {
             const auto remaining = static_cast<std::size_t>(region.end - cursor);
@@ -166,12 +174,18 @@ std::vector<std::uintptr_t> findVptrHits(const std::uintptr_t expectedVptr)
                 continue;
             }
             const auto usable = static_cast<std::size_t>(count);
-            for (std::size_t offset = 0; offset + sizeof(std::uintptr_t) <= usable; offset += alignof(std::uintptr_t)) {
+            for (std::size_t offset = 0; offset + 2 * sizeof(std::uintptr_t) <= usable; offset += alignof(std::uintptr_t)) {
                 std::uintptr_t value{};
+                std::uintptr_t privateData{};
                 std::memcpy(&value, buffer.data() + offset, sizeof(value));
-                if (value == expectedVptr) {
-                    hits.push_back(cursor + offset);
+                if (value != expectedVptr) {
+                    continue;
                 }
+                std::memcpy(&privateData, buffer.data() + offset + sizeof(value), sizeof(privateData));
+                if (privateData == 0 || !inRegion(regions, privateData)) {
+                    continue;
+                }
+                hits.push_back(cursor + offset);
             }
             cursor += wanted;
         }
@@ -272,7 +286,9 @@ void ipcServer()
         return;
     }
     g_socketPath = socketEnv;
-    if (g_socketPath.size() >= sizeof(sockaddr_un::sun_path)) {
+
+    sockaddr_un address{};
+    if (g_socketPath.size() >= sizeof(address.sun_path)) {
         return;
     }
 
@@ -282,7 +298,6 @@ void ipcServer()
     if (server < 0) {
         return;
     }
-    sockaddr_un address{};
     address.sun_family = AF_UNIX;
     std::strncpy(address.sun_path, g_socketPath.c_str(), sizeof(address.sun_path) - 1);
     if (::bind(server, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||

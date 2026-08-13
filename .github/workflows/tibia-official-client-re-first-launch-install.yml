@@ -1,0 +1,130 @@
+name: Track A install current official client via first-launch
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-first-launch-install.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Run official launcher first-launch install
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$(id -u)" == 0 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"; home="$state/home"; runtime="$state/runtime"
+
+          warp_pid="$(tr -cd '0-9' <"$runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          xvfb_pid="$(tr -cd '0-9' <"$runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
+          kill -0 "$xvfb_pid"
+
+          owned=0
+          for proc in /proc/[0-9]*; do
+            [[ -r "$proc/environ" && -e "$proc/exe" ]] || continue
+            grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"; base="$(basename "$exe" 2>/dev/null || true)"
+            case "$base" in Tibia|client) echo "TRACK_A_PREINSTALL_PROCESS=$proc|$exe"; owned=$((owned+1));; esac
+          done
+          echo TRACK_A_PREINSTALL_PROCESS_COUNT="$owned"
+          [[ "$owned" == 0 ]]
+
+          running="$home/.local/share/CipSoft GmbH/Tibia/.running"
+          if [[ -f "$running" ]]; then
+            python3 - "$running" <<'PY'
+          import fcntl,os,sys
+          fd=os.open(sys.argv[1],os.O_RDWR)
+          try:
+              try: fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+              except BlockingIOError: raise SystemExit('active .running lock')
+              fcntl.flock(fd,fcntl.LOCK_UN)
+          finally: os.close(fd)
+          PY
+            rm -- "$running"
+            echo TRACK_A_PREINSTALL_STALE_RUNNING_REMOVED=true
+          fi
+
+          work="$state/first-launch/run-$GITHUB_RUN_ID"; unpack="$work/unpacked"; mkdir -p "$unpack"; chmod 700 "$work"
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          with tarfile.open(sys.argv[1],'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(sys.argv[2],filter='data')
+              except TypeError:h.extractall(sys.argv[2])
+          PY
+          launcher="$unpack/Tibia/Tibia"; [[ -x "$launcher" ]]
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"; [[ -n "$proxy_lib" ]]
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"; tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          workdir="$(dirname "$launcher")"; log="$work/launcher.log"
+          child="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          before="$(sha256sum "$child" 2>/dev/null | awk '{print $1}' || true)"
+          echo TRACK_A_FIRST_LAUNCH_SHA_BEFORE="$before"
+          cd "$workdir"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$home" XDG_DATA_HOME="$home/.local/share" DISPLAY="$TRACK_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$launcher" --first-launch >"$log" 2>&1 </dev/null &
+          lp=$!
+          echo TRACK_A_FIRST_LAUNCH_PID="$lp"
+
+          changed=0; last=''; stable=0
+          for _ in $(seq 1 300); do
+            if grep -Fq 'Application is already running' "$log" 2>/dev/null; then
+              echo TRACK_A_FIRST_LAUNCH_SINGLETON_BLOCKED=true
+              tail -n 150 "$log" | sed 's/^/TRACK_A_FIRST_LAUNCH_LOG=/' || true
+              exit 41
+            fi
+            if [[ -s "$child" ]]; then
+              sha="$(sha256sum "$child" | awk '{print $1}')"
+              [[ -n "$before" && "$sha" != "$before" ]] && changed=1
+              if [[ "$sha" == "$last" ]]; then stable=$((stable+1)); else stable=0; last="$sha"; fi
+            fi
+            # finish only after launcher explicitly reports install/update completion or package is changed and stable
+            if grep -Eq 'installationOrUpdateFinished|Installation.*finished|Changing local package status.*(UpToDate|Installed)|Package.*loaded completely' "$log" 2>/dev/null; then
+              if [[ -s "$child" && $stable -ge 5 ]]; then break; fi
+            fi
+            if (( changed == 1 && stable >= 8 )); then break; fi
+            if ! kill -0 "$lp" 2>/dev/null && (( stable >= 3 )); then break; fi
+            sleep 2
+          done
+          [[ -s "$child" ]]
+          after="$(sha256sum "$child" | awk '{print $1}')"
+          echo TRACK_A_FIRST_LAUNCH_SHA_AFTER="$after"
+          echo TRACK_A_FIRST_LAUNCH_CLIENT_SIZE="$(stat -c %s "$child")"
+          echo TRACK_A_FIRST_LAUNCH_SHA_CHANGED="$([[ "$after" != "$before" ]] && echo true || echo false)"
+          echo TRACK_A_FIRST_LAUNCH_PROCESS_ALIVE="$([[ -d /proc/$lp ]] && echo true || echo false)"
+          echo TRACK_A_FIRST_LAUNCH_RELEVANT_LOG_BEGIN=true
+          grep -Ei 'first.launch|package|install|update|download|status|version|error|failed|already running' "$log" | tail -n 250 | sed 's/^/TRACK_A_FIRST_LAUNCH_LOG=/' || true
+          echo TRACK_A_FIRST_LAUNCH_RELEVANT_LOG_END=true
+          echo TRACK_A_FIRST_LAUNCH_COMPLETE=true

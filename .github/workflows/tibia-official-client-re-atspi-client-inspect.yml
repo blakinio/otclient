@@ -1,0 +1,115 @@
+name: Track A semantic client inspect
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-atspi-client-inspect.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Launch exact client on direct private AT-SPI bus and inspect semantics
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          cfg="$root/usr/share/defaults/at-spi2/accessibility.conf"
+          registry="$(find "$root" -type f -name at-spi2-registryd -perm -u+x -print -quit)"
+          [[ -x "$client" && -s "$cfg" && -n "$registry" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_EXACT_OFFICIAL_CLIENT_VERIFIED=true
+
+          old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          if [[ -n "$old_pid" && -r "/proc/$old_pid/environ" ]]; then
+            grep -azFxq "$marker" "/proc/$old_pid/environ"
+            [[ "$(readlink -f "/proc/$old_pid/exe")" == "$client" ]]
+            kill "$old_pid" 2>/dev/null || true
+            for _ in $(seq 1 30); do kill -0 "$old_pid" 2>/dev/null || break; sleep .2; done
+          fi
+
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+          kill -0 "$xvfb_pid"
+          [[ -e /tmp/.X11-unix/X98 ]]
+
+          mapfile -t bus < <(PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-daemon" \
+            --config-file="$cfg" --fork --print-address=1 --print-pid=1)
+          [[ ${#bus[@]} -ge 2 && -n "${bus[0]}" && "${bus[1]}" =~ ^[0-9]+$ ]]
+          addr="${bus[0]}"; bus_pid="${bus[1]}"
+          reg_pid=''; pid=''
+          cleanup(){
+            [[ -z "$pid" ]] || kill "$pid" 2>/dev/null || true
+            [[ -z "$reg_pid" ]] || kill "$reg_pid" 2>/dev/null || true
+            kill "$bus_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          AT_SPI_BUS_ADDRESS="$addr" DBUS_SESSION_BUS_ADDRESS="$addr" PATH="$path" LD_LIBRARY_PATH="$lib" \
+            "$registry" >/tmp/track-a-inspect-registryd.log 2>&1 &
+          reg_pid=$!
+          for _ in $(seq 1 30); do
+            if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --bus="$addr" --print-reply \
+              --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | \
+              grep -q 'org.a11y.atspi.Registry'; then break; fi
+            sleep .2
+          done
+          kill -0 "$reg_pid"
+          echo TRACK_A_PRIVATE_REGISTRY_REGISTERED=true
+
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          proxy_conf="$state/config/proxychains.conf"
+          [[ -n "$proxy_lib" && -s "$proxy_conf" ]]
+          cd "$runtime"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$path" \
+            LD_LIBRARY_PATH="$runtime/lib:$lib" \
+            QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none QT_ACCESSIBILITY=1 \
+            AT_SPI_BUS_ADDRESS="$addr" DBUS_SESSION_BUS_ADDRESS="$addr" \
+            XDG_DATA_DIRS="$root/usr/share:/usr/share" \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
+          pid=$!
+          printf '%s\n' "$pid" >"$state/runtime/client.pid"
+          chmod 600 "$state/runtime/client.pid"
+          for _ in $(seq 1 60); do
+            kill -0 "$pid"
+            if PYTHONPATH="$root/usr/lib/python3/dist-packages" \
+               GI_TYPELIB_PATH="$root/usr/lib/x86_64-linux-gnu/girepository-1.0:$root/usr/lib/girepository-1.0" \
+               LD_LIBRARY_PATH="$lib" AT_SPI_BUS_ADDRESS="$addr" DBUS_SESSION_BUS_ADDRESS="$addr" \
+               python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" inspect; then
+              echo TRACK_A_SEMANTIC_CLIENT_INSPECT_SUCCESS=true
+              exit 0
+            fi
+            sleep .5
+          done
+          echo TRACK_A_SEMANTIC_CLIENT_INSPECT_SUCCESS=false
+          tail -n 40 "$state/runtime/client.log" | sed 's/^/TRACK_A_CLIENT_LOG=/' || true
+          exit 1

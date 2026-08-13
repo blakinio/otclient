@@ -1,0 +1,82 @@
+name: Track A launcher singleton static analysis
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-static-singleton.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Inspect launcher strings and imports
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+
+          work="$state/static-singleton/run-$GITHUB_RUN_ID"; unpack="$work/unpacked"
+          mkdir -p "$unpack"; chmod 700 "$work"
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          echo TRACK_A_STATIC_LAUNCHER_SHA256="$(sha256sum "$launcher" | awk '{print $1}')"
+          echo TRACK_A_STATIC_LAUNCHER_SIZE="$(stat -c %s "$launcher")"
+          file "$launcher" 2>/dev/null | sed 's/^/TRACK_A_STATIC_FILE=/' || true
+          echo TRACK_A_STATIC_TOOLS="$(command -v strings || true)|$(command -v readelf || true)|$(command -v objdump || true)|$(command -v nm || true)"
+
+          python3 - "$launcher" <<'PY'
+          import pathlib,re,sys
+          b=pathlib.Path(sys.argv[1]).read_bytes()
+          pats=(b'Application is already running',b'already running',b'single',b'mutex',b'lock',b'localhost',b'127.0.0.1',b'QLocal',b'QShared',b'QSystemSemaphore',b'QNativeIpc',b'pid',b'socket')
+          for p in pats:
+              hits=[m.start() for m in re.finditer(re.escape(p),b,re.I)]
+              print('TRACK_A_STATIC_PATTERN='+p.decode('ascii','replace')+'|count='+str(len(hits))+'|offsets='+','.join(hex(x) for x in hits[:20]))
+          # print ASCII strings containing singleton-related terms
+          strings=[m.group().decode('latin1','replace') for m in re.finditer(rb'[ -~]{4,}',b)]
+          terms=('already running','single','mutex','lock','localserver','localsocket','sharedmemory','systemsemaphore','nativeipc','localhost','127.0.0.1','socket','instance','applicationname','organizationname')
+          seen=set()
+          for s in strings:
+              if any(t in s.lower() for t in terms) and s not in seen:
+                  seen.add(s); print('TRACK_A_STATIC_STRING='+s[:1000])
+          PY
+
+          if command -v readelf >/dev/null 2>&1; then
+            echo TRACK_A_STATIC_READELF_BEGIN=true
+            readelf -Ws "$launcher" 2>/dev/null | grep -Ei 'socket|bind|connect|listen|flock|fcntl|openat|shm|sem_|lock|local|Qt|QShared|QSystem' | head -n 300 | sed 's/^/TRACK_A_STATIC_SYMBOL=/' || true
+            echo TRACK_A_STATIC_READELF_END=true
+          fi
+          if command -v objdump >/dev/null 2>&1; then
+            echo TRACK_A_STATIC_OBJDUMP_BEGIN=true
+            objdump -T "$launcher" 2>/dev/null | grep -Ei 'socket|bind|connect|listen|flock|fcntl|openat|shm|sem_|lock|local' | head -n 300 | sed 's/^/TRACK_A_STATIC_DYNSYM=/' || true
+            echo TRACK_A_STATIC_OBJDUMP_END=true
+          fi
+          echo TRACK_A_STATIC_COMPLETE=true

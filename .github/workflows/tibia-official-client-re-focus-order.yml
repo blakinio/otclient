@@ -1,0 +1,101 @@
+name: Track A official login focus order
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-focus-order.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Checkout exact Track A head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Prove focus order with benign markers only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          toolroot="$state/toolroot"
+          tool_path="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          evidence="$state/evidence/focus-order-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$evidence"
+          chmod 700 "$evidence"
+          cleanup() { rm -f "$evidence"/*.xwd 2>/dev/null || true; }
+          trap cleanup EXIT
+
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          kill -0 "$pid"
+
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
+          window=''
+          for _ in $(seq 1 40); do
+            for candidate in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+              geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$candidate" 2>/dev/null || true)"
+              [[ "$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')" == 1020 ]] || continue
+              [[ "$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')" == 650 ]] || continue
+              window="$candidate"
+              break
+            done
+            [[ -n "$window" ]] && break
+            sleep 0.25
+          done
+          [[ -n "$window" ]]
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          [[ "$("$toolroot/usr/bin/xdotool" getwindowfocus)" == "$window" ]]
+
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
+          "$toolroot/usr/bin/xdotool" key ctrl+a BackSpace
+          "$toolroot/usr/bin/xdotool" mousemove 1800 1000
+          sleep 0.35
+          a0="$evidence/a0.xwd"; a1="$evidence/a1.xwd"; a2="$evidence/a2.xwd"
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$a0"
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
+          "$toolroot/usr/bin/xdotool" type --delay 10 -- 'x'
+          "$toolroot/usr/bin/xdotool" mousemove 1800 1000
+          sleep 0.35
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$a1"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" FOCUS_FIRST "$a0" "$a1"
+
+          "$toolroot/usr/bin/xdotool" key Tab
+          "$toolroot/usr/bin/xdotool" type --delay 10 -- 'y'
+          "$toolroot/usr/bin/xdotool" mousemove 1800 1000
+          sleep 0.35
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$a2"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" FOCUS_AFTER_TAB "$a1" "$a2"
+
+          "$toolroot/usr/bin/xdotool" key ctrl+a BackSpace
+          "$toolroot/usr/bin/xdotool" key shift+Tab
+          "$toolroot/usr/bin/xdotool" key ctrl+a BackSpace
+          cleanup
+          trap - EXIT
+          echo TRACK_A_FOCUS_ORDER_PROBE_COMPLETE=true

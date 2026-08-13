@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:29:00+02:00
-head: 27dacbc7d645b4701bc40133ffb86ac84a989118
+updated_at: 2026-08-13T15:31:00+02:00
+head: 3e17bdd8d7d0176f909ca58ab0d30691e0c2f0ad
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -101,8 +101,8 @@ unknown:
   - whether the exact historically proven explicit coordinate sequence transitions this isolated runtime from Account Login to Select Character
   - decoded current-world records and authoritative player position
 first_failure:
-  marker: exact versioned input sequence does not transition either persistent or fresh Track A client home after Login click
-  evidence: run 31715206847 job 94498079465 used fresh HOME/XDG state, historical 1280x800 display and five-second stabilization, plus versioned input delivery; transition 4483 < 45000 and local SOCKS stayed at 2
+  marker: prior transition comparison used changed XWD bytes rather than the historical ImageMagick AE changed-pixel unit
+  evidence: runs through 31715206847 remain valid for process, click, field-mutation and transport observations, but their numeric transition values cannot be compared directly to the historical >45000 pixel threshold
 rejected_hypotheses:
   - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
   - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
@@ -149,6 +149,9 @@ validation:
   - command: Track A structural login run 31715484884 job 94499024983
     result: INVALID_PRELOGIN_TRANSPORT_VARIANT
     evidence: private proxychains4 wrapper exited before client startup with 'couldnt locate libproxychains.so.4'; no secrets were injected and no runner-global library path was modified
+  - command: python -m unittest tests.tools.test_tibia_official_client_re_reconstruct tests.tools.test_tibia_official_client_re_xwd_diff
+    result: PASS
+    evidence: six tests, including XWD changed-pixel rather than changed-byte semantics
 blockers: []
-next_action: restore verified private LD_PRELOAD transport, then compare the current forced Vulkan RHI configuration against the historical GLX/llvmpipe configuration without claiming that graphics is a sufficient standalone login cause
+next_action: rerun the fresh-home, 1280x800, five-second-stabilized, versioned explicit-coordinate baseline through verified private LD_PRELOAD transport and measure login transition using the XWD changed-pixel comparator; only then apply the historical >45000 threshold
 ```

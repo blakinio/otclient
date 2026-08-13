@@ -236,7 +236,7 @@ jobs:
               window="$(resolve_window || true)"
               [[ -n "$window" ]] || continue
               "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$after"
-              changed="$(python3 -c 'import pathlib,sys; a=pathlib.Path(sys.argv[1]).read_bytes(); b=pathlib.Path(sys.argv[2]).read_bytes(); print(sum(x != y for x,y in zip(a,b)) + abs(len(a)-len(b)))' "$before" "$after")"
+              changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$before" "$after")"
               [[ "$changed" =~ ^[0-9]+$ ]] || continue
               if (( changed > 45000 )); then transition=1; break; fi
             done

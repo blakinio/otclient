@@ -466,6 +466,15 @@ The canonical workflow now builds the exact branch head as a native Linux
 artifact before the Synology probe and replaces only the task-owned cached
 runtime binary. No official client binary or non-Linux runtime is involved.
 
+Run `31707825958`, jobs `94472766713` and `94481506722`, exact head
+`0a2b83e080f7f513a865229102028f947ba71c76`, proved the exact native Linux
+build, artifact handoff, isolated bootstrap, WARP and HTTP login. It stopped
+after consuming the tmpfs handoff but before the character-login call, with
+zero bytes in both directions and no full-version marker. This is a local Lua
+binding/harness failure, not protocol evidence. The string accessors now use
+Lua-binder-safe value semantics and the setter is guarded by `pcall` with a
+fixed boolean marker before any network attempt.
+
 # Evidence classification
 
 PROVEN:

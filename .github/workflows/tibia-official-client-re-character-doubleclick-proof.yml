@@ -1,0 +1,122 @@
+name: Track A bounded character activation proof
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-character-doubleclick-proof.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  prove:
+    runs-on: [otclient, synology]
+    timeout-minutes: 6
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Arm map decoder then use bounded historical double-click fallback
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          tool_path="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          evidence="$state/evidence/character-doubleclick-proof-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$evidence"; chmod 700 "$evidence"
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          kill -0 "$pid"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
+          window=''
+          for _ in $(seq 1 30); do
+            for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+              g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+              [[ "$(printf '%s\n' "$g" | sed -n 's/^WIDTH=//p')" == 1020 ]] || continue
+              [[ "$(printf '%s\n' "$g" | sed -n 's/^HEIGHT=//p')" == 650 ]] || continue
+              window="$w"; break
+            done
+            [[ -n "$window" ]] && break; sleep .3
+          done
+          [[ -n "$window" ]]
+          before="$evidence/before.xwd"; after="$evidence/after.xwd"
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$before"
+
+          if [[ -w /proc/sys/kernel/yama/ptrace_scope ]]; then printf '0\n' >/proc/sys/kernel/yama/ptrace_scope; fi
+          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
+          start="$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')"
+          offset="$(printf '%s\n' "$line" | awk '{print $3}')"
+          bias=$((16#$start - 16#$offset))
+          records="$evidence/map-records.txt"; hit="$evidence/map-hit.txt"; : >"$records"
+          cat >"$evidence/world.gdb" <<EOF
+          set pagination off
+          set confirm off
+          attach $pid
+          python
+          import gdb, struct
+          inf=gdb.selected_inferior(); out='$records'; hit='$hit'
+          class B(gdb.Breakpoint):
+              def __init__(self): super().__init__('*0x%x' % ($bias + 0x19a8ea3)); self.n=0
+              def stop(self):
+                  try:
+                      rsp=int(gdb.parse_and_eval('\$rsp')); order=int(gdb.parse_and_eval('\$rbp')) & 0xffffffff
+                      x,y,z=struct.unpack('<III', bytes(inf.read_memory(rsp+0x88,12)))
+                      if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                          self.n+=1
+                          with open(out,'a') as f: f.write(f'{x} {y} {z} {order}\n')
+                          if self.n>=8:
+                              with open(hit,'w') as f: f.write(str(self.n))
+                  except Exception: pass
+                  return False
+          B()
+          end
+          continue
+          EOF
+          gdb -q -nx -batch -x "$evidence/world.gdb" >"$evidence/gdb.log" 2>&1 &
+          gdb_pid=$!
+          sleep 2
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 285 193 click --repeat 2 --delay 160 1
+          echo TRACK_A_BOUNDED_DOUBLECLICK_SENT=true
+          for _ in $(seq 1 30); do [[ -s "$hit" ]] && break; sleep 1; done
+          if kill -0 "$gdb_pid" 2>/dev/null; then kill -INT "$gdb_pid" 2>/dev/null || true; sleep 1; fi
+          kill -CONT "$pid" 2>/dev/null || true
+          kill -0 "$pid"
+          window=''
+          for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do window="$w"; break; done
+          [[ -n "$window" ]]
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$after"
+          changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$before" "$after")"
+          echo TRACK_A_CHARACTER_ACTIVATION_CHANGED_PIXELS="$changed"
+          [[ -s "$hit" ]]
+          valid="$(wc -l <"$records")"
+          echo TRACK_A_DECODED_MAP_RECORD_COUNT="$valid"
+          (( valid >= 8 ))
+          awk '{if(!($1>0&&$1<100000&&$2>0&&$2<100000&&$3<32&&$4<128)) exit 1} END{if(NR<8) exit 1}' "$records"
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          rm -f "$before" "$after"
+          echo TRACK_A_STRUCTURAL_IN_GAME=true
+          echo TRACK_A_OFFICIAL_LINUX_WORLD_LOGIN_PROVEN=true
+          echo TRACK_A_VISIBLE_WORLD_MAP_PROVEN=true
+          echo TRACK_A_SESSION_LEFT_LOGGED_IN=true

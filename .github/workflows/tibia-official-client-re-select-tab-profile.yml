@@ -1,0 +1,61 @@
+name: Track A Select Character tab profile
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-select-tab-profile.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Measure one Tab focus transition without activation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          toolroot="$state/toolroot"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          window=''
+          for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+            g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+            [[ "$(printf '%s\n' "$g" | sed -n 's/^WIDTH=//p')" == 1020 ]] || continue
+            [[ "$(printf '%s\n' "$g" | sed -n 's/^HEIGHT=//p')" == 650 ]] || continue
+            window="$w"; break
+          done
+          [[ -n "$window" ]]
+          evidence="$state/evidence/select-tab-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$evidence"; chmod 700 "$evidence"
+          trap 'rm -f "$evidence"/*.xwd 2>/dev/null || true' EXIT
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          "$toolroot/usr/bin/xdotool" mousemove 1800 1000
+          sleep .4
+          b="$evidence/b.xwd"; a="$evidence/a.xwd"
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$b"
+          "$toolroot/usr/bin/xdotool" key Tab
+          "$toolroot/usr/bin/xdotool" mousemove 1800 1000
+          sleep .4
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$a"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" SELECT_TAB "$b" "$a"
+          "$toolroot/usr/bin/xdotool" key shift+Tab
+          rm -f "$b" "$a"; trap - EXIT
+          echo TRACK_A_SELECT_TAB_PROFILE_COMPLETE=true

@@ -32,17 +32,19 @@ The candidate extends rather than replaces the baseline. This evaluation checks 
 | completed workflow/PR | one bounded experiment or PR finishes | milestone only; continue base autonomous programme while safe READY work remains | PASS |
 | context rotation | worker context becomes too large | persist durable task/checkpoint and continue from Git; no chat-memory dependency | PASS |
 | OTBM/bridge lanes | #279/#283 exist | reuse current owners/tools rather than create parallel pipelines/bridges | PASS |
+| mandatory persistence | worker obtains a material finding, failure, runtime result or next action | persist it in `blakinio/otclient` before return/rotation; large external artifacts must be indexed by exact evidence reference | PASS |
 
 ## Baseline comparison
 
 The baseline already correctly establishes `blakinio/otclient` as the writable repository and external Oteryn repositories as read-only evidence. However, it intentionally lists historical runner/container leads and requires live revalidation. After the dedicated OTClient runner work existed, that left an avoidable routing ambiguity for a fresh worker.
 
-The candidate narrows only that ambiguity:
+The candidate narrows only that ambiguity and strengthens durable persistence:
 
 ```text
 active repository -> blakinio/otclient
 active runtime -> dedicated OTClient runner
 external Oteryn runtime -> read-only historical evidence
+material work -> persisted/indexed in blakinio/otclient before return/rotation
 ```
 
 It does not weaken:
@@ -66,13 +68,14 @@ The wrapper contains no rule that:
 - treats socket/network deltas as authoritative movement;
 - copies historical PIDs/PIE/heap addresses into current runtime;
 - claims complete OTBM/global-map coverage;
-- allows fallback to an unrelated self-hosted runner.
+- allows fallback to an unrelated self-hosted runner;
+- permits material continuation state to remain only in chat or transient runner storage.
 
 ## Outcome
 
 ```yaml
-cases: 12
-passed: 12
+cases: 13
+passed: 13
 failed: 0
 candidate_status: PASS
 rollback: remove SHORT_COMMANDS alias entry and canonical wrapper; the unchanged base programme prompt remains on main

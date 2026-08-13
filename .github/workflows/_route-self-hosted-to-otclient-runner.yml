@@ -22,57 +22,32 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
 
-          roots = [Path('.github/workflows'), Path('.github/scripts')]
-          old_selector = 'runs-on: [self-hosted, oteryn-staging]'
-          new_selector = 'runs-on: [self-hosted, otclient, synology]'
-          old_runner = 'oteryn-synology-staging'
-          new_runner = 'synology-otclient-01'
+          selector_before="$(grep -R --include='*.yml' --include='*.yaml' -F 'runs-on: [self-hosted, oteryn-staging]' .github/workflows 2>/dev/null | wc -l || true)"
+          runner_before="$(grep -R --include='*.yml' --include='*.yaml' --include='*.sh' -F 'oteryn-synology-staging' .github/workflows .github/scripts 2>/dev/null | wc -l || true)"
+          echo "LEGACY_SELECTOR_COUNT_BEFORE=$selector_before"
+          echo "LEGACY_RUNNER_NAME_COUNT_BEFORE=$runner_before"
+          (( selector_before > 0 ))
 
-          changed = []
-          selector_hits = 0
-          runner_hits = 0
-          for root in roots:
-              if not root.exists():
-                  continue
-              for path in sorted(p for p in root.rglob('*') if p.is_file() and p.name != '_route-self-hosted-to-otclient-runner.yml'):
-                  text = path.read_text(encoding='utf-8')
-                  s = text.count(old_selector)
-                  r = text.count(old_runner)
-                  if not (s or r):
-                      continue
-                  text = text.replace(old_selector, new_selector).replace(old_runner, new_runner)
-                  path.write_text(text, encoding='utf-8')
-                  selector_hits += s
-                  runner_hits += r
-                  changed.append(str(path))
+          find .github/workflows .github/scripts -type f \( -name '*.yml' -o -name '*.yaml' -o -name '*.sh' \) -print0 \
+            | xargs -0 sed -i \
+                -e 's/runs-on: \[self-hosted, oteryn-staging\]/runs-on: [self-hosted, otclient, synology]/g' \
+                -e 's/oteryn-synology-staging/synology-otclient-01/g'
 
-          print(f'LEGACY_SELECTOR_REPLACEMENTS={selector_hits}')
-          print(f'LEGACY_RUNNER_NAME_REPLACEMENTS={runner_hits}')
-          for path in changed:
-              print(f'CHANGED={path}')
-          if selector_hits < 1:
-              raise SystemExit('no legacy self-hosted selector found')
-
-          for root in roots:
-              if not root.exists():
-                  continue
-              for path in (p for p in root.rglob('*') if p.is_file()):
-                  text = path.read_text(encoding='utf-8')
-                  if old_selector in text or old_runner in text:
-                      raise SystemExit(f'legacy OTClient runner routing remains in {path}')
-          PY
+          selector_after="$(grep -R --include='*.yml' --include='*.yaml' -F 'runs-on: [self-hosted, oteryn-staging]' .github/workflows 2>/dev/null | wc -l || true)"
+          runner_after="$(grep -R --include='*.yml' --include='*.yaml' --include='*.sh' -F 'oteryn-synology-staging' .github/workflows .github/scripts 2>/dev/null | wc -l || true)"
+          echo "LEGACY_SELECTOR_COUNT_AFTER=$selector_after"
+          echo "LEGACY_RUNNER_NAME_COUNT_AFTER=$runner_after"
+          [[ "$selector_after" == 0 ]]
+          [[ "$runner_after" == 0 ]]
 
           git diff --check
+          echo '=== routing diff ==='
           git diff -- .github/workflows .github/scripts
+
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add .github/workflows .github/scripts
-          if git diff --cached --quiet; then
-            echo NO_ROUTING_CHANGES=true
-            exit 1
-          fi
+          git diff --cached --quiet && { echo NO_ROUTING_CHANGES=true; exit 1; }
           git commit -m 'ci: use dedicated OTClient Synology runner'
           git push origin HEAD:ci/OTC-20260727-tibia-linux-runner-analysis

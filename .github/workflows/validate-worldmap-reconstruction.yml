@@ -1,0 +1,62 @@
+name: Validate worldmap reconstruction
+
+on:
+  push:
+    branches:
+      - feat/OTC-20260812-worldmap-reconstruction
+    paths:
+      - .github/workflows/validate-worldmap-reconstruction.yml
+      - tools/tibia_worldmap_reconstruction/**
+      - tests/tools/tibia_worldmap_reconstruction/**
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Focused tests and syntax
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=. python3 tests/tools/tibia_worldmap_reconstruction/test_pipeline.py
+          python3 -m py_compile \
+            tools/tibia_worldmap_reconstruction/pipeline.py \
+            tools/tibia_worldmap_reconstruction/cli.py
+          echo WORLDMAP_FOCUSED_VALIDATION_PASS=true
+
+      - name: Synthetic reconstruct compare plan E2E
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          work="$(mktemp -d)"
+          cat >"$work/observations.json" <<'JSON'
+          {"schema":"otclient.worldmap.observation.v1","client_version":"15.32.df7b29","observations":[{"position":{"x":32000,"y":32001,"z":7},"contents":[100,200,300,900],"provenance":{"source":"synthetic-e2e","capture_id":"one"}}]}
+          JSON
+          cat >"$work/catalog.json" <<'JSON'
+          {"schema":"otclient.worldmap.appearance-catalog.v1","client_version":"15.32.df7b29","appearances":[{"client_id":100,"roles":["ground"],"evidence":"synthetic"},{"client_id":200,"roles":["static"],"evidence":"synthetic"},{"client_id":300,"roles":["static"],"evidence":"synthetic"},{"client_id":900,"roles":["creature","dynamic"],"evidence":"synthetic"}]}
+          JSON
+          cat >"$work/mapping.json" <<'JSON'
+          {"schema":"otclient.worldmap.otb-mapping.v1","client_version":"15.32.df7b29","otb_version":"synthetic-v1","mappings":[{"client_id":100,"otb_id":1100,"evidence":"synthetic"},{"client_id":200,"otb_id":1200,"evidence":"synthetic"},{"client_id":300,"otb_id":1300,"evidence":"synthetic"}]}
+          JSON
+          cat >"$work/reference.json" <<'JSON'
+          {"schema":"otclient.worldmap.reference.v1","source":"synthetic-reference","otb_version":"synthetic-v1","tiles":[{"position":{"x":32000,"y":32001,"z":7},"ground_otb_id":1100,"static_otb_ids":[1200,1300]}]}
+          JSON
+          python3 -m tools.tibia_worldmap_reconstruction.cli reconstruct --observations "$work/observations.json" --catalog "$work/catalog.json" --mapping "$work/mapping.json" --output "$work/snapshot.json"
+          python3 -m tools.tibia_worldmap_reconstruction.cli compare --snapshot "$work/snapshot.json" --reference "$work/reference.json" --output "$work/diff.json"
+          python3 -m tools.tibia_worldmap_reconstruction.cli plan-otbm --snapshot "$work/snapshot.json" --output "$work/plan.json"
+          python3 - "$work/diff.json" "$work/plan.json" <<'PY'
+          import json,sys
+          diff=json.load(open(sys.argv[1]));plan=json.load(open(sys.argv[2]))
+          assert diff['diffs'][0]['status']=='MATCH'
+          assert plan['exportable'] is True
+          assert len(plan['tiles'])==1
+          print('SYNTHETIC_RECONSTRUCT_COMPARE_PLAN_PASS=true')
+          PY

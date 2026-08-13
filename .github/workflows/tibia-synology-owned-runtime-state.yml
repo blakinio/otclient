@@ -1,0 +1,78 @@
+name: Tibia Synology owned runtime state
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-synology-owned-runtime-state.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [self-hosted, oteryn-staging]
+    timeout-minutes: 8
+    env:
+      CONTAINER_NAME: otclient-tibia-login-analysis
+      STATE_ROOT: /var/lib/oteryn-staging-state/tibia-linux-analysis
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Verify exact runner and inspect only task-owned runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "RUNNER_NAME=$RUNNER_NAME"
+          [[ "$RUNNER_NAME" == "oteryn-synology-staging" ]]
+          docker version >/dev/null
+          if ! docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+            echo OWNED_CONTAINER_EXISTS=false
+            exit 2
+          fi
+          echo OWNED_CONTAINER_EXISTS=true
+          owner=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER_NAME")
+          purpose=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.purpose" }}' "$CONTAINER_NAME")
+          task=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME")
+          bind=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/analysis"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME")
+          status=$(docker inspect --format '{{.State.Status}}' "$CONTAINER_NAME")
+          echo "CONTAINER_STATUS=$status"
+          echo "OWNER_LABEL=$owner"
+          echo "PURPOSE_LABEL=$purpose"
+          echo "TASK_LABEL=$task"
+          [[ "$owner" == otclient && "$purpose" == tibia-login-no-ocr && "$task" == OTC-20260727-tibia-linux-runner-analysis ]]
+          [[ "$bind" == "$STATE_ROOT" ]]
+          [[ "$status" == running ]]
+          docker ps -a --filter 'label=com.docker.compose.project=oteryn-staging' --format '{{.ID}}\t{{.Names}}' | sort >/tmp/oteryn-owned-probe-before.tsv
+          docker exec "$CONTAINER_NAME" bash -lc '
+            set -Eeuo pipefail
+            echo RUNTIME_STATE_BEGIN
+            echo CLIENT_PIDS=$(pgrep -x client 2>/dev/null | paste -sd, - || true)
+            echo XVFB_PIDS=$(pgrep -f "^Xvfb :99" 2>/dev/null | paste -sd, - || true)
+            echo WIREPROXY_PIDS=$(pgrep -f "/wireproxy .*wireproxy.conf" 2>/dev/null | paste -sd, - || true)
+            for home in /analysis/current/home /analysis/home /root /home/*; do
+              [[ -d "$home" ]] || continue
+              client=$(find "$home" -type f -path "*/packages/Tibia/bin/client" -perm -111 -print -quit 2>/dev/null || true)
+              if [[ -n "$client" ]]; then
+                echo CLIENT_HOME=$home
+                echo CLIENT_SHA256=$(sha256sum "$client" | awk "{print \$1}")
+                echo CLIENT_SIZE=$(stat -c %s "$client")
+                cfg_count=$(find "$home" -maxdepth 5 -type f 2>/dev/null | wc -l)
+                echo HOME_FILE_COUNT=$cfg_count
+                break
+              fi
+            done
+            pid=$(pgrep -x client | head -n1 || true)
+            if [[ -n "$pid" ]]; then
+              tcp=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+              udp=$(ss -nup 2>/dev/null | grep "pid=$pid," || true)
+              local=$(printf "%s\n" "$tcp" | awk "\$5 ~ /127\\.0\\.0\\.1:25344$/ || \$5 ~ /\\[::1\\]:25344$/ {n++} END{print n+0}")
+              total=$(printf "%s\n" "$tcp" | grep -c . || true)
+              direct=$((total-local))
+              echo ACTIVE_LOCAL_SOCKS_COUNT=$local
+              echo ACTIVE_DIRECT_TCP_COUNT=$direct
+              echo ACTIVE_UDP_COUNT=$(printf "%s\n" "$udp" | grep -c . || true)
+            fi
+            echo RUNTIME_STATE_END
+          '
+          docker ps -a --filter 'label=com.docker.compose.project=oteryn-staging' --format '{{.ID}}\t{{.Names}}' | sort >/tmp/oteryn-owned-probe-after.tsv
+          diff -u /tmp/oteryn-owned-probe-before.tsv /tmp/oteryn-owned-probe-after.tsv
+          echo OWNED_RUNTIME_READONLY_PROBE_COMPLETE=true

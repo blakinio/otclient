@@ -123,6 +123,14 @@ docker exec -d -e DISPLAY=:100 -e HOME=/lab/state/home -e LIBGL_ALWAYS_SOFTWARE=
   "$CONTAINER" bash -lc 'cd /otclient && exec proxychains4 -f /lab/runtime/proxychains.conf ./otclient >>/lab/runtime/otclient.stdout.log 2>&1'
 unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
 
+client_started=false
+for _ in $(seq 1 60); do
+  if docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' >/dev/null 2>&1; then client_started=true; break; fi
+  sleep 0.5
+done
+echo "LAB_OTCLIENT_PROCESS_STARTED=$client_started"
+[[ "$client_started" == true ]]
+
 for _ in $(seq 1 500); do
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log && break
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] PROBE_TIMEOUT=true' /lab/runtime/otclient.stdout.log && break

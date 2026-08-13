@@ -1,0 +1,62 @@
+name: Track A current official package metadata
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-current-package-metadata.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Fetch package metadata
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          work="$state/current-metadata/run-$GITHUB_RUN_ID"; mkdir -p "$work"; chmod 700 "$work"
+          base='https://static.tibia.com/launcher/tibiaclient-linux-current'
+          curlp=(curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsSL --connect-timeout 20 --max-time 60 --retry 2 --retry-all-errors)
+          "${curlp[@]}" https://static.tibia.com/launcher/tibiametadata.json -o "$work/tibiametadata.json"
+          "${curlp[@]}" "$base/package.json.version" -o "$work/package.json.version"
+          echo TRACK_A_PACKAGE_VERSION_RAW="$(tr -d '\r\n' <"$work/package.json.version")"
+          echo TRACK_A_TIBIAMETADATA_RELEVANT_BEGIN=true
+          python3 - "$work/tibiametadata.json" <<'PY'
+          import json,sys
+          o=json.load(open(sys.argv[1]))
+          def walk(x,p=''):
+              if isinstance(x,dict):
+                  for k,v in x.items():
+                      q=f'{p}.{k}' if p else k
+                      if any(t in q.lower() for t in ('linux','package','client','tibia','url','cdn')):
+                          if not isinstance(v,(dict,list)): print(f'TRACK_A_META={q}={v}')
+                      walk(v,q)
+              elif isinstance(x,list):
+                  for i,v in enumerate(x): walk(v,f'{p}[{i}]')
+          walk(o)
+          PY
+          echo TRACK_A_TIBIAMETADATA_RELEVANT_END=true
+          for name in package.json package.json.sha256 package.json.current package.json.gz; do
+            code="$(curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -sS -o "$work/$name" -w '%{http_code}' --connect-timeout 20 --max-time 60 "$base/$name" || true)"
+            size="$(stat -c %s "$work/$name" 2>/dev/null || echo 0)"
+            echo "TRACK_A_PACKAGE_CANDIDATE=$name|http=$code|size=$size"
+            if [[ "$code" == 200 && "$size" -lt 2000000 ]]; then head -c 20000 "$work/$name" | tr '\n' ' ' | sed "s/^/TRACK_A_PACKAGE_CANDIDATE_BODY=$name|/"; echo; fi
+          done
+          echo TRACK_A_CURRENT_METADATA_COMPLETE=true

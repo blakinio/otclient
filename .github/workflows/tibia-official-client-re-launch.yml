@@ -2,6 +2,10 @@ name: Track A official Linux client launch
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launch.yml
 
 permissions:
   contents: read

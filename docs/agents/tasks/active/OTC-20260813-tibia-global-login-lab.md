@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T12:55:00+02:00
+updated: 2026-08-13T13:05:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -242,6 +242,16 @@ probe independently attempts a bounded SOCKS5 TCP connection through the same
 userspace-WARP endpoint to the handoff world host/port, emits only a boolean
 grant marker, discards all curl output, and does not log target values.
 
+Run `31693018740`, job `94424378218`, exact head
+`c8c425bb8ae4ad937f129478e31de8493c8c3f26`, proved that an independent SOCKS5
+connection to the exact handoff game endpoint is granted through WARP while
+OTClient's proxychains-wrapped asynchronous connection still times out with
+code 110. The remaining transport defect is therefore the proxychains adapter,
+not WARP or game-port reachability. The lab now uses a loopback-only TCP forward
+that performs the SOCKS5 handshake itself; proxychains bypasses only loopback
+and continues to cover any other OTClient socket. Target values remain only in
+the tmpfs handoff and are never logged.
+
 # Evidence classification
 
 PROVEN:
@@ -290,4 +300,4 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with the independent SOCKS5 game-port probe. If SOCKS TCP is granted but OTClient still times out, inspect proxychains integration; if both time out, persist the exact WARP/game-port reachability boundary and falsify it from another approved lab egress before terminal classification.
+Run the canonical E2E through the loopback TCP-to-SOCKS5 forwarder. Continue from the first server/game callback or exact post-connect protocol failure while requiring the forward grant marker and zero direct non-loopback OTClient TCP.

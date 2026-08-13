@@ -64,6 +64,7 @@ cat > /tmp/lab-proxychains.conf <<'EOF'
 strict_chain
 proxy_dns
 quiet_mode
+localnet 127.0.0.0/255.0.0.0
 tcp_read_time_out 15000
 tcp_connect_time_out 8000
 [ProxyList]
@@ -197,6 +198,21 @@ granted = 'SOCKS5 request granted' in probe.stderr or 'Connected to ' in probe.s
 print(f"LAB_GAME_TCP_VIA_WARP_SOCKS_GRANTED={'true' if granted else 'false'}")
 PY
 
+docker cp tools/tibia-global-login-lab/scripts/game-socks-forward.py "$CONTAINER:/lab/runtime/game-socks-forward.py"
+docker exec "$CONTAINER" bash -lc '
+  chmod 700 /lab/runtime/game-socks-forward.py
+  rm -f /lab/runtime/game-socks-forward.ready /lab/runtime/game-socks-forward.granted
+  nohup python3 /lab/runtime/game-socks-forward.py >/dev/null 2>&1 </dev/null &
+  echo $! >/lab/runtime/game-socks-forward.pid
+'
+forward_ready=false
+for _ in $(seq 1 30); do
+  if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.ready; then forward_ready=true; break; fi
+  sleep 0.2
+done
+echo "LAB_GAME_SOCKS_FORWARD_READY=$forward_ready"
+[[ "$forward_ready" == true ]]
+
 cp init.lua /tmp/lab-init.lua
 cat >>/tmp/lab-init.lua <<'LUA'
 if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
@@ -266,7 +282,8 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     handoff.sessionKey=nil
     mark('CHARACTER_LOGIN_ATTEMPT=true')
     local ok=pcall(function()
-      g_game.loginWorld('', '', handoff.worldName, handoff.worldHost, tonumber(handoff.worldPort), handoff.characterName, '', sessionKey)
+      mark('GAME_SOCKS_FORWARD_SELECTED=true')
+      g_game.loginWorld('', '', handoff.worldName, '127.0.0.1', 37171, handoff.characterName, '', sessionKey)
     end)
     sessionKey=nil
     handoff=nil
@@ -310,10 +327,15 @@ for _ in $(seq 1 300); do
 done
 
 docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z0-9_-]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
+if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.granted; then
+  echo LAB_GAME_SOCKS_FORWARD_GRANTED=true
+else
+  echo LAB_GAME_SOCKS_FORWARD_GRANTED=false
+fi
 pid=$(docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' | head -n1 || true)
 if [[ -n "$pid" ]]; then
   rows=$(docker exec "$CONTAINER" ss -ntp 2>/dev/null | grep "pid=$pid," || true)
-  direct=$(printf '%s\n' "$rows" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -c . || true)
+  direct=$(printf '%s\n' "$rows" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):(25344|37171)$' | grep -c . || true)
   echo "LAB_OTCLIENT_DIRECT_TCP_COUNT=$direct"
   [[ "$direct" -eq 0 ]]
 fi

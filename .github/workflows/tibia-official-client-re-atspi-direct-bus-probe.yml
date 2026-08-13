@@ -1,0 +1,61 @@
+name: Track A direct private AT-SPI bus probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-atspi-direct-bus-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Start accessibility bus directly from private config
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          root="$state/toolroot"
+          lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          cfg="$root/usr/share/defaults/at-spi2/accessibility.conf"
+          [[ -s "$cfg" ]]
+          registry="$(find "$root" -type f -name at-spi2-registryd -perm -u+x -print -quit)"
+          [[ -n "$registry" ]]
+          echo TRACK_A_PRIVATE_ACCESSIBILITY_CONFIG=true
+          echo TRACK_A_PRIVATE_REGISTRYD=true
+          grep -E '<servicedir>|<include|<listen>|<auth>|<policy' "$cfg" | head -n 40 | sed 's/^/TRACK_A_ACCESSIBILITY_CONFIG=/' || true
+
+          mapfile -t bus < <(PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-daemon" \
+            --config-file="$cfg" --fork --print-address=1 --print-pid=1)
+          [[ ${#bus[@]} -ge 2 && -n "${bus[0]}" && "${bus[1]}" =~ ^[0-9]+$ ]]
+          addr="${bus[0]}"; bus_pid="${bus[1]}"
+          reg_pid=''
+          cleanup(){ [[ -z "$reg_pid" ]] || kill "$reg_pid" 2>/dev/null || true; kill "$bus_pid" 2>/dev/null || true; }
+          trap cleanup EXIT
+          kill -0 "$bus_pid"
+          echo TRACK_A_DIRECT_ACCESSIBILITY_BUS_READY=true
+
+          AT_SPI_BUS_ADDRESS="$addr" DBUS_SESSION_BUS_ADDRESS="$addr" PATH="$path" LD_LIBRARY_PATH="$lib" \
+            "$registry" >/tmp/track-a-registryd.log 2>&1 &
+          reg_pid=$!
+          for _ in $(seq 1 30); do
+            kill -0 "$reg_pid" 2>/dev/null || break
+            if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --address="$addr" --print-reply \
+              --dest=org.freedesktop.DBus / org.freedesktop.DBus.ListNames >/tmp/track-a-direct-names.txt 2>/dev/null && \
+              grep -q 'org.a11y.atspi.Registry' /tmp/track-a-direct-names.txt; then
+              echo TRACK_A_PRIVATE_REGISTRY_REGISTERED=true
+              exit 0
+            fi
+            sleep .2
+          done
+          sed -n '1,40p' /tmp/track-a-registryd.log | sed 's/^/TRACK_A_REGISTRYD_STDERR=/' || true
+          exit 1

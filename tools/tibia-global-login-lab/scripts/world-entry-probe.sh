@@ -422,6 +422,8 @@ elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_LOGIN_ERROR=tru
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_CONNECTION_ERROR=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=game_connection_error
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] CHARACTER_LOGIN_CALL_RETURNED=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=after_character_login_call_before_game_callback
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] CHARACTER_LOGIN_CALL_ERROR=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=character_login_call_error
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] FULL_CLIENT_VERSION_CALL_FAILED=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=full_client_version_call_failed
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] FULL_CLIENT_VERSION_READBACK_MISMATCH=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=full_client_version_readback_mismatch
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] FULL_CLIENT_VERSION_CONFIG_BEGIN=true' /lab/runtime/otclient.stdout.log && ! docker exec "$CONTAINER" grep -Eq '\[TIBIA_GLOBAL_LAB\] FULL_CLIENT_VERSION_(CALL_FAILED|READBACK_MISMATCH|CONFIGURED)=true' /lab/runtime/otclient.stdout.log; then
   if [[ "$client_exit_status" =~ ^[0-9]+$ ]]; then echo FAILURE_STAGE=full_client_version_outcome_missing_after_exit
   else echo FAILURE_STAGE=full_client_version_outcome_missing; fi

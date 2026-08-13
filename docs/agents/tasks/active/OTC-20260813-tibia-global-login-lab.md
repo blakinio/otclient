@@ -11,7 +11,7 @@ phase: recovery-validation
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T18:20:00+02:00
+updated: 2026-08-13T18:35:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -529,6 +529,29 @@ terminal `1525` entry plus its closing brace, and its complete inner container
 patch is executed against an offline copy of the verified module shape before
 the next E2E.
 
+Run `31719826179`, jobs `94513685119` and `94513846464`, exact head
+`7b0265d52262f9fba68c6ca96fde76bed48bc3b7`, passed the exact native-Linux
+build, isolated bootstrap, WARP transport, HTTP login, tmpfs handoff, SOCKS
+reachability and OTClient process startup. It then classified the requested
+boundary without exporting exception text or configured/session values:
+
+```text
+HANDOFF_CONSUMED=true
+FULL_CLIENT_VERSION_CONFIG_BEGIN=true
+FULL_CLIENT_VERSION_CALL_FAILED=true
+LAB_GAME_FORWARD_CLIENT_BYTES=false
+LAB_GAME_FORWARD_SERVER_BYTES=false
+LAB_GAME_FORWARD_CLIENT_LENGTH=0
+LAB_GAME_FORWARD_SERVER_LENGTH=0
+```
+
+The setter call failed inside the Lua/C++ binding before character login and
+before network traffic. The full-version wire hypothesis is therefore still
+`UNKNOWN`, not disproven; opcode `0x14` was not observed on this head. The
+bounded heavy attempt is exhausted. The failure-stage classifier now maps this
+outcome directly to `full_client_version_call_failed`, and the next action is a
+network-free binding test/repair before another E2E is authorized.
+
 # Evidence classification
 
 PROVEN:
@@ -581,20 +604,19 @@ UNKNOWN:
 
 # Next action
 
-Run exactly one canonical native-Linux E2E on the regex-validated injector
-repair head; classify the required full-version marker outcome, then use
-directional bytes and structural opcode/callback evidence only if configuration
-succeeded.
+Add a network-free focused Lua binding test that invokes the registered
+`g_gameConfig.setClientVersionString()` and verifies getter readback, then fix
+the binding defect before authorizing another native-Linux E2E.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T16:20:00Z
+updated_at: 2026-08-13T16:35:00Z
 track: otclient-global-login
 track_alias: OTCLIENT-GLOBAL-LOGIN
-head: d112e8a642530f4ab8dba068cc7cd12584e0b2f7
-last_e2e_head: d112e8a642530f4ab8dba068cc7cd12584e0b2f7
+head: 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
+last_e2e_head: 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
 recovery_base_head: 27418b03ee787f049b2e89b14ccc29b50701428f
 base_main: dc18f795bf13cee37a115164da56a452aaa14f02
 branch: feat/OTC-20260813-tibia-global-login-lab
@@ -615,16 +637,18 @@ proven:
   - run 31702087216/job 94453443371 preserved version 1532, sent 230 client bytes, received 148 server bytes, and reached GAME_LOGIN_ERROR
   - run 31706716385/job 94469029667 structurally returned opcode 0x14 with a client+world relationship at exact head 0ee27024357913cfe4d0fca2214a609b86339b01
   - run 31712081913/job 94487558014 reached HANDOFF_CONSUMED and VERSION_CONFIG_BEGIN on exact native Linux head 2b184f882a0a873ce55bdff281c5be7e6dd1f6f0
+  - run 31719826179/job 94513846464 emitted FULL_CLIENT_VERSION_CALL_FAILED before character login with zero bytes in both directions on exact native Linux head 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
 derived:
   - the prior =false pcall marker cannot classify the setter boundary because the exporter emits only =true categories
+  - the current blocker is the Lua/C++ full-version setter binding, not game protocol, WARP, proxy, or official endpoint reachability
 unknown:
   - whether setClientVersionString succeeds and reads back the full version in the exact Linux runtime
   - whether the official endpoint accepts the exact full version string and advances beyond opcode 0x14
 conflicts:
   - none
 first_failure:
-  marker: LAB_1532 injector supported-client tail guard before OTClient launch
-  evidence: run 31718980508/job 94511106360 at d112e8a642530f4ab8dba068cc7cd12584e0b2f7
+  marker: FULL_CLIENT_VERSION_CALL_FAILED=true
+  evidence: run 31719826179/job 94513846464 at 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
@@ -647,6 +671,6 @@ validation:
     result: PASS
     evidence: LAB_1532_INJECTOR_RENDER_CHECK=true; executes the full inner module patch against the verified 1525 source shape with no container, secret, or network access
 blockers:
-  - runs 31717603954/job 94507702845 and 31718980508/job 94511106360 stopped in the lab injector before OTClient launch; neither is setter or protocol evidence
-next_action: run exactly one canonical native-Linux E2E on the regex-validated injector repair head and classify the full-version marker outcome before any protocol-layout change
+  - the bounded heavy attempt is exhausted after run 31719826179 classified the Lua/C++ setter call failure
+next_action: add a network-free focused Lua binding test for setClientVersionString plus getter readback and repair that binding before authorizing another native-Linux E2E
 ```

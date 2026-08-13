@@ -45,7 +45,7 @@ statev=$(sed -n "s/^warp=//p" /tmp/lab-warp.trace)
 [[ "$statev" == on || "$statev" == plus ]]
 '
 
-docker exec -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD "$CONTAINER" python3 - <<'PY'
+docker exec -i -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD "$CONTAINER" python3 - <<'PY'
 import json, os
 from pathlib import Path
 payload = {
@@ -61,7 +61,7 @@ http_status=$(docker exec "$CONTAINER" bash -lc "curl --socks5-hostname 127.0.0.
 [[ "$http_status" =~ ^[0-9]{3}$ ]]
 echo "LAB_HTTP_PREFLIGHT_STATUS=$http_status"
 
-docker exec "$CONTAINER" python3 - <<'PY'
+docker exec -i "$CONTAINER" python3 - <<'PY'
 import json
 from pathlib import Path
 p = Path('/tmp/tibia-login-response.json')

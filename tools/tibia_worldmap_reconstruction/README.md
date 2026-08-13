@@ -75,6 +75,31 @@ Schema: `otclient.worldmap.otb-mapping.v1`
 
 Mappings are version-sensitive evidence. Every mapping requires explicit evidence. A client ID is never assumed to equal an OTB/server ID, and the observation/catalog/mapping client versions must match exactly.
 
+## Snapshot trust boundary
+
+The snapshot is a deterministic **intermediate artifact**, not a cryptographically authenticated evidence envelope.
+
+`validate_snapshot()` fail-closes malformed and internally inconsistent snapshot state. For an `OK` tile it verifies, among other things:
+
+- exactly one observed variant exists;
+- the ground client ID occurs exactly once in that variant;
+- ground/static/dynamic client-ID roles do not overlap;
+- every observed client ID is accounted for by ground/static/dynamic fields with matching multiplicity;
+- static and dynamic client-ID ordering agrees with the observed variant;
+- unresolved IDs are absent and static client/OTB arrays have matching lengths.
+
+This prevents a caller from taking an observed variant and independently forging a contradictory `status=OK` projection that the planner would export.
+
+It does **not** prove the external provenance of a fully self-consistent snapshot or cryptographically authenticate its OTB IDs. The authoritative evidence chain remains:
+
+```text
+trusted observations + verified appearance catalog + verified mapping
+-> reconstruct()
+-> validated snapshot
+```
+
+Do not accept an arbitrary third-party/manual snapshot as proof that a mapping was verified merely because it passes structural validation. If an untrusted handoff boundary is introduced later, add an authenticated evidence envelope or revalidate against the original catalog/mapping inputs rather than overstating what the snapshot schema proves.
+
 ## Reference map
 
 Schema: `otclient.worldmap.reference.v1`
@@ -117,7 +142,7 @@ python -m tools.tibia_worldmap_reconstruction.cli plan-otbm \
   --output otbm-plan.json
 ```
 
-`plan-otbm` emits only a neutral export plan. It does not write the binary OTBM container yet. The plan is exportable only when at least one tile exists, every included tile has one proven ground, all static IDs are mapped and no unresolved/conflicting state remains.
+`plan-otbm` emits only a neutral export plan. It does not write the binary OTBM container yet. The plan is exportable only when at least one tile exists, every included tile has one structurally consistent mapped ground, all static IDs are mapped, no unresolved/conflicting state remains, and the snapshot was produced through the trusted evidence pipeline described above.
 
 ## Comparator statuses
 
@@ -146,4 +171,4 @@ Focused test command:
 PYTHONPATH=. python3 tests/tools/tibia_worldmap_reconstruction/test_pipeline.py
 ```
 
-The focused suite covers successful reconstruction/comparison/OTBM planning, conflicting captures, unresolved ground, unmapped IDs, stack-order differences, unknown appearance roles, malformed/missing provenance, contradictory roles, conflicting mappings, client/OTB version mismatches and empty-plan rejection.
+The focused suite covers successful reconstruction/comparison/OTBM planning, conflicting captures, unresolved ground, unmapped IDs, stack-order differences, unknown appearance roles, malformed/missing provenance, contradictory roles, conflicting mappings, client/OTB version mismatches, empty-plan rejection, malformed snapshot/reference types and inconsistent forged-`OK` snapshot projections.

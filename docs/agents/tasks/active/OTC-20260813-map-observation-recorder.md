@@ -12,7 +12,7 @@ branch: feat/OTC-20260813-map-observation-recorder
 base_branch: main
 start_sha: 005158b5b9bf25fe77bd5fc10813a6388a072836
 created: 2026-08-13T21:14:46Z
-updated: 2026-08-13T21:44:38Z
+updated: 2026-08-13T21:47:00Z
 risk: medium
 related_pr: 292
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
@@ -100,8 +100,8 @@ map-observation-recorder-output: /absolute/local/path/observations.jsonl
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T21:44:38Z
-head: c5e2d9745a1073e82a1b6d789ccc3562b78d1b50
+updated_at: 2026-08-13T21:47:00Z
+head: c171a0a5b4e97e97385b94c8cf892c091a42610b
 branch: feat/OTC-20260813-map-observation-recorder
 pr: 292
 status: validating

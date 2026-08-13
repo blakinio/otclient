@@ -49,23 +49,33 @@ jobs:
           [[ -n "$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
           kill -0 "$xvfb_pid"
 
-          cleared=0
+          canonical_client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          stopped_clients=0
+          cleared_launchers=0
           for proc in /proc/[0-9]*; do
             [[ -r "$proc/environ" && -r "$proc/exe" ]] || continue
             grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            pid="${proc##*/}"
             exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            if [[ "$exe" == "$canonical_client" ]]; then
+              kill "$pid" 2>/dev/null || true
+              for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
+              kill -KILL "$pid" 2>/dev/null || true
+              stopped_clients=$((stopped_clients+1))
+              continue
+            fi
             [[ "$(basename "$exe" 2>/dev/null || true)" == Tibia ]] || continue
             case "$exe" in
               "$state"/*|/tmp/track-a-altuid-*/*/Tibia/Tibia)
-                pid="${proc##*/}"
                 kill "$pid" 2>/dev/null || true
                 for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
                 kill -KILL "$pid" 2>/dev/null || true
-                cleared=$((cleared+1))
+                cleared_launchers=$((cleared_launchers+1))
                 ;;
             esac
           done
-          echo TRACK_A_LAUNCHER_UI_ORPHANS_CLEARED="$cleared"
+          echo TRACK_A_LAUNCHER_UI_CLIENTS_STOPPED="$stopped_clients"
+          echo TRACK_A_LAUNCHER_UI_ORPHANS_CLEARED="$cleared_launchers"
 
           tarball="$work/tibia.x64.tar.gz"
           url='https://static.tibia.com/download/tibia.x64.tar.gz'

@@ -43,21 +43,29 @@ warp=$(sed -n "s/^ip=//p" /tmp/lab-warp.trace)
 statev=$(sed -n "s/^warp=//p" /tmp/lab-warp.trace)
 [[ -n "$direct" && -n "$warp" && "$direct" != "$warp" ]]
 [[ "$statev" == on || "$statev" == plus ]]
+assetversion=$(curl --socks5-hostname 127.0.0.1:25344 --compressed -fsSL --connect-timeout 15 --max-time 60 -A "Mozilla/5.0" https://static.tibia.com/launcher/assets-current/assets.json.sha256 | awk "NR==1{print \$1}")
+[[ "$assetversion" =~ ^[0-9a-fA-F]{64}$ ]]
+printf "%s" "$assetversion" >/tmp/tibia-assetversion
 '
 
 docker exec -i -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD "$CONTAINER" python3 - <<'PY'
 import json, os
 from pathlib import Path
+assetversion = Path('/tmp/tibia-assetversion').read_text().strip()
 payload = {
     "email": os.environ["TIBIA_TEST_EMAIL"],
     "password": os.environ["TIBIA_TEST_PASSWORD"],
     "stayloggedin": True,
     "type": "login",
+    "clientversion": "15.32.df7b29",
+    "clienttype": 2,
+    "assetversion": assetversion,
 }
-Path('/tmp/tibia-login-request.json').write_text(json.dumps(payload), encoding='utf-8')
+Path('/tmp/tibia-login-request.json').write_text(json.dumps(payload, separators=(',', ':')), encoding='utf-8')
+print('LAB_HTTP_PREFLIGHT_ASSET_VERSION_LENGTH=' + str(len(assetversion)))
 PY
 
-http_status=$(docker exec "$CONTAINER" bash -lc "curl --socks5-hostname 127.0.0.1:25344 -sS --connect-timeout 15 --max-time 30 -A 'Mozilla/5.0' -H 'Content-Type: application/json' --data-binary @/tmp/tibia-login-request.json -o /tmp/tibia-login-response.json -w '%{http_code}' https://www.tibia.com/clientservices/loginservice.php")
+http_status=$(docker exec "$CONTAINER" bash -lc "curl --socks5-hostname 127.0.0.1:25344 --compressed -sS --connect-timeout 15 --max-time 60 -A 'Mozilla/5.0' -H 'Content-Type: application/json' -H 'Accept: */*' --data-binary @/tmp/tibia-login-request.json -o /tmp/tibia-login-response.json -w '%{http_code}' https://www.tibia.com/clientservices/loginservice.php")
 [[ "$http_status" =~ ^[0-9]{3}$ ]]
 echo "LAB_HTTP_PREFLIGHT_STATUS=$http_status"
 
@@ -80,8 +88,9 @@ else:
     if isinstance(doc.get('errorCode'), int):
         print('LAB_HTTP_PREFLIGHT_ERROR_CODE=' + str(doc['errorCode']))
     print('LAB_HTTP_PREFLIGHT_HAS_ERROR_MESSAGE=' + str(bool(doc.get('errorMessage'))).lower())
+    print('LAB_HTTP_PREFLIGHT_HAS_DEVICE_COOKIE=' + str('devicecookie' in doc).lower())
 PY
 
-docker exec "$CONTAINER" rm -f /tmp/tibia-login-request.json /tmp/tibia-login-response.json
+docker exec "$CONTAINER" rm -f /tmp/tibia-login-request.json /tmp/tibia-login-response.json /tmp/tibia-assetversion
 unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
 echo LAB_HTTP_PREFLIGHT_COMPLETE=true

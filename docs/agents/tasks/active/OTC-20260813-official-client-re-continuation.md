@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:22:00+02:00
-head: 71d1720436fe946c78876adeb48dd4a8c1e166f3
+updated_at: 2026-08-13T15:24:00+02:00
+head: e91c519c8b19f497ca5191ad2551ea780a390df8
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -102,7 +102,7 @@ unknown:
   - decoded current-world records and authoritative player position
 first_failure:
   marker: exact versioned input sequence does not transition either persistent or fresh Track A client home after Login click
-  evidence: run 31714821056 job 94496738127 used a fresh temporary HOME/XDG config directory and versioned input delivery; transition 4813 < 45000 and local SOCKS stayed at 3
+  evidence: run 31714821056 job 94496738127 used a fresh temporary HOME/XDG config directory and versioned input delivery; transition 4813 < 45000 and local SOCKS stayed at 3; run 31715045843 did not reach the baseline because the marker pipeline tr|grep raised SIGPIPE
 rejected_hypotheses:
   - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
   - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
@@ -139,6 +139,9 @@ validation:
   - command: Track A structural login run 31714821056 job 94496738127
     result: FAIL_FOR_FRESH_HOME_BASELINE
     evidence: fresh client HOME/XDG config was used and removed; versioned input delivery; transition 4813 < 45000; no structural IN_GAME claim
+  - command: Track A structural login run 31715045843 job 94497518892
+    result: INVALID_PRELOGIN_VALIDATION
+    evidence: fresh-home 1280x800 attempt stopped at the owned-client marker pipeline because tr|grep returned SIGPIPE under pipefail; no secrets were injected
 blockers: []
-next_action: run the same fresh-home versioned baseline with the historical 1280x800 Xvfb screen and five-second window-stabilization interval before the three explicit input clicks
+next_action: replace marker tr|grep pipelines with NUL-safe direct grep and rerun the same fresh-home 1280x800 baseline with the five-second stabilization interval
 ```

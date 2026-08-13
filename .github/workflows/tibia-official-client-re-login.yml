@@ -58,7 +58,7 @@ jobs:
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
           if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
             [[ -r "/proc/$pid/environ" ]]
-            tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker"
+            grep -azFxq "$marker" "/proc/$pid/environ"
             [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
             kill "$pid"
             for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
@@ -69,7 +69,7 @@ jobs:
           if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
             warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid")"
             [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
-            tr '\0' '\n' <"/proc/$warp_pid/environ" | grep -Fxq "$marker"
+            grep -azFxq "$marker" "/proc/$warp_pid/environ"
             kill -0 "$warp_pid"
             curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
               https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
@@ -77,7 +77,7 @@ jobs:
             xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
             if [[ -n "$xvfb_pid" ]] && kill -0 "$xvfb_pid" 2>/dev/null; then
               [[ -r "/proc/$xvfb_pid/environ" ]]
-              tr '\0' '\n' <"/proc/$xvfb_pid/environ" | grep -Fxq "$marker"
+              grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
               kill "$xvfb_pid"
               for _ in $(seq 1 30); do kill -0 "$xvfb_pid" 2>/dev/null || break; sleep 0.2; done
               ! kill -0 "$xvfb_pid" 2>/dev/null
@@ -135,8 +135,8 @@ jobs:
           [[ -n "$pid" ]] && kill -0 "$pid"
           echo TRACK_A_CLIENT_ENVIRON_READABLE="$([[ -r "/proc/$pid/environ" ]] && echo true || echo false)"
           [[ -r "/proc/$pid/environ" ]]
-          echo TRACK_A_CLIENT_MARKER_PRESENT="$(tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker" && echo true || echo false)"
-          tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker"
+          echo TRACK_A_CLIENT_MARKER_PRESENT="$(grep -azFxq "$marker" "/proc/$pid/environ" && echo true || echo false)"
+          grep -azFxq "$marker" "/proc/$pid/environ"
           executable="$(readlink -f "/proc/$pid/exe")"
           echo TRACK_A_CLIENT_EXECUTABLE="$executable"
           [[ "$executable" == "$client" ]]

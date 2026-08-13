@@ -1,0 +1,53 @@
+name: Track A forced AT-SPI bus probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-atspi-force-bus-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Force accessibility bus without GSettings
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          root="$state/toolroot"
+          lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          launcher="$(find "$root" -type f -name at-spi-bus-launcher -print -quit)"
+          [[ -n "$launcher" ]]
+          mapfile -t info < <(PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-daemon" --session --fork --print-address=1 --print-pid=1)
+          [[ ${#info[@]} -ge 2 && -n "${info[0]}" && "${info[1]}" =~ ^[0-9]+$ ]]
+          export DBUS_SESSION_BUS_ADDRESS="${info[0]}"
+          dbus_pid="${info[1]}"
+          atspi_pid=''
+          cleanup() { [[ -z "$atspi_pid" ]] || kill "$atspi_pid" 2>/dev/null || true; kill "$dbus_pid" 2>/dev/null || true; }
+          trap cleanup EXIT
+          echo TRACK_A_SESSION_DBUS_READY=true
+          PATH="$path" LD_LIBRARY_PATH="$lib" "$launcher" --launch-immediately --a11y=1 >/tmp/track-a-atspi-force.log 2>&1 &
+          atspi_pid=$!
+          for _ in $(seq 1 30); do
+            if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --session --print-reply \
+              --dest=org.a11y.Bus /org/a11y/bus org.a11y.Bus.GetAddress >/tmp/track-a-atspi-address.txt 2>/dev/null; then
+              break
+            fi
+            sleep 0.2
+          done
+          if ! kill -0 "$atspi_pid" 2>/dev/null; then
+            sed -n '1,40p' /tmp/track-a-atspi-force.log | sed 's/^/TRACK_A_ATSPI_STDERR=/'
+            exit 1
+          fi
+          grep -q 'string "' /tmp/track-a-atspi-address.txt
+          echo TRACK_A_FORCED_ATSPI_BUS_READY=true

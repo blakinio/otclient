@@ -1,0 +1,151 @@
+name: Tibia hosted Qt preload bridge prototype
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-preload-qobject-probe.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-preload-probe-home
+      PACKAGE_BASE: https://static.tibia.com/launcher/tibiaclient-linux-current
+      ASSET_BASE: https://static.tibia.com/launcher/assets-current
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Reconstruct exact runtime without credentials
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends python3-yaml build-essential pkg-config qt6-base-dev
+          python3 - <<'PY'
+          import pathlib,yaml
+          doc=yaml.safe_load(pathlib.Path('.github/workflows/tibia-hosted-complete-assets-no-ocr-login-v4.yml').read_text())
+          steps=doc['jobs']['world-entry']['steps'];out=pathlib.Path('/tmp/tibia-v4-steps');out.mkdir(parents=True,exist_ok=True)
+          wanted={
+            'Install strict no-OCR runtime':'01-install.sh',
+            'Establish pinned userspace WARP':'02-warp.sh',
+            'Reconstruct official package and preserve packed runtime assets':'03-runtime.sh',
+          }
+          seen=set()
+          for step in steps:
+            if step.get('name') in wanted:
+              p=out/wanted[step['name']];p.write_text(step['run']);p.chmod(0o700);seen.add(step['name'])
+          if set(wanted)-seen:raise SystemExit('missing runtime bootstrap steps')
+          PY
+          for s in 01-install.sh 02-warp.sh 03-runtime.sh;do /usr/bin/bash --noprofile --norc -e -o pipefail "/tmp/tibia-v4-steps/$s";done
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo PRELOAD_PROBE_RUNTIME_READY=true
+
+      - name: Build temporary Qt helper
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat >/tmp/tibia-qobject-probe.cpp <<'CPP'
+          #include <QtCore/QCoreApplication>
+          #include <QtCore/QMetaMethod>
+          #include <QtCore/QMetaObject>
+          #include <QtCore/QObject>
+          #include <QtCore/QTimer>
+          #include <algorithm>
+          #include <atomic>
+          #include <chrono>
+          #include <cstdio>
+          #include <fstream>
+          #include <set>
+          #include <string>
+          #include <thread>
+          #include <vector>
+
+          static std::atomic<int> scans{0};
+          static const char* out_path="/tmp/tibia-runtime/qobject-probe.txt";
+          static bool wanted(const std::string& s) {
+            static const char* terms[]={"Player","Creature","Container","Inventory","Worldmap","GameClient","Chat","Cooldown","StatusBar","Minimap","ProtocolMessage","Authentication","CharacterSelection","GameSession"};
+            for (auto t:terms) if (s.find(t)!=std::string::npos) return true;
+            return false;
+          }
+          static void scan_once() {
+            auto* app=QCoreApplication::instance();
+            if(!app) return;
+            std::vector<QObject*> objects; objects.push_back(app);
+            const auto children=app->findChildren<QObject*>();
+            for(auto* o:children) objects.push_back(o);
+            std::set<std::string> rows;
+            for(auto* o:objects) {
+              if(!o) continue;
+              const QMetaObject* mo=o->metaObject();
+              if(!mo) continue;
+              std::string cls=mo->className()?mo->className():"";
+              if(!wanted(cls)) continue;
+              rows.insert("CLASS "+cls);
+              for(int i=mo->methodOffset();i<mo->methodCount();++i) {
+                auto m=mo->method(i); std::string sig=m.methodSignature().constData();
+                if(wanted(sig) || sig.find("attack")!=std::string::npos || sig.find("follow")!=std::string::npos || sig.find("use")!=std::string::npos || sig.find("move")!=std::string::npos || sig.find("talk")!=std::string::npos || sig.find("position")!=std::string::npos || sig.find("health")!=std::string::npos || sig.find("mana")!=std::string::npos || sig.find("capacity")!=std::string::npos)
+                  rows.insert("METHOD "+cls+" "+sig);
+              }
+            }
+            std::ofstream f(out_path,std::ios::app);
+            f<<"SCAN "<<scans.load()<<" OBJECTS "<<objects.size()<<" MATCHES "<<rows.size()<<"\n";
+            for(const auto& r:rows) f<<r<<"\n";
+            f.flush();
+            int n=++scans;
+            if(n<8) QTimer::singleShot(1500,app,[](){scan_once();});
+          }
+          __attribute__((constructor)) static void init_probe() {
+            std::ofstream(out_path,std::ios::trunc)<<"PRELOAD_CONSTRUCTOR=true\n";
+            std::thread([](){
+              for(int i=0;i<200;++i) {
+                if(auto* app=QCoreApplication::instance()) {
+                  bool ok=QMetaObject::invokeMethod(app,[](){scan_once();},Qt::QueuedConnection);
+                  std::ofstream f(out_path,std::ios::app);f<<"QUEUED_SCAN="<<(ok?"true":"false")<<"\n";f.flush();
+                  return;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+              }
+              std::ofstream(out_path,std::ios::app)<<"QCOREAPPLICATION_NOT_FOUND=true\n";
+            }).detach();
+          }
+          CPP
+          c++ -std=c++20 -fPIC -shared /tmp/tibia-qobject-probe.cpp -o /tmp/tibia-qobject-probe.so $(pkg-config --cflags --libs Qt6Core) -pthread
+          test -s /tmp/tibia-qobject-probe.so
+          echo QT_PRELOAD_HELPER_BUILT=true
+
+      - name: Launch exact client with helper and inspect safe structural classes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/tibia-runtime/xvfb-preload.log 2>&1 </dev/null &
+          for _ in $(seq 1 30);do xdpyinfo -display :99 >/dev/null 2>&1&&break;sleep 1;done
+          pkg="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia";client="$pkg/bin/client";cd "$pkg"
+          lvp=$(find /usr/share/vulkan/icd.d -maxdepth 1 -type f -name 'lvp_icd*.json' -print -quit);[[ -f "$lvp" ]]
+          rm -f /tmp/tibia-runtime/qobject-probe.txt /tmp/tibia-runtime/client-preload.log
+          nohup env LD_PRELOAD=/tmp/tibia-qobject-probe.so VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp" LIBGL_ALWAYS_SOFTWARE=1 \
+            proxychains4 -f /tmp/tibia-runtime/proxychains.conf "$client" >/tmp/tibia-runtime/client-preload.log 2>&1 </dev/null &
+          pid=$!;echo "$pid">/tmp/tibia-runtime/preload-client-pid
+          for _ in $(seq 1 80);do grep -q '^PRELOAD_CONSTRUCTOR=true' /tmp/tibia-runtime/qobject-probe.txt 2>/dev/null&&break;sleep 0.25;done
+          grep -q '^PRELOAD_CONSTRUCTOR=true' /tmp/tibia-runtime/qobject-probe.txt
+          for _ in $(seq 1 80);do grep -q '^SCAN ' /tmp/tibia-runtime/qobject-probe.txt 2>/dev/null&&break;sleep 0.25;done
+          sleep 12
+          kill -0 "$pid"
+          echo QOBJECT_PROBE_BEGIN
+          grep -E '^(PRELOAD_CONSTRUCTOR|QUEUED_SCAN|SCAN |CLASS |METHOD )' /tmp/tibia-runtime/qobject-probe.txt | head -n 500 || true
+          echo QOBJECT_PROBE_END
+          grep -q '^QUEUED_SCAN=true' /tmp/tibia-runtime/qobject-probe.txt
+          grep -q '^SCAN ' /tmp/tibia-runtime/qobject-probe.txt
+          scans=$(grep -c '^SCAN ' /tmp/tibia-runtime/qobject-probe.txt||true);echo QOBJECT_SCAN_COUNT=$scans
+          classes=$(grep -c '^CLASS ' /tmp/tibia-runtime/qobject-probe.txt||true);echo QOBJECT_MATCHED_CLASS_ROWS=$classes
+          echo QT_PRELOAD_BRIDGE_THREAD_INVOCATION_PROVEN=true

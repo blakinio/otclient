@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:15:00+02:00
-head: 0b02d719d92e469464260f9112b487c4857f9530
+updated_at: 2026-08-13T15:18:00+02:00
+head: dce10a9eefaf5dacc4d06edb67e777b96499af85
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -101,8 +101,8 @@ unknown:
   - whether the exact historically proven explicit coordinate sequence transitions this isolated runtime from Account Login to Select Character
   - decoded current-world records and authoritative player position
 first_failure:
-  marker: no valid failure classification yet for the versioned successful input implementation
-  evidence: run 31714150143 job 94494444800 proved click coordinates, but used global key/type delivery and 12ms delay rather than the historical workflow's --window key/type delivery and 3ms delay
+  marker: exact versioned input sequence does not transition the current persistent client home after Login click
+  evidence: run 31714475543 job 94495543093 used the versioned --window key/type delivery and 3ms delay; all click coordinates matched; transition 4785 < 45000 and local SOCKS stayed at 2
 rejected_hypotheses:
   - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
   - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
@@ -133,6 +133,9 @@ validation:
   - command: Track A structural login run 31714150143 job 94494444800
     result: INCONCLUSIVE_FOR_VERSIONED_BASELINE
     evidence: pointer coordinates exactly matched the three historical coordinates, but key/type delivery differed from the versioned successful workflow
+  - command: Track A structural login run 31714475543 job 94495543093
+    result: FAIL_FOR_VERSIONED_INPUT_BASELINE
+    evidence: exact versioned key/type and explicit-click implementation; coordinates matched; transition 4785 < 45000; no post-submit SOCKS increase; no structural IN_GAME claim
 blockers: []
-next_action: execute the repository-versioned successful input implementation exactly: windowactivate, explicit three coordinate clicks, xdotool key --window/type --window with 3ms delay, then the historical transition and character-selection gates
+next_action: repeat the exact versioned input sequence with an isolated temporary HOME/XDG config directory for the official client while preserving the verified reconstructed runtime; remove only that exact temporary directory after the job
 ```

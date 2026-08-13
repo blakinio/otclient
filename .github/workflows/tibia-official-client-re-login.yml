@@ -46,7 +46,14 @@ jobs:
           evidence="$state/evidence/login-$(date -u +%Y%m%dT%H%M%SZ)"
           mkdir -p "$evidence"
           chmod 700 "$state/evidence" "$evidence"
-          trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "TRACK_A_LOGIN_FAILURE_RC=$rc"; for log in "$evidence/vulkaninfo.txt" "$state/runtime/xvfb.log" "$state/runtime/client.log"; do if [[ -f "$log" ]]; then echo "TRACK_A_LOG_BEGIN=$(basename "$log")"; tail -n 80 "$log"; echo "TRACK_A_LOG_END=$(basename "$log")"; fi; done; fi' EXIT
+          login_home="$(mktemp -d "$state/runtime/login-home.XXXXXX")"
+          chmod 700 "$login_home"
+          cleanup_login_home() {
+            if [[ -d "${login_home:-}" && "$login_home" == "$state/runtime/login-home."* ]]; then
+              rm -rf -- "$login_home"
+            fi
+          }
+          trap 'rc=$?; cleanup_login_home; if [[ $rc -ne 0 ]]; then echo "TRACK_A_LOGIN_FAILURE_RC=$rc"; for log in "$evidence/vulkaninfo.txt" "$state/runtime/xvfb.log" "$state/runtime/client.log"; do if [[ -f "$log" ]]; then echo "TRACK_A_LOG_BEGIN=$(basename "$log")"; tail -n 80 "$log"; echo "TRACK_A_LOG_END=$(basename "$log")"; fi; done; fi' EXIT
 
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
           if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
@@ -105,7 +112,9 @@ jobs:
             echo TRACK_A_LAVAPIPE_VERIFIED=true
             cd "$runtime"
             env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-              HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
+              HOME="$login_home" XDG_CONFIG_HOME="$login_home/.config" \
+              XDG_CACHE_HOME="$login_home/.cache" XDG_DATA_HOME="$login_home/.local/share" \
+              DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
               LD_LIBRARY_PATH="$runtime/lib:$tool_lib" \
               LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" QSG_RHI_BACKEND=vulkan \
               VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
@@ -115,6 +124,7 @@ jobs:
             pid=$!
             printf '%s\n' "$pid" >"$state/runtime/client.pid"
             chmod 600 "$state/runtime/client.pid" "$state/runtime/xvfb.pid"
+            echo TRACK_A_FRESH_CLIENT_HOME=true
             sleep 12
           fi
 

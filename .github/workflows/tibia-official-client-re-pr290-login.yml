@@ -1,4 +1,4 @@
-name: Track A PR290 world login
+name: Track A current official child recovery
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  login:
+  recover:
     runs-on: [otclient, synology]
     timeout-minutes: 12
     env:
@@ -23,24 +23,15 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_DISPLAY: ':98'
       TRACK_WARP_PORT: '25354'
-      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-      TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
-      TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+      OLD_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-
-      - name: Reproduce PR290 login and leave character in world
+      - name: Recover canonical child through official Linux launcher
         shell: bash
         run: |
-          set +x
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
-          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
-
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
@@ -48,183 +39,124 @@ jobs:
           toolroot="$state/toolroot"
           tool_path="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
-          proxy_conf="$state/config/proxychains.conf"
-          evidence="$state/evidence/pr290-login-$(date -u +%Y%m%dT%H%M%SZ)"
-          mkdir -p "$state/runtime" "$evidence" artifacts/track-a-pr290
-          chmod 700 "$state/runtime" "$evidence"
-          trap 'rm -f "$evidence"/select.* "$evidence"/ocr.* "$evidence"/*.tsv 2>/dev/null || true' EXIT
+          work="$state/launcher-recovery/canonical-$GITHUB_RUN_ID"
+          evidence="$GITHUB_WORKSPACE/artifacts/track-a-current-child"
+          mkdir -p "$work/unpacked" "$evidence"
+          chmod 700 "$work" "$work/unpacked"
 
           [[ -x "$client" ]]
-          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          echo TRACK_A_EXACT_OFFICIAL_CLIENT_VERIFIED=true
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$OLD_CLIENT_SHA256" ]]
+          echo TRACK_A_REJECTED_CHILD_SHA_VERIFIED=true
 
           warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
           [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
           grep -azFxq "$marker" "/proc/$warp_pid/environ"
           kill -0 "$warp_pid"
-          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
-          echo TRACK_A_WARP_VERIFIED=true
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace >"$work/warp-before.txt"
+          grep -Eq '^warp=(on|plus)$' "$work/warp-before.txt"
+          echo TRACK_A_RECOVERY_WARP_VERIFIED=true
 
           old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
-          if [[ -n "$old_pid" && -r "/proc/$old_pid/environ" ]]; then
-            grep -azFxq "$marker" "/proc/$old_pid/environ"
-            [[ "$(readlink -f "/proc/$old_pid/exe")" == "$client" ]]
-            kill "$old_pid" 2>/dev/null || true
-            for _ in $(seq 1 30); do kill -0 "$old_pid" 2>/dev/null || break; sleep .2; done
-          fi
+          [[ -n "$old_pid" && -r "/proc/$old_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$old_pid/environ"
+          [[ "$(readlink -f "/proc/$old_pid/exe")" == "$client" ]]
+          kill -0 "$old_pid"
+          echo TRACK_A_REJECTED_CHILD_PID="$old_pid"
+          kill "$old_pid"
+          for _ in $(seq 1 40); do
+            kill -0 "$old_pid" 2>/dev/null || break
+            sleep .25
+          done
+          ! kill -0 "$old_pid" 2>/dev/null
+          rm -f "$state/runtime/client.pid"
+          echo TRACK_A_REJECTED_CHILD_STOPPED=true
 
           xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
-          if [[ -z "$xvfb_pid" || ! -e "/proc/$xvfb_pid" || ! -e /tmp/.X11-unix/X98 ]]; then
-            private_xvfb="$state/runtime/Xvfb-track-a"
-            [[ -x "$private_xvfb" ]]
-            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-              PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
-              nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1280x800x24 -xkbdir "$toolroot/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset \
-              >"$state/runtime/xvfb.log" 2>&1 </dev/null &
-            xvfb_pid=$!
-            printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"
-            for _ in $(seq 1 30); do [[ -e /tmp/.X11-unix/X98 ]] && break; sleep 1; done
-          fi
+          [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+          kill -0 "$xvfb_pid"
           [[ -e /tmp/.X11-unix/X98 ]]
+          echo TRACK_A_RECOVERY_DISPLAY_VERIFIED=true
+
+          tarball="$work/tibia.x64.tar.gz"
+          url='https://static.tibia.com/download/tibia.x64.tar.gz'
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL \
+            --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$url" -H 'Accept: */*' "$url" -o "$tarball"
+          echo TRACK_A_CURRENT_TARBALL_SHA256="$(sha256sum "$tarball" | awk '{print $1}')"
+          echo TRACK_A_CURRENT_TARBALL_SIZE="$(stat -c %s "$tarball")"
+          python3 - "$tarball" "$work/unpacked" <<'PY'
+          import pathlib,sys,tarfile
+          with tarfile.open(sys.argv[1],'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try: h.extractall(sys.argv[2],filter='data')
+              except TypeError: h.extractall(sys.argv[2])
+          PY
+          launcher="$work/unpacked/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          echo TRACK_A_CURRENT_LAUNCHER_SHA256="$(sha256sum "$launcher" | awk '{print $1}')"
+          echo TRACK_A_CURRENT_LAUNCHER_SIZE="$(stat -c %s "$launcher")"
 
           proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
-          vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
-          swrast="$(find "$toolroot" \( -type f -o -type l \) -name 'swrast_dri.so' -print -quit)"
-          [[ -n "$proxy_lib" && -n "$vk_icd" && -n "$swrast" && -s "$proxy_conf" ]]
+          vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit 2>/dev/null || true)"
+          swrast="$(find "$toolroot" \( -type f -o -type l \) -name 'swrast_dri.so' -print -quit 2>/dev/null || true)"
+          [[ -n "$proxy_lib" && -n "$vk_icd" && -n "$swrast" ]]
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode \
+            'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' \
+            '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          chmod 600 "$proxy_conf"
           dri_dir="$(dirname "$swrast")"
-
-          cd "$runtime"
+          launcher_dir="$(dirname "$launcher")"
+          cd "$launcher_dir"
           env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-            HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
-            LD_LIBRARY_PATH="$runtime/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" \
-            QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
-            FONTCONFIG_PATH="$toolroot/etc/fonts" FONTCONFIG_FILE="$toolroot/etc/fonts/fonts.conf" \
+            HOME="$state/home" XDG_DATA_HOME="$state/home/.local/share" DISPLAY="$TRACK_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$launcher_dir:$launcher_dir/lib:$tool_lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            VK_ICD_FILENAMES="$vk_icd" VK_DRIVER_FILES="$vk_icd" \
             LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
-            nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
-          pid=$!
-          printf '%s\n' "$pid" >"$state/runtime/client.pid"
-          chmod 600 "$state/runtime/client.pid"
-          sleep 12
-          kill -0 "$pid"
-          grep -azFxq "$marker" "/proc/$pid/environ"
-          echo TRACK_A_OFFICIAL_CLIENT_RUNNING=true
+            nohup "$launcher" >"$evidence/launcher.log" 2>&1 </dev/null &
+          launcher_pid=$!
+          echo TRACK_A_CURRENT_LAUNCHER_PID="$launcher_pid"
 
-          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
-          resolve_window() {
-            local w g width height area best='' best_area=0
-            for _ in $(seq 1 50); do
-              best=''; best_area=0
-              for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
-                g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
-                width="$(printf '%s\n' "$g" | sed -n 's/^WIDTH=//p')"; height="$(printf '%s\n' "$g" | sed -n 's/^HEIGHT=//p')"
-                [[ -n "$width" && -n "$height" ]] || continue
-                area=$((width*height)); if ((area>best_area)); then best="$w"; best_area=$area; fi
-              done
-              [[ -n "$best" ]] && { printf '%s\n' "$best"; return 0; }
-              sleep .4
-            done
-            return 1
-          }
-
-          window="$(resolve_window)"
-          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
-          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
-
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 250 click 1
-          "$toolroot/usr/bin/xdotool" key ctrl+a
-          "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_EMAIL"
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 384 click 1
-          "$toolroot/usr/bin/xdotool" key ctrl+a
-          "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_PASSWORD"
-          "$toolroot/usr/bin/xdotool" key Return
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          echo TRACK_A_ACCOUNT_LOGIN_SUBMITTED=true
-
-          sleep 8
-          kill -0 "$pid"
-          window="$(resolve_window)"
-
-          command -v tesseract >/dev/null 2>&1
-          xwd="$evidence/select.xwd"
-          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$xwd"
-          img=''
-          if command -v xwdtopnm >/dev/null 2>&1; then
-            img="$evidence/select.ppm"; xwdtopnm "$xwd" >"$img" 2>/dev/null
-          elif command -v convert >/dev/null 2>&1; then
-            img="$evidence/select.png"; convert "$xwd" "$img"
-          elif command -v magick >/dev/null 2>&1; then
-            img="$evidence/select.png"; magick "$xwd" "$img"
-          else
-            echo TRACK_A_OCR_IMAGE_CONVERTER_MISSING=true; exit 41
-          fi
-          tesseract "$img" "$evidence/ocr" --psm 6 tsv >/dev/null 2>&1
-
-          read -r row_x row_y < <(python3 - "$evidence/ocr.tsv" <<'PY'
-import csv,sys
-rows=[]
-with open(sys.argv[1],encoding='utf-8',errors='replace') as f:
-    for r in csv.DictReader(f,delimiter='\t'):
-        try:
-            text=(r.get('text') or '').strip(); conf=float(r.get('conf') or -1)
-            x=int(r.get('left') or 0); y=int(r.get('top') or 0); w=int(r.get('width') or 0); h=int(r.get('height') or 0)
-        except Exception: continue
-        if text and conf>=20: rows.append((text.lower(),x,y,w,h))
-headers=[r for r in rows if r[0] in ('character','status')]
-if not headers:
-    raise SystemExit(2)
-header_y=min(r[2] for r in headers)
-candidates=[]
-for text,x,y,w,h in rows:
-    if y <= header_y+12 or y > header_y+180: continue
-    if text in ('character','status','online','offline'): continue
-    candidates.append((y,x,w,h))
-if not candidates:
-    raise SystemExit(3)
-y0=min(y for y,_,_,_ in candidates)
-line=[r for r in candidates if abs(r[0]-y0)<=8]
-left=min(x for _,x,_,_ in line); right=max(x+w for _,x,w,_ in line)
-height=max(h for _,_,_,h in line)
-print((left+right)//2, y0+max(8,height//2))
-PY
-          )
-          [[ "$row_x" =~ ^[0-9]+$ && "$row_y" =~ ^[0-9]+$ ]]
-          echo TRACK_A_CHARACTER_ROW_LOCATED_BY_OCR=true
-          echo TRACK_A_CHARACTER_ROW_X="$row_x"
-          echo TRACK_A_CHARACTER_ROW_Y="$row_y"
-          rm -f "$evidence/ocr.tsv" "$evidence/ocr.txt" "$img" "$xwd"
-
-          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" "$row_x" "$row_y" click 1
-          sleep .3
-          "$toolroot/usr/bin/xdotool" key Return
-          echo TRACK_A_CHARACTER_ACTIVATION_SENT=true
-
-          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$evidence/preworld.xwd"
-          world=0
-          for _ in $(seq 1 45); do
-            sleep 1
-            kill -0 "$pid"
-            window="$(resolve_window || true)"; [[ -n "$window" ]] || continue
-            "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$evidence/world.xwd"
-            changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$evidence/preworld.xwd" "$evidence/world.xwd" 2>/dev/null || echo 0)"
-            if [[ "$changed" =~ ^[0-9]+$ ]] && (( changed > 20000 )); then world=1; break; fi
+          new_sha=''
+          stable=0
+          for _ in $(seq 1 240); do
+            if [[ -s "$client" ]]; then
+              sha="$(sha256sum "$client" | awk '{print $1}')"
+              if [[ "$sha" != "$OLD_CLIENT_SHA256" ]]; then
+                if [[ "$sha" == "$new_sha" ]]; then stable=$((stable+1)); else new_sha="$sha"; stable=0; fi
+                (( stable >= 3 )) && break
+              fi
+            fi
+            sleep 2
           done
-          echo TRACK_A_WORLD_VIEWPORT_TRANSITION="$world"
-          [[ "$world" == 1 ]]
+          [[ -n "$new_sha" && "$new_sha" != "$OLD_CLIENT_SHA256" && $stable -ge 3 ]]
+          echo TRACK_A_CURRENT_CHILD_SHA256="$new_sha"
+          echo TRACK_A_CURRENT_CHILD_SIZE="$(stat -c %s "$client")"
+          python3 - "$client" <<'PY'
+          import pathlib,re,sys
+          data=pathlib.Path(sys.argv[1]).read_bytes(); seen=[]
+          for m in re.finditer(rb'15\.[0-9]{2}(?:\.[A-Za-z0-9]+)?',data):
+              s=m.group().decode('ascii','ignore')
+              if s not in seen: seen.append(s)
+          print('TRACK_A_CURRENT_CHILD_VERSION_STRINGS='+','.join(seen[:20]))
+          PY
+          echo TRACK_A_CURRENT_CHILD_RECOVERED=true
 
-          cp "$evidence/world.xwd" artifacts/track-a-pr290/world.xwd
-          grep -azFxq "$marker" "/proc/$pid/environ"
-          kill -0 "$pid"
-          echo TRACK_A_PHYSICAL_WORLD_ENTRY_PROVEN=true
-          echo TRACK_A_SESSION_LEFT_LOGGED_IN=true
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace >"$work/warp-after.txt"
+          grep -Eq '^warp=(on|plus)$' "$work/warp-after.txt"
+          echo TRACK_A_RECOVERY_WARP_STILL_VERIFIED=true
 
-      - name: Upload achieved world screenshot
+      - name: Upload recovery evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: track-a-pr290-world
-          path: artifacts/track-a-pr290/world.xwd
-          if-no-files-found: ignore
+          name: track-a-current-child-recovery
+          path: artifacts/track-a-current-child/**
+          if-no-files-found: warn
           retention-days: 7
-
-# manual rerun requested by repository owner on 2026-08-13

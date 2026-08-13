@@ -1,0 +1,205 @@
+name: Track A official Linux structural login
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-login.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  login:
+    runs-on: ${{ fromJSON('["otclient", "synology"]') }}
+    timeout-minutes: 15
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+      TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+    steps:
+      - name: Login and require decoded world state
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          toolroot="$state/toolroot"
+          tool_path="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          evidence="$state/evidence/login-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$evidence"
+          chmod 700 "$state/evidence" "$evidence"
+
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid")"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker"
+          kill -0 "$pid"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
+          resolve_window() {
+            local w geometry width height best='' best_area=0 area
+            for _ in $(seq 1 80); do
+              best=''; best_area=0
+              for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+                geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+                width="$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')"
+                height="$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')"
+                [[ -n "$width" && -n "$height" ]] || continue
+                area=$((width * height))
+                if (( area > best_area )); then best="$w"; best_area=$area; fi
+              done
+              if [[ -n "$best" ]]; then
+                geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$best")"
+                width="$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')"
+                height="$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')"
+                [[ "$width" == 1020 && "$height" == 650 ]] && { printf '%s\n' "$best"; return 0; }
+              fi
+              sleep 0.5
+            done
+            return 1
+          }
+
+          cat >"$evidence/socket_state.py" <<'PY'
+          import os, pathlib, sys
+          pid, port = sys.argv[1], int(sys.argv[2])
+          inodes = set()
+          for fd in pathlib.Path('/proc', pid, 'fd').iterdir():
+              try: target = os.readlink(fd)
+              except OSError: continue
+              if target.startswith('socket:['): inodes.add(target[8:-1])
+          local = direct = udp = 0
+          for name, is_udp in [('tcp', False), ('tcp6', False), ('udp', True), ('udp6', True)]:
+              try: lines = pathlib.Path('/proc', pid, 'net', name).read_text().splitlines()[1:]
+              except OSError: continue
+              for line in lines:
+                  cols = line.split()
+                  if len(cols) < 10 or cols[9] not in inodes: continue
+                  remote_port = int(cols[2].rsplit(':', 1)[1], 16)
+                  if is_udp: udp += 1
+                  elif cols[3] == '01':
+                      if remote_port == port: local += 1
+                      else: direct += 1
+          print(f'{local} {direct} {udp}')
+          PY
+          socket_state() { python3 "$evidence/socket_state.py" "$pid" "$TRACK_WARP_PORT"; }
+
+          read -r initial_local initial_direct initial_udp < <(socket_state)
+          echo TRACK_A_INITIAL_LOCAL_SOCKS="$initial_local"
+          [[ "$initial_direct" == 0 && "$initial_udp" == 0 ]]
+          if (( initial_local < 2 )); then
+            window="$(resolve_window)"
+            "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
+            "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
+            printf '%s' "$TIBIA_TEST_EMAIL" | "$toolroot/usr/bin/xclip" -selection clipboard -in
+            "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+v
+            printf '' | "$toolroot/usr/bin/xclip" -selection clipboard -in
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
+            "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
+            printf '%s' "$TIBIA_TEST_PASSWORD" | "$toolroot/usr/bin/xclip" -selection clipboard -in
+            "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+v
+            printf '' | "$toolroot/usr/bin/xclip" -selection clipboard -in
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
+            unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+            sleep 8
+            window="$(resolve_window)"
+            "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 285 193 click 1
+            sleep 0.4
+            "$toolroot/usr/bin/xdotool" key --window "$window" Return
+            sleep 3
+            window="$(resolve_window || true)"
+            if [[ -n "$window" ]]; then
+              "$toolroot/usr/bin/xdotool" mousemove --window "$window" 285 193 click --repeat 2 --delay 160 1 || true
+            fi
+          else
+            unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+            echo TRACK_A_EXISTING_SESSION_PRESERVED=true
+          fi
+
+          sustained=0; consecutive=0; max_local=0
+          for _ in $(seq 1 75); do
+            sleep 1
+            kill -0 "$pid"
+            read -r local direct udp < <(socket_state)
+            (( local > max_local )) && max_local=$local || true
+            [[ "$direct" == 0 && "$udp" == 0 ]]
+            if (( local >= 2 )); then consecutive=$((consecutive + 1)); else consecutive=0; fi
+            if (( consecutive >= 6 )); then sustained=1; break; fi
+          done
+          echo TRACK_A_LOCAL_SOCKS_MAX="$max_local"
+          echo TRACK_A_SUSTAINED_WORLD_TRANSPORT="$sustained"
+          [[ "$sustained" == 1 ]]
+
+          if [[ -w /proc/sys/kernel/yama/ptrace_scope ]]; then printf '0\n' >/proc/sys/kernel/yama/ptrace_scope; fi
+          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
+          [[ -n "$line" ]]
+          start="$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')"
+          offset="$(printf '%s\n' "$line" | awk '{print $3}')"
+          bias=$((16#$start - 16#$offset))
+          printf 'TRACK_A_PIE_BASE=0x%x\n' "$bias"
+          cat >"$evidence/postworld.gdb" <<EOF
+          set pagination off
+          set confirm off
+          attach $pid
+          python
+          import gdb, struct
+          inf=gdb.selected_inferior(); out='$evidence/map-records'; open(out,'w').close()
+          class B(gdb.Breakpoint):
+            def __init__(self): super().__init__('*0x%x'%($bias+0x19a8ea3)); self.n=0
+            def stop(self):
+              try:
+                rsp=int(gdb.parse_and_eval('\$rsp')); order=int(gdb.parse_and_eval('\$rbp'))&0xffffffff
+                x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))
+                if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                  self.n+=1; open(out,'a').write(f'{x} {y} {z} {order}\n')
+                  if self.n>=8: open('$evidence/map-hit','w').write(f'DECODED_MAP_RECORD_COUNT={self.n}\n'); self.enabled=False
+              except Exception: pass
+              return False
+          B(); gdb.write('POSTWORLD_MAP_BREAKPOINT_READY=true\n')
+          end
+          continue
+          EOF
+          rm -f "$evidence/map-hit" "$evidence/gdb.log"
+          env -u RUNNER_TRACKING_ID LD_LIBRARY_PATH="$tool_lib" \
+            "$toolroot/usr/bin/gdb" -q -nx -x "$evidence/postworld.gdb" >"$evidence/gdb.log" 2>&1 &
+          gdb_pid=$!
+          for _ in $(seq 1 30); do grep -q 'POSTWORLD_MAP_BREAKPOINT_READY=true' "$evidence/gdb.log" 2>/dev/null && break; sleep 0.5; done
+          grep -q 'POSTWORLD_MAP_BREAKPOINT_READY=true' "$evidence/gdb.log"
+          window="$(resolve_window)"
+          "$toolroot/usr/bin/xdotool" key --window "$window" Right || true
+          sleep 2
+          window="$(resolve_window || true)"
+          [[ -n "$window" ]] && "$toolroot/usr/bin/xdotool" key --window "$window" Left || true
+          for _ in $(seq 1 20); do [[ -s "$evidence/map-hit" ]] && break; sleep 1; done
+          count="$(wc -l <"$evidence/map-records" 2>/dev/null || echo 0)"
+          echo TRACK_A_DECODED_MAP_RECORD_COUNT="$count"
+          [[ "$count" -ge 8 && -s "$evidence/map-hit" ]]
+          read -r final_local final_direct final_udp < <(socket_state)
+          echo TRACK_A_FINAL_LOCAL_SOCKS="$final_local"
+          echo TRACK_A_FINAL_DIRECT_TCP="$final_direct"
+          echo TRACK_A_FINAL_UDP="$final_udp"
+          [[ "$final_local" -ge 2 && "$final_direct" == 0 && "$final_udp" == 0 ]]
+          kill -0 "$pid"
+          chmod 600 "$evidence"/*
+          echo TRACK_A_STRUCTURAL_IN_GAME=true
+          echo TRACK_A_OFFICIAL_LINUX_WORLD_LOGIN_PROVEN=true

@@ -201,7 +201,8 @@ PY
 docker cp tools/tibia-global-login-lab/scripts/game-socks-forward.py "$CONTAINER:/lab/runtime/game-socks-forward.py"
 docker exec "$CONTAINER" bash -lc '
   chmod 700 /lab/runtime/game-socks-forward.py
-  rm -f /lab/runtime/game-socks-forward.ready /lab/runtime/game-socks-forward.granted
+  rm -f /lab/runtime/game-socks-forward.ready /lab/runtime/game-socks-forward.granted \
+    /lab/runtime/game-socks-forward.client-bytes /lab/runtime/game-socks-forward.server-bytes
   nohup python3 /lab/runtime/game-socks-forward.py >/dev/null 2>&1 </dev/null &
   echo $! >/lab/runtime/game-socks-forward.pid
 '
@@ -331,6 +332,16 @@ if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.granted; the
   echo LAB_GAME_SOCKS_FORWARD_GRANTED=true
 else
   echo LAB_GAME_SOCKS_FORWARD_GRANTED=false
+fi
+if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.client-bytes; then
+  echo LAB_GAME_FORWARD_CLIENT_BYTES=true
+else
+  echo LAB_GAME_FORWARD_CLIENT_BYTES=false
+fi
+if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.server-bytes; then
+  echo LAB_GAME_FORWARD_SERVER_BYTES=true
+else
+  echo LAB_GAME_FORWARD_SERVER_BYTES=false
 fi
 pid=$(docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' | head -n1 || true)
 if [[ -n "$pid" ]]; then

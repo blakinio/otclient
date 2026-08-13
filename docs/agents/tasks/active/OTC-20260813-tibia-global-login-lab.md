@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T13:05:00+02:00
+updated: 2026-08-13T13:12:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -252,6 +252,14 @@ that performs the SOCKS5 handshake itself; proxychains bypasses only loopback
 and continues to cover any other OTClient socket. Target values remain only in
 the tmpfs handoff and are never logged.
 
+Run `31693536712`, job `94426014523`, exact head
+`505bf6ab29546b67cad805b10a718dd26413f3fd`, proved the loopback forward was
+selected and its SOCKS5 request was granted. OTClient no longer emitted a
+connection error, but neither a game callback nor `GAME_START` occurred before
+the watchdog. The forwarder now records only direction-presence booleans for
+client-to-server and server-to-client bytes, without retaining counts or
+payloads, to distinguish a challenge-first deadlock from a parser failure.
+
 # Evidence classification
 
 PROVEN:
@@ -300,4 +308,4 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E through the loopback TCP-to-SOCKS5 forwarder. Continue from the first server/game callback or exact post-connect protocol failure while requiring the forward grant marker and zero direct non-loopback OTClient TCP.
+Run the canonical E2E with direction-only forwarder instrumentation. If neither side sends bytes, test the evidence-backed removal of the legacy challenge-first gate in the lab; if server bytes arrive, isolate the first parser boundary without capturing payload contents.

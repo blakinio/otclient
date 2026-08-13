@@ -9,6 +9,8 @@ from pathlib import Path
 HANDOFF = Path('/lab/secrets/login-handoff.json')
 READY = Path('/lab/runtime/game-socks-forward.ready')
 GRANTED = Path('/lab/runtime/game-socks-forward.granted')
+CLIENT_BYTES = Path('/lab/runtime/game-socks-forward.client-bytes')
+SERVER_BYTES = Path('/lab/runtime/game-socks-forward.server-bytes')
 LISTEN_HOST = '127.0.0.1'
 LISTEN_PORT = 37171
 SOCKS_HOST = '127.0.0.1'
@@ -66,6 +68,7 @@ def relay(client, target_host, target_port):
                 data = source.recv(65536)
                 if not data:
                     return
+                (CLIENT_BYTES if source is client else SERVER_BYTES).touch(mode=0o600, exist_ok=True)
                 (upstream if source is client else client).sendall(data)
     except (OSError, ValueError):
         return
@@ -82,6 +85,8 @@ def main():
 
     READY.unlink(missing_ok=True)
     GRANTED.unlink(missing_ok=True)
+    CLIENT_BYTES.unlink(missing_ok=True)
+    SERVER_BYTES.unlink(missing_ok=True)
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind((LISTEN_HOST, LISTEN_PORT))

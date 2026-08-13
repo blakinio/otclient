@@ -475,6 +475,13 @@ binding/harness failure, not protocol evidence. The string accessors now use
 Lua-binder-safe value semantics and the setter is guarded by `pcall` with a
 fixed boolean marker before any network attempt.
 
+Run `31711058660`, jobs `94483865718` and `94485052635`, exact head
+`313cd1b8d5c1a463154a9ea675b00b2d6da95e3d`, reproduced the same pre-network
+stop with zero directional bytes and no full-version `pcall` marker. Therefore
+execution stops earlier at the existing last-supported-version setter. The
+next run emits a marker before that call and guards it independently, so the
+exact failing Lua/C++ boundary is classified without exposing error text.
+
 # Evidence classification
 
 PROVEN:

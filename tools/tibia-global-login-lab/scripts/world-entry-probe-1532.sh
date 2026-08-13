@@ -56,7 +56,10 @@ text = text.replace(old_asset_marker, new_asset_marker, 1)
 # connected and still configure the normal OTClient feature set.
 old_version = '    g_game.setClientVersion(1532)\n'
 new_version = (
-    '    g_gameConfig.setLastSupportedVersion(1532)\n'
+    "    mark('VERSION_CONFIG_BEGIN=true')\n"
+    "    local versionLimitConfigured=pcall(function() g_gameConfig.setLastSupportedVersion(1532) end)\n"
+    "    mark('VERSION_LIMIT_CONFIGURED=' .. tostring(versionLimitConfigured))\n"
+    "    if not versionLimitConfigured then return end\n"
     "    local fullVersionConfigured=pcall(function() g_gameConfig.setClientVersionString('15.32.df7b29') end)\n"
     "    mark('FULL_CLIENT_VERSION_STRING_CONFIGURED=' .. tostring(fullVersionConfigured))\n"
     "    if not fullVersionConfigured then return end\n"

@@ -12,13 +12,22 @@ docker version >/dev/null
 CONTAINER="otclient-tibia-global-login-lab"
 STATE_VOLUME="otclient-tibia-global-login-state"
 RUNTIME_VOLUME="otclient-tibia-global-login-runtime"
-IMAGE="ghcr.io/blakinio/otclient:latest"
+BASE_IMAGE="ghcr.io/blakinio/otclient:latest"
+RUNTIME_IMAGE="otclient-tibia-global-login-lab-runtime:local"
 TASK="OTC-20260813-tibia-global-login-lab"
 
+# If a previous lab container contains the expensive no-OCR runtime packages,
+# preserve them in a runner-local image before refreshing the isolated container.
+# Named-volume bytes (assets/WARP state) and docker-exec secrets are not part of
+# the committed image filesystem/config.
 if docker inspect "$CONTAINER" >/dev/null 2>&1; then
   owner=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER")
   task=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER")
   [[ "$owner" == "otclient" && "$task" == "$TASK" ]]
+  if docker exec "$CONTAINER" bash -lc 'command -v proxychains4 >/dev/null && command -v Xvfb >/dev/null && command -v python3 >/dev/null'; then
+    docker commit "$CONTAINER" "$RUNTIME_IMAGE" >/dev/null
+    echo TIBIA_GLOBAL_LOGIN_LAB_RUNTIME_IMAGE_CACHED=true
+  fi
   docker rm -f "$CONTAINER" >/dev/null
 fi
 
@@ -36,8 +45,13 @@ for volume in "$STATE_VOLUME" "$RUNTIME_VOLUME"; do
   fi
 done
 
-if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-  timeout 240 docker pull "$IMAGE" >/dev/null
+if ! docker image inspect "$BASE_IMAGE" >/dev/null 2>&1; then
+  timeout 240 docker pull "$BASE_IMAGE" >/dev/null
+fi
+if docker image inspect "$RUNTIME_IMAGE" >/dev/null 2>&1; then
+  IMAGE="$RUNTIME_IMAGE"
+else
+  IMAGE="$BASE_IMAGE"
 fi
 image_id=$(docker image inspect "$IMAGE" --format '{{.Id}}')
 
@@ -56,13 +70,13 @@ container_id=$(docker inspect --format '{{.Id}}' "$CONTAINER")
 container_network=$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$CONTAINER")
 [[ "$container_network" == "none" ]]
 
-docker exec -e HEAD="$GITHUB_SHA" -e IMAGE_ID="$image_id" "$CONTAINER" bash -lc 'cat >/lab/state/bootstrap.env <<EOF
+docker exec -e HEAD="$GITHUB_SHA" -e IMAGE_ID="$image_id" -e IMAGE="$IMAGE" "$CONTAINER" bash -lc 'cat >/lab/state/bootstrap.env <<EOF
 TASK=OTC-20260813-tibia-global-login-lab
 REPOSITORY=blakinio/otclient
 HEAD=$HEAD
 RUNNER=synology-otclient-01
 CONTAINER=otclient-tibia-global-login-lab
-IMAGE=ghcr.io/blakinio/otclient:latest
+IMAGE=$IMAGE
 IMAGE_ID=$IMAGE_ID
 NETWORK_MODE=none
 EOF
@@ -76,4 +90,5 @@ printf '%s\n' \
   'TIBIA_GLOBAL_LOGIN_LAB_CONTAINER_READY=true' \
   'TIBIA_GLOBAL_LOGIN_LAB_NETWORK_ISOLATED=true' \
   "TIBIA_GLOBAL_LOGIN_LAB_HEAD=$GITHUB_SHA" \
+  "TIBIA_GLOBAL_LOGIN_LAB_IMAGE=$IMAGE" \
   "TIBIA_GLOBAL_LOGIN_LAB_IMAGE_ID=$image_id"

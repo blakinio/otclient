@@ -13,7 +13,6 @@ RUNTIME_VOLUME=otclient-tibia-global-login-runtime
 IMAGE=otclient-tibia-global-login-lab-runtime:local
 TASK=OTC-20260813-tibia-global-login-lab
 
-# The asset catalog was materialized and hash-verified by the preceding canonical run.
 docker volume inspect "$STATE_VOLUME" >/dev/null
 docker image inspect "$IMAGE" >/dev/null
 
@@ -27,13 +26,11 @@ docker run -d --name "$CONTAINER" --network bridge --user root \
   --mount "type=volume,src=$RUNTIME_VOLUME,dst=/lab/runtime" \
   "$IMAGE" sleep infinity >/dev/null
 
-# Require the previously verified complete asset set; fail closed rather than re-download here.
 asset_count=$(docker exec "$CONTAINER" bash -lc 'find /lab/state/things/1532 -maxdepth 1 -type f | wc -l')
 [[ "$asset_count" -ge 5088 ]]
 docker exec "$CONTAINER" bash -lc 'test -s /lab/state/things/1532/catalog-content.json; rm -rf /otclient/data/things/1532; mkdir -p /otclient/data/things/1532; cp -a /lab/state/things/1532/. /otclient/data/things/1532/'
 echo LAB_REUSED_VERIFIED_ASSETS=true
 
-# Start the already pinned userspace WARP state using PID-only process management.
 docker exec "$CONTAINER" bash -lc '
 set -Eeuo pipefail
 root=/lab/state/userspace-warp
@@ -41,16 +38,10 @@ bin="$root/bin"
 state="$root/state"
 [[ -x "$bin/wireproxy" && -s "$state/wireproxy.conf" ]]
 "$bin/wireproxy" -n -c "$state/wireproxy.conf"
-if [[ -s "$root/wireproxy.pid" ]]; then
-  oldpid=$(cat "$root/wireproxy.pid")
-  kill "$oldpid" 2>/dev/null || true
-fi
+if [[ -s "$root/wireproxy.pid" ]]; then oldpid=$(cat "$root/wireproxy.pid"); kill "$oldpid" 2>/dev/null || true; fi
 nohup "$bin/wireproxy" -c "$state/wireproxy.conf" >"$root/wireproxy.log" 2>&1 </dev/null &
 echo $! >"$root/wireproxy.pid"
-for _ in $(seq 1 30); do
-  curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/lab-warp.trace 2>/dev/null && break
-  sleep 2
-done
+for _ in $(seq 1 30); do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/lab-warp.trace 2>/dev/null && break; sleep 2; done
 direct=$(curl -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace | sed -n "s/^ip=//p")
 warp=$(sed -n "s/^ip=//p" /tmp/lab-warp.trace)
 statev=$(sed -n "s/^warp=//p" /tmp/lab-warp.trace)
@@ -83,9 +74,9 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     onUpdateNeeded=function() mark('GAME_UPDATE_NEEDED=true') end
   })
   local success=EnterGame.loginSuccess
-  EnterGame.loginSuccess=function(requestId,characters,session)
+  EnterGame.loginSuccess=function(requestId,jsonSession,jsonWorlds,jsonCharacters)
     mark('HTTP_LOGIN_SUCCESS=true')
-    success(requestId,characters,session)
+    success(requestId,jsonSession,jsonWorlds,jsonCharacters)
     scheduleEvent(function()
       if CharacterList and CharacterList.doLogin then
         mark('CHARACTER_LOGIN_ATTEMPT=true')
@@ -146,10 +137,7 @@ if [[ -n "$pid" ]]; then
   [[ "$direct" -eq 0 ]]
 fi
 
-if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log; then
-  echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=true
-  exit 0
-fi
+if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log; then echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=true; exit 0; fi
 
 echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=false
 if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_SUCCESS=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=after_http_login_before_game_start

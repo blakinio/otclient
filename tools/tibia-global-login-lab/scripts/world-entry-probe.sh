@@ -232,11 +232,14 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     onLoginError=function(errorText)
       mark('GAME_LOGIN_ERROR=true')
       local lowered=string.lower(tostring(errorText or ''))
-      if lowered:find('client',1,true) or lowered:find('version',1,true) or lowered:find('protocol',1,true) or lowered:find('update',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_CLIENT_VERSION=true') end
-      if lowered:find('session',1,true) or lowered:find('token',1,true) or lowered:find('authenticator',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_SESSION_AUTH=true') end
-      if lowered:find('account',1,true) or lowered:find('password',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_ACCOUNT_AUTH=true') end
-      if lowered:find('character',1,true) or lowered:find('world',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_CHARACTER_WORLD=true') end
-      if lowered:find('battleye',1,true) or lowered:find('integrity',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_INTEGRITY=true') end
+      local classified=false
+      if lowered:find('only clients',1,true) or lowered:find('client version',1,true) or lowered:find('protocol version',1,true) or lowered:find('client needs update',1,true) or lowered:find('update your client',1,true) or lowered:find('unsupported client',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_CLIENT_VERSION=true'); classified=true end
+      if lowered:find('session key',1,true) or lowered:find('session expired',1,true) or lowered:find('authentication token',1,true) or lowered:find('authenticator token',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_SESSION_AUTH=true'); classified=true end
+      if lowered:find('account name',1,true) or lowered:find('account password',1,true) or lowered:find('invalid account',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_ACCOUNT_AUTH=true'); classified=true end
+      if lowered:find('character does not exist',1,true) or lowered:find('character is already',1,true) or lowered:find('character could not',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_CHARACTER=true'); classified=true end
+      if lowered:find('world is offline',1,true) or lowered:find('world is currently',1,true) or lowered:find('world does not exist',1,true) or lowered:find('world unavailable',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_WORLD=true'); classified=true end
+      if lowered:find('battleye',1,true) or lowered:find('client integrity',1,true) then mark('GAME_LOGIN_ERROR_DETAIL_INTEGRITY=true'); classified=true end
+      if not classified then mark('GAME_LOGIN_ERROR_DETAIL_UNCLASSIFIED=true') end
       lowered=nil
     end,
     onConnectionError=function(_, code)

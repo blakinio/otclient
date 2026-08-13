@@ -420,6 +420,14 @@ while its guard accepted only the original source form. This is a harness
 failure and not protocol evidence. The runtime patch is now idempotent: it
 accepts exactly the original single gate or the exact marked replacement.
 
+Run `31704259145`, job `94460713960`, exact head
+`cf5ab7b4383b25360743c5274d830d6db02a2b7e`, reproduced the 230/148-byte
+exchange with effective versions 1532. The first classifier matched both
+client/version and character/world because it used individual generic words,
+including `world`. The classifier is now phrase-based, emits one or more
+specific detail categories, and explicitly emits `UNCLASSIFIED` when none
+matches; it still never prints the server text.
+
 # Evidence classification
 
 PROVEN:
@@ -478,8 +486,8 @@ Run the canonical E2E with fixed non-secret login-error category markers and con
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T13:10:00Z
-head: 1d8c3e900e42a48137e5209ee590bd6d7a315f5b
+updated_at: 2026-08-13T13:25:00Z
+head: cf5ab7b4383b25360743c5274d830d6db02a2b7e
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -494,7 +502,7 @@ proven:
 derived:
   - first remaining boundary is the server-returned game-login rejection category
 unknown:
-  - exact non-secret category of the server GAME_LOGIN_ERROR response
+  - exact phrase-based non-secret detail category of the server GAME_LOGIN_ERROR response
 conflicts:
   - none
 first_failure:
@@ -514,5 +522,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with fixed non-secret login-error category markers and continue from the returned category
+next_action: run the exact-head canonical E2E with phrase-based login-error detail markers and continue from the returned category
 ```

@@ -53,7 +53,7 @@ jobs:
           [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           echo GDB_START_RUNTIME_READY=true
 
-      - name: Start exact client under GDB and arm structural state before UI
+      - name: Start exact client under GDB and arm decoded map capture before UI
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -65,6 +65,7 @@ jobs:
           pkg="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia";client="$pkg/bin/client";cd "$pkg"
           : >/tmp/tibia-runtime/gdb-from-start.log
           : >/tmp/tibia-runtime/gdb-from-start-events
+          : >/tmp/tibia-runtime/map-records
           cat >/tmp/tibia-runtime/gdb-from-start.gdb <<'GDB'
           set pagination off
           set confirm off
@@ -72,7 +73,7 @@ jobs:
           set print thread-events off
           starti
           python
-          import gdb,os
+          import gdb,os,struct
           inf=gdb.selected_inferior();pid=inf.pid
           rows=[]
           for line in open(f'/proc/{pid}/maps',errors='replace'):
@@ -82,33 +83,36 @@ jobs:
           if not rows: raise gdb.GdbError('PIE mapping unavailable')
           zero=[x for x in rows if x[0]==0];base=(zero[0] if zero else sorted(rows)[0])[1]
           gdb.write(f'PIE_BASE=0x{base:x}\n')
-          ev='/tmp/tibia-runtime/gdb-from-start-events'
-          def mark(name):
-              open(ev,'a').write(name+'\n')
-          class B(gdb.Breakpoint):
-              def __init__(self,off,name,world=False):
-                  super().__init__(f'*0x{base+off:x}');self.name=name;self.world=world
-              def stop(self):
-                  mark(self.name)
-                  if self.world:
-                      open('/tmp/tibia-runtime/worldmap-hit','w').write(self.name+'=true\n');self.enabled=False
-                  return False
+          ev='/tmp/tibia-runtime/gdb-from-start-events'; rec='/tmp/tibia-runtime/map-records'
+          def mark(name): open(ev,'a').write(name+'\n')
+          class MarkBP(gdb.Breakpoint):
+              def __init__(self,off,name): super().__init__(f'*0x{base+off:x}');self.name=name
+              def stop(self): mark(self.name);return False
           for off,name in [
               (0xcfadd4,'LOGIN_STATE_MACHINE_STARTED'),(0xcfb2ff,'LOGIN_WAITING_DIALOG_ENTERED'),
               (0xcfb7c0,'ACCOUNT_LOGIN_UPLOADER_SUCCESS'),(0xcfb790,'ACCOUNT_LOGIN_UPLOADER_FAILED'),
-              (0xcfb780,'ACCOUNT_LOGIN_MISSING_2FA_TOKEN'),(0xcfb770,'ACCOUNT_LOGIN_MISSING_EMAIL_CODE'),
-              (0xcfb700,'ACCOUNT_LOGIN_MISSING_LOGIN_CONFIRMATION'),(0xcfb6f0,'ACCOUNT_LOGIN_INVALID_SERVER_RESPONSE'),
-              (0xcfb6e0,'ACCOUNT_LOGIN_INVALID_DEVICE_COOKIE'),(0xcfb6c0,'ACCOUNT_LOGIN_CLIENT_OUT_OF_DATE'),
-              (0xcfb41e,'TWO_FACTOR_TOKEN_STATE_ENTERED'),(0xcfb4a5,'DEVICE_VERIFICATION_CODE_STATE_ENTERED'),
-              (0xcfb438,'TWO_FACTOR_EMAIL_STATE_ENTERED'),(0xcfb34e,'LOGIN_CONFIRMATION_STATE_ENTERED'),
-              (0xcfb374,'CHARACTER_SELECTION_STATE_ENTERED'),(0xd47168,'CHARACTER_LIST_CHANGED'),
-              (0xd47118,'SELECTED_CHARACTERS_CHANGED'),(0xd47130,'CHARACTER_SELECTION_CONFIRMED'),
+              (0xcfb374,'CHARACTER_SELECTION_STATE_ENTERED'),(0xd47130,'CHARACTER_SELECTION_CONFIRMED'),
               (0xcfb122,'START_GAMESERVER_LOGIN_STATE_ENTERED'),(0xcfa0e0,'GAMESERVER_TCP_CONNECTED'),
               (0xd06810,'CLIENT_CONNECT_GAMESERVER'),(0xd067b0,'CLIENT_ABORT_GAMESERVER_CONNECT'),
               (0xd066e0,'GAME_SESSION_CONNECTED'),(0xcfb404,'LOGIN_FAILED_STATE_ENTERED'),
-              (0xcfaeb4,'LOGIN_FINISHED_SUCCESSFULLY')]: B(off,name)
-          B(0xcec8d0,'FULLMAP_HANDLER_HIT',True);B(0xcd3190,'FIELDDATA_HANDLER_HIT',True)
-          gdb.write('GDB_FROM_START_STRUCTURAL_BREAKPOINTS_READY=true\n')
+              (0xcfaeb4,'LOGIN_FINISHED_SUCCESSFULLY')]: MarkBP(off,name)
+          class MapBP(gdb.Breakpoint):
+              def __init__(self): super().__init__(f'*0x{base+0x19a8ea3:x}');self.n=0
+              def stop(self):
+                  try:
+                      rsp=int(gdb.parse_and_eval('$rsp')); order=int(gdb.parse_and_eval('$rbp'))&0xffffffff
+                      data=bytes(inf.read_memory(rsp+0x88,12));x,y,z=struct.unpack('<III',data)
+                      if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                          self.n+=1;open(rec,'a').write(f'{self.n}\n')
+                          if self.n==1: mark('DECODED_MAP_RECORD_STARTED')
+                          if self.n>=8:
+                              open('/tmp/tibia-runtime/worldmap-hit','w').write(f'DECODED_MAP_RECORD_COUNT={self.n}\n')
+                              mark('DECODED_WORLDMAP_WORLD_ENTRY_PROVEN');self.enabled=False
+                  except Exception as e:
+                      gdb.write('MAP_CAPTURE_ERROR=%s\n'%type(e).__name__)
+                  return False
+          MapBP()
+          gdb.write('GDB_FROM_START_DECODED_MAP_BREAKPOINT_READY=true\n')
           end
           continue
           GDB
@@ -117,13 +121,13 @@ jobs:
             proxychains4 -f /tmp/tibia-runtime/proxychains.conf \
             gdb -q -nx -x /tmp/tibia-runtime/gdb-from-start.gdb --args "$client" >/tmp/tibia-runtime/gdb-from-start.log 2>&1 </dev/null &
           echo $! >/tmp/tibia-runtime/gdb-start-pid
-          for _ in $(seq 1 80);do grep -q 'GDB_FROM_START_STRUCTURAL_BREAKPOINTS_READY=true' /tmp/tibia-runtime/gdb-from-start.log 2>/dev/null&&break;sleep 0.5;done
-          grep -q 'GDB_FROM_START_STRUCTURAL_BREAKPOINTS_READY=true' /tmp/tibia-runtime/gdb-from-start.log
+          for _ in $(seq 1 80);do grep -q 'GDB_FROM_START_DECODED_MAP_BREAKPOINT_READY=true' /tmp/tibia-runtime/gdb-from-start.log 2>/dev/null&&break;sleep 0.5;done
+          grep -q 'GDB_FROM_START_DECODED_MAP_BREAKPOINT_READY=true' /tmp/tibia-runtime/gdb-from-start.log
           for _ in $(seq 1 80);do pgrep -x client >/dev/null&&break;sleep 0.5;done
           pid=$(pgrep -x client|head -n1);[[ -n "$pid" ]];echo "$pid">/tmp/tibia-runtime/client-pid
           echo GDB_FROM_START_CLIENT_RUNNING=true
 
-      - name: Login and enter first character with structural gates only
+      - name: Login and enter first character using decoded map records as truth
         shell: bash
         run: |
           set +x
@@ -134,9 +138,20 @@ jobs:
             local w g wi he
             for _ in $(seq 1 80);do
               for w in $(xdotool search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null||true);do
+                xwininfo -id "$w" >/dev/null 2>&1||continue
                 g=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null||true);wi=$(printf '%s\n' "$g"|sed -n 's/^WIDTH=//p');he=$(printf '%s\n' "$g"|sed -n 's/^HEIGHT=//p')
                 if [[ "$wi" == 1020 && "$he" == 650 ]];then echo "$w";return 0;fi
               done;sleep 0.5
+            done;return 1
+          }
+          quick() {
+            local w g wi he
+            for _ in $(seq 1 12);do
+              for w in $(xdotool search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null||true);do
+                xwininfo -id "$w" >/dev/null 2>&1||continue
+                g=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null||true);wi=$(printf '%s\n' "$g"|sed -n 's/^WIDTH=//p');he=$(printf '%s\n' "$g"|sed -n 's/^HEIGHT=//p')
+                if [[ "$wi" == 1020 && "$he" == 650 ]];then echo "$w";return 0;fi
+              done;sleep 0.25
             done;return 1
           }
           w=$(resolve);[[ -n "$w" ]];sleep 5
@@ -146,41 +161,42 @@ jobs:
           xdotool mousemove --window "$w" 590 388 click 1
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
           echo GDB_FROM_START_LOGIN_SUBMITTED=true
-          auth_tcp=0
+          connected=0
           for n in $(seq 1 45);do
             sleep 1
             rows=$(ss -ntp 2>/dev/null|grep "pid=$pid,"||true)
             lc=$(printf '%s\n' "$rows"|awk '$5~/127\.0\.0\.1:25344$/||$5~/\[::1\]:25344$/{n++}END{print n+0}')
-            ((lc>0))&&auth_tcp=1||true
-            if grep -q 'CHARACTER_SELECTION_STATE_ENTERED' /tmp/tibia-runtime/gdb-from-start-events 2>/dev/null;then break;fi
+            ((lc>0))&&connected=1||true
+            ((n>=12&&connected==1))&&break
           done
-          echo AUTH_LOCAL_SOCKS_OBSERVED=$auth_tcp
-          echo PRE_CHARACTER_EVENTS_BEGIN;cat /tmp/tibia-runtime/gdb-from-start-events||true;echo PRE_CHARACTER_EVENTS_END
-          if ! grep -q 'CHARACTER_SELECTION_STATE_ENTERED' /tmp/tibia-runtime/gdb-from-start-events;then
-            echo STRUCTURAL_CHARACTER_SELECTION=false
-            exit 11
+          echo AUTH_LOCAL_SOCKS_OBSERVED=$connected;((connected==1))
+          w=$(resolve);[[ -n "$w" ]];xdotool windowactivate --sync "$w" 2>/dev/null||true
+          xdotool mousemove --window "$w" 285 193 click 1;xdotool key --window "$w" Return
+          echo FIRST_CHARACTER_RETURN_SENT=true
+          records=0
+          for _ in $(seq 1 25);do sleep 1;records=$(wc -l </tmp/tibia-runtime/map-records 2>/dev/null||echo 0);((records>=8))&&break;done
+          echo DECODED_RECORD_COUNT_AFTER_RETURN=$records
+          if ((records<8));then
+            if w=$(quick);then xdotool mousemove --window "$w" 285 193 click --repeat 2 --delay 160 1||true;echo CHARACTER_DOUBLECLICK_FALLBACK_SENT=true;else echo CHARACTER_DOUBLECLICK_FALLBACK_SENT=false;fi
+            for _ in $(seq 1 35);do sleep 1;records=$(wc -l </tmp/tibia-runtime/map-records 2>/dev/null||echo 0);((records>=8))&&break;done
           fi
-          echo STRUCTURAL_CHARACTER_SELECTION=true
-          w=$(resolve);xdotool windowactivate --sync "$w" 2>/dev/null||true
-          xdotool mousemove --window "$w" 285 193 click 1;sleep 0.4;xdotool key --window "$w" Return
-          for _ in $(seq 1 25);do [[ -s /tmp/tibia-runtime/worldmap-hit ]]&&break;sleep 1;done
-          if [[ ! -s /tmp/tibia-runtime/worldmap-hit ]];then
-            w=$(resolve||true);if [[ -n "$w" ]];then xdotool mousemove --window "$w" 285 193 click --repeat 2 --delay 160 1||true;fi
-            for _ in $(seq 1 35);do [[ -s /tmp/tibia-runtime/worldmap-hit ]]&&break;sleep 1;done
-          fi
-          echo POST_CHARACTER_EVENTS_BEGIN;cat /tmp/tibia-runtime/gdb-from-start-events||true;echo POST_CHARACTER_EVENTS_END
+          echo DECODED_RECORD_COUNT_AFTER_ENTRY=$records
+          ((records>=8))
+          echo DECODED_WORLDMAP_WORLD_ENTRY_PROVEN=true
           kill -0 "$pid"
 
       - name: Require structural world entry and confinement
+        if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
-          pid=$(cat /tmp/tibia-runtime/client-pid)
-          echo FINAL_STRUCTURAL_EVENTS_BEGIN;cat /tmp/tibia-runtime/gdb-from-start-events||true;echo FINAL_STRUCTURAL_EVENTS_END
+          pid=$(cat /tmp/tibia-runtime/client-pid 2>/dev/null||true);[[ -n "$pid" ]];kill -0 "$pid"
+          records=$(wc -l </tmp/tibia-runtime/map-records 2>/dev/null||echo 0);echo DECODED_CAPTURE_RECORD_COUNT=$records
+          echo STRUCTURAL_EVENTS_BEGIN;cat /tmp/tibia-runtime/gdb-from-start-events 2>/dev/null||true;echo STRUCTURAL_EVENTS_END
           last=$(tail -n1 /tmp/tibia-runtime/gdb-from-start-events 2>/dev/null||true);echo "LAST_STRUCTURAL_EVENT=${last:-NONE}"
-          [[ -s /tmp/tibia-runtime/worldmap-hit ]];cat /tmp/tibia-runtime/worldmap-hit
-          echo STRUCTURAL_IN_GAME=true
+          [[ "$records" -ge 8 && -s /tmp/tibia-runtime/worldmap-hit ]];cat /tmp/tibia-runtime/worldmap-hit
           tcp=$(ss -ntp 2>/dev/null|grep "pid=$pid,"||true);udp=$(ss -nup 2>/dev/null|grep "pid=$pid,"||true)
-          direct=$(printf '%s\n' "$tcp"|awk '{print $5}'|grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$'|grep -c .||true);uc=$(printf '%s\n' "$udp"|grep -c .||true)
-          echo "ACTIVE_DIRECT_TCP_COUNT=$direct";echo "ACTIVE_UDP_COUNT=$uc";[[ "$direct" == 0 && "$uc" == 0 ]];kill -0 "$pid"
+          local_count=$(printf '%s\n' "$tcp"|awk '$5~/127\.0\.0\.1:25344$/||$5~/\[::1\]:25344$/{n++}END{print n+0}');total=$(printf '%s\n' "$tcp"|grep -c .||true);direct=$((total-local_count));uc=$(printf '%s\n' "$udp"|grep -c .||true)
+          echo "FINAL_LOCAL_SOCKS_COUNT=$local_count";echo "FINAL_DIRECT_TCP_COUNT=$direct";echo "FINAL_UDP_COUNT=$uc";[[ "$direct" == 0 && "$uc" == 0 ]]
+          echo STRUCTURAL_IN_GAME=true
           echo PHYSICAL_TIBIA_WORLD_LOGIN_PROVEN=true

@@ -22,7 +22,6 @@ jobs:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_WARP_PORT: '25354'
-      PROBE_DISPLAY: ':97'
     steps:
       - name: Launch official launcher on fresh isolated X display
         shell: bash
@@ -45,16 +44,26 @@ jobs:
           kill -0 "$warp_pid"
           curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
 
-          [[ ! -e /tmp/.X11-unix/X97 ]]
+          display_num=''
+          for n in 91 92 93 94 95 96 97 99; do
+            if [[ ! -e "/tmp/.X11-unix/X$n" && ! -e "/tmp/.X$n-lock" ]]; then display_num="$n"; break; fi
+          done
+          [[ -n "$display_num" ]]
+          probe_display=":$display_num"
+          echo TRACK_A_FRESH_DISPLAY_SELECTED="$probe_display"
+
           private_xvfb="$state/runtime/Xvfb-track-a"
           [[ -x "$private_xvfb" ]]
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
           tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
-          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$root/usr/share/X11/xkb" nohup "$private_xvfb" "$PROBE_DISPLAY" -screen 0 1280x800x24 -xkbdir "$root/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset >"$work/xvfb.log" 2>&1 </dev/null &
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$root/usr/share/X11/xkb" nohup "$private_xvfb" "$probe_display" -screen 0 1280x800x24 -xkbdir "$root/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset >"$work/xvfb.log" 2>&1 </dev/null &
           xvfb_pid=$!
           trap 'kill "$xvfb_pid" 2>/dev/null || true' EXIT
-          for _ in $(seq 1 30); do [[ -e /tmp/.X11-unix/X97 ]] && break; sleep .2; done
-          [[ -e /tmp/.X11-unix/X97 ]]
+          for _ in $(seq 1 50); do [[ -e "/tmp/.X11-unix/X$display_num" ]] && break; sleep .2; done
+          if [[ ! -e "/tmp/.X11-unix/X$display_num" ]]; then
+            sed 's/^/TRACK_A_FRESH_DISPLAY_XVFB_LOG=/' "$work/xvfb.log" || true
+            exit 31
+          fi
           echo TRACK_A_FRESH_DISPLAY_READY=true
 
           tarball="$work/tibia.x64.tar.gz"
@@ -79,7 +88,7 @@ jobs:
           cd "$workdir"
           rc=0
           env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-            HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_RUNTIME_DIR="$runtime_dir" TMPDIR="$tmp" DISPLAY="$PROBE_DISPLAY" \
+            HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_RUNTIME_DIR="$runtime_dir" TMPDIR="$tmp" DISPLAY="$probe_display" \
             PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" \
             LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
             FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \

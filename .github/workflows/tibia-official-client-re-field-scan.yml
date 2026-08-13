@@ -1,0 +1,135 @@
+name: Track A official login field scan
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-field-scan.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Checkout exact Track A head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Scan vertical editable-field geometry with a benign marker
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          toolroot="$state/toolroot"
+          tool_path="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          evidence="$state/evidence/field-scan-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$state/runtime" "$state/evidence" "$evidence"
+          chmod 700 "$state" "$state/runtime" "$state/evidence" "$evidence"
+          cleanup() { rm -f "$evidence"/*.xwd 2>/dev/null || true; }
+          trap cleanup EXIT
+
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+
+          old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          if [[ -n "$old_pid" && -e "/proc/$old_pid" ]]; then
+            [[ -r "/proc/$old_pid/environ" ]]
+            grep -azFxq "$marker" "/proc/$old_pid/environ"
+            [[ "$(readlink -f "/proc/$old_pid/exe")" == "$client" ]]
+            kill "$old_pid"
+            for _ in $(seq 1 30); do kill -0 "$old_pid" 2>/dev/null || break; sleep 0.2; done
+          fi
+
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -e "/proc/$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
+          [[ -r "/proc/$xvfb_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+
+          proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
+          vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
+          swrast="$(find "$toolroot" \( -type f -o -type l \) -name 'swrast_dri.so' -print -quit)"
+          [[ -n "$proxy_lib" && -n "$vk_icd" && -n "$swrast" ]]
+          dri_dir="$(dirname "$swrast")"
+          proxy_conf="$state/config/proxychains.conf"
+          [[ -s "$proxy_conf" ]]
+
+          cd "$runtime"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
+            LD_LIBRARY_PATH="$runtime/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \
+            LIBGL_DRIVERS_PATH="$dri_dir" QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" \
+            XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
+            FONTCONFIG_PATH="$toolroot/etc/fonts" FONTCONFIG_FILE="$toolroot/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
+          pid=$!
+          printf '%s\n' "$pid" >"$state/runtime/client.pid"
+          chmod 600 "$state/runtime/client.pid"
+          sleep 12
+          kill -0 "$pid"
+
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
+          window=''
+          for _ in $(seq 1 60); do
+            for candidate in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+              geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$candidate" 2>/dev/null || true)"
+              [[ "$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')" == 1020 ]] || continue
+              [[ "$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')" == 650 ]] || continue
+              window="$candidate"
+              break
+            done
+            [[ -n "$window" ]] && break
+            sleep 0.5
+          done
+          [[ -n "$window" ]]
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          [[ "$("$toolroot/usr/bin/xdotool" getwindowfocus)" == "$window" ]]
+          echo TRACK_A_FIELD_SCAN_WINDOW_READY=true
+
+          for y in 220 230 240 250 260 270 280 290 300 310 320 330 340 350; do
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 "$y" click 1
+            "$toolroot/usr/bin/xdotool" key ctrl+a BackSpace
+            "$toolroot/usr/bin/xdotool" mousemove 1800 1000
+            sleep 0.35
+            before="$evidence/y${y}-before.xwd"
+            after="$evidence/y${y}-after.xwd"
+            "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$before"
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 "$y" click 1
+            "$toolroot/usr/bin/xdotool" type --delay 10 -- 'x'
+            "$toolroot/usr/bin/xdotool" mousemove 1800 1000
+            sleep 0.35
+            "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$after"
+            python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" "FIELD_Y${y}" "$before" "$after"
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 "$y" click 1
+            "$toolroot/usr/bin/xdotool" key ctrl+a BackSpace
+            rm -f "$before" "$after"
+          done
+          echo TRACK_A_FIELD_SCAN_COMPLETE=true
+          cleanup
+          trap - EXIT

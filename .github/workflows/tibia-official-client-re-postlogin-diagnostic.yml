@@ -1,0 +1,32 @@
+name: Track A post-login diagnostic
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-postlogin-diagnostic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Inspect owned process and non-secret renderer diagnostics
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          if [[ -n "$pid" && -e "/proc/$pid" ]]; then echo TRACK_A_CLIENT_ALIVE=true; else echo TRACK_A_CLIENT_ALIVE=false; fi
+          log="$state/runtime/client.log"
+          if [[ -s "$log" ]]; then
+            grep -Ei 'error|fail|fatal|opengl|vulkan|rhi|egl|glx|crash|render' "$log" | tail -n 80 | sed 's/^/TRACK_A_CLIENT_DIAG=/' || true
+          fi
+          echo TRACK_A_POSTLOGIN_DIAGNOSTIC_COMPLETE=true

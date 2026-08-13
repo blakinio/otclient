@@ -372,3 +372,85 @@ next_action:
 ```
 
 No Codex or owner-funded AI/API quota was used.
+
+## Continuation evidence — 2026-08-13 12:10 CEST
+
+### Current official-client identity — PROVEN unchanged
+
+Hosted run `31674406184` at head
+`cfaa7654352e2dbafc316f30aea9c787aaa64b8d` completed successfully through fresh
+WARP and emitted:
+
+```yaml
+client_http_code: 200
+packed_size: 10150849
+packed_sha256: 496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b
+client_size: 51965216
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+version_strings: "15.32"
+```
+
+This exactly matches the researched binary identity. The failed earlier run
+`31654893952` is superseded for current-client identity only; it remains useful
+as downloader-failure evidence. Existing exact-SHA profiles may therefore be
+reused after live PID/PIE/object rediscovery.
+
+### Dedicated runner reconciliation — WAITING
+
+PR #48 current head is
+`17b55cecb596ff0224201d85ea50e02cb1b67511`. Canonical bootstrap run
+`31687610951`, job `94407259983`, remained `queued` at the bounded observation.
+The older canonical bootstrap `31679097113`, migration run `31686590850`, and
+broad `runs-on: self-hosted` probe `31643425060` also remain queued. No live
+evidence proves that `synology-otclient-01` is online or accepting jobs.
+
+PR #280 persists the already-reviewed deployment stack and one-time migration
+workflow. The current environment exposes neither an authorized Synology/SSH
+execution channel nor an available self-hosted GitHub Actions control-plane job,
+so the runner cannot be recreated safely from this session.
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-08-13T12:10:00+02:00
+head: 17b55cecb596ff0224201d85ea50e02cb1b67511
+branch: ci/OTC-20260727-tibia-linux-runner-analysis
+pr: 48
+status: blocked
+context_routes:
+  - official-client-runtime-analysis
+  - dedicated-runner-migration
+owned_paths:
+  - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
+proven:
+  - current official-client identity is unchanged at e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe by run 31674406184
+  - exact researched relocation-aware profiles remain applicable after live PID/PIE/object rediscovery
+  - PR 48 canonical bootstrap is queued and has not been accepted by synology-otclient-01
+derived:
+  - live structural experiments can resume without a new exact-version profile once the dedicated runner is restored
+unknown:
+  - Synology host power and reachability state
+  - repository registration state of synology-otclient-01
+  - current official-client process/session/container state because no runner job can inspect it
+  - structural IN_GAME, authoritative player position, and live action effects
+conflicts:
+  - owner handover says synology-otclient-01 is now working, while current GitHub jobs remain queued
+first_failure:
+  marker: no authorized execution path reaches the Synology host
+  evidence: runs 31687610951, 31686590850, and 31643425060 remain queued
+validation:
+  - command: gh run view 31674406184 --repo blakinio/otclient --log
+    result: PASS
+    evidence: HTTP 200 and exact packed/client hashes above
+  - command: gh run view 31687610951 --repo blakinio/otclient --json status,conclusion,jobs
+    result: BLOCKED
+    evidence: bootstrap job 94407259983 remains queued
+rejected_hypotheses:
+  - current official-client binary changed: disproven by run 31674406184
+changed_paths:
+  - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
+blockers:
+  - no authorized live Synology/SSH channel and no available self-hosted repository runner
+next_action: restore one authorized Synology execution path, deploy PR 280's reviewed otclient-runner stack, then reconcile PR 48 run 31687610951 and inspect the official-client process/session structurally
+```

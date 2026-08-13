@@ -1,0 +1,68 @@
+name: Track A launcher hidden flock path resolver
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-launcher-kernel-lock-paths.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Resolve PID-0 kernel FLOCK inodes to visible files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          python3 - "$state" <<'PY'
+          import os,pathlib,sys
+          state=pathlib.Path(sys.argv[1])
+          targets=set()
+          for line in pathlib.Path('/proc/locks').read_text().splitlines():
+              parts=line.split()
+              if len(parts)<8 or parts[1] != 'FLOCK' or parts[3] != 'WRITE' or parts[4] != '0':
+                  continue
+              devino=parts[5]
+              try:
+                  maj_s,min_s,ino_s=devino.split(':')
+                  targets.add((int(maj_s,16),int(min_s,16),int(ino_s)))
+              except Exception:
+                  continue
+          print('TRACK_A_HIDDEN_FLOCK_TARGET_COUNT='+str(len(targets)))
+          roots=[state,pathlib.Path('/tmp')]
+          seen=set()
+          matches=[]
+          for root in roots:
+              if not root.exists(): continue
+              for base,dirs,files in os.walk(root,followlinks=False):
+                  # Avoid duplicate gigantic candidate reconstructions if their device cannot match any target.
+                  for name in files:
+                      p=pathlib.Path(base)/name
+                      try: st=p.stat(follow_symlinks=False)
+                      except OSError: continue
+                      key=(os.major(st.st_dev),os.minor(st.st_dev),st.st_ino)
+                      if key in targets and (key,str(p)) not in seen:
+                          seen.add((key,str(p))); matches.append((key,p))
+                  for name in dirs:
+                      p=pathlib.Path(base)/name
+                      try: st=p.stat(follow_symlinks=False)
+                      except OSError: continue
+                      key=(os.major(st.st_dev),os.minor(st.st_dev),st.st_ino)
+                      if key in targets and (key,str(p)) not in seen:
+                          seen.add((key,str(p))); matches.append((key,p))
+          print('TRACK_A_HIDDEN_FLOCK_PATH_MATCH_COUNT='+str(len(matches)))
+          for (maj,minor,ino),p in matches:
+              print(f'TRACK_A_HIDDEN_FLOCK_PATH={maj:02x}:{minor:02x}:{ino}|{p}')
+          print('TRACK_A_HIDDEN_FLOCK_PATH_RESOLUTION_COMPLETE=true')
+          PY

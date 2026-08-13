@@ -66,20 +66,7 @@ jobs:
               ! kill -0 "$xvfb_pid" 2>/dev/null
             fi
             private_xvfb="$state/runtime/Xvfb-track-a"
-            python3 - "$toolroot/usr/bin/Xvfb" "$private_xvfb" <<'PY'
-            import pathlib, sys
-            data = pathlib.Path(sys.argv[1]).read_bytes()
-            patches = [
-                (b'/usr/bin\0', b'.\0'),
-                (b'/usr/lib/xorg/modules\0', b'../lib/xorg/modules\0'),
-            ]
-            for needle, value in patches:
-                count = data.count(needle)
-                print(f'TRACK_A_XVFB_PATH_PATCH_{needle[:-1].decode().replace("/", "_")}={count}')
-                if count:
-                    data = data.replace(needle, value + b'\0' * (len(needle) - len(value)))
-            pathlib.Path(sys.argv[2]).write_bytes(data)
-            PY
+            python3 -c 'import pathlib, sys; data = pathlib.Path(sys.argv[1]).read_bytes(); patches = [(b"/usr/bin\0", b".\0"), (b"/usr/lib/xorg/modules\0", b"../lib/xorg/modules\0")]; [(print("TRACK_A_XVFB_PATH_PATCH_" + needle[:-1].decode().replace("/", "_") + "=" + str(data.count(needle)))) for needle, _ in patches]; data = __import__("functools").reduce(lambda value, patch: value.replace(patch[0], patch[1] + b"\0" * (len(patch[0]) - len(patch[1]))), patches, data); pathlib.Path(sys.argv[2]).write_bytes(data)' "$toolroot/usr/bin/Xvfb" "$private_xvfb"
             chmod 700 "$private_xvfb"
             cd "$toolroot/usr/bin"
             env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \

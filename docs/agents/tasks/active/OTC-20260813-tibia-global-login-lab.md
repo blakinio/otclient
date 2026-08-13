@@ -377,6 +377,15 @@ version 1532 after the staticdata probe and immediately before choosing the
 official RSA/login path. Runtime remains the task-owned native Linux image
 `sha256:3ec759b55702dd967a6ef601967b4cf71e71192d69e2493481630241959b9dc7`.
 
+Run `31701038478`, job `94449979161`, exact head
+`ffbc7e50644d57f75baa2a08041e62077368da61`, showed that restoring 1532
+retriggered the still-connected `ThingsLoaderController`, which again reset
+both values to zero and removed `GameSessionKey` before any client bytes were
+sent. The earlier disconnect candidate referenced `modules.game_things.load`,
+but the loader function is local and the real registration is controller-owned.
+The lab now terminates only `ThingsLoaderController` before changing versions,
+then performs its explicit appearances/staticdata probes itself.
+
 # Evidence classification
 
 PROVEN:
@@ -429,14 +438,14 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E after restoring effective client version 1532 immediately before game-login construction and classify the resulting exchange.
+Run the canonical E2E with the task-local things controller event disconnected through its actual controller lifecycle, then verify effective versions and classify the exchange.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:38:00Z
-head: 32df0e573aa91cc993cd30d65cb9f02dd72055c1
+updated_at: 2026-08-13T12:45:00Z
+head: ffbc7e50644d57f75baa2a08041e62077368da61
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -451,7 +460,7 @@ proven:
 derived:
   - first remaining boundary is the official 15.32 initial game-login packet identity/framing
 unknown:
-  - whether restoring client version 1532 after the staticdata probe yields a server response
+  - whether disconnecting the actual ThingsLoaderController preserves client/protocol version 1532 through login construction
 conflicts:
   - none
 first_failure:
@@ -472,5 +481,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E after restoring effective client version 1532 immediately before loginWorld and classify aggregate direction markers
+next_action: run the exact-head canonical E2E after terminating the lab-owned ThingsLoaderController event lifecycle and verify effective versions plus aggregate direction markers
 ```

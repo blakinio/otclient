@@ -31,10 +31,9 @@ text = text.replace(old_stdin, new_stdin, 1)
 # connected and still configure the normal OTClient feature set.
 old_version = '    g_game.setClientVersion(1532)\n'
 new_version = (
-    "    local gameThingsLoad=modules.game_things and modules.game_things.load or nil\n"
-    "    if gameThingsLoad then\n"
-    "      disconnect(g_game,{onClientVersionChange=gameThingsLoad})\n"
-    "      mark('GAME_THINGS_AUTOLOAD_DISCONNECTED=true')\n"
+    "    if ThingsLoaderController then\n"
+    "      ThingsLoaderController:terminate()\n"
+    "      mark('GAME_THINGS_CONTROLLER_TERMINATED_FOR_LAB=true')\n"
     "    end\n"
     '    g_gameConfig.setLastSupportedVersion(1532)\n'
     "    mark('CLIENT_VERSION_LIMIT_OVERRIDE=true')\n"

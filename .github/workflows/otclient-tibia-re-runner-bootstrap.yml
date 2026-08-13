@@ -1,5 +1,6 @@
 name: OTClient Tibia RE runner bootstrap
 
+# Fresh dedicated-runner acceptance probe: 2026-08-13T11:38+02:00.
 on:
   workflow_dispatch:
   push:

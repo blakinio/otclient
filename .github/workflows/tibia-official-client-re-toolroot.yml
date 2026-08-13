@@ -44,7 +44,15 @@ jobs:
           apt-get "${apt_opts[@]}" update
 
           cd "$debs"
-          packages=(file gdb proxychains4 socat xdotool xvfb)
+          # Keep the toolroot self-contained. apt-get download does not resolve
+          # dependencies, so list the direct runtime libraries observed on the
+          # pinned Ubuntu noble runner image explicitly.
+          packages=(
+            file gdb proxychains4 socat xdotool xvfb
+            libmagic1t64 libpython3.12 libbabeltrace1 libbabeltrace-ctf1
+            libipt2 libmpfr6 libsource-highlight4t64 libdebuginfod1t64
+            libxdo3 libgl1 libpixman-1-0 libxfont2 libssl3t64 libwrap0
+          )
           for package in "${packages[@]}"; do
             apt-get "${apt_opts[@]}" download "$package"
           done
@@ -55,7 +63,8 @@ jobs:
           required=(file gdb proxychains4 socat xdotool Xvfb)
           missing=0
           for tool in "${required[@]}"; do
-            candidate="$(find "$root/usr/bin" "$root/usr/sbin" -maxdepth 1 -type f -name "$tool" -print -quit 2>/dev/null || true)"
+            candidate="$(find "$root/usr/bin" "$root/usr/sbin" -maxdepth 1 \
+              \( -type f -o -type l \) -name "$tool" -print -quit 2>/dev/null || true)"
             if [[ -z "$candidate" ]]; then
               echo TRACK_A_TOOLROOT_MISSING_BINARY="$tool"
               missing=$((missing+1))
@@ -69,6 +78,17 @@ jobs:
           done
           echo TRACK_A_TOOLROOT_MISSING_BINARY_COUNT="$missing"
           [[ "$missing" == 0 ]]
+          unresolved_total="$(
+            for tool in "${required[@]}"; do
+              candidate="$(find "$root/usr/bin" "$root/usr/sbin" -maxdepth 1 \
+                \( -type f -o -type l \) -name "$tool" -print -quit 2>/dev/null || true)"
+              [[ -n "$candidate" ]] || continue
+              LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" \
+                ldd "$candidate" 2>/dev/null | awk '/not found/{print $1}'
+            done | sort -u | paste -sd, -
+          )"
+          echo TRACK_A_TOOLROOT_UNRESOLVED_TOTAL="$unresolved_total"
+          [[ -z "$unresolved_total" ]]
           printf 'PATH=%s\nLD_LIBRARY_PATH=%s\n' \
             "$root/usr/bin:$root/usr/sbin" \
             "$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" \

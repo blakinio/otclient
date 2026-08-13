@@ -38,8 +38,10 @@ asset_count=$(docker exec "$CONTAINER" bash -lc 'find /lab/state/things/1532 -ma
 docker exec "$CONTAINER" bash -lc 'test -s /lab/state/things/1532/catalog-content.json; rm -rf /otclient/data/things/1532; mkdir -p /otclient/data/things/1532; cp -a /lab/state/things/1532/. /otclient/data/things/1532/'
 ASSET_VERSION=$(docker exec "$CONTAINER" bash -lc "awk 'NR==1{print \$1}' /lab/state/things/1532/assets.json.sha256")
 [[ "$ASSET_VERSION" =~ ^[0-9a-fA-F]{64}$ ]]
+printf '%s' "$ASSET_VERSION" | docker exec -i "$CONTAINER" sh -c 'cat > /otclient/data/things/1532/assets.json.sha256'
 echo LAB_REUSED_VERIFIED_ASSETS=true
 echo LAB_ASSET_VERSION_READY=true
+echo LAB_RUNTIME_ASSET_IDENTIFIER_LENGTH=64
 
 docker exec "$CONTAINER" bash -lc '
 set -Eeuo pipefail

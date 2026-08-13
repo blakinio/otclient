@@ -331,6 +331,16 @@ restored feature subset was then compared again with `features.lua`; it omitted
 and contributes one pre-RSA field. The next experiment restores that field and
 removes the disproven OS override so only the packet layout changes.
 
+Run `31698702409`, job `94442332169`, exact head
+`7eefc0f5a93fe0be33e6ce433839e0f349a18fb1`, proved the preview field was
+present and increased the first packet from 143 to 144 bytes, but the server
+still returned zero bytes. Inspection then identified a concrete identifier
+encoding defect: `loadAppearances()` assigns the complete raw contents of
+`assets.json.sha256` to the game-login asset identifier, while the successful
+HTTP flow extracts its 64-hex first field. The lab now normalizes only the
+runtime copy consumed by Linux OTClient to exactly that already-validated
+64-character identifier; the cached source asset remains unchanged.
+
 # Evidence classification
 
 PROVEN:
@@ -356,6 +366,7 @@ DISPROVEN:
 - challenge-first behavior on the current official game endpoint: run `31695992918` produced neither client nor server bytes after the granted TCP connection.
 - the missing encryption/checksum/client-version/login-pending/sequenced feature set as the sole no-response cause: run `31697097942` sent 143 client bytes and received zero server bytes after restoring them.
 - the Linux OS id as the sole no-response cause: run `31698057223` advertised Windows and still sent 143 client bytes to zero server bytes.
+- the missing preview-state field as the sole no-response cause: run `31698702409` sent 144 client bytes and received zero server bytes.
 
 UNKNOWN:
 - whether `g_game.loginWorld()` with appearances-only state reaches a game-server TCP/session callback;
@@ -382,14 +393,14 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with `GamePreviewState` restored and classify the first game-server exchange from the aggregate direction markers.
+Run the canonical E2E with the runtime asset identifier normalized to 64 hex characters and classify the first game-server exchange.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:10:00Z
-head: 7c49a4a3efa1de68f247b7c289bca31c76f3dff8
+updated_at: 2026-08-13T12:18:00Z
+head: 7eefc0f5a93fe0be33e6ce433839e0f349a18fb1
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -404,7 +415,7 @@ proven:
 derived:
   - first remaining boundary is the official 15.32 initial game-login packet identity/framing
 unknown:
-  - whether restoring the preview-state login field yields a server response
+  - whether normalizing the runtime asset identifier yields a server response
 conflicts:
   - none
 first_failure:
@@ -414,6 +425,7 @@ rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
   - Linux OS identity alone: run 31698057223 advertised Windows and still received zero server bytes
+  - missing preview-state field alone: run 31698702409 sent 144 client bytes and received zero server bytes
 changed_paths:
   - tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
@@ -423,5 +435,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with GamePreviewState restored and classify aggregate direction markers
+next_action: run the exact-head canonical E2E with the runtime asset identifier normalized to 64 hex characters and classify aggregate direction markers
 ```

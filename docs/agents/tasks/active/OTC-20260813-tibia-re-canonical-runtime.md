@@ -10,7 +10,7 @@ phase: consolidation
 branch: docs/OTC-20260813-tibia-re-canonical-runtime
 base_branch: main
 created: 2026-08-13T09:41:00+02:00
-updated: 2026-08-13T09:56:00+02:00
+updated: 2026-08-13T10:02:00+02:00
 risk: medium
 related_pr: "#285"
 owned_paths:
@@ -18,6 +18,7 @@ owned_paths:
   - docs/agents/SHORT_COMMANDS.md
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
   - docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-state.md
+  - docs/agents/reports/OTCLIENT-20260813-tibia-re-login-recovery-import.md
   - docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-prompt-eval.md
 reuses:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
@@ -25,7 +26,7 @@ reuses:
   - PR #279 worldmap reconstruction tooling
   - PR #280 dedicated runner infrastructure
   - PR #283 runtime bridge
-  - historical Oteryn-Platform reports as read-only evidence only
+  - historical Oteryn-Platform reports/task as read-only evidence only
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -57,10 +58,11 @@ All new material work for this programme must be persisted or indexed in `blakin
 - [x] The canonical wrapper prompt loads the original programme prompt but overrides runtime ownership to `blakinio/otclient` and the dedicated OTClient runner.
 - [x] The wrapper explicitly forbids treating `oteryn-staging`, `oteryn-synology-staging`, or `oteryn-tibia-client-analysis` as active execution targets for new programme work.
 - [x] The wrapper explicitly requires every material finding/result/checkpoint/next action to be persisted or indexed in `blakinio/otclient` before return/rotation.
-- [x] A consolidated report records material external Oteryn evidence required for continuation, including exact run/job/commit identifiers and claim boundaries.
+- [x] A consolidated report records material external Oteryn worldmap/native-action evidence with exact run/job/commit identifiers and claim boundaries.
+- [x] The proven historical non-OCR login/world-entry recovery recipe is imported into `blakinio/otclient` with exact-version/layout gates and semantic claim boundaries.
 - [x] Current OTClient work inventory is recorded: PR #48 runtime, #279 OTBM pipeline, #280 runner infrastructure, #283 stable bridge.
 - [x] Current unknowns and canonical continuation order are recorded.
-- [x] Prompt routing was evaluated against positive, negative, boundary, stale-state, persistence and injection-style cases: 13/13 PASS.
+- [x] Prompt/registry routing was evaluated against positive, negative, boundary, stale-state, persistence, imported-recovery and injection-style cases: 14/14 PASS.
 - [x] No external repository is mutated.
 - [x] No Codex, OpenAI API quota, user token or owner-funded AI service is used.
 - [ ] Exact-head repository CI and PR diff/review hygiene are terminal before merge.
@@ -80,33 +82,34 @@ PROVEN:
 - `blakinio/otclient` `main` at task creation is `05450748daca8344d9555638b638e98b6dc3abc7`.
 - master programme prompt is already on `main` at `docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md`.
 - PR #48, #279, #280 and #283 are all in `blakinio/otclient` and contain the active implementation/runtime work.
-- historical Oteryn worldmap/action evidence was read from `blakinio/Oteryn-Platform` and consolidated without mutating the external repository.
-- canonical wrapper evaluation passed 13/13 documented cases.
-- owner explicitly requires all future material programme work to be saved in `blakinio/otclient`; this requirement is now encoded in the canonical wrapper and task.
+- historical Oteryn worldmap/action/login evidence was read from `blakinio/Oteryn-Platform` and consolidated without mutating the external repository.
+- canonical routing evaluation passed 14/14 documented cases.
+- owner explicitly requires all future material programme work to be saved in `blakinio/otclient`; this requirement is encoded in the canonical wrapper/task/registry.
 
 DERIVED:
-- after #280 deployment and #48 runner acceptance proof, future workers no longer need to query Oteryn-Platform merely to recover normal programme state.
+- after #280 deployment and #48 runner acceptance proof, future workers no longer need to query Oteryn-Platform merely to recover normal programme state or the known historical login recipe.
 
 UNKNOWN:
-- exact result of the current PR #280 Docker target validation until its workflow becomes terminal;
 - whether the updated PR #280 runner image is deployed on Synology;
 - whether the dedicated runner currently carries the new `tibia-re` label;
 - whether the PR #48 canonical bootstrap job is accepted by `synology-otclient-01`;
 - current upstream official-client SHA;
 - current structural `IN_GAME` state.
 
-# Prompt evaluation
+# Validation
 
-`docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-prompt-eval.md` compares the canonical wrapper against the unchanged base programme prompt and records 13/13 passing routing/safety/persistence/continuation cases. The candidate removes active-runtime ambiguity and requires repository persistence without weakening structural evidence, SHA fencing, recovery, OTBM or owner-funded-AI constraints.
+- pre-import exact-head CI run `31679686687` passed on head `95f562d0b4a1ca592a3e4924d3cf0a8ffe21fd22`, including `CI / Required` job `94382580159`;
+- the imported login report and registry/eval updates moved the head afterward, so a new exact-head CI is required before merge;
+- review threads/submitted reviews were empty before the import update; recheck on final head.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 3
+checkpoint_version: 4
 status: validating
 branch: docs/OTC-20260813-tibia-re-canonical-runtime
 pr: 285
-head_before_checkpoint: 9fe7ad92a769ea6cbf033b603678fc7e461c622a
+head_before_checkpoint: 68e11c6fd820ea09205187df97a4cf126665b8c5
 base_head: 05450748daca8344d9555638b638e98b6dc3abc7
 related_prs:
   runtime: 48
@@ -114,8 +117,8 @@ related_prs:
   runner: 280
   bridge: 283
 prompt_eval:
-  cases: 13
-  passed: 13
+  cases: 14
+  passed: 14
 blockers: []
-next_action: verify PR #285 full diff and exact-head CI; merge the documentation routing layer if clean, while runner deployment/runtime acceptance continues in #280/#48
+next_action: verify final PR #285 diff/reviews and exact-head CI after imported login evidence; keep auto-merge enabled or merge when required checks pass
 ```

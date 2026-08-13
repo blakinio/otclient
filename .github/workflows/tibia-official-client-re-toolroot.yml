@@ -67,7 +67,7 @@ jobs:
             dpkg-deb -x "$archive" "$root"
           done
 
-          required=(file gdb proxychains4 socat xdotool Xvfb vulkaninfo import compare)
+          required=(file gdb proxychains4 socat xdotool Xvfb vulkaninfo import-im6.q16 compare-im6.q16)
           missing=0
           for tool in "${required[@]}"; do
             candidate="$(find "$root/usr/bin" "$root/usr/sbin" -maxdepth 1 \

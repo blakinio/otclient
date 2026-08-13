@@ -24,6 +24,7 @@ jobs:
       TRACK_DISPLAY: ':98'
       TRACK_WARP_PORT: '25354'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_PACKAGE_VERSION: 15.32.df7b29
       TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
       TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
     steps:
@@ -56,7 +57,9 @@ jobs:
 
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          [[ "$(tr -d '\r\n' < "$runtime/package.json.version")" == "$EXPECTED_PACKAGE_VERSION" ]]
           echo TRACK_A_EXACT_OFFICIAL_CLIENT_VERIFIED=true
+          echo TRACK_A_CURRENT_PACKAGE_VERSION_VERIFIED=true
 
           warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
           [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]

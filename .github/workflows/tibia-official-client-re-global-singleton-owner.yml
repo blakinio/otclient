@@ -1,0 +1,68 @@
+name: Track A global Tibia singleton owner probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-global-singleton-owner.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Inspect all Tibia-named processes and IPC read-only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          echo TRACK_A_GLOBAL_PROCESS_PROBE_BEGIN=true
+          count=0
+          for proc in /proc/[0-9]*; do
+            [[ -r "$proc/comm" ]] || continue
+            pid="${proc##*/}"
+            comm="$(cat "$proc/comm" 2>/dev/null || true)"
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            base="$(basename "$exe" 2>/dev/null || true)"
+            case "$comm:$base" in
+              *Tibia*|*tibia*|*client*) ;;
+              *) continue;;
+            esac
+            uid="$(awk '/^Uid:/{print $2}' "$proc/status" 2>/dev/null || true)"
+            owned=false
+            [[ -r "$proc/environ" ]] && grep -azFxq "$marker" "$proc/environ" 2>/dev/null && owned=true
+            under_state=false
+            case "$exe" in "$state"/*) under_state=true;; esac
+            echo "TRACK_A_GLOBAL_PROCESS=pid:$pid|uid:$uid|comm:$comm|base:$base|track_owned:$owned|under_state:$under_state|exe:$exe"
+            count=$((count+1))
+          done
+          echo TRACK_A_GLOBAL_PROCESS_COUNT="$count"
+          python3 - <<'PY'
+          import pathlib
+          rows=pathlib.Path('/proc/net/unix').read_text(errors='replace').splitlines()[1:]
+          for row in rows:
+              p=row.split()
+              if len(p)<7: continue
+              path=p[7] if len(p)>7 else ''
+              low=path.lower()
+              if any(k in low for k in ('tibia','cipsoft','single','qipc','qt')):
+                  print('TRACK_A_GLOBAL_UNIX_SOCKET='+path.replace('\x00','@'))
+          PY
+          uid="$(id -u)"
+          for d in /tmp /dev/shm "/run/user/$uid"; do
+            [[ -d "$d" ]] || continue
+            find "$d" -maxdepth 3 -user "$uid" \
+              \( -iname '*tibia*' -o -iname '*cipsoft*' -o -iname '*single*' -o -iname '*qipc*' -o -iname '*qt*' \) \
+              -printf 'TRACK_A_GLOBAL_FILE=%p|type=%y|mode=%m\n' 2>/dev/null | head -n 300 || true
+          done
+          echo TRACK_A_GLOBAL_PROCESS_PROBE_COMPLETE=true

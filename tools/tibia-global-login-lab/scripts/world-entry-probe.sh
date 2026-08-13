@@ -202,7 +202,8 @@ docker cp tools/tibia-global-login-lab/scripts/game-socks-forward.py "$CONTAINER
 docker exec "$CONTAINER" bash -lc '
   chmod 700 /lab/runtime/game-socks-forward.py
   rm -f /lab/runtime/game-socks-forward.ready /lab/runtime/game-socks-forward.granted \
-    /lab/runtime/game-socks-forward.client-bytes /lab/runtime/game-socks-forward.server-bytes
+    /lab/runtime/game-socks-forward.client-bytes /lab/runtime/game-socks-forward.server-bytes \
+    /lab/runtime/game-socks-forward.client-length /lab/runtime/game-socks-forward.server-length
   nohup python3 /lab/runtime/game-socks-forward.py >/dev/null 2>&1 </dev/null &
   echo $! >/lab/runtime/game-socks-forward.pid
 '
@@ -343,6 +344,11 @@ if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.server-bytes
 else
   echo LAB_GAME_FORWARD_SERVER_BYTES=false
 fi
+client_length=$(docker exec "$CONTAINER" sh -c 'cat /lab/runtime/game-socks-forward.client-length 2>/dev/null || echo 0')
+server_length=$(docker exec "$CONTAINER" sh -c 'cat /lab/runtime/game-socks-forward.server-length 2>/dev/null || echo 0')
+[[ "$client_length" =~ ^[0-9]+$ && "$server_length" =~ ^[0-9]+$ ]]
+echo "LAB_GAME_FORWARD_CLIENT_LENGTH=$client_length"
+echo "LAB_GAME_FORWARD_SERVER_LENGTH=$server_length"
 pid=$(docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' | head -n1 || true)
 if [[ -n "$pid" ]]; then
   rows=$(docker exec "$CONTAINER" ss -ntp 2>/dev/null | grep "pid=$pid," || true)

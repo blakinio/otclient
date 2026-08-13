@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T13:36:00+02:00
+updated: 2026-08-13T13:51:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -287,6 +287,16 @@ is protocol evidence. The owner has explicitly authorized resuming the exact
 challenge-first experiment and keeping PR #284 active until terminal condition
 A or B is proven.
 
+Run `31695992918`, job `94433781793`, exact head
+`3d1467255e73584163b11f2c88750477643c40dc`, completed that challenge-first
+experiment. SOCKS was granted, but both directional markers were false. This
+disproves challenge-first behavior for the current official game endpoint. The
+earlier non-challenge run sent client bytes while normal encryption, checksum,
+client-version, login-pending, and sequenced-packet flags were absent. The next
+experiment keeps challenge-first disabled, restores those existing
+version-derived features, and records only aggregate directional byte lengths,
+never payloads.
+
 # Evidence classification
 
 PROVEN:
@@ -309,6 +319,7 @@ DISPROVEN:
 - tmpfs handoff creation/consumption as the current blocker;
 - official 15.32 appearances parser incompatibility;
 - unavailable `synology-otclient-01` runner as the current blocker.
+- challenge-first behavior on the current official game endpoint: run `31695992918` produced neither client nor server bytes after the granted TCP connection.
 
 UNKNOWN:
 - whether `g_game.loginWorld()` with appearances-only state reaches a game-server TCP/session callback;
@@ -335,4 +346,4 @@ UNKNOWN:
 
 # Next action
 
-Rerun the cancelled canonical E2E on exact experiment head `7310c03d8507b3c07e11f4bc4226bd91d71c6ef9` and classify the challenge-first hypothesis from `LAB_GAME_FORWARD_CLIENT_BYTES` and `LAB_GAME_FORWARD_SERVER_BYTES`; continue from the first resulting protocol boundary without stopping at the first failure.
+Run the canonical E2E with challenge-first disabled, restored version-derived login packet features, and aggregate direction lengths. Continue from the first server callback/bytes or exact no-response packet boundary.

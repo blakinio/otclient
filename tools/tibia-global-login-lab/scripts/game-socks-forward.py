@@ -11,6 +11,8 @@ READY = Path('/lab/runtime/game-socks-forward.ready')
 GRANTED = Path('/lab/runtime/game-socks-forward.granted')
 CLIENT_BYTES = Path('/lab/runtime/game-socks-forward.client-bytes')
 SERVER_BYTES = Path('/lab/runtime/game-socks-forward.server-bytes')
+CLIENT_LENGTH = Path('/lab/runtime/game-socks-forward.client-length')
+SERVER_LENGTH = Path('/lab/runtime/game-socks-forward.server-length')
 LISTEN_HOST = '127.0.0.1'
 LISTEN_PORT = 37171
 SOCKS_HOST = '127.0.0.1'
@@ -57,6 +59,8 @@ def connect_via_socks(target_host, target_port):
 
 def relay(client, target_host, target_port):
     upstream = None
+    client_length = 0
+    server_length = 0
     try:
         upstream = connect_via_socks(target_host, target_port)
         sockets = [client, upstream]
@@ -68,7 +72,14 @@ def relay(client, target_host, target_port):
                 data = source.recv(65536)
                 if not data:
                     return
-                (CLIENT_BYTES if source is client else SERVER_BYTES).touch(mode=0o600, exist_ok=True)
+                if source is client:
+                    client_length += len(data)
+                    CLIENT_BYTES.touch(mode=0o600, exist_ok=True)
+                    CLIENT_LENGTH.write_text(str(client_length), encoding='ascii')
+                else:
+                    server_length += len(data)
+                    SERVER_BYTES.touch(mode=0o600, exist_ok=True)
+                    SERVER_LENGTH.write_text(str(server_length), encoding='ascii')
                 (upstream if source is client else client).sendall(data)
     except (OSError, ValueError):
         return
@@ -87,6 +98,8 @@ def main():
     GRANTED.unlink(missing_ok=True)
     CLIENT_BYTES.unlink(missing_ok=True)
     SERVER_BYTES.unlink(missing_ok=True)
+    CLIENT_LENGTH.unlink(missing_ok=True)
+    SERVER_LENGTH.unlink(missing_ok=True)
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listener.bind((LISTEN_HOST, LISTEN_PORT))

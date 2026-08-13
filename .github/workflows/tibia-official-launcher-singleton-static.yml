@@ -1,0 +1,49 @@
+name: Track A official launcher singleton static analysis
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-launcher-singleton-static.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Inspect fresh official launcher ELF without executing it
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          work="$state/launcher-singleton-static/run-$GITHUB_RUN_ID"
+          mkdir -p "$work/unpacked"
+          url='https://static.tibia.com/download/tibia.x64.tar.gz'
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' "$url" -o "$work/tibia.x64.tar.gz"
+          tar -xzf "$work/tibia.x64.tar.gz" -C "$work/unpacked"
+          launcher="$work/unpacked/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          echo TRACK_A_LAUNCHER_STATIC_SHA256="$(sha256sum "$launcher" | awk '{print $1}')"
+          echo TRACK_A_LAUNCHER_STATIC_SIZE="$(stat -c %s "$launcher")"
+          file "$launcher" | sed 's/^/TRACK_A_LAUNCHER_FILE=/'
+          echo TRACK_A_LAUNCHER_SINGLETON_STRINGS_BEGIN=true
+          strings -a -t x "$launcher" | grep -Ei -C 8 'Application is already running|single.?application|single.?instance|QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|lock.?file|server.?name|local.?socket' | head -n 400 | sed 's/^/TRACK_A_LAUNCHER_STRING=/' || true
+          echo TRACK_A_LAUNCHER_SINGLETON_IMPORTS_BEGIN=true
+          objdump -T "$launcher" 2>/dev/null | grep -Ei 'QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|QLockFile|flock|fcntl|sem_|shm_|socket|bind|connect' | head -n 300 | sed 's/^/TRACK_A_LAUNCHER_IMPORT=/' || true
+          readelf -d "$launcher" | grep NEEDED | sed 's/^/TRACK_A_LAUNCHER_NEEDED=/' || true
+          echo TRACK_A_LAUNCHER_SINGLETON_STATIC_COMPLETE=true

@@ -19,6 +19,7 @@ Resolution procedure:
 3. read the repository-owned consolidated state/report evidence, including:
    - `docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-state.md`;
    - `docs/agents/reports/OTCLIENT-20260813-tibia-re-login-recovery-import.md`;
+   - `docs/agents/reports/OTCLIENT-20260813-tibia-re-external-evidence-manifest.md`;
 4. inspect live `main`, active tasks, open PRs, runner/runtime state and exact `next_action` values;
 5. execute the programme from durable state rather than chat memory;
 6. do not invent a task named `OTCLIENT-TIBIA-RE.md`, a branch named `agent/otclient-tibia-re`, or a required `workflow_dispatch` endpoint.

@@ -38,5 +38,5 @@ jobs:
         run: |
           set -Eeuo pipefail
           patched="$RUNNER_TEMP/tibia-official-client-re-autonomous-world-login-current.sh"
-          sed 's/== 51965216/== 78197896/' .github/scripts/tibia-official-client-re-autonomous-world-login.sh > "$patched"
+          sed -e 's/== 51965216/== 78197896/' -e '3a trap '\''rc=$?; echo "::error::TRACK_A_FLOW_FAILED_LINE=$LINENO RC=$rc"; exit $rc'\'' ERR' .github/scripts/tibia-official-client-re-autonomous-world-login.sh > "$patched"
           bash "$patched"

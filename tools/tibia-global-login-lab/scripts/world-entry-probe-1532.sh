@@ -77,6 +77,41 @@ if text.count(old_gate) != 1:
     raise SystemExit(f"expected exactly one normal things gate, found {text.count(old_gate)}")
 text = text.replace(old_gate, new_gate, 1)
 
+# Run #33 failed before OTClient launch because Xvfb did not become reachable.
+# Keep display recovery inside the lab: remove stale per-container lock/socket,
+# verify the binary exists, require a live Xvfb PID and emit its non-secret log
+# only when display startup actually fails.
+old_xvfb = """docker exec "$CONTAINER" bash -lc ': >/lab/runtime/otclient.stdout.log; nohup Xvfb :100 -screen 0 1280x800x24 -nolisten tcp >/lab/runtime/xvfb.log 2>&1 </dev/null &'
+for _ in $(seq 1 30); do docker exec "$CONTAINER" xdpyinfo -display :100 >/dev/null 2>&1 && break; sleep 1; done
+docker exec "$CONTAINER" xdpyinfo -display :100 >/dev/null
+"""
+new_xvfb = """docker exec "$CONTAINER" bash -lc '
+set -Eeuo pipefail
+command -v Xvfb >/dev/null
+rm -f /tmp/.X100-lock /tmp/.X11-unix/X100
+mkdir -p /tmp/.X11-unix
+: >/lab/runtime/otclient.stdout.log
+: >/lab/runtime/xvfb.log
+nohup Xvfb :100 -screen 0 1280x800x24 -nolisten tcp >/lab/runtime/xvfb.log 2>&1 </dev/null &
+echo $! >/lab/runtime/xvfb.pid
+'
+xvfb_ready=false
+for _ in $(seq 1 60); do
+  if docker exec "$CONTAINER" xdpyinfo -display :100 >/dev/null 2>&1; then xvfb_ready=true; break; fi
+  docker exec "$CONTAINER" bash -lc 'test -s /lab/runtime/xvfb.pid && kill -0 "$(cat /lab/runtime/xvfb.pid)" 2>/dev/null' || break
+  sleep 0.5
+done
+if [[ "$xvfb_ready" != true ]]; then
+  echo 'LAB_XVFB_READY=false'
+  docker exec "$CONTAINER" bash -lc 'tail -n 80 /lab/runtime/xvfb.log || true'
+  exit 1
+fi
+echo LAB_XVFB_READY=true
+"""
+if text.count(old_xvfb) != 1:
+    raise SystemExit(f"expected exactly one Xvfb bootstrap block, found {text.count(old_xvfb)}")
+text = text.replace(old_xvfb, new_xvfb, 1)
+
 dst.write_text(text, encoding="utf-8")
 PY
 

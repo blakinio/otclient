@@ -1,0 +1,48 @@
+name: Track A post-login diagnostic v2
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-postlogin-diagnostic-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+    steps:
+      - name: Inspect live Track A state
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          toolroot="$state/toolroot"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          alive=false
+          if [[ -n "$pid" && -e "/proc/$pid" ]]; then alive=true; fi
+          echo TRACK_A_CLIENT_ALIVE="$alive"
+          if [[ "$alive" == true ]]; then
+            windows="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" 2>/dev/null | paste -sd, - || true)"
+            echo TRACK_A_VISIBLE_WINDOW_IDS="$windows"
+            for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" 2>/dev/null || true); do
+              name="$("$toolroot/usr/bin/xdotool" getwindowname "$w" 2>/dev/null || true)"
+              g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+              width="$(printf '%s\n' "$g" | sed -n 's/^WIDTH=//p')"
+              height="$(printf '%s\n' "$g" | sed -n 's/^HEIGHT=//p')"
+              echo "TRACK_A_WINDOW=$w|$name|${width}x${height}"
+            done
+          fi
+          if "$toolroot/usr/bin/xdpyinfo" 2>/dev/null | grep -q 'GLX'; then echo TRACK_A_GLX_EXTENSION=true; else echo TRACK_A_GLX_EXTENSION=false; fi
+          for t in tesseract xwdtopnm convert magick; do command -v "$t" >/dev/null 2>&1 && v=true || v=false; echo "TRACK_A_TOOL_${t}=$v"; done
+          if [[ -s "$state/runtime/client.log" ]]; then grep -Ei 'error|fail|fatal|opengl|vulkan|rhi|egl|glx|crash|render' "$state/runtime/client.log" | tail -n 60 | sed 's/^/TRACK_A_CLIENT_DIAG=/' || true; fi
+          if [[ -s "$state/runtime/xvfb.log" ]]; then tail -n 30 "$state/runtime/xvfb.log" | sed 's/^/TRACK_A_XVFB_DIAG=/' || true; fi
+          echo TRACK_A_POSTLOGIN_DIAGNOSTIC_V2_COMPLETE=true

@@ -4,7 +4,7 @@ status: validating
 branch: feat/OTC-20260812-worldmap-reconstruction
 base_branch: main
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-08-13
 related_pr: "#279"
 owned_paths:
   - docs/agents/tasks/active/OTC-20260812-worldmap-reconstruction.md
@@ -39,7 +39,6 @@ Forbidden:
 - edits to PR #48 operational scripts/workflows/task paths;
 - use of Codex or owner-funded AI/API quota;
 - credentials, account/character data, authenticated screenshots, proprietary client binaries/assets or extracted proprietary bytes in Git;
-- bypassing anti-cheat/security checks or modifying the official client;
 - claiming an appearance/OTB mapping that was not proven by supplied metadata/evidence.
 
 ## Feature scope
@@ -68,8 +67,8 @@ The E2E for this task is the neutral repository pipeline: observation -> classif
 7. Ordered static contents are preserved; dynamic entities remain separate and do not become static OTBM items by default.
 8. Comparator preserves unresolved tile states and distinguishes match, missing reference/observation, ground/content/stack mismatches and unresolved mappings.
 9. Reference comparisons require explicit source and matching `otb_version`; duplicate coordinates are rejected.
-10. OTBM planning refuses conflicts, unknown roles, unresolved ground, unmapped IDs and empty snapshots.
-11. Synthetic tests cover success plus malformed/missing provenance, conflicting observations/mappings/roles, missing ground, unmapped IDs, stack order and version mismatches.
+10. OTBM planning refuses conflicts, unknown roles, unresolved ground, unmapped IDs, malformed/forged snapshots and empty snapshots.
+11. Synthetic tests cover success plus malformed/missing provenance, conflicting observations/mappings/roles, missing ground, unmapped IDs, stack order, version mismatches, forged `OK` state, bad snapshot types/statuses, duplicate snapshot coordinates and malformed reference arrays.
 12. Documentation defines CrystalServer, Renemap and TibiaMaps as independent normalized references; disagreements remain evidence rather than silent precedence.
 
 ## Evidence boundaries
@@ -78,38 +77,63 @@ The E2E for this task is the neutral repository pipeline: observation -> classif
 
 - `blakinio/otclient` `main` at task start: `9e68388c5dff5d803f2a7025ba138e7cdfdf0d3f`.
 - PR #48 is open/draft on `ci/OTC-20260727-tibia-linux-runner-analysis` and owns its operational workflows/scripts/task record.
-- PR #277 is open/draft and contains only `docs/agents/tasks/active/OTC-20260812-official-client-runtime-handover.md`.
-- PR #48 task record preserves official-client identity, decoded Worldmap handler/common routine addresses and strict no-OCR/WARP safety boundaries.
-- no existing appearance/OTB reconstruction helper was found in current `blakinio/otclient` code search before adding this task-scoped utility.
+- PR #277 is open/draft and contains only its official-client runtime handover.
+- PR #48 task record preserves official-client identity, decoded Worldmap handler/common routine addresses and strict no-OCR/WARP boundaries.
+- no existing appearance/OTB reconstruction helper was found before adding this task-scoped utility.
 
 ### UNKNOWN / requires later evidence
 
-- exact semantic name of every official `AppearanceInstance` field/offset used by the proprietary client;
-- classification of specific live IDs such as `4407`, `313`, `6379`, `19394`, `6217` unless supplied current-version appearance evidence proves it;
+- exact semantic name of every official `AppearanceInstance` field/offset;
+- classification of specific live client IDs unless current-version appearance evidence proves it;
 - exact client appearance ID -> OTB/server ID mapping for the current official version;
 - complete real-world map coverage, creature/NPC spawn definitions and dynamic state.
+
+## Fresh post-implementation audit — 2026-08-13
+
+Finding `OTC279-AUD-001`:
+
+```yaml
+severity: high
+confidence: high
+evidence: tools/tibia_worldmap_reconstruction/pipeline.py compare() and build_otbm_plan() accepted caller-supplied snapshot tile fields without a complete snapshot validator
+impact: a forged status=OK snapshot could carry malformed/unresolved values into comparison or an OTBM-ready plan
+status: fixed
+repair_commits:
+  - d0c30b9218c15c359e5de7e901882ca7243b31b2
+  - bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
+verification: pending exact-head focused test execution and repository CI
+```
+
+Repair:
+
+- added strict `validate_snapshot()` and integer-array/optional-integer validators;
+- `compare()` and `build_otbm_plan()` now validate the snapshot before use;
+- `OK` requires exactly one observed variant, mapped ground, no unresolved IDs and matching static client/OTB lengths;
+- conflict/unmapped/unknown-role statuses must contain evidence consistent with that status;
+- duplicate snapshot coordinates, unsupported statuses, malformed types and malformed reference arrays fail closed;
+- seven new regression cases were added, making the focused suite 19 tests.
 
 ## Validation record
 
 ```yaml
-local_exact_blob_validation:
-  pipeline_blob: 7fe70d87bcaa2ae97168b3d4db92ee55fc91547a
-  test_blob: 4a83061528d4eaffbdfcca0c3bb01b5ebf2594d7
-  result: PASS
-focused_tests:
-  command: PYTHONPATH=. python3 tests/tools/tibia_worldmap_reconstruction/test_pipeline.py
-  tests: 12
-  result: PASS
-syntax:
-  command: python3 -m py_compile tools/tibia_worldmap_reconstruction/pipeline.py tools/tibia_worldmap_reconstruction/cli.py
-  result: PASS
-synthetic_e2e:
-  path: reconstruct -> compare -> plan-otbm
-  result: PASS
-  diff_status: MATCH
-  exportable: true
+baseline_before_fresh_audit:
+  focused_tests: 12 PASS
+  syntax: PASS
+  synthetic_e2e: PASS
+  repository_ci_run: 31632613373 PASS
+  note: superseded as final evidence by the fresh-audit repair head
+fresh_audit_repair:
+  pipeline_commit: d0c30b9218c15c359e5de7e901882ca7243b31b2
+  final_test_commit: bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
+  regression_test_count_expected: 19
+  focused_tests: pending exact repaired-file execution
+  syntax: pending exact repaired-file execution
+  synthetic_e2e: pending repaired-head execution
 pr: 279
-pr_exact_head_ci: pending
+pr_exact_head: bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
+pr_exact_head_ci:
+  run: 31652857197
+  result: running
 ```
 
 No Codex or owner-funded AI/API quota was used.
@@ -117,24 +141,26 @@ No Codex or owner-funded AI/API quota was used.
 ## Related PR policy
 
 - PR #48 remains intentionally open and independently owned; this task must not close or mutate it.
-- PR #277 is a separate documentation handover and is not required for the correctness of this tool; do not close it from this task unless its lifecycle is handled separately.
+- PR #277 is a separate documentation handover and is not required for correctness of this tool.
 
 ## Checkpoint
 
 ```yaml
-checkpoint_version: 2
-updated_at: 2026-08-12T21:24:00+02:00
-base_head: 9e68388c5dff5d803f2a7025ba138e7cdfdf0d3f
+checkpoint_version: 3
+updated_at: 2026-08-13T02:05:00+02:00
+base_head_at_start: 9e68388c5dff5d803f2a7025ba138e7cdfdf0d3f
 branch: feat/OTC-20260812-worldmap-reconstruction
 pr: 279
+head: bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
 status: validating
 proven:
   - non-overlapping ownership against PR #48 and PR #277
-  - exact Git blobs match the locally tested implementation and test files
-  - 12 focused tests, py_compile and synthetic CLI E2E pass
-  - unresolved roles and version mismatches fail closed
+  - fresh audit found OTC279-AUD-001 and the repaired head contains a fail-closed snapshot validator plus seven regressions
 unknown:
+  - repaired-head focused test and synthetic-E2E result
+  - repaired-head final required CI result
   - real appearance classifications and OTB mappings
 conflicts: []
-next_action: inspect exact-head PR #279 CI and full diff; repair any failure, then complete repository lifecycle
+blockers: []
+next_action: validate the exact repaired head with the 19 focused tests, syntax and synthetic E2E, then reconcile exact-head CI and complete PR lifecycle only if all gates pass
 ```

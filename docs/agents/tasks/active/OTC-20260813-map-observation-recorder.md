@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-map-observation-recorder
-status: investigating
+status: implementing
 agent: Codex
 project_lane: otclient
 lane: otclient
@@ -12,7 +12,7 @@ branch: feat/OTC-20260813-map-observation-recorder
 base_branch: main
 start_sha: 005158b5b9bf25fe77bd5fc10813a6388a072836
 created: 2026-08-13T21:14:46Z
-updated: 2026-08-13T21:14:46Z
+updated: 2026-08-13T21:25:00Z
 risk: medium
 related_pr: null
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
@@ -21,9 +21,10 @@ owned_paths:
   - src/client/mapobservationrecorder.h
   - src/client/mapobservationrecorder.cpp
   - src/client/protocolgameparse.cpp
+  - src/client/luafunctions.cpp
   - src/CMakeLists.txt
-  - tests/unit/client/map_observation_recorder_test.cpp
-  - tests/unit/client/CMakeLists.txt
+  - tests/unit/map/map_observation_recorder_test.cpp
+  - tests/unit/map/CMakeLists.txt
 modules_touched:
   - map-observation-recorder
   - protocol-game-map-state
@@ -34,6 +35,7 @@ reuses:
   - src/client/thing.h
   - src/client/item.h
   - src/client/protocolgameparse.cpp
+  - src/client/luafunctions.cpp
   - tests/support/**
 depends_on:
   - PR #291 merged as 005158b5b9bf25fe77bd5fc10813a6388a072836
@@ -89,11 +91,11 @@ the recorder if PR #284 remains open when P1 reaches closeout.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T21:14:46Z
-head: 005158b5b9bf25fe77bd5fc10813a6388a072836
+updated_at: 2026-08-13T21:25:00Z
+head: 36021c5f519d3165b8d5bd1e7260f1fe9722b023
 branch: feat/OTC-20260813-map-observation-recorder
 pr: none
-status: investigating
+status: implementing
 context_routes:
   - P1 local recorder implementation
 owned_paths:
@@ -102,16 +104,18 @@ owned_paths:
   - src/client/mapobservationrecorder.cpp
   - src/client/protocolgameparse.cpp
   - src/CMakeLists.txt
-  - tests/unit/client/map_observation_recorder_test.cpp
-  - tests/unit/client/CMakeLists.txt
+  - tests/unit/map/map_observation_recorder_test.cpp
+  - tests/unit/map/CMakeLists.txt
 proven:
   - P0 contract v1 is merged on main at 005158b5b9bf25fe77bd5fc10813a6388a072836.
   - Track B PR #284 owns no P1 declared path but does own its runtime namespace.
   - ProtocolGame mutates decoded Map/Tile state through setTileDescription and tile add/transform/remove handlers.
+  - The repository provides nlohmann::ordered_json and an existing map unit-test target with tile builders.
 derived:
   - The recorder can attach after existing decoded-state mutations without reparsing packet contents.
+  - A bounded deferred JSONL queue avoids filesystem writes in the parser mutation handlers.
 unknown:
-  - Existing configuration and test seams suitable for explicit recorder enablement and sink-failure coverage.
+  - Native-Linux runtime availability for a Track B smoke proof remains unverified.
 conflicts:
   - MODULE_CATALOG.md and CHANGELOG.md are actively owned by Track B PR #284.
 first_failure:
@@ -120,10 +124,20 @@ first_failure:
 rejected_hypotheses: []
 changed_paths:
   - docs/agents/tasks/active/OTC-20260813-map-observation-recorder.md
+  - src/client/mapobservationrecorder.h
+  - src/client/mapobservationrecorder.cpp
+  - src/client/luafunctions.cpp
+  - src/client/protocolgameparse.cpp
+  - src/CMakeLists.txt
+  - tests/unit/map/CMakeLists.txt
+  - tests/unit/map/map_observation_recorder_test.cpp
 validation:
   - command: P0 merge and Track B ownership inspection
     result: PASS
     evidence: origin/main 005158b5b9bf25fe77bd5fc10813a6388a072836 and PR #284 changed-path inventory
+  - command: implementation source inspection
+    result: PASS
+    evidence: recorder is Lua-enabled explicitly, disabled by default, and receives only decoded Map/Tile values
 blockers: []
-next_action: Inspect existing configuration, JSON, logging, and test seams before selecting the smallest recorder integration surface.
+next_action: Run the focused map-recorder test build using the configured Windows test preset after initializing the supported MSVC developer environment.
 ```

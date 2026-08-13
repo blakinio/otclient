@@ -412,6 +412,7 @@ set(SOURCE_FILES
         client/luafunctions.cpp
         client/luavaluecasts_client.cpp
         client/map.cpp
+        client/mapobservationrecorder.cpp
         client/mapio.cpp
         client/mapview.cpp
         client/minimap.cpp

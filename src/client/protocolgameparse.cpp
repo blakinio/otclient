@@ -32,6 +32,7 @@
 #include "protocolcodes.h"
 #include "luavaluecasts_client.h"
 #include "map.h"
+#include "mapobservationrecorder.h"
 #include "mapview.h"
 #include "missile.h"
 #include "thingtype.h"
@@ -1524,6 +1525,7 @@ void ProtocolGame::parseTileAddThing(const InputMessagePtr& msg)
     const auto& thing = getThing(msg);
 
     g_map.addThing(thing, pos, stackPos);
+    g_mapObservationRecorder.recordTileDelta(pos, "add", stackPos, thing);
 }
 
 void ProtocolGame::parseTileTransformThing(const InputMessagePtr& msg)
@@ -1545,6 +1547,7 @@ void ProtocolGame::parseTileTransformThing(const InputMessagePtr& msg)
     }
 
     g_map.addThing(newThing, pos, stackPos);
+    g_mapObservationRecorder.recordTileDelta(pos, "change", stackPos, newThing);
 }
 
 void ProtocolGame::parseTileRemoveThing(const InputMessagePtr& msg) const
@@ -1555,8 +1558,12 @@ void ProtocolGame::parseTileRemoveThing(const InputMessagePtr& msg) const
         return;
     }
 
+    const auto pos = thing->getServerPosition();
+    const auto stackPos = thing->getStackPos();
     if (!g_map.removeThing(thing))
         g_logger.traceError("ProtocolGame::parseTileRemoveThing: unable to remove thing");
+    else
+        g_mapObservationRecorder.recordTileDelta(pos, "delete", stackPos);
 }
 
 void ProtocolGame::parseCreatureMove(const InputMessagePtr& msg)
@@ -3915,7 +3922,9 @@ int ProtocolGame::setTileDescription(const InputMessagePtr& msg, const Position 
     bool gotEffect = false;
     for (auto stackPos = 0; stackPos < 256; ++stackPos) {
         if (msg->peekU16() >= 0xff00) {
-            return msg->getU16() & 0xff;
+            const auto skip = msg->getU16() & 0xff;
+            g_mapObservationRecorder.recordTileSnapshot(position, g_map.getTile(position));
+            return skip;
         }
 
         if (g_game.getFeature(Otc::GameEnvironmentEffect) && !gotEffect) {

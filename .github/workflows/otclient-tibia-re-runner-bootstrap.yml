@@ -14,7 +14,9 @@ permissions:
 
 jobs:
   bootstrap:
-    runs-on: [self-hosted, otclient, synology]
+    # This runner was registered with --no-default-labels, so GitHub reports
+    # only its two explicit repository-scoped labels.
+    runs-on: [otclient, synology]
     timeout-minutes: 15
     steps:
       - name: Checkout task branch

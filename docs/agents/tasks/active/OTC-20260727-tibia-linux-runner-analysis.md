@@ -395,29 +395,34 @@ This exactly matches the researched binary identity. The failed earlier run
 as downloader-failure evidence. Existing exact-SHA profiles may therefore be
 reused after live PID/PIE/object rediscovery.
 
-### Dedicated runner reconciliation — WAITING
+### Dedicated runner reconciliation — ONLINE WITH LABEL MISMATCH
 
 PR #48 current head is
 `17b55cecb596ff0224201d85ea50e02cb1b67511`. Canonical bootstrap run
 `31687610951`, job `94407259983`, remained `queued` at the bounded observation.
 The older canonical bootstrap `31679097113`, migration run `31686590850`, and
-broad `runs-on: self-hosted` probe `31643425060` also remain queued. No live
-evidence proves that `synology-otclient-01` is online or accepting jobs.
+broad `runs-on: self-hosted` probe `31643425060` also remain queued.
 
-PR #280 persists the already-reviewed deployment stack and one-time migration
-workflow. The current environment exposes neither an authorized Synology/SSH
-execution channel nor an available self-hosted GitHub Actions control-plane job,
-so the runner cannot be recreated safely from this session.
+The repository runner API subsequently proved runner ID `21`, name
+`synology-otclient-01`, online with explicit labels `otclient,synology`. It was
+registered without GitHub's default `self-hosted,Linux,X64` labels, so workflows
+requiring `self-hosted` cannot match it. The bootstrap selector is corrected to
+the exact repository-scoped live label set `[otclient, synology]`.
+
+PR #280 persists the reviewed target stack and remains responsible for eventual
+image/label convergence. PR #48 can now perform its bounded bootstrap directly
+on the already-online repository-scoped runner without waiting for that
+re-registration.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:10:00+02:00
+updated_at: 2026-08-13T12:36:00+02:00
 head: 17b55cecb596ff0224201d85ea50e02cb1b67511
 branch: ci/OTC-20260727-tibia-linux-runner-analysis
 pr: 48
-status: blocked
+status: implementing
 context_routes:
   - official-client-runtime-analysis
   - dedicated-runner-migration
@@ -426,31 +431,32 @@ owned_paths:
 proven:
   - current official-client identity is unchanged at e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe by run 31674406184
   - exact researched relocation-aware profiles remain applicable after live PID/PIE/object rediscovery
-  - PR 48 canonical bootstrap is queued and has not been accepted by synology-otclient-01
+  - GitHub runner API reports synology-otclient-01 online as runner ID 21 with explicit labels otclient and synology
 derived:
   - live structural experiments can resume without a new exact-version profile once the dedicated runner is restored
 unknown:
   - Synology host power and reachability state
-  - repository registration state of synology-otclient-01
+  - whether the current runner image contains the full Tibia RE runtime dependencies
   - current official-client process/session/container state because no runner job can inspect it
   - structural IN_GAME, authoritative player position, and live action effects
 conflicts:
-  - owner handover says synology-otclient-01 is now working, while current GitHub jobs remain queued
+  - repository canonical selector includes self-hosted, while the live runner was registered without default labels
 first_failure:
-  marker: no authorized execution path reaches the Synology host
-  evidence: runs 31687610951, 31686590850, and 31643425060 remain queued
+  marker: workflow label mismatch prevented assignment to the online runner
+  evidence: runner ID 21 labels are otclient,synology while run 31687610951 required self-hosted,otclient,synology
 validation:
   - command: gh run view 31674406184 --repo blakinio/otclient --log
     result: PASS
     evidence: HTTP 200 and exact packed/client hashes above
   - command: gh run view 31687610951 --repo blakinio/otclient --json status,conclusion,jobs
     result: BLOCKED
-    evidence: bootstrap job 94407259983 remains queued
+    evidence: bootstrap job 94407259983 remained queued under the mismatched selector
 rejected_hypotheses:
   - current official-client binary changed: disproven by run 31674406184
 changed_paths:
+  - .github/workflows/otclient-tibia-re-runner-bootstrap.yml
   - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
 blockers:
-  - no authorized live Synology/SSH channel and no available self-hosted repository runner
-next_action: restore one authorized Synology execution path, deploy PR 280's reviewed otclient-runner stack, then reconcile PR 48 run 31687610951 and inspect the official-client process/session structurally
+  - synology-otclient-01 is online but registered without the self-hosted default label, so the canonical bootstrap selector cannot match until corrected
+next_action: trigger the bootstrap with the runner's exact live labels otclient and synology, then inspect its environment and official-client runtime state
 ```

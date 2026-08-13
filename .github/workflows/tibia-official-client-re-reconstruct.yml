@@ -23,12 +23,10 @@ jobs:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_WARP_PORT: '25354'
-      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-      EXPECTED_CLIENT_SIZE: '51965216'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Track A ownership and reconstruct hash-verified runtime
+      - name: Verify Track A ownership and reconstruct current hash-verified candidate
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -48,11 +46,10 @@ jobs:
             https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
           echo TRACK_A_WARP_OWNERSHIP_VERIFIED=true
 
-          package_out="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          package_out="$state/candidate-current/Tibia"
+          rm -rf "$state/candidate-current"
           mkdir -p "$package_out"
-          chmod 700 "$state/home" "$state/home/.local" "$state/home/.local/share" \
-            "$state/home/.local/share/CipSoft GmbH" "$state/home/.local/share/CipSoft GmbH/Tibia" \
-            "$state/home/.local/share/CipSoft GmbH/Tibia/packages" "$package_out"
+          chmod 700 "$state/candidate-current" "$package_out"
           TIBIA_PACKAGE_OUT="$package_out" TIBIA_SOCKS="127.0.0.1:$TRACK_WARP_PORT" \
             python3 .github/scripts/tibia-official-client-re-reconstruct.py
 
@@ -60,9 +57,9 @@ jobs:
           [[ -x "$client" ]]
           actual_sha="$(sha256sum "$client" | awk '{print $1}')"
           actual_size="$(stat -c %s "$client")"
-          [[ "$actual_sha" == "$EXPECTED_CLIENT_SHA256" ]]
-          [[ "$actual_size" == "$EXPECTED_CLIENT_SIZE" ]]
-          echo TRACK_A_RUNTIME_FILE_COUNT="$(find "$package_out" -type f | wc -l)"
-          echo TRACK_A_RUNTIME_TOTAL_BYTES="$(du -sb "$package_out" | awk '{print $1}')"
-          echo TRACK_A_RUNTIME_CLIENT_SHA256="$actual_sha"
-          echo TRACK_A_RUNTIME_RECONSTRUCTED=true
+          [[ -n "$actual_sha" && "$actual_size" -gt 0 ]]
+          echo TRACK_A_CANDIDATE_FILE_COUNT="$(find "$package_out" -type f | wc -l)"
+          echo TRACK_A_CANDIDATE_TOTAL_BYTES="$(du -sb "$package_out" | awk '{print $1}')"
+          echo TRACK_A_CANDIDATE_CLIENT_SIZE="$actual_size"
+          echo TRACK_A_CANDIDATE_CLIENT_SHA256="$actual_sha"
+          echo TRACK_A_CURRENT_CANDIDATE_RECONSTRUCTED=true

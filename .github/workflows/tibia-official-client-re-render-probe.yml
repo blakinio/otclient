@@ -1,0 +1,33 @@
+name: Track A render probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-render-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+    steps:
+      - name: Inspect X extensions and exact client render environment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          toolroot="$state/toolroot"
+          export DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          echo TRACK_A_GLX_EXTENSION="$((xdpyinfo 2>/dev/null | grep -q 'GLX') && echo true || echo false)"
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          tr '\0' '\n' <"/proc/$pid/environ" | grep -E '^(QT_|QSG_|LIBGL_|LIBEGL_|MESA_|GALLIUM_|VK_|DISPLAY=)' | sed 's/^/TRACK_A_RENDER_ENV=/' || true
+          echo TRACK_A_RENDER_PROBE_COMPLETE=true

@@ -66,6 +66,12 @@ docker run -d --name "$CONTAINER" \
   --mount "type=volume,src=$RUNTIME_VOLUME,dst=/lab/runtime" \
   "$IMAGE" sleep infinity >/dev/null
 
+EXACT_BINARY="$GITHUB_WORKSPACE/artifacts/exact-linux/otclient"
+[[ -f "$EXACT_BINARY" ]]
+EXACT_HEAD="${LAB_EXACT_HEAD:-$GITHUB_SHA}"
+docker cp "$EXACT_BINARY" "$CONTAINER:/otclient/otclient.exact"
+docker exec "$CONTAINER" bash -lc 'chown otclient:otclient /otclient/otclient.exact && chmod 0755 /otclient/otclient.exact && mv /otclient/otclient.exact /otclient/otclient'
+
 container_id=$(docker inspect --format '{{.Id}}' "$CONTAINER")
 container_network=$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$CONTAINER")
 [[ "$container_network" == "none" ]]
@@ -89,6 +95,7 @@ printf '%s\n' \
   'TIBIA_GLOBAL_LOGIN_LAB_VOLUMES_READY=true' \
   'TIBIA_GLOBAL_LOGIN_LAB_CONTAINER_READY=true' \
   'TIBIA_GLOBAL_LOGIN_LAB_NETWORK_ISOLATED=true' \
-  "TIBIA_GLOBAL_LOGIN_LAB_HEAD=$GITHUB_SHA" \
+  "TIBIA_GLOBAL_LOGIN_LAB_HEAD=$EXACT_HEAD" \
   "TIBIA_GLOBAL_LOGIN_LAB_IMAGE=$IMAGE" \
   "TIBIA_GLOBAL_LOGIN_LAB_IMAGE_ID=$image_id"
+echo TIBIA_GLOBAL_LOGIN_LAB_EXACT_LINUX_BINARY=true

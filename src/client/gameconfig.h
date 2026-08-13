@@ -37,6 +37,8 @@ public:
     uint8_t getSpriteSize() { return m_spriteSize; }
     uint16_t getLastSupportedVersion() const { return m_lastSupportedVersion; }
     void setLastSupportedVersion(uint16_t version) { m_lastSupportedVersion = version; }
+    const std::string& getClientVersionString() const { return m_clientVersionString; }
+    void setClientVersionString(const std::string& version) { m_clientVersionString = version; }
     bool drawTyping() const { return m_drawTyping; }
     std::string getTypingIcon() const { return m_typingIcon; }
 
@@ -96,6 +98,7 @@ private:
     // Game
     uint8_t m_spriteSize{ 32 };
     uint16_t m_lastSupportedVersion{ kSafeProtocolFallbackVersion };
+    std::string m_clientVersionString;
     bool m_drawTyping{ false };
     std::string m_typingIcon{ "/images/game/console/typing" };
 

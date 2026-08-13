@@ -10,16 +10,23 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T13:51:00+02:00
+updated: 2026-08-13T16:20:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
   - tools/tibia-global-login-lab/**
   - .github/workflows/tibia-global-login-lab.yml
+  - src/client/gameconfig.h
+  - src/client/luafunctions.cpp
+  - src/client/protocolgamesend.cpp
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
 modules_touched:
   - legacy-analysis
   - github-actions
+  - game-config
+  - protocol-game-login
 reuses:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
   - PR #48 runtime evidence as migration input only
@@ -442,6 +449,23 @@ only numeric server opcodes through the existing pre-dispatch `onOpcode` hook
 and adds the missing boolean `onLoginAdvice` callback. Payload bytes remain
 unread and unlogged.
 
+Run `31706716385`, job `94469029667`, exact head
+`0ee27024357913cfe4d0fca2214a609b86339b01`, reproduced the effective
+1532/1532 and 230/148-byte exchange and structurally identified server opcode
+`20` (`0x14`, game-login error). The fixed non-secret relationship markers
+showed `client+world=true`, and the discarded message length was 117. This
+proves a server-returned client/world compatibility rejection rather than a
+timeout, harness, proxy, WARP, or challenge-first failure.
+
+Source inspection found that the post-1281 login packet sends only the numeric
+string `"1532"`, while the proven HTTP login cut identifies itself as exact
+version `"15.32.df7b29"`. The next bounded experiment adds an optional full
+client-version string to `g_gameConfig`, retaining the existing numeric fallback
+when unset, and configures only the Track B Linux lab with the exact full string.
+The canonical workflow now builds the exact branch head as a native Linux
+artifact before the Synology probe and replaces only the task-owned cached
+runtime binary. No official client binary or non-Linux runtime is involved.
+
 # Evidence classification
 
 PROVEN:
@@ -494,14 +518,16 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with fixed non-secret login-error category markers and continue from the exact returned category.
+Build and run the exact-head canonical native Linux E2E with full game-login
+version string `15.32.df7b29`; classify the exchange from both directional byte
+markers and continue from the returned structural opcode/callback.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T13:48:00Z
-head: f827ecfd5a529a5656a4565eeebcaa40f12e8975
+updated_at: 2026-08-13T14:20:00Z
+head: 0ee27024357913cfe4d0fca2214a609b86339b01
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -510,18 +536,24 @@ context_routes:
 owned_paths:
   - tools/tibia-global-login-lab/**
   - .github/workflows/tibia-global-login-lab.yml
+  - src/client/gameconfig.h
+  - src/client/luafunctions.cpp
+  - src/client/protocolgamesend.cpp
+  - docs/agents/MODULE_CATALOG.md
+  - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
 proven:
   - run 31702087216/job 94453443371 preserved version 1532, sent 230 client bytes, received 148 server bytes, and reached GAME_LOGIN_ERROR
+  - run 31706716385/job 94469029667 structurally returned opcode 0x14 with a client+world relationship at exact head 0ee27024357913cfe4d0fca2214a609b86339b01
 derived:
-  - first remaining boundary is the server-returned game-login rejection category
+  - the numeric-only post-1281 version string is the next bounded packet mismatch to falsify
 unknown:
-  - numeric first server opcode and whether it reaches login-error or login-advice dispatch
+  - whether the official endpoint accepts the exact full version string and advances beyond opcode 0x14
 conflicts:
   - none
 first_failure:
   marker: GAME_LOGIN_ERROR=true
-  evidence: run 31702087216/job 94453443371 at 76d30527c718650dd50316140847f07154449342
+  evidence: run 31706716385/job 94469029667 at 0ee27024357913cfe4d0fca2214a609b86339b01
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
@@ -536,5 +568,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with numeric server-opcode telemetry and continue from its dispatch outcome
+next_action: build and run the exact native Linux head with full version string 15.32.df7b29 and continue from directional bytes plus structural opcode/callback evidence
 ```

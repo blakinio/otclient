@@ -57,6 +57,8 @@ text = text.replace(old_asset_marker, new_asset_marker, 1)
 old_version = '    g_game.setClientVersion(1532)\n'
 new_version = (
     '    g_gameConfig.setLastSupportedVersion(1532)\n'
+    "    g_gameConfig.setClientVersionString('15.32.df7b29')\n"
+    "    mark('FULL_CLIENT_VERSION_STRING_CONFIGURED=true')\n"
     "    mark('CLIENT_VERSION_LIMIT_OVERRIDE=true')\n"
     "    if g_game.getClientVersion()==1532 then\n"
     "      g_game.setClientVersion(0)\n"

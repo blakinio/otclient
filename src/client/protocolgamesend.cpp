@@ -21,6 +21,7 @@
  */
 
 #include "game.h"
+#include "gameconfig.h"
 #include "item.h"
 #include "protocolgame.h"
 #include "framework/net/outputmessage.h"
@@ -59,7 +60,8 @@ void ProtocolGame::sendLoginPacket(const uint32_t challengeTimestamp, const uint
         msg->addU32(g_game.getClientVersion());
 
     if (g_game.getClientVersion() >= 1281) {
-        msg->addString(std::to_string(g_game.getClientVersion()));
+        const auto& configuredVersion = g_gameConfig.getClientVersionString();
+        msg->addString(configuredVersion.empty() ? std::to_string(g_game.getClientVersion()) : configuredVersion);
     }
 
     if (g_game.getClientVersion() >= 1334) {

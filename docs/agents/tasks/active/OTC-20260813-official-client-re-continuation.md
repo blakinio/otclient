@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:27:00+02:00
-head: f7816be246ee646d4e5c4765b3c5ddd55758c8ff
+updated_at: 2026-08-13T15:29:00+02:00
+head: 27dacbc7d645b4701bc40133ffb86ac84a989118
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -106,6 +106,7 @@ first_failure:
 rejected_hypotheses:
   - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
   - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
+  - invoking private proxychains4 without a global library path: rejected because the wrapper hard-codes the runner-global libproxychains location and exits before client startup
 changed_paths:
   - .github/scripts/tibia-official-client-re-reconstruct.py
   - .github/workflows/tibia-official-client-re-identity.yml
@@ -145,6 +146,9 @@ validation:
   - command: Track A structural login run 31715206847 job 94498079465
     result: FAIL_FOR_DISPLAY_ALIGNED_BASELINE
     evidence: pipe-safe marker checks; fresh HOME/XDG; historical display/timing; versioned input delivery; transition 4483 < 45000; no structural IN_GAME claim
+  - command: Track A structural login run 31715484884 job 94499024983
+    result: INVALID_PRELOGIN_TRANSPORT_VARIANT
+    evidence: private proxychains4 wrapper exited before client startup with 'couldnt locate libproxychains.so.4'; no secrets were injected and no runner-global library path was modified
 blockers: []
-next_action: preserve fresh HOME/XDG, historical display/timing and input sequence, but launch through the private proxychains4 wrapper as in the versioned successful workflow rather than manually setting LD_PRELOAD
+next_action: restore verified private LD_PRELOAD transport, then compare the current forced Vulkan RHI configuration against the historical GLX/llvmpipe configuration without claiming that graphics is a sufficient standalone login cause
 ```

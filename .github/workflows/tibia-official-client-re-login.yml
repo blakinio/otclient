@@ -46,7 +46,7 @@ jobs:
           evidence="$state/evidence/login-$(date -u +%Y%m%dT%H%M%SZ)"
           mkdir -p "$evidence"
           chmod 700 "$state/evidence" "$evidence"
-          trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "TRACK_A_LOGIN_FAILURE_RC=$rc"; if [[ -f "$state/runtime/client.log" ]]; then echo TRACK_A_CLIENT_LOG_BEGIN=true; tail -n 80 "$state/runtime/client.log"; echo TRACK_A_CLIENT_LOG_END=true; fi; fi' EXIT
+          trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "TRACK_A_LOGIN_FAILURE_RC=$rc"; for log in "$evidence/glxinfo.txt" "$state/runtime/xvfb.log" "$state/runtime/client.log"; do if [[ -f "$log" ]]; then echo "TRACK_A_LOG_BEGIN=$(basename "$log")"; tail -n 80 "$log"; echo "TRACK_A_LOG_END=$(basename "$log")"; fi; done; fi' EXIT
 
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
           if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
@@ -79,14 +79,23 @@ jobs:
 
             proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
             vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
+            swrast="$(find "$toolroot" -type f -name 'swrast_dri.so' -print -quit)"
+            [[ -n "$swrast" ]]
+            dri_dir="$(dirname "$swrast")"
             proxy_conf="$state/config/proxychains.conf"
-            [[ -n "$proxy_lib" && -n "$vk_icd" && -s "$proxy_conf" ]]
+            [[ -n "$proxy_lib" && -n "$vk_icd" && -d "$dri_dir" && -s "$proxy_conf" ]]
+            HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
+              LD_LIBRARY_PATH="$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" \
+              "$toolroot/usr/bin/glxinfo" -B >"$evidence/glxinfo.txt" 2>&1
+            grep -qi 'OpenGL renderer string:.*llvmpipe' "$evidence/glxinfo.txt"
+            echo TRACK_A_LLVMPIPE_VERIFIED=true
             cd "$runtime"
             env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
               HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
               LD_LIBRARY_PATH="$runtime/lib:$tool_lib" \
-              LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$toolroot/usr/lib/x86_64-linux-gnu/dri" \
+              LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" \
               VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
+              FONTCONFIG_PATH="$toolroot/etc/fonts" FONTCONFIG_FILE="$toolroot/etc/fonts/fonts.conf" \
               LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
               nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
             pid=$!

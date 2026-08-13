@@ -440,6 +440,7 @@ unknown:
   - whether the current runner image contains the full Tibia RE runtime dependencies
   - current official-client process/session/container state because no runner job can inspect it
   - structural IN_GAME, authoritative player position, and live action effects
+  - recovered official-client runtime contents after the task-owned container is recreated
 conflicts:
   - repository canonical selector includes self-hosted, while the live runner was registered without default labels
 first_failure:
@@ -456,9 +457,10 @@ rejected_hypotheses:
   - current official-client binary changed: disproven by run 31674406184
 changed_paths:
   - .github/workflows/otclient-tibia-re-runner-bootstrap.yml
+  - .github/workflows/tibia-dedicated-runtime-recover.yml
   - .github/workflows/tibia-synology-owned-runtime-state.yml
   - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
 blockers:
-  - synology-otclient-01 is online but registered without the self-hosted default label, so the canonical bootstrap selector cannot match until corrected
-next_action: run the bounded task-owned runtime-state probe on synology-otclient-01 and reconcile container, official-client process, exact SHA, WARP, and socket state
+  - task-owned container otclient-tibia-login-analysis was absent in run 31695193423 and must be recreated before runtime inspection
+next_action: run the task-owned dedicated runtime recovery workflow, then materialize and start the exact official client through verified userspace WARP without using login secrets
 ```

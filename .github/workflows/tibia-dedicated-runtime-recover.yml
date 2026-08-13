@@ -1,0 +1,87 @@
+name: Tibia dedicated runtime recovery
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-dedicated-runtime-recover.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tibia-dedicated-runtime-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: [otclient, synology]
+    timeout-minutes: 20
+    env:
+      CONTAINER_NAME: otclient-tibia-login-analysis
+      STATE_ROOT: /home/runner/_work/_otclient_tibia_re_state/runtime
+    steps:
+      - name: Recover task-owned official-client analysis container
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          docker version >/dev/null
+          mkdir -p "$STATE_ROOT"
+          test -w "$STATE_ROOT"
+
+          if docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+            [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER_NAME")" == otclient ]]
+            [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.purpose" }}' "$CONTAINER_NAME")" == tibia-login-no-ocr ]]
+            [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME")" == OTC-20260727-tibia-linux-runner-analysis ]]
+            [[ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/analysis"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME")" == "$STATE_ROOT" ]]
+            [[ "$(docker inspect --format '{{.State.Status}}' "$CONTAINER_NAME")" == running ]] || docker start "$CONTAINER_NAME" >/dev/null
+          else
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              --network bridge \
+              --label com.blakinio.owner=otclient \
+              --label com.blakinio.purpose=tibia-login-no-ocr \
+              --label com.blakinio.task=OTC-20260727-tibia-linux-runner-analysis \
+              --mount "type=bind,src=$STATE_ROOT,dst=/analysis" \
+              ubuntu:24.04 sleep infinity >/dev/null
+          fi
+
+          [[ "$(docker inspect --format '{{.State.Status}}' "$CONTAINER_NAME")" == running ]]
+          [[ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/analysis"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME")" == "$STATE_ROOT" ]]
+          test ! -e /var/lib/oteryn-staging-state/tibia-linux-analysis
+          echo DEDICATED_ANALYSIS_CONTAINER_READY=true
+          echo DEDICATED_ANALYSIS_STATE_ROOT="$STATE_ROOT"
+
+      - name: Install bounded official-client runtime dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker exec -i "$CONTAINER_NAME" bash <<'INNER'
+          set -Eeuo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            bash ca-certificates coreutils curl dbus-x11 file findutils gawk grep iproute2 \
+            libdbus-1-3 libegl1 libfontconfig1 libfreetype6 libgl1 libglx0 libopengl0 \
+            libx11-6 libx11-xcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-render0 libxcb-shape0 \
+            libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 libxcb-xinerama0 libxcb-xkb1 \
+            libxi6 libxkbcommon-x11-0 libxrender1 libxtst6 mesa-vulkan-drivers procps \
+            proxychains4 sed tar xdotool xvfb
+          command -v xdotool >/dev/null
+          command -v proxychains4 >/dev/null
+          if command -v tesseract >/dev/null 2>&1; then
+            echo FORBIDDEN_OCR_BINARY_PRESENT=true >&2
+            exit 1
+          fi
+          echo DEDICATED_RUNTIME_DEPENDENCIES_READY=true
+          INNER
+
+      - name: Verify recovered runtime boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER_NAME")" == otclient ]]
+          [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME")" == OTC-20260727-tibia-linux-runner-analysis ]]
+          docker exec "$CONTAINER_NAME" bash -lc 'test -d /analysis && test -w /analysis'
+          echo DEDICATED_RUNTIME_RECOVERY_PASS=true

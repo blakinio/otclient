@@ -67,15 +67,13 @@ jobs:
             fi
             private_xvfb="$state/runtime/Xvfb-track-a"
             [[ -x "$private_xvfb" ]]
-            xorg_modules="$toolroot/usr/lib/xorg/modules"
-            [[ -f "$xorg_modules/extensions/libglx.so" ]]
             cd "$toolroot/usr/bin"
             env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
               PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \
               XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
               nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
-              -modulepath "$xorg_modules" -xkbdir "$toolroot/usr/share/X11/xkb" \
-              +extension GLX +render -nolisten tcp -noreset \
+              -xkbdir "$toolroot/usr/share/X11/xkb" +extension GLX +iglx +render \
+              -nolisten tcp -noreset \
               >"$state/runtime/xvfb.log" 2>&1 </dev/null &
             xvfb_pid=$!
             printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"

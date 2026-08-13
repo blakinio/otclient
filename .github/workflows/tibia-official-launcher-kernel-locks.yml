@@ -1,0 +1,39 @@
+name: Track A launcher kernel lock inventory
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-launcher-kernel-locks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    steps:
+      - name: Read active kernel FLOCK owners
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          echo TRACK_A_KERNEL_FLOCK_BEGIN=true
+          count=0
+          while IFS= read -r line; do
+            [[ "$line" == *FLOCK* ]] || continue
+            pid="$(awk '{print $5}' <<<"$line")"
+            comm=''; exe=''; cmd=''
+            if [[ "$pid" =~ ^[0-9]+$ && -d "/proc/$pid" ]]; then
+              comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
+              exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+              cmd="$(tr '\0' ' ' <"/proc/$pid/cmdline" 2>/dev/null | head -c 300 || true)"
+            fi
+            echo "TRACK_A_KERNEL_FLOCK=$line|comm=$comm|exe=$exe|cmd=$cmd"
+            count=$((count+1))
+          done </proc/locks
+          echo TRACK_A_KERNEL_FLOCK_COUNT="$count"
+          echo TRACK_A_KERNEL_FLOCK_COMPLETE=true

@@ -1,0 +1,94 @@
+name: Track A launcher singleton IPC trace
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-ipc-strace.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trace:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Trace singleton detection syscalls
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          work="$state/ipc-trace/run-$GITHUB_RUN_ID"
+          home="$work/home"; tmp="$work/tmp"; runtime_dir="$work/runtime-dir"; unpack="$work/unpacked"
+          mkdir -p "$home" "$tmp" "$runtime_dir" "$unpack"
+          chmod 700 "$work" "$home" "$tmp" "$runtime_dir"
+
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
+          kill -0 "$xvfb_pid"
+
+          echo TRACK_A_IPC_SNAPSHOT_BEGIN=true
+          if command -v ipcs >/dev/null 2>&1; then
+            ipcs -a | sed 's/^/TRACK_A_IPCS=/' || true
+          else
+            echo TRACK_A_IPCS_MISSING=true
+          fi
+          find /dev/shm -maxdepth 2 -printf 'TRACK_A_SHM_FILE=%p|type=%y|uid=%U|gid=%G|mode=%m|size=%s\n' 2>/dev/null | head -n 500 || true
+          echo TRACK_A_IPC_SNAPSHOT_END=true
+
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          [[ -n "$proxy_lib" ]]
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          strace_bin="$(command -v strace 2>/dev/null || true)"
+          [[ -n "$strace_bin" ]] || strace_bin="$(find "$root" -type f -name strace -perm -111 -print -quit 2>/dev/null || true)"
+          echo TRACK_A_STRACE_BIN="$strace_bin"
+          [[ -n "$strace_bin" ]]
+
+          workdir="$(dirname "$launcher")"
+          cd "$workdir"
+          rc=0
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_RUNTIME_DIR="$runtime_dir" TMPDIR="$tmp" DISPLAY="$TRACK_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            "$strace_bin" -ff -tt -s 256 -o "$work/trace" -e trace=%file,%ipc,%network "$launcher" >"$work/launcher.log" 2>&1 || rc=$?
+          echo TRACK_A_STRACE_LAUNCHER_RC="$rc"
+          grep -F 'Application is already running' "$work/launcher.log" | sed 's/^/TRACK_A_STRACE_LAUNCHER_LOG=/' || true
+          echo TRACK_A_STRACE_HIGHLIGHTS_BEGIN=true
+          grep -hEi '/dev/shm|semget|semctl|shmget|shmat|shmctl|msgget|flock|fcntl|lock|single|tibia|cipsoft|connect\(|bind\(|listen\(' "$work"/trace* 2>/dev/null | tail -n 400 | sed 's/^/TRACK_A_STRACE=/' || true
+          echo TRACK_A_STRACE_HIGHLIGHTS_END=true
+          echo TRACK_A_STRACE_COMPLETE=true

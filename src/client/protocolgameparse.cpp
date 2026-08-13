@@ -1452,7 +1452,8 @@ void ProtocolGame::parseFloorDescription(const InputMessagePtr& msg)
 void ProtocolGame::parseMapDescription(const InputMessagePtr& msg)
 {
     const auto& pos = getPosition(msg);
-    const auto& oldPos = m_localPlayer->getPosition();
+    const auto& oldPos = g_map.getCentralPosition();
+    const bool hadKnownMap = m_mapKnown;
 
     if (!m_mapKnown) {
         m_localPlayer->setPosition(pos);
@@ -1462,6 +1463,9 @@ void ProtocolGame::parseMapDescription(const InputMessagePtr& msg)
 
     const auto& range = g_map.getAwareRange();
     setMapDescription(msg, pos.x - range.left, pos.y - range.top, pos.z, range.horizontal(), range.vertical());
+
+    if (hadKnownMap)
+        g_mapObservationRecorder.recordTransition(oldPos, g_map.getCentralPosition());
 
     if (!m_mapKnown) {
         g_dispatcher.addEvent([] { g_lua.callGlobalField("g_game", "onMapKnown"); });
@@ -1474,42 +1478,50 @@ void ProtocolGame::parseMapDescription(const InputMessagePtr& msg)
 
 void ProtocolGame::parseMapMoveNorth(const InputMessagePtr& msg)
 {
+    const auto beforePosition = g_map.getCentralPosition();
     auto pos = g_game.getFeature(Otc::GameMapMovePosition) ? getPosition(msg) : g_map.getCentralPosition();
     --pos.y;
 
     const auto& range = g_map.getAwareRange();
     setMapDescription(msg, pos.x - range.left, pos.y - range.top, pos.z, range.horizontal(), 1);
     g_map.setCentralPosition(pos);
+    g_mapObservationRecorder.recordTransition(beforePosition, g_map.getCentralPosition());
 }
 
 void ProtocolGame::parseMapMoveEast(const InputMessagePtr& msg)
 {
+    const auto beforePosition = g_map.getCentralPosition();
     auto pos = g_game.getFeature(Otc::GameMapMovePosition) ? getPosition(msg) : g_map.getCentralPosition();
     ++pos.x;
 
     const auto& range = g_map.getAwareRange();
     setMapDescription(msg, pos.x + range.right, pos.y - range.top, pos.z, 1, range.vertical());
     g_map.setCentralPosition(pos);
+    g_mapObservationRecorder.recordTransition(beforePosition, g_map.getCentralPosition());
 }
 
 void ProtocolGame::parseMapMoveSouth(const InputMessagePtr& msg)
 {
+    const auto beforePosition = g_map.getCentralPosition();
     auto pos = g_game.getFeature(Otc::GameMapMovePosition) ? getPosition(msg) : g_map.getCentralPosition();
     ++pos.y;
 
     const auto& range = g_map.getAwareRange();
     setMapDescription(msg, pos.x - range.left, pos.y + range.bottom, pos.z, range.horizontal(), 1);
     g_map.setCentralPosition(pos);
+    g_mapObservationRecorder.recordTransition(beforePosition, g_map.getCentralPosition());
 }
 
 void ProtocolGame::parseMapMoveWest(const InputMessagePtr& msg)
 {
+    const auto beforePosition = g_map.getCentralPosition();
     auto pos = g_game.getFeature(Otc::GameMapMovePosition) ? getPosition(msg) : g_map.getCentralPosition();
     --pos.x;
 
     const auto& range = g_map.getAwareRange();
     setMapDescription(msg, pos.x - range.left, pos.y - range.top, pos.z, 1, range.vertical());
     g_map.setCentralPosition(pos);
+    g_mapObservationRecorder.recordTransition(beforePosition, g_map.getCentralPosition());
 }
 
 void ProtocolGame::parseUpdateTile(const InputMessagePtr& msg)
@@ -1525,7 +1537,12 @@ void ProtocolGame::parseTileAddThing(const InputMessagePtr& msg)
     const auto& thing = getThing(msg);
 
     g_map.addThing(thing, pos, stackPos);
-    g_mapObservationRecorder.recordTileDelta(pos, "add", stackPos, thing);
+    const auto& tile = g_map.getTile(pos);
+    if (tile) {
+        const auto observedStackPos = tile->getThingStackPos(thing);
+        if (observedStackPos >= 0)
+            g_mapObservationRecorder.recordTileDelta(pos, "add", observedStackPos, thing);
+    }
 }
 
 void ProtocolGame::parseTileTransformThing(const InputMessagePtr& msg)
@@ -1547,7 +1564,12 @@ void ProtocolGame::parseTileTransformThing(const InputMessagePtr& msg)
     }
 
     g_map.addThing(newThing, pos, stackPos);
-    g_mapObservationRecorder.recordTileDelta(pos, "change", stackPos, newThing);
+    const auto& tile = g_map.getTile(pos);
+    if (tile) {
+        const auto observedStackPos = tile->getThingStackPos(newThing);
+        if (observedStackPos >= 0)
+            g_mapObservationRecorder.recordTileDelta(pos, "change", observedStackPos, newThing);
+    }
 }
 
 void ProtocolGame::parseTileRemoveThing(const InputMessagePtr& msg) const
@@ -1562,7 +1584,7 @@ void ProtocolGame::parseTileRemoveThing(const InputMessagePtr& msg) const
     const auto stackPos = thing->getStackPos();
     if (!g_map.removeThing(thing))
         g_logger.traceError("ProtocolGame::parseTileRemoveThing: unable to remove thing");
-    else
+    else if (stackPos >= 0)
         g_mapObservationRecorder.recordTileDelta(pos, "delete", stackPos);
 }
 
@@ -3096,6 +3118,7 @@ void ProtocolGame::parseWalkWait(const InputMessagePtr& msg) const
 
 void ProtocolGame::parseFloorChangeUp(const InputMessagePtr& msg)
 {
+    const auto beforePosition = g_map.getCentralPosition();
     const AwareRange& range = g_map.getAwareRange();
 
     auto pos = g_game.getFeature(Otc::GameMapMovePosition) ? getPosition(msg) : g_map.getCentralPosition();
@@ -3114,12 +3137,14 @@ void ProtocolGame::parseFloorChangeUp(const InputMessagePtr& msg)
     ++newPos.x;
     ++newPos.y;
     g_map.setCentralPosition(newPos);
+    g_mapObservationRecorder.recordTransition(beforePosition, g_map.getCentralPosition());
 
     g_lua.callGlobalField("g_game", "onTeleport", m_localPlayer, newPos, pos);
 }
 
 void ProtocolGame::parseFloorChangeDown(const InputMessagePtr& msg)
 {
+    const auto beforePosition = g_map.getCentralPosition();
     const AwareRange& range = g_map.getAwareRange();
 
     auto pos = g_game.getFeature(Otc::GameMapMovePosition) ? getPosition(msg) : g_map.getCentralPosition();
@@ -3140,6 +3165,7 @@ void ProtocolGame::parseFloorChangeDown(const InputMessagePtr& msg)
     --newPos.x;
     --newPos.y;
     g_map.setCentralPosition(newPos);
+    g_mapObservationRecorder.recordTransition(beforePosition, g_map.getCentralPosition());
 
     g_lua.callGlobalField("g_game", "onTeleport", m_localPlayer, newPos, pos);
 }

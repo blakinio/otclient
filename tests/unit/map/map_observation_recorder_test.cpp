@@ -27,7 +27,7 @@ void resetOutput(const std::filesystem::path& path)
 
 } // namespace
 
-TEST(MapObservationRecorder, DisabledRecorderDoesNotCreateAnArtifact)
+TEST(MapObservationRecorder, DisabledRecorderLeavesUnknownAsNoObservation)
 {
     const auto path = outputPath("disabled");
     resetOutput(path);
@@ -41,7 +41,7 @@ TEST(MapObservationRecorder, DisabledRecorderDoesNotCreateAnArtifact)
     EXPECT_FALSE(std::filesystem::exists(path));
 }
 
-TEST(MapObservationRecorder, WritesOrderedFullEmptyAndPartialRecords)
+TEST(MapObservationRecorder, WritesOrderedFullEmptyPartialAndTransitionRecords)
 {
     const auto path = outputPath("records");
     resetOutput(path);
@@ -54,7 +54,10 @@ TEST(MapObservationRecorder, WritesOrderedFullEmptyAndPartialRecords)
     g_mapObservationRecorder.setEnabled(true);
     g_mapObservationRecorder.recordTileSnapshot(fullTile->getPosition(), fullTile);
     g_mapObservationRecorder.recordTileSnapshot(emptyTile->getPosition(), emptyTile);
+    g_mapObservationRecorder.recordTileDelta(fullTile->getPosition(), "add", 0, first);
+    g_mapObservationRecorder.recordTileDelta(fullTile->getPosition(), "change", 1, second);
     g_mapObservationRecorder.recordTileDelta(fullTile->getPosition(), "delete", 1);
+    g_mapObservationRecorder.recordTransition(Position(100, 100, 7), Position(101, 100, 7));
     g_dispatcher.poll();
 
     std::ifstream input(path, std::ios::binary);
@@ -63,18 +66,37 @@ TEST(MapObservationRecorder, WritesOrderedFullEmptyAndPartialRecords)
     for (std::string line; std::getline(input, line);)
         records.push_back(nlohmann::ordered_json::parse(line));
 
-    ASSERT_EQ(3U, records.size());
+    ASSERT_EQ(6U, records.size());
     EXPECT_EQ("FULL", records[0]["completeness"]);
-    EXPECT_EQ(0, records[0]["things"][0]["stack_position"]);
-    EXPECT_EQ(1, records[0]["things"][1]["stack_position"]);
-    EXPECT_EQ(3031, records[0]["things"][0]["identity"]["client_appearance_id"]);
-    EXPECT_EQ(424242, records[0]["things"][1]["identity"]["client_creature_id"]);
+    ASSERT_EQ(fullTile->getThings().size(), records[0]["things"].size());
+    for (size_t index = 0; index < fullTile->getThings().size(); ++index) {
+        const auto& thing = fullTile->getThings()[index];
+        const auto& observation = records[0]["things"][index];
+        EXPECT_EQ(static_cast<int>(index), observation["stack_position"]);
+        if (thing->isCreature())
+            EXPECT_EQ(thing->getId(), observation["identity"]["client_creature_id"]);
+        else
+            EXPECT_EQ(thing->getClientId(), observation["identity"]["client_appearance_id"]);
+    }
     EXPECT_EQ("EMPTY", records[1]["completeness"]);
     EXPECT_TRUE(records[1]["things"].empty());
     EXPECT_EQ("PARTIAL", records[2]["completeness"]);
-    EXPECT_EQ("delete", records[2]["changes"][0]["operation"]);
-    EXPECT_FALSE(records[2]["changes"][0].contains("thing"));
+    EXPECT_EQ("add", records[2]["changes"][0]["operation"]);
+    EXPECT_EQ(3031, records[2]["changes"][0]["thing"]["identity"]["client_appearance_id"]);
+    EXPECT_EQ("change", records[3]["changes"][0]["operation"]);
+    EXPECT_EQ(424242, records[3]["changes"][0]["thing"]["identity"]["client_creature_id"]);
+    EXPECT_EQ("delete", records[4]["changes"][0]["operation"]);
+    EXPECT_FALSE(records[4]["changes"][0].contains("thing"));
+    EXPECT_EQ("transition_event", records[5]["record_type"]);
+    EXPECT_EQ("decoded_state", records[5]["evidence"]);
+    EXPECT_EQ(100, records[5]["before_position"]["x"]);
+    EXPECT_EQ(101, records[5]["after_position"]["x"]);
     EXPECT_FALSE(records[0]["session_id"].get<std::string>().empty());
+
+    const auto serialized = records[0].dump();
+    EXPECT_EQ(std::string::npos, serialized.find("password"));
+    EXPECT_EQ(std::string::npos, serialized.find("token"));
+    EXPECT_EQ(std::string::npos, serialized.find("cookie"));
 
     g_mapObservationRecorder.setEnabled(false);
     resetOutput(path);

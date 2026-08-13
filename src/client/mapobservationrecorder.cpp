@@ -5,29 +5,57 @@
 #include "tile.h"
 
 #include <framework/core/eventdispatcher.h>
+#include <framework/core/configmanager.h>
 #include <framework/core/logger.h>
 
 MapObservationRecorder g_mapObservationRecorder;
 
 void MapObservationRecorder::setEnabled(const bool enabled)
 {
+    m_configurationLoaded = true;
     m_enabled = enabled;
     m_writeFailed = false;
+    m_queueOverflowLogged = false;
     m_sequence = 0;
     m_pendingRecords.clear();
     m_drainScheduled = false;
     m_sessionId = enabled ? "map-observation-" + std::to_string(++m_sessionGeneration) : "";
-    if (!enabled && m_output.is_open())
+    if (m_output.is_open())
         m_output.close();
+    m_output.clear();
 }
 
 void MapObservationRecorder::setOutputPath(std::string path)
 {
     if (m_output.is_open())
         m_output.close();
+    m_output.clear();
     m_outputPath = std::move(path);
     m_pendingRecords.clear();
     m_writeFailed = false;
+    m_queueOverflowLogged = false;
+}
+
+void MapObservationRecorder::loadConfiguration()
+{
+    if (m_configurationLoaded)
+        return;
+
+    m_configurationLoaded = true;
+    const auto& settings = g_configs.getSettings();
+    if (!settings || settings->getValue("map-observation-recorder-enabled") != "true")
+        return;
+
+    const auto outputPath = settings->getValue("map-observation-recorder-output");
+    if (outputPath.empty()) {
+        g_logger.warning("Map observation recorder is enabled but has no configured output path");
+        m_writeFailed = true;
+        return;
+    }
+
+    m_outputPath = outputPath;
+    m_enabled = true;
+    m_sessionId = "map-observation-" + std::to_string(++m_sessionGeneration);
 }
 
 bool MapObservationRecorder::ensureOutput()
@@ -84,7 +112,10 @@ void MapObservationRecorder::enqueueRecord(const nlohmann::ordered_json& record)
         return;
     constexpr size_t maxPendingRecords = 256;
     if (m_pendingRecords.size() >= maxPendingRecords) {
-        g_logger.warning("Map observation recorder dropped an observation because its bounded queue is full");
+        if (!m_queueOverflowLogged) {
+            g_logger.warning("Map observation recorder dropped an observation because its bounded queue is full");
+            m_queueOverflowLogged = true;
+        }
         return;
     }
     m_pendingRecords.push_back(record.dump());
@@ -119,6 +150,7 @@ void MapObservationRecorder::drainPendingRecords()
 
 void MapObservationRecorder::recordTileSnapshot(const Position& position, const TilePtr& tile)
 {
+    loadConfiguration();
     if (!m_enabled)
         return;
     nlohmann::ordered_json record{
@@ -142,10 +174,17 @@ void MapObservationRecorder::recordTileSnapshot(const Position& position, const 
 
 void MapObservationRecorder::recordTileDelta(const Position& position, std::string_view operation, const int stackPosition, const ThingPtr& thing)
 {
+    loadConfiguration();
     if (!m_enabled)
         return;
+    if (stackPosition < 0 ||
+        (operation != "add" && operation != "change" && operation != "delete") ||
+        ((operation == "add" || operation == "change") && !thing)) {
+        g_logger.warning("Map observation recorder rejected an invalid tile delta");
+        return;
+    }
     nlohmann::ordered_json change{ { "operation", operation }, { "stack_position", stackPosition } };
-    if (thing)
+    if (operation != "delete")
         change["thing"] = serializeThing(thing, stackPosition);
     enqueueRecord({
         { "schema_version", 1 },
@@ -156,5 +195,22 @@ void MapObservationRecorder::recordTileDelta(const Position& position, std::stri
         { "position", { { "x", position.x }, { "y", position.y }, { "z", position.z } } },
         { "completeness", "PARTIAL" },
         { "changes", nlohmann::ordered_json::array({ std::move(change) }) }
+    });
+}
+
+void MapObservationRecorder::recordTransition(const Position& beforePosition, const Position& afterPosition)
+{
+    loadConfiguration();
+    if (!m_enabled || beforePosition == afterPosition)
+        return;
+    enqueueRecord({
+        { "schema_version", 1 },
+        { "record_type", "transition_event" },
+        { "sequence", ++m_sequence },
+        { "session_id", m_sessionId },
+        { "producer", producer() },
+        { "before_position", { { "x", beforePosition.x }, { "y", beforePosition.y }, { "z", beforePosition.z } } },
+        { "after_position", { { "x", afterPosition.x }, { "y", afterPosition.y }, { "z", afterPosition.z } } },
+        { "evidence", "decoded_state" }
     });
 }

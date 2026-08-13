@@ -33,7 +33,6 @@
 #include "localplayer.h"
 #include "luavaluecasts_client.h"
 #include "map.h"
-#include "mapobservationrecorder.h"
 #include "minimap.h"
 #include "satellitemap.h"
 #include "missile.h"
@@ -73,12 +72,6 @@
 
 void Client::registerLuaFunctions()
 {
-    g_lua.registerSingletonClass("g_mapObservationRecorder");
-    g_lua.bindSingletonFunction("g_mapObservationRecorder", "setEnabled", &MapObservationRecorder::setEnabled, &g_mapObservationRecorder);
-    g_lua.bindSingletonFunction("g_mapObservationRecorder", "isEnabled", &MapObservationRecorder::isEnabled, &g_mapObservationRecorder);
-    g_lua.bindSingletonFunction("g_mapObservationRecorder", "setOutputPath", &MapObservationRecorder::setOutputPath, &g_mapObservationRecorder);
-    g_lua.bindSingletonFunction("g_mapObservationRecorder", "getOutputPath", &MapObservationRecorder::getOutputPath, &g_mapObservationRecorder);
-
     g_lua.registerSingletonClass("g_things");
     g_lua.bindSingletonFunction("g_things", "loadAppearances", &ThingTypeManager::loadAppearances, &g_things);
     g_lua.bindSingletonFunction("g_things", "loadStaticData", &ThingTypeManager::loadStaticData, &g_things);

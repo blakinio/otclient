@@ -12,16 +12,15 @@ branch: feat/OTC-20260813-map-observation-recorder
 base_branch: main
 start_sha: 005158b5b9bf25fe77bd5fc10813a6388a072836
 created: 2026-08-13T21:14:46Z
-updated: 2026-08-13T21:25:00Z
+updated: 2026-08-13T21:44:38Z
 risk: medium
-related_pr: null
+related_pr: 292
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
 owned_paths:
   - docs/agents/tasks/active/OTC-20260813-map-observation-recorder.md
   - src/client/mapobservationrecorder.h
   - src/client/mapobservationrecorder.cpp
   - src/client/protocolgameparse.cpp
-  - src/client/luafunctions.cpp
   - src/CMakeLists.txt
   - tests/unit/map/map_observation_recorder_test.cpp
   - tests/unit/map/CMakeLists.txt
@@ -35,7 +34,6 @@ reuses:
   - src/client/thing.h
   - src/client/item.h
   - src/client/protocolgameparse.cpp
-  - src/client/luafunctions.cpp
   - tests/support/**
 depends_on:
   - PR #291 merged as 005158b5b9bf25fe77bd5fc10813a6388a072836
@@ -74,6 +72,17 @@ compatibility files, and `docs/agents/MODULE_CATALOG.md`/`CHANGELOG.md`; this
 task will not touch them. A later dedicated coordination change can catalogue
 the recorder if PR #284 remains open when P1 reaches closeout.
 
+## Explicit local enablement
+
+The recorder remains off unless the client settings contain both values below
+before decoded map observations begin. The output is a user-chosen local JSONL
+path; no network sink is configured.
+
+```otml
+map-observation-recorder-enabled: true
+map-observation-recorder-output: /absolute/local/path/observations.jsonl
+```
+
 ## Acceptance inventory
 
 - [ ] disabled-by-default recorder leaves normal protocol/map behavior unchanged;
@@ -91,11 +100,11 @@ the recorder if PR #284 remains open when P1 reaches closeout.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T21:25:00Z
-head: 36021c5f519d3165b8d5bd1e7260f1fe9722b023
+updated_at: 2026-08-13T21:44:38Z
+head: c5e2d9745a1073e82a1b6d789ccc3562b78d1b50
 branch: feat/OTC-20260813-map-observation-recorder
-pr: none
-status: implementing
+pr: 292
+status: validating
 context_routes:
   - P1 local recorder implementation
 owned_paths:
@@ -111,22 +120,25 @@ proven:
   - Track B PR #284 owns no P1 declared path but does own its runtime namespace.
   - ProtocolGame mutates decoded Map/Tile state through setTileDescription and tile add/transform/remove handlers.
   - The repository provides nlohmann::ordered_json and an existing map unit-test target with tile builders.
+  - PR #292 is a draft P1 implementation PR, based on the merged P0 head.
+  - The configured Windows test preset currently fails while vcpkg builds OpenAL before any P1 translation unit is compiled: OpenAL 1.25.1 emits C3889 under MSVC 14.52.
 derived:
   - The recorder can attach after existing decoded-state mutations without reparsing packet contents.
   - A bounded deferred JSONL queue avoids filesystem writes in the parser mutation handlers.
+  - The recorder can read two explicit local settings once before its first observation, keeping its default state disabled without modifying Track B's Lua binding file.
 unknown:
   - Native-Linux runtime availability for a Track B smoke proof remains unverified.
 conflicts:
   - MODULE_CATALOG.md and CHANGELOG.md are actively owned by Track B PR #284.
+  - An initial P1 commit touched src/client/luafunctions.cpp, which is owned by Track B PR #284; that touch is removed before the next P1 push and is not in the final-base diff.
 first_failure:
-  marker: none
-  evidence: none
+  marker: windows-tests-vcpkg-openal
+  evidence: OpenAL 1.25.1 C3889 with MSVC 14.52 during `cmake --preset windows-tests`, before CMake generated a P1 build target.
 rejected_hypotheses: []
 changed_paths:
   - docs/agents/tasks/active/OTC-20260813-map-observation-recorder.md
   - src/client/mapobservationrecorder.h
   - src/client/mapobservationrecorder.cpp
-  - src/client/luafunctions.cpp
   - src/client/protocolgameparse.cpp
   - src/CMakeLists.txt
   - tests/unit/map/CMakeLists.txt
@@ -137,7 +149,11 @@ validation:
     evidence: origin/main 005158b5b9bf25fe77bd5fc10813a6388a072836 and PR #284 changed-path inventory
   - command: implementation source inspection
     result: PASS
-    evidence: recorder is Lua-enabled explicitly, disabled by default, and receives only decoded Map/Tile values
-blockers: []
-next_action: Run the focused map-recorder test build using the configured Windows test preset after initializing the supported MSVC developer environment.
+    evidence: recorder is disabled by default, has explicit local settings, and receives only decoded Map/Tile values after parser mutations.
+  - command: `cmake --preset windows-tests && cmake --build --preset windows-tests --target otclient_tile_order_tests && ctest --preset windows-tests -R MapObservationRecorder`
+    result: BLOCKED
+    evidence: vcpkg OpenAL 1.25.1 C3889 under MSVC 14.52, before configuration generated the target.
+blockers:
+  - The required Windows test preset cannot currently compile the repository's OpenAL dependency with the sole installed MSVC toolchain.
+next_action: Run the configured `linux-tests` preset in the available Ubuntu WSL environment, using its native vcpkg installation, then inspect the focused recorder result.
 ```

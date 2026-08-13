@@ -194,6 +194,7 @@ jobs:
             [[ "$("$toolroot/usr/bin/xdotool" getwindowfocus)" == "$window" ]]
             before="$evidence/login-before.xwd"
             after="$evidence/login-after.xwd"
+            typed="$evidence/login-typed.xwd"
             "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$before"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
             "$toolroot/usr/bin/xdotool" key ctrl+a
@@ -201,6 +202,10 @@ jobs:
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
             "$toolroot/usr/bin/xdotool" key ctrl+a
             "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_PASSWORD"
+            "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$typed"
+            typed_changed="$(python3 -c 'import pathlib,sys; a=pathlib.Path(sys.argv[1]).read_bytes(); b=pathlib.Path(sys.argv[2]).read_bytes(); print(sum(x != y for x,y in zip(a,b)) + abs(len(a)-len(b)))' "$before" "$typed")"
+            echo TRACK_A_CREDENTIAL_FIELDS_CHANGED_BYTES="$typed_changed"
+            [[ "$typed_changed" -gt 100 ]]
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
             unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
             transition=0; changed=0
@@ -215,7 +220,7 @@ jobs:
             done
             echo TRACK_A_LOGIN_TRANSITION_CHANGED_PIXELS="$changed"
             echo TRACK_A_LOGIN_TRANSITION_PROVEN="$transition"
-            rm -f -- "$before" "$after"
+            rm -f -- "$before" "$after" "$typed"
             [[ "$transition" == 1 ]]
             window="$(resolve_window)"
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true

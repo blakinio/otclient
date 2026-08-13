@@ -2,20 +2,22 @@
 
 ## Status
 
-`active_decoded_world_entry_reproduction` — exact current-client runtime, login-service identity, Qt/protobuf capability surfaces and same-hash decoded Worldmap boundary are proven. Hosted account login now produces real tunneled TCP under GDB-from-start; the current experiment reproduces the successful same-hash Worldmap capture by using the decoded ordered-map routine itself as the `IN_GAME` truth signal instead of inferred Qt wrapper call sites.
+`active_cv_bootstrap_structural_world` — `OTCLIENT-TIBIA-RE` continues on PR #48. Exact current-client runtime, WARP login identity, Worldmap decoding boundary, protocol/action/state catalogues and a non-GDB Qt integration primitive are proven. The current live experiment starts the client normally, uses non-OCR visual differencing only to bootstrap the already-proven account/character flow, and accepts `IN_GAME` only from decoded ordered-map records after bootstrap.
 
-This is an operational `OTCLIENT-TIBIA-RE` task. Temporary `.github/workflows/tibia-*` files are evidence scaffolding, not product code.
+This is an operational research task. Temporary `.github/workflows/tibia-*` files are evidence scaffolding and are not product code.
 
 ## Ownership and authority
 
-- repository: `blakinio/otclient`
-- branch: `ci/OTC-20260727-tibia-linux-runner-analysis`
-- PR: `#48` draft operational PR
-- writable scope: this task record plus task-owned temporary Tibia analysis workflows
-- `blakinio/Oteryn-Platform@ops/oteryn-tibia-client-analysis-20260811`: read-only same-hash evidence only
-- canonical `oteryn-staging`: out of scope
-- owner-funded Codex/API quota: forbidden unless separately authorized
-- existing test-account Actions secrets: authorized only through the existing task workflow/runtime path; never expose values
+```yaml
+repository: blakinio/otclient
+branch: ci/OTC-20260727-tibia-linux-runner-analysis
+pr: 48
+programme: OTCLIENT-TIBIA-RE
+external_runtime_evidence: blakinio/Oteryn-Platform@ops/oteryn-tibia-client-analysis-20260811 read-only only
+canonical_oteryn_staging: out_of_scope
+owner_funded_codex_api: forbidden_without_separate_owner_authorization
+test_account_actions_secrets: authorized_only_through_existing_task_workflow_runtime
+```
 
 ## Exact client/runtime — PROVEN
 
@@ -33,7 +35,7 @@ Run `31626946078`, job `94215664628`, proved complete runtime reconstruction wit
 
 ## WARP/account login service — PROVEN
 
-Run `31647827166`, job `94285373954`, proved current login identity through verified changed WARP egress:
+Run `31647827166`, job `94285373954`, through verified changed WARP egress:
 
 ```text
 HTTPS_STATUS=200
@@ -43,11 +45,9 @@ HAS_CHARACTERS=true
 HAS_WORLDS=true
 ```
 
-The accepted identity bundle uses `clientversion=15.32.df7b29`, `clienttype=2` and the current 64-character asset version. No credential/session/character/world values are retained.
+The accepted request identity uses `clientversion=15.32.df7b29`, `clienttype=2` and the current 64-character asset version. Secret/account/session values were not persisted.
 
 ## Worldmap structural boundary — PROVEN
-
-For the exact current binary:
 
 ```text
 FullMap        0xcec8d0
@@ -63,11 +63,11 @@ metadata       0x1cd8820
 static call    0xdf2a60
 ```
 
-QMetaObject layout is `string +0x8`, `metadata +0x10`, `static_metacall +0x18`.
+QMetaObject layout: `string +0x8`, `metadata +0x10`, `static_metacall +0x18`.
 
-Read-only same-hash Oteryn evidence proves a live decoded sample with 83 real ordered records across z6/z7. `raw28/raw30` semantics remain `UNKNOWN`.
+Read-only same-hash Oteryn evidence proves 83 live ordered map records with real x/y/z over z6/z7. `raw28/raw30` semantics remain `UNKNOWN`.
 
-## Exact login/session metadata — PROVEN static ownership
+## Static login/session discovery — PROVEN
 
 Runs:
 
@@ -75,220 +75,172 @@ Runs:
 - method-owner index `31650684531`, job `94294137219`: PASS
 - auth inventory `31652067802`, job `94298391194`: PASS
 
-Important owners:
+Important semantic owners:
 
 ```text
 TCharacterSelectionController qmeta=0x2f656a0 static=0xd46550
-  requestCharacterLogin index 0 -> qmeta dispatch target 0xd47300
-  onCharacterSelectionConfirmed index 11 -> 0xd47130
-
 TAuthenticationProcessController qmeta=0x3073920 static=0xcfabb0
-  onLoginStateMachineStarted -> 0xcfadd4
-  onShowCharacterSelectionStateEntered -> 0xcfb374
-  onStartGameServerLoginStateEntered -> 0xcfb122
-  onLoginFailedStateEntered -> 0xcfb404
-  onLoginFinishedSuccessfullyEntered -> 0xcfaeb4
-
 TLoginRequestUploader qmeta=0x2f657e0 static=0xcfb5a0
-  loginSuccessful -> 0xcfb7c0
-  loginFailed -> 0xcfb790
-
 TGameserverLoginProcessController qmeta=0x30cdc60 static=0xcf9da0
-  TCP connected -> 0xcfa0e0
-  secondary connected -> 0xcfa110
-  disconnected -> 0xcfa150
-
 TGameClient qmeta=0x2f61ea0 static=0xd06260
-  connect existing -> 0xd06660
-  onConnect -> 0xd06810
-  onAbort -> 0xd067b0
-  onGameSessionConnected -> 0xd066e0
-
 IGameSession qmeta=0x30790a0 static=0xd26400
-  gameLoginSuccessful index 5
-  worldEntered index 6
+TGameserverGameSession qmeta=0x2f765a0 static=0xd215c0
 ```
 
-**DISPROVEN:** the earlier claim that critical QMetaObjects were missing. The failing filter mixed methods owned by different objects.
+**DISPROVEN:** critical QMetaObjects were missing. The original filter mixed methods owned by different QMetaObjects.
 
-**IMPORTANT DERIVED CORRECTION:** QMeta static-dispatch targets are useful semantic ownership evidence but are not proven normal runtime call sites. Live runs produced real auth TCP without hitting those wrapper breakpoints. Do not use absence of those hits to claim the corresponding state did not occur.
+**DERIVED CORRECTION:** QMeta static-dispatch targets prove semantic ownership but are not proven normal runtime call sites. Absence of a breakpoint on those wrappers is not evidence that the semantic state did not occur.
 
-## Live hosted experiments — current conclusions
+## Static action/protocol catalogue — PROVEN for exact binary
 
-### Old post-start attach path
+- capability QMeta run `31651155741`, job `94295569820`: PASS — 494 relevant methods, 460 direct qmeta dispatch targets;
+- generated protocol inventory `31651220862`, job `94295767215`: PASS — 240 GameclientMessage + 550 GameserverMessage symbols, 142 capability-related;
+- signature inventory `31651501473`, job `94296624884`: PASS;
+- high-level action inventory `31651684700`, job `94297172395`: PASS — 1004 high-level action methods;
+- structural read/state inventory `31652393473`, job `94299386259`: PASS — 121 targeted read/update methods.
 
-Run `31650884938`, job `94294748731`, and corrected geometry run `31651611051`, job `94296954131`:
-
-- exact client/runtime and trace armed;
-- no decoded map hit;
-- no direct TCP/UDP;
-- client survived;
-- Qt wrapper-event file remained empty.
-
-This disproves the old marker `FIRST_CHARACTER_ACTIVATED` as proof of character activation.
-
-### Auth structural trace
-
-Run `31652180172`, job `94298739316`:
-
-- exact bootstrap succeeded;
-- no decoded map hit;
-- no direct TCP/UDP;
-- wrapper trace remained empty.
-
-Because QMeta wrapper targets are not proven normal call sites, this run does **not** prove the authentication state machine itself was absent.
-
-### GDB-from-start v1
-
-Run `31652573423`, job `94299916593`:
-
-- exact runtime reconstruction: PASS
-- exact client started under GDB from `starti`: PASS
-- breakpoint setup before UI: PASS
-- account login produced real local SOCKS traffic: `AUTH_LOCAL_SOCKS_OBSERVED=1`
-- Qt wrapper trace: empty
-- run stopped before character activation because it incorrectly required the wrapper `CHARACTER_SELECTION_STATE_ENTERED`
-
-**DISPROVEN:** absence of QMeta wrapper hits is a valid character-selection gate.
-
-## Current live experiment
-
-```yaml
-experiment_id: OTC48-WORLD-ENTRY-002
-workflow: .github/workflows/tibia-hosted-gdb-from-start-world-entry.yml
-head: e581377cb990bec332ef4cbd67e3546aa01b3366
-run: 31653056907
-objective: reproduce same-hash decoded world entry using the ordered-map content routine as truth
-preconditions:
-  binary_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-  egress: verified WARP
-  runtime: complete 1634+7094 reconstruction
-  debugger: attached from starti before UI
-method:
-  - arm base+0x19a8ea3 decoded content capture before client proceeds
-  - submit login with proven coordinates
-  - require observed local SOCKS auth traffic
-  - use the same row/Return + bounded double-click fallback as the successful same-hash Oteryn capture
-  - accept IN_GAME only after at least 8 structurally valid decoded map records
-  - require zero direct TCP and UDP
-result: RUNNING
-```
-
-The map capture writes only record counts to workflow state; proprietary content bytes are not persisted as artifacts.
-
-## Exact static capability catalogue — PROVEN for this binary
-
-Capability QMeta run `31651155741`, job `94295569820`: PASS (`494` relevant methods, `460` direct qmeta dispatch targets).
-
-Generated protocol inventory `31651220862`, job `94295767215`: PASS (`240` GameclientMessage + `550` GameserverMessage symbols; `142` capability-related).
-
-Signature inventory `31651501473`, job `94296624884`: PASS.
-
-High-level action inventory `31651684700`, job `94297172395`: PASS (`1004` high-level action methods).
-
-### Outbound/action families
+Exact action families:
 
 ```text
 TPlayerProtocolMessageHandler qmeta=0x30852a0 static=0xd1a920
   N/E/S/W, diagonals, GoPath, Rotate N/E/S/W, Stop, Cancel
-
 TCreaturesGameActionHandler qmeta=0x3085060 static=0xd16340
-  sendAttack, sendFollow
-
+  Attack, Follow
 TGenericGameActionHandler qmeta=0x3085020 static=0xdcb990
-  sendUseObject, sendMoveObject
-
+  UseObject, MoveObject
 TUseWithGameActionHandler qmeta=0x3085120 static=0xdc4480
-  sendUseTwoObjects, sendUseOnCreature
-
+  UseTwoObjects, UseOnCreature
 TChatGameActionHandler qmeta=0x30851a0 static=0xcff5b0
-  sendTalkMessage
-
+  Talk
 TContainerProtocolMessageHandler qmeta=0x3084fe0 static=0xd1e000
-  close/up/seek/action plus inventory/container inbound handlers
+  Close/Up/Seek/Action plus incoming inventory/container handlers
 ```
 
-Exact generated argument types resolve to `GameclientMessageGo*`, `Attack`, `Follow`, `UseObject`, `UseTwoObjects`, `UseOnCreature`, `MoveObject`, `Talk`, and container message types.
+High-level surfaces include `attackCreature(qint64)`, `followCreature(qint64)`, `useOnCreature(qint64)`, channel/private/NPC message methods, container methods and turn/movement controllers.
 
-High-level Qt surfaces include `attackCreature(qint64)`, `followCreature(qint64)`, `useOnCreature(qint64)`, `sendChannelMessage(QString)`, `sendPrivateMessage(QString,QString)`, `sendNpcMessage(QString)`, container open/close methods and character turning.
+Important read/update families include `TCreature`, `TCreatureStorage`, `TCyclopediaMapStorage`, `TCooldownStorage`, `TPlayerData`, `TPlayerSkillStats`, `THitpointManabarController`, `TPlayerInventoryAndStatusController`, `TStatusBarController`, `TContainerStorage`, `TInventoryContainer`, `TMinimapController`, `TWorldmapProtocolMessageHandler` and `TProtocolMessageQueue`.
 
-### Read/state families
+## Same-hash native action lead — read-only evidence
 
-State inventory run `31652393473`, job `94299386259`: PASS (`121` targeted read/update methods).
+The Oteryn runtime independently proved a live `TPlayerProtocolMessageHandler` object with vptr offset `0x308a008` and native movement/rotation bodies:
 
 ```text
-TCreature                   positionWasUpdated
-TCreatureStorage            creatureUpdated / appearanceUpdated
-TCyclopediaMapStorage       playerPositionChanged / onPlayerPositionWasUpdated
-TCooldownStorage            spell/group/multi-use/passive cooldown changes
-TPlayerData                 playerDataChanged / level / vocation
-TPlayerSkillStats           playerSkillStatsChanged
-THitpointManabarController  current/max HP and mana
-TPlayerInventoryAndStatus   capacity / states / inventory / soul
-TStatusBarController        states / HP / mana / skills
-TContainerStorage           containerUpdated / containerRemoved
-TInventoryContainer         inventoryChanged
-TMinimapController          onPlayerPositionChanged
-TWorldmapProtocolHandler    FullMap / FieldData / Create / Change / Delete
-TProtocolMessageQueue       world entered, map, creature, player, inventory, container families
+N 0xee2cd0  E 0xee2d50  S 0xee2dd0  W 0xee2e50
+NE 0xee2ed0 SE 0xee2f50 SW 0xee2fd0 NW 0xee3050
+Stop 0xee30d0 Cancel 0xee3150
+Rotate N/E/S/W 0xee31d0/0xee3250/0xee32d0/0xee3350
 ```
 
-## Same-hash native movement lead — read-only evidence
+Client survival and socket-byte changes were proven there, but authoritative OTClient-owned before/after position remains `UNKNOWN`.
 
-The Oteryn runtime independently proved a live `TPlayerProtocolMessageHandler` object using vptr offset `0x308a008` and invoked native movement/rotation bodies while the client stayed alive and socket counters changed. That is a **lead**, not OTClient proof of authoritative before/after position.
+Raw-file vptr scanner run `31652312282`, job `94299139890`, failed without useful evidence. Do not repeat the identical scanner.
 
-Current semantic-vptr raw-file scanner run `31652312282`, job `94299139890`, failed without useful output. **Rejected implementation:** blind raw-qword RTTI/vptr scan. A future stable resolver should use relocations/semantic calibration instead.
+## Phase 9 stable bridge — PROVEN primitive
 
-## Stable bridge direction — DERIVED, not yet implemented
+Experiment:
 
-Evidence supports a future non-GDB interface using a process helper/sidecar with:
+```yaml
+workflow: .github/workflows/tibia-hosted-preload-qobject-probe.yml
+commit: 1e04782d624a478338c633ee27d06064e13b2d3c
+run: 31653375069
+job: 94302324521
+result: PASS
+```
 
-- exact-hash semantic resolver (Qt metaobjects, protobuf names, RTTI/vtables/signatures);
-- structured Unix-domain IPC;
-- Qt-thread-safe action invocation using high-level object methods where possible;
-- structural reads from player/map/creature/inventory/container state;
-- disconnect/restart detection and dynamic PID/PIE/object reacquisition.
+The exact official client was launched with a temporary `LD_PRELOAD` Qt6 helper and no credentials. It proved:
 
-GDB remains research instrumentation only and is not the final Phase 9 interface.
+```text
+PRELOAD_CONSTRUCTOR=true
+QUEUED_SCAN=true
+QOBJECT_SCAN_COUNT=8
+QT_PRELOAD_BRIDGE_THREAD_INVOCATION_PROVEN=true
+```
+
+Therefore **PROVEN:** a non-GDB injected helper can execute queued code on the real client Qt event loop without permanently patching CipSoft files.
+
+The helper's `QCoreApplication::findChildren<QObject*>()` scans found only 6–7 ordinary descendants and zero target Tibia classes (`QOBJECT_MATCHED_CLASS_ROWS=0`). Therefore **DISPROVEN:** the game handlers can be discovered simply as QCoreApplication QObject children.
+
+**DERIVED bridge architecture:** retain `LD_PRELOAD` + Qt-thread invocation, add Unix-domain IPC, and resolve target objects through semantic static/runtime references, registries, vptrs/RTTI/signatures and structural validation rather than QObject child traversal.
+
+## Live world-entry experiments and rejected hypotheses
+
+Runs `31650884938`, `31651611051`, `31652180172` proved that old UI marker `FIRST_CHARACTER_ACTIVATED` and QMeta wrapper-hit absence were not valid structural state evidence.
+
+GDB-from-start run `31652573423`, job `94299916593`, proved real local SOCKS auth traffic but not world entry. Decoded-map GDB-from-start run `31653056907`, job `94301369226`, reached zero map records despite auth traffic and bounded row activation.
+
+Read-only same-hash handover shows the successful world entry starts the client normally and attaches GDB only after the bootstrap session exists. Therefore **REJECTED:** starting the client under GDB is the preferred recovery/login path.
+
+## Current live experiment
+
+```yaml
+experiment_id: OTC48-WORLD-ENTRY-003
+workflow: .github/workflows/tibia-hosted-cv-bootstrap-structural-world.yml
+head: 0f5912373e010d445e0589381f86e738f95d844b
+run: 31653732464
+status: running
+objective: reproduce normal-start same-hash world bootstrap, then attach and prove decoded map records
+bootstrap_evidence:
+  - local screenshot difference only as non-OCR recovery aid, threshold >45000
+  - login transition must be observed before character-row activation
+  - local SOCKS game connection must remain sustained >=6 observations
+  - reversible Right action must change viewport by >1000 pixels
+semantic_acceptance:
+  - GDB attaches only after bootstrap
+  - base+0x19a8ea3 produces >=8 structurally valid decoded map records
+  - zero direct TCP/UDP
+  - only then STRUCTURAL_IN_GAME=true
+```
+
+Visual differences are not accepted as protocol/interface semantics; they only reproduce the proven bootstrap procedure before structural validation.
+
+## Persistent self-hosted runtime recovery
+
+PR #48 owns a persistent design on selector `[self-hosted, oteryn-staging]` with expected runner `oteryn-synology-staging`, container `otclient-tibia-login-analysis`, and state bind `/var/lib/oteryn-staging-state/tibia-linux-analysis`.
+
+Read-only probe workflow `.github/workflows/tibia-synology-owned-runtime-state.yml`, run `31653611110`, is pending runner acceptance. Do not claim the runner/container available until a job actually starts.
 
 ## Safety invariants
 
 - no OCR/Tesseract/image-to-text for login or semantic proof;
 - no secret values in argv/logs/screenshots/repository/artifacts/chat;
-- changed WARP egress before secret use;
-- zero unintended direct TCP/UDP when required by experiment;
+- verify changed WARP egress before secret use;
+- zero unintended direct TCP/UDP where required;
 - no canonical staging mutation and no mutation of the separately owned Oteryn runtime;
-- pixels/windows are bootstrap aids, never semantic world-state evidence;
-- debugger instrumentation in this task is observational only;
-- leave character idle when world entry is proven; action proofs belong to the next programme phase.
+- pixels/windows are bootstrap aids only, never semantic world-state evidence;
+- leave the character idle once world entry is structurally proven until the next action experiment is explicitly bounded.
 
 ## Durable checkpoint
 
 ```yaml
-checkpoint_version: 5
-updated_at: 2026-08-13T02:07:00+02:00
+checkpoint_version: 6
+updated_at: 2026-08-13T02:19:00+02:00
 branch: ci/OTC-20260727-tibia-linux-runner-analysis
 pr: 48
+head_before_checkpoint: 0f5912373e010d445e0589381f86e738f95d844b
 status: investigating
-client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 proven:
-  - exact full runtime and current login-service identity
-  - same-hash Worldmap structural decode boundary
+  - exact full runtime and current WARP login-service identity
+  - same-hash Worldmap decode boundary
   - exact Qt/protobuf action and state catalogues
-  - GDB-from-start login produces real local SOCKS auth traffic
+  - non-GDB LD_PRELOAD helper executes queued work on the real Qt event loop
 rejected_hypotheses:
-  - missing critical QMetaObjects
+  - critical QMetaObjects missing
   - FIRST_CHARACTER_ACTIVATED marker proves activation
-  - lack of QMeta wrapper breakpoints proves auth/character state absent
-  - raw-qword semantic vptr scanner
+  - lack of QMeta wrapper breakpoint proves auth state absent
+  - GDB-from-start is the preferred world-entry recovery path
+  - QCoreApplication QObject descendants contain the target game handlers
+  - blind raw-qword vptr scanner
 unknown:
-  - whether hosted GDB-from-start run can reproduce >=8 decoded map records
-  - authoritative current player position in the OTClient-owned live session
-  - live before/after action effects
-active_operation:
-  run: 31653056907
-  head: e581377cb990bec332ef4cbd67e3546aa01b3366
-  workflow: tibia-hosted-gdb-from-start-world-entry.yml
+  - current OTClient-owned structural IN_GAME session
+  - authoritative player position in a current OTClient-owned live session
+  - live before/after movement/action effects in that session
+  - stable target-object resolver for the preload bridge
+active_operations:
+  - run: 31653732464
+    workflow: tibia-hosted-cv-bootstrap-structural-world.yml
+  - run: 31653611110
+    workflow: tibia-synology-owned-runtime-state.yml
+    state: awaiting self-hosted runner acceptance
 safe_to_resume: true
-next_action: inspect terminal run 31653056907 once; if decoded records >=8, persist structural IN_GAME and close this login phase, otherwise use the decoded-map count/socket outcome as the sole next live hypothesis
+next_action: reconcile terminal CV-bootstrap run once; on decoded IN_GAME immediately reacquire PID/PIE and prove authoritative player-position plus one reversible movement transition, while continuing preload target-object resolver work independently
 ```

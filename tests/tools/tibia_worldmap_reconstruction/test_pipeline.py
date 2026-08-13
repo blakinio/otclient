@@ -233,6 +233,33 @@ class ReconstructionTests(unittest.TestCase):
         with self.assertRaises(ReconstructionError):
             compare(snapshot, reference)
 
+    def test_forged_ok_snapshot_variant_mismatch_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["observed_variants"] = [[999]]
+        with self.assertRaises(ReconstructionError):
+            compare(snapshot, self.reference())
+        with self.assertRaises(ReconstructionError):
+            build_otbm_plan(snapshot)
+
+    def test_forged_ok_snapshot_static_order_mismatch_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["static_client_ids"] = [300, 200]
+        snapshot["tiles"][0]["static_otb_ids"] = [1300, 1200]
+        with self.assertRaises(ReconstructionError):
+            build_otbm_plan(snapshot)
+
+    def test_forged_ok_snapshot_dynamic_projection_mismatch_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["dynamic_client_ids"] = [999]
+        with self.assertRaises(ReconstructionError):
+            build_otbm_plan(snapshot)
+
+    def test_forged_ok_snapshot_role_overlap_fails_closed(self):
+        snapshot = self.valid_snapshot()
+        snapshot["tiles"][0]["dynamic_client_ids"] = [200, 900]
+        with self.assertRaises(ReconstructionError):
+            build_otbm_plan(snapshot)
+
 
 if __name__ == "__main__":
     unittest.main()

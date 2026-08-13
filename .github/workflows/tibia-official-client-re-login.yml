@@ -58,24 +58,26 @@ jobs:
               https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
 
             xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
-            if [[ -z "$xvfb_pid" ]] || ! kill -0 "$xvfb_pid" 2>/dev/null || [[ ! -e /tmp/.X11-unix/X98 ]]; then
-              private_xvfb="$state/runtime/Xvfb-track-a"
-              [[ -x "$private_xvfb" ]]
-              cd "$toolroot/usr/bin"
-              env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-                PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \
-                XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
-                nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
-                -xkbdir "$toolroot/usr/share/X11/xkb" -nolisten tcp -noreset \
-                >"$state/runtime/xvfb.log" 2>&1 </dev/null &
-              xvfb_pid=$!
-              printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"
-              for _ in $(seq 1 30); do [[ -e /tmp/.X11-unix/X98 ]] && break; kill -0 "$xvfb_pid"; sleep 1; done
-              [[ -e /tmp/.X11-unix/X98 ]]
-            else
+            if [[ -n "$xvfb_pid" ]] && kill -0 "$xvfb_pid" 2>/dev/null; then
               [[ -r "/proc/$xvfb_pid/environ" ]]
               tr '\0' '\n' <"/proc/$xvfb_pid/environ" | grep -Fxq "$marker"
+              kill "$xvfb_pid"
+              for _ in $(seq 1 30); do kill -0 "$xvfb_pid" 2>/dev/null || break; sleep 0.2; done
+              ! kill -0 "$xvfb_pid" 2>/dev/null
             fi
+            private_xvfb="$state/runtime/Xvfb-track-a"
+            [[ -x "$private_xvfb" ]]
+            cd "$toolroot/usr/bin"
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+              PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \
+              XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
+              nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
+              -xkbdir "$toolroot/usr/share/X11/xkb" +extension GLX +render -nolisten tcp -noreset \
+              >"$state/runtime/xvfb.log" 2>&1 </dev/null &
+            xvfb_pid=$!
+            printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"
+            for _ in $(seq 1 30); do [[ -e /tmp/.X11-unix/X98 ]] && break; kill -0 "$xvfb_pid"; sleep 1; done
+            [[ -e /tmp/.X11-unix/X98 ]]
 
             proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
             vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"

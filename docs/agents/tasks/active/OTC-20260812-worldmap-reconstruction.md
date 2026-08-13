@@ -13,7 +13,7 @@ owned_paths:
   - tests/tools/tibia_worldmap_reconstruction/**
 reuses:
   - PR #48 runtime/login evidence and official-client package reconstruction helpers as read-only evidence
-  - PR #277 official-client runtime handover as read-only evidence
+  - repository-owned OTCLIENT-TIBIA-RE canonical evidence imports
 depends_on:
   - PR #48 only for future real official-client capture; this task does not edit PR #48 paths
 blocks: []
@@ -30,7 +30,7 @@ Prepare a deterministic, fail-closed pipeline in `blakinio/otclient` that can in
 Allowed:
 
 - repository-only tooling, tests and documentation in the owned paths above;
-- read-only use of PR #48 and PR #277 evidence;
+- read-only use of PR #48 and repository-owned imported official-client evidence;
 - neutral JSON schemas and synthetic fixtures;
 - comparison against normalized reference exports supplied later by the owner.
 
@@ -39,7 +39,8 @@ Forbidden:
 - edits to PR #48 operational scripts/workflows/task paths;
 - use of Codex or owner-funded AI/API quota;
 - credentials, account/character data, authenticated screenshots, proprietary client binaries/assets or extracted proprietary bytes in Git;
-- claiming an appearance/OTB mapping that was not proven by supplied metadata/evidence.
+- claiming an appearance/OTB mapping that was not proven by supplied metadata/evidence;
+- treating structural snapshot validation as cryptographic provenance authentication.
 
 ## Feature scope
 
@@ -67,9 +68,10 @@ The E2E for this task is the neutral repository pipeline: observation -> classif
 7. Ordered static contents are preserved; dynamic entities remain separate and do not become static OTBM items by default.
 8. Comparator preserves unresolved tile states and distinguishes match, missing reference/observation, ground/content/stack mismatches and unresolved mappings.
 9. Reference comparisons require explicit source and matching `otb_version`; duplicate coordinates are rejected.
-10. OTBM planning refuses conflicts, unknown roles, unresolved ground, unmapped IDs, malformed/forged snapshots and empty snapshots.
-11. Synthetic tests cover success plus malformed/missing provenance, conflicting observations/mappings/roles, missing ground, unmapped IDs, stack order, version mismatches, forged `OK` state, bad snapshot types/statuses, duplicate snapshot coordinates and malformed reference arrays.
+10. OTBM planning refuses conflicts, unknown roles, unresolved ground, unmapped IDs, malformed or internally inconsistent `OK` snapshots and empty snapshots.
+11. Synthetic tests cover success plus malformed/missing provenance, conflicting observations/mappings/roles, missing ground, unmapped IDs, stack order, version mismatches, forged/inconsistent `OK` state, bad snapshot types/statuses, duplicate snapshot coordinates and malformed reference arrays.
 12. Documentation defines CrystalServer, Renemap and TibiaMaps as independent normalized references; disagreements remain evidence rather than silent precedence.
+13. Snapshot validation is explicitly bounded to schema/internal consistency; an arbitrary self-consistent snapshot is not treated as authenticated proof of mapping provenance.
 
 ## Evidence boundaries
 
@@ -77,8 +79,7 @@ The E2E for this task is the neutral repository pipeline: observation -> classif
 
 - `blakinio/otclient` `main` at task start: `9e68388c5dff5d803f2a7025ba138e7cdfdf0d3f`.
 - PR #48 is open/draft on `ci/OTC-20260727-tibia-linux-runner-analysis` and owns its operational workflows/scripts/task record.
-- PR #277 is open/draft and contains only its official-client runtime handover.
-- PR #48 task record preserves official-client identity, decoded Worldmap handler/common routine addresses and strict no-OCR/WARP boundaries.
+- PR #48 and the canonical OTCLIENT-TIBIA-RE reports preserve official-client identity, decoded Worldmap evidence and strict no-OCR/WARP boundaries.
 - no existing appearance/OTB reconstruction helper was found before adding this task-scoped utility.
 
 ### UNKNOWN / requires later evidence
@@ -86,11 +87,10 @@ The E2E for this task is the neutral repository pipeline: observation -> classif
 - exact semantic name of every official `AppearanceInstance` field/offset;
 - classification of specific live client IDs unless current-version appearance evidence proves it;
 - exact client appearance ID -> OTB/server ID mapping for the current official version;
-- complete real-world map coverage, creature/NPC spawn definitions and dynamic state.
+- complete real-world map coverage, creature/NPC spawn definitions and dynamic state;
+- cryptographic authenticity of an arbitrary externally supplied snapshot/mapping document; the current tool validates structure and explicit evidence fields, not signatures.
 
-## Fresh post-implementation audit — 2026-08-13
-
-Finding `OTC279-AUD-001`:
+## Fresh post-implementation audit — finding OTC279-AUD-001
 
 ```yaml
 severity: high
@@ -108,11 +108,60 @@ verification:
 Repair:
 
 - added strict `validate_snapshot()` and integer-array/optional-integer validators;
-- `compare()` and `build_otbm_plan()` now validate the snapshot before use;
+- `compare()` and `build_otbm_plan()` validate the snapshot before use;
 - `OK` requires exactly one observed variant, mapped ground, no unresolved IDs and matching static client/OTB lengths;
 - conflict/unmapped/unknown-role statuses must contain evidence consistent with that status;
 - duplicate snapshot coordinates, unsupported statuses, malformed types and malformed reference arrays fail closed;
-- seven new regression cases were added, making the focused suite 19 tests.
+- seven regression cases increased the focused suite to 19 tests.
+
+## Fresh closeout audit — finding OTC279-AUD-002
+
+A second independent diff/code audit found that the first repair still did not bind the decomposed fields of an `OK` tile back to `observed_variants`.
+
+```yaml
+severity: high
+confidence: high
+finding: OTC279-AUD-002
+impact: a caller could keep status=OK while replacing observed_variants or independently changing ground/static/dynamic client-ID projections; the planner could then export a structurally contradictory snapshot
+status: fixed
+repair_commits:
+  - eba161284a3d9444cca6cbeac3e5e5164dd250a7
+  - 08704e2412a342e3e1618d9985d3d45801ea29c5
+validation_workflow_head: 7427fe1676cdb64eb7293229ee32c8a69c0cf0dd
+validation_run: 31681045961
+validation_job: 94386320196
+result: PASS
+```
+
+Second repair:
+
+- `OK` ground must occur exactly once in its single observed variant;
+- ground/static/dynamic client-ID roles may not overlap;
+- the multiset of `ground + static + dynamic` must account for the entire observed variant;
+- static and dynamic client-ID order must be the order projected from the observed variant;
+- four regression cases cover variant mismatch, static-order mismatch, dynamic projection mismatch and role overlap;
+- focused suite now passes 23/23;
+- Python syntax validation passes;
+- synthetic CLI `reconstruct -> compare -> plan-otbm` E2E passes with `SYNTHETIC_RECONSTRUCT_COMPARE_PLAN_PASS=true`.
+
+The temporary second-audit validation workflow was removed by commit `4e03c5b7ed6578af9fbfd2cdeb240acb8e109c1f` after the proof.
+
+## Snapshot provenance boundary
+
+The snapshot format is an intermediate representation. Internal validation proves that a snapshot is structurally self-consistent; it does not cryptographically prove who produced it or that a fully self-consistent manually supplied OTB ID originated from the verified mapping document.
+
+The authoritative pipeline remains:
+
+```text
+trusted bounded observations
++ verified appearance-role catalog
++ verified client->OTB mapping
+-> reconstruct()
+-> structurally validated snapshot
+-> compare()/plan-otbm
+```
+
+If a future design accepts snapshots across an untrusted handoff boundary, add an authenticated evidence envelope or revalidate them against their original catalog/mapping inputs. Do not claim the current schema alone prevents a malicious party from fabricating an entirely self-consistent document.
 
 ## Validation record
 
@@ -122,50 +171,54 @@ baseline_before_fresh_audit:
   syntax: PASS
   synthetic_e2e: PASS
   repository_ci_run: 31632613373 PASS
-  note: superseded as final evidence by the fresh-audit repair
-fresh_audit_repair:
-  pipeline_commit: d0c30b9218c15c359e5de7e901882ca7243b31b2
-  regression_commit: bcd5dcd06d344cc2c66b4aabcca733a3d3609f33
-  validation_workflow_head: 9f5c69391d656d1b65c7f29b21f205d3360c12e3
+first_audit_repair:
   validation_run: 31653654639
   validation_job: 94303192632
   focused_tests: PASS_19_OF_19
   syntax: PASS
   synthetic_e2e: PASS
+second_audit_repair:
+  pipeline_commit: eba161284a3d9444cca6cbeac3e5e5164dd250a7
+  regression_commit: 08704e2412a342e3e1618d9985d3d45801ea29c5
+  validation_workflow_head: 7427fe1676cdb64eb7293229ee32c8a69c0cf0dd
+  validation_run: 31681045961
+  validation_job: 94386320196
+  focused_tests: PASS_23_OF_23
+  syntax: PASS
+  synthetic_e2e: PASS
   synthetic_marker: SYNTHETIC_RECONSTRUCT_COMPARE_PLAN_PASS=true
-  temporary_validation_workflow_removed_by: e447a31431b675effeb419892a35d7f22e5d321d
+  temporary_validation_workflow_removed_by: 4e03c5b7ed6578af9fbfd2cdeb240acb8e109c1f
 pr: 279
-final_required_ci: pending on the final head after this checkpoint
+final_required_ci: pending on final workflow-free documentation/code head
 ```
 
-The temporary validation workflow is no longer in the branch. The validation run remains supporting exact-code evidence; repository-required final CI must still pass on the final workflow-free head.
-
-No Codex or owner-funded AI/API quota was used.
+No Codex or owner-funded AI/API quota was used. All material work is persisted in `blakinio/otclient`.
 
 ## Related PR policy
 
 - PR #48 remains intentionally open and independently owned; this task must not close or mutate it.
-- PR #277 is a separate documentation handover and is not required for correctness of this tool.
+- Runtime/dedicated-runner waiting does not block merging this neutral repository pipeline because its required E2E is synthetic and explicitly internal-only; real capture is a later evidence producer input.
 
 ## Checkpoint
 
 ```yaml
-checkpoint_version: 4
-updated_at: 2026-08-13T02:15:00+02:00
+checkpoint_version: 5
+updated_at: 2026-08-13T10:15:00+02:00
 branch: feat/OTC-20260812-worldmap-reconstruction
 pr: 279
 status: validating
 proven:
-  - fail-closed snapshot validation repair is implemented
-  - focused repaired suite passed 19/19
+  - first and second fail-closed snapshot repairs implemented
+  - focused repaired suite passed 23/23 on exact repair head
   - Python syntax validation passed
   - synthetic CLI reconstruct -> compare -> plan-otbm E2E passed
-  - temporary validation workflow was removed
+  - snapshot trust/provenance boundary is documented without overclaiming authentication
+  - temporary second-audit validation workflow was removed
 unknown:
-  - final required repository CI result on the workflow-free final head
-  - independent fresh-context closeout audit availability
+  - final required repository CI result on the final workflow-free head
   - real appearance classifications and OTB mappings
+  - real official-client capture integration inputs
 conflicts: []
 blockers: []
-next_action: verify final exact-head repository CI, then complete fresh-context audit/PR hygiene and merge only if every closeout gate passes
+next_action: verify final exact-head repository CI, full diff and review hygiene; merge PR #279 if every closeout gate passes, then archive the completed tooling task separately
 ```

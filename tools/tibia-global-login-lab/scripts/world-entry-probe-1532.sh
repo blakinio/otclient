@@ -42,8 +42,18 @@ if text.count(old) == 1:
     path.write_text(text.replace(old, new, 1), encoding='utf-8')
 elif new not in text:
     raise SystemExit(f'expected original or already-patched staticdata fatal gate, found {text.count(old)}')
+
+game_path = Path('/otclient/modules/gamelib/game.lua')
+game_text = game_path.read_text(encoding='utf-8')
+supported_clients_tail = '    1520, 1521, 1522, 1523, 1524, 1525\n}'
+supported_clients_replacement = '    1520, 1521, 1522, 1523, 1524, 1525, 1532\n}'
+if game_text.count(supported_clients_tail) == 1:
+    game_path.write_text(game_text.replace(supported_clients_tail, supported_clients_replacement, 1), encoding='utf-8')
+elif supported_clients_replacement not in game_text:
+    raise SystemExit('expected original or already-patched supported-client tail')
 PY_STATICDATA
 echo LAB_STATICDATA_FATAL_GATE_BYPASSED=true
+echo LAB_CLIENT_VERSION_CAP_RAISED=true
 '''
 if text.count(old_asset_marker) != 1:
     raise SystemExit(f"expected exactly one runtime asset marker, found {text.count(old_asset_marker)}")
@@ -56,13 +66,19 @@ text = text.replace(old_asset_marker, new_asset_marker, 1)
 # connected and still configure the normal OTClient feature set.
 old_version = '    g_game.setClientVersion(1532)\n'
 new_version = (
-    "    mark('VERSION_CONFIG_BEGIN=true')\n"
-    "    local versionLimitConfigured=pcall(function() g_gameConfig.setLastSupportedVersion(1532) end)\n"
-    "    mark('VERSION_LIMIT_CONFIGURED=' .. tostring(versionLimitConfigured))\n"
-    "    if not versionLimitConfigured then return end\n"
-    "    local fullVersionConfigured=pcall(function() g_gameConfig.setClientVersionString('15.32.df7b29') end)\n"
-    "    mark('FULL_CLIENT_VERSION_STRING_CONFIGURED=' .. tostring(fullVersionConfigured))\n"
-    "    if not fullVersionConfigured then return end\n"
+    "    mark('FULL_CLIENT_VERSION_CONFIG_BEGIN=true')\n"
+    "    local fullVersionCallOk=pcall(function() g_gameConfig.setClientVersionString('15.32.df7b29') end)\n"
+    "    if not fullVersionCallOk then\n"
+    "      mark('FULL_CLIENT_VERSION_CALL_FAILED=true')\n"
+    "      return\n"
+    "    end\n"
+    "    local fullVersionReadOk,fullVersionReadback=pcall(function() return g_gameConfig.getClientVersionString() end)\n"
+    "    if not fullVersionReadOk or fullVersionReadback~='15.32.df7b29' then\n"
+    "      mark('FULL_CLIENT_VERSION_READBACK_MISMATCH=true')\n"
+    "      return\n"
+    "    end\n"
+    "    fullVersionReadback=nil\n"
+    "    mark('FULL_CLIENT_VERSION_CONFIGURED=true')\n"
     "    mark('CLIENT_VERSION_LIMIT_OVERRIDE=true')\n"
     "    if g_game.getClientVersion()==1532 then\n"
     "      g_game.setClientVersion(0)\n"

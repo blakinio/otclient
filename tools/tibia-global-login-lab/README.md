@@ -41,7 +41,7 @@ Each gate must emit only non-secret structural markers. A successful HTTP respon
 
 ## Credential boundary
 
-This bootstrap project does **not** consume account credentials. Existing test-account secrets used by operational PR #48 remain on that already-authorized path until their use is explicitly migrated into this lab. Secret values, session keys, cookies and account/character data must never be committed or printed.
+The canonical Track B workflow is authorized to consume the existing GitHub Actions test-account secrets only for its bounded HTTP preflight and controlled game-entry probe. The values remain inside the workflow/container's transient secret path and must never be committed, printed, uploaded, or reused by local scripts. Session keys, cookies and account/character data remain prohibited from repository persistence.
 
 ## Proprietary data boundary
 

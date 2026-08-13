@@ -341,7 +341,14 @@ docker exec "$CONTAINER" xdpyinfo -display :100 >/dev/null
 
 docker exec -d -e DISPLAY=:100 -e HOME=/lab/state/home -e LIBGL_ALWAYS_SOFTWARE=1 \
   -e OTCLIENT_TIBIA_GLOBAL_LAB=1 \
-  "$CONTAINER" bash -lc 'cd /otclient && exec proxychains4 -f /lab/runtime/proxychains.conf ./otclient >>/lab/runtime/otclient.stdout.log 2>&1'
+  "$CONTAINER" bash -lc '
+    rm -f /lab/runtime/otclient.exit-status
+    cd /otclient
+    proxychains4 -f /lab/runtime/proxychains.conf ./otclient >>/lab/runtime/otclient.stdout.log 2>&1
+    status=$?
+    printf "%s\n" "$status" >/lab/runtime/otclient.exit-status
+    exit "$status"
+  '
 
 client_started=false
 for _ in $(seq 1 60); do
@@ -360,6 +367,16 @@ done
 
 docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z0-9_-]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
 docker exec "$CONTAINER" bash -lc "grep -oE '\[TIBIA_GLOBAL_LAB\] (CLIENT_VERSION_VALUE|PROTOCOL_VERSION_VALUE|GAME_LOGIN_ERROR_TEXT_LENGTH)=[0-9]+' /lab/runtime/otclient.stdout.log | sort -u || true"
+client_exit_status=$(docker exec "$CONTAINER" sh -c 'cat /lab/runtime/otclient.exit-status 2>/dev/null || true')
+if [[ "$client_exit_status" =~ ^[0-9]+$ ]]; then
+  if (( client_exit_status >= 128 )); then
+    echo "LAB_OTCLIENT_TERMINATED_SIGNAL_$((client_exit_status - 128))=true"
+  else
+    echo "LAB_OTCLIENT_EXIT_STATUS_${client_exit_status}=true"
+  fi
+else
+  echo LAB_OTCLIENT_EXIT_STATUS_UNAVAILABLE=true
+fi
 if docker exec "$CONTAINER" test -f /lab/runtime/game-socks-forward.granted; then
   echo LAB_GAME_SOCKS_FORWARD_GRANTED=true
 else
@@ -405,6 +422,9 @@ elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_LOGIN_ERROR=tru
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_CONNECTION_ERROR=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=game_connection_error
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] CHARACTER_LOGIN_CALL_RETURNED=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=after_character_login_call_before_game_callback
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] CHARACTER_LOGIN_CALL_ERROR=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=character_login_call_error
+elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] FULL_CLIENT_VERSION_CONFIG_BEGIN=true' /lab/runtime/otclient.stdout.log && ! docker exec "$CONTAINER" grep -Eq '\[TIBIA_GLOBAL_LAB\] FULL_CLIENT_VERSION_(CALL_FAILED|READBACK_MISMATCH|CONFIGURED)=true' /lab/runtime/otclient.stdout.log; then
+  if [[ "$client_exit_status" =~ ^[0-9]+$ ]]; then echo FAILURE_STAGE=full_client_version_outcome_missing_after_exit
+  else echo FAILURE_STAGE=full_client_version_outcome_missing; fi
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] SESSION_KEY_FEATURE_MISSING=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=session_key_feature_missing
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] THINGS_NOT_LOADED=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=things_not_loaded
 elif docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HANDOFF_CONSUMED=true' /lab/runtime/otclient.stdout.log; then echo FAILURE_STAGE=after_handoff_before_character_login

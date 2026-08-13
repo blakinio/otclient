@@ -27,6 +27,8 @@
 #include <framework/graphics/bitmapfont.h>
 #include <framework/otml/declarations.h>
 
+#include <string>
+
  // @bindclass
 class GameConfig
 {
@@ -39,6 +41,7 @@ public:
     void setLastSupportedVersion(uint16_t version) { m_lastSupportedVersion = version; }
     std::string getClientVersionString() const { return m_clientVersionString; }
     void setClientVersionString(const std::string& version) { m_clientVersionString = version; }
+    std::string getGameLoginVersionString(uint16_t clientVersion) const { return m_clientVersionString.empty() ? std::to_string(clientVersion) : m_clientVersionString; }
     bool drawTyping() const { return m_drawTyping; }
     std::string getTypingIcon() const { return m_typingIcon; }
 

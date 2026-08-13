@@ -60,8 +60,7 @@ void ProtocolGame::sendLoginPacket(const uint32_t challengeTimestamp, const uint
         msg->addU32(g_game.getClientVersion());
 
     if (g_game.getClientVersion() >= 1281) {
-        const auto& configuredVersion = g_gameConfig.getClientVersionString();
-        msg->addString(configuredVersion.empty() ? std::to_string(g_game.getClientVersion()) : configuredVersion);
+        msg->addString(g_gameConfig.getGameLoginVersionString(g_game.getClientVersion()));
     }
 
     if (g_game.getClientVersion() >= 1334) {

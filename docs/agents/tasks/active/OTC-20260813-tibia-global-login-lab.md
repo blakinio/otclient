@@ -1,16 +1,17 @@
 ---
 task_id: OTC-20260813-tibia-global-login-lab
 status: validating
-agent: ChatGPT
+agent: Codex
 project_lane: otclient
 lane: otclient
-track: legacy-analysis
-task_kind: infrastructure
-phase: live-world-entry
+track: otclient-global-login
+track_alias: OTCLIENT-GLOBAL-LOGIN
+task_kind: protocol
+phase: recovery-validation
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T16:20:00+02:00
+updated: 2026-08-13T17:00:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -19,16 +20,19 @@ owned_paths:
   - src/client/gameconfig.h
   - src/client/luafunctions.cpp
   - src/client/protocolgamesend.cpp
+  - tests/unit/protocol/CMakeLists.txt
+  - tests/unit/protocol/game_login_version_string_test.cpp
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
 modules_touched:
-  - legacy-analysis
+  - otclient-global-login
   - github-actions
   - game-config
   - protocol-game-login
 reuses:
-  - docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
+  - docs/agents/TIBIA_RESEARCH_TRACKS.md
+  - docs/agents/SHORT_COMMANDS.md
   - PR #48 runtime evidence as migration input only
   - synology-otclient-01 self-hosted runner
 cross_repo_tasks: []
@@ -55,9 +59,10 @@ Make `blakinio/otclient` the single durable source of truth and execution home f
 
 All material work for this investigation is persisted in `blakinio/otclient`. Chat is not a source of durable continuation state. Runtime-only proprietary bytes, credentials, cookies, session keys, character/world values and other protected material remain outside Git and are referenced only by redacted/non-secret evidence markers.
 
-The owner explicitly restored this task and PR #284 as the canonical active
-OTCLIENT-TIBIA-RE implementation lane for the repository's own OTClient on
-2026-08-13. PR #48 is historical evidence only and must not replace this lane.
+The owner restored this task and PR #284 as the canonical active Track B
+`otclient-global-login` / `OTCLIENT-GLOBAL-LOGIN` lane for the repository's
+native Linux OTClient on 2026-08-13. PR #48 is historical evidence only and
+must not replace this lane.
 
 # Safety and isolation
 
@@ -482,6 +487,24 @@ execution stops earlier at the existing last-supported-version setter. The
 next run emits a marker before that call and guards it independently, so the
 exact failing Lua/C++ boundary is classified without exposing error text.
 
+Run `31712081913`, jobs `94487351437` and `94487558014`, exact head
+`2b184f882a0a873ce55bdff281c5be7e6dd1f6f0`, passed the exact native-Linux
+build, artifact transfer, isolated Synology bootstrap, WARP path and HTTP
+login. The controlled probe reached `HANDOFF_CONSUMED=true` and
+`VERSION_CONFIG_BEGIN=true`, then produced zero client/server directional bytes
+and no subsequent configuration outcome marker. The prior diagnostic emitted
+its `pcall` outcome as `=false`, which the existing boolean-only exporter did
+not surface. This run therefore establishes neither a full-version setter
+failure nor a protocol result.
+
+The recovery change rebases Track B on current `main` and makes the bounded
+full-version diagnostic self-classifying: it removes the unrelated runtime
+last-supported-version setter from this path, raises only the lab runtime's
+supported-client cap before OTClient starts, emits exactly one full-version
+outcome marker, and exports a numeric exit-or-signal category if the process
+ends before an outcome. The production selection path now has focused tests for
+configured full-string serialization and the empty numeric fallback.
+
 # Evidence classification
 
 PROVEN:
@@ -534,16 +557,21 @@ UNKNOWN:
 
 # Next action
 
-Build and run the exact-head canonical native Linux E2E with full game-login
-version string `15.32.df7b29`; classify the exchange from both directional byte
-markers and continue from the returned structural opcode/callback.
+Run exactly one canonical native-Linux E2E on the final rebased recovery head;
+classify the required full-version marker outcome, then use directional bytes
+and structural opcode/callback evidence only if configuration succeeded.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T14:20:00Z
-head: 0ee27024357913cfe4d0fca2214a609b86339b01
+updated_at: 2026-08-13T15:00:00Z
+track: otclient-global-login
+track_alias: OTCLIENT-GLOBAL-LOGIN
+head: 27418b03ee787f049b2e89b14ccc29b50701428f
+last_e2e_head: 2b184f882a0a873ce55bdff281c5be7e6dd1f6f0
+recovery_base_head: 27418b03ee787f049b2e89b14ccc29b50701428f
+base_main: dc18f795bf13cee37a115164da56a452aaa14f02
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -561,28 +589,36 @@ owned_paths:
 proven:
   - run 31702087216/job 94453443371 preserved version 1532, sent 230 client bytes, received 148 server bytes, and reached GAME_LOGIN_ERROR
   - run 31706716385/job 94469029667 structurally returned opcode 0x14 with a client+world relationship at exact head 0ee27024357913cfe4d0fca2214a609b86339b01
+  - run 31712081913/job 94487558014 reached HANDOFF_CONSUMED and VERSION_CONFIG_BEGIN on exact native Linux head 2b184f882a0a873ce55bdff281c5be7e6dd1f6f0
 derived:
-  - the numeric-only post-1281 version string is the next bounded packet mismatch to falsify
+  - the prior =false pcall marker cannot classify the setter boundary because the exporter emits only =true categories
 unknown:
+  - whether setClientVersionString succeeds and reads back the full version in the exact Linux runtime
   - whether the official endpoint accepts the exact full version string and advances beyond opcode 0x14
 conflicts:
   - none
 first_failure:
-  marker: GAME_LOGIN_ERROR=true
-  evidence: run 31706716385/job 94469029667 at 0ee27024357913cfe4d0fca2214a609b86339b01
+  marker: FULL_CLIENT_VERSION_CONFIG_BEGIN=true without an outcome marker
+  evidence: run 31712081913/job 94487558014 at 2b184f882a0a873ce55bdff281c5be7e6dd1f6f0
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
   - missing preview-state field alone: run 31698702409 sent 144 client bytes and received zero server bytes
   - raw runtime asset identifier alone: run 31699422432 normalized it and still received zero server bytes
 changed_paths:
+  - src/client/gameconfig.h
+  - src/client/protocolgamesend.cpp
+  - tests/unit/protocol/CMakeLists.txt
+  - tests/unit/protocol/game_login_version_string_test.cpp
   - tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh
+  - tools/tibia-global-login-lab/scripts/world-entry-probe.sh
+  - tools/tibia-global-login-lab/README.md
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
 validation:
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md --require-checkpoint
     result: PASS
-    evidence: checkpoint schema validated locally before commit
+    evidence: recovery checkpoint schema validated locally; final exact-head native-Linux E2E remains authorized after publication
 blockers:
   - none
-next_action: build and run the exact native Linux head with full version string 15.32.df7b29 and continue from directional bytes plus structural opcode/callback evidence
+next_action: run exactly one canonical native-Linux E2E on the final rebased recovery head and classify the full-version marker outcome before any protocol-layout change
 ```

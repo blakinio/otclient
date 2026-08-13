@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T13:12:00+02:00
+updated: 2026-08-13T13:18:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -260,6 +260,15 @@ the watchdog. The forwarder now records only direction-presence booleans for
 client-to-server and server-to-client bytes, without retaining counts or
 payloads, to distinguish a challenge-first deadlock from a parser failure.
 
+Run `31693969725`, job `94427365487`, exact head
+`6718c89eee5276d70217b4d1f1a0360b44e79b1c`, proved client-to-server bytes were
+sent while no server bytes arrived. Source inspection then identified that the
+lab's `setClientVersion(1532)` can be a no-op when the persisted runtime already
+holds 1532, leaving the feature set previously reset by failed normal things
+loading. The lab now forces a feature rebuild through `0 -> 1532` after
+disconnecting only the things autoloader and records the critical login packet,
+challenge, checksum, authenticator, and pending-login flags.
+
 # Evidence classification
 
 PROVEN:
@@ -308,4 +317,4 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with direction-only forwarder instrumentation. If neither side sends bytes, test the evidence-backed removal of the legacy challenge-first gate in the lab; if server bytes arrive, isolate the first parser boundary without capturing payload contents.
+Run the canonical E2E with a deterministic full 15.32 feature rebuild. Use critical feature markers and byte direction to distinguish the expected challenge path from an invalid modern login packet, then continue from the first callback or exact handshake boundary.

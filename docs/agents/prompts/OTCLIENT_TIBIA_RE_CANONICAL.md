@@ -1,7 +1,7 @@
 # OTCLIENT-TIBIA-RE canonical repository/runtime wrapper
 
 ```yaml
-prompt_contract_version: 1.1.0
+prompt_contract_version: 1.1.1
 alias: OTCLIENT-TIBIA-RE
 repository: blakinio/otclient
 base_prompt: docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
@@ -45,6 +45,33 @@ PR #283 stable non-GDB runtime bridge
 ```
 
 Revalidate their exact heads/states before use. When any lane merges or becomes superseded, continue from current `main` and its durable task records rather than preserving stale PR numbers as authority.
+
+## Mandatory repository persistence
+
+All material work performed for this programme must be persisted in `blakinio/otclient` during the same bounded worker session or before rotation/return.
+
+This includes, where applicable:
+
+```text
+- discoveries and disproven hypotheses;
+- experiment contracts and results;
+- run/job/artifact identifiers;
+- binary versions/hashes and resolver outputs;
+- code, scripts, tools and tests;
+- workflow/runtime changes;
+- protocol/action/state catalogues;
+- OTBM findings and mappings;
+- capability matrix changes;
+- runner/runtime state and recovery procedures;
+- blockers, UNKNOWN/CONFLICT classifications;
+- handovers, checkpoints and exactly one executable next_action.
+```
+
+Do not leave material continuation state only in chat, local scratch space, a transient runner filesystem, an external repository, or an unreferenced Actions log/artifact. Large binary/log/trace artifacts may remain outside Git when repository policy requires it, but their provenance, semantic result, exact run/job/artifact ID and continuation consequence must be indexed from `blakinio/otclient`.
+
+Do not create new active durable programme state in another repository. External repositories may be read for evidence only unless the owner separately authorizes a different exact write target.
+
+Before returning `ROTATE`, `WAITING`, `BLOCKED` or `DONE`, verify that every material fact needed by a fresh agent is recoverable from `blakinio/otclient` plus explicitly referenced evidence.
 
 ## Canonical runtime
 

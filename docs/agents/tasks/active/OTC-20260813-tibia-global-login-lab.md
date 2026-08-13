@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-tibia-global-login-lab
-status: waiting
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: otclient
@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T13:27:00+02:00
+updated: 2026-08-13T13:36:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -47,6 +47,10 @@ Make `blakinio/otclient` the single durable source of truth and execution home f
 # Owner durable-state directive
 
 All material work for this investigation is persisted in `blakinio/otclient`. Chat is not a source of durable continuation state. Runtime-only proprietary bytes, credentials, cookies, session keys, character/world values and other protected material remain outside Git and are referenced only by redacted/non-secret evidence markers.
+
+The owner explicitly restored this task and PR #284 as the canonical active
+OTCLIENT-TIBIA-RE implementation lane for the repository's own OTClient on
+2026-08-13. PR #48 is historical evidence only and must not replace this lane.
 
 # Safety and isolation
 
@@ -279,8 +283,9 @@ would reject that handshake variant for this endpoint.
 The challenge-first run `31694806569` and its one exact-head manual retry
 `31695124060` were both cancelled externally before producing the required
 direction markers; the retry was cancelled during HTTP preflight. Neither run
-is protocol evidence. Per the no-repeat rule, the task is waiting rather than
-starting a third identical attempt.
+is protocol evidence. The owner has explicitly authorized resuming the exact
+challenge-first experiment and keeping PR #284 active until terminal condition
+A or B is proven.
 
 # Evidence classification
 
@@ -330,4 +335,4 @@ UNKNOWN:
 
 # Next action
 
-Once external run cancellation has ceased, run the canonical E2E once on exact head `7310c03d8507b3c07e11f4bc4226bd91d71c6ef9` and classify the challenge-first hypothesis from `LAB_GAME_FORWARD_CLIENT_BYTES` and `LAB_GAME_FORWARD_SERVER_BYTES`.
+Rerun the cancelled canonical E2E on exact experiment head `7310c03d8507b3c07e11f4bc4226bd91d71c6ef9` and classify the challenge-first hypothesis from `LAB_GAME_FORWARD_CLIENT_BYTES` and `LAB_GAME_FORWARD_SERVER_BYTES`; continue from the first resulting protocol boundary without stopping at the first failure.

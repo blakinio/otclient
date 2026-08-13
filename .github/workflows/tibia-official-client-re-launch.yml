@@ -1,0 +1,118 @@
+name: Track A official Linux client launch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  launch:
+    runs-on: ${{ fromJSON('["otclient", "synology"]') }}
+    timeout-minutes: 15
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Launch isolated official native-Linux client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          toolroot="$state/toolroot"
+          tool_path="$toolroot/usr/bin:$toolroot/usr/sbin"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          mkdir -p "$state/runtime" "$state/home" "$state/config"
+          chmod 700 "$state" "$state/runtime" "$state/home" "$state/config"
+
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          [[ -x "$toolroot/usr/bin/Xvfb" ]]
+          [[ -x "$toolroot/usr/bin/proxychains4" ]]
+
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid")"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          tr '\0' '\n' <"/proc/$warp_pid/environ" | grep -Fxq "$marker"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+
+          xvfb_pid_file="$state/runtime/xvfb.pid"
+          if [[ -e /tmp/.X11-unix/X98 ]]; then
+            [[ -s "$xvfb_pid_file" ]]
+            xvfb_pid="$(tr -cd '0-9' <"$xvfb_pid_file")"
+            [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" ]]
+            tr '\0' '\n' <"/proc/$xvfb_pid/environ" | grep -Fxq "$marker"
+            kill -0 "$xvfb_pid"
+          else
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+              PATH="$tool_path:/usr/bin:/bin" LD_LIBRARY_PATH="$tool_lib" \
+              nohup "$toolroot/usr/bin/Xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
+              -nolisten tcp -noreset >"$state/runtime/xvfb.log" 2>&1 </dev/null &
+            xvfb_pid=$!
+            printf '%s\n' "$xvfb_pid" >"$xvfb_pid_file"
+            chmod 600 "$xvfb_pid_file"
+            for _ in $(seq 1 30); do
+              [[ -e /tmp/.X11-unix/X98 ]] && break
+              sleep 1
+            done
+            [[ -e /tmp/.X11-unix/X98 ]]
+          fi
+          echo TRACK_A_XVFB_PID="$xvfb_pid"
+          echo TRACK_A_DISPLAY_OWNERSHIP_VERIFIED=true
+
+          proxy_conf="$state/config/proxychains.conf"
+          printf '%s\n' \
+            strict_chain proxy_dns quiet_mode \
+            'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' \
+            '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          chmod 600 "$proxy_conf"
+
+          client_pid_file="$state/runtime/client.pid"
+          if [[ -s "$client_pid_file" ]]; then
+            client_pid="$(tr -cd '0-9' <"$client_pid_file")"
+            if [[ -n "$client_pid" && -r "/proc/$client_pid/environ" ]] && \
+                tr '\0' '\n' <"/proc/$client_pid/environ" | grep -Fxq "$marker"; then
+              kill -0 "$client_pid"
+            else
+              echo '::error title=Track A ownership mismatch::Client PID file is stale or does not identify an owned process.'
+              exit 1
+            fi
+          else
+            cd "$runtime"
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+              HOME="$state/home" DISPLAY="$TRACK_DISPLAY" \
+              PATH="$tool_path:/usr/bin:/bin" LD_LIBRARY_PATH="$runtime/lib:$tool_lib" \
+              nohup "$toolroot/usr/bin/proxychains4" -f "$proxy_conf" "$client" \
+              >"$state/runtime/client.log" 2>&1 </dev/null &
+            client_pid=$!
+            printf '%s\n' "$client_pid" >"$client_pid_file"
+            chmod 600 "$client_pid_file"
+          fi
+
+          sleep 12
+          kill -0 "$client_pid"
+          [[ -r "/proc/$client_pid/exe" ]]
+          executable="$(readlink -f "/proc/$client_pid/exe")"
+          [[ "$executable" == "$client" ]]
+          tr '\0' '\n' <"/proc/$client_pid/environ" | grep -Fxq "$marker"
+          windows="$(HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$tool_lib" "$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$client_pid" 2>/dev/null | paste -sd, - || true)"
+          [[ -n "$windows" ]]
+          echo TRACK_A_CLIENT_PID="$client_pid"
+          echo TRACK_A_CLIENT_EXECUTABLE="$executable"
+          echo TRACK_A_CLIENT_WINDOWS="$windows"
+          echo TRACK_A_OFFICIAL_NATIVE_LINUX_CLIENT_RUNNING=true

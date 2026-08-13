@@ -72,11 +72,11 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:52:00+02:00
-head: 402d3605b2b0c669ad332ce0a6b8f81148dd6971
+updated_at: 2026-08-13T16:05:00+02:00
+head: 7a9d4a4ccf0411466540621556ec846220b37c46
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
-status: investigating
+status: paused_by_owner
 context_routes:
   - official-client-re
   - native-linux-runtime
@@ -167,6 +167,10 @@ validation:
   - command: Track A structural login run 31716923856 job 94503872080
     result: INCONCLUSIVE_FOR_PRELOGIN_GDB_TRACE
     evidence: the version-pinned trace armed before credential input, but emitted no state label and the pixel transition remained 1846 < 45000. Repository-owned recovery evidence says a pre-login GDB attach changes Qt/UI timing, so this run does not establish that the submit handler was not reached; the trace is disabled before the next live attempt.
+  - command: Track A structural login run 31717327457 job 94505245329
+    result: FAIL_FOR_RETURN_THEN_BUTTON_SUBMIT_VARIANT
+    evidence: without pre-login GDB, Return was sent after the verified credential-field mutation; after four seconds the same changed-pixel comparator did not transition, so the exact historical button coordinate was used as fallback. The final value was 1632 < 45000, with no structural IN_GAME claim.
 blockers: []
-next_action: run one bounded no-GDB submit variant: send Return after the proven field mutations, then use the exact historical button coordinate only if the same changed-pixel threshold did not transition; record the chosen method and retain the structural IN_GAME gate
+paused_by: owner request at 2026-08-13T16:05:00+02:00
+next_action: do not run another client experiment until the owner explicitly resumes Track A; on resume, revalidate the current repository/PR/runner state before selecting a new non-GDB, non-OCR input-delivery diagnostic
 ```

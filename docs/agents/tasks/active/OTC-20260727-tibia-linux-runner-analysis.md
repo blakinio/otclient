@@ -461,6 +461,6 @@ changed_paths:
   - .github/workflows/tibia-synology-owned-runtime-state.yml
   - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
 blockers:
-  - first recovery run 31695448562 disproved host-bind visibility for the runner-in-container path; recovery must share the runner's named work volume instead
-next_action: rerun dedicated runtime recovery using the runner's exact named work volume, then materialize and start the exact official client through verified userspace WARP without using login secrets
+  - recovery runs 31695448562 and 31695575309 proved that the runner-visible path is not a host bind and the work mount has no Docker volume name; recovery must reuse the exact inspected mount type and daemon-side source
+next_action: rerun dedicated runtime recovery using the runner work mount's exact type and daemon-side source without logging it, then materialize and start the exact official client through verified userspace WARP without using login secrets
 ```

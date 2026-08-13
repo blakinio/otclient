@@ -40,10 +40,26 @@ jobs:
           [[ -x "$launcher" ]]
           echo TRACK_A_LAUNCHER_STATIC_SHA256="$(sha256sum "$launcher" | awk '{print $1}')"
           echo TRACK_A_LAUNCHER_STATIC_SIZE="$(stat -c %s "$launcher")"
-          readelf -h "$launcher" | grep -E 'Class:|Type:|Machine:' | sed 's/^/TRACK_A_LAUNCHER_ELF=/' || true
-          echo TRACK_A_LAUNCHER_SINGLETON_STRINGS_BEGIN=true
-          strings -a -t x "$launcher" | grep -Ei -C 10 'Application is already running|single.?application|single.?instance|QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|lock.?file|server.?name|local.?socket|shared.?memory|semaphore' | head -n 500 | sed 's/^/TRACK_A_LAUNCHER_STRING=/' || true
-          echo TRACK_A_LAUNCHER_SINGLETON_IMPORTS_BEGIN=true
-          objdump -T "$launcher" 2>/dev/null | grep -Ei 'QLocal(Server|Socket)|QSharedMemory|QSystemSemaphore|QLockFile|flock|fcntl|sem_|shm_|socket|bind|connect' | head -n 400 | sed 's/^/TRACK_A_LAUNCHER_IMPORT=/' || true
-          readelf -d "$launcher" | grep NEEDED | sed 's/^/TRACK_A_LAUNCHER_NEEDED=/' || true
-          echo TRACK_A_LAUNCHER_SINGLETON_STATIC_COMPLETE=true
+          python3 - "$launcher" <<'PY'
+          import pathlib,re,sys
+          data=pathlib.Path(sys.argv[1]).read_bytes()
+          rows=[(m.start(),m.group().decode('latin1','replace')) for m in re.finditer(rb'[ -~]{4,}',data)]
+          patterns=re.compile(r'Application is already running|single.?application|single.?instance|QLocal(?:Server|Socket)|QSharedMemory|QSystemSemaphore|QLockFile|lock.?file|server.?name|local.?socket|shared.?memory|semaphore|flock|fcntl|sem_|shm_|socket|bind|connect',re.I)
+          hits=[i for i,(_,s) in enumerate(rows) if patterns.search(s)]
+          print('TRACK_A_LAUNCHER_PY_STRING_COUNT='+str(len(rows)))
+          print('TRACK_A_LAUNCHER_PY_MATCH_COUNT='+str(len(hits)))
+          emitted=set()
+          for idx in hits:
+              for j in range(max(0,idx-12),min(len(rows),idx+13)):
+                  off,s=rows[j]
+                  key=(off,s)
+                  if key in emitted: continue
+                  emitted.add(key)
+                  safe=s.replace('\n','\\n').replace('\r','\\r')
+                  print(f'TRACK_A_LAUNCHER_PY_STRING=0x{off:x}|{safe}')
+          # Emit all mangled Qt/local IPC-looking names even if not adjacent to the log message.
+          for off,s in rows:
+              if any(k in s for k in ('QLocalServer','QLocalSocket','QSharedMemory','QSystemSemaphore','QLockFile')):
+                  print(f'TRACK_A_LAUNCHER_QT_IPC=0x{off:x}|{s}')
+          print('TRACK_A_LAUNCHER_SINGLETON_STATIC_COMPLETE=true')
+          PY

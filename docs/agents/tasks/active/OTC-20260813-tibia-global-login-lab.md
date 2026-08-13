@@ -11,7 +11,7 @@ phase: recovery-validation
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T17:00:00+02:00
+updated: 2026-08-13T18:05:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -109,7 +109,10 @@ The login flow is now:
 9. consume/delete the handoff from Lua;
 10. require structural OTClient game callbacks (`GAME_LOGIN`, `GAME_PENDING`, `GAME_ENTER`, `GAME_START`) for semantic progress.
 
-Product support still declares last supported client 1525. The lab uses the existing Lua binding `g_gameConfig.setLastSupportedVersion(1532)` rather than modifying production `game.cpp`/`game.lua`. Product files owned by other tasks are not mutated.
+Product support still declares last supported client 1525. The lab patches only its
+container-local copy of `modules/gamelib/game.lua` to admit 1532 before OTClient
+starts; it does not call the unrelated `g_gameConfig.setLastSupportedVersion()`
+binding or modify production `game.cpp`/`game.lua`.
 
 # Live evidence
 
@@ -505,6 +508,16 @@ outcome marker, and exports a numeric exit-or-signal category if the process
 ends before an outcome. The production selection path now has focused tests for
 configured full-string serialization and the empty numeric fallback.
 
+Run `31717603954`, job `94507702845`, exact head
+`281a9d47491f064138b29dbe8ce450411cbb88a0`, passed the exact native-Linux
+build, isolated bootstrap, WARP transport and HTTP login, but did **not** start
+OTClient. Its lab-only Python injector stopped with an unterminated string
+literal while rendering the container-local supported-client patch. Therefore
+no `FULL_CLIENT_VERSION_*`, directional-byte, callback, or opcode marker was
+produced. This is a reproducible harness defect, not a setter or protocol
+classification; the injector now has a render check that reproduces the exact
+transformation locally before the one valid bounded E2E retry.
+
 # Evidence classification
 
 PROVEN:
@@ -557,19 +570,19 @@ UNKNOWN:
 
 # Next action
 
-Run exactly one canonical native-Linux E2E on the final rebased recovery head;
-classify the required full-version marker outcome, then use directional bytes
-and structural opcode/callback evidence only if configuration succeeded.
+Run exactly one canonical native-Linux E2E on the validated injector-repair
+head; classify the required full-version marker outcome, then use directional
+bytes and structural opcode/callback evidence only if configuration succeeded.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T15:00:00Z
+updated_at: 2026-08-13T16:00:00Z
 track: otclient-global-login
 track_alias: OTCLIENT-GLOBAL-LOGIN
-head: 27418b03ee787f049b2e89b14ccc29b50701428f
-last_e2e_head: 2b184f882a0a873ce55bdff281c5be7e6dd1f6f0
+head: 281a9d47491f064138b29dbe8ce450411cbb88a0
+last_e2e_head: 281a9d47491f064138b29dbe8ce450411cbb88a0
 recovery_base_head: 27418b03ee787f049b2e89b14ccc29b50701428f
 base_main: dc18f795bf13cee37a115164da56a452aaa14f02
 branch: feat/OTC-20260813-tibia-global-login-lab
@@ -598,8 +611,8 @@ unknown:
 conflicts:
   - none
 first_failure:
-  marker: FULL_CLIENT_VERSION_CONFIG_BEGIN=true without an outcome marker
-  evidence: run 31712081913/job 94487558014 at 2b184f882a0a873ce55bdff281c5be7e6dd1f6f0
+  marker: LAB_1532 injector SyntaxError before OTClient launch
+  evidence: run 31717603954/job 94507702845 at 281a9d47491f064138b29dbe8ce450411cbb88a0
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
@@ -617,8 +630,11 @@ changed_paths:
 validation:
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md --require-checkpoint
     result: PASS
-    evidence: recovery checkpoint schema validated locally; final exact-head native-Linux E2E remains authorized after publication
+    evidence: injector-repair checkpoint schema validated locally; the next E2E remains pending
+  - command: bash -n tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh plus local injected-render execution
+    result: PASS
+    evidence: LAB_1532_INJECTOR_RENDER_CHECK=true; no container, secret, or network access used
 blockers:
-  - none
-next_action: run exactly one canonical native-Linux E2E on the final rebased recovery head and classify the full-version marker outcome before any protocol-layout change
+  - run 31717603954/job 94507702845 stopped in the lab injector before OTClient launch; its failure is non-protocol and repaired locally
+next_action: run exactly one canonical native-Linux E2E on the validated injector-repair head and classify the full-version marker outcome before any protocol-layout change
 ```

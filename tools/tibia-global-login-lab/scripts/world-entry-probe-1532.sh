@@ -45,8 +45,8 @@ elif new not in text:
 
 game_path = Path('/otclient/modules/gamelib/game.lua')
 game_text = game_path.read_text(encoding='utf-8')
-supported_clients_tail = '    1520, 1521, 1522, 1523, 1524, 1525\n}'
-supported_clients_replacement = '    1520, 1521, 1522, 1523, 1524, 1525, 1532\n}'
+supported_clients_tail = '    1520, 1521, 1522, 1523, 1524, 1525\\n}'
+supported_clients_replacement = '    1520, 1521, 1522, 1523, 1524, 1525, 1532\\n}'
 if game_text.count(supported_clients_tail) == 1:
     game_path.write_text(game_text.replace(supported_clients_tail, supported_clients_replacement, 1), encoding='utf-8')
 elif supported_clients_replacement not in game_text:

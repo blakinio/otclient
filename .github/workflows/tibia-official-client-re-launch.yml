@@ -46,6 +46,20 @@ jobs:
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           [[ -x "$toolroot/usr/bin/Xvfb" ]]
+          private_xvfb="$state/runtime/Xvfb-track-a"
+          python3 - "$toolroot/usr/bin/Xvfb" "$private_xvfb" <<'PY'
+          import pathlib, sys
+          source = pathlib.Path(sys.argv[1]).read_bytes()
+          needle = b'/usr/bin/xkbcomp'
+          replacement = b'xkbcomp' + b'\0' * (len(needle) - len(b'xkbcomp'))
+          count = source.count(needle)
+          if count < 1:
+              raise SystemExit('expected hardcoded xkbcomp path was not found')
+          pathlib.Path(sys.argv[2]).write_bytes(source.replace(needle, replacement))
+          print(f'TRACK_A_XVFB_XKBCOMP_PATCH_COUNT={count}')
+          PY
+          chmod 700 "$private_xvfb"
+          echo TRACK_A_PRIVATE_XVFB_SHA256="$(sha256sum "$private_xvfb" | awk '{print $1}')"
           proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
           vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit 2>/dev/null || true)"
           [[ -n "$proxy_lib" ]]
@@ -72,8 +86,8 @@ jobs:
             env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
               PATH="$tool_path:/usr/bin:/bin" LD_LIBRARY_PATH="$tool_lib" \
               XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
-              nohup "$toolroot/usr/bin/Xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
-              -kb -nolisten tcp -noreset \
+              nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
+              -nolisten tcp -noreset \
               >"$state/runtime/xvfb.log" 2>&1 </dev/null &
             xvfb_pid=$!
             printf '%s\n' "$xvfb_pid" >"$xvfb_pid_file"

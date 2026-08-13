@@ -1,0 +1,46 @@
+name: Track A session socket count
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-session-sockets-shell.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 2
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Count established TCP sockets owned by exact Track A client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          inodes=''
+          for fd in /proc/$pid/fd/*; do
+            target="$(readlink "$fd" 2>/dev/null || true)"
+            case "$target" in socket:\[*\]) inode="${target#socket:[}"; inode="${inode%]}"; inodes="$inodes $inode";; esac
+          done
+          established=0
+          for table in /proc/net/tcp /proc/net/tcp6; do
+            [[ -r "$table" ]] || continue
+            while read -r sl local remote st rest; do
+              [[ "$st" == 01 ]] || continue
+              inode="$(printf '%s\n' "$rest" | awk '{print $6}')"
+              case " $inodes " in *" $inode "*) established=$((established+1));; esac
+            done < <(tail -n +2 "$table")
+          done
+          echo TRACK_A_ESTABLISHED_TCP_COUNT="$established"
+          echo TRACK_A_SESSION_SOCKET_COUNT_COMPLETE=true

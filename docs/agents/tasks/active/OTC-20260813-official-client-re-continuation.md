@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:09:00+02:00
-head: c0b167ed143ba47277ee9079f037ad76411d128b
+updated_at: 2026-08-13T15:12:00+02:00
+head: 756c3d0fc9834b2ca0085384365422d767e9c17d
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -93,7 +93,7 @@ proven:
   - isolated private toolroot succeeded in run 31710205236
   - normal official-client launch succeeded in run 31707899241 job 94473004427 with owned display and no unresolved libraries
   - lavapipe/Vulkan startup is usable for the official client; private Xvfb and XKB startup are usable
-  - login runs 31713018398 and 31713638527 proved the live exact client process and that both credential fields materially changed without persisting secrets
+  - login runs 31713018398, 31713638527 and 31713902095 proved the live exact client process and that both credential fields materially changed without persisting secrets
 derived:
   - socket counts alone are bootstrap/session indicators and are not structural IN_GAME evidence
 unknown:
@@ -102,7 +102,7 @@ unknown:
   - decoded current-world records and authoritative player position
 first_failure:
   marker: exact same-SHA coordinate baseline returned no login-form transition after explicit Login-button click
-  evidence: run 31713638527 job 94492697675 passed owned process/WARP/lavapipe/window-focus gates, executed explicit email click, explicit password click and explicit Login click; credential fields changed 4654 bytes but transition was 5259, below required >45000
+  evidence: run 31713902095 job 94493601193 passed owned process/WARP/lavapipe/window-focus gates, executed explicit email click, explicit password click and explicit Login click; credential fields changed but transition was 4174, below required >45000, with no increase beyond two local SOCKS connections
 rejected_hypotheses:
   - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
   - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
@@ -127,6 +127,9 @@ validation:
   - command: Track A structural login run 31713638527 job 94492697675
     result: FAIL_FOR_LOGIN_TRANSITION
     evidence: faithful explicit coordinate baseline; field changes 4654; transition 5259 < 45000; no structural IN_GAME claim
+  - command: Track A structural login run 31713902095 job 94493601193
+    result: FAIL_FOR_LOGIN_TRANSITION
+    evidence: faithful explicit coordinate baseline plus non-secret telemetry; transition 4174 < 45000; local SOCKS max stayed 2; process I/O deltas are non-attributable due rendering
 blockers: []
-next_action: repeat the exact explicit-coordinate baseline unchanged with only redacted process-I/O and owned-SOCKS count deltas around the Login click; classify whether current submission produces any local runtime transport activity before proposing a new login mechanism
+next_action: repeat the exact explicit-coordinate baseline unchanged with root-pointer coordinates recorded after each click; compare the observed click locations against the currently resolved 1020x650 Tibia window before proposing any new login mechanism
 ```

@@ -184,6 +184,9 @@ jobs:
           process_io() {
             awk '/^(rchar|wchar):/ { values[$1]=$2 } END { print values["rchar:"], values["wchar:"] }' "/proc/$pid/io"
           }
+          pointer_location() {
+            "$toolroot/usr/bin/xdotool" getmouselocation --shell | awk -F= '/^X=/{x=$2} /^Y=/{y=$2} END { print x "," y }'
+          }
 
           read -r initial_local initial_direct initial_udp < <(socket_state)
           read -r io_before_read io_before_write < <(process_io)
@@ -201,9 +204,11 @@ jobs:
             typed="$evidence/login-typed.xwd"
             "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$before"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
+            echo TRACK_A_EMAIL_CLICK_POINTER="$(pointer_location)"
             "$toolroot/usr/bin/xdotool" key ctrl+a
             "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_EMAIL"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
+            echo TRACK_A_PASSWORD_CLICK_POINTER="$(pointer_location)"
             "$toolroot/usr/bin/xdotool" key ctrl+a
             "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_PASSWORD"
             "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$typed"
@@ -211,6 +216,7 @@ jobs:
             echo TRACK_A_CREDENTIAL_FIELDS_CHANGED_BYTES="$typed_changed"
             [[ "$typed_changed" -gt 100 ]]
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
+            echo TRACK_A_LOGIN_CLICK_POINTER="$(pointer_location)"
             unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
             transition=0; changed=0; submit_local_max="$initial_local"
             for _ in $(seq 1 60); do

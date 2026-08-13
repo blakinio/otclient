@@ -50,13 +50,13 @@ jobs:
           python3 - "$toolroot/usr/bin/Xvfb" "$private_xvfb" <<'PY'
           import pathlib, sys
           source = pathlib.Path(sys.argv[1]).read_bytes()
-          needle = b'/usr/bin/xkbcomp'
-          replacement = b'xkbcomp' + b'\0' * (len(needle) - len(b'xkbcomp'))
+          needle = b'/usr/bin\0'
+          replacement = b'.\0' + b'\0' * (len(needle) - 2)
           count = source.count(needle)
           if count < 1:
-              raise SystemExit('expected hardcoded xkbcomp path was not found')
+              raise SystemExit('expected hardcoded executable directory was not found')
           pathlib.Path(sys.argv[2]).write_bytes(source.replace(needle, replacement))
-          print(f'TRACK_A_XVFB_XKBCOMP_PATCH_COUNT={count}')
+          print(f'TRACK_A_XVFB_EXEC_DIR_PATCH_COUNT={count}')
           PY
           chmod 700 "$private_xvfb"
           echo TRACK_A_PRIVATE_XVFB_SHA256="$(sha256sum "$private_xvfb" | awk '{print $1}')"
@@ -83,6 +83,7 @@ jobs:
             tr '\0' '\n' <"/proc/$xvfb_pid/environ" | grep -Fxq "$marker"
             kill -0 "$xvfb_pid"
           else
+            cd "$toolroot/usr/bin"
             env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
               PATH="$tool_path:/usr/bin:/bin" LD_LIBRARY_PATH="$tool_lib" \
               XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \

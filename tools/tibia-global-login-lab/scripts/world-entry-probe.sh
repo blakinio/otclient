@@ -105,8 +105,10 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     email=nil; password=nil
     mark('LOGIN_START=true')
     EnterGame.doLogin()
+    scheduleEvent(function()
+      if not g_game.isOnline() then mark('PROBE_TIMEOUT=true'); g_app.exit() end
+    end,60000)
   end,1500)
-  scheduleEvent(function() if not g_game.isOnline() then mark('PROBE_TIMEOUT=true'); g_app.exit() end end,90000)
 end
 LUA
 docker cp /tmp/lab-init.lua "$CONTAINER:/otclient/init.lua"
@@ -121,7 +123,7 @@ docker exec -d -e DISPLAY=:100 -e HOME=/lab/state/home -e LIBGL_ALWAYS_SOFTWARE=
   "$CONTAINER" bash -lc 'cd /otclient && exec proxychains4 -f /lab/runtime/proxychains.conf ./otclient >>/lab/runtime/otclient.stdout.log 2>&1'
 unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
 
-for _ in $(seq 1 220); do
+for _ in $(seq 1 500); do
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log && break
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] PROBE_TIMEOUT=true' /lab/runtime/otclient.stdout.log && break
   docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' >/dev/null 2>&1 || break

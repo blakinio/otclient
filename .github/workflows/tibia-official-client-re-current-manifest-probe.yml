@@ -1,0 +1,65 @@
+name: Track A current official manifest probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-current-manifest-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-reconstruct
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Fetch and summarize official current package manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --retry 3 --connect-timeout 20 --max-time 60 \
+            'https://static.tibia.com/launcher/tibiaclient-linux-current/package.json' -o "$tmp"
+          python3 - "$tmp" <<'PY'
+          import json,sys
+          doc=json.load(open(sys.argv[1],encoding='utf-8'))
+          rows=[]
+          def walk(v):
+              if isinstance(v,dict):
+                  u=v.get('url'); p=v.get('packedhash'); q=v.get('unpackedhash')
+                  if isinstance(u,str) and isinstance(p,str): rows.append((u,p,q if isinstance(q,str) else ''))
+                  for x in v.values(): walk(x)
+              elif isinstance(v,list):
+                  for x in v: walk(x)
+          walk(doc)
+          uniq={u:(p,q) for u,p,q in rows}
+          print(f'TRACK_A_CURRENT_PACKAGE_ENTRY_COUNT={len(uniq)}')
+          matches=[(u,*h) for u,h in uniq.items() if u.endswith('/bin/client.lzma') or u in ('bin/client.lzma','bin/client') or u.endswith('/bin/client')]
+          if not matches:
+              matches=[(u,*h) for u,h in uniq.items() if u.endswith('client.lzma')]
+          print(f'TRACK_A_CURRENT_CLIENT_MANIFEST_MATCHES={len(matches)}')
+          for u,p,q in matches[:5]:
+              print(f'TRACK_A_CURRENT_CLIENT_URL={u}')
+              print(f'TRACK_A_CURRENT_CLIENT_PACKED_SHA256={p.lower()}')
+              print(f'TRACK_A_CURRENT_CLIENT_UNPACKED_SHA256={q.lower()}')
+          if not matches: raise SystemExit(2)
+          PY
+          echo TRACK_A_CURRENT_MANIFEST_PROBED=true

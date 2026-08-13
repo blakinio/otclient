@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-tibia-global-login-lab
-status: implementing
+status: waiting
 agent: ChatGPT
 project_lane: otclient
 lane: otclient
@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T13:22:00+02:00
+updated: 2026-08-13T13:27:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -276,6 +276,12 @@ bounded falsification explicitly enables only `GameChallengeOnLogin`: server
 bytes would prove challenge-first behavior, while no bytes in either direction
 would reject that handshake variant for this endpoint.
 
+The challenge-first run `31694806569` and its one exact-head manual retry
+`31695124060` were both cancelled externally before producing the required
+direction markers; the retry was cancelled during HTTP preflight. Neither run
+is protocol evidence. Per the no-repeat rule, the task is waiting rather than
+starting a third identical attempt.
+
 # Evidence classification
 
 PROVEN:
@@ -324,4 +330,4 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with the isolated challenge-first override and direction-only markers. Keep the override only if server bytes prove the handshake; otherwise remove it and persist the rejected hypothesis.
+Once external run cancellation has ceased, run the canonical E2E once on exact head `7310c03d8507b3c07e11f4bc4226bd91d71c6ef9` and classify the challenge-first hypothesis from `LAB_GAME_FORWARD_CLIENT_BYTES` and `LAB_GAME_FORWARD_SERVER_BYTES`.

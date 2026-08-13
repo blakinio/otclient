@@ -1,0 +1,139 @@
+# Tibia research track isolation
+
+This contract is mandatory for all current and future official-Tibia research in `blakinio/otclient`.
+
+## Repository boundary
+
+All active coordination, code, scripts, workflows, task state, reports, evidence indexes and continuation state for both tracks live only in:
+
+```text
+blakinio/otclient
+```
+
+For these tracks, do not search, read, fetch, cite, reference, mutate or depend on `blakinio/Oteryn-Platform`, historical Oteryn branches, Oteryn runners, Oteryn containers or Oteryn state directories. The material historical evidence needed for normal continuation has already been imported/indexed into this repository.
+
+If a detail is absent from `blakinio/otclient`, classify it as `UNKNOWN` and recover/research it inside the appropriate OTClient track. Do not reopen Oteryn as a shortcut.
+
+Historical provenance strings already committed in migration reports may remain as archival text; they are not active research inputs.
+
+## Track A — official client reverse engineering
+
+```yaml
+track_id: official-client-re
+alias: OTCLIENT-TIBIA-RE
+subject: official Linux Tibia client
+objective: structurally analyze the official client runtime and protocol/game-state surface
+canonical_prompt: docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
+repository: blakinio/otclient
+runner: synology-otclient-01
+```
+
+Track A owns research whose subject is the official Tibia client itself, including:
+
+- official-client login/session recovery needed to establish the research runtime;
+- decoded GameState/worldmap/player/inventory/container/creature state;
+- inbound/outbound protocol handlers and message builders;
+- native official-client actions and structural before/after proof;
+- stable official-client runtime bridge/instrumentation;
+- OTBM-relevant structural extraction from official-client state;
+- exact-version hashes, relocation profiles and protocol/action catalogues.
+
+Track A must not modify or take over Track B's OTClient-to-Global lab, workflow, branch, PR, containers or mutable state.
+
+## Track B — OTClient to Tibia Global compatibility
+
+```yaml
+track_id: otclient-global-login
+alias: OTCLIENT-GLOBAL-LOGIN
+subject: this blakinio/otclient fork
+objective: make this OTClient authenticate to and enter official Tibia Global
+canonical_task: docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
+canonical_pr: 284
+repository: blakinio/otclient
+runner: synology-otclient-01
+```
+
+Track B owns compatibility work whose subject is this repository's OTClient, including:
+
+- HTTP login/session handoff into OTClient;
+- OTClient 15.32 feature/version compatibility required for Global login;
+- OTClient game-server connection and login packet compatibility;
+- OTClient parser/schema compatibility required for world entry;
+- structural OTClient callbacks proving login/pending/enter/start;
+- minimal lab-only compatibility experiments needed to establish world entry.
+
+Track B must not claim the `OTCLIENT-TIBIA-RE` alias, must not become the canonical official-client reverse-engineering lane, and must not modify or take over Track A's official-client runtime/bridge/worldmap tasks or mutable state.
+
+## Runtime isolation on the shared runner
+
+Both tracks may use `synology-otclient-01`, but shared runner hardware does not imply shared runtime ownership.
+
+Every live task must declare and verify its own unique namespace before mutation or process control:
+
+```yaml
+container_names: unique per track/task
+named_volumes: unique per track/task
+state_directory: unique per track/task
+display: unique per track/task when X11 is used
+loopback_ports: unique per track/task
+process_ownership_marker: task-specific where technically available
+```
+
+An agent may stop, restart, remove, clean, attach to, inject into, signal or reconfigure only processes/containers/displays/ports/state that its own task explicitly owns. Never use broad `pkill`, Docker cleanup, shared display cleanup or state deletion that can affect the other track.
+
+Before any destructive or invasive runtime action, verify the target belongs to the current task. If ownership is ambiguous, stop that action and choose a non-destructive discovery method.
+
+## Path and PR isolation
+
+One task, one branch, one worktree and one PR remains the default. Each track must declare exact `owned_paths`.
+
+Cross-track edits are forbidden unless a dedicated coordination task explicitly owns the shared path. A normal Track A worker must not edit Track B task/workflow/lab paths; a normal Track B worker must not edit Track A prompt/bridge/worldmap/runtime-analysis paths.
+
+Shared governance/index paths may be edited only by a dedicated coordination task after overlap inspection.
+
+## Evidence sharing contract
+
+The tracks may share only promoted repository-owned contracts/evidence, never mutable runtime ownership.
+
+Allowed examples:
+
+- exact official client version/hash already recorded in an OTClient report;
+- a version-fenced protocol fact promoted into a repository-owned report/tool;
+- an OTClient parser incompatibility recorded by Track B and consumed as a hypothesis by another OTClient task;
+- stable read-only helper tooling with explicit ownership and interface.
+
+Before consuming cross-track evidence, verify its exact version/claim boundary. Do not treat another track's live container, active session, transient PID, heap address, socket, display or secret-bearing handoff as shared state.
+
+## Coordination rule
+
+If both tracks are active simultaneously:
+
+1. preserve both as independent tasks/PRs;
+2. verify disjoint `owned_paths` and runtime namespaces;
+3. do not reassign one track's task to the other;
+4. do not merge their objectives into a single worker context;
+5. checkpoint only track-local findings in the owning task;
+6. promote genuinely reusable facts through a deliberate repository-owned report/contract;
+7. resolve any overlap before mutation.
+
+A worker discovering a scope collision must stop the conflicting mutation, record the collision, and continue only with work inside its own declared ownership.
+
+## Current lane mapping
+
+At the time this contract was created:
+
+```text
+Track A / official-client-re:
+  alias: OTCLIENT-TIBIA-RE
+  canonical prompt: docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
+  imported state: docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-state.md
+  supporting lanes include official-client runtime/bridge/worldmap work as live state determines
+
+Track B / otclient-global-login:
+  alias: OTCLIENT-GLOBAL-LOGIN
+  task: docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
+  PR: #284
+  owned implementation: tools/tibia-global-login-lab/** and .github/workflows/tibia-global-login-lab.yml
+```
+
+Revalidate exact live PR/task state on every continuation, but preserve the track boundary above unless the owner explicitly changes it.

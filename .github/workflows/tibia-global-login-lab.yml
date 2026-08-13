@@ -38,4 +38,4 @@ jobs:
           TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
           TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
         shell: bash
-        run: bash tools/tibia-global-login-lab/scripts/run-probe.sh
+        run: bash tools/tibia-global-login-lab/scripts/world-entry-probe.sh

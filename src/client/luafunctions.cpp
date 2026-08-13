@@ -456,8 +456,12 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_gameConfig", "getWidgetTextFontName", &GameConfig::getWidgetTextFontName, &g_gameConfig);
 
     g_lua.bindSingletonFunction("g_gameConfig", "setLastSupportedVersion", &GameConfig::setLastSupportedVersion, &g_gameConfig);
-    g_lua.bindSingletonFunction("g_gameConfig", "getClientVersionString", &GameConfig::getClientVersionString, &g_gameConfig);
-    g_lua.bindSingletonFunction("g_gameConfig", "setClientVersionString", &GameConfig::setClientVersionString, &g_gameConfig);
+    g_lua.bindClassStaticFunction("g_gameConfig", "getClientVersionString", [] {
+        return g_gameConfig.getClientVersionString();
+    });
+    g_lua.bindClassStaticFunction("g_gameConfig", "setClientVersionString", [](std::string version) {
+        g_gameConfig.setClientVersionString(version);
+    });
 
     g_lua.registerSingletonClass("g_client");
     g_lua.bindSingletonFunction("g_client", "setEffectAlpha", &Client::setEffectAlpha, &g_client);

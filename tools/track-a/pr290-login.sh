@@ -31,9 +31,9 @@ kill -0 "$warp_pid"
 curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
 echo TRACK_A_WARP_VERIFIED=true
 
-# Prior passive screenshot proved the owned client is on Error Report and the
-# client had zero established TCP sockets, so this cannot log out an in-world
-# character. Stop only the exact Track A-owned crashed client.
+# The previous attempt is a renderer error state, not a live world session.
+# Stop only Track A-owned client/Xvfb processes, then reproduce the historical
+# launcher from the original Track A launch workflow exactly.
 old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
 if [[ -n "$old_pid" && -r "/proc/$old_pid/environ" ]]; then
   grep -azFxq "$marker" "/proc/$old_pid/environ"
@@ -43,18 +43,31 @@ if [[ -n "$old_pid" && -r "/proc/$old_pid/environ" ]]; then
 fi
 
 xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
-if [[ -z "$xvfb_pid" || ! -e "/proc/$xvfb_pid" || ! -e /tmp/.X11-unix/X98 ]]; then
-  private_xvfb="$state/runtime/Xvfb-track-a"
-  [[ -x "$private_xvfb" ]]
-  env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-    PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
-    nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1280x800x24 -xkbdir "$toolroot/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset \
-    >"$state/runtime/xvfb.log" 2>&1 </dev/null &
-  xvfb_pid=$!
-  printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"
-  for _ in $(seq 1 30); do [[ -e /tmp/.X11-unix/X98 ]] && break; sleep 1; done
+if [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" ]]; then
+  grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+  kill "$xvfb_pid" 2>/dev/null || true
+  for _ in $(seq 1 30); do kill -0 "$xvfb_pid" 2>/dev/null || break; sleep .2; done
 fi
+rm -f /tmp/.X98-lock /tmp/.X11-unix/X98 2>/dev/null || true
+
+private_xvfb="$state/runtime/Xvfb-track-a"
+[[ -x "$private_xvfb" ]]
+cd "$toolroot/usr/bin"
+env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+  PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
+  nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
+  -xkbdir "$toolroot/usr/share/X11/xkb" -nolisten tcp -noreset \
+  >"$state/runtime/xvfb.log" 2>&1 </dev/null &
+xvfb_pid=$!
+printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"
+chmod 600 "$state/runtime/xvfb.pid"
+for _ in $(seq 1 30); do
+  kill -0 "$xvfb_pid" 2>/dev/null || break
+  [[ -e /tmp/.X11-unix/X98 ]] && break
+  sleep 1
+done
 [[ -e /tmp/.X11-unix/X98 ]]
+echo TRACK_A_HISTORICAL_XVFB_RESTORED=true
 
 proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
 vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
@@ -66,8 +79,7 @@ cd "$runtime"
 env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
   HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
   LD_LIBRARY_PATH="$runtime/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" \
-  QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
-  FONTCONFIG_PATH="$toolroot/etc/fonts" FONTCONFIG_FILE="$toolroot/etc/fonts/fonts.conf" \
+  VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
   LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
   nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
 pid=$!
@@ -99,10 +111,10 @@ window="$(resolve_window)"
 "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
 "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
 "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 250 click 1
-"$toolroot/usr/bin/xdotool" key ctrl+a
+"$toolroot/usr/bin/xdotool" key ctrl+a BackSpace
 "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_EMAIL"
 "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 384 click 1
-"$toolroot/usr/bin/xdotool" key ctrl+a
+"$toolroot/usr/bin/xdotool" key ctrl+a BackSpace
 "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_PASSWORD"
 "$toolroot/usr/bin/xdotool" key Return
 unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD

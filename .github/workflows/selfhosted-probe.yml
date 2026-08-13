@@ -1,5 +1,6 @@
 name: Self-hosted OTClient Probe
 
+# Fresh infrastructure discovery probe: 2026-08-13T11:40+02:00.
 on:
   push:
     branches:
@@ -20,6 +21,7 @@ jobs:
         shell: bash
         run: |
           set -u
+          echo "runner_name=${RUNNER_NAME:-unknown}"
           echo "hostname=$(hostname)"
           echo "user=$(id -un)"
           echo "kernel=$(uname -a)"

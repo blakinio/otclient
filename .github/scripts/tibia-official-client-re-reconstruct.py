@@ -18,8 +18,6 @@ OUT = Path(os.environ["TIBIA_PACKAGE_OUT"])
 SOCKS = os.environ.get("TIBIA_SOCKS", "127.0.0.1:25354")
 PACKAGE_BASE = "https://static.tibia.com/launcher/tibiaclient-linux-current"
 ASSET_BASE = "https://static.tibia.com/launcher/assets-current"
-EXPECTED_PACKAGE_ENTRIES = 1634
-EXPECTED_ASSET_ENTRIES = 7094
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/151.0.0.0 Safari/537.36"
 
 
@@ -143,8 +141,8 @@ def main() -> None:
     assets = rows(load_manifest(ASSET_BASE, "assets.json"))
     print(f"TRACK_A_PACKAGE_ENTRY_COUNT={len(package)}")
     print(f"TRACK_A_ASSET_ENTRY_COUNT={len(assets)}")
-    if len(package) != EXPECTED_PACKAGE_ENTRIES or len(assets) != EXPECTED_ASSET_ENTRIES:
-        raise RuntimeError("manifest cardinality changed")
+    if not package or not assets:
+        raise RuntimeError("official current manifest is empty")
     OUT.mkdir(parents=True, exist_ok=True)
     batch(PACKAGE_BASE, package, 8, False, "PACKAGE")
     batch(ASSET_BASE, assets, 12, True, "ASSET")

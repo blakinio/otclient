@@ -54,6 +54,7 @@ new_version = (
     "    g_game.enableFeature(GameProtocolChecksum)\n"
     "    g_game.enableFeature(GameClientVersion)\n"
     "    g_game.enableFeature(GameLoginPending)\n"
+    "    g_game.enableFeature(GamePreviewState)\n"
     "    g_game.enableFeature(GameSequencedPackets)\n"
     "    mark('LOGIN_PACKET_FEATURES_LAB_RESTORED=true')\n"
     "    if g_game.getFeature(GameChallengeOnLogin) then mark('FEATURE_CHALLENGE_ON_LOGIN=true') end\n"
@@ -61,6 +62,7 @@ new_version = (
     "    if g_game.getFeature(GameClientVersion) then mark('FEATURE_CLIENT_VERSION=true') end\n"
     "    if g_game.getFeature(GameAuthenticator) then mark('FEATURE_AUTHENTICATOR=true') end\n"
     "    if g_game.getFeature(GameLoginPending) then mark('FEATURE_LOGIN_PENDING=true') end\n"
+    "    if g_game.getFeature(GamePreviewState) then mark('FEATURE_PREVIEW_STATE=true') end\n"
     "    local thingsPath=resolvepath('/data/things/1532/')\n"
     "    local appearancesCall,appearancesResult=pcall(function() return g_things.loadAppearances(thingsPath) end)\n"
     "    if appearancesCall and appearancesResult then mark('APPEARANCES_LOAD_OK=true') else mark('APPEARANCES_LOAD_FAILED=true') end\n"
@@ -75,20 +77,6 @@ new_version = (
 if text.count(old_version) != 1:
     raise SystemExit(f"expected exactly one 1532 client-version site, found {text.count(old_version)}")
 text = text.replace(old_version, new_version, 1)
-
-# Official Tibia 15.32 has no native Linux client. The normal official-host
-# helper advertises Linux when this lab binary runs in its Linux container.
-# Keep the product helper unchanged, but advertise the official Windows OS id
-# in this bounded experiment after chooseRsa() has selected the CipSoft key.
-old_rsa = "    g_game.chooseRsa('www.tibia.com')\n"
-new_rsa = (
-    old_rsa
-    + "    g_game.setCustomOs(OsTypes.Windows)\n"
-    + "    mark('OFFICIAL_WINDOWS_OS_LAB_OVERRIDE=true')\n"
-)
-if text.count(old_rsa) != 1:
-    raise SystemExit(f"expected exactly one official RSA selection site, found {text.count(old_rsa)}")
-text = text.replace(old_rsa, new_rsa, 1)
 
 # Run #31 proved that appearances parse successfully while staticdata does not.
 # For the login-only experiment require the appearance catalogue (needed for

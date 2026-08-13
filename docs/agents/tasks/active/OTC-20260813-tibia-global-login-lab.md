@@ -322,6 +322,15 @@ runs in a Linux container, although official Tibia 15.32 has no native Linux
 client. The next bounded experiment keeps the proven non-challenge framing and
 advertises the official Windows OS id after selecting the CipSoft RSA key.
 
+Run `31698057223`, job `94440289781`, exact head
+`7c49a4a3efa1de68f247b7c289bca31c76f3dff8`, disproved that OS identity
+hypothesis. The Windows override was active, the forward granted the connection,
+and the exchange remained exactly 143 client bytes to zero server bytes. The
+restored feature subset was then compared again with `features.lua`; it omitted
+`GamePreviewState`, which has been part of the login packet since version 980
+and contributes one pre-RSA field. The next experiment restores that field and
+removes the disproven OS override so only the packet layout changes.
+
 # Evidence classification
 
 PROVEN:
@@ -346,6 +355,7 @@ DISPROVEN:
 - unavailable `synology-otclient-01` runner as the current blocker.
 - challenge-first behavior on the current official game endpoint: run `31695992918` produced neither client nor server bytes after the granted TCP connection.
 - the missing encryption/checksum/client-version/login-pending/sequenced feature set as the sole no-response cause: run `31697097942` sent 143 client bytes and received zero server bytes after restoring them.
+- the Linux OS id as the sole no-response cause: run `31698057223` advertised Windows and still sent 143 client bytes to zero server bytes.
 
 UNKNOWN:
 - whether `g_game.loginWorld()` with appearances-only state reaches a game-server TCP/session callback;
@@ -372,14 +382,14 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with the official Windows OS id lab override and classify the first game-server exchange from the aggregate direction markers.
+Run the canonical E2E with `GamePreviewState` restored and classify the first game-server exchange from the aggregate direction markers.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T14:19:00Z
-head: 05ba7696579a82601034959430243eca12aeb4c2
+updated_at: 2026-08-13T12:10:00Z
+head: 7c49a4a3efa1de68f247b7c289bca31c76f3dff8
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -394,7 +404,7 @@ proven:
 derived:
   - first remaining boundary is the official 15.32 initial game-login packet identity/framing
 unknown:
-  - whether advertising the official Windows OS id yields a server response
+  - whether restoring the preview-state login field yields a server response
 conflicts:
   - none
 first_failure:
@@ -403,6 +413,7 @@ first_failure:
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
+  - Linux OS identity alone: run 31698057223 advertised Windows and still received zero server bytes
 changed_paths:
   - tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
@@ -412,5 +423,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with the official Windows OS id lab override and classify aggregate direction markers
+next_action: run the exact-head canonical E2E with GamePreviewState restored and classify aggregate direction markers
 ```

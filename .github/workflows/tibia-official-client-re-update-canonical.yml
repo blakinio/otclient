@@ -1,0 +1,132 @@
+name: Track A update canonical official Linux client
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-update-canonical.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+      OLD_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Update only Track A canonical package with official launcher
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          package="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$package/bin/client"
+          [[ -x "$client" ]]
+          old_sha="$(sha256sum "$client" | awk '{print $1}')"
+          [[ "$old_sha" == "$OLD_CLIENT_SHA256" ]]
+          echo TRACK_A_OLD_CLIENT_VERIFIED=true
+
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo TRACK_A_WARP_VERIFIED=true
+
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" && -e /tmp/.X11-unix/X98 ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+          kill -0 "$xvfb_pid"
+
+          old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          if [[ -n "$old_pid" && -r "/proc/$old_pid/environ" ]]; then
+            grep -azFxq "$marker" "/proc/$old_pid/environ"
+            [[ "$(readlink -f "/proc/$old_pid/exe")" == "$client" ]]
+            kill "$old_pid"
+            for _ in $(seq 1 50); do kill -0 "$old_pid" 2>/dev/null || break; sleep .2; done
+            ! kill -0 "$old_pid" 2>/dev/null
+            echo TRACK_A_OLD_CLIENT_STOPPED=true
+          fi
+
+          work="$state/update-canonical/run-$GITHUB_RUN_ID"
+          unpack="$work/unpacked"
+          mkdir -p "$unpack"
+          chmod 700 "$work" "$unpack"
+          tarball="$work/tibia.x64.tar.gz"
+          url='https://static.tibia.com/download/tibia.x64.tar.gz'
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 -A 'Mozilla/5.0 (X11; Linux x86_64)' "$url" -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try: h.extractall(d,filter='data')
+              except TypeError: h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          echo TRACK_A_OFFICIAL_LAUNCHER_SHA256="$(sha256sum "$launcher" | awk '{print $1}')"
+
+          backup="$state/update-canonical/backup-$GITHUB_RUN_ID"
+          cp -a "$package" "$backup"
+          [[ "$(sha256sum "$backup/bin/client" | awk '{print $1}')" == "$old_sha" ]]
+          echo TRACK_A_OLD_PACKAGE_BACKED_UP=true
+
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          proxy_conf="$state/config/proxychains.conf"
+          [[ -n "$proxy_lib" && -s "$proxy_conf" ]]
+          workdir="$(dirname "$launcher")"
+          cd "$workdir"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$state/home" XDG_DATA_HOME="$state/home/.local/share" DISPLAY="$TRACK_DISPLAY" PATH="$path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$lib" LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" nohup "$launcher" >"$work/launcher.log" 2>&1 </dev/null &
+          launcher_pid=$!
+          echo TRACK_A_OFFICIAL_LAUNCHER_STARTED=true
+
+          new_sha="$old_sha"; stable=0; last=''
+          for _ in $(seq 1 180); do
+            if [[ -s "$client" ]]; then
+              new_sha="$(sha256sum "$client" | awk '{print $1}')"
+              if [[ "$new_sha" != "$old_sha" ]]; then
+                if [[ "$new_sha" == "$last" ]]; then stable=$((stable+1)); else stable=0; last="$new_sha"; fi
+                (( stable >= 3 )) && break
+              fi
+            fi
+            sleep 2
+          done
+          if [[ "$new_sha" == "$old_sha" || $stable -lt 3 ]]; then
+            echo TRACK_A_UPDATE_FAILED=true
+            tail -n 80 "$work/launcher.log" | sed 's/^/TRACK_A_LAUNCHER_LOG=/' || true
+            exit 1
+          fi
+          [[ -x "$client" ]]
+          echo TRACK_A_NEW_CLIENT_SHA256="$new_sha"
+          echo TRACK_A_NEW_CLIENT_SIZE="$(stat -c %s "$client")"
+          python3 - "$client" <<'PY'
+          import pathlib,re,sys
+          b=pathlib.Path(sys.argv[1]).read_bytes(); out=[]
+          for m in re.finditer(rb'15\.[0-9]{2}(?:\.[A-Za-z0-9]+)?',b):
+              s=m.group().decode('ascii','ignore')
+              if s not in out: out.append(s)
+          print('TRACK_A_NEW_CLIENT_VERSION_STRINGS='+','.join(out[:20]))
+          PY
+          kill "$launcher_pid" 2>/dev/null || true
+          echo TRACK_A_CANONICAL_CLIENT_UPDATE_COMPLETE=true

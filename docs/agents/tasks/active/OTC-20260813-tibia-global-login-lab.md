@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T12:36:00+02:00
+updated: 2026-08-13T12:48:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -216,6 +216,24 @@ unchanged. Fast Checks also identified the repository validator's missing
 knowledge of the already-working `otclient` and `synology` self-hosted runner
 labels, now declared in `.github/actionlint.yaml`.
 
+Run `31692159409`, job `94421655408`, exact head
+`aff08a5b8d3b02436edd455f788eb0e2d52e2e2c`, proved the session-key feature
+restoration and reached the first game connection callback:
+
+```text
+SESSION_KEY_FEATURE=true
+CHARACTER_LOGIN_ATTEMPT=true
+CHARACTER_LOGIN_CALL_RETURNED=true
+GAME_CONNECTION_ERROR=true
+LAB_OTCLIENT_DIRECT_TCP_COUNT=0
+FAILURE_STAGE=game_connection_error
+```
+
+The current callback intentionally discarded both error arguments, so this run
+does not yet distinguish a proxy/TCP failure from a post-connect transport
+close. The probe now records only the numeric `std::error_code` value as a
+non-secret marker and continues to discard its free-form message.
+
 # Evidence classification
 
 PROVEN:
@@ -264,4 +282,4 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with the lab-only session-key feature restoration. Continue from the first exact game TCP or `GAME_*` callback, or persist the exact protocol boundary if the official 15.32 game server rejects the current login packet.
+Run the canonical E2E with numeric-only connection-error classification. Use the exact code plus proxy/direct-TCP evidence to distinguish DNS/TCP/proxy failure from a post-connect transport close, then continue at the first failing layer.

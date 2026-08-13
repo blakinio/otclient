@@ -188,7 +188,10 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     onGameStart=function() mark('GAME_START=true') end,
     onLoginWait=function() mark('GAME_LOGIN_WAIT=true') end,
     onLoginError=function() mark('GAME_LOGIN_ERROR=true') end,
-    onConnectionError=function() mark('GAME_CONNECTION_ERROR=true') end,
+    onConnectionError=function(_, code)
+      mark('GAME_CONNECTION_ERROR=true')
+      mark('GAME_CONNECTION_ERROR_CODE_' .. tostring(tonumber(code) or -1) .. '=true')
+    end,
     onSessionEnd=function() mark('GAME_SESSION_END=true') end,
     onUpdateNeeded=function() mark('GAME_UPDATE_NEEDED=true') end
   })
@@ -284,7 +287,7 @@ for _ in $(seq 1 300); do
   sleep 0.5
 done
 
-docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z_]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
+docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z0-9_-]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
 pid=$(docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' | head -n1 || true)
 if [[ -n "$pid" ]]; then
   rows=$(docker exec "$CONTAINER" ss -ntp 2>/dev/null | grep "pid=$pid," || true)

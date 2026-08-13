@@ -10,7 +10,7 @@ phase: consolidation
 branch: docs/OTC-20260813-tibia-re-canonical-runtime
 base_branch: main
 created: 2026-08-13T09:41:00+02:00
-updated: 2026-08-13T10:07:00+02:00
+updated: 2026-08-13T10:20:00+02:00
 risk: medium
 related_pr: "#285"
 owned_paths:
@@ -21,6 +21,7 @@ owned_paths:
   - docs/agents/reports/OTCLIENT-20260813-tibia-re-login-recovery-import.md
   - docs/agents/reports/OTCLIENT-20260813-tibia-re-external-evidence-manifest.md
   - docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-prompt-eval.md
+modules_touched: []
 reuses:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
   - PR #48 runtime evidence/task
@@ -28,6 +29,9 @@ reuses:
   - PR #280 dedicated runner infrastructure
   - PR #283 runtime bridge
   - historical Oteryn-Platform reports/task as read-only evidence only
+depends_on: []
+blocks: []
+cross_repository_tasks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -64,14 +68,16 @@ All new material work for this programme must be persisted or indexed in `blakin
 - [x] An external-evidence manifest maps the relevant Oteryn Tibia reports to imported/superseded/not-copied OTClient state and preserves missing worldmap runtime details without duplicating large evidence corpora.
 - [x] Current OTClient work inventory is recorded: PR #48 runtime, #279 OTBM pipeline, #280 runner infrastructure, #283 stable bridge.
 - [x] Current unknowns and canonical continuation order are recorded.
-- [x] Prompt/registry routing was evaluated against positive, negative, boundary, stale-state, persistence, imported-recovery and injection-style cases: 14/14 PASS.
+- [x] A 14-case **manual scenario matrix** was reviewed for static contract consistency; behavioral agent trials were explicitly not run and no behavioral 14/14 pass is claimed.
+- [x] Deterministic repository outcome verification confirms the alias, wrapper, OTClient-only persistence/runtime routing and imported evidence exist in the resulting Git state.
+- [x] Mandatory task coordination fields are explicitly declared, including empty lists where no dependency/block/cross-repo task applies.
 - [x] No external repository is mutated.
 - [x] No Codex, OpenAI API quota, user token or owner-funded AI service is used.
-- [ ] Exact-head repository CI and PR diff/review hygiene are terminal before merge.
+- [ ] Exact-head repository CI and final PR diff/review hygiene are terminal before merge.
 
 # Coordination
 
-This task does not edit PR #48 workflow/task paths, PR #280 `infra/ot-runners/**`, PR #279 tooling, or PR #283 bridge paths. Those owners continue their own implementation. This task only creates the canonical routing/coordination layer on top of current `main`.
+This task does not edit PR #48 workflow/task paths, PR #280 `infra/ot-runners/**`, PR #279 tooling, or PR #283 bridge paths. Those owners continue their own implementation. This task creates the canonical routing/coordination layer on top of `main`.
 
 Runtime migration itself is being executed in the owning lanes:
 
@@ -81,11 +87,12 @@ Runtime migration itself is being executed in the owning lanes:
 # Evidence boundary
 
 PROVEN:
-- `blakinio/otclient` `main` at task creation is `05450748daca8344d9555638b638e98b6dc3abc7`.
+- `blakinio/otclient` `main` at task creation was `05450748daca8344d9555638b638e98b6dc3abc7`.
 - master programme prompt is already on `main` at `docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md`.
 - PR #48, #279, #280 and #283 are all in `blakinio/otclient` and contain the active implementation/runtime work.
 - historical Oteryn worldmap/action/login evidence was read from `blakinio/Oteryn-Platform` and consolidated/indexed without mutating the external repository.
-- canonical routing evaluation passed 14/14 documented cases.
+- the manual scenario matrix contains 14 representative static routing/safety/continuation cases; all 14 are represented consistently in candidate text, but behavioral pass rate is **NOT_MEASURED**.
+- deterministic repository outcome verification passes for the actual routing/persistence files and related PR/runtime migration state.
 - owner explicitly requires all future material programme work to be saved in `blakinio/otclient`; this requirement is encoded in the canonical wrapper/task/registry.
 - PR #280 exact implementation Docker proof run `31679256871`, job `94380701487`, passed both image builds and dependency inspection; final workflow-free head `5f76d213d859c2a8838ac5b8740865ef6afaf1ab` passed repository CI run `31679760916`, including `CI / Required` job `94383401816`.
 
@@ -93,36 +100,52 @@ DERIVED:
 - after #280 deployment and #48 runner acceptance proof, future workers no longer need to query Oteryn-Platform merely to recover normal programme state, the known historical login recipe or the important worldmap/action evidence.
 
 UNKNOWN:
+- measured future agent behavioral compatibility with the canonical wrapper, because no executable fresh-agent eval harness exists and no behavioral trials are claimed;
 - whether the updated PR #280 runner image is deployed on Synology;
 - whether the dedicated runner currently carries the new `tibia-re` label;
 - whether the PR #48 canonical bootstrap job is accepted by `synology-otclient-01`;
 - current upstream official-client SHA;
 - current structural `IN_GAME` state.
 
+# Review findings
+
+Two P1 review findings were addressed:
+
+1. Prompt eval overclaim: the former `14/14 PASS` wording was corrected to a manual scenario matrix with `behavioral_agent_trials: NOT_RUN`, while deterministic repository outcome evidence is reported separately.
+2. Task coordination metadata: `modules_touched`, `depends_on`, `blocks` and `cross_repository_tasks` are now explicitly declared.
+
+These fixes move the PR head; final exact-head CI and review-thread resolution are still required after the changes.
+
 # Validation
 
-- baseline canonical-routing CI run `31679686687` passed on head `95f562d0b4a1ca592a3e4924d3cf0a8ffe21fd22`, including `CI / Required` job `94382580159`;
-- subsequent imported recovery/manifest changes moved the head, so final exact-head CI is required again before merge;
-- full diff/review inventory must be rechecked after final evidence-import commit;
-- auto-merge was enabled earlier but must not be assumed active/terminal after head movement without live verification.
+- earlier exact-head canonical-routing CI run `31680504103` passed on head `289fa706b3edd5547ac9d561731cb9400776053d`, including `CI / Required` job `94385013470`;
+- that run predates the review-finding repairs and is supporting evidence only;
+- final exact-head CI must pass after the eval/task corrections;
+- changed-file inventory remains confined to the seven canonical-routing/evidence documentation paths.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 5
+checkpoint_version: 6
 status: validating
 branch: docs/OTC-20260813-tibia-re-canonical-runtime
 pr: 285
-head_before_checkpoint: 28167b3fa71ef3470c8a90d0eaee84a7699977b0
-base_head: 05450748daca8344d9555638b638e98b6dc3abc7
+head_before_checkpoint: 20d950cf7c6f2c924d90a96a129b8bc3459b2003
+base_head_at_task_start: 05450748daca8344d9555638b638e98b6dc3abc7
 related_prs:
   runtime: 48
   otbm: 279
   runner: 280
   bridge: 283
 prompt_eval:
-  cases: 14
-  passed: 14
+  mode: manual_scenario_matrix
+  cases_reviewed: 14
+  static_contract_consistency: 14_of_14
+  behavioral_trials: NOT_RUN
+  repository_outcome_verification: PASS
+review_findings:
+  prompt_eval_overclaim: fixed
+  missing_coordination_fields: fixed
 blockers: []
-next_action: verify final PR #285 diff/reviews and exact-head CI after the external-evidence manifest; merge/auto-merge only when required checks pass on the exact final head
+next_action: run final exact-head CI and recheck/resolve PR #285 review threads; merge only when all required checks pass on the exact final head
 ```

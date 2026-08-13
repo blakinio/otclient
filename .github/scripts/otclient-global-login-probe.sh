@@ -9,7 +9,7 @@ PROBE_STATE="$SOURCE_STATE/current/otclient-global-probe"
 OTCLIENT_IMAGE=ghcr.io/blakinio/otclient:latest
 ASSET_BASE=https://static.tibia.com/launcher/assets-current
 
-[[ "$RUNNER_NAME" == "oteryn-synology-staging" ]]
+[[ "$RUNNER_NAME" == "synology-otclient-01" ]]
 [[ -n "${TIBIA_TEST_EMAIL:-}" && -n "${TIBIA_TEST_PASSWORD:-}" ]]
 docker version >/dev/null
 docker ps -a --filter 'label=com.docker.compose.project=oteryn-staging' --format '{{.ID}}\t{{.Names}}' | sort >/tmp/oteryn-before.tsv

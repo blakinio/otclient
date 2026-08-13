@@ -24,14 +24,14 @@ jobs:
           set -Eeuo pipefail
           grep -RIlZ --include='*.yml' --include='*.yaml' --include='*.sh' \
             -e 'runs-on: \[self-hosted, oteryn-staging\]' \
-            -e 'oteryn-synology-staging' \
+            -e 'synology-otclient-01' \
             .github/workflows .github/scripts \
             | xargs -0 -r sed -i \
                 -e 's/runs-on: \[self-hosted, oteryn-staging\]/runs-on: [self-hosted, otclient, synology]/g' \
-                -e 's/oteryn-synology-staging/synology-otclient-01/g'
+                -e 's/synology-otclient-01/synology-otclient-01/g'
 
-          ! grep -R --include='*.yml' --include='*.yaml' -F 'runs-on: [self-hosted, oteryn-staging]' .github/workflows
-          ! grep -R --include='*.yml' --include='*.yaml' --include='*.sh' -F 'oteryn-synology-staging' .github/workflows .github/scripts
+          ! grep -R --include='*.yml' --include='*.yaml' -F 'runs-on: [self-hosted, otclient, synology]' .github/workflows
+          ! grep -R --include='*.yml' --include='*.yaml' --include='*.sh' -F 'synology-otclient-01' .github/workflows .github/scripts
           git diff --check
 
           git config user.name github-actions[bot]

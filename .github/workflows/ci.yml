@@ -77,7 +77,7 @@ jobs:
   otclient-global-login-probe:
     name: OTClient Tibia Global Login Probe
     if: github.event_name == 'pull_request' && github.event.pull_request.number == 48 && github.head_ref == 'ci/OTC-20260727-tibia-linux-runner-analysis'
-    runs-on: [self-hosted, oteryn-staging]
+    runs-on: [self-hosted, otclient, synology]
     timeout-minutes: 45
     permissions:
       contents: read

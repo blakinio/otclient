@@ -23,8 +23,8 @@ jobs:
         run: |
           set -Eeuo pipefail
 
-          selector_before="$(grep -R --include='*.yml' --include='*.yaml' -F 'runs-on: [self-hosted, oteryn-staging]' .github/workflows 2>/dev/null | wc -l || true)"
-          runner_before="$(grep -R --include='*.yml' --include='*.yaml' --include='*.sh' -F 'oteryn-synology-staging' .github/workflows .github/scripts 2>/dev/null | wc -l || true)"
+          selector_before="$(grep -R --include='*.yml' --include='*.yaml' -F 'runs-on: [self-hosted, otclient, synology]' .github/workflows 2>/dev/null | wc -l || true)"
+          runner_before="$(grep -R --include='*.yml' --include='*.yaml' --include='*.sh' -F 'synology-otclient-01' .github/workflows .github/scripts 2>/dev/null | wc -l || true)"
           echo "LEGACY_SELECTOR_COUNT_BEFORE=$selector_before"
           echo "LEGACY_RUNNER_NAME_COUNT_BEFORE=$runner_before"
           (( selector_before > 0 ))
@@ -32,10 +32,10 @@ jobs:
           find .github/workflows .github/scripts -type f \( -name '*.yml' -o -name '*.yaml' -o -name '*.sh' \) -print0 \
             | xargs -0 sed -i \
                 -e 's/runs-on: \[self-hosted, oteryn-staging\]/runs-on: [self-hosted, otclient, synology]/g' \
-                -e 's/oteryn-synology-staging/synology-otclient-01/g'
+                -e 's/synology-otclient-01/synology-otclient-01/g'
 
-          selector_after="$(grep -R --include='*.yml' --include='*.yaml' -F 'runs-on: [self-hosted, oteryn-staging]' .github/workflows 2>/dev/null | wc -l || true)"
-          runner_after="$(grep -R --include='*.yml' --include='*.yaml' --include='*.sh' -F 'oteryn-synology-staging' .github/workflows .github/scripts 2>/dev/null | wc -l || true)"
+          selector_after="$(grep -R --include='*.yml' --include='*.yaml' -F 'runs-on: [self-hosted, otclient, synology]' .github/workflows 2>/dev/null | wc -l || true)"
+          runner_after="$(grep -R --include='*.yml' --include='*.yaml' --include='*.sh' -F 'synology-otclient-01' .github/workflows .github/scripts 2>/dev/null | wc -l || true)"
           echo "LEGACY_SELECTOR_COUNT_AFTER=$selector_after"
           echo "LEGACY_RUNNER_NAME_COUNT_AFTER=$runner_after"
           [[ "$selector_after" == 0 ]]

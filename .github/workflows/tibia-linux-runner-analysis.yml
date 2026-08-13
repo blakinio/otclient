@@ -24,7 +24,7 @@ env:
 jobs:
   login-no-ocr:
     name: Attempt official Tibia login without OCR
-    runs-on: [self-hosted, oteryn-staging]
+    runs-on: [self-hosted, otclient, synology]
     timeout-minutes: 25
 
     steps:
@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ "$RUNNER_NAME" == "oteryn-synology-staging" ]]
+          [[ "$RUNNER_NAME" == "synology-otclient-01" ]]
           docker version >/dev/null
           docker ps -a --filter 'label=com.docker.compose.project=oteryn-staging' --format '{{.ID}}\t{{.Names}}' | sort >/tmp/oteryn-before.tsv
           test -s /tmp/oteryn-before.tsv

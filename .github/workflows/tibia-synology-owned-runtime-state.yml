@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   inspect:
-    runs-on: [self-hosted, oteryn-staging]
+    runs-on: [self-hosted, otclient, synology]
     timeout-minutes: 8
     env:
       CONTAINER_NAME: otclient-tibia-login-analysis
@@ -22,7 +22,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           echo "RUNNER_NAME=$RUNNER_NAME"
-          [[ "$RUNNER_NAME" == "oteryn-synology-staging" ]]
+          [[ "$RUNNER_NAME" == "synology-otclient-01" ]]
           docker version >/dev/null
           if ! docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
             echo OWNED_CONTAINER_EXISTS=false

@@ -24,7 +24,7 @@ env:
 
 jobs:
   probe:
-    runs-on: [self-hosted, oteryn-staging]
+    runs-on: [self-hosted, otclient, synology]
     timeout-minutes: 45
     steps:
       - name: Verify runner, ownership, and secret gate
@@ -35,7 +35,7 @@ jobs:
         run: |
           set +x
           set -Eeuo pipefail
-          [[ "$RUNNER_NAME" == "oteryn-synology-staging" ]]
+          [[ "$RUNNER_NAME" == "synology-otclient-01" ]]
           docker version >/dev/null
           [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
           docker ps -a --filter 'label=com.docker.compose.project=oteryn-staging' --format '{{.ID}}\t{{.Names}}' | sort >/tmp/oteryn-before.tsv

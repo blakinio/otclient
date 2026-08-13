@@ -198,10 +198,18 @@ jobs:
             "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$before"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
             "$toolroot/usr/bin/xdotool" key ctrl+a
-            "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_EMAIL"
+            printf '%s' "$TIBIA_TEST_EMAIL" | "$toolroot/usr/bin/xclip" -selection clipboard -in -loops 1 -silent &
+            clip_pid=$!
+            sleep 0.2
+            "$toolroot/usr/bin/xdotool" key ctrl+v
+            wait "$clip_pid"
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
             "$toolroot/usr/bin/xdotool" key ctrl+a
-            "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_PASSWORD"
+            printf '%s' "$TIBIA_TEST_PASSWORD" | "$toolroot/usr/bin/xclip" -selection clipboard -in -loops 1 -silent &
+            clip_pid=$!
+            sleep 0.2
+            "$toolroot/usr/bin/xdotool" key ctrl+v
+            wait "$clip_pid"
             "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$typed"
             typed_changed="$(python3 -c 'import pathlib,sys; a=pathlib.Path(sys.argv[1]).read_bytes(); b=pathlib.Path(sys.argv[2]).read_bytes(); print(sum(x != y for x,y in zip(a,b)) + abs(len(a)-len(b)))' "$before" "$typed")"
             echo TRACK_A_CREDENTIAL_FIELDS_CHANGED_BYTES="$typed_changed"

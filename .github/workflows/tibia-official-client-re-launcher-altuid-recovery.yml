@@ -41,13 +41,12 @@ jobs:
           kill -0 "$xvfb_pid"
           echo TRACK_A_ALTUID_PREREQUISITES_VERIFIED=true
 
-          # Everything executed by uid 65534 lives below /tmp so no private Track-A
-          # parent directory can block traversal. The canonical state is read-only here.
           work="/tmp/track-a-altuid-$GITHUB_RUN_ID"
           home="$work/home"
           unpack="$work/unpacked"
-          mkdir -p "$home" "$unpack"
-          chmod 755 "$work" "$home" "$unpack"
+          libdeps="$work/libdeps"
+          mkdir -p "$home" "$unpack" "$libdeps"
+          chmod 755 "$work" "$home" "$unpack" "$libdeps"
           tarball="$work/tibia.x64.tar.gz"
           url='https://static.tibia.com/download/tibia.x64.tar.gz'
           curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 -A 'Mozilla/5.0 (X11; Linux x86_64)' "$url" -o "$tarball"
@@ -65,6 +64,23 @@ jobs:
           [[ -x "$launcher" ]]
           chmod -R a+rX "$unpack"
 
+          # Mirror only shared libraries from the private Track-A toolroot into an
+          # alt-UID-readable directory. This covers EGL/GL dispatch dependencies
+          # without exposing any credentials or writable canonical state.
+          find "$root/usr/lib/x86_64-linux-gnu" "$root/lib/x86_64-linux-gnu" -maxdepth 1 \
+            \( -type f -o -type l \) -name '*.so*' -print0 2>/dev/null \
+            | while IFS= read -r -d '' p; do
+                name="$(basename "$p")"
+                if [[ -L "$p" ]]; then
+                  target="$(readlink -f "$p" 2>/dev/null || true)"
+                  [[ -n "$target" && -f "$target" ]] && cp -L "$target" "$libdeps/$name" || true
+                else
+                  cp "$p" "$libdeps/$name"
+                fi
+              done
+          chmod -R a+rX "$libdeps"
+          echo TRACK_A_ALTUID_LIBDEP_COUNT="$(find "$libdeps" -type f | wc -l)"
+
           proxy_src="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
           [[ -n "$proxy_src" ]]
           proxy_lib="$work/libproxychains.so.4"
@@ -79,7 +95,7 @@ jobs:
           workdir="$(dirname "$launcher")"
           setpriv --reuid=65534 --regid=65534 --clear-groups env -u RUNNER_TRACKING_ID \
             OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$home" XDG_DATA_HOME="$home/.local/share" \
-            DISPLAY="$TRACK_DISPLAY" PATH="/usr/bin:/bin" LD_LIBRARY_PATH="$workdir:$workdir/lib" \
+            DISPLAY="$TRACK_DISPLAY" PATH="/usr/bin:/bin" LD_LIBRARY_PATH="$libdeps:$workdir:$workdir/lib" \
             LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
             LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
             nohup "$launcher" >"$log" 2>&1 </dev/null &

@@ -41,6 +41,7 @@ jobs:
           tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           mkdir -p "$state/runtime" "$state/home" "$state/config"
           chmod 700 "$state" "$state/runtime" "$state/home" "$state/config"
+          trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "TRACK_A_LAUNCH_FAILURE_RC=$rc"; for log in "$state/runtime/xvfb.log" "$state/runtime/client.log"; do if [[ -f "$log" ]]; then echo "TRACK_A_LOG_BEGIN=$(basename "$log")"; tail -n 80 "$log"; echo "TRACK_A_LOG_END=$(basename "$log")"; fi; done; fi' EXIT
 
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
@@ -70,6 +71,10 @@ jobs:
             printf '%s\n' "$xvfb_pid" >"$xvfb_pid_file"
             chmod 600 "$xvfb_pid_file"
             for _ in $(seq 1 30); do
+              if ! kill -0 "$xvfb_pid" 2>/dev/null; then
+                echo TRACK_A_XVFB_EXITED_EARLY=true
+                break
+              fi
               [[ -e /tmp/.X11-unix/X98 ]] && break
               sleep 1
             done

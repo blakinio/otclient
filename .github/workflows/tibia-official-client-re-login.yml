@@ -79,7 +79,7 @@ jobs:
 
             proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
             vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
-            swrast="$(find "$toolroot" -type f -name 'swrast_dri.so' -print -quit)"
+            swrast="$(find "$toolroot" \( -type f -o -type l \) -name 'swrast_dri.so' -print -quit)"
             [[ -n "$swrast" ]]
             dri_dir="$(dirname "$swrast")"
             proxy_conf="$state/config/proxychains.conf"

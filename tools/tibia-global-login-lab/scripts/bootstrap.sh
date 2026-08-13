@@ -28,7 +28,10 @@ if docker inspect "$CONTAINER" >/dev/null 2>&1; then
   docker rm -f "$CONTAINER" >/dev/null
 fi
 
-docker pull "$IMAGE" >/dev/null
+# Reuse the runner-local image when available; otherwise pull with a hard bound.
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  timeout 240 docker pull "$IMAGE" >/dev/null
+fi
 image_id=$(docker image inspect "$IMAGE" --format '{{.Id}}')
 
 # This container is intentionally network-isolated during bootstrap.

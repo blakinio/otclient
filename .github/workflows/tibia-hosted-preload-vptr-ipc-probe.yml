@@ -1,0 +1,158 @@
+name: Tibia hosted preload vptr IPC bridge prototype
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-hosted-preload-vptr-ipc-probe.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-preload-vptr-home
+      PACKAGE_BASE: https://static.tibia.com/launcher/tibiaclient-linux-current
+      ASSET_BASE: https://static.tibia.com/launcher/assets-current
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Reconstruct exact runtime without credentials
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends python3-yaml build-essential pkg-config qt6-base-dev socat
+          python3 - <<'PY'
+          import pathlib,yaml
+          doc=yaml.safe_load(pathlib.Path('.github/workflows/tibia-hosted-complete-assets-no-ocr-login-v4.yml').read_text())
+          steps=doc['jobs']['world-entry']['steps'];out=pathlib.Path('/tmp/v4');out.mkdir(parents=True,exist_ok=True)
+          wanted={'Install strict no-OCR runtime':'01.sh','Establish pinned userspace WARP':'02.sh','Reconstruct official package and preserve packed runtime assets':'03.sh'}
+          seen=set()
+          for step in steps:
+            if step.get('name') in wanted:
+              p=out/wanted[step['name']];p.write_text(step['run']);p.chmod(0o700);seen.add(step['name'])
+          if set(wanted)-seen:raise SystemExit('missing proven runtime step')
+          PY
+          for s in 01.sh 02.sh 03.sh;do /usr/bin/bash --noprofile --norc -e -o pipefail "/tmp/v4/$s";done
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo PRELOAD_VPTR_RUNTIME_READY=true
+
+      - name: Build temporary IPC bridge helper
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat >/tmp/tibia-vptr-bridge.cpp <<'CPP'
+          #include <QtCore/QCoreApplication>
+          #include <QtCore/QMetaObject>
+          #include <QtCore/QObject>
+          #include <atomic>
+          #include <chrono>
+          #include <cstdint>
+          #include <cstdio>
+          #include <cstring>
+          #include <dlfcn.h>
+          #include <fstream>
+          #include <link.h>
+          #include <mutex>
+          #include <sstream>
+          #include <string>
+          #include <thread>
+          #include <vector>
+          #include <sys/socket.h>
+          #include <sys/un.h>
+          #include <unistd.h>
+
+          static constexpr uintptr_t PLAYER_PROTOCOL_VPTR_OFFSET=0x308a008;
+          static const char* SOCK="/tmp/tibia-runtime/otclient-tibia-re.sock";
+          static const char* LOG="/tmp/tibia-runtime/preload-vptr-ipc.txt";
+          static std::atomic<uintptr_t> main_base{0};
+          static std::mutex log_mu;
+          static void logline(const std::string& s){std::lock_guard<std::mutex> g(log_mu);std::ofstream f(LOG,std::ios::app);f<<s<<"\n";f.flush();}
+          static int phdr_cb(dl_phdr_info* info,size_t,void*){
+            if(!info->dlpi_name || info->dlpi_name[0]=='\0'){main_base.store((uintptr_t)info->dlpi_addr);return 1;}return 0;
+          }
+          struct Region{uintptr_t a,b;};
+          static std::vector<Region> rw_regions(){
+            std::ifstream f("/proc/self/maps");std::string line;std::vector<Region> out;
+            while(std::getline(f,line)){
+              unsigned long long a=0,b=0;char p[5]{};
+              if(std::sscanf(line.c_str(),"%llx-%llx %4s",&a,&b,p)!=3)continue;
+              if(p[0]!='r'||p[1]!='w')continue;
+              auto len=b-a;if(len==0||len>(512ull<<20))continue;
+              out.push_back({(uintptr_t)a,(uintptr_t)b});
+            }return out;
+          }
+          static std::string scan_player_handler_on_qt(){
+            uintptr_t base=main_base.load();uintptr_t want=base+PLAYER_PROTOCOL_VPTR_OFFSET;size_t hits=0;std::string cls;
+            for(auto r:rw_regions()){
+              uintptr_t p=(r.a+7u)&~uintptr_t(7u);
+              for(;p+sizeof(uintptr_t)<=r.b;p+=sizeof(uintptr_t)){
+                uintptr_t v=*reinterpret_cast<uintptr_t*>(p);if(v!=want)continue;++hits;
+                if(cls.empty()){
+                  auto* o=reinterpret_cast<QObject*>(p);
+                  const QMetaObject* mo=o->metaObject();
+                  if(mo && mo->className())cls=mo->className();
+                }
+              }
+            }
+            std::ostringstream s;s<<"PLAYER_PROTOCOL_VPTR_HITS="<<hits<<" CLASS="<<(cls.empty()?"NONE":cls);return s.str();
+          }
+          static std::string dispatch(const std::string& cmd){
+            if(cmd=="PING"){
+              std::ostringstream s;s<<"PONG MAIN_BASE=0x"<<std::hex<<main_base.load()<<" TARGET_VPTR=0x"<<(main_base.load()+PLAYER_PROTOCOL_VPTR_OFFSET);return s.str();
+            }
+            if(cmd=="SCAN"){
+              auto* app=QCoreApplication::instance();if(!app)return "ERROR NO_QCOREAPPLICATION";
+              std::string result;bool ok=QMetaObject::invokeMethod(app,[&](){result=scan_player_handler_on_qt();},Qt::BlockingQueuedConnection);
+              return ok?result:"ERROR QT_INVOKE_FAILED";
+            }
+            return "ERROR UNKNOWN_COMMAND";
+          }
+          static void server(){
+            for(int i=0;i<300 && !QCoreApplication::instance();++i)std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            dl_iterate_phdr(phdr_cb,nullptr);logline("MAIN_BASE_READY=true");
+            ::unlink(SOCK);int fd=::socket(AF_UNIX,SOCK_STREAM,0);if(fd<0){logline("SOCKET_CREATE_FAILED=true");return;}
+            sockaddr_un a{};a.sun_family=AF_UNIX;std::strncpy(a.sun_path,SOCK,sizeof(a.sun_path)-1);
+            if(::bind(fd,(sockaddr*)&a,sizeof(a))<0||::listen(fd,4)<0){logline("SOCKET_BIND_LISTEN_FAILED=true");::close(fd);return;}
+            logline("IPC_LISTENING=true");
+            for(int n=0;n<8;++n){int c=::accept(fd,nullptr,nullptr);if(c<0)break;char buf[128]{};auto k=::read(c,buf,sizeof(buf)-1);std::string cmd=k>0?std::string(buf,(size_t)k):"";while(!cmd.empty()&&(cmd.back()=='\n'||cmd.back()=='\r'))cmd.pop_back();auto r=dispatch(cmd);r+='\n';::write(c,r.data(),r.size());::close(c);logline("IPC_COMMAND="+cmd+" RESULT="+r.substr(0,r.size()-1));}
+            ::close(fd);::unlink(SOCK);
+          }
+          __attribute__((constructor)) static void init(){std::ofstream(LOG,std::ios::trunc)<<"PRELOAD_VPTR_CONSTRUCTOR=true\n";std::thread(server).detach();}
+          CPP
+          c++ -std=c++20 -fPIC -shared /tmp/tibia-vptr-bridge.cpp -o /tmp/tibia-vptr-bridge.so $(pkg-config --cflags --libs Qt6Core) -ldl -pthread
+          test -s /tmp/tibia-vptr-bridge.so
+          echo PRELOAD_VPTR_IPC_HELPER_BUILT=true
+
+      - name: Launch client and prove local IPC plus Qt-thread vptr scan
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/tibia-runtime/xvfb-vptr.log 2>&1 </dev/null &
+          for _ in $(seq 1 30);do xdpyinfo -display :99 >/dev/null 2>&1&&break;sleep 1;done
+          pkg="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia";client="$pkg/bin/client";cd "$pkg"
+          lvp=$(find /usr/share/vulkan/icd.d -maxdepth 1 -type f -name 'lvp_icd*.json' -print -quit);[[ -f "$lvp" ]]
+          rm -f /tmp/tibia-runtime/otclient-tibia-re.sock /tmp/tibia-runtime/preload-vptr-ipc.txt
+          nohup env LD_PRELOAD=/tmp/tibia-vptr-bridge.so VK_ICD_FILENAMES="$lvp" VK_DRIVER_FILES="$lvp" LIBGL_ALWAYS_SOFTWARE=1 \
+            proxychains4 -f /tmp/tibia-runtime/proxychains.conf "$client" >/tmp/tibia-runtime/client-vptr.log 2>&1 </dev/null &
+          pid=$!;echo "$pid">/tmp/tibia-runtime/vptr-client-pid
+          for _ in $(seq 1 120);do [[ -S /tmp/tibia-runtime/otclient-tibia-re.sock ]]&&break;sleep 0.1;done
+          [[ -S /tmp/tibia-runtime/otclient-tibia-re.sock ]];kill -0 "$pid"
+          ping=$(printf 'PING\n'|socat - UNIX-CONNECT:/tmp/tibia-runtime/otclient-tibia-re.sock);echo "IPC_PING_RESPONSE=$ping";[[ "$ping" == PONG* ]]
+          scan=$(printf 'SCAN\n'|socat - UNIX-CONNECT:/tmp/tibia-runtime/otclient-tibia-re.sock);echo "IPC_SCAN_RESPONSE=$scan";[[ "$scan" == PLAYER_PROTOCOL_VPTR_HITS=* ]]
+          grep -q '^PRELOAD_VPTR_CONSTRUCTOR=true' /tmp/tibia-runtime/preload-vptr-ipc.txt
+          grep -q '^IPC_LISTENING=true' /tmp/tibia-runtime/preload-vptr-ipc.txt
+          echo PRELOAD_LOCAL_IPC_PROVEN=true
+          echo PRELOAD_QT_THREAD_VPTR_SCAN_PROVEN=true
+          if [[ "$scan" == *"CLASS=tibia::game::TPlayerProtocolMessageHandler"* ]];then echo PLAYER_PROTOCOL_OBJECT_RESOLVER_PROVEN=true;else echo PLAYER_PROTOCOL_OBJECT_RESOLVER_PROVEN=false;fi
+          kill -0 "$pid"

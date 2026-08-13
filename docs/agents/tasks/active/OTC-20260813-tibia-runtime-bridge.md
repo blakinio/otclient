@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-tibia-runtime-bridge
-status: validating
+status: waiting
 agent: ChatGPT
 project_lane: otclient
 lane: otclient
@@ -10,7 +10,7 @@ phase: stable-bridge-v1
 branch: feat/OTC-20260813-tibia-runtime-bridge
 base_branch: main
 created: 2026-08-13T02:20:00+02:00
-updated: 2026-08-13T08:18:00+02:00
+updated: 2026-08-13T10:10:00+02:00
 risk: medium
 related_pr: "#283"
 owned_paths:
@@ -65,52 +65,68 @@ No gameplay write/action command is part of this bridge slice. Write operations 
 Relocation-aware run `31654434331`, job `94305639119`, passed and recovered primary vptrs for the exact SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`:
 
 ```text
-TPlayerProtocolMessageHandler  0x308a008
+TPlayerProtocolMessageHandler   0x308a008
 TWorldmapProtocolMessageHandler 0x30871d8
-TGameserverGameSession         0x3078ba0
-TGameSessionBase               0x3084648
-IGameSession                   0x30841c0
-TPlayerData                    0x308ca70
-TContainerStorage              0x308a1a0
-TCreatureStorage               0x308d078
-TGameClient                    0x3076908
+TGameserverGameSession          0x3078ba0
+TGameSessionBase                0x3084648
+IGameSession                    0x30841c0
+TPlayerData                     0x308ca70
+TContainerStorage               0x308a1a0
+TCreatureStorage                0x308d078
+TGameClient                     0x3076908
 ```
 
-The committed profile currently exposes seven resolver targets: player protocol handler, worldmap handler, gameserver game session, player data, container storage, creature storage, and game client. Every target is fenced to the exact client hash and cites run `31654434331` as evidence.
+The committed profile exposes seven resolver targets: player protocol handler, worldmap handler, gameserver game session, player data, container storage, creature storage, and game client. Every target is fenced to the exact client hash and cites run `31654434331` as evidence.
 
-# Integration validation — PROVEN for head 39ff79ac44a0a1010b4bcc8b8e3617525353df7e
+# Exact implementation validation — PROVEN
 
-Run `31654701845`, job `94306484551`, completed successfully on exact bridge head `39ff79ac44a0a1010b4bcc8b8e3617525353df7e`:
+Run `31654823776`, job `94306874981`, completed successfully while explicitly checking out exact bridge code head:
 
 ```text
+BRIDGE_HEAD=89e13819e6f53026b831b7e8e4c8fab228d1626c
 EXACT_BRIDGE_HEAD_VERIFIED=true
-11 focused tests: PASS
+12 focused tests: PASS
+py_compile launcher/ipc_client/resolver: PASS
 BRIDGE_STANDALONE_BUILD_PASS=true
 COMPLETE_OFFICIAL_RUNTIME_LAYOUT_VERIFIED=true
 EXACT_BRIDGE_VALIDATION_RUNTIME_READY=true
+PROFILE_REDISCOVERY_MATCH=true
 BRIDGE_SOCKET_MODE=600
 EXACT_CLIENT_BRIDGE_E2E_PASS=true
 ```
 
-The exact official client remained alive, `PING` resolved the main PIE base, and all seven `DISCOVER` queries returned structurally valid JSON. In the logged-out no-credential state the three session markers correctly returned zero hits and `session-status` returned:
+The run reconstructed the researched exact official client through the task WARP path, independently reran `resolver.py`, and required each profile target to resolve uniquely to its committed primary-vptr offset. The exact client remained alive through the no-credential E2E.
+
+Logged-out `session-status` correctly returned:
 
 ```yaml
 in_game_candidate: false
 evidence_level: DERIVED_UNTIL_LIVE_CORRELATION
+player_protocol_handler.validated_hits: 0
+gameserver_game_session.validated_hits: 0
+worldmap_handler.validated_hits: 0
 ```
 
-This is positive fail-closed behavior, not proof that the markers will be present in a live world session.
+This is positive fail-closed behavior, not proof that the markers are authoritative in a live world session.
 
-# Current head and validation gap
+# Current PR head relationship
 
 ```yaml
 pr: 283
 branch: feat/OTC-20260813-tibia-runtime-bridge
-current_head: 89e13819e6f53026b831b7e8e4c8fab228d1626c
-state: draft_open_mergeable
+current_head: b9a8b73b05d543c565090be7c70aa879c24c1c16
+validated_code_head: 89e13819e6f53026b831b7e8e4c8fab228d1626c
+compare:
+  ahead_by: 1
+  changed_files:
+    - docs/agents/tasks/active/OTC-20260813-tibia-runtime-bridge.md
+  product_code_delta: none
+repository_ci_current_head:
+  run: 31673504822
+  conclusion: success
 ```
 
-The current head is newer than the fully successful integration head because it adds the durable relocation resolver and additional tests. Therefore a final exact-head validation is still required before merge/completion claims.
+GitHub compare proves the sole commit after the exact E2E code head changed only this task record. Therefore the current product/tool/test code is exactly the code validated by run `31654823776`; no second official-client execution is required merely for the documentation-only checkpoint delta.
 
 # Acceptance inventory
 
@@ -123,10 +139,10 @@ The current head is newer than the fully successful integration head because it 
 - [x] `DISCOVER` scans only current-process readable/writable mappings and validates expected Qt class names when hits exist.
 - [x] Qt-sensitive discovery runs on the real Qt event-loop thread.
 - [x] Unsupported commands/targets fail closed.
-- [x] Focused tests cover profile/hash fencing, IPC framing, and session-status logic.
-- [x] Exact-client no-credential E2E proved helper load and IPC on head `39ff79ac...`.
+- [x] Focused tests cover profile/hash fencing, IPC framing, session-status logic and resolver names.
 - [x] Relocation-aware primary-vptr recovery is implemented and backed by exact-binary evidence.
-- [ ] Repeat focused/build/exact-client validation on current head `89e13819...`.
+- [x] Focused/build/relocation/exact-client no-credential E2E passed on exact implementation head `89e13819...`.
+- [x] Current PR head differs from the validated implementation only by this task documentation and has green repository CI.
 - [ ] Correlate `session-status` markers with a current OTClient-owned structural live world session.
 - [ ] Prove authoritative player position and one reversible before/after action before adding write APIs.
 
@@ -134,12 +150,13 @@ The current head is newer than the fully successful integration head because it 
 
 ## PROVEN
 
-- exact client `15.32.df7b29`, historical researched SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`;
+- exact researched client `15.32.df7b29`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`;
 - temporary preload proof run `31653375069`, job `94302324521` established real Qt event-loop execution without credentials;
 - QCoreApplication child traversal is insufficient for handler discovery;
 - relocation-aware resolver recovered nine exact-binary primary vptrs;
-- durable bridge head `39ff79ac...` passed focused tests, standalone Qt build and exact-client no-credential E2E;
-- logged-out session markers resolve to zero hits and fail closed.
+- exact bridge implementation head `89e13819...` passed 12 tests, standalone Qt build, complete runtime reconstruction, profile rediscovery and exact-client no-credential E2E;
+- logged-out session markers resolve to zero hits and fail closed;
+- current head `b9a8b73...` has no code/test/tool delta from validated implementation and repository CI is green.
 
 ## DERIVED
 
@@ -152,29 +169,34 @@ The current head is newer than the fully successful integration head because it 
 - authoritative player position through the bridge;
 - all gameplay write/action semantics.
 
+# Waiting boundary
+
+The remaining acceptance items require a current OTClient-owned structural live world session. New live execution is migrating to the dedicated `synology-otclient-01` runner through PR #280/#48. Do not fall back to the historical Oteryn runner. While the canonical runner job remains unaccepted, this task is accurately `waiting`, not technically failed.
+
 # Durable checkpoint
 
 ```yaml
-checkpoint_version: 2
-updated_at: 2026-08-13T08:18:00+02:00
+checkpoint_version: 3
+updated_at: 2026-08-13T10:10:00+02:00
 branch: feat/OTC-20260813-tibia-runtime-bridge
 pr: 283
-head: 89e13819e6f53026b831b7e8e4c8fab228d1626c
-status: validating
+head_before_checkpoint: b9a8b73b05d543c565090be7c70aa879c24c1c16
+status: waiting
 proven:
   - durable read-only LD_PRELOAD/Qt/Unix-IPC bridge implemented
   - exact-hash fencing and dynamic PIE-base discovery implemented
   - relocation-aware vptr resolver proven on exact researched binary
   - seven exact-profile discovery targets persisted
-  - head 39ff79ac passed 11 tests, standalone Qt build, complete runtime bootstrap and exact-client no-credential E2E
+  - exact implementation head 89e13819 passed 12 tests, standalone Qt build, complete runtime reconstruction, profile rediscovery and exact-client no-credential E2E
+  - current PR head has only task-doc delta from validated code and green repository CI
   - logged-out session-status fails closed with zero marker hits
 unknown:
-  - current-head 89e13819 exact validation result
   - current upstream official-client hash
   - live structural session marker correlation
   - authoritative position and before/after actions
-blockers: []
-next_action: validate exact current head 89e13819; independently restore a structurally proven live world session, correlate session-status, then prove authoritative position and one reversible movement transition before any write API is added
+blockers:
+  - current OTClient-owned live structural IN_GAME session is unavailable until dedicated runner/runtime recovery resumes
+next_action: after synology-otclient-01 accepts the canonical PR #48 runtime, recover structural IN_GAME, correlate bridge session-status, read authoritative position, and prove one reversible movement transition before any write API is added
 ```
 
-No Codex or owner-funded AI/API quota was used.
+No Codex or owner-funded AI/API quota was used. All material task state is persisted in `blakinio/otclient`.

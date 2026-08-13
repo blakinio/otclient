@@ -418,11 +418,11 @@ re-registration.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T13:22:00+02:00
+updated_at: 2026-08-13T13:42:00+02:00
 head: 17b55cecb596ff0224201d85ea50e02cb1b67511
 branch: ci/OTC-20260727-tibia-linux-runner-analysis
 pr: 48
-status: implementing
+status: blocked
 context_routes:
   - official-client-runtime-analysis
   - dedicated-runner-migration
@@ -433,6 +433,7 @@ proven:
   - exact researched relocation-aware profiles remain applicable after live PID/PIE/object rediscovery
   - GitHub runner API reports synology-otclient-01 online as runner ID 21 with explicit labels otclient and synology
   - bootstrap run 31694880387 passed on synology-otclient-01 and initialized writable persistent state without Oteryn runtime dependency
+  - recovery run 31695910117 created the task-owned container successfully on the live /work volume before dependency installation was cancelled
 derived:
   - live structural experiments can resume without a new exact-version profile once the dedicated runner is restored
 unknown:
@@ -443,9 +444,10 @@ unknown:
   - recovered official-client runtime contents after the task-owned container is recreated
 conflicts:
   - repository canonical selector includes self-hosted, while the live runner was registered without default labels
+  - PR 284 was closed as superseded but was concurrently reopened at head 3d1467255e73584163b11f2c88750477643c40dc and its run 31695992918 took the only runner while PR 48 recovery was cancelled
 first_failure:
-  marker: workflow label mismatch prevented assignment to the online runner
-  evidence: runner ID 21 labels are otclient,synology while run 31687610951 required self-hosted,otclient,synology
+  marker: active ownership conflict on the only dedicated runner
+  evidence: PR 284 reopened with new head and run 31695992918 after its superseded close; PR 48 recovery run 31695910117 was cancelled during dependency installation
 validation:
   - command: gh run view 31674406184 --repo blakinio/otclient --log
     result: PASS
@@ -453,6 +455,9 @@ validation:
   - command: gh run view 31687610951 --repo blakinio/otclient --json status,conclusion,jobs
     result: BLOCKED
     evidence: bootstrap job 94407259983 remained queued under the mismatched selector
+  - command: gh run view 31695910117 --repo blakinio/otclient --json status,conclusion,jobs
+    result: BLOCKED
+    evidence: container recovery passed, then dependency installation was cancelled when concurrent PR 284 work resumed on the only runner
 rejected_hypotheses:
   - current official-client binary changed: disproven by run 31674406184
 changed_paths:
@@ -461,6 +466,6 @@ changed_paths:
   - .github/workflows/tibia-synology-owned-runtime-state.yml
   - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
 blockers:
-  - run 31695830309 proved the online runner still uses legacy persistent volume destinations /runner and /work rather than PR 280's /home/runner/_work layout
-next_action: recover the task-owned container on the exact /work named volume with a compatibility link for the canonical state path, then materialize and start the exact official client through verified userspace WARP without using login secrets
+  - unresolved live ownership conflict: another writer actively reopened and updated superseded PR 284 and is consuming synology-otclient-01
+next_action: resolve ownership of synology-otclient-01 by pausing the PR 284 writer, then rerun PR 48 dedicated runtime recovery from the already-created task-owned container
 ```

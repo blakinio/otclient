@@ -15,7 +15,6 @@ RUNTIME_VOLUME="otclient-tibia-global-login-runtime"
 IMAGE="ghcr.io/blakinio/otclient:latest"
 TASK="OTC-20260813-tibia-global-login-lab"
 
-# Fail closed if the container name is occupied by another task.
 if docker inspect "$CONTAINER" >/dev/null 2>&1; then
   owner=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER")
   task=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER")
@@ -44,6 +43,7 @@ image_id=$(docker image inspect "$IMAGE" --format '{{.Id}}')
 
 docker run -d --name "$CONTAINER" \
   --network none \
+  --user root \
   --label com.blakinio.owner=otclient \
   --label com.blakinio.repository=blakinio/otclient \
   --label com.blakinio.task="$TASK" \

@@ -174,7 +174,9 @@ jobs:
           read -r initial_local initial_direct initial_udp < <(socket_state)
           echo TRACK_A_INITIAL_LOCAL_SOCKS="$initial_local"
           [[ "$initial_direct" == 0 && "$initial_udp" == 0 ]]
-          if (( initial_local < 2 )); then
+          # Bootstrap/API connections already produce multiple proxied sockets;
+          # they are not evidence of an authenticated world session.
+          if [[ "$LOGIN_ATTEMPT" -ge 1 ]]; then
             window="$(resolve_window)"
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1

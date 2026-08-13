@@ -1,0 +1,154 @@
+name: Track A launcher LD_PRELOAD singleton trace
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-ldpreload-trace.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trace:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Interpose launcher libc IPC and socket calls
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          work="$state/ldtrace/run-$GITHUB_RUN_ID"
+          home="$work/home"; tmp="$work/tmp"; runtime_dir="$work/runtime-dir"; unpack="$work/unpacked"
+          mkdir -p "$home" "$tmp" "$runtime_dir" "$unpack"
+          chmod 700 "$work" "$home" "$tmp" "$runtime_dir"
+
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
+          kill -0 "$xvfb_pid"
+
+          cc_bin="$(command -v cc 2>/dev/null || command -v gcc 2>/dev/null || true)"
+          echo TRACK_A_LDTRACE_CC="$cc_bin"
+          [[ -n "$cc_bin" ]]
+          cat >"$work/trace.c" <<'C'
+          #define _GNU_SOURCE
+          #include <dlfcn.h>
+          #include <errno.h>
+          #include <fcntl.h>
+          #include <stdarg.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <sys/file.h>
+          #include <sys/socket.h>
+          #include <sys/stat.h>
+          #include <sys/syscall.h>
+          #include <sys/types.h>
+          #include <netinet/in.h>
+          #include <arpa/inet.h>
+          #include <unistd.h>
+          #include <semaphore.h>
+
+          static int logfd=-1;
+          static void emit(const char *fmt, ...) {
+            if(logfd<0) return;
+            char b[2048]; va_list ap; va_start(ap,fmt); int n=vsnprintf(b,sizeof(b),fmt,ap); va_end(ap);
+            if(n>0){ if(n>(int)sizeof(b)) n=sizeof(b); syscall(SYS_write,logfd,b,n); }
+          }
+          __attribute__((constructor)) static void init(void){
+            const char *p=getenv("OTC_TRACE_LOG");
+            if(p) logfd=syscall(SYS_openat,AT_FDCWD,p,O_WRONLY|O_CREAT|O_APPEND,0600);
+            emit("TRACE init pid=%d\n",getpid());
+          }
+          int bind(int fd,const struct sockaddr *a,socklen_t l){
+            static int(*real)(int,const struct sockaddr*,socklen_t); if(!real)real=dlsym(RTLD_NEXT,"bind");
+            if(a&&a->sa_family==AF_UNIX) emit("bind AF_UNIX path=%s\n",a->sa_data);
+            else if(a&&a->sa_family==AF_INET){const struct sockaddr_in *s=(const void*)a; emit("bind AF_INET %s:%u\n",inet_ntoa(s->sin_addr),ntohs(s->sin_port));}
+            else if(a&&a->sa_family==AF_INET6){const struct sockaddr_in6 *s=(const void*)a; emit("bind AF_INET6 port=%u\n",ntohs(s->sin6_port));}
+            return real(fd,a,l);
+          }
+          int connect(int fd,const struct sockaddr *a,socklen_t l){
+            static int(*real)(int,const struct sockaddr*,socklen_t); if(!real)real=dlsym(RTLD_NEXT,"connect");
+            if(a&&a->sa_family==AF_UNIX) emit("connect AF_UNIX path=%s\n",a->sa_data);
+            else if(a&&a->sa_family==AF_INET){char ip[64]; const struct sockaddr_in *s=(const void*)a; inet_ntop(AF_INET,&s->sin_addr,ip,sizeof(ip)); emit("connect AF_INET %s:%u\n",ip,ntohs(s->sin_port));}
+            else if(a&&a->sa_family==AF_INET6){const struct sockaddr_in6 *s=(const void*)a; emit("connect AF_INET6 port=%u\n",ntohs(s->sin6_port));}
+            return real(fd,a,l);
+          }
+          int listen(int fd,int backlog){ static int(*real)(int,int); if(!real)real=dlsym(RTLD_NEXT,"listen"); emit("listen fd=%d backlog=%d\n",fd,backlog); return real(fd,backlog); }
+          int flock(int fd,int op){ static int(*real)(int,int); if(!real)real=dlsym(RTLD_NEXT,"flock"); int r=real(fd,op); emit("flock fd=%d op=%d rc=%d errno=%d\n",fd,op,r,errno); return r; }
+          int shm_open(const char*n,int oflag,mode_t mode){ static int(*real)(const char*,int,mode_t); if(!real)real=dlsym(RTLD_NEXT,"shm_open"); int r=real(n,oflag,mode); emit("shm_open name=%s flags=%x rc=%d errno=%d\n",n?n:"",oflag,r,errno); return r; }
+          int shm_unlink(const char*n){ static int(*real)(const char*); if(!real)real=dlsym(RTLD_NEXT,"shm_unlink"); int r=real(n); emit("shm_unlink name=%s rc=%d errno=%d\n",n?n:"",r,errno); return r; }
+          sem_t *sem_open(const char*n,int oflag,...){
+            static sem_t*(*real)(const char*,int,...); if(!real)real=dlsym(RTLD_NEXT,"sem_open"); sem_t*r;
+            if(oflag&O_CREAT){va_list ap;va_start(ap,oflag);mode_t m=va_arg(ap,int);unsigned v=va_arg(ap,unsigned);va_end(ap);r=real(n,oflag,m,v);}else r=real(n,oflag);
+            emit("sem_open name=%s flags=%x rc=%p errno=%d\n",n?n:"",oflag,(void*)r,errno); return r;
+          }
+          int sem_unlink(const char*n){ static int(*real)(const char*); if(!real)real=dlsym(RTLD_NEXT,"sem_unlink"); int r=real(n); emit("sem_unlink name=%s rc=%d errno=%d\n",n?n:"",r,errno); return r; }
+          int open(const char*p,int f,...){
+            static int(*real)(const char*,int,...); if(!real)real=dlsym(RTLD_NEXT,"open"); mode_t m=0; int r;
+            if(f&O_CREAT){va_list ap;va_start(ap,f);m=va_arg(ap,int);va_end(ap);r=real(p,f,m);}else r=real(p,f);
+            if(p) emit("open path=%s flags=%x rc=%d errno=%d\n",p,f,r,errno); return r;
+          }
+          int open64(const char*p,int f,...){
+            static int(*real)(const char*,int,...); if(!real)real=dlsym(RTLD_NEXT,"open64"); mode_t m=0; int r;
+            if(f&O_CREAT){va_list ap;va_start(ap,f);m=va_arg(ap,int);va_end(ap);r=real(p,f,m);}else r=real(p,f);
+            if(p) emit("open64 path=%s flags=%x rc=%d errno=%d\n",p,f,r,errno); return r;
+          }
+          int unlink(const char*p){ static int(*real)(const char*); if(!real)real=dlsym(RTLD_NEXT,"unlink"); int r=real(p); emit("unlink path=%s rc=%d errno=%d\n",p?p:"",r,errno); return r; }
+          C
+          "$cc_bin" -shared -fPIC -O2 -Wall -Wextra "$work/trace.c" -o "$work/libotctrace.so" -ldl -pthread
+          [[ -s "$work/libotctrace.so" ]]
+          echo TRACK_A_LDTRACE_BUILT=true
+
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          [[ -n "$proxy_lib" ]]
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          workdir="$(dirname "$launcher")"
+          trace_log="$work/calls.log"; touch "$trace_log"; chmod 600 "$trace_log"
+          cd "$workdir"
+          rc=0
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re OTC_TRACE_LOG="$trace_log" \
+            HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_RUNTIME_DIR="$runtime_dir" TMPDIR="$tmp" DISPLAY="$TRACK_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$work/libotctrace.so:$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            "$launcher" >"$work/launcher.log" 2>&1 || rc=$?
+          echo TRACK_A_LDTRACE_LAUNCHER_RC="$rc"
+          grep -F 'Application is already running' "$work/launcher.log" | sed 's/^/TRACK_A_LDTRACE_LAUNCHER_LOG=/' || true
+          echo TRACK_A_LDTRACE_CALLS_BEGIN=true
+          grep -Ei 'AF_UNIX|AF_INET|shm_|sem_|flock|lock|single|tibia|cipsoft|runtime|tmp' "$trace_log" | tail -n 600 | sed 's/^/TRACK_A_LDTRACE=/' || true
+          echo TRACK_A_LDTRACE_CALLS_END=true
+          echo TRACK_A_LDTRACE_COMPLETE=true

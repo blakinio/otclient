@@ -89,7 +89,7 @@ jobs:
             env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
               PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \
               XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
-              nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
+              nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1280x800x24 \
               -xkbdir "$toolroot/usr/share/X11/xkb" +extension GLX +iglx +render \
               -nolisten tcp -noreset \
               >"$state/runtime/xvfb.log" 2>&1 </dev/null &
@@ -207,6 +207,7 @@ jobs:
           if [[ "$LOGIN_ATTEMPT" -ge 1 ]]; then
             window="$(resolve_window)"
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+            sleep 5
             before="$evidence/login-before.xwd"
             after="$evidence/login-after.xwd"
             typed="$evidence/login-typed.xwd"

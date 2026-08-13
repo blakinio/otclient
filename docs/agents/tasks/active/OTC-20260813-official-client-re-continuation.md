@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:18:00+02:00
-head: dce10a9eefaf5dacc4d06edb67e777b96499af85
+updated_at: 2026-08-13T15:22:00+02:00
+head: 71d1720436fe946c78876adeb48dd4a8c1e166f3
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -101,8 +101,8 @@ unknown:
   - whether the exact historically proven explicit coordinate sequence transitions this isolated runtime from Account Login to Select Character
   - decoded current-world records and authoritative player position
 first_failure:
-  marker: exact versioned input sequence does not transition the current persistent client home after Login click
-  evidence: run 31714475543 job 94495543093 used the versioned --window key/type delivery and 3ms delay; all click coordinates matched; transition 4785 < 45000 and local SOCKS stayed at 2
+  marker: exact versioned input sequence does not transition either persistent or fresh Track A client home after Login click
+  evidence: run 31714821056 job 94496738127 used a fresh temporary HOME/XDG config directory and versioned input delivery; transition 4813 < 45000 and local SOCKS stayed at 3
 rejected_hypotheses:
   - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
   - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
@@ -136,6 +136,9 @@ validation:
   - command: Track A structural login run 31714475543 job 94495543093
     result: FAIL_FOR_VERSIONED_INPUT_BASELINE
     evidence: exact versioned key/type and explicit-click implementation; coordinates matched; transition 4785 < 45000; no post-submit SOCKS increase; no structural IN_GAME claim
+  - command: Track A structural login run 31714821056 job 94496738127
+    result: FAIL_FOR_FRESH_HOME_BASELINE
+    evidence: fresh client HOME/XDG config was used and removed; versioned input delivery; transition 4813 < 45000; no structural IN_GAME claim
 blockers: []
-next_action: repeat the exact versioned input sequence with an isolated temporary HOME/XDG config directory for the official client while preserving the verified reconstructed runtime; remove only that exact temporary directory after the job
+next_action: run the same fresh-home versioned baseline with the historical 1280x800 Xvfb screen and five-second window-stabilization interval before the three explicit input clicks
 ```

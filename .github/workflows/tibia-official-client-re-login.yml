@@ -32,7 +32,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Login with proven same-SHA recipe and require decoded world state
+      - name: Login semantically and require decoded world state
         shell: bash
         run: |
           set +x
@@ -49,22 +49,33 @@ jobs:
           toolroot="$state/toolroot"
           tool_path="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
-          evidence="$state/evidence/login-$(date -u +%Y%m%dT%H%M%SZ)"
+          py_path="$toolroot/usr/lib/python3/dist-packages"
+          gi_path="$toolroot/usr/lib/x86_64-linux-gnu/girepository-1.0:$toolroot/usr/lib/girepository-1.0"
+          evidence="$state/evidence/semantic-login-$(date -u +%Y%m%dT%H%M%SZ)"
           mkdir -p "$state/runtime" "$state/evidence" "$evidence"
           chmod 700 "$state" "$state/runtime" "$state/evidence" "$evidence"
-          trap 'rc=$?; rm -f "$evidence"/*.xwd 2>/dev/null || true; if [[ $rc -ne 0 ]]; then echo TRACK_A_LOGIN_FAILURE_RC=$rc; for log in "$state/runtime/xvfb.log" "$state/runtime/client.log" "$evidence/gdb.log"; do if [[ -f "$log" ]]; then echo TRACK_A_LOG_BEGIN=$(basename "$log"); tail -n 60 "$log"; echo TRACK_A_LOG_END=$(basename "$log"); fi; done; fi' EXIT
+          dbus_pid=''; atspi_pid=''; gdb_pid=''
+          cleanup_bus() {
+            [[ -z "$gdb_pid" ]] || kill "$gdb_pid" 2>/dev/null || true
+            [[ -z "$atspi_pid" ]] || kill "$atspi_pid" 2>/dev/null || true
+            [[ -z "$dbus_pid" ]] || kill "$dbus_pid" 2>/dev/null || true
+          }
+          trap 'rc=$?; cleanup_bus; if [[ $rc -ne 0 ]]; then echo TRACK_A_SEMANTIC_LOGIN_FAILURE_RC=$rc; for log in "$state/runtime/xvfb.log" "$state/runtime/client.log" "$evidence/atspi-bus.log" "$evidence/gdb.log"; do if [[ -f "$log" ]]; then echo TRACK_A_LOG_BEGIN=$(basename "$log"); tail -n 60 "$log"; echo TRACK_A_LOG_END=$(basename "$log"); fi; done; fi' EXIT
 
           [[ -x "$client" ]]
           [[ "$(stat -c %s "$client")" == 51965216 ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" LD_LIBRARY_PATH="$tool_lib" python3 -c 'import pyatspi'
+          atspi_launcher="$(find "$toolroot" -type f -name at-spi-bus-launcher -print -quit)"
+          [[ -n "$atspi_launcher" ]]
           echo TRACK_A_EXACT_OFFICIAL_CLIENT_VERIFIED=true
+          echo TRACK_A_ATSPI_PREREQUISITES_VERIFIED=true
 
           warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
           [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
           grep -azFxq "$marker" "/proc/$warp_pid/environ"
           kill -0 "$warp_pid"
-          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
-            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
           echo TRACK_A_WARP_VERIFIED=true
 
           old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
@@ -75,7 +86,7 @@ jobs:
             kill "$old_pid"
             for _ in $(seq 1 30); do kill -0 "$old_pid" 2>/dev/null || break; sleep 0.2; done
             ! kill -0 "$old_pid" 2>/dev/null
-            echo TRACK_A_OWNED_STALE_CLIENT_STOPPED=true
+            echo TRACK_A_PREVIOUS_OWNED_CLIENT_STOPPED=true
           fi
 
           xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
@@ -83,11 +94,7 @@ jobs:
             private_xvfb="$state/runtime/Xvfb-track-a"
             [[ -x "$private_xvfb" ]]
             cd "$toolroot/usr/bin"
-            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-              PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
-              nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1280x800x24 \
-              -xkbdir "$toolroot/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset \
-              >"$state/runtime/xvfb.log" 2>&1 </dev/null &
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1280x800x24 -xkbdir "$toolroot/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset >"$state/runtime/xvfb.log" 2>&1 </dev/null &
             xvfb_pid=$!
             printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"
             chmod 600 "$state/runtime/xvfb.pid"
@@ -98,6 +105,22 @@ jobs:
           grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
           echo TRACK_A_XVFB_VERIFIED=true
 
+          mapfile -t dbus_info < <(PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$toolroot/usr/bin/dbus-daemon" --session --fork --print-address=1 --print-pid=1)
+          [[ ${#dbus_info[@]} -ge 2 && -n "${dbus_info[0]}" && "${dbus_info[1]}" =~ ^[0-9]+$ ]]
+          export DBUS_SESSION_BUS_ADDRESS="${dbus_info[0]}"
+          dbus_pid="${dbus_info[1]}"
+          echo TRACK_A_SESSION_DBUS_READY=true
+
+          PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$atspi_launcher" --launch-immediately >"$evidence/atspi-bus.log" 2>&1 &
+          atspi_pid=$!
+          for _ in $(seq 1 30); do
+            if PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$toolroot/usr/bin/dbus-send" --session --print-reply --dest=org.a11y.Bus /org/a11y/bus org.a11y.Bus.GetAddress >"$evidence/atspi-address.txt" 2>/dev/null; then break; fi
+            sleep 0.2
+          done
+          kill -0 "$atspi_pid"
+          grep -q 'string "' "$evidence/atspi-address.txt"
+          echo TRACK_A_ATSPI_BUS_READY=true
+
           proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
           vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
           swrast="$(find "$toolroot" \( -type f -o -type l \) -name 'swrast_dri.so' -print -quit)"
@@ -106,17 +129,8 @@ jobs:
           proxy_conf="$state/config/proxychains.conf"
           [[ -s "$proxy_conf" ]]
 
-          # Match the historically successful same-SHA runtime: persistent HOME,
-          # normal client startup, no pre-login debugger attach.
           cd "$runtime"
-          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-            HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
-            LD_LIBRARY_PATH="$runtime/lib:$tool_lib" \
-            LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" QSG_RHI_BACKEND=vulkan \
-            VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
-            FONTCONFIG_PATH="$toolroot/etc/fonts" FONTCONFIG_FILE="$toolroot/etc/fonts/fonts.conf" \
-            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
-            nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$state/home" DISPLAY="$TRACK_DISPLAY" DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" QT_ACCESSIBILITY=1 QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 PATH="$tool_path" LD_LIBRARY_PATH="$runtime/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" FONTCONFIG_PATH="$toolroot/etc/fonts" FONTCONFIG_FILE="$toolroot/etc/fonts/fonts.conf" LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
           pid=$!
           printf '%s\n' "$pid" >"$state/runtime/client.pid"
           chmod 600 "$state/runtime/client.pid"
@@ -124,118 +138,72 @@ jobs:
           kill -0 "$pid"
           [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
           grep -azFxq "$marker" "/proc/$pid/environ"
-          echo TRACK_A_OFFICIAL_CLIENT_RUNNING=true
+          echo TRACK_A_ACCESSIBLE_OFFICIAL_CLIENT_RUNNING=true
 
-          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
-          resolve_window() {
-            local w geometry width height best='' best_area=0 area
-            for _ in $(seq 1 60); do
-              best=''; best_area=0
-              for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
-                geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
-                width="$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')"
-                height="$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')"
-                [[ -n "$width" && -n "$height" ]] || continue
-                area=$((width * height))
-                if (( area > best_area )); then best="$w"; best_area=$area; fi
-              done
-              if [[ -n "$best" ]]; then
-                geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$best")"
-                width="$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')"
-                height="$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')"
-                [[ "$width" == 1020 && "$height" == 650 ]] && { printf '%s\n' "$best"; return 0; }
-              fi
-              sleep 0.5
-            done
-            return 1
-          }
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" DBUS_SESSION_BUS_ADDRESS
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" inspect
+          echo TRACK_A_ATSPI_CLIENT_TREE_PROVEN=true
+
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" login
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo TRACK_A_ATSPI_ACCOUNT_LOGIN_COMPLETED=true
+
+          set +e
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" character
+          char_rc=$?
+          set -e
+          if [[ "$char_rc" == 6 ]]; then
+            best="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null | head -n1 || true)"
+            [[ -n "$best" ]]
+            "$toolroot/usr/bin/xdotool" mousemove --window "$best" 285 193 click 1
+            sleep 0.4
+            "$toolroot/usr/bin/xdotool" key --window "$best" Return
+            sleep 3
+            "$toolroot/usr/bin/xdotool" mousemove --window "$best" 285 193 click --repeat 2 --delay 160 1 || true
+            echo TRACK_A_CHARACTER_COORDINATE_FALLBACK=true
+          elif [[ "$char_rc" != 0 ]]; then
+            exit "$char_rc"
+          fi
+          echo TRACK_A_CHARACTER_ACTIVATION_SENT=true
 
           cat >"$evidence/socket_state.py" <<'PY'
           import os, pathlib, sys
           pid, port = sys.argv[1], int(sys.argv[2])
-          inodes = set()
-          for fd in pathlib.Path('/proc', pid, 'fd').iterdir():
-              try: target = os.readlink(fd)
+          inodes=set()
+          for fd in pathlib.Path('/proc',pid,'fd').iterdir():
+              try: target=os.readlink(fd)
               except OSError: continue
               if target.startswith('socket:['): inodes.add(target[8:-1])
-          local = direct = udp = 0
-          for name, is_udp in [('tcp', False), ('tcp6', False), ('udp', True), ('udp6', True)]:
-              try: lines = pathlib.Path('/proc', pid, 'net', name).read_text().splitlines()[1:]
+          local=direct=udp=0
+          for name,is_udp in [('tcp',False),('tcp6',False),('udp',True),('udp6',True)]:
+              try: rows=pathlib.Path('/proc',pid,'net',name).read_text().splitlines()[1:]
               except OSError: continue
-              for line in lines:
-                  cols = line.split()
-                  if len(cols) < 10 or cols[9] not in inodes: continue
-                  remote_port = int(cols[2].rsplit(':', 1)[1], 16)
-                  if is_udp: udp += 1
-                  elif cols[3] == '01':
-                      if remote_port == port: local += 1
-                      else: direct += 1
-          print(f'{local} {direct} {udp}')
+              for row in rows:
+                  cols=row.split()
+                  if len(cols)<10 or cols[9] not in inodes: continue
+                  remote_port=int(cols[2].rsplit(':',1)[1],16)
+                  if is_udp: udp+=1
+                  elif cols[3]=='01':
+                      if remote_port==port: local+=1
+                      else: direct+=1
+          print(local,direct,udp)
           PY
           socket_state() { python3 "$evidence/socket_state.py" "$pid" "$TRACK_WARP_PORT"; }
 
-          window="$(resolve_window)"
-          echo TRACK_A_LOGIN_WINDOW_RESOLVED=true
-          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
-          sleep 1
-          before="$evidence/login-before.xwd"
-          after="$evidence/login-after.xwd"
-          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$before"
-
-          # Exact historical baseline for the verified 1020x650 layout.
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
-          "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
-          "$toolroot/usr/bin/xdotool" type --window "$window" --delay 12 -- "$TIBIA_TEST_EMAIL"
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
-          "$toolroot/usr/bin/xdotool" key --window "$window" ctrl+a
-          "$toolroot/usr/bin/xdotool" type --window "$window" --delay 12 -- "$TIBIA_TEST_PASSWORD"
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          echo TRACK_A_PROVEN_LOGIN_SEQUENCE_SUBMITTED=true
-
-          transition=0; changed=0
-          for _ in $(seq 1 80); do
-            sleep 0.5
-            window="$(resolve_window || true)"
-            [[ -n "$window" ]] || continue
-            "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$after"
-            changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$before" "$after")"
-            [[ "$changed" =~ ^[0-9]+$ ]] || continue
-            if (( changed > 45000 )); then transition=1; break; fi
-          done
-          echo TRACK_A_LOGIN_TRANSITION_CHANGED_PIXELS="$changed"
-          echo TRACK_A_LOGIN_TRANSITION_PROVEN="$transition"
-          [[ "$transition" == 1 ]]
-          rm -f "$before" "$after"
-
-          # Character selection from the historically proven first-row geometry.
-          window="$(resolve_window)"
-          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 285 193 click 1
-          sleep 0.4
-          "$toolroot/usr/bin/xdotool" key --window "$window" Return
-          sleep 3
-          window="$(resolve_window || true)"
-          if [[ -n "$window" ]]; then
-            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 285 193 click --repeat 2 --delay 160 1 || true
-          fi
-          echo TRACK_A_PROVEN_CHARACTER_ACTIVATION_SEQUENCE_SENT=true
-
           sustained=0; consecutive=0; max_local=0
-          for _ in $(seq 1 75); do
-            sleep 1
+          for _ in $(seq 1 90); do
+            sleep 0.5
             kill -0 "$pid"
             read -r local direct udp < <(socket_state)
             (( local > max_local )) && max_local=$local || true
             [[ "$direct" == 0 && "$udp" == 0 ]]
-            if (( local >= 2 )); then consecutive=$((consecutive + 1)); else consecutive=0; fi
-            if (( consecutive >= 6 )); then sustained=1; break; fi
+            if (( local >= 2 )); then consecutive=$((consecutive+1)); else consecutive=0; fi
+            if (( consecutive >= 8 )); then sustained=1; break; fi
           done
-          echo TRACK_A_LOCAL_SOCKS_MAX="$max_local"
+          echo TRACK_A_POST_CHARACTER_LOCAL_SOCKS_MAX="$max_local"
           echo TRACK_A_SUSTAINED_TUNNELED_SESSION="$sustained"
           [[ "$sustained" == 1 ]]
 
-          # Structural IN_GAME proof. Attach only now, after normal startup/login.
           if [[ -w /proc/sys/kernel/yama/ptrace_scope ]]; then printf '0\n' >/proc/sys/kernel/yama/ptrace_scope; fi
           line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
           [[ -n "$line" ]]
@@ -268,23 +236,23 @@ jobs:
           end
           continue
           EOF
-          env -u RUNNER_TRACKING_ID LD_LIBRARY_PATH="$tool_lib" \
-            "$toolroot/usr/bin/gdb" -q -nx -x "$evidence/postworld.gdb" >"$evidence/gdb.log" 2>&1 &
+          env -u RUNNER_TRACKING_ID LD_LIBRARY_PATH="$tool_lib" "$toolroot/usr/bin/gdb" -q -nx -x "$evidence/postworld.gdb" >"$evidence/gdb.log" 2>&1 &
           gdb_pid=$!
           for _ in $(seq 1 30); do grep -q 'POSTWORLD_MAP_BREAKPOINT_READY=true' "$evidence/gdb.log" 2>/dev/null && break; sleep 0.5; done
           grep -q 'POSTWORLD_MAP_BREAKPOINT_READY=true' "$evidence/gdb.log"
 
-          window="$(resolve_window)"
-          "$toolroot/usr/bin/xdotool" key --window "$window" Right || true
+          best="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null | head -n1 || true)"
+          [[ -n "$best" ]]
+          "$toolroot/usr/bin/xdotool" key --window "$best" Right || true
           sleep 2
-          window="$(resolve_window || true)"
-          [[ -n "$window" ]] && "$toolroot/usr/bin/xdotool" key --window "$window" Left || true
+          best="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null | head -n1 || true)"
+          [[ -n "$best" ]] && "$toolroot/usr/bin/xdotool" key --window "$best" Left || true
           for _ in $(seq 1 25); do [[ -s "$hit" ]] && break; sleep 1; done
           count="$(wc -l <"$records" 2>/dev/null || echo 0)"
           echo TRACK_A_DECODED_MAP_RECORD_COUNT="$count"
           [[ "$count" -ge 8 && -s "$hit" ]]
           kill -0 "$pid"
-          rm -f "$evidence"/*.xwd 2>/dev/null || true
-          trap - EXIT
           echo TRACK_A_STRUCTURAL_IN_GAME=true
           echo TRACK_A_OFFICIAL_LINUX_WORLD_LOGIN_PROVEN=true
+          cleanup_bus
+          trap - EXIT

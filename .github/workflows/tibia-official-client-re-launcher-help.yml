@@ -25,10 +25,14 @@ jobs:
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           launcher="$state/launcher-recovery/isolated-31741562880/unpacked/Tibia/Tibia"
           [[ "$(sha256sum "$launcher" | awk '{print $1}')" == "$LAUNCHER_SHA256" ]]
+          root="$state/toolroot"
+          workdir="$(dirname "$launcher")"
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           set +e
-          output="$(cd "$(dirname "$launcher")" && "$launcher" --help 2>&1)"
+          output="$(cd "$workdir" && env PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" "$launcher" --help 2>&1)"
           rc=$?
           set -e
           echo TRACK_A_LAUNCHER_HELP_RC="$rc"
-          printf '%s\n' "$output" | head -n 120 | sed 's/^/TRACK_A_LAUNCHER_HELP=/'
+          printf '%s\n' "$output" | head -n 160 | sed 's/^/TRACK_A_LAUNCHER_HELP=/'
           echo TRACK_A_LAUNCHER_HELP_COMPLETE=true

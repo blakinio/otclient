@@ -56,8 +56,16 @@ jobs:
           [[ -x "$private_xvfb" ]]
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
           tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
-          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$root/usr/share/X11/xkb" nohup "$private_xvfb" "$probe_display" -screen 0 1280x800x24 -xkbdir "$root/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset >"$work/xvfb.log" 2>&1 </dev/null &
-          xvfb_pid=$!
+          xkbcomp="$(find "$root" -type f -name xkbcomp -perm -111 -print -quit)"
+          [[ -n "$xkbcomp" ]]
+          cp "$xkbcomp" "$work/xkbcomp"
+          chmod 755 "$work/xkbcomp"
+          (
+            cd "$work"
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$root/usr/share/X11/xkb" nohup "$private_xvfb" "$probe_display" -screen 0 1280x800x24 -xkbdir "$root/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset >"$work/xvfb.log" 2>&1 </dev/null &
+            echo $! >"$work/xvfb.pid"
+          )
+          xvfb_pid="$(cat "$work/xvfb.pid")"
           trap 'kill "$xvfb_pid" 2>/dev/null || true' EXIT
           for _ in $(seq 1 50); do [[ -e "/tmp/.X11-unix/X$display_num" ]] && break; sleep .2; done
           if [[ ! -e "/tmp/.X11-unix/X$display_num" ]]; then

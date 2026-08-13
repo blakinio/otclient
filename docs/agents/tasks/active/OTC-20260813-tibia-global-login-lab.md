@@ -331,6 +331,11 @@ restored feature subset was then compared again with `features.lua`; it omitted
 and contributes one pre-RSA field. The next experiment restores that field and
 removes the disproven OS override so only the packet layout changes.
 
+Under the current `main` Linux-only Track B governance, the temporary Windows
+OS-id spoof is historical/non-admissible compatibility evidence. It never ran a
+Windows binary, was removed immediately, and is not used by the current Linux
+protocol conclusion or next action.
+
 Run `31698702409`, job `94442332169`, exact head
 `7eefc0f5a93fe0be33e6ce433839e0f349a18fb1`, proved the preview field was
 present and increased the first packet from 143 to 144 bytes, but the server
@@ -356,6 +361,22 @@ the wrapper exported only `=true` markers. The harness now exports only the two
 strictly named public numeric version markers; no payload/session field is
 matched.
 
+Run `31700524092`, job `94448283844`, exact head
+`32df0e573aa91cc993cd30d65cb9f02dd72055c1`, proved the actual defect:
+
+```text
+CLIENT_VERSION_VALUE=0
+PROTOCOL_VERSION_VALUE=1532
+LAB_GAME_FORWARD_CLIENT_LENGTH=144
+LAB_GAME_FORWARD_SERVER_LENGTH=0
+```
+
+The appearances/staticdata isolation path therefore left the effective client
+version at zero before game-login construction. The lab now restores client
+version 1532 after the staticdata probe and immediately before choosing the
+official RSA/login path. Runtime remains the task-owned native Linux image
+`sha256:3ec759b55702dd967a6ef601967b4cf71e71192d69e2493481630241959b9dc7`.
+
 # Evidence classification
 
 PROVEN:
@@ -380,7 +401,6 @@ DISPROVEN:
 - unavailable `synology-otclient-01` runner as the current blocker.
 - challenge-first behavior on the current official game endpoint: run `31695992918` produced neither client nor server bytes after the granted TCP connection.
 - the missing encryption/checksum/client-version/login-pending/sequenced feature set as the sole no-response cause: run `31697097942` sent 143 client bytes and received zero server bytes after restoring them.
-- the Linux OS id as the sole no-response cause: run `31698057223` advertised Windows and still sent 143 client bytes to zero server bytes.
 - the missing preview-state field as the sole no-response cause: run `31698702409` sent 144 client bytes and received zero server bytes.
 - a raw/untrimmed runtime asset identifier as the sole no-response cause: run `31699422432` normalized it to 64 characters and still received zero server bytes.
 
@@ -409,14 +429,14 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with public numeric client/protocol version markers immediately before `loginWorld()` and reconcile them with the observed packet length.
+Run the canonical E2E after restoring effective client version 1532 immediately before game-login construction and classify the resulting exchange.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:32:00Z
-head: 4251aa83e826e71991f47f03807a1f688c875a9d
+updated_at: 2026-08-13T12:38:00Z
+head: 32df0e573aa91cc993cd30d65cb9f02dd72055c1
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -431,7 +451,7 @@ proven:
 derived:
   - first remaining boundary is the official 15.32 initial game-login packet identity/framing
 unknown:
-  - whether failed staticdata loading mutates client/protocol version before loginWorld
+  - whether restoring client version 1532 after the staticdata probe yields a server response
 conflicts:
   - none
 first_failure:
@@ -452,5 +472,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with numeric client/protocol version markers immediately before loginWorld and reconcile them with packet length
+next_action: run the exact-head canonical E2E after restoring effective client version 1532 immediately before loginWorld and classify aggregate direction markers
 ```

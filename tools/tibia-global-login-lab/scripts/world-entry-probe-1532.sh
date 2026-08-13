@@ -80,7 +80,11 @@ text = text.replace(old_version, new_version, 1)
 
 old_rsa = "    g_game.chooseRsa('www.tibia.com')\n"
 new_rsa = (
-    old_rsa
+    "    if g_game.getClientVersion()~=1532 then\n"
+    + "      g_game.setClientVersion(1532)\n"
+    + "      mark('CLIENT_VERSION_RESTORED_AFTER_STATICDATA=true')\n"
+    + "    end\n"
+    + old_rsa
     + "    mark('CLIENT_VERSION_VALUE='..tostring(g_game.getClientVersion()))\n"
     + "    mark('PROTOCOL_VERSION_VALUE='..tostring(g_game.getProtocolVersion()))\n"
 )

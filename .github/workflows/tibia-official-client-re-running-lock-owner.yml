@@ -1,0 +1,114 @@
+name: Track A launcher .running lock owner
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-running-lock-owner.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Find and observe .running lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
+          kill -0 "$xvfb_pid"
+
+          echo TRACK_A_RUNNING_PREEXISTING_BEGIN=true
+          python3 - <<'PY'
+          import fcntl,os,pathlib
+          roots=['/tmp','/home','/work','/root','/run','/var/tmp']
+          seen=set()
+          for root in roots:
+              p=pathlib.Path(root)
+              if not p.exists(): continue
+              try:
+                  for x in p.rglob('.running'):
+                      s=str(x)
+                      if s in seen: continue
+                      seen.add(s)
+                      try:
+                          st=x.stat(); fd=os.open(s,os.O_RDWR)
+                          try:
+                              fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB); locked=False; fcntl.flock(fd,fcntl.LOCK_UN)
+                          except BlockingIOError: locked=True
+                          finally: os.close(fd)
+                          print(f'TRACK_A_RUNNING_FILE={s}|size={st.st_size}|uid={st.st_uid}|mode={oct(st.st_mode&0o7777)}|LOCKED={str(locked).lower()}')
+                      except Exception as e: print(f'TRACK_A_RUNNING_FILE_ERROR={s}|{type(e).__name__}:{e}')
+              except Exception as e: print(f'TRACK_A_RUNNING_SCAN_ERROR={root}|{type(e).__name__}:{e}')
+          print('TRACK_A_RUNNING_FILE_COUNT='+str(len(seen)))
+          PY
+          echo TRACK_A_RUNNING_PREEXISTING_END=true
+          command -v lslocks 2>/dev/null | sed 's/^/TRACK_A_LSLOCKS_BIN=/' || true
+          if command -v lslocks >/dev/null 2>&1; then lslocks -o PID,COMMAND,PATH,TYPE,MODE 2>/dev/null | sed 's/^/TRACK_A_LSLOCKS=/' || true; fi
+
+          work="$state/running-observe/run-$GITHUB_RUN_ID"; home="$work/home"; runtime_dir="$work/runtime-dir"; tmp="$work/tmp"; unpack="$work/unpacked"
+          mkdir -p "$home" "$runtime_dir" "$tmp" "$unpack"; chmod 700 "$work" "$home" "$runtime_dir" "$tmp"
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          with tarfile.open(sys.argv[1],'r:gz') as h:
+              try:h.extractall(sys.argv[2],filter='data')
+              except TypeError:h.extractall(sys.argv[2])
+          PY
+          launcher="$unpack/Tibia/Tibia"; [[ -x "$launcher" ]]
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"; [[ -n "$proxy_lib" ]]
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"; tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          workdir="$(dirname "$launcher")"; log="$work/launcher.log"
+          cd "$workdir"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            HOME="$home" XDG_DATA_HOME="$home/.local/share" XDG_RUNTIME_DIR="$runtime_dir" TMPDIR="$tmp" DISPLAY="$TRACK_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            "$launcher" >"$log" 2>&1 &
+          pid=$!
+          echo TRACK_A_OBSERVED_LAUNCHER_PID="$pid"
+          python3 - "$pid" <<'PY'
+          import os,pathlib,sys,time
+          pid=sys.argv[1]; root=pathlib.Path('/proc')/pid
+          seen=set(); deadline=time.time()+4
+          while time.time()<deadline and root.exists():
+              try:
+                  for fd in (root/'fd').iterdir():
+                      try:t=os.readlink(fd)
+                      except OSError:continue
+                      key=(fd.name,t)
+                      if key not in seen:
+                          seen.add(key); print(f'TRACK_A_FD={fd.name}|{t}')
+              except OSError: pass
+              time.sleep(.002)
+          print('TRACK_A_FD_UNIQUE_COUNT='+str(len(seen)))
+          PY
+          wait "$pid" || rc=$?; rc="${rc:-0}"
+          echo TRACK_A_OBSERVED_LAUNCHER_RC="$rc"
+          grep -F 'Application is already running' "$log" | sed 's/^/TRACK_A_OBSERVED_LOG=/' || true
+          echo TRACK_A_RUNNING_POST_BEGIN=true
+          find "$work" "$home" "$tmp" "$runtime_dir" "$unpack" -name '.running' -o -name '*.running' 2>/dev/null | sort -u | sed 's/^/TRACK_A_RUNNING_POST=/' || true
+          echo TRACK_A_RUNNING_POST_END=true
+          echo TRACK_A_RUNNING_LOCK_OWNER_COMPLETE=true

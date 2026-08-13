@@ -1,0 +1,49 @@
+name: Track A X server GLX probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-xserver-glx-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Compare isolated X servers on temporary displays
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          toolroot="$state/toolroot"
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          echo TRACK_A_SYSTEM_XVFB="$(command -v Xvfb || true)"
+          echo TRACK_A_PRIVATE_XVFB="$state/runtime/Xvfb-track-a"
+          for spec in "system:$(command -v Xvfb || true):99" "private:$state/runtime/Xvfb-track-a:100"; do
+            IFS=: read -r label bin display_no <<<"$spec"
+            [[ -n "$bin" && -x "$bin" ]] || { echo TRACK_A_XSERVER_${label}_AVAILABLE=false; continue; }
+            display=":$display_no"
+            rm -f "/tmp/.X${display_no}-lock" "/tmp/.X11-unix/X${display_no}" 2>/dev/null || true
+            "$bin" "$display" -screen 0 1280x800x24 +extension GLX +render -nolisten tcp -noreset >"/tmp/track-a-${label}-x.log" 2>&1 & xp=$!
+            for _ in $(seq 1 20); do [[ -e "/tmp/.X11-unix/X${display_no}" ]] && break; kill -0 "$xp" 2>/dev/null || break; sleep .2; done
+            if [[ -e "/tmp/.X11-unix/X${display_no}" ]]; then
+              if DISPLAY="$display" xdpyinfo 2>/dev/null | grep -q 'GLX'; then glx=true; else glx=false; fi
+              echo TRACK_A_XSERVER_${label}_GLX="$glx"
+              if command -v glxinfo >/dev/null 2>&1; then
+                if DISPLAY="$display" LIBGL_ALWAYS_SOFTWARE=1 glxinfo -B >/tmp/track-a-${label}-glxinfo.txt 2>&1; then echo TRACK_A_XSERVER_${label}_GLXINFO=true; else echo TRACK_A_XSERVER_${label}_GLXINFO=false; fi
+                grep -E 'OpenGL renderer|string|direct rendering' /tmp/track-a-${label}-glxinfo.txt | head -n 8 | sed "s/^/TRACK_A_XSERVER_${label}_GLXINFO_LINE=/" || true
+              fi
+            else
+              echo TRACK_A_XSERVER_${label}_STARTED=false
+            fi
+            kill "$xp" 2>/dev/null || true; wait "$xp" 2>/dev/null || true
+          done
+          echo TRACK_A_XSERVER_GLX_PROBE_COMPLETE=true

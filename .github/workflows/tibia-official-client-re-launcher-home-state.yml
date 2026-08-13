@@ -1,0 +1,45 @@
+name: Track A launcher package state inventory
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-home-state.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Inventory launcher-owned package metadata without secrets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          home="$state/home"
+          base="$home/.local/share/CipSoft GmbH/Tibia"
+          [[ -d "$base" ]]
+          echo TRACK_A_LAUNCHER_STATE_BASE_PRESENT=true
+          find "$base" -maxdepth 3 -type f -printf '%P|%s\n' 2>/dev/null \
+            | grep -Ev '(^|/)(client\.log|crash|screenshots?|logs?)(/|$)' \
+            | head -n 300 | sed 's/^/TRACK_A_LAUNCHER_STATE_FILE=/'
+          echo TRACK_A_LAUNCHER_METADATA_BEGIN=true
+          find "$base" -maxdepth 3 -type f \( -name '*.json' -o -name '*.version' -o -name '*.sha256' -o -name '*.cfg' -o -name '*.conf' -o -name '*.ini' -o -name '.running' \) -print0 \
+            | while IFS= read -r -d '' f; do
+                rel="${f#$base/}"
+                echo "TRACK_A_LAUNCHER_METADATA_FILE=$rel"
+                case "$rel" in
+                  *account*|*credential*|*login*|*password*|*token*|*session*) echo TRACK_A_LAUNCHER_METADATA_REDACTED=true;;
+                  *) head -c 4096 "$f" 2>/dev/null | tr '\n' ' ' | sed -E 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[REDACTED_EMAIL]/g' | sed "s#^#TRACK_A_LAUNCHER_METADATA_CONTENT=$rel|#"; echo;;
+                esac
+              done
+          echo TRACK_A_LAUNCHER_STATE_INVENTORY_COMPLETE=true

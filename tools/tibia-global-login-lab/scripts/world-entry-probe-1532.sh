@@ -78,6 +78,16 @@ if text.count(old_version) != 1:
     raise SystemExit(f"expected exactly one 1532 client-version site, found {text.count(old_version)}")
 text = text.replace(old_version, new_version, 1)
 
+old_rsa = "    g_game.chooseRsa('www.tibia.com')\n"
+new_rsa = (
+    old_rsa
+    + "    mark('CLIENT_VERSION_VALUE='..tostring(g_game.getClientVersion()))\n"
+    + "    mark('PROTOCOL_VERSION_VALUE='..tostring(g_game.getProtocolVersion()))\n"
+)
+if text.count(old_rsa) != 1:
+    raise SystemExit(f"expected exactly one official RSA selection site, found {text.count(old_rsa)}")
+text = text.replace(old_rsa, new_rsa, 1)
+
 # Run #31 proved that appearances parse successfully while staticdata does not.
 # For the login-only experiment require the appearance catalogue (needed for
 # game objects) but do not make unrelated staticdata compatibility a gate. This

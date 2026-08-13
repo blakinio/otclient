@@ -341,6 +341,14 @@ HTTP flow extracts its 64-hex first field. The lab now normalizes only the
 runtime copy consumed by Linux OTClient to exactly that already-validated
 64-character identifier; the cached source asset remains unchanged.
 
+Run `31699422432`, job `94444685453`, exact head
+`4a830036f1d404bc8b3126cb042f1c1ffab85f3b`, proved the runtime identifier
+normalization was active, but the exchange remained 144 client bytes to zero
+server bytes. Because 144 bytes is structurally shorter than the expected
+version-1532 packet with a 64-character pre-RSA asset identifier, the next run
+records the public numeric client/protocol versions immediately before
+`loginWorld()` to determine whether failed staticdata loading mutates them.
+
 # Evidence classification
 
 PROVEN:
@@ -367,6 +375,7 @@ DISPROVEN:
 - the missing encryption/checksum/client-version/login-pending/sequenced feature set as the sole no-response cause: run `31697097942` sent 143 client bytes and received zero server bytes after restoring them.
 - the Linux OS id as the sole no-response cause: run `31698057223` advertised Windows and still sent 143 client bytes to zero server bytes.
 - the missing preview-state field as the sole no-response cause: run `31698702409` sent 144 client bytes and received zero server bytes.
+- a raw/untrimmed runtime asset identifier as the sole no-response cause: run `31699422432` normalized it to 64 characters and still received zero server bytes.
 
 UNKNOWN:
 - whether `g_game.loginWorld()` with appearances-only state reaches a game-server TCP/session callback;
@@ -393,14 +402,14 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with the runtime asset identifier normalized to 64 hex characters and classify the first game-server exchange.
+Run the canonical E2E with public numeric client/protocol version markers immediately before `loginWorld()` and reconcile them with the observed packet length.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:18:00Z
-head: 7eefc0f5a93fe0be33e6ce433839e0f349a18fb1
+updated_at: 2026-08-13T12:24:00Z
+head: 4a830036f1d404bc8b3126cb042f1c1ffab85f3b
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -415,7 +424,7 @@ proven:
 derived:
   - first remaining boundary is the official 15.32 initial game-login packet identity/framing
 unknown:
-  - whether normalizing the runtime asset identifier yields a server response
+  - whether failed staticdata loading mutates client/protocol version before loginWorld
 conflicts:
   - none
 first_failure:
@@ -426,6 +435,7 @@ rejected_hypotheses:
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
   - Linux OS identity alone: run 31698057223 advertised Windows and still received zero server bytes
   - missing preview-state field alone: run 31698702409 sent 144 client bytes and received zero server bytes
+  - raw runtime asset identifier alone: run 31699422432 normalized it and still received zero server bytes
 changed_paths:
   - tools/tibia-global-login-lab/scripts/world-entry-probe-1532.sh
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
@@ -435,5 +445,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with the runtime asset identifier normalized to 64 hex characters and classify aggregate direction markers
+next_action: run the exact-head canonical E2E with numeric client/protocol version markers immediately before loginWorld and reconcile them with packet length
 ```

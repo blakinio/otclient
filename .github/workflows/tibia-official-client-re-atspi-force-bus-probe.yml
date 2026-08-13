@@ -1,4 +1,4 @@
-name: Track A forced AT-SPI bus probe
+name: Track A Qt accessibility runtime probe
 
 on:
   push:
@@ -17,40 +17,23 @@ jobs:
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Force accessibility bus with private schemas
+      - name: Inspect exact official runtime accessibility components
         shell: bash
         run: |
           set -Eeuo pipefail
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
-          root="$state/toolroot"
-          lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
-          path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
-          schema="$root/usr/share/glib-2.0/schemas"
-          [[ -s "$schema/gschemas.compiled" ]]
-          launcher="$(find "$root" -type f -name at-spi-bus-launcher -print -quit)"
-          [[ -n "$launcher" ]]
-          mapfile -t info < <(PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-daemon" --session --fork --print-address=1 --print-pid=1)
-          [[ ${#info[@]} -ge 2 && -n "${info[0]}" && "${info[1]}" =~ ^[0-9]+$ ]]
-          export DBUS_SESSION_BUS_ADDRESS="${info[0]}"
-          dbus_pid="${info[1]}"
-          atspi_pid=''
-          cleanup() { [[ -z "$atspi_pid" ]] || kill "$atspi_pid" 2>/dev/null || true; kill "$dbus_pid" 2>/dev/null || true; }
-          trap cleanup EXIT
-          echo TRACK_A_SESSION_DBUS_READY=true
-          PATH="$path" LD_LIBRARY_PATH="$lib" XDG_DATA_DIRS="$root/usr/share:/usr/share" GSETTINGS_SCHEMA_DIR="$schema" \
-            "$launcher" --launch-immediately --a11y=1 >/tmp/track-a-atspi-force.log 2>&1 &
-          atspi_pid=$!
-          for _ in $(seq 1 30); do
-            if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --session --print-reply \
-              --dest=org.a11y.Bus /org/a11y/bus org.a11y.Bus.GetAddress >/tmp/track-a-atspi-address.txt 2>/dev/null; then
-              break
-            fi
-            sleep 0.2
-          done
-          if ! kill -0 "$atspi_pid" 2>/dev/null; then
-            sed -n '1,40p' /tmp/track-a-atspi-force.log | sed 's/^/TRACK_A_ATSPI_STDERR=/'
-            exit 1
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_EXACT_OFFICIAL_CLIENT_VERIFIED=true
+          echo TRACK_A_ACCESSIBILITY_FILES_BEGIN=true
+          find "$runtime" -type f \( -iname '*accessib*' -o -iname '*atspi*' -o -iname '*dbus*' -o -iname '*qxcb*' \) -printf '%P\n' | sort | head -n 120 | sed 's/^/TRACK_A_RUNTIME_FILE=/'
+          echo TRACK_A_ACCESSIBILITY_FILES_END=true
+          if command -v readelf >/dev/null 2>&1; then
+            readelf -d "$client" 2>/dev/null | grep -Ei 'NEEDED.*(Qt.*DBus|dbus|Qt.*Gui|Qt.*Widgets|Qt.*Quick)' | head -n 80 | sed 's/^/TRACK_A_CLIENT_NEEDED=/' || true
           fi
-          grep -q 'string "' /tmp/track-a-atspi-address.txt
-          echo TRACK_A_FORCED_ATSPI_BUS_READY=true
+          strings -a "$client" | grep -Ei 'AT_SPI|org\.a11y|accessibility|QAccessible|QT_LINUX_ACCESSIBILITY|dbus' | head -n 120 | sed 's/^/TRACK_A_CLIENT_STRING=/' || true
+          echo TRACK_A_QT_ACCESSIBILITY_RUNTIME_PROBE_COMPLETE=true

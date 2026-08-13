@@ -19,7 +19,7 @@ jobs:
       ASSET_BASE: https://static.tibia.com/launcher/assets-current
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
       EXPECTED_CLIENT_SIZE: '51965216'
-      BRIDGE_HEAD: 39ff79ac44a0a1010b4bcc8b8e3617525353df7e
+      BRIDGE_HEAD: 89e13819e6f53026b831b7e8e4c8fab228d1626c
     steps:
       - name: Checkout runtime evidence branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -40,19 +40,24 @@ jobs:
           [[ "$(git -C bridge-src rev-parse HEAD)" == "$BRIDGE_HEAD" ]]
           echo EXACT_BRIDGE_HEAD_VERIFIED=true
 
+      - name: Install bridge validation dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config qt6-base-dev python3-pyelftools python3-yaml socat
+
       - name: Focused Python tests
         shell: bash
         run: |
           set -Eeuo pipefail
           PYTHONPATH=bridge-src python3 bridge-src/tests/tools/tibia_runtime_bridge/test_bridge.py
-          python3 -m py_compile bridge-src/tools/tibia_runtime_bridge/launcher.py bridge-src/tools/tibia_runtime_bridge/ipc_client.py
+          python3 -m py_compile bridge-src/tools/tibia_runtime_bridge/launcher.py bridge-src/tools/tibia_runtime_bridge/ipc_client.py bridge-src/tools/tibia_runtime_bridge/resolver.py
 
       - name: Standalone Qt bridge build with warnings denied
         shell: bash
         run: |
           set -Eeuo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config qt6-base-dev python3-yaml socat
           cmake -S bridge-src/tools/tibia_runtime_bridge -B /tmp/tibia-bridge-build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/tibia-bridge-build --parallel 2
           test -s /tmp/tibia-bridge-build/otclient-tibia-runtime-bridge.so
@@ -78,6 +83,25 @@ jobs:
           [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           echo EXACT_BRIDGE_VALIDATION_RUNTIME_READY=true
 
+      - name: Verify profile targets by relocation rediscovery
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/resolver.py" \
+            --profile "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json" \
+            "$client" >/tmp/tibia-runtime/resolved-targets.json
+          python3 - "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json" /tmp/tibia-runtime/resolved-targets.json <<'PY'
+          import json,sys
+          profile=json.load(open(sys.argv[1])); resolved=json.load(open(sys.argv[2]))
+          for name,target in profile['targets'].items():
+              expected=target['vptr_offset'].lower()
+              candidates=resolved['targets'][name]['primary_vptr_candidates']
+              assert resolved['targets'][name]['unique'] is True, (name,candidates)
+              assert candidates == [expected], (name,expected,candidates)
+          print('PROFILE_REDISCOVERY_MATCH=true')
+          PY
+
       - name: Exact-client no-credential bridge E2E
         shell: bash
         run: |
@@ -96,7 +120,7 @@ jobs:
               --helper /tmp/tibia-bridge-build/otclient-tibia-runtime-bridge.so \
               --socket "$socket" \
               "$client" >/tmp/tibia-runtime/bridge-launch.log 2>&1 </dev/null &
-          launcher_pid=$!;echo "$launcher_pid">/tmp/tibia-runtime/bridge-launcher-pid
+          launcher_pid=$!
           for _ in $(seq 1 160);do [[ -S "$socket" ]]&&break;sleep 0.1;done
           [[ -S "$socket" ]]
           mode=$(stat -c '%a' "$socket");echo BRIDGE_SOCKET_MODE=$mode;[[ "$mode" == 600 ]]

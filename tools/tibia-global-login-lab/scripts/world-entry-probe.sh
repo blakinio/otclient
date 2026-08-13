@@ -175,6 +175,28 @@ unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD ASSET_VERSION
 
 docker exec "$CONTAINER" bash -lc 'test "$(stat -c %a /lab/secrets/login-handoff.json)" = 600'
 
+docker exec -i "$CONTAINER" python3 - <<'PY'
+import json
+import subprocess
+
+with open('/lab/secrets/login-handoff.json', 'r', encoding='utf-8') as handle:
+    handoff = json.load(handle)
+
+target = f"telnet://{handoff['worldHost']}:{int(handoff['worldPort'])}"
+probe = subprocess.run(
+    [
+        'curl', '--silent', '--show-error', '--verbose', '--socks5-hostname', '127.0.0.1:25344',
+        '--connect-timeout', '15', '--max-time', '20', target,
+    ],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.PIPE,
+    text=True,
+    check=False,
+)
+granted = 'SOCKS5 request granted' in probe.stderr or 'Connected to ' in probe.stderr
+print(f"LAB_GAME_TCP_VIA_WARP_SOCKS_GRANTED={'true' if granted else 'false'}")
+PY
+
 cp init.lua /tmp/lab-init.lua
 cat >>/tmp/lab-init.lua <<'LUA'
 if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then

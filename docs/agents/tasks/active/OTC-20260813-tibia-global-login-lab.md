@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T12:48:00+02:00
+updated: 2026-08-13T12:55:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -234,6 +234,14 @@ does not yet distinguish a proxy/TCP failure from a post-connect transport
 close. The probe now records only the numeric `std::error_code` value as a
 non-secret marker and continues to discard its free-form message.
 
+Run `31692607512`, job `94423060887`, exact head
+`5598eae8141f3ec532a19a2f5937223298cd02ee`, reproduced the connection callback
+with numeric code `110` (`ETIMEDOUT`) after the character login call. No
+`GAME_LOGIN` callback occurred and direct OTClient TCP remained zero. The next
+probe independently attempts a bounded SOCKS5 TCP connection through the same
+userspace-WARP endpoint to the handoff world host/port, emits only a boolean
+grant marker, discards all curl output, and does not log target values.
+
 # Evidence classification
 
 PROVEN:
@@ -282,4 +290,4 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with numeric-only connection-error classification. Use the exact code plus proxy/direct-TCP evidence to distinguish DNS/TCP/proxy failure from a post-connect transport close, then continue at the first failing layer.
+Run the canonical E2E with the independent SOCKS5 game-port probe. If SOCKS TCP is granted but OTClient still times out, inspect proxychains integration; if both time out, persist the exact WARP/game-port reachability boundary and falsify it from another approved lab egress before terminal classification.

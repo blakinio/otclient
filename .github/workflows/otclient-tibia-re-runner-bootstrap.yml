@@ -2,40 +2,60 @@ name: OTClient Tibia RE runner bootstrap
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ci/OTC-20260727-tibia-linux-runner-analysis
+    paths:
+      - .github/workflows/otclient-tibia-re-runner-bootstrap.yml
 
 permissions:
   contents: read
 
 jobs:
   bootstrap:
-    runs-on: [self-hosted, oteryn-staging]
+    runs-on: [self-hosted, otclient, synology]
     timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Verify runner and Docker
+      - name: Checkout task branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Verify dedicated OTClient runner
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           echo "RUNNER_NAME=${RUNNER_NAME:-unknown}"
+          echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY}"
+          echo "GITHUB_REF_NAME=${GITHUB_REF_NAME}"
           uname -a
-          docker version
-          docker info >/dev/null
-      - name: Recreate isolated OTClient Tibia RE container
+          test "${GITHUB_REPOSITORY}" = "blakinio/otclient"
+          test "${RUNNER_NAME:-}" = "synology-otclient-01"
+          echo OTCLIENT_DEDICATED_RUNNER_VERIFIED=true
+
+      - name: Initialize persistent OTClient Tibia RE state
         shell: bash
         run: |
-          set -euo pipefail
-          name=otclient-tibia-re
-          state=/var/lib/oteryn-staging-state/tibia-linux-analysis
-          mkdir -p "$state"
-          docker rm -f "$name" >/dev/null 2>&1 || true
-          docker run -d \
-            --name "$name" \
-            --restart unless-stopped \
-            --init \
-            -v "$state:/state" \
-            -w /state \
-            ubuntu:24.04 \
-            sleep infinity
-          docker inspect "$name" --format '{{.Name}} {{.State.Status}} {{.Config.Image}}'
-          docker exec "$name" sh -lc 'uname -a; id; test -w /state'
+          set -Eeuo pipefail
+          state=/home/runner/_work/_otclient_tibia_re_state
+          mkdir -p "$state"/{runtime,cache,artifacts,checkpoints}
+          test -w "$state"
+          cat >"$state/runner-contract.txt" <<EOF
+          repository=${GITHUB_REPOSITORY}
+          runner=${RUNNER_NAME}
+          selector=self-hosted,otclient,synology
+          state_dir=$state
+          branch=${GITHUB_REF_NAME}
+          head=${GITHUB_SHA}
+          EOF
+          test -s "$state/runner-contract.txt"
+          echo "OTCLIENT_TIBIA_RE_STATE_DIR=$state"
+          echo OTCLIENT_TIBIA_RE_PERSISTENT_STATE_READY=true
+
+      - name: Prove Oteryn runtime independence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "${RUNNER_NAME}" != "oteryn-synology-staging"
+          test ! -e /var/lib/oteryn-staging-state/tibia-linux-analysis
+          echo OTCLIENT_TIBIA_RE_OTERYN_RUNTIME_DEPENDENCY=false

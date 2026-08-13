@@ -41,6 +41,26 @@ jobs:
           kill -0 "$xvfb_pid"
           echo TRACK_A_ALTUID_PREREQUISITES_VERIFIED=true
 
+          # Clear only orphan official launchers that were deliberately detached by
+          # previous Track A recovery jobs. Never match the child bin/client.
+          cleared=0
+          for proc in /proc/[0-9]*; do
+            [[ -r "$proc/environ" && -r "$proc/exe" ]] || continue
+            grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            [[ "$(basename "$exe" 2>/dev/null || true)" == Tibia ]] || continue
+            case "$exe" in
+              "$state"/*|/tmp/track-a-altuid-*/*/Tibia/Tibia)
+                pid="${proc##*/}"
+                kill "$pid" 2>/dev/null || true
+                for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
+                if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; fi
+                cleared=$((cleared+1))
+                ;;
+            esac
+          done
+          echo TRACK_A_ORPHAN_LAUNCHERS_CLEARED="$cleared"
+
           work="/tmp/track-a-altuid-$GITHUB_RUN_ID"
           home="$work/home"
           unpack="$work/unpacked"
@@ -64,9 +84,6 @@ jobs:
           [[ -x "$launcher" ]]
           chmod -R a+rX "$unpack"
 
-          # Mirror only shared libraries from the private Track-A toolroot into an
-          # alt-UID-readable directory. This covers EGL/GL dispatch dependencies
-          # without exposing any credentials or writable canonical state.
           find "$root/usr/lib/x86_64-linux-gnu" "$root/lib/x86_64-linux-gnu" -maxdepth 1 \
             \( -type f -o -type l \) -name '*.so*' -print0 2>/dev/null \
             | while IFS= read -r -d '' p; do

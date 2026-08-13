@@ -49,13 +49,15 @@ jobs:
           reg_pid=$!
           for _ in $(seq 1 30); do
             kill -0 "$reg_pid" 2>/dev/null || break
-            if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --address="$addr" --print-reply \
-              --dest=org.freedesktop.DBus / org.freedesktop.DBus.ListNames >/tmp/track-a-direct-names.txt 2>/dev/null && \
+            if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --bus="$addr" --print-reply \
+              --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames \
+              >/tmp/track-a-direct-names.txt 2>/tmp/track-a-direct-dbus.err && \
               grep -q 'org.a11y.atspi.Registry' /tmp/track-a-direct-names.txt; then
               echo TRACK_A_PRIVATE_REGISTRY_REGISTERED=true
               exit 0
             fi
             sleep .2
           done
+          sed -n '1,20p' /tmp/track-a-direct-dbus.err | sed 's/^/TRACK_A_DBUS_SEND_STDERR=/' || true
           sed -n '1,40p' /tmp/track-a-registryd.log | sed 's/^/TRACK_A_REGISTRYD_STDERR=/' || true
           exit 1

@@ -1,0 +1,69 @@
+name: Track A official Linux client reconstruction
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-reconstruct.yml
+      - .github/scripts/tibia-official-client-re-reconstruct.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-reconstruct
+  cancel-in-progress: false
+
+jobs:
+  reconstruct:
+    runs-on: [otclient, synology]
+    timeout-minutes: 60
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_WARP_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Track A ownership and reconstruct hash-verified runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          pid_file="$state/runtime/wireproxy.pid"
+          [[ -s "$pid_file" ]]
+          pid="$(tr -cd '0-9' <"$pid_file")"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker"
+          kill -0 "$pid"
+          ss -lntH "sport = :$TRACK_WARP_PORT" | grep -q .
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo TRACK_A_WARP_OWNERSHIP_VERIFIED=true
+
+          package_out="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          mkdir -p "$package_out"
+          chmod 700 "$state/home" "$state/home/.local" "$state/home/.local/share" \
+            "$state/home/.local/share/CipSoft GmbH" "$state/home/.local/share/CipSoft GmbH/Tibia" \
+            "$state/home/.local/share/CipSoft GmbH/Tibia/packages" "$package_out"
+          TIBIA_PACKAGE_OUT="$package_out" TIBIA_SOCKS="127.0.0.1:$TRACK_WARP_PORT" \
+            python3 .github/scripts/tibia-official-client-re-reconstruct.py
+
+          client="$package_out/bin/client"
+          [[ -x "$client" ]]
+          actual_sha="$(sha256sum "$client" | awk '{print $1}')"
+          actual_size="$(stat -c %s "$client")"
+          [[ "$actual_sha" == "$EXPECTED_CLIENT_SHA256" ]]
+          [[ "$actual_size" == "$EXPECTED_CLIENT_SIZE" ]]
+          echo TRACK_A_RUNTIME_FILE_COUNT="$(find "$package_out" -type f | wc -l)"
+          echo TRACK_A_RUNTIME_TOTAL_BYTES="$(du -sb "$package_out" | awk '{print $1}')"
+          echo TRACK_A_RUNTIME_CLIENT_SHA256="$actual_sha"
+          echo TRACK_A_RUNTIME_RECONSTRUCTED=true

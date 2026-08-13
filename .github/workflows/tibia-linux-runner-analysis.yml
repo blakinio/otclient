@@ -24,7 +24,7 @@ env:
 jobs:
   login-no-ocr:
     name: Attempt official Tibia login without OCR
-    runs-on: [self-hosted, otclient, synology]
+    runs-on: [otclient, synology]
     timeout-minutes: 25
 
     steps:
@@ -106,89 +106,6 @@ jobs:
           echo OCR_BINARY_ABSENT=true
           INNER
 
-      - name: Materialize and verify the exact researched official client
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          docker exec -i "$CONTAINER_NAME" bash <<'INNER'
-          set -Eeuo pipefail
-          export HOME=/analysis/current/home
-          export XDG_DATA_HOME="$HOME/.local/share"
-          export XDG_CONFIG_HOME="$HOME/.config"
-          export DISPLAY=:99
-          export LIBGL_ALWAYS_SOFTWARE=1
-          export QT_XCB_GL_INTEGRATION=none
-          mkdir -p /analysis/current/download /analysis/current/home /analysis/current/runtime
-          chmod 700 /analysis/current/runtime
-
-          expected_sha='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
-          expected_size='51965216'
-          client=$(find "$HOME" -type f -path '*/packages/Tibia/bin/client' -perm -111 -print -quit 2>/dev/null || true)
-          have_expected=false
-          if [[ -n "$client" ]]; then
-            actual_sha=$(sha256sum "$client" | awk '{print $1}')
-            actual_size=$(stat -c %s "$client")
-            if [[ "$actual_sha" == "$expected_sha" && "$actual_size" == "$expected_size" ]]; then
-              have_expected=true
-            fi
-          fi
-
-          if [[ "$have_expected" != true ]]; then
-            archive=/analysis/current/download/tibia.x64.tar.gz
-            rm -rf /analysis/current/download/Tibia
-            curl --fail --location --retry 5 --retry-delay 3 \
-              -A 'Mozilla/5.0 (X11; Linux x86_64)' \
-              -e 'https://www.tibia.com/' \
-              -o "$archive" https://static.tibia.com/download/tibia.x64.tar.gz
-            tar -xzf "$archive" -C /analysis/current/download
-            launcher=/analysis/current/download/Tibia/Tibia
-            [[ -x "$launcher" ]]
-
-            pkill -f '^Xvfb :99' 2>/dev/null || true
-            nohup Xvfb :99 -screen 0 1280x800x24 >/analysis/current/runtime/xvfb.log 2>&1 </dev/null &
-            sleep 2
-            nohup dbus-run-session -- "$launcher" >/analysis/current/runtime/launcher.log 2>&1 </dev/null &
-            launcher_pid=$!
-            sleep 10
-
-            for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
-              geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
-              width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
-              height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
-              [[ -n "$width" && -n "$height" ]] || continue
-              if (( width < 1000 || height < 650 )); then
-                xdotool mousemove --window "$w" 400 193 click 1 || true
-              fi
-            done
-
-            for _ in $(seq 1 90); do
-              client=$(find "$HOME" -type f -path '*/packages/Tibia/bin/client' -perm -111 -print -quit 2>/dev/null || true)
-              if [[ -n "$client" ]]; then
-                actual_sha=$(sha256sum "$client" | awk '{print $1}')
-                actual_size=$(stat -c %s "$client")
-                if [[ "$actual_sha" == "$expected_sha" && "$actual_size" == "$expected_size" ]]; then
-                  break
-                fi
-              fi
-              sleep 2
-            done
-            kill "$launcher_pid" 2>/dev/null || true
-          fi
-
-          client=$(find "$HOME" -type f -path '*/packages/Tibia/bin/client' -perm -111 -print -quit 2>/dev/null || true)
-          [[ -n "$client" ]]
-          actual_sha=$(sha256sum "$client" | awk '{print $1}')
-          actual_size=$(stat -c %s "$client")
-          echo "client_size=$actual_size"
-          echo "client_sha256=$actual_sha"
-          if [[ "$actual_sha" != "$expected_sha" || "$actual_size" != "$expected_size" ]]; then
-            echo CLIENT_IDENTITY_MISMATCH=true >&2
-            exit 1
-          fi
-          printf '%s' "$client" >/analysis/current/runtime/client-path
-          echo EXACT_CLIENT_IDENTITY_VERIFIED=true
-          INNER
-
       - name: Materialize pinned userspace WARP tooling
         shell: bash
         run: |
@@ -199,14 +116,10 @@ jobs:
           mkdir -p "$root/bin" "$root/state"
           chmod 700 "$root" "$root/state"
           cd "$root/bin"
-          curl -fL --retry 3 --connect-timeout 10 \
-            -o wgcf \
-            https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          curl -fL --retry 3 --connect-timeout 10 -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
           echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
           chmod 755 wgcf
-          curl -fL --retry 3 --connect-timeout 10 \
-            -o wireproxy.tar.gz \
-            https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          curl -fL --retry 3 --connect-timeout 10 -o wireproxy.tar.gz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
           echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tar.gz' | sha256sum -c -
           rm -rf wireproxy-extract
           mkdir wireproxy-extract
@@ -259,176 +172,16 @@ jobs:
           [[ -n "$baseline" && -n "$warp_ip" && "$baseline" != "$warp_ip" ]]
           [[ "$warp_state" == on || "$warp_state" == plus ]]
           echo USERSPACE_WARP_EGRESS_VERIFIED=true
-          grep -E '^(loc|warp)=' /tmp/warp-trace
-          cat >/analysis/current/runtime/proxychains-tibia.conf <<'EOF'
-          strict_chain
-          proxy_dns
-          tcp_read_time_out 15000
-          tcp_connect_time_out 8000
-          [ProxyList]
-          socks5 127.0.0.1 25344
-          EOF
-          proxy_ip=$(proxychains4 -f /analysis/current/runtime/proxychains-tibia.conf curl -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | sed -n 's/^ip=//p')
-          [[ "$proxy_ip" == "$warp_ip" ]]
-          echo PROXYCHAINS_WARP_EGRESS_VERIFIED=true
           INNER
 
-      - name: Launch exact client through WARP and prove TCP confinement
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          docker exec -i "$CONTAINER_NAME" bash <<'INNER'
-          set -Eeuo pipefail
-          export DISPLAY=:99 HOME=/analysis/current/home
-          client=$(cat /analysis/current/runtime/client-path)
-          pkg=$(dirname "$(dirname "$client")")
-          cfg=/analysis/current/runtime/proxychains-tibia.conf
-          [[ -x "$client" && -f "$cfg" ]]
-          pkill -f 'packages/Tibia/bin/client' 2>/dev/null || true
-          pgrep -f '^Xvfb :99' >/dev/null || nohup Xvfb :99 -screen 0 1280x800x24 >/analysis/current/runtime/xvfb.log 2>&1 </dev/null &
-          sleep 2
-          cd "$pkg"
-          : >/analysis/current/runtime/client-proxychains.log
-          nohup proxychains4 -f "$cfg" "$client" >/analysis/current/runtime/client-proxychains.log 2>&1 </dev/null &
-          for _ in $(seq 1 30); do
-            pgrep -f 'packages/Tibia/bin/client' >/dev/null && break
-            sleep 1
-          done
-          pid=$(pgrep -f 'packages/Tibia/bin/client' | head -n1)
-          [[ -n "$pid" ]]
-          sleep 10
-          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
-          if printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -q .; then
-            echo CLIENT_DIRECT_TCP_DETECTED=true >&2
-            exit 1
-          fi
-          printf '%s\n' "$sockets" | awk '{print $5}' | grep -Eq '^(127\.0\.0\.1|\[::1\]):25344$'
-          echo CLIENT_TCP_USERSPACE_WARP_CONFINEMENT_VERIFIED=true
+      - name: Checkout exact probe source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
-          best=''; best_area=0; best_width=0; best_height=0
-          for w in $(xdotool search --onlyvisible --name '^Tibia$' 2>/dev/null || true); do
-            geom=$(xdotool getwindowgeometry --shell "$w" 2>/dev/null || true)
-            width=$(printf '%s\n' "$geom" | sed -n 's/^WIDTH=//p')
-            height=$(printf '%s\n' "$geom" | sed -n 's/^HEIGHT=//p')
-            [[ -n "$width" && -n "$height" ]] || continue
-            area=$((width*height))
-            if (( area > best_area )); then
-              best=$w; best_area=$area; best_width=$width; best_height=$height
-            fi
-          done
-          [[ -n "$best" && "$best_width" == 1020 && "$best_height" == 650 ]]
-          xdotool mousemove --window "$best" 510 302 click 1
-          sleep 2
-          printf '%s' "$best" >/analysis/current/runtime/tibia-window-id
-          printf '%s' "$pid" >/analysis/current/runtime/tibia-pid
-          echo EXACT_LOGIN_WINDOW_GEOMETRY_VERIFIED=true
-          INNER
-
-      - name: Enter credentials and activate first character without OCR
-        shell: bash
+      - name: Run bounded Global login probe
         env:
           TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
           TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
-        run: |
-          set +x
-          set -Eeuo pipefail
-          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
-          docker exec -e TIBIA_TEST_EMAIL -e TIBIA_TEST_PASSWORD -i "$CONTAINER_NAME" bash <<'INNER'
-          set +x
-          set -Eeuo pipefail
-          export DISPLAY=:99 HOME=/analysis/current/home
-          best=$(cat /analysis/current/runtime/tibia-window-id)
-          pid=$(cat /analysis/current/runtime/tibia-pid)
-          [[ -n "$best" && -n "$pid" ]]
-          [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^WIDTH=//p')" == 1020 ]]
-          [[ "$(xdotool getwindowgeometry --shell "$best" | sed -n 's/^HEIGHT=//p')" == 650 ]]
-
-          export WINDOWID="$best"
-          xdotool mousemove --window "$best" 535 275 click 1
-          xdotool key --window "$best" ctrl+a
-          xdotool - <<'XDO_EMAIL'
-          type --window $WINDOWID --delay 3 "$TIBIA_TEST_EMAIL"
-          XDO_EMAIL
-          xdotool mousemove --window "$best" 535 304 click 1
-          xdotool key --window "$best" ctrl+a
-          xdotool - <<'XDO_PASSWORD'
-          type --window $WINDOWID --delay 3 "$TIBIA_TEST_PASSWORD"
-          XDO_PASSWORD
-          xdotool mousemove --window "$best" 590 388 click 1
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD WINDOWID
-          echo CREDENTIALS_ENTERED_WITHOUT_OCR=true
-
-          sleep 25
-          before_lines=$(wc -l </analysis/current/runtime/client-proxychains.log)
-          printf '%s' "$before_lines" >/analysis/current/runtime/proxy-log-before-character
-
-          # Exact client hash and 1020x650 geometry were verified above. The first
-          # character row interior is activated by a bounded double-click; there is
-          # no screenshot, OCR, text recognition, or character-name extraction.
-          xdotool mousemove --window "$best" 400 214 click --repeat 2 --delay 180 1
-          echo FIRST_CHARACTER_ROW_DOUBLECLICKED=true
-          sleep 30
-
-          kill -0 "$pid"
-          sockets=$(ss -ntp 2>/dev/null | grep "pid=$pid," || true)
-          if printf '%s\n' "$sockets" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -q .; then
-            echo CLIENT_DIRECT_TCP_DETECTED_AFTER_LOGIN=true >&2
-            exit 1
-          fi
-          echo CLIENT_DIRECT_TCP_DETECTED_AFTER_LOGIN=false
-          echo CLIENT_PROCESS_ALIVE_AFTER_CHARACTER_ACTIVATION=true
-          INNER
-
-      - name: Prove post-activation game-server transport without image text
         shell: bash
-        run: |
-          set -Eeuo pipefail
-          docker exec -i "$CONTAINER_NAME" python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          log = Path('/analysis/current/runtime/client-proxychains.log')
-          before_path = Path('/analysis/current/runtime/proxy-log-before-character')
-          if not log.exists() or not before_path.exists():
-              raise SystemExit('missing bounded proxy evidence')
-          lines = log.read_text(errors='replace').splitlines()
-          before = int(before_path.read_text().strip() or '0')
-          post = lines[before:]
-          ok_lines = [line for line in post if re.search(r'\bOK\b', line, re.I)]
-          ports = set()
-          for line in ok_lines:
-              for m in re.finditer(r':([0-9]{1,5})(?=\D|$)', line):
-                  port = int(m.group(1))
-                  if 1 <= port <= 65535 and port not in {25344, 443}:
-                      ports.add(port)
-          print(f'POST_ACTIVATION_PROXY_LINE_COUNT={len(post)}')
-          print(f'POST_ACTIVATION_PROXY_OK_COUNT={len(ok_lines)}')
-          print('POST_ACTIVATION_NON_HTTPS_TARGET_PORTS=' + ','.join(map(str, sorted(ports))))
-          proven = bool(ports)
-          print(f'GAME_SERVER_PROXY_CONNECTION_PROVEN={str(proven).lower()}')
-          if not proven:
-              raise SystemExit('no successful post-activation non-HTTPS proxied target observed')
-          PY
-
-      - name: Leave successful session online and verify owned runtime
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER_NAME")" == "otclient" ]]
-          [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.purpose" }}' "$CONTAINER_NAME")" == "tibia-login-no-ocr" ]]
-          [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME")" == "OTC-20260727-tibia-linux-runner-analysis" ]]
-          docker exec "$CONTAINER_NAME" pgrep -f 'packages/Tibia/bin/client' >/dev/null
-          echo TIBIA_SESSION_LEFT_RUNNING=true
-
-      - name: Verify canonical staging unchanged
-        if: always()
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          docker ps -a --filter 'label=com.docker.compose.project=oteryn-staging' --format '{{.ID}}\t{{.Names}}' | sort >/tmp/oteryn-after.tsv
-          if [[ -f /tmp/oteryn-before.tsv ]]; then
-            diff -u /tmp/oteryn-before.tsv /tmp/oteryn-after.tsv
-          fi
-          if docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
-            docker inspect --format 'analysis_name={{.Name}} status={{.State.Status}} owner={{ index .Config.Labels "com.blakinio.owner" }} purpose={{ index .Config.Labels "com.blakinio.purpose" }} task={{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME"
-          fi
+        run: bash .github/scripts/otclient-global-login-probe.sh

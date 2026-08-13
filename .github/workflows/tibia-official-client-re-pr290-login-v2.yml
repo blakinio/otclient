@@ -6,7 +6,7 @@ on:
       - ci/OTC-20260813-official-client-re-continuation
     paths:
       - .github/workflows/tibia-official-client-re-pr290-login-v2.yml
-      - tools/track-a/pr290-login.sh
+      - .github/scripts/tibia-official-client-re-autonomous-world-login.sh
   workflow_dispatch:
 
 permissions:
@@ -30,17 +30,9 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-      - name: Execute PR290 login flow
+      - name: Execute autonomous no-OCR Track A login flow
         shell: bash
         env:
           TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
           TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
-        run: bash tools/track-a/pr290-login.sh
-      - name: Upload achieved world screenshot
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: track-a-pr290-world
-          path: artifacts/track-a-pr290/world.xwd
-          if-no-files-found: ignore
-          retention-days: 7
+        run: bash .github/scripts/tibia-official-client-re-autonomous-world-login.sh

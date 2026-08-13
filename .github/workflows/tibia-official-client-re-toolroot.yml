@@ -32,13 +32,21 @@ jobs:
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           root="$state/toolroot"
           debs="$state/cache/toolroot-debs"
-          mkdir -p "$root" "$debs"
-          chmod 700 "$state" "$root" "$debs"
+          aptroot="$state/cache/toolroot-apt"
+          mkdir -p "$root" "$debs" "$aptroot/lists/partial" "$aptroot/archives/partial"
+          chmod 700 "$state" "$root" "$debs" "$aptroot" "$aptroot/lists" "$aptroot/archives"
+
+          apt_opts=(
+            -o "Dir::State::lists=$aptroot/lists"
+            -o "Dir::Cache::archives=$aptroot/archives"
+            -o APT::Get::List-Cleanup=0
+          )
+          apt-get "${apt_opts[@]}" update
 
           cd "$debs"
           packages=(file gdb proxychains4 socat xdotool xvfb)
           for package in "${packages[@]}"; do
-            apt-get download "$package"
+            apt-get "${apt_opts[@]}" download "$package"
           done
           for archive in ./*.deb; do
             dpkg-deb -x "$archive" "$root"

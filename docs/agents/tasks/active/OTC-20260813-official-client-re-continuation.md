@@ -98,12 +98,12 @@ derived:
   - a fresh main-based Track A task and PR are required for discoverable continuation
 unknown:
   - current structural session state
-  - whether six missing runner tools can run from an isolated unprivileged Track A toolroot without changing the shared runner image
+  - whether six missing runner tools can run from an isolated unprivileged Track A toolroot after refreshing private package indexes
 conflicts:
   - canonical preferred runner labels differ from the currently reported legacy label set
 first_failure:
-  marker: direct runner image lacks six dependencies required for client launch and instrumentation
-  evidence: run 31700834510 job 94449297810 emitted TRACK_A_MISSING_TOOL_COUNT=6
+  marker: private toolroot package download had no apt package index
+  evidence: run 31701102595 job 94450191425 failed with Unable to locate package file
 rejected_hypotheses:
   - continue mutating closed PR 48 as active ownership: rejected by live PR state and current main governance
 changed_paths:
@@ -126,7 +126,10 @@ validation:
   - command: python -m unittest tests.tools.test_tibia_official_client_re_reconstruct
     result: PASS
     evidence: four path/hash-policy tests pass
+  - command: Track A official-client RE toolroot run 31701102595 job 94450191425
+    result: FAIL
+    evidence: legacy runner apt lists are absent; retry uses private Track A lists/cache
 blockers:
-  - runner image lacks file gdb proxychains4 socat xdotool and Xvfb for launch/instrumentation phases
-next_action: prepare and validate an unprivileged Track A toolroot for the six missing binaries without altering the shared runner image or Track B runtime
+  - toolroot run 31701102595 failed because the legacy runner image has no usable apt package index; no shared system mutation was attempted
+next_action: refresh apt indexes under the private Track A cache and retry the unprivileged toolroot without altering the shared runner image or Track B runtime
 ```

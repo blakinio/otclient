@@ -1,0 +1,71 @@
+name: Tibia runtime reconstruct-start diagnostic
+
+on:
+  push:
+    branches: [ci/OTC-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-runtime-reconstruct-start-diagnostic.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-reconstruct-diagnostic-home
+      PACKAGE_BASE: https://static.tibia.com/launcher/tibiaclient-linux-current
+      ASSET_BASE: https://static.tibia.com/launcher/assets-current
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Isolate exact reconstruction and pre-login startup
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends python3-yaml
+          python3 - <<'PY'
+          import pathlib,yaml
+          doc=yaml.safe_load(pathlib.Path('.github/workflows/tibia-hosted-complete-assets-no-ocr-login-v4.yml').read_text())
+          steps=doc['jobs']['world-entry']['steps'];out=pathlib.Path('/tmp/v4diag');out.mkdir(parents=True,exist_ok=True)
+          wanted={
+            'Install strict no-OCR runtime':'01.sh',
+            'Establish pinned userspace WARP':'02.sh',
+            'Reconstruct official package and preserve packed runtime assets':'03.sh',
+            'Start exact client through WARP':'04.sh',
+          }
+          seen=set()
+          for step in steps:
+            if step.get('name') in wanted:
+              text=step['run']
+              if step['name']=='Reconstruct official package and preserve packed runtime assets':
+                text=text.replace('stderr=subprocess.DEVNULL','stderr=None')
+              p=out/wanted[step['name']];p.write_text(text);p.chmod(0o700);seen.add(step['name'])
+          if set(wanted)-seen: raise SystemExit('missing bootstrap step')
+          PY
+          for s in 01.sh 02.sh 03.sh 04.sh; do
+            echo "DIAG_START=$s"
+            start=$(date +%s)
+            if /usr/bin/bash --noprofile --norc -e -o pipefail "/tmp/v4diag/$s"; then
+              echo "DIAG_PASS=$s"
+            else
+              rc=$?
+              echo "DIAG_FAIL=$s"
+              echo "DIAG_EXIT=$rc"
+              exit "$rc"
+            fi
+            echo "DIAG_SECONDS_$s=$(($(date +%s)-start))"
+          done
+          pid=$(cat /tmp/tibia-runtime/client-pid)
+          kill -0 "$pid"
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          sha=$(sha256sum "$client"|awk '{print $1}')
+          echo "DIAG_CLIENT_SHA256=$sha"
+          [[ "$sha" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo RUNTIME_RECONSTRUCT_START_PASS=true

@@ -130,3 +130,5 @@ jobs:
           echo TRACK_A_OFFICIAL_LINUX_WORLD_LOGIN_PROVEN=true
           echo TRACK_A_VISIBLE_WORLD_MAP_PROVEN=true
           echo TRACK_A_SESSION_LEFT_LOGGED_IN=true
+
+          # Verification trigger: 2026-08-13 software-backend live session.

@@ -16,6 +16,10 @@ IMAGE="ghcr.io/blakinio/otclient:latest"
 TASK="OTC-20260813-tibia-global-login-lab"
 ASSET_BASE="https://static.tibia.com/launcher/assets-current"
 CLIENT_VERSION_STRING="15.32.df7b29"
+WGCF_VERSION="2.2.32"
+WGCF_SHA256="2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c"
+WIREPROXY_VERSION="1.1.3"
+WIREPROXY_SHA256="e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c"
 
 for volume in "$STATE_VOLUME" "$RUNTIME_VOLUME"; do
   docker volume inspect "$volume" >/dev/null
@@ -43,24 +47,112 @@ task=$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' 
 [[ "$owner" == "otclient" && "$task" == "$TASK" ]]
 
 docker exec "$CONTAINER" bash -lc '
+  set -Eeuo pipefail
   export DEBIAN_FRONTEND=noninteractive
   missing=0
-  for cmd in curl python3 Xvfb xdpyinfo pgrep ss; do command -v "$cmd" >/dev/null 2>&1 || missing=1; done
+  for cmd in curl python3 Xvfb xdpyinfo pgrep ss proxychains4 tar; do command -v "$cmd" >/dev/null 2>&1 || missing=1; done
   if [[ "$missing" -eq 1 ]]; then
     apt-get update -qq
-    apt-get install -y --no-install-recommends curl python3 xvfb x11-utils procps iproute2 ca-certificates >/dev/null
+    apt-get install -y --no-install-recommends curl python3 xvfb x11-utils procps iproute2 ca-certificates proxychains4 tar >/dev/null
   fi
   ! command -v tesseract >/dev/null 2>&1
 '
+echo LAB_OCR_BINARY_ABSENT=true
 
-# Fetch and verify only the current catalog files required by OTClient.
+# Migrate the proven PR #48 userspace-WARP pattern into this lab-owned persistent volume.
+docker exec \
+  -e WGCF_VERSION="$WGCF_VERSION" \
+  -e WGCF_SHA256="$WGCF_SHA256" \
+  -e WIREPROXY_VERSION="$WIREPROXY_VERSION" \
+  -e WIREPROXY_SHA256="$WIREPROXY_SHA256" \
+  "$CONTAINER" bash -lc '
+set -Eeuo pipefail
+root=/lab/state/userspace-warp
+bin="$root/bin"
+state="$root/state"
+mkdir -p "$bin" "$state"
+chmod 700 "$root" "$state"
+
+cd "$bin"
+if [[ ! -x wgcf ]] || ! printf "%s  wgcf\n" "$WGCF_SHA256" | sha256sum -c - >/dev/null 2>&1; then
+  rm -f wgcf
+  curl -fL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 180 \
+    -o wgcf "https://github.com/ViRb3/wgcf/releases/download/v${WGCF_VERSION}/wgcf_${WGCF_VERSION}_linux_amd64"
+  printf "%s  wgcf\n" "$WGCF_SHA256" | sha256sum -c -
+  chmod 755 wgcf
+fi
+
+if [[ ! -x wireproxy ]]; then
+  rm -f wireproxy wireproxy.tar.gz
+  curl -fL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 180 \
+    -o wireproxy.tar.gz "https://github.com/windtf/wireproxy/releases/download/v${WIREPROXY_VERSION}/wireproxy_linux_amd64.tar.gz"
+  printf "%s  wireproxy.tar.gz\n" "$WIREPROXY_SHA256" | sha256sum -c -
+  rm -rf wireproxy-extract
+  mkdir wireproxy-extract
+  tar -xzf wireproxy.tar.gz -C wireproxy-extract
+  wp=$(find wireproxy-extract -type f -name wireproxy -print -quit)
+  [[ -n "$wp" ]]
+  cp "$wp" wireproxy
+  chmod 755 wireproxy
+fi
+
+echo LAB_WARP_TOOLING_VERIFIED=true
+
+cd "$state"
+if [[ ! -s wgcf-account.toml ]]; then
+  "$bin/wgcf" register --accept-tos >/dev/null
+fi
+chmod 600 wgcf-account.toml
+"$bin/wgcf" generate >/dev/null
+chmod 600 wgcf-profile.conf
+cat >wireproxy.conf <<EOF
+WGConfig = $state/wgcf-profile.conf
+
+[Socks5]
+BindAddress = 127.0.0.1:25344
+EOF
+chmod 600 wireproxy.conf
+"$bin/wireproxy" -n -c "$state/wireproxy.conf"
+pkill -f "/wireproxy .*wireproxy.conf" 2>/dev/null || true
+nohup "$bin/wireproxy" -c "$state/wireproxy.conf" >"$root/wireproxy.log" 2>&1 </dev/null &
+
+ready=0
+for _ in $(seq 1 30); do
+  if curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/warp-trace 2>/dev/null; then
+    ready=1
+    break
+  fi
+  sleep 2
+done
+[[ "$ready" == 1 ]]
+direct_ip=$(curl -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace | sed -n "s/^ip=//p")
+warp_ip=$(sed -n "s/^ip=//p" /tmp/warp-trace)
+warp_state=$(sed -n "s/^warp=//p" /tmp/warp-trace)
+[[ -n "$direct_ip" && -n "$warp_ip" && "$direct_ip" != "$warp_ip" ]]
+[[ "$warp_state" == on || "$warp_state" == plus ]]
+echo LAB_WARP_CHANGED_EGRESS_VERIFIED=true
+'
+
+# Proxychains is used for the OTClient process itself; asset retrieval explicitly uses the same SOCKS endpoint.
+docker exec "$CONTAINER" bash -lc 'cat >/lab/runtime/proxychains.conf <<EOF
+strict_chain
+proxy_dns
+quiet_mode
+tcp_read_time_out 15000
+tcp_connect_time_out 8000
+[ProxyList]
+socks5 127.0.0.1 25344
+EOF
+chmod 600 /lab/runtime/proxychains.conf'
+
+# Fetch and verify only the current catalog files required by OTClient, through verified WARP egress.
 docker exec -e ASSET_BASE="$ASSET_BASE" -i "$CONTAINER" python3 - <<'PY'
 import hashlib,json,lzma,os,pathlib,subprocess,tempfile,urllib.parse
 base=os.environ['ASSET_BASE'].rstrip('/')
 out=pathlib.Path('/lab/state/things/1532')
 out.mkdir(parents=True,exist_ok=True)
 def get(url,path):
-    subprocess.run(['curl','-fsSL','--retry','3','--retry-all-errors','--connect-timeout','15','--max-time','180',url,'-o',str(path)],check=True)
+    subprocess.run(['curl','--socks5-hostname','127.0.0.1:25344','-fsSL','--retry','3','--retry-all-errors','--connect-timeout','15','--max-time','180',url,'-o',str(path)],check=True)
 manifest=pathlib.Path('/tmp/assets.json'); get(base+'/assets.json',manifest); doc=json.loads(manifest.read_text())
 rows=[]
 def walk(v):
@@ -107,7 +199,7 @@ PY
 ASSET_VERSION=$(docker exec "$CONTAINER" bash -lc "tr -d '\\r\\n ' </lab/state/things/1532/assets.json.sha256")
 [[ -n "$ASSET_VERSION" ]]
 
-# Keep proprietary asset bytes transient in the lab container/volume only.
+# Keep proprietary asset bytes in the runner-local lab volume only.
 docker exec "$CONTAINER" bash -lc 'rm -rf /otclient/data/things/1532 && mkdir -p /otclient/data/things/1532 && cp -a /lab/state/things/1532/. /otclient/data/things/1532/'
 
 docker cp init.lua "$CONTAINER:/lab/runtime/init.lua"
@@ -175,10 +267,10 @@ docker exec -d \
   -e TIBIA_TEST_PASSWORD \
   -e TIBIA_ASSET_VERSION="$ASSET_VERSION" \
   -e TIBIA_CLIENT_VERSION_STRING="$CLIENT_VERSION_STRING" \
-  "$CONTAINER" bash -lc 'cd /otclient && exec ./otclient >>/lab/runtime/otclient.stdout.log 2>&1'
+  "$CONTAINER" bash -lc 'cd /otclient && exec proxychains4 -f /lab/runtime/proxychains.conf ./otclient >>/lab/runtime/otclient.stdout.log 2>&1'
 unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD ASSET_VERSION
 
-for _ in $(seq 1 160); do
+for _ in $(seq 1 180); do
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log && break
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] PROBE_TIMEOUT=true' /lab/runtime/otclient.stdout.log && break
   docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] HTTP_LOGIN_REJECTED=true' /lab/runtime/otclient.stdout.log && break
@@ -188,6 +280,14 @@ for _ in $(seq 1 160); do
 done
 
 docker exec "$CONTAINER" bash -lc "grep -o '\[TIBIA_GLOBAL_LAB\] [A-Z_]*=true' /lab/runtime/otclient.stdout.log | sort -u || true"
+
+pid=$(docker exec "$CONTAINER" pgrep -f '/otclient/otclient|./otclient' | head -n1 || true)
+if [[ -n "$pid" ]]; then
+  rows=$(docker exec "$CONTAINER" ss -ntp 2>/dev/null | grep "pid=$pid," || true)
+  direct=$(printf '%s\n' "$rows" | awk '{print $5}' | grep -Ev '^(127\.0\.0\.1|\[::1\]):25344$' | grep -c . || true)
+  echo "LAB_OTCLIENT_DIRECT_TCP_COUNT=$direct"
+  [[ "$direct" -eq 0 ]]
+fi
 
 if docker exec "$CONTAINER" grep -q '\[TIBIA_GLOBAL_LAB\] GAME_START=true' /lab/runtime/otclient.stdout.log; then
   echo TIBIA_GLOBAL_LAB_GAME_START_PROVEN=true

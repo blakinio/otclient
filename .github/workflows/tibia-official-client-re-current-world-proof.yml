@@ -131,4 +131,4 @@ jobs:
           echo TRACK_A_VISIBLE_WORLD_MAP_PROVEN=true
           echo TRACK_A_SESSION_LEFT_LOGGED_IN=true
 
-          # Verification trigger: 2026-08-13 software-backend live session.
+          # Verification trigger: 2026-08-14 live-session recheck.

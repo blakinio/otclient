@@ -1,0 +1,42 @@
+name: Track A AT-SPI schema probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-atspi-schema-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Inspect isolated AT-SPI schema closure
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          root="$state/toolroot"
+          schema="$root/usr/share/glib-2.0/schemas"
+          echo TRACK_A_ATSPI_SCHEMA_XML="$([[ -s "$schema/org.a11y.atspi.gschema.xml" ]] && echo true || echo false)"
+          echo TRACK_A_GSCHEMAS_COMPILED="$([[ -s "$schema/gschemas.compiled" ]] && echo true || echo false)"
+          compiler="$(find "$root/usr/bin" /usr/bin -maxdepth 1 -type f -name glib-compile-schemas -print -quit 2>/dev/null || true)"
+          echo TRACK_A_GLIB_SCHEMA_COMPILER="$([[ -n "$compiler" ]] && echo true || echo false)"
+          echo TRACK_A_GLIB_SCHEMA_COMPILER_PATH="${compiler:-none}"
+          launcher="$(find "$root" -type f -name at-spi-bus-launcher -print -quit)"
+          [[ -n "$launcher" ]]
+          set +e
+          XDG_DATA_DIRS="$root/usr/share:/usr/share" GSETTINGS_SCHEMA_DIR="$schema" \
+            LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" \
+            "$launcher" --help >/tmp/track-a-launcher-help.txt 2>/tmp/track-a-launcher-help.err
+          rc=$?
+          set -e
+          echo TRACK_A_ATSPI_LAUNCHER_HELP_RC="$rc"
+          sed -n '1,20p' /tmp/track-a-launcher-help.err | sed 's/^/TRACK_A_ATSPI_LAUNCHER_STDERR=/'

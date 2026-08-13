@@ -19,18 +19,26 @@ jobs:
       ASSET_BASE: https://static.tibia.com/launcher/assets-current
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
       EXPECTED_CLIENT_SIZE: '51965216'
+      BRIDGE_HEAD: 39ff79ac44a0a1010b4bcc8b8e3617525353df7e
     steps:
       - name: Checkout runtime evidence branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Checkout exact durable bridge branch
+      - name: Checkout exact durable bridge head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          ref: feat/OTC-20260813-tibia-runtime-bridge
+          ref: ${{ env.BRIDGE_HEAD }}
           path: bridge-src
           persist-credentials: false
+
+      - name: Verify exact checked-out bridge head
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$(git -C bridge-src rev-parse HEAD)" == "$BRIDGE_HEAD" ]]
+          echo EXACT_BRIDGE_HEAD_VERIFIED=true
 
       - name: Focused Python tests
         shell: bash
@@ -93,11 +101,16 @@ jobs:
           [[ -S "$socket" ]]
           mode=$(stat -c '%a' "$socket");echo BRIDGE_SOCKET_MODE=$mode;[[ "$mode" == 600 ]]
           ping=$(python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/ipc_client.py" --socket "$socket" ping)
-          echo BRIDGE_PING_JSON_BEGIN;printf '%s\n' "$ping";echo BRIDGE_PING_JSON_END
           printf '%s' "$ping"|python3 -c 'import json,sys;d=json.load(sys.stdin);assert d["ok"] is True and d["main_base_resolved"] is True'
           discovery=$(python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/ipc_client.py" --socket "$socket" discover player_protocol_handler)
-          echo BRIDGE_DISCOVERY_JSON_BEGIN;printf '%s\n' "$discovery";echo BRIDGE_DISCOVERY_JSON_END
           printf '%s' "$discovery"|python3 -c 'import json,sys;d=json.load(sys.stdin);assert d["ok"] is True and d["target"]=="player_protocol_handler" and isinstance(d["vptr_hits"],int) and isinstance(d["validated_hits"],int)'
+          session=$(python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/ipc_client.py" --socket "$socket" session-status)
+          echo BRIDGE_SESSION_STATUS_JSON_BEGIN;printf '%s\n' "$session";echo BRIDGE_SESSION_STATUS_JSON_END
+          printf '%s' "$session"|python3 -c 'import json,sys;d=json.load(sys.stdin);assert d["ok"] is True and d["evidence_level"]=="DERIVED_UNTIL_LIVE_CORRELATION" and d["in_game_candidate"] is False'
+          for target in worldmap_handler gameserver_game_session player_data container_storage creature_storage game_client; do
+            response=$(python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/ipc_client.py" --socket "$socket" discover "$target")
+            printf '%s' "$response"|python3 -c 'import json,sys;d=json.load(sys.stdin);assert d["ok"] is True and isinstance(d["vptr_hits"],int) and isinstance(d["validated_hits"],int)'
+          done
           client_pid=$(pgrep -x client|head -n1);[[ -n "$client_pid" ]];kill -0 "$client_pid"
           echo EXACT_CLIENT_BRIDGE_E2E_PASS=true
           echo BRIDGE_PLAYER_PROTOCOL_VALIDATED_HITS=$(printf '%s' "$discovery"|python3 -c 'import json,sys;print(json.load(sys.stdin)["validated_hits"])')

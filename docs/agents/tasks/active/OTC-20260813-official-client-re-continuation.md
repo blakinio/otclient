@@ -61,7 +61,7 @@ cleanup.
 
 - [x] Live Track A namespace is proven isolated on the dedicated runner.
 - [x] Exact current official Linux client version, size and SHA are verified.
-- [ ] Official client is reconstructed and launched normally through verified WARP.
+- [x] Official client is reconstructed and launched normally through verified WARP.
 - [ ] Login recovery consumes secrets only in the approved Actions step and does not persist them.
 - [ ] `IN_GAME` is proven from decoded structural state, not OCR/pixels/sockets.
 - [ ] Bridge session status is correlated with decoded world state.
@@ -71,9 +71,9 @@ cleanup.
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 1
-updated_at: 2026-08-13T15:03:00+02:00
-head: 6c17e329d
+checkpoint_version: 2
+updated_at: 2026-08-13T15:05:00+02:00
+head: 46d53927f2c00c3081da20521ebe519302176769
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -87,28 +87,25 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/**
 proven:
-  - current main defines Track A as official native Linux client only and isolates Track B mutable runtime
-  - PR 48 is closed without merge and is no longer the active ownership source
-  - synology-otclient-01 is online with live labels otclient and synology
-  - run 31700834510 job 94449297810 proved isolated native-Linux Track A state at /work/_otclient_tibia_re_state with display :98 and WARP port 25354
-  - the live Track A namespace has no owned client, Xvfb, or wireproxy PID marker
-  - the current runner image has bash curl and python3 but lacks file gdb proxychains4 socat xdotool and Xvfb
-  - run 31700967902 job 94449744345 proved WARP ownership and current official client SHA e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-  - run 31701968002 job 94453042070 revalidated the isolated Track A namespace on head 9fbc65a3e
-  - required CI run 31701972404 passed on head 9fbc65a3e
+  - official native-Linux client version 15.32.df7b29, size 51965216, SHA256 e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  - isolated Track A state, owned WARP SOCKS 127.0.0.1:25354, display :98 and process marker are live on synology-otclient-01
+  - official runtime reconstruction succeeded in run 31702126665
+  - isolated private toolroot succeeded in run 31710205236
+  - normal official-client launch succeeded in run 31707899241 job 94473004427 with owned display and no unresolved libraries
+  - lavapipe/Vulkan startup is usable for the official client; private Xvfb and XKB startup are usable
+  - login run 31713018398 proved the live exact client process and that both credential fields materially changed without persisting secrets
 derived:
-  - a fresh main-based Track A task and PR are required for discoverable continuation
+  - socket counts alone are bootstrap/session indicators and are not structural IN_GAME evidence
 unknown:
   - current structural session state
-  - whether the complete APT dependency closure runs from the isolated Track A toolroot
-  - exact reconstructed runtime file count and byte size
-conflicts:
-  - canonical preferred runner labels differ from the currently reported legacy label set
+  - whether the exact historically proven explicit coordinate sequence transitions this isolated runtime from Account Login to Select Character
+  - decoded current-world records and authoritative player position
 first_failure:
-  marker: initial reconstruction probe required absent ss binary
-  evidence: run 31701967974 job 94453057997 stopped before downloads at ss command not found; exact PID/marker/curl ownership checks remain
+  marker: login-form transition below historical threshold after credential injection
+  evidence: run 31713018398 job 94490585180 recorded credential-field byte change 12569 but login transition 5231, below required >45000
 rejected_hypotheses:
-  - continue mutating closed PR 48 as active ownership: rejected by live PR state and current main governance
+  - missing WARP, missing lavapipe, missing Xvfb/XKB, missing private toolroot, or absent current official client: rejected by current Track A runs
+  - treating proxied socket counts, pixels, or a visible window as IN_GAME proof: rejected by canonical structural-evidence requirement
 changed_paths:
   - .github/scripts/tibia-official-client-re-reconstruct.py
   - .github/workflows/tibia-official-client-re-identity.yml
@@ -118,34 +115,15 @@ changed_paths:
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - tests/tools/test_tibia_official_client_re_reconstruct.py
 validation:
-  - command: live main governance and PR/runner preflight
+  - command: Track A official Linux client reconstruction run 31702126665
     result: PASS
-    evidence: main dc18f795, PR 48 closed, runner 21 online
-  - command: Track A official-client RE live state run 31700834510 job 94449297810
+  - command: Track A official-client RE toolroot run 31710205236
     result: PASS
-    evidence: isolated namespace proven; no owned runtime processes; six required tools absent
-  - command: Track A official Linux client identity run 31700967902 job 94449744345
+  - command: Track A official native Linux launch run 31707899241 job 94473004427
     result: PASS
-    evidence: isolated WARP ready; current client size 51965216 and SHA e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-  - command: python -m unittest tests.tools.test_tibia_official_client_re_reconstruct
-    result: PASS
-    evidence: four path/hash-policy tests pass
-  - command: Track A official-client RE toolroot run 31701102595 job 94450191425
-    result: FAIL
-    evidence: legacy runner apt lists are absent; retry uses private Track A lists/cache
-  - command: Track A official-client RE toolroot run 31701470178 job 94451400940
-    result: FAIL
-    evidence: private apt indexes succeeded; direct packages alone left runtime libraries unresolved and socat undiscovered
-  - command: Track A official-client RE toolroot run 31701967968 job 94453042031
-    result: FAIL
-    evidence: explicit dependency candidate libpython3.12 is unavailable on noble; replacement uses APT-resolved closure with private empty dpkg status
-  - command: Track A official-client RE toolroot run 31702126645 job 94453574980
-    result: FAIL
-    evidence: APT resolved 148 packages and 86.9 MB without system installation, then awaited confirmation; head 6c17e329d adds noninteractive --yes
-  - command: Track A official Linux client reconstruction run 31701967974 job 94453057997
-    result: FAIL
-    evidence: stopped before download because ss is absent; redundant ss check removed after exact Track A PID, environment marker and WARP curl checks
-blockers:
-  - reconstruction run 31702126665 is actively downloading and hash-verifying the official runtime on synology-otclient-01; toolroot run 31702528574 is queued behind it
-next_action: reconcile active reconstruction run 31702126665 and queued toolroot run 31702528574, persist exact results, then launch the verified official native-Linux client under Track A display :98 and process marker
+  - command: Track A structural login run 31713018398 job 94490585180
+    result: FAIL_FOR_LOGIN_TRANSITION
+    evidence: exact client/process/WARP/lavapipe gates passed; field changes 12569; login transition 5231 < 45000; no structural IN_GAME claim
+blockers: []
+next_action: run the exact same-SHA baseline unchanged: focus current 1020x650 Tibia window, explicit email click/type, explicit password click/type, explicit Login-button click, require >45000 transition, then select first character and attach post-login decoded-map instrumentation
 ```

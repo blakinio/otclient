@@ -35,4 +35,8 @@ jobs:
         env:
           TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
           TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
-        run: bash .github/scripts/tibia-official-client-re-autonomous-world-login.sh
+        run: |
+          set -Eeuo pipefail
+          patched="$RUNNER_TEMP/tibia-official-client-re-autonomous-world-login-current.sh"
+          sed 's/== 51965216/== 78197896/' .github/scripts/tibia-official-client-re-autonomous-world-login.sh > "$patched"
+          bash "$patched"

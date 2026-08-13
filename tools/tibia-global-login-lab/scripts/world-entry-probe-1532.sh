@@ -38,9 +38,10 @@ new = ''' + '"""' + '''        -- Track B 15.32 lab: staticdata is probed explic
         -- known parser failure must not reset client/protocol version before
         -- the game-login packet can be tested with valid appearances.
 ''' + '"""' + '''
-if text.count(old) != 1:
-    raise SystemExit(f'expected one staticdata fatal gate, found {text.count(old)}')
-path.write_text(text.replace(old, new, 1), encoding='utf-8')
+if text.count(old) == 1:
+    path.write_text(text.replace(old, new, 1), encoding='utf-8')
+elif new not in text:
+    raise SystemExit(f'expected original or already-patched staticdata fatal gate, found {text.count(old)}')
 PY_STATICDATA
 echo LAB_STATICDATA_FATAL_GATE_BYPASSED=true
 '''

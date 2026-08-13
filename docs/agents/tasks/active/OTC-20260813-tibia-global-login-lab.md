@@ -413,6 +413,13 @@ The endpoint now parses enough of the native Linux OTClient login to return a
 protocol login error. The callback still discards the free-form text. The next
 run maps it only to fixed non-secret categories without printing the message.
 
+Run `31702589243`, job `94455122542`, exact head
+`1d8c3e900e42a48137e5209ee590bd6d7a315f5b`, stopped before OTClient launch:
+the task-owned cached Linux runtime already contained the lab staticdata patch,
+while its guard accepted only the original source form. This is a harness
+failure and not protocol evidence. The runtime patch is now idempotent: it
+accepts exactly the original single gate or the exact marked replacement.
+
 # Evidence classification
 
 PROVEN:
@@ -471,8 +478,8 @@ Run the canonical E2E with fixed non-secret login-error category markers and con
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:58:00Z
-head: 76d30527c718650dd50316140847f07154449342
+updated_at: 2026-08-13T13:10:00Z
+head: 1d8c3e900e42a48137e5209ee590bd6d7a315f5b
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating

@@ -190,6 +190,8 @@ jobs:
           if [[ "$LOGIN_ATTEMPT" -ge 1 ]]; then
             window="$(resolve_window)"
             "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+            "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+            [[ "$("$toolroot/usr/bin/xdotool" getwindowfocus)" == "$window" ]]
             before="$evidence/login-before.xwd"
             after="$evidence/login-after.xwd"
             "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$before"

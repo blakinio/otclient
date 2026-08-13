@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 state=/tmp/tibia-world
+repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
 pkg="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
 client="$pkg/bin/client"
+controller="$repo_root/.github/scripts/tibia-atspi-controller.py"
 [[ -x "$client" ]]
+[[ -f "$controller" ]]
 mkdir -p "$state"
 
 nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >"$state/xvfb.log" 2>&1 </dev/null &
@@ -53,5 +56,5 @@ echo "PRELOGIN_DIRECT_TCP=$direct"
 echo "PRELOGIN_UDP=$udp"
 [[ "$direct" -eq 0 && "$udp" -eq 0 ]]
 
-python3 .github/scripts/tibia-atspi-controller.py inspect
+/usr/bin/python3 "$controller" inspect
 echo ATSPI_LAUNCH_READY=true

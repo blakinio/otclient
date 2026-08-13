@@ -11,7 +11,7 @@ phase: recovery-validation
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T18:55:00+02:00
+updated: 2026-08-13T19:11:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -568,6 +568,19 @@ repair replaces only the two full-version member-pointer bindings with explicit
 static Lua functions using value-semantics `std::string`; the existing
 `GameConfig` storage and login-packet selection contract are unchanged.
 
+Run `31723213104`, jobs `94525071799` and `94527090954`, exact head
+`8a3ea454747186a896ceb973dd55d20e7ba4946e`, proved that explicit static Lua
+functions with value-semantics `std::string` did not repair the runtime call.
+The exact Linux build and every pre-network gate passed, but the same
+`FULL_CLIENT_VERSION_CALL_FAILED=true` marker occurred with zero directional
+bytes. Artifact `9190396013`, digest
+`sha256:624618e73a78216364efbd9e0b91fdfb3c132e255dda6b073c84c05c683fd16c`,
+was inspected locally and contains both `getClientVersionString` and
+`setClientVersionString` names and compiled symbols. A stale binary or absent
+compiled binding is therefore disproven. The ineffective registration change
+was reverted without another workflow run. The focused source test remains,
+but CI scope detection did not execute it.
+
 # Evidence classification
 
 PROVEN:
@@ -620,19 +633,20 @@ UNKNOWN:
 
 # Next action
 
-Validate the explicit value-semantics Lua registration on the exact Linux head,
-then run one bounded canonical native-Linux E2E and classify full-version
-readback before using directional bytes or server opcode evidence.
+In a fresh bounded recovery phase, add fixed pre-network Lua markers for the
+runtime type/presence of `g_gameConfig`, its setter and getter, plus a known
+working string-taking binding control. Run the binding smoke without credentials
+or official-service traffic before changing product code or retrying E2E.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T16:55:00Z
+updated_at: 2026-08-13T17:11:00Z
 track: otclient-global-login
 track_alias: OTCLIENT-GLOBAL-LOGIN
-head: b196c5019a682ebdeb4a4dfba7cf762a5757e0a2
-last_e2e_head: b196c5019a682ebdeb4a4dfba7cf762a5757e0a2
+head: 8a3ea454747186a896ceb973dd55d20e7ba4946e
+last_e2e_head: 8a3ea454747186a896ceb973dd55d20e7ba4946e
 recovery_base_head: 27418b03ee787f049b2e89b14ccc29b50701428f
 base_main: dc18f795bf13cee37a115164da56a452aaa14f02
 branch: feat/OTC-20260813-tibia-global-login-lab
@@ -655,9 +669,12 @@ proven:
   - run 31712081913/job 94487558014 reached HANDOFF_CONSUMED and VERSION_CONFIG_BEGIN on exact native Linux head 2b184f882a0a873ce55bdff281c5be7e6dd1f6f0
   - run 31719826179/job 94513846464 emitted FULL_CLIENT_VERSION_CALL_FAILED before character login with zero bytes in both directions on exact native Linux head 7b0265d52262f9fba68c6ca96fde76bed48bc3b7
   - run 31722078520/job 94522602196 reproduced FULL_CLIENT_VERSION_CALL_FAILED before character login with zero bytes in both directions on exact native Linux head b196c5019a682ebdeb4a4dfba7cf762a5757e0a2
+  - run 31723213104/job 94527090954 reproduced FULL_CLIENT_VERSION_CALL_FAILED after an explicit value-semantics static binding compiled successfully at exact native Linux head 8a3ea454747186a896ceb973dd55d20e7ba4946e
+  - exact Linux artifact 9190396013 contains both full-version binding names and compiled GameConfig getter/setter symbols
 derived:
   - the prior =false pcall marker cannot classify the setter boundary because the exporter emits only =true categories
   - the current blocker is the Lua/C++ full-version setter binding, not game protocol, WARP, proxy, or official endpoint reachability
+  - changing member-pointer registration to explicit static value-semantics registration does not repair the runtime call
 unknown:
   - whether setClientVersionString succeeds and reads back the full version in the exact Linux runtime
   - whether the official endpoint accepts the exact full version string and advances beyond opcode 0x14
@@ -665,7 +682,7 @@ conflicts:
   - none
 first_failure:
   marker: FULL_CLIENT_VERSION_CALL_FAILED=true
-  evidence: run 31722078520/job 94522602196 at b196c5019a682ebdeb4a4dfba7cf762a5757e0a2
+  evidence: run 31723213104/job 94527090954 at 8a3ea454747186a896ceb973dd55d20e7ba4946e
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
@@ -689,5 +706,6 @@ validation:
     evidence: LAB_1532_INJECTOR_RENDER_CHECK=true; executes the full inner module patch against the verified 1525 source shape with no container, secret, or network access
 blockers:
   - local CMake and Docker are unavailable; exact Linux compilation and runtime validation must use repository CI
-next_action: validate the explicit value-semantics full-version Lua registration on exact Linux head, then run one bounded canonical native-Linux E2E and classify readback before protocol interpretation
+  - two heavy Track B runtime attempts in this recovery session reproduced the same pre-network call failure; another E2E requires a fresh defect-isolation phase
+next_action: add a credential-free pre-network runtime binding smoke that emits fixed type/presence markers for g_gameConfig plus its full-version setter/getter and one known working string-binding control before any product-code change or official-service E2E
 ```

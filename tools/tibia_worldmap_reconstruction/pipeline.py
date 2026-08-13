@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import json
 from typing import Any
 
@@ -226,6 +227,34 @@ def reconstruct(observations_doc: Any, catalog_doc: Any, mapping_doc: Any) -> di
     }
 
 
+def _validate_ok_snapshot_projection(
+    index: int,
+    variant: list[int],
+    ground_client_id: int,
+    static_client_ids: list[int],
+    dynamic_client_ids: list[int],
+) -> None:
+    static_set = set(static_client_ids)
+    dynamic_set = set(dynamic_client_ids)
+    if static_set & dynamic_set:
+        raise ReconstructionError(f"snapshot tiles[{index}] static/dynamic client IDs overlap")
+    if ground_client_id in static_set or ground_client_id in dynamic_set:
+        raise ReconstructionError(f"snapshot tiles[{index}] ground overlaps another client-ID role")
+    if variant.count(ground_client_id) != 1:
+        raise ReconstructionError(f"snapshot tiles[{index}] OK tile requires ground exactly once in observed variant")
+
+    accounted = [ground_client_id, *static_client_ids, *dynamic_client_ids]
+    if Counter(variant) != Counter(accounted):
+        raise ReconstructionError(f"snapshot tiles[{index}] OK tile fields do not account for observed variant")
+
+    projected_static = [client_id for client_id in variant if client_id in static_set]
+    projected_dynamic = [client_id for client_id in variant if client_id in dynamic_set]
+    if projected_static != static_client_ids:
+        raise ReconstructionError(f"snapshot tiles[{index}] static client order disagrees with observed variant")
+    if projected_dynamic != dynamic_client_ids:
+        raise ReconstructionError(f"snapshot tiles[{index}] dynamic client order disagrees with observed variant")
+
+
 def validate_snapshot(doc: Any) -> tuple[str, str, dict[str, dict[str, Any]]]:
     if not isinstance(doc, dict) or doc.get("schema") != SNAPSHOT_SCHEMA:
         raise ReconstructionError(f"snapshot schema must be {SNAPSHOT_SCHEMA}")
@@ -285,6 +314,13 @@ def validate_snapshot(doc: Any) -> tuple[str, str, dict[str, dict[str, Any]]]:
                 raise ReconstructionError(f"snapshot tiles[{index}] static client/OTB lengths differ")
             if len(variants) != 1:
                 raise ReconstructionError(f"snapshot tiles[{index}] OK tile requires one observed variant")
+            _validate_ok_snapshot_projection(
+                index,
+                variants[0],
+                ground_client_id,
+                static_client_ids,
+                dynamic_client_ids,
+            )
         elif status == "CONFLICT" and len(variants) < 2:
             raise ReconstructionError(f"snapshot tiles[{index}] CONFLICT requires multiple variants")
         elif status == "UNMAPPED_ID" and not unmapped_client_ids:

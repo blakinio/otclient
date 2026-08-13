@@ -40,6 +40,15 @@ jobs:
           for archive in "$aptroot"/archives/*.deb; do
             dpkg-deb -x "$archive" "$root"
           done
+
+          schema="$root/usr/share/glib-2.0/schemas"
+          compiler="$(find "$root" -type f -name glib-compile-schemas -perm -u+x -print -quit)"
+          [[ -n "$compiler" && -d "$schema" ]]
+          LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" \
+            "$compiler" "$schema"
+          [[ -s "$schema/gschemas.compiled" ]]
+          echo TRACK_A_GSCHEMAS_COMPILED=true
+
           py_path="$root/usr/lib/python3/dist-packages"
           gi_path="$root/usr/lib/x86_64-linux-gnu/girepository-1.0:$root/usr/lib/girepository-1.0"
           PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" \

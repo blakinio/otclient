@@ -461,6 +461,6 @@ changed_paths:
   - .github/workflows/tibia-synology-owned-runtime-state.yml
   - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
 blockers:
-  - task-owned container otclient-tibia-login-analysis was absent in run 31695193423 and must be recreated before runtime inspection
-next_action: run the task-owned dedicated runtime recovery workflow, then materialize and start the exact official client through verified userspace WARP without using login secrets
+  - first recovery run 31695448562 disproved host-bind visibility for the runner-in-container path; recovery must share the runner's named work volume instead
+next_action: rerun dedicated runtime recovery using the runner's exact named work volume, then materialize and start the exact official client through verified userspace WARP without using login secrets
 ```

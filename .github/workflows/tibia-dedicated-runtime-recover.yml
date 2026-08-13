@@ -28,12 +28,16 @@ jobs:
           docker version >/dev/null
           mkdir -p "$STATE_ROOT"
           test -w "$STATE_ROOT"
+          runner_container="$(hostname)"
+          docker inspect "$runner_container" >/dev/null
+          work_volume="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/home/runner/_work"}}{{.Name}}{{end}}{{end}}' "$runner_container")"
+          [[ -n "$work_volume" ]]
 
           if docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
             [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.owner" }}' "$CONTAINER_NAME")" == otclient ]]
             [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.purpose" }}' "$CONTAINER_NAME")" == tibia-login-no-ocr ]]
             [[ "$(docker inspect --format '{{ index .Config.Labels "com.blakinio.task" }}' "$CONTAINER_NAME")" == OTC-20260727-tibia-linux-runner-analysis ]]
-            [[ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/analysis"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME")" == "$STATE_ROOT" ]]
+            [[ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/runner-work"}}{{.Name}}{{end}}{{end}}' "$CONTAINER_NAME")" == "$work_volume" ]]
             [[ "$(docker inspect --format '{{.State.Status}}' "$CONTAINER_NAME")" == running ]] || docker start "$CONTAINER_NAME" >/dev/null
           else
             docker run -d \
@@ -42,12 +46,13 @@ jobs:
               --label com.blakinio.owner=otclient \
               --label com.blakinio.purpose=tibia-login-no-ocr \
               --label com.blakinio.task=OTC-20260727-tibia-linux-runner-analysis \
-              --mount "type=bind,src=$STATE_ROOT,dst=/analysis" \
-              ubuntu:24.04 sleep infinity >/dev/null
+              --mount "type=volume,src=$work_volume,dst=/runner-work" \
+              ubuntu:24.04 \
+              bash -lc 'mkdir -p /runner-work/_otclient_tibia_re_state/runtime; ln -s /runner-work/_otclient_tibia_re_state/runtime /analysis; exec sleep infinity' >/dev/null
           fi
 
           [[ "$(docker inspect --format '{{.State.Status}}' "$CONTAINER_NAME")" == running ]]
-          [[ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/analysis"}}{{.Source}}{{end}}{{end}}' "$CONTAINER_NAME")" == "$STATE_ROOT" ]]
+          [[ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/runner-work"}}{{.Name}}{{end}}{{end}}' "$CONTAINER_NAME")" == "$work_volume" ]]
           test ! -e /var/lib/oteryn-staging-state/tibia-linux-analysis
           echo DEDICATED_ANALYSIS_CONTAINER_READY=true
           echo DEDICATED_ANALYSIS_STATE_ROOT="$STATE_ROOT"

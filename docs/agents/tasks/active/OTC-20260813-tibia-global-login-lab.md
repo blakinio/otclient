@@ -10,7 +10,7 @@ phase: live-world-entry
 branch: feat/OTC-20260813-tibia-global-login-lab
 base_branch: main
 created: 2026-08-13T09:10:00+02:00
-updated: 2026-08-13T12:18:00+02:00
+updated: 2026-08-13T12:28:00+02:00
 risk: medium
 related_pr: 284
 owned_paths:
@@ -176,6 +176,23 @@ runner: synology-otclient-01
 status_at_checkpoint: in_progress
 ```
 
+Run `31690398665` was cancelled while a newer PR-head run superseded it. Run
+`31690489689`, job `94416503465`, exact PR head
+`887465e86c2bb465a3412c1d23830b0ad22c0904`, again proved HTTP 200 and a valid
+tmpfs game handoff, but failed before OTClient process start because display
+`:100` never became ready:
+
+```text
+LAB_TRANSIENT_GAME_HANDOFF_READY=true
+xdpyinfo: unable to open display ":100"
+```
+
+The first failing layer is therefore stale/unready lab Xvfb state, not HTTP
+authentication, handoff creation, asset parsing, or the game protocol. The lab
+now terminates only its prior `Xvfb :100`, removes only that display's stale
+lock/socket, starts a fresh server, and emits `LAB_XVFB_READY` plus
+`FAILURE_STAGE=xvfb_not_ready` on bounded readiness failure.
+
 # Evidence classification
 
 PROVEN:
@@ -224,4 +241,4 @@ UNKNOWN:
 
 # Next action
 
-Reconcile run `31690398665` once terminal. If the appearances-only login reaches `SESSION_KEY_FEATURE`, `CHARACTER_LOGIN_ATTEMPT`, game TCP or any `GAME_*` callback, continue from the first exact downstream marker. If it fails before the login call, fix only that deterministic lab boundary; do not re-open HTTP authentication or the proven appearances path.
+Run the canonical E2E on the Xvfb-reset head. If the appearances-only login reaches `SESSION_KEY_FEATURE`, `CHARACTER_LOGIN_ATTEMPT`, game TCP or any `GAME_*` callback, continue from the first exact downstream marker. If Xvfb still fails, inspect only `/lab/runtime/xvfb.log` and repair that deterministic lab boundary; do not re-open HTTP authentication or the proven appearances path.

@@ -16,8 +16,11 @@ Resolution procedure:
 
 1. read the canonical prompt listed above;
 2. read the base programme prompt it extends;
-3. inspect live `main`, active tasks, open PRs, runner/runtime state and exact `next_action` values;
-4. execute the programme from durable state rather than chat memory;
-5. do not invent a task named `OTCLIENT-TIBIA-RE.md`, a branch named `agent/otclient-tibia-re`, or a required `workflow_dispatch` endpoint.
+3. read the repository-owned consolidated state/report evidence, including:
+   - `docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-state.md`;
+   - `docs/agents/reports/OTCLIENT-20260813-tibia-re-login-recovery-import.md`;
+4. inspect live `main`, active tasks, open PRs, runner/runtime state and exact `next_action` values;
+5. execute the programme from durable state rather than chat memory;
+6. do not invent a task named `OTCLIENT-TIBIA-RE.md`, a branch named `agent/otclient-tibia-re`, or a required `workflow_dispatch` endpoint.
 
-External Oteryn repositories, historical Oteryn runners and old containers are evidence sources only for this alias unless the owner separately authorizes work there.
+External Oteryn repositories, historical Oteryn runners and old containers are evidence sources only for this alias unless the owner separately authorizes work there. Material continuation state must be persisted or indexed in `blakinio/otclient` before return/rotation.

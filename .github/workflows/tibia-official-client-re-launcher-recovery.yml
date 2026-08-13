@@ -1,0 +1,243 @@
+name: Track A official Linux launcher recovery
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-recovery.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Recover current child package through official Linux launcher
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
+          if [[ -d /work && -w /work ]]; then
+            state="$LEGACY_IMAGE_STATE"
+          else
+            state="$CANONICAL_STATE"
+          fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          phase_marker='OTCLIENT_TIBIA_RE_PHASE=launcher-recovery'
+          toolroot="$state/toolroot"
+          tool_path="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          recovery="$state/launcher-recovery/run-$GITHUB_RUN_ID"
+          home="$recovery/home"
+          unpack="$recovery/unpacked"
+          evidence="$GITHUB_WORKSPACE/artifacts/track-a-launcher-recovery"
+          mkdir -p "$home" "$unpack" "$evidence"
+          chmod 700 "$recovery" "$home" "$unpack"
+
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace >"$recovery/warp-before.txt"
+          grep -Eq '^warp=(on|plus)$' "$recovery/warp-before.txt"
+          echo TRACK_A_LAUNCHER_RECOVERY_WARP_VERIFIED=true
+
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+          kill -0 "$xvfb_pid"
+          [[ -e /tmp/.X11-unix/X98 ]]
+          echo TRACK_A_LAUNCHER_RECOVERY_DISPLAY_VERIFIED=true
+
+          tarball="$recovery/tibia.x64.tar.gz"
+          url='https://static.tibia.com/download/tibia.x64.tar.gz'
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL \
+            --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$url" -H 'Accept: */*' \
+            "$url" -o "$tarball"
+          tar_sha="$(sha256sum "$tarball" | awk '{print $1}')"
+          tar_size="$(stat -c %s "$tarball")"
+          echo TRACK_A_OFFICIAL_LINUX_TARBALL_SHA256="$tar_sha"
+          echo TRACK_A_OFFICIAL_LINUX_TARBALL_SIZE="$tar_size"
+          tar -tzf "$tarball" >"$evidence/tar-list.txt"
+
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib
+          import sys
+          import tarfile
+
+          archive = pathlib.Path(sys.argv[1])
+          destination = pathlib.Path(sys.argv[2])
+          with tarfile.open(archive, "r:gz") as handle:
+              for member in handle.getmembers():
+                  path = pathlib.PurePosixPath(member.name)
+                  if path.is_absolute() or ".." in path.parts:
+                      raise SystemExit("unsafe archive path")
+              try:
+                  handle.extractall(destination, filter="data")
+              except TypeError:
+                  handle.extractall(destination)
+          PY
+
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          launcher_sha="$(sha256sum "$launcher" | awk '{print $1}')"
+          launcher_size="$(stat -c %s "$launcher")"
+          launcher_type="$(file -b "$launcher")"
+          echo TRACK_A_OFFICIAL_LAUNCHER_SHA256="$launcher_sha"
+          echo TRACK_A_OFFICIAL_LAUNCHER_SIZE="$launcher_size"
+          printf '%s\n' "$launcher_type" >"$evidence/launcher-file.txt"
+
+          proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
+          [[ -n "$proxy_lib" ]]
+          proxy_conf="$recovery/proxychains.conf"
+          printf '%s\n' \
+            strict_chain proxy_dns quiet_mode \
+            'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' \
+            '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          chmod 600 "$proxy_conf"
+          vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit 2>/dev/null || true)"
+
+          workdir="$(dirname "$launcher")"
+          cd "$workdir"
+          env -u RUNNER_TRACKING_ID \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            OTCLIENT_TIBIA_RE_PHASE=launcher-recovery \
+            HOME="$home" XDG_DATA_HOME="$home/.local/share" DISPLAY="$TRACK_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 \
+            QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            ${vk_icd:+VK_ICD_FILENAMES="$vk_icd"} \
+            ${vk_icd:+VK_DRIVER_FILES="$vk_icd"} \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$launcher" >"$evidence/launcher.log" 2>&1 </dev/null &
+          launcher_pid=$!
+          printf '%s\n' "$launcher_pid" >"$evidence/launcher.pid"
+          echo TRACK_A_OFFICIAL_LAUNCHER_PID="$launcher_pid"
+
+          child="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          last_sha=''
+          stable=0
+          for _ in $(seq 1 120); do
+            if [[ -s "$child" ]]; then
+              current_sha="$(sha256sum "$child" | awk '{print $1}')"
+              if [[ "$current_sha" == "$last_sha" ]]; then
+                stable=$((stable + 1))
+              else
+                stable=0
+                last_sha="$current_sha"
+              fi
+              (( stable >= 3 )) && break
+            fi
+            sleep 2
+          done
+          [[ -s "$child" ]]
+          (( stable >= 3 ))
+          child_sha="$(sha256sum "$child" | awk '{print $1}')"
+          child_size="$(stat -c %s "$child")"
+          echo TRACK_A_LAUNCHER_CHILD_SHA256="$child_sha"
+          echo TRACK_A_LAUNCHER_CHILD_SIZE="$child_size"
+
+          python3 - "$child" "$evidence/identity.txt" "$tar_sha" "$tar_size" "$launcher_sha" "$launcher_size" <<'PY'
+          import hashlib
+          import pathlib
+          import re
+          import sys
+
+          child = pathlib.Path(sys.argv[1]).read_bytes()
+          versions = []
+          for match in re.finditer(rb"15\.[0-9]{2}(?:\.[A-Za-z0-9]+)?", child):
+              value = match.group().decode("ascii", "ignore")
+              if value not in versions:
+                  versions.append(value)
+          lines = [
+              "TARBALL_SHA256=" + sys.argv[3],
+              "TARBALL_SIZE=" + sys.argv[4],
+              "LAUNCHER_SHA256=" + sys.argv[5],
+              "LAUNCHER_SIZE=" + sys.argv[6],
+              "CHILD_SHA256=" + hashlib.sha256(child).hexdigest(),
+              "CHILD_SIZE=" + str(len(child)),
+              "CHILD_VERSION_STRINGS=" + ",".join(versions[:20]),
+          ]
+          pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print("TRACK_A_LAUNCHER_CHILD_VERSION_STRINGS=" + ",".join(versions[:20]))
+          PY
+
+          : >"$evidence/owned-processes.txt"
+          recovery_client_pid=''
+          for proc in /proc/[0-9]*; do
+            p="${proc##*/}"
+            [[ -r "$proc/environ" && -r "$proc/exe" ]] || continue
+            grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            grep -azFxq "$phase_marker" "$proc/environ" 2>/dev/null || continue
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            printf '%s %s\n' "$p" "$(basename "$exe")" >>"$evidence/owned-processes.txt"
+            if [[ "$exe" == "$child" ]]; then
+              recovery_client_pid="$p"
+            fi
+          done
+          echo TRACK_A_LAUNCHER_RECOVERY_CLIENT_PID="${recovery_client_pid:-none}"
+
+          if [[ -n "$recovery_client_pid" ]]; then
+            export HOME="$home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
+            best=''
+            best_area=0
+            for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$recovery_client_pid" --name '^Tibia$' 2>/dev/null || true); do
+              geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+              width="$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')"
+              height="$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')"
+              [[ -n "$width" && -n "$height" ]] || continue
+              area=$((width * height))
+              if (( area > best_area )); then
+                best="$w"
+                best_area="$area"
+              fi
+            done
+            if [[ -n "$best" ]]; then
+              "$toolroot/usr/bin/xwd" -silent -id "$best" -out "$evidence/client-screen.xwd"
+              echo TRACK_A_LAUNCHER_RECOVERY_CLIENT_SCREEN_CAPTURED=true
+            else
+              echo TRACK_A_LAUNCHER_RECOVERY_CLIENT_SCREEN_CAPTURED=false
+            fi
+          else
+            echo TRACK_A_LAUNCHER_RECOVERY_CLIENT_SCREEN_CAPTURED=false
+          fi
+
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace >"$recovery/warp-after.txt"
+          grep -Eq '^warp=(on|plus)$' "$recovery/warp-after.txt"
+          echo TRACK_A_LAUNCHER_RECOVERY_WARP_STILL_VERIFIED=true
+          echo TRACK_A_CREDENTIAL_FREE_LAUNCHER_RECOVERY_COMPLETE=true
+
+          for proc in /proc/[0-9]*; do
+            p="${proc##*/}"
+            [[ -r "$proc/environ" ]] || continue
+            grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            grep -azFxq "$phase_marker" "$proc/environ" 2>/dev/null || continue
+            kill "$p" 2>/dev/null || true
+          done
+
+      - name: Upload launcher recovery evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-launcher-recovery
+          path: artifacts/track-a-launcher-recovery/**
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6

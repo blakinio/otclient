@@ -1,0 +1,74 @@
+name: Track A launcher flock path probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-flock-path-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Resolve lock-file implementation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+
+          work="$state/flock-path/run-$GITHUB_RUN_ID"; unpack="$work/unpacked"
+          mkdir -p "$unpack"; chmod 700 "$work"
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+
+          echo TRACK_A_COMPILER_SEARCH_BEGIN=true
+          find "$root" -type f \( -name 'gcc' -o -name 'gcc-*' -o -name 'clang' -o -name 'clang-*' -o -name 'cc' -o -name 'musl-gcc' \) -perm -111 -print 2>/dev/null | head -n 50 | sed 's/^/TRACK_A_COMPILER=/' || true
+          echo TRACK_A_COMPILER_SEARCH_END=true
+
+          python3 - "$launcher" <<'PY'
+          import pathlib,re,sys
+          b=pathlib.Path(sys.argv[1]).read_bytes()
+          rec=[]
+          for m in re.finditer(rb'[ -~]{4,}',b):
+              s=m.group().decode('latin1','replace')
+              rec.append((m.start(),s))
+          print('TRACK_A_NEAR_STARTUP_BEGIN=true')
+          for off,s in rec:
+              if 0xc5000 <= off <= 0xc9000:
+                  print(f'TRACK_A_NEAR_STARTUP={off:#x}|{s[:1500]}')
+          print('TRACK_A_NEAR_STARTUP_END=true')
+          print('TRACK_A_LOCKLIKE_STRINGS_BEGIN=true')
+          terms=('lock','instance','running','launcher','pid','temp','tmp','runtime','application','cipsoft','tibia')
+          for off,s in rec:
+              sl=s.lower()
+              if any(t in sl for t in terms):
+                  print(f'TRACK_A_LOCKLIKE={off:#x}|{s[:1500]}')
+          print('TRACK_A_LOCKLIKE_STRINGS_END=true')
+          PY
+          echo TRACK_A_FLOCK_PATH_PROBE_COMPLETE=true

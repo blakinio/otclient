@@ -73,11 +73,13 @@ status: queued
 
 At this checkpoint the bootstrap job has not been assigned to a runner. This does **not** prove the dedicated runner is absent; it proves only that no matching runner accepted the job yet.
 
+Independent historical repository probe evidence is consistent with a broader self-hosted availability problem: PR #281 run `31643425060`, which uses only `runs-on: self-hosted`, is also still queued. This still does not identify the exact cause; it only shows the canonical job is not uniquely blocked by its `otclient,synology` selector.
+
 The GitHub integration available to the current worker cannot list repository runners (`403 Resource not accessible by integration`), so runner registration/online state cannot be independently queried through the connector.
 
 ## Required host deployment
 
-The updated PR #280 stack must be built/recreated on the Synology Docker host. The current worker has no authorized SSH/NAS execution tool, so this host mutation cannot be performed from the current tool environment.
+The updated PR #280 stack must be built/recreated on the Synology Docker host. The current worker has no authorized SSH/NAS execution tool, so this host mutation cannot be performed from the current tool environment. Plugin discovery for `SSH OR Synology` returned no available plugin, so there is no alternate connected execution path in this session.
 
 After deployment, the acceptance proof is:
 

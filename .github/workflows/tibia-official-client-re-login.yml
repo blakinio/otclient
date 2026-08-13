@@ -46,12 +46,20 @@ jobs:
           evidence="$state/evidence/login-$(date -u +%Y%m%dT%H%M%SZ)"
           mkdir -p "$evidence"
           chmod 700 "$state/evidence" "$evidence"
+          trap 'rc=$?; if [[ $rc -ne 0 ]]; then echo "TRACK_A_LOGIN_FAILURE_RC=$rc"; if [[ -f "$state/runtime/client.log" ]]; then echo TRACK_A_CLIENT_LOG_BEGIN=true; tail -n 80 "$state/runtime/client.log"; echo TRACK_A_CLIENT_LOG_END=true; fi; fi' EXIT
 
+          echo TRACK_A_CLIENT_PID_FILE_PRESENT="$([[ -s "$state/runtime/client.pid" ]] && echo true || echo false)"
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid")"
-          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          echo TRACK_A_CLIENT_PID="$pid"
+          echo TRACK_A_CLIENT_PID_ALIVE="$([[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && echo true || echo false)"
+          [[ -n "$pid" ]] && kill -0 "$pid"
+          echo TRACK_A_CLIENT_ENVIRON_READABLE="$([[ -r "/proc/$pid/environ" ]] && echo true || echo false)"
+          [[ -r "/proc/$pid/environ" ]]
+          echo TRACK_A_CLIENT_MARKER_PRESENT="$(tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker" && echo true || echo false)"
           tr '\0' '\n' <"/proc/$pid/environ" | grep -Fxq "$marker"
-          kill -0 "$pid"
-          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          executable="$(readlink -f "/proc/$pid/exe")"
+          echo TRACK_A_CLIENT_EXECUTABLE="$executable"
+          [[ "$executable" == "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
 

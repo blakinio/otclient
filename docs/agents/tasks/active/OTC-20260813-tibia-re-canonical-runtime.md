@@ -10,7 +10,7 @@ phase: consolidation
 branch: docs/OTC-20260813-tibia-re-canonical-runtime
 base_branch: main
 created: 2026-08-13T09:41:00+02:00
-updated: 2026-08-13T10:02:00+02:00
+updated: 2026-08-13T10:07:00+02:00
 risk: medium
 related_pr: "#285"
 owned_paths:
@@ -19,6 +19,7 @@ owned_paths:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
   - docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-state.md
   - docs/agents/reports/OTCLIENT-20260813-tibia-re-login-recovery-import.md
+  - docs/agents/reports/OTCLIENT-20260813-tibia-re-external-evidence-manifest.md
   - docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-prompt-eval.md
 reuses:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
@@ -59,7 +60,8 @@ All new material work for this programme must be persisted or indexed in `blakin
 - [x] The wrapper explicitly forbids treating `oteryn-staging`, `oteryn-synology-staging`, or `oteryn-tibia-client-analysis` as active execution targets for new programme work.
 - [x] The wrapper explicitly requires every material finding/result/checkpoint/next action to be persisted or indexed in `blakinio/otclient` before return/rotation.
 - [x] A consolidated report records material external Oteryn worldmap/native-action evidence with exact run/job/commit identifiers and claim boundaries.
-- [x] The proven historical non-OCR login/world-entry recovery recipe is imported into `blakinio/otclient` with exact-version/layout gates and semantic claim boundaries.
+- [x] The proven historical non-OCR login/world-entry recovery recipe is imported with exact-version/layout gates, failed-hypothesis exclusions and semantic claim boundaries.
+- [x] An external-evidence manifest maps the relevant Oteryn Tibia reports to imported/superseded/not-copied OTClient state and preserves missing worldmap runtime details without duplicating large evidence corpora.
 - [x] Current OTClient work inventory is recorded: PR #48 runtime, #279 OTBM pipeline, #280 runner infrastructure, #283 stable bridge.
 - [x] Current unknowns and canonical continuation order are recorded.
 - [x] Prompt/registry routing was evaluated against positive, negative, boundary, stale-state, persistence, imported-recovery and injection-style cases: 14/14 PASS.
@@ -82,12 +84,13 @@ PROVEN:
 - `blakinio/otclient` `main` at task creation is `05450748daca8344d9555638b638e98b6dc3abc7`.
 - master programme prompt is already on `main` at `docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md`.
 - PR #48, #279, #280 and #283 are all in `blakinio/otclient` and contain the active implementation/runtime work.
-- historical Oteryn worldmap/action/login evidence was read from `blakinio/Oteryn-Platform` and consolidated without mutating the external repository.
+- historical Oteryn worldmap/action/login evidence was read from `blakinio/Oteryn-Platform` and consolidated/indexed without mutating the external repository.
 - canonical routing evaluation passed 14/14 documented cases.
 - owner explicitly requires all future material programme work to be saved in `blakinio/otclient`; this requirement is encoded in the canonical wrapper/task/registry.
+- PR #280 exact implementation Docker proof run `31679256871`, job `94380701487`, passed both image builds and dependency inspection; final workflow-free head `5f76d213d859c2a8838ac5b8740865ef6afaf1ab` passed repository CI run `31679760916`, including `CI / Required` job `94383401816`.
 
 DERIVED:
-- after #280 deployment and #48 runner acceptance proof, future workers no longer need to query Oteryn-Platform merely to recover normal programme state or the known historical login recipe.
+- after #280 deployment and #48 runner acceptance proof, future workers no longer need to query Oteryn-Platform merely to recover normal programme state, the known historical login recipe or the important worldmap/action evidence.
 
 UNKNOWN:
 - whether the updated PR #280 runner image is deployed on Synology;
@@ -98,18 +101,19 @@ UNKNOWN:
 
 # Validation
 
-- pre-import exact-head CI run `31679686687` passed on head `95f562d0b4a1ca592a3e4924d3cf0a8ffe21fd22`, including `CI / Required` job `94382580159`;
-- the imported login report and registry/eval updates moved the head afterward, so a new exact-head CI is required before merge;
-- review threads/submitted reviews were empty before the import update; recheck on final head.
+- baseline canonical-routing CI run `31679686687` passed on head `95f562d0b4a1ca592a3e4924d3cf0a8ffe21fd22`, including `CI / Required` job `94382580159`;
+- subsequent imported recovery/manifest changes moved the head, so final exact-head CI is required again before merge;
+- full diff/review inventory must be rechecked after final evidence-import commit;
+- auto-merge was enabled earlier but must not be assumed active/terminal after head movement without live verification.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 4
+checkpoint_version: 5
 status: validating
 branch: docs/OTC-20260813-tibia-re-canonical-runtime
 pr: 285
-head_before_checkpoint: 68e11c6fd820ea09205187df97a4cf126665b8c5
+head_before_checkpoint: 28167b3fa71ef3470c8a90d0eaee84a7699977b0
 base_head: 05450748daca8344d9555638b638e98b6dc3abc7
 related_prs:
   runtime: 48
@@ -120,5 +124,5 @@ prompt_eval:
   cases: 14
   passed: 14
 blockers: []
-next_action: verify final PR #285 diff/reviews and exact-head CI after imported login evidence; keep auto-merge enabled or merge when required checks pass
+next_action: verify final PR #285 diff/reviews and exact-head CI after the external-evidence manifest; merge/auto-merge only when required checks pass on the exact final head
 ```

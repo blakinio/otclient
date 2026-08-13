@@ -1,0 +1,13 @@
+{
+  "schema": "otclient.tibia-runtime-bridge.profile.v1",
+  "client_version": "15.32.df7b29",
+  "binary_sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+  "targets": {
+    "player_protocol_handler": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x308a008",
+      "expected_qt_class": "tibia::game::TPlayerProtocolMessageHandler",
+      "evidence": "same-hash read-only runtime evidence; revalidate in OTClient live session before action use"
+    }
+  }
+}

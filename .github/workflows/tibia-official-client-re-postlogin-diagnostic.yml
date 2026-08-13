@@ -17,16 +17,40 @@ jobs:
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
     steps:
       - name: Inspect owned process and non-secret renderer diagnostics
         shell: bash
         run: |
           set -Eeuo pipefail
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          toolroot="$state/toolroot"
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
-          if [[ -n "$pid" && -e "/proc/$pid" ]]; then echo TRACK_A_CLIENT_ALIVE=true; else echo TRACK_A_CLIENT_ALIVE=false; fi
+          if [[ -n "$pid" && -e "/proc/$pid" ]]; then
+            echo TRACK_A_CLIENT_ALIVE=true
+            if [[ -r "/proc/$pid/environ" ]]; then
+              tr '\0' '\n' <"/proc/$pid/environ" | grep -E '^(DISPLAY|QSG_|QT_|LIBGL_|VK_)=' | sed 's/^/TRACK_A_CLIENT_ENV=/' || true
+            fi
+            export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+            windows="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" 2>/dev/null | paste -sd, - || true)"
+            echo TRACK_A_VISIBLE_WINDOW_IDS="$windows"
+            for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" 2>/dev/null || true); do
+              name="$("$toolroot/usr/bin/xdotool" getwindowname "$w" 2>/dev/null || true)"
+              g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+              width="$(printf '%s\n' "$g" | sed -n 's/^WIDTH=//p')"
+              height="$(printf '%s\n' "$g" | sed -n 's/^HEIGHT=//p')"
+              printf 'TRACK_A_WINDOW=%s|%s|%sx%s\n' "$w" "$name" "$width" "$height"
+            done
+          else
+            echo TRACK_A_CLIENT_ALIVE=false
+          fi
+          export DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          if "$toolroot/usr/bin/xdpyinfo" 2>/dev/null | grep -q 'GLX'; then echo TRACK_A_GLX_EXTENSION=true; else echo TRACK_A_GLX_EXTENSION=false; fi
+          for t in tesseract xwdtopnm convert magick; do if command -v "$t" >/dev/null 2>&1; then echo TRACK_A_TOOL_${t}=true; else echo TRACK_A_TOOL_${t}=false; fi; done
           log="$state/runtime/client.log"
           if [[ -s "$log" ]]; then
             grep -Ei 'error|fail|fatal|opengl|vulkan|rhi|egl|glx|crash|render' "$log" | tail -n 80 | sed 's/^/TRACK_A_CLIENT_DIAG=/' || true
           fi
+          xlog="$state/runtime/xvfb.log"
+          if [[ -s "$xlog" ]]; then tail -n 40 "$xlog" | sed 's/^/TRACK_A_XVFB_DIAG=/' || true; fi
           echo TRACK_A_POSTLOGIN_DIAGNOSTIC_COMPLETE=true

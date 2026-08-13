@@ -1,0 +1,130 @@
+name: Track A clear stale .running and update official client
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-clear-stale-running-update.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Verify stale marker, remove it, and recover current package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$(id -u)" == 0 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          home="$state/home"
+          runtime="$state/runtime"
+          mkdir -p "$runtime"
+
+          warp_pid="$(tr -cd '0-9' <"$runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          xvfb_pid="$(tr -cd '0-9' <"$runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
+          kill -0 "$xvfb_pid"
+
+          # Re-prove no owned launcher/client process exists before touching the marker.
+          owned=0
+          for proc in /proc/[0-9]*; do
+            [[ -r "$proc/environ" && -e "$proc/exe" ]] || continue
+            grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            base="$(basename "$exe" 2>/dev/null || true)"
+            case "$base" in Tibia|client) echo "TRACK_A_OWNED_PROCESS=$proc|$exe"; owned=$((owned+1));; esac
+          done
+          echo TRACK_A_OWNED_TIBIA_PROCESS_COUNT="$owned"
+          [[ "$owned" == 0 ]]
+
+          running="$home/.local/share/CipSoft GmbH/Tibia/.running"
+          [[ -f "$running" ]]
+          python3 - "$running" <<'PY'
+          import fcntl,os,sys
+          p=sys.argv[1]; fd=os.open(p,os.O_RDWR)
+          try:
+              try: fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+              except BlockingIOError: raise SystemExit('TRACK_A_RUNNING_MARKER_IS_LOCKED=true')
+              print('TRACK_A_RUNNING_MARKER_IS_LOCKED=false')
+              fcntl.flock(fd,fcntl.LOCK_UN)
+          finally: os.close(fd)
+          PY
+          rm -- "$running"
+          [[ ! -e "$running" ]]
+          echo TRACK_A_STALE_RUNNING_MARKER_REMOVED=true
+
+          work="$state/update-after-running/run-$GITHUB_RUN_ID"; unpack="$work/unpacked"
+          mkdir -p "$unpack"; chmod 700 "$work"
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          with tarfile.open(sys.argv[1],'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(sys.argv[2],filter='data')
+              except TypeError:h.extractall(sys.argv[2])
+          PY
+          launcher="$unpack/Tibia/Tibia"; [[ -x "$launcher" ]]
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"; [[ -n "$proxy_lib" ]]
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"; tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          workdir="$(dirname "$launcher")"; log="$work/launcher.log"
+          cd "$workdir"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$home" XDG_DATA_HOME="$home/.local/share" DISPLAY="$TRACK_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$launcher" >"$log" 2>&1 </dev/null &
+          lp=$!
+          echo TRACK_A_UPDATE_LAUNCHER_PID="$lp"
+
+          child="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          before="$(sha256sum "$child" 2>/dev/null | awk '{print $1}' || true)"
+          echo TRACK_A_CLIENT_SHA_BEFORE="$before"
+          last=''; stable=0
+          for _ in $(seq 1 240); do
+            if grep -Fq 'Application is already running' "$log" 2>/dev/null; then break; fi
+            if [[ -s "$child" ]]; then
+              sha="$(sha256sum "$child" | awk '{print $1}')"
+              if [[ "$sha" == "$last" ]]; then stable=$((stable+1)); else stable=0; last="$sha"; fi
+              # require stability after launcher had at least several seconds to update
+              if (( stable >= 5 )); then sleep 5; sha2="$(sha256sum "$child" | awk '{print $1}')"; [[ "$sha2" == "$sha" ]] && break; fi
+            fi
+            sleep 2
+          done
+          if grep -Fq 'Application is already running' "$log" 2>/dev/null; then
+            echo TRACK_A_SINGLETON_STILL_BLOCKED=true
+            tail -n 120 "$log" | sed 's/^/TRACK_A_UPDATE_LOG=/' || true
+            exit 41
+          fi
+          [[ -s "$child" ]]
+          after="$(sha256sum "$child" | awk '{print $1}')"
+          echo TRACK_A_CLIENT_SHA_AFTER="$after"
+          echo TRACK_A_CLIENT_SIZE_AFTER="$(stat -c %s "$child")"
+          echo TRACK_A_SINGLETON_STILL_BLOCKED=false
+          tail -n 80 "$log" | sed 's/^/TRACK_A_UPDATE_LOG=/' || true
+          echo TRACK_A_CURRENT_CLIENT_RECOVERED=true

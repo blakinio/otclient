@@ -1,0 +1,52 @@
+name: Track A official Linux launcher owner probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-owner-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Inspect launcher processes without exposing environment values
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          track_marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          count=0
+          for proc in /proc/[0-9]*; do
+            pid="${proc##*/}"
+            [[ -r "$proc/exe" && -r "$proc/environ" ]] || continue
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            [[ "$(basename "$exe")" == Tibia ]] || continue
+            count=$((count + 1))
+            owned=false
+            grep -azFxq "$track_marker" "$proc/environ" 2>/dev/null && owned=true
+            recovery=false
+            if tr '\0' '\n' <"$proc/environ" 2>/dev/null | grep -Eq '^OTCLIENT_TIBIA_RE_PHASE=launcher-recovery-[0-9]+$'; then recovery=true; fi
+            state_path=false
+            case "$exe" in "$state"/*) state_path=true;; esac
+            echo TRACK_A_LAUNCHER_PROCESS_PID="$pid"
+            echo TRACK_A_LAUNCHER_PROCESS_TRACK_OWNED="$owned"
+            echo TRACK_A_LAUNCHER_PROCESS_RECOVERY_PHASE="$recovery"
+            echo TRACK_A_LAUNCHER_PROCESS_UNDER_STATE="$state_path"
+          done
+          echo TRACK_A_LAUNCHER_PROCESS_COUNT="$count"
+          echo TRACK_A_LAUNCHER_OWNER_PROBE_COMPLETE=true

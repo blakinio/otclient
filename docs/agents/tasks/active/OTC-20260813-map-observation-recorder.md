@@ -101,7 +101,7 @@ map-observation-recorder-output: /absolute/local/path/observations.jsonl
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-08-13T21:47:00Z
-head: c171a0a5b4e97e97385b94c8cf892c091a42610b
+head: c171a0a5bc5afaf9021cbfe2f671d86cd78aa6c3
 branch: feat/OTC-20260813-map-observation-recorder
 pr: 292
 status: validating

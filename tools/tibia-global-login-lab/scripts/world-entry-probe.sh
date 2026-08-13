@@ -101,7 +101,7 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     local h=rootWidget:recursiveGetChildById('httpLoginBox')
     local stay=rootWidget:recursiveGetChildById('stayLoggedBox')
     if not a or not p or not h then mark('LOGIN_WIDGETS_UNAVAILABLE=true'); return end
-    a:setText(email); p:setText(password); h:setChecked(true); if stay then stay:setChecked(false) end
+    a:setText(email); p:setText(password); h:setChecked(false); if stay then stay:setChecked(false) end
     email=nil; password=nil
     mark('LOGIN_START=true')
     EnterGame.doLogin()

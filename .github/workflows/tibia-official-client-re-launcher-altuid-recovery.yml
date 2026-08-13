@@ -31,8 +31,6 @@ jobs:
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           root="$state/toolroot"
-          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
-          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
           [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
           grep -azFxq "$marker" "/proc/$warp_pid/environ"
@@ -43,10 +41,13 @@ jobs:
           kill -0 "$xvfb_pid"
           echo TRACK_A_ALTUID_PREREQUISITES_VERIFIED=true
 
-          work="$state/launcher-altuid/run-$GITHUB_RUN_ID"
+          # Everything executed by uid 65534 lives below /tmp so no private Track-A
+          # parent directory can block traversal. The canonical state is read-only here.
+          work="/tmp/track-a-altuid-$GITHUB_RUN_ID"
           home="$work/home"
           unpack="$work/unpacked"
           mkdir -p "$home" "$unpack"
+          chmod 755 "$work" "$home" "$unpack"
           tarball="$work/tibia.x64.tar.gz"
           url='https://static.tibia.com/download/tibia.x64.tar.gz'
           curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 -A 'Mozilla/5.0 (X11; Linux x86_64)' "$url" -o "$tarball"
@@ -62,19 +63,26 @@ jobs:
           PY
           launcher="$unpack/Tibia/Tibia"
           [[ -x "$launcher" ]]
+          chmod -R a+rX "$unpack"
 
-          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
-          [[ -n "$proxy_lib" ]]
+          proxy_src="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          [[ -n "$proxy_src" ]]
+          proxy_lib="$work/libproxychains.so.4"
+          cp "$proxy_src" "$proxy_lib"
+          chmod 755 "$proxy_lib"
           proxy_conf="$work/proxychains.conf"
           printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
-          chmod -R a+rX "$unpack"
-          chmod 755 "$work" "$home"
           chmod 644 "$proxy_conf"
           chown -R 65534:65534 "$home"
           log="$work/launcher.log"
           touch "$log"; chown 65534:65534 "$log"
           workdir="$(dirname "$launcher")"
-          setpriv --reuid=65534 --regid=65534 --clear-groups env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$home" XDG_DATA_HOME="$home/.local/share" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" nohup "$launcher" >"$log" 2>&1 </dev/null &
+          setpriv --reuid=65534 --regid=65534 --clear-groups env -u RUNNER_TRACKING_ID \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$home" XDG_DATA_HOME="$home/.local/share" \
+            DISPLAY="$TRACK_DISPLAY" PATH="/usr/bin:/bin" LD_LIBRARY_PATH="$workdir:$workdir/lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$launcher" >"$log" 2>&1 </dev/null &
           launcher_pid=$!
           echo TRACK_A_ALTUID_LAUNCHER_STARTED=true
 

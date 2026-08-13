@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-map-observation-export
-status: validating
+status: blocked
 agent: Codex
 project_lane: otclient
 lane: otclient
@@ -10,7 +10,7 @@ branch: docs/OTC-20260813-map-observation-export
 base_branch: main
 start_sha: dc18f795bf13cee37a115164da56a452aaa14f02
 created: 2026-08-13T22:24:00+02:00
-updated: 2026-08-13T20:48:59Z
+updated: 2026-08-13T20:52:30Z
 risk: medium
 related_pr: 291
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
@@ -106,11 +106,11 @@ Owner-funded Codex/API quota is forbidden unless the owner explicitly authorizes
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T20:48:59Z
-head: c799a1bb38fc93a349255919fd1fb84820aefb64
+updated_at: 2026-08-13T20:52:30Z
+head: 11686a15b4cd98218ffb8b616c313eab06ecbdf8
 branch: docs/OTC-20260813-map-observation-export
 pr: 291
-status: validating
+status: blocked
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
 context_routes:
   - repository-local P0 contract and fixture corpus
@@ -131,8 +131,8 @@ unknown:
 conflicts:
   - The original P0 text made external acceptance implementation-blocking, conflicting with TIBIA_RESEARCH_TRACKS repository-only coordination.
 first_failure:
-  marker: exact-head validation pending
-  evidence: contract commit c799a1bb38fc93a349255919fd1fb84820aefb64 is pushed to PR #291
+  marker: independent documentation audit unavailable
+  evidence: the local-worker review path produced no valid fresh full audit because its path, context-size, and citation-quality gates rejected the attempts; owner-funded Codex/API review is forbidden by AGENTS.md
 rejected_hypotheses:
   - External repository acceptance is required for local P0: contradicted by TIBIA_RESEARCH_TRACKS.md repository-only rule and the PR review finding.
 changed_paths:
@@ -148,7 +148,11 @@ validation:
   - command: git diff --check
     result: PASS
     evidence: working-tree P0 diff has no whitespace errors
+  - command: PR #291 exact-head CI observation
+    result: NOT_RUN
+    evidence: CI / Required was queued for 11686a15b4cd98218ffb8b616c313eab06ecbdf8 at the first ordinary observation
 blockers:
+  - A fresh independent documentation audit is required before merge; the available local reviewer produced no valid full-audit result because its path, context-size, and citation-quality gates rejected the attempts, while repository policy forbids owner-funded AI review without current explicit authorization.
   - P0 requires exact-head PR validation before it can be merged; P1 must not start on this unmerged contract.
-next_action: Observe the exact-head checks for the pushed P0 checkpoint and, if they pass, complete the required documentation audit and merge closeout before considering P1.
+next_action: Obtain a fresh independent no-owner-funded audit of PR #291's exact P0 diff, then resolve any findings and re-check exact-head CI before merge closeout.
 ```

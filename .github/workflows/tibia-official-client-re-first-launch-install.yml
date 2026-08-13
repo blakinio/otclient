@@ -98,7 +98,7 @@ jobs:
           lp=$!
           echo TRACK_A_FIRST_LAUNCH_PID="$lp"
 
-          changed=0; last=''; stable=0
+          changed=0; last=''; stable=0; completed=0
           for _ in $(seq 1 300); do
             if grep -Fq 'Application is already running' "$log" 2>/dev/null; then
               echo TRACK_A_FIRST_LAUNCH_SINGLETON_BLOCKED=true
@@ -110,10 +110,9 @@ jobs:
               [[ -n "$before" && "$sha" != "$before" ]] && changed=1
               if [[ "$sha" == "$last" ]]; then stable=$((stable+1)); else stable=0; last="$sha"; fi
             fi
-            if grep -Eq 'installationOrUpdateFinished|Installation.*finished|Changing local package status.*(UpToDate|Installed)|Package.*loaded completely' "$log" 2>/dev/null; then
-              if [[ -s "$child" && $stable -ge 5 ]]; then break; fi
-            fi
+            if grep -Eqi 'fully installed|installationOrUpdateFinished|Changing local package status.*(UpToDate|Ready)|Installation \(Update\).*finished' "$log" 2>/dev/null; then completed=1; fi
             if (( changed == 1 && stable >= 8 )); then break; fi
+            if (( completed == 1 && stable >= 5 )); then break; fi
             if ! kill -0 "$lp" 2>/dev/null && (( stable >= 3 )); then break; fi
             sleep 2
           done
@@ -122,8 +121,10 @@ jobs:
           echo TRACK_A_FIRST_LAUNCH_SHA_AFTER="$after"
           echo TRACK_A_FIRST_LAUNCH_CLIENT_SIZE="$(stat -c %s "$child")"
           echo TRACK_A_FIRST_LAUNCH_SHA_CHANGED="$([[ "$after" != "$before" ]] && echo true || echo false)"
+          echo TRACK_A_FIRST_LAUNCH_INSTALL_COMPLETED="$([[ "$completed" == 1 ]] && echo true || echo false)"
           echo TRACK_A_FIRST_LAUNCH_PROCESS_ALIVE="$([[ -d /proc/$lp ]] && echo true || echo false)"
           echo TRACK_A_FIRST_LAUNCH_RELEVANT_LOG_BEGIN=true
-          grep -Ei 'first.launch|package|install|update|download|status|version|error|failed|already running' "$log" | tail -n 250 | sed 's/^/TRACK_A_FIRST_LAUNCH_LOG=/' || true
+          grep -Ei 'first.launch|package|install|update|download|status|version|error|failed|already running|fully' "$log" | tail -n 350 | sed 's/^/TRACK_A_FIRST_LAUNCH_LOG=/' || true
           echo TRACK_A_FIRST_LAUNCH_RELEVANT_LOG_END=true
+          [[ "$after" != "$before" || "$completed" == 1 ]]
           echo TRACK_A_FIRST_LAUNCH_COMPLETE=true

@@ -198,10 +198,10 @@ jobs:
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
             "$toolroot/usr/bin/xdotool" key ctrl+a
             "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_EMAIL"
-            "$toolroot/usr/bin/xdotool" key Tab
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
             "$toolroot/usr/bin/xdotool" key ctrl+a
             "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_PASSWORD"
-            "$toolroot/usr/bin/xdotool" key Return
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
             unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
             transition=0; changed=0
             for _ in $(seq 1 60); do

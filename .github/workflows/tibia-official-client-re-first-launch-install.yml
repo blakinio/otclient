@@ -110,7 +110,6 @@ jobs:
               [[ -n "$before" && "$sha" != "$before" ]] && changed=1
               if [[ "$sha" == "$last" ]]; then stable=$((stable+1)); else stable=0; last="$sha"; fi
             fi
-            # finish only after launcher explicitly reports install/update completion or package is changed and stable
             if grep -Eq 'installationOrUpdateFinished|Installation.*finished|Changing local package status.*(UpToDate|Installed)|Package.*loaded completely' "$log" 2>/dev/null; then
               if [[ -s "$child" && $stable -ge 5 ]]; then break; fi
             fi

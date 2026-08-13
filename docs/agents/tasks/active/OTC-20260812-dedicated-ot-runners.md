@@ -83,6 +83,8 @@ build_target: base
 - [x] The deployment documentation defines the canonical OTCLIENT-TIBIA-RE runner selector and persistent state path.
 - [x] No Docker socket or privileged mode is introduced.
 - [x] `docker compose config` and both Docker build targets pass on a real Docker engine for exact implementation head `e97cf8be1b2a8c63cecc39e07d0347830b874d5f`.
+- [x] Temporary image-validation workflow was removed after its evidence run.
+- [x] Workflow-free repository CI passed on head `5f76d213d859c2a8838ac5b8740865ef6afaf1ab`.
 - [ ] Updated `otclient-runner` is deployed on Synology and registers `synology-otclient-01` with `tibia-re`.
 - [ ] A PR #48 canonical probe is accepted by that runner and proves writable persistent state without touching `/var/lib/oteryn-staging-state/**`.
 - [ ] `synology-ots-01` remains available in `blakinio/Otheryn` after the stack update.
@@ -116,7 +118,7 @@ checks:
 
 The job completed all steps successfully, including `docker compose config`, building `base`, building `otclient-tibia-re`, and verifying GDB/Xvfb/proxychains/xdotool/Vulkan plus Python `elftools`/YAML availability.
 
-The temporary validation workflow is evidence scaffolding only and should be removed before final PR closeout; run `31679256871` remains the supporting exact-implementation evidence after removal.
+The temporary validation workflow was removed after this proof. Workflow-free final code/docs head `5f76d213d859c2a8838ac5b8740865ef6afaf1ab` passed repository CI run `31679760916`, including `CI / Required` job `94383401816`.
 
 Target-NAS registration proof is still required because GitHub repository runner inventory cannot be read by the current integration (`403 Resource not accessible by integration`).
 
@@ -127,6 +129,7 @@ PROVEN:
 - the runner stack is repository-scoped and independent of Oteryn Platform/Freqtrade infrastructure;
 - the declarative OTClient runner has a Tibia-RE-specific image target and label;
 - the OTClient Tibia-RE image and Compose configuration build/validate successfully on a real Docker engine;
+- the temporary validation workflow was removed and workflow-free repository CI is green on the last implementation head;
 - PR #48 has a consumer migration path that does not require Docker or an Oteryn container.
 
 DERIVED:
@@ -144,4 +147,4 @@ WAITING_ON:
 BLOCKER:
 - final deployment to the Synology Docker host cannot be performed through the currently available GitHub connector; no authorized NAS/SSH execution tool is available in this session.
 
-next_action: remove temporary validation workflow, then deploy/recreate the PR #280 stack on Synology and prove PR #48 run 31679097113 or a fresh exact-head equivalent is accepted by `synology-otclient-01`
+next_action: deploy/recreate the PR #280 stack on Synology, verify `synology-otclient-01` registers with `tibia-re`, then reconcile PR #48 run `31679097113` (or a fresh exact-head equivalent) once and prove persistent OTClient state plus zero active Oteryn runtime dependency

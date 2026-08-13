@@ -47,11 +47,14 @@ track_id: otclient-global-login
 alias: OTCLIENT-GLOBAL-LOGIN
 subject: this blakinio/otclient fork
 objective: make this OTClient authenticate to and enter official Tibia Global
-canonical_task: docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
 canonical_pr: 284
+active_branch_while_pr_open: feat/OTC-20260813-tibia-global-login-lab
+active_task_while_pr_open: docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
 repository: blakinio/otclient
 runner: synology-otclient-01
 ```
+
+While PR #284 remains active, the Track B task is intentionally resolved from that exact PR-local branch/path rather than falsely assumed to exist on `main`. Always verify the live PR head before use. After #284 becomes terminal, resolve Track B from the resulting `main` task/archive or explicitly recorded replacement PR/task.
 
 Track B owns compatibility work whose subject is this repository's OTClient, including:
 
@@ -131,8 +134,9 @@ Track A / official-client-re:
 
 Track B / otclient-global-login:
   alias: OTCLIENT-GLOBAL-LOGIN
-  task: docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
   PR: #284
+  branch while active: feat/OTC-20260813-tibia-global-login-lab
+  task on that branch: docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
   owned implementation: tools/tibia-global-login-lab/** and .github/workflows/tibia-global-login-lab.yml
 ```
 

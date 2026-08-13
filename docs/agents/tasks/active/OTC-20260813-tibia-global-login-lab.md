@@ -435,6 +435,13 @@ the already-proven word relationship without content by emitting only
 client+world, client+connect and client+denied booleans plus total message
 length. No text or hash is exported.
 
+Run `31705787903`, job `94465887261`, exact head
+`f827ecfd5a529a5656a4565eeebcaa40f12e8975`, again exchanged 230/148 bytes at
+effective 1532/1532 but emitted no login callback at all. The next run records
+only numeric server opcodes through the existing pre-dispatch `onOpcode` hook
+and adds the missing boolean `onLoginAdvice` callback. Payload bytes remain
+unread and unlogged.
+
 # Evidence classification
 
 PROVEN:
@@ -493,8 +500,8 @@ Run the canonical E2E with fixed non-secret login-error category markers and con
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T13:36:00Z
-head: 06b8ab5b6ff41ba68ddd2b82bbc138ec9c8574b6
+updated_at: 2026-08-13T13:48:00Z
+head: f827ecfd5a529a5656a4565eeebcaa40f12e8975
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -509,7 +516,7 @@ proven:
 derived:
   - first remaining boundary is the server-returned game-login rejection category
 unknown:
-  - exact non-secret client/world/connect/denied relationship in the server GAME_LOGIN_ERROR response
+  - numeric first server opcode and whether it reaches login-error or login-advice dispatch
 conflicts:
   - none
 first_failure:
@@ -529,5 +536,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with relational login-error markers and continue from the returned relationship
+next_action: run the exact-head canonical E2E with numeric server-opcode telemetry and continue from its dispatch outcome
 ```

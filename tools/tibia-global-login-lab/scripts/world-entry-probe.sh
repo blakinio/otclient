@@ -223,12 +223,20 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
   if Services and Services.clientAssets then Services.clientAssets.enabled = false end
   local function mark(s) g_logger.info('[TIBIA_GLOBAL_LAB] ' .. s) end
 
+  local originalProtocolGameOnOpcode=ProtocolGame.onOpcode
+  function ProtocolGame:onOpcode(opcode, msg)
+    mark('GAME_SERVER_OPCODE_'..tostring(tonumber(opcode) or -1)..'=true')
+    if originalProtocolGameOnOpcode then return originalProtocolGameOnOpcode(self, opcode, msg) end
+    return false
+  end
+
   connect(g_game, {
     onLogin=function() mark('GAME_LOGIN=true') end,
     onPendingGame=function() mark('GAME_PENDING=true') end,
     onEnterGame=function() mark('GAME_ENTER=true') end,
     onGameStart=function() mark('GAME_START=true') end,
     onLoginWait=function() mark('GAME_LOGIN_WAIT=true') end,
+    onLoginAdvice=function() mark('GAME_LOGIN_ADVICE=true') end,
     onLoginError=function(errorText)
       mark('GAME_LOGIN_ERROR=true')
       local lowered=string.lower(tostring(errorText or ''))

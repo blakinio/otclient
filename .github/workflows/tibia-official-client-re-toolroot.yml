@@ -49,7 +49,7 @@ jobs:
           packages=(file gdb proxychains4 socat xdotool xvfb)
           # An empty private dpkg status makes APT resolve and download the
           # complete dependency closure without installing into the runner.
-          apt-get "${apt_opts[@]}" --download-only --no-install-recommends \
+          apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends \
             install "${packages[@]}"
           for archive in "$aptroot"/archives/*.deb; do
             dpkg-deb -x "$archive" "$root"

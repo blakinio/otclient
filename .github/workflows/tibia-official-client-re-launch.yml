@@ -46,7 +46,13 @@ jobs:
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           [[ -x "$toolroot/usr/bin/Xvfb" ]]
-          [[ -x "$toolroot/usr/bin/proxychains4" ]]
+          proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
+          vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit 2>/dev/null || true)"
+          [[ -n "$proxy_lib" ]]
+          [[ -n "$vk_icd" ]]
+          unresolved="$(LD_LIBRARY_PATH="$runtime/lib:$tool_lib" ldd "$client" | awk '/not found/{print $1}' | paste -sd, - || true)"
+          echo TRACK_A_CLIENT_UNRESOLVED_LIBRARIES="$unresolved"
+          [[ -z "$unresolved" ]]
 
           warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid")"
           [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
@@ -98,15 +104,22 @@ jobs:
                 tr '\0' '\n' <"/proc/$client_pid/environ" | grep -Fxq "$marker"; then
               kill -0 "$client_pid"
             else
-              echo '::error title=Track A ownership mismatch::Client PID file is stale or does not identify an owned process.'
-              exit 1
+              if [[ -n "$client_pid" && -e "/proc/$client_pid" ]]; then
+                echo '::error title=Track A ownership mismatch::Client PID was reused by a process outside Track A.'
+                exit 1
+              fi
+              rm -f "$client_pid_file"
             fi
-          else
+          fi
+          if [[ ! -s "$client_pid_file" ]]; then
             cd "$runtime"
             env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
               HOME="$state/home" DISPLAY="$TRACK_DISPLAY" \
               PATH="$tool_path:/usr/bin:/bin" LD_LIBRARY_PATH="$runtime/lib:$tool_lib" \
-              nohup "$toolroot/usr/bin/proxychains4" -f "$proxy_conf" "$client" \
+              LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$toolroot/usr/lib/x86_64-linux-gnu/dri" \
+              VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
+              LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+              nohup "$client" \
               >"$state/runtime/client.log" 2>&1 </dev/null &
             client_pid=$!
             printf '%s\n' "$client_pid" >"$client_pid_file"

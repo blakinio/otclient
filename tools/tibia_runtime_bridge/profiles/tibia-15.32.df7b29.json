@@ -7,7 +7,43 @@
       "resolver": "primary_vptr",
       "vptr_offset": "0x308a008",
       "expected_qt_class": "tibia::game::TPlayerProtocolMessageHandler",
-      "evidence": "same-hash read-only runtime evidence; revalidate in OTClient live session before action use"
+      "evidence": "relocation-aware exact-binary proof run 31654434331"
+    },
+    "worldmap_handler": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x30871d8",
+      "expected_qt_class": "tibia::worldmap::TWorldmapProtocolMessageHandler",
+      "evidence": "relocation-aware exact-binary proof run 31654434331"
+    },
+    "gameserver_game_session": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x3078ba0",
+      "expected_qt_class": "tibia::game::TGameserverGameSession",
+      "evidence": "relocation-aware exact-binary proof run 31654434331"
+    },
+    "player_data": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x308ca70",
+      "expected_qt_class": "tibia::game::TPlayerData",
+      "evidence": "relocation-aware exact-binary proof run 31654434331"
+    },
+    "container_storage": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x308a1a0",
+      "expected_qt_class": "tibia::container::TContainerStorage",
+      "evidence": "relocation-aware exact-binary proof run 31654434331"
+    },
+    "creature_storage": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x308d078",
+      "expected_qt_class": "tibia::creatures::TCreatureStorage",
+      "evidence": "relocation-aware exact-binary proof run 31654434331"
+    },
+    "game_client": {
+      "resolver": "primary_vptr",
+      "vptr_offset": "0x3076908",
+      "expected_qt_class": "tibia::client::TGameClient",
+      "evidence": "relocation-aware exact-binary proof run 31654434331"
     }
   }
 }

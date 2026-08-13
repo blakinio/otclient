@@ -1,0 +1,47 @@
+name: Track A exact launcher running-path probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-running-paths.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Inspect exact candidate .running paths
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          roots=(
+            "$state/launcher-recovery/run-31740025398/unpacked/Tibia"
+            "$state/launcher-recovery/run-31740025398/home/.local/share/CipSoft GmbH/Tibia"
+            "$state/launcher-recovery/isolated-31741562880/unpacked/Tibia"
+            "$state/launcher-recovery/isolated-31741562880/home/.local/share/CipSoft GmbH/Tibia"
+            "$state/home/.local/share/CipSoft GmbH/Tibia"
+          )
+          count=0
+          for root in "${roots[@]}"; do
+            marker="$root/.running"
+            rel="${marker#$state/}"
+            if [[ -e "$marker" ]]; then
+              count=$((count+1))
+              echo TRACK_A_RUNNING_PATH_PRESENT="$rel"
+              echo TRACK_A_RUNNING_PATH_SIZE="$(stat -c %s "$marker")"
+              echo TRACK_A_RUNNING_PATH_MODE="$(stat -c %a "$marker")"
+            else
+              echo TRACK_A_RUNNING_PATH_ABSENT="$rel"
+            fi
+          done
+          echo TRACK_A_RUNNING_EXACT_PRESENT_COUNT="$count"
+          echo TRACK_A_RUNNING_EXACT_PATH_PROBE_COMPLETE=true

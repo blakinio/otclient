@@ -199,6 +199,125 @@ jobs:
             "$toolroot/usr/bin/xdotool" getmouselocation --shell | awk -F= '/^X=/{x=$2} /^Y=/{y=$2} END { print x "," y }'
           }
 
+          # The pixel threshold above is only a regression detector.  This
+          # trace uses the version-pinned client control-flow offsets to tell
+          # whether the exact submit reaches authentication and which state it
+          # reaches; it never records credential values or image contents.
+          if [[ -w /proc/sys/kernel/yama/ptrace_scope ]]; then printf '0\n' >/proc/sys/kernel/yama/ptrace_scope; fi
+          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
+          [[ -n "$line" ]]
+          start="$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')"
+          offset="$(printf '%s\n' "$line" | awk '{print $3}')"
+          auth_bias=$((16#$start - 16#$offset))
+          auth_trace="$evidence/auth-trace"
+          auth_gdb="$evidence/auth-trace.gdb"
+          auth_gdb_log="$evidence/auth-gdb.log"
+          : >"$auth_trace"
+          cat >"$auth_gdb" <<EOF
+          set pagination off
+          set confirm off
+          attach $pid
+          break *0x$(printf '%x' $((auth_bias + 0xcfadd4)))
+          commands 1
+            silent
+            shell printf 'LOGIN_STATE_MACHINE_STARTED\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb2ff)))
+          commands 2
+            silent
+            shell printf 'LOGIN_WAITING_DIALOG_ENTERED\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb7c0)))
+          commands 3
+            silent
+            shell printf 'ACCOUNT_LOGIN_UPLOADER_SUCCESS\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb790)))
+          commands 4
+            silent
+            shell printf 'ACCOUNT_LOGIN_UPLOADER_FAILED\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb780)))
+          commands 5
+            silent
+            shell printf 'ACCOUNT_LOGIN_MISSING_2FA_TOKEN\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb770)))
+          commands 6
+            silent
+            shell printf 'ACCOUNT_LOGIN_MISSING_EMAIL_CODE\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb700)))
+          commands 7
+            silent
+            shell printf 'ACCOUNT_LOGIN_MISSING_LOGIN_CONFIRMATION\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb6f0)))
+          commands 8
+            silent
+            shell printf 'ACCOUNT_LOGIN_INVALID_SERVER_RESPONSE\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb6e0)))
+          commands 9
+            silent
+            shell printf 'ACCOUNT_LOGIN_INVALID_DEVICE_COOKIE\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb6c0)))
+          commands 10
+            silent
+            shell printf 'ACCOUNT_LOGIN_CLIENT_OUT_OF_DATE\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb41e)))
+          commands 11
+            silent
+            shell printf 'TWO_FACTOR_TOKEN_STATE_ENTERED\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb4a5)))
+          commands 12
+            silent
+            shell printf 'DEVICE_VERIFICATION_CODE_STATE_ENTERED\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb438)))
+          commands 13
+            silent
+            shell printf 'TWO_FACTOR_EMAIL_STATE_ENTERED\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb34e)))
+          commands 14
+            silent
+            shell printf 'LOGIN_CONFIRMATION_STATE_ENTERED\\n' >>'$auth_trace'
+            continue
+          end
+          break *0x$(printf '%x' $((auth_bias + 0xcfb374)))
+          commands 15
+            silent
+            shell printf 'CHARACTER_SELECTION_STATE_ENTERED\\n' >>'$auth_trace'
+            continue
+          end
+          echo AUTH_STRUCTURAL_TRACE_ARMED=true
+          continue
+          EOF
+          rm -f "$auth_gdb_log"
+          env -u RUNNER_TRACKING_ID LD_LIBRARY_PATH="$tool_lib" \
+            "$toolroot/usr/bin/gdb" -q -nx -x "$auth_gdb" >"$auth_gdb_log" 2>&1 &
+          auth_gdb_pid=$!
+          for _ in $(seq 1 30); do grep -q 'AUTH_STRUCTURAL_TRACE_ARMED=true' "$auth_gdb_log" 2>/dev/null && break; sleep 0.5; done
+          grep -q 'AUTH_STRUCTURAL_TRACE_ARMED=true' "$auth_gdb_log"
+          echo TRACK_A_AUTH_TRACE_ARMED=true
+
           read -r initial_local initial_direct initial_udp < <(socket_state)
           read -r io_before_read io_before_write < <(process_io)
           echo TRACK_A_INITIAL_LOCAL_SOCKS="$initial_local"
@@ -247,6 +366,10 @@ jobs:
             echo TRACK_A_LOGIN_SUBMIT_LOCAL_SOCKS_MAX="$submit_local_max"
             echo TRACK_A_LOGIN_SUBMIT_READ_DELTA="$((io_after_read - io_before_read))"
             echo TRACK_A_LOGIN_SUBMIT_WRITE_DELTA="$((io_after_write - io_before_write))"
+            echo TRACK_A_AUTH_TRACE_BEGIN
+            cat "$auth_trace"
+            echo TRACK_A_AUTH_TRACE_END
+            echo "TRACK_A_LAST_AUTH_EVENT=$(tail -n1 "$auth_trace" 2>/dev/null || true)"
             rm -f -- "$before" "$after" "$typed"
             [[ "$transition" == 1 ]]
             window="$(resolve_window)"

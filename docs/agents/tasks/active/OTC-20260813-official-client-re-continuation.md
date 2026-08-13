@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:35:00+02:00
-head: e1583bcedab9f80abd8a856b74e9ffa63986342f
+updated_at: 2026-08-13T15:52:00+02:00
+head: c77dbe3e914a202dd8a2ecdbac072da04de34a1a
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -155,6 +155,15 @@ validation:
   - command: Track A structural login run 31716060387 job 94500972188
     result: INVALID_COMPARATOR_EXECUTION
     evidence: normal client start and credential injection reached the comparator, but this minimal workflow had no checkout, so the helper path was absent; no numeric transition result was produced
+  - command: Track A structural login run 31716296567 job 94501758491
+    result: FAIL_FOR_PIXEL_ALIGNED_BASELINE
+    evidence: pinned checkout made the versioned XWD changed-pixel comparator available; exact 1280x800 fresh-home explicit-click sequence reached the official client with the three historical pointer coordinates, but changed pixels were 1624 < 45000. No structural IN_GAME claim was made.
+  - command: python -c "import yaml; yaml.safe_load(open('.github/workflows/tibia-official-client-re-login.yml'))"
+    result: PASS
+    evidence: workflow YAML remained syntactically parseable after adding the bounded static auth-state trace.
+  - command: python -m unittest tests.tools.test_tibia_official_client_re_reconstruct tests.tools.test_tibia_official_client_re_xwd_diff
+    result: PASS
+    evidence: six tests passed after adding the auth trace workflow change.
 blockers: []
-next_action: rerun the same baseline after a pinned read-only checkout makes the tested XWD comparator available on the runner
+next_action: run the same pinned pixel baseline with the version-specific GDB auth-state trace armed before credential input; use its safe state labels to identify the first reached login outcome before attempting any further input variation
 ```

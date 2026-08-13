@@ -181,8 +181,12 @@ jobs:
           print(f'{local} {direct} {udp}')
           PY
           socket_state() { python3 "$evidence/socket_state.py" "$pid" "$TRACK_WARP_PORT"; }
+          process_io() {
+            awk '/^(rchar|wchar):/ { values[$1]=$2 } END { print values["rchar:"], values["wchar:"] }' "/proc/$pid/io"
+          }
 
           read -r initial_local initial_direct initial_udp < <(socket_state)
+          read -r io_before_read io_before_write < <(process_io)
           echo TRACK_A_INITIAL_LOCAL_SOCKS="$initial_local"
           [[ "$initial_direct" == 0 && "$initial_udp" == 0 ]]
           # Bootstrap/API connections already produce multiple proxied sockets;
@@ -208,9 +212,12 @@ jobs:
             [[ "$typed_changed" -gt 100 ]]
             "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
             unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-            transition=0; changed=0
+            transition=0; changed=0; submit_local_max="$initial_local"
             for _ in $(seq 1 60); do
               sleep 0.5
+              read -r submit_local submit_direct submit_udp < <(socket_state)
+              [[ "$submit_direct" == 0 && "$submit_udp" == 0 ]]
+              (( submit_local > submit_local_max )) && submit_local_max=$submit_local || true
               window="$(resolve_window || true)"
               [[ -n "$window" ]] || continue
               "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$after"
@@ -220,6 +227,10 @@ jobs:
             done
             echo TRACK_A_LOGIN_TRANSITION_CHANGED_PIXELS="$changed"
             echo TRACK_A_LOGIN_TRANSITION_PROVEN="$transition"
+            read -r io_after_read io_after_write < <(process_io)
+            echo TRACK_A_LOGIN_SUBMIT_LOCAL_SOCKS_MAX="$submit_local_max"
+            echo TRACK_A_LOGIN_SUBMIT_READ_DELTA="$((io_after_read - io_before_read))"
+            echo TRACK_A_LOGIN_SUBMIT_WRITE_DELTA="$((io_after_write - io_before_write))"
             rm -f -- "$before" "$after" "$typed"
             [[ "$transition" == 1 ]]
             window="$(resolve_window)"

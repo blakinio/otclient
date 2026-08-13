@@ -395,6 +395,24 @@ fatal staticdata error-list addition from the container copy of
 `STATICDATA_LOAD_FAILED`, while successful appearances can keep version 1532
 alive for the game-login experiment.
 
+Run `31702087216`, job `94453443371`, exact head
+`76d30527c718650dd50316140847f07154449342`, crossed the previous boundary:
+
+```text
+CLIENT_VERSION_VALUE=1532
+PROTOCOL_VERSION_VALUE=1532
+SESSION_KEY_FEATURE=true
+LAB_GAME_FORWARD_CLIENT_BYTES=true
+LAB_GAME_FORWARD_CLIENT_LENGTH=230
+LAB_GAME_FORWARD_SERVER_BYTES=true
+LAB_GAME_FORWARD_SERVER_LENGTH=148
+GAME_LOGIN_ERROR=true
+```
+
+The endpoint now parses enough of the native Linux OTClient login to return a
+protocol login error. The callback still discards the free-form text. The next
+run maps it only to fixed non-secret categories without printing the message.
+
 # Evidence classification
 
 PROVEN:
@@ -447,14 +465,14 @@ UNKNOWN:
 
 # Next action
 
-Run the canonical E2E with the lab runtime staticdata fatal gate bypassed, verify effective versions remain 1532, and classify the exchange.
+Run the canonical E2E with fixed non-secret login-error category markers and continue from the exact returned category.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:51:00Z
-head: 2e6c604c095b54a42bc9ea10ab405bdab3da62bd
+updated_at: 2026-08-13T12:58:00Z
+head: 76d30527c718650dd50316140847f07154449342
 branch: feat/OTC-20260813-tibia-global-login-lab
 pr: 284
 status: validating
@@ -465,20 +483,19 @@ owned_paths:
   - .github/workflows/tibia-global-login-lab.yml
   - docs/agents/tasks/active/OTC-20260813-tibia-global-login-lab.md
 proven:
-  - run 31697097942/job 94437261305 sent 143 client bytes and received zero server bytes after SOCKS grant
+  - run 31702087216/job 94453443371 preserved version 1532, sent 230 client bytes, received 148 server bytes, and reached GAME_LOGIN_ERROR
 derived:
-  - first remaining boundary is the official 15.32 initial game-login packet identity/framing
+  - first remaining boundary is the server-returned game-login rejection category
 unknown:
-  - whether bypassing only the lab runtime staticdata fatal gate preserves client/protocol version 1532 through login construction
+  - exact non-secret category of the server GAME_LOGIN_ERROR response
 conflicts:
   - none
 first_failure:
-  marker: LAB_GAME_FORWARD_SERVER_BYTES=false
-  evidence: run 31697097942/job 94437261305 at 05ba7696579a82601034959430243eca12aeb4c2
+  marker: GAME_LOGIN_ERROR=true
+  evidence: run 31702087216/job 94453443371 at 76d30527c718650dd50316140847f07154449342
 rejected_hypotheses:
   - challenge-first: run 31695992918 produced zero bytes in both directions
   - missing restored legacy login features alone: run 31697097942 still received zero server bytes
-  - Linux OS identity alone: run 31698057223 advertised Windows and still received zero server bytes
   - missing preview-state field alone: run 31698702409 sent 144 client bytes and received zero server bytes
   - raw runtime asset identifier alone: run 31699422432 normalized it and still received zero server bytes
 changed_paths:
@@ -490,5 +507,5 @@ validation:
     evidence: checkpoint schema validated locally before commit
 blockers:
   - none
-next_action: run the exact-head canonical E2E with the lab runtime staticdata fatal gate bypassed and verify effective versions plus aggregate direction markers
+next_action: run the exact-head canonical E2E with fixed non-secret login-error category markers and continue from the returned category
 ```

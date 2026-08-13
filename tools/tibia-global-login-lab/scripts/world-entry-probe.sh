@@ -229,7 +229,16 @@ if os.getenv('OTCLIENT_TIBIA_GLOBAL_LAB') == '1' then
     onEnterGame=function() mark('GAME_ENTER=true') end,
     onGameStart=function() mark('GAME_START=true') end,
     onLoginWait=function() mark('GAME_LOGIN_WAIT=true') end,
-    onLoginError=function() mark('GAME_LOGIN_ERROR=true') end,
+    onLoginError=function(errorText)
+      mark('GAME_LOGIN_ERROR=true')
+      local lowered=string.lower(tostring(errorText or ''))
+      if lowered:find('client',1,true) or lowered:find('version',1,true) or lowered:find('protocol',1,true) or lowered:find('update',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_CLIENT_VERSION=true') end
+      if lowered:find('session',1,true) or lowered:find('token',1,true) or lowered:find('authenticator',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_SESSION_AUTH=true') end
+      if lowered:find('account',1,true) or lowered:find('password',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_ACCOUNT_AUTH=true') end
+      if lowered:find('character',1,true) or lowered:find('world',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_CHARACTER_WORLD=true') end
+      if lowered:find('battleye',1,true) or lowered:find('integrity',1,true) then mark('GAME_LOGIN_ERROR_CATEGORY_INTEGRITY=true') end
+      lowered=nil
+    end,
     onConnectionError=function(_, code)
       mark('GAME_CONNECTION_ERROR=true')
       mark('GAME_CONNECTION_ERROR_CODE_' .. tostring(tonumber(code) or -1) .. '=true')

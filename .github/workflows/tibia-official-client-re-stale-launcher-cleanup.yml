@@ -1,0 +1,70 @@
+name: Track A stale official launcher cleanup
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-stale-launcher-cleanup.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Stop only verified stale Track A launcher processes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          found=0
+          stopped=0
+          for proc in /proc/[0-9]*; do
+            [[ -r "$proc/environ" && -e "$proc/exe" ]] || continue
+            grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            [[ -n "$exe" ]] || continue
+            [[ "$(basename "$exe")" == Tibia ]] || continue
+            case "$exe" in
+              "$state"/update-canonical/*/unpacked/Tibia/Tibia|"$state"/launcher-recovery/*/unpacked/Tibia/Tibia)
+                ;;
+              *)
+                echo "TRACK_A_STALE_LAUNCHER_SKIPPED_NONSCOPED=true"
+                continue
+                ;;
+            esac
+            pid="${proc##*/}"
+            found=$((found+1))
+            echo "TRACK_A_STALE_LAUNCHER_VERIFIED_PID=$pid"
+            kill -TERM "$pid"
+            for _ in $(seq 1 50); do
+              kill -0 "$pid" 2>/dev/null || break
+              sleep .1
+            done
+            if kill -0 "$pid" 2>/dev/null; then
+              kill -KILL "$pid"
+              for _ in $(seq 1 20); do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep .1
+              done
+            fi
+            ! kill -0 "$pid" 2>/dev/null
+            stopped=$((stopped+1))
+          done
+          echo "TRACK_A_STALE_LAUNCHER_FOUND=$found"
+          echo "TRACK_A_STALE_LAUNCHER_STOPPED=$stopped"
+          [[ "$found" -eq "$stopped" ]]
+          echo TRACK_A_STALE_LAUNCHER_CLEANUP_COMPLETE=true

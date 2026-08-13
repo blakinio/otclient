@@ -72,8 +72,8 @@ cleanup.
 
 ```yaml
 checkpoint_version: 2
-updated_at: 2026-08-13T15:31:00+02:00
-head: 3e17bdd8d7d0176f909ca58ab0d30691e0c2f0ad
+updated_at: 2026-08-13T15:35:00+02:00
+head: e1583bcedab9f80abd8a856b74e9ffa63986342f
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -152,6 +152,9 @@ validation:
   - command: python -m unittest tests.tools.test_tibia_official_client_re_reconstruct tests.tools.test_tibia_official_client_re_xwd_diff
     result: PASS
     evidence: six tests, including XWD changed-pixel rather than changed-byte semantics
+  - command: Track A structural login run 31716060387 job 94500972188
+    result: INVALID_COMPARATOR_EXECUTION
+    evidence: normal client start and credential injection reached the comparator, but this minimal workflow had no checkout, so the helper path was absent; no numeric transition result was produced
 blockers: []
-next_action: rerun the fresh-home, 1280x800, five-second-stabilized, versioned explicit-coordinate baseline through verified private LD_PRELOAD transport and measure login transition using the XWD changed-pixel comparator; only then apply the historical >45000 threshold
+next_action: rerun the same baseline after a pinned read-only checkout makes the tested XWD comparator available on the runner
 ```

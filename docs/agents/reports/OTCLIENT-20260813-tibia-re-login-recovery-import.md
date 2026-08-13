@@ -13,6 +13,7 @@ source_repository: blakinio/Oteryn-Platform
 source_branch: ops/oteryn-tibia-client-analysis-20260811
 source_pr: 1006
 source_task: docs/agents/tasks/active/OTERYN-20260811-tibia-client-analysis.md
+historical_runtime_report: docs/agents/reports/OTERYN-20260812-tibia-runtime-auth-and-world-entry.md
 historical_runner: oteryn-synology-staging
 historical_container: oteryn-tibia-client-analysis
 historical_display: :99
@@ -93,6 +94,61 @@ client
 Before credential use, `curl --socks5-hostname 127.0.0.1:25344 .../cdn-cgi/trace` had to prove `warp=on`.
 
 The official client launched successfully on Xvfb `:99` with software Vulkan/lavapipe and exposed a `1020x650` Tibia window in that exact runtime.
+
+Earlier WARP confinement was independently demonstrated by run `31604103984`, job `94138500351`, and push run `31604419752`, job `94139596953`. Rerun attempt 2 of run `31604419752`, job `94144553452`, proved account authentication reached `Select Character` after test secrets became available, without printing or persisting their values.
+
+## Earlier blocker isolation — PROVEN exclusions
+
+Before the final successful non-OCR world-entry workflow, bounded experiments isolated several plausible causes of the immediate `Select Character -> Account Login` reset. These findings remain useful specifically to avoid repeating the same hypotheses as standalone fixes.
+
+### Local reset preceded a game-server Internet connect in the observed failure window
+
+Run `31616078668`, job `94179099943`, classified the post-activation syscall window:
+
+```text
+connect() calls: 24
+AF_UNIX: 24
+AF_INET: 0
+AF_INET6: 0
+```
+
+For that failed activation path, the reset occurred before the normal Internet-family game-server connection transition. Therefore a remote game-server TCP refusal/timeout was not the immediate observed cause of that specific failure.
+
+### Proxychains / LD_PRELOAD was not a sufficient cause
+
+A transparent TUN-to-SOCKS experiment launched the client without proxychains `LD_PRELOAD` while keeping container egress through WARP. The same pre-game reset remained. Therefore proxychains interposition alone was not sufficient to explain the failure.
+
+### Root execution was not a sufficient cause
+
+Run `31619426456`, job `94190213906`, launched the official client as effective UID `1000`. Authentication and character activation still returned to Account Login, so root/UID 0 alone was not sufficient to explain the failure.
+
+### Missing Vulkan was real but not sufficient
+
+The historical runtime initially lacked working Vulkan. Software Mesa lavapipe was then installed and run `31619426807`, job `94190214746`, proved Vulkan initialization and account/character-selection operation. The same pre-game reset still occurred, so missing Vulkan alone was not sufficient to explain the failure.
+
+### Recovery-setup warning was not the blocker
+
+A character-selection warning stated that recovery setup needed completion. Separate owner-side validation with the official Windows client showed that this warning did not prevent normal world login. Do not automate recovery-key/setup work as a purported login fix.
+
+### Superseded false-positive world-entry validator
+
+Run `31608703101`, job `94154190380`, emitted `TIBIA_WORLD_ENTRY_PROVEN=true`, but manual screenshot inspection showed Account Login rather than an in-world state. The validator had accepted generic OCR/UI terms and is **DISPROVEN** as world-entry evidence. Never reuse that claim.
+
+Taken together, the following are rejected as sufficient standalone explanations for that historical failed path:
+
+```text
+wrong account credentials
+failure to reach Select Character
+recovery-setup warning
+obviously wrong GUI region
+userspace WARP failure
+proxychains / LD_PRELOAD injection
+remote game-server TCP refusal/timeout in the observed activation window
+root execution
+missing Vulkan instance support alone
+```
+
+These exclusions do not mean those components can never fail in a future/current environment; they mean repeating them unchanged is not a justified next hypothesis without new contradictory evidence.
 
 ## Historical fixed-coordinate recovery geometry
 

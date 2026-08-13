@@ -5,7 +5,7 @@ track_id: official-client-re
 alias: OTCLIENT-TIBIA-RE
 branch: ci/OTC-20260813-official-client-re-continuation
 base_branch: main
-pr: pending
+pr: 289
 task_kind: runtime-research
 phase: live-state-revalidation
 risk: medium
@@ -74,7 +74,7 @@ checkpoint_version: 1
 updated_at: 2026-08-13T13:55:00+02:00
 head: dc18f795bf13cee37a115164da56a452aaa14f02
 branch: ci/OTC-20260813-official-client-re-continuation
-pr: pending
+pr: 289
 status: investigating
 context_routes:
   - official-client-re

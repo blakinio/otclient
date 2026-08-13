@@ -65,9 +65,6 @@ jobs:
           curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
           echo TRACK_A_WARP_VERIFIED=true
 
-          # The previously captured Track A window is an Error Report with zero
-          # established client TCP sockets, not an in-world session. Stop only
-          # that exact owned client process before recovery; never touch Track B.
           old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
           if [[ -n "$old_pid" && -r "/proc/$old_pid/environ" ]]; then
             grep -azFxq "$marker" "/proc/$old_pid/environ"
@@ -133,8 +130,6 @@ jobs:
           "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
           "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
 
-          # Current Track A field geometry was re-proven immediately before this
-          # PR290 reproduction: email around y=250, password around y=384.
           "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 250 click 1
           "$toolroot/usr/bin/xdotool" key ctrl+a
           "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_EMAIL"
@@ -145,12 +140,10 @@ jobs:
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
           echo TRACK_A_ACCOUNT_LOGIN_SUBMITTED=true
 
-          # Wait for a substantial post-login transition.
           sleep 8
           kill -0 "$pid"
           window="$(resolve_window)"
 
-          # PR #290 correction: OCR is used only to locate the character row.
           command -v tesseract >/dev/null 2>&1
           xwd="$evidence/select.xwd"
           "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$xwd"
@@ -206,8 +199,6 @@ PY
           "$toolroot/usr/bin/xdotool" key Return
           echo TRACK_A_CHARACTER_ACTIVATION_SENT=true
 
-          # Bounded world-entry validation: require sustained local SOCKS session
-          # and a large central viewport transition, then leave the client alive.
           "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$evidence/preworld.xwd"
           world=0
           for _ in $(seq 1 45); do
@@ -221,7 +212,6 @@ PY
           echo TRACK_A_WORLD_VIEWPORT_TRANSITION="$world"
           [[ "$world" == 1 ]]
 
-          # Preserve exact achieved screen for owner review; do not terminate client.
           cp "$evidence/world.xwd" artifacts/track-a-pr290/world.xwd
           grep -azFxq "$marker" "/proc/$pid/environ"
           kill -0 "$pid"
@@ -236,3 +226,5 @@ PY
           path: artifacts/track-a-pr290/world.xwd
           if-no-files-found: ignore
           retention-days: 7
+
+# manual rerun requested by repository owner on 2026-08-13

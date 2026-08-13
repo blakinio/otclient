@@ -1,0 +1,123 @@
+name: Track A official launcher update UI capture
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-launcher-ui-capture.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+    steps:
+      - name: Launch clean official launcher and capture update UI
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          evidence="$GITHUB_WORKSPACE/artifacts/track-a-launcher-ui"
+          work="$state/launcher-ui/run-$GITHUB_RUN_ID"
+          home="$work/home"
+          unpack="$work/unpacked"
+          mkdir -p "$evidence" "$home" "$unpack"
+          chmod 700 "$work" "$home"
+
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -e /tmp/.X11-unix/X98 ]]
+          kill -0 "$xvfb_pid"
+
+          cleared=0
+          for proc in /proc/[0-9]*; do
+            [[ -r "$proc/environ" && -r "$proc/exe" ]] || continue
+            grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            [[ "$(basename "$exe" 2>/dev/null || true)" == Tibia ]] || continue
+            case "$exe" in
+              "$state"/*|/tmp/track-a-altuid-*/*/Tibia/Tibia)
+                pid="${proc##*/}"
+                kill "$pid" 2>/dev/null || true
+                for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
+                kill -KILL "$pid" 2>/dev/null || true
+                cleared=$((cleared+1))
+                ;;
+            esac
+          done
+          echo TRACK_A_LAUNCHER_UI_ORPHANS_CLEARED="$cleared"
+
+          tarball="$work/tibia.x64.tar.gz"
+          url='https://static.tibia.com/download/tibia.x64.tar.gz'
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" --compressed -fL --connect-timeout 20 --max-time 120 --retry 3 --retry-all-errors -A 'Mozilla/5.0 (X11; Linux x86_64)' "$url" -o "$tarball"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          [[ -n "$proxy_lib" ]]
+          proxy_conf="$work/proxychains.conf"
+          printf '%s\n' strict_chain proxy_dns quiet_mode 'tcp_read_time_out 15000' 'tcp_connect_time_out 8000' '[ProxyList]' "socks5 127.0.0.1 $TRACK_WARP_PORT" >"$proxy_conf"
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          workdir="$(dirname "$launcher")"
+          cd "$workdir"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            HOME="$home" XDG_DATA_HOME="$home/.local/share" DISPLAY="$TRACK_DISPLAY" \
+            PATH="$tool_path" LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool_lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$launcher" >"$evidence/launcher.log" 2>&1 </dev/null &
+          launcher_pid=$!
+          echo TRACK_A_LAUNCHER_UI_PID="$launcher_pid"
+          sleep 15
+          export DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
+          "$root/usr/bin/xdotool" search --onlyvisible --name '.*' getwindowname %@ >"$evidence/windows.txt" 2>&1 || true
+          "$root/usr/bin/xwd" -silent -root -out "$evidence/root.xwd"
+          child="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          if [[ -s "$child" ]]; then
+            echo TRACK_A_LAUNCHER_UI_CHILD_PRESENT=true
+            sha256sum "$child" | awk '{print "TRACK_A_LAUNCHER_UI_CHILD_SHA256="$1}'
+          else
+            echo TRACK_A_LAUNCHER_UI_CHILD_PRESENT=false
+          fi
+          tail -n 100 "$evidence/launcher.log" | sed 's/^/TRACK_A_LAUNCHER_UI_LOG=/' || true
+          echo TRACK_A_LAUNCHER_UI_CAPTURE_COMPLETE=true
+      - name: Upload launcher UI evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-launcher-ui
+          path: artifacts/track-a-launcher-ui/**
+          if-no-files-found: warn
+          retention-days: 2
+          compression-level: 6

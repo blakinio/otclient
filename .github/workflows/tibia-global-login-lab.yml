@@ -12,16 +12,17 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: tibia-global-login-lab-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  bootstrap:
-    name: Bootstrap isolated Tibia Global login lab
+  probe:
+    name: Tibia Global login/world-entry probe
     runs-on: [otclient, synology]
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout exact lab source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
@@ -31,3 +32,10 @@ jobs:
       - name: Verify and bootstrap isolated lab
         shell: bash
         run: bash tools/tibia-global-login-lab/scripts/bootstrap.sh
+
+      - name: Run controlled login and world-entry probe
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        shell: bash
+        run: bash tools/tibia-global-login-lab/scripts/login-probe.sh

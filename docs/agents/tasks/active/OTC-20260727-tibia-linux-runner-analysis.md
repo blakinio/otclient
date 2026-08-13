@@ -244,3 +244,131 @@ active_operations:
 safe_to_resume: true
 next_action: reconcile terminal CV-bootstrap run once; on decoded IN_GAME immediately reacquire PID/PIE and prove authoritative player-position plus one reversible movement transition, while continuing preload target-object resolver work independently
 ```
+
+## Continuation evidence — 2026-08-13 08:18 CEST
+
+This section supersedes the stale `status: running`/`active_operations` values above while preserving the historical experiment description.
+
+### CV-bootstrap world-entry result — terminal failure before login
+
+Run `31653732464`, job `94303431126`, is terminal `failure`.
+
+```yaml
+failed_step: Reconstruct and start exact client normally
+cv_bootstrap_login_step: skipped
+post_bootstrap_structural_attach_step: skipped
+semantic_world_evidence_produced: false
+```
+
+The logs prove WARP account/profile generation succeeded, but the step exited with code 1 before `NORMAL_EXACT_CLIENT_READY=true`. No account-login or character-selection action ran in this experiment. The exact failing subcommand inside the reused reconstruction/start sequence is **UNKNOWN** from the retained log; do not attribute this failure to login, UI geometry, character selection, or changed client identity.
+
+### Relocation-aware primary-vptr recovery — PROVEN
+
+Run `31654434331`, job `94305639119`, passed on the exact researched binary and recovered nine primary vptrs:
+
+```text
+TPlayerProtocolMessageHandler   0x308a008
+TWorldmapProtocolMessageHandler 0x30871d8
+TGameserverGameSession          0x3078ba0
+TGameSessionBase                0x3084648
+IGameSession                    0x30841c0
+TPlayerData                     0x308ca70
+TContainerStorage               0x308a1a0
+TCreatureStorage                0x308d078
+TGameClient                     0x3076908
+```
+
+This replaces the rejected blind raw-qword scanner as the preferred exact-binary resolver approach. The durable implementation lives in PR #283 under `tools/tibia_runtime_bridge/**`.
+
+### Durable runtime bridge — PROVEN through exact-client no-credential E2E on head 39ff79ac
+
+PR #283 is the separate stable Phase 9 bridge task. Run `31654701845`, job `94306484551`, validated exact bridge head `39ff79ac44a0a1010b4bcc8b8e3617525353df7e`:
+
+```text
+EXACT_BRIDGE_HEAD_VERIFIED=true
+11 focused tests PASS
+BRIDGE_STANDALONE_BUILD_PASS=true
+COMPLETE_OFFICIAL_RUNTIME_LAYOUT_VERIFIED=true
+EXACT_BRIDGE_VALIDATION_RUNTIME_READY=true
+BRIDGE_SOCKET_MODE=600
+EXACT_CLIENT_BRIDGE_E2E_PASS=true
+```
+
+`PING` resolved the PIE base; all profiled discovery commands returned valid bounded JSON; the exact client remained alive. In logged-out state:
+
+```yaml
+player_protocol_handler.validated_hits: 0
+gameserver_game_session.validated_hits: 0
+worldmap_handler.validated_hits: 0
+in_game_candidate: false
+evidence_level: DERIVED_UNTIL_LIVE_CORRELATION
+```
+
+That is correct fail-closed behavior. It is not yet proof of live `IN_GAME` marker correlation.
+
+PR #283 current head at this checkpoint is `89e13819e6f53026b831b7e8e4c8fab228d1626c`, newer than the successful E2E head because it adds the durable relocation resolver and additional tests. Final exact-current-head validation remains required.
+
+### Current upstream client identity — UNKNOWN, probe inconclusive
+
+Run `31654893952`, job `94307092804`, failed during the fresh WARP download of:
+
+```text
+https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+```
+
+WARP setup succeeded, but the job terminated before any of these markers were emitted:
+
+```text
+CURRENT_PACKED_SHA256
+CURRENT_PACKED_SIZE
+CURRENT_CLIENT_SHA256
+CURRENT_CLIENT_SIZE
+```
+
+Therefore the probe gives **no evidence** that the official client changed and no evidence that it stayed identical. The current upstream SHA must be re-verified before treating historical offsets as current.
+
+### Programme state after continuation
+
+```yaml
+checkpoint_version: 7
+updated_at: 2026-08-13T08:18:00+02:00
+branch: ci/OTC-20260727-tibia-linux-runner-analysis
+pr: 48
+status: investigating_runtime_recovery_and_live_bridge_correlation
+proven:
+  - exact researched client/runtime and WARP login-service identity
+  - same-hash Worldmap decode boundary and 83-record read-only live sample
+  - exact action/protocol/state catalogues
+  - non-GDB Qt preload primitive
+  - relocation-aware primary-vptr resolver on exact researched binary
+  - durable bridge exact-client no-credential E2E on head 39ff79ac
+rejected_hypotheses:
+  - critical QMetaObjects missing
+  - FIRST_CHARACTER_ACTIVATED marker proves activation
+  - lack of QMeta wrapper breakpoint proves auth state absent
+  - GDB-from-start preferred recovery path
+  - QCoreApplication descendants contain target game handlers
+  - blind raw-qword vptr scanning
+latest_terminal_failures:
+  - run: 31653732464
+    scope: CV-bootstrap
+    failure_boundary: runtime reconstruction/start before login
+  - run: 31654893952
+    scope: current-client identity
+    failure_boundary: fresh client.lzma download before any hash output
+unknown:
+  - current upstream official-client SHA
+  - current OTClient-owned structural IN_GAME session
+  - live correlation of bridge session markers
+  - authoritative player position
+  - live before/after movement and other action effects
+  - raw28/raw30 semantics
+safe_to_resume: true
+next_action:
+  - first re-verify current upstream client identity with a bounded downloader that emits HTTP/curl diagnostics without secrets
+  - if SHA is unchanged, isolate the CV-bootstrap reconstruction/start failure instead of repeating the full login workflow
+  - if SHA changed, run durable relocation resolver against the new ELF and create a new exact-version profile
+  - once structural IN_GAME is restored, correlate bridge session-status, read authoritative position, and prove one reversible movement transition before any write/action bridge API
+```
+
+No Codex or owner-funded AI/API quota was used.

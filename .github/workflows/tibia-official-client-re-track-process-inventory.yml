@@ -1,0 +1,70 @@
+name: Track A process and singleton inventory
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-track-process-inventory.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Inventory only Track A owned processes and IPC
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          echo TRACK_A_PROCESS_INVENTORY_BEGIN=true
+          count=0
+          for proc in /proc/[0-9]*; do
+            [[ -r "$proc/environ" ]] || continue
+            grep -azFxq "$marker" "$proc/environ" 2>/dev/null || continue
+            pid="${proc##*/}"
+            exe="$(readlink -f "$proc/exe" 2>/dev/null || true)"
+            comm="$(cat "$proc/comm" 2>/dev/null || true)"
+            case "$exe" in "$state"/*) under_state=true;; *) under_state=false;; esac
+            echo TRACK_A_PROCESS_PID="$pid"
+            echo TRACK_A_PROCESS_COMM="$comm"
+            echo TRACK_A_PROCESS_EXE_BASENAME="$(basename "$exe" 2>/dev/null || true)"
+            echo TRACK_A_PROCESS_UNDER_STATE="$under_state"
+            python3 - "$pid" <<'PY'
+          import os,pathlib,re,sys
+          pid=sys.argv[1]; ins=set()
+          try: fds=list(pathlib.Path('/proc',pid,'fd').iterdir())
+          except OSError: fds=[]
+          for fd in fds:
+              try:t=os.readlink(fd)
+              except OSError:continue
+              m=re.fullmatch(r'socket:\[(\d+)\]',t)
+              if m: ins.add(m.group(1))
+          rows=[]
+          try: unix=pathlib.Path('/proc/net/unix').read_text().splitlines()[1:]
+          except OSError: unix=[]
+          for row in unix:
+              p=row.split()
+              if len(p)>=7 and p[6] in ins:
+                  rows.append(p[7] if len(p)>7 else '(unnamed)')
+          print('TRACK_A_PROCESS_UNIX_SOCKET_COUNT='+str(len(rows)))
+          for x in rows: print('TRACK_A_PROCESS_UNIX_SOCKET='+x.replace('\x00','@'))
+          PY
+            count=$((count+1))
+          done
+          echo TRACK_A_PROCESS_COUNT="$count"
+          uid="$(id -u)"
+          for d in /tmp /dev/shm "/run/user/$uid"; do
+            [[ -d "$d" ]] || continue
+            find "$d" -maxdepth 2 -user "$uid" -type s -printf 'TRACK_A_SOCKET_FILE=%p\n' 2>/dev/null | head -n 100 || true
+          done
+          echo TRACK_A_PROCESS_INVENTORY_COMPLETE=true

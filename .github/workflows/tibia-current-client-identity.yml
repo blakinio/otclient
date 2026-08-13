@@ -28,8 +28,30 @@ jobs:
           nohup "$r/bin/wireproxy" -c w.conf >/tmp/wp.log 2>&1 </dev/null &
           for _ in $(seq 1 30);do curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/t 2>/dev/null&&break;sleep 2;done
           grep -Eq '^warp=(on|plus)$' /tmp/t
+          echo WARP_READY=true
+
           u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
-          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o /tmp/c/client.lzma
+          set +e
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL \
+            --connect-timeout 15 --max-time 120 --retry 2 --retry-all-errors --retry-delay 2 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
+            -D /tmp/client.headers -w 'CLIENT_HTTP_CODE=%{http_code}\nCLIENT_BYTES=%{size_download}\nCLIENT_TIME=%{time_total}\n' \
+            "$u" -o /tmp/c/client.lzma
+          rc=$?
+          set -e
+          echo CLIENT_CURL_EXIT=$rc
+          grep -Ei '^(HTTP/|content-length:|content-type:|location:|server:)' /tmp/client.headers | tail -n 20 || true
+          if [[ $rc -ne 0 || ! -s /tmp/c/client.lzma ]]; then
+            set +e
+            curl --socks5-hostname 127.0.0.1:25344 -sS -o /dev/null \
+              --connect-timeout 15 --max-time 30 \
+              -w 'ASSETS_JSON_HTTP_CODE=%{http_code}\nASSETS_JSON_TIME=%{time_total}\n' \
+              https://static.tibia.com/launcher/assets-current/assets.json
+            echo ASSETS_JSON_CURL_EXIT=$?
+            set -e
+            exit 1
+          fi
+
           packed=$(sha256sum /tmp/c/client.lzma|awk '{print $1}');echo CURRENT_PACKED_SHA256=$packed
           echo CURRENT_PACKED_SIZE=$(stat -c %s /tmp/c/client.lzma)
           python3 - <<'PY'

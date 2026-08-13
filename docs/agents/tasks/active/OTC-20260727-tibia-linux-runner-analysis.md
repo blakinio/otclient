@@ -418,7 +418,7 @@ re-registration.
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-13T12:36:00+02:00
+updated_at: 2026-08-13T13:22:00+02:00
 head: 17b55cecb596ff0224201d85ea50e02cb1b67511
 branch: ci/OTC-20260727-tibia-linux-runner-analysis
 pr: 48
@@ -432,6 +432,7 @@ proven:
   - current official-client identity is unchanged at e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe by run 31674406184
   - exact researched relocation-aware profiles remain applicable after live PID/PIE/object rediscovery
   - GitHub runner API reports synology-otclient-01 online as runner ID 21 with explicit labels otclient and synology
+  - bootstrap run 31694880387 passed on synology-otclient-01 and initialized writable persistent state without Oteryn runtime dependency
 derived:
   - live structural experiments can resume without a new exact-version profile once the dedicated runner is restored
 unknown:
@@ -455,8 +456,9 @@ rejected_hypotheses:
   - current official-client binary changed: disproven by run 31674406184
 changed_paths:
   - .github/workflows/otclient-tibia-re-runner-bootstrap.yml
+  - .github/workflows/tibia-synology-owned-runtime-state.yml
   - docs/agents/tasks/active/OTC-20260727-tibia-linux-runner-analysis.md
 blockers:
   - synology-otclient-01 is online but registered without the self-hosted default label, so the canonical bootstrap selector cannot match until corrected
-next_action: trigger the bootstrap with the runner's exact live labels otclient and synology, then inspect its environment and official-client runtime state
+next_action: run the bounded task-owned runtime-state probe on synology-otclient-01 and reconcile container, official-client process, exact SHA, WARP, and socket state
 ```

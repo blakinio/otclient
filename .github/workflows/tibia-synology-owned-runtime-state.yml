@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   inspect:
-    runs-on: [self-hosted, otclient, synology]
+    runs-on: [otclient, synology]
     timeout-minutes: 8
     env:
       CONTAINER_NAME: otclient-tibia-login-analysis

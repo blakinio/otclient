@@ -1,0 +1,54 @@
+experiment_id: EXP-20260814-gameaction-connectimpl-correlation
+objective: Narrow direct QObject connectImpl callsites by nearby exact references to six high-value GameAction static metaobjects.
+falsifiable_hypothesis: At least one direct connectImpl callsite has a version-fenced GameAction static-metaobject reference within the bounded preceding window.
+client_version: 15.32.df7b29
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+runner: synology-otclient-01
+runtime: native Linux static binary analysis
+pid: not_applicable
+pie_base: not_applicable
+session_epoch: not_applicable
+preconditions:
+  - exact binary SHA check passes
+  - connectImpl PLT target and six static metaobjects are version-fenced
+runtime_objects: []
+authorized_effects: read-only static analysis
+side_effect_budget:
+  max_gold: 0
+  max_tibia_coins: 0
+  max_items_at_risk: 0
+  max_irreversible_changes: 0
+allowed_targets:
+  - exact official native Linux client binary
+baseline: callsite census run 31799755489
+stimulus: none
+expected_structural_evidence:
+  - connectImpl callsite with exact nearby static-metaobject reference
+abort_conditions:
+  - binary SHA mismatch
+  - runner identity mismatch
+rollback: not_applicable
+observed_evidence:
+  run: 31800490781
+  job: 94767068361
+  head: 2bebb9615e9cb93fd26014df1f8b36b9ca4bc1ce
+  connectimpl_callsites: 2078
+  window_bytes: 384
+  candidate_pairs: 86
+  near_pairs_distance_le_64: 31
+  near_family_counts:
+    Chat: 2
+    Container: 2
+    Creatures: 2
+    Player: 22
+    PlayerTrade: 2
+    WorldMap: 1
+negative_control: exact target equality against only six version-fenced static-metaobject addresses
+repeatability: exact-version deterministic scan
+restart_test: not_applicable_static_enumeration
+result: PROVEN
+confidence_boundary: Nearby reference/callsite correlations only; signal indices, receiver slots, and semantic edges remain unknown.
+privacy_redactions: none_required
+artifacts:
+  - GitHub Actions run 31800490781 job 94767068361
+next_action: Disassemble the 31 distance-at-most-64 candidates and recover connectImpl sender signal-pointer, receiver, slot-object, and static-metaobject arguments.

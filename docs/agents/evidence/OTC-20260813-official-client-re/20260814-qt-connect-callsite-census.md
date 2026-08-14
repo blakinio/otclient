@@ -64,3 +64,20 @@ All ordinals are accounted for:
 These are static UI/controller signal candidates. They do not prove protocol messages, receiver implementation addresses, ABI layouts, server acceptance, or action gates above `A0`.
 
 The absence of the six high-value `send*` GameAction signals from the legacy string-edge set supports a bounded next hypothesis: their receiver connections use `QObject::connectImpl` or a wrapper/indirect path. Cross-correlate the 2,078 `connectImpl` callsites with nearby exact references to the six version-fenced GameAction static metaobjects before broad disassembly.
+
+## GameAction `connectImpl` correlation
+
+Run `31800490781` / job `94767068361` completed on head `2bebb9615e9cb93fd26014df1f8b36b9ca4bc1ce`. A bounded 384-byte backward window found 86 static-metaobject-reference/callsite pairs across the 2,078 direct `connectImpl` calls. Because one reference can precede several consecutive connections, the 86 pairs are candidates rather than 86 unique proven semantic edges.
+
+The tighter `distance <= 64` subset contains 31 candidates:
+
+```yaml
+Chat: 2
+Container: 2
+Creatures: 2
+Player: 22
+PlayerTrade: 2
+WorldMap: 1
+```
+
+This proves a high-information cluster suitable for bounded disassembly. It does not yet map the GameAction signal indices to receivers or distinguish the six target `send*` signals from other signals on the same metaobjects.

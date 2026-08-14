@@ -198,6 +198,7 @@ last_progress:
   - isolated legacy-neighborhood run 31799979849 failure to unavailable system objdump and reused the proven Track A toolroot GDB path
   - completed GDB neighborhood run 31800072490 for all 41 legacy string-connect callsites
   - completed string-edge run 31800240820 with 40 classified UI/controller edges and one explicit UNCLASSIFIED callsite
+  - completed GameAction connectImpl correlation run 31800490781 with 86 bounded pairs and a 31-candidate near subset
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 3
@@ -215,19 +216,19 @@ recovery:
   session_started_at: 2026-08-14T14:00:00+02:00
   checkpointed_at: 2026-08-14T14:17:00+02:00
   last_progress_at: 2026-08-14T14:17:00+02:00
-  phase: static-gameaction-connectimpl-correlation
-  exact_head: 5b72f60a17dc67e2e02901a69362f43da0f4c8c4
+  phase: static-gameaction-connectimpl-argument-reconstruction
+  exact_head: 2bebb9615e9cb93fd26014df1f8b36b9ca4bc1ce
   pull_request: 289
-  active_operation: run GameAction connectImpl correlation
-  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820]
+  active_operation: persist GameAction connectImpl correlation result
+  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
   checks_used: 2
   status: active
   safe_to_resume: true
-  resume_condition: high-value connectImpl correlation workflow reaches terminal state
-  next_action: commit and push the GameAction connectImpl correlation workflow, then inspect its terminal result once
+  resume_condition: correlation result is committed and pushed
+  next_action: disassemble the 31 near candidates and reconstruct connectImpl arguments
 ```
 
 ## Context checkpoint
@@ -235,7 +236,7 @@ recovery:
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-08-14T12:17:00Z
-head: 5b72f60a17dc67e2e02901a69362f43da0f4c8c4
+head: 2bebb9615e9cb93fd26014df1f8b36b9ca4bc1ce
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -252,11 +253,13 @@ proven:
   - repaired callsite census run 31799755489 enumerated 2184 direct calls across three exact PLT targets
   - GDB neighborhood run 31800072490 emitted all 41 bounded legacy callsite disassemblies
   - string-edge run 31800240820 classified 40 legacy UI/controller edges and retained one explicit UNCLASSIFIED callsite
+  - correlation run 31800490781 found 31 distance-at-most-64 GameAction metaobject/connectImpl candidates across all six families
 derived:
   - the 41 legacy string-based connect calls are the smallest high-information subset for argument reconstruction
   - high-value GameAction send signals are absent from the recovered legacy string-edge set and should be tested against connectImpl/wrapper paths
 unknown:
   - receiver identities for the six high-value GameAction send signals
+  - connectImpl signal indices and slot-object targets for the 31 near candidates
 conflicts: []
 first_failure:
   marker: legacy_neighborhood_disassembler_unavailable
@@ -273,12 +276,13 @@ changed_paths:
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-connect-callsite-census.yaml
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-legacy-connect-string-edges.yaml
+  - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-gameaction-connectimpl-correlation.yaml
 validation:
   - command: YAML safe_load and git diff --check
     result: PASS
     evidence: local exact working tree
 blockers: []
-next_action: commit and push the GameAction connectImpl correlation workflow, then inspect its terminal result once
+next_action: disassemble the 31 distance-at-most-64 candidates and reconstruct connectImpl arguments
 ```
 
 ## Rejected interpretations
@@ -293,5 +297,5 @@ next_action: commit and push the GameAction connectImpl correlation workflow, th
 ## Next action
 
 ```text
-Commit and push the bounded GameAction `connectImpl` correlation workflow, inspect its terminal result once, and persist every nearby exact static-metaobject match or the bounded negative result.
+Disassemble the 31 distance-at-most-64 GameAction `connectImpl` candidates and recover, where structurally possible, the sender signal pointer/index, receiver object source, slot-object target, connection type, and sender static metaobject; explicitly classify unresolved candidates.
 ```

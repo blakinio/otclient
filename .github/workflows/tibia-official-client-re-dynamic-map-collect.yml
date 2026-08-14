@@ -1,0 +1,60 @@
+name: Track A dynamic map observer collector
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-dynamic-map-collect.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: official-client-re-observer-collector
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 2
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Verify persistent observer and print bounded event evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          runtime="$state/runtime"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          [[ -r "$runtime/client.pid" && -r "$runtime/dynamic-map-gdb.pid" ]]
+          pid="$(tr -cd '0-9' <"$runtime/client.pid")"
+          gdb_pid="$(tr -cd '0-9' <"$runtime/dynamic-map-gdb.pid")"
+          kill -0 "$pid"
+          kill -0 "$gdb_pid"
+          [[ -r "/proc/$pid/environ" && -r "/proc/$gdb_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          grep -azFxq "$marker" "/proc/$gdb_pid/environ"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          log="$runtime/dynamic-map-events.log"
+          stdout="$runtime/dynamic-map-gdb.stdout"
+          [[ -s "$log" ]]
+          grep -q 'OBSERVER_ARMED' "$log"
+          echo TRACK_A_LIVE_CLIENT_PID="$pid"
+          echo TRACK_A_DYNAMIC_MAP_GDB_PID="$gdb_pid"
+          echo TRACK_A_DYNAMIC_MAP_OBSERVER_PERSISTENT=true
+          event_count="$(grep -c '^EVENT ' "$log" || true)"
+          echo TRACK_A_DYNAMIC_MAP_EVENT_COUNT="$event_count"
+          echo TRACK_A_DYNAMIC_MAP_LOG_BEGIN=true
+          tail -n 80 "$log"
+          echo TRACK_A_DYNAMIC_MAP_LOG_END=true
+          if [[ -s "$stdout" ]]; then
+            echo TRACK_A_DYNAMIC_MAP_GDB_STDOUT_BEGIN=true
+            tail -n 40 "$stdout"
+            echo TRACK_A_DYNAMIC_MAP_GDB_STDOUT_END=true
+          fi

@@ -12,11 +12,12 @@ permissions:
 jobs:
   enable:
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Start verified Track A browser GUI for DSM reverse proxy
+      - name: Restore official client and verified browser GUI
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -31,20 +32,75 @@ jobs:
           [[ -n "$state" ]]
 
           root="$state/toolroot"
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
           tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           xwd="$root/usr/bin/xwd"
           xdotool="$root/usr/bin/xdotool"
           server="$state/runtime/track-a-remote-gui.py"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_EXACT_CLIENT_VERIFIED=true
 
+          # Reuse any already-running exact official client. Otherwise start the normal client
+          # on the existing Xvfb :98 without restarting Xvfb or the browser bridge.
+          client_pid=''
+          for e in /proc/[0-9]*/exe; do
+            [[ -e "$e" ]] || continue
+            if [[ "$(readlink -f "$e" 2>/dev/null || true)" == "$client" ]]; then
+              client_pid="${e#/proc/}"; client_pid="${client_pid%/exe}"; break
+            fi
+          done
+
+          if [[ -z "$client_pid" ]]; then
+            proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+            proxy_conf="$state/config/proxychains.conf"
+            [[ -n "$proxy_lib" && -s "$proxy_conf" ]]
+            cd "$runtime"
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+              HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
+              LD_LIBRARY_PATH="$runtime/lib:$tool_lib" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+              XDG_DATA_DIRS="$root/usr/share:/usr/share" FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
+              LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+              nohup "$client" >"$state/runtime/client-gui.log" 2>&1 </dev/null &
+            client_pid=$!
+            printf '%s\n' "$client_pid" >"$state/runtime/client.pid"
+            chmod 600 "$state/runtime/client.pid"
+            echo TRACK_A_CLIENT_STARTED_PID="$client_pid"
+          else
+            echo TRACK_A_CLIENT_REUSED_PID="$client_pid"
+          fi
+
+          for _ in $(seq 1 30); do
+            kill -0 "$client_pid" 2>/dev/null && [[ "$(readlink -f "/proc/$client_pid/exe" 2>/dev/null || true)" == "$client" ]] && break
+            sleep 1
+          done
+          if ! kill -0 "$client_pid" 2>/dev/null; then
+            echo TRACK_A_CLIENT_START_FAILED=true
+            tail -n 120 "$state/runtime/client-gui.log" 2>/dev/null || true
+            exit 30
+          fi
+          [[ "$(readlink -f "/proc/$client_pid/exe")" == "$client" ]]
+          echo TRACK_A_OFFICIAL_CLIENT_RUNNING=true
+
+          # Give Qt time to create and paint its window.
+          sleep 8
           probe=/tmp/track-a-live-probe.xwd
           DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xwd" -root -silent -out "$probe"
           [[ -s "$probe" ]]
           python3 - "$probe" <<'PY'
           import struct,sys
-          h=struct.unpack('>25I',open(sys.argv[1],'rb').read(100))
+          d=open(sys.argv[1],'rb').read()
+          h=struct.unpack('>25I',d[:100])
           assert (h[4],h[5]) == (1920,1080)
-          print('TRACK_A_CAPTURE_VERIFIED=1920x1080')
+          off=h[0]+h[19]*12
+          payload=d[off:off+h[12]*h[5]]
+          # Empty Xvfb is all zeros. A painted client must produce a meaningful number of non-zero bytes.
+          nz=sum(1 for b in payload[::64] if b)
+          print(f'TRACK_A_CAPTURE_NONZERO_SAMPLE={nz}')
+          assert nz > 100
+          print('TRACK_A_CAPTURE_VERIFIED=1920x1080-nonblack')
           PY
           rm -f "$probe"
 
@@ -66,8 +122,16 @@ jobs:
             sleep 1
           done
           [[ "$ready" == true ]]
-          code="$(curl -sS --max-time 12 -o /tmp/track-a-test.bmp -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)"
+          code="$(curl -sS --max-time 15 -o /tmp/track-a-test.bmp -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)"
           [[ "$code" == 200 && "$(head -c2 /tmp/track-a-test.bmp)" == BM ]]
+          python3 - /tmp/track-a-test.bmp <<'PY'
+          import sys
+          d=open(sys.argv[1],'rb').read()
+          off=int.from_bytes(d[10:14],'little')
+          nz=sum(1 for b in d[off::64] if b)
+          print(f'TRACK_A_BROWSER_NONZERO_SAMPLE={nz}')
+          assert nz > 100
+          PY
           rm -f /tmp/track-a-test.bmp
           echo TRACK_A_BROWSER_BACKEND_READY=true
           echo TRACK_A_RUNNER_IP="$runner_ip"

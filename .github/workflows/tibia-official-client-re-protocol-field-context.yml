@@ -1,0 +1,73 @@
+name: Track A official client protocol field context
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-protocol-field-context.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Inspect descriptor-local field strings
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import re,sys
+          data=open(sys.argv[1],'rb').read()
+          targets=[
+            'GameserverMessageCreateOnMap','GameserverMessageChangeOnMap','GameserverMessageDeleteOnMap','GameserverMessageMoveCreature',
+            'GameserverMessageCreatureData','GameserverMessageCreatureUpdate','GameserverMessageCreatureHealth','GameserverMessagePlayerDataCurrent',
+            'GameserverMessagePlayerSkills','GameserverMessageTalk','GameserverMessageContainer','GameserverMessageCreateInContainer',
+            'GameclientMessageMoveObject','GameclientMessageAttack','GameclientMessageFollow','GameclientMessageTradeObject','GameclientMessageTalk','GameclientMessageGoPath'
+          ]
+          # Common generated/semantic field vocabulary. We print all compact identifier strings in a local window,
+          # but tag likely fields to keep the logs usable.
+          semantic=('position','coordinate','stack','object','thing','creature','id','type','health','speed','outfit','name','text','channel','speaker','statement','container','slot','index','count','item','target','source','destination','direction','path','x','y','z','flags','state','skills','level','mana','capacity','party','trade','offer','amount','price')
+          def printable(a,b):
+              out=[]
+              for m in re.finditer(rb'[A-Za-z_][A-Za-z0-9_./:-]{1,95}', data[a:b]):
+                  try:s=m.group().decode('ascii')
+                  except:continue
+                  if len(s)>96:continue
+                  out.append((a+m.start(),s))
+              return out
+          print('TRACK_A_PROTOCOL_FIELD_CONTEXT_BEGIN=true')
+          for t in targets:
+              needle=t.encode(); poss=[]; p=0
+              while True:
+                  q=data.find(needle,p)
+                  if q<0:break
+                  poss.append(q); p=q+1
+              print(f'TARGET name={t} occurrences={len(poss)} positions='+','.join(hex(x) for x in poss[:8]))
+              for q in poss[:3]:
+                  a=max(0,q-1800); b=min(len(data),q+2600)
+                  seen=set(); rows=[]
+                  for off,s in printable(a,b):
+                      if s in seen:continue
+                      seen.add(s)
+                      low=s.lower()
+                      likely=any(k in low for k in semantic)
+                      # Exclude generic long symbol noise unless semantically relevant or close to target.
+                      if likely or abs(off-q)<700:
+                          rows.append((off,s,likely))
+                  for off,s,likely in rows[:180]:
+                      print(f' CTX target={t} delta={off-q:+d} off=0x{off:x} likely_field={str(likely).lower()} text={s}')
+          print('TRACK_A_PROTOCOL_FIELD_CONTEXT_END=true')
+          print('TRACK_A_PROTOCOL_FIELD_CONTEXT_COMPLETE=true')
+          PY

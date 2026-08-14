@@ -6,7 +6,9 @@ repository: blakinio/otclient
 pr: 289
 branch: ci/OTC-20260813-official-client-re-continuation
 created_at: 2026-08-14T16:52:00+02:00
+updated_at: 2026-08-14T17:43:00+02:00
 source_head_before_checkpoint: fd206d429c48ddcdb32ba2d43c29d071a671b266
+latest_recovery_head: f4c073d78834848b52affbc51d3396907c6cb7cb
 completion_claim: incomplete
 
 client:
@@ -22,6 +24,17 @@ runtime:
   display: ':98'
   warp_socks_port: 25354
   process_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
+
+recovery:
+  generation: 2
+  attempts: 2
+  state: active_external_operation
+  active_run: 31815819731
+  active_workflow: Track A outgoing payload consumer provenance
+  active_head: c15899ebef7cadb7ce6f4a302a28dff064f6b537
+  first_observed_status: queued
+  wait_deadline_at: 2026-08-14T18:27:34+02:00
+  durable_checkpoint: ../20260814-chatgpt-recovery-generation-2.md
 
 facts:
   protocol_census:
@@ -69,9 +82,17 @@ facts:
         - '0xbc6750'
     internal_discriminators_are_final_wire_bytes: UNKNOWN
   outbound_handoff:
-    chain: semantic_action -> action_router -> TProtocolMessageQueue -> clientMessageReadyToProcess -> containing_network_owner -> virtual_slot_plus_0x90 -> QTcpSocket_bearing_setup
-    network_owner_virtual_slot: '+0x90'
-    qtcp_socket_setup_exact_build_lead: '+0x196fee0'
+    chain: semantic_action -> action_router -> TProtocolMessageQueue -> clientMessageReadyToProcess -> containing_network_owner -> primary_slot_plus_0x90 -> contained_subobject_slot_plus_0xb8
+    primary_network_owner_vtable_address_point: '0x308c408'
+    primary_network_owner_slot_0x90: '0x8409d0'
+    primary_slot_classification: delegating_thunk
+    contained_subobject_offset: '+0x88'
+    contained_subobject_vtable_address_point: '0x2f66288'
+    contained_subobject_slot_0xb8: '0xb5b880'
+    downstream_helper_lead: '0xb222a0'
+    source_run: 31812572191
+    source_job: 94806473825
+    source_result: SUCCESS
     exact_serializer: UNKNOWN
     exact_framing: UNKNOWN
     final_network_write: UNKNOWN
@@ -117,12 +138,20 @@ facts:
       stimulus_delivered: FACT
       moveobject_server_confirmed: false
       action_gate: below_A3
+  ci:
+    exact_head_60323a1:
+      run: 31812575746
+      result: FAILURE
+      first_failed_job: 94807088316
+      failed_step: Run yamllint
+      semantic_track_a_run_same_source_head: 31812572191
+      semantic_track_a_result: SUCCESS
 
 unknowns:
-  - concrete function behind network-owner virtual slot +0x90
-  - exact GameclientMessage serializer
-  - exact framing and final network-send path
+  - exact serializer semantics downstream of 0xb5b880
+  - exact framing and final network-send/write path
   - final wire-byte relationship of internal GameclientMessage discriminators
+  - any OutGoingMessagePayload or equivalent envelope relationship not independently reproduced by the current exact-SHA experiment
   - bridge session-status correlation with decoded structural world state
   - direct standalone player-position member
   - HP and maxHP authoritative live read
@@ -142,13 +171,13 @@ rejected_or_disproven:
   - GameAction send signal wrapper itself is a direct serializer
   - changed pixels alone prove MoveObject success
   - internal GameclientMessage discriminator may be called a final wire opcode without framing proof
-  - network-owner virtual slot +0x90 may be named the serializer before concrete-function recovery
+  - primary network-owner slot +0x90 is itself the serializer; exact disassembly proves it delegates through the contained subobject
 
 next_actions:
   - priority: 1
-    action: recover live read-only bridge correlation by separating build sysroot libraries from official client Qt 6.9 runtime
+    action: finish run 31815819731 and persist exact-SHA provenance from 0xb5b880 through framing/final-write candidates
   - priority: 2
-    action: resolve concrete function behind containing network-owner virtual slot +0x90 and close serializer/framing/final-write chain
+    action: recover live read-only bridge correlation by separating build sysroot libraries from official client Qt 6.9 runtime
   - priority: 3
     action: promote one safest reversible semantic action, preferably movement, through reference parity to server-confirmed A3 and bridge A4
   - priority: 4
@@ -156,7 +185,7 @@ next_actions:
   - priority: 5
     action: complete generated-message and Tibia-owned QMeta/runtime classification registries and quantitative coverage
   - priority: 6
-    action: reconcile active task acceptance checkboxes with latest evidence, run audit/exact-head CI/PR hygiene, then merge/archive only when policy permits
+    action: repair workflow yamllint failures, reconcile acceptance, run exact-head CI/PR hygiene, and merge/archive only when policy permits
 
 safety:
   default_effect_budget: read_only_or_reversible_no_cost
@@ -167,6 +196,7 @@ safety:
 
 references:
   - ../20260814-chatgpt-continuation-handover.md
+  - ../20260814-chatgpt-recovery-generation-2.md
   - ../20260814-protocol-queue-action-builders.md
   - ../20260814-protocol-queue-network-handoff.md
   - ../20260814-live-structural-world-and-reversible-movement.md

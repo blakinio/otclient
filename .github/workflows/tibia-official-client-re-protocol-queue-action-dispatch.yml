@@ -1,0 +1,80 @@
+name: Track A protocol queue action dispatch
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-protocol-queue-action-dispatch.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Decode and disassemble selected TProtocolMessageQueue cases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+          python3 -u - "$client" > "$tmp/cases.tsv" <<'PY'
+          import struct
+          import sys
+          data = open(sys.argv[1], 'rb').read()
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          loads = []
+          for index in range(phnum):
+              offset = phoff + index * phentsz
+              typ, flags, file_offset, va, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', data, offset)
+              if typ == 1:
+                  loads.append((file_offset, file_offset + filesz, va, va + filesz, flags))
+          def va2off(value):
+              for lo, hi, va, vhi, _ in loads:
+                  if va <= value < vhi:
+                      return lo + value - va
+          table = 0x1d8bd6c
+          table_offset = va2off(table)
+          assert table_offset is not None
+          names = {
+              194: 'prepareAndEnqueueGameclientMessage',
+              195: 'handleGameAction',
+              201: 'sendGoNorth', 202: 'sendGoEast', 203: 'sendGoSouth', 204: 'sendGoWest',
+              209: 'sendGoNorthEast', 210: 'sendGoSouthEast', 211: 'sendGoSouthWest', 212: 'sendGoNorthWest',
+              213: 'sendGoPath', 218: 'sendMoveObject', 237: 'sendTalkMessage',
+              247: 'sendAttack', 248: 'sendFollow', 283: 'sendTradeObject',
+          }
+          for index, name in names.items():
+              relative = struct.unpack_from('<i', data, table_offset + index * 4)[0]
+              print(f'{index}\t{name}\t0x{table + relative:x}')
+          PY
+          echo 'TRACK_A_PROTOCOL_QUEUE_ACTION_DISPATCH_BEGIN=true'
+          while IFS=$'\t' read -r index name entry; do
+            end=$(printf '0x%x' $((entry+160)))
+            echo "QUEUE_CASE_BEGIN index=$index method=$name entry=$entry"
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $entry,$end"
+            echo "QUEUE_CASE_END index=$index"
+          done < "$tmp/cases.tsv"
+          echo 'TRACK_A_PROTOCOL_QUEUE_ACTION_DISPATCH_COMPLETE=true'

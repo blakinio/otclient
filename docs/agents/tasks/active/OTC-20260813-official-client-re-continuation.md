@@ -12,8 +12,8 @@ phase: static-outbound-framing-convergence
 risk: medium
 runtime_platform: native_linux_only
 safe_to_resume: true
-recovery_generation: 2
-recovery_attempts: 2
+recovery_generation: 3
+recovery_attempts: 3
 ai_owner_billing_authorized: false
 owned_paths:
   - .github/workflows/tibia-official-client-re-*.yml
@@ -29,7 +29,7 @@ owned_paths:
 
 Continue Track A against the **official native Linux Tibia client only**. Recover and validate structural world/player/creature/inventory/protocol/action state without OCR assumptions, preserve runtime isolation from Track B, and promote only exact-version evidence with explicit confidence boundaries.
 
-This task is intentionally kept compact. Historical experiment details remain canonical in `docs/agents/evidence/OTC-20260813-official-client-re/` and are not duplicated here.
+Historical experiment details remain canonical under `docs/agents/evidence/OTC-20260813-official-client-re/`; disproven hypotheses must not remain as current acceptance facts.
 
 ## Hard scope and safety
 
@@ -58,7 +58,7 @@ sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 platform: native_linux_only
 ```
 
-Every binary experiment that can promote a client-specific conclusion must re-check this fence.
+Every binary experiment that promotes a client-specific conclusion must re-check this fence.
 
 ## Acceptance inventory
 
@@ -71,9 +71,12 @@ Every binary experiment that can promote a client-specific conclusion must re-ch
 - [x] `TInternalGameActionRouter @ 0x8332d0` proven router/re-emitter and disproven as serializer.
 - [x] Outbound builders recovered for movement, `MoveObject`, `Talk`, `Attack`, `Follow`, `TradeObject`.
 - [x] Structural live-world map state and one forward/inverse reversible movement transition proven for the exact build.
-- [x] Primary network-owner vtable and delegation edge recovered through concrete contained-subobject target `0xb5b880`.
-- [ ] Exact serializer semantics downstream of `0xb5b880` proven.
-- [ ] Exact framing and final `QIODevice`/`QTcpSocket` network-write site proven.
+- [x] Correct `clientMessageReadyToProcess` Qt handoff recovered: heap `QSlotObject`, invoker `0x7dd630`, owner saved at slot-object `+0x10`.
+- [x] Neighbor transport cluster `0x7dd3f0` structurally linked to the same owner state and to a real `QIODevice::write` callsite `0x7dd563`.
+- [x] `tibia::network::TUnencryptedRawMessageStream` uniquely recovered at vtable address point `0x3084c58`, RTTI `0x3080660`, deriving from `QBuffer`; local virtual `+0xe8 = 0xb40630` reaches `QIODevice::write` at `0xb4066b`.
+- [ ] Concrete owner stream-pair mapping for `+0x9f0/+0xa00/+0xa10/+0xc18` proven.
+- [ ] Exact ordering of raw stream, framing, encryption/compression and final `QTcpSocket` proven.
+- [ ] Exact serializer semantics and final gameplay network-write site proven.
 - [ ] Bridge `session-status` correlated with decoded structural world state using the official bundled Qt 6.9 runtime.
 - [ ] Direct standalone player-position member proven; viewport-center position remains `DERIVED` only.
 - [ ] P0 live reads proven for HP/maxHP, mana/maxMana, identity/state, CreatureStorage/lifecycle, battle target, inventory/equipment, containers, structured chat/world events.
@@ -81,19 +84,23 @@ Every binary experiment that can promote a client-specific conclusion must re-ch
 - [ ] Generated-message and Tibia-owned QMeta/runtime classification registries reconciled to quantitative coverage target or documented terminal blockers.
 - [ ] Fresh final audit, exact-head CI, PR hygiene, acceptance reconciliation and archive/merge gate completed.
 
-## Proven outbound convergence
+## Corrected outbound convergence
 
 ```text
 semantic action
   -> TInternalGameActionRouter
   -> TProtocolMessageQueue builder
   -> clientMessageReadyToProcess
-  -> containing network owner
-  -> primary owner vtable address point 0x308c408
-  -> primary slot +0x90 = 0x8409d0
-  -> contained subobject at owner +0x88
-  -> contained subobject vtable address point 0x2f66288
-  -> contained subobject slot +0xb8 = 0xb5b880
+  -> Qt QSlotObject connection @ 0x19716a3
+  -> QSlotObject invoker 0x7dd630
+  -> containing owner stream family (+0xc18 / +0xa00 / +0xa10)
+
+neighboring transport path:
+  owner stream family (+0xa10 / +0x9f0)
+  -> function 0x7dd3f0
+  -> devirtualized stream method check +0xe8 == 0xb40630
+  -> tibia::network::TUnencryptedRawMessageStream
+  -> QIODevice::write callsites 0x7dd563 and 0xb4066b in the recovered stream cluster
 ```
 
 Exact queue convergence retained from earlier evidence:
@@ -104,18 +111,38 @@ TProtocolMessageQueue_sendMessage_body: '0xde6de0'
 prepareAndEnqueueGameclientMessage_entry: '0xdf6b99'
 prepareAndEnqueueGameclientMessage_body: '0xbc6e20'
 queue_helpers: ['0xde91b0', '0xbc6f00', '0xbc6750']
-primary_owner_vtable: '0x308c408'
-primary_slot_0x90: '0x8409d0'
-primary_slot_classification: delegating_thunk
-contained_subobject_offset: '+0x88'
-contained_subobject_vtable: '0x2f66288'
-contained_subobject_slot_0xb8: '0xb5b880'
-source_run: 31812572191
-source_job: 94806473825
-source_result: SUCCESS
+clientMessageReadyToProcess_connection: '0x19716a3'
+qslot_invoker: '0x7dd630'
+transport_cluster: '0x7dd3f0'
+raw_stream_class: tibia::network::TUnencryptedRawMessageStream
+raw_stream_vtable: '0x3084c58'
+raw_stream_rtti: '0x3080660'
+raw_stream_base: QBuffer
+raw_stream_plus_e8: '0xb40630'
+raw_stream_qiodevice_write: '0xb4066b'
 ```
 
-Do **not** name `0x8409d0` or `0xb5b880` as the final serializer/write routine until their downstream semantics are proven. Do **not** call internal builder discriminators final wire opcodes until framing is proven.
+Do **not** call `0x7dd563`, `0xb40630`, or `0xb4066b` the final gameplay socket write until downstream/layer ordering and the `QTcpSocket` object are proven. Do **not** call internal builder discriminators final wire opcodes until framing is proven.
+
+## Superseded / disproven outbound model
+
+The previous convergence below is **not current truth** and must not be reused:
+
+```text
+clientMessageReadyToProcess
+  -> containing owner virtual +0x90 = 0x8409d0
+  -> owner+0x88 subobject
+  -> subobject +0xb8 = 0xb5b880
+```
+
+Exact-build correction:
+
+- the connection uses a heap `QSlotObject` with invoker `0x7dd630`; the previously parsed PMF `0x91` belonged to the preceding connection;
+- `0x2f66288 + 0xb8` resolves to `0x313cce0`, non-executable;
+- `0xb5b880` lies inside an instruction beginning at `0xb5b87c`;
+- the workflow that promoted `0xb5b880` had hardcoded that value rather than recovering it from ELF.
+
+Classification: **DISPROVEN / SUPERSEDED**.
 
 ## Structural live-world state
 
@@ -144,57 +171,34 @@ Deterministic recovery rule:
 - official client runtime must use bundled Qt 6.9;
 - after semantic world entry, query bridge `session-status` and correlate it with already decoded structural map/world state.
 
-## Current recovery checkpoint — generation 2
+## Current recovery checkpoint — generation 3
 
 ```yaml
-recovery_generation: 2
-recovery_attempts: 2
-continuation_mode: bounded_slice
+recovery_generation: 3
+continuation_mode: autonomous_program
 observed_state: active_external_operation
 safe_to_resume: true
-takeover_source_head: 60323a1e5ea252f22ee0fcc47a14ae62c9575792
-checkpoint_commit: 2f4591f32f3f9fdbdb313757f9b6eb9114b36cba
-machine_state_commit: 09fa30c86b791062724aca0d251ed84e552d90e7
+isolated_recovery_branch: ci/OTC-20260814-track-a-chatgpt-framing-recovery
+latest_proven_evidence_commit: 7a3d2bcac9a32ab5c07043b4b43e4146e674aeaf
+machine_state_correction_commit: 103969b467869f66cba07ae52a468d12943130d7
 active_operation:
   type: static_exact_sha_experiment
-  id: outgoing-payload-consumer-provenance
-  workflow: Track A outgoing payload consumer provenance
-  workflow_path: .github/workflows/tibia-official-client-re-outgoing-payload-consumers.yml
-  experiment_head: c15899ebef7cadb7ce6f4a302a28dff064f6b537
-  run_id: 31815819731
-  job_id: null
+  id: stream-owner-pair-mapping
+  workflow: Track A stream owner pair mapping
+  workflow_path: .github/workflows/tibia-official-client-re-stream-owner-pairs.yml
+  experiment_head: 0a3c4fdb824c943e34b2c318ef41f41db733d132
+  run_id: 31824297168
   first_observed_status: queued
-  operation_started_at: 2026-08-14T17:42:34+02:00
-  wait_deadline_at: 2026-08-14T18:27:34+02:00
-resume_condition: >-
-  run 31815819731 reaches terminal state or the persisted wait deadline expires;
-  do not redispatch the same semantic operation while it is active
 ```
 
-The experiment starts from `0xb5b880`, independently searches bounded direct-call provenance, protobuf/envelope literals and Qt/network-write symbols, and uploads a durable report artifact. A previously mentioned `OutGoingMessagePayload` relationship is **not promoted** until this or later exact-SHA evidence independently reproduces it.
-
-## CI state requiring closeout repair
-
-For source head `60323a1e5ea252f22ee0fcc47a14ae62c9575792`:
-
-```yaml
-track_a_run: 31812572191
-track_a_job: 94806473825
-track_a_result: SUCCESS
-generic_ci_run: 31812575746
-generic_ci_result: FAILURE
-first_failed_ci_job: 94807088316
-first_failed_ci_step: Run yamllint
-```
-
-This is a repository quality-gate failure, not a contradiction of the successful Track A binary experiment. It must be repaired and revalidated before closeout.
+This experiment is mapping the concrete classes/control blocks behind owner shared-pointer pairs `+0x9f0/+0x9f8`, `+0xa00/+0xa08`, `+0xa10/+0xa18`, `+0xc18/+0xc20` and ordering them against `TUnencryptedRawMessageStream`.
 
 ## Current unknowns
 
-- exact serializer semantics downstream of `0xb5b880`;
-- exact framing and final network write;
-- relationship between internal GameclientMessage discriminators and final wire bytes;
-- independently reproduced outbound envelope/protobuf wrapper semantics;
+- concrete owner stream-pair class mapping for `+0x9f0/+0xa00/+0xa10/+0xc18`;
+- exact layer ordering of `TUnencryptedRawMessageStream`, framing, encryption/compression and final socket;
+- exact serializer semantics and final gameplay network write;
+- final wire relationship of internal `GameclientMessage` discriminators;
 - bridge session-status/live structural-world correlation;
 - direct player-position member;
 - HP/maxHP and mana/maxMana;
@@ -208,26 +212,24 @@ This is a repository quality-gate failure, not a contradiction of the successful
 
 ## Ordered continuation
 
-1. Finish run `31815819731`; persist its artifact-derived framing/write provenance.
-2. Continue static P2 edge-by-edge until serializer/framing/final-write is proven or a concrete evidence-backed blocker is reached.
+1. Finish run `31824297168`; persist exact owner stream-pair mappings and class RTTI evidence.
+2. Continue static P2 edge-by-edge until raw stream -> framing/encryption/compression -> `QTcpSocket` ordering and final write are proven or an evidence-backed blocker is reached.
 3. Repair bridge Qt separation and correlate live read-only bridge `session-status` with structural world state.
 4. Recover P0 reads with causal/restart-stable evidence.
 5. Promote safest reversible movement through A3/A4 parity; avoid costly/irreversible effects.
 6. Complete protocol/QMeta registries and quantitative coverage.
-7. Repair workflow `yamllint`, perform fresh audit, exact-head CI, reviews/threads/PR hygiene, then merge/archive only when all policy gates permit.
+7. Repair remaining CI quality gates, perform fresh audit, exact-head CI, reviews/threads/PR hygiene, then merge/archive only when all policy gates permit.
 
 ## Durable evidence
 
-- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-chatgpt-recovery-generation-2.md`
+- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-chatgpt-network-handoff-correction.md`
+- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-queue-qslot-consumer-success.md`
+- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-derived-transport-field-provenance.md`
+- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-unencrypted-raw-message-stream-proven.md`
 - `docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-continuation-state.yaml`
-- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-network-owner-vtable-census.md`
-- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-protocol-queue-network-handoff.md`
 - `docs/agents/evidence/OTC-20260813-official-client-re/20260814-protocol-queue-action-builders.md`
 - `docs/agents/evidence/OTC-20260813-official-client-re/20260814-live-structural-world-and-reversible-movement.md`
-- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md`
-- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-gameaction-connectimpl-arguments.md`
-- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-gameaction-slot-provenance.md`
 
 ## Next action
 
-Inspect `31815819731` after a state change. If terminal, download its report artifact, classify the concrete path from `0xb5b880`, persist the result, and immediately select the next unresolved downstream edge. Do not launch the live client while this static P2 operation is still active.
+Inspect `31824297168` after a state change. If terminal, persist its artifact-derived owner-pair/class mapping and immediately continue to the next unresolved stream/framing/socket edge. Do not launch the live client while this static P2 operation is active.

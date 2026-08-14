@@ -17,7 +17,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Disassemble proven parser caller
+      - name: Disassemble proven parser caller with gdb
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -25,12 +25,14 @@ jobs:
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
           toolroot="$state/toolroot"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          objdump_bin="$toolroot/usr/bin/objdump"
-          [[ -x "$objdump_bin" ]] || objdump_bin=/usr/bin/objdump
-          "$objdump_bin" -d -M intel --start-address=0xcd9000 --stop-address=0xcdf000 "$client" > /tmp/track-a-parser-disasm.txt
+          gdb_bin="$toolroot/usr/bin/gdb"; [[ -x "$gdb_bin" ]]
+          "$gdb_bin" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble 0xcd9000,0xcdf000' > /tmp/track-a-parser-disasm.txt 2>&1
           echo TRACK_A_DISASM_LINES="$(wc -l < /tmp/track-a-parser-disasm.txt)"
           grep -n -E 'cmp.*0x6a|cmp.*0x6b|cmp.*0x6c|0x6a,|0x6b,|0x6c,' /tmp/track-a-parser-disasm.txt || true
           echo TRACK_A_CALLER_CONTEXT_BEGIN=true
-          sed -n '/cdbb40:/,/cdbc80:/p' /tmp/track-a-parser-disasm.txt || true
+          grep -n -A120 -B80 'cdbba0' /tmp/track-a-parser-disasm.txt || true
           echo TRACK_A_CALLER_CONTEXT_END=true
           echo TRACK_A_PARSER_DISASSEMBLY_CAPTURED=true

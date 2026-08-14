@@ -56,5 +56,8 @@ jobs:
           0xbd5530 queue-sendTalkMessage
           0xbcc510 queue-sendAttack
           0xbcc6d0 queue-sendFollow
+          0xde6de0 queue-sendMessage-body
+          0xbc6750 queue-fire-new-client-message
+          0xbc6f00 queue-fire-new-protocol-message
           EOF
           echo 'TRACK_A_GAMEACTION_RECEIVER_TARGETS_COMPLETE=true'

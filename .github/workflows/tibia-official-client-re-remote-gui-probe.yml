@@ -1,0 +1,54 @@
+name: Track A remote GUI probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-remote-gui-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+    steps:
+      - name: Probe existing Track A GUI without mutation
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          client_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" && -e /tmp/.X11-unix/X98 ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+          kill -0 "$xvfb_pid"
+          echo TRACK_A_XVFB_RUNNING=true
+          if [[ -n "$client_pid" && -r "/proc/$client_pid/environ" ]] && grep -azFxq "$marker" "/proc/$client_pid/environ" && kill -0 "$client_pid" 2>/dev/null; then
+            echo TRACK_A_CLIENT_RUNNING=true
+          else
+            echo TRACK_A_CLIENT_RUNNING=false
+          fi
+          for cmd in x11vnc x0vncserver Xtigervnc vncserver websockify novnc_proxy socat python3; do
+            if command -v "$cmd" >/dev/null 2>&1; then echo "TRACK_A_CMD_${cmd//[^A-Za-z0-9]/_}=true"; else echo "TRACK_A_CMD_${cmd//[^A-Za-z0-9]/_}=false"; fi
+          done
+          echo TRACK_A_HOSTNAME="$(hostname)"
+          echo TRACK_A_IPS="$(hostname -I 2>/dev/null | xargs || true)"
+          if command -v ss >/dev/null 2>&1; then
+            echo TRACK_A_PORT_5900_LISTENING="$(ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)5900$' && echo true || echo false)"
+            echo TRACK_A_PORT_6080_LISTENING="$(ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)6080$' && echo true || echo false)"
+          fi

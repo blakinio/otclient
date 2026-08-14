@@ -63,7 +63,10 @@ jobs:
           end
           continue
           GDB
-          (sleep 3; DISPLAY=:98 "$toolroot/usr/bin/xdotool" key Up; sleep 1; DISPLAY=:98 "$toolroot/usr/bin/xdotool" key Down) & stimulus=$!
+          (sleep 3; window="$(DISPLAY=:98 "$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' | tail -n1)"; \
+            DISPLAY=:98 "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; \
+            DISPLAY=:98 "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"; \
+            for key in Up Down Left Right; do DISPLAY=:98 "$toolroot/usr/bin/xdotool" key --window "$window" "$key"; sleep 1; done) & stimulus=$!
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           "$toolroot/usr/bin/gdb" -q -nx -batch -x "$gcmd" "$client"

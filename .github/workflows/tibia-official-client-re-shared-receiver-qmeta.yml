@@ -64,7 +64,7 @@ jobs:
                   relas[relocation_offset] = (info & 0xffffffff, addend)
 
           print('TRACK_A_SHARED_RECEIVER_QMETA_BEGIN=true')
-          for base in (0x3074b20, 0x3085b60):
+          for base in (0x3074b20, 0x3085b60, 0x3085ba0):
               fields = {}
               for displacement, name in ((8, 'stringdata'), (0x10, 'metadata'), (0x18, 'static_metacall'), (0x28, 'associated')):
                   relocation = relas.get(base + displacement)

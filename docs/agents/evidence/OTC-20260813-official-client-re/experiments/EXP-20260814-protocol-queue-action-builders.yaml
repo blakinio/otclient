@@ -21,4 +21,3 @@ facts:
 limits:
   - discriminators are not promoted to final wire bytes before serializer framing is recovered
   - exact field layouts remain partially unresolved
-

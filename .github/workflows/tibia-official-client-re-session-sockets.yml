@@ -58,7 +58,9 @@ jobs:
           evidence="$state/evidence/aware-range-$(date -u +%Y%m%dT%H%M%SZ)"
           mkdir -p "$evidence"
           records="$evidence/records.txt"
+          phases="$evidence/phases.txt"
           : >"$records"
+          : >"$phases"
           script="$evidence/probe.gdb"
           printf '%s\n' \
             'set pagination off' \
@@ -77,7 +79,7 @@ jobs:
             '            order=int(gdb.parse_and_eval("$rbp")) & 0xffffffff' \
             "            x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))" \
             '            if 0<x<100000 and 0<y<100000 and z<32 and order<128:' \
-            "                with open(out,'a') as f: f.write(f'{time.time_ns()} {x} {y} {z} {order}\\n')" \
+            "                with open(out,'a') as f: f.write(f'{time.time_ns()//1000} {x} {y} {z} {order}\\n')" \
             '        except Exception:' \
             '            pass' \
             '        return False' \
@@ -92,16 +94,21 @@ jobs:
           for spec in 'RIGHT Right Left' 'LEFT Left Right' 'UP Up Down' 'DOWN Down Up'; do
             set -- $spec
             name="$1"; key="$2"; back="$3"
-            printf 'TRACK_A_%s_START=%s\n' "$name" "$(date +%s%N)"
+            s="$(date +%s%6N)"
             "$toolroot/usr/bin/xdotool" key "$key"
             sleep 1.2
-            printf 'TRACK_A_%s_END=%s\n' "$name" "$(date +%s%N)"
+            e="$(date +%s%6N)"
+            printf '%s %s %s\n' "$name" "$s" "$e" >>"$phases"
+            printf 'TRACK_A_%s_START_US=%s\nTRACK_A_%s_END_US=%s\n' "$name" "$s" "$name" "$e"
             "$toolroot/usr/bin/xdotool" key "$back" || true
             sleep 1.2
           done
           if kill -0 "$gp" 2>/dev/null; then kill -INT "$gp" 2>/dev/null || true; sleep 1; fi
           kill -CONT "$pid" 2>/dev/null || true
-          python3 -c "import sys; rows=[tuple(map(int,l.split())) for l in open(sys.argv[1]) if len(l.split())==5]; print(f'TRACK_A_DECODED_MAP_RECORD_COUNT={len(rows)}'); assert len(rows)>=8; c=[(r[1],r[2],r[3]) for r in rows]; xs=[x for x,_,_ in c]; ys=[y for _,y,_ in c]; zs=[z for *_,z in c]; print(f'TRACK_A_X_MIN={min(xs)}'); print(f'TRACK_A_X_MAX={max(xs)}'); print(f'TRACK_A_X_SPAN={max(xs)-min(xs)+1}'); print(f'TRACK_A_Y_MIN={min(ys)}'); print(f'TRACK_A_Y_MAX={max(ys)}'); print(f'TRACK_A_Y_SPAN={max(ys)-min(ys)+1}'); print(f'TRACK_A_Z_MIN={min(zs)}'); print(f'TRACK_A_Z_MAX={max(zs)}'); print('TRACK_A_Z_VALUES='+','.join(map(str,sorted(set(zs))))); print(f'TRACK_A_UNIQUE_XYZ={len(set(c))}')" "$records"
+          python3 -c "import sys; rows=[tuple(map(int,l.split())) for l in open(sys.argv[1]) if len(l.split())==5]; print(f'TRACK_A_DECODED_MAP_RECORD_COUNT={len(rows)}'); assert len(rows)>=8; c=[(r[1],r[2],r[3]) for r in rows]; xs=[x for x,_,_ in c]; ys=[y for _,y,_ in c]; zs=[z for *_,z in c]; print(f'TRACK_A_X_MIN={min(xs)}'); print(f'TRACK_A_X_MAX={max(xs)}'); print(f'TRACK_A_X_SPAN={max(xs)-min(xs)+1}'); print(f'TRACK_A_Y_MIN={min(ys)}'); print(f'TRACK_A_Y_MAX={max(ys)}'); print(f'TRACK_A_Y_SPAN={max(ys)-min(ys)+1}'); print(f'TRACK_A_Z_VALUES='+','.join(map(str,sorted(set(zs))))); print(f'TRACK_A_UNIQUE_XYZ={len(set(c))}')" "$records"
+          while read -r name s e; do
+            awk -v name="$name" -v s="$s" -v e="$e" '$1>=s && $1<=e { n++; x=$2; y=$3; z=$4; if(n==1||x<xmin)xmin=x; if(n==1||x>xmax)xmax=x; if(n==1||y<ymin)ymin=y; if(n==1||y>ymax)ymax=y; zs[z]=1; xyz[x FS y FS z]=1 } END { printf "TRACK_A_PHASE_%s_COUNT=%d\n",name,n; if(n){ printf "TRACK_A_PHASE_%s_X_MIN=%d\nTRACK_A_PHASE_%s_X_MAX=%d\nTRACK_A_PHASE_%s_X_SPAN=%d\n",name,xmin,name,xmax,name,xmax-xmin+1; printf "TRACK_A_PHASE_%s_Y_MIN=%d\nTRACK_A_PHASE_%s_Y_MAX=%d\nTRACK_A_PHASE_%s_Y_SPAN=%d\n",name,ymin,name,ymax,name,ymax-ymin+1; c=0; for(k in xyz)c++; printf "TRACK_A_PHASE_%s_UNIQUE_XYZ=%d\n",name,c; first=1; printf "TRACK_A_PHASE_%s_Z_VALUES=",name; for(k in zs){ if(!first)printf ","; printf "%s",k; first=0 } printf "\n" } }' "$records"
+          done <"$phases"
           kill -0 "$pid"
           grep -azFxq "$marker" "/proc/$pid/environ"
           echo TRACK_A_SESSION_LEFT_LOGGED_IN=true

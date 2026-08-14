@@ -36,7 +36,7 @@ jobs:
             [[ ! -d "/proc/$observer" ]]
           fi
           kill -CONT "$pid" 2>/dev/null || true; kill -0 "$pid"
-          base="$(awk -v exe="$client" '$6==exe && $3=="00000000" {print "0x"$1; exit}' "/proc/$pid/maps" | cut -d- -f1)"
+          base="$(awk -v exe="$client" 'index($0,exe) && $3=="00000000" {print "0x"$1; exit}' "/proc/$pid/maps" | cut -d- -f1)"
           [[ "$base" =~ ^0x[0-9a-f]+$ ]]
           gcmd="$(mktemp)"; gout="$(mktemp)"; trap 'rm -f "$gcmd" "$gout"' EXIT
           cat >"$gcmd" <<GDB

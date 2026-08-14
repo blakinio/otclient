@@ -118,6 +118,7 @@ jobs:
               return f'UNRESOLVED(no-write:{register})'
 
           invoker = 'UNRESOLVED(no-store)'
+          payload = ['UNRESOLVED(no-xmm-copy)', 'UNRESOLVED(no-xmm-copy)']
           for index in range(len(rows) - 2, -1, -1):
               va, text = rows[index]
               stored = re.match(r'^mov\s+QWORD PTR \[(?:rax|r9)\+0x8\],([a-z0-9]+)$', text)
@@ -127,11 +128,56 @@ jobs:
               invoker = resolve_register(source, index)
               break
 
+          def split_memory(expression):
+              match = re.fullmatch(r'(rsp|rbp)(?:([+-])0x([0-9a-f]+))?', expression)
+              if not match:
+                  return None
+              displacement = int(match.group(3), 16) if match.group(3) else 0
+              if match.group(2) == '-':
+                  displacement = -displacement
+              return match.group(1), displacement
+
+          def resolve_memory(base, displacement, before_index):
+              wanted = (base, displacement)
+              for write_index in range(before_index - 1, -1, -1):
+                  source_va, source_text = rows[write_index]
+                  written = re.match(r'^mov\s+QWORD PTR \[([^]]+)\],(.+)$', source_text)
+                  if not written or split_memory(written.group(1)) != wanted:
+                      continue
+                  rhs = written.group(2).strip()
+                  if re.fullmatch(r'0x[0-9a-f]+', rhs):
+                      return f'{rhs}@0x{source_va:x}'
+                  if re.fullmatch(r'r(?:ax|bx|cx|dx|si|di|bp|sp|8|9|1[0-5])', rhs):
+                      return resolve_register(rhs, write_index)
+                  return f'UNRESOLVED(0x{source_va:x}:{source_text})'
+              return f'UNRESOLVED(no-write:{base}{displacement:+#x})'
+
+          for store_index in range(len(rows) - 2, -1, -1):
+              _, store_text = rows[store_index]
+              stored = re.match(r'^movups\s+XMMWORD PTR \[(?:rax|r9)\+0x10\],(xmm[0-9]+)$', store_text)
+              if not stored:
+                  continue
+              xmm = stored.group(1)
+              for load_index in range(store_index - 1, -1, -1):
+                  _, load_text = rows[load_index]
+                  loaded = re.match(r'^movdqa\s+' + re.escape(xmm) + r',XMMWORD PTR \[([^]]+)\]$', load_text)
+                  if not loaded:
+                      continue
+                  memory = split_memory(loaded.group(1))
+                  if memory:
+                      payload = [
+                          resolve_memory(memory[0], memory[1], load_index),
+                          resolve_memory(memory[0], memory[1] + 8, load_index),
+                      ]
+                  break
+              break
+
           print(
               f'PROVEN_SITE call={call} family={family} sender_metaobject={metaobject} '
               f'invoker={invoker} sender_source="{last_write("rsi")}" '
               f'signal_storage="{last_write("rdx")}" receiver_source="{last_write("rcx")}" '
-              f'slot_storage="{last_write("r8")}" slot_object="{last_write("r9")}"'
+              f'slot_storage="{last_write("r8")}" slot_object="{last_write("r9")}" '
+              f'slot_payload_word0="{payload[0]}" slot_payload_word1="{payload[1]}"'
           )
           PY
           done < "$tmp/candidates.tsv"

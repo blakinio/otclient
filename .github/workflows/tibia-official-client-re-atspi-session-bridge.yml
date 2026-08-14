@@ -23,6 +23,8 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+      TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -142,3 +144,19 @@ jobs:
             DBUS_SESSION_BUS_ADDRESS="$session_addr" PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" \
             python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" inspect
           echo TRACK_A_SESSION_BRIDGE_SEMANTIC_INSPECT_SUCCESS=true
+
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$path" LD_LIBRARY_PATH="$lib" \
+            DBUS_SESSION_BUS_ADDRESS="$session_addr" PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" \
+            TIBIA_TEST_EMAIL="$TIBIA_TEST_EMAIL" TIBIA_TEST_PASSWORD="$TIBIA_TEST_PASSWORD" \
+            python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" login
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo TRACK_A_SEMANTIC_LOGIN_COMPLETE=true
+          HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$path" LD_LIBRARY_PATH="$lib" \
+            DBUS_SESSION_BUS_ADDRESS="$session_addr" PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" \
+            python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" character
+          sleep 10
+          kill -0 "$pid"
+          echo TRACK_A_SEMANTIC_CHARACTER_ENTER_COMPLETE=true
+          trap - EXIT
+          echo TRACK_A_ACCESSIBLE_SESSION_LEFT_RUNNING=true

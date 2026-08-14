@@ -46,7 +46,7 @@ jobs:
             '                type_id=struct.unpack("<I",bytes(inf.read_memory(obj+0x30,4)))[0]' \
             '                kind=struct.unpack("<I",bytes(inf.read_memory(obj+0x38,4)))[0]' \
             '                if type_id<1000000:' \
-            '                    with open(out,"a") as f:f.write(f"{time.time_ns()//1000} {x} {y} {z} {order} {type_id} {kind} 0x{obj:x}\\n")' \
+            '                    with open(out,"a") as f:f.write(f"{time.time_ns()//1000} {x} {y} {z} {order} {type_id} {kind} 0x{obj:x}\n")' \
             '        except: pass' '        return False' 'P()' 'end' 'continue' >"$script"
           gdb -q -nx -batch -x "$script" >"$evidence/gdb.log" 2>&1 & gp=$!; sleep 2
           "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$toolroot/usr/bin/xdotool" windowfocus --sync "$window" || true

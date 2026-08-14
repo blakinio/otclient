@@ -110,8 +110,29 @@ jobs:
                   return f'UNRESOLVED(0x{source_va:x}:{source_text})'
               return f'UNRESOLVED(no-write:{base}{displacement:+#x})'
 
+          def resolve_storage(register, before_index, seen=None):
+              seen = set() if seen is None else seen
+              if register in seen: return None
+              seen.add(register)
+              for idx in range(before_index - 1, -1, -1):
+                  _, text = rows[idx]
+                  write = re.match(r'^(?:lea|mov)\s+' + re.escape(register) + r',(.+)$', text)
+                  if not write: continue
+                  rhs = write.group(1).strip()
+                  memory = re.fullmatch(r'\[(rsp|rbp)(?:([+-])0x([0-9a-f]+))?\]', rhs)
+                  if text.startswith('lea ') and memory:
+                      displacement = int(memory.group(3), 16) if memory.group(3) else 0
+                      if memory.group(2) == '-': displacement = -displacement
+                      return memory.group(1), displacement, idx
+                  alias = re.fullmatch(r'r(?:ax|bx|cx|dx|si|di|bp|sp|8|9|1[0-5])', rhs)
+                  if text.startswith('mov ') and alias:
+                      return resolve_storage(alias.group(0), idx, seen)
+                  return None
+              return None
+
           invoker = 'UNRESOLVED(no-store)'
           payload = ['UNRESOLVED(no-xmm-copy)', 'UNRESOLVED(no-xmm-copy)']
+          signal_payload = ['UNRESOLVED(signal-storage)', 'UNRESOLVED(signal-storage)']
           for index in range(len(rows) - 2, -1, -1):
               _, text = rows[index]
               stored = re.match(r'^mov\s+QWORD PTR \[(?:rax|r9)\+0x8\],([a-z0-9]+)$', text)
@@ -131,8 +152,15 @@ jobs:
                       payload = [resolve_memory(memory[0], memory[1], load_index), resolve_memory(memory[0], memory[1] + 8, load_index)]
                   break
               break
+          signal_storage = resolve_storage('rdx', len(rows) - 1)
+          if signal_storage:
+              signal_payload = [
+                  resolve_memory(signal_storage[0], signal_storage[1], len(rows) - 1),
+                  resolve_memory(signal_storage[0], signal_storage[1] + 8, len(rows) - 1),
+              ]
           print(f'PROVEN_SITE call={call} sender_metaobject=0x3085b60 invoker={invoker} '
                 f'sender_source="{last_write("rsi")}" signal_storage="{last_write("rdx")}" '
+                f'signal_payload_word0="{signal_payload[0]}" signal_payload_word1="{signal_payload[1]}" '
                 f'receiver_source="{last_write("rcx")}" slot_storage="{last_write("r8")}" '
                 f'slot_object="{last_write("r9")}" slot_payload_word0="{payload[0]}" slot_payload_word1="{payload[1]}"')
           PY

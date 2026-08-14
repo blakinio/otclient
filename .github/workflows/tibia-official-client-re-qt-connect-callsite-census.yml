@@ -1,0 +1,58 @@
+name: Track A Qt connect callsite census
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [self-hosted, linux, otclient]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Locate direct Qt connect callsites in official client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          execs=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and (flags&1): execs.append((off,off+filesz,va))
+          targets={0x4dd800:'QObject::connectImpl@plt',0x4dffd0:'QObject::connect@plt',0x4de9e0:'QObject::disconnectImpl@plt'}
+          print('TRACK_A_QT_CONNECT_CALLSITE_CENSUS_BEGIN=true')
+          total=0
+          for off0,off1,va0 in execs:
+              for off in range(off0,off1-4):
+                  if data[off] != 0xE8: continue
+                  rel=struct.unpack_from('<i',data,off+1)[0]
+                  src=va0+(off-off0)
+                  dst=src+5+rel
+                  name=targets.get(dst)
+                  if name:
+                      print(f'CALLSITE target={name} call=0x{src:x}')
+                      total+=1
+          print(f'TOTAL_QT_CONNECT_CALLSITES={total}')
+          assert total>0,'no direct Qt connect/disconnect callsites found'
+          print('TRACK_A_QT_CONNECT_CALLSITE_CENSUS_COMPLETE=true')
+          PY

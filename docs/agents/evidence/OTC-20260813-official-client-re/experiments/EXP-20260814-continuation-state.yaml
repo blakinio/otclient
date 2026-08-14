@@ -7,8 +7,8 @@ pr: 289
 primary_task_branch: ci/OTC-20260813-official-client-re-continuation
 recovery_branch: ci/OTC-20260814-track-a-chatgpt-framing-recovery
 created_at: 2026-08-14T16:52:00+02:00
-updated_at: 2026-08-14T19:30:00+02:00
-latest_recovery_head_before_checkpoint: 0a3c4fdb824c943e34b2c318ef41f41db733d132
+updated_at: 2026-08-14T19:45:00+02:00
+latest_recovery_head_before_checkpoint: 2f7e322b8da5139351e8b8faf91605795a117483
 completion_claim: incomplete
 
 client:
@@ -30,9 +30,9 @@ recovery:
   generation: 3
   state: active_external_operation
   ownership: isolated_recovery_branch
-  active_run: 31824297168
-  active_workflow: Track A stream owner pair mapping
-  active_experiment_head: 0a3c4fdb824c943e34b2c318ef41f41db733d132
+  active_run: 31825417040
+  active_workflow: Track A final socket write resolution
+  active_experiment_head: 2f7e322b8da5139351e8b8faf91605795a117483
   first_observed_status: queued
   supersedes_generation_2_outbound_handoff_model: true
 
@@ -85,22 +85,27 @@ facts:
   outbound_handoff:
     classification: FACT
     corrected_at: 2026-08-14T19:28:00+02:00
-    chain: semantic_action -> action_router -> TProtocolMessageQueue -> clientMessageReadyToProcess -> Qt_QSlotObject_invoker_0x7dd630 -> owner_stream_family
+    chain: semantic_action -> action_router -> TProtocolMessageQueue -> clientMessageReadyToProcess -> Qt_QSlotObject_invoker_0x7dd630 -> TProtocolClientMessageProcessor -> TGameserverNetworkPacketRawDataProcessor -> TGameserverDualConnection
     signal_wrapper: '0xde91b0'
     connection_callsite: '0x19716a3'
     qslot_invoker: '0x7dd630'
     owner_saved_in_slot_object_offset: '+0x10'
-    qslot_owner_fields:
-      - '+0xc18'
-      - '+0xa00'
-      - '+0xa10'
-    neighboring_transport_cluster: '0x7dd3f0'
-    neighboring_transport_fields:
-      - '+0xa10'
-      - '+0x9f0'
-    direct_qiodevice_write_in_cluster: '0x7dd563'
-    exact_serializer: UNKNOWN
-    exact_framing: UNKNOWN
+    exact_owner_fields:
+      '+0x9f0': tibia::protocol::TProtocolServerPacketProcessor
+      '+0xa00': tibia::protocol::TProtocolClientMessageProcessor
+      '+0xa10': tibia::network::TGameserverNetworkPacketRawDataProcessor
+      '+0xc18': tibia::network::TGameserverDualConnection
+    exact_virtual_targets:
+      dual_connection_precondition_slot_0x90: '0xb40370'
+      client_message_processor_slot_0x10: '0xc2df80'
+      raw_data_processor_slot_0x10: '0xb47130'
+      dual_connection_slot_0x80: '0xb56d60'
+      dual_connection_slot_0x78: '0xb56970'
+    source_runs:
+      owner_field_mapping: 31824297168
+      outbound_vtable_resolution: 31824546383
+    exact_serializer: PARTIAL_STRUCTURAL
+    exact_framing: PARTIAL_STRUCTURAL
     final_network_write: UNKNOWN
 
   unencrypted_raw_message_stream:
@@ -146,9 +151,11 @@ facts:
     excluded_file_io:
       - '0xc4a848'
       - '0xd08642'
-    transport_high_value:
-      - '0x7dd563'
-      - '0xb4066b'
+    classified_non_final_outbound:
+      '0x7dd563': server_read_side_transport_cluster
+      '0xb4066b': TUnencryptedRawMessageStream_internal_QBuffer_write
+    unresolved_high_value:
+      - '0xb46c75'
 
   owner_stream_fields:
     constructor_initial_state:
@@ -156,14 +163,25 @@ facts:
       '+0xa00': zero_initialized
       '+0xa10': zero_initialized
       '+0xc18': zero_initialized_as_part_of_0xc10_0xc1f_block
-    proven_later_pair_stores:
-      '+0xc18/+0xc20': '0x19707b5..0x19707bc'
-      '+0x9f0/+0x9f8': '0x1970c6a..0x1970c78'
     concrete_class_mapping:
-      '+0x9f0/+0x9f8': UNKNOWN
-      '+0xa00/+0xa08': UNKNOWN
-      '+0xa10/+0xa18': UNKNOWN
-      '+0xc18/+0xc20': UNKNOWN
+      '+0x9f0/+0x9f8': tibia::protocol::TProtocolServerPacketProcessor
+      '+0xa00/+0xa08': tibia::protocol::TProtocolClientMessageProcessor
+      '+0xa10/+0xa18': tibia::network::TGameserverNetworkPacketRawDataProcessor
+      '+0xc18/+0xc20': tibia::network::TGameserverDualConnection
+    mapping_source_run: 31824297168
+    mapping_source_result: SUCCESS
+
+  transport_rtti_inventory:
+    TGameserverTCPConnection: '0x3080630'
+    TGameserverNetworkPacketConnection: '0x3080648'
+    TUnencryptedRawMessageStream: '0x3080660'
+    TGameserverNetworkPacketSequenceFlowProcessor: '0x3080678'
+    TGameserverDualConnection: '0x30b7628'
+    TIODeviceWriter: '0x3080718'
+    TProtocolWriter: '0x3080728'
+    TProtobufClientMessageTranslator: '0x3080748'
+    TProtocolClientMessageProcessor: '0x3080758'
+    TGameserverNetworkPacketRawDataProcessor: '0x3080768'
 
   live_world:
     structural_world_proven: true
@@ -211,6 +229,9 @@ superseded_or_disproven:
   - claim: 0xb5b880 is a validated function entry for outbound serialization
     classification: DISPROVEN
     reason: address lies inside instruction beginning at 0xb5b87c and earlier workflow hardcoded it
+  - claim: 0x7dd3f0 -> 0x7dd563 is the outbound final-write path
+    classification: DISPROVEN_AS_OUTBOUND
+    reason: owner provenance maps it to server/read-side processing
   - claim: primary owner slot +0x90 is itself the serializer
     classification: DISPROVEN
   - claim: TInternalGameActionRouter is the serializer
@@ -221,10 +242,10 @@ superseded_or_disproven:
     classification: DISPROVEN
 
 unknowns:
-  - exact concrete class mapping for owner pairs +0x9f0/+0x9f8, +0xa00/+0xa08, +0xa10/+0xa18, +0xc18/+0xc20
-  - exact ordering of TUnencryptedRawMessageStream versus framing, encryption, compression and final socket layer
-  - exact serializer semantics
-  - exact framing and final gameplay QTcpSocket network-write path
+  - exact TIODeviceWriter vtable and relationship to direct QIODevice::write callsite 0xb46c75
+  - exact TGameserverTCPConnection vtable and concrete final socket write function
+  - exact final framing boundary after TGameserverNetworkPacketRawDataProcessor
+  - encryption/compression/sequence details on selected outbound path
   - final wire-byte relationship of internal GameclientMessage discriminators
   - bridge session-status correlation with decoded structural world state
   - direct standalone player-position member
@@ -241,9 +262,9 @@ unknowns:
 
 next_actions:
   - priority: 1
-    action: finish run 31824297168 and map owner shared-pointer pairs +0x9f0/+0xa00/+0xa10/+0xc18 to concrete RTTI/vtables in setup 0x1970600..0x1971800
+    action: finish run 31825417040; resolve TIODeviceWriter and TGameserverTCPConnection vtables, constructor xrefs, 0xb46c75, and the exact final socket-write edge
   - priority: 2
-    action: order the proven TUnencryptedRawMessageStream layer against framing/encryption/compression and the QTcpSocket-bearing final transport layer
+    action: persist final framing/write provenance and reconcile outbound acceptance language
   - priority: 3
     action: recover live read-only bridge correlation by separating build sysroot libraries from official client Qt 6.9 runtime
   - priority: 4
@@ -267,6 +288,8 @@ references:
   - ../20260814-queue-qslot-consumer-success.md
   - ../20260814-derived-transport-field-provenance.md
   - ../20260814-unencrypted-raw-message-stream-proven.md
+  - ../20260814-stream-owner-pair-mapping.md
+  - ../20260814-outbound-owner-vtable-resolution.md
   - ../20260814-protocol-queue-action-builders.md
   - ../20260814-live-structural-world-and-reversible-movement.md
   - ../20260814-qt-connect-callsite-census.md

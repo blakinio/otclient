@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-official-client-re-continuation
-status: waiting
+status: investigating
 track_id: official-client-re
 alias: OTCLIENT-TIBIA-RE
 branch: ci/OTC-20260813-official-client-re-continuation
@@ -33,10 +33,7 @@ cross_repository_tasks: []
 
 ## Objective
 
-Continue Track A against the official native Linux Tibia client only. Recover and
-validate structural world/player/creature/inventory/protocol/action state without
-OCR assumptions, preserve runtime isolation from Track B, and promote only
-exact-version evidence with explicit confidence boundaries.
+Continue Track A against the official native Linux Tibia client only. Recover and validate structural world/player/creature/inventory/protocol/action state without OCR assumptions, preserve runtime isolation from Track B, and promote only exact-version evidence with explicit confidence boundaries.
 
 ## Runtime ownership
 
@@ -52,8 +49,7 @@ process_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
 container_names: none
 ```
 
-Track B runtime/process/display/ports/state remain out of scope and must not be
-read, stopped, attached to, reconfigured or cleaned by this task.
+Track B runtime/process/display/ports/state remain out of scope and must not be read, stopped, attached to, reconfigured or cleaned by this task.
 
 ## Acceptance inventory
 
@@ -63,6 +59,8 @@ read, stopped, attached to, reconfigured or cleaned by this task.
 - [x] Protocol surface inventory is persisted from the exact binary.
 - [x] High-confidence QMeta/string clusters are persisted for Chat, Container, Effect, Market, NPC Trade, Player Trade, Quest and Game Event.
 - [x] Capability/observation matrix is persisted with `FACT` versus `UNKNOWN` boundaries.
+- [x] Embedded protobuf `Coordinate` schema is recovered as x=1/y=2/z=3, all `uint32`.
+- [x] Selected high-value game message schemas are proven absent from the seven embedded `FileDescriptorProto` records, narrowing layout recovery to generated C++ metadata/accessors/disassembly/runtime objects.
 - [ ] Login recovery / structural `IN_GAME` acceptance is re-proven for the current live session when a live-world experiment becomes necessary.
 - [ ] Bridge session status is correlated with decoded world state.
 - [ ] Authoritative player position and one reversible movement transition are proven structurally.
@@ -78,24 +76,25 @@ official_client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442
 protocol_inventory:
   run: 31787489302
   job: 94726575137
-  head: c63dec6c1329bfb1494de17715956a6815786d66
   result: PASS
-  totals:
-    protocol_handler_classes: 47
-    handle_message_names: 146
-    inbound_gameserver_messages: 189
-    outbound_gameclient_messages: 160
+  totals: {protocol_handler_classes: 47, handle_message_names: 146, inbound_gameserver_messages: 189, outbound_gameclient_messages: 160}
 qmeta_neighborhoods:
   run: 31787757301
   job: 94727417973
-  head: 797c8079b6280644cbbd9ce0641846c6fa0fb21e
   result: PASS
 symbol_surface:
   run: 31787886977
   job: 94727824870
-  head: 923d297ecc49129130b530a9ea6c333de549598f
   result: PASS
   finding: stripped binary exposes no usable qt_static_metacall/staticMetaObject/handler function symbols through GDB
+protobuf_descriptor_census:
+  parser_revision: 2
+  head: f3082b8e9070d390251e5ecf0338ed800e58f5b1
+  run: 31789613193
+  job: 94733342439
+  result: PASS
+  valid_embedded_file_descriptors: 7
+  coordinate: {x: [1, uint32], y: [2, uint32], z: [3, uint32]}
 ```
 
 ## Promoted static conclusions
@@ -107,7 +106,8 @@ symbol_surface:
 - Chat/channel/player-NPC speech surfaces are present; `handleTalkMessage` and channel lifecycle handlers form a compact Chat cluster.
 - NPC trade, player trade, market, quest, game-event and graphical-effect groups have compact class-local method-name clusters.
 - Outbound named surfaces include directional movement, `GoPath`, `MoveObject`, object use/look, `Attack`, `Follow`, party actions, `Talk`, NPC/player trade, market, container, stash/depot and buddy/friend actions.
-- These names do **not** establish wire opcodes, message field layouts, executable handler offsets or safe callable builder offsets by themselves.
+- The embedded serialized descriptor set contains `shared.proto`, `appearances.proto`, `map.proto`, two sound descriptors and two Google protobuf descriptors; it does not contain the selected Gameserver/Gameclient message schemas.
+- Protocol/message names do **not** establish wire opcodes, message field layouts, executable handler offsets or safe callable builder offsets by themselves.
 
 ## Evidence index
 
@@ -116,77 +116,57 @@ Canonical evidence for the current phase:
 - `docs/agents/evidence/OTC-20260813-official-client-re/20260814-official-client-protocol-surface-inventory.md`
 - `docs/agents/evidence/OTC-20260813-official-client-re/20260814-protocol-handler-qmeta-neighborhoods.md`
 - `docs/agents/evidence/OTC-20260813-official-client-re/20260814-capability-observation-matrix.md`
+- `docs/agents/evidence/OTC-20260813-official-client-re/20260814-protobuf-descriptor-census-and-xref-gate.md`
 - `docs/agents/evidence/OTC-20260813-official-client-re/README.md`
 
-Earlier login/reconstruction/runtime failures and their exact run/job evidence remain
-preserved in Git history and the earlier evidence/checkpoint documents. They are
-not re-expanded here because the current durable task checkpoint is intentionally
-compact.
+## Xref gate
 
-## Current experiment
+### v1 terminal evidence
 
 ```yaml
-experiment: protocol metadata string -> absolute pointer -> executable RIP xref graph
-workflow_source_head: 55dc75c830e571490be30a5c83a922a528c5931f
+head: 55dc75c830e571490be30a5c83a922a528c5931f
 run: 31788735824
 job: 94730524231
-runner: synology-otclient-01
-subject_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-scope:
-  inbound:
-    - Chat/Talk
-    - Container
-    - Creature/MoveCreature
-    - PlayerDataBasic
-    - Effect
-    - Market
-    - NPC Trade
-    - Player Trade
-    - Quest
-    - GameEvent
-  outbound:
-    - MoveObject
-    - Attack
-    - Follow
-    - Talk
-    - TradeObject
-    - GoPath
+job_conclusion: cancelled_by_timeout
+python_complete_marker: true
+finding:
+  selected_literal_absolute_qword_refs: 0
+  selected_literal_direct_riprefs_reported: 0
+limitation: repeated full executable rescan per literal occurrence caused timeout pressure
+```
+
+The completed Python output is preserved as partial exact-version evidence; the cancelled GitHub job is not promoted as a PASS.
+
+### v2 replacement
+
+```yaml
+workflow: .github/workflows/tibia-official-client-re-xref-graph-v2.yml
+head: cfbe04c03de34f83646a82569c90dafaf342c129
+run: 31789670398
+algorithm: one linear executable RIP-relative LEA/MOV scan indexed by target VA
 state_at_checkpoint: in_progress
 result_claimed: false
 ```
 
-The standalone first version of the xref workflow was removed from the branch
-after its run started; the maintained xref step is folded into
-`.github/workflows/tibia-official-client-re-qmeta-handler-neighborhood.yml`.
-Do not treat deletion of the source workflow as invalidating run `31788735824`:
-the run is pinned to its exact source head and exact official-client SHA.
-
 ## Anti-stall checkpoint
 
 ```yaml
-checkpoint_version: 3
-updated_at: 2026-08-14T11:37:00+02:00
-owner_resume: explicit in current conversation
+checkpoint_version: 4
+updated_at: 2026-08-14T11:50:00+02:00
+owner_resume: explicit
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
-pr_state: open_draft_mergeable
-status: waiting
-invocation_started_at: 2026-08-14T11:34:00+02:00
-last_progress_at: 2026-08-14T11:37:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: other
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 2
-identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 1
-stall_warnings: 0
+status: investigating
 last_progress:
-  - persisted exact-binary xref experiment
-  - persisted capability/observation matrix
-  - updated evidence index
-  - removed redundant standalone workflow after folding probe into maintained qmeta workflow
+  - corrected descriptor census parser before promotion
+  - descriptor census revision 2 PASS with exact field evidence
+  - recorded xref-v1 completed-output/cancelled-job boundary
+  - replaced multiplicative xref scan with linear v2 workflow
+  - persisted new evidence document and evidence index
+unchanged_state_checks: 0
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 1
+stall_warnings: 0
 blockers: []
 ```
 
@@ -195,16 +175,12 @@ blockers: []
 - Pixels, socket counts or a visible window are not structural `IN_GAME` proof.
 - String offsets are not function offsets.
 - Protocol/message names are not wire opcodes.
+- Absence from embedded `FileDescriptorProto` records is not absence of the message/type from the client.
 - QMeta string proximity is not sufficient where class ownership is ambiguous.
-- VIP functionality is not absent merely because literal `Vip` message names are sparse; Buddy/FriendSystem vocabulary is used.
 - Pre-world GDB attach must not be reintroduced as a normal login diagnostic because prior evidence shows it changes Qt/UI timing.
 
 ## Next action
 
 ```text
-After run 31788735824 reaches a terminal state, inspect job 94730524231 once,
-persist the exact xref findings (or exact failure) into Track A evidence, then use
-that result to choose the narrowest next deterministic target: QMeta metadata
-reconstruction if metadata xrefs are useful, otherwise selected protobuf/wrapper
-layout recovery for MoveCreature/PlayerDataCurrent/Container/Talk.
+Inspect run 31789670398 once after terminal state. Persist exact linear RIP-reference findings. If literal RIP refs remain empty, move directly to generated protobuf descriptor/default-instance/accessor and Qt integer-offset metadata reconstruction rather than another literal-string xref variant.
 ```

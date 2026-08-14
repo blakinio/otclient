@@ -1,0 +1,73 @@
+name: Track A protocol queue concrete slot ownership
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-protocol-queue-concrete-slot.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Inspect concrete slot ownership and connection site
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; readelf="$toolroot/usr/bin/readelf"
+          [[ -x "$gdb" && -x "$readelf" ]]
+          echo 'TRACK_A_PROTOCOL_QUEUE_CONCRETE_SLOT_BEGIN=true'
+          echo 'CONNECTION_SITE_BEGIN=0x84a900'
+          "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble /r 0x84a900,0x84ab30'
+          echo 'CONNECTION_SITE_END=0x84ab30'
+          echo 'TARGET_RELOCATIONS_BEGIN=true'
+          "$readelf" -rW "$client" | grep -Ei '831ea0|de82b0|de6ed0|de9a20|de9a50' || true
+          echo 'TARGET_RELOCATIONS_END=true'
+          echo 'TARGET_XREFS_BEGIN=true'
+          python3 -u - "$client" <<'PY'
+          import struct, sys
+          data = open(sys.argv[1], 'rb').read()
+          targets = {0x831ea0, 0xde82b0, 0xde6ed0, 0xde9a20, 0xde9a50}
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          loads = []
+          for i in range(phnum):
+              off = phoff + i * phentsz
+              typ, flags, fo, va, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', data, off)
+              if typ == 1 and filesz: loads.append((fo, fo + filesz, va, flags))
+          for target in sorted(targets):
+              needle = struct.pack('<Q', target)
+              for fs, fe, va, flags in loads:
+                  pos = data.find(needle, fs, fe)
+                  while pos >= 0:
+                      print(f'ABS_QWORD target=0x{target:x} slot=0x{va+pos-fs:x} flags=0x{flags:x}')
+                      pos = data.find(needle, pos + 1, fe)
+              for fs, fe, va, flags in loads:
+                  if not flags & 1: continue
+                  for pos in range(fs, fe - 7):
+                      if 0x40 <= data[pos] <= 0x4f and data[pos+1] == 0x8d and data[pos+2] & 0xc7 == 0x05:
+                          site = va + pos - fs
+                          resolved = site + 7 + struct.unpack_from('<i', data, pos+3)[0]
+                          if resolved == target: print(f'LEA_XREF target=0x{target:x} site=0x{site:x}')
+          PY
+          echo 'TARGET_XREFS_END=true'
+          echo 'TRACK_A_PROTOCOL_QUEUE_CONCRETE_SLOT_COMPLETE=true'

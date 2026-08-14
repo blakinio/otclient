@@ -128,6 +128,46 @@ These offsets/flags are structural observations only; their protocol meanings ar
 
 The secondary target `0xbf3990` is also adapter-like, which supports treating the `0xbd36a0` virtual dispatch as the next boundary rather than treating the Qt slot itself as the serializer.
 
+## Static receiver recovery boundary — PROVEN
+
+Exact-SHA workflow run `31821681618`, job `94836155679`, on `synology-otclient-01` completed successfully. The run revalidated the exact client SHA and inspected the complete local wiring window `0x7d4800..0x7d5b00` plus static references to the primary slot target.
+
+It reconfirmed the primary connect setup directly:
+
+```asm
+0x7d55c8: mov rcx,QWORD PTR [rbx+0x88]
+...
+0x7d55e4: lea rax,[rip+...]        # 0xbd36a0
+...
+0x7d55f0: lea rax,[rip+...]        # 0xcf2950
+...
+0x7d562f: lea rax,[rip+...]        # 0x7d4220
+...
+0x7d564f: call QObject::connectImpl
+```
+
+The same run produced these bounded negative results:
+
+```text
+SLOT_TARGET_QWORD_REF_COUNT=0
+VTABLE_CONTEXT: no candidate emitted
+SLOT_TARGET_CODE_XREFS: only RIP_REF site=0x7d55e4
+```
+
+Within the inspected wiring window `[enclosing+0x88]` is repeatedly read but no assignment to that member was recovered. Therefore the local static scan does not identify the receiver class/vptr, and the absence of a raw `0xbd36a0` qword reference means the slot PMF target cannot be used as a direct vtable anchor.
+
+This result disproves the simple local-static strategy `find 0xbd36a0 as a qword in a vtable -> infer receiver vptr`. It does **not** disprove that the receiver has a normal vtable; it only shows that this slot PMF target is not itself stored there and that the receiver provenance lies outside the scanned local wiring window.
+
+Run artifact:
+
+```text
+artifact: track-a-login-receiver-static-31821681618
+artifact_id: 9227423011
+artifact_zip_sha256: 02d96e532b285f9319f3fbf2a6dc67d0356cb7bd8f03e266572b1fb2a0a2bd3b
+```
+
+The next shortest proof path is a no-credential runtime observation at the already-proven primary `connectImpl` call. Under the corrected ABI, `rcx` at `0x7d564f` is the receiver, so a bounded probe can read `receiver`, `*(receiver)`, and `*(*(receiver)+0x68)` without triggering account login or recording session/character data.
+
 ## Corrected claim boundary
 
 ### FACT
@@ -137,12 +177,14 @@ The secondary target `0xbf3990` is also adapter-like, which supports treating th
 - `0xcf2ca0` is an InvokeMetaMethod case entry, not the packet builder.
 - `0xbd36a0` constructs an intermediate object and invokes `receiver->vtable[+0x68]`.
 - primary receiver source at connect setup is `[enclosing_object+0x88]`.
+- the local static wiring window does not contain a recovered write assigning `[enclosing+0x88]` and does not expose a direct vtable anchor through `0xbd36a0`.
 
 ### DISPROVEN
 
 - `0xcf2ca0` is the official game-login packet builder.
 - `0x7d4220` QSlotObject trampoline is the semantic serializer.
 - `0xbd36a0` has been proven to be the final wire serializer.
+- a direct raw-qword/vtable lookup anchored on `0xbd36a0` resolves the primary receiver in the inspected local wiring window.
 
 ### UNKNOWN
 
@@ -171,9 +213,10 @@ slot_target_role: adapter_delegator
 adapter_intermediate_size: 0x50
 adapter_virtual_dispatch_offset: 0x68
 adapter_virtual_dispatch_target: UNKNOWN
+static_receiver_lookup_from_slot_target: INSUFFICIENT
 serializer_or_builder_address: UNKNOWN
 ```
 
 ## Next action
 
-Resolve the exact receiver vptr and `*(vptr+0x68)` target, preferably through an exact-SHA no-credential structural runtime probe or a statically proven receiver-vtable mapping. Then disassemble that target and continue until the actual outbound writer/serializer boundary is proven. Promote only non-secret, version-fenced structural facts to Track B.
+Run an exact-SHA, no-credential structural runtime probe that stops at the proven primary connect call `0x7d564f`, verifies the primary signal/slot PMFs, reads the receiver from `rcx`, then records only the receiver vptr and `*(vptr+0x68)` target as non-secret structural addresses. Convert any in-module runtime address back to its static RVA using the executable load bias, disassemble that exact target, and continue one delegation layer at a time until the actual outbound writer/serializer boundary is proven.

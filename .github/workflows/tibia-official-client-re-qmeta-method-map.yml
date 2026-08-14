@@ -1,0 +1,92 @@
+name: Track A QMeta method map
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-method-map.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Decode QMeta method descriptors and static-metacall disassembly
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          records={
+            'GameEvent':(0x1cd7f44,0x1cd7ec0,0xd20800),
+            'Chat':(0x1cd8268,0x1cd8060,0xd05f20),
+            'Worldmap':(0x1cd8a54,0x1cd8820,0xdf2a60),
+            'Effect':(0x1d73f64,0x1d73ee0,0xd338d0),
+            'Container':(0x1caec88,0x1cae760,0xd1e000),
+          }
+          phoff=struct.unpack_from('<Q',data,0x20)[0];phentsz=struct.unpack_from('<H',data,0x36)[0];phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def string_table(base):
+              o=va2off(base)
+              first=struct.unpack_from('<I',data,o)[0]
+              assert first%8==0 and 0<first<=0x10000
+              count=first//8;out=[]
+              for i in range(count):
+                  rel,ln=struct.unpack_from('<II',data,o+i*8)
+                  raw=data[o+rel:o+rel+ln]
+                  out.append(raw.decode('utf-8','replace'))
+              return out
+          print('TRACK_A_QMETA_METHOD_MAP_BEGIN=true')
+          for name,(sb,mb,fn) in records.items():
+              ss=string_table(sb);mo=va2off(mb)
+              words=[struct.unpack_from('<I',data,mo+i*4)[0] for i in range(512)]
+              revision=words[0];class_idx=words[1];mcount=words[4];moff=words[5]
+              print(f'CLASS name={name} class_string={ss[class_idx]!r} revision={revision} method_count={mcount} method_offset={moff} static_metacall=0x{fn:x} string_count={len(ss)}')
+              for i in range(mcount):
+                  j=moff+i*6
+                  name_idx,argc,param_off,tag_idx,flags,meta_off=words[j:j+6]
+                  n=ss[name_idx] if name_idx<len(ss) else f'<bad:{name_idx}>'
+                  tag=ss[tag_idx] if tag_idx<len(ss) else f'<bad:{tag_idx}>'
+                  print(f' METHOD class={name} index={i} name_index={name_idx} name={n!r} argc={argc} param_off={param_off} tag={tag!r} flags=0x{flags:x} meta_off={meta_off}')
+          print('TRACK_A_QMETA_METHOD_MAP_COMPLETE=true')
+          PY
+          gdb="$toolroot/usr/bin/gdb"
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          [[ -x "$gdb" ]]
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'set disassembly-flavor intel' \
+            -ex 'echo TRACK_A_CHAT_DISASM_BEGIN=true\n' \
+            -ex 'disassemble /r 0xd05f20,0xd06520' \
+            -ex 'echo TRACK_A_CHAT_DISASM_END=true\n' \
+            -ex 'echo TRACK_A_EFFECT_DISASM_BEGIN=true\n' \
+            -ex 'disassemble /r 0xd338d0,0xd33cd0' \
+            -ex 'echo TRACK_A_EFFECT_DISASM_END=true\n' \
+            -ex 'echo TRACK_A_CONTAINER_DISASM_BEGIN=true\n' \
+            -ex 'disassemble /r 0xd1e000,0xd1e900' \
+            -ex 'echo TRACK_A_CONTAINER_DISASM_END=true\n' \
+            -ex 'echo TRACK_A_GAMEEVENT_DISASM_BEGIN=true\n' \
+            -ex 'disassemble /r 0xd20800,0xd20b00' \
+            -ex 'echo TRACK_A_GAMEEVENT_DISASM_END=true\n'

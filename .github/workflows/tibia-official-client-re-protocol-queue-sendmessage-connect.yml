@@ -1,0 +1,83 @@
+name: Track A protocol queue sendMessage connections
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-protocol-queue-sendmessage-connect.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Correlate sendMessage PMF references with connectImpl
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+          python3 -u - "$client" > "$tmp/sites.tsv" <<'PY'
+          import struct
+          import sys
+          data = open(sys.argv[1], 'rb').read()
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          execs = []
+          for index in range(phnum):
+              offset = phoff + index * phentsz
+              typ, flags, file_offset, va, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', data, offset)
+              if typ == 1 and flags & 1 and filesz:
+                  execs.append((file_offset, file_offset + filesz, va))
+          connect_impl = 0x4dd800
+          send_message = 0xde6de0
+          for file_start, file_end, va_start in execs:
+              refs = []
+              calls = []
+              for offset in range(file_start, file_end - 7):
+                  site = va_start + offset - file_start
+                  if data[offset] == 0xe8:
+                      target = site + 5 + struct.unpack_from('<i', data, offset + 1)[0]
+                      if target == connect_impl:
+                          calls.append(site)
+                  if 0x40 <= data[offset] <= 0x4f and data[offset + 1] == 0x8d and data[offset + 2] & 0xc7 == 0x05:
+                      target = site + 7 + struct.unpack_from('<i', data, offset + 3)[0]
+                      if target == send_message:
+                          refs.append(site)
+              for ref in refs:
+                  nearby = [call for call in calls if ref < call <= ref + 512]
+                  call = min(nearby) if nearby else 0
+                  print(f'0x{ref:x}\t0x{call:x}\t{call-ref if call else -1}')
+          PY
+          echo 'TRACK_A_PROTOCOL_QUEUE_SENDMESSAGE_CONNECT_BEGIN=true'
+          echo "SENDMESSAGE_REF_COUNT=$(wc -l < "$tmp/sites.tsv")"
+          while IFS=$'\t' read -r ref call distance; do
+            echo "SENDMESSAGE_REF ref=$ref next_connect=$call distance=$distance"
+            [[ "$call" != 0x0 ]] || continue
+            start=$(printf '0x%x' $((ref-64)))
+            end=$(printf '0x%x' $((call+16)))
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end"
+          done < "$tmp/sites.tsv"
+          echo 'TRACK_A_PROTOCOL_QUEUE_SENDMESSAGE_CONNECT_COMPLETE=true'

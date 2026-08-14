@@ -31,16 +31,12 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
-          gdb="$toolroot/usr/bin/gdb"; readelf="$(command -v readelf)"
-          [[ -x "$gdb" && -x "$readelf" ]]
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
           echo 'TRACK_A_PROTOCOL_QUEUE_CONCRETE_SLOT_BEGIN=true'
           echo 'CONNECTION_SITE_BEGIN=0x84a900'
           "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
             -ex 'disassemble /r 0x84a900,0x84ab30'
           echo 'CONNECTION_SITE_END=0x84ab30'
-          echo 'TARGET_RELOCATIONS_BEGIN=true'
-          "$readelf" -rW "$client" | grep -Ei '831ea0|de82b0|de6ed0|de9a20|de9a50' || true
-          echo 'TARGET_RELOCATIONS_END=true'
           echo 'TARGET_XREFS_BEGIN=true'
           python3 -u - "$client" <<'PY'
           import struct, sys

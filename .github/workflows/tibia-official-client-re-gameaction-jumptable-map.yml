@@ -1,4 +1,4 @@
-name: Track A high-value GameAction jump-table map
+name: Track A high-value GameAction dispatch map
 on:
   push:
     branches:
@@ -17,7 +17,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Decode exact GameAction QMeta case entries
+      - name: Decode exact high-value GameAction QMeta case entries
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -30,18 +30,6 @@ jobs:
           python3 - "$client" <<'PY'
           import struct,sys
           data=open(sys.argv[1],'rb').read()
-          groups={
-            'Creatures':(0x1d72e54,[
-              'publishGameAction','unmarkCreature','sendSetNextPreset','sendRequestOutfit','sendSetOutfit','sendSetCreaturePodium','sendMount','sendDismount','sendLookAtCreature','sendLookAt','requestLookAt','requestLookAtCreature','requestLookAtCreatureOrExit','requestInspectCreature','sendAttack','sendFollow','sendJoinAggression','sendLookAtCreature','sendLookAt','requestLookAt','requestLookAtCreature','requestAttack','requestFollow','requestJoinAggression','requestSetNextPreset','requestSetOutfit','requestRequestOutfit','requestSetCreaturePodium','requestMount','requestDismount','requestLookAtCreatureOrExit','requestInspectCreature','onCreatureRemoved','onCreatureAdded','onAttackStateChanged','onFollowStateChanged','onPlayerCreatureAddedToCreatureStorage','onPlayerCreatureRemovedFromCreatureStorage','onCreatureStorageChanged','onPlayerOutfitChanged','onPlayerMountChanged']),
-            'Chat':(0x1d6ddd8,[
-              'publishGameAction','sendGetChannels','sendJoinChannel','sendOpenChannel','sendPrivateChannel','sendLeaveChannel','sendCloseNpcChannel','sendOpenNpcChannel','sendTalkMessage','requestSendTalkMessage','requestSendDialogResponse','requestSendChannelInvitation','requestSendChannelExclusion','requestJoinChatChannel','requestLeaveChatChannel','requestOpenPrivateChatChannel','requestCloseNpcChatChannel','requestSendChatMessageDefault','requestSendChatMessageAnonymous','requestSendChatMessageWithRecipient','requestSendChatMessageWithChannelID','requestSendChatMessageToNpc','requestCloseChannel','requestInitiateDialog','requestCloseDialog','onPlayerBlackListReceived','onConnectionStateChanged','onPlayerCreatureAddedToCreatureStorage']),
-            'Container':(0x1d71408,[
-              'publishGameAction','sendMoveObject','sendQuickLoot','sendQuickLootBlackWhitelist','requestMoveObject','requestMoveFromBrowseField','requestQuickLoot','requestSetQuickLootBlackWhiteList','requestStoreObject','requestRetrieveObject','requestStoreAllObjects','onQuickLootAssignmentRequest','onQuickLootAssignmentRequestForContainer','onQuickLootAssignmentRequestForTile','onQuickLootAssignmentRequestForContainerObjectType','onQuickLootAssignmentRequestForTileObjectType']),
-            'WorldMap':(0x1de36f8,[
-              'publishGameAction','sendLook','sendBrowseField','sendPopUpMenuRequest','requestSendLook','requestMoveObject','requestUseObject','requestRotateObject']),
-            'PlayerTrade':(0x1de3824,[
-              'publishGameAction','sendTradeObject','sendLookTrade','sendAcceptTrade','sendRejectTrade','requestTradeObject','requestAcceptTrade','requestRejectTrade']),
-          }
           phoff=struct.unpack_from('<Q',data,0x20)[0];phentsz=struct.unpack_from('<H',data,0x36)[0];phnum=struct.unpack_from('<H',data,0x38)[0]
           loads=[]
           for i in range(phnum):
@@ -51,27 +39,83 @@ jobs:
           def va2off(v):
               for lo,hi,va,vhi,fl in loads:
                   if va<=v<vhi:return lo+(v-va)
-          print('TRACK_A_GAMEACTION_JUMPTABLE_MAP_BEGIN=true')
-          for cls,(table,methods) in groups.items():
-              to=va2off(table);assert to is not None
+          def is_exec(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return bool(fl&1)
+              return False
+          # Method indices are independently pinned by qmeta-gameaction-census run
+          # 31790921915 / job 94737395183. Dispatch layouts are independently pinned
+          # by gameaction-dispatch-map run 31790967810 / job 94737543252.
+          table_groups={
+            'Creatures':{
+              'static':0xd16340,'table':0x1d712dc,'count':13,
+              'targets':{1:'sendAttack',2:'sendFollow'}},
+            'Chat':{
+              'static':0xcff5b0,'table':0x1d6dcbc,'count':38,
+              'targets':{9:'sendTalkMessage'}},
+            'Container':{
+              'static':0xd1dac0,'table':0x1d7145c,'count':23,
+              'targets':{1:'sendMoveObject'}},
+          }
+          direct_groups={
+            'PlayerTrade':{
+              'static':0xdecff0,'count':3,
+              'entries':{0:0xded090,1:0xded060,2:0xded0b8},
+              'targets':{1:'sendTradeObject'}},
+            'WorldMap':{
+              'static':0xdeda80,'count':3,
+              'entries':{0:0xdedac0,1:0xdedaf0,2:0xdedb00},
+              'targets':{0:'sendMoveObject'}},
+          }
+          def validate_entry(cls,static,entry):
+              assert is_exec(static),f'{cls}: static_metacall not executable: 0x{static:x}'
+              assert is_exec(entry),f'{cls}: case entry not executable: 0x{entry:x}'
+              assert abs(entry-static)<0x10000,f'{cls}: implausible case distance: static=0x{static:x} entry=0x{entry:x}'
+          def decode_tail(entry,boundaries):
+              larger=[x for x in boundaries if x>entry]
+              if not larger:return (None,None)
+              end=min(larger)
+              o=va2off(entry)
+              if o is None:return (None,None)
+              span=min(end-entry,64)
+              if span<5:return (None,None)
+              for d in range(span-4):
+                  op=data[o+d]
+                  if op==0xc3:
+                      break
+                  if op==0xe9:
+                      disp=struct.unpack_from('<i',data,o+d+1)[0]
+                      tail=entry+d+5+disp
+                      if is_exec(tail):return (tail,entry+d)
+                      raise AssertionError(f'invalid tail from 0x{entry:x}: 0x{tail:x}')
+              return (None,None)
+          print('TRACK_A_GAMEACTION_DISPATCH_MAP_BEGIN=true')
+          critical=[]
+          for cls,g in table_groups.items():
+              table=g['table'];to=va2off(table);assert to is not None,f'{cls}: table unmapped'
               entries=[]
-              for i,name in enumerate(methods):
+              for i in range(g['count']):
                   rel=struct.unpack_from('<i',data,to+i*4)[0]
-                  entries.append((table+rel)&0xffffffffffffffff)
-              boundaries=sorted(set(entries))
-              print(f'CLASS name={cls} table=0x{table:x} count={len(methods)} distinct_entries={len(boundaries)}')
-              for i,(name,entry) in enumerate(zip(methods,entries)):
-                  larger=[x for x in boundaries if x>entry]
-                  end=min(larger) if larger else None
-                  tail=None;jat=None
-                  # Conservative tail decoding: never scan the highest-address case without a proven next case boundary.
-                  if end is not None:
-                      o=va2off(entry)
-                      if o is not None:
-                          for d in range(max(0,min(end-entry,64)-4)):
-                              if data[o+d]==0xe9:
-                                  disp=struct.unpack_from('<i',data,o+d+1)[0]
-                                  tail=entry+d+5+disp;jat=entry+d;break
-                  print(f'CASE class={cls} index={i} method={name} entry=0x{entry:x} block_end={"0x%x"%end if end is not None else "unknown"} direct_jmp={"0x%x"%tail if tail is not None else "none"} jmp_at={"0x%x"%jat if jat is not None else "none"}')
-          print('TRACK_A_GAMEACTION_JUMPTABLE_MAP_COMPLETE=true')
+                  e=table+rel
+                  validate_entry(cls,g['static'],e)
+                  entries.append(e)
+              bounds=sorted(set(entries))
+              print(f'CLASS name={cls} kind=rel32 static_metacall=0x{g["static"]:x} table=0x{table:x} count={g["count"]} distinct_entries={len(bounds)}')
+              for idx,name in g['targets'].items():
+                  e=entries[idx];tail,jat=decode_tail(e,bounds)
+                  print(f'TARGET class={cls} index={idx} method={name} entry=0x{e:x} direct_jmp={"0x%x"%tail if tail is not None else "none"} jmp_at={"0x%x"%jat if jat is not None else "none"}')
+                  critical.append((cls,name,e))
+          for cls,g in direct_groups.items():
+              assert len(g['entries'])==g['count']
+              for e in g['entries'].values():validate_entry(cls,g['static'],e)
+              print(f'CLASS name={cls} kind=direct static_metacall=0x{g["static"]:x} count={g["count"]}')
+              bounds=sorted(set(g['entries'].values()))
+              for idx,name in g['targets'].items():
+                  e=g['entries'][idx];tail,jat=decode_tail(e,bounds)
+                  print(f'TARGET class={cls} index={idx} method={name} entry=0x{e:x} direct_jmp={"0x%x"%tail if tail is not None else "none"} jmp_at={"0x%x"%jat if jat is not None else "none"}')
+                  critical.append((cls,name,e))
+          assert len(critical)==6,f'expected 6 critical mappings, got {len(critical)}'
+          assert len({(c,n) for c,n,e in critical})==6
+          print('CRITICAL_MAPPING_COUNT=6')
+          print('TRACK_A_GAMEACTION_DISPATCH_MAP_COMPLETE=true')
           PY

@@ -32,6 +32,7 @@ jobs:
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
           echo 'TRACK_A_PROTOCOL_QUEUE_CONCRETE_SLOT_BEGIN=true'
           echo 'CONNECTION_SITE_BEGIN=0x84a900'
           "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
@@ -60,6 +61,24 @@ jobs:
           end=$(printf '0x%x' $((start+1024)))
           "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
             -ex "disassemble /r $start,$end"
+          python3 -u - "$client" > "$tmp/receiver-calls.tsv" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read(); target=0x196fee0
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; es=struct.unpack_from('<H',data,0x36)[0]; n=struct.unpack_from('<H',data,0x38)[0]
+          for i in range(n):
+              o=phoff+i*es; typ,flags,fo,va,_,sz,_,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ!=1 or not flags&1: continue
+              for p in range(fo,fo+sz-4):
+                  if data[p]!=0xe8: continue
+                  site=va+p-fo
+                  if site+5+struct.unpack_from('<i',data,p+1)[0]==target: print(hex(site))
+          PY
+          while read -r site; do
+            echo "RECEIVER_SETUP_CALL=$site"
+            lo=$(printf '0x%x' $((site-192))); hi=$(printf '0x%x' $((site+64)))
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $lo,$hi"
+          done < "$tmp/receiver-calls.tsv"
           echo 'TARGET_XREFS_BEGIN=true'
           python3 -u - "$client" <<'PY'
           import struct, sys

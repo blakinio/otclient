@@ -7,7 +7,7 @@ Exact executable size: `51965216`
 
 ## Purpose
 
-Correct the cross-track interpretation of `tibia::authentication::TLoginProtocolMessageHandler::sendLoginMessage` before Track B uses it as an oracle for the official 15.32 first game-login packet.
+Recover the exact Qt signal-to-consumer path for the official 15.32 game-login message before Track B uses the official client as a protocol oracle.
 
 ## Exact-client QMeta evidence — PROVEN
 
@@ -18,78 +18,141 @@ class: tibia::authentication::TLoginProtocolMessageHandler
 QMetaObject: 0x3084fa0
 static metacall: 0xcf2aa0
 
-sendLoginMessage:          0xcf2ca0   argc=1 flags=0x6
-sendSecondaryLoginMessage: 0xcf2c50   argc=1 flags=0x6
+sendLoginMessage:          InvokeMetaMethod case entry 0xcf2ca0   argc=1 flags=0x6
+sendSecondaryLoginMessage: InvokeMetaMethod case entry 0xcf2c50   argc=1 flags=0x6
 ```
 
-The addresses and flags above are version-fenced to the exact executable hash named at the top of this report.
+Qt QMeta flags `0x06` are `AccessPublic (0x02) | MethodSignal (0x04)`, so both are public Qt signals. The `0xcf2cxx` addresses above are case entries inside the generated static metacall path; they are not packet serializers.
 
-## Qt metadata interpretation — PROVEN FRAMEWORK SEMANTICS
+## Exact signal PMF identity — PROVEN
 
-Qt's QMetaObject method-flag definitions assign:
+Exact-SHA workflow run `31820653663`, job `94832832975`, on `synology-otclient-01` disassembled `qt_static_metacall` and the signal functions themselves.
+
+The `IndexOfMethod` path compares the supplied pointer-to-member against the exact signal functions and writes the corresponding QMeta method index:
 
 ```text
-AccessPublic = 0x02
-MethodSignal = 0x04
+PMF 0xcf2950 -> method/signal index 0
+PMF 0xcf2980 -> method/signal index 1
+PMF 0xcf29b0 -> method/signal index 2
+PMF 0xcf29d0 -> method/signal index 3
+PMF 0xcf2a10 -> method/signal index 4
+PMF 0xcf2a50 -> method/signal index 5
+PMF 0xcf2a80 -> method/signal index 6
 ```
 
-Therefore QMeta flags `0x06` classify both `sendLoginMessage` and `sendSecondaryLoginMessage` as **public Qt signals**.
+The functions also directly confirm their signal indices through `QMetaObject::activate`:
 
-This interpretation is additionally consistent with earlier exact-client Track A evidence in `20260814-high-value-outbound-signal-disassembly.md`, where other high-value `send*` QMeta entries resolve to small signal-emission wrappers around `QMetaObject::activate` rather than their downstream protocol builders.
+```text
+0xcf2950 -> QMetaObject::activate(..., signal_index=0, ...)
+0xcf2980 -> QMetaObject::activate(..., signal_index=1, ...)
+```
+
+Combining that result with the previously recovered QMeta method order proves:
+
+```text
+sendLoginMessage          -> signal PMF 0xcf2950
+sendSecondaryLoginMessage -> signal PMF 0xcf2980
+```
+
+## QObject::connect ABI correction — PROVEN
+
+The earlier register labels around `QObject::connectImpl` omitted the hidden structure-return argument for `QMetaObject::Connection`. With the SysV hidden `sret` accounted for, the exact call-site mapping is:
+
+```text
+rdi   hidden QMetaObject::Connection return storage
+rsi   sender
+rdx   signal PMF storage
+rcx   receiver
+r8    slot PMF storage
+r9    QSlotObjectBase*
+stack connection type / types / sender QMetaObject
+```
+
+This corrected interpretation supersedes older provisional register labels from the first consumer scan.
+
+## Primary and secondary consumer paths — PROVEN
+
+The focused connect provenance plus the PMF map now prove the following exact-version paths:
+
+```text
+sendLoginMessage
+  QMeta index:      0
+  signal PMF:       0xcf2950
+  connectImpl call: 0x7d564f
+  QSlotObject invoke trampoline: 0x7d4220
+  slot PMF target:  0xbd36a0
+
+sendSecondaryLoginMessage
+  QMeta index:      1
+  signal PMF:       0xcf2980
+  connectImpl call: 0x7d56e7
+  QSlotObject invoke trampoline: 0x7d4190
+  slot PMF target:  0xbf3990
+```
+
+At the primary connect setup, the binary materializes `0xbd36a0` into the slot-PMF storage and `0xcf2950` into the signal-PMF storage before `QObject::connectImpl`. The secondary connect similarly materializes `0xbf3990` and `0xcf2980`.
+
+The `0x7d42xx`/`0x7d41xx` functions are Qt slot-object management/invocation trampolines. The semantically relevant receiver candidate is therefore the captured slot PMF target, not the trampoline.
 
 ## Corrected claim boundary
 
 ### FACT
 
-`TLoginProtocolMessageHandler::sendLoginMessage @ 0xcf2ca0` is an exact-version public Qt signal surface.
+- `sendLoginMessage` is QMeta signal index 0.
+- its actual signal PMF is `0xcf2950`.
+- it is connected through `connectImpl @ 0x7d564f`.
+- the connection captures real slot PMF target `0xbd36a0`.
+- `0xcf2ca0` is an InvokeMetaMethod case entry for signal index 0, not a proven serializer.
 
 ### DISPROVEN
 
-The address `0xcf2ca0` by itself is **not** evidence that this function serializes or builds the official game-login packet.
+- `0xcf2ca0` is the official game-login packet builder.
+- the `0x7d4220` QSlotObject trampoline itself is the semantic packet serializer.
 
 ### UNKNOWN
 
-The following remain unknown until the signal connection is recovered and its receiver is analyzed:
+Until `0xbd36a0` and its downstream calls are structurally analyzed, these remain unknown:
 
-- the concrete receiver/consumer of `sendLoginMessage`;
-- the function that serializes the corresponding outbound login message;
+- whether `0xbd36a0` directly serializes the packet or delegates to another function;
 - ordered public/pre-secret fields and widths;
-- exact version representation on the game socket;
+- exact game-socket version representation;
 - asset identifier source/encoding/placement;
 - preview-state presence/placement;
 - RSA-block boundary;
 - checksum/sequence/framing state for the first game-login message.
 
-## Active recovery experiment
+## Active receiver-target experiment
 
-Track A commit `8ac9c72ee16427a8d79526184cb525f6a2114e8e` added:
+Track A commit `ba89cb8affc8106974ae1054cb8c3c648bbabf2b` adds:
 
-`.github/workflows/tibia-official-client-re-login-signal-oracle.yml`
+`.github/workflows/tibia-official-client-re-login-slot-target.yml`
 
-Push run `31816876078` is the bounded exact-SHA experiment for:
+Run `31821003485` is the exact-SHA bounded analysis of:
 
-1. disassembling the two login signal wrappers;
-2. checking for `QMetaObject::activate` behavior;
-3. scanning direct/RIP/data references to the signal wrappers and login QMetaObject;
-4. producing bounded neighborhoods that can identify where the login signal is wired to its consumer.
+- primary slot PMF target `0xbd36a0`;
+- secondary control target `0xbf3990`;
+- their direct call graph neighborhoods and non-secret static references.
 
-At the time this evidence was written, the `inspect` job was queued; no runtime or static result from that run is claimed yet.
+No result from that run is promoted here until it completes successfully and is inspected.
 
 ## Cross-track promotion contract
 
-Track B may consume the following immediately:
+Track B may consume this immediately:
 
 ```yaml
 exact_client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 login_message_qmeta: 0x3084fa0
-send_login_message_signal: 0xcf2ca0
-send_login_message_qmeta_flags: 0x06
-classification: public_qt_signal
+send_login_message_qmeta_index: 0
+send_login_message_signal_pmf: 0xcf2950
+send_login_message_static_metacall_case: 0xcf2ca0
+send_login_message_connect_call: 0x7d564f
+send_login_message_slot_invoker: 0x7d4220
+send_login_message_slot_target: 0xbd36a0
 serializer_or_builder_address: UNKNOWN
 ```
 
-Track B must not treat `0xcf2ca0` as the packet builder and must not infer a game-wire field layout from the signal name alone.
+Track B must not infer field layout from names or offsets alone. The next promotable protocol contract must come from structural analysis of `0xbd36a0` and its downstream callees.
 
 ## Next action
 
-Recover the exact signal-to-consumer connection for `sendLoginMessage`; then analyze the receiver function as the candidate outbound login serializer/builder. Promote only version-fenced, non-secret structural facts to Track B.
+Analyze `0xbd36a0` as the exact primary receiver candidate, follow its outbound serialization/send callees, derive only non-secret version-fenced structural fields, and then compare that contract field-by-field with Track B `ProtocolGame::sendLoginPacket()`.

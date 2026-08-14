@@ -1,0 +1,203 @@
+name: Track A network writer vtable census
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-network-writer-vtable-census.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      WRITER_A: '0x7dd3f0'
+      WRITER_B: '0xb40630'
+      WRITER_C: '0xb46bd0'
+      NETWORK_OWNER_VTABLE: '0x2f66350'
+      NETWORK_SUBOBJECT_VTABLE: '0x2f66288'
+    steps:
+      - name: Resolve writer vtable ownership and known-network overlap
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          report="$RUNNER_TEMP/track-a-network-writer-vtable-census.txt"
+          frames="$RUNNER_TEMP/track-a-network-writer-frames.txt"
+          : >"$report"
+          exec > >(tee -a "$report") 2>&1
+
+          echo TRACK_A_NETWORK_WRITER_VTABLE_CENSUS_BEGIN=true
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo "CLIENT_SIZE=$EXPECTED_CLIENT_SIZE"
+          readelf --debug-dump=frames "$client" >"$frames"
+
+          python3 -u - "$client" "$frames" <<'PY'
+          import re,struct,sys
+          client,frames_path=sys.argv[1:]
+          data=open(client,'rb').read()
+          targets={
+              'WRITER_A':0x7dd3f0,
+              'WRITER_B':0xb40630,
+              'WRITER_C':0xb46bd0,
+          }
+          known_vtables={
+              'NETWORK_OWNER_VTABLE':0x2f66350,
+              'NETWORK_SUBOBJECT_VTABLE':0x2f66288,
+          }
+
+          # ELF64 little-endian program/section mappings.
+          if data[:4] != b'\x7fELF' or data[4] != 2 or data[5] != 1:
+              raise SystemExit('expected ELF64 little-endian client')
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          shoff=struct.unpack_from('<Q',data,0x28)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          shentsz=struct.unpack_from('<H',data,0x3a)[0]
+          shnum=struct.unpack_from('<H',data,0x3c)[0]
+          shstrndx=struct.unpack_from('<H',data,0x3e)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,fsz,msz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fsz:
+                  loads.append((fo,fo+fsz,va,va+msz,flags))
+          def va_to_off(va):
+              for fs,fe,base,vend,flags in loads:
+                  if base <= va < base+(fe-fs):
+                      return fs+(va-base)
+          def off_to_va(off):
+              for fs,fe,base,vend,flags in loads:
+                  if fs <= off < fe:
+                      return base+(off-fs)
+          def qword(va):
+              off=va_to_off(va)
+              if off is None or off+8>len(data): return None
+              return struct.unpack_from('<Q',data,off)[0]
+
+          # Section names for classifying qword references.
+          raw_sections=[]
+          if shoff and shnum and shstrndx < shnum:
+              shstr_o=shoff+shstrndx*shentsz
+              _,_,_,_,str_off,str_sz,_,_,_,_=struct.unpack_from('<IIQQQQIIQQ',data,shstr_o)
+              strs=data[str_off:str_off+str_sz]
+              def sname(idx):
+                  end=strs.find(b'\0',idx)
+                  if end<0:end=len(strs)
+                  return strs[idx:end].decode('utf-8','replace')
+              for i in range(shnum):
+                  o=shoff+i*shentsz
+                  ni,typ,flags,addr,off,size,link,info,align,entsize=struct.unpack_from('<IIQQQQIIQQ',data,o)
+                  raw_sections.append((addr,addr+size,off,off+size,sname(ni),flags))
+          def section_for_va(va):
+              for lo,hi,fo,fe,name,flags in raw_sections:
+                  if lo <= va < hi:
+                      return name
+              return 'UNKNOWN'
+
+          print('KNOWN_VTABLE_DUMPS_BEGIN=true')
+          for name,base in known_vtables.items():
+              print(f'{name}=0x{base:x}')
+              for rel in range(-0x10,0x121,8):
+                  va=base+rel
+                  val=qword(va)
+                  if val is None:
+                      print(f'VTABLE_QWORD name={name} rel={rel:+#x} va=0x{va:x} value=UNMAPPED')
+                  else:
+                      marks=[k for k,v in targets.items() if v==val]
+                      mark=(' target='+','.join(marks)) if marks else ''
+                      print(f'VTABLE_QWORD name={name} rel={rel:+#x} va=0x{va:x} value=0x{val:x}{mark}')
+              val=qword(base+0xd0)
+              print(f'KNOWN_VTABLE_PLUS_D0 name={name} value={"UNMAPPED" if val is None else hex(val)} equals_writer_b={int(val==targets["WRITER_B"] if val is not None else False)}')
+          print('KNOWN_VTABLE_DUMPS_END=true')
+
+          # Exact raw qword occurrences of candidate function addresses.
+          for tname,target in targets.items():
+              needle=struct.pack('<Q',target)
+              hits=[]; start=0
+              while True:
+                  off=data.find(needle,start)
+                  if off<0:break
+                  va=off_to_va(off)
+                  if va is not None:hits.append((off,va))
+                  start=off+1
+              print(f'{tname}_QWORD_REF_COUNT={len(hits)}')
+              for off,va in hits[:256]:
+                  print(f'{tname}_QWORD_REF off=0x{off:x} va=0x{va:x} section={section_for_va(va)}')
+                  # Itanium vtable candidates usually have offset-to-top/typeinfo before an address point.
+                  for rel in range(-0x20,0x41,8):
+                      x=qword(va+rel)
+                      if x is not None:
+                          print(f'{tname}_QWORD_CONTEXT ref=0x{va:x} rel={rel:+#x} value=0x{x:x}')
+
+          # Direct E8 callers for candidates.
+          execs=[x for x in loads if x[4]&1]
+          def direct_calls(target):
+              out=[]
+              for fs,fe,base,vend,flags in execs:
+                  blob=data[fs:fe]; p=0
+                  while True:
+                      p=blob.find(b'\xe8',p)
+                      if p<0:break
+                      if p+5 <= len(blob):
+                          site=base+p
+                          got=(site+5+struct.unpack_from('<i',blob,p+1)[0]) & 0xffffffffffffffff
+                          if got==target:out.append(site)
+                      p+=1
+              return out
+          frames=open(frames_path,errors='replace').read().splitlines()
+          fdes=[]
+          for line in frames:
+              m=re.search(r'pc=([0-9a-fA-F]+)\.\.([0-9a-fA-F]+)',line)
+              if m:fdes.append((int(m.group(1),16),int(m.group(2),16)))
+          def containing(addr):return [(a,b) for a,b in fdes if a<=addr<b]
+          for tname,target in targets.items():
+              calls=direct_calls(target)
+              print(f'{tname}_DIRECT_CALL_COUNT={len(calls)}')
+              print(f'{tname}_DIRECT_CALL_SITES='+(','.join(hex(x) for x in calls) if calls else 'none'))
+              for site in calls:
+                  cf=containing(site)
+                  print(f'{tname}_CALLER_FDE site=0x{site:x} ranges={",".join(f"0x{a:x}-0x{b:x}" for a,b in cf) if cf else "none"}')
+          PY
+
+          echo SYMBOL_PROBES_BEGIN=true
+          "$gdb" -q -nx -batch "$client" -ex 'set pagination off' \
+            -ex 'info symbol 0x7dd3f0' \
+            -ex 'info symbol 0xb40630' \
+            -ex 'info symbol 0xb46bd0' \
+            -ex 'info symbol 0x2f66350' \
+            -ex 'info symbol 0x2f66288' || true
+          echo SYMBOL_PROBES_END=true
+
+          echo WRITER_B_DISASSEMBLY_BEGIN=true
+          "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble /r 0xb40630,0xb4068c' || true
+          echo WRITER_B_DISASSEMBLY_END=true
+          echo TRACK_A_NETWORK_WRITER_VTABLE_CENSUS_COMPLETE=true
+          grep -q '^TRACK_A_NETWORK_WRITER_VTABLE_CENSUS_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version structural report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-network-writer-vtable-census-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-network-writer-vtable-census.txt
+          if-no-files-found: error
+          retention-days: 7

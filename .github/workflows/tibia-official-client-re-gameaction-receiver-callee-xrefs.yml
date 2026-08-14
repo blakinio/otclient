@@ -1,0 +1,101 @@
+name: Track A GameAction receiver callee xrefs
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-gameaction-receiver-callee-xrefs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Enumerate direct callees and printable RIP references
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 -u - "$client" <<'PY'
+          import struct
+          import sys
+
+          data = open(sys.argv[1], 'rb').read()
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          loads = []
+          for index in range(phnum):
+              offset = phoff + index * phentsz
+              typ, flags, file_offset, va, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', data, offset)
+              if typ == 1 and filesz:
+                  loads.append((file_offset, file_offset + filesz, va, va + filesz, flags))
+          def va2off(value):
+              for lo, hi, va, vhi, _ in loads:
+                  if va <= value < vhi:
+                      return lo + value - va
+          def executable(value):
+              return any(va <= value < vhi and flags & 1 for _, _, va, vhi, flags in loads)
+          def printable(value):
+              offset = va2off(value)
+              if offset is None:
+                  return None
+              raw = bytearray()
+              for byte in data[offset:offset + 256]:
+                  if byte == 0:
+                      break
+                  if byte < 0x20 or byte > 0x7e:
+                      return None
+                  raw.append(byte)
+              return raw.decode('ascii') if len(raw) >= 4 else None
+          def scan(start, size):
+              offset = va2off(start)
+              assert offset is not None
+              blob = data[offset:offset + size]
+              calls = set()
+              refs = set()
+              for index in range(len(blob) - 7):
+                  site = start + index
+                  if blob[index] == 0xe8:
+                      target = site + 5 + struct.unpack_from('<i', blob, index + 1)[0]
+                      if executable(target):
+                          calls.add((site, target))
+                  if 0x40 <= blob[index] <= 0x4f and blob[index + 1] in (0x8d, 0x8b) and blob[index + 2] & 0xc7 == 0x05:
+                      target = site + 7 + struct.unpack_from('<i', blob, index + 3)[0]
+                      text = printable(target)
+                      if text:
+                          refs.add((site, target, text))
+              return sorted(calls), sorted(refs)
+
+          roots = {
+              0xbf3cd0: 'Creatures-early',
+              0xbd3be0: 'WorldMap',
+              0xbcfff0: 'PlayerTrade-early',
+          }
+          print('TRACK_A_GAMEACTION_RECEIVER_CALLEE_XREFS_BEGIN=true')
+          for root, label in roots.items():
+              calls, refs = scan(root, 0x300)
+              print(f'RECEIVER root=0x{root:x} label={label} direct_calls={len(calls)} printable_refs={len(refs)}')
+              for site, target, text in refs:
+                  print(f' ROOT_STRING site=0x{site:x} target=0x{target:x} text={text!r}')
+              for site, target in calls:
+                  _, callee_refs = scan(target, 0x300)
+                  print(f' CALLEE site=0x{site:x} target=0x{target:x} printable_refs={len(callee_refs)}')
+                  for ref_site, ref_target, text in callee_refs[:20]:
+                      print(f'  CALLEE_STRING site=0x{ref_site:x} target=0x{ref_target:x} text={text!r}')
+          print('TRACK_A_GAMEACTION_RECEIVER_CALLEE_XREFS_COMPLETE=true')
+          PY

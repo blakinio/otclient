@@ -1,0 +1,135 @@
+name: Track A map provenance proto census
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-map-provenance-proto-census.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 6
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Dump complete embedded map proto schema and provenance-like symbols
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          actual="$(sha256sum "$client" | awk '{print $1}')"
+          [[ "$actual" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo "TRACK_A_CLIENT_SHA256=$actual"
+          python3 - "$client" <<'PY'
+          import re,sys
+          data=open(sys.argv[1],'rb').read()
+          def varint(p,end):
+              v=0;s=0
+              while p<end and s<70:
+                  c=data[p];p+=1;v|=(c&0x7f)<<s
+                  if not c&0x80:return v,p
+                  s+=7
+              raise ValueError
+          def fields(start,end,limit=200000):
+              p=start;out=[]
+              for _ in range(limit):
+                  if p>=end:break
+                  try:k,p2=varint(p,end)
+                  except:break
+                  no=k>>3;wt=k&7
+                  if no==0 or wt not in (0,1,2,5):break
+                  p=p2
+                  if wt==0:
+                      try:v,p=varint(p,end)
+                      except:break
+                      out.append((no,wt,v,None))
+                  elif wt==1:
+                      if p+8>end:break
+                      out.append((no,wt,None,(p,p+8)));p+=8
+                  elif wt==5:
+                      if p+4>end:break
+                      out.append((no,wt,None,(p,p+4)));p+=4
+                  else:
+                      try:n,p2=varint(p,end)
+                      except:break
+                      if n>20_000_000 or p2+n>end:break
+                      out.append((no,wt,n,(p2,p2+n)));p=p2+n
+              return out,p
+          def txt(sp):
+              if not sp:return ''
+              try:return data[sp[0]:sp[1]].decode('utf-8')
+              except:return ''
+          def parse_field(sp):
+              fs,endp=fields(*sp);d={}
+              if endp!=sp[1]:return None
+              for no,wt,v,s in fs:
+                  if no in (1,2,6) and wt==2:d[no]=txt(s)
+                  elif no in (3,4,5,9) and wt==0:d[no]=v
+              if not d.get(1) or 3 not in d:return None
+              return dict(name=d.get(1),extendee=d.get(2),number=d.get(3),label=d.get(4),type=d.get(5),type_name=d.get(6),oneof_index=d.get(9))
+          def parse_msg(sp):
+              fs,endp=fields(*sp);name='';fds=[];nested=[];oneofs=[]
+              if endp!=sp[1]:return None
+              for no,wt,v,s in fs:
+                  if no==1 and wt==2:name=txt(s)
+                  elif no==2 and wt==2:
+                      f=parse_field(s)
+                      if f:fds.append(f)
+                  elif no==3 and wt==2:
+                      n=parse_msg(s)
+                      if n:nested.append(n)
+                  elif no==8 and wt==2:
+                      os,oe=fields(*s);on=''
+                      if oe==s[1]:
+                          for a,b,c,d in os:
+                              if a==1 and b==2:on=txt(d)
+                      oneofs.append(on)
+              if not name or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*',name):return None
+              return dict(name=name,fields=fds,nested=nested,oneofs=oneofs)
+          candidates=[]
+          needle=b'map.proto'
+          for m in re.finditer(needle,data):
+              pos=m.start()
+              for st in range(max(0,pos-8),pos):
+                  if data[st]!=0x0a:continue
+                  try:ln,p2=varint(st+1,pos+1)
+                  except:continue
+                  if p2==pos and ln==len(needle):candidates.append(st)
+          found=False
+          for st in sorted(set(candidates)):
+              fs,endp=fields(st,min(len(data),st+300000))
+              fname='';pkg='';msgs=[]
+              for no,wt,v,s in fs:
+                  if no==1 and wt==2 and not fname:fname=txt(s)
+                  elif no==2 and wt==2 and not pkg:pkg=txt(s)
+                  elif no==4 and wt==2:
+                      mm=parse_msg(s)
+                      if mm:msgs.append(mm)
+              if fname!='map.proto':continue
+              found=True
+              print(f'MAP_PROTO_DESCRIPTOR start=0x{st:x} end=0x{endp:x} package={pkg} top_messages={len(msgs)}')
+              def show(m,prefix=''):
+                  q=prefix+m['name']
+                  print(f'MESSAGE {q} oneofs={m["oneofs"]!r} fields={len(m["fields"])}')
+                  for f in m['fields']:
+                      print(' FIELD name={name} number={number} label={label} type={type} type_name={type_name} oneof_index={oneof_index}'.format(**f))
+                  for n in m['nested']:show(n,q+'.')
+              for mm in msgs:show(mm)
+          print(f'MAP_PROTO_DESCRIPTOR_FOUND={str(found).lower()}')
+          # This is only a string-surface census, never semantic proof by itself.
+          terms=[b'provenance',b'origin',b'permanent',b'static',b'dynamic',b'temporary',b'corpse',b'field']
+          low=data.lower()
+          for t in terms:
+              hits=[m.start() for m in re.finditer(re.escape(t),low)]
+              print(f'STRING_TERM term={t.decode()} count={len(hits)} sample_offsets={",".join(hex(x) for x in hits[:16])}')
+          print('TRACK_A_MAP_PROVENANCE_PROTO_CENSUS_COMPLETE=true')
+          PY

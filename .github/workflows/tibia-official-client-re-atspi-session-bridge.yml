@@ -50,7 +50,9 @@ jobs:
           export PATH="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           build="$state/build/tibia-runtime-bridge"
-          cmake -S bridge-src/tools/tibia_runtime_bridge -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$root/usr"
+          [[ "$build" == "$state/build/tibia-runtime-bridge" ]]; rm -rf "$build"
+          cmake -S bridge-src/tools/tibia_runtime_bridge -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSROOT="$root" -DCMAKE_PREFIX_PATH="$root/usr"
           cmake --build "$build" --parallel 2
           [[ -s "$build/otclient-tibia-runtime-bridge.so" ]]
           echo TRACK_A_RUNTIME_BRIDGE_BUILD_READY=true

@@ -63,27 +63,27 @@ jobs:
                   relocation_offset, info, addend = struct.unpack_from('<QQq', data, position)
                   relas[relocation_offset] = (info & 0xffffffff, addend)
 
-          base = 0x3074b20
-          fields = {}
-          for displacement, name in ((8, 'stringdata'), (0x10, 'metadata'), (0x18, 'static_metacall'), (0x28, 'associated')):
-              relocation = relas.get(base + displacement)
-              assert relocation and relocation[0] == 8, (name, relocation)
-              fields[name] = relocation[1]
-          string_offset = va2off(fields['stringdata'])
-          first = struct.unpack_from('<I', data, string_offset)[0]
-          assert first % 8 == 0 and 8 <= first <= 0x20000
-          strings = []
-          for index in range(first // 8):
-              relative, length = struct.unpack_from('<II', data, string_offset + index * 8)
-              strings.append(data[string_offset + relative:string_offset + relative + length].decode('utf-8'))
-          metadata_offset = va2off(fields['metadata'])
-          words = [struct.unpack_from('<I', data, metadata_offset + index * 4)[0] for index in range(20)]
-          method_count, method_offset = words[4], words[5]
           print('TRACK_A_SHARED_RECEIVER_QMETA_BEGIN=true')
-          print(f'RECORD base=0x{base:x} class={strings[0]!r} stringdata=0x{fields["stringdata"]:x} metadata=0x{fields["metadata"]:x} static_metacall=0x{fields["static_metacall"]:x} associated=0x{fields["associated"]:x} revision={words[0]} method_count={method_count}')
-          for index in range(method_count):
-              entry = metadata_offset + (method_offset + index * 6) * 4
-              name_index = struct.unpack_from('<I', data, entry)[0]
-              print(f'METHOD index={index} name={strings[name_index]!r}')
+          for base in (0x3074b20, 0x3085b60):
+              fields = {}
+              for displacement, name in ((8, 'stringdata'), (0x10, 'metadata'), (0x18, 'static_metacall'), (0x28, 'associated')):
+                  relocation = relas.get(base + displacement)
+                  assert relocation and relocation[0] == 8, (hex(base), name, relocation)
+                  fields[name] = relocation[1]
+              string_offset = va2off(fields['stringdata'])
+              first = struct.unpack_from('<I', data, string_offset)[0]
+              assert first % 8 == 0 and 8 <= first <= 0x20000
+              strings = []
+              for index in range(first // 8):
+                  relative, length = struct.unpack_from('<II', data, string_offset + index * 8)
+                  strings.append(data[string_offset + relative:string_offset + relative + length].decode('utf-8'))
+              metadata_offset = va2off(fields['metadata'])
+              words = [struct.unpack_from('<I', data, metadata_offset + index * 4)[0] for index in range(20)]
+              method_count, method_offset = words[4], words[5]
+              print(f'RECORD base=0x{base:x} class={strings[0]!r} stringdata=0x{fields["stringdata"]:x} metadata=0x{fields["metadata"]:x} static_metacall=0x{fields["static_metacall"]:x} associated=0x{fields["associated"]:x} revision={words[0]} method_count={method_count}')
+              for index in range(method_count):
+                  entry = metadata_offset + (method_offset + index * 6) * 4
+                  name_index = struct.unpack_from('<I', data, entry)[0]
+                  print(f'METHOD base=0x{base:x} index={index} name={strings[name_index]!r}')
           print('TRACK_A_SHARED_RECEIVER_QMETA_COMPLETE=true')
           PY

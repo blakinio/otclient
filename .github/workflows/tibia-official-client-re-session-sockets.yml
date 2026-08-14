@@ -1,4 +1,4 @@
-name: Track A dynamic map parser case inspection
+name: Track A parser-family xref enumeration
 on:
   push:
     branches:
@@ -11,13 +11,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 3
+    timeout-minutes: 5
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Inspect parser cases around map opcodes 0x69 through 0x6d
+      - name: Enumerate calls into proven map parser family
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -26,30 +26,25 @@ jobs:
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
           toolroot="$state/toolroot"
-          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
-          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          objdump="$toolroot/usr/bin/objdump"
+          [[ -x "$objdump" ]] || objdump=/usr/bin/objdump
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          gdb="$toolroot/usr/bin/gdb"
-          [[ -x "$gdb" ]]
 
-          # The proven strip/movement parser family is around +0xcdbad0..+0xcdbc20.
-          # Capture the complete neighboring dispatcher/case region without attaching
-          # to the live process. The compatible protocol model assigns 0x69..0x6d to
-          # UpdateTile/CreateOnMap/ChangeOnMap/DeleteOnMap/MoveCreature.
-          "$gdb" -q -nx -batch "$client" \
-            -ex 'set pagination off' \
-            -ex 'set disassembly-flavor intel' \
-            -ex 'disassemble 0xcdb700,0xcdc800' \
-            > /tmp/track-a-map-cases.txt 2>&1
+          out=/tmp/track-a-full-disasm.txt
+          "$objdump" -d -M intel "$client" > "$out"
+          echo TRACK_A_FULL_DISASM_LINES="$(wc -l < "$out")"
 
-          echo TRACK_A_MAP_CASE_DISASM_LINES="$(wc -l < /tmp/track-a-map-cases.txt)"
-          echo TRACK_A_KNOWN_MOVEMENT_CASES_BEGIN=true
-          grep -n -B8 -A24 -E '^Dump of assembler|0xcdbad0|0xcdbb40|0xcdbbb0|0xcdbc20|call.*0x19a8a80' /tmp/track-a-map-cases.txt || true
-          echo TRACK_A_KNOWN_MOVEMENT_CASES_END=true
+          echo TRACK_A_ROW_HANDLER_XREFS_BEGIN=true
+          grep -n -B24 -A48 -E 'call[[:space:]]+cdbad0|call[[:space:]]+cdbb40|call[[:space:]]+cdbbb0|call[[:space:]]+cdbc20|call[[:space:]]+cdbc90|call[[:space:]]+cdbe30' "$out" || true
+          echo TRACK_A_ROW_HANDLER_XREFS_END=true
 
-          echo TRACK_A_DYNAMIC_NEIGHBOR_CONTEXT_BEGIN=true
-          sed -n '/0x0000000000cdb900/,/0x0000000000cdc700/p' /tmp/track-a-map-cases.txt || cat /tmp/track-a-map-cases.txt
-          echo TRACK_A_DYNAMIC_NEIGHBOR_CONTEXT_END=true
+          echo TRACK_A_COMMON_POSITION_PARSER_XREFS_BEGIN=true
+          grep -n -B18 -A36 -E 'call[[:space:]]+cdb770' "$out" || true
+          echo TRACK_A_COMMON_POSITION_PARSER_XREFS_END=true
 
-          echo TRACK_A_MAP_CASE_INSPECTION_COMPLETE=true
+          echo TRACK_A_TILE_DESCRIPTION_XREFS_BEGIN=true
+          grep -n -B18 -A36 -E 'call[[:space:]]+19a8a80' "$out" || true
+          echo TRACK_A_TILE_DESCRIPTION_XREFS_END=true
+
+          echo TRACK_A_PARSER_FAMILY_XREF_ENUMERATION_COMPLETE=true

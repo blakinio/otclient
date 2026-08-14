@@ -1,0 +1,140 @@
+name: Track A ProtocolMessageQueue slot provenance
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-protocol-queue-slot-provenance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Recover ProtocolMessageQueue slot provenance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+
+          cat > "$tmp/candidates.tsv" <<'EOF'
+          0x7d7b42
+          0x7e09b1
+          0x7e24e2
+          0x84aafb
+          0xc41b52
+          0xc41c0e
+          0x1971576
+          0x19716a3
+          EOF
+
+          echo 'TRACK_A_PROTOCOL_QUEUE_SLOT_PROVENANCE_BEGIN=true'
+          count="$(wc -l < "$tmp/candidates.tsv")"; echo "CANDIDATE_COUNT=$count"; [[ "$count" -eq 8 ]]
+          while read -r call; do
+            start=$(printf '0x%x' $((call-4096)))
+            end=$(printf '0x%x' $((call+8)))
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end" > "$tmp/gdb.out"
+            python3 -u - "$tmp/gdb.out" "$call" <<'PY'
+          import re, sys
+          path, call = sys.argv[1:]
+          rows = []
+          for line in open(path, encoding='utf-8', errors='replace'):
+              match = re.match(r'\s*(0x[0-9a-f]+):\s+(?:[0-9a-f]{2}\s+)+\s*(.*)$', line)
+              if match:
+                  rows.append((int(match.group(1), 16), match.group(2).strip()))
+          call_va = int(call, 16)
+          rows = [(va, text) for va, text in rows if va <= call_va]
+
+          def last_write(register):
+              pattern = re.compile(r'^(?:mov|lea)\s+' + re.escape(register) + r',(.+)$')
+              for va, text in reversed(rows[:-1]):
+                  match = pattern.match(text)
+                  if match:
+                      return f'0x{va:x}:{text}'
+              return 'UNRESOLVED'
+
+          def resolve_register(register, before_index, seen=None):
+              seen = set() if seen is None else seen
+              if register in seen: return f'UNRESOLVED(cycle:{register})'
+              seen.add(register)
+              for idx in range(before_index - 1, -1, -1):
+                  source_va, source_text = rows[idx]
+                  loaded = re.match(r'^(?:lea|mov)\s+' + re.escape(register) + r',(.+)$', source_text)
+                  if not loaded: continue
+                  rhs = loaded.group(1).strip()
+                  target = re.search(r'# (0x[0-9a-f]+)$', rhs)
+                  if source_text.startswith('lea ') and target: return f'{target.group(1)}@0x{source_va:x}'
+                  alias = re.fullmatch(r'(r(?:ax|bx|cx|dx|si|di|bp|sp|8|9|1[0-5]))', rhs)
+                  if source_text.startswith('mov ') and alias: return resolve_register(alias.group(1), idx, seen)
+                  return f'UNRESOLVED(0x{source_va:x}:{source_text})'
+              return f'UNRESOLVED(no-write:{register})'
+
+          def split_memory(expression):
+              match = re.fullmatch(r'(rsp|rbp)(?:([+-])0x([0-9a-f]+))?', expression)
+              if not match: return None
+              displacement = int(match.group(3), 16) if match.group(3) else 0
+              if match.group(2) == '-': displacement = -displacement
+              return match.group(1), displacement
+
+          def resolve_memory(base, displacement, before_index):
+              for write_index in range(before_index - 1, -1, -1):
+                  source_va, source_text = rows[write_index]
+                  written = re.match(r'^mov\s+QWORD PTR \[([^]]+)\],(.+)$', source_text)
+                  if not written or split_memory(written.group(1)) != (base, displacement): continue
+                  rhs = written.group(2).strip()
+                  if re.fullmatch(r'0x[0-9a-f]+', rhs): return f'{rhs}@0x{source_va:x}'
+                  if re.fullmatch(r'r(?:ax|bx|cx|dx|si|di|bp|sp|8|9|1[0-5])', rhs):
+                      return resolve_register(rhs, write_index)
+                  return f'UNRESOLVED(0x{source_va:x}:{source_text})'
+              return f'UNRESOLVED(no-write:{base}{displacement:+#x})'
+
+          invoker = 'UNRESOLVED(no-store)'
+          payload = ['UNRESOLVED(no-xmm-copy)', 'UNRESOLVED(no-xmm-copy)']
+          for index in range(len(rows) - 2, -1, -1):
+              _, text = rows[index]
+              stored = re.match(r'^mov\s+QWORD PTR \[(?:rax|r9)\+0x8\],([a-z0-9]+)$', text)
+              if stored:
+                  invoker = resolve_register(stored.group(1), index)
+                  break
+          for store_index in range(len(rows) - 2, -1, -1):
+              _, store_text = rows[store_index]
+              stored = re.match(r'^movups\s+XMMWORD PTR \[(?:rax|r9)\+0x10\],(xmm[0-9]+)$', store_text)
+              if not stored: continue
+              for load_index in range(store_index - 1, -1, -1):
+                  _, load_text = rows[load_index]
+                  loaded = re.match(r'^movdqa\s+' + re.escape(stored.group(1)) + r',XMMWORD PTR \[([^]]+)\]$', load_text)
+                  if not loaded: continue
+                  memory = split_memory(loaded.group(1))
+                  if memory:
+                      payload = [resolve_memory(memory[0], memory[1], load_index), resolve_memory(memory[0], memory[1] + 8, load_index)]
+                  break
+              break
+          print(f'PROVEN_SITE call={call} sender_metaobject=0x3085b60 invoker={invoker} '
+                f'sender_source="{last_write("rsi")}" signal_storage="{last_write("rdx")}" '
+                f'receiver_source="{last_write("rcx")}" slot_storage="{last_write("r8")}" '
+                f'slot_object="{last_write("r9")}" slot_payload_word0="{payload[0]}" slot_payload_word1="{payload[1]}"')
+          PY
+          done < "$tmp/candidates.tsv"
+          echo 'TRACK_A_PROTOCOL_QUEUE_SLOT_PROVENANCE_COMPLETE=true'

@@ -43,52 +43,23 @@ jobs:
               for lo,hi,va,vhi,fl in loads:
                   if va<=v<vhi:return bool(fl&1)
               return False
-          # Method indices are independently pinned by qmeta-gameaction-census run
-          # 31790921915 / job 94737395183. Dispatch layouts are independently pinned
-          # by gameaction-dispatch-map run 31790967810 / job 94737543252.
+          # Method indices: qmeta-gameaction-census run 31790921915 / job 94737395183.
+          # Dispatch layouts: gameaction-dispatch-map run 31790967810 / job 94737543252.
+          # This workflow intentionally maps case entries only. Tail/call analysis must use
+          # a real instruction decoder/disassembler, never raw opcode-byte scanning.
           table_groups={
-            'Creatures':{
-              'static':0xd16340,'table':0x1d712dc,'count':13,
-              'targets':{1:'sendAttack',2:'sendFollow'}},
-            'Chat':{
-              'static':0xcff5b0,'table':0x1d6dcbc,'count':38,
-              'targets':{9:'sendTalkMessage'}},
-            'Container':{
-              'static':0xd1dac0,'table':0x1d7145c,'count':23,
-              'targets':{1:'sendMoveObject'}},
+            'Creatures':{'static':0xd16340,'table':0x1d712dc,'count':13,'targets':{1:'sendAttack',2:'sendFollow'}},
+            'Chat':{'static':0xcff5b0,'table':0x1d6dcbc,'count':38,'targets':{9:'sendTalkMessage'}},
+            'Container':{'static':0xd1dac0,'table':0x1d7145c,'count':23,'targets':{1:'sendMoveObject'}},
           }
           direct_groups={
-            'PlayerTrade':{
-              'static':0xdecff0,'count':3,
-              'entries':{0:0xded090,1:0xded060,2:0xded0b8},
-              'targets':{1:'sendTradeObject'}},
-            'WorldMap':{
-              'static':0xdeda80,'count':3,
-              'entries':{0:0xdedac0,1:0xdedaf0,2:0xdedb00},
-              'targets':{0:'sendMoveObject'}},
+            'PlayerTrade':{'static':0xdecff0,'count':3,'entries':{0:0xded090,1:0xded060,2:0xded0b8},'targets':{1:'sendTradeObject'}},
+            'WorldMap':{'static':0xdeda80,'count':3,'entries':{0:0xdedac0,1:0xdedaf0,2:0xdedb00},'targets':{0:'sendMoveObject'}},
           }
           def validate_entry(cls,static,entry):
               assert is_exec(static),f'{cls}: static_metacall not executable: 0x{static:x}'
               assert is_exec(entry),f'{cls}: case entry not executable: 0x{entry:x}'
               assert abs(entry-static)<0x10000,f'{cls}: implausible case distance: static=0x{static:x} entry=0x{entry:x}'
-          def decode_tail(entry,boundaries):
-              larger=[x for x in boundaries if x>entry]
-              if not larger:return (None,None)
-              end=min(larger)
-              o=va2off(entry)
-              if o is None:return (None,None)
-              span=min(end-entry,64)
-              if span<5:return (None,None)
-              for d in range(span-4):
-                  op=data[o+d]
-                  if op==0xc3:
-                      break
-                  if op==0xe9:
-                      disp=struct.unpack_from('<i',data,o+d+1)[0]
-                      tail=entry+d+5+disp
-                      if is_exec(tail):return (tail,entry+d)
-                      raise AssertionError(f'invalid tail from 0x{entry:x}: 0x{tail:x}')
-              return (None,None)
           print('TRACK_A_GAMEACTION_DISPATCH_MAP_BEGIN=true')
           critical=[]
           for cls,g in table_groups.items():
@@ -99,20 +70,18 @@ jobs:
                   e=table+rel
                   validate_entry(cls,g['static'],e)
                   entries.append(e)
-              bounds=sorted(set(entries))
-              print(f'CLASS name={cls} kind=rel32 static_metacall=0x{g["static"]:x} table=0x{table:x} count={g["count"]} distinct_entries={len(bounds)}')
+              print(f'CLASS name={cls} kind=rel32 static_metacall=0x{g["static"]:x} table=0x{table:x} count={g["count"]} distinct_entries={len(set(entries))}')
               for idx,name in g['targets'].items():
-                  e=entries[idx];tail,jat=decode_tail(e,bounds)
-                  print(f'TARGET class={cls} index={idx} method={name} entry=0x{e:x} direct_jmp={"0x%x"%tail if tail is not None else "none"} jmp_at={"0x%x"%jat if jat is not None else "none"}')
+                  e=entries[idx]
+                  print(f'TARGET class={cls} index={idx} method={name} entry=0x{e:x}')
                   critical.append((cls,name,e))
           for cls,g in direct_groups.items():
               assert len(g['entries'])==g['count']
               for e in g['entries'].values():validate_entry(cls,g['static'],e)
               print(f'CLASS name={cls} kind=direct static_metacall=0x{g["static"]:x} count={g["count"]}')
-              bounds=sorted(set(g['entries'].values()))
               for idx,name in g['targets'].items():
-                  e=g['entries'][idx];tail,jat=decode_tail(e,bounds)
-                  print(f'TARGET class={cls} index={idx} method={name} entry=0x{e:x} direct_jmp={"0x%x"%tail if tail is not None else "none"} jmp_at={"0x%x"%jat if jat is not None else "none"}')
+                  e=g['entries'][idx]
+                  print(f'TARGET class={cls} index={idx} method={name} entry=0x{e:x}')
                   critical.append((cls,name,e))
           assert len(critical)==6,f'expected 6 critical mappings, got {len(critical)}'
           assert len({(c,n) for c,n,e in critical})==6

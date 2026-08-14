@@ -22,14 +22,17 @@ jobs:
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient && "$RUNNER_NAME" == synology-otclient-01 ]]
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
           [[ -x "$client" ]]
           actual="$(sha256sum "$client"|awk '{print $1}')"; [[ "$actual" == "$EXPECTED_CLIENT_SHA256" ]]
-          objdump_bin="$(command -v objdump)"
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
           echo TRACK_A_CLIENT_SHA256="$actual"
-          for spec in 'CreateOnMap cecb80 ced150' 'ChangeOnMap cece50 ced4b0' 'DeleteOnMap cd4d30 cd54a0' 'FullMap cec790 cecaa0' 'MapDescription 19a89c0 19a9000'; do
+          for spec in 'CreateOnMap 0xcecb80 0xced150' 'ChangeOnMap 0xcece50 0xced4b0' 'DeleteOnMap 0xcd4d30 0xcd54a0' 'FullMap 0xcec790 0xcecaa0' 'MapDescription 0x19a89c0 0x19a9000'; do
             set -- $spec; name="$1"; start="$2"; stop="$3"
-            echo "DISASM_BEGIN handler=$name start=0x$start stop=0x$stop"
-            "$objdump_bin" -d -M intel --start-address="0x$start" --stop-address="0x$stop" "$client"
+            echo "DISASM_BEGIN handler=$name start=$start stop=$stop"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $start,$stop"
             echo "DISASM_END handler=$name"
           done
           echo TRACK_A_MAP_PROVENANCE_HANDLER_DISASSEMBLY_COMPLETE=true

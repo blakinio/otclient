@@ -109,6 +109,17 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - machine-readable experiment records for the strongest current live movement and outbound queue-to-network facts;
    - use these rather than prose-only interpretation when promoting read/action gates.
 
+21. `experiments/EXP-20260814-continuation-state.yaml`
+   - machine-readable current-state checkpoint for handoff/recovery;
+   - records exact client/runtime fencing, protocol/QMeta counts, recovered action builders, queue/network convergence, structural live-world movement, bridge Qt mismatch, controlled item-drag result, current unknowns, rejected interpretations, ordered next actions and safety boundaries.
+
+22. `20260814-task-acceptance-reconciliation.md`
+   - reconciles the older active-task acceptance checklist against newer evidence without weakening acceptance;
+   - marks structural live `IN_GAME` and reversible movement evidence as now proven for the tested session, while preserving direct player-position member as unknown;
+   - records builder recovery as proven but serializer/framing as incomplete;
+   - keeps bridge correlation and server-confirmed MoveObject below completion;
+   - provides the exact remaining terminal gates before audit/CI/merge/archive.
+
 Current continuation rule:
 
 ```text

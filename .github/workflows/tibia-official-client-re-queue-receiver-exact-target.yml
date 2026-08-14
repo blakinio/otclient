@@ -1,0 +1,137 @@
+name: Track A queue receiver exact target
+
+on:
+  push:
+    branches: [ci/OTC-20260814-official-client-re-receiver-recovery]
+    paths: [.github/workflows/tibia-official-client-re-queue-receiver-exact-target.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Re-derive concrete queue receiver target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$gdb" ]]
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          report="$RUNNER_TEMP/track-a-queue-receiver-exact-target.txt"
+          exec > >(tee -a "$report") 2>&1
+
+          echo 'TRACK_A_QUEUE_RECEIVER_EXACT_TARGET_BEGIN=true'
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo 'PROVEN_CONNECT_SITE=0x7e7470'
+          echo 'PROVEN_RECEIVER_PM_ENCODING=0x91'
+          echo 'PROVEN_RECEIVER_SLOT_OFFSET=0x90'
+
+          python3 -u - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,fsz,msz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fsz:loads.append((fo,fo+fsz,va,va+msz,flags))
+          def va_to_off(va):
+              for fs,fe,base,vend,flags in loads:
+                  if base<=va<base+(fe-fs):return fs+(va-base)
+          def flags_at(va):
+              for fs,fe,base,vend,flags in loads:
+                  if base<=va<vend:return flags
+              return 0
+          def qword(va):
+              o=va_to_off(va)
+              if o is None or o+8>len(data):return None
+              return struct.unpack_from('<Q',data,o)[0]
+          def score_address_point(va):
+              vals=[qword(va+i*8) for i in range(20)]
+              execs=sum(1 for v in vals if v is not None and flags_at(v)&1)
+              slot=qword(va+0x90)
+              return execs,slot,bool(slot is not None and flags_at(slot)&1)
+
+          for ap,slot_off,label in [(0x308c408,0x90,'old_primary'),(0x2f66288,0xb8,'old_subobject')]:
+              val=qword(ap+slot_off)
+              print(f'DIRECT_TABLE_READ label={label} address_point=0x{ap:x} slot=0x{slot_off:x} value={hex(val) if val is not None else "unmapped"} executable={bool(val is not None and flags_at(val)&1)}')
+
+          start,end=0x7e7000,0x7e8100
+          o=va_to_off(start)
+          if o is None:raise SystemExit('setup range unmapped')
+          blob=data[o:o+(end-start)]
+          refs=[]
+          for p in range(0,len(blob)-7):
+              if not (0x40<=blob[p]<=0x4f and blob[p+1] in (0x8d,0x8b)):continue
+              modrm=blob[p+2]
+              if (modrm & 0xc7)!=0x05:continue
+              site=start+p
+              target=(site+7+struct.unpack_from('<i',blob,p+3)[0]) & 0xffffffffffffffff
+              if va_to_off(target) is None:continue
+              score,slot90,slot_exec=score_address_point(target)
+              if score>=4 or slot_exec:
+                  refs.append((site,target,score,slot90,slot_exec))
+          seen=set()
+          for site,target,score,slot90,slot_exec in refs:
+              key=(site,target)
+              if key in seen:continue
+              seen.add(key)
+              print(f'SETUP_ADDRESS_POINT_CANDIDATE site=0x{site:x} target=0x{target:x} first20_exec={score} slot90={hex(slot90) if slot90 is not None else "unmapped"} slot90_executable={slot_exec}')
+
+          needle=0x8409d0
+          matches=[]
+          for fs,fe,base,vend,flags in loads:
+              if flags&1:continue
+              for off in range(fs,fe-0x98,8):
+                  ap=base+(off-fs)
+                  if struct.unpack_from('<Q',data,off+0x90)[0]==needle:
+                      score,slot90,slot_exec=score_address_point(ap)
+                      if score>=4:matches.append((ap,score))
+          print('SLOT90_0x8409d0_ADDRESS_POINTS=' + (','.join(f'0x{ap:x}:score={score}' for ap,score in matches[:64]) if matches else 'none'))
+          PY
+
+          for spec in \
+            'connect_setup:0x7e7000:0x7e8100' \
+            'connect_site:0x7e7400:0x7e7520' \
+            'slot_object_callable:0x2a73180:0x2a73480' \
+            'candidate_8409d0:0x8409d0:0x840c80' \
+            'old_subobject_exact:0xb5b880:0xb5bb80'; do
+            name=${spec%%:*}; rest=${spec#*:}; lo=${rest%%:*}; hi=${rest##*:}
+            echo "EXACT_DISASSEMBLY_BEGIN name=$name lo=$lo hi=$hi"
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $lo,$hi" || true
+            echo "EXACT_DISASSEMBLY_END name=$name"
+          done
+
+          echo 'TRACK_A_QUEUE_RECEIVER_EXACT_TARGET_COMPLETE=true'
+          grep -q '^TRACK_A_QUEUE_RECEIVER_EXACT_TARGET_COMPLETE=true$' "$report"
+
+      - name: Upload exact receiver report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-queue-receiver-exact-target-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-queue-receiver-exact-target.txt
+          if-no-files-found: error
+          retention-days: 7

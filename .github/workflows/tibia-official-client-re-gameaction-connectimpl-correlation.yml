@@ -53,6 +53,7 @@ jobs:
               0x3085360: 'PlayerTrade',
               0x30850e0: 'WorldMap',
               0x30852a0: 'Player',
+              0x3085b60: 'ProtocolMessageQueue',
           }
           window = 0x180
           callsites = []

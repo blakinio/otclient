@@ -51,5 +51,10 @@ jobs:
           0xbc6e20 shared-receiver-submit
           0x1ab2600 shared-message-selector
           0xdf5fe0 protocol-message-queue-static-metacall
+          0xbc7ed0 queue-sendGoNorth
+          0xbd3330 queue-sendGoPath
+          0xbd5530 queue-sendTalkMessage
+          0xbcc510 queue-sendAttack
+          0xbcc6d0 queue-sendFollow
           EOF
           echo 'TRACK_A_GAMEACTION_RECEIVER_TARGETS_COMPLETE=true'

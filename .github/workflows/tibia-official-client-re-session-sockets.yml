@@ -1,4 +1,4 @@
-name: Track A dynamic map runtime observer
+name: Track A dynamic map parser case inspection
 on:
   push:
     branches:
@@ -8,11 +8,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-concurrency:
-  group: official-client-re-runtime
-  cancel-in-progress: false
 jobs:
-  observe:
+  inspect:
     runs-on: [otclient, synology]
     timeout-minutes: 3
     env:
@@ -20,88 +17,39 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Arm post-login hardware breakpoints on dynamic map candidates
+      - name: Inspect parser cases around map opcodes 0x69 through 0x6d
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
-          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
           toolroot="$state/toolroot"
-          runtime="$state/runtime"
-          mkdir -p "$runtime"
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-
-          [[ -r "$runtime/client.pid" ]]
-          pid="$(tr -cd '0-9' <"$runtime/client.pid")"
-          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
-          grep -azFxq "$marker" "/proc/$pid/environ"
-          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
-          kill -0 "$pid"
-          echo TRACK_A_LIVE_CLIENT_PID="$pid"
-
-          old_gdb=''
-          if [[ -r "$runtime/dynamic-map-gdb.pid" ]]; then
-            old_gdb="$(tr -cd '0-9' <"$runtime/dynamic-map-gdb.pid")"
-          fi
-          if [[ -n "$old_gdb" ]] && kill -0 "$old_gdb" 2>/dev/null; then
-            kill -INT "$old_gdb" 2>/dev/null || true
-            for _ in $(seq 1 30); do kill -0 "$old_gdb" 2>/dev/null || break; sleep .1; done
-          fi
-
-          base="$(awk -v exe="$client" 'index($0,exe) && $3=="00000000" {split($1,a,"-"); print "0x" a[1]; exit}' "/proc/$pid/maps")"
-          [[ "$base" =~ ^0x[0-9a-fA-F]+$ ]]
-          echo TRACK_A_CLIENT_PIE_BASE="$base"
-
-          log="$runtime/dynamic-map-events.log"
-          cmd="$runtime/dynamic-map-observer.gdb"
-          : >"$log"
-          chmod 600 "$log"
-          cat >"$cmd" <<GDB
-          set pagination off
-          set confirm off
-          set breakpoint pending on
-          set logging file $log
-          set logging overwrite off
-          set logging enabled on
-          set \$base = $base
-          hbreak *(\$base + 0xcecc70)
-          commands
-            silent
-            printf "EVENT ts_source=gdb handler=cecc70 pc=%p rdi=%p rsi=%p rdx=%p rcx=%p r8=%p r9=%p\\n", \$pc, \$rdi, \$rsi, \$rdx, \$rcx, \$r8, \$r9
-            printf "ARG cecc70 event_ptr=%p pos_ref=%p thing_ptr=%p stack_raw=0x%x\\n", \$rsi, *(void**)(\$rsi+0x18), *(void**)(\$rsi+0x20), *(unsigned int*)(\$rsi+0x28)
-            x/8gx \$rsi
-            continue
-          end
-          hbreak *(\$base + 0xcecf40)
-          commands
-            silent
-            printf "EVENT ts_source=gdb handler=cecf40 pc=%p rdi=%p rsi=%p rdx=%p rcx=%p r8=%p r9=%p\\n", \$pc, \$rdi, \$rsi, \$rdx, \$rcx, \$r8, \$r9
-            printf "ARG cecf40 event_ptr=%p pos_ref=%p thing_ptr=%p stack_raw=0x%x flags=0x%x\\n", \$rsi, *(void**)(\$rsi+0x18), *(void**)(\$rsi+0x20), *(unsigned int*)(\$rsi+0x28), *(unsigned int*)(\$rsi+0x10)
-            x/8gx \$rsi
-            continue
-          end
-          printf "OBSERVER_ARMED pid=$pid base=$base\\n"
-          continue
-          GDB
-          chmod 600 "$cmd"
-
           gdb="$toolroot/usr/bin/gdb"
-          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-            nohup "$gdb" -q -nx -p "$pid" -x "$cmd" >"$runtime/dynamic-map-gdb.stdout" 2>&1 </dev/null &
-          gdb_pid=$!
-          printf '%s\n' "$gdb_pid" >"$runtime/dynamic-map-gdb.pid"
-          chmod 600 "$runtime/dynamic-map-gdb.pid"
-          sleep 3
-          kill -0 "$pid"
-          kill -0 "$gdb_pid"
-          grep -q 'OBSERVER_ARMED' "$log"
-          echo TRACK_A_POST_LOGIN_ATTACH_STABLE=true
-          echo TRACK_A_DYNAMIC_MAP_OBSERVER_ARMED=true
-          echo TRACK_A_DYNAMIC_MAP_GDB_PID="$gdb_pid"
-          echo TRACK_A_DYNAMIC_MAP_EVENT_LOG="$log"
+          [[ -x "$gdb" ]]
+
+          # The proven strip/movement parser family is around +0xcdbad0..+0xcdbc20.
+          # Capture the complete neighboring dispatcher/case region without attaching
+          # to the live process. The compatible protocol model assigns 0x69..0x6d to
+          # UpdateTile/CreateOnMap/ChangeOnMap/DeleteOnMap/MoveCreature.
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble 0xcdb700,0xcdc800' \
+            > /tmp/track-a-map-cases.txt 2>&1
+
+          echo TRACK_A_MAP_CASE_DISASM_LINES="$(wc -l < /tmp/track-a-map-cases.txt)"
+          echo TRACK_A_KNOWN_MOVEMENT_CASES_BEGIN=true
+          grep -n -B8 -A24 -E '^Dump of assembler|0xcdbad0|0xcdbb40|0xcdbbb0|0xcdbc20|call.*0x19a8a80' /tmp/track-a-map-cases.txt || true
+          echo TRACK_A_KNOWN_MOVEMENT_CASES_END=true
+
+          echo TRACK_A_DYNAMIC_NEIGHBOR_CONTEXT_BEGIN=true
+          sed -n '/0x0000000000cdb900/,/0x0000000000cdc700/p' /tmp/track-a-map-cases.txt || cat /tmp/track-a-map-cases.txt
+          echo TRACK_A_DYNAMIC_NEIGHBOR_CONTEXT_END=true
+
+          echo TRACK_A_MAP_CASE_INSPECTION_COMPLETE=true

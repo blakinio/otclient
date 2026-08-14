@@ -1,0 +1,230 @@
+name: Track A canonical outbound binary sink
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-network-outbound-binary-sink.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 14
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      NETWORK_OWNER_VTABLE: '0x308c408'
+      NETWORK_OWNER_SLOT: '0x90'
+      NETWORK_OUTBOUND: '0x8409d0'
+      RAW_WRITE_CALLSITE: '0xc33259'
+    steps:
+      - name: Resolve canonical outbound path against raw QIODevice writer
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+
+          report="$RUNNER_TEMP/track-a-network-outbound-binary-sink.txt"
+          frames="$RUNNER_TEMP/track-a-network-outbound-frames.txt"
+          relocs="$RUNNER_TEMP/track-a-network-outbound-relocs.txt"
+          plt="$RUNNER_TEMP/track-a-network-outbound-plt.txt"
+          plan="$RUNNER_TEMP/track-a-network-outbound-plan.txt"
+          : >"$report"; : >"$plan"; : >"$plt"
+          exec > >(tee -a "$report") 2>&1
+
+          echo TRACK_A_NETWORK_OUTBOUND_BINARY_SINK_BEGIN=true
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo "CLIENT_SIZE=$EXPECTED_CLIENT_SIZE"
+          echo "NETWORK_OUTBOUND=$NETWORK_OUTBOUND"
+          echo "RAW_WRITE_CALLSITE=$RAW_WRITE_CALLSITE"
+
+          readelf --debug-dump=frames "$client" >"$frames"
+          readelf -WrC "$client" >"$relocs"
+          for sec in .plt .plt.got .plt.sec; do
+            objdump -d -C -j "$sec" "$client" 2>/dev/null || true
+          done >"$plt"
+
+          echo QIODEVICE_WRITE_PLT_SURFACE_BEGIN=true
+          grep -F 'QIODevice::write' "$plt" || true
+          echo QIODEVICE_WRITE_PLT_SURFACE_END=true
+
+          raw_write_plt="$(awk '/<QIODevice::write\(char const\*, long long\)@plt>:/ {gsub(":","",$1); print "0x" $1; exit}' "$plt")"
+          if [[ -z "$raw_write_plt" ]]; then
+            raw_write_plt="NONE"
+          fi
+          echo "RAW_WRITE_PLT=$raw_write_plt"
+
+          python3 -u - "$client" "$frames" "$relocs" "$plan" "$raw_write_plt" <<'PY'
+          import re,struct,sys
+          client,frames_path,reloc_path,plan_path,raw_plt_text=sys.argv[1:]
+          data=open(client,'rb').read()
+          owner_ap=0x308c408
+          owner_slot=0x90
+          outbound=0x8409d0
+          raw_site=0xc33259
+          raw_plt=None if raw_plt_text=='NONE' else int(raw_plt_text,16)
+
+          if data[:4]!=b'\x7fELF' or data[4]!=2 or data[5]!=1:
+              raise SystemExit('expected ELF64 little-endian client')
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          shoff=struct.unpack_from('<Q',data,0x28)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          shentsz=struct.unpack_from('<H',data,0x3a)[0]
+          shnum=struct.unpack_from('<H',data,0x3c)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,filesz,memsz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and filesz: loads.append((fo,fo+filesz,va,va+filesz,flags))
+          execs=[x for x in loads if x[4]&1]
+          def va_to_off(va):
+              for fs,fe,base,end,flags in loads:
+                  if base<=va<end:return fs+va-base
+          def is_exec(va):
+              return any(base<=va<end and flags&1 for fs,fe,base,end,flags in loads)
+
+          fdes=[]
+          for line in open(frames_path,errors='replace'):
+              m=re.search(r'pc=([0-9a-fA-F]+)\.\.([0-9a-fA-F]+)',line)
+              if m:fdes.append((int(m.group(1),16),int(m.group(2),16)))
+          def containing(addr):return [(a,b) for a,b in fdes if a<=addr<b]
+
+          rel={}
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              if struct.unpack_from('<I',data,o+4)[0]!=4:continue
+              roff=struct.unpack_from('<Q',data,o+0x18)[0]
+              rsize=struct.unpack_from('<Q',data,o+0x20)[0]
+              rentsz=struct.unpack_from('<Q',data,o+0x38)[0] or 24
+              for p in range(roff,roff+rsize,rentsz):
+                  r_offset,r_info,r_addend=struct.unpack_from('<QQq',data,p)
+                  if (r_info&0xffffffff)==8:rel[r_offset]=r_addend&0xffffffffffffffff
+          def qword(va):
+              if va in rel:return rel[va]
+              off=va_to_off(va)
+              if off is None or off+8>len(data):return None
+              return struct.unpack_from('<Q',data,off)[0]
+
+          slot_value=qword(owner_ap+owner_slot)
+          print(f'OWNER_VTABLE=0x{owner_ap:x}')
+          print(f'OWNER_SLOT=0x{owner_slot:x}')
+          print(f'OWNER_SLOT_VALUE={hex(slot_value) if slot_value is not None else "UNMAPPED"}')
+          print(f'OWNER_SLOT_MATCH={int(slot_value==outbound)}')
+          if slot_value!=outbound:
+              raise SystemExit('canonical owner slot no longer resolves to expected outbound target')
+
+          def direct_calls(target):
+              out=[]
+              for fs,fe,base,end,flags in execs:
+                  blob=data[fs:fe];p=0
+                  while True:
+                      p=blob.find(b'\xe8',p)
+                      if p<0:break
+                      if p+5<=len(blob):
+                          site=base+p
+                          got=(site+5+struct.unpack_from('<i',blob,p+1)[0])&0xffffffffffffffff
+                          if got==target:out.append(site)
+                      p+=1
+              return out
+
+          def direct_targets_in_fde(a,b):
+              off=va_to_off(a); last=va_to_off(b-1)
+              out=[]
+              if off is None or last is None:return out
+              blob=data[off:last+1]
+              for p in range(0,max(0,len(blob)-4)):
+                  if blob[p]!=0xe8:continue
+                  site=a+p
+                  got=(site+5+struct.unpack_from('<i',blob,p+1)[0])&0xffffffffffffffff
+                  if is_exec(got):out.append((site,got))
+              return out
+
+          outbound_fdes=containing(outbound)
+          raw_site_fdes=containing(raw_site)
+          print('NETWORK_OUTBOUND_FDES='+(','.join(f'0x{a:x}-0x{b:x}' for a,b in outbound_fdes) or 'none'))
+          print('RAW_WRITE_CALLSITE_FDES='+(','.join(f'0x{a:x}-0x{b:x}' for a,b in raw_site_fdes) or 'none'))
+
+          callers=direct_calls(outbound)
+          print(f'NETWORK_OUTBOUND_DIRECT_CALL_COUNT={len(callers)}')
+          print('NETWORK_OUTBOUND_DIRECT_CALL_SITES='+(','.join(hex(x) for x in callers) if callers else 'none'))
+
+          if raw_plt is not None:
+              raw_calls=direct_calls(raw_plt)
+              print(f'RAW_WRITE_DIRECT_CALL_COUNT={len(raw_calls)}')
+              print('RAW_WRITE_DIRECT_CALL_SITES='+(','.join(hex(x) for x in raw_calls) if raw_calls else 'none'))
+              print(f'RAW_SITE_MATCH={int(raw_site in raw_calls)}')
+          else:
+              raw_calls=[]
+              print('RAW_WRITE_DIRECT_CALL_COUNT=UNKNOWN')
+              print('RAW_WRITE_DIRECT_CALL_SITES=none')
+              print('RAW_SITE_MATCH=0')
+
+          print('OUTBOUND_FDE_DIRECT_TARGETS_BEGIN=true')
+          for a,b in outbound_fdes:
+              for site,target in direct_targets_in_fde(a,b):
+                  print(f'OUTBOUND_DIRECT_CALL site=0x{site:x} target=0x{target:x} target_fde='+(','.join(f'0x{x:x}-0x{y:x}' for x,y in containing(target)) or 'none'))
+          print('OUTBOUND_FDE_DIRECT_TARGETS_END=true')
+
+          print('RAW_FDE_DIRECT_TARGETS_BEGIN=true')
+          for a,b in raw_site_fdes:
+              for site,target in direct_targets_in_fde(a,b):
+                  print(f'RAW_FDE_DIRECT_CALL site=0x{site:x} target=0x{target:x} target_fde='+(','.join(f'0x{x:x}-0x{y:x}' for x,y in containing(target)) or 'none'))
+          print('RAW_FDE_DIRECT_TARGETS_END=true')
+
+          for target_name,target in [('NETWORK_OUTBOUND',outbound)]:
+              dests=sorted(addr for addr,addend in rel.items() if addend==target)
+              print(f'{target_name}_RELATIVE_RELOC_COUNT={len(dests)}')
+              print(f'{target_name}_RELATIVE_RELOC_DESTS='+(','.join(hex(x) for x in dests[:256]) if dests else 'none'))
+
+          selected=[]
+          for a,b in outbound_fdes+raw_site_fdes:
+              if (a,b) not in selected and b-a<=0x8000:selected.append((a,b))
+          for site in callers:
+              for f in containing(site):
+                  if f not in selected and f[1]-f[0]<=0x8000:selected.append(f)
+          if raw_plt is not None:
+              for site in raw_calls:
+                  for f in containing(site):
+                      if f not in selected and f[1]-f[0]<=0x8000:selected.append(f)
+          with open(plan_path,'w') as f:
+              for a,b in selected[:32]:f.write(f'0x{a:x} 0x{b:x}\n')
+          print(f'SELECTED_FDE_COUNT={len(selected[:32])}')
+          for a,b in selected[:32]:print(f'SELECTED_FDE start=0x{a:x} end=0x{b:x} size=0x{b-a:x}')
+          print('TRACK_A_NETWORK_OUTBOUND_STATIC_COMPLETE=true')
+          PY
+
+          while read -r lo hi; do
+            [[ "$lo" =~ ^0x[0-9a-f]+$ && "$hi" =~ ^0x[0-9a-f]+$ ]] || continue
+            echo "FDE_DISASSEMBLY_BEGIN lo=$lo hi=$hi"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi" || true
+            echo "FDE_DISASSEMBLY_END lo=$lo hi=$hi"
+          done <"$plan"
+
+          echo TRACK_A_NETWORK_OUTBOUND_BINARY_SINK_COMPLETE=true
+          grep -q '^TRACK_A_NETWORK_OUTBOUND_STATIC_COMPLETE=true$' "$report"
+          grep -q '^OWNER_SLOT_MATCH=1$' "$report"
+
+      - name: Upload exact-version outbound sink report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-network-outbound-binary-sink-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-network-outbound-binary-sink.txt
+          if-no-files-found: error
+          retention-days: 7

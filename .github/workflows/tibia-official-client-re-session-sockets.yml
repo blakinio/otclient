@@ -73,8 +73,8 @@ jobs:
             "        super().__init__('*0x%x' % ($bias + 0x19a8ea3))" \
             '    def stop(self):' \
             '        try:' \
-            "            rsp=int(gdb.parse_and_eval('\\$rsp'))" \
-            "            order=int(gdb.parse_and_eval('\\$rbp')) & 0xffffffff" \
+            '            rsp=int(gdb.parse_and_eval("$rsp"))' \
+            '            order=int(gdb.parse_and_eval("$rbp")) & 0xffffffff' \
             "            x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))" \
             '            if 0<x<100000 and 0<y<100000 and z<32 and order<128:' \
             "                with open(out,'a') as f: f.write(f'{time.time_ns()} {x} {y} {z} {order}\\n')" \

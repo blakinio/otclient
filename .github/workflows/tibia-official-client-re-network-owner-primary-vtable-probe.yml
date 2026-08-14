@@ -1,0 +1,117 @@
+name: Track A network owner primary vtable probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-network-owner-primary-vtable-probe.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Resolve candidate vtable slots and constructor/setup xrefs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          out="$(mktemp)"; trap 'rm -f "$out"' EXIT
+          python3 -u - "$client" >"$out" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          ap=0x3084648
+          ctor=0x7e7130
+          setup=0x7e7fe0
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; es=struct.unpack_from('<H',data,0x36)[0]; n=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(n):
+              o=phoff+i*es
+              typ,flags,fo,va,_,sz,_,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and sz: loads.append((fo,fo+sz,va,va+sz,flags))
+          def off(va):
+              for fs,fe,base,end,f in loads:
+                  if base<=va<end:return fs+va-base
+          def fl(va):
+              for fs,fe,base,end,f in loads:
+                  if base<=va<end:return f
+              return 0
+          rel={}
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shes=struct.unpack_from('<H',data,0x3a)[0]; shn=struct.unpack_from('<H',data,0x3c)[0]
+          for i in range(shn):
+              o=shoff+i*shes
+              if struct.unpack_from('<I',data,o+4)[0]!=4: continue
+              so=struct.unpack_from('<Q',data,o+0x18)[0]; ss=struct.unpack_from('<Q',data,o+0x20)[0]; se=struct.unpack_from('<Q',data,o+0x38)[0] or 24
+              for p in range(so,so+ss,se):
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p)
+                  if (ri&0xffffffff)==8: rel[ro]=ra&0xffffffffffffffff
+          def q(va):
+              if va in rel:return rel[va]
+              p=off(va)
+              return struct.unpack_from('<Q',data,p)[0] if p is not None else None
+          def sq(va):
+              p=off(va)
+              return struct.unpack_from('<q',data,p)[0] if p is not None else None
+          print('TRACK_A_NETWORK_OWNER_PRIMARY_VTABLE_PROBE_BEGIN=true')
+          print(f'CANDIDATE_ADDRESS_POINT=0x{ap:x}')
+          print(f'CANDIDATE_OFFSET_TO_TOP={sq(ap-16)}')
+          rtti=q(ap-8)
+          print(f'CANDIDATE_RTTI={"0x%x"%rtti if rtti is not None else "unknown"}')
+          for ofs in (0,0x8,0x10,0x18,0x20,0x28,0x30,0x38,0x40,0x48,0x50,0x58,0x60,0x68,0x70,0x78,0x80,0x88,0x90,0x98,0xa0,0x4a8,0x4b0,0x4b8,0x4c0,0x4c8,0x4d8):
+              v=q(ap+ofs)
+              print(f'VTABLE_SLOT offset=0x{ofs:x} target={"0x%x"%v if v is not None else "unknown"} executable={str(bool(v and fl(v)&1)).lower()}')
+          def scan_call(target):
+              hits=[]
+              for fs,fe,base,end,f in loads:
+                  if not f&1:continue
+                  for p in range(fs,fe-4):
+                      if data[p]!=0xe8:continue
+                      site=base+p-fs
+                      if site+5+struct.unpack_from('<i',data,p+1)[0]==target:hits.append(site)
+              return hits
+          def scan_lea(target):
+              hits=[]
+              for fs,fe,base,end,f in loads:
+                  if not f&1:continue
+                  for p in range(fs,fe-7):
+                      if not (0x40<=data[p]<=0x4f and data[p+1]==0x8d and data[p+2]&0xc7==0x05):continue
+                      site=base+p-fs
+                      if site+7+struct.unpack_from('<i',data,p+3)[0]==target:hits.append(site)
+              return hits
+          for target,name in ((ap,'candidate_vtable'),(ctor,'ctor_7e7130'),(setup,'setup_7e7fe0')):
+              hits=scan_lea(target) if name=='candidate_vtable' else scan_call(target)
+              print(f'XREF_COUNT name={name} count={len(hits)}')
+              for site in hits[:64]:print(f'XREF name={name} site=0x{site:x}')
+          print('TRACK_A_NETWORK_OWNER_PRIMARY_VTABLE_PROBE_COMPLETE=true')
+          PY
+          cat "$out"
+          grep -q '^TRACK_A_NETWORK_OWNER_PRIMARY_VTABLE_PROBE_COMPLETE=true$' "$out"
+          while read -r target; do
+            [[ "$target" =~ ^0x[0-9a-f]+$ ]] || continue
+            lo=$(printf '0x%x' $((target-32))); hi=$(printf '0x%x' $((target+192)))
+            echo "SLOT_DISASSEMBLY_BEGIN=$target"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi"
+            echo "SLOT_DISASSEMBLY_END=$target"
+          done < <(sed -n 's/^VTABLE_SLOT offset=.* target=\(0x[0-9a-f]*\) executable=true$/\1/p' "$out" | sort -u)
+          while read -r site; do
+            lo=$(printf '0x%x' $((site-64))); hi=$(printf '0x%x' $((site+96)))
+            echo "XREF_NEIGHBORHOOD_BEGIN=$site"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi"
+            echo "XREF_NEIGHBORHOOD_END=$site"
+          done < <(sed -n 's/^XREF .* site=\(0x[0-9a-f]*\)$/\1/p' "$out" | sort -u)

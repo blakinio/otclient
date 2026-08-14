@@ -1,0 +1,106 @@
+name: Track A QMeta relocation records
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-relocation-records.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Decode candidate 0x40-byte QMetaObject records
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import collections,struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0];phentsz=struct.unpack_from('<H',data,0x36)[0];phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def flags(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return fl
+              return 0
+          def preview(v,n=48):
+              o=va2off(v)
+              if o is None:return ''
+              raw=data[o:o+n]
+              out=''
+              for b in raw:
+                  if 32<=b<127:out+=chr(b)
+                  else:break
+              return out
+          shoff=struct.unpack_from('<Q',data,0x28)[0];shentsz=struct.unpack_from('<H',data,0x3a)[0];shnum=struct.unpack_from('<H',data,0x3c)[0]
+          relas=[]
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              _,typ,_,_,so,ss,_,_,_,se=struct.unpack_from('<IIQQQQIIQQ',data,o)
+              if typ!=4 or not se:continue
+              for p in range(so,so+ss,se):
+                  if p+24>len(data):break
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p);relas.append((ro,ri&0xffffffff,ra))
+          byslot={ro:(typ,add) for ro,typ,add in relas}
+          # Calibration family: previous evidence independently tied Worldmap to metadata base 0x1cd8a54 via slot 0x3087808.
+          anchors={
+            'GameEvent':0x3087788,
+            'Chat':0x30877c8,
+            'Worldmap':0x3087808,
+            'Effect':0x30ce788,
+            'Container':0x3084f68,
+          }
+          wanted=set()
+          for name,slot in anchors.items():
+              base=slot-8 # hypothesis: stringdata pointer is field +8 in a 0x40 QMetaObject record
+              for d in range(0,0x40,8):wanted.add(base+d)
+          codehits=collections.defaultdict(list)
+          for lo,hi,segva,vhi,fl in loads:
+              if not fl&1:continue
+              chunk=data[lo:hi]
+              for i in range(len(chunk)-7):
+                  b0,b1,b2=chunk[i],chunk[i+1],chunk[i+2]
+                  if b0 not in (0x48,0x4c) or b1 not in (0x8d,0x8b) or (b2&0xc7)!=0x05:continue
+                  disp=struct.unpack_from('<i',chunk,i+3)[0];src=segva+i;dst=(src+7+disp)&0xffffffffffffffff
+                  if dst in wanted:codehits[dst].append(src)
+          print('TRACK_A_QMETA_RELOCATION_RECORDS_BEGIN=true')
+          for name,slot in anchors.items():
+              base=slot-8
+              print(f'ANCHOR name={name} observed_slot=0x{slot:x} candidate_record_base=0x{base:x}')
+              bo=va2off(base)
+              if bo is not None:
+                  vals=[struct.unpack_from('<Q',data,bo+i*8)[0] for i in range(8)]
+                  print(' RAW_QWORDS '+' '.join(f'{i}=0x{v:x}' for i,v in enumerate(vals)))
+              for i in range(8):
+                  s=base+i*8
+                  typ,add=byslot.get(s,(None,None))
+                  if typ is None:
+                      print(f' FIELD index={i} slot=0x{s:x} relocation=none code_refs={",".join(hex(x) for x in codehits.get(s,[])) or "none"}')
+                  else:
+                      print(f' FIELD index={i} slot=0x{s:x} rela_type={typ} addend=0x{add:x} addend_flags={flags(add)} preview={preview(add)!r} code_refs={",".join(hex(x) for x in codehits.get(s,[])) or "none"}')
+              # Also show all RELATIVE relocations within +/-0x80 of record.
+              near=sorted((ro,t,a) for ro,t,a in relas if base-0x80<=ro<base+0xc0)
+              for ro,t,a in near:
+                  print(f' NEAR slot=0x{ro:x} delta={ro-base:+#x} type={t} addend=0x{a:x} flags={flags(a)} preview={preview(a)!r}')
+          print('TRACK_A_QMETA_RELOCATION_RECORDS_COMPLETE=true')
+          PY

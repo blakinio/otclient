@@ -216,11 +216,11 @@ recovery:
   session_started_at: 2026-08-14T14:00:00+02:00
   checkpointed_at: 2026-08-14T16:00:00+02:00
   last_progress_at: 2026-08-14T16:00:00+02:00
-  phase: static-gameaction-slot-payload-reconstruction
-  exact_head: 5fd366fe1225245befd95c8d27e982c5411556dd
+  phase: static-gameaction-receiver-builder-convergence
+  exact_head: d783d609dcb07f29980b5af18bb2df2507a97306
   pull_request: 289
   active_operation: none
-  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307, 31801334150, 31801505722, 31801581157, 31801659100, 31801723690, 31801845276]
+  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307, 31801334150, 31801505722, 31801581157, 31801659100, 31801723690, 31801845276, 31802254026, 31802346130, 31802470787]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
@@ -228,15 +228,15 @@ recovery:
   status: ready
   safe_to_resume: true
   resume_condition: slot provenance and invoker semantics are committed and pushed
-  next_action: reconstruct the two-word slot payload and resolve concrete receiver targets for high-value sender sites
+  next_action: classify the early direct receiver callees and follow the internal-router re-emission edges toward builders and serializers
 ```
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-14T14:00:00Z
-head: 5fd366fe1225245befd95c8d27e982c5411556dd
+updated_at: 2026-08-14T14:30:00Z
+head: d783d609dcb07f29980b5af18bb2df2507a97306
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: ready
@@ -257,12 +257,15 @@ proven:
   - corrected argument run 31801334150 reconstructed the hidden-return ABI, all 31 AutoConnection/null-types/slot-object arguments, 29 exact sender-metaobject matches, one mismatch and one bounded unresolved case
   - provenance run 31801723690 resolved QSlotObject invoke addresses for all 29 proven sender sites, with 24 unique addresses and no unresolved entries
   - invoker run 31801845276 proved selected invoke addresses are generic QSlotObject operation/member-pointer dispatchers rather than receiver serializers
+  - payload run 31802254026 resolved both slot payload words for all 29 proven sender sites with zero unresolved values
+  - QMeta run 31802470787 identifies shared receiver 0x8332d0 as tibia::game::TInternalGameActionRouter, an internal re-emitter rather than serializer
 derived:
   - the 41 legacy string-based connect calls are the smallest high-information subset for argument reconstruction
   - high-value GameAction send signals are absent from the recovered legacy string-edge set and should be tested against connectImpl/wrapper paths
 unknown:
   - receiver identities for the six high-value GameAction send signals
-  - concrete receiver identities and executable targets encoded in the two-word slot payload
+  - builder/serializer identities downstream of early receivers 0xbf3cd0, 0xbd3be0 and 0xbcfff0
+  - downstream subscribers of TInternalGameActionRouter re-emissions
   - pointer-to-member signal indices for the proven sender-metaobject sites
 conflicts: []
 first_failure:
@@ -279,6 +282,8 @@ changed_paths:
   - .github/workflows/tibia-official-client-re-gameaction-connectimpl-arguments.yml
   - .github/workflows/tibia-official-client-re-gameaction-slot-provenance.yml
   - .github/workflows/tibia-official-client-re-gameaction-slot-invokers.yml
+  - .github/workflows/tibia-official-client-re-gameaction-receiver-targets.yml
+  - .github/workflows/tibia-official-client-re-shared-receiver-qmeta.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-connect-callsite-census.yaml
@@ -293,7 +298,7 @@ validation:
     result: PASS
     evidence: local exact working tree
 blockers: []
-next_action: reconstruct the two-word slot payload and resolve concrete receiver targets for high-value sender sites
+next_action: classify early direct receiver callees and follow internal-router re-emission edges toward builders and serializers
 ```
 
 ## Rejected interpretations
@@ -308,5 +313,5 @@ next_action: reconstruct the two-word slot payload and resolve concrete receiver
 ## Next action
 
 ```text
-Reconstruct the two-word slot payload for the high-value proven-sender `connectImpl` sites, resolve direct or virtual receiver targets, and retain receiver class identities as unresolved until constructor or RTTI provenance proves them.
+Classify the exact callees of early direct receivers `0xbf3cd0`, `0xbd3be0`, and `0xbcfff0`, and follow `TInternalGameActionRouter` re-emission connections until concrete builders or serializers are structurally proven.
 ```

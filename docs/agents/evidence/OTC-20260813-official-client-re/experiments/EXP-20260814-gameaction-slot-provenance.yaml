@@ -7,6 +7,11 @@ provenance_run: 31801723690
 provenance_job: 94771021150
 invoker_disassembly_run: 31801845276
 invoker_disassembly_job: 94771408713
+payload_run: 31802254026
+payload_job: 94772727592
+receiver_disassembly_run: 31802346130
+shared_receiver_qmeta_run: 31802470787
+shared_receiver_qmeta_job: 94773438804
 result: PASS
 facts:
   proven_sender_sites: 29
@@ -15,7 +20,10 @@ facts:
   shared_0x6b10d0_sites: 5
   unresolved_invoker_sites: 0
   selected_invokers_are_qslotobject_dispatchers: true
+  resolved_slot_payload_sites: 29
+  unresolved_slot_payload_sites: 0
+  selected_payload_adjustments_are_zero: true
+  shared_late_receiver: tibia::game::TInternalGameActionRouter
 limits:
   - invoke-function identity is not concrete receiver identity
   - concrete receiver target is encoded in the two-word slot payload
-

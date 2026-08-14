@@ -43,7 +43,33 @@ Therefore the invoke-function address is a template/trampoline identity. Sharing
 
 The provenance run also records, for every site, the final sender, signal-storage, receiver, slot-storage and slot-object register/frame expressions. These expressions are structural evidence but are not promoted to concrete class identities without constructor or RTTI provenance.
 
+## Concrete two-word payloads
+
+Payload run `31802254026`, job `94772727592`, recovered both words copied to slot-object offsets `+0x10/+0x18` for all `29/29` sites. No payload word remains unresolved. Every recovered adjustment word is zero. Selected non-Player direct targets are:
+
+| Connect call | Sender family | payload word 0 | adjustment |
+| --- | --- | --- | --- |
+| `0x7d6876` | Creatures | `0xbf3cd0` | `0` |
+| `0x7d7857` | WorldMap | `0xbd3be0` | `0` |
+| `0x7d8b66` | PlayerTrade | `0xbcfff0` | `0` |
+| `0x7ff2c3` | Creatures | `0x8332d0` | `0` |
+| `0x7ff3e1` | PlayerTrade | `0x8332d0` | `0` |
+| `0x7ff58e` | Chat | `0x8332d0` | `0` |
+| `0x7ffb24` | Container | `0x8332d0` | `0` |
+
+The low bit of each selected first word is clear, so these are direct member-function targets rather than virtual-table offsets.
+
+## Shared late receiver identity
+
+Receiver disassembly run `31802346130` proves `0x8332d0` re-emits through `QMetaObject::activate` on static metaobject `0x3074b20`. Exact relocation-backed QMeta decode run `31802470787`, job `94773438804`, identifies that record as `tibia::game::TInternalGameActionRouter` with four methods:
+
+0. `publishGameActionInternal`
+1. `publishGameActionBetweenRouters`
+2. `handleGameActionInternal`
+3. `handleGameActionFromOtherRouter`
+
+Thus `0x8332d0` is a structurally identified internal action-router receiver/re-emitter, not a serializer or network sender. The early direct targets `0xbf3cd0`, `0xbd3be0`, and `0xbcfff0` remain the higher-information candidates for concrete builder/serializer convergence.
+
 ## Next boundary
 
-Recover the two-word slot payload for the high-value sender sites. Resolve a direct first word as the concrete receiver target; when its low bit marks a virtual member, recover the vtable entry after applying the stored receiver adjustment. Only then follow the receiver toward builder/serializer/network convergence.
-
+Disassemble and classify the early direct receivers `0xbf3cd0`, `0xbd3be0`, and `0xbcfff0` and their exact callees, while separately following the `TInternalGameActionRouter` re-emission edges. Promote a builder or serializer only after structural message construction or serialization evidence.

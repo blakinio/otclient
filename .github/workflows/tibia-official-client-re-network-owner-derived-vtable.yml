@@ -1,0 +1,129 @@
+name: Track A derived network owner vtable resolution
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-network-owner-derived-vtable.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Find most-derived vtables containing the proven owner setup function
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          out="$(mktemp)"; trap 'rm -f "$out"' EXIT
+          python3 -u - "$client" >"$out" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          setup=0x7e7fe0
+          known_derived=0x308c408
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; es=struct.unpack_from('<H',data,0x36)[0]; n=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(n):
+              o=phoff+i*es
+              typ,flags,fo,va,_,sz,_,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and sz: loads.append((fo,fo+sz,va,va+sz,flags))
+          def off(va):
+              for fs,fe,base,end,f in loads:
+                  if base<=va<end:return fs+va-base
+          def fl(va):
+              for fs,fe,base,end,f in loads:
+                  if base<=va<end:return f
+              return 0
+          rel={}
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shes=struct.unpack_from('<H',data,0x3a)[0]; shn=struct.unpack_from('<H',data,0x3c)[0]
+          for i in range(shn):
+              o=shoff+i*shes
+              if struct.unpack_from('<I',data,o+4)[0]!=4: continue
+              so=struct.unpack_from('<Q',data,o+0x18)[0]; ss=struct.unpack_from('<Q',data,o+0x20)[0]; se=struct.unpack_from('<Q',data,o+0x38)[0] or 24
+              for p in range(so,so+ss,se):
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p)
+                  if (ri&0xffffffff)==8: rel[ro]=ra&0xffffffffffffffff
+          def q(va):
+              if va in rel:return rel[va]
+              p=off(va)
+              return struct.unpack_from('<Q',data,p)[0] if p is not None else None
+          def sq(va):
+              p=off(va)
+              return struct.unpack_from('<q',data,p)[0] if p is not None else None
+          def valid_header(ap):
+              ot=sq(ap-16); rtti=q(ap-8)
+              if ot is None or abs(ot)>0x100000:return False
+              if rtti not in (0,None) and not fl(rtti):return False
+              return True
+          # Enumerate address points by finding the setup function in a bounded
+          # vtable window and validating an Itanium-style header.
+          found=[]
+          for fs,fe,base,end,f in loads:
+              if f&1:continue
+              for loc in range((base+7)&~7,end,8):
+                  if q(loc)!=setup:continue
+                  for ofs in range(0,0x601,8):
+                      ap=loc-ofs
+                      if ap<base+16 or not valid_header(ap):continue
+                      slot90=q(ap+0x90)
+                      hi=[q(ap+x) for x in (0x4a8,0x4b0,0x4b8,0x4c0,0x4c8,0x4d8)]
+                      exec_hi=sum(bool(v and fl(v)&1) for v in hi)
+                      if slot90 and fl(slot90)&1 and exec_hi>=4:
+                          found.append((ap,ofs,slot90,exec_hi,tuple(hi),q(ap-8),sq(ap-16)))
+          uniq={x[0]:x for x in found}
+          found=sorted(uniq.values(),key=lambda x:(x[1],-x[3],x[0]))
+          print('TRACK_A_DERIVED_NETWORK_OWNER_VTABLE_BEGIN=true')
+          print(f'SETUP_FUNCTION=0x{setup:x}')
+          print(f'DERIVED_VTABLE_CANDIDATE_COUNT={len(found)}')
+          for ap,ofs,slot90,exec_hi,hi,rtti,ot in found[:64]:
+              print(f'DERIVED_VTABLE address_point=0x{ap:x} setup_offset=0x{ofs:x} slot90=0x{slot90:x} exec_high_slots={exec_hi} rtti={"0x%x"%rtti if rtti else "0"} offset_to_top={ot} high_targets={",".join("0x%x"%v if v else "0" for v in hi)}')
+          print(f'KNOWN_DERIVED_ADDRESS_POINT=0x{known_derived:x}')
+          for ofs in (0x60,0x68,0x70,0x78,0x80,0x88,0x90,0xa0,0x4a8,0x4b0,0x4b8,0x4c0,0x4c8,0x4d8):
+              v=q(known_derived+ofs)
+              print(f'KNOWN_DERIVED_SLOT offset=0x{ofs:x} target={"0x%x"%v if v is not None else "unknown"} executable={str(bool(v and fl(v)&1)).lower()}')
+          # Direct LEA refs identify constructor/destructor stores for candidates.
+          cand=set(x[0] for x in found)
+          refs={ap:[] for ap in cand}
+          for fs,fe,base,end,f in loads:
+              if not f&1:continue
+              for p in range(fs,fe-7):
+                  if not (0x40<=data[p]<=0x4f and data[p+1]==0x8d and data[p+2]&0xc7==0x05):continue
+                  site=base+p-fs; target=site+7+struct.unpack_from('<i',data,p+3)[0]
+                  if target in refs:refs[target].append(site)
+          for ap in sorted(refs):
+              print(f'DERIVED_VTABLE_XREFS address_point=0x{ap:x} count={len(refs[ap])} sites={",".join(hex(x) for x in refs[ap][:32]) if refs[ap] else "none"}')
+          print('TRACK_A_DERIVED_NETWORK_OWNER_VTABLE_COMPLETE=true')
+          PY
+          cat "$out"
+          grep -q '^TRACK_A_DERIVED_NETWORK_OWNER_VTABLE_COMPLETE=true$' "$out"
+          while read -r target; do
+            [[ "$target" =~ ^0x[0-9a-f]+$ ]] || continue
+            lo=$(printf '0x%x' $((target-32))); hi=$(printf '0x%x' $((target+256)))
+            echo "DERIVED_SLOT90_DISASSEMBLY_BEGIN=$target"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi"
+            echo "DERIVED_SLOT90_DISASSEMBLY_END=$target"
+          done < <(sed -n 's/^DERIVED_VTABLE .* slot90=\(0x[0-9a-f]*\).*/\1/p' "$out" | sort -u)
+          while read -r site; do
+            [[ "$site" =~ ^0x[0-9a-f]+$ ]] || continue
+            lo=$(printf '0x%x' $((site-64))); hi=$(printf '0x%x' $((site+96)))
+            echo "DERIVED_VTABLE_XREF_NEIGHBORHOOD_BEGIN=$site"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi"
+            echo "DERIVED_VTABLE_XREF_NEIGHBORHOOD_END=$site"
+          done < <(sed -n 's/^DERIVED_VTABLE_XREFS .* sites=//p' "$out" | tr ',' '\n' | grep '^0x' | sort -u)

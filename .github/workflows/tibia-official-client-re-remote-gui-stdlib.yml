@@ -5,10 +5,8 @@ on:
     branches: [ci/track-a-remote-gui-access]
     paths:
       - .github/workflows/tibia-official-client-re-remote-gui-stdlib.yml
-
 permissions:
   contents: read
-
 jobs:
   enable:
     runs-on: [otclient, synology]
@@ -17,78 +15,38 @@ jobs:
       TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Fit existing Tibia window and enable persistent noVNC
+      - name: Apply experimental 30fps low-latency profile
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          [[ -S /var/run/docker.sock ]]
-          [[ -S /tmp/.X11-unix/X98 ]]
-          state=/work/_otclient_tibia_re_state
-          [[ -d "$state" ]] || state=/home/runner/_work/_otclient_tibia_re_state
-          root="$state/toolroot"
-          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
-          client="$runtime/bin/client"
-          xdotool="$root/usr/bin/xdotool"
-          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
-          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
-          [[ -x "$client" && -x "$xdotool" ]]
-          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-
-          client_pid=''
-          for e in /proc/[0-9]*/exe; do
-            [[ -e "$e" ]] || continue
-            if [[ "$(readlink -f "$e" 2>/dev/null || true)" == "$client" ]]; then client_pid="${e#/proc/}"; client_pid="${client_pid%/exe}"; break; fi
-          done
-          [[ -n "$client_pid" ]]; kill -0 "$client_pid"
-          echo TRACK_A_OFFICIAL_CLIENT_REUSED_PID="$client_pid"
-
-          # Resize only the live official-client X11 window. No client restart.
-          wins="$(DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xdotool" search --all --pid "$client_pid" 2>/dev/null || true)"
-          [[ -n "$wins" ]]
-          best=''; best_area=0
-          for w in $wins; do
-            geo="$(DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
-            width="$(printf '%s\n' "$geo" | sed -n 's/^WIDTH=//p')"; height="$(printf '%s\n' "$geo" | sed -n 's/^HEIGHT=//p')"
-            [[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[0-9]+$ ]] || continue
-            area=$((width*height)); if (( area > best_area )); then best="$w"; best_area=$area; fi
-          done
-          [[ -n "$best" ]]
-          DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xdotool" windowmap "$best"
-          DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xdotool" windowmove "$best" 0 0
-          DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xdotool" windowsize "$best" 1920 1080
-          sleep 2
-          geo="$(DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xdotool" getwindowgeometry --shell "$best")"
-          echo "$geo"
-          x="$(printf '%s\n' "$geo" | sed -n 's/^X=//p')"; y="$(printf '%s\n' "$geo" | sed -n 's/^Y=//p')"; width="$(printf '%s\n' "$geo" | sed -n 's/^WIDTH=//p')"; height="$(printf '%s\n' "$geo" | sed -n 's/^HEIGHT=//p')"
-          [[ "$x" == 0 && "$y" == 0 && "$width" == 1920 && "$height" == 1080 ]]
-          echo TRACK_A_TIBIA_WINDOW_FULL_VIEWPORT=true
-
-          x11vnc="$(command -v x11vnc)"; websockify="$(command -v websockify)"
-          [[ -x "$x11vnc" && -x "$websockify" && -d /usr/share/novnc ]]
-          mkdir -p "$state/runtime/novnc-web"
-          cp -a /usr/share/novnc/. "$state/runtime/novnc-web/"
-          novnc_web="$state/runtime/novnc-web"
+          [[ "$RUNNER_NAME" == synology-otclient-01 && -S /tmp/.X11-unix/X98 ]]
+          state=/work/_otclient_tibia_re_state; [[ -d "$state" ]] || state=/home/runner/_work/_otclient_tibia_re_state
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"; client="$runtime/bin/client"
+          [[ -x "$client" && "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          client_pid=''; for e in /proc/[0-9]*/exe; do [[ -e "$e" ]] || continue; [[ "$(readlink -f "$e" 2>/dev/null || true)" == "$client" ]] && { client_pid="${e#/proc/}"; client_pid="${client_pid%/exe}"; break; }; done
+          [[ -n "$client_pid" ]]; kill -0 "$client_pid"; echo TRACK_A_OFFICIAL_CLIENT_REUSED_PID="$client_pid"
+          x11vnc="$(command -v x11vnc)"; websockify="$(command -v websockify)"; [[ -x "$x11vnc" && -x "$websockify" && -d /usr/share/novnc ]]
+          mkdir -p "$state/runtime/novnc-web"; cp -a /usr/share/novnc/. "$state/runtime/novnc-web/"; novnc_web="$state/runtime/novnc-web"
           cat >"$novnc_web/index.html" <<'HTML'
-          <!doctype html><meta charset="utf-8"><title>Track A Tibia noVNC</title>
-          <script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=6&compression=6&show_dot=true&path=websockify');</script>
+          <!doctype html><meta charset="utf-8"><title>Track A Tibia noVNC 30fps test</title>
+          <script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=5&compression=3&show_dot=true&path=websockify');</script>
           HTML
-          if [[ -f "$state/runtime/x11vnc.pid" ]]; then kill "$(cat "$state/runtime/x11vnc.pid")" 2>/dev/null || true; fi
-          if [[ -f "$state/runtime/novnc-websockify.pid" ]]; then kill "$(cat "$state/runtime/novnc-websockify.pid")" 2>/dev/null || true; fi
+          [[ ! -f "$state/runtime/x11vnc.pid" ]] || kill "$(cat "$state/runtime/x11vnc.pid")" 2>/dev/null || true
+          [[ ! -f "$state/runtime/novnc-websockify.pid" ]] || kill "$(cat "$state/runtime/novnc-websockify.pid")" 2>/dev/null || true
           sleep 1
-          env -u RUNNER_TRACKING_ID DISPLAY="$TRACK_DISPLAY" nohup "$x11vnc" -display "$TRACK_DISPLAY" -rfbport 5901 -localhost -forever -shared -nopw -xkb -repeat -wait 5 -defer 5 -o "$state/runtime/x11vnc.log" >/dev/null 2>&1 </dev/null &
+          # 30fps target ~= 33ms.  Lower defer/wait removes the prior 5ms polling profile's CPU churn;
+          # XDamage remains enabled so unchanged rectangles are not resent.
+          env -u RUNNER_TRACKING_ID DISPLAY="$TRACK_DISPLAY" nohup "$x11vnc" -display "$TRACK_DISPLAY" -rfbport 5901 -localhost -forever -shared -nopw -xkb -repeat -wait 10 -defer 10 -deferupdate 20 -threads -noxrecord -noxfixes -o "$state/runtime/x11vnc.log" >/dev/null 2>&1 </dev/null &
           vnc_pid=$!; printf '%s\n' "$vnc_pid" >"$state/runtime/x11vnc.pid"
-          env -u RUNNER_TRACKING_ID nohup "$websockify" --web "$novnc_web" --verbose 6081 127.0.0.1:5901 >"$state/runtime/novnc-websockify.log" 2>&1 </dev/null &
+          env -u RUNNER_TRACKING_ID nohup "$websockify" --web "$novnc_web" 6081 127.0.0.1:5901 >"$state/runtime/novnc-websockify.log" 2>&1 </dev/null &
           ws_pid=$!; printf '%s\n' "$ws_pid" >"$state/runtime/novnc-websockify.pid"
           for _ in $(seq 1 20); do curl -fsS --max-time 1 -o /tmp/root.html http://127.0.0.1:6081/ 2>/dev/null && break; sleep .5; done
           kill -0 "$vnc_pid"; kill -0 "$ws_pid"
           python3 - <<'PY'
           import socket,base64,os
           s=socket.create_connection(('127.0.0.1',5901),3); b=s.recv(12); s.close(); assert b.startswith(b'RFB ')
-          key=base64.b64encode(os.urandom(16)).decode(); req=('GET /websockify HTTP/1.1\r\nHost: 127.0.0.1:6081\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'+f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode(); s=socket.create_connection(('127.0.0.1',6081),3); s.sendall(req); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
-          print('TRACK_A_NOVNC_STREAM_OK=true')
+          key=base64.b64encode(os.urandom(16)).decode(); q=('GET /websockify HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'+f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode(); s=socket.create_connection(('127.0.0.1',6081),3); s.sendall(q); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
+          print('TRACK_A_30FPS_PROFILE_STREAM_OK=true')
           PY
-          self="$(hostname)"; runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"; [[ -n "$runner_ip" ]]
-          curl -fsS --max-time 5 -o /tmp/target.html "http://${runner_ip}:6081/"
-          echo TRACK_A_DSM_TARGET_VERIFIED="http://${runner_ip}:6081"
+          echo TRACK_A_30FPS_PROFILE='x11vnc wait=10 defer=10 deferupdate=20 threads quality=5 compression=3'
           echo TRACK_A_USER_URL=http://synology:6082

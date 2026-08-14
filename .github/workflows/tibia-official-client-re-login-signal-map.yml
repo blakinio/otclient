@@ -1,0 +1,102 @@
+name: Track A official login signal PMF map
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-login-signal-map.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: "51965216"
+    steps:
+      - name: Map exact-version login signal PMFs and consumers
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$gdb" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+
+          report="$RUNNER_TEMP/track-a-login-signal-map.txt"
+          exec > >(tee -a "$report") 2>&1
+          echo 'TRACK_A_LOGIN_SIGNAL_MAP_BEGIN=true'
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo 'ABI_NOTE=QMetaObject_Connection_sret_shifts_connectImpl_register_arguments'
+          echo 'CONNECT_IMPL_EFFECTIVE_ARGS=rdi:sret,rsi:sender,rdx:signal_pmf,rcx:receiver,r8:slot_pmf,r9:slot_object,stack:type/types/sender_metaobject'
+
+          dump_range() {
+            local label="$1" start="$2" end="$3"
+            echo "${label}_BEGIN=true"
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end"
+            echo "${label}_END=true"
+          }
+
+          dump_range LOGIN_HANDLER_CLUSTER 0xcf2880 0xcf2d40
+          dump_range LOGIN_CONSUMER_INVOKERS 0x7d3f80 0x7d4430
+          dump_range LOGIN_CONNECT_SETUP_A 0x7d5380 0x7d59d0
+          dump_range LOGIN_CONNECT_SETUP_B 0x7de450 0x7de7b0
+
+          python3 -u - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          segs=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,fsz,msz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fsz:
+                  segs.append((fo,fo+fsz,va,flags))
+          execs=[x for x in segs if x[3]&1]
+          targets=[0xcf29b0,0xcf29d0,0xcf2a10,0xcf2a50,0xcf2a80,0xcf2aa0,0xcf2bf0,0xcf2c38,0xcf2c50,0xcf2ca0,0x7d3fe0,0x7d4070,0x7d4100,0x7d4190,0x7d4220,0x7d42b0,0x7d4850,0x7d48e0,0x7d4970,0x7ceb20]
+          print('DIRECT_CALL_XREF_SCAN_BEGIN=true')
+          for target in targets:
+              hits=[]
+              for fs,fe,base,flags in execs:
+                  blob=data[fs:fe]
+                  for p in range(len(blob)-4):
+                      if blob[p]!=0xe8:
+                          continue
+                      site=base+p
+                      dst=site+5+struct.unpack_from('<i',blob,p+1)[0]
+                      if dst==target:
+                          hits.append(site)
+              print(f'DIRECT_CALL_XREF target=0x{target:x} count={len(hits)} sites={",".join(hex(x) for x in hits[:64])}')
+          print('DIRECT_CALL_XREF_SCAN_END=true')
+          PY
+
+          echo 'TRACK_A_LOGIN_SIGNAL_MAP_COMPLETE=true'
+
+      - name: Upload exact-version login signal map
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-login-signal-map-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-login-signal-map.txt
+          if-no-files-found: error
+          retention-days: 7

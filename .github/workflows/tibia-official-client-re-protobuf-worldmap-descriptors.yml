@@ -1,0 +1,114 @@
+name: Track A worldmap protobuf descriptor inspection
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-protobuf-worldmap-descriptors.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Extract descriptor-local strings and references
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+
+          python3 - "$client" <<'PY'
+          import re,struct,sys
+          data=open(sys.argv[1],'rb').read()
+          e_phoff=struct.unpack_from('<Q',data,0x20)[0]
+          e_phentsize=struct.unpack_from('<H',data,0x36)[0]
+          e_phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(e_phnum):
+              o=e_phoff+i*e_phentsize
+              typ,flags,off,vaddr,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1: loads.append((vaddr,vaddr+filesz,off,filesz,flags))
+          def off_to_va(pos):
+              for lo,hi,off,fs,fl in loads:
+                  if off<=pos<off+fs:return lo+(pos-off)
+              return None
+          def va_to_off(va):
+              for lo,hi,off,fs,fl in loads:
+                  if lo<=va<hi:return off+(va-lo)
+              return None
+          def printable_context(pos,radius=512):
+              a=max(0,pos-radius); z=min(len(data),pos+radius)
+              chunk=data[a:z]
+              out=[]; i=0
+              while i<len(chunk):
+                  j=i
+                  while j<len(chunk) and 32<=chunk[j]<127:j+=1
+                  if j-i>=2:
+                      out.append((a+i,chunk[i:j].decode('ascii','replace')))
+                  i=max(i+1,j+1)
+              return out
+          needles=[
+            b'GameserverMessageCreateOnMap',b'GameserverMessageChangeOnMap',b'GameserverMessageDeleteOnMap',
+            b'WorldmapObjectPosition',b'ObjectPosition',b'ObjectIdentifierAndPosition',b'stackposition',
+            b'MapFieldData',b'CreateOnMapMessage',b'ChangeOnMapMessage',b'DeleteOnMapMessage'
+          ]
+          print('TRACK_A_PROTOBUF_STRING_CONTEXT_BEGIN=true')
+          seen=set()
+          for needle in needles:
+              start=0
+              while True:
+                  pos=data.find(needle,start)
+                  if pos<0:break
+                  va=off_to_va(pos)
+                  key=(needle,pos)
+                  if key not in seen:
+                      seen.add(key)
+                      print(f'NEEDLE name={needle.decode()} file_off=0x{pos:x} va={"0x%x"%va if va is not None else "none"}')
+                      for p,s in printable_context(pos,700):
+                          if any(k in s.lower() for k in ['map','position','object','stack','coordinate','appearance','field','create','change','delete','thing','identifier']):
+                              sva=off_to_va(p)
+                              print(f'CTX va={"0x%x"%sva if sva is not None else "none"} text={s!r}')
+                  start=pos+1
+          print('TRACK_A_PROTOBUF_STRING_CONTEXT_END=true')
+
+          # Search all printable strings for likely generated protobuf field names.
+          print('TRACK_A_PROTOBUF_FIELDNAME_CANDIDATES_BEGIN=true')
+          for m in re.finditer(rb'[A-Za-z_][A-Za-z0-9_]{1,63}\x00',data):
+              s=m.group()[:-1].decode('ascii','replace')
+              low=s.lower()
+              if any(k in low for k in ['stackposition','stack_position','coordinate','worldmapobject','objectposition','object_position','appearance','objectidentifier','object_identifier','field_data','mapfield']):
+                  va=off_to_va(m.start())
+                  print(f'FIELDSTR va={"0x%x"%va if va is not None else "none"} text={s!r}')
+          print('TRACK_A_PROTOBUF_FIELDNAME_CANDIDATES_END=true')
+
+          # Find little-endian pointers to important string VAs. Generated protobuf tables often
+          # retain direct string/type pointers; these xrefs narrow descriptor objects for later decoding.
+          print('TRACK_A_PROTOBUF_STRING_PTR_XREFS_BEGIN=true')
+          for needle in needles[:7]:
+              pos=data.find(needle)
+              if pos<0: continue
+              va=off_to_va(pos)
+              if va is None: continue
+              pat=struct.pack('<Q',va)
+              xs=[]; st=0
+              while True:
+                  q=data.find(pat,st)
+                  if q<0: break
+                  qva=off_to_va(q)
+                  if qva is not None: xs.append(qva)
+                  st=q+1
+              print(f'PTRXREF needle={needle.decode()} string_va=0x{va:x} count={len(xs)} refs='+','.join(f'0x{x:x}' for x in xs[:80]))
+          print('TRACK_A_PROTOBUF_STRING_PTR_XREFS_END=true')
+          print('TRACK_A_PROTOBUF_DESCRIPTOR_INSPECTION_COMPLETE=true')
+          PY

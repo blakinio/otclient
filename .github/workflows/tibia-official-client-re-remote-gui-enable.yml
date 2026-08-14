@@ -1,0 +1,94 @@
+name: Track A enable loopback noVNC
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-remote-gui-enable.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  enable:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+    steps:
+      - name: Enable private noVNC bridge for existing Track A display
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ -S /var/run/docker.sock ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          client_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" && -e /tmp/.X11-unix/X98 ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+          kill -0 "$xvfb_pid"
+          [[ -n "$client_pid" && -r "/proc/$client_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$client_pid/environ"
+          kill -0 "$client_pid"
+          echo TRACK_A_EXISTING_SESSION_VERIFIED=true
+
+          self="$(hostname)"
+          docker inspect "$self" >/dev/null
+
+          if ! command -v x11vnc >/dev/null 2>&1 || ! command -v websockify >/dev/null 2>&1 || [[ ! -d /usr/share/novnc ]]; then
+            docker exec -u 0 "$self" sh -lc 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y --no-install-recommends x11vnc novnc websockify >/dev/null'
+          fi
+          command -v x11vnc >/dev/null
+          command -v websockify >/dev/null
+          [[ -d /usr/share/novnc ]]
+          echo TRACK_A_NOVNC_DEPENDENCIES_READY=true
+
+          if ! ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)5900$'; then
+            docker exec -d -u 0 -e DISPLAY="$TRACK_DISPLAY" "$self" sh -lc \
+              'exec x11vnc -display "$DISPLAY" -rfbport 5900 -localhost -forever -shared -nopw -noxdamage -quiet'
+          fi
+          for _ in $(seq 1 30); do
+            ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)5900$' && break
+            sleep 1
+          done
+          ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)5900$'
+          echo TRACK_A_X11VNC_READY=true
+
+          if ! ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)6080$'; then
+            docker exec -d -u 0 "$self" sh -lc \
+              'exec websockify --web=/usr/share/novnc 0.0.0.0:6080 127.0.0.1:5900'
+          fi
+          for _ in $(seq 1 30); do
+            ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)6080$' && break
+            sleep 1
+          done
+          ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)6080$'
+          echo TRACK_A_WEBSOCKIFY_READY=true
+
+          runner_ip="$(hostname -I | awk '{print $1}')"
+          [[ "$runner_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          bridge=otclient-track-a-novnc-loopback
+          docker rm -f "$bridge" >/dev/null 2>&1 || true
+          docker pull alpine:3.22 >/dev/null
+          docker run -d --name "$bridge" --restart unless-stopped --network host alpine:3.22 \
+            sh -lc "apk add --no-cache socat >/dev/null && exec socat TCP-LISTEN:6080,bind=127.0.0.1,reuseaddr,fork TCP:${runner_ip}:6080" >/dev/null
+          sleep 3
+          [[ "$(docker inspect -f '{{.State.Running}}' "$bridge")" == true ]]
+          docker exec "$bridge" sh -lc 'wget -qO- http://127.0.0.1:6080/vnc.html | grep -qi novnc'
+          echo TRACK_A_HOST_LOOPBACK_NOVNC_READY=true
+
+          host_ips="$(docker run --rm --network host alpine:3.22 sh -lc "ip -4 -o addr show scope global 2>/dev/null | awk '{print \\\$4}' | cut -d/ -f1 | tr '\\n' ' '" | xargs || true)"
+          echo TRACK_A_SYNOLOGY_HOST_IPS="$host_ips"
+          echo TRACK_A_ACCESS_MODE=ssh-loopback-tunnel
+          echo TRACK_A_ACCESS_HOST_PORT=6080

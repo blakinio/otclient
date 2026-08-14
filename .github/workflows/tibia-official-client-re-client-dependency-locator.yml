@@ -1,0 +1,46 @@
+name: Track A locate official client runtime dependencies
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-single-item-drag]
+    paths: [.github/workflows/tibia-official-client-re-client-dependency-locator.yml]
+permissions:
+  contents: read
+jobs:
+  locate:
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Locate exact missing dependencies without launching client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient && "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          pkg="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          root="$state/toolroot"
+          [[ -x "$client" && "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_DEP_CLIENT_SHA_OK=true
+          echo TRACK_A_DEP_DYNAMIC_SECTION_BEGIN=true
+          readelf -d "$client" | grep -E 'NEEDED|RPATH|RUNPATH' || true
+          echo TRACK_A_DEP_DYNAMIC_SECTION_END=true
+          echo TRACK_A_DEP_LDD_BASE_BEGIN=true
+          LD_LIBRARY_PATH="$pkg/lib:$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" ldd "$client" || true
+          echo TRACK_A_DEP_LDD_BASE_END=true
+          echo TRACK_A_DEP_PXBACKEND_BEGIN=true
+          find "$state" /usr /lib /opt -xdev \( -type f -o -type l \) -name 'libpxbackend-1.0.so*' -printf '%p -> %l\n' 2>/dev/null | sort -u || true
+          echo TRACK_A_DEP_PXBACKEND_END=true
+          echo TRACK_A_DEP_LIBPROXY_BEGIN=true
+          find "$state" /usr /lib /opt -xdev \( -type f -o -type l \) \( -name 'libproxy.so*' -o -name 'libproxy-*.so*' -o -name 'libpxbackend*.so*' \) -printf '%p -> %l\n' 2>/dev/null | sort -u | head -n 300 || true
+          echo TRACK_A_DEP_LIBPROXY_END=true
+          echo TRACK_A_DEP_DPKG_BEGIN=true
+          dpkg-query -S 'libpxbackend-1.0.so' 2>/dev/null || true
+          dpkg-query -W -f='${Package}\t${Version}\n' 2>/dev/null | grep -Ei 'libproxy|proxy.*plugin' || true
+          echo TRACK_A_DEP_DPKG_END=true
+          echo TRACK_A_DEP_TOOLROOT_PACKAGES_BEGIN=true
+          find "$root" -maxdepth 5 -type f \( -name '*.list' -o -name 'status' \) -print 2>/dev/null | head -n 100 || true
+          echo TRACK_A_DEP_TOOLROOT_PACKAGES_END=true

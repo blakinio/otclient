@@ -22,4 +22,3 @@ classification:
   reversible_one_tile_transition: FACT
   player_coordinate_from_viewport_center: DERIVED
   direct_player_member_address: UNKNOWN
-

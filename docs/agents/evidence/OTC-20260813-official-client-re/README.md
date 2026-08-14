@@ -55,6 +55,17 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - maps exact Chat and Container QMeta method indices to executable case entries and bounded direct-tail targets;
    - fixes the first jump-tail scanner's cross-case false-positive risk.
 
+11. `20260814-gameaction-qmeta-dispatch-map.md`
+   - recovers the exact QMeta method counts/indices and dispatch forms for high-value outbound GameAction handlers;
+   - proves executable case entries for Attack, Follow, Talk, Container/WorldMap MoveObject and TradeObject;
+   - records and rejects the superseded mapper that used incorrect hard-coded jump tables.
+
+12. `20260814-high-value-outbound-signal-disassembly.md`
+   - proves the six mapped `send*` cases are Qt signal-emission wrappers calling `QMetaObject::activate`, not direct protocol serializers;
+   - records their exact static metaobjects and signal indices;
+   - corrects the prior Player `+0xd1abc0` sender hypothesis: it is only a shared epilogue/return point;
+   - redirects the next RE gate to signal-to-receiver connection recovery.
+
 Current continuation rule:
 
 ```text
@@ -64,6 +75,7 @@ Do not use pre-world GDB attach or bypass BattlEye.
 Post-login, preserve the promoted dynamic-map observer until a controlled mutation is available.
 For protocol/action RE, prefer the exact relocation-backed QMeta records, metadata method indices and bounded case entries over string proximity.
 TCreatureProtocolMessageHandler has zero own QMeta methods in this exact version; recover creature routing through the actual upstream/base/direct protocol path rather than inventing handler cases.
+Treat GameAction `send*` QMeta cases as signal emitters until their connected receiver/slot is directly recovered; do not label their shared epilogues as serializers.
 Do not promote message names as wire opcodes or field layouts.
 Do not write every observed world object directly into canonical OTBM.
 ```

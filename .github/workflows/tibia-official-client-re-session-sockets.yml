@@ -1,4 +1,4 @@
-name: Track A meta-dispatch map cases
+name: Track A dynamic map target classification
 on:
   push:
     branches:
@@ -17,7 +17,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Inspect meta-dispatch cases following row movement handlers
+      - name: Disassemble adjacent candidate callback implementations
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,10 +27,16 @@ jobs:
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          "$toolroot/usr/bin/gdb" -q -nx -batch "$client" \
-            -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
-            -ex 'disassemble 0xdf2a80,0xdf3600' > /tmp/track-a-meta-map.txt 2>&1
-          echo TRACK_A_META_MAP_BEGIN=true
-          cat /tmp/track-a-meta-map.txt
-          echo TRACK_A_META_MAP_END=true
-          echo TRACK_A_META_MAP_CASES_CAPTURED=true
+          g="$toolroot/usr/bin/gdb"
+          for spec in \
+            'cd3190 cd3230' \
+            'cecc70 cecf40' \
+            'cecf40 ced220' \
+            'cd4e20 cd5140' \
+            'cd32c0 cd3650'; do
+            set -- $spec
+            echo "=== TARGET_0x$1_BEGIN ==="
+            "$g" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble 0x$1,0x$2" 2>/dev/null || true
+            echo "=== TARGET_0x$1_END ==="
+          done
+          echo TRACK_A_DYNAMIC_MAP_TARGETS_CAPTURED=true

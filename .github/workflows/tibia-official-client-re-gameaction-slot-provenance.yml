@@ -71,7 +71,7 @@ jobs:
           echo 'TRACK_A_GAMEACTION_SLOT_PROVENANCE_BEGIN=true'
           count="$(wc -l < "$tmp/candidates.tsv")"; echo "PROVEN_SENDER_CANDIDATE_COUNT=$count"; [[ "$count" -eq 29 ]]
           while read -r call family metaobject; do
-            start=$(printf '0x%x' $((call-1024)))
+            start=$(printf '0x%x' $((call-2048)))
             end=$(printf '0x%x' $((call+8)))
             "$gdb" -q -nx -batch "$client" \
               -ex 'set pagination off' \

@@ -66,6 +66,12 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - corrects the prior Player `+0xd1abc0` sender hypothesis: it is only a shared epilogue/return point;
    - redirects the next RE gate to signal-to-receiver connection recovery.
 
+13. `20260814-qt-connect-callsite-census.md`
+   - enumerates 2,184 direct calls to three exact Qt connect/disconnect PLT targets;
+   - separates 2,078 `connectImpl`, 41 legacy string-based `connect`, and 65 `disconnectImpl` calls;
+   - preserves the boundary that callsites alone do not identify semantic signal/slot edges;
+   - selects the bounded 41-call legacy neighborhood reconstruction as the next experiment.
+
 Current continuation rule:
 
 ```text

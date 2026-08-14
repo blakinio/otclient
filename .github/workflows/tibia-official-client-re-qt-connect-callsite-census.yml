@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qt-connect-callsite-census.yml
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,48 @@
+experiment_id: EXP-20260814-qt-connect-callsite-census
+objective: Enumerate direct calls to selected Qt connect and disconnect PLT targets in the exact official Linux client binary.
+falsifiable_hypothesis: The executable contains at least one direct x86-64 E8 call to the recovered QObject connect or disconnect PLT targets.
+client_version: 15.32.df7b29
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+runner: synology-otclient-01
+runtime: native Linux static binary analysis
+pid: not_applicable
+pie_base: not_applicable
+session_epoch: not_applicable
+preconditions:
+  - exact binary SHA check passes
+  - recovered PLT targets are version-fenced to the same binary
+runtime_objects: []
+authorized_effects: read-only static analysis
+side_effect_budget:
+  max_gold: 0
+  max_tibia_coins: 0
+  max_items_at_risk: 0
+  max_irreversible_changes: 0
+allowed_targets:
+  - exact official native Linux client binary
+baseline: Qt symbol census run 31793668176
+stimulus: none
+expected_structural_evidence:
+  - direct callsite address and exact PLT target
+abort_conditions:
+  - binary SHA mismatch
+  - runner identity mismatch
+rollback: not_applicable
+observed_evidence:
+  run: 31799755489
+  job: 94764705414
+  head: 3d0a54a9edd658555df44929494c902abfd846ec
+  counts:
+    QObject_connectImpl: 2078
+    QObject_connect_legacy_string_api: 41
+    QObject_disconnectImpl: 65
+    total: 2184
+negative_control: not_applicable_static_enumeration
+repeatability: exact-version deterministic scan
+restart_test: not_applicable_static_enumeration
+result: PROVEN
+confidence_boundary: Direct E8 calls to the three exact PLT targets only; no semantic edge or Tibia ownership is established.
+privacy_redactions: none_required
+artifacts:
+  - GitHub Actions run 31799755489 job 94764705414
+next_action: Disassemble and classify bounded neighborhoods for all 41 legacy string-based QObject connect callsites.

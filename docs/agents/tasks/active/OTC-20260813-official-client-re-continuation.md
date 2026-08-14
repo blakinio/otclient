@@ -167,9 +167,17 @@ symbol_census:
     QObject_disconnectImpl: 0x4de9e0
 callsite_census:
   first_run: 31794273375
-  state: queued_runner_label_mismatch
+  repaired_run: 31799755489
+  repaired_job: 94764705414
+  repaired_head: 3d0a54a9edd658555df44929494c902abfd846ec
+  state: PASS
   first_failure: workflow requested labels not exposed by synology-otclient-01; successful adjacent Track A jobs use only otclient/synology
   repair: use [otclient, synology]
+  counts:
+    QObject_connectImpl: 2078
+    QObject_connect_legacy_string_api: 41
+    QObject_disconnectImpl: 65
+    total: 2184
 ```
 
 ## Anti-stall checkpoint
@@ -180,11 +188,13 @@ updated_at: 2026-08-14T14:17:00+02:00
 owner_resume: explicit
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
-status: implementing
+status: investigating
 last_progress:
   - verified xref-v2 run 31789670398 PASS with zero direct selected-literal RIP references
   - verified Qt connect symbol census run 31793668176 PASS
   - isolated the queued callsite census to a runner-label mismatch and aligned it with successful adjacent Track A workflows
+  - completed repaired callsite census run 31799755489 with 2184 direct calls
+  - persisted the bounded experiment record and selected legacy string-connect neighborhood reconstruction
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 2
@@ -202,19 +212,19 @@ recovery:
   session_started_at: 2026-08-14T14:00:00+02:00
   checkpointed_at: 2026-08-14T14:17:00+02:00
   last_progress_at: 2026-08-14T14:17:00+02:00
-  phase: static-qt-connect-callsite-census-repair
-  exact_head: 3aaa0025df36e2a0fb0fa199ac86d7699aff89c3
+  phase: static-qt-legacy-connect-neighborhoods
+  exact_head: 3d0a54a9edd658555df44929494c902abfd846ec
   pull_request: 289
-  active_operation: persist and push canonical runner selector repair
-  external_run_ids: [31794273375, 31798163007]
+  active_operation: persist and push legacy QObject connect neighborhood experiment
+  external_run_ids: [31799755489]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
-  checks_used: 1
+  checks_used: 2
   status: active
   safe_to_resume: true
-  resume_condition: repaired workflow is pushed and a new callsite census reaches terminal state
-  next_action: commit and push the runner-selector repair, then inspect the resulting callsite census once
+  resume_condition: legacy string-connect neighborhood workflow is pushed and reaches terminal state
+  next_action: commit and push the legacy string-connect neighborhood experiment, then inspect its terminal result once
 ```
 
 ## Context checkpoint
@@ -222,10 +232,10 @@ recovery:
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-08-14T12:17:00Z
-head: 3aaa0025df36e2a0fb0fa199ac86d7699aff89c3
+head: 3d0a54a9edd658555df44929494c902abfd846ec
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
-status: implementing
+status: investigating
 context_routes:
   - docs/agents/TIBIA_RESEARCH_TRACKS.md
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
@@ -236,10 +246,11 @@ proven:
   - xref-v2 run 31789670398 completed successfully with TOTAL_DIRECT_RIPREFS=0 for its exact bounded scanner
   - Qt symbol census run 31793668176 recovered the three selected QObject connect/disconnect PLT targets
   - synology-otclient-01 is online and successful adjacent Track A workflows select it with otclient/synology
+  - repaired callsite census run 31799755489 enumerated 2184 direct calls across three exact PLT targets
 derived:
-  - the callsite census queue is caused by labels beyond the proven otclient/synology pair
+  - the 41 legacy string-based connect calls are the smallest high-information subset for argument reconstruction
 unknown:
-  - direct callsite count and addresses until the repaired workflow completes
+  - sender/receiver and signal/slot identities for every recovered callsite
 conflicts: []
 first_failure:
   marker: queued_runner_label_mismatch
@@ -248,13 +259,16 @@ rejected_hypotheses:
   - runner unavailable: GitHub runner API reports synology-otclient-01 online and idle
 changed_paths:
   - .github/workflows/tibia-official-client-re-qt-connect-callsite-census.yml
+  - .github/workflows/tibia-official-client-re-qt-legacy-connect-neighborhoods.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
+  - docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md
+  - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-connect-callsite-census.yaml
 validation:
   - command: YAML safe_load and git diff --check
     result: PASS
     evidence: local exact working tree
 blockers: []
-next_action: commit and push the runner-selector repair, then inspect the resulting callsite census once
+next_action: commit and push the legacy string-connect neighborhood experiment, then inspect its terminal result once
 ```
 
 ## Rejected interpretations
@@ -269,5 +283,5 @@ next_action: commit and push the runner-selector repair, then inspect the result
 ## Next action
 
 ```text
-Commit and push the canonical runner-selector repair, then inspect the resulting Qt connect callsite census once after terminal state and persist the exact callsite set or first failure.
+Commit and push the legacy string-connect neighborhood experiment, then inspect its terminal result once and classify the recoverable semantic string edges or the first failure.
 ```

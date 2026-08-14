@@ -158,6 +158,49 @@ established direct TCP connections: 0
 UDP sockets: 0
 ```
 
+## PROVEN — reproducible successful login recipe
+
+The successful execution used the existing workflow:
+
+```text
+.github/workflows/tibia-official-client-re-software-world-login.yml
+workflow id: 333784548
+successful run: 31730884814
+successful attempt: 5
+successful job: 94617262508
+```
+
+The procedure that actually succeeded was:
+
+1. Use the persistent Track A state root `/work/_otclient_tibia_re_state` when available.
+2. Require the exact official child client at `home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client` with SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
+3. Require the existing Track A WARP/wireproxy process and verify `warp=on|plus` through SOCKS5 at `127.0.0.1:25354`.
+4. Before login, ensure the official launcher/package state has already been recovered to `15.32.df7b29` / `InstalledAndUsable`. If launcher startup is incorrectly blocked while no Tibia process exists, inspect `home/.local/share/CipSoft GmbH/Tibia/.running`; remove it only after proving no owned Tibia/client process is alive and the file is not actively `flock`-locked, then complete official launcher `--first-launch` installation.
+5. Clear only the Track A-owned `packages/Tibia/crashdump` contents before starting the child client.
+6. Reuse the Track A X server on display `:98` and launch the exact child `bin/client` with persistent `HOME=$state/home`, software Qt rendering (`QT_QUICK_BACKEND=software`, `QT_XCB_GL_INTEGRATION=none`), the Track A toolroot/font paths, and the existing proxychains `LD_PRELOAD`/configuration so all network traffic remains on the owned SOCKS/WARP path.
+7. Wait for the visible Tibia window and focus it.
+8. On the 1020x650 Account Login UI used by the successful run, execute the exact observed input sequence:
+
+```text
+click email field:     (535,275)
+Ctrl+A
+enter TIBIA_TEST_EMAIL
+click password field:  (535,304)
+Ctrl+A
+enter TIBIA_TEST_PASSWORD
+click Login button:    (590,388)
+```
+
+9. Wait approximately 8 seconds for the Account Login screen to transition to Select Character. Do not treat changed-pixel count alone as proof; the successful artifact showed the actual Select Character screen.
+10. On the successful Select Character screen, the workflow selected the first visible character row at `(285,193)`, then sent `Return`. In this exact successful attempt, that activated the selected character and entered the world. This records what actually succeeded; a future semantic/UI-controller implementation may replace the coordinate/Return mechanism with explicit character selection plus the dialog's `OK` action.
+11. Wait approximately 15 seconds for world load.
+12. Preserve and inspect `pre-login.xwd`, `select.xwd`, and `world.xwd`. A successful claim requires `select.xwd` to be the actual Select Character UI and `world.xwd` to show the actual in-game world, not an update/error dialog.
+13. Verify the live client remains Track A-owned and network-confined. The successful run had `8` established SOCKS-path connections, `0` direct established TCP connections, and `0` UDP sockets.
+
+Credentials are never stored in the repository. The workflow receives them only from the existing GitHub Actions secrets `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD`, uses `set +x`, and unsets them after submission.
+
+The historical rerun is important: creating/replacing other login workflows was not necessary for the final success. Re-running the already credential-capable workflow after repairing the launcher/package state was sufficient.
+
 ## Structural consequence
 
 Structural run `31731046581`, job `94560023155`, attached during the earlier update-error state. Its lack of Worldmap records does not falsify the historical exact-version Worldmap decode path.

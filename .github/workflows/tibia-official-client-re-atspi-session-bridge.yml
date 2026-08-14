@@ -49,6 +49,11 @@ jobs:
             apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install build-essential cmake ninja-build pkg-config qt6-base-dev
             for archive in "$aptroot"/archives/*.deb; do dpkg-deb -x "$archive" "$root"; done
           fi
+          if ! find "$root" -type f -name 'libpxbackend-1.0.so' -print -quit | grep -q .; then
+            apt_opts=(-o "Dir::State::lists=$aptroot/lists" -o "Dir::State::status=$aptroot/status" -o "Dir::Cache::archives=$aptroot/archives" -o APT::Get::List-Cleanup=0)
+            apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install libproxy1-plugin-gsettings
+            for archive in "$aptroot"/archives/libproxy1-plugin-gsettings*.deb; do dpkg-deb -x "$archive" "$root"; done
+          fi
           mkdir -p "$root/lib/x86_64-linux-gnu"
           for source in "$root/usr/lib/x86_64-linux-gnu"/*; do
             name="${source##*/}"; [[ -e "$root/lib/x86_64-linux-gnu/$name" ]] || ln -s "../../usr/lib/x86_64-linux-gnu/$name" "$root/lib/x86_64-linux-gnu/$name"

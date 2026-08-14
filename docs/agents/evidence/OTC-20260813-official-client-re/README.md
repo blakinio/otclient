@@ -97,6 +97,18 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - ties the containing-owner setup path to `QTcpSocket` construction;
    - retains the exact serializer/framing function and final wire bytes as unknown pending concrete-slot recovery.
 
+19. `20260814-chatgpt-continuation-handover.md`
+   - consolidates the current exact-client Track A state for the next ChatGPT continuation agent;
+   - records the 47/146/189/160 protocol census, 2,184 Qt connect/disconnect callsites, 29 proven GameAction sender-metaobject sites, `TInternalGameActionRouter` rejection as serializer, concrete `TProtocolMessageQueue` builder convergence points and the queue-to-network-owner handoff;
+   - records structural live world entry, reversible movement and the `18x14` current-floor aware-range result while preserving player position as `DERIVED` from authoritative strips rather than a direct member read;
+   - records the PR #283 bridge build success followed by the exact Qt 6.4/Qt 6.9 runtime-shadowing failure and its deterministic recovery action;
+   - records the controlled single-item drag as stimulus-only evidence with no A3/A4 promotion because the current structural observer saw no event/strip delta;
+   - provides the ordered remaining work: bridge/world correlation, serializer/framing closure, first server-confirmed reversible semantic action, P0 live reads, complete S1/S2 registries/coverage, causal recorder, audit/CI/PR closeout.
+
+20. `experiments/EXP-20260814-live-reversible-movement.yaml` and `experiments/EXP-20260814-protocol-queue-network-handoff.yaml`
+   - machine-readable experiment records for the strongest current live movement and outbound queue-to-network facts;
+   - use these rather than prose-only interpretation when promoting read/action gates.
+
 Current continuation rule:
 
 ```text
@@ -108,5 +120,10 @@ For protocol/action RE, prefer the exact relocation-backed QMeta records, metada
 TCreatureProtocolMessageHandler has zero own QMeta methods in this exact version; recover creature routing through the actual upstream/base/direct protocol path rather than inventing handler cases.
 Treat GameAction `send*` QMeta cases as signal emitters until their connected receiver/slot is directly recovered; do not label their shared epilogues as serializers.
 Do not promote message names as wire opcodes or field layouts.
+Do not promote internal GameclientMessage discriminators to final wire bytes until serializer/framing evidence proves the relationship.
+Do not call network-owner virtual slot +0x90 the serializer until its concrete function and semantics are structurally recovered.
+Treat the live player coordinate as DERIVED from authoritative strip geometry until a direct standalone player-position member is proven.
+Treat the single-item drag workflow SUCCESS as stimulus-delivery evidence only; changed pixels without authoritative source/destination state are not MoveObject A3/A4.
+Keep extracted build/sysroot Qt 6.4 libraries out of the official client's runtime LD_LIBRARY_PATH; launch against the bundled Qt 6.9 runtime before repeating bridge session-status correlation.
 Do not write every observed world object directly into canonical OTBM.
 ```

@@ -1,4 +1,4 @@
-name: Track A parser call-chain probe
+name: Track A parser dispatch disassembly
 on:
   push:
     branches:
@@ -11,60 +11,26 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 4
+    timeout-minutes: 3
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
-      TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Capture call chain at proven tile parser hook
+      - name: Disassemble proven parser caller
         shell: bash
         run: |
           set -Eeuo pipefail
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
-          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
           toolroot="$state/toolroot"
-          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY"
-          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
-          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
-          pid="$(tr -cd '0-9' < "$state/runtime/client.pid")"
-          kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          window="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' | head -1)"; [[ -n "$window" ]]
-          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
-          start="$(awk '{split($1,a,"-");print a[1]}' <<< "$line")"; off="$(awk '{print $3}' <<< "$line")"; bias=$((16#$start-16#$off))
-          d="$state/evidence/parser-call-chain"; rm -rf "$d"; mkdir -p "$d"
-          cat > "$d/probe.gdb" <<GDB
-          set pagination off
-          set confirm off
-          attach $pid
-          break *$((bias+0x19a8ea3))
-          commands
-            silent
-            printf "TRACK_A_PROVEN_HOOK_PC=%p\n", \$pc
-            printf "TRACK_A_PROVEN_HOOK_RSP=%p\n", \$rsp
-            printf "TRACK_A_PROVEN_HOOK_RBX=%p\n", \$rbx
-            bt 14
-            info registers rax rbx rcx rdx rsi rdi rbp rsp r8 r9 r10 r11 r12 r13 r14 r15 rip
-            x/40gx \$rsp
-            detach
-            quit
-          end
-          continue
-          GDB
-          "$toolroot/usr/bin/gdb" -q -nx -batch -x "$d/probe.gdb" > "$d/gdb.log" 2>&1 & gp=$!
-          sleep 2
-          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
-          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
-          "$toolroot/usr/bin/xdotool" key Right
-          for _ in $(seq 1 40); do
-            if ! kill -0 "$gp" 2>/dev/null; then break; fi
-            sleep .25
-          done
-          if kill -0 "$gp" 2>/dev/null; then kill -INT "$gp" 2>/dev/null || true; sleep 1; kill -CONT "$pid" 2>/dev/null || true; fi
-          cat "$d/gdb.log"
-          kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"
-          echo TRACK_A_PARSER_CALL_CHAIN_CAPTURED=true
-          echo TRACK_A_SESSION_LEFT_RUNNING=true
+          objdump_bin="$toolroot/usr/bin/objdump"
+          [[ -x "$objdump_bin" ]] || objdump_bin=/usr/bin/objdump
+          "$objdump_bin" -d -M intel --start-address=0xcd9000 --stop-address=0xcdf000 "$client" > /tmp/track-a-parser-disasm.txt
+          echo TRACK_A_DISASM_LINES="$(wc -l < /tmp/track-a-parser-disasm.txt)"
+          grep -n -E 'cmp.*0x6a|cmp.*0x6b|cmp.*0x6c|0x6a,|0x6b,|0x6c,' /tmp/track-a-parser-disasm.txt || true
+          echo TRACK_A_CALLER_CONTEXT_BEGIN=true
+          sed -n '/cdbb40:/,/cdbc80:/p' /tmp/track-a-parser-disasm.txt || true
+          echo TRACK_A_CALLER_CONTEXT_END=true
+          echo TRACK_A_PARSER_DISASSEMBLY_CAPTURED=true

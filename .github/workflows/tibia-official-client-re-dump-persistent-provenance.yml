@@ -1,0 +1,37 @@
+name: Track A dump persistent provenance evidence
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-single-item-drag]
+    paths: [.github/workflows/tibia-official-client-re-dump-persistent-provenance.yml]
+permissions:
+  contents: read
+jobs:
+  dump:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Read only persisted Track A provenance files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient && "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          runtime="$state/runtime"
+          for f in map-provenance-persistent-events.tsv map-provenance-persistent-raw.log map-provenance-persistent-strips.tsv map-provenance-persistent-gdb.stdout; do
+            [[ -r "$runtime/$f" ]]
+          done
+          echo TRACK_A_EVENTS_BEGIN=true; cat "$runtime/map-provenance-persistent-events.tsv"; echo TRACK_A_EVENTS_END=true
+          echo TRACK_A_RAW_BEGIN=true; cat "$runtime/map-provenance-persistent-raw.log"; echo TRACK_A_RAW_END=true
+          echo TRACK_A_STRIPS_BEGIN=true; cat "$runtime/map-provenance-persistent-strips.tsv"; echo TRACK_A_STRIPS_END=true
+          echo TRACK_A_GDB_STDOUT_BEGIN=true; cat "$runtime/map-provenance-persistent-gdb.stdout"; echo TRACK_A_GDB_STDOUT_END=true
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/persistent-provenance"
+          cp "$runtime/map-provenance-persistent-events.tsv" "$runtime/map-provenance-persistent-raw.log" "$runtime/map-provenance-persistent-strips.tsv" "$runtime/map-provenance-persistent-gdb.stdout" "$GITHUB_WORKSPACE/artifacts/persistent-provenance/"
+      - name: Upload persisted provenance evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-persistent-provenance-dump
+          path: artifacts/persistent-provenance/*
+          retention-days: 7

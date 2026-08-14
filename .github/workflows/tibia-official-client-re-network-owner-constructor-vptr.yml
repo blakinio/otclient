@@ -1,0 +1,107 @@
+name: Track A network owner constructor vptr provenance
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-network-owner-constructor-vptr.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Trace candidate vtable references through the exact owner setup chain
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          refs="$(mktemp)"; trap 'rm -f "$refs"' EXIT
+          python3 -u - "$client" >"$refs" <<'PY'
+          import struct, sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; es=struct.unpack_from('<H',data,0x36)[0]; n=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(n):
+              o=phoff+i*es
+              typ,flags,fo,va,_,sz,_,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and sz: loads.append((fo,fo+sz,va,va+sz,flags))
+          def off(va):
+              for fs,fe,base,end,flags in loads:
+                  if base<=va<end:return fs+va-base
+          def flags(va):
+              for fs,fe,base,end,f in loads:
+                  if base<=va<end:return f
+              return 0
+          rel={}
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shes=struct.unpack_from('<H',data,0x3a)[0]; shn=struct.unpack_from('<H',data,0x3c)[0]
+          for i in range(shn):
+              o=shoff+i*shes
+              if struct.unpack_from('<I',data,o+4)[0]!=4:continue
+              so=struct.unpack_from('<Q',data,o+0x18)[0]; ss=struct.unpack_from('<Q',data,o+0x20)[0]; se=struct.unpack_from('<Q',data,o+0x38)[0] or 24
+              for p in range(so,so+ss,se):
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p)
+                  if (ri&0xffffffff)==8:rel[ro]=ra&0xffffffffffffffff
+          def q(va):
+              if va in rel:return rel[va]
+              p=off(va)
+              return struct.unpack_from('<Q',data,p)[0] if p is not None else None
+          def sq(va):
+              p=off(va)
+              return struct.unpack_from('<q',data,p)[0] if p is not None else None
+          sig=(0x4a8,0x4b0,0x4b8,0x4c0,0x4c8,0x4d8)
+          candidates=set()
+          for fs,fe,base,end,f in loads:
+              if f&1:continue
+              for ap in range((base+7)&~7,end-0x4e0,8):
+                  if not (q(ap) and flags(q(ap))&1):continue
+                  if not (q(ap+0x90) and flags(q(ap+0x90))&1):continue
+                  if any(not (q(ap+x) and flags(q(ap+x))&1) for x in sig):continue
+                  ot=sq(ap-16); rt=q(ap-8)
+                  if ot is None or abs(ot)>0x100000:continue
+                  if rt not in (0,None) and not flags(rt):continue
+                  candidates.add(ap)
+          hits=[]
+          for fs,fe,base,end,f in loads:
+              if not f&1:continue
+              for p in range(fs,fe-7):
+                  if not (0x40<=data[p]<=0x4f and data[p+1]==0x8d and data[p+2]&0xc7==0x05):continue
+                  site=base+p-fs
+                  target=site+7+struct.unpack_from('<i',data,p+3)[0]
+                  if target in candidates and 0x7e7000<=site<0x7e8008:
+                      hits.append((site,target,q(target+0x90)))
+          print('TRACK_A_NETWORK_OWNER_CONSTRUCTOR_VPTR_BEGIN=true')
+          print(f'OWNER_SETUP_RANGE_VTABLE_REF_COUNT={len(hits)}')
+          for site,target,slot in sorted(hits):
+              print(f'OWNER_SETUP_VTABLE_REF site=0x{site:x} address_point=0x{target:x} slot90=0x{slot:x}')
+          print('TRACK_A_NETWORK_OWNER_CONSTRUCTOR_VPTR_SCAN_COMPLETE=true')
+          PY
+          cat "$refs"
+          grep -q '^TRACK_A_NETWORK_OWNER_CONSTRUCTOR_VPTR_SCAN_COMPLETE=true$' "$refs"
+          echo 'OWNER_SETUP_CHAIN_DISASSEMBLY_BEGIN=true'
+          "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble /r 0x7e7000,0x7e8008'
+          echo 'OWNER_SETUP_CHAIN_DISASSEMBLY_END=true'
+          while read -r site; do
+            lo=$(printf '0x%x' $((site-48))); hi=$(printf '0x%x' $((site+80)))
+            echo "VTABLE_REF_NEIGHBORHOOD_BEGIN=$site"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi"
+            echo "VTABLE_REF_NEIGHBORHOOD_END=$site"
+          done < <(sed -n 's/^OWNER_SETUP_VTABLE_REF site=\(0x[0-9a-f]*\).*/\1/p' "$refs")
+          echo 'TRACK_A_NETWORK_OWNER_CONSTRUCTOR_VPTR_COMPLETE=true'

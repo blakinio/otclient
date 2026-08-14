@@ -218,7 +218,7 @@ recovery:
   phase: static-gameaction-connectimpl-correlation
   exact_head: 5b72f60a17dc67e2e02901a69362f43da0f4c8c4
   pull_request: 289
-  active_operation: persist legacy string-edge result and prepare GameAction connectImpl correlation
+  active_operation: run GameAction connectImpl correlation
   external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820]
   operation_started_at: null
   wait_deadline_at: null
@@ -226,8 +226,8 @@ recovery:
   checks_used: 2
   status: active
   safe_to_resume: true
-  resume_condition: high-value connectImpl correlation experiment is implemented and pushed
-  next_action: cross-correlate connectImpl callsites with nearby exact GameAction static-metaobject references
+  resume_condition: high-value connectImpl correlation workflow reaches terminal state
+  next_action: commit and push the GameAction connectImpl correlation workflow, then inspect its terminal result once
 ```
 
 ## Context checkpoint
@@ -268,6 +268,7 @@ changed_paths:
   - .github/workflows/tibia-official-client-re-qt-connect-callsite-census.yml
   - .github/workflows/tibia-official-client-re-qt-legacy-connect-neighborhoods.yml
   - .github/workflows/tibia-official-client-re-qt-legacy-connect-string-edges.yml
+  - .github/workflows/tibia-official-client-re-gameaction-connectimpl-correlation.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-connect-callsite-census.yaml
@@ -277,7 +278,7 @@ validation:
     result: PASS
     evidence: local exact working tree
 blockers: []
-next_action: cross-correlate connectImpl callsites with nearby exact GameAction static-metaobject references
+next_action: commit and push the GameAction connectImpl correlation workflow, then inspect its terminal result once
 ```
 
 ## Rejected interpretations
@@ -292,5 +293,5 @@ next_action: cross-correlate connectImpl callsites with nearby exact GameAction 
 ## Next action
 
 ```text
-Cross-correlate the 2,078 direct `QObject::connectImpl` callsites with nearby exact references to the six version-fenced GameAction static metaobjects, persist every match or a bounded negative result, and avoid broad callsite disassembly until this filter is tested.
+Commit and push the bounded GameAction `connectImpl` correlation workflow, inspect its terminal result once, and persist every nearby exact static-metaobject match or the bounded negative result.
 ```

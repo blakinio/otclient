@@ -1,0 +1,94 @@
+name: Track A GameAction connectImpl correlation
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-gameaction-connectimpl-correlation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Correlate connectImpl calls with GameAction static metaobjects
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct
+          import sys
+
+          data = open(sys.argv[1], 'rb').read()
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          execs = []
+          for index in range(phnum):
+              offset = phoff + index * phentsz
+              typ, flags, file_offset, va, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', data, offset)
+              if typ == 1 and flags & 1:
+                  execs.append((file_offset, file_offset + filesz, va))
+
+          connect_impl_plt = 0x4dd800
+          metaobjects = {
+              0x3085060: 'Creatures',
+              0x30851a0: 'Chat',
+              0x30850a0: 'Container',
+              0x3085360: 'PlayerTrade',
+              0x30850e0: 'WorldMap',
+              0x30852a0: 'Player',
+          }
+          window = 0x180
+          callsites = []
+          matches = []
+          for file_start, file_end, va_start in execs:
+              for call_offset in range(file_start, file_end - 4):
+                  if data[call_offset] != 0xE8:
+                      continue
+                  callsite = va_start + (call_offset - file_start)
+                  relative = struct.unpack_from('<i', data, call_offset + 1)[0]
+                  if callsite + 5 + relative != connect_impl_plt:
+                      continue
+                  callsites.append(callsite)
+                  local = []
+                  for offset in range(max(file_start, call_offset - window), call_offset - 6):
+                      if not (0x40 <= data[offset] <= 0x4f and data[offset + 1] == 0x8d):
+                          continue
+                      if data[offset + 2] & 0xc7 != 0x05:
+                          continue
+                      instruction_va = va_start + (offset - file_start)
+                      displacement = struct.unpack_from('<i', data, offset + 3)[0]
+                      target = instruction_va + 7 + displacement
+                      family = metaobjects.get(target)
+                      if family is not None:
+                          local.append((instruction_va, target, family))
+                  for instruction_va, target, family in local:
+                      matches.append((callsite, instruction_va, target, family))
+
+          print('TRACK_A_GAMEACTION_CONNECTIMPL_CORRELATION_BEGIN=true')
+          print(f'CONNECTIMPL_CALLSITE_TOTAL={len(callsites)}')
+          print(f'CORRELATION_WINDOW_BYTES={window}')
+          for callsite, instruction_va, target, family in matches:
+              print(
+                  f'MATCH call=0x{callsite:x} meta_ref=0x{instruction_va:x} '
+                  f'distance={callsite - instruction_va} family={family} metaobject=0x{target:x}'
+              )
+          print(f'GAMEACTION_METAOBJECT_NEAR_CONNECTIMPL_MATCHES={len(matches)}')
+          print('TRACK_A_GAMEACTION_CONNECTIMPL_CORRELATION_COMPLETE=true')
+          PY

@@ -1,0 +1,93 @@
+name: Track A protocol handler qmeta neighborhood mapping
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-handler-neighborhood.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Recover class-local QMetaObject strings and method neighborhoods
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import re,sys,struct
+          data=open(sys.argv[1],'rb').read()
+          classes=[
+            'TCreatureProtocolMessageHandler','TChatProtocolMessageHandler','TContainerProtocolMessageHandler',
+            'TPlayerProtocolMessageHandler','TEffectProtocolMessageHandler','TNPCTradeProtocolMessageHandler',
+            'TPlayerTradeProtocolMessageHandler','TMarketProtocolMessageHandler','TVipProtocolMessageHandler',
+            'TFriendsProtocolMessageHandler','TQuestLogProtocolMessageHandler','TGameEventProtocolMessageHandler'
+          ]
+          # ELF VA helpers.
+          e_phoff=struct.unpack_from('<Q',data,0x20)[0]
+          e_phentsize=struct.unpack_from('<H',data,0x36)[0]
+          e_phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(e_phnum):
+              o=e_phoff+i*e_phentsize
+              typ,flags,off,vaddr,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((vaddr,vaddr+filesz,off,filesz,flags))
+          def off_to_va(pos):
+              for lo,hi,off,fs,fl in loads:
+                  if off<=pos<off+fs:return lo+(pos-off)
+          def va_to_off(va):
+              for lo,hi,off,fs,fl in loads:
+                  if lo<=va<hi:return off+(va-lo)
+          # printable starts for local neighborhood catalogues
+          printable=[]
+          for m in re.finditer(rb'[ -~]{3,}',data):
+              try:s=m.group().decode('ascii')
+              except:continue
+              printable.append((m.start(),s))
+          print('TRACK_A_QMETA_HANDLER_NEIGHBORHOOD_BEGIN=true')
+          for cls in classes:
+              positions=[]; p=0; n=cls.encode()
+              while True:
+                  q=data.find(n,p)
+                  if q<0:break
+                  positions.append(q);p=q+1
+              print(f'CLASS name={cls} occurrences={len(positions)} positions='+','.join(hex(x) for x in positions[:12]))
+              for q in positions[:6]:
+                  va=off_to_va(q)
+                  # qmeta string tables commonly place method names in compact string pools near class name.
+                  local=[]
+                  for off,s in printable:
+                      if off < q-6000: continue
+                      if off > q+16000: break
+                      if s.startswith('handle') and s.endswith('Message'):
+                          local.append((off-q,off,s))
+                  if local:
+                      print(f' CLASS_NEIGHBORHOOD class={cls} class_off=0x{q:x} class_va={"0x%x"%va if va is not None else "none"} method_count={len(local)}')
+                      for d,off,s in local[:100]:
+                          print(f'  METHOD delta={d:+d} off=0x{off:x} va={"0x%x"%off_to_va(off) if off_to_va(off) is not None else "none"} name={s}')
+                  # find direct qword xrefs to class string; generated QMetaObject structures often reference string-data objects/pools.
+                  if va is not None:
+                      pat=struct.pack('<Q',va); refs=[]; st=0
+                      while True:
+                          r=data.find(pat,st)
+                          if r<0:break
+                          rva=off_to_va(r)
+                          if rva is not None:refs.append(rva)
+                          st=r+1
+                      if refs:print(' CLASS_STRING_PTR_XREFS class='+cls+' refs='+','.join(hex(x) for x in refs[:40]))
+          print('TRACK_A_QMETA_HANDLER_NEIGHBORHOOD_END=true')
+          print('TRACK_A_QMETA_HANDLER_NEIGHBORHOOD_COMPLETE=true')
+          PY

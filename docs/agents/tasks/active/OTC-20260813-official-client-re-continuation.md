@@ -319,5 +319,47 @@ next_action: follow TProtocolMessageQueue sendMessage and queue-processing helpe
 ## Next action
 
 ```text
-Follow `TProtocolMessageQueue::sendMessage` body `0xde6de0` and queue-processing helpers `0xbc6750`/`0xbc6f00` to the exact serializer, framing and final network-send path; determine whether the internal discriminators are preserved as wire bytes.
+Rebuild the PR #283 read-only bridge helper against the official client's bundled Qt 6.9 headers/libraries (or avoid exposing the extracted Qt 6.4 runtime through LD_LIBRARY_PATH), then repeat semantic world login and correlate bridge `session-status` with the already proven decoded map state. Separately resolve the concrete function behind the containing network owner's virtual slot `+0x90` before naming an exact serializer/framing entry.
+```
+
+## Live continuation checkpoint — 2026-08-14 16:35 CEST
+
+```yaml
+checkpoint_version: 6
+head: 9af08efbf1aaf51c220205fb5142c1db361e03b6
+branch: ci/OTC-20260813-official-client-re-continuation
+pr: 289
+status: ready
+proven:
+  - exact live world bootstrap run 31730884814 left the owned client running through WARP
+  - persistent structural observer run 31806223531 armed exact map decoding
+  - reversible movement run 31806312967 decoded the derived path (32546,32510,7) -> (32546,32509,7) -> (32546,32510,7)
+  - player and creature handler QMeta outcomes plus selected live map-strip layout are persisted
+  - requested outbound action builder bodies and internal discriminators are recovered
+  - clientMessageReadyToProcess hands queue owner+0x88 to containing owner virtual slot +0x90
+  - setup path constructs QTcpSocket at +0x196fee0
+  - QMeta run 31806620571 identifies 0x3085ba0 as TCreatureStorage and rejects it as transport owner
+  - exact PR 283 bridge source builds successfully in run 31809994339
+derived:
+  - player coordinate is derived from authoritative decoded strip geometry, not a direct standalone member read
+unknown:
+  - concrete function and exact serializer/framing semantics behind virtual slot +0x90
+  - final wire-byte relationship of internal message discriminators
+  - live bridge session-status correlation
+current_failure:
+  run: 31809994339
+  job: 94798051385
+  step: Bridge session DBus to private AT-SPI and inspect Tibia
+  cause: extracted Ubuntu Qt 6.4 libQt6Core shadows the official client's required bundled Qt_6.9 runtime
+  exact_error: "libQt6Core.so.6: version Qt_6.9 not found"
+  repeated_identical_failures: 1
+persisted_evidence:
+  - docs/agents/evidence/OTC-20260813-official-client-re/20260814-live-structural-world-and-reversible-movement.md
+  - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-live-reversible-movement.yaml
+  - docs/agents/evidence/OTC-20260813-official-client-re/20260814-protocol-queue-network-handoff.md
+  - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-protocol-queue-network-handoff.yaml
+local_worker_review:
+  model: gemma4:12b
+  result: position remains DERIVED and slot +0x90 must not yet be called the exact serializer
+next_action: keep extracted build tools out of client LD_LIBRARY_PATH, launch with bundled Qt 6.9, and query bridge session-status after semantic world entry
 ```

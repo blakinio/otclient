@@ -1,0 +1,38 @@
+name: Track A fast remote GUI probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-remote-gui-fast-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+    steps:
+      - name: Read-only post-install state
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          for p in xvfb client; do
+            pid="$(tr -cd '0-9' <"$state/runtime/$p.pid" 2>/dev/null || true)"
+            if [[ -n "$pid" && -r "/proc/$pid/environ" ]] && grep -azFxq "$marker" "/proc/$pid/environ" && kill -0 "$pid" 2>/dev/null; then echo "TRACK_A_${p^^}_RUNNING=true"; else echo "TRACK_A_${p^^}_RUNNING=false"; fi
+          done
+          for cmd in x11vnc websockify; do command -v "$cmd" >/dev/null 2>&1 && echo "TRACK_A_CMD_${cmd}=true" || echo "TRACK_A_CMD_${cmd}=false"; done
+          for pkg in x11vnc novnc websockify; do dpkg -s "$pkg" >/dev/null 2>&1 && echo "TRACK_A_PKG_${pkg}=installed" || echo "TRACK_A_PKG_${pkg}=missing"; done
+          [[ -d /usr/share/novnc ]] && echo TRACK_A_NOVNC_WEBROOT=true || echo TRACK_A_NOVNC_WEBROOT=false
+          [[ -S /var/run/docker.sock ]] && echo TRACK_A_DOCKER_SOCKET=true || echo TRACK_A_DOCKER_SOCKET=false
+          echo TRACK_A_SELF_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$(hostname)")"
+          echo TRACK_A_SELF_NETWORKS="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(hostname)" | xargs)"
+          ps -eo pid,comm,args | grep -E '[a]pt-get|[d]pkg' | head -n10 || true

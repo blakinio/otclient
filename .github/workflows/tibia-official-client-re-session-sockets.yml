@@ -13,14 +13,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
-      TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Capture structural map stack type ids
+      - name: Wait for fresh login client and capture initial map
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,32 +27,83 @@ jobs:
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
-          toolroot="$state/toolroot"
-          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
-          pid="$(tr -cd '0-9' <"$state/runtime/client.pid")"
-          [[ -r "/proc/$pid/environ" ]]; grep -azFxq "$marker" "/proc/$pid/environ"; kill -0 "$pid"
-          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          echo TRACK_A_OBSERVER_OLD_PID="$old_pid"
+          echo TRACK_A_OBSERVER_WAITING_FOR_FRESH_PID=true
+          pid=''
+          for _ in $(seq 1 240); do
+            candidate="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+            if [[ -n "$candidate" && "$candidate" != "$old_pid" && -r "/proc/$candidate/environ" ]]; then
+              if grep -azFxq "$marker" "/proc/$candidate/environ" && kill -0 "$candidate" 2>/dev/null && [[ "$(readlink -f "/proc/$candidate/exe" 2>/dev/null || true)" == "$client" ]]; then
+                pid="$candidate"; break
+              fi
+            fi
+            sleep 0.5
+          done
+          [[ -n "$pid" ]]
           [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          window=''; for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"; [[ "$(printf '%s\n' "$g"|sed -n 's/^WIDTH=//p')" == 1020 && "$(printf '%s\n' "$g"|sed -n 's/^HEIGHT=//p')" == 650 ]] && { window="$w"; break; }; done; [[ -n "$window" ]]
-          line="$(grep -F "$client" "/proc/$pid/maps"|awk '$2~/r-xp/{print;exit}')"; start="$(awk '{split($1,a,"-");print a[1]}'<<<"$line")"; off="$(awk '{print $3}'<<<"$line")"; bias=$((16#$start-16#$off))
-          evidence="$state/evidence/type-id-$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$evidence"; out="$evidence/records.txt"; :>"$out"; script="$evidence/probe.gdb"
+          echo TRACK_A_OBSERVER_FRESH_PID="$pid"
+          line="$(grep -F "$client" "/proc/$pid/maps"|awk '$2~/r-xp/{print;exit}')"
+          [[ -n "$line" ]]
+          start="$(awk '{split($1,a,"-");print a[1]}'<<<"$line")"
+          off="$(awk '{print $3}'<<<"$line")"
+          bias=$((16#$start-16#$off))
+          printf 'TRACK_A_OBSERVER_PIE_BASE=0x%x\n' "$bias"
+          evidence="$state/evidence/initial-map-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$evidence"
+          records="$evidence/records.txt"
+          : >"$records"
+          script="$evidence/probe.gdb"
           printf '%s\n' \
-            'set pagination off' 'set confirm off' "attach $pid" 'python' 'import gdb,struct,time' 'inf=gdb.selected_inferior()' "out='$out'" \
+            'set pagination off' 'set confirm off' "attach $pid" 'python' 'import gdb,struct,time' 'inf=gdb.selected_inferior()' "out='$records'" \
             'class P(gdb.Breakpoint):' '    def __init__(self):' "        super().__init__('*0x%x' % ($bias+0x19a8ea3))" \
-            '    def stop(self):' '        try:' '            rsp=int(gdb.parse_and_eval("$rsp")); rbp=int(gdb.parse_and_eval("$rbp")); obj=int(gdb.parse_and_eval("$rbx"))' \
+            '    def stop(self):' '        try:' \
+            '            rsp=int(gdb.parse_and_eval("$rsp")); rbp=int(gdb.parse_and_eval("$rbp")); obj=int(gdb.parse_and_eval("$rbx"))' \
             '            x,y,z=struct.unpack("<III",bytes(inf.read_memory(rsp+0x88,12))); order=rbp&0xffffffff' \
-            '            if 0<x<100000 and 0<y<100000 and z<32 and order<32 and obj:' \
-            '                type_id=struct.unpack("<I",bytes(inf.read_memory(obj+0x30,4)))[0]' \
-            '                kind=struct.unpack("<I",bytes(inf.read_memory(obj+0x38,4)))[0]' \
-            '                if type_id<1000000:' \
-            '                    with open(out,"a") as f:f.write(f"{time.time_ns()//1000} {x} {y} {z} {order} {type_id} {kind} 0x{obj:x}\n")' \
+            '            if 0<x<100000 and 0<y<100000 and z<32 and order<64:' \
+            '                type_id=-1; kind=-1' \
+            '                if obj:' \
+            '                    try: type_id=struct.unpack("<I",bytes(inf.read_memory(obj+0x30,4)))[0]; kind=struct.unpack("<I",bytes(inf.read_memory(obj+0x38,4)))[0]' \
+            '                    except: pass' \
+            '                with open(out,"a") as f:f.write(f"{time.time_ns()//1000} {x} {y} {z} {order} {type_id} {kind}\n")' \
             '        except: pass' '        return False' 'P()' 'end' 'continue' >"$script"
-          gdb -q -nx -batch -x "$script" >"$evidence/gdb.log" 2>&1 & gp=$!; sleep 2
-          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$toolroot/usr/bin/xdotool" windowfocus --sync "$window" || true
-          start_us="$(date +%s%6N)"; "$toolroot/usr/bin/xdotool" key Right; sleep 1.5; end_us="$(date +%s%6N)"; "$toolroot/usr/bin/xdotool" key Left || true; sleep 1
-          kill -INT "$gp" 2>/dev/null || true; sleep 1; kill -CONT "$pid" 2>/dev/null || true
-          echo TRACK_A_TYPE_ID_RECORDS_BEGIN
-          awk -v s="$start_us" -v e="$end_us" '$1>=s&&$1<=e {print "REC x="$2" y="$3" z="$4" order="$5" type_id="$6" kind="$7" obj="$8}' "$out"
-          echo TRACK_A_TYPE_ID_RECORDS_END
-          awk -v s="$start_us" -v e="$end_us" '$1>=s&&$1<=e && $4==7 { key=$2 FS $3 FS $5; ids[key]=$6; n++ } END { print "TRACK_A_Z7_RECORDS="n; for(k in ids)u[ids[k]]=1; c=0; for(k in u)c++; print "TRACK_A_Z7_DISTINCT_TYPE_IDS="c }' "$out"
-          kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"; echo TRACK_A_SESSION_LEFT_LOGGED_IN=true
+          gdb -q -nx -batch -x "$script" >"$evidence/gdb.log" 2>&1 & gp=$!
+          echo TRACK_A_OBSERVER_ATTACHED=true
+          sleep 100
+          if kill -0 "$gp" 2>/dev/null; then kill -INT "$gp" 2>/dev/null || true; sleep 1; fi
+          kill -CONT "$pid" 2>/dev/null || true
+          python3 - "$records" <<'PY'
+          import sys,collections
+          rows=[]
+          for line in open(sys.argv[1]):
+              p=line.split()
+              if len(p)==7:
+                  try: rows.append(tuple(map(int,p)))
+                  except: pass
+          print(f'TRACK_A_INITIAL_TOTAL_RECORDS={len(rows)}')
+          if not rows: raise SystemExit(1)
+          zs=sorted({r[3] for r in rows})
+          print('TRACK_A_INITIAL_Z_VALUES='+','.join(map(str,zs)))
+          print(f'TRACK_A_INITIAL_Z_COUNT={len(zs)}')
+          for z in zs:
+              rr=[r for r in rows if r[3]==z]
+              xs=[r[1] for r in rr]; ys=[r[2] for r in rr]
+              xy={(r[1],r[2]) for r in rr}
+              ids={r[5] for r in rr if 0 <= r[5] < 1000000}
+              print(f'TRACK_A_Z{z}_RECORDS={len(rr)}')
+              print(f'TRACK_A_Z{z}_UNIQUE_XY={len(xy)}')
+              print(f'TRACK_A_Z{z}_X_MIN={min(xs)}')
+              print(f'TRACK_A_Z{z}_X_MAX={max(xs)}')
+              print(f'TRACK_A_Z{z}_X_SPAN={max(xs)-min(xs)+1}')
+              print(f'TRACK_A_Z{z}_Y_MIN={min(ys)}')
+              print(f'TRACK_A_Z{z}_Y_MAX={max(ys)}')
+              print(f'TRACK_A_Z{z}_Y_SPAN={max(ys)-min(ys)+1}')
+              print(f'TRACK_A_Z{z}_DISTINCT_TYPE_IDS={len(ids)}')
+          print('TRACK_A_INITIAL_MAP_CAPTURE_PROVEN=true')
+          PY
+          echo TRACK_A_INITIAL_SAMPLE_BEGIN
+          head -40 "$records" || true
+          echo TRACK_A_INITIAL_SAMPLE_END
+          kill -0 "$pid"
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          echo TRACK_A_SESSION_LEFT_RUNNING=true

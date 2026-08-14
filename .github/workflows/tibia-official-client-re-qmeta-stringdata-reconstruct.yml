@@ -1,0 +1,129 @@
+name: Track A QMeta stringdata reconstruction
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-stringdata-reconstruct.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Reconstruct Qt meta string tables and base references
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import collections,struct,sys
+          data=open(sys.argv[1],'rb').read()
+          classes=[
+            'TWorldmapProtocolMessageHandler','TChatProtocolMessageHandler','TContainerProtocolMessageHandler',
+            'TCreatureProtocolMessageHandler','TPlayerProtocolMessageHandler','TEffectProtocolMessageHandler',
+            'TMarketProtocolMessageHandler','TNPCTradeProtocolMessageHandler','TPlayerTradeProtocolMessageHandler',
+            'TQuestLogProtocolMessageHandler','TGameEventProtocolMessageHandler'
+          ]
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phentsz=struct.unpack_from('<H',data,0x36)[0]; phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def off2va(o):
+              for lo,hi,va,vhi,fl in loads:
+                  if lo<=o<hi:return va+(o-lo)
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def segflags(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return fl
+              return 0
+          def printable(bs):
+              return all((32<=b<127) or b in (9,) for b in bs)
+          def find_tables(cls):
+              b=cls.encode(); p=0; out=[]
+              while True:
+                  pos=data.find(b,p)
+                  if pos<0:break
+                  p=pos+1
+                  for n in range(2,257):
+                      table_bytes=n*8; base=pos-table_bytes
+                      if base<0:continue
+                      off0,l0=struct.unpack_from('<II',data,base)
+                      if off0!=table_bytes or l0!=len(b) or base+off0!=pos:continue
+                      vals=[];ok=True;prev=table_bytes
+                      for i in range(n):
+                          off,ln=struct.unpack_from('<II',data,base+i*8)
+                          if off<table_bytes or off<prev or ln>1024 or base+off+ln>len(data):ok=False;break
+                          raw=data[base+off:base+off+ln]
+                          if not printable(raw):ok=False;break
+                          if base+off+ln<len(data) and data[base+off+ln]!=0:ok=False;break
+                          try:s=raw.decode('ascii')
+                          except:ok=False;break
+                          vals.append((off,ln,s));prev=off
+                      if ok and vals and vals[0][2]==cls and any(v[2].startswith('handle') for v in vals):
+                          out.append((base,pos,n,vals))
+              # exact generated table should be unique by base
+              uniq=[];seen=set()
+              for x in out:
+                  if x[0] not in seen:seen.add(x[0]);uniq.append(x)
+              return uniq
+          recovered=[]
+          print('TRACK_A_QMETA_STRINGDATA_BEGIN=true')
+          for cls in classes:
+              tabs=find_tables(cls)
+              print(f'CLASS name={cls} table_candidates={len(tabs)}')
+              for base,pos,n,vals in tabs:
+                  bva=off2va(base);sva=off2va(pos)
+                  if bva is None:continue
+                  refs=[];pat=struct.pack('<Q',bva);q=0
+                  while True:
+                      r=data.find(pat,q)
+                      if r<0:break
+                      rv=off2va(r)
+                      if rv is not None:refs.append((r,rv))
+                      q=r+1
+                  print(f' TABLE class={cls} base_off=0x{base:x} base_va=0x{bva:x} string_off=0x{pos:x} strings={n} qword_refs={len(refs)}')
+                  for i,(off,ln,s) in enumerate(vals):print(f'  STRING index={i} rel=0x{off:x} len={ln} value={s}')
+                  for r,rv in refs[:16]:
+                      candidate=rv-8;co=va2off(candidate)
+                      words=[]
+                      if co is not None and co+56<=len(data):
+                          for j in range(7):
+                              v=struct.unpack_from('<Q',data,co+j*8)[0]
+                              words.append(f'{j}:0x{v:x}/fl={segflags(v)}')
+                      print(f'  BASE_QWORD_REF off=0x{r:x} va=0x{rv:x} candidate_qmeta=0x{candidate:x} qwords={";".join(words)}')
+                      recovered.append((cls,bva,rv,candidate))
+          # Scan executable ranges once for refs to table bases, qword slots, and candidate QMetaObject bases.
+          wanted=collections.defaultdict(list)
+          for cls,bva,rv,cand in recovered:
+              wanted[bva].append((cls,'stringdata_base'))
+              wanted[rv].append((cls,'stringdata_pointer_slot'))
+              wanted[cand].append((cls,'candidate_qmeta_base'))
+          hits=collections.defaultdict(list)
+          for lo,hi,segva,vhi,fl in loads:
+              if not (fl&1):continue
+              chunk=data[lo:hi]
+              for i in range(len(chunk)-7):
+                  b0,b1,b2=chunk[i],chunk[i+1],chunk[i+2]
+                  if b0 not in (0x48,0x4c) or b1 not in (0x8d,0x8b) or (b2&0xc7)!=0x05:continue
+                  disp=struct.unpack_from('<i',chunk,i+3)[0];src=segva+i;dst=(src+7+disp)&0xffffffffffffffff
+                  if dst in wanted:hits[dst].append(src)
+          for dst,labels in wanted.items():
+              print(f'XREF target=0x{dst:x} labels={labels!r} refs={",".join(hex(x) for x in hits.get(dst,[])[:64]) or "none"}')
+          print('TRACK_A_QMETA_STRINGDATA_COMPLETE=true')
+          PY

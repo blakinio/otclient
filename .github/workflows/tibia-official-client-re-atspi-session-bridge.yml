@@ -30,6 +30,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: d93ccb34f66af7d3198a50a46e706b4f902ae637
+          path: bridge-src
+          persist-credentials: false
+
+      - name: Build exact-version read-only runtime bridge
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          build="$state/build/tibia-runtime-bridge"
+          cmake -S bridge-src/tools/tibia_runtime_bridge -B "$build" -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$build" --parallel 2
+          [[ -s "$build/otclient-tibia-runtime-bridge.so" ]]
+          echo TRACK_A_RUNTIME_BRIDGE_BUILD_READY=true
+
       - name: Bridge session DBus to private AT-SPI and inspect Tibia
         shell: bash
         run: |
@@ -125,13 +142,25 @@ jobs:
 
           proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
           proxy_conf="$state/config/proxychains.conf"
-          [[ -n "$proxy_lib" && -s "$proxy_conf" ]]
+          helper="$state/build/tibia-runtime-bridge/otclient-tibia-runtime-bridge.so"
+          profile="$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json"
+          socket="$state/runtime/otclient-tibia-re.sock"
+          targets="$(python3 - "$profile" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          print(';'.join(f"{n},{int(v['vptr_offset'],16):x},{v['expected_qt_class']}" for n,v in sorted(d['targets'].items())))
+          PY
+          )"
+          [[ -n "$proxy_lib" && -s "$proxy_conf" && -s "$helper" && -n "$targets" ]]
+          rm -f "$socket"
           cd "$runtime"
           env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$path" \
             LD_LIBRARY_PATH="$runtime/lib:$lib" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
             QT_ACCESSIBILITY=1 QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 DBUS_SESSION_BUS_ADDRESS="$session_addr" \
             XDG_DATA_DIRS="$root/usr/share:/usr/share" FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
-            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            LD_PRELOAD="$helper:$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            OTCLIENT_TIBIA_RE_SOCKET="$socket" OTCLIENT_TIBIA_RE_BINARY_SHA256="$EXPECTED_CLIENT_SHA256" \
+            OTCLIENT_TIBIA_RE_CLIENT_VERSION=15.32.df7b29 OTCLIENT_TIBIA_RE_TARGETS="$targets" \
             nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
           pid=$!
           printf '%s\n' "$pid" >"$state/runtime/client.pid"; chmod 600 "$state/runtime/client.pid"
@@ -157,6 +186,11 @@ jobs:
             python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" character
           sleep 10
           kill -0 "$pid"
+          [[ -S "$socket" && "$(stat -c '%a' "$socket")" == 600 ]]
           echo TRACK_A_SEMANTIC_CHARACTER_ENTER_COMPLETE=true
+          status="$(python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/ipc_client.py" --socket "$socket" session-status)"
+          echo TRACK_A_BRIDGE_SESSION_STATUS_BEGIN=true; printf '%s\n' "$status"; echo TRACK_A_BRIDGE_SESSION_STATUS_END=true
+          printf '%s' "$status" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["in_game_candidate"]; assert all(d["markers"][k]["validated_hits"]>0 for k in d["required_markers"])'
+          echo TRACK_A_BRIDGE_IN_GAME_CANDIDATE=true
           trap - EXIT
           echo TRACK_A_ACCESSIBLE_SESSION_LEFT_RUNNING=true

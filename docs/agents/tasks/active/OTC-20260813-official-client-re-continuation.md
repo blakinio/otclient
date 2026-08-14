@@ -214,29 +214,29 @@ recovery:
   generation: 1
   session_id: 20260814-track-a-gemma-continuation
   session_started_at: 2026-08-14T14:00:00+02:00
-  checkpointed_at: 2026-08-14T14:30:00+02:00
-  last_progress_at: 2026-08-14T14:30:00+02:00
-  phase: static-gameaction-connectimpl-argument-reconstruction
-  exact_head: a460030dd2d8b26ccc755cb3e57da3718f063542
+  checkpointed_at: 2026-08-14T15:00:00+02:00
+  last_progress_at: 2026-08-14T15:00:00+02:00
+  phase: static-gameaction-connectimpl-slot-target-reconstruction
+  exact_head: 89827b7b182654ef8a696d63bc54724f77be5162
   pull_request: 289
   active_operation: none
-  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781]
+  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
   checks_used: 2
   status: ready
   safe_to_resume: true
-  resume_condition: correlation result is committed and pushed
-  next_action: disassemble the 31 near candidates and reconstruct connectImpl arguments
+  resume_condition: connectImpl argument reconstruction is committed and pushed
+  next_action: map the slot-object invoke targets and signal pointer-to-member storage for the proven sender-metaobject sites
 ```
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-14T12:30:00Z
-head: a460030dd2d8b26ccc755cb3e57da3718f063542
+updated_at: 2026-08-14T13:00:00Z
+head: 89827b7b182654ef8a696d63bc54724f77be5162
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: ready
@@ -254,12 +254,13 @@ proven:
   - GDB neighborhood run 31800072490 emitted all 41 bounded legacy callsite disassemblies
   - string-edge run 31800240820 classified 40 legacy UI/controller edges and retained one explicit UNCLASSIFIED callsite
   - correlation run 31800490781 found 31 distance-at-most-64 GameAction metaobject/connectImpl candidates across all six families
+  - argument run 31800999307 reconstructed the hidden-return ABI, all 31 AutoConnection/null-types/slot-object arguments, 29 exact sender-metaobject matches, one mismatch and one bounded unresolved case
 derived:
   - the 41 legacy string-based connect calls are the smallest high-information subset for argument reconstruction
   - high-value GameAction send signals are absent from the recovered legacy string-edge set and should be tested against connectImpl/wrapper paths
 unknown:
   - receiver identities for the six high-value GameAction send signals
-  - connectImpl signal indices and slot-object targets for the 31 near candidates
+  - concrete receiver identities, pointer-to-member signal indices and slot-object invoke target semantics for the proven sender-metaobject sites
 conflicts: []
 first_failure:
   marker: legacy_neighborhood_disassembler_unavailable
@@ -272,17 +273,20 @@ changed_paths:
   - .github/workflows/tibia-official-client-re-qt-legacy-connect-neighborhoods.yml
   - .github/workflows/tibia-official-client-re-qt-legacy-connect-string-edges.yml
   - .github/workflows/tibia-official-client-re-gameaction-connectimpl-correlation.yml
+  - .github/workflows/tibia-official-client-re-gameaction-connectimpl-arguments.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-connect-callsite-census.yaml
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-legacy-connect-string-edges.yaml
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-gameaction-connectimpl-correlation.yaml
+  - docs/agents/evidence/OTC-20260813-official-client-re/20260814-gameaction-connectimpl-arguments.md
+  - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-gameaction-connectimpl-arguments.yaml
 validation:
   - command: YAML safe_load and git diff --check
     result: PASS
     evidence: local exact working tree
 blockers: []
-next_action: disassemble the 31 distance-at-most-64 candidates and reconstruct connectImpl arguments
+next_action: map slot-object invoke targets and signal pointer-to-member storage for the proven sender-metaobject sites
 ```
 
 ## Rejected interpretations
@@ -297,5 +301,5 @@ next_action: disassemble the 31 distance-at-most-64 candidates and reconstruct c
 ## Next action
 
 ```text
-Disassemble the 31 distance-at-most-64 GameAction `connectImpl` candidates and recover, where structurally possible, the sender signal pointer/index, receiver object source, slot-object target, connection type, and sender static metaobject; explicitly classify unresolved candidates.
+Map the slot-object invoke targets and signal pointer-to-member storage for the proven sender-metaobject `connectImpl` sites; retain register-only receiver identities as unresolved until RTTI or constructor provenance proves them.
 ```

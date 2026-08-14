@@ -1,0 +1,22 @@
+experiment_id: EXP-20260814-gameaction-connectimpl-arguments
+track: A
+client_version: 15.32.df7b29
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+method: read-only bounded disassembly of 31 tightly correlated QObject::connectImpl callsites
+runner: synology-otclient-01
+workflow_run: 31800999307
+job: 94768688628
+result: PASS
+facts:
+  candidate_count: 31
+  effective_abi_has_hidden_connection_return: true
+  auto_connection_count: 31
+  null_queued_types_count: 31
+  allocated_slot_object_count: 31
+  nearby_metaobject_is_sender_metaobject: 29
+  nearby_metaobject_mismatch: 1
+  sender_metaobject_unresolved_in_window: 1
+limits:
+  - register source expressions are not concrete object identities
+  - signal indices and slot-lambda semantics are not yet recovered
+

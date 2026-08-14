@@ -102,5 +102,5 @@ jobs:
               -ex "disassemble /r $start,$end"
             echo "ARGUMENT_CANDIDATE_END call=$call"
           done < "$tmp/candidates.tsv"
-          echo 'CONNECTIMPL_SYSV_ARGS=rdi:sender,rsi:signal,rdx:receiver,rcx:slot,r8:slot_object,r9:connection_type,stack7:types,stack8:sender_metaobject'
+          echo 'CONNECTIMPL_SYSV_ARGS=rdi:hidden_connection_return,rsi:sender,rdx:signal,rcx:receiver,r8:slot,r9:slot_object,stack7:connection_type,stack8:types,stack9:sender_metaobject'
           echo 'TRACK_A_GAMEACTION_CONNECTIMPL_ARGUMENTS_COMPLETE=true'

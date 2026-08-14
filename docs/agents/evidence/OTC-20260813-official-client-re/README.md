@@ -72,6 +72,11 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - preserves the boundary that callsites alone do not identify semantic signal/slot edges;
    - selects the bounded 41-call legacy neighborhood reconstruction as the next experiment.
 
+14. `20260814-gameaction-connectimpl-arguments.md`
+   - corrects the effective ABI for the hidden `QMetaObject::Connection` return pointer;
+   - reconstructs argument-source patterns for all 31 tightly correlated `connectImpl` sites;
+   - proves 29 nearby GameAction metaobjects are actual sender metaobjects and retains two explicit exceptions.
+
 Current continuation rule:
 
 ```text

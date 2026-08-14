@@ -28,7 +28,7 @@ jobs:
       TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
     steps:
       - name: Checkout exact Track A head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           persist-credentials: false
 

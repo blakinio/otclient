@@ -26,11 +26,11 @@ jobs:
       TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
       TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           persist-credentials: false
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           ref: d93ccb34f66af7d3198a50a46e706b4f902ae637
           path: bridge-src

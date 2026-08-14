@@ -18,7 +18,7 @@ jobs:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
     steps:
-      - name: Read detached initial-map capture
+      - name: Inspect detached initial-map capture logs
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -31,11 +31,10 @@ jobs:
           echo TRACK_A_WATCHER_RESULT_BEGIN
           cat "$watchdir/result.txt" 2>/dev/null || true
           echo TRACK_A_WATCHER_RESULT_END
-          records="$watchdir/records.txt"
-          if [[ -f "$records" ]]; then
-            echo TRACK_A_WATCHER_RECORD_LINES="$(wc -l <"$records")"
-            awk '{zs[$4]=1} END {printf "TRACK_A_WATCHER_LIVE_Z_VALUES="; first=1; for(z in zs){if(!first)printf ","; printf "%s",z; first=0} printf "\n"}' "$records"
-            echo TRACK_A_WATCHER_SAMPLE_BEGIN
-            head -20 "$records"
-            echo TRACK_A_WATCHER_SAMPLE_END
-          fi
+          echo TRACK_A_WATCHER_GDB_BEGIN
+          cat "$watchdir/gdb.log" 2>/dev/null || true
+          echo TRACK_A_WATCHER_GDB_END
+          echo TRACK_A_WATCHER_NOHUP_BEGIN
+          cat "$watchdir/nohup.log" 2>/dev/null || true
+          echo TRACK_A_WATCHER_NOHUP_END
+          if [[ -f "$watchdir/records.txt" ]]; then echo TRACK_A_WATCHER_RECORD_LINES="$(wc -l <"$watchdir/records.txt")"; fi

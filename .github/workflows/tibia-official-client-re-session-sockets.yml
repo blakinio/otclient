@@ -13,13 +13,14 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 3
+    timeout-minutes: 5
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Summarize latest aware-range capture per floor
+      - name: Inspect structural map record inputs
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,19 +29,82 @@ jobs:
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
           [[ -n "$pid" && -r "/proc/$pid/environ" ]]
           grep -azFxq "$marker" "/proc/$pid/environ"
           [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          latest="$(find "$state/evidence" -maxdepth 1 -type d -name 'aware-range-*' -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
-          [[ -n "$latest" && -s "$latest/records.txt" && -s "$latest/phases.txt" ]]
-          records="$latest/records.txt"
-          while read -r name s e; do
-            for z in 6 7; do
-              awk -v name="$name" -v s="$s" -v e="$e" -v wantz="$z" '$1>=s && $1<=e && $4==wantz { n++; x=$2; y=$3; if(n==1||x<xmin)xmin=x; if(n==1||x>xmax)xmax=x; if(n==1||y<ymin)ymin=y; if(n==1||y>ymax)ymax=y; xy[x FS y]=1 } END { printf "TRACK_A_%s_Z%d_COUNT=%d\n",name,wantz,n; if(n){ c=0; for(k in xy)c++; printf "TRACK_A_%s_Z%d_X_MIN=%d\nTRACK_A_%s_Z%d_X_MAX=%d\nTRACK_A_%s_Z%d_X_SPAN=%d\n",name,wantz,xmin,name,wantz,xmax,name,wantz,xmax-xmin+1; printf "TRACK_A_%s_Z%d_Y_MIN=%d\nTRACK_A_%s_Z%d_Y_MAX=%d\nTRACK_A_%s_Z%d_Y_SPAN=%d\n",name,wantz,ymin,name,wantz,ymax,name,wantz,ymax-ymin+1; printf "TRACK_A_%s_Z%d_UNIQUE_XY=%d\n",name,wantz,c } }' "$records"
-            done
-          done <"$latest/phases.txt"
+          window=''
+          for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+            g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+            [[ "$(printf '%s\n' "$g" | sed -n 's/^WIDTH=//p')" == 1020 ]] || continue
+            [[ "$(printf '%s\n' "$g" | sed -n 's/^HEIGHT=//p')" == 650 ]] || continue
+            window="$w"; break
+          done
+          [[ -n "$window" ]]
+          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
+          start="$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')"
+          offset="$(printf '%s\n' "$line" | awk '{print $3}')"
+          bias=$((16#$start - 16#$offset))
+          echo TRACK_A_MAP_BP_FILE_OFFSET=0x19a8ea3
+          printf 'TRACK_A_CURRENT_PIE_BASE=0x%x\n' "$bias"
+          echo TRACK_A_DISASSEMBLY_BEGIN
+          objdump -d --start-address=$((0x19a8e40)) --stop-address=$((0x19a8f20)) "$client" 2>/dev/null | tail -n +5 || true
+          echo TRACK_A_DISASSEMBLY_END
+          evidence="$state/evidence/map-field-diag-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$evidence"
+          out="$evidence/hits.txt"
+          script="$evidence/probe.gdb"
+          : >"$out"
+          printf '%s\n' \
+            'set pagination off' \
+            'set confirm off' \
+            "attach $pid" \
+            'python' \
+            'import gdb, struct' \
+            'inf=gdb.selected_inferior()' \
+            "out='$out'" \
+            'hits=0' \
+            'class P(gdb.Breakpoint):' \
+            '    def __init__(self):' \
+            "        super().__init__('*0x%x' % ($bias + 0x19a8ea3))" \
+            '    def stop(self):' \
+            '        global hits' \
+            '        try:' \
+            '            rsp=int(gdb.parse_and_eval("$rsp")); rbp=int(gdb.parse_and_eval("$rbp"))' \
+            '            x,y,z=struct.unpack("<III",bytes(inf.read_memory(rsp+0x88,12)))' \
+            '            order=rbp & 0xffffffff' \
+            '            if 0<x<100000 and 0<y<100000 and z<32 and order<128 and hits<8:' \
+            '                regs={r:int(gdb.parse_and_eval("$"+r)) for r in ["rax","rbx","rcx","rdx","rsi","rdi","r8","r9","r10","r11","r12","r13","r14","r15"]}' \
+            '                raw=bytes(inf.read_memory(rsp,0xc0))' \
+            '                with open(out,"a") as f:' \
+            '                    f.write("HIT %d xyz=%d,%d,%d order=%d regs=%s\\n"%(hits,x,y,z,order," ".join("%s=0x%x"%(k,v) for k,v in regs.items())))' \
+            '                    f.write("STACK "+raw.hex()+"\\n")' \
+            '                hits+=1' \
+            '        except Exception as e:' \
+            '            pass' \
+            '        return False' \
+            'P()' \
+            'end' \
+            'continue' >"$script"
+          gdb -q -nx -batch -x "$script" >"$evidence/gdb.log" 2>&1 & gp=$!
+          sleep 2
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window" || true
+          "$toolroot/usr/bin/xdotool" key Right
+          sleep 1.5
+          "$toolroot/usr/bin/xdotool" key Left || true
+          sleep 1
+          if kill -0 "$gp" 2>/dev/null; then kill -INT "$gp" 2>/dev/null || true; sleep 1; fi
+          kill -CONT "$pid" 2>/dev/null || true
+          echo TRACK_A_FIELD_HITS_BEGIN
+          cat "$out"
+          echo TRACK_A_FIELD_HITS_END
+          echo TRACK_A_GDB_LOG_TAIL_BEGIN
+          tail -80 "$evidence/gdb.log" || true
+          echo TRACK_A_GDB_LOG_TAIL_END
           kill -0 "$pid"
           grep -azFxq "$marker" "/proc/$pid/environ"
           echo TRACK_A_SESSION_LEFT_LOGGED_IN=true

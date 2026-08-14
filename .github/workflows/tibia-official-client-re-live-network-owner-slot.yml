@@ -1,0 +1,71 @@
+name: Track A live network owner slot
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-live-network-owner-slot.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Resolve live queue owner vtable and processing slot
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          runtime="$state/runtime"; client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"; toolroot="$state/toolroot"
+          [[ -x "$client" ]]; [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          pid="$(tr -cd '0-9' <"$runtime/client.pid")"; [[ -r "/proc/$pid/environ" ]]
+          tr '\0' '\n' <"/proc/$pid/environ" | grep -qx 'OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          observer="$(tr -cd '0-9' <"$runtime/map-provenance-gdb.pid")"
+          [[ -r "/proc/$observer/environ" ]]; tr '\0' '\n' <"/proc/$observer/environ" | grep -qx 'OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          kill -TERM "$observer"; for _ in $(seq 1 50); do [[ ! -d "/proc/$observer" ]] && break; sleep 0.1; done
+          [[ ! -d "/proc/$observer" ]]; kill -0 "$pid"
+          base="$(awk -v exe="$client" '$6==exe && $3=="00000000" {print "0x"$1; exit}' "/proc/$pid/maps" | cut -d- -f1)"
+          [[ "$base" =~ ^0x[0-9a-f]+$ ]]
+          gcmd="$(mktemp)"; gout="$(mktemp)"; trap 'rm -f "$gcmd" "$gout"' EXIT
+          cat >"$gcmd" <<GDB
+          set pagination off
+          set confirm off
+          set logging file $gout
+          set logging redirect on
+          set logging enabled on
+          attach $pid
+          set \$base=$base
+          break *(\$base+0xde91b0)
+          commands
+          silent
+          set \$queue=\$rdi
+          set \$owner=\$queue-0x88
+          set \$vptr=*(void**)\$owner
+          set \$slot=*(void**)(\$vptr+0x90)
+          printf "LIVE_QUEUE=%p LIVE_OWNER=%p LIVE_VPTR=%p LIVE_SLOT_90=%p\\n", \$queue, \$owner, \$vptr, \$slot
+          x/4gx \$owner
+          x/4gx \$vptr+0x80
+          info symbol \$slot
+          detach
+          quit
+          end
+          continue
+          GDB
+          (sleep 3; DISPLAY=:98 xdotool key Up; sleep 1; DISPLAY=:98 xdotool key Down) & stimulus=$!
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          "$toolroot/usr/bin/gdb" -q -nx -batch -x "$gcmd" "$client"
+          wait "$stimulus"
+          cat "$gout"
+          grep -q 'LIVE_SLOT_90=0x' "$gout"
+          kill -0 "$pid"
+          echo 'TRACK_A_LIVE_NETWORK_OWNER_SLOT_COMPLETE=true'

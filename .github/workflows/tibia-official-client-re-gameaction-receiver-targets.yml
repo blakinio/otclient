@@ -59,5 +59,10 @@ jobs:
           0xde6de0 queue-sendMessage-body
           0xbc6750 queue-fire-new-client-message
           0xbc6f00 queue-fire-new-protocol-message
+          0x831ea0 queue-slot-target-831ea0
+          0xde82b0 queue-slot-target-de82b0
+          0xde6ed0 queue-slot-target-de6ed0
+          0xde9a20 queue-slot-target-de9a20
+          0xde9a50 queue-slot-target-de9a50
           EOF
           echo 'TRACK_A_GAMEACTION_RECEIVER_TARGETS_COMPLETE=true'

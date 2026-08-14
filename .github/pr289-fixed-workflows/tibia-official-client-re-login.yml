@@ -1,0 +1,272 @@
+name: Track A official Linux structural login
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-login.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  login:
+    runs-on: [otclient, synology]
+    timeout-minutes: 15
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+      TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+    steps:
+      - name: Checkout exact Track A head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Calibrate login controls and continue only on proven transition
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          toolroot="$state/toolroot"
+          tool_path="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          evidence="$state/evidence/login-calibration-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$state/runtime" "$state/evidence" "$evidence"
+          chmod 700 "$state" "$state/runtime" "$state/evidence" "$evidence"
+          gdb_pid=''
+          cleanup_private() {
+            rm -f "$evidence"/*.xwd 2>/dev/null || true
+            [[ -z "$gdb_pid" ]] || kill "$gdb_pid" 2>/dev/null || true
+          }
+          trap 'rc=$?; cleanup_private; if [[ $rc -ne 0 ]]; then echo TRACK_A_LOGIN_CALIBRATION_FAILURE_RC=$rc; for log in "$state/runtime/xvfb.log" "$state/runtime/client.log" "$evidence/gdb.log"; do if [[ -f "$log" ]]; then echo TRACK_A_LOG_BEGIN=$(basename "$log"); tail -n 40 "$log"; echo TRACK_A_LOG_END=$(basename "$log"); fi; done; fi' EXIT
+
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == 51965216 ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_EXACT_OFFICIAL_CLIENT_VERIFIED=true
+
+          warp_pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo TRACK_A_WARP_VERIFIED=true
+
+          old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          if [[ -n "$old_pid" && -e "/proc/$old_pid" ]]; then
+            [[ -r "/proc/$old_pid/environ" ]]
+            grep -azFxq "$marker" "/proc/$old_pid/environ"
+            [[ "$(readlink -f "/proc/$old_pid/exe")" == "$client" ]]
+            kill "$old_pid"
+            for _ in $(seq 1 30); do kill -0 "$old_pid" 2>/dev/null || break; sleep 0.2; done
+            ! kill -0 "$old_pid" 2>/dev/null
+          fi
+
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          if [[ -z "$xvfb_pid" || ! -e "/proc/$xvfb_pid" || ! -e /tmp/.X11-unix/X98 ]]; then
+            private_xvfb="$state/runtime/Xvfb-track-a"
+            [[ -x "$private_xvfb" ]]
+            cd "$toolroot/usr/bin"
+            env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+              PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" XKB_CONFIG_ROOT="$toolroot/usr/share/X11/xkb" \
+              nohup "$private_xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
+              -xkbdir "$toolroot/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset \
+              >"$state/runtime/xvfb.log" 2>&1 </dev/null &
+            xvfb_pid=$!
+            printf '%s\n' "$xvfb_pid" >"$state/runtime/xvfb.pid"
+            chmod 600 "$state/runtime/xvfb.pid"
+            for _ in $(seq 1 30); do [[ -e /tmp/.X11-unix/X98 ]] && break; kill -0 "$xvfb_pid"; sleep 1; done
+          fi
+          [[ -e /tmp/.X11-unix/X98 ]]
+          [[ -r "/proc/$xvfb_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+
+          proxy_lib="$(find "$toolroot" -type f -name 'libproxychains.so.4' -print -quit)"
+          vk_icd="$(find "$toolroot/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
+          swrast="$(find "$toolroot" \( -type f -o -type l \) -name 'swrast_dri.so' -print -quit)"
+          [[ -n "$proxy_lib" && -n "$vk_icd" && -n "$swrast" ]]
+          dri_dir="$(dirname "$swrast")"
+          proxy_conf="$state/config/proxychains.conf"
+          [[ -s "$proxy_conf" ]]
+
+          cd "$runtime"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
+            LD_LIBRARY_PATH="$runtime/lib:$tool_lib" \
+            LIBGL_ALWAYS_SOFTWARE=1 LIBGL_DRIVERS_PATH="$dri_dir" QSG_RHI_BACKEND=vulkan \
+            VK_ICD_FILENAMES="$vk_icd" XDG_DATA_DIRS="$toolroot/usr/share:/usr/share" \
+            FONTCONFIG_PATH="$toolroot/etc/fonts" FONTCONFIG_FILE="$toolroot/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
+          pid=$!
+          printf '%s\n' "$pid" >"$state/runtime/client.pid"
+          chmod 600 "$state/runtime/client.pid"
+          sleep 12
+          kill -0 "$pid"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          echo TRACK_A_OFFICIAL_CLIENT_RUNNING=true
+
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib"
+          resolve_window() {
+            local w geometry width height best='' best_area=0 area
+            for _ in $(seq 1 80); do
+              best=''; best_area=0
+              for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+                geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+                width="$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')"
+                height="$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')"
+                [[ -n "$width" && -n "$height" ]] || continue
+                area=$((width * height))
+                if (( area > best_area )); then best="$w"; best_area=$area; fi
+              done
+              if [[ -n "$best" ]]; then
+                geometry="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$best")"
+                width="$(printf '%s\n' "$geometry" | sed -n 's/^WIDTH=//p')"
+                height="$(printf '%s\n' "$geometry" | sed -n 's/^HEIGHT=//p')"
+                [[ "$width" == 1020 && "$height" == 650 ]] && { printf '%s\n' "$best"; return 0; }
+              fi
+              sleep 0.5
+            done
+            return 1
+          }
+
+          window="$(resolve_window)"
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          [[ "$("$toolroot/usr/bin/xdotool" getwindowfocus)" == "$window" ]]
+          echo TRACK_A_LOGIN_WINDOW_FOCUSED=true
+
+          s0="$evidence/s0.xwd"; s1="$evidence/s1-email.xwd"; s2="$evidence/s2-password.xwd"
+          s3="$evidence/s3-hover.xwd"; s4="$evidence/s4-click.xwd"; s5="$evidence/s5-post.xwd"
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 900 600
+          sleep 0.5
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$s0"
+
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
+          "$toolroot/usr/bin/xdotool" key ctrl+a
+          "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_EMAIL"
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 900 600
+          sleep 0.5
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$s1"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" EMAIL_INPUT "$s0" "$s1"
+
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
+          "$toolroot/usr/bin/xdotool" key ctrl+a
+          "$toolroot/usr/bin/xdotool" type --delay 12 -- "$TIBIA_TEST_PASSWORD"
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 900 600
+          sleep 0.5
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$s2"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" PASSWORD_INPUT "$s1" "$s2"
+
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 590 388
+          sleep 0.5
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$s3"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" LOGIN_HOVER "$s2" "$s3"
+
+          "$toolroot/usr/bin/xdotool" click 1
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 900 600
+          sleep 0.5
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$s4"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" LOGIN_CLICK "$s3" "$s4"
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo TRACK_A_LOGIN_CALIBRATION_SUBMITTED=true
+
+          sleep 3
+          window="$(resolve_window || true)"
+          [[ -n "$window" ]]
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$s5"
+          python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-regions.py" LOGIN_POST "$s2" "$s5"
+          changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$s2" "$s5")"
+          echo TRACK_A_LOGIN_POST_CHANGED_PIXELS="$changed"
+
+          if (( changed <= 45000 )); then
+            echo TRACK_A_LOGIN_TRANSITION_PROVEN=0
+            cleanup_private
+            trap - EXIT
+            exit 2
+          fi
+          echo TRACK_A_LOGIN_TRANSITION_PROVEN=1
+
+          window="$(resolve_window)"
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 285 193 click 1
+          sleep 0.4
+          "$toolroot/usr/bin/xdotool" key Return
+          sleep 3
+          window="$(resolve_window || true)"
+          if [[ -n "$window" ]]; then
+            "$toolroot/usr/bin/xdotool" mousemove --window "$window" 285 193 click --repeat 2 --delay 160 1 || true
+          fi
+          echo TRACK_A_CHARACTER_ACTIVATION_SENT=true
+
+          sleep 8
+          if [[ -w /proc/sys/kernel/yama/ptrace_scope ]]; then printf '0\n' >/proc/sys/kernel/yama/ptrace_scope; fi
+          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
+          [[ -n "$line" ]]
+          start="$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')"
+          offset="$(printf '%s\n' "$line" | awk '{print $3}')"
+          bias=$((16#$start - 16#$offset))
+          printf 'TRACK_A_PIE_BASE=0x%x\n' "$bias"
+          records="$evidence/map-records"; hit="$evidence/map-hit"; : >"$records"
+          cat >"$evidence/postworld.gdb" <<EOF
+          set pagination off
+          set confirm off
+          attach $pid
+          python
+          import gdb, struct
+          inf=gdb.selected_inferior(); out='$records'; hit='$hit'
+          class B(gdb.Breakpoint):
+            def __init__(self): super().__init__('*0x%x'%($bias+0x19a8ea3)); self.n=0
+            def stop(self):
+              try:
+                rsp=int(gdb.parse_and_eval('\$rsp')); order=int(gdb.parse_and_eval('\$rbp'))&0xffffffff
+                x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))
+                if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                  self.n+=1; open(out,'a').write(f'{x} {y} {z} {order}\n')
+                  if self.n>=8: open(hit,'w').write(f'DECODED_MAP_RECORD_COUNT={self.n}\n'); self.enabled=False
+              except Exception: pass
+              return False
+          B(); gdb.write('POSTWORLD_MAP_BREAKPOINT_READY=true\n')
+          end
+          continue
+          EOF
+          env -u RUNNER_TRACKING_ID LD_LIBRARY_PATH="$tool_lib" "$toolroot/usr/bin/gdb" -q -nx -x "$evidence/postworld.gdb" >"$evidence/gdb.log" 2>&1 &
+          gdb_pid=$!
+          for _ in $(seq 1 30); do grep -q 'POSTWORLD_MAP_BREAKPOINT_READY=true' "$evidence/gdb.log" 2>/dev/null && break; sleep 0.5; done
+          grep -q 'POSTWORLD_MAP_BREAKPOINT_READY=true' "$evidence/gdb.log"
+          window="$(resolve_window)"
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window" || true
+          "$toolroot/usr/bin/xdotool" key Right || true
+          sleep 2
+          window="$(resolve_window || true)"
+          if [[ -n "$window" ]]; then "$toolroot/usr/bin/xdotool" windowfocus --sync "$window" || true; "$toolroot/usr/bin/xdotool" key Left || true; fi
+          for _ in $(seq 1 25); do [[ -s "$hit" ]] && break; sleep 1; done
+          count="$(wc -l <"$records" 2>/dev/null || echo 0)"
+          echo TRACK_A_DECODED_MAP_RECORD_COUNT="$count"
+          [[ "$count" -ge 8 && -s "$hit" ]]
+          kill -0 "$pid"
+          cleanup_private
+          trap - EXIT
+          echo TRACK_A_STRUCTURAL_IN_GAME=true
+          echo TRACK_A_OFFICIAL_LINUX_WORLD_LOGIN_PROVEN=true

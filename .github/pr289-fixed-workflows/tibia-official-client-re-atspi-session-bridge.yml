@@ -1,0 +1,225 @@
+name: Track A private AT-SPI session bridge
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/tibia-official-client-re-atspi-session-bridge.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: [otclient, synology]
+    timeout-minutes: 20
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+      TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          ref: d93ccb34f66af7d3198a50a46e706b4f902ae637
+          path: bridge-src
+          persist-credentials: false
+
+      - name: Build exact-version read-only runtime bridge
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          root="$state/toolroot"; aptroot="$state/cache/bridge-build-apt"
+          mkdir -p "$root" "$aptroot/lists/partial" "$aptroot/archives/partial"; : >"$aptroot/status"
+          if [[ ! -x "$root/usr/bin/g++" || ! -x "$root/usr/bin/cmake" || ! -d "$root/usr/lib/x86_64-linux-gnu/cmake/Qt6" ]]; then
+            apt_opts=(-o "Dir::State::lists=$aptroot/lists" -o "Dir::State::status=$aptroot/status" -o "Dir::Cache::archives=$aptroot/archives" -o APT::Get::List-Cleanup=0)
+            find "$aptroot/lists" -maxdepth 1 -type f -size +0c -print -quit | grep -q . || apt-get "${apt_opts[@]}" update
+            apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install build-essential cmake ninja-build pkg-config qt6-base-dev
+            for archive in "$aptroot"/archives/*.deb; do dpkg-deb -x "$archive" "$root"; done
+          fi
+          if ! find "$root" -type f -name 'libpxbackend-1.0.so' -print -quit | grep -q .; then
+            apt_opts=(-o "Dir::State::lists=$aptroot/lists" -o "Dir::State::status=$aptroot/status" -o "Dir::Cache::archives=$aptroot/archives" -o APT::Get::List-Cleanup=0)
+            apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install libproxy1-plugin-gsettings
+            for archive in "$aptroot"/archives/libproxy1-plugin-gsettings*.deb; do dpkg-deb -x "$archive" "$root"; done
+          fi
+          mkdir -p "$root/lib/x86_64-linux-gnu"
+          for source in "$root/usr/lib/x86_64-linux-gnu"/*; do
+            name="${source##*/}"; [[ -e "$root/lib/x86_64-linux-gnu/$name" ]] || ln -s "../../usr/lib/x86_64-linux-gnu/$name" "$root/lib/x86_64-linux-gnu/$name"
+          done
+          mkdir -p "$root/lib64"
+          [[ -e "$root/lib64/ld-linux-x86-64.so.2" ]] || ln -s "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" "$root/lib64/ld-linux-x86-64.so.2"
+          export PATH="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          build="$state/build/tibia-runtime-bridge"
+          [[ "$build" == "$state/build/tibia-runtime-bridge" ]]; rm -rf "$build"
+          cmake -S bridge-src/tools/tibia_runtime_bridge -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSROOT="$root" -DCMAKE_PREFIX_PATH="$root/usr"
+          cmake --build "$build" --parallel 2
+          [[ -s "$build/otclient-tibia-runtime-bridge.so" ]]
+          echo TRACK_A_RUNTIME_BRIDGE_BUILD_READY=true
+
+      - name: Bridge session DBus to private AT-SPI and inspect Tibia
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          root="$state/toolroot"
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          pxbackend="$(find "$root" \( -type f -o -type l \) -name 'libpxbackend-1.0.so' -print -quit)"
+          [[ -n "$pxbackend" ]]; lib="$lib:${pxbackend%/*}"
+          cfg="$root/usr/share/defaults/at-spi2/accessibility.conf"
+          registry="$(find "$root" -type f -name at-spi2-registryd -perm -u+x -print -quit)"
+          py_path="$root/usr/lib/python3/dist-packages"
+          gi_path="$root/usr/lib/x86_64-linux-gnu/girepository-1.0:$root/usr/lib/girepository-1.0"
+          [[ -x "$client" && -s "$cfg" && -n "$registry" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_EXACT_OFFICIAL_CLIENT_VERIFIED=true
+
+          old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
+          if [[ -n "$old_pid" && -r "/proc/$old_pid/environ" ]]; then
+            grep -azFxq "$marker" "/proc/$old_pid/environ"
+            [[ "$(readlink -f "/proc/$old_pid/exe")" == "$client" ]]
+            kill "$old_pid" 2>/dev/null || true
+            for _ in $(seq 1 30); do kill -0 "$old_pid" 2>/dev/null || break; sleep .2; done
+          fi
+          xvfb_pid="$(tr -cd '0-9' <"$state/runtime/xvfb.pid" 2>/dev/null || true)"
+          [[ -n "$xvfb_pid" && -r "/proc/$xvfb_pid/environ" && -e /tmp/.X11-unix/X98 ]]
+          grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
+          kill -0 "$xvfb_pid"
+
+          mapfile -t session < <(PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-daemon" --session --fork --print-address=1 --print-pid=1)
+          mapfile -t access < <(PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-daemon" --config-file="$cfg" --fork --print-address=1 --print-pid=1)
+          [[ ${#session[@]} -ge 2 && ${#access[@]} -ge 2 ]]
+          session_addr="${session[0]}"; session_pid="${session[1]}"
+          access_addr="${access[0]}"; access_pid="${access[1]}"
+          [[ "$session_pid" =~ ^[0-9]+$ && "$access_pid" =~ ^[0-9]+$ ]]
+          reg_pid=''; bridge_pid=''; pid=''
+          cleanup(){
+            [[ -z "$pid" ]] || kill "$pid" 2>/dev/null || true
+            [[ -z "$bridge_pid" ]] || kill "$bridge_pid" 2>/dev/null || true
+            [[ -z "$reg_pid" ]] || kill "$reg_pid" 2>/dev/null || true
+            kill "$access_pid" "$session_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          AT_SPI_BUS_ADDRESS="$access_addr" DBUS_SESSION_BUS_ADDRESS="$session_addr" PATH="$path" LD_LIBRARY_PATH="$lib" \
+            "$registry" >"$state/runtime/atspi-registry.log" 2>&1 &
+          reg_pid=$!
+          for _ in $(seq 1 30); do
+            if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --bus="$access_addr" --print-reply \
+              --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.ListNames 2>/dev/null | grep -q 'org.a11y.atspi.Registry'; then break; fi
+            sleep .2
+          done
+          kill -0 "$reg_pid"
+          echo TRACK_A_ACCESSIBILITY_REGISTRY_READY=true
+
+          bridge="$state/runtime/atspi-session-bridge.py"
+          cat >"$bridge" <<'PY'
+          import os
+          from gi.repository import Gio, GLib
+          xml='''<node><interface name="org.a11y.Bus"><method name="GetAddress"><arg type="s" direction="out"/></method></interface></node>'''
+          info=Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0]
+          conn=Gio.bus_get_sync(Gio.BusType.SESSION, None)
+          address=os.environ['TRACK_A_ACCESS_ADDR']
+          def call(connection, sender, object_path, interface_name, method_name, parameters, invocation):
+              if method_name == 'GetAddress':
+                  invocation.return_value(GLib.Variant('(s)', (address,)))
+              else:
+                  invocation.return_dbus_error('org.a11y.Bus.Error', 'unsupported')
+          reg=conn.register_object('/org/a11y/bus', info, call, None, None)
+          owner=Gio.bus_own_name_on_connection(conn, 'org.a11y.Bus', Gio.BusNameOwnerFlags.NONE, None, None)
+          print('TRACK_A_SESSION_BRIDGE_PROCESS_READY=true', flush=True)
+          GLib.MainLoop().run()
+          PY
+          chmod 600 "$bridge"
+          DBUS_SESSION_BUS_ADDRESS="$session_addr" TRACK_A_ACCESS_ADDR="$access_addr" \
+            PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" LD_LIBRARY_PATH="$lib" \
+            python3 "$bridge" >"$state/runtime/atspi-session-bridge.log" 2>&1 &
+          bridge_pid=$!
+          for _ in $(seq 1 40); do
+            if PATH="$path" LD_LIBRARY_PATH="$lib" "$root/usr/bin/dbus-send" --bus="$session_addr" --print-reply \
+              --dest=org.a11y.Bus /org/a11y/bus org.a11y.Bus.GetAddress >"$state/runtime/atspi-get-address.log" 2>/dev/null && \
+              grep -Fq "$access_addr" "$state/runtime/atspi-get-address.log"; then break; fi
+            sleep .2
+          done
+          kill -0 "$bridge_pid"
+          grep -Fq "$access_addr" "$state/runtime/atspi-get-address.log"
+          echo TRACK_A_SESSION_A11Y_BUS_BRIDGE_READY=true
+
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          proxy_conf="$state/config/proxychains.conf"
+          helper="$state/build/tibia-runtime-bridge/otclient-tibia-runtime-bridge.so"
+          profile="$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json"
+          socket="$state/runtime/otclient-tibia-re.sock"
+          targets="$(python3 - "$profile" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          print(';'.join(f"{n},{int(v['vptr_offset'],16):x},{v['expected_qt_class']}" for n,v in sorted(d['targets'].items())))
+          PY
+          )"
+          [[ -n "$proxy_lib" && -s "$proxy_conf" && -s "$helper" && -n "$targets" ]]
+          rm -f "$socket"
+          cd "$runtime"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$path" \
+            LD_LIBRARY_PATH="$runtime/lib:$lib" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            QT_ACCESSIBILITY=1 QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 DBUS_SESSION_BUS_ADDRESS="$session_addr" \
+            XDG_DATA_DIRS="$root/usr/share:/usr/share" FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$helper:$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            OTCLIENT_TIBIA_RE_SOCKET="$socket" OTCLIENT_TIBIA_RE_BINARY_SHA256="$EXPECTED_CLIENT_SHA256" \
+            OTCLIENT_TIBIA_RE_CLIENT_VERSION=15.32.df7b29 OTCLIENT_TIBIA_RE_TARGETS="$targets" \
+            nohup "$client" >"$state/runtime/client.log" 2>&1 </dev/null &
+          pid=$!
+          printf '%s\n' "$pid" >"$state/runtime/client.pid"; chmod 600 "$state/runtime/client.pid"
+          sleep 10
+          if ! kill -0 "$pid" 2>/dev/null; then
+            echo TRACK_A_BRIDGED_CLIENT_EARLY_EXIT=true
+            tail -n 120 "$state/runtime/client.log" || true
+            exit 1
+          fi
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          echo TRACK_A_OFFICIAL_CLIENT_RUNNING=true
+
+          HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$path" LD_LIBRARY_PATH="$lib" \
+            DBUS_SESSION_BUS_ADDRESS="$session_addr" PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" \
+            python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" inspect
+          echo TRACK_A_SESSION_BRIDGE_SEMANTIC_INSPECT_SUCCESS=true
+
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$path" LD_LIBRARY_PATH="$lib" \
+            DBUS_SESSION_BUS_ADDRESS="$session_addr" PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" \
+            TIBIA_TEST_EMAIL="$TIBIA_TEST_EMAIL" TIBIA_TEST_PASSWORD="$TIBIA_TEST_PASSWORD" \
+            python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" login
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo TRACK_A_SEMANTIC_LOGIN_COMPLETE=true
+          HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$path" LD_LIBRARY_PATH="$lib" \
+            DBUS_SESSION_BUS_ADDRESS="$session_addr" PYTHONPATH="$py_path" GI_TYPELIB_PATH="$gi_path" \
+            python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-atspi.py" character
+          sleep 10
+          kill -0 "$pid"
+          [[ -S "$socket" && "$(stat -c '%a' "$socket")" == 600 ]]
+          echo TRACK_A_SEMANTIC_CHARACTER_ENTER_COMPLETE=true
+          status="$(python3 "$GITHUB_WORKSPACE/bridge-src/tools/tibia_runtime_bridge/ipc_client.py" --socket "$socket" session-status)"
+          echo TRACK_A_BRIDGE_SESSION_STATUS_BEGIN=true; printf '%s\n' "$status"; echo TRACK_A_BRIDGE_SESSION_STATUS_END=true
+          printf '%s' "$status" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["ok"] and d["in_game_candidate"]; assert all(d["markers"][k]["validated_hits"]>0 for k in d["required_markers"])'
+          echo TRACK_A_BRIDGE_IN_GAME_CANDIDATE=true
+          trap - EXIT
+          echo TRACK_A_ACCESSIBLE_SESSION_LEFT_RUNNING=true

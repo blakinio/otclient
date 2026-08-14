@@ -1,0 +1,103 @@
+name: Track A QMeta game-action census
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-gameaction-census.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Enumerate relocation-backed GameAction QMeta records
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0];phentsz=struct.unpack_from('<H',data,0x36)[0];phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def flags(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return fl
+              return 0
+          shoff=struct.unpack_from('<Q',data,0x28)[0];shentsz=struct.unpack_from('<H',data,0x3a)[0];shnum=struct.unpack_from('<H',data,0x3c)[0]
+          relas={}
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              _,typ,_,_,so,ss,_,_,_,se=struct.unpack_from('<IIQQQQIIQQ',data,o)
+              if typ!=4 or not se:continue
+              for p in range(so,so+ss,se):
+                  if p+24>len(data):break
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p);relas[ro]=(ri&0xffffffff,ra)
+          def strings(base):
+              o=va2off(base)
+              if o is None:return None
+              first=struct.unpack_from('<I',data,o)[0]
+              if first%8 or first<8 or first>0x20000:return None
+              n=first//8;out=[]
+              for i in range(n):
+                  rel,ln=struct.unpack_from('<II',data,o+i*8)
+                  if rel<first or ln>2048 or o+rel+ln>len(data):return None
+                  try:out.append(data[o+rel:o+rel+ln].decode('utf-8'))
+                  except:return None
+              return out
+          found=[];seen=set()
+          for slot in sorted(relas):
+              base=slot-8
+              if base in seen:continue
+              xs=[];ok=True
+              for d in (8,0x10,0x18,0x28):
+                  x=relas.get(base+d)
+                  if not x or x[0]!=8:ok=False;break
+                  xs.append(x[1])
+              if not ok:continue
+              sb,mb,fn,extra=xs
+              if not flags(fn)&1:continue
+              ss=strings(sb)
+              if not ss:continue
+              cls=ss[0]
+              if 'GameAction' not in cls:continue
+              mo=va2off(mb)
+              if mo is None:continue
+              w=[struct.unpack_from('<I',data,mo+i*4)[0] for i in range(20)]
+              if w[0]!=13:continue
+              mc,mp=w[4],w[5]
+              methods=[];valid=True
+              for i in range(mc):
+                  p=mo+(mp+i*6)*4
+                  if p+24>len(data):valid=False;break
+                  idx=struct.unpack_from('<I',data,p)[0]
+                  methods.append(ss[idx] if idx<len(ss) else f'<bad:{idx}>')
+              if not valid:continue
+              seen.add(base);found.append((cls,base,sb,mb,fn,extra,methods))
+          found.sort()
+          print('TRACK_A_QMETA_GAMEACTION_CENSUS_BEGIN=true')
+          print(f'GAMEACTION_RECORD_COUNT={len(found)}')
+          for cls,base,sb,mb,fn,extra,methods in found:
+              print(f'GAMEACTION class={cls} record=0x{base:x} stringdata=0x{sb:x} metadata=0x{mb:x} static_metacall=0x{fn:x} extra=0x{extra:x} method_count={len(methods)}')
+              for i,m in enumerate(methods):print(f' METHOD class={cls} index={i} name={m}')
+          print('TRACK_A_QMETA_GAMEACTION_CENSUS_COMPLETE=true')
+          PY

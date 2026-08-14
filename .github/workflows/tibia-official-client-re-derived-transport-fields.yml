@@ -1,0 +1,227 @@
+name: Track A derived transport field provenance
+
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-chatgpt-framing-recovery]
+    paths: [.github/workflows/tibia-official-client-re-derived-transport-fields.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Recover derived transport fields and QIODevice class
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then
+            state="$LEGACY_IMAGE_STATE"
+          else
+            state="$CANONICAL_STATE"
+          fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          env LD_LIBRARY_PATH="$tool_lib" "$gdb" --version >/dev/null
+
+          report="$RUNNER_TEMP/track-a-derived-transport-fields.txt"
+          candidates="$RUNNER_TEMP/track-a-derived-transport-vtables.txt"
+          : >"$report"
+          : >"$candidates"
+          exec > >(tee -a "$report") 2>&1
+
+          echo 'TRACK_A_DERIVED_TRANSPORT_FIELDS_BEGIN=true'
+          echo 'DERIVED_CTOR_WINDOW=0x6fcc50..0x6fda00'
+          echo 'QUEUE_CONSUMER=0x7dd630'
+          echo 'TRANSPORT_CLUSTER=0x7dd3f0'
+          echo 'CONCRETE_E8_METHOD=0xb40630'
+          echo 'QIODEVICE_WRITE_PLT=0x4de370'
+
+          python3 -u - "$client" "$candidates" <<'PY'
+          import hashlib
+          import struct
+          import sys
+
+          path, candidate_path = sys.argv[1:]
+          data = open(path, 'rb').read()
+          concrete = 0xb40630
+          target_slots = (0x10, 0x18, 0x20, 0x28, 0x38, 0x78, 0x80, 0x88, 0x90, 0xe8, 0xf0, 0x108)
+
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          segments = []
+          for index in range(phnum):
+              off = phoff + index * phentsz
+              typ, flags, file_off, va, _, file_size, mem_size, _ = struct.unpack_from('<IIQQQQQQ', data, off)
+              if typ == 1 and file_size:
+                  segments.append((file_off, file_off + file_size, va, va + mem_size, flags))
+
+          def va_to_off(va):
+              for fs, fe, base, mend, flags in segments:
+                  if base <= va < base + (fe - fs):
+                      return fs + (va - base)
+              return None
+
+          def flags_for(va):
+              for fs, fe, base, mend, flags in segments:
+                  if base <= va < mend:
+                      return flags
+              return 0
+
+          shoff = struct.unpack_from('<Q', data, 0x28)[0]
+          shentsz = struct.unpack_from('<H', data, 0x3a)[0]
+          shnum = struct.unpack_from('<H', data, 0x3c)[0]
+          reloc = {}
+          for index in range(shnum):
+              off = shoff + index * shentsz
+              if struct.unpack_from('<I', data, off + 4)[0] != 4:
+                  continue
+              section_off = struct.unpack_from('<Q', data, off + 0x18)[0]
+              section_size = struct.unpack_from('<Q', data, off + 0x20)[0]
+              entry_size = struct.unpack_from('<Q', data, off + 0x38)[0] or 24
+              for pos in range(section_off, section_off + section_size, entry_size):
+                  r_offset, r_info, r_addend = struct.unpack_from('<QQq', data, pos)
+                  if (r_info & 0xffffffff) == 8:
+                      reloc[r_offset] = r_addend & 0xffffffffffffffff
+
+          def qword(va):
+              if va in reloc:
+                  return reloc[va]
+              off = va_to_off(va)
+              if off is None or off + 8 > len(data):
+                  return None
+              return struct.unpack_from('<Q', data, off)[0]
+
+          def sqword(va):
+              off = va_to_off(va)
+              if off is None or off + 8 > len(data):
+                  return None
+              return struct.unpack_from('<q', data, off)[0]
+
+          def plausible_header(ap):
+              ot = sqword(ap - 16)
+              rtti = qword(ap - 8)
+              if ot is None or abs(ot) > 0x100000:
+                  return False
+              if rtti not in (None, 0) and flags_for(rtti) == 0:
+                  return False
+              return True
+
+          candidates = []
+          for fs, fe, base, mend, flags in segments:
+              if flags & 1:
+                  continue
+              start = (base + 0x10 + 7) & ~7
+              end = base + (fe - fs) - 0x110
+              for ap in range(start, end, 8):
+                  if qword(ap + 0xe8) != concrete:
+                      continue
+                  if not plausible_header(ap):
+                      continue
+                  candidates.append(ap)
+
+          candidates = sorted(set(candidates))
+          print(f'CLIENT_SHA256={hashlib.sha256(data).hexdigest()}')
+          print(f'VTABLE_E8_TARGET=0x{concrete:x}')
+          print(f'VTABLE_E8_CANDIDATE_COUNT={len(candidates)}')
+
+          exec_segments = [x for x in segments if x[4] & 1]
+          all_refs = {}
+          for ap in candidates:
+              refs = []
+              for fs, fe, base, mend, flags in exec_segments:
+                  blob = data[fs:fe]
+                  for pos in range(0, max(0, len(blob) - 7)):
+                      # REX + LEA r64,[RIP+disp32]
+                      if not (0x40 <= blob[pos] <= 0x4f and blob[pos + 1] == 0x8d and (blob[pos + 2] & 0xc7) == 0x05):
+                          continue
+                      site = base + pos
+                      target = site + 7 + struct.unpack_from('<i', blob, pos + 3)[0]
+                      if target == ap:
+                          refs.append(site)
+              all_refs[ap] = refs
+              ot = sqword(ap - 16)
+              rtti = qword(ap - 8)
+              print(f'VTABLE_CANDIDATE address_point=0x{ap:x} offset_to_top={ot} rtti={"0x%x"%rtti if rtti else "0"} lea_refs={len(refs)} sites={",".join(hex(x) for x in refs[:128]) if refs else "none"}')
+              for slot in target_slots:
+                  target = qword(ap + slot)
+                  executable = bool(target and (flags_for(target) & 1))
+                  print(f'VTABLE_SLOT address_point=0x{ap:x} offset=0x{slot:x} target={"0x%x"%target if target is not None else "unknown"} executable={str(executable).lower()}')
+
+          with open(candidate_path, 'w') as handle:
+              for ap in candidates:
+                  handle.write(f'0x{ap:x}\n')
+
+          # Locate direct references to the derived owner field displacements in
+          # the bounded constructor window via raw little-endian disp32 bytes.
+          # This is a recall aid only; GDB disassembly below is authoritative.
+          ctor_lo, ctor_hi = 0x6fcc50, 0x6fda00
+          ctor_off = va_to_off(ctor_lo)
+          ctor_blob = data[ctor_off:ctor_off + (ctor_hi - ctor_lo)] if ctor_off is not None else b''
+          for field in (0x9d0, 0x9e0, 0x9f0, 0xa00, 0xa10, 0xa20, 0xa30, 0xc18):
+              needle = struct.pack('<I', field)
+              hits = []
+              pos = 0
+              while True:
+                  pos = ctor_blob.find(needle, pos)
+                  if pos < 0:
+                      break
+                  hits.append(ctor_lo + pos)
+                  pos += 1
+              print(f'CTOR_DISP32_RECALL field=0x{field:x} hits={len(hits)} sites={",".join(hex(x) for x in hits[:128]) if hits else "none"}')
+
+          print('TRACK_A_DERIVED_TRANSPORT_STATIC_COMPLETE=true')
+          PY
+
+          echo 'DERIVED_CTOR_DISASSEMBLY_BEGIN=true'
+          env LD_LIBRARY_PATH="$tool_lib" "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble /r 0x6fcc50,0x6fda00'
+          echo 'DERIVED_CTOR_DISASSEMBLY_END=true'
+
+          echo 'CONCRETE_E8_METHOD_DISASSEMBLY_BEGIN=true'
+          env LD_LIBRARY_PATH="$tool_lib" "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble /r 0xb405d0,0xb40730'
+          echo 'CONCRETE_E8_METHOD_DISASSEMBLY_END=true'
+
+          while read -r ap; do
+            [[ "$ap" =~ ^0x[0-9a-f]+$ ]] || continue
+            # Direct LEA xrefs are emitted by Python. Print bounded vtable memory
+            # so slot provenance remains independently auditable.
+            lo=$(printf '0x%x' $((ap-32)))
+            hi=$(printf '0x%x' $((ap+288)))
+            echo "VTABLE_MEMORY_BEGIN address_point=$ap lo=$lo hi=$hi"
+            env LD_LIBRARY_PATH="$tool_lib" "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex "x/40gx $lo"
+            echo "VTABLE_MEMORY_END address_point=$ap"
+          done <"$candidates"
+
+          echo 'TRACK_A_DERIVED_TRANSPORT_FIELDS_COMPLETE=true'
+          grep -q '^TRACK_A_DERIVED_TRANSPORT_FIELDS_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version derived transport report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-derived-transport-fields-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-derived-transport-fields.txt
+          if-no-files-found: error
+          retention-days: 7

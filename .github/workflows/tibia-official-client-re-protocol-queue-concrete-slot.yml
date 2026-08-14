@@ -41,6 +41,25 @@ jobs:
           "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
             -ex 'disassemble /r 0x1971500,0x1971710'
           echo 'CLIENT_READY_CONNECTION_END=0x1971710'
+          start=$(python3 - "$client" <<'PY'
+          import struct, sys
+          data=open(sys.argv[1],'rb').read(); target=0x1971500
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; es=struct.unpack_from('<H',data,0x36)[0]; n=struct.unpack_from('<H',data,0x38)[0]
+          for i in range(n):
+              o=phoff+i*es; typ,flags,fo,va,_,sz,_,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and flags&1 and va<=target<va+sz:
+                  pos=fo+(target-va); window=data[max(fo,pos-0x30000):pos]
+                  hits=[]
+                  for pattern in (b'\x55\x48\x89\xe5\x41\x57', b'\x55\x48\x89\xe5\x41\x56'):
+                      p=window.rfind(pattern)
+                      if p>=0: hits.append(max(fo,pos-0x30000)+p)
+                  print(hex(va+max(hits)-fo)); break
+          PY
+          )
+          echo "RECEIVER_CONSTRUCTOR_PROLOGUE=$start"
+          end=$(printf '0x%x' $((start+1024)))
+          "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex "disassemble /r $start,$end"
           echo 'TARGET_XREFS_BEGIN=true'
           python3 -u - "$client" <<'PY'
           import struct, sys

@@ -1,0 +1,77 @@
+name: Track A Player and GameProtocol map
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-player-gameprotocol-map.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Decode Player and GameProtocol method tables and disassembly
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          records={
+            'Player':(0x1cb4d44,0x1cb4a00,0xd1a920),
+            'GameProtocol':(0x1cb9980,0x1cb95c0,0xd20e10),
+            'Creature':(0x1d756bc,0x1d75680,0xd12510),
+          }
+          phoff=struct.unpack_from('<Q',data,0x20)[0];phentsz=struct.unpack_from('<H',data,0x36)[0];phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def strs(base):
+              o=va2off(base);first=struct.unpack_from('<I',data,o)[0];n=first//8;out=[]
+              for i in range(n):
+                  rel,ln=struct.unpack_from('<II',data,o+i*8);out.append(data[o+rel:o+rel+ln].decode('utf-8','replace'))
+              return out
+          print('TRACK_A_PLAYER_GAMEPROTOCOL_METHODS_BEGIN=true')
+          for cls,(sb,mb,fn) in records.items():
+              ss=strs(sb);mo=va2off(mb);w=[struct.unpack_from('<I',data,mo+i*4)[0] for i in range(512)]
+              mc,mp=w[4],w[5]
+              print(f'CLASS name={cls} class={ss[w[1]]!r} static_metacall=0x{fn:x} method_count={mc} method_offset={mp}')
+              for i in range(mc):
+                  j=mp+i*6;idx,argc,param,tag,flags,meta=w[j:j+6]
+                  print(f' METHOD class={cls} index={i} name={ss[idx]!r} argc={argc} flags=0x{flags:x}')
+          print('TRACK_A_PLAYER_GAMEPROTOCOL_METHODS_COMPLETE=true')
+          PY
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'set disassembly-flavor intel' \
+            -ex 'echo TRACK_A_PLAYER_DISASM_BEGIN=true\n' \
+            -ex 'disassemble /r 0xd1a920,0xd1b100' \
+            -ex 'echo TRACK_A_PLAYER_DISASM_END=true\n' \
+            -ex 'echo TRACK_A_GAMEPROTOCOL_DISASM_BEGIN=true\n' \
+            -ex 'disassemble /r 0xd20e10,0xd21800' \
+            -ex 'echo TRACK_A_GAMEPROTOCOL_DISASM_END=true\n' \
+            -ex 'echo TRACK_A_CREATURE_DISASM_BEGIN=true\n' \
+            -ex 'disassemble /r 0xd12510,0xd12700' \
+            -ex 'echo TRACK_A_CREATURE_DISASM_END=true\n'

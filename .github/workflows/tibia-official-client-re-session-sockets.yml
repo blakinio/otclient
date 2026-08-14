@@ -1,4 +1,4 @@
-name: Track A map opcode dispatcher anchor
+name: Track A map handler xrefs
 on:
   push:
     branches:
@@ -17,7 +17,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Find callers of proven row handlers near runtime dispatcher frame
+      - name: Scan rel32 call xrefs and inspect caller neighborhoods
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,14 +27,34 @@ jobs:
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          out=/tmp/track-a-dispatch-anchor.txt
-          "$toolroot/usr/bin/gdb" -q -nx -batch "$client" \
-            -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
-            -ex 'disassemble 0xde0000,0xdf0000' > "$out" 2>&1
-          echo TRACK_A_DISPATCH_ANCHOR_CALLS_BEGIN=true
-          grep -n -B25 -A35 -E 'call[[:space:]]+0xcdbad0|call[[:space:]]+0xcdbb40|call[[:space:]]+0xcdbbb0|call[[:space:]]+0xcdbc20|call[[:space:]]+0xcdbc90|call[[:space:]]+0xcdbe20' "$out" || true
-          echo TRACK_A_DISPATCH_ANCHOR_CALLS_END=true
-          echo TRACK_A_FRAME3_CONTEXT_BEGIN=true
-          grep -n -B160 -A160 'de6fb5' "$out" || true
-          echo TRACK_A_FRAME3_CONTEXT_END=true
-          echo TRACK_A_DISPATCH_ANCHOR_SCAN_PROVEN=true
+          xrefs=/tmp/track-a-map-xrefs.txt
+          python3 - "$client" > "$xrefs" <<'PY'
+          import mmap,struct,sys
+          path=sys.argv[1]
+          targets={
+            0xcdbad0:'row_a',0xcdbb40:'row_b',0xcdbbb0:'row_c',0xcdbc20:'row_d',
+            0xcdbc90:'floor_or_full_a',0xcdbe20:'floor_or_full_b',0x19a8a80:'tile_description'
+          }
+          with open(path,'rb') as f:
+            data=f.read()
+          found=[]
+          for i,b in enumerate(data[:-5]):
+            if b!=0xE8: continue
+            rel=struct.unpack_from('<i',data,i+1)[0]
+            dst=i+5+rel
+            if dst in targets:
+              found.append((i,dst,targets[dst]))
+          for src,dst,name in found:
+            print(f'XREF src=0x{src:x} dst=0x{dst:x} name={name}')
+          print('XREF_COUNT='+str(len(found)))
+          PY
+          cat "$xrefs"
+          mapfile -t srcs < <(awk '/^XREF src=/{for(i=1;i<=NF;i++) if($i~/^src=/){sub("src=0x","",$i); print $i}}' "$xrefs" | sort -u)
+          echo TRACK_A_XREF_CONTEXTS_BEGIN=true
+          for s in "${srcs[@]}"; do
+            dec=$((16#$s)); lo=$((dec-160)); (( lo < 0 )) && lo=0; hi=$((dec+192));
+            printf '=== XREF_CONTEXT src=0x%s ===\n' "$s"
+            "$toolroot/usr/bin/gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble $lo,$hi" 2>/dev/null || true
+          done
+          echo TRACK_A_XREF_CONTEXTS_END=true
+          echo TRACK_A_MAP_HANDLER_XREF_SCAN_PROVEN=true

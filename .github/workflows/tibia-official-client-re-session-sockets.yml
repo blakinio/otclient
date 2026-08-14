@@ -59,42 +59,39 @@ jobs:
           mkdir -p "$evidence"
           records="$evidence/records.txt"
           : >"$records"
-          cat >"$evidence/probe.gdb" <<EOF
-set pagination off
-set confirm off
-attach $pid
-python
-import gdb, struct, time
-inf=gdb.selected_inferior()
-out='$records'
-class MapBP(gdb.Breakpoint):
-    def __init__(self):
-        super().__init__('*0x%x' % ($bias + 0x19a8ea3))
-    def stop(self):
-        try:
-            rsp=int(gdb.parse_and_eval('\$rsp'))
-            order=int(gdb.parse_and_eval('\$rbp')) & 0xffffffff
-            x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))
-            if 0<x<100000 and 0<y<100000 and z<32 and order<128:
-                with open(out,'a') as f:
-                    f.write(f'{time.time_ns()} {x} {y} {z} {order}\n')
-        except Exception:
-            pass
-        return False
-MapBP()
-end
-continue
-EOF
-          gdb -q -nx -batch -x "$evidence/probe.gdb" >"$evidence/gdb.log" 2>&1 &
+          script="$evidence/probe.gdb"
+          printf '%s\n' \
+            'set pagination off' \
+            'set confirm off' \
+            "attach $pid" \
+            'python' \
+            'import gdb, struct, time' \
+            'inf=gdb.selected_inferior()' \
+            "out='$records'" \
+            'class MapBP(gdb.Breakpoint):' \
+            '    def __init__(self):' \
+            "        super().__init__('*0x%x' % ($bias + 0x19a8ea3))" \
+            '    def stop(self):' \
+            '        try:' \
+            "            rsp=int(gdb.parse_and_eval('\\$rsp'))" \
+            "            order=int(gdb.parse_and_eval('\\$rbp')) & 0xffffffff" \
+            "            x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))" \
+            '            if 0<x<100000 and 0<y<100000 and z<32 and order<128:' \
+            "                with open(out,'a') as f: f.write(f'{time.time_ns()} {x} {y} {z} {order}\\n')" \
+            '        except Exception:' \
+            '            pass' \
+            '        return False' \
+            'MapBP()' \
+            'end' \
+            'continue' >"$script"
+          gdb -q -nx -batch -x "$script" >"$evidence/gdb.log" 2>&1 &
           gp=$!
           sleep 2
           "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
           "$toolroot/usr/bin/xdotool" windowfocus --sync "$window" || true
           for spec in 'RIGHT Right Left' 'LEFT Left Right' 'UP Up Down' 'DOWN Down Up'; do
             set -- $spec
-            name="$1"
-            key="$2"
-            back="$3"
+            name="$1"; key="$2"; back="$3"
             printf 'TRACK_A_%s_START=%s\n' "$name" "$(date +%s%N)"
             "$toolroot/usr/bin/xdotool" key "$key"
             sleep 1.2
@@ -104,31 +101,7 @@ EOF
           done
           if kill -0 "$gp" 2>/dev/null; then kill -INT "$gp" 2>/dev/null || true; sleep 1; fi
           kill -CONT "$pid" 2>/dev/null || true
-          python3 - "$records" <<'PY'
-import sys
-rows=[]
-for line in open(sys.argv[1]):
-    p=line.split()
-    if len(p)==5:
-        rows.append(tuple(map(int,p)))
-print(f'TRACK_A_DECODED_MAP_RECORD_COUNT={len(rows)}')
-if len(rows)<8:
-    raise SystemExit(1)
-coords=[(r[1],r[2],r[3]) for r in rows]
-xs=[c[0] for c in coords]
-ys=[c[1] for c in coords]
-zs=[c[2] for c in coords]
-print(f'TRACK_A_X_MIN={min(xs)}')
-print(f'TRACK_A_X_MAX={max(xs)}')
-print(f'TRACK_A_X_SPAN={max(xs)-min(xs)+1}')
-print(f'TRACK_A_Y_MIN={min(ys)}')
-print(f'TRACK_A_Y_MAX={max(ys)}')
-print(f'TRACK_A_Y_SPAN={max(ys)-min(ys)+1}')
-print(f'TRACK_A_Z_MIN={min(zs)}')
-print(f'TRACK_A_Z_MAX={max(zs)}')
-print('TRACK_A_Z_VALUES='+','.join(map(str,sorted(set(zs)))))
-print(f'TRACK_A_UNIQUE_XYZ={len(set(coords))}')
-PY
+          python3 -c "import sys; rows=[tuple(map(int,l.split())) for l in open(sys.argv[1]) if len(l.split())==5]; print(f'TRACK_A_DECODED_MAP_RECORD_COUNT={len(rows)}'); assert len(rows)>=8; c=[(r[1],r[2],r[3]) for r in rows]; xs=[x for x,_,_ in c]; ys=[y for _,y,_ in c]; zs=[z for *_,z in c]; print(f'TRACK_A_X_MIN={min(xs)}'); print(f'TRACK_A_X_MAX={max(xs)}'); print(f'TRACK_A_X_SPAN={max(xs)-min(xs)+1}'); print(f'TRACK_A_Y_MIN={min(ys)}'); print(f'TRACK_A_Y_MAX={max(ys)}'); print(f'TRACK_A_Y_SPAN={max(ys)-min(ys)+1}'); print(f'TRACK_A_Z_MIN={min(zs)}'); print(f'TRACK_A_Z_MAX={max(zs)}'); print('TRACK_A_Z_VALUES='+','.join(map(str,sorted(set(zs))))); print(f'TRACK_A_UNIQUE_XYZ={len(set(c))}')" "$records"
           kill -0 "$pid"
           grep -azFxq "$marker" "/proc/$pid/environ"
           echo TRACK_A_SESSION_LEFT_LOGGED_IN=true

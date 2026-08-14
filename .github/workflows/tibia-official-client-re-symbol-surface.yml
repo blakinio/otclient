@@ -1,0 +1,53 @@
+name: Track A official client handler symbol surface
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-symbol-surface.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Inspect GDB symbol and RTTI surface
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$gdb" ]]
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'echo TRACK_A_SYMBOL_INFO_FUNCTIONS_BEGIN=true\n' \
+            -ex 'info functions qt_static_metacall' \
+            -ex 'info functions TChatProtocolMessageHandler' \
+            -ex 'info functions TContainerProtocolMessageHandler' \
+            -ex 'info functions TCreatureProtocolMessageHandler' \
+            -ex 'info functions TPlayerProtocolMessageHandler' \
+            -ex 'info functions TEffectProtocolMessageHandler' \
+            -ex 'info functions TMarketProtocolMessageHandler' \
+            -ex 'info functions TNPCTradeProtocolMessageHandler' \
+            -ex 'info functions TPlayerTradeProtocolMessageHandler' \
+            -ex 'info functions TQuestLogProtocolMessageHandler' \
+            -ex 'info functions TGameEventProtocolMessageHandler' \
+            -ex 'echo TRACK_A_SYMBOL_INFO_FUNCTIONS_END=true\n' \
+            -ex 'echo TRACK_A_SYMBOL_INFO_VARIABLES_BEGIN=true\n' \
+            -ex 'info variables staticMetaObject' \
+            -ex 'info variables TChatProtocolMessageHandler' \
+            -ex 'info variables TContainerProtocolMessageHandler' \
+            -ex 'echo TRACK_A_SYMBOL_INFO_VARIABLES_END=true\n' \
+            -ex 'echo TRACK_A_SYMBOL_SURFACE_COMPLETE=true\n'

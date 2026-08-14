@@ -1,4 +1,4 @@
-name: Track A baseline provenance scan
+name: Track A post-drop provenance scan
 on:
   push:
     branches:
@@ -18,7 +18,7 @@ jobs:
       TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Scan one square around player
+      - name: Scan after external item drop
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -34,13 +34,15 @@ jobs:
           kill -0 "$pid"
           grep -azFxq "$marker" "/proc/$pid/environ"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          baseline="$state/evidence/item-provenance-baseline/baseline.txt"
+          [[ -s "$baseline" ]]
           window="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' | head -1)"
           [[ -n "$window" ]]
           line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
           start="$(awk '{split($1,a,"-");print a[1]}' <<< "$line")"
           off="$(awk '{print $3}' <<< "$line")"
           bias=$((16#$start-16#$off))
-          d="$state/evidence/item-provenance-baseline"
+          d="$state/evidence/item-provenance-postdrop"
           rm -rf "$d"
           mkdir -p "$d"
           records="$d/records.txt"
@@ -55,7 +57,7 @@ jobs:
           kill -INT "$gp" 2>/dev/null || true
           sleep 1
           kill -CONT "$pid" 2>/dev/null || true
-          python3 -c 'import sys; p=sys.argv[1]; out=sys.argv[2]; rows=[]; [rows.append(tuple(map(int,l.split()))) for l in open(p) if len(l.split())==6]; assert rows; canon=sorted({(r[1],r[2],r[3],r[4],r[5]) for r in rows}); open(out,"w").write("".join(" ".join(map(str,r))+"\n" for r in canon)); tids=sorted({r[4] for r in canon if 0<=r[4]<1000000}); print("TRACK_A_BASELINE_RECORDS="+str(len(rows))); print("TRACK_A_BASELINE_CANONICAL_ROWS="+str(len(canon))); print("TRACK_A_BASELINE_Z_VALUES="+",".join(map(str,sorted({r[2] for r in canon})))); print("TRACK_A_BASELINE_DISTINCT_TYPE_IDS="+str(len(tids))); print("TRACK_A_BASELINE_TYPE_IDS="+",".join(map(str,tids))); print("TRACK_A_BASELINE_ITEM_SCAN_PROVEN=true")' "$records" "$d/baseline.txt"
+          python3 -c 'import sys; b=set(tuple(map(int,l.split())) for l in open(sys.argv[1]) if len(l.split())==5); rows=[tuple(map(int,l.split())) for l in open(sys.argv[2]) if len(l.split())==6]; assert rows; p=set((r[1],r[2],r[3],r[4],r[5]) for r in rows); added=sorted(p-b); removed=sorted(b-p); print("TRACK_A_POSTDROP_RECORDS="+str(len(rows))); print("TRACK_A_POSTDROP_ROWS="+str(len(p))); print("TRACK_A_POSTDROP_ADDED_COUNT="+str(len(added))); [print("TRACK_A_POSTDROP_ADDED="+" ".join(map(str,r))) for r in added]; print("TRACK_A_POSTDROP_REMOVED_COUNT="+str(len(removed))); [print("TRACK_A_POSTDROP_REMOVED="+" ".join(map(str,r))) for r in removed[:30]]; print("TRACK_A_POSTDROP_COMPARISON_PROVEN=true")' "$baseline" "$records"
           kill -0 "$pid"
           grep -azFxq "$marker" "/proc/$pid/environ"
           echo TRACK_A_SESSION_LEFT_RUNNING=true

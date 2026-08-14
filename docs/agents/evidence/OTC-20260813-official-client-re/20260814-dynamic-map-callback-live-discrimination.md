@@ -1,4 +1,4 @@
-# Track A callback live discrimination — corrected 2026-08-14
+# Track A dynamic world-map callback discrimination — corrected 2026-08-14
 
 ## Scope
 
@@ -6,10 +6,11 @@ Repository: `blakinio/otclient`
 Track: `official-client-re` / Track A
 Runner: `synology-otclient-01`
 Subject: official native Linux Tibia client only
+Official child-client SHA256: `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`
 
-This checkpoint supersedes the initial hypothesis that child-client offsets `+0xcecc70` / `+0xcecf40` were map/item callbacks. Later live object-graph evidence disproved that interpretation.
+This checkpoint supersedes both the initial unverified map-callback hypothesis and the later overcorrection that classified `+0xcecc70` / `+0xcecf40` as unrelated UI handlers. Exact Qt metaobject data embedded in the same official binary now identifies the owning class and method names directly.
 
-The experiments used post-login GDB hardware breakpoints against the Track A-owned official client. They did not patch client code, modify or bypass BattlEye, inject gameplay packets, or persist credentials.
+The experiments used static binary inspection and bounded post-login GDB observation. They did not patch client code, modify or bypass BattlEye, inject gameplay packets, or persist credentials.
 
 ## Fresh verified world recovery
 
@@ -29,128 +30,209 @@ TRACK_A_UDP_SOCKET_COUNT=0
 TRACK_A_SESSION_LEFT_RUNNING=true
 ```
 
-## Fresh observer and baseline
+## Existing post-login runtime controls
+
+A post-login observer was previously armed against `+0xcecc70` and `+0xcecf40` with a clean zero-hit baseline. A real one-tile player movement (`run 31784304719`, job `94716687631`, artifact `9212883577`) changed the rendered world by 151920 pixels but produced zero hits. A separate bounded drag (`run 31784509337`, job `94717325713`, artifact `9212961464`) was proven by frame inspection to be only a hover/no-op and also produced zero hits.
+
+Later, the observer recorded two `+0xcecf40` hits. Their event-associated memory included UTF-16 strings `Low lag (147 ms)` and an FPS-style string. Those records are still valid observations, but their earlier interpretation as proof that `cecf40` itself was a non-map UI handler was too strong. The function identity must be taken from the binary's own Qt metadata, while the status-text observation only proves that the particular object pointers/register assumptions used by that early runtime logger were not authoritative map payload decoding.
+
+## Static recovery of the real Worldmap Qt dispatcher
+
+A complete direct-call xref scan and focused disassembly established a Qt static-meta-call dispatcher at `+0xdf2a60`:
 
 ```text
-observer run: 31783518111
-observer job: 94716375182
+test esi,esi
+cmp edx,0xd
+ja ...
+lea rsi,[jump_table]
+movsxd rax,DWORD PTR [rsi+rdx*4]
+add rax,rsi
+jmp rax
+```
+
+The exact 14-entry jump table at `0x1d8bd10` was decoded in:
+
+```text
+run: 31786047410
+job: 94722066149
+commit: 476236613b9a48e60a9a45e77689c2c7ab6a8c76
 result: success
-live client pid: 19092
-persistent gdb pid: 19394
-client PIE base: 0x560e600db000
-breakpoint candidates:
-  - base + 0xcecc70
-  - base + 0xcecf40
 ```
 
-Collector job `94716527251` verified that the client and detached GDB persisted after Actions cleanup and initially reported zero hits.
-
-## Controlled player movement negative control
+Decoded case targets:
 
 ```text
-workflow: .github/workflows/tibia-official-client-re-controlled-step.yml
-run: 31784304719
-job: 94716687631
-artifact_id: 9212883577
-TRACK_A_CONTROLLED_STEP_CHANGED_PIXELS=151920
-TRACK_A_DYNAMIC_MAP_EVENTS_BEFORE=0
-TRACK_A_DYNAMIC_MAP_EVENTS_AFTER=0
+case  0 -> +0xdf2b58
+case  1 -> +0xdf2b88
+case  2 -> +0xdf2ba0
+case  3 -> +0xdf2c00
+case  4 -> +0xdf2c38
+case  5 -> +0xdf2c70
+case  6 -> +0xdf2ca8
+case  7 -> +0xdf2cc0
+case  8 -> +0xdf2cd8
+case  9 -> +0xdf2cf0
+case 10 -> +0xdf2d08
+case 11 -> +0xdf2d20
+case 12 -> +0xdf2d38
+case 13 -> +0xdf2ac8
 ```
 
-The downloaded XWD artifact was directly inspected and shows a real one-tile movement while remaining in the normal game world. Thus post-login GDB attach did not itself force logout in this trial, and ordinary player movement did not hit the two candidate callbacks.
-
-## Controlled drag no-op
+The case tails were independently disassembled. Relevant tail targets include:
 
 ```text
-workflow: .github/workflows/tibia-official-client-re-controlled-item-drag.yml
-run: 31784509337
-job: 94717325713
-artifact_id: 9212961464
-TRACK_A_CONTROLLED_ITEM_DRAG_CHANGED_PIXELS=30760
-TRACK_A_DYNAMIC_MAP_EVENTS_BEFORE=0
-TRACK_A_DYNAMIC_MAP_EVENTS_AFTER=0
+case 1  -> +0xcec8d0
+case 2  -> left/right/top/bottom movement/map-description path
+case 3  -> movement/map-description path
+case 4  -> movement/map-description path
+case 5  -> movement/map-description path
+case 6  -> +0xcdbc90
+case 7  -> +0xcdbe30
+case 8  -> +0xcd3190
+case 9  -> +0xcecc70
+case 10 -> +0xcecf40
+case 11 -> +0xcd4e20
+case 12 -> +0xcd32c0
 ```
 
-Direct inspection of the downloaded before/after XWD frames proved that no ground item moved; only the tile hover/selection highlight changed. This is a UI no-op control, not item-movement evidence.
+## Direct method names from the official binary
 
-## Exact later callback records
-
-The corrected schema-2 collector finally exposed the exact records that were previously hidden by unrelated shared-library warning output.
+The `QMetaObject` corresponding to the `+0xdf2a60` dispatcher is at `0x3087800`. Its fields directly reference:
 
 ```text
-collector run: 31784814270
-collector job: 94718266716
-TRACK_A_DYNAMIC_MAP_EVENT_COUNT=2
-TRACK_A_DYNAMIC_MAP_ARG_COUNT=2
-
-EVENT handler=cecf40 ... rsi=0x560e7c6d0c20 ...
-ARG cecf40 event_ptr=0x560e7c6d0c20 pos_ref=0x560e7c7cd7a0 thing_ptr=0x560e7d103560 stack_raw=0x2 flags=0x7
-
-EVENT handler=cecf40 ... rsi=0x560e7ab5fa80 ...
-ARG cecf40 event_ptr=0x560e7ab5fa80 pos_ref=0x560e7d275d80 thing_ptr=0x560e7e0391f0 stack_raw=0x2 flags=0x7
+stringdata/data regions: 0x1cd8a54 / 0x1cd8820
+static_metacall:         0xdf2a60
+related metadata:        0x2f6ab00
 ```
 
-Both hits were `cecf40`; no `cecc70` hit was recorded.
-
-The two hits occurred after the controlled step/no-op-drag windows had already independently ended with zero hits, so they cannot be attributed to either controlled action. They also cannot be attributed to the earlier user item placement, because the observer had been freshly re-armed and its log truncated after that earlier session.
-
-## Live object-graph classification
-
-Static disassembly from job `94710283300` shows `cecf40` consuming `rsi+0x10`, `rsi+0x18`, `rsi+0x20` and `rsi+0x28` through an object/model-style callback path.
-
-The first attempt to interpret the object referenced by `event+0x18` as a simple position tuple was disproved by live memory run `31784874756`, job `94718452402`: the 12 bytes at `ref+0x18` were pointer-like values, not plausible Tibia coordinates.
-
-A deeper live object-graph probe then ran as:
+The method decode run was:
 
 ```text
-run: 31784940411
-job: 94718659436
+run: 31786106136
+job: 94722253536
+commit: eb8090c2b633fd1824b17711072433704b3fb1e9
 result: success
-TRACK_A_CECF40_RECORD_COUNT=2
 ```
 
-The live event objects contained directly readable UTF-16 text payloads. Record 1 includes the sequence:
+The embedded class name is:
 
 ```text
-0x00200077006f004c
-0x002000670061006c
-0x0037003400310028
-0x00290073006d0020
+tibia::worldmap::TWorldmapProtocolMessageHandler
 ```
 
-Interpreted as little-endian UTF-16 code units this is:
+The ordered method strings in the same metaobject region are:
 
 ```text
-Low lag (147 ms)
+publishGameAction
+handleFullMapMessage
+handleLeftColumnMessage
+handleRightColumnMessage
+handleTopRowMessage
+handleBottomRowMessage
+handleTopFloorMessage
+handleBottomFloorMessage
+handleFieldDataMessage
+handleCreateOnMapMessage
+handleChangeOnMapMessage
+handleDeleteOnMapMessage
+handleAmbientLightMessage
+handleTibiaTimeMessage
 ```
 
-The other record contains an FPS-style text payload ending in `fps`.
+The associated protobuf type names are also embedded next to the handlers, including:
 
-This directly falsifies the map/item-callback hypothesis for the observed `cecf40` hits. They belong to a UI/status/performance text update path, or a closely related model path, not authoritative world-map mutation evidence.
+```text
+tibia::protobuf::protocol::GameserverMessageFullMap
+tibia::protobuf::protocol::GameserverMessageLeftColumn
+tibia::protobuf::protocol::GameserverMessageRightColumn
+tibia::protobuf::protocol::GameserverMessageTopRow
+tibia::protobuf::protocol::GameserverMessageBottomRow
+tibia::protobuf::protocol::GameserverMessageTopFloor
+tibia::protobuf::protocol::GameserverMessageBottomFloor
+tibia::protobuf::protocol::GameserverMessageFieldData
+tibia::protobuf::protocol::GameserverMessageCreateOnMap
+tibia::protobuf::protocol::GameserverMessageChangeOnMap
+tibia::protobuf::protocol::GameserverMessageDeleteOnMap
+```
 
-## Corrected conclusions
+Because the metaobject has exactly 14 dispatch cases and exactly the ordered method set above, and the already-known full-map/directional/floor handlers align with cases 1 through 7, the dynamic mutation identities are established for this binary:
+
+```text
++0xcd3190 = handleFieldDataMessage
++0xcecc70 = handleCreateOnMapMessage
++0xcecf40 = handleChangeOnMapMessage
++0xcd4e20 = handleDeleteOnMapMessage
++0xcd32c0 = handleAmbientLightMessage
+case 13    = handleTibiaTimeMessage
+```
+
+This mapping is direct binary evidence, not an OTClient naming assumption.
+
+## Structural behavior of the three mutation handlers
+
+Static disassembly is consistent with the recovered names:
+
+### `+0xcecc70` — `handleCreateOnMapMessage`
+
+The handler consumes a position-like record, resolves a world-map/tile object through a virtual method, obtains a thing/object payload and stack/index-like field, invokes helper `+0xceca50`, and dispatches a virtual mutation operation on the resolved map object.
+
+### `+0xcecf40` — `handleChangeOnMapMessage`
+
+The handler consumes a position-like record, thing/object payload and stack/index-like field, resolves the target world-map/tile object, invokes helper `+0xceca50`, and dispatches a different virtual mutation operation. It also contains an alternate branch for another object-position encoding.
+
+### `+0xcd4e20` — `handleDeleteOnMapMessage`
+
+The handler consumes an object-position representation with multiple variants, resolves a world-map target, and follows deletion/object-class-specific paths. The surrounding code includes object type/vtable checks and dynamic-cast-style handling.
+
+These structural observations explain why the functions looked map-related before their names were recovered.
+
+## Reinterpretation of the earlier status-text hits
 
 ### PROVEN
 
-- Fresh in-world Track A sessions can survive the current bounded post-login observer during controlled experiments.
-- One real one-tile player movement did not hit `+0xcecc70` or `+0xcecf40`.
-- The observed two later hits were both `+0xcecf40`.
-- The live `cecf40` event payload includes `Low lag (147 ms)` and an FPS-style text payload.
-- Therefore these observed `cecf40` hits are not evidence of item placement, map mutation, player position, or OTBM state.
+- `+0xcecf40` is the official binary's `handleChangeOnMapMessage` for `TWorldmapProtocolMessageHandler`.
+- The two old GDB records at this address nevertheless exposed pointers whose memory contained `Low lag (147 ms)` and FPS-style text.
+- Therefore those old register/object-field assumptions did **not** correctly decode the authoritative `GameserverMessageChangeOnMap` payload.
 
-### REJECTED HYPOTHESES
+### INFERENCE
 
-- `+0xcecf40` is established as a map/item callback because two hits appeared after an earlier manual item placement: **rejected**. Temporal correlation was coincidental; fresh-session object contents identify status/performance text updates.
-- `event+0x18` is a simple `x,y,z` structure: **rejected** by direct live memory values.
-- the controlled adjacent drag moved an item: **rejected** by direct frame inspection.
+The status strings may have been reached through stale/transient/shared pointer state, an incorrect interpretation of the handler's C++ argument wrapper, or an indirect object referenced during processing. They must not be used to classify the handler itself.
 
-### UNKNOWN
+### REJECTED
 
-- The actual current official-client world-map mutation callback(s).
-- Authoritative structural player coordinates.
-- Structural add/remove/move item records.
-- Whether the historical Worldmap decoder target remains valid in this exact current client build.
+- `+0xcecf40` is purely a status/performance UI handler: **rejected by direct QMetaObject method-name evidence**.
+- the old `event+0x18` pointer is a plain `x,y,z` tuple: **still rejected by direct live memory values**.
+- two unclassified hits alone prove a user item placement: **still rejected**; exact payload decoding is required.
+
+## Current proven architecture
+
+```text
+FULL / STRIP SNAPSHOT PATH
+  handleFullMapMessage / directional / floor handlers
+  -> map description routine around +0x19a8a80
+  -> proven structural record hook +0x19a8ea3
+
+DYNAMIC WORLD-MAP PATH
+  +0xcecc70 = CreateOnMap
+  +0xcecf40 = ChangeOnMap
+  +0xcd4e20 = DeleteOnMap
+
+FIELD DATA PATH
+  +0xcd3190 = FieldData
+
+PROVENANCE LAYER
+  required to distinguish map-loaded/static state from later dynamic mutations
+```
+
+This directly supports the user's earlier hypothesis that initial/map-loaded state and later player/environment modifications travel through different processing paths, while not implying that the client itself labels an object as 'map-editor-created'.
+
+## Remaining unknowns
+
+- Exact in-memory protobuf/wrapper field layout at entry to CreateOnMap, ChangeOnMap and DeleteOnMap.
+- Correct authoritative extraction of world `x,y,z`, stack position and stable appearance/type identifier for each dynamic event.
+- Whether creature movement is represented through these modern protobuf messages or a separate handler/class in this client version.
+- Proven dynamic classification of corpses, effects, missiles, doors/transforms and player-dropped items.
 
 ## Exactly one next action
 
-Return to the historical Worldmap decode/call-chain evidence and derive a new exact-build candidate set from functions that consume or emit real tile-position records. Do not use `+0xcecc70` / `+0xcecf40` as map evidence again unless new independent evidence changes their classification.
+Arm a new post-login observer on the now-identified `CreateOnMap`, `ChangeOnMap` and `DeleteOnMap` handlers, but log raw argument-wrapper bytes/pointers first rather than reusing the disproven `event+0x18 = position` assumption. Correlate exactly one controlled world mutation with one handler and decode its protobuf/wrapper layout from that evidence before generalizing.

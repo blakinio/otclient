@@ -1,4 +1,4 @@
-name: Track A map handler xrefs
+name: Track A meta-dispatch map cases
 on:
   push:
     branches:
@@ -11,13 +11,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 4
+    timeout-minutes: 3
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Scan rel32 call xrefs and inspect caller neighborhoods
+      - name: Inspect meta-dispatch cases following row movement handlers
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,34 +27,10 @@ jobs:
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          xrefs=/tmp/track-a-map-xrefs.txt
-          python3 - "$client" > "$xrefs" <<'PY'
-          import mmap,struct,sys
-          path=sys.argv[1]
-          targets={
-            0xcdbad0:'row_a',0xcdbb40:'row_b',0xcdbbb0:'row_c',0xcdbc20:'row_d',
-            0xcdbc90:'floor_or_full_a',0xcdbe20:'floor_or_full_b',0x19a8a80:'tile_description'
-          }
-          with open(path,'rb') as f:
-            data=f.read()
-          found=[]
-          for i,b in enumerate(data[:-5]):
-            if b!=0xE8: continue
-            rel=struct.unpack_from('<i',data,i+1)[0]
-            dst=i+5+rel
-            if dst in targets:
-              found.append((i,dst,targets[dst]))
-          for src,dst,name in found:
-            print(f'XREF src=0x{src:x} dst=0x{dst:x} name={name}')
-          print('XREF_COUNT='+str(len(found)))
-          PY
-          cat "$xrefs"
-          mapfile -t srcs < <(awk '/^XREF src=/{for(i=1;i<=NF;i++) if($i~/^src=/){sub("src=0x","",$i); print $i}}' "$xrefs" | sort -u)
-          echo TRACK_A_XREF_CONTEXTS_BEGIN=true
-          for s in "${srcs[@]}"; do
-            dec=$((16#$s)); lo=$((dec-160)); (( lo < 0 )) && lo=0; hi=$((dec+192));
-            printf '=== XREF_CONTEXT src=0x%s ===\n' "$s"
-            "$toolroot/usr/bin/gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble $lo,$hi" 2>/dev/null || true
-          done
-          echo TRACK_A_XREF_CONTEXTS_END=true
-          echo TRACK_A_MAP_HANDLER_XREF_SCAN_PROVEN=true
+          "$toolroot/usr/bin/gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble 0xdf2a80,0xdf3600' > /tmp/track-a-meta-map.txt 2>&1
+          echo TRACK_A_META_MAP_BEGIN=true
+          cat /tmp/track-a-meta-map.txt
+          echo TRACK_A_META_MAP_END=true
+          echo TRACK_A_META_MAP_CASES_CAPTURED=true

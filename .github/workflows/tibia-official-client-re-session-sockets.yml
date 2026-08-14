@@ -1,4 +1,4 @@
-name: Track A parser-family xref enumeration
+name: Track A unknown map parser caller disassembly
 on:
   push:
     branches:
@@ -11,13 +11,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 3
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Enumerate direct call xrefs into proven map parser family
+      - name: Disassemble cec9 and df2b parser-family callers
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -30,53 +30,14 @@ jobs:
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-
-          python3 - "$client" <<'PY'
-          import struct, sys
-          p=sys.argv[1]
-          b=open(p,'rb').read()
-          if b[:4] != b'\x7fELF' or b[4] != 2 or b[5] != 1:
-              raise SystemExit('expected little-endian ELF64')
-          e_shoff=struct.unpack_from('<Q',b,0x28)[0]
-          e_shentsize=struct.unpack_from('<H',b,0x3a)[0]
-          e_shnum=struct.unpack_from('<H',b,0x3c)[0]
-          e_shstrndx=struct.unpack_from('<H',b,0x3e)[0]
-          sh=[]
-          for i in range(e_shnum):
-              o=e_shoff+i*e_shentsize
-              sh.append(struct.unpack_from('<IIQQQQIIQQ',b,o))
-          st=sh[e_shstrndx]
-          names=b[st[4]:st[4]+st[5]]
-          def sname(off):
-              e=names.find(b'\0',off)
-              return names[off:e].decode('ascii','replace')
-          exec_sections=[]
-          for ent in sh:
-              name=sname(ent[0]); flags=ent[2]; addr=ent[3]; off=ent[4]; size=ent[5]
-              if flags & 0x4 and size:
-                  exec_sections.append((name,addr,off,size))
-          targets={
-            0xcdb770:'common_position_helper',
-            0xcdbad0:'map_move_1',0xcdbb40:'map_move_2',0xcdbbb0:'map_move_3',0xcdbc20:'map_move_4',
-            0xcdbc90:'floor_path_1',0xcdbe30:'floor_path_2',0x19a8a80:'map_description',
-          }
-          hits=[]
-          for name,addr,off,size in exec_sections:
-              data=b[off:off+size]
-              for i in range(0,len(data)-4):
-                  if data[i] != 0xE8: continue
-                  rel=struct.unpack_from('<i',data,i+1)[0]
-                  src=addr+i
-                  dst=(src+5+rel) & ((1<<64)-1)
-                  if dst in targets:
-                      hits.append((src,dst,targets[dst],name))
-          print('TRACK_A_ELF_EXEC_SECTIONS='+','.join(x[0] for x in exec_sections))
-          print(f'TRACK_A_DIRECT_XREF_COUNT={len(hits)}')
-          for src,dst,label,name in sorted(hits):
-              print(f'XREF src=0x{src:x} dst=0x{dst:x} target={label} section={name}')
-          for dst,label in targets.items():
-              xs=[src for src,d,l,n in hits if d==dst]
-              print(f'TARGET target={label} addr=0x{dst:x} count={len(xs)} callers='+','.join(f'0x{x:x}' for x in xs))
-          PY
-
-          echo TRACK_A_PARSER_FAMILY_XREF_ENUMERATION_COMPLETE=true
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$gdb" ]]
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex 'echo TRACK_A_CEC9_BLOCK_BEGIN=true\n' \
+            -ex 'disassemble 0xcec880,0xcecb40' \
+            -ex 'echo TRACK_A_CEC9_BLOCK_END=true\n' \
+            -ex 'echo TRACK_A_DF2B_BLOCK_BEGIN=true\n' \
+            -ex 'disassemble 0xdf2a80,0xdf2d40' \
+            -ex 'echo TRACK_A_DF2B_BLOCK_END=true\n' \
+            -ex 'echo TRACK_A_UNKNOWN_CALLER_DISASM_COMPLETE=true\n'

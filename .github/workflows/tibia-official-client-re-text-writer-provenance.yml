@@ -1,0 +1,180 @@
+name: Track A final direct text writer provenance
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-text-writer-provenance.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      METAOBJECT: '0x30b7d00'
+      WRITER_FDE_START: '0xb46bd0'
+      WRITER_FDE_END: '0xb46cce'
+    steps:
+      - name: Decode QMeta object and device provenance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          report="$RUNNER_TEMP/track-a-text-writer-provenance.txt"
+          relocs="$RUNNER_TEMP/track-a-text-writer-relocs.txt"
+          frames="$RUNNER_TEMP/track-a-text-writer-frames.txt"
+          : >"$report"
+          exec > >(tee -a "$report") 2>&1
+
+          echo TRACK_A_TEXT_WRITER_PROVENANCE_BEGIN=true
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          readelf -WrC "$client" >"$relocs"
+          readelf --debug-dump=frames "$client" >"$frames"
+
+          echo METAOBJECT_RELOCATION_WINDOW_BEGIN=true
+          awk '$1 ~ /^[0-9a-fA-F]+$/ {x=strtonum("0x"$1); if (x>=strtonum("0x30b7cc0") && x<strtonum("0x30b7d80")) print}' "$relocs" 2>/dev/null || \
+            grep -Ei '^00000000030b7c|^00000000030b7d' "$relocs" || true
+          echo METAOBJECT_RELOCATION_WINDOW_END=true
+
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'set print elements 0' \
+            -ex 'info symbol 0x30b7d00' \
+            -ex 'x/16gx 0x30b7cc0' \
+            -ex 'x/16gx 0x30b7d00' \
+            -ex 'info symbol 0xb46bd0' \
+            -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble /r 0xb46bd0,0xb46cce' || true
+
+          python3 -u - "$client" "$relocs" "$frames" <<'PY'
+          import re,struct,sys
+          client,reloc_path,frames_path=sys.argv[1:]
+          data=open(client,'rb').read()
+          meta=0x30b7d00
+          writer=0xb46bd0
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phentsz=struct.unpack_from('<H',data,0x36)[0]; phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,fsz,msz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fsz:loads.append((fo,fo+fsz,va,va+fsz,flags))
+          def va_to_off(va):
+              for fs,fe,base,end,flags in loads:
+                  if base<=va<end:return fs+va-base
+          def off_to_va(off):
+              for fs,fe,base,end,flags in loads:
+                  if fs<=off<fe:return base+off-fs
+          execs=[x for x in loads if x[4]&1]
+
+          # Parse relative relocations so local QMeta pointers are resolved.
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shentsz=struct.unpack_from('<H',data,0x3a)[0]; shnum=struct.unpack_from('<H',data,0x3c)[0]
+          rel={}
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              if struct.unpack_from('<I',data,o+4)[0]!=4:continue
+              roff=struct.unpack_from('<Q',data,o+0x18)[0]; rsize=struct.unpack_from('<Q',data,o+0x20)[0]; rentsz=struct.unpack_from('<Q',data,o+0x38)[0] or 24
+              for p in range(roff,roff+rsize,rentsz):
+                  r_offset,r_info,r_addend=struct.unpack_from('<QQq',data,p)
+                  if (r_info&0xffffffff)==8:rel[r_offset]=r_addend & 0xffffffffffffffff
+          def qword(va):
+              if va in rel:return rel[va]
+              off=va_to_off(va)
+              if off is None or off+8>len(data):return None
+              return struct.unpack_from('<Q',data,off)[0]
+          def cstrings_near(va,radius=0x400):
+              off=va_to_off(va)
+              if off is None:return []
+              lo=max(0,off-radius); hi=min(len(data),off+radius)
+              blob=data[lo:hi]
+              out=[]
+              for m in re.finditer(rb'[ -~]{4,}',blob):
+                  s=m.group().decode('ascii','replace')
+                  out.append((off_to_va(lo+m.start()),s))
+              return out
+
+          print('META_QWORDS_BEGIN=true')
+          for r in range(-0x40,0x80,8):
+              v=qword(meta+r)
+              print(f'META_QWORD rel={r:+#x} addr=0x{meta+r:x} value={hex(v) if v is not None else "UNMAPPED"}')
+          print('META_QWORDS_END=true')
+
+          # QMetaObject::Data commonly stores local stringdata/data/static_metacall pointers in first words.
+          ptrs=[]
+          for r in range(0,0x40,8):
+              v=qword(meta+r)
+              if v and va_to_off(v) is not None:ptrs.append((r,v))
+          for r,v in ptrs:
+              print(f'META_LOCAL_POINTER rel=0x{r:x} value=0x{v:x}')
+              for sva,s in cstrings_near(v,0x300):
+                  if any(ch.isalpha() for ch in s):
+                      print(f'META_NEAR_STRING ptr_rel=0x{r:x} va={hex(sva) if sva is not None else "UNKNOWN"} text={s[:240]!r}')
+
+          # Any full relocation lines whose destination is the QMetaObject block or mentions its address.
+          lines=open(reloc_path,errors='replace').read().splitlines()
+          for line in lines:
+              m=re.match(r'^\s*([0-9a-fA-F]+)\s+',line)
+              if m and 0x30b7c80<=int(m.group(1),16)<0x30b7d80:
+                  print('META_RELOC '+line.strip())
+
+          # Direct and RIP-relative references to metaobject and writer entry.
+          for label,target in [('META',meta),('WRITER',writer)]:
+              direct=[]; rip=[]
+              for fs,fe,base,end,flags in execs:
+                  blob=data[fs:fe]
+                  p=0
+                  while True:
+                      p=blob.find(b'\xe8',p)
+                      if p<0:break
+                      if p+5<=len(blob):
+                          site=base+p
+                          got=(site+5+struct.unpack_from('<i',blob,p+1)[0])&0xffffffffffffffff
+                          if got==target:direct.append(site)
+                      p+=1
+                  for p in range(0,len(blob)-7):
+                      if 0x40<=blob[p]<=0x4f and blob[p+1] in (0x8d,0x8b) and (blob[p+2]&0xc7)==0x05:
+                          site=base+p
+                          got=(site+7+struct.unpack_from('<i',blob,p+3)[0])&0xffffffffffffffff
+                          if got==target:rip.append(site)
+              print(f'{label}_DIRECT_CALLS count={len(direct)} sites='+(','.join(hex(x) for x in direct) or 'none'))
+              print(f'{label}_RIP_REFS count={len(rip)} sites='+(','.join(hex(x) for x in rip) or 'none'))
+
+          # Scan writes of a register into +0x10 in functions near code references to this metaobject.
+          print('WRITER_TEXT_LITERALS_BEGIN=true')
+          off=va_to_off(writer)
+          if off is not None:
+              for va,s in cstrings_near(writer,0x200000):
+                  low=s.lower()
+                  if any(k in low for k in ('log','console','stdout','stderr','debug','trace','file')):
+                      print(f'NEAR_ROLE_STRING va={hex(va) if va else "UNKNOWN"} text={s[:220]!r}')
+          print('WRITER_TEXT_LITERALS_END=true')
+          print('TRACK_A_TEXT_WRITER_STATIC_SCAN_COMPLETE=true')
+          PY
+
+          echo TRACK_A_TEXT_WRITER_PROVENANCE_COMPLETE=true
+          grep -q '^TRACK_A_TEXT_WRITER_STATIC_SCAN_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version text-writer report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-text-writer-provenance-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-text-writer-provenance.txt
+          if-no-files-found: error
+          retention-days: 7

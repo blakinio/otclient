@@ -1,0 +1,92 @@
+name: Track A fixed bundled-Qt world login
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-single-item-drag]
+    paths: [.github/workflows/tibia-official-client-re-fixed-world-login.yml]
+permissions:
+  contents: read
+jobs:
+  login:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Start exact official client with bundled Qt and enter world
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient && "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'; pkg="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"; client="$pkg/bin/client"; root="$state/toolroot"; rt="$state/runtime"
+          [[ -x "$client" && "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          warp_pid="$(tr -cd '0-9' <"$rt/wireproxy.pid" 2>/dev/null || true)"; [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]; grep -azFxq "$marker" "/proc/$warp_pid/environ"; kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$TRACK_WARP_PORT" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo TRACK_A_FIXED_LOGIN_WARP_VERIFIED=true
+          old="$(tr -cd '0-9' <"$rt/client.pid" 2>/dev/null || true)"; if [[ -n "$old" && -r "/proc/$old/environ" ]] && grep -azFxq "$marker" "/proc/$old/environ"; then kill "$old" 2>/dev/null || true; for _ in $(seq 1 30); do kill -0 "$old" 2>/dev/null || break; sleep .2; done; kill -0 "$old" 2>/dev/null && { kill -KILL "$old" 2>/dev/null || true; sleep .3; }; fi
+          crash="$pkg/crashdump"; [[ -d "$crash" ]]; find "$crash" -xdev -mindepth 1 -delete
+          xvfb="$(tr -cd '0-9' <"$rt/xvfb.pid" 2>/dev/null || true)"; [[ -n "$xvfb" && -e /tmp/.X11-unix/X98 ]]; kill -0 "$xvfb"
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"; [[ -n "$proxy_lib" ]]; conf="$state/config/proxychains.conf"; [[ -s "$conf" ]]
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"; runtime_lib="$pkg/bin/lib:$root/usr/lib/x86_64-linux-gnu/libproxy:$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          cd "$pkg"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$runtime_lib" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none XDG_DATA_DIRS="$root/usr/share:/usr/share" FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$conf" nohup "$client" >"$rt/client.log" 2>&1 </dev/null &
+          pid=$!; echo "$pid" >"$rt/client.pid"; chmod 600 "$rt/client.pid"
+          sleep 12; kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"; [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          echo TRACK_A_FIXED_LOGIN_CLIENT_RUNNING=true
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$runtime_lib"
+          resolve(){ local w g ww hh area best='' ba=0; for _ in $(seq 1 60); do best='';ba=0; for w in $("$root/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do g="$("$root/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"; ww="$(sed -n 's/^WIDTH=//p'<<<"$g")"; hh="$(sed -n 's/^HEIGHT=//p'<<<"$g")"; [[ -n "$ww" && -n "$hh" ]] || continue; area=$((ww*hh)); ((area>ba))&&{best=$w;ba=$area;}; done; [[ -n "$best" ]]&&{ echo "$best";return;}; sleep .4; done; return 1; }
+          window="$(resolve)"; "$root/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$root/usr/bin/xdotool" windowfocus --sync "$window"
+          out="$GITHUB_WORKSPACE/artifacts/fixed-world-login"; mkdir -p "$out"; "$root/usr/bin/xwd" -silent -id "$window" -out "$out/pre.xwd"
+          "$root/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1; "$root/usr/bin/xdotool" key --window "$window" ctrl+a; "$root/usr/bin/xdotool" type --window "$window" --delay 12 -- "$TIBIA_TEST_EMAIL"
+          "$root/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1; "$root/usr/bin/xdotool" key --window "$window" ctrl+a; "$root/usr/bin/xdotool" type --window "$window" --delay 12 -- "$TIBIA_TEST_PASSWORD"
+          "$root/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1; unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo TRACK_A_FIXED_LOGIN_SUBMITTED=true
+          sleep 8; kill -0 "$pid"; window="$(resolve)"; "$root/usr/bin/xwd" -silent -id "$window" -out "$out/select.xwd"
+          "$root/usr/bin/xdotool" windowfocus --sync "$window"; "$root/usr/bin/xdotool" mousemove --window "$window" 285 193 click 1; sleep .4; "$root/usr/bin/xdotool" key --window "$window" Return
+          echo TRACK_A_FIXED_LOGIN_CHARACTER_ENTER_SENT=true
+          sleep 15; kill -0 "$pid"; window="$(resolve)"; "$root/usr/bin/xwd" -silent -id "$window" -out "$out/world.xwd"
+          changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$out/select.xwd" "$out/world.xwd")"; echo TRACK_A_FIXED_LOGIN_WORLD_CHANGED_PIXELS="$changed"; ((changed>10000))
+          python3 - "$pid" "$TRACK_WARP_PORT" <<'PY'
+          import os,pathlib,sys
+          pid,port=sys.argv[1],int(sys.argv[2]); ins=set()
+          for fd in pathlib.Path('/proc',pid,'fd').iterdir():
+            try:t=os.readlink(fd)
+            except OSError:continue
+            if t.startswith('socket:['):ins.add(t[8:-1])
+          local=direct=udp=0
+          for name,u in [('tcp',0),('tcp6',0),('udp',1),('udp6',1)]:
+            try: rows=pathlib.Path('/proc',pid,'net',name).read_text().splitlines()[1:]
+            except OSError: continue
+            for r in rows:
+              c=r.split()
+              if len(c)<10 or c[9] not in ins: continue
+              rp=int(c[2].rsplit(':',1)[1],16)
+              if u: udp+=1
+              elif c[3]=='01':
+                if rp==port: local+=1
+                else: direct+=1
+          print('TRACK_A_FIXED_LOGIN_LOCAL_SOCKS='+str(local));print('TRACK_A_FIXED_LOGIN_DIRECT='+str(direct));print('TRACK_A_FIXED_LOGIN_UDP='+str(udp))
+          if local<1 or direct or udp: raise SystemExit(3)
+          PY
+          echo TRACK_A_FIXED_LOGIN_WORLD_VERIFIED=true
+          echo TRACK_A_SESSION_LEFT_RUNNING=true
+      - name: Upload verified world screens
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-fixed-world-login
+          path: artifacts/fixed-world-login/*.xwd
+          if-no-files-found: ignore
+          retention-days: 7

@@ -18,7 +18,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_DISPLAY: ':98'
     steps:
-      - name: Enable private stdlib browser bridge without touching client
+      - name: Expose existing Track A browser bridge on trusted LAN
         shell: bash
         run: |
           set +x
@@ -34,178 +34,30 @@ jobs:
             kill -0 "$pid"
           done
           [[ -e /tmp/.X11-unix/X98 ]]
-          echo TRACK_A_EXISTING_SESSION_VERIFIED=true
+          curl -fsS --max-time 5 http://127.0.0.1:6081/ | grep -q 'Track A'
+          status="$(curl -sS --max-time 10 -o /tmp/track-a-lan-screen.bin -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)"
+          [[ "$status" == 200 ]]
+          [[ "$(head -c2 /tmp/track-a-lan-screen.bin)" == BM ]]
+          rm -f /tmp/track-a-lan-screen.bin
+          echo TRACK_A_EXISTING_BROWSER_BRIDGE_VERIFIED=true
 
           root="$state/toolroot"
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
-          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
-          xwd="$(PATH="$tool_path" command -v xwd)"
-          xdotool="$(PATH="$tool_path" command -v xdotool)"
           socat="$(PATH="$tool_path" command -v socat)"
-          [[ -x "$xwd" && -x "$xdotool" && -x "$socat" ]]
-          echo TRACK_A_CAPTURE_TOOLS_VERIFIED=true
-
-          # Prove xwd itself works with the same environment before starting HTTP.
-          probe="$state/runtime/track-a-gui-probe.xwd"
-          rm -f "$probe"
-          DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xwd" -root -silent -out "$probe"
-          [[ -s "$probe" ]]
-          python3 - "$probe" <<'PY'
-          import struct,sys
-          data=open(sys.argv[1],'rb').read(100)
-          if len(data)!=100: raise SystemExit(2)
-          h=struct.unpack('>25I',data)
-          print(f'TRACK_A_XWD_HEADER_SIZE={h[0]}')
-          print(f'TRACK_A_XWD_WIDTH={h[4]}')
-          print(f'TRACK_A_XWD_HEIGHT={h[5]}')
-          print(f'TRACK_A_XWD_BYTE_ORDER={h[7]}')
-          print(f'TRACK_A_XWD_BPP={h[11]}')
-          print(f'TRACK_A_XWD_BPL={h[12]}')
-          print(f'TRACK_A_XWD_RED_MASK={h[14]}')
-          print(f'TRACK_A_XWD_GREEN_MASK={h[15]}')
-          print(f'TRACK_A_XWD_BLUE_MASK={h[16]}')
-          print(f'TRACK_A_XWD_NCOLORS={h[19]}')
-          PY
-          rm -f "$probe"
-          echo TRACK_A_XWD_CAPTURE_VERIFIED=true
-
-          server="$state/runtime/track-a-remote-gui.py"
-          cat >"$server" <<'PY'
-          import http.server, json, os, struct, subprocess, tempfile
-
-          DISPLAY=os.environ.get('DISPLAY', ':98')
-          XWD=os.environ['TRACK_A_XWD']
-          XDOTOOL=os.environ['TRACK_A_XDOTOOL']
-          TOOL_LIB=os.environ.get('TRACK_A_TOOL_LIB','')
-          TOOL_PATH=os.environ.get('TRACK_A_TOOL_PATH','')
-          PORT=int(os.environ.get('TRACK_A_GUI_PORT','6081'))
-
-          HTML=r'''<!doctype html><html><head><meta charset="utf-8"><title>Track A Tibia</title><style>html,body{margin:0;background:#111;color:#eee;font:14px sans-serif;height:100%}#bar{padding:7px 10px;background:#222}#screen{display:block;max-width:100vw;max-height:calc(100vh - 34px);margin:auto;image-rendering:auto;outline:none;cursor:crosshair}</style></head><body><div id="bar">Track A — live view/control. Click image to focus; keyboard and mouse are forwarded.</div><img id="screen" tabindex="0" draggable="false"><script>
-          const im=document.getElementById('screen');let seq=0;
-          function refresh(){const n=new Image();n.onload=()=>{im.src=n.src;setTimeout(refresh,350)};n.onerror=()=>setTimeout(refresh,1000);n.src='/screen.bmp?'+(++seq)}refresh();
-          async function send(o){try{await fetch('/input',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(o)})}catch(e){}}
-          function pos(e){const r=im.getBoundingClientRect();return {x:Math.max(0,Math.min(im.naturalWidth-1,Math.round((e.clientX-r.left)*im.naturalWidth/r.width))),y:Math.max(0,Math.min(im.naturalHeight-1,Math.round((e.clientY-r.top)*im.naturalHeight/r.height)))}}
-          im.addEventListener('mousedown',e=>{e.preventDefault();im.focus();const p=pos(e);send({t:'md',b:e.button,x:p.x,y:p.y})});
-          im.addEventListener('mouseup',e=>{e.preventDefault();const p=pos(e);send({t:'mu',b:e.button,x:p.x,y:p.y})});
-          im.addEventListener('mousemove',e=>{if(e.buttons){const p=pos(e);send({t:'mm',x:p.x,y:p.y})}});
-          im.addEventListener('wheel',e=>{e.preventDefault();send({t:'wh',d:Math.sign(e.deltaY)})},{passive:false});
-          im.addEventListener('contextmenu',e=>e.preventDefault());
-          im.addEventListener('keydown',e=>{e.preventDefault();send({t:'kd',k:e.key})});
-          im.addEventListener('keyup',e=>{e.preventDefault();send({t:'ku',k:e.key})});
-          </script></body></html>'''.encode()
-
-          def childenv():
-              env=os.environ.copy();env['DISPLAY']=DISPLAY
-              if TOOL_LIB: env['LD_LIBRARY_PATH']=TOOL_LIB
-              if TOOL_PATH: env['PATH']=TOOL_PATH
-              return env
-
-          def component(v, mask):
-              if not mask: return 0
-              shift=(mask & -mask).bit_length()-1
-              top=mask>>shift
-              return (((v & mask)>>shift)*255)//top
-
-          def capture_bmp():
-              fd,path=tempfile.mkstemp(prefix='tracka-',suffix='.xwd');os.close(fd)
-              try:
-                  p=subprocess.run([XWD,'-root','-silent','-out',path],env=childenv(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=4)
-                  if p.returncode:
-                      raise RuntimeError('xwd rc=%d stderr=%s'%(p.returncode,p.stderr.decode(errors='replace')[:500]))
-                  data=open(path,'rb').read()
-              finally:
-                  try: os.unlink(path)
-                  except OSError: pass
-              if len(data)<100: raise ValueError('short xwd')
-              h=struct.unpack('>25I',data[:100])
-              header_size,width,height,byte_order,bpp,bpl=h[0],h[4],h[5],h[7],h[11],h[12]
-              red,green,blue,ncolors=h[14],h[15],h[16],h[19]
-              off=header_size+ncolors*12
-              if not (0 < width <= 4096 and 0 < height <= 4096): raise ValueError('bad dimensions')
-              if bpp not in (24,32): raise ValueError('unsupported bpp %r'%bpp)
-              if off+bpl*height>len(data): raise ValueError('truncated xwd')
-              step=bpp//8; raw=memoryview(data)[off:off+bpl*height]
-              pad=(-width*3)%4; rowbytes=width*3+pad
-              pixels=bytearray(rowbytes*height)
-              little=(byte_order==0)
-              for yy in range(height):
-                  src=yy*bpl; dst=(height-1-yy)*rowbytes
-                  for x in range(width):
-                      i=src+x*step
-                      v=int.from_bytes(raw[i:i+step], 'little' if little else 'big')
-                      j=dst+x*3
-                      pixels[j]=component(v,blue);pixels[j+1]=component(v,green);pixels[j+2]=component(v,red)
-              size=54+len(pixels)
-              fh=b'BM'+struct.pack('<IHHI',size,0,0,54)
-              ih=struct.pack('<IIIHHIIIIII',40,width,height,1,24,0,len(pixels),2835,2835,0,0)
-              return fh+ih+pixels
-
-          KEYMAP={'ArrowUp':'Up','ArrowDown':'Down','ArrowLeft':'Left','ArrowRight':'Right','Enter':'Return','Escape':'Escape','Backspace':'BackSpace','Tab':'Tab',' ':'space','Shift':'Shift_L','Control':'Control_L','Alt':'Alt_L','Delete':'Delete','Home':'Home','End':'End','PageUp':'Prior','PageDown':'Next'}
-          def keyname(k):
-              if k in KEYMAP:return KEYMAP[k]
-              if len(k)==1 and (k.isalnum() or k in "-=[];',./\\`"):return k
-              if k.startswith('F') and k[1:].isdigit() and 1<=int(k[1:])<=12:return k
-              return None
-          def xd(*args):
-              subprocess.run([XDOTOOL,*map(str,args)],env=childenv(),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=2,check=False)
-
-          class H(http.server.BaseHTTPRequestHandler):
-              def log_message(self,*a): pass
-              def sendb(self,code,typ,body):
-                  self.send_response(code);self.send_header('Content-Type',typ);self.send_header('Cache-Control','no-store');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
-              def do_GET(self):
-                  if self.path.startswith('/screen.bmp'):
-                      try:self.sendb(200,'image/bmp',capture_bmp())
-                      except Exception as e:self.sendb(500,'text/plain',(type(e).__name__+': '+str(e)).encode())
-                  else:self.sendb(200,'text/html; charset=utf-8',HTML)
-              def do_POST(self):
-                  if self.path!='/input':self.sendb(404,'text/plain',b'');return
-                  try:
-                      n=min(int(self.headers.get('Content-Length','0')),4096);o=json.loads(self.rfile.read(n));t=o.get('t')
-                      if t in ('mm','md','mu'):
-                          x=max(0,min(1279,int(o.get('x',0))));y=max(0,min(799,int(o.get('y',0))));xd('mousemove',x,y)
-                          if t in ('md','mu'):
-                              b={0:1,1:2,2:3}.get(int(o.get('b',0)))
-                              if b: xd('mousedown' if t=='md' else 'mouseup',b)
-                      elif t=='wh':xd('click',4 if int(o.get('d',1))<0 else 5)
-                      elif t in ('kd','ku'):
-                          k=keyname(str(o.get('k','')))
-                          if k:xd('keydown' if t=='kd' else 'keyup',k)
-                      self.sendb(204,'text/plain',b'')
-                  except Exception:self.sendb(400,'text/plain',b'bad input')
-          http.server.ThreadingHTTPServer(('0.0.0.0',PORT),H).serve_forever()
-          PY
-          chmod 700 "$server"
-
+          [[ -x "$socat" ]]
           self="$(hostname)"
           runner_ip="$(hostname -I | awk '{print $1}')"
-          docker exec "$self" sh -lc "pkill -f '[t]rack-a-remote-gui.py' 2>/dev/null || true"
-          docker exec -d -u 0 \
-            -e DISPLAY="$TRACK_DISPLAY" -e TRACK_A_XWD="$xwd" -e TRACK_A_XDOTOOL="$xdotool" \
-            -e TRACK_A_TOOL_LIB="$tool_lib" -e TRACK_A_TOOL_PATH="$tool_path" -e TRACK_A_GUI_PORT=6081 \
-            "$self" python3 "$server"
-          for _ in $(seq 1 20); do curl -fsS --max-time 2 "http://127.0.0.1:6081/" >/dev/null 2>&1 && break; sleep 1; done
-          curl -fsS --max-time 3 "http://127.0.0.1:6081/" | grep -q 'Track A'
-          status="$(curl -sS --max-time 8 -o "$state/runtime/track-a-screen-test.bin" -w '%{http_code}' "http://127.0.0.1:6081/screen.bmp")"
-          if [[ "$status" != 200 ]]; then
-            echo TRACK_A_SCREEN_HTTP_STATUS="$status"
-            head -c 800 "$state/runtime/track-a-screen-test.bin" || true
-            exit 1
-          fi
-          [[ "$(head -c2 "$state/runtime/track-a-screen-test.bin")" == BM ]]
-          rm -f "$state/runtime/track-a-screen-test.bin"
-          echo TRACK_A_BROWSER_BRIDGE_READY=true
-
           image="$(docker inspect -f '{{.Config.Image}}' "$self")"
-          bridge=otclient-track-a-browser-loopback
+          bridge=otclient-track-a-browser-lan
           docker rm -f "$bridge" >/dev/null 2>&1 || true
           docker run -d --name "$bridge" --restart unless-stopped --network host --volumes-from "$self" --entrypoint /bin/sh "$image" \
-            -lc "exec '$socat' TCP-LISTEN:6081,bind=127.0.0.1,reuseaddr,fork TCP:${runner_ip}:6081" >/dev/null
+            -lc "exec '$socat' TCP-LISTEN:6082,bind=0.0.0.0,reuseaddr,fork TCP:${runner_ip}:6081" >/dev/null
           sleep 2
           [[ "$(docker inspect -f '{{.State.Running}}' "$bridge")" == true ]]
-          echo TRACK_A_HOST_LOOPBACK_BRIDGE_READY=true
 
-          host_ips="$(docker run --rm --network host --entrypoint /bin/sh "$image" -lc 'hostname -I 2>/dev/null || true' | xargs || true)"
-          echo TRACK_A_SYNOLOGY_HOST_IPS="$host_ips"
-          echo TRACK_A_ACCESS_HOST_PORT=6081
-          echo TRACK_A_ACCESS_MODE=ssh-loopback-tunnel
+          # Verify the LAN-facing listener from host networking.
+          host_ip="$(docker run --rm --network host --entrypoint /bin/sh "$image" -lc 'hostname -I 2>/dev/null' | tr ' ' '\n' | grep '^192\.168\.1\.' | head -n1)"
+          [[ -n "$host_ip" ]]
+          docker run --rm --network host --entrypoint /bin/sh "$image" -lc "curl -fsS --max-time 5 http://${host_ip}:6082/ | grep -q 'Track A'"
+          echo TRACK_A_LAN_BROWSER_BRIDGE_READY=true
+          echo TRACK_A_LAN_URL="http://${host_ip}:6082/"

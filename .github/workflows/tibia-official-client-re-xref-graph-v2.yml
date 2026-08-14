@@ -1,0 +1,86 @@
+name: Track A protocol xref graph v2
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-xref-graph-v2.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Scan executable RIP references once
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import collections,struct,sys
+          data=open(sys.argv[1],'rb').read()
+          targets=[
+            'TChatProtocolMessageHandler','handleTalkMessage','TContainerProtocolMessageHandler','handleContainerMessage',
+            'TCreatureProtocolMessageHandler','TPlayerProtocolMessageHandler','handlePlayerDataBasicMessage',
+            'TEffectProtocolMessageHandler','handleGraphicalEffectsMessage','TMarketProtocolMessageHandler','handleMarketEnterMessage',
+            'TNPCTradeProtocolMessageHandler','handleNPCOfferMessage','TPlayerTradeProtocolMessageHandler','handleOwnOfferMessage',
+            'TQuestLogProtocolMessageHandler','handleQuestLogMessage','TGameEventProtocolMessageHandler','handleGameEventMessage',
+            'GameclientMessageMoveObject','GameclientMessageAttack','GameclientMessageFollow','GameclientMessageTalk',
+            'GameclientMessageTradeObject','GameclientMessageGoPath',
+            'GameserverMessageMoveCreature','GameserverMessagePlayerDataCurrent','GameserverMessageContainer','GameserverMessageTalk'
+          ]
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phentsz=struct.unpack_from('<H',data,0x36)[0]; phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def off2va(o):
+              for lo,hi,va,vhi,fl in loads:
+                  if lo<=o<hi:return va+(o-lo)
+          occurrences={}; va_to_names=collections.defaultdict(list)
+          for name in targets:
+              b=name.encode(); p=0; occ=[]
+              while True:
+                  q=data.find(b,p)
+                  if q<0:break
+                  va=off2va(q)
+                  if va is not None:
+                      occ.append((q,va));va_to_names[va].append(name)
+                  p=q+1
+              occurrences[name]=occ
+          wanted=set(va_to_names)
+          direct=collections.defaultdict(list)
+          # Linear pass over executable segments. Match 64-bit RIP-relative LEA/MOV forms.
+          for lo,hi,segva,vhi,fl in loads:
+              if not (fl&1):continue
+              chunk=data[lo:hi]; n=len(chunk)
+              for i in range(n-7):
+                  b0,b1,b2=chunk[i],chunk[i+1],chunk[i+2]
+                  if b0 not in (0x48,0x4c) or b1 not in (0x8d,0x8b) or (b2&0xc7)!=0x05:continue
+                  disp=struct.unpack_from('<i',chunk,i+3)[0]
+                  src=segva+i; dst=(src+7+disp)&0xffffffffffffffff
+                  if dst in wanted:direct[dst].append(src)
+          print('TRACK_A_XREF_V2_BEGIN=true')
+          print('SCANNER_COMPLEXITY=linear_exec_pass')
+          for name in targets:
+              occ=occurrences[name]
+              print(f'TARGET name={name} occurrences={len(occ)}')
+              for idx,(off,va) in enumerate(occ):
+                  refs=direct.get(va,[])
+                  print(f' STRING idx={idx} off=0x{off:x} va=0x{va:x} direct_riprefs={len(refs)} refs={",".join(hex(x) for x in refs[:64]) or "none"}')
+          total=sum(len(v) for v in direct.values())
+          print(f'TOTAL_DIRECT_RIPREFS={total}')
+          print('TRACK_A_XREF_V2_COMPLETE=true')
+          PY

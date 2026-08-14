@@ -1,0 +1,141 @@
+name: Track A outbound owner vtable resolution
+
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-chatgpt-framing-recovery]
+    paths: [.github/workflows/tibia-official-client-re-outbound-owner-vtables.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Resolve exact outbound virtual targets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          report="$RUNNER_TEMP/track-a-outbound-owner-vtables.txt"
+          targets="$RUNNER_TEMP/track-a-outbound-owner-targets.txt"
+          exec > >(tee "$report") 2>&1
+          echo 'TRACK_A_OUTBOUND_OWNER_VTABLES_BEGIN=true'
+
+          python3 -u - "$client" "$targets" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read(); target_file=sys.argv[2]
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phes=struct.unpack_from('<H',data,0x36)[0]; phn=struct.unpack_from('<H',data,0x38)[0]
+          seg=[]
+          for i in range(phn):
+              o=phoff+i*phes
+              typ,fl,fo,va,_,fs,ms,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fs:seg.append((fo,fo+fs,va,va+ms,fl))
+          def off(va):
+              for fs,fe,b,e,f in seg:
+                  if b<=va<b+(fe-fs):return fs+va-b
+          def flags(va):
+              for fs,fe,b,e,f in seg:
+                  if b<=va<e:return f
+              return 0
+          def rawq(va):
+              p=off(va)
+              return struct.unpack_from('<Q',data,p)[0] if p is not None and p+8<=len(data) else 0
+          def cstr(va,lim=500):
+              p=off(va)
+              if p is None:return None
+              z=data.find(b'\0',p,min(len(data),p+lim))
+              return data[p:z].decode('utf-8','replace') if z>=0 else None
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shes=struct.unpack_from('<H',data,0x3a)[0]; shn=struct.unpack_from('<H',data,0x3c)[0]
+          sec=[struct.unpack_from('<IIQQQQIIQQ',data,shoff+i*shes) for i in range(shn)]
+          syms={}
+          for i,s in enumerate(sec):
+              _,typ,_,_,so,ss,link,_,_,es=s
+              if typ not in (2,11) or not es:continue
+              st=sec[link]; strings=data[st[4]:st[4]+st[5]]; arr=[]
+              for p in range(so,so+ss,es):
+                  sn,si,oth,shndx,sv,sz=struct.unpack_from('<IBBHQQ',data,p)
+                  z=strings.find(b'\0',sn); nm=strings[sn:z].decode('utf-8','replace') if z>=0 else ''
+                  arr.append((nm,sv))
+              syms[i]=arr
+          rel={}
+          for i,s in enumerate(sec):
+              _,typ,_,_,so,ss,link,_,_,es=s
+              if typ!=4 or not es:continue
+              arr=syms.get(link,[])
+              for p in range(so,so+ss,es):
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p); idx=ri>>32; rt=ri&0xffffffff
+                  nm,sv=arr[idx] if idx<len(arr) else ('',0)
+                  rel.setdefault(ro,[]).append((rt,nm,sv,ra))
+          def resolve(va):
+              v=rawq(va)
+              for rt,nm,sv,ra in rel.get(va,[]):
+                  if rt==8:v=ra & 0xffffffffffffffff
+                  elif sv:v=(sv+ra)&0xffffffffffffffff
+              return v
+          def rname(rt):
+              if not rt or not flags(rt) or flags(rt)&1:return None
+              return cstr(resolve(rt+8))
+          def reltxt(va):
+              return ';'.join(f't={rt},sym={nm or "-"},sv=0x{sv:x},a={ra}' for rt,nm,sv,ra in rel.get(va,[])) or 'none'
+
+          tables={
+            'TGameserverDualConnection':(0x30b7b68,[0x78,0x80,0x90]),
+            'TProtocolClientMessageProcessor':(0x2f6a208,[0x10]),
+            'TGameserverNetworkPacketRawDataProcessor':(0x2f6a230,[0x10,0x18]),
+          }
+          out=[]
+          for cls,(ap,wanted) in tables.items():
+              rt=resolve(ap-8); ot=struct.unpack('<q',struct.pack('<Q',rawq(ap-16)))[0]
+              print(f'CLASS name={cls} address_point=0x{ap:x} offset_to_top={ot} rtti=0x{rt:x} rtti_name={rname(rt) or "unknown"}')
+              for ofs in range(0,0x118,8):
+                  addr=ap+ofs; val=resolve(addr)
+                  print(f'VTABLE class={cls} offset=0x{ofs:x} target=0x{val:x} executable={str(bool(val and flags(val)&1)).lower()} reloc={reltxt(addr)}')
+                  if ofs in wanted:
+                      print(f'WANTED class={cls} offset=0x{ofs:x} target=0x{val:x}')
+                      if val and flags(val)&1:out.append((cls,ofs,val))
+          with open(target_file,'w') as f:
+              for cls,ofs,val in out:f.write(f'{cls} 0x{ofs:x} 0x{val:x}\n')
+          print(f'WANTED_EXECUTABLE_TARGET_COUNT={len(out)}')
+          print('TRACK_A_OUTBOUND_OWNER_STATIC_COMPLETE=true')
+          PY
+
+          while read -r cls ofs target; do
+            [[ "$target" =~ ^0x[0-9a-f]+$ ]] || continue
+            lo=$(printf '0x%x' $((target-32)))
+            hi=$(printf '0x%x' $((target+512)))
+            echo "TARGET_DISASSEMBLY_BEGIN class=$cls slot=$ofs target=$target"
+            env LD_LIBRARY_PATH="$tool_lib" "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi"
+            echo "TARGET_DISASSEMBLY_END class=$cls slot=$ofs target=$target"
+          done <"$targets"
+
+          # Inspect the proven consumer with the now-known class labels adjacent.
+          echo 'QSLOT_CONSUMER_DISASSEMBLY_BEGIN=true'
+          env LD_LIBRARY_PATH="$tool_lib" "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex 'disassemble /r 0x7dd620,0x7dd760'
+          echo 'QSLOT_CONSUMER_DISASSEMBLY_END=true'
+          echo 'TRACK_A_OUTBOUND_OWNER_VTABLES_COMPLETE=true'
+
+      - name: Upload outbound vtable report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-outbound-owner-vtables-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-outbound-owner-vtables.txt
+          if-no-files-found: error
+          retention-days: 7

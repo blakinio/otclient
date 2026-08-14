@@ -1,0 +1,179 @@
+name: Track A receiver FDE and write sink v2
+
+on:
+  push:
+    branches: [ci/OTC-20260814-official-client-re-receiver-recovery]
+    paths: [.github/workflows/tibia-official-client-re-receiver-fde-write-sink-v2.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Trace FDE-aligned receiver provenance and write sinks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          readelf="$(command -v readelf || true)"; [[ -x "$readelf" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          frames="$RUNNER_TEMP/client-frames.txt"
+          plan="$RUNNER_TEMP/receiver-fde-plan.tsv"
+          receiver_fde="$RUNNER_TEMP/receiver-fde.txt"
+          report="$RUNNER_TEMP/track-a-receiver-fde-write-sink-v2.txt"
+          "$readelf" -wf "$client" >"$frames"
+
+          python3 -u - "$client" "$frames" "$plan" <<'PY'
+          import re,struct,sys
+          client,frames_path,plan_path=sys.argv[1:]
+          data=open(client,'rb').read()
+          text=open(frames_path,errors='replace').read().splitlines()
+          fdes=[]
+          pat=re.compile(r'FDE\s+cie=.*?pc=([0-9a-fA-F]+)\.\.([0-9a-fA-F]+)')
+          for line in text:
+              m=pat.search(line)
+              if m:
+                  a,b=(int(m.group(1),16),int(m.group(2),16))
+                  if b>a:fdes.append((a,b))
+          fdes=sorted(set(fdes))
+          print(f'FDE_COUNT={len(fdes)}')
+          def containing(va):
+              hits=[x for x in fdes if x[0]<=va<x[1]]
+              return min(hits,key=lambda x:x[1]-x[0]) if hits else None
+          receiver_site=0x19716a3
+          rfde=containing(receiver_site)
+          print('RECEIVER_CONNECT_SITE=0x19716a3')
+          print('RECEIVER_FDE=' + (f'0x{rfde[0]:x}..0x{rfde[1]:x}' if rfde else 'none'))
+
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,fsz,msz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fsz:loads.append((fo,fo+fsz,va,va+msz,flags))
+          exec_segments=[x for x in loads if x[4]&1]
+
+          # Direct CALL rel32 candidates to the QIODevice::write(QByteArray const&) PLT
+          # recovered independently in the prior exact-SHA GDB query.
+          qiodevice_write=0x4de370
+          write_sites=[]
+          for fs,fe,base,vend,flags in exec_segments:
+              blob=data[fs:fe]
+              for p in range(len(blob)-5):
+                  if blob[p]!=0xe8:continue
+                  site=base+p
+                  target=(site+5+struct.unpack_from('<i',blob,p+1)[0]) & 0xffffffffffffffff
+                  if target==qiodevice_write:
+                      write_sites.append(site)
+          print('RAW_QIODEVICE_WRITE_CALL_CANDIDATES=' + (','.join(hex(x) for x in write_sites) if write_sites else 'none'))
+
+          # Candidate RIP-relative references to the two address points whose +0x90
+          # qword equals 0x8409d0. FDE-aligned disassembly validates instruction boundaries.
+          vtargets={0x28db78:'candidate_ap_a',0x308c408:'candidate_ap_b'}
+          refs=[]
+          for fs,fe,base,vend,flags in exec_segments:
+              blob=data[fs:fe]
+              for p in range(len(blob)-7):
+                  if not (0x40<=blob[p]<=0x4f and blob[p+1] in (0x8d,0x8b)):continue
+                  modrm=blob[p+2]
+                  if (modrm&0xc7)!=0x05:continue
+                  site=base+p
+                  target=(site+7+struct.unpack_from('<i',blob,p+3)[0]) & 0xffffffffffffffff
+                  if target in vtargets:refs.append((site,target,vtargets[target]))
+          for site,target,label in refs:
+              print(f'RAW_VPTR_ADDRESS_POINT_REF label={label} site=0x{site:x} target=0x{target:x}')
+
+          rows=[]
+          if rfde:rows.append(('receiver',receiver_site,receiver_site,rfde[0],rfde[1]))
+          for site in write_sites:
+              fde=containing(site)
+              rows.append(('qiodevice_write',site,qiodevice_write,fde[0] if fde else 0,fde[1] if fde else 0))
+          for site,target,label in refs:
+              fde=containing(site)
+              rows.append((label,site,target,fde[0] if fde else 0,fde[1] if fde else 0))
+          with open(plan_path,'w') as f:
+              for row in rows:f.write('\t'.join(hex(x) if isinstance(x,int) else x for x in row)+'\n')
+          PY
+
+          : >"$report"
+          {
+            echo 'TRACK_A_RECEIVER_FDE_WRITE_SINK_V2_BEGIN=true'
+            echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+            cat "$plan"
+          } >>"$report"
+
+          receiver_start="$(awk -F'\t' '$1=="receiver"{print $4; exit}' "$plan")"
+          receiver_end="$(awk -F'\t' '$1=="receiver"{print $5; exit}' "$plan")"
+          [[ "$receiver_start" =~ ^0x[0-9a-f]+$ && "$receiver_end" =~ ^0x[0-9a-f]+$ ]]
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex "disassemble /r $receiver_start,$receiver_end" >"$receiver_fde"
+          {
+            echo "RECEIVER_FDE_DISASSEMBLY_BEGIN start=$receiver_start end=$receiver_end"
+            cat "$receiver_fde"
+            echo 'RECEIVER_FDE_DISASSEMBLY_END=true'
+          } >>"$report"
+
+          python3 -u - "$receiver_fde" >>"$report" <<'PY'
+          import re,sys
+          lines=open(sys.argv[1],errors='replace').read().splitlines()
+          addr_re=re.compile(r'^\s*(0x[0-9a-f]+):')
+          anchors=[]
+          for i,line in enumerate(lines):
+              if ('rbp-0x1b0' in line or '0x19716a3' in line or '# 0x308c408' in line or '# 0x28db78' in line):
+                  anchors.append(i)
+          print(f'RECEIVER_PROVENANCE_CONTEXT_COUNT={len(anchors)}')
+          emitted=set()
+          for n,i in enumerate(anchors,1):
+              lo=max(0,i-12); hi=min(len(lines),i+13)
+              key=(lo,hi)
+              if key in emitted:continue
+              emitted.add(key)
+              print(f'RECEIVER_PROVENANCE_CONTEXT_BEGIN ordinal={n}')
+              for line in lines[lo:hi]:print(line)
+              print(f'RECEIVER_PROVENANCE_CONTEXT_END ordinal={n}')
+          PY
+
+          # Disassemble each unique FDE containing a raw candidate from an exact FDE start.
+          awk -F'\t' '$1!="receiver" && $4!="0x0" {print $4"\t"$5}' "$plan" | sort -u >"$RUNNER_TEMP/candidate-fdes.tsv"
+          while IFS=$'\t' read -r start end; do
+            [[ "$start" =~ ^0x[0-9a-f]+$ && "$end" =~ ^0x[0-9a-f]+$ ]] || continue
+            echo "CANDIDATE_FDE_DISASSEMBLY_BEGIN start=$start end=$end" >>"$report"
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end" >>"$report" || true
+            echo 'CANDIDATE_FDE_DISASSEMBLY_END=true' >>"$report"
+          done <"$RUNNER_TEMP/candidate-fdes.tsv"
+
+          echo 'TRACK_A_RECEIVER_FDE_WRITE_SINK_V2_COMPLETE=true' >>"$report"
+          cat "$report"
+          grep -q '^TRACK_A_RECEIVER_FDE_WRITE_SINK_V2_COMPLETE=true$' "$report"
+
+      - name: Upload FDE-aligned provenance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-receiver-fde-write-sink-v2-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-receiver-fde-write-sink-v2.txt
+          if-no-files-found: error
+          retention-days: 7

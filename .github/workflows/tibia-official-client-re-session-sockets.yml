@@ -1,4 +1,4 @@
-name: Track A parser dispatcher table mapping
+name: Track A Qt dispatcher metadata decode
 on:
   push:
     branches:
@@ -11,13 +11,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 3
+    timeout-minutes: 4
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Map dispatcher cases and inspect candidate dynamic handlers
+      - name: Decode 14-case jump table and nearby Qt metadata strings
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -32,21 +32,68 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           gdb="$toolroot/usr/bin/gdb"
           [[ -x "$gdb" ]]
+
           "$gdb" -q -nx -batch "$client" \
             -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
-            -ex 'echo TRACK_A_DISPATCH_PROLOGUE_BEGIN=true\n' \
-            -ex 'disassemble 0xdf2960,0xdf2f40' \
-            -ex 'echo TRACK_A_DISPATCH_PROLOGUE_END=true\n' \
-            -ex 'echo TRACK_A_CD3190_BEGIN=true\n' \
-            -ex 'disassemble 0xcd3190,0xcd3500' \
-            -ex 'echo TRACK_A_CD3190_END=true\n' \
-            -ex 'echo TRACK_A_CD4E20_BEGIN=true\n' \
-            -ex 'disassemble 0xcd4e20,0xcd5250' \
-            -ex 'echo TRACK_A_CD4E20_END=true\n' \
-            -ex 'echo TRACK_A_CECC70_BEGIN=true\n' \
-            -ex 'disassemble 0xcecc70,0xcecf40' \
-            -ex 'echo TRACK_A_CECC70_END=true\n' \
-            -ex 'echo TRACK_A_CECF40_BEGIN=true\n' \
-            -ex 'disassemble 0xcecf40,0xced220' \
-            -ex 'echo TRACK_A_CECF40_END=true\n' \
-            -ex 'echo TRACK_A_DISPATCH_TABLE_MAPPING_COMPLETE=true\n'
+            -ex 'echo TRACK_A_JUMP_TABLE_RAW_BEGIN=true\n' \
+            -ex 'x/14wd 0x1d8bd10' \
+            -ex 'echo TRACK_A_JUMP_TABLE_RAW_END=true\n' \
+            -ex 'echo TRACK_A_META_3087400_BEGIN=true\n' \
+            -ex 'x/96bx 0x3087400' \
+            -ex 'echo TRACK_A_META_3087400_END=true\n' \
+            -ex 'echo TRACK_A_META_3087600_BEGIN=true\n' \
+            -ex 'x/160bx 0x3087600' \
+            -ex 'echo TRACK_A_META_3087600_END=true\n' \
+            -ex 'echo TRACK_A_META_3087800_BEGIN=true\n' \
+            -ex 'x/192bx 0x3087800' \
+            -ex 'echo TRACK_A_META_3087800_END=true\n' \
+            -ex 'echo TRACK_A_CED1B0_BEGIN=true\n' \
+            -ex 'disassemble 0xced1b0,0xced650' \
+            -ex 'echo TRACK_A_CED1B0_END=true\n'
+
+          python3 - "$client" <<'PY'
+          import struct,sys
+          p=sys.argv[1]; data=open(p,'rb').read()
+          # Translate virtual addresses to file offsets through PT_LOAD segments.
+          e_phoff=struct.unpack_from('<Q',data,0x20)[0]
+          e_phentsize=struct.unpack_from('<H',data,0x36)[0]
+          e_phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(e_phnum):
+              o=e_phoff+i*e_phentsize
+              typ,flags,off,vaddr,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1: loads.append((vaddr,vaddr+filesz,off))
+          def vaoff(va):
+              for lo,hi,off in loads:
+                  if lo<=va<hi:return off+(va-lo)
+              return None
+          base=0x1d8bd10
+          o=vaoff(base)
+          if o is None: raise SystemExit('jump table VA not file-backed')
+          print('TRACK_A_JUMP_TABLE_DECODE_BEGIN=true')
+          targets=[]
+          for i in range(14):
+              rel=struct.unpack_from('<i',data,o+4*i)[0]
+              tgt=(base+rel)&((1<<64)-1)
+              targets.append(tgt)
+              print(f'CASE index={i} rel={rel} target=0x{tgt:x}')
+          print('TRACK_A_JUMP_TABLE_DECODE_END=true')
+
+          # Extract printable ASCII strings around candidate Qt stringdata regions.
+          print('TRACK_A_QT_STRING_SCAN_BEGIN=true')
+          for va0,va1 in [(0x3087000,0x3089000),(0x3099000,0x309a500)]:
+              oo=vaoff(va0); ee=vaoff(va1-1)
+              if oo is None or ee is None: continue
+              chunk=data[oo:ee+1]
+              i=0
+              while i<len(chunk):
+                  j=i
+                  while j<len(chunk) and 32<=chunk[j]<127: j+=1
+                  if j-i>=4:
+                      s=chunk[i:j].decode('ascii','replace')
+                      print(f'STR va=0x{va0+i:x} text={s!r}')
+                  i=max(j+1,i+1)
+          print('TRACK_A_QT_STRING_SCAN_END=true')
+          PY
+
+          echo TRACK_A_QT_DISPATCH_METADATA_DECODE_COMPLETE=true

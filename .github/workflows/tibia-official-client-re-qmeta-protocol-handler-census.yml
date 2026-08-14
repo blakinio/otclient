@@ -1,0 +1,103 @@
+name: Track A QMeta protocol handler census
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-protocol-handler-census.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Enumerate relocation-backed protocol handler QMeta records
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import re,struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0];phentsz=struct.unpack_from('<H',data,0x36)[0];phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def flags(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return fl
+              return 0
+          shoff=struct.unpack_from('<Q',data,0x28)[0];shentsz=struct.unpack_from('<H',data,0x3a)[0];shnum=struct.unpack_from('<H',data,0x3c)[0]
+          relas={}
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              _,typ,_,_,so,ss,_,_,_,se=struct.unpack_from('<IIQQQQIIQQ',data,o)
+              if typ!=4 or not se:continue
+              for p in range(so,so+ss,se):
+                  if p+24>len(data):break
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p); relas[ro]=(ri&0xffffffff,ra)
+          def strings(base):
+              o=va2off(base)
+              if o is None:return None
+              first=struct.unpack_from('<I',data,o)[0]
+              if first%8 or first<8 or first>0x20000:return None
+              count=first//8;out=[]
+              for i in range(count):
+                  rel,ln=struct.unpack_from('<II',data,o+i*8)
+                  if ln>2048 or o+rel+ln>len(data):return None
+                  try:s=data[o+rel:o+rel+ln].decode('utf-8')
+                  except:return None
+                  out.append(s)
+              return out
+          print('TRACK_A_QMETA_PROTOCOL_HANDLER_CENSUS_BEGIN=true')
+          found=[]
+          # Every known QMeta record is 0x40 aligned/family and has RELATIVE relocations at +8,+10,+18,+28.
+          for base in sorted(relas):
+              if base%0x40:continue
+              fields=[];ok=True
+              for d in (8,0x10,0x18,0x28):
+                  x=relas.get(base+d)
+                  if not x or x[0]!=8:ok=False;break
+                  fields.append(x[1])
+              if not ok:continue
+              sb,mb,fn,extra=fields
+              if not (flags(fn)&1):continue
+              ss=strings(sb)
+              if not ss:continue
+              cls=ss[0]
+              if 'ProtocolMessageHandler' not in cls:continue
+              mo=va2off(mb)
+              if mo is None:continue
+              words=[struct.unpack_from('<I',data,mo+i*4)[0] for i in range(20)]
+              if words[0]!=13:continue
+              mcount,moff=words[4],words[5]
+              if mcount>512 or mo+(moff+mcount*6)*4>len(data):continue
+              methods=[]
+              for i in range(mcount):
+                  idx=struct.unpack_from('<I',data,mo+(moff+i*6)*4)[0]
+                  methods.append(ss[idx] if idx<len(ss) else f'<bad:{idx}>')
+              found.append((cls,base,sb,mb,fn,extra,mcount,methods))
+          found.sort()
+          print(f'HANDLER_RECORD_COUNT={len(found)}')
+          for cls,base,sb,mb,fn,extra,mcount,methods in found:
+              print(f'HANDLER class={cls} record=0x{base:x} stringdata=0x{sb:x} metadata=0x{mb:x} static_metacall=0x{fn:x} extra=0x{extra:x} method_count={mcount}')
+              if any(k in cls for k in ('CreatureProtocol','PlayerProtocol','ChatProtocol','ContainerProtocol','WorldmapProtocol')):
+                  for i,m in enumerate(methods):print(f' METHOD class={cls} index={i} name={m}')
+          print('TRACK_A_QMETA_PROTOCOL_HANDLER_CENSUS_COMPLETE=true')
+          PY

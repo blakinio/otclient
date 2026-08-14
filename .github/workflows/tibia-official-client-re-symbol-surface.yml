@@ -1,4 +1,4 @@
-name: Track A official client handler symbol surface
+name: Track A raw Qt protocol metadata census
 on:
   push:
     branches:
@@ -11,13 +11,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Inspect GDB symbol and RTTI surface
+      - name: Census raw Tibia Qt protocol metadata
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -25,31 +25,62 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
-          toolroot="$state/toolroot"
-          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
-          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ -x "$client" ]]
-          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          gdb="$toolroot/usr/bin/gdb"
-          [[ -x "$gdb" ]]
-          "$gdb" -q -nx -batch "$client" \
-            -ex 'set pagination off' \
-            -ex 'echo TRACK_A_SYMBOL_INFO_FUNCTIONS_BEGIN=true\n' \
-            -ex 'info functions qt_static_metacall' \
-            -ex 'info functions TChatProtocolMessageHandler' \
-            -ex 'info functions TContainerProtocolMessageHandler' \
-            -ex 'info functions TCreatureProtocolMessageHandler' \
-            -ex 'info functions TPlayerProtocolMessageHandler' \
-            -ex 'info functions TEffectProtocolMessageHandler' \
-            -ex 'info functions TMarketProtocolMessageHandler' \
-            -ex 'info functions TNPCTradeProtocolMessageHandler' \
-            -ex 'info functions TPlayerTradeProtocolMessageHandler' \
-            -ex 'info functions TQuestLogProtocolMessageHandler' \
-            -ex 'info functions TGameEventProtocolMessageHandler' \
-            -ex 'echo TRACK_A_SYMBOL_INFO_FUNCTIONS_END=true\n' \
-            -ex 'echo TRACK_A_SYMBOL_INFO_VARIABLES_BEGIN=true\n' \
-            -ex 'info variables staticMetaObject' \
-            -ex 'info variables TChatProtocolMessageHandler' \
-            -ex 'info variables TContainerProtocolMessageHandler' \
-            -ex 'echo TRACK_A_SYMBOL_INFO_VARIABLES_END=true\n' \
-            -ex 'echo TRACK_A_SYMBOL_SURFACE_COMPLETE=true\n'
+          sha="$(sha256sum "$client" | awk '{print $1}')"
+          [[ "$sha" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo "TRACK_A_CLIENT_SHA256=$sha"
+          python3 - "$client" <<'PY'
+          import re,sys,collections
+          p=sys.argv[1]
+          data=open(p,'rb').read()
+          # This is an unfiltered printable-string census used as a raw-metadata
+          # discovery layer, not as the coverage boundary. Preserve every unique
+          # Tibia protocol/QMeta-looking token and its binary offsets.
+          strings=[]
+          for m in re.finditer(rb'[ -~]{4,}', data):
+              try:s=m.group().decode('ascii')
+              except UnicodeDecodeError:continue
+              strings.append((m.start(),s))
+          pats=(
+            'ProtocolMessageHandler','ProtocolMessageQueue','GameserverMessage',
+            'GameclientMessage','staticMetaObject','qt_static_metacall',
+            'Storage','Controller','Worldmap','Creature','Container','Chat',
+            'Trade','Market','Quest','Prey','Bestiary','Bosstiary','Forge','Wheel',
+            'Party','Cooldown','Analyzer','Reward','Imbu','Proficiency','VIP','Guild'
+          )
+          hits=[(o,s) for o,s in strings if any(x.lower() in s.lower() for x in pats)]
+          by=collections.defaultdict(list)
+          for o,s in hits: by[s].append(o)
+          print(f'TRACK_A_PRINTABLE_STRING_COUNT={len(strings)}')
+          print(f'TRACK_A_QMETA_PROTOCOL_UNIQUE_TOKEN_COUNT={len(by)}')
+          handlers=sorted(s for s in by if 'ProtocolMessageHandler' in s)
+          gs=sorted(s for s in by if 'GameserverMessage' in s)
+          gc=sorted(s for s in by if 'GameclientMessage' in s)
+          print(f'TRACK_A_HANDLER_TOKEN_COUNT={len(handlers)}')
+          print(f'TRACK_A_GAMESERVER_MESSAGE_TOKEN_COUNT={len(gs)}')
+          print(f'TRACK_A_GAMECLIENT_MESSAGE_TOKEN_COUNT={len(gc)}')
+          print('TRACK_A_HANDLER_TOKENS_BEGIN=true')
+          for s in handlers:
+              print('HANDLER',repr(s),'OFFSETS',','.join(hex(x) for x in by[s][:16]))
+          print('TRACK_A_HANDLER_TOKENS_END=true')
+          print('TRACK_A_GAMESERVER_MESSAGES_BEGIN=true')
+          for s in gs: print('IN_TOKEN',repr(s),'OFFSETS',','.join(hex(x) for x in by[s][:8]))
+          print('TRACK_A_GAMESERVER_MESSAGES_END=true')
+          print('TRACK_A_GAMECLIENT_MESSAGES_BEGIN=true')
+          for s in gc: print('OUT_TOKEN',repr(s),'OFFSETS',','.join(hex(x) for x in by[s][:8]))
+          print('TRACK_A_GAMECLIENT_MESSAGES_END=true')
+          # Emit compact neighborhoods around every handler class string so the
+          # next reconstruction can bind method-name order to raw QMeta tables.
+          print('TRACK_A_HANDLER_NEIGHBORHOODS_BEGIN=true')
+          for s in handlers:
+              for off in by[s][:4]:
+                  lo=max(0,off-512); hi=min(len(data),off+2048)
+                  ns=[]
+                  for m in re.finditer(rb'[ -~]{3,}',data[lo:hi]):
+                      t=m.group().decode('ascii','ignore')
+                      if len(t)<=160: ns.append((lo+m.start(),t))
+                  print('CLASS',repr(s),'AT',hex(off),'NEIGHBOR_COUNT',len(ns))
+                  for no,t in ns[:120]: print(' META',hex(no),repr(t))
+          print('TRACK_A_HANDLER_NEIGHBORHOODS_END=true')
+          print('TRACK_A_RAW_QMETA_CENSUS_COMPLETE=true')
+          PY

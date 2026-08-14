@@ -1,0 +1,176 @@
+name: Track A network owner vtable census
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-network-owner-vtable-census.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Census static vtables matching the proven network-owner virtual-call shape
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$gdb" ]]
+          out="$(mktemp)"
+          trap 'rm -f "$out"' EXIT
+          python3 -u - "$client" >"$out" <<'PY'
+          import struct, sys
+
+          data = open(sys.argv[1], 'rb').read()
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          loads = []
+          for i in range(phnum):
+              o = phoff + i * phentsz
+              typ, flags, fo, va, _, filesz, memsz, _ = struct.unpack_from('<IIQQQQQQ', data, o)
+              if typ == 1 and filesz:
+                  loads.append((fo, fo + filesz, va, va + filesz, flags))
+
+          def va_to_off(va):
+              for fs, fe, base, end, flags in loads:
+                  if base <= va < end:
+                      return fs + va - base
+              return None
+
+          def load_flags(va):
+              for fs, fe, base, end, flags in loads:
+                  if base <= va < end:
+                      return flags
+              return 0
+
+          def is_exec(va):
+              return bool(load_flags(va) & 1)
+
+          # Apply the common x86-64 PIE R_X86_64_RELATIVE relocations so that
+          # vtable function pointers can be inspected from the on-disk image.
+          rel = {}
+          shoff = struct.unpack_from('<Q', data, 0x28)[0]
+          shentsz = struct.unpack_from('<H', data, 0x3a)[0]
+          shnum = struct.unpack_from('<H', data, 0x3c)[0]
+          for i in range(shnum):
+              o = shoff + i * shentsz
+              sh_type = struct.unpack_from('<I', data, o + 4)[0]
+              if sh_type != 4:  # SHT_RELA
+                  continue
+              sh_offset = struct.unpack_from('<Q', data, o + 0x18)[0]
+              sh_size = struct.unpack_from('<Q', data, o + 0x20)[0]
+              sh_entsize = struct.unpack_from('<Q', data, o + 0x38)[0] or 24
+              for p in range(sh_offset, sh_offset + sh_size, sh_entsize):
+                  r_offset, r_info, r_addend = struct.unpack_from('<QQq', data, p)
+                  if (r_info & 0xffffffff) == 8:  # R_X86_64_RELATIVE
+                      rel[r_offset] = r_addend & 0xffffffffffffffff
+
+          def qword(va):
+              if va in rel:
+                  return rel[va]
+              off = va_to_off(va)
+              if off is None or off + 8 > len(data):
+                  return None
+              return struct.unpack_from('<Q', data, off)[0]
+
+          def signed_qword(va):
+              off = va_to_off(va)
+              if off is None or off + 8 > len(data):
+                  return None
+              return struct.unpack_from('<q', data, off)[0]
+
+          # The containing owner is proven to make virtual calls at these
+          # offsets in the 0x7e7fe0 setup path. A candidate address point must
+          # make all of them executable, as well as the downstream +0x90 slot.
+          signature_offsets = (0x4a8, 0x4b0, 0x4b8, 0x4c0, 0x4c8, 0x4d8)
+          candidates = []
+          for fs, fe, base, end, flags in loads:
+              if flags & 1:
+                  continue
+              start = (base + 7) & ~7
+              stop = end - 0x4e0
+              for ap in range(start, stop, 8):
+                  slot90 = qword(ap + 0x90)
+                  if slot90 is None or not is_exec(slot90):
+                      continue
+                  vals = [qword(ap + off) for off in signature_offsets]
+                  if any(v is None or not is_exec(v) for v in vals):
+                      continue
+                  first = qword(ap)
+                  if first is None or not is_exec(first):
+                      continue
+                  off_top = signed_qword(ap - 16)
+                  rtti = qword(ap - 8)
+                  if off_top is None or abs(off_top) > 0x100000:
+                      continue
+                  if rtti not in (0, None) and not load_flags(rtti):
+                      continue
+                  candidates.append((ap, slot90, off_top, rtti or 0, vals))
+
+          candidate_set = {c[0] for c in candidates}
+          xrefs = {ap: [] for ap in candidate_set}
+          for fs, fe, base, end, flags in loads:
+              if not (flags & 1):
+                  continue
+              for p in range(fs, fe - 7):
+                  if not (0x40 <= data[p] <= 0x4f and data[p + 1] == 0x8d and (data[p + 2] & 0xc7) == 0x05):
+                      continue
+                  site = base + p - fs
+                  target = site + 7 + struct.unpack_from('<i', data, p + 3)[0]
+                  if target in xrefs:
+                      xrefs[target].append(site)
+
+          ranked = sorted(
+              candidates,
+              key=lambda c: (
+                  0 if xrefs[c[0]] else 1,
+                  min((abs(site - 0x7e7fe0) for site in xrefs[c[0]]), default=1 << 62),
+                  c[0],
+              ),
+          )
+          print('TRACK_A_NETWORK_OWNER_VTABLE_CENSUS_BEGIN=true')
+          print(f'VTABLE_SHAPE_CANDIDATE_COUNT={len(ranked)}')
+          for ap, slot90, off_top, rtti, vals in ranked[:32]:
+              refs = xrefs[ap]
+              ref_text = ','.join(hex(x) for x in refs[:16]) if refs else 'none'
+              sig_text = ','.join(hex(x) for x in vals)
+              print(
+                  f'VTABLE_CANDIDATE address_point=0x{ap:x} slot90=0x{slot90:x} '
+                  f'offset_to_top={off_top} rtti=0x{rtti:x} lea_xrefs={ref_text} signature_targets={sig_text}'
+              )
+          if len(ranked) == 1:
+              print(f'NETWORK_OWNER_VTABLE_UNIQUE=0x{ranked[0][0]:x}')
+              print(f'NETWORK_OWNER_SLOT_90_UNIQUE=0x{ranked[0][1]:x}')
+          else:
+              print('NETWORK_OWNER_VTABLE_UNIQUE=unknown')
+              print('NETWORK_OWNER_SLOT_90_UNIQUE=unknown')
+          print('TRACK_A_NETWORK_OWNER_VTABLE_CENSUS_COMPLETE=true')
+          PY
+          cat "$out"
+          grep -q '^TRACK_A_NETWORK_OWNER_VTABLE_CENSUS_COMPLETE=true$' "$out"
+          slot="$(sed -n 's/^NETWORK_OWNER_SLOT_90_UNIQUE=//p' "$out")"
+          if [[ "$slot" =~ ^0x[0-9a-f]+$ ]]; then
+            lo=$(printf '0x%x' $((slot-64)))
+            hi=$(printf '0x%x' $((slot+768)))
+            echo "NETWORK_OWNER_SLOT_90_DISASSEMBLY_BEGIN=$lo"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi"
+            echo "NETWORK_OWNER_SLOT_90_DISASSEMBLY_END=$hi"
+          fi

@@ -1,0 +1,104 @@
+name: Track A ELF relocation xrefs
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-elf-relocation-xrefs.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Resolve exact and nearby RELA addends for protocol metadata strings
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import collections,struct,sys
+          data=open(sys.argv[1],'rb').read()
+          targets=[
+            'TWorldmapProtocolMessageHandler','handleFullMapMessage','handleCreateOnMapMessage',
+            'TChatProtocolMessageHandler','handleTalkMessage','TContainerProtocolMessageHandler','handleContainerMessage',
+            'TCreatureProtocolMessageHandler','TPlayerProtocolMessageHandler','handlePlayerDataBasicMessage',
+            'TEffectProtocolMessageHandler','handleGraphicalEffectsMessage','TMarketProtocolMessageHandler','handleMarketEnterMessage',
+            'TNPCTradeProtocolMessageHandler','handleNPCOfferMessage','TPlayerTradeProtocolMessageHandler','handleOwnOfferMessage',
+            'TQuestLogProtocolMessageHandler','handleQuestLogMessage','TGameEventProtocolMessageHandler','handleGameEventMessage',
+            'GameserverMessageMoveCreature','GameserverMessagePlayerDataCurrent','GameserverMessageContainer','GameserverMessageTalk',
+            'GameclientMessageMoveObject','GameclientMessageAttack','GameclientMessageFollow','GameclientMessageTalk','GameclientMessageTradeObject','GameclientMessageGoPath'
+          ]
+          # Program-load VA mapping.
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phentsz=struct.unpack_from('<H',data,0x36)[0]; phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def off2va(o):
+              for lo,hi,va,vhi,fl in loads:
+                  if lo<=o<hi:return va+(o-lo)
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def pstring(va,maxn=100):
+              o=va2off(va)
+              if o is None:return ''
+              e=o
+              while e<len(data) and e-o<maxn and 32<=data[e]<127:e+=1
+              if e==o:return ''
+              try:return data[o:e].decode('ascii')
+              except:return ''
+          # Parse all SHT_RELA sections directly from section headers.
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shentsz=struct.unpack_from('<H',data,0x3a)[0]; shnum=struct.unpack_from('<H',data,0x3c)[0]
+          relas=[]
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              sh_name,sh_type,sh_flags,sh_addr,sh_offset,sh_size,sh_link,sh_info,sh_addralign,sh_entsize=struct.unpack_from('<IIQQQQIIQQ',data,o)
+              if sh_type!=4 or not sh_entsize:continue
+              for p in range(sh_offset,sh_offset+sh_size,sh_entsize):
+                  if p+24>len(data):break
+                  r_offset,r_info,r_addend=struct.unpack_from('<QQq',data,p)
+                  relas.append((r_offset,r_info&0xffffffff,r_addend,i))
+          by_addend=collections.defaultdict(list)
+          for x in relas:by_addend[x[2]].append(x)
+          print('TRACK_A_ELF_RELOCATION_XREF_BEGIN=true')
+          print(f'RELA_COUNT={len(relas)}')
+          print(f'RELA_TYPE_RELATIVE_COUNT={sum(1 for _,t,_,_ in relas if t==8)}')
+          for name in targets:
+              b=name.encode();p=0;occ=[]
+              while True:
+                  q=data.find(b,p)
+                  if q<0:break
+                  va=off2va(q)
+                  if va is not None:occ.append((q,va))
+                  p=q+1
+              print(f'TARGET name={name} occurrences={len(occ)}')
+              for idx,(off,va) in enumerate(occ):
+                  exact=by_addend.get(va,[])
+                  print(f' STRING idx={idx} off=0x{off:x} va=0x{va:x} exact_relocations={len(exact)}')
+                  for ro,typ,add,si in exact[:32]:
+                      print(f'  EXACT_RELA slot=0x{ro:x} type={typ} addend=0x{add:x} section_index={si}')
+                  near=[]
+                  for ro,typ,add,si in relas:
+                      d=add-va
+                      if -0x400<=d<=0x400:
+                          s=pstring(add)
+                          if s:near.append((abs(d),d,ro,typ,add,s))
+                  near.sort()
+                  for _,d,ro,typ,add,s in near[:24]:
+                      print(f'  NEAR_RELA delta={d:+#x} slot=0x{ro:x} type={typ} addend=0x{add:x} string={s[:80]!r}')
+          print('TRACK_A_ELF_RELOCATION_XREF_COMPLETE=true')
+          PY

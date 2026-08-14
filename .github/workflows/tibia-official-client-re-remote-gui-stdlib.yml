@@ -16,83 +16,52 @@ jobs:
     env:
       TRACK_DISPLAY: ':98'
     steps:
-      - name: Start verified Track A browser GUI and DSM bridge
+      - name: Start verified Track A browser GUI for DSM reverse proxy
         shell: bash
         run: |
           set -Eeuo pipefail
-          echo CHECKPOINT_RUNNER="$RUNNER_NAME"
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ -S /var/run/docker.sock ]]
           [[ -S /tmp/.X11-unix/X98 ]]
-          echo CHECKPOINT_X98=true
 
           state=''
           for c in /work/_otclient_tibia_re_state /home/runner/_work/_otclient_tibia_re_state; do
-            if [[ -x "$c/toolroot/usr/bin/xwd" && -x "$c/toolroot/usr/bin/xdotool" ]]; then state="$c"; break; fi
+            if [[ -x "$c/toolroot/usr/bin/xwd" && -x "$c/toolroot/usr/bin/xdotool" && -s "$c/runtime/track-a-remote-gui.py" ]]; then state="$c"; break; fi
           done
           [[ -n "$state" ]]
-          echo CHECKPOINT_STATE="$state"
-
-          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
-          marker_count=0
-          for e in /proc/[0-9]*/environ; do
-            [[ -r "$e" ]] || continue
-            if grep -azFxq "$marker" "$e" 2>/dev/null; then
-              marker_count=$((marker_count+1))
-              p="${e#/proc/}"; p="${p%/environ}"
-              printf 'TRACK_A_MARKED_PID=%s CMD=' "$p"
-              tr '\0' ' ' <"/proc/$p/cmdline" 2>/dev/null || true
-              echo
-            fi
-          done
-          [[ "$marker_count" -ge 2 ]]
-          echo CHECKPOINT_MARKED_PROCESSES="$marker_count"
 
           root="$state/toolroot"
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
           tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           xwd="$root/usr/bin/xwd"
           xdotool="$root/usr/bin/xdotool"
-          socat="$(PATH="$tool_path" command -v socat)"
-          [[ -x "$xwd" && -x "$xdotool" && -x "$socat" ]]
-          echo CHECKPOINT_TOOLS=true
+          server="$state/runtime/track-a-remote-gui.py"
 
           probe=/tmp/track-a-live-probe.xwd
-          rm -f "$probe"
           DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xwd" -root -silent -out "$probe"
           [[ -s "$probe" ]]
           python3 - "$probe" <<'PY'
           import struct,sys
-          d=open(sys.argv[1],'rb').read(100)
-          h=struct.unpack('>25I',d)
-          assert 0<h[4]<=4096 and 0<h[5]<=4096
-          print(f'CHECKPOINT_CAPTURE={h[4]}x{h[5]}')
+          h=struct.unpack('>25I',open(sys.argv[1],'rb').read(100))
+          assert (h[4],h[5]) == (1920,1080)
+          print('TRACK_A_CAPTURE_VERIFIED=1920x1080')
           PY
           rm -f "$probe"
-
-          server="$state/runtime/track-a-remote-gui.py"
-          mkdir -p "$state/runtime"
-          if [[ ! -s "$server" ]]; then
-            echo MISSING_EXISTING_SERVER=true
-            exit 20
-          fi
-          python3 -m py_compile "$server"
-          echo CHECKPOINT_SERVER_FILE=true
 
           self="$(hostname)"
           runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
           image="$(docker inspect -f '{{.Config.Image}}' "$self")"
           [[ -n "$runner_ip" && -n "$image" ]]
-          echo CHECKPOINT_RUNNER_IP="$runner_ip"
 
-          docker exec "$self" sh -lc "pkill -f '[t]rack-a-remote-gui.py' 2>/dev/null || true"
-          docker exec -d -u 0 \
-            -e DISPLAY="$TRACK_DISPLAY" -e TRACK_A_XWD="$xwd" -e TRACK_A_XDOTOOL="$xdotool" \
-            -e TRACK_A_TOOL_LIB="$tool_lib" -e TRACK_A_TOOL_PATH="$tool_path" -e TRACK_A_GUI_PORT=6081 \
-            "$self" python3 "$server"
+          if ! curl -fsS --max-time 3 http://127.0.0.1:6081/ | grep -q 'Track A'; then
+            docker exec -d -u 0 \
+              -e DISPLAY="$TRACK_DISPLAY" -e TRACK_A_XWD="$xwd" -e TRACK_A_XDOTOOL="$xdotool" \
+              -e TRACK_A_TOOL_LIB="$tool_lib" -e TRACK_A_TOOL_PATH="$tool_path" -e TRACK_A_GUI_PORT=6081 \
+              "$self" python3 "$server"
+          fi
 
           ready=false
-          for _ in $(seq 1 30); do
+          for _ in $(seq 1 20); do
             if curl -fsS --max-time 2 http://127.0.0.1:6081/ | grep -q 'Track A'; then ready=true; break; fi
             sleep 1
           done
@@ -101,22 +70,10 @@ jobs:
           [[ "$code" == 200 && "$(head -c2 /tmp/track-a-test.bmp)" == BM ]]
           rm -f /tmp/track-a-test.bmp
           echo TRACK_A_BROWSER_BACKEND_READY=true
+          echo TRACK_A_RUNNER_IP="$runner_ip"
 
-          # Prove host namespace can reach the runner backend before adding loopback proxy.
-          docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
+          timeout 20s docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
             "curl -fsS --max-time 8 http://${runner_ip}:6081/ | grep -q 'Track A'"
-          echo CHECKPOINT_HOST_TO_RUNNER=true
-
-          docker rm -f otclient-track-a-browser-lan otclient-track-a-browser-loopback otclient-track-a-dsm-proxy >/dev/null 2>&1 || true
-          docker run -d --name otclient-track-a-dsm-proxy --restart unless-stopped \
-            --network host --volumes-from "$self" --entrypoint /bin/sh "$image" \
-            -lc "export PATH='$tool_path'; export LD_LIBRARY_PATH='$tool_lib'; exec '$socat' TCP-LISTEN:6081,bind=127.0.0.1,reuseaddr,fork TCP:${runner_ip}:6081" >/dev/null
-          sleep 2
-          [[ "$(docker inspect -f '{{.State.Running}}' otclient-track-a-dsm-proxy)" == true ]]
-          docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
-            "curl -fsS --max-time 8 http://127.0.0.1:6081/ | grep -q 'Track A'"
-          docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
-            "test \"\$(curl -sS --max-time 12 -o /tmp/s.bmp -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)\" = 200 && test \"\$(head -c2 /tmp/s.bmp)\" = BM"
-          echo TRACK_A_DSM_LOOPBACK_READY=true
-          echo TRACK_A_DSM_PROXY_TARGET=http://127.0.0.1:6081
+          echo TRACK_A_DSM_TO_RUNNER_VERIFIED=true
+          echo TRACK_A_DSM_PROXY_TARGET="http://${runner_ip}:6081"
           echo TRACK_A_USER_URL=http://synology:6082

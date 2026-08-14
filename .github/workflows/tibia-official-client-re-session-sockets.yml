@@ -13,13 +13,17 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 2
+    timeout-minutes: 6
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
-      TRACK_WARP_PORT: '25354'
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Count live owned client sockets only
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Capture live map coordinate span over controlled moves
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,29 +31,104 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          toolroot="$state/toolroot"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
           [[ -n "$pid" && -r "/proc/$pid/environ" ]]
           grep -azFxq "$marker" "/proc/$pid/environ"
-          python3 - "$pid" "$TRACK_WARP_PORT" <<'PY'
-import os,pathlib,sys
-pid,port=sys.argv[1],int(sys.argv[2]); inodes=set()
-for fd in pathlib.Path('/proc',pid,'fd').iterdir():
-    try:t=os.readlink(fd)
-    except OSError:continue
-    if t.startswith('socket:['):inodes.add(t[8:-1])
-local=direct=udp=0
-for name,is_udp in [('tcp',False),('tcp6',False),('udp',True),('udp6',True)]:
-    try:rows=pathlib.Path('/proc',pid,'net',name).read_text().splitlines()[1:]
-    except OSError:continue
-    for row in rows:
-        c=row.split()
-        if len(c)<10 or c[9] not in inodes:continue
-        rp=int(c[2].rsplit(':',1)[1],16)
-        if is_udp:udp+=1
-        elif c[3]=='01':
-            if rp==port:local+=1
-            else:direct+=1
-print(f'TRACK_A_LOCAL_SOCKS_ESTABLISHED={local}')
-print(f'TRACK_A_DIRECT_ESTABLISHED={direct}')
-print(f'TRACK_A_UDP_SOCKET_COUNT={udp}')
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          kill -0 "$pid"
+          window=''
+          for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+            g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+            [[ "$(printf '%s\n' "$g" | sed -n 's/^WIDTH=//p')" == 1020 ]] || continue
+            [[ "$(printf '%s\n' "$g" | sed -n 's/^HEIGHT=//p')" == 650 ]] || continue
+            window="$w"
+            break
+          done
+          [[ -n "$window" ]]
+          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
+          start="$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')"
+          offset="$(printf '%s\n' "$line" | awk '{print $3}')"
+          bias=$((16#$start - 16#$offset))
+          printf 'TRACK_A_CURRENT_PIE_BASE=0x%x\n' "$bias"
+          evidence="$state/evidence/aware-range-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$evidence"
+          records="$evidence/records.txt"
+          : >"$records"
+          cat >"$evidence/probe.gdb" <<EOF
+set pagination off
+set confirm off
+attach $pid
+python
+import gdb, struct, time
+inf=gdb.selected_inferior()
+out='$records'
+class MapBP(gdb.Breakpoint):
+    def __init__(self):
+        super().__init__('*0x%x' % ($bias + 0x19a8ea3))
+    def stop(self):
+        try:
+            rsp=int(gdb.parse_and_eval('\$rsp'))
+            order=int(gdb.parse_and_eval('\$rbp')) & 0xffffffff
+            x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))
+            if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                with open(out,'a') as f:
+                    f.write(f'{time.time_ns()} {x} {y} {z} {order}\n')
+        except Exception:
+            pass
+        return False
+MapBP()
+end
+continue
+EOF
+          gdb -q -nx -batch -x "$evidence/probe.gdb" >"$evidence/gdb.log" 2>&1 &
+          gp=$!
+          sleep 2
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window" || true
+          for spec in 'RIGHT Right Left' 'LEFT Left Right' 'UP Up Down' 'DOWN Down Up'; do
+            set -- $spec
+            name="$1"
+            key="$2"
+            back="$3"
+            printf 'TRACK_A_%s_START=%s\n' "$name" "$(date +%s%N)"
+            "$toolroot/usr/bin/xdotool" key "$key"
+            sleep 1.2
+            printf 'TRACK_A_%s_END=%s\n' "$name" "$(date +%s%N)"
+            "$toolroot/usr/bin/xdotool" key "$back" || true
+            sleep 1.2
+          done
+          if kill -0 "$gp" 2>/dev/null; then kill -INT "$gp" 2>/dev/null || true; sleep 1; fi
+          kill -CONT "$pid" 2>/dev/null || true
+          python3 - "$records" <<'PY'
+import sys
+rows=[]
+for line in open(sys.argv[1]):
+    p=line.split()
+    if len(p)==5:
+        rows.append(tuple(map(int,p)))
+print(f'TRACK_A_DECODED_MAP_RECORD_COUNT={len(rows)}')
+if len(rows)<8:
+    raise SystemExit(1)
+coords=[(r[1],r[2],r[3]) for r in rows]
+xs=[c[0] for c in coords]
+ys=[c[1] for c in coords]
+zs=[c[2] for c in coords]
+print(f'TRACK_A_X_MIN={min(xs)}')
+print(f'TRACK_A_X_MAX={max(xs)}')
+print(f'TRACK_A_X_SPAN={max(xs)-min(xs)+1}')
+print(f'TRACK_A_Y_MIN={min(ys)}')
+print(f'TRACK_A_Y_MAX={max(ys)}')
+print(f'TRACK_A_Y_SPAN={max(ys)-min(ys)+1}')
+print(f'TRACK_A_Z_MIN={min(zs)}')
+print(f'TRACK_A_Z_MAX={max(zs)}')
+print('TRACK_A_Z_VALUES='+','.join(map(str,sorted(set(zs)))))
+print(f'TRACK_A_UNIQUE_XYZ={len(set(coords))}')
 PY
+          kill -0 "$pid"
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          echo TRACK_A_SESSION_LEFT_LOGGED_IN=true

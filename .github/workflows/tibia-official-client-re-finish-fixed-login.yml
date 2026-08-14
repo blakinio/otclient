@@ -1,0 +1,131 @@
+name: Track A finish repaired official client login
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-single-item-drag]
+    paths: [.github/workflows/tibia-official-client-re-finish-fixed-login.yml]
+permissions:
+  contents: read
+jobs:
+  login:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Use existing repaired client and enter first character
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient && "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ -n "$TIBIA_TEST_EMAIL" && -n "$TIBIA_TEST_PASSWORD" ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          pkg="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$pkg/bin/client"
+          root="$state/toolroot"
+          rt="$state/runtime"
+          pid="$(tr -cd '0-9' <"$rt/client.pid")"
+          kill -0 "$pid"
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          runtime_lib="$pkg/bin/lib:$root/usr/lib/x86_64-linux-gnu/libproxy:$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$runtime_lib"
+          resolve_window() {
+            local w g ww hh area best ba
+            for _ in $(seq 1 60); do
+              best=''
+              ba=0
+              for w in $("$root/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+                g="$("$root/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"
+                ww="$(printf '%s\n' "$g" | sed -n 's/^WIDTH=//p')"
+                hh="$(printf '%s\n' "$g" | sed -n 's/^HEIGHT=//p')"
+                [[ -n "$ww" && -n "$hh" ]] || continue
+                area=$((ww*hh))
+                if (( area > ba )); then best="$w"; ba=$area; fi
+              done
+              if [[ -n "$best" ]]; then printf '%s\n' "$best"; return 0; fi
+              sleep .4
+            done
+            return 1
+          }
+          window="$(resolve_window)"
+          out="$GITHUB_WORKSPACE/artifacts/finish-fixed-login"
+          mkdir -p "$out"
+          "$root/usr/bin/xwd" -silent -id "$window" -out "$out/pre.xwd"
+          "$root/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
+          "$root/usr/bin/xdotool" windowfocus --sync "$window"
+          "$root/usr/bin/xdotool" mousemove --window "$window" 535 275 click 1
+          "$root/usr/bin/xdotool" key --window "$window" ctrl+a
+          "$root/usr/bin/xdotool" type --window "$window" --delay 12 -- "$TIBIA_TEST_EMAIL"
+          "$root/usr/bin/xdotool" mousemove --window "$window" 535 304 click 1
+          "$root/usr/bin/xdotool" key --window "$window" ctrl+a
+          "$root/usr/bin/xdotool" type --window "$window" --delay 12 -- "$TIBIA_TEST_PASSWORD"
+          "$root/usr/bin/xdotool" mousemove --window "$window" 590 388 click 1
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          echo TRACK_A_FINISH_LOGIN_SUBMITTED=true
+          sleep 8
+          kill -0 "$pid"
+          window="$(resolve_window)"
+          "$root/usr/bin/xwd" -silent -id "$window" -out "$out/select.xwd"
+          changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$out/pre.xwd" "$out/select.xwd")"
+          echo TRACK_A_FINISH_LOGIN_SELECT_CHANGED_PIXELS="$changed"
+          (( changed > 5000 ))
+          "$root/usr/bin/xdotool" windowfocus --sync "$window"
+          "$root/usr/bin/xdotool" mousemove --window "$window" 285 193 click 1
+          sleep .4
+          "$root/usr/bin/xdotool" key --window "$window" Return
+          echo TRACK_A_FINISH_LOGIN_CHARACTER_ENTER_SENT=true
+          sleep 15
+          kill -0 "$pid"
+          window="$(resolve_window)"
+          "$root/usr/bin/xwd" -silent -id "$window" -out "$out/world.xwd"
+          world_changed="$(python3 "$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-xwd-diff.py" "$out/select.xwd" "$out/world.xwd")"
+          echo TRACK_A_FINISH_LOGIN_WORLD_CHANGED_PIXELS="$world_changed"
+          (( world_changed > 10000 ))
+          python3 - "$pid" "$TRACK_WARP_PORT" <<'PY'
+          import os,pathlib,sys
+          pid,port=sys.argv[1],int(sys.argv[2]); ins=set()
+          for fd in pathlib.Path('/proc',pid,'fd').iterdir():
+              try:t=os.readlink(fd)
+              except OSError:continue
+              if t.startswith('socket:['):ins.add(t[8:-1])
+          local=direct=udp=0
+          for name,u in [('tcp',0),('tcp6',0),('udp',1),('udp6',1)]:
+              try:rows=pathlib.Path('/proc',pid,'net',name).read_text().splitlines()[1:]
+              except OSError:continue
+              for r in rows:
+                  c=r.split()
+                  if len(c)<10 or c[9] not in ins:continue
+                  rp=int(c[2].rsplit(':',1)[1],16)
+                  if u:udp+=1
+                  elif c[3]=='01':
+                      if rp==port:local+=1
+                      else:direct+=1
+          print(f'TRACK_A_FINISH_LOGIN_LOCAL_SOCKS={local}')
+          print(f'TRACK_A_FINISH_LOGIN_DIRECT={direct}')
+          print(f'TRACK_A_FINISH_LOGIN_UDP={udp}')
+          if local<1 or direct or udp:raise SystemExit(3)
+          PY
+          echo TRACK_A_FINISH_LOGIN_WORLD_VERIFIED=true
+          echo TRACK_A_SESSION_LEFT_RUNNING=true
+      - name: Upload repaired login evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-finish-fixed-login
+          path: artifacts/finish-fixed-login/*.xwd
+          if-no-files-found: ignore
+          retention-days: 7

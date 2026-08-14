@@ -41,8 +41,16 @@ jobs:
         run: |
           set -Eeuo pipefail
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          root="$state/toolroot"; aptroot="$state/cache/bridge-build-apt"
+          mkdir -p "$root" "$aptroot/lists/partial" "$aptroot/archives/partial"; : >"$aptroot/status"
+          apt_opts=(-o "Dir::State::lists=$aptroot/lists" -o "Dir::State::status=$aptroot/status" -o "Dir::Cache::archives=$aptroot/archives" -o APT::Get::List-Cleanup=0)
+          apt-get "${apt_opts[@]}" update
+          apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install build-essential cmake ninja-build pkg-config qt6-base-dev
+          for archive in "$aptroot"/archives/*.deb; do dpkg-deb -x "$archive" "$root"; done
+          export PATH="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           build="$state/build/tibia-runtime-bridge"
-          cmake -S bridge-src/tools/tibia_runtime_bridge -B "$build" -DCMAKE_BUILD_TYPE=Release
+          cmake -S bridge-src/tools/tibia_runtime_bridge -B "$build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$root/usr"
           cmake --build "$build" --parallel 2
           [[ -s "$build/otclient-tibia-runtime-bridge.so" ]]
           echo TRACK_A_RUNTIME_BRIDGE_BUILD_READY=true

@@ -41,6 +41,13 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - separates `present`/`clustered` evidence from still-unknown executable offsets, field layouts and runtime invocation proof;
    - prioritizes MoveCreature/player state/chat/container and movement/MoveObject/Attack/Follow/Trade builder gates.
 
+7. `20260814-protobuf-descriptor-census-and-xref-gate.md`
+   - records the successful revision-2 census of embedded `FileDescriptorProto` records;
+   - directly recovers `Coordinate.x/y/z` as fields `1/2/3`, all `uint32`;
+   - proves selected game protocol message schemas are not present in the seven embedded file descriptors and must be recovered from generated C++ metadata/accessors/disassembly;
+   - records the completed-output/cancelled-job boundary of xref v1 and rejects the tested literal-string absolute-qword route;
+   - introduces the linear xref-v2 replacement gate.
+
 Current continuation rule:
 
 ```text

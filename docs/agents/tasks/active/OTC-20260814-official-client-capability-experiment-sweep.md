@@ -287,7 +287,7 @@ Runtime E2E for this documentation-only design task is `NOT_APPLICABLE_WITH_REAS
 ## Current checkpoint
 
 ```yaml
-checkpoint_version: 2
+checkpoint_version: 3
 updated_at: 2026-08-14T10:05:00+02:00
 base_main: 005158b5b9bf25fe77bd5fc10813a6388a072836
 pr: 293
@@ -300,6 +300,9 @@ durable_design:
 durable_evidence:
   - docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md
   - docs/agents/reports/OTCLIENT-20260814-official-client-experiment-design-review.md
+validation_notes:
+  - changed-file ownership must remain exactly aligned with the seven research-design paths
+  - documentation-only runtime E2E is not applicable; exact-head CI and PR hygiene remain required
 safe_to_resume: true
 post_merge_programme_action: resolve exact current official Linux client version/SHA, execute S1/S2 exhaustive static census and graph/probe planning before login, then recover/login and structurally prove IN_GAME for L1 live correlation
 next_action: review the exact PR #293 changed-file set and diff, verify exact-head documentation CI and mergeability, fix any design/CI findings, then mark ready and merge when the repository merge gate is satisfied

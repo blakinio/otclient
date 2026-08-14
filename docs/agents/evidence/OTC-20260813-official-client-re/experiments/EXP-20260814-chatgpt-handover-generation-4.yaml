@@ -1,0 +1,206 @@
+experiment_id: EXP-20260814-chatgpt-handover-generation-4
+kind: continuation_handover
+track: official-client-re
+alias: OTCLIENT-TIBIA-RE
+repository: blakinio/otclient
+created_at: 2026-08-14T21:06:00+02:00
+completion_claim: incomplete
+safe_to_resume: true
+
+client_fence:
+  version: 15.32.df7b29
+  size: 51965216
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  platform: native_linux_only
+
+branches:
+  primary_pr: 289
+  primary_branch: ci/OTC-20260813-official-client-re-continuation
+  primary_head_observed: 4ac4a7546b182fcc11aaac3893c2a0116304f3e2
+  recovery_branch: ci/OTC-20260814-track-a-chatgpt-framing-recovery
+  recovery_head_before_generation_4: 7e9db4a04aa914ea209f68eeaf39181120e230ba
+  task_refresh_commit: 8e42f226c3c07e5b0b3995e713ca2e7e06ab1acc
+  handover_commit: e08662522ae04ed8067f552607f49bb8ec08ee39
+  prompt_commit: b2106460bbe9aac31c14ee8082bc7b576ef2c08a
+  reconciliation_required: true
+
+active_operation:
+  workflow: Track A final socket write resolution
+  run_id: 31825417040
+  job_id: 94848268697
+  last_observed_status: queued
+  semantic_goal: resolve TIODeviceWriter and TGameserverTCPConnection and concrete final gameplay socket write
+  duplicate_redispatch_while_active: forbidden
+
+proven_outbound:
+  qslot_connection_callsite: '0x19716a3'
+  qslot_invoker: '0x7dd630'
+  chain:
+    - TInternalGameActionRouter
+    - TProtocolMessageQueue
+    - clientMessageReadyToProcess
+    - Qt_QSlotObject_0x7dd630
+    - TProtocolClientMessageProcessor
+    - TGameserverNetworkPacketRawDataProcessor
+    - TGameserverDualConnection
+  owner_fields:
+    '+0x9f0/+0x9f8': tibia::protocol::TProtocolServerPacketProcessor
+    '+0xa00/+0xa08': tibia::protocol::TProtocolClientMessageProcessor
+    '+0xa10/+0xa18': tibia::network::TGameserverNetworkPacketRawDataProcessor
+    '+0xc18/+0xc20': tibia::network::TGameserverDualConnection
+  virtual_targets:
+    TProtocolClientMessageProcessor_plus_0x10: '0xc2df80'
+    TGameserverNetworkPacketRawDataProcessor_plus_0x10: '0xb47130'
+    TGameserverDualConnection_plus_0x80: '0xb56d60'
+    TGameserverDualConnection_plus_0x78: '0xb56970'
+    TGameserverDualConnection_precondition_plus_0x90: '0xb40370'
+
+queue_convergence:
+  sendMessage_entry: '0xdf7930'
+  sendMessage_body: '0xde6de0'
+  prepareAndEnqueueGameclientMessage_entry: '0xdf6b99'
+  prepareAndEnqueueGameclientMessage_body: '0xbc6e20'
+  helpers: ['0xde91b0', '0xbc6f00', '0xbc6750']
+
+raw_stream:
+  class: tibia::network::TUnencryptedRawMessageStream
+  vtable_address_point: '0x3084c58'
+  rtti: '0x3080660'
+  base_class: QBuffer
+  plus_0xe8: '0xb40630'
+  qiodevice_write_callsite: '0xb4066b'
+  classification: FACT_NOT_FINAL_SOCKET
+
+direct_qiodevice_write_census:
+  callsites: ['0x7dd563', '0xb4066b', '0xb46c75', '0xc4a848', '0xd08642']
+  file_io: ['0xc4a848', '0xd08642']
+  server_read_side: '0x7dd563'
+  raw_qbuffer_internal: '0xb4066b'
+  high_priority_unresolved: '0xb46c75'
+
+fresh_primary_candidate:
+  source_commit: 4ac4a7546b182fcc11aaac3893c2a0116304f3e2
+  source_run: 31827951737
+  source_job: 94856503248
+  writer_fde: '0xb46bd0..0xb46cce'
+  qiodevice_write_callsite: '0xb46c75'
+  qmetaobject: '0x30b7d00'
+  stringdata: '0x1d4d2b0'
+  metadata: '0x1d4d1a0'
+  qt_static_metacall: '0xdd1cc0'
+  device_member: '[this+0x10]'
+  classification: HIGH_PRIORITY_UNRESOLVED_GAMESERVER_TCP_CANDIDATE
+  unknowns:
+    - exact_qmeta_class_identity
+    - concrete_device_member_type
+    - newline_payload_semantics
+    - actual_binary_gameplay_frame_write
+
+superseded_or_disproven:
+  - claim: clientMessageReadyToProcess_uses_owner_virtual_plus_0x90
+    classification: DISPROVEN
+  - claim: canonical_outbound_root_is_0x8409d0_to_owner_plus_0x88_to_0xb5b880
+    classification: DISPROVEN
+  - claim: 0x2f66288_plus_0xb8_equals_0xb5b880
+    classification: DISPROVEN
+    exact_value: '0x313cce0'
+    executable: false
+  - claim: 0xb5b880_is_valid_outbound_function_entry
+    classification: DISPROVEN
+    reason: lies_inside_instruction_beginning_at_0xb5b87c_and_was_hardcoded_by_old_workflow
+  - claim: 0x7dd563_is_outbound_final_write
+    classification: DISPROVEN_AS_OUTBOUND
+
+conflicts:
+  - source: primary_branch_evidence_commit_4ac4a754
+    statement: relation_to_canonical_outbound_subobject_target_0xb5b880
+    classification: STALE_CONFLICT
+    resolution_rule: preserve_new_0xb46bd0_qmeta_tcp_facts_but_reject_0xb5b880_reference_unless_independently_reproven
+
+transport_rtti:
+  TGameserverTCPConnection: '0x3080630'
+  TGameserverNetworkPacketConnection: '0x3080648'
+  TUnencryptedRawMessageStream: '0x3080660'
+  TGameserverNetworkPacketSequenceFlowProcessor: '0x3080678'
+  TGameserverDualConnection: '0x30b7628'
+  TIODeviceWriter: '0x3080718'
+  TProtocolWriter: '0x3080728'
+  TProtobufClientMessageTranslator: '0x3080748'
+  TProtocolClientMessageProcessor: '0x3080758'
+  TGameserverNetworkPacketRawDataProcessor: '0x3080768'
+
+live_world:
+  structural_world_proven: true
+  reversible_path:
+    - [32546, 32510, 7]
+    - [32546, 32509, 7]
+    - [32546, 32510, 7]
+  aware_range: [18, 14]
+  player_position:
+    classification: DERIVED
+    direct_member: UNKNOWN
+
+bridge:
+  build_proven: true
+  historical_run: 31809994339
+  live_correlation: UNKNOWN
+  failure: toolroot_Qt_6_4_shadowed_official_bundled_Qt_6_9
+  recovery:
+    - separate_build_sysroot_from_client_runtime
+    - use_official_bundled_Qt_6_9
+    - provide_live_DBus_ATSPI_session
+    - query_read_only_session_status_after_world_entry
+
+p0_unknowns:
+  - direct_player_position
+  - hp_maxhp
+  - mana_maxmana
+  - identity_state
+  - CreatureStorage_lifecycle
+  - battle_target
+  - inventory_equipment
+  - containers
+  - structured_chat_world_events
+
+coverage:
+  protocol_handler_classes: 47
+  handle_message_names: 146
+  inbound_gameserver_messages: 189
+  outbound_gameclient_messages: 160
+  QObject_connectImpl: 2078
+  legacy_connect: 41
+  QObject_disconnectImpl: 65
+  legacy_classified: 40
+  legacy_unclassified: 1
+  gameaction_candidates: 31
+  proven_sender_metaobjects: 29
+  full_semantic_coverage: UNKNOWN
+
+next_actions:
+  - reconcile_primary_and_recovery_heads_and_ownership
+  - inspect_run_31825417040_after_state_change
+  - decode_QMetaObject_0x30b7d00_and_static_metacall_0xdd1cc0
+  - enumerate_QTcpSocket_constructor_callsites
+  - prove_member_this_plus_0x10_concrete_type
+  - resolve_TIODeviceWriter_and_TGameserverTCPConnection_vtables_constructors_members
+  - trace_0xc2df80_to_0xb47130_to_dual_connection_to_binary_gameplay_socket_write
+  - prove_framing_encryption_compression_sequence_and_final_wire_boundary
+  - repair_bridge_Qt6_9_and_DBus_ATSPI_correlation
+  - recover_P0_direct_reads
+  - promote_safest_reversible_action_to_A3_A4
+  - complete_quantitative_protocol_QMeta_coverage
+  - final_CI_audit_PR_hygiene_acceptance_archive_merge_gate
+
+references:
+  - ../20260814-chatgpt-framing-recovery-handover-v2.md
+  - ../../../tasks/active/OTC-20260813-official-client-re-continuation.md
+  - ../../../../prompts/OTCLIENT_TIBIA_RE_FRAMING_RECOVERY_CONTINUATION.md
+  - EXP-20260814-continuation-state.yaml
+
+safety:
+  track_b: OUT_OF_SCOPE
+  default_effect: READ_ONLY_OR_REVERSIBLE_NO_COST
+  owner_funded_ai_without_current_permission: FORBIDDEN
+  costly_or_irreversible_actions: FORBIDDEN_WITHOUT_EXPLICIT_OWNER_AUTHORIZATION
+  credentials_in_evidence: FORBIDDEN
+  direct_push_to_main: FORBIDDEN

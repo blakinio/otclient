@@ -11,7 +11,7 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
@@ -30,28 +30,15 @@ jobs:
           python3 - "$client" <<'PY'
           import re,sys,struct
           data=open(sys.argv[1],'rb').read()
-          classes=[
-            'TCreatureProtocolMessageHandler','TChatProtocolMessageHandler','TContainerProtocolMessageHandler',
-            'TPlayerProtocolMessageHandler','TEffectProtocolMessageHandler','TNPCTradeProtocolMessageHandler',
-            'TPlayerTradeProtocolMessageHandler','TMarketProtocolMessageHandler','TVipProtocolMessageHandler',
-            'TFriendsProtocolMessageHandler','TQuestLogProtocolMessageHandler','TGameEventProtocolMessageHandler'
-          ]
-          # ELF VA helpers.
-          e_phoff=struct.unpack_from('<Q',data,0x20)[0]
-          e_phentsize=struct.unpack_from('<H',data,0x36)[0]
-          e_phnum=struct.unpack_from('<H',data,0x38)[0]
+          classes=['TCreatureProtocolMessageHandler','TChatProtocolMessageHandler','TContainerProtocolMessageHandler','TPlayerProtocolMessageHandler','TEffectProtocolMessageHandler','TNPCTradeProtocolMessageHandler','TPlayerTradeProtocolMessageHandler','TMarketProtocolMessageHandler','TVipProtocolMessageHandler','TFriendsProtocolMessageHandler','TQuestLogProtocolMessageHandler','TGameEventProtocolMessageHandler']
+          e_phoff=struct.unpack_from('<Q',data,0x20)[0]; e_phentsize=struct.unpack_from('<H',data,0x36)[0]; e_phnum=struct.unpack_from('<H',data,0x38)[0]
           loads=[]
           for i in range(e_phnum):
-              o=e_phoff+i*e_phentsize
-              typ,flags,off,vaddr,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              o=e_phoff+i*e_phentsize; typ,flags,off,vaddr,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
               if typ==1:loads.append((vaddr,vaddr+filesz,off,filesz,flags))
           def off_to_va(pos):
               for lo,hi,off,fs,fl in loads:
                   if off<=pos<off+fs:return lo+(pos-off)
-          def va_to_off(va):
-              for lo,hi,off,fs,fl in loads:
-                  if lo<=va<hi:return off+(va-lo)
-          # printable starts for local neighborhood catalogues
           printable=[]
           for m in re.finditer(rb'[ -~]{3,}',data):
               try:s=m.group().decode('ascii')
@@ -66,19 +53,14 @@ jobs:
                   positions.append(q);p=q+1
               print(f'CLASS name={cls} occurrences={len(positions)} positions='+','.join(hex(x) for x in positions[:12]))
               for q in positions[:6]:
-                  va=off_to_va(q)
-                  # qmeta string tables commonly place method names in compact string pools near class name.
-                  local=[]
+                  va=off_to_va(q); local=[]
                   for off,s in printable:
                       if off < q-6000: continue
                       if off > q+16000: break
-                      if s.startswith('handle') and s.endswith('Message'):
-                          local.append((off-q,off,s))
+                      if s.startswith('handle') and s.endswith('Message'): local.append((off-q,off,s))
                   if local:
                       print(f' CLASS_NEIGHBORHOOD class={cls} class_off=0x{q:x} class_va={"0x%x"%va if va is not None else "none"} method_count={len(local)}')
-                      for d,off,s in local[:100]:
-                          print(f'  METHOD delta={d:+d} off=0x{off:x} va={"0x%x"%off_to_va(off) if off_to_va(off) is not None else "none"} name={s}')
-                  # find direct qword xrefs to class string; generated QMetaObject structures often reference string-data objects/pools.
+                      for d,off,s in local[:100]: print(f'  METHOD delta={d:+d} off=0x{off:x} va={"0x%x"%off_to_va(off) if off_to_va(off) is not None else "none"} name={s}')
                   if va is not None:
                       pat=struct.pack('<Q',va); refs=[]; st=0
                       while True:
@@ -90,4 +72,63 @@ jobs:
                       if refs:print(' CLASS_STRING_PTR_XREFS class='+cls+' refs='+','.join(hex(x) for x in refs[:40]))
           print('TRACK_A_QMETA_HANDLER_NEIGHBORHOOD_END=true')
           print('TRACK_A_QMETA_HANDLER_NEIGHBORHOOD_COMPLETE=true')
+          PY
+      - name: Recover metadata pointer and executable RIP xrefs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phentsz=struct.unpack_from('<H',data,0x36)[0]; phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz; typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def off2va(o):
+              for lo,hi,va,vhi,fl in loads:
+                  if lo<=o<hi:return va+(o-lo)
+          def flags_for_va(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return fl
+              return 0
+          exec_ranges=[(lo,hi,va) for lo,hi,va,vhi,fl in loads if fl&1]
+          targets=['TChatProtocolMessageHandler','handleTalkMessage','TContainerProtocolMessageHandler','handleContainerMessage','TCreatureProtocolMessageHandler','handleMoveCreatureMessage','TPlayerProtocolMessageHandler','handlePlayerDataBasicMessage','TEffectProtocolMessageHandler','handleGraphicalEffectsMessage','TMarketProtocolMessageHandler','handleMarketEnterMessage','TNPCTradeProtocolMessageHandler','handleNPCOfferMessage','TPlayerTradeProtocolMessageHandler','handleOwnOfferMessage','TQuestLogProtocolMessageHandler','handleQuestLogMessage','TGameEventProtocolMessageHandler','handleGameEventMessage','GameclientMessageMoveObject','GameclientMessageAttack','GameclientMessageFollow','GameclientMessageTalk','GameclientMessageTradeObject','GameclientMessageGoPath']
+          def occurrences(s):
+              b=s.encode(); out=[]; p=0
+              while True:
+                  q=data.find(b,p)
+                  if q<0:return out
+                  out.append(q);p=q+1
+          def qrefs(va):
+              pat=struct.pack('<Q',va);out=[];p=0
+              while True:
+                  q=data.find(pat,p)
+                  if q<0:return out
+                  out.append(q);p=q+1
+          def riprefs(target):
+              out=[]
+              for lo,hi,segva in exec_ranges:
+                  c=data[lo:hi]
+                  for i in range(len(c)-7):
+                      if c[i] not in (0x48,0x4c) or c[i+1] not in (0x8d,0x8b) or (c[i+2]&0xc7)!=0x05: continue
+                      disp=struct.unpack_from('<i',c,i+3)[0]; iva=segva+i
+                      if ((iva+7+disp)&0xffffffffffffffff)==target: out.append(iva)
+              return out
+          print('TRACK_A_XREF_GRAPH_BEGIN=true')
+          for s in targets:
+              occ=occurrences(s); print(f'TARGET name={s} occurrences={len(occ)}')
+              for idx,o in enumerate(occ[:8]):
+                  va=off2va(o)
+                  if va is None:continue
+                  refs=qrefs(va); print(f' STRING idx={idx} off=0x{o:x} va=0x{va:x} qword_refs={len(refs)} direct_riprefs={",".join(hex(x) for x in riprefs(va)[:24]) or "none"}')
+                  for r in refs[:20]:
+                      rv=off2va(r)
+                      if rv is None:continue
+                      print(f'  PTR off=0x{r:x} va=0x{rv:x} flags={flags_for_va(rv)} riprefs={",".join(hex(x) for x in riprefs(rv)[:20]) or "none"} ptr2={",".join(hex(off2va(x)) for x in qrefs(rv)[:20] if off2va(x) is not None) or "none"}')
+          print('TRACK_A_XREF_GRAPH_END=true')
+          print('TRACK_A_XREF_GRAPH_COMPLETE=true')
           PY

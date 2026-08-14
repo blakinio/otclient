@@ -16,6 +16,7 @@ jobs:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      CENSUS_REVISION: "2"
     steps:
       - name: Census QObject connect-related dynamic symbols
         shell: bash
@@ -31,6 +32,7 @@ jobs:
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          echo "CENSUS_REVISION=$CENSUS_REVISION"
           echo 'TRACK_A_QT_CONNECT_SYMBOL_CENSUS_BEGIN=true'
           "$gdb" -q -nx -batch "$client" \
             -ex 'set pagination off' \

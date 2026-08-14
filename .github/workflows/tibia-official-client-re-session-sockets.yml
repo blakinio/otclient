@@ -1,4 +1,4 @@
-name: Track A Qt metaobject method decode
+name: Track A named worldmap mutation observer
 on:
   push:
     branches:
@@ -8,103 +8,115 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
 jobs:
-  inspect:
+  observe:
     runs-on: [otclient, synology]
-    timeout-minutes: 4
+    timeout-minutes: 3
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Decode Qt stringdata and metadata for df2a60 dispatcher
+      - name: Arm raw observer on CreateOnMap ChangeOnMap DeleteOnMap
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          runtime="$state/runtime"
+          mkdir -p "$runtime"
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
 
-          python3 - "$client" <<'PY'
-          import struct,sys
-          data=open(sys.argv[1],'rb').read()
-          e_phoff=struct.unpack_from('<Q',data,0x20)[0]
-          e_phentsize=struct.unpack_from('<H',data,0x36)[0]
-          e_phnum=struct.unpack_from('<H',data,0x38)[0]
-          loads=[]
-          for i in range(e_phnum):
-              o=e_phoff+i*e_phentsize
-              typ,flags,off,vaddr,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
-              if typ==1: loads.append((vaddr,vaddr+filesz,off))
-          def vaoff(va):
-              for lo,hi,off in loads:
-                  if lo<=va<hi:return off+(va-lo)
-              return None
-          def raw(va,n):
-              o=vaoff(va)
-              if o is None:return None
-              return data[o:o+n]
-          def ascii_runs(va,n,minlen=2):
-              b=raw(va,n)
-              if b is None:return
-              i=0
-              while i<len(b):
-                  j=i
-                  while j<len(b) and 32<=b[j]<127:j+=1
-                  if j-i>=minlen:
-                      print(f'ASCII va=0x{va+i:x} len={j-i} text={b[i:j].decode("ascii","replace")!r}')
-                  i=max(j+1,i+1)
-          print('TRACK_A_QMETAOBJECT_3087800_WORDS_BEGIN=true')
-          b=raw(0x3087800,0x40)
-          for i in range(0,len(b),8):
-              print(f'QMETA field_off=0x{i:x} qword=0x{struct.unpack_from("<Q",b,i)[0]:x}')
-          print('TRACK_A_QMETAOBJECT_3087800_WORDS_END=true')
+          pid="$(tr -cd '0-9' <"$runtime/client.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -r "/proc/$pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          kill -0 "$pid"
+          echo TRACK_A_LIVE_CLIENT_PID="$pid"
 
-          # Qt metaobject at 0x3087800 references these regions directly.
-          for va,n,label in [
-              (0x1cd8600,0x800,'STRINGDATA_AROUND_1CD8820'),
-              (0x1cd8800,0x900,'STRINGDATA_AROUND_1CD8A54'),
-              (0x2f6a900,0x600,'METADATA_AROUND_2F6AB00'),
-          ]:
-              print(f'TRACK_A_{label}_BEGIN=true')
-              ascii_runs(va,n,2)
-              print(f'TRACK_A_{label}_END=true')
+          old_gdb="$(tr -cd '0-9' <"$runtime/dynamic-map-gdb.pid" 2>/dev/null || true)"
+          if [[ -n "$old_gdb" ]] && kill -0 "$old_gdb" 2>/dev/null; then
+            kill -INT "$old_gdb" 2>/dev/null || true
+            for _ in $(seq 1 30); do
+              kill -0 "$old_gdb" 2>/dev/null || break
+              sleep .1
+            done
+          fi
 
-          # Print metadata as u32 around the pointer carried in the QMetaObject.
-          for va in [0x1cd8820,0x1cd8a54,0x2f6ab00]:
-              b=raw(va,0x180)
-              if b is None: continue
-              print(f'TRACK_A_U32_DUMP_BEGIN va=0x{va:x}')
-              for i in range(0,len(b),16):
-                  vals=struct.unpack_from('<IIII',b,i)
-                  print(f'U32 va=0x{va+i:x} values='+','.join(f'0x{x:x}' for x in vals))
-              print(f'TRACK_A_U32_DUMP_END va=0x{va:x}')
+          base="$(awk -v exe="$client" 'index($0,exe) && $3=="00000000" {split($1,a,"-"); print "0x" a[1]; exit}' "/proc/$pid/maps")"
+          [[ "$base" =~ ^0x[0-9a-fA-F]+$ ]]
+          echo TRACK_A_CLIENT_PIE_BASE="$base"
 
-          # Scan the whole file for highly relevant method-name fragments, preserving VA.
-          needles=[b'map',b'Map',b'tile',b'Tile',b'thing',b'Thing',b'creature',b'Creature',b'position',b'Position']
-          print('TRACK_A_RELEVANT_STRING_HITS_BEGIN=true')
-          for needle in needles:
-              start=0; seen=0
-              while True:
-                  pos=data.find(needle,start)
-                  if pos<0:break
-                  # Convert file offset back to VA.
-                  va=None
-                  for lo,hi,off in loads:
-                      if off<=pos<off+(hi-lo): va=lo+(pos-off); break
-                  if va is not None:
-                      l=pos
-                      while l>0 and 32<=data[l-1]<127 and pos-l<80:l-=1
-                      r=pos
-                      while r<len(data) and 32<=data[r]<127 and r-l<200:r+=1
-                      print(f'HIT needle={needle.decode()} va=0x{va:x} text={data[l:r].decode("ascii","replace")!r}')
-                      seen+=1
-                      if seen>=80: break
-                  start=pos+1
-          print('TRACK_A_RELEVANT_STRING_HITS_END=true')
-          PY
+          log="$runtime/worldmap-mutation-events.log"
+          cmd="$runtime/worldmap-mutation-observer.gdb"
+          : >"$log"
+          chmod 600 "$log"
+          cat >"$cmd" <<GDB
+          set pagination off
+          set confirm off
+          set breakpoint pending on
+          set logging file $log
+          set logging overwrite off
+          set logging enabled on
+          set \$base = $base
 
-          echo TRACK_A_QT_METAOBJECT_METHOD_DECODE_COMPLETE=true
+          hbreak *(\$base + 0xcecc70)
+          commands
+            silent
+            printf "WORLDMAP_EVENT handler=CreateOnMap offset=0xcecc70 pc=%p rdi=%p rsi=%p rdx=%p rcx=%p r8=%p r9=%p rsp=%p\\n", \$pc, \$rdi, \$rsi, \$rdx, \$rcx, \$r8, \$r9, \$rsp
+            printf "WORLDMAP_ARG_RAW handler=CreateOnMap arg_rsi=%p\\n", \$rsi
+            x/16gx \$rsi
+            continue
+          end
+
+          hbreak *(\$base + 0xcecf40)
+          commands
+            silent
+            printf "WORLDMAP_EVENT handler=ChangeOnMap offset=0xcecf40 pc=%p rdi=%p rsi=%p rdx=%p rcx=%p r8=%p r9=%p rsp=%p\\n", \$pc, \$rdi, \$rsi, \$rdx, \$rcx, \$r8, \$r9, \$rsp
+            printf "WORLDMAP_ARG_RAW handler=ChangeOnMap arg_rsi=%p\\n", \$rsi
+            x/16gx \$rsi
+            continue
+          end
+
+          hbreak *(\$base + 0xcd4e20)
+          commands
+            silent
+            printf "WORLDMAP_EVENT handler=DeleteOnMap offset=0xcd4e20 pc=%p rdi=%p rsi=%p rdx=%p rcx=%p r8=%p r9=%p rsp=%p\\n", \$pc, \$rdi, \$rsi, \$rdx, \$rcx, \$r8, \$r9, \$rsp
+            printf "WORLDMAP_ARG_RAW handler=DeleteOnMap arg_rsi=%p\\n", \$rsi
+            x/16gx \$rsi
+            continue
+          end
+
+          printf "WORLDMAP_OBSERVER_ARMED pid=$pid base=$base schema=raw-v1\\n"
+          continue
+          GDB
+          chmod 600 "$cmd"
+
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$gdb" ]]
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            nohup "$gdb" -q -nx -p "$pid" -x "$cmd" >"$runtime/worldmap-mutation-gdb.stdout" 2>&1 </dev/null &
+          gdb_pid=$!
+          printf '%s\n' "$gdb_pid" >"$runtime/dynamic-map-gdb.pid"
+          printf '%s\n' "$gdb_pid" >"$runtime/worldmap-mutation-gdb.pid"
+          chmod 600 "$runtime/dynamic-map-gdb.pid" "$runtime/worldmap-mutation-gdb.pid"
+          sleep 3
+          kill -0 "$pid"
+          kill -0 "$gdb_pid"
+          grep -q 'WORLDMAP_OBSERVER_ARMED' "$log"
+
+          echo TRACK_A_POST_LOGIN_ATTACH_STABLE=true
+          echo TRACK_A_WORLDMAP_MUTATION_OBSERVER_ARMED=true
+          echo TRACK_A_WORLDMAP_MUTATION_SCHEMA=raw-v1
+          echo TRACK_A_WORLDMAP_MUTATION_GDB_PID="$gdb_pid"
+          echo TRACK_A_WORLDMAP_MUTATION_EVENT_COUNT="$(grep -c '^WORLDMAP_EVENT ' "$log" || true)"

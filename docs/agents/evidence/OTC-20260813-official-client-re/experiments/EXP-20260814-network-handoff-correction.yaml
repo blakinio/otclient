@@ -1,0 +1,58 @@
+schema: otclient.tibia-re.experiment.v1
+experiment_id: EXP-20260814-network-handoff-correction
+track: official-client-re
+alias: OTCLIENT-TIBIA-RE
+created_at: 2026-08-14T18:55:00+02:00
+recovery_branch: ci/OTC-20260814-track-a-chatgpt-framing-recovery
+client:
+  version: 15.32.df7b29
+  size: 51965216
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+re_audited_runs:
+  - {run: 31805205225, job: 94782356408, result: SUCCESS}
+  - {run: 31805264031, job: 94782546544, result: SUCCESS}
+  - {run: 31821085647, job: 94834146391, result: SUCCESS}
+facts:
+  connection_site: '0x19716a3'
+  sender_pointer_source: '[owner+0x88]'
+  sender_class: tibia::protocol::TProtocolMessageQueue
+  signal_wrapper: '0xde91b0'
+  receiver: containing_owner
+  explicit_slot_storage_r8: null
+  slot_object:
+    allocation_size: '0x18'
+    invoker: '0x7dd630'
+    payload_plus_0x10: containing_owner_pointer
+  primary_owner_vtable_candidate: '0x308c408'
+  primary_vtable_plus_0x90: '0x8409d0'
+  qiodevice_write_qbytearray_plt: '0x4de370'
+  confirmed_direct_write_callsites:
+    - '0x7dd563'
+    - '0xb4066b'
+    - '0xb46c75'
+    - '0xc4a848'
+    - '0xd08642'
+disproven:
+  - clientMessageReadyToProcess dispatches via owner virtual slot +0x90
+  - slot payload for connection 0x19716a3 is pointer-to-member '{0x91,0}'
+  - primary vtable +0x90 at 0x8409d0 is proven queue consumer by this connection
+  - 0x2f66288 +0xb8 equals 0xb5b880
+  - 0xb5b880 is a conventional function entry
+  - proven chain 0x8409d0 -> subobject +0xb8 -> 0xb5b880
+root_cause: >-
+  The earlier generic backward parser crossed an adjacent QObject::connectImpl setup.
+  The value 0x91 was written for the preceding connection at 0x1971595 and was
+  incorrectly attributed to the later clientMessageReadyToProcess connection at 0x19716a3.
+unknowns:
+  - exact callable path implemented by QSlotObject invoker 0x7dd630
+  - exact serializer
+  - exact framing
+  - exact encryption/compression stage if any
+  - final network write site
+next_action: >-
+  disassemble and classify 0x7dd630, recover its call-operation branch and concrete owner
+  consumer target, then prove a structural path from that consumer toward confirmed
+  QIODevice::write candidates or an indirect/virtual write path
+safety:
+  effect: static_read_only
+  track_b_runtime: OUT_OF_SCOPE

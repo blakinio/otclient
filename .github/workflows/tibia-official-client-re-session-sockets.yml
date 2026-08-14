@@ -1,4 +1,4 @@
-name: Track A provenance overlap analysis
+name: Track A preserve with-item provenance
 on:
   push:
     branches:
@@ -16,12 +16,17 @@ jobs:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
     steps:
-      - name: Compare only overlapping baseline coordinates
+      - name: Preserve with-item reload dataset
         shell: bash
         run: |
           set -Eeuo pipefail
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
-          baseline="$state/evidence/item-provenance-baseline/baseline.txt"
-          reload="$state/evidence/item-provenance-reload/records.txt"
-          [[ -s "$baseline" && -s "$reload" ]]
-          python3 -c 'import sys,collections; b=[tuple(map(int,l.split())) for l in open(sys.argv[1]) if len(l.split())==5]; rr=[tuple(map(int,l.split())) for l in open(sys.argv[2]) if len(l.split())==6]; p=[(r[1],r[2],r[3],r[4],r[5]) for r in rr]; bxy={(r[0],r[1],r[2]) for r in b}; pxy={(r[0],r[1],r[2]) for r in p}; overlap=bxy&pxy; bs={r for r in b if r[:3] in overlap}; ps={r for r in p if r[:3] in overlap}; added=sorted(ps-bs); removed=sorted(bs-ps); print("TRACK_A_OVERLAP_COORDS="+str(len(overlap))); print("TRACK_A_OVERLAP_ADDED_COUNT="+str(len(added))); [print("TRACK_A_OVERLAP_ADDED="+" ".join(map(str,r))) for r in added]; print("TRACK_A_OVERLAP_REMOVED_COUNT="+str(len(removed))); [print("TRACK_A_OVERLAP_REMOVED="+" ".join(map(str,r))) for r in removed]; print("TRACK_A_OVERLAP_ANALYSIS_PROVEN=true")' "$baseline" "$reload"
+          src="$state/evidence/item-provenance-reload/records.txt"
+          dst="$state/evidence/item-provenance-with-item"
+          [[ -s "$src" ]]
+          rm -rf "$dst"; mkdir -p "$dst"
+          cp "$src" "$dst/records.txt"
+          sha256sum "$dst/records.txt" > "$dst/records.sha256"
+          echo TRACK_A_WITH_ITEM_RECORDS="$(wc -l < "$dst/records.txt")"
+          echo TRACK_A_WITH_ITEM_SHA256="$(sha256sum "$dst/records.txt" | awk '{print $1}')"
+          echo TRACK_A_WITH_ITEM_DATASET_PRESERVED=true

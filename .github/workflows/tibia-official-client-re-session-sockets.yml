@@ -37,14 +37,18 @@ jobs:
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
 
-          pid="$(tr -cd '0-9' <"$runtime/client.pid" 2>/dev/null || true)"
+          [[ -r "$runtime/client.pid" ]]
+          pid="$(tr -cd '0-9' <"$runtime/client.pid")"
           [[ -n "$pid" && -r "/proc/$pid/environ" ]]
           grep -azFxq "$marker" "/proc/$pid/environ"
           [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
           kill -0 "$pid"
           echo TRACK_A_LIVE_CLIENT_PID="$pid"
 
-          old_gdb="$(tr -cd '0-9' <"$runtime/dynamic-map-gdb.pid" 2>/dev/null || true)"
+          old_gdb=''
+          if [[ -r "$runtime/dynamic-map-gdb.pid" ]]; then
+            old_gdb="$(tr -cd '0-9' <"$runtime/dynamic-map-gdb.pid")"
+          fi
           if [[ -n "$old_gdb" ]] && kill -0 "$old_gdb" 2>/dev/null; then
             kill -INT "$old_gdb" 2>/dev/null || true
             for _ in $(seq 1 30); do kill -0 "$old_gdb" 2>/dev/null || break; sleep .1; done

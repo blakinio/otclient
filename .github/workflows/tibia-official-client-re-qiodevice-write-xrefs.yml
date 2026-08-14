@@ -1,0 +1,170 @@
+name: Track A QIODevice write xrefs
+
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-chatgpt-framing-recovery]
+    paths: [.github/workflows/tibia-official-client-re-qiodevice-write-xrefs.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Recover exact direct QIODevice write callsites
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then
+            state="$LEGACY_IMAGE_STATE"
+          else
+            state="$CANONICAL_STATE"
+          fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          report="$RUNNER_TEMP/track-a-qiodevice-write-xrefs.txt"
+          candidates="$RUNNER_TEMP/track-a-qiodevice-write-candidates.txt"
+          : >"$report"
+          : >"$candidates"
+          exec > >(tee -a "$report") 2>&1
+
+          python3 -u - "$client" "$candidates" <<'PY'
+          import struct
+          import sys
+
+          path, out_path = sys.argv[1:]
+          data = open(path, 'rb').read()
+          write_plt = 0x4de370
+          qtcp_ctor = 0x4ddbc0
+          root = 0xb5b880
+
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          exec_segments = []
+          all_segments = []
+          for index in range(phnum):
+              off = phoff + index * phentsz
+              typ, flags, file_off, va, _, file_size, _, _ = struct.unpack_from('<IIQQQQQQ', data, off)
+              if typ != 1 or not file_size:
+                  continue
+              row = (file_off, file_off + file_size, va, flags)
+              all_segments.append(row)
+              if flags & 1:
+                  exec_segments.append(row)
+
+          def executable(va):
+              for file_start, file_end, base, flags in exec_segments:
+                  if base <= va < base + (file_end - file_start):
+                      return True
+              return False
+
+          direct_calls = []
+          direct_jumps = []
+          all_call_targets = {}
+          for file_start, file_end, base, _ in exec_segments:
+              blob = data[file_start:file_end]
+              for pos in range(0, len(blob) - 5):
+                  opcode = blob[pos]
+                  if opcode not in (0xE8, 0xE9):
+                      continue
+                  site = base + pos
+                  target = site + 5 + struct.unpack_from('<i', blob, pos + 1)[0]
+                  if not executable(target) and target != write_plt:
+                      continue
+                  if opcode == 0xE8:
+                      all_call_targets.setdefault(target, []).append(site)
+                      if target == write_plt:
+                          direct_calls.append(site)
+                  elif target == write_plt:
+                      direct_jumps.append(site)
+
+          selected_root_targets = []
+          for file_start, file_end, base, _ in exec_segments:
+              if not (base <= root < base + (file_end - file_start)):
+                  continue
+              root_off = file_start + (root - base)
+              stop = min(file_end, root_off + 0x1000)
+              blob = data[root_off:stop]
+              for pos in range(0, len(blob) - 5):
+                  if blob[pos] != 0xE8:
+                      continue
+                  site = root + pos
+                  target = site + 5 + struct.unpack_from('<i', blob, pos + 1)[0]
+                  if executable(target) and target not in selected_root_targets:
+                      selected_root_targets.append(target)
+              break
+
+          print('TRACK_A_QIODEVICE_WRITE_XREFS_BEGIN=true')
+          print(f'CLIENT_SHA256={__import__("hashlib").sha256(data).hexdigest()}')
+          print(f'CLIENT_SIZE={len(data)}')
+          print(f'QIODEVICE_WRITE_PLT=0x{write_plt:x}')
+          print(f'QTCP_SOCKET_CTOR_PLT=0x{qtcp_ctor:x}')
+          print(f'PROVEN_FORWARD_ROOT=0x{root:x}')
+          print(f'RAW_DIRECT_WRITE_CALL_CANDIDATES={len(direct_calls)}')
+          print(f'RAW_DIRECT_WRITE_JUMP_CANDIDATES={len(direct_jumps)}')
+          for site in direct_calls:
+              print(f'WRITE_CALL_CANDIDATE site=0x{site:x}')
+          for site in direct_jumps:
+              print(f'WRITE_JUMP_CANDIDATE site=0x{site:x}')
+          print(f'ROOT_DIRECT_EXEC_TARGET_COUNT={len(selected_root_targets)}')
+          for target in selected_root_targets:
+              callers = all_call_targets.get(target, [])
+              print(
+                  f'ROOT_TARGET target=0x{target:x} global_direct_callers={len(callers)} '
+                  f'caller_sites={",".join(hex(x) for x in callers[:64]) if callers else "none"}'
+              )
+          with open(out_path, 'w') as handle:
+              for site in direct_calls:
+                  handle.write(f'call\t0x{site:x}\n')
+              for site in direct_jumps:
+                  handle.write(f'jump\t0x{site:x}\n')
+          print('TRACK_A_QIODEVICE_WRITE_XREF_SCAN_COMPLETE=true')
+          PY
+
+          count=0
+          while IFS=$'\t' read -r kind site; do
+            [[ "$site" =~ ^0x[0-9a-f]+$ ]] || continue
+            (( count += 1 ))
+            (( count <= 64 )) || break
+            lo=$(printf '0x%x' $((site-768)))
+            hi=$(printf '0x%x' $((site+384)))
+            echo "WRITE_XREF_NEIGHBORHOOD_BEGIN kind=$kind site=$site lo=$lo hi=$hi"
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $lo,$hi" || true
+            echo "WRITE_XREF_NEIGHBORHOOD_END kind=$kind site=$site"
+          done <"$candidates"
+
+          echo 'GDB_QIODEVICE_WRITE_SYMBOL_BEGIN=true'
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'info functions QIODevice::write' \
+            -ex 'info functions QAbstractSocket' \
+            -ex 'info functions QTcpSocket' || true
+          echo 'GDB_QIODEVICE_WRITE_SYMBOL_END=true'
+
+          echo 'TRACK_A_QIODEVICE_WRITE_XREFS_COMPLETE=true'
+          grep -q '^TRACK_A_QIODEVICE_WRITE_XREFS_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version write-xref report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-qiodevice-write-xrefs-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-qiodevice-write-xrefs.txt
+          if-no-files-found: error
+          retention-days: 7

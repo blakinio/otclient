@@ -36,4 +36,6 @@ The exact completion markers were `TOTAL_QT_CONNECT_CALLSITES=2184` and `TRACK_A
 
 ## Next experiment
 
-Disassemble bounded neighborhoods for the 41 legacy string-based `QObject::connect` callsites. Recover candidate signal/slot string argument setup where structurally visible, classify every callsite or leave it explicitly `UNCLASSIFIED`, and use the result to decide whether legacy connections expose high-value semantic graph edges before attempting the larger `connectImpl` population.
+Run `31800072490` / job `94765746423` successfully produced all 41 bounded GDB neighborhoods after one failed system-`objdump` availability hypothesis (`31799979849`). The neighborhoods prove that candidate legacy calls commonly load signal and slot string pointers into `rdx` and `r8` immediately before the call, but the raw neighborhood log does not itself validate every pointed-to string.
+
+Next, structurally resolve the nearest printable C-string targets loaded into `rdx` and `r8` for every legacy callsite. Classify every callsite as a recovered candidate edge or explicit `UNCLASSIFIED`, then decide whether any edge belongs to a high-value Tibia protocol/storage/controller path before attempting the larger `connectImpl` population.

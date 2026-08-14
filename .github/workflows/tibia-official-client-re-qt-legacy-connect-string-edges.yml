@@ -1,0 +1,120 @@
+name: Track A Qt legacy connect string edges
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qt-legacy-connect-string-edges.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Recover bounded legacy QObject string edges
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct
+          import sys
+
+          data = open(sys.argv[1], 'rb').read()
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          loads = []
+          execs = []
+          for index in range(phnum):
+              offset = phoff + index * phentsz
+              typ, flags, file_offset, va, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', data, offset)
+              if typ != 1:
+                  continue
+              loads.append((file_offset, file_offset + filesz, va, va + filesz))
+              if flags & 1:
+                  execs.append((file_offset, file_offset + filesz, va))
+
+          def va_to_offset(va):
+              for file_start, file_end, va_start, va_end in loads:
+                  if va_start <= va < va_end:
+                      return file_start + (va - va_start)
+              return None
+
+          def cstring(va):
+              offset = va_to_offset(va)
+              if offset is None:
+                  return None
+              end = data.find(b'\0', offset, min(len(data), offset + 512))
+              if end < 0:
+                  return None
+              raw = data[offset:end]
+              if not raw or any(byte < 0x20 or byte > 0x7e for byte in raw):
+                  return None
+              return raw.decode('ascii')
+
+          legacy_connect_plt = 0x4dffd0
+          callsites = []
+          for file_start, file_end, va_start in execs:
+              for offset in range(file_start, file_end - 4):
+                  if data[offset] != 0xE8:
+                      continue
+                  relative = struct.unpack_from('<i', data, offset + 1)[0]
+                  source = va_start + (offset - file_start)
+                  if source + 5 + relative == legacy_connect_plt:
+                      callsites.append((offset, source))
+
+          print('TRACK_A_QT_LEGACY_STRING_EDGES_BEGIN=true')
+          classified = 0
+          unclassified = 0
+          for ordinal, (call_offset, callsite) in enumerate(callsites):
+              candidates = {'signal': [], 'slot': []}
+              for offset in range(max(0, call_offset - 0x60), call_offset - 6):
+                  register = None
+                  if data[offset:offset + 3] == b'\x48\x8d\x15':
+                      register = 'signal'
+                  elif data[offset:offset + 3] == b'\x4c\x8d\x05':
+                      register = 'slot'
+                  if register is None:
+                      continue
+                  instruction_va = callsite - (call_offset - offset)
+                  displacement = struct.unpack_from('<i', data, offset + 3)[0]
+                  target = instruction_va + 7 + displacement
+                  value = cstring(target)
+                  if value is not None:
+                      candidates[register].append((instruction_va, target, value))
+              signal = candidates['signal'][-1] if candidates['signal'] else None
+              slot = candidates['slot'][-1] if candidates['slot'] else None
+              if signal and slot:
+                  classified += 1
+                  print(
+                      f'EDGE ordinal={ordinal} call=0x{callsite:x} '
+                      f'signal_va=0x{signal[1]:x} signal={signal[2]!r} '
+                      f'slot_va=0x{slot[1]:x} slot={slot[2]!r}'
+                  )
+              else:
+                  unclassified += 1
+                  print(
+                      f'UNCLASSIFIED ordinal={ordinal} call=0x{callsite:x} '
+                      f'signal_candidate={signal!r} slot_candidate={slot!r}'
+                  )
+          print(f'LEGACY_STRING_EDGE_TOTAL={len(callsites)}')
+          print(f'LEGACY_STRING_EDGE_CLASSIFIED={classified}')
+          print(f'LEGACY_STRING_EDGE_UNCLASSIFIED={unclassified}')
+          assert classified + unclassified == len(callsites)
+          print('TRACK_A_QT_LEGACY_STRING_EDGES_COMPLETE=true')
+          PY

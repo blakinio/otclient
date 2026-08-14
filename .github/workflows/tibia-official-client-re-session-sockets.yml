@@ -20,7 +20,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Arm raw observer on CreateOnMap ChangeOnMap DeleteOnMap
+      - name: Arm raw-v2 observer on CreateOnMap ChangeOnMap DeleteOnMap
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -73,31 +73,76 @@ jobs:
           hbreak *(\$base + 0xcecc70)
           commands
             silent
+            set \$m = \$rsi
             printf "WORLDMAP_EVENT handler=CreateOnMap offset=0xcecc70 pc=%p rdi=%p rsi=%p rdx=%p rcx=%p r8=%p r9=%p rsp=%p\\n", \$pc, \$rdi, \$rsi, \$rdx, \$rcx, \$r8, \$r9, \$rsp
-            printf "WORLDMAP_ARG_RAW handler=CreateOnMap arg_rsi=%p\\n", \$rsi
-            x/16gx \$rsi
+            printf "WORLDMAP_ARG_RAW handler=CreateOnMap arg_rsi=%p\\n", \$m
+            x/16gx \$m
+            set \$coord = *(void **)(\$m + 0x18)
+            set \$thing = *(void **)(\$m + 0x20)
+            set \$stack = *(unsigned int *)(\$m + 0x28)
+            printf "WORLDMAP_CANDIDATE handler=CreateOnMap coord_ptr=%p thing_ptr=%p stack_u32=%u\\n", \$coord, \$thing, \$stack
+            if \$coord != 0
+              printf "WORLDMAP_COORD_RAW handler=CreateOnMap ptr=%p\\n", \$coord
+              x/12wx \$coord
+              printf "WORLDMAP_COORD_CANDIDATE handler=CreateOnMap x_u32=%u y_u32=%u z_u32=%u\\n", *(unsigned int *)(\$coord + 0x18), *(unsigned int *)(\$coord + 0x1c), *(unsigned int *)(\$coord + 0x20)
+            end
+            if \$thing != 0
+              printf "WORLDMAP_THING_RAW handler=CreateOnMap ptr=%p\\n", \$thing
+              x/16gx \$thing
+            end
             continue
           end
 
           hbreak *(\$base + 0xcecf40)
           commands
             silent
+            set \$m = \$rsi
             printf "WORLDMAP_EVENT handler=ChangeOnMap offset=0xcecf40 pc=%p rdi=%p rsi=%p rdx=%p rcx=%p r8=%p r9=%p rsp=%p\\n", \$pc, \$rdi, \$rsi, \$rdx, \$rcx, \$r8, \$r9, \$rsp
-            printf "WORLDMAP_ARG_RAW handler=ChangeOnMap arg_rsi=%p\\n", \$rsi
-            x/16gx \$rsi
+            printf "WORLDMAP_ARG_RAW handler=ChangeOnMap arg_rsi=%p\\n", \$m
+            x/16gx \$m
+            set \$variant_bits = *(unsigned int *)(\$m + 0x10)
+            set \$coord = *(void **)(\$m + 0x18)
+            set \$thing = *(void **)(\$m + 0x20)
+            set \$stack = *(unsigned int *)(\$m + 0x28)
+            printf "WORLDMAP_CANDIDATE handler=ChangeOnMap variant_u32=0x%x coord_ptr=%p thing_ptr=%p stack_u32=%u\\n", \$variant_bits, \$coord, \$thing, \$stack
+            if \$coord != 0
+              printf "WORLDMAP_COORD_RAW handler=ChangeOnMap ptr=%p\\n", \$coord
+              x/12wx \$coord
+              printf "WORLDMAP_COORD_CANDIDATE handler=ChangeOnMap x_u32=%u y_u32=%u z_u32=%u\\n", *(unsigned int *)(\$coord + 0x18), *(unsigned int *)(\$coord + 0x1c), *(unsigned int *)(\$coord + 0x20)
+            end
+            if \$thing != 0
+              printf "WORLDMAP_THING_RAW handler=ChangeOnMap ptr=%p\\n", \$thing
+              x/16gx \$thing
+            end
             continue
           end
 
           hbreak *(\$base + 0xcd4e20)
           commands
             silent
+            set \$m = \$rsi
             printf "WORLDMAP_EVENT handler=DeleteOnMap offset=0xcd4e20 pc=%p rdi=%p rsi=%p rdx=%p rcx=%p r8=%p r9=%p rsp=%p\\n", \$pc, \$rdi, \$rsi, \$rdx, \$rcx, \$r8, \$r9, \$rsp
-            printf "WORLDMAP_ARG_RAW handler=DeleteOnMap arg_rsi=%p\\n", \$rsi
-            x/16gx \$rsi
+            printf "WORLDMAP_ARG_RAW handler=DeleteOnMap arg_rsi=%p\\n", \$m
+            x/16gx \$m
+            set \$case = *(unsigned int *)(\$m + 0x1c)
+            printf "WORLDMAP_DELETE_CANDIDATE case_u32=%u payload_qword_10=%p\\n", \$case, *(void **)(\$m + 0x10)
+            if \$case == 1
+              set \$p1 = *(void **)(\$m + 0x10)
+              if \$p1 != 0
+                printf "WORLDMAP_DELETE_CASE1_RAW p1=%p\\n", \$p1
+                x/12gx \$p1
+                set \$coord = *(void **)(\$p1 + 0x18)
+                if \$coord != 0
+                  printf "WORLDMAP_COORD_RAW handler=DeleteOnMap ptr=%p\\n", \$coord
+                  x/12wx \$coord
+                  printf "WORLDMAP_COORD_CANDIDATE handler=DeleteOnMap x_u32=%u y_u32=%u z_u32=%u\\n", *(unsigned int *)(\$coord + 0x18), *(unsigned int *)(\$coord + 0x1c), *(unsigned int *)(\$coord + 0x20)
+                end
+              end
+            end
             continue
           end
 
-          printf "WORLDMAP_OBSERVER_ARMED pid=$pid base=$base schema=raw-v1\\n"
+          printf "WORLDMAP_OBSERVER_ARMED pid=$pid base=$base schema=raw-v2\\n"
           continue
           GDB
           chmod 600 "$cmd"
@@ -117,6 +162,6 @@ jobs:
 
           echo TRACK_A_POST_LOGIN_ATTACH_STABLE=true
           echo TRACK_A_WORLDMAP_MUTATION_OBSERVER_ARMED=true
-          echo TRACK_A_WORLDMAP_MUTATION_SCHEMA=raw-v1
+          echo TRACK_A_WORLDMAP_MUTATION_SCHEMA=raw-v2
           echo TRACK_A_WORLDMAP_MUTATION_GDB_PID="$gdb_pid"
           echo TRACK_A_WORLDMAP_MUTATION_EVENT_COUNT="$(grep -c '^WORLDMAP_EVENT ' "$log" || true)"

@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-      - name: Capture decoded map records for controlled one-tile moves
+      - name: Baseline scan around player with type ids
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -37,7 +37,7 @@ jobs:
           [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           window=''; for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$'); do g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w")"; [[ "$(sed -n 's/^WIDTH=//p'<<<"$g")" == 1020 && "$(sed -n 's/^HEIGHT=//p'<<<"$g")" == 650 ]] && { window="$w"; break; }; done; [[ -n "$window" ]]
           line="$(grep -F "$client" "/proc/$pid/maps"|awk '$2~/r-xp/{print;exit}')"; start="$(awk '{split($1,a,"-");print a[1]}'<<<"$line")"; off="$(awk '{print $3}'<<<"$line")"; bias=$((16#$start-16#$off))
-          evidence="$state/evidence/aware-range-$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$evidence"; records="$evidence/records.txt"; :>"$records"
+          evidence="$state/evidence/baseline-item-scan"; rm -rf "$evidence"; mkdir -p "$evidence"; records="$evidence/records.txt"; :>"$records"
           cat >"$evidence/probe.gdb" <<EOF
           set pagination off
           set confirm off
@@ -49,33 +49,44 @@ jobs:
             def __init__(self): super().__init__('*0x%x'%($bias+0x19a8ea3))
             def stop(self):
               try:
-                rsp=int(gdb.parse_and_eval('\$rsp')); order=int(gdb.parse_and_eval('\$rbp'))&0xffffffff
+                rsp=int(gdb.parse_and_eval('\\$rsp')); order=int(gdb.parse_and_eval('\\$rbp'))&0xffffffff; obj=int(gdb.parse_and_eval('\\$rbx'))
                 x,y,z=struct.unpack('<III',bytes(inf.read_memory(rsp+0x88,12)))
                 if 0<x<100000 and 0<y<100000 and z<32 and order<128:
-                  with open(out,'a') as f:f.write(f'{time.time_ns()} {x} {y} {z} {order}\n')
+                  tid=-1
+                  if obj:
+                    try: tid=struct.unpack('<I',bytes(inf.read_memory(obj+0x30,4)))[0]
+                    except Exception: pass
+                  with open(out,'a') as f:f.write(f'{time.time_ns()} {x} {y} {z} {order} {tid}\\n')
               except Exception: pass
               return False
           B()
           end
           continue
           EOF
-          gdb -q -nx -batch -x "$evidence/probe.gdb" >"$evidence/gdb.log" 2>&1 & gp=$!; sleep 2
+          "$toolroot/usr/bin/gdb" -q -nx -batch -x "$evidence/probe.gdb" >"$evidence/gdb.log" 2>&1 & gp=$!; sleep 2
           "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
-          echo PHASE=BASE >>"$evidence/phases.txt"; sleep 1
-          for pair in 'RIGHT Right Left' 'LEFT Left Right' 'UP Up Down' 'DOWN Down Up'; do set -- $pair; name=$1; key=$2; back=$3; echo "PHASE=$name START=$(date +%s%N)" >>"$evidence/phases.txt"; "$toolroot/usr/bin/xdotool" key "$key"; sleep 1.2; echo "PHASE=$name END=$(date +%s%N)" >>"$evidence/phases.txt"; "$toolroot/usr/bin/xdotool" key "$back"; sleep 1.2; done
+          echo "BASELINE_START=$(date +%s%N)" >"$evidence/phases.txt"
+          for key in Right Down Left Up; do echo "MOVE=$key START=$(date +%s%N)" >>"$evidence/phases.txt"; "$toolroot/usr/bin/xdotool" key "$key"; sleep 1.5; echo "MOVE=$key END=$(date +%s%N)" >>"$evidence/phases.txt"; done
+          echo "BASELINE_END=$(date +%s%N)" >>"$evidence/phases.txt"
           kill -INT "$gp" 2>/dev/null || true; sleep 1; kill -CONT "$pid" 2>/dev/null || true
           python3 - "$records" <<'PY'
-          import sys
+          import sys,collections
           rows=[]
           for l in open(sys.argv[1]):
-            p=l.split();
-            if len(p)==5: rows.append(tuple(map(int,p)))
-          print('TRACK_A_RECORDS',len(rows))
+            p=l.split()
+            if len(p)==6:
+              try: rows.append(tuple(map(int,p)))
+              except: pass
           if not rows: raise SystemExit(1)
-          xs=[r[1] for r in rows]; ys=[r[2] for r in rows]; zs=[r[3] for r in rows]
-          print('TRACK_A_X_MIN',min(xs)); print('TRACK_A_X_MAX',max(xs)); print('TRACK_A_X_SPAN',max(xs)-min(xs)+1)
-          print('TRACK_A_Y_MIN',min(ys)); print('TRACK_A_Y_MAX',max(ys)); print('TRACK_A_Y_SPAN',max(ys)-min(ys)+1)
-          print('TRACK_A_Z_MIN',min(zs)); print('TRACK_A_Z_MAX',max(zs)); print('TRACK_A_Z_VALUES',','.join(map(str,sorted(set(zs)))))
-          print('TRACK_A_UNIQUE_XYZ',len(set((r[1],r[2],r[3]) for r in rows)))
+          print('TRACK_A_BASELINE_RECORDS='+str(len(rows)))
+          print('TRACK_A_BASELINE_Z_VALUES='+','.join(map(str,sorted({r[3] for r in rows}))))
+          print('TRACK_A_BASELINE_UNIQUE_XYZ='+str(len({(r[1],r[2],r[3]) for r in rows})))
+          tids=sorted({r[5] for r in rows if 0 <= r[5] < 1000000})
+          print('TRACK_A_BASELINE_DISTINCT_TYPE_IDS='+str(len(tids)))
+          print('TRACK_A_BASELINE_TYPE_IDS='+','.join(map(str,tids)))
+          # Store canonicalized baseline for later post-drop comparison.
+          with open(sys.argv[1]+'.canonical','w') as f:
+            for r in sorted({(r[1],r[2],r[3],r[4],r[5]) for r in rows}): f.write(' '.join(map(str,r))+'\n')
+          print('TRACK_A_BASELINE_ITEM_SCAN_PROVEN=true')
           PY
           kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"; echo TRACK_A_SESSION_LEFT_RUNNING=true

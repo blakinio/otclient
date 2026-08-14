@@ -124,17 +124,9 @@ jobs:
           self="$(hostname)"
           runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
           [[ -n "$runner_ip" ]]
-          ss -ltnp 2>/dev/null | grep ':6081' || true
           curl -fsS --max-time 5 -o /tmp/track-a-target-root.html "http://${runner_ip}:6081/"
           grep -q 'Track A Tibia noVNC' /tmp/track-a-target-root.html
           echo TRACK_A_DSM_TARGET_DIRECT_REACHABLE=true
-
-          gateway="$(ip route show default 2>/dev/null | awk '{print $3; exit}')"
-          if [[ -n "$gateway" ]] && curl -fsS --max-time 3 -o /tmp/track-a-dsm-proxy.html "http://${gateway}:6082/" 2>/dev/null && grep -q 'Track A Tibia noVNC' /tmp/track-a-dsm-proxy.html; then
-            echo TRACK_A_DSM_REVERSE_PROXY_E2E=true
-          else
-            echo TRACK_A_DSM_REVERSE_PROXY_E2E_FROM_CONTAINER=UNAVAILABLE
-          fi
 
           echo TRACK_A_X11VNC_READY=true
           echo TRACK_A_NOVNC_READY=true

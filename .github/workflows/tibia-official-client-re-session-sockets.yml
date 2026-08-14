@@ -20,7 +20,7 @@ jobs:
       TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Inspect candidate thing object memory
+      - name: Capture structural map stack type ids
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -36,21 +36,24 @@ jobs:
           [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           window=''; for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"; [[ "$(printf '%s\n' "$g"|sed -n 's/^WIDTH=//p')" == 1020 && "$(printf '%s\n' "$g"|sed -n 's/^HEIGHT=//p')" == 650 ]] && { window="$w"; break; }; done; [[ -n "$window" ]]
           line="$(grep -F "$client" "/proc/$pid/maps"|awk '$2~/r-xp/{print;exit}')"; start="$(awk '{split($1,a,"-");print a[1]}'<<<"$line")"; off="$(awk '{print $3}'<<<"$line")"; bias=$((16#$start-16#$off))
-          evidence="$state/evidence/thing-object-$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$evidence"; out="$evidence/hits.txt"; :>"$out"; script="$evidence/probe.gdb"
+          evidence="$state/evidence/type-id-$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$evidence"; out="$evidence/records.txt"; :>"$out"; script="$evidence/probe.gdb"
           printf '%s\n' \
-            'set pagination off' 'set confirm off' "attach $pid" 'python' 'import gdb,struct' 'inf=gdb.selected_inferior()' "out='$out'" 'hits=0' \
-            'def mem(addr,n=128):' '    try: return bytes(inf.read_memory(addr,n)).hex()' '    except: return "UNREADABLE"' \
+            'set pagination off' 'set confirm off' "attach $pid" 'python' 'import gdb,struct,time' 'inf=gdb.selected_inferior()' "out='$out'" \
             'class P(gdb.Breakpoint):' '    def __init__(self):' "        super().__init__('*0x%x' % ($bias+0x19a8ea3))" \
-            '    def stop(self):' '        global hits' '        try:' '            rsp=int(gdb.parse_and_eval("$rsp")); rbp=int(gdb.parse_and_eval("$rbp"))' \
+            '    def stop(self):' '        try:' '            rsp=int(gdb.parse_and_eval("$rsp")); rbp=int(gdb.parse_and_eval("$rbp")); obj=int(gdb.parse_and_eval("$rbx"))' \
             '            x,y,z=struct.unpack("<III",bytes(inf.read_memory(rsp+0x88,12))); order=rbp&0xffffffff' \
-            '            if 0<x<100000 and 0<y<100000 and z<32 and order<16 and hits<12:' \
-            '                regs={r:int(gdb.parse_and_eval("$"+r)) for r in ["rbx","r10","r12","r13","r14"]}' \
-            '                with open(out,"a") as f:' '                    f.write("HIT %d xyz=%d,%d,%d order=%d %s\\n"%(hits,x,y,z,order," ".join("%s=0x%x"%(k,v) for k,v in regs.items())))' \
-            '                    for r in ["rbx","r10","r13","r14"]: f.write("MEM_%s %s\\n"%(r,mem(regs[r],128) if regs[r] else "NULL"))' \
-            '                hits+=1' '        except: pass' '        return False' 'P()' 'end' 'continue' >"$script"
+            '            if 0<x<100000 and 0<y<100000 and z<32 and order<32 and obj:' \
+            '                type_id=struct.unpack("<I",bytes(inf.read_memory(obj+0x30,4)))[0]' \
+            '                kind=struct.unpack("<I",bytes(inf.read_memory(obj+0x38,4)))[0]' \
+            '                if type_id<1000000:' \
+            '                    with open(out,"a") as f:f.write(f"{time.time_ns()//1000} {x} {y} {z} {order} {type_id} {kind} 0x{obj:x}\\n")' \
+            '        except: pass' '        return False' 'P()' 'end' 'continue' >"$script"
           gdb -q -nx -batch -x "$script" >"$evidence/gdb.log" 2>&1 & gp=$!; sleep 2
           "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$toolroot/usr/bin/xdotool" windowfocus --sync "$window" || true
-          "$toolroot/usr/bin/xdotool" key Right; sleep 1.5; "$toolroot/usr/bin/xdotool" key Left || true; sleep 1
+          start_us="$(date +%s%6N)"; "$toolroot/usr/bin/xdotool" key Right; sleep 1.5; end_us="$(date +%s%6N)"; "$toolroot/usr/bin/xdotool" key Left || true; sleep 1
           kill -INT "$gp" 2>/dev/null || true; sleep 1; kill -CONT "$pid" 2>/dev/null || true
-          cat "$out"
+          echo TRACK_A_TYPE_ID_RECORDS_BEGIN
+          awk -v s="$start_us" -v e="$end_us" '$1>=s&&$1<=e {print "REC x="$2" y="$3" z="$4" order="$5" type_id="$6" kind="$7" obj="$8}' "$out"
+          echo TRACK_A_TYPE_ID_RECORDS_END
+          awk -v s="$start_us" -v e="$end_us" '$1>=s&&$1<=e && $4==7 { key=$2 FS $3 FS $5; ids[key]=$6; n++ } END { print "TRACK_A_Z7_RECORDS="n; for(k in ids)u[ids[k]]=1; c=0; for(k in u)c++; print "TRACK_A_Z7_DISTINCT_TYPE_IDS="c }' "$out"
           kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"; echo TRACK_A_SESSION_LEFT_LOGGED_IN=true

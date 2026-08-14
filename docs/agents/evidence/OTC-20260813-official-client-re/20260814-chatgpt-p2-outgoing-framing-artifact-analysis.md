@@ -1,12 +1,15 @@
 # Track A — ChatGPT P2 outgoing framing artifact analysis
 
 Timestamp: 2026-08-14T18:42:00+02:00
+Correction applied: 2026-08-14T18:57:00+02:00
 
 Track: Track A / `official-client-re` / `OTCLIENT-TIBIA-RE` only.
 
+> **SUPERSEDED INTERPRETATION:** the P2 workflow printed `PRIMARY_SLOT_90=0x8409d0`, `SUBOBJECT_VTABLE=0x2f66288`, `SUBOBJECT_SLOT_B8=0xb5b880`, and `DOWNSTREAM_HELPER_ROOT=0xb222a0` as hard-coded labels. Later relocation-aware and connection-site validation disproved the claimed `clientMessageReadyToProcess -> owner virtual +0x90 -> ... -> 0xb5b880` path. The canonical correction is `20260814-chatgpt-network-handoff-correction.md` and machine record `experiments/EXP-20260814-network-handoff-correction.yaml`.
+
 ## Repository / ownership boundary
 
-This checkpoint is intentionally persisted on isolated recovery branch `ci/OTC-20260814-track-a-chatgpt-framing-recovery` because PR #289 head `e4c8334e73b04668a69b4cd2372b865248561ad5` was updated by another writer inside the current 45-minute lease window. No mutation of that writer's active branch/runtime is performed here.
+This checkpoint is persisted on isolated recovery branch `ci/OTC-20260814-track-a-chatgpt-framing-recovery` because PR #289 head `e4c8334e73b04668a69b4cd2372b865248561ad5` was updated by another writer inside the current 45-minute lease window. No mutation of that writer's active branch/runtime is performed here.
 
 ## Exact client fence
 
@@ -32,20 +35,36 @@ artifact:
   report_size_bytes: 345729
 ```
 
-The downloaded report begins with the exact client SHA/size fence and ends with `TRACK_A_OUTGOING_PAYLOAD_CONSUMERS_COMPLETE=true`.
+The report begins with the exact client SHA/size fence and ends with `TRACK_A_OUTGOING_PAYLOAD_CONSUMERS_COMPLETE=true`.
 
-## Reproduced structural chain
+## What the P2 artifact actually proves
 
-The artifact independently reports:
+The workflow source shows the following values were emitted with literal `echo` statements and therefore are **not recovered facts by themselves**:
 
 ```text
 PRIMARY_OWNER_VTABLE=0x308c408
 PRIMARY_SLOT_90=0x8409d0
 SUBOBJECT_VTABLE=0x2f66288
 SUBOBJECT_SLOT_B8=0xb5b880
+DOWNSTREAM_HELPER_ROOT=0xb222a0
 ```
 
-This is consistent with the previously recovered queue-to-owner delegation chain. The concrete next implementation body remains `0xb5b880`.
+Independent later ELF relocation validation does confirm:
+
+```text
+0x308c408 + 0x90 = 0x8409d0
+```
+
+but the Qt connection that carries `clientMessageReadyToProcess` does not use that virtual slot. Instead, it installs a QSlotObject with invoker `0x7dd630`; see the correction evidence.
+
+Independent later ELF validation also proves:
+
+```text
+0x2f66288 + 0xb8 = 0x313cce0
+executable = false
+```
+
+and linear disassembly proves `0xb5b880` lies inside an instruction beginning at `0xb5b87c`, so `0xb5b880` is not a conventional function entry for the claimed vtable slot.
 
 ## Negative protobuf/string evidence
 
@@ -64,7 +83,7 @@ Classification:
 
 - **FACT:** these exact literal names were absent from this exact-binary scan.
 - **DISPROVEN:** an earlier unverified hypothesis that an `OutGoingMessagePayload` literal/envelope was already recovered from this build.
-- **UNKNOWN:** protobuf or another generated serializer can still exist without these exported/literal names; the negative string result does not prove absence of protobuf/generated serialization.
+- **UNKNOWN:** protobuf or another generated serializer can still exist without these exported/literal names; the negative string result does not prove absence of generated serialization.
 
 ## Network symbol surface
 
@@ -77,52 +96,29 @@ QTcpSocket::QTcpSocket(QObject*)@plt   = 0x4ddbc0
 
 `QIODevice`, `QAbstractSocket`, `QTcpSocket`, and `writeData` strings exist in the binary, but no dynamic symbol for `QIODevice::writeData` or `QAbstractSocket::writeData` was recovered by this query.
 
-## Important call-graph correction
-
-The report scans two independent bounded direct-call windows:
+A later exact-binary recovery run (`31821085647`, job `94834146391`) confirms exactly five direct calls to `QIODevice::write(QByteArray const&)@plt`:
 
 ```text
-subobject_slot_b8: start 0xb5b880 size 0x1000
-downstream_helper: start 0xb222a0 size 0x1400
+0x7dd563
+0xb4066b
+0xb46c75
+0xc4a848
+0xd08642
 ```
 
-In those reported windows:
+Notably `0x7dd563` is only `0xcd` bytes before the real QSlotObject invoker `0x7dd630`, making that local code cluster a high-priority structural candidate. Proximity alone is not promoted as a call edge.
 
-- no direct `call rel32` to `QIODevice::write(QByteArray const&)@plt (0x4de370)` is reported;
-- the report does not itself establish a direct or indirect edge `0xb5b880 -> 0xb222a0`;
-- therefore `0xb222a0` must not be promoted as a proven downstream child of `0xb5b880` merely because the workflow named it `DOWNSTREAM_HELPER_ROOT`.
+## P2 call-window limitations
 
-Classification:
+The P2 report independently scans windows beginning at `0xb5b880` and `0xb222a0`, but does not establish a structural edge between them. Since `0xb5b880` is now disproven as the claimed slot entry, direct-call results obtained by linear byte scanning from that non-instruction boundary must not be used as a semantic forward call graph.
 
-- **FACT:** `0xb5b880` has a large exact-binary body and numerous direct executable callees in the bounded window.
-- **FACT:** `0xb222a0` was independently disassembled/scanned.
-- **UNKNOWN:** whether `0xb222a0` lies on the same concrete outbound message path.
-- **UNKNOWN:** exact serializer, framing transform, buffer-encryption/compression stage, and final `QIODevice`/`QTcpSocket` write site.
-
-## Selected direct callees from `0xb5b880`
-
-The artifact records executable direct targets including:
-
-```text
-0x6b23c0
-0x7b9140
-0x19a5eb0
-0x6b24e0
-0x7b7f20
-0x78e800
-0x19a3080
-0xc33830
-0x19b1d40
-0x7b5a20
-```
-
-The included disassembly shows several of these are allocation/tree/container/value-copy helpers rather than an obvious socket-write primitive. This narrows the next experiment away from simple proximity/string heuristics.
+`0xb222a0` remains independently disassembled data only; its relationship to the outbound queue path is `UNKNOWN`.
 
 ## CI status observed during this slice
 
-PR #289 exact head `e4c8334e73b04668a69b4cd2372b865248561ad5` has CI run `31818176071 = FAILURE`. The failing job is `94824765433 Fast Checks / Syntax and workflow validation`, specifically `yamllint`.
+PR #289 head `e4c8334e73b04668a69b4cd2372b865248561ad5` has CI run `31818176071 = FAILURE`. The failing job is `94824765433 Fast Checks / Syntax and workflow validation`, specifically `yamllint`.
 
-Fatal yamllint finding from the job log:
+Fatal yamllint finding:
 
 ```text
 docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-quantitative-coverage-baseline.yaml
@@ -131,16 +127,16 @@ docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qu
 
 Seven Track A workflow comment-spacing findings are warnings, not the fatal error shown in this run.
 
-## Next static experiment
+## Current next static gate
 
-Do not guess the serializer from `0xb5b880` adjacency. Build a reverse/direct-call provenance experiment that:
+Start from the corrected Qt connection:
 
-1. globally enumerates direct callsites to `QIODevice::write(QByteArray const&)@plt (0x4de370)` and other candidate byte-output Qt symbols;
-2. reconstructs bounded caller functions around those sites;
-3. builds a reverse direct-call graph from each write-site caller for a bounded depth;
-4. independently builds a forward direct-call graph from the proven `0xb5b880` body/callees;
-5. intersects both graphs and reports only structurally shared functions/edges;
-6. separately scans for virtual/indirect call patterns where direct intersection is empty;
-7. promotes framing/final-write only if an exact structural path is recovered.
+```text
+TProtocolMessageQueue at [owner+0x88]
+  -> clientMessageReadyToProcess wrapper 0xde91b0
+  -> QObject::connectImpl @ 0x19716a3
+  -> QSlotObject invoker 0x7dd630
+  -> stored containing-owner pointer at slot-object +0x10
+```
 
-No live-client effect is required for this next gate.
+Disassemble/classify `0x7dd630`, recover its call-operation branch and concrete consumer, then prove a structural path to one of the confirmed `QIODevice::write` callsites or to an indirect/virtual socket-write path. Do not return to the superseded `+0x90 -> 0x8409d0 -> 0xb5b880` hypothesis.

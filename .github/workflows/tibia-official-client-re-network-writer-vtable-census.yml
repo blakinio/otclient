@@ -21,10 +21,12 @@ jobs:
       WRITER_A: '0x7dd3f0'
       WRITER_B: '0xb40630'
       WRITER_C: '0xb46bd0'
-      NETWORK_OWNER_VTABLE: '0x2f66350'
+      NETWORK_OWNER_VTABLE: '0x308c408'
       NETWORK_SUBOBJECT_VTABLE: '0x2f66288'
+      NETWORK_OWNER_SOURCE_RUN: '31812572191'
+      NETWORK_OWNER_SOURCE_JOB: '94806473825'
     steps:
-      - name: Resolve writer vtable ownership and known-network overlap
+      - name: Resolve writer vtable ownership and canonical-network overlap
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -47,6 +49,8 @@ jobs:
           echo TRACK_A_NETWORK_WRITER_VTABLE_CENSUS_BEGIN=true
           echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
           echo "CLIENT_SIZE=$EXPECTED_CLIENT_SIZE"
+          echo "NETWORK_OWNER_SOURCE_RUN=$NETWORK_OWNER_SOURCE_RUN"
+          echo "NETWORK_OWNER_SOURCE_JOB=$NETWORK_OWNER_SOURCE_JOB"
           readelf --debug-dump=frames "$client" >"$frames"
 
           python3 -u - "$client" "$frames" <<'PY'
@@ -59,11 +63,10 @@ jobs:
               'WRITER_C':0xb46bd0,
           }
           known_vtables={
-              'NETWORK_OWNER_VTABLE':0x2f66350,
+              'NETWORK_OWNER_VTABLE':0x308c408,
               'NETWORK_SUBOBJECT_VTABLE':0x2f66288,
           }
 
-          # ELF64 little-endian program/section mappings.
           if data[:4] != b'\x7fELF' or data[4] != 2 or data[5] != 1:
               raise SystemExit('expected ELF64 little-endian client')
           phoff=struct.unpack_from('<Q',data,0x20)[0]
@@ -81,18 +84,15 @@ jobs:
                   loads.append((fo,fo+fsz,va,va+msz,flags))
           def va_to_off(va):
               for fs,fe,base,vend,flags in loads:
-                  if base <= va < base+(fe-fs):
-                      return fs+(va-base)
+                  if base <= va < base+(fe-fs): return fs+(va-base)
           def off_to_va(off):
               for fs,fe,base,vend,flags in loads:
-                  if fs <= off < fe:
-                      return base+(off-fs)
+                  if fs <= off < fe:return base+(off-fs)
           def qword(va):
               off=va_to_off(va)
               if off is None or off+8>len(data): return None
               return struct.unpack_from('<Q',data,off)[0]
 
-          # Section names for classifying qword references.
           raw_sections=[]
           if shoff and shnum and shstrndx < shnum:
               shstr_o=shoff+shstrndx*shentsz
@@ -108,16 +108,14 @@ jobs:
                   raw_sections.append((addr,addr+size,off,off+size,sname(ni),flags))
           def section_for_va(va):
               for lo,hi,fo,fe,name,flags in raw_sections:
-                  if lo <= va < hi:
-                      return name
+                  if lo <= va < hi:return name
               return 'UNKNOWN'
 
           print('KNOWN_VTABLE_DUMPS_BEGIN=true')
           for name,base in known_vtables.items():
               print(f'{name}=0x{base:x}')
               for rel in range(-0x10,0x121,8):
-                  va=base+rel
-                  val=qword(va)
+                  va=base+rel; val=qword(va)
                   if val is None:
                       print(f'VTABLE_QWORD name={name} rel={rel:+#x} va=0x{va:x} value=UNMAPPED')
                   else:
@@ -128,10 +126,8 @@ jobs:
               print(f'KNOWN_VTABLE_PLUS_D0 name={name} value={"UNMAPPED" if val is None else hex(val)} equals_writer_b={int(val==targets["WRITER_B"] if val is not None else False)}')
           print('KNOWN_VTABLE_DUMPS_END=true')
 
-          # Exact raw qword occurrences of candidate function addresses.
           for tname,target in targets.items():
-              needle=struct.pack('<Q',target)
-              hits=[]; start=0
+              needle=struct.pack('<Q',target); hits=[]; start=0
               while True:
                   off=data.find(needle,start)
                   if off<0:break
@@ -141,13 +137,10 @@ jobs:
               print(f'{tname}_QWORD_REF_COUNT={len(hits)}')
               for off,va in hits[:256]:
                   print(f'{tname}_QWORD_REF off=0x{off:x} va=0x{va:x} section={section_for_va(va)}')
-                  # Itanium vtable candidates usually have offset-to-top/typeinfo before an address point.
                   for rel in range(-0x20,0x41,8):
                       x=qword(va+rel)
-                      if x is not None:
-                          print(f'{tname}_QWORD_CONTEXT ref=0x{va:x} rel={rel:+#x} value=0x{x:x}')
+                      if x is not None:print(f'{tname}_QWORD_CONTEXT ref=0x{va:x} rel={rel:+#x} value=0x{x:x}')
 
-          # Direct E8 callers for candidates.
           execs=[x for x in loads if x[4]&1]
           def direct_calls(target):
               out=[]
@@ -156,14 +149,13 @@ jobs:
                   while True:
                       p=blob.find(b'\xe8',p)
                       if p<0:break
-                      if p+5 <= len(blob):
+                      if p+5<=len(blob):
                           site=base+p
                           got=(site+5+struct.unpack_from('<i',blob,p+1)[0]) & 0xffffffffffffffff
                           if got==target:out.append(site)
                       p+=1
               return out
-          frames=open(frames_path,errors='replace').read().splitlines()
-          fdes=[]
+          frames=open(frames_path,errors='replace').read().splitlines(); fdes=[]
           for line in frames:
               m=re.search(r'pc=([0-9a-fA-F]+)\.\.([0-9a-fA-F]+)',line)
               if m:fdes.append((int(m.group(1),16),int(m.group(2),16)))
@@ -182,7 +174,7 @@ jobs:
             -ex 'info symbol 0x7dd3f0' \
             -ex 'info symbol 0xb40630' \
             -ex 'info symbol 0xb46bd0' \
-            -ex 'info symbol 0x2f66350' \
+            -ex 'info symbol 0x308c408' \
             -ex 'info symbol 0x2f66288' || true
           echo SYMBOL_PROBES_END=true
 

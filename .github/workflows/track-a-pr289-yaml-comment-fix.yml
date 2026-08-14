@@ -1,0 +1,44 @@
+name: Track A PR289 YAML comment spacing fix
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths:
+      - .github/workflows/track-a-pr289-yaml-comment-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Apply annotation-only spacing fix and remove fixer
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          files=(
+            .github/workflows/tibia-official-client-re-login.yml
+            .github/workflows/tibia-official-client-re-live-state.yml
+            .github/workflows/tibia-official-client-re-focus-order.yml
+            .github/workflows/tibia-official-client-re-field-scan.yml
+            .github/workflows/tibia-official-client-re-atspi-session-bridge.yml
+            .github/workflows/tibia-official-client-re-atspi-semantic-inspect.yml
+          )
+          for f in "${files[@]}"; do
+            sed -i 's|actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3|actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3|g' "$f"
+          done
+          git rm .github/workflows/track-a-pr289-yaml-comment-fix.yml
+          git diff --check
+          git diff --exit-code -- . ':!*.yml' ':!*.yaml'
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "${files[@]}"
+          git commit -m 'ci(track-a): fix YAML inline comment spacing'
+          git push origin HEAD:ci/OTC-20260813-official-client-re-continuation

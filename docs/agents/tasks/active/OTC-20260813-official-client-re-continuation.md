@@ -214,29 +214,29 @@ recovery:
   generation: 1
   session_id: 20260814-track-a-gemma-continuation
   session_started_at: 2026-08-14T14:00:00+02:00
-  checkpointed_at: 2026-08-14T15:00:00+02:00
-  last_progress_at: 2026-08-14T15:00:00+02:00
-  phase: static-gameaction-connectimpl-slot-target-reconstruction
-  exact_head: 89827b7b182654ef8a696d63bc54724f77be5162
+  checkpointed_at: 2026-08-14T16:00:00+02:00
+  last_progress_at: 2026-08-14T16:00:00+02:00
+  phase: static-gameaction-slot-payload-reconstruction
+  exact_head: 5fd366fe1225245befd95c8d27e982c5411556dd
   pull_request: 289
   active_operation: none
-  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307, 31801334150]
+  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307, 31801334150, 31801505722, 31801581157, 31801659100, 31801723690, 31801845276]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
   checks_used: 2
   status: ready
   safe_to_resume: true
-  resume_condition: connectImpl argument reconstruction is committed and pushed
-  next_action: map the slot-object invoke targets and signal pointer-to-member storage for the proven sender-metaobject sites
+  resume_condition: slot provenance and invoker semantics are committed and pushed
+  next_action: reconstruct the two-word slot payload and resolve concrete receiver targets for high-value sender sites
 ```
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-14T13:00:00Z
-head: 89827b7b182654ef8a696d63bc54724f77be5162
+updated_at: 2026-08-14T14:00:00Z
+head: 5fd366fe1225245befd95c8d27e982c5411556dd
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: ready
@@ -255,12 +255,15 @@ proven:
   - string-edge run 31800240820 classified 40 legacy UI/controller edges and retained one explicit UNCLASSIFIED callsite
   - correlation run 31800490781 found 31 distance-at-most-64 GameAction metaobject/connectImpl candidates across all six families
   - corrected argument run 31801334150 reconstructed the hidden-return ABI, all 31 AutoConnection/null-types/slot-object arguments, 29 exact sender-metaobject matches, one mismatch and one bounded unresolved case
+  - provenance run 31801723690 resolved QSlotObject invoke addresses for all 29 proven sender sites, with 24 unique addresses and no unresolved entries
+  - invoker run 31801845276 proved selected invoke addresses are generic QSlotObject operation/member-pointer dispatchers rather than receiver serializers
 derived:
   - the 41 legacy string-based connect calls are the smallest high-information subset for argument reconstruction
   - high-value GameAction send signals are absent from the recovered legacy string-edge set and should be tested against connectImpl/wrapper paths
 unknown:
   - receiver identities for the six high-value GameAction send signals
-  - concrete receiver identities, pointer-to-member signal indices and slot-object invoke target semantics for the proven sender-metaobject sites
+  - concrete receiver identities and executable targets encoded in the two-word slot payload
+  - pointer-to-member signal indices for the proven sender-metaobject sites
 conflicts: []
 first_failure:
   marker: legacy_neighborhood_disassembler_unavailable
@@ -274,6 +277,8 @@ changed_paths:
   - .github/workflows/tibia-official-client-re-qt-legacy-connect-string-edges.yml
   - .github/workflows/tibia-official-client-re-gameaction-connectimpl-correlation.yml
   - .github/workflows/tibia-official-client-re-gameaction-connectimpl-arguments.yml
+  - .github/workflows/tibia-official-client-re-gameaction-slot-provenance.yml
+  - .github/workflows/tibia-official-client-re-gameaction-slot-invokers.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-connect-callsite-census.yaml
@@ -281,12 +286,14 @@ changed_paths:
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-gameaction-connectimpl-correlation.yaml
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-gameaction-connectimpl-arguments.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-gameaction-connectimpl-arguments.yaml
+  - docs/agents/evidence/OTC-20260813-official-client-re/20260814-gameaction-slot-provenance.md
+  - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-gameaction-slot-provenance.yaml
 validation:
   - command: YAML safe_load and git diff --check
     result: PASS
     evidence: local exact working tree
 blockers: []
-next_action: map slot-object invoke targets and signal pointer-to-member storage for the proven sender-metaobject sites
+next_action: reconstruct the two-word slot payload and resolve concrete receiver targets for high-value sender sites
 ```
 
 ## Rejected interpretations
@@ -301,5 +308,5 @@ next_action: map slot-object invoke targets and signal pointer-to-member storage
 ## Next action
 
 ```text
-Map the slot-object invoke targets and signal pointer-to-member storage for the proven sender-metaobject `connectImpl` sites; retain register-only receiver identities as unresolved until RTTI or constructor provenance proves them.
+Reconstruct the two-word slot payload for the high-value proven-sender `connectImpl` sites, resolve direct or virtual receiver targets, and retain receiver class identities as unresolved until constructor or RTTI provenance proves them.
 ```

@@ -1,0 +1,21 @@
+experiment_id: EXP-20260814-gameaction-slot-provenance
+track: A
+client_version: 15.32.df7b29
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+runner: synology-otclient-01
+provenance_run: 31801723690
+provenance_job: 94771021150
+invoker_disassembly_run: 31801845276
+invoker_disassembly_job: 94771408713
+result: PASS
+facts:
+  proven_sender_sites: 29
+  resolved_invoker_sites: 29
+  unique_invoker_addresses: 24
+  shared_0x6b10d0_sites: 5
+  unresolved_invoker_sites: 0
+  selected_invokers_are_qslotobject_dispatchers: true
+limits:
+  - invoke-function identity is not concrete receiver identity
+  - concrete receiver target is encoded in the two-word slot payload
+

@@ -77,6 +77,11 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - reconstructs argument-source patterns for all 31 tightly correlated `connectImpl` sites;
    - proves 29 nearby GameAction metaobjects are actual sender metaobjects and retains two explicit exceptions.
 
+15. `20260814-gameaction-slot-provenance.md`
+   - resolves the QSlotObject invoke-function address for all 29 proven sender sites;
+   - proves the selected invoke functions are generic operation/pointer-to-member dispatchers rather than receiver serializers;
+   - redirects concrete receiver recovery to the two-word slot payload.
+
 Current continuation rule:
 
 ```text

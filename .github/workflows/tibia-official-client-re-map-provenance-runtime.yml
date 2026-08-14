@@ -1,0 +1,139 @@
+name: Track A map snapshot vs dynamic provenance runtime
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-map-provenance-runtime.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+jobs:
+  experiment:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Capture mutation payload and conditionally force aware-range reload
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient && "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"; runtime="$state/runtime"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          [[ -x "$client" && -r "$runtime/client.pid" ]]
+          [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          pid="$(tr -cd '0-9' <"$runtime/client.pid")"; kill -0 "$pid"; [[ -r "/proc/$pid/environ" ]]; grep -azFxq "$marker" "/proc/$pid/environ"; [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          echo TRACK_A_CLIENT_PID="$pid"
+          tracer="$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")"
+          known=''
+          for f in "$runtime/dynamic-map-gdb.pid" "$runtime/worldmap-mutation-gdb.pid"; do [[ -r "$f" ]] && known="$(tr -cd '0-9' <"$f")"; done
+          if [[ "$tracer" != 0 ]]; then
+            if [[ -n "$known" && "$tracer" == "$known" && -r "/proc/$tracer/environ" ]] && grep -azFxq "$marker" "/proc/$tracer/environ"; then
+              echo TRACK_A_REPLACING_OWNED_DYNAMIC_OBSERVER="$tracer"
+              kill -INT "$tracer" 2>/dev/null || true
+              for _ in $(seq 1 30); do kill -0 "$tracer" 2>/dev/null || break; sleep .1; done
+              tracer="$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")"
+            fi
+          fi
+          if [[ "$tracer" != 0 ]]; then echo "TRACK_A_RUNTIME_BLOCKED_FOREIGN_TRACER=$tracer"; exit 42; fi
+
+          window=''; best_area=0
+          for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
+            g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"; width="$(sed -n 's/^WIDTH=//p'<<<"$g")"; height="$(sed -n 's/^HEIGHT=//p'<<<"$g")"; [[ -n "$width" && -n "$height" ]] || continue; area=$((width*height)); ((area>best_area)) && { best_area=$area; window=$w; }
+          done
+          [[ -n "$window" ]]; echo TRACK_A_WINDOW="$window"; echo TRACK_A_WINDOW_AREA="$best_area"
+          line="$(grep -F "$client" "/proc/$pid/maps"|awk '$2~/r-xp/{print;exit}')"; start="$(awk '{split($1,a,"-");print a[1]}'<<<"$line")"; off="$(awk '{print $3}'<<<"$line")"; bias=$((16#$start-16#$off)); echo TRACK_A_PIE_BIAS="$(printf '0x%x' "$bias")"
+          ev="$runtime/map-provenance-events.tsv"; raw="$runtime/map-provenance-raw.log"; strips="$runtime/map-provenance-strips.tsv"; phases="$runtime/map-provenance-phases.tsv"; gcmd="$runtime/map-provenance.gdb"
+          :>"$ev"; :>"$raw"; :>"$strips"; :>"$phases"; chmod 600 "$ev" "$raw" "$strips" "$phases"
+          cat >"$gcmd" <<EOF
+          set pagination off
+          set confirm off
+          attach $pid
+          python
+          import gdb,struct,time
+          inf=gdb.selected_inferior(); ev='$ev'; raw='$raw'; strips='$strips'
+          def mem(addr,n):
+            try:return bytes(inf.read_memory(addr,n))
+            except:return None
+          def dump(label,addr,n=256):
+            if not addr:return
+            b=mem(addr,n)
+            if b is not None:
+              with open(raw,'a') as f:f.write(f'{time.time_ns()} {label} 0x{addr:x} '+b.hex()+'\\n')
+          class M(gdb.Breakpoint):
+            def __init__(self,off,name): self.name0=name; super().__init__('*0x%x'%($bias+off),internal=False)
+            def stop(self):
+              try:
+                ns=time.time_ns(); regs={r:int(gdb.parse_and_eval('\\$'+r)) for r in ('rdi','rsi','rdx','rcx','r8','r9','rsp')}
+                with open(ev,'a') as f:f.write(str(ns)+'\\t'+self.name0+'\\t'+'\\t'.join(f'{k}=0x{v:x}' for k,v in regs.items())+'\\n')
+                for r,v in regs.items():
+                  if r!='rsp':
+                    dump(self.name0+':'+r,v)
+                    b=mem(v,64)
+                    if b:
+                      for i in range(0,64,8):
+                        p=struct.unpack_from('<Q',b,i)[0]
+                        if 0x10000 < p < 0x800000000000: dump(self.name0+f':{r}+{i:#x}->',p,128)
+              except Exception as e:
+                with open(raw,'a') as f:f.write(f'{time.time_ns()} ERROR {self.name0} {e}\\n')
+              return False
+          M(0xcecc70,'CreateOnMap'); M(0xcecf40,'ChangeOnMap'); M(0xcd4e20,'DeleteOnMap'); M(0xcec8d0,'FullMap')
+          class S(gdb.Breakpoint):
+            def __init__(self): super().__init__('*0x%x'%($bias+0x19a8ea3),internal=False)
+            def stop(self):
+              try:
+                ns=time.time_ns(); rsp=int(gdb.parse_and_eval('\\$rsp')); order=int(gdb.parse_and_eval('\\$rbp'))&0xffffffff; obj=int(gdb.parse_and_eval('\\$rbx'))
+                b=mem(rsp+0x88,12)
+                if b:
+                  x,y,z=struct.unpack('<III',b); tid=-1
+                  if obj:
+                    t=mem(obj+0x30,4)
+                    if t:tid=struct.unpack('<I',t)[0]
+                  if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                    with open(strips,'a') as f:f.write(f'{ns}\\t{x}\\t{y}\\t{z}\\t{order}\\t{tid}\\n')
+              except: pass
+              return False
+          S()
+          end
+          continue
+          EOF
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          "$gdb" -q -nx -batch -x "$gcmd" >"$runtime/map-provenance-gdb.stdout" 2>&1 & gp=$!
+          cleanup(){ kill -INT "$gp" 2>/dev/null || true; sleep .5; kill -CONT "$pid" 2>/dev/null || true; }
+          trap cleanup EXIT
+          sleep 2; kill -0 "$pid"; kill -0 "$gp"; [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")" == "$gp" ]]
+          echo TRACK_A_MAP_PROVENANCE_OBSERVER_ARMED=true
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          printf '%s\tDRAG_BEGIN\n' "$(date +%s%N)" >>"$phases"
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 270 205 mousedown 1; sleep .25; "$toolroot/usr/bin/xdotool" mousemove --window "$window" 302 205; sleep .25; "$toolroot/usr/bin/xdotool" mouseup 1
+          printf '%s\tDRAG_END\n' "$(date +%s%N)" >>"$phases"; sleep 3
+          creates="$(awk -F '\t' '$2=="CreateOnMap"{n++} END{print n+0}' "$ev")"; changes="$(awk -F '\t' '$2=="ChangeOnMap"{n++} END{print n+0}' "$ev")"; deletes="$(awk -F '\t' '$2=="DeleteOnMap"{n++} END{print n+0}' "$ev")"
+          echo TRACK_A_AFTER_DRAG_CREATE_COUNT="$creates"; echo TRACK_A_AFTER_DRAG_CHANGE_COUNT="$changes"; echo TRACK_A_AFTER_DRAG_DELETE_COUNT="$deletes"
+          if ((creates+changes+deletes==0)); then echo TRACK_A_CONTROL_ACTION_MUTATION_PROVEN=false; exit 0; fi
+          echo TRACK_A_CONTROL_ACTION_MUTATION_PROVEN=true
+          printf '%s\tRELOAD_OUT_BEGIN\n' "$(date +%s%N)" >>"$phases"
+          for _ in $(seq 1 12); do "$toolroot/usr/bin/xdotool" key Right; sleep .55; done
+          printf '%s\tRELOAD_OUT_END\n' "$(date +%s%N)" >>"$phases"; sleep 1
+          printf '%s\tRELOAD_BACK_BEGIN\n' "$(date +%s%N)" >>"$phases"
+          for _ in $(seq 1 12); do "$toolroot/usr/bin/xdotool" key Left; sleep .55; done
+          printf '%s\tRELOAD_BACK_END\n' "$(date +%s%N)" >>"$phases"; sleep 3
+          kill -0 "$pid"
+          echo TRACK_A_FINAL_CREATE_COUNT="$(awk -F '\t' '$2=="CreateOnMap"{n++} END{print n+0}' "$ev")"
+          echo TRACK_A_FINAL_CHANGE_COUNT="$(awk -F '\t' '$2=="ChangeOnMap"{n++} END{print n+0}' "$ev")"
+          echo TRACK_A_FINAL_DELETE_COUNT="$(awk -F '\t' '$2=="DeleteOnMap"{n++} END{print n+0}' "$ev")"
+          echo TRACK_A_FULLMAP_COUNT="$(awk -F '\t' '$2=="FullMap"{n++} END{print n+0}' "$ev")"
+          echo TRACK_A_STRIP_RECORD_COUNT="$(wc -l <"$strips")"
+          echo TRACK_A_EVENT_EVIDENCE_BEGIN=true; cat "$ev"; echo TRACK_A_EVENT_EVIDENCE_END=true
+          echo TRACK_A_PHASE_EVIDENCE_BEGIN=true; cat "$phases"; echo TRACK_A_PHASE_EVIDENCE_END=true
+          echo TRACK_A_STRIP_EVIDENCE_BEGIN=true; cat "$strips"; echo TRACK_A_STRIP_EVIDENCE_END=true
+          echo TRACK_A_RAW_ARGUMENT_EVIDENCE_BEGIN=true; cat "$raw"; echo TRACK_A_RAW_ARGUMENT_EVIDENCE_END=true
+          echo TRACK_A_SESSION_LEFT_RUNNING=true

@@ -54,3 +54,4 @@ jobs:
           echo TRACK_A_DYNAMIC_MAP_EVENT_EVIDENCE_BEGIN=true
           grep -E '^(OBSERVER_ARMED|EVENT |ARG )' "$log" || true
           echo TRACK_A_DYNAMIC_MAP_EVENT_EVIDENCE_END=true
+          echo TRACK_A_DYNAMIC_MAP_COLLECTOR_SCHEMA=2

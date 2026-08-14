@@ -28,22 +28,31 @@ jobs:
           toolroot="$state/toolroot"
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
           tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
           echo 'TRACK_A_GAMEACTION_SIGNAL_XREF_BEGIN=true'
 
-          # Binutils in the recovered toolroot is not assumed compatible with its injected
-          # LD_LIBRARY_PATH. Prefer the runner's objdump when present, otherwise the toolroot copy.
-          if command -v objdump >/dev/null 2>&1; then objdump="$(command -v objdump)"; else objdump="$toolroot/usr/bin/objdump"; fi
-          [[ -x "$objdump" ]]
-          echo "OBJDUMP_PATH=$objdump"
-          "$objdump" --version | head -n 1 || true
-          set +e
-          "$objdump" -d -M intel "$client" > "$tmp/disasm.txt" 2> "$tmp/objdump.err"
-          obj_rc=$?
-          set -e
-          echo "OBJDUMP_RC=$obj_rc"
-          echo "OBJDUMP_LINES=$(wc -l < "$tmp/disasm.txt")"
-          if [[ -s "$tmp/objdump.err" ]]; then head -n 20 "$tmp/objdump.err"; fi
+          read -r exec_start exec_end < <(python3 - "$client" <<'PY'
+          import struct,sys
+          d=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',d,0x20)[0]; entsz=struct.unpack_from('<H',d,0x36)[0]; n=struct.unpack_from('<H',d,0x38)[0]
+          segs=[]
+          for i in range(n):
+              o=phoff+i*entsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',d,o)
+              if typ==1 and flags&1 and filesz: segs.append((va,va+filesz))
+          assert segs
+          print(hex(min(x for x,y in segs)),hex(max(y for x,y in segs)))
+          PY
+          )
+          echo "EXEC_RANGE start=$exec_start end=$exec_end"
+          "$gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' \
+            -ex 'set disassembly-flavor intel' \
+            -ex "disassemble $exec_start,$exec_end" > "$tmp/disasm.txt"
+          echo "GDB_DISASSEMBLY_LINES=$(wc -l < "$tmp/disasm.txt")"
           [[ -s "$tmp/disasm.txt" ]]
 
           declare -A targets=(
@@ -63,9 +72,9 @@ jobs:
           for name in Creatures_sendAttack Creatures_sendFollow Chat_sendTalkMessage Container_sendMoveObject PlayerTrade_sendTradeObject WorldMap_sendMoveObject Creatures_staticMetaObject Chat_staticMetaObject Container_staticMetaObject PlayerTrade_staticMetaObject WorldMap_staticMetaObject Player_staticMetaObject; do
             hex="${targets[$name]}"
             echo "XREF_TARGET_BEGIN name=$name va=0x$hex"
-            # Match resolved target operands/comments, not the instruction line whose own address equals the target.
-            grep -Ein -B4 -A4 "[[:space:],<+#]0*x*0*${hex}([[:space:],>+#]|$)|# [[:space:]]*0*x*0*${hex}([[:space:],>+#]|$)" "$tmp/disasm.txt" \
-              | grep -Ev "^[0-9:-]*[[:space:]]*0*${hex}:" \
+            # GDB resolves direct branches and RIP-relative operands to absolute hexadecimal targets.
+            grep -Ein -B4 -A4 "0x0*${hex}([^0-9a-f]|$)" "$tmp/disasm.txt" \
+              | grep -Ev "^[0-9:-]*[[:space:]]*0x0*${hex}[[:space:]]" \
               | head -n 240 || true
             echo "XREF_TARGET_END name=$name"
           done

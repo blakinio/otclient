@@ -1,0 +1,104 @@
+name: Track A official client protocol surface inventory
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-protocol-surface-inventory.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Enumerate protocol handler and message strings
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          sha="$(sha256sum "$client" | awk '{print $1}')"
+          [[ "$sha" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_PROTOCOL_SURFACE_SHA256="$sha"
+
+          python3 - "$client" <<'PY'
+          import re,sys,collections
+          data=open(sys.argv[1],'rb').read()
+          strings=[]
+          for m in re.finditer(rb'[ -~]{4,}', data):
+              try:s=m.group().decode('ascii')
+              except:continue
+              strings.append((m.start(),s))
+
+          pats={
+            'handler_class': re.compile(r'\bT?[A-Za-z0-9_]*ProtocolMessageHandler\b'),
+            'handle_method': re.compile(r'\bhandle[A-Za-z0-9_]*Message\b'),
+            'gameserver_msg': re.compile(r'\bGameserverMessage[A-Za-z0-9_]+\b'),
+            'gameclient_msg': re.compile(r'\bGameclientMessage[A-Za-z0-9_]+\b'),
+          }
+          found={k:[] for k in pats}
+          for off,s in strings:
+              for k,p in pats.items():
+                  for mm in p.finditer(s):
+                      found[k].append((off+mm.start(),mm.group()))
+          for k in found:
+              ded=[]; seen=set()
+              for off,s in found[k]:
+                  if s not in seen:
+                      seen.add(s); ded.append((off,s))
+              found[k]=ded
+
+          print('TRACK_A_PROTOCOL_SURFACE_COUNTS_BEGIN=true')
+          for k in ['handler_class','handle_method','gameserver_msg','gameclient_msg']:
+              print(f'COUNT kind={k} unique={len(found[k])}')
+          print('TRACK_A_PROTOCOL_SURFACE_COUNTS_END=true')
+
+          print('TRACK_A_HANDLER_CLASSES_BEGIN=true')
+          for off,s in found['handler_class']:
+              print(f'HANDLER_CLASS off=0x{off:x} name={s}')
+          print('TRACK_A_HANDLER_CLASSES_END=true')
+
+          # Group handler methods by semantic family; emit all to make the catalogue durable.
+          families={
+            'worldmap': ('Map','Field','Floor','North','East','South','West','Light','Time','Effect','Missile'),
+            'creature': ('Creature','Outfit','Skull','Shield','Party','Guild','Mark','Unpass','PvP','SpeechBubble'),
+            'chat': ('Talk','Text','Channel','Message','RuleViolation','Private','Console'),
+            'container_inventory': ('Container','Inventory','Depot','StoreInbox','Stash','Item','Imbuement','CyclopediaItem'),
+            'trade': ('Trade','Shop','Market','Npc','NPC'),
+            'combat_social': ('Attack','Follow','Party','Vip','VIP','Buddy','Friend','Prey','TaskHunting'),
+            'player_state': ('Player','Health','Mana','Skills','Experience','Bless','Death','Cooldown','Magic','Vocation','Capacity','Speed','Soul'),
+            'quest_world': ('Quest','Bestiary','Bosstiary','Cyclopedia','World','Tournament','Daily','Event'),
+          }
+          print('TRACK_A_HANDLE_METHODS_BEGIN=true')
+          for off,s in found['handle_method']:
+              fam=[]
+              for name,needles in families.items():
+                  if any(n.lower() in s.lower() for n in needles): fam.append(name)
+              print(f'HANDLE_METHOD off=0x{off:x} families={"|".join(fam) if fam else "other"} name={s}')
+          print('TRACK_A_HANDLE_METHODS_END=true')
+
+          for kind,label in [('gameserver_msg','GAMESERVER_MESSAGE'),('gameclient_msg','GAMECLIENT_MESSAGE')]:
+              print(f'TRACK_A_{label}S_BEGIN=true')
+              for off,s in found[kind]:
+                  print(f'{label} off=0x{off:x} name={s}')
+              print(f'TRACK_A_{label}S_END=true')
+
+          # Compact keyword counts for requested capabilities.
+          caps=['CreateOnMap','ChangeOnMap','DeleteOnMap','MoveCreature','Talk','Channel','Container','Inventory','Trade','Shop','Market','Attack','Follow','Party','Vip','Quest','Effect','Missile','TextMessage','Player','Creature','Health','Skills']
+          universe=[s for _,s in found['handle_method']]+[s for _,s in found['gameserver_msg']]+[s for _,s in found['gameclient_msg']]
+          print('TRACK_A_CAPABILITY_STRING_COUNTS_BEGIN=true')
+          for cap in caps:
+              hits=sorted({s for s in universe if cap.lower() in s.lower()})
+              print(f'CAP keyword={cap} count={len(hits)} names={"|".join(hits[:40])}')
+          print('TRACK_A_CAPABILITY_STRING_COUNTS_END=true')
+          print('TRACK_A_PROTOCOL_SURFACE_INVENTORY_COMPLETE=true')
+          PY

@@ -1,0 +1,20 @@
+schema: otclient.tibia-re.experiment.v1
+experiment_id: EXP-20260814-protocol-queue-network-handoff
+subject: {version: 15.32.df7b29, sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe}
+runs:
+  slot_provenance: {run: 31805205225, result: PASS}
+  concrete_connection: {run: 31805264031, result: PASS}
+  qmeta_falsification: {run: 31806620571, job: 94786993940, result: PASS}
+handoff:
+  signal: tibia::protocol::TProtocolMessageQueue::clientMessageReadyToProcess
+  signal_index: 191
+  signal_wrapper: 0xde91b0
+  queue_offset_in_owner: 0x88
+  receiver: containing_owner
+  receiver_virtual_slot: 0x90
+  socket_constructor_path: 0x196fee0
+classification:
+  builder_entrypoints: FACT
+  downstream_processing_entry_slot: FACT
+  exact_serializer_entry: UNKNOWN
+  final_wire_bytes: UNKNOWN

@@ -1,0 +1,25 @@
+schema: otclient.tibia-re.experiment.v1
+experiment_id: EXP-20260814-live-reversible-movement
+subject:
+  version: 15.32.df7b29
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+runner: synology-otclient-01
+runs:
+  login: {run: 31730884814, job: 94785048338, result: PASS}
+  observer: {run: 31806223531, job: 94785688088, result: PASS}
+  reversible_step: {run: 31806312967, job: 94785974126, result: PASS}
+stimulus: [Up, Down]
+observed:
+  strip_counts: [0, 33, 88]
+  forward_floor7_strip: {x_min: 32537, x_max: 32554, y: 32502, z: 7}
+  inverse_floor7_strip: {x_min: 32537, x_max: 32554, y: 32516, z: 7}
+  derived_player_path:
+    - [32546, 32510, 7]
+    - [32546, 32509, 7]
+    - [32546, 32510, 7]
+classification:
+  decoded_strip_coordinates: FACT
+  reversible_one_tile_transition: FACT
+  player_coordinate_from_viewport_center: DERIVED
+  direct_player_member_address: UNKNOWN
+

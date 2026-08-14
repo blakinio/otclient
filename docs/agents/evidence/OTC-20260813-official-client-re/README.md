@@ -87,6 +87,16 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - maps movement, MoveObject, Talk, Attack, Follow and TradeObject case entries to concrete builder bodies;
    - recovers exact internal message discriminators while retaining the wire-byte boundary until serializer convergence.
 
+17. `20260814-live-structural-world-and-reversible-movement.md`
+   - correlates the owned exact-client world session with decoded map-strip execution;
+   - proves one north step and inverse south step, with the derived path `(32546,32510,7) -> (32546,32509,7) -> (32546,32510,7)`;
+   - preserves the boundary between authoritative strip coordinates and the viewport-center-derived player coordinate.
+
+18. `20260814-protocol-queue-network-handoff.md`
+   - proves `clientMessageReadyToProcess` hands the queue to its containing owner through virtual slot `+0x90`;
+   - ties the containing-owner setup path to `QTcpSocket` construction;
+   - retains the exact serializer/framing function and final wire bytes as unknown pending concrete-slot recovery.
+
 Current continuation rule:
 
 ```text

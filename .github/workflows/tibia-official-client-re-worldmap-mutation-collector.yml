@@ -1,0 +1,67 @@
+name: Track A worldmap mutation collector
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-worldmap-mutation-collector.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: official-client-re-runtime-collector
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 2
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Collect named worldmap mutation evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          runtime="$state/runtime"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+
+          pid="$(tr -cd '0-9' <"$runtime/client.pid" 2>/dev/null || true)"
+          gdb_pid="$(tr -cd '0-9' <"$runtime/worldmap-mutation-gdb.pid" 2>/dev/null || true)"
+          [[ -n "$pid" && -n "$gdb_pid" ]]
+          client_alive=false; gdb_alive=false
+          kill -0 "$pid" 2>/dev/null && client_alive=true
+          kill -0 "$gdb_pid" 2>/dev/null && gdb_alive=true
+          echo TRACK_A_WORLDMAP_CLIENT_PID="$pid"
+          echo TRACK_A_WORLDMAP_GDB_PID="$gdb_pid"
+          echo TRACK_A_WORLDMAP_CLIENT_ALIVE="$client_alive"
+          echo TRACK_A_WORLDMAP_GDB_ALIVE="$gdb_alive"
+          [[ "$client_alive" == true && "$gdb_alive" == true ]]
+          grep -azFxq "$marker" "/proc/$pid/environ"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+
+          log="$runtime/worldmap-mutation-events.log"
+          [[ -f "$log" ]]
+          total="$(grep -c '^WORLDMAP_EVENT ' "$log" || true)"
+          create="$(grep -c '^WORLDMAP_EVENT handler=CreateOnMap ' "$log" || true)"
+          change="$(grep -c '^WORLDMAP_EVENT handler=ChangeOnMap ' "$log" || true)"
+          delete="$(grep -c '^WORLDMAP_EVENT handler=DeleteOnMap ' "$log" || true)"
+          echo TRACK_A_WORLDMAP_EVENT_COUNT="$total"
+          echo TRACK_A_WORLDMAP_CREATE_COUNT="$create"
+          echo TRACK_A_WORLDMAP_CHANGE_COUNT="$change"
+          echo TRACK_A_WORLDMAP_DELETE_COUNT="$delete"
+          echo TRACK_A_WORLDMAP_FILTERED_LOG_BEGIN=true
+          awk '
+            /^WORLDMAP_EVENT / {capture=1; rows=0}
+            capture {print; rows++}
+            capture && rows>=6 {capture=0}
+          ' "$log" | tail -n 180
+          echo TRACK_A_WORLDMAP_FILTERED_LOG_END=true
+          echo TRACK_A_WORLDMAP_COLLECTOR_SUCCESS=true

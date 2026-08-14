@@ -53,6 +53,8 @@ jobs:
           for source in "$root/usr/lib/x86_64-linux-gnu"/*; do
             name="${source##*/}"; [[ -e "$root/lib/x86_64-linux-gnu/$name" ]] || ln -s "../../usr/lib/x86_64-linux-gnu/$name" "$root/lib/x86_64-linux-gnu/$name"
           done
+          mkdir -p "$root/lib64"
+          [[ -e "$root/lib64/ld-linux-x86-64.so.2" ]] || ln -s "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" "$root/lib64/ld-linux-x86-64.so.2"
           export PATH="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           build="$state/build/tibia-runtime-bridge"

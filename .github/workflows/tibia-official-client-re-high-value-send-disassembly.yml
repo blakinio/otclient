@@ -25,9 +25,12 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          command -v gdb >/dev/null
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
           echo 'TRACK_A_HIGH_VALUE_SEND_DISASSEMBLY_BEGIN=true'
           # These entry VAs are pinned by successful dispatch-map run 31793073416 / job 94744105956.
           # This is file-only disassembly: no client process is started and no game action is emitted.
@@ -52,7 +55,7 @@ jobs:
           for name in Creatures_sendAttack Creatures_sendFollow Chat_sendTalkMessage Container_sendMoveObject PlayerTrade_sendTradeObject WorldMap_sendMoveObject Player_common_tail; do
             start="${STARTS[$name]}"; end="${ENDS[$name]}"
             echo "DISASSEMBLY_TARGET_BEGIN name=$name start=$start end=$end"
-            gdb -q -nx -batch "$client" \
+            "$gdb" -q -nx -batch "$client" \
               -ex 'set pagination off' \
               -ex 'set disassembly-flavor intel' \
               -ex "disassemble /r $start,$end"

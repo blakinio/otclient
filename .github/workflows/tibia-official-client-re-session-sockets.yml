@@ -1,4 +1,4 @@
-name: Track A unknown map parser caller disassembly
+name: Track A parser dispatcher table mapping
 on:
   push:
     branches:
@@ -17,7 +17,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Disassemble cec9 and df2b parser-family callers
+      - name: Map dispatcher cases and inspect candidate dynamic handlers
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -34,10 +34,19 @@ jobs:
           [[ -x "$gdb" ]]
           "$gdb" -q -nx -batch "$client" \
             -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
-            -ex 'echo TRACK_A_CEC9_BLOCK_BEGIN=true\n' \
-            -ex 'disassemble 0xcec880,0xcecb40' \
-            -ex 'echo TRACK_A_CEC9_BLOCK_END=true\n' \
-            -ex 'echo TRACK_A_DF2B_BLOCK_BEGIN=true\n' \
-            -ex 'disassemble 0xdf2a80,0xdf2d40' \
-            -ex 'echo TRACK_A_DF2B_BLOCK_END=true\n' \
-            -ex 'echo TRACK_A_UNKNOWN_CALLER_DISASM_COMPLETE=true\n'
+            -ex 'echo TRACK_A_DISPATCH_PROLOGUE_BEGIN=true\n' \
+            -ex 'disassemble 0xdf2960,0xdf2f40' \
+            -ex 'echo TRACK_A_DISPATCH_PROLOGUE_END=true\n' \
+            -ex 'echo TRACK_A_CD3190_BEGIN=true\n' \
+            -ex 'disassemble 0xcd3190,0xcd3500' \
+            -ex 'echo TRACK_A_CD3190_END=true\n' \
+            -ex 'echo TRACK_A_CD4E20_BEGIN=true\n' \
+            -ex 'disassemble 0xcd4e20,0xcd5250' \
+            -ex 'echo TRACK_A_CD4E20_END=true\n' \
+            -ex 'echo TRACK_A_CECC70_BEGIN=true\n' \
+            -ex 'disassemble 0xcecc70,0xcecf40' \
+            -ex 'echo TRACK_A_CECC70_END=true\n' \
+            -ex 'echo TRACK_A_CECF40_BEGIN=true\n' \
+            -ex 'disassemble 0xcecf40,0xced220' \
+            -ex 'echo TRACK_A_CECF40_END=true\n' \
+            -ex 'echo TRACK_A_DISPATCH_TABLE_MAPPING_COMPLETE=true\n'

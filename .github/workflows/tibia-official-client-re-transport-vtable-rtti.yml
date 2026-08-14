@@ -1,0 +1,211 @@
+name: Track A transport vtable RTTI relocations
+
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-chatgpt-framing-recovery]
+    paths: [.github/workflows/tibia-official-client-re-transport-vtable-rtti.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Resolve transport vtable RTTI and constructor refs
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+
+          report="$RUNNER_TEMP/track-a-transport-vtable-rtti.txt"
+          exec > >(tee "$report") 2>&1
+          echo 'TRACK_A_TRANSPORT_VTABLE_RTTI_BEGIN=true'
+          echo 'CANDIDATE_ADDRESS_POINT=0x3084c58'
+          echo 'RTTI_OBJECT=0x3080660'
+          echo 'E8_METHOD=0xb40630'
+
+          python3 -u - "$client" <<'PY'
+          import struct, sys
+          data=open(sys.argv[1],'rb').read()
+
+          # Program segments.
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          phes=struct.unpack_from('<H',data,0x36)[0]
+          phn=struct.unpack_from('<H',data,0x38)[0]
+          seg=[]
+          for i in range(phn):
+              o=phoff+i*phes
+              typ,flags,fo,va,_,fs,ms,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fs: seg.append((fo,fo+fs,va,va+ms,flags))
+          def vaoff(va):
+              for fs,fe,b,e,f in seg:
+                  if b<=va<b+(fe-fs): return fs+va-b
+              return None
+          def flags(va):
+              for fs,fe,b,e,f in seg:
+                  if b<=va<e:return f
+              return 0
+          def rawq(va):
+              o=vaoff(va)
+              return struct.unpack_from('<Q',data,o)[0] if o is not None and o+8<=len(data) else None
+          def cstr(va,limit=512):
+              o=vaoff(va)
+              if o is None:return None
+              end=data.find(b'\0',o,min(len(data),o+limit))
+              if end<0:return None
+              try:return data[o:end].decode('utf-8','replace')
+              except:return None
+
+          # Section metadata, section-name table and symbol tables.
+          shoff=struct.unpack_from('<Q',data,0x28)[0]
+          shes=struct.unpack_from('<H',data,0x3a)[0]
+          shn=struct.unpack_from('<H',data,0x3c)[0]
+          shstrndx=struct.unpack_from('<H',data,0x3e)[0]
+          sections=[]
+          for i in range(shn):
+              o=shoff+i*shes
+              fields=struct.unpack_from('<IIQQQQIIQQ',data,o)
+              sections.append(fields)
+          shstr=sections[shstrndx]
+          shstr_blob=data[shstr[4]:shstr[4]+shstr[5]]
+          def secname(idx):
+              n=sections[idx][0]; end=shstr_blob.find(b'\0',n)
+              return shstr_blob[n:end].decode('utf-8','replace') if end>=0 else ''
+
+          # Parse all SHT_SYMTAB/SHT_DYNSYM into section-indexed maps.
+          symtabs={}
+          for i,s in enumerate(sections):
+              name,typ,fl,addr,off,size,link,info,align,entsz=s
+              if typ not in (2,11) or not entsz: continue
+              strsec=sections[link]
+              strings=data[strsec[4]:strsec[4]+strsec[5]]
+              syms=[]
+              for p in range(off,off+size,entsz):
+                  st_name,st_info,st_other,st_shndx,st_value,st_size=struct.unpack_from('<IBBHQQ',data,p)
+                  e=strings.find(b'\0',st_name)
+                  nm=strings[st_name:e].decode('utf-8','replace') if e>=0 else ''
+                  syms.append((nm,st_value,st_size,st_info,st_shndx))
+              symtabs[i]=syms
+
+          # Parse RELA sections, preserving symbol identity for non-RELATIVE entries.
+          relocs={}
+          for i,s in enumerate(sections):
+              name,typ,fl,addr,off,size,link,info,align,entsz=s
+              if typ!=4 or not entsz: continue
+              syms=symtabs.get(link,[])
+              for p in range(off,off+size,entsz):
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p)
+                  symidx=ri>>32; rtype=ri&0xffffffff
+                  sym=syms[symidx][0] if symidx<len(syms) else ''
+                  sval=syms[symidx][1] if symidx<len(syms) else 0
+                  relocs.setdefault(ro,[]).append((rtype,sym,sval,ra,secname(i)))
+
+          def fmt_reloc(addr):
+              rs=relocs.get(addr,[])
+              if not rs:return 'none'
+              return ';'.join(f'type={t},sym={n or "<none>"},symval=0x{sv:x},addend={a},section={sc}' for t,n,sv,a,sc in rs)
+
+          ap=0x3084c58
+          rtti=0x3080660
+          print(f'AP_SEGMENT_FLAGS=0x{flags(ap):x}')
+          print(f'RTTI_SEGMENT_FLAGS=0x{flags(rtti):x}')
+          print(f'RTTI_EXECUTABLE={str(bool(flags(rtti)&1)).lower()}')
+          print(f'RAW_HEADER_OFFSET_TO_TOP={rawq(ap-16)}')
+          print(f'RAW_HEADER_RTTI=0x{(rawq(ap-8) or 0):x}')
+          print(f'HEADER_RTTI_RELOC={fmt_reloc(ap-8)}')
+          print(f'RTTI_VPTR_RAW=0x{(rawq(rtti) or 0):x}')
+          print(f'RTTI_VPTR_RELOC={fmt_reloc(rtti)}')
+          nameptr=rawq(rtti+8) or 0
+          # RELATIVE relocation may carry the actual name pointer in addend.
+          for t,n,sv,a,sc in relocs.get(rtti+8,[]):
+              if t==8:nameptr=a & 0xffffffffffffffff
+              elif sv:nameptr=(sv+a)&0xffffffffffffffff
+          print(f'RTTI_NAMEPTR=0x{nameptr:x}')
+          print(f'RTTI_NAME={cstr(nameptr) if nameptr else "unknown"}')
+          print(f'RTTI_NAME_RELOC={fmt_reloc(rtti+8)}')
+
+          # Resolve the whole candidate table range and preserve imported Qt method symbols.
+          for addr in range(ap-0x10,ap+0x130,8):
+              raw=rawq(addr) or 0
+              print(f'AP_ENTRY addr=0x{addr:x} rel=0x{addr-ap:x} raw=0x{raw:x} flags=0x{flags(raw):x} reloc={fmt_reloc(addr)}')
+
+          # Also dump relocations surrounding RTTI and the adjacent likely staticMetaObject pointer.
+          for addr in range(rtti-0x20,rtti+0x80,8):
+              if relocs.get(addr) or rawq(addr):
+                  print(f'RTTI_ENTRY addr=0x{addr:x} raw=0x{(rawq(addr) or 0):x} reloc={fmt_reloc(addr)}')
+
+          # Strict rescan: local +0xe8 target and RTTI must be non-executable mapped data.
+          strict=[]
+          for fs,fe,b,e,f in seg:
+              if f&1: continue
+              for cand in range((b+0x10+7)&~7,b+(fe-fs)-0x100,8):
+                  # Resolve only RELATIVE/local raw value for +e8; target is local and known.
+                  val=rawq(cand+0xe8) or 0
+                  for t,n,sv,a,sc in relocs.get(cand+0xe8,[]):
+                      if t==8:val=a & 0xffffffffffffffff
+                      elif sv:val=(sv+a)&0xffffffffffffffff
+                  if val!=0xb40630:continue
+                  rt=rawq(cand-8) or 0
+                  for t,n,sv,a,sc in relocs.get(cand-8,[]):
+                      if t==8:rt=a & 0xffffffffffffffff
+                      elif sv:rt=(sv+a)&0xffffffffffffffff
+                  ot=struct.unpack('<q',struct.pack('<Q',rawq(cand-16) or 0))[0]
+                  if abs(ot)>0x100000 or not rt or not flags(rt) or (flags(rt)&1):continue
+                  strict.append((cand,ot,rt))
+          print(f'STRICT_VTABLE_E8_CANDIDATE_COUNT={len(strict)}')
+          for cand,ot,rt in strict: print(f'STRICT_VTABLE address_point=0x{cand:x} offset_to_top={ot} rtti=0x{rt:x}')
+
+          # Direct rel32 CALL census for key local functions.
+          targets=(0x7dcbd0,0x7dcbe0,0xb40630,0xb40690)
+          for target in targets:
+              sites=[]
+              for fs,fe,b,e,f in seg:
+                  if not (f&1):continue
+                  blob=data[fs:fe]
+                  for p in range(0,len(blob)-5):
+                      if blob[p]!=0xe8:continue
+                      site=b+p
+                      dest=site+5+struct.unpack_from('<i',blob,p+1)[0]
+                      if dest==target:sites.append(site)
+              print(f'DIRECT_CALL_XREF target=0x{target:x} count={len(sites)} sites={",".join(hex(x) for x in sites[:128]) if sites else "none"}')
+
+          print('TRACK_A_TRANSPORT_VTABLE_STATIC_COMPLETE=true')
+          PY
+
+          for range in \
+            '0x7dcb70,0x7dcc40' \
+            '0x1970780,0x19708b0' \
+            '0x1970c20,0x1970d60' \
+            '0xb405f0,0xb40720'; do
+            echo "DISASSEMBLY_BEGIN=$range"
+            env LD_LIBRARY_PATH="$tool_lib" "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $range"
+            echo "DISASSEMBLY_END=$range"
+          done
+
+          echo 'TRACK_A_TRANSPORT_VTABLE_RTTI_COMPLETE=true'
+          grep -q '^TRACK_A_TRANSPORT_VTABLE_RTTI_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version transport vtable report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-transport-vtable-rtti-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-transport-vtable-rtti.txt
+          if-no-files-found: error
+          retention-days: 7

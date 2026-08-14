@@ -168,9 +168,27 @@ showed descriptor/message-order neighborhoods for selected `GameserverMessage*` 
 
 **FACT:** that technique is insufficient for field-layout claims and is not being promoted as evidence of field offsets.
 
+## Stripped symbol-surface test
+
+A direct GDB symbol query was executed after fixing the toolroot library path:
+
+```text
+.github/workflows/tibia-official-client-re-symbol-surface.yml
+fix commit: 923d297ecc49129130b530a9ea6c333de549598f
+run: 31787886977
+job: 94727824870
+result: SUCCESS
+```
+
+GDB returned empty match sets for `qt_static_metacall`, every queried `T*ProtocolMessageHandler` function pattern, `staticMetaObject`, and queried handler-class variables.
+
+**FACT:** useful Qt handler symbols are stripped/not exposed through GDB's symbol table for this exact client binary. Direct `info functions` / `info variables` cannot provide the missing handler code addresses.
+
+**RESEARCH CONSEQUENCE:** further mapping must reconstruct QMetaObject/static-metacall structures from raw binary metadata and code, as was already done successfully for `TWorldmapProtocolMessageHandler`, rather than relying on debug/symbol names.
+
 ## Next deterministic gates
 
-1. Resolve class-specific Qt static-metacall functions and jump tables for Chat, Container, Effect, Market, NPC Trade, Player Trade, Quest and Game Event.
+1. Resolve class-specific Qt static-metacall functions and jump tables for Chat, Container, Effect, Market, NPC Trade, Player Trade, Quest and Game Event from raw QMetaObject metadata/code.
 2. Map each dispatch index to a concrete executable offset, using the compact method-name order as a candidate ordering only after QMetaObject metadata confirms it.
 3. Separately locate outbound serializer/builder xrefs for `MoveObject`, `Attack`, `Follow`, `TradeObject`, `Talk` and `GoPath`.
 4. Do not disturb the already armed dynamic-world `raw-v2` observer while no controlled owner-side mutation is available.

@@ -1,4 +1,4 @@
-name: Track A preserve with-item provenance
+name: Track A moved-item provenance diff
 on:
   push:
     branches:
@@ -11,22 +11,75 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 2
+    timeout-minutes: 5
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Preserve with-item reload dataset
+      - name: Capture after moved item and diff
         shell: bash
         run: |
           set -Eeuo pipefail
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
-          src="$state/evidence/item-provenance-reload/records.txt"
-          dst="$state/evidence/item-provenance-with-item"
-          [[ -s "$src" ]]
-          rm -rf "$dst"; mkdir -p "$dst"
-          cp "$src" "$dst/records.txt"
-          sha256sum "$dst/records.txt" > "$dst/records.sha256"
-          echo TRACK_A_WITH_ITEM_RECORDS="$(wc -l < "$dst/records.txt")"
-          echo TRACK_A_WITH_ITEM_SHA256="$(sha256sum "$dst/records.txt" | awk '{print $1}')"
-          echo TRACK_A_WITH_ITEM_DATASET_PRESERVED=true
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY"
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          pid="$(tr -cd '0-9' < "$state/runtime/client.pid")"
+          kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          with="$state/evidence/item-provenance-with-item/records.txt"; [[ -s "$with" ]]
+          window="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' | head -1)"; [[ -n "$window" ]]
+          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
+          start="$(awk '{split($1,a,"-");print a[1]}' <<< "$line")"; off="$(awk '{print $3}' <<< "$line")"; bias=$((16#$start-16#$off))
+          d="$state/evidence/item-provenance-after-move"; rm -rf "$d"; mkdir -p "$d"; records="$d/records.txt"; : > "$records"
+          printf '%s\n' 'set pagination off' 'set confirm off' "attach $pid" 'python' 'import gdb,struct,time' 'inf=gdb.selected_inferior()' "out='$records'" 'class B(gdb.Breakpoint):' '    def __init__(self):' "        super().__init__('*0x%x' % ($bias+0x19a8ea3))" '    def stop(self):' '        try:' '            rsp=int(gdb.parse_and_eval("$rsp")); order=int(gdb.parse_and_eval("$rbp"))&0xffffffff; obj=int(gdb.parse_and_eval("$rbx"))' '            x,y,z=struct.unpack("<III",bytes(inf.read_memory(rsp+0x88,12)))' '            if 0<x<100000 and 0<y<100000 and z<32 and order<128:' '                tid=-1' '                if obj:' '                    try: tid=struct.unpack("<I",bytes(inf.read_memory(obj+0x30,4)))[0]' '                    except: pass' '                with open(out,"a") as f: f.write(f"{time.time_ns()} {x} {y} {z} {order} {tid}\n")' '        except: pass' '        return False' 'B()' 'end' 'continue' > "$d/probe.gdb"
+          "$toolroot/usr/bin/gdb" -q -nx -batch -x "$d/probe.gdb" > "$d/gdb.log" 2>&1 & gp=$!; sleep 2
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          for _ in $(seq 1 12); do "$toolroot/usr/bin/xdotool" key Right; sleep .45; done
+          sleep 1
+          for _ in $(seq 1 12); do "$toolroot/usr/bin/xdotool" key Left; sleep .45; done
+          sleep 2
+          kill -INT "$gp" 2>/dev/null || true; sleep 1; kill -CONT "$pid" 2>/dev/null || true
+          python3 - "$with" "$records" <<'PY'
+          import sys
+          def load(path, with_ts):
+              out=[]
+              for line in open(path):
+                  p=line.split()
+                  if len(p)!=(6 if with_ts else 6):
+                      continue
+                  vals=tuple(map(int,p))
+                  out.append((vals[1],vals[2],vals[3],vals[4],vals[5]))
+              return set(out)
+          before=load(sys.argv[1], True)
+          after=load(sys.argv[2], True)
+          bcoords={r[:3] for r in before}; acoords={r[:3] for r in after}; overlap=bcoords & acoords
+          b={r for r in before if r[:3] in overlap}; a={r for r in after if r[:3] in overlap}
+          removed=sorted(b-a); added=sorted(a-b)
+          print('TRACK_A_AFTER_MOVE_RECORDS='+str(sum(1 for _ in open(sys.argv[2]))))
+          print('TRACK_A_AFTER_MOVE_OVERLAP_COORDS='+str(len(overlap)))
+          print('TRACK_A_MOVED_REMOVED_COUNT='+str(len(removed)))
+          for r in removed: print('TRACK_A_MOVED_REMOVED='+' '.join(map(str,r)))
+          print('TRACK_A_MOVED_ADDED_COUNT='+str(len(added)))
+          for r in added: print('TRACK_A_MOVED_ADDED='+' '.join(map(str,r)))
+          # Pair same type-id changes to identify likely moved item.
+          rem_by_tid={}
+          add_by_tid={}
+          for r in removed: rem_by_tid.setdefault(r[4],[]).append(r)
+          for r in added: add_by_tid.setdefault(r[4],[]).append(r)
+          pairs=[]
+          for tid in sorted(set(rem_by_tid)&set(add_by_tid)):
+              if len(rem_by_tid[tid])==1 and len(add_by_tid[tid])==1:
+                  pairs.append((rem_by_tid[tid][0],add_by_tid[tid][0]))
+          print('TRACK_A_MOVED_UNIQUE_TYPE_PAIRS='+str(len(pairs)))
+          for old,new in pairs:
+              print('TRACK_A_MOVED_CANDIDATE_FROM='+' '.join(map(str,old)))
+              print('TRACK_A_MOVED_CANDIDATE_TO='+' '.join(map(str,new)))
+          print('TRACK_A_MOVED_ITEM_DIFF_PROVEN=true')
+          PY
+          kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"; echo TRACK_A_SESSION_LEFT_RUNNING=true

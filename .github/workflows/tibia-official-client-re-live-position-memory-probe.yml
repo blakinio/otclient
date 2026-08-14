@@ -1,4 +1,4 @@
-name: Track A live cecf40 position reference probe
+name: Track A live cecf40 object graph probe
 on:
   push:
     branches:
@@ -20,7 +20,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Read referenced 12-byte tuples from live process memory
+      - name: Read cecf40 event object graph from live process memory
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -36,34 +36,43 @@ jobs:
           gdb_pid="$(tr -cd '0-9' <"$runtime/dynamic-map-gdb.pid")"
           kill -0 "$pid"; kill -0 "$gdb_pid"
           grep -azFxq "$marker" "/proc/$pid/environ"
+          base="$(awk -v exe="$client" 'index($0,exe) && $3=="00000000" {split($1,a,"-"); print "0x" a[1]; exit}' "/proc/$pid/maps")"
           log="$runtime/dynamic-map-events.log"
-          python3 - "$pid" "$log" <<'PY'
-          import os,re,struct,sys
-          pid=int(sys.argv[1]); log=sys.argv[2]
+          python3 - "$pid" "$log" "$base" <<'PY'
+          import re,struct,sys
+          pid=int(sys.argv[1]); log=sys.argv[2]; base=int(sys.argv[3],16)
           text=open(log,'r',errors='replace').read()
-          ptrs=[]
-          for m in re.finditer(r'^ARG cecf40 .*?pos_ref=(0x[0-9a-fA-F]+)', text, re.M):
-              p=int(m.group(1),16)
-              if p not in ptrs: ptrs.append(p)
-          print(f'TRACK_A_CECF40_POS_REF_COUNT={len(ptrs)}')
-          if not ptrs:
-              raise SystemExit(0)
-          try:
-              mem=open(f'/proc/{pid}/mem','rb',buffering=0)
-          except OSError as e:
-              print(f'TRACK_A_PROC_MEM_OPEN_ERROR={e.errno}:{e.strerror}')
-              raise SystemExit(2)
-          with mem:
-              for i,p in enumerate(ptrs):
-                  try:
-                      mem.seek(p+0x18)
-                      b=mem.read(12)
-                  except OSError as e:
-                      print(f'POSREF index={i} ptr=0x{p:x} read_error={e.errno}:{e.strerror}')
-                      continue
-                  if len(b)!=12:
-                      print(f'POSREF index={i} ptr=0x{p:x} short_read={len(b)}')
-                      continue
-                  a,bv,c=struct.unpack('<III',b)
-                  print(f'POSREF index={i} ptr=0x{p:x} raw12={b.hex()} u32_0={a} u32_1={bv} u32_2={c}')
+          records=[]
+          events={}
+          for m in re.finditer(r'^EVENT .*?handler=cecf40 .*?rsi=(0x[0-9a-fA-F]+)',text,re.M):
+              events.setdefault(int(m.group(1),16),{})['event']=int(m.group(1),16)
+          for m in re.finditer(r'^ARG cecf40 event_ptr=(0x[0-9a-fA-F]+) pos_ref=(0x[0-9a-fA-F]+) thing_ptr=(0x[0-9a-fA-F]+) stack_raw=(0x[0-9a-fA-F]+) flags=(0x[0-9a-fA-F]+)',text,re.M):
+              records.append(tuple(int(x,16) for x in m.groups()))
+          print(f'TRACK_A_CECF40_RECORD_COUNT={len(records)}')
+          def read(mem,p,n):
+              try:
+                  mem.seek(p); b=mem.read(n)
+                  return b if len(b)==n else None
+              except OSError:
+                  return None
+          def fmtq(b):
+              if b is None:return 'unreadable'
+              return ','.join(f'0x{x:016x}' for x in struct.unpack('<'+'Q'*(len(b)//8),b))
+          with open(f'/proc/{pid}/mem','rb',buffering=0) as mem:
+              for i,(event,pos,thing,stack,flags) in enumerate(records):
+                  print(f'RECORD index={i} event=0x{event:x} ref=0x{pos:x} thing=0x{thing:x} stack=0x{stack:x} flags=0x{flags:x}')
+                  for label,p in [('event',event),('ref',pos),('thing',thing)]:
+                      b=read(mem,p,64)
+                      print(f'OBJECT index={i} label={label} ptr=0x{p:x} qwords={fmtq(b)}')
+                      if b:
+                          q0=struct.unpack_from('<Q',b,0)[0]
+                          rel=q0-base if base <= q0 < base+0x4000000 else None
+                          print(f'VTABLE index={i} label={label} q0=0x{q0:x} image_offset={"0x%x"%rel if rel is not None else "outside-image"}')
+                  b=read(mem,pos,0x28)
+                  if b:
+                      p18=struct.unpack_from('<Q',b,0x18)[0]
+                      u20=struct.unpack_from('<I',b,0x20)[0]
+                      print(f'REF_FIELDS index={i} qword18=0x{p18:x} dword20=0x{u20:x}')
+                      if p18:
+                          print(f'REF_QWORD18_TARGET index={i} ptr=0x{p18:x} qwords={fmtq(read(mem,p18,32))}')
           PY

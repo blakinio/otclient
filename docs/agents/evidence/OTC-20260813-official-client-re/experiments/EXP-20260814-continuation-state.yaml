@@ -6,7 +6,7 @@ repository: blakinio/otclient
 source_pr: 289
 branch: ci/OTC-20260814-official-client-re-receiver-recovery
 base_branch: ci/OTC-20260813-official-client-re-continuation
-updated_at: 2026-08-14T17:58:00+02:00
+updated_at: 2026-08-14T18:02:00+02:00
 completion_claim: incomplete
 client:
   version: 15.32.df7b29
@@ -23,15 +23,20 @@ runtime:
 recovery:
   generation: 2
   attempts: 2
-  state: isolated_branch_preparing_exact_target
+  state: active_external_operation
   source_branch_conflict_head: 8ac9c72ee16427a8d79526184cb525f6a2114e8e
-  source_branch_active_run: 31816876078
-  source_branch_active_run_status: queued
-  completed_run: 31815819731
-  completed_job: 94817115581
-  completed_result: SUCCESS
-  completed_artifact: 9225203231
-  completed_artifact_digest: sha256:e0ca5a278d7235e1755105775ed235a4f5ee501db2e5cb473b6d008e8f9831a3
+  source_branch_other_run: 31816876078
+  active_operation: queue-receiver-exact-target
+  active_workflow: Track A queue receiver exact target
+  active_head: 7be0c193d2b20cbb2c82b53884ecd2f5c439f344
+  active_run: 31817347325
+  active_run_status: queued
+  wait_deadline_at: 2026-08-14T18:46:26+02:00
+  previous_run: 31815819731
+  previous_job: 94817115581
+  previous_result: SUCCESS
+  previous_artifact: 9225203231
+  previous_artifact_digest: sha256:e0ca5a278d7235e1755105775ed235a4f5ee501db2e5cb473b6d008e8f9831a3
 facts:
   protocol_census:
     protocol_handler_classes: 47
@@ -124,9 +129,9 @@ unknowns:
   - complete item-level protocol/QMeta/P0 coverage
 next_actions:
   - priority: 1
-    action: run exact-target receiver reconstruction from connect site 0x7e7470 and setup/constructor vptr provenance on isolated recovery branch
+    action: finish run 31817347325 and artifact-first classify exact receiver target
   - priority: 2
-    action: continue serializer/framing/final-write convergence only from independently re-proven receiver target
+    action: continue serializer/framing/final-write convergence only from independently re-proven target
   - priority: 3
     action: recover bridge live correlation with official bundled Qt 6.9 runtime
   - priority: 4

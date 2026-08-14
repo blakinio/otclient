@@ -144,30 +144,117 @@ workflow: .github/workflows/tibia-official-client-re-xref-graph-v2.yml
 head: cfbe04c03de34f83646a82569c90dafaf342c129
 run: 31789670398
 algorithm: one linear executable RIP-relative LEA/MOV scan indexed by target VA
-state_at_checkpoint: in_progress
-result_claimed: false
+job: 94733517691
+job_conclusion: success
+state_at_checkpoint: completed
+finding:
+  scanner: one linear executable PT_LOAD pass over direct x86-64 RIP-relative LEA/MOV references
+  selected_literal_direct_riprefs: 0
+  total_direct_riprefs: 0
+limitation: the negative result applies only to the scanned direct instruction forms and exact selected literal addresses
+```
+
+## Qt connect census gate
+
+```yaml
+symbol_census:
+  run: 31793668176
+  head: 6cf46ed2cb1c277c5bde247e7d4ba5cc668ff35b
+  result: PASS
+  proven_plt_targets:
+    QObject_connectImpl: 0x4dd800
+    QObject_connect_legacy: 0x4dffd0
+    QObject_disconnectImpl: 0x4de9e0
+callsite_census:
+  first_run: 31794273375
+  state: queued_runner_label_mismatch
+  first_failure: workflow requested labels not exposed by synology-otclient-01; successful adjacent Track A jobs use only otclient/synology
+  repair: use [otclient, synology]
 ```
 
 ## Anti-stall checkpoint
 
 ```yaml
-checkpoint_version: 4
-updated_at: 2026-08-14T11:50:00+02:00
+checkpoint_version: 5
+updated_at: 2026-08-14T14:17:00+02:00
 owner_resume: explicit
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
-status: investigating
+status: implementing
 last_progress:
-  - corrected descriptor census parser before promotion
-  - descriptor census revision 2 PASS with exact field evidence
-  - recorded xref-v1 completed-output/cancelled-job boundary
-  - replaced multiplicative xref scan with linear v2 workflow
-  - persisted new evidence document and evidence index
+  - verified xref-v2 run 31789670398 PASS with zero direct selected-literal RIP references
+  - verified Qt connect symbol census run 31793668176 PASS
+  - isolated the queued callsite census to a runner-label mismatch and aligned it with successful adjacent Track A workflows
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 stall_warnings: 0
 blockers: []
+```
+
+## Recovery checkpoint
+
+```yaml
+recovery:
+  policy_version: 1
+  generation: 1
+  session_id: 20260814-track-a-gemma-continuation
+  session_started_at: 2026-08-14T14:00:00+02:00
+  checkpointed_at: 2026-08-14T14:17:00+02:00
+  last_progress_at: 2026-08-14T14:17:00+02:00
+  phase: static-qt-connect-callsite-census-repair
+  exact_head: 3aaa0025df36e2a0fb0fa199ac86d7699aff89c3
+  pull_request: 289
+  active_operation: persist and push canonical runner selector repair
+  external_run_ids: [31794273375, 31798163007]
+  operation_started_at: null
+  wait_deadline_at: null
+  check_generation: experiment
+  checks_used: 1
+  status: active
+  safe_to_resume: true
+  resume_condition: repaired workflow is pushed and a new callsite census reaches terminal state
+  next_action: commit and push the runner-selector repair, then inspect the resulting callsite census once
+```
+
+## Context checkpoint
+
+```yaml
+checkpoint_version: 1
+updated_at: 2026-08-14T12:17:00Z
+head: 3aaa0025df36e2a0fb0fa199ac86d7699aff89c3
+branch: ci/OTC-20260813-official-client-re-continuation
+pr: 289
+status: implementing
+context_routes:
+  - docs/agents/TIBIA_RESEARCH_TRACKS.md
+  - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
+owned_paths:
+  - .github/workflows/tibia-official-client-re-*.yml
+  - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
+proven:
+  - xref-v2 run 31789670398 completed successfully with TOTAL_DIRECT_RIPREFS=0 for its exact bounded scanner
+  - Qt symbol census run 31793668176 recovered the three selected QObject connect/disconnect PLT targets
+  - synology-otclient-01 is online and successful adjacent Track A workflows select it with otclient/synology
+derived:
+  - the callsite census queue is caused by labels beyond the proven otclient/synology pair
+unknown:
+  - direct callsite count and addresses until the repaired workflow completes
+conflicts: []
+first_failure:
+  marker: queued_runner_label_mismatch
+  evidence: runs 31794273375, 31798163007, and 31799696037 remained queued while runner 21 was online and idle; successful adjacent workflows select only otclient/synology
+rejected_hypotheses:
+  - runner unavailable: GitHub runner API reports synology-otclient-01 online and idle
+changed_paths:
+  - .github/workflows/tibia-official-client-re-qt-connect-callsite-census.yml
+  - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
+validation:
+  - command: YAML safe_load and git diff --check
+    result: PASS
+    evidence: local exact working tree
+blockers: []
+next_action: commit and push the runner-selector repair, then inspect the resulting callsite census once
 ```
 
 ## Rejected interpretations
@@ -182,5 +269,5 @@ blockers: []
 ## Next action
 
 ```text
-Inspect run 31789670398 once after terminal state. Persist exact linear RIP-reference findings. If literal RIP refs remain empty, move directly to generated protobuf descriptor/default-instance/accessor and Qt integer-offset metadata reconstruction rather than another literal-string xref variant.
+Commit and push the canonical runner-selector repair, then inspect the resulting Qt connect callsite census once after terminal state and persist the exact callsite set or first failure.
 ```

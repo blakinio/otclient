@@ -220,7 +220,7 @@ recovery:
   exact_head: 89827b7b182654ef8a696d63bc54724f77be5162
   pull_request: 289
   active_operation: none
-  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307]
+  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307, 31801334150]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
@@ -254,7 +254,7 @@ proven:
   - GDB neighborhood run 31800072490 emitted all 41 bounded legacy callsite disassemblies
   - string-edge run 31800240820 classified 40 legacy UI/controller edges and retained one explicit UNCLASSIFIED callsite
   - correlation run 31800490781 found 31 distance-at-most-64 GameAction metaobject/connectImpl candidates across all six families
-  - argument run 31800999307 reconstructed the hidden-return ABI, all 31 AutoConnection/null-types/slot-object arguments, 29 exact sender-metaobject matches, one mismatch and one bounded unresolved case
+  - corrected argument run 31801334150 reconstructed the hidden-return ABI, all 31 AutoConnection/null-types/slot-object arguments, 29 exact sender-metaobject matches, one mismatch and one bounded unresolved case
 derived:
   - the 41 legacy string-based connect calls are the smallest high-information subset for argument reconstruction
   - high-value GameAction send signals are absent from the recovered legacy string-edge set and should be tested against connectImpl/wrapper paths

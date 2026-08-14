@@ -4,7 +4,7 @@
 
 - Official native Linux client `15.32.df7b29`.
 - SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
-- Read-only workflow run `31800999307`, job `94768688628`, on `synology-otclient-01`.
+- Corrected read-only workflow run `31801334150`, job `94769784890`, on `synology-otclient-01`.
 - Input: 31 direct `connectImpl@plt` calls with a selected GameAction static-metaobject reference in the preceding 64 bytes.
 
 ## ABI correction
@@ -23,7 +23,7 @@
 | stack argument 8 | queued argument types |
 | stack argument 9 | sender static metaobject |
 
-This corrects the naive register-only interpretation that omitted the hidden return pointer. Every recovered site pushes, in order, a sender-metaobject pointer, zero, and zero before the call. Thus all 31 use `Qt::AutoConnection`, pass no queued-type array, supply a sender static metaobject, and allocate a 32-byte slot object placed in `r9`.
+This corrects the naive register-only interpretation that omitted the hidden return pointer; the corrected ABI marker was rerun successfully on the exact binary. Every recovered site pushes, in order, a sender-metaobject pointer, zero, and zero before the call. Thus all 31 use `Qt::AutoConnection`, pass no queued-type array, supply a sender static metaobject, and allocate a 32-byte slot object placed in `r9`.
 
 ## Static-metaobject role classification
 
@@ -53,4 +53,3 @@ The slot-object invoke-function address is stored at offset `+0x8` of the alloca
 - `0x7d7b42`: explicitly nearby but not the sender metaobject.
 - `0x7d7307`: sender metaobject `UNRESOLVED` within this window.
 - Source expressions do not alone establish receiver class identities, pointer-to-member signal indices, or lambda semantics.
-

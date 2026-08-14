@@ -1,4 +1,4 @@
-name: Track A post-drop provenance scan
+name: Track A provenance reload scan
 on:
   push:
     branches:
@@ -11,14 +11,14 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 4
+    timeout-minutes: 5
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Scan after external item drop
+      - name: Reload nearby tile through aware range
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -26,38 +26,24 @@ jobs:
           marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
           toolroot="$state/toolroot"
-          export HOME="$state/home"
-          export DISPLAY="$TRACK_DISPLAY"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY"
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           pid="$(tr -cd '0-9' < "$state/runtime/client.pid")"
-          kill -0 "$pid"
-          grep -azFxq "$marker" "/proc/$pid/environ"
+          kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          baseline="$state/evidence/item-provenance-baseline/baseline.txt"
-          [[ -s "$baseline" ]]
-          window="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' | head -1)"
-          [[ -n "$window" ]]
+          baseline="$state/evidence/item-provenance-baseline/baseline.txt"; [[ -s "$baseline" ]]
+          window="$("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' | head -1)"; [[ -n "$window" ]]
           line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
-          start="$(awk '{split($1,a,"-");print a[1]}' <<< "$line")"
-          off="$(awk '{print $3}' <<< "$line")"
-          bias=$((16#$start-16#$off))
-          d="$state/evidence/item-provenance-postdrop"
-          rm -rf "$d"
-          mkdir -p "$d"
-          records="$d/records.txt"
-          : > "$records"
+          start="$(awk '{split($1,a,"-");print a[1]}' <<< "$line")"; off="$(awk '{print $3}' <<< "$line")"; bias=$((16#$start-16#$off))
+          d="$state/evidence/item-provenance-reload"; rm -rf "$d"; mkdir -p "$d"; records="$d/records.txt"; : > "$records"
           printf '%s\n' 'set pagination off' 'set confirm off' "attach $pid" 'python' 'import gdb,struct,time' 'inf=gdb.selected_inferior()' "out='$records'" 'class B(gdb.Breakpoint):' '    def __init__(self):' "        super().__init__('*0x%x' % ($bias+0x19a8ea3))" '    def stop(self):' '        try:' '            rsp=int(gdb.parse_and_eval("$rsp")); order=int(gdb.parse_and_eval("$rbp"))&0xffffffff; obj=int(gdb.parse_and_eval("$rbx"))' '            x,y,z=struct.unpack("<III",bytes(inf.read_memory(rsp+0x88,12)))' '            if 0<x<100000 and 0<y<100000 and z<32 and order<128:' '                tid=-1' '                if obj:' '                    try: tid=struct.unpack("<I",bytes(inf.read_memory(obj+0x30,4)))[0]' '                    except: pass' '                with open(out,"a") as f: f.write(f"{time.time_ns()} {x} {y} {z} {order} {tid}\n")' '        except: pass' '        return False' 'B()' 'end' 'continue' > "$d/probe.gdb"
-          "$toolroot/usr/bin/gdb" -q -nx -batch -x "$d/probe.gdb" > "$d/gdb.log" 2>&1 &
-          gp=$!
-          sleep 2
-          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true
-          "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
-          for key in Right Down Left Up; do "$toolroot/usr/bin/xdotool" key "$key"; sleep 1.6; done
-          kill -INT "$gp" 2>/dev/null || true
+          "$toolroot/usr/bin/gdb" -q -nx -batch -x "$d/probe.gdb" > "$d/gdb.log" 2>&1 & gp=$!; sleep 2
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          for _ in $(seq 1 12); do "$toolroot/usr/bin/xdotool" key Right; sleep .45; done
           sleep 1
-          kill -CONT "$pid" 2>/dev/null || true
-          python3 -c 'import sys; b=set(tuple(map(int,l.split())) for l in open(sys.argv[1]) if len(l.split())==5); rows=[tuple(map(int,l.split())) for l in open(sys.argv[2]) if len(l.split())==6]; assert rows; p=set((r[1],r[2],r[3],r[4],r[5]) for r in rows); added=sorted(p-b); removed=sorted(b-p); print("TRACK_A_POSTDROP_RECORDS="+str(len(rows))); print("TRACK_A_POSTDROP_ROWS="+str(len(p))); print("TRACK_A_POSTDROP_ADDED_COUNT="+str(len(added))); [print("TRACK_A_POSTDROP_ADDED="+" ".join(map(str,r))) for r in added]; print("TRACK_A_POSTDROP_REMOVED_COUNT="+str(len(removed))); [print("TRACK_A_POSTDROP_REMOVED="+" ".join(map(str,r))) for r in removed[:30]]; print("TRACK_A_POSTDROP_COMPARISON_PROVEN=true")' "$baseline" "$records"
-          kill -0 "$pid"
-          grep -azFxq "$marker" "/proc/$pid/environ"
-          echo TRACK_A_SESSION_LEFT_RUNNING=true
+          for _ in $(seq 1 12); do "$toolroot/usr/bin/xdotool" key Left; sleep .45; done
+          sleep 2
+          kill -INT "$gp" 2>/dev/null || true; sleep 1; kill -CONT "$pid" 2>/dev/null || true
+          python3 -c 'import sys; b=set(tuple(map(int,l.split())) for l in open(sys.argv[1]) if len(l.split())==5); rows=[tuple(map(int,l.split())) for l in open(sys.argv[2]) if len(l.split())==6]; assert rows; p=set((r[1],r[2],r[3],r[4],r[5]) for r in rows); xs=[r[1] for r in rows]; ys=[r[2] for r in rows]; added=sorted(p-b); print("TRACK_A_RELOAD_RECORDS="+str(len(rows))); print("TRACK_A_RELOAD_X_SPAN="+str(max(xs)-min(xs)+1)); print("TRACK_A_RELOAD_Y_SPAN="+str(max(ys)-min(ys)+1)); print("TRACK_A_RELOAD_ADDED_COUNT="+str(len(added))); [print("TRACK_A_RELOAD_ADDED="+" ".join(map(str,r))) for r in added]; print("TRACK_A_RELOAD_SCAN_PROVEN=true")' "$baseline" "$records"
+          kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"; echo TRACK_A_SESSION_LEFT_RUNNING=true

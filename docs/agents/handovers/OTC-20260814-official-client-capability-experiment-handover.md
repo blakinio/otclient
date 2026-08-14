@@ -4,423 +4,380 @@
 programme: OTCLIENT-TIBIA-RE
 track: official-client-re
 repository: blakinio/otclient
-owner_request: persist all current capability-research state in Git
-status: ACTIVE_DISCOVERY_PROGRAM
+status: RESEARCH_DESIGN_READY_FOR_VALIDATION
 source_of_truth: live repository + retained GitHub Actions evidence
+execution_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md
 ```
 
-## Scope
+## Purpose
 
-This handover persists the material findings and decisions from the current owner conversation about extracting every useful semantic capability from the official native Linux Tibia client and adding it to the Track A experiment programme.
+This handover preserves the current Track A design and exact evidence boundary for extracting useful semantic state, events and actions from the official native Linux Tibia client without OCR or screen-coordinate clicking as the normal interface.
 
-It does not itself promote static binary evidence into a live runtime capability. Static presence remains a lead until revalidated on the current exact client SHA with the evidence gates defined in `docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_SWEEP.md`.
+It is a continuation aid, not proof that the runtime capabilities already work. Static binary evidence remains `STATIC_PRESENT` until the current exact client version is revalidated and promoted through the read/action evidence gates.
+
+## Normative document set
+
+Read together:
+
+```text
+docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
+docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_SWEEP.md
+docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_CENSUS_EXTENSION.md
+docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md
+docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md
+docs/agents/reports/OTCLIENT-20260814-official-client-experiment-design-review.md
+```
+
+Where execution order/evidence methodology differs, the execution model controls. Repository safety/authorization and the canonical programme remain more authoritative.
+
+## Lifecycle
+
+PR #293 is a **research-design deliverable**. It does not execute the entire capability sweep.
+
+After PR #293 is merged:
+
+1. archive the design task;
+2. resume the canonical `OTCLIENT-TIBIA-RE` programme;
+3. execute bounded hypotheses/phases with durable experiment records;
+4. rotate worker context rather than turning the design task into a permanent catch-all owner.
 
 ## Exact researched binary evidence
 
-Retained successful GitHub Actions evidence for the researched official Linux client identifies:
+Retained successful inventory evidence for the historical exact official Linux client:
 
 ```text
 client version: 15.32.df7b29
 client SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 ```
 
-Generated protocol inventory run `31651220862`, job `94295767215` established:
+Important retained runs:
 
 ```text
-PROTOCOL_MESSAGE_TOTAL=349
-CLIENT_TO_SERVER_MESSAGE_SYMBOLS=160
-SERVER_TO_CLIENT_MESSAGE_SYMBOLS=189
-PROTOCOL_CAPABILITY_MESSAGE_COUNT=98
-REQUIRED_OUTBOUND_SYMBOLS_PRESENT=true
+protocol inventory
+  run: 31651220862
+  job: 94295767215
+  total generated message symbols: 349
+  client -> server: 160
+  server -> client: 189
+  old capability-regex matches: 98
+  unclassified-by-old-regex: 251
+
+capability QMeta inventory
+  run: 31651155741
+  job: 94295569820
+  capability method hits: 494
+  direct QMeta dispatch targets: 460
+
+high-level action inventory
+  run: 31651684700
+  job: 94297172395
+  HIGHLEVEL_ACTION_METHOD_COUNT=612
+
+state/update inventory
+  run: 31652393473
+  job: 94299386259
+  targeted hits: 121
+
+action signature inventory
+  run: 31651501473
+  job: 94296624884
 ```
 
-Therefore 251 generated protocol message names were not covered by the old feature regex and require an unfiltered census before the programme can claim broad protocol coverage.
+The older value `1004` for high-level action methods is not the direct marker from run `31651684700`; treat it as a different historical filter/count definition unless its provenance is reconstructed.
 
-High-level QMeta inventory run `31651684700`, job `94297172395` established:
+## Static surfaces already evidenced
+
+The exact researched binary exposes named leads for, among others:
+
+- session/authentication/world-entered/disconnect/death/server modal state;
+- player data, HP/max HP, mana/max mana, skills, capacity, soul, resting/player state and cooldowns;
+- all cardinal/diagonal movement, path, stop/cancel and rotation;
+- CreatureStorage, creature health/outfit/speed/skull/party/type/light/marks and HUD status;
+- battle lists, selected targets, attack and follow;
+- inventory, object counts and semantic appearance metadata;
+- containers, pagination, stash, depot search, managed containers and Quick Loot;
+- chat/channel/private/NPC channel state and talk actions;
+- player-to-player trade models/controllers;
+- NPC trade storage/controller;
+- party/shared-experience lead (`sendShareExperience` + inbound creature-party state);
+- Cyclopedia/Bestiary/Bosstiary/monster bonus effects;
+- Skill Wheel/gems/presets;
+- Exaltation Forge fusion/transfer preview surfaces;
+- Prey, Taskboard/Bounty/Weekly/Soul Seals;
+- Imbuements and Weapon Proficiency;
+- Market, Houses, Quest Log, Reward Wall/Daily Reward;
+- Friends/VIP/Social;
+- action bars/hotkeys/passive abilities/multi-actions;
+- analyzers: Loot, Waste, Impact, Damage Input, Hunting Session, Progress, Analytics Selector, Party Hunt;
+- network dual-connection state and FPS/latency controller;
+- sound/event cue storages;
+- minimap/world-map transforms and markers;
+- generic dialog/sidebar/modal/controller state;
+- `tibia::sessiondump::*` as a passive replay-feasibility lead only.
+
+Static presence is not a live API and is not permission to invoke mutating actions.
+
+## High-value semantic item metadata lead
+
+The exact binary exposes `TAppearanceTypeHelperQmlService` methods equivalent to:
 
 ```text
-HIGHLEVEL_ACTION_METHOD_COUNT=612
+appearance ID -> item name
+appearance ID -> item description
+item name -> appearance ID
 ```
 
-Targeted state/read inventory run `31652393473`, job `94299386259` established 121 targeted state/read/update hits and included a static `sendShareExperience` lead.
+This should be tested early because it may allow structural object naming without OCR or external item tables.
 
-## High-value static capability families already surfaced
+## Required execution order
 
-The binary evidence already exposes named surfaces for the following families. These are `STATIC_PRESENT` leads until live correlation proves stronger gates.
-
-### Core movement, combat and world interaction
-
-- `GameclientMessageGoNorth`, `GoEast`, `GoSouth`, `GoWest` and diagonals;
-- `GameclientMessageGoPath`;
-- rotate north/east/south/west;
-- `Stop`, `Cancel`;
-- `Attack`, `Follow`;
-- `UseObject`, `UseTwoObjects`, `UseOnCreature`;
-- `MoveObject`;
-- `BrowseField`;
-- look/inspect player/creature/object paths;
-- battle list target-selection and attack-first/next/previous surfaces.
-
-### Map, creatures and player state
-
-Server-side generated messages and runtime classes include:
-
-- `GameserverMessageFullMap`;
-- `FieldData`, `ChangeOnMap`, `CreateOnMap`, `DeleteOnMap`;
-- `MoveCreature`;
-- creature health/light/outfit/party/skull/speed/type/unpass/update/data;
-- `TCreatureStorage` and creature update signals;
-- player basic/current data, skills, state, inventory and vocation-specific data;
-- world-entered/session lifecycle surfaces;
-- minimap and Cyclopedia map controllers/storage;
-- world-map camera and coordinate-transform QML types.
-
-### Inventory, containers, depot, stash and Quick Loot
-
-Static surfaces include:
-
-- `TContainerProtocolMessageHandler`;
-- close/up/next-page/previous-page/update container;
-- object-info requests;
-- container sort;
-- move content to managed containers;
-- `TContainerStorage`;
-- `TInventoryContainer`;
-- object-count and object-info storage;
-- stash and depot-search open/close;
-- `TManagedContainerStorage`;
-- Quick Loot / obtain-container selection, clear and open operations;
-- item blacklist/whitelist configuration.
-
-### Item semantic metadata
-
-`TAppearanceTypeHelperQmlService` exposes static methods equivalent to:
+Do not log in before static work that does not need a session.
 
 ```text
-appearance/type ID -> object name
-appearance/type ID -> object description
-object name -> appearance/type ID
+S0
+resolve current official Linux client version/SHA and binary provenance
+
+S1
+exhaustively enumerate all generated messages and all Tibia-owned QMeta/runtime types
+without feature-name filters
+
+S2
+classify and graph:
+GeneratedMessage -> ProtocolMessageQueue -> handler -> storage -> controller/model
+and the outbound inverse; rank high-information probes
+
+--------- LIVE BOUNDARY ---------
+
+L0
+resolve current approved Track A login/recovery path
+login through the authorized mechanism
+structurally prove IN_GAME
+create a new session_epoch
+
+L1
+instrument competing inbound/outbound dispatcher hypotheses
+establish no-stimulus background baseline
+start causal recorder
+
+L2
+promote core reads: position, HP/mana/player state, map, creatures,
+inventory/containers, chat/world events
+
+L3
+promote core actions with normal-client reference parity and server-confirmed results
+
+L4
+party/player trade/NPC trade/cooldowns/quick loot/analyzers/context/action bars
+
+L5
+rich read/preview systems: Bestiary/Wheel/Forge/Prey/Market/etc.
+
+L6
+fresh PID/ASLR/relogin rediscovery, stable bridge and update-resilience validation
 ```
 
-This is a high-priority live experiment because it may allow semantic item recognition without OCR and without an external lookup table.
+## Dispatcher hypotheses
 
-### Player-to-player trade
+Do not assume one common dispatcher merely because it would simplify the bridge.
 
-Static evidence includes:
-
-- `TPlayerTradeProtocolMessageHandler`;
-- open/close player trade widget;
-- `TPlayerTradeController`;
-- own-side and counter-offer look operations;
-- `TPlayerTradeObject` item-change state.
-
-Live work must remain non-destructive and avoid valuable items.
-
-### NPC conversation and NPC trade
-
-Static evidence includes:
-
-- NPC talk partners and NPC chat/channel state;
-- `TNPCTradeProtocolMessageHandler`;
-- `TNPCTradeStorage`;
-- player and trader inventory change signals;
-- `TNPCTradeController`;
-- switch buy/sell;
-- select/look trader goods.
-
-Read-only live correlation is the default. Any purchase/sale experiment requires a harmless, bounded and reversible test with proven ABI/cost semantics.
-
-### Party and shared experience
-
-Targeted inventory surfaced `sendShareExperience`. The experiment programme must separately identify:
-
-- party membership/invite/join/leave state where exposed;
-- leader/member identity and status;
-- shared-experience enable/disable action family;
-- server confirmation/rejection state;
-- any party-hunt analyzer coupling.
-
-### Chat, channels and social state
-
-Static evidence includes:
-
-- `GameclientMessageTalk`;
-- get/open/join/leave/private channel;
-- invite/exclude from channel;
-- close NPC channel;
-- incoming `GameserverMessageTalk`, channel event/channels/open/close/private;
-- `TChatChannelStorage`, `TChatProtocolMessageHandler`, `TChatStorage`, `TTextStorage`;
-- `TFriendsProtocolMessageHandler`;
-- `TVipStorage` and VIP widget model.
-
-The target is structured semantic chat/social state rather than OCR-derived text.
-
-### Skill Wheel, gems and presets
-
-Static evidence includes:
-
-- `GameclientMessageRequestSkillWheel`;
-- `GameclientMessageApplySkillWheel`;
-- `GameserverMessageSkillWheel`;
-- `TSkillWheelStorage`;
-- Gem Atelier inventory state;
-- Skill Wheel dialog/page/preset-management controllers;
-- use-server-wheel-as-current and skill-removal surfaces.
-
-### Forge
-
-Static evidence includes:
-
-- `TExaltationForgeFusionPageController`;
-- `TExaltationForgeTransferPageController`;
-- fusion/resource/source/target object selection;
-- Exaltation Forge/result dialog controllers.
-
-Read-only state discovery precedes any mutating forge operation.
-
-### Monster Bonus Effects, Bestiary/Bosstiary and Prey
-
-Static evidence includes:
-
-- `GameclientMessageMonsterBonusEffectAction`;
-- `GameserverMessageMonsterCyclopediaBonusEffects`;
-- `TMonsterBonusEffectStorage`;
-- unlock/clear/assign bonus-effect UI/controller paths;
-- Bestiary/Bosstiary trackers and dialogs;
-- creature tracker;
-- Prey dialog/render controllers.
-
-No point/currency spending is authorized merely for proof.
-
-### Taskboard, Bounty, Weekly Tasks and Soul Seals
-
-Static evidence includes:
-
-- `TTaskboardProtocolMessageHandler`;
-- taskboard dialog;
-- Bounty and Weekly Task entry points from the kill tracker;
-- `TWeeklyTasksController`;
-- Soul Seals dialog and monster-race ID payload.
-
-This family is now an explicit census/live-experiment target rather than an incidental UI feature.
-
-### Houses
-
-Static evidence includes:
-
-- `THousesStorage`;
-- house information, character houses and limits;
-- house selection;
-- layer bounds;
-- house world-map/viewport integration;
-- move-out/cancel-transfer controller paths;
-- Cyclopedia house actions/results.
-
-Read-only discovery must be separated from financially or ownership-sensitive house actions.
-
-### Rewards, returner state, calendar and news
-
-Static evidence includes:
-
-- Reward Wall controller;
-- resting-area bonuses;
-- fixed/pick-items reward collection paths;
-- returner reward state;
-- Daily Reward item picking;
-- calendar and news controllers/storage.
-
-Collection/spending actions are not required for initial proof.
-
-### Imbuements
-
-Static evidence includes:
-
-- `TImbuementDurationsStorage`;
-- imbued-object changes;
-- imbuing protocol handler/dialog.
-
-The live experiment should prioritize item IDs, slots, duration/expiry and current imbuement metadata as read-only state.
-
-### Weapon Proficiency
-
-Static evidence includes:
-
-- Weapon Proficiency dialog/controller;
-- weapon selection;
-- shape/reshape/options dialogs;
-- inspect-object coupling;
-- object proficiency XP update surface.
-
-Any mutating reshaping is out of initial proof scope.
-
-### Market and economy surfaces
-
-Static evidence includes:
-
-- `TMarketProtocolMessageHandler`;
-- `TMarketStorage`;
-- market item details;
-- own offers/history;
-- offer cancel UI path;
-- Store, premium, transaction history and transfer-credit dialogs.
-
-Initial work is read-only. No real purchase, TC transfer or valuable market mutation is required for proof.
-
-### Quest Log and trackers
-
-Static evidence includes:
-
-- `TQuestLogController`;
-- quest tracker widget;
-- request-open quest log dialog.
-
-The live experiment should determine whether quest IDs/progress are structurally represented and whether updates arrive as dedicated protocol/state mutations or formatted text.
-
-### Analytics/analyzers
-
-`TSidebarWidgetsManager` names the following analyzer widget families:
+Inbound candidates to falsify:
 
 ```text
-Loot Analyzer
-Waste Analyzer
-Impact Analyzer
-Damage Input Analyzer
-Hunting Session Analyzer
-Progress Analyzer
-Analytics Selector
-Party Hunt Analyzer
+H-IN-1 TProtocolMessageQueue is the central semantic spine
+H-IN-2 queue fans out; family handlers/storages are the real semantic boundaries
+H-IN-3 multiple materially independent lanes exist
 ```
 
-Additionally `TGainWasteStorage` exposes looted/wasted items and metrics. The programme must test whether client-normalized XP/damage/loot/waste/supply/party-hunt values can be read directly rather than reconstructed from OCR or chat text.
-
-### Server modal, death and disconnect intelligence
-
-Static evidence includes:
-
-- `TServerModalDialogProtocolMessageHandler` with structured `TServerModalDialogData`;
-- `TGameSessionDisconnectReactionController`;
-- game-session disconnect/modal reactions;
-- death handling with `EDeathType` and `TFairFightFactor`;
-- client-check close paths;
-- world/session connection state.
-
-This is a priority for autonomous agent resilience: detect warning/disconnect/death/session-loss state structurally and checkpoint/recover rather than relying on screenshots.
-
-### Network, latency and connection state
-
-Static evidence includes:
-
-- `TGameserverDualConnection`;
-- connection-used change signals;
-- packet sequence flow processor;
-- `TFPSLatencyIndicatorController`.
-
-Live tests should determine whether latency, connection path, reconnect and sequence state are structurally readable.
-
-### Sound events
-
-Static evidence includes:
-
-- `TGameSessionSoundProvider`;
-- `TSoundStorage`;
-- object ambience stream-count events;
-- sound effect identifiers.
-
-Sound may provide an additional structured event channel for world/UI correlation and should be inventoried, but must not substitute for stronger protocol/runtime evidence.
-
-### Action bars, hotkeys and semantic UI
-
-Static evidence includes:
-
-- action bar controller;
-- assign spell/object/text/passive ability actions;
-- multi-action popup;
-- object assignment with semantic IDs/types;
-- hotkey use-object type;
-- inventory and cooldown coupling;
-- general dialog/window/sidebar/controller state.
-
-The long-term goal is semantic invocation and state inspection without pixel-coordinate clicking.
-
-## Mandatory extension experiments
-
-The current programme explicitly requires extension experiments `E51-E75` in `docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_CENSUS_EXTENSION.md`.
-
-Highest-priority sequence:
-
-1. `E51` unfiltered full census of all 349 generated message types;
-2. `E52` unfiltered QMeta census, removing the earlier feature-name bias;
-3. recover current live runner/login ownership and verify exact current official-client SHA;
-4. structurally prove `IN_GAME` before capability tests;
-5. map common inbound dispatch and outbound action dispatch;
-6. correlate player position, HP/mana, world map/tiles and CreatureStorage;
-7. independently map player trade and party/shared-experience families;
-8. exercise the remaining E53-E75 capability families with read-only or reversible differential controls;
-9. classify every still-unexplained message/class instead of dropping unknowns.
-
-## Evidence policy
-
-Use the programme gates:
+Outbound candidates:
 
 ```text
-G0 STRUCTURAL OBSERVATION
-G1 PASSIVE CORRELATION
-G2 REVERSIBLE ACTION PROOF
-G3 BOUNDED MUTATING ACTION PROOF
-G4 STABLE BRIDGE/API
+H-OUT-1 one common action spine
+H-OUT-2 several family action spines
+H-OUT-3 important features require independent paths
 ```
 
-Do not promote:
+Preserve negative results.
+
+## Causal evidence requirement
+
+Live before/after proximity is not enough in a continuously changing game session.
+
+Use evidence equivalent to:
 
 ```text
-STATIC_PRESENT -> PROVEN LIVE API
-QMeta method name -> safe callable ABI
-protobuf type name -> decoded semantic fields
-UI reaction -> server-authoritative confirmation
+session_epoch
+monotonic timestamp
+stimulus_id
+message direction/type/sequence
+connection lane
+thread
+handler/runtime object
+before_state_hash
+after_state_hash
+normalized semantic delta
 ```
 
-without the required differential/runtime controls.
+Capture a bounded no-stimulus baseline for important new probes so natural regen/movement/timer/chat traffic does not become a false correlation.
 
-All current-address and exact-layout findings are version-fenced. After restart/relogin or client update reacquire PID, PIE base, runtime objects and semantic resolvers.
+## Read/action maturity
 
-## Safety and authorization boundaries
-
-- official native Linux Tibia client Track A only;
-- no Windows/Wine/Proton/mobile/browser evidence as authority;
-- no attacks on server infrastructure or security-control bypass;
-- never print/persist account secrets;
-- do not use valuable inventory, market, store, forge, charm, wheel, reward or house mutations merely for proof;
-- prefer passive/read-only experiments, then harmless reversible actions;
-- do not message random players or interfere with other players;
-- no OCR except login/bootstrap or visual cross-check when structural evidence is unavailable;
-- do not consume owner Codex/API/token credentials unless separately and explicitly authorized.
-
-## Durable files for this work
-
-The current branch/PR carries the following durable research state:
+Track independently:
 
 ```text
-docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_SWEEP.md
-docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_CENSUS_EXTENSION.md
-docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md
-docs/agents/tasks/active/OTC-20260814-official-client-capability-experiment-sweep.md
-docs/agents/handovers/OTC-20260814-official-client-capability-experiment-handover.md
+R0 STATIC_PRESENT
+R1 LIVE_READ
+R2 CAUSAL_READ
+R3 RESTART_STABLE_READ
+R4 BRIDGE_READ
+
+A0 STATIC_PRESENT
+A1 REFERENCE_TRACE
+A2 ABI_MESSAGE_PROVEN
+A3 SERVER_CONFIRMED_ACTION
+A4 BRIDGE_ACTION
 ```
 
-## Current PR state at handover creation
+A readable feature may remain action-unsupported. Do not imply action support from read maturity.
+
+## Action reference-path parity
+
+Before A3/A4 promotion:
 
 ```text
-PR: #293
-title: docs(tibia-re): add official-client capability experiment sweep
-branch: docs/OTC-20260814-official-client-capability-experiment-sweep
-base: main
-previous verified head before this handover commit: edd592b7d187d8b3d6ba7173366a004de5651065
+normal official-client action
+-> normalized outbound semantic message
+-> authoritative result
+
+programmatic candidate action
+-> normalized outbound semantic message
+-> authoritative result
 ```
 
-The previous PR snapshot showed 4 changed files, 1817 additions, 0 deletions, and CI run `31780682389` queued on that previous exact head. This handover commit changes the exact head, so CI must be rechecked on the new head before any green/exact-head closeout claim.
+Semantic message fields/results must match or differences must be explained. Transport sequence/timing/framing may differ.
 
-## Exact next action
+## Exhaustive census expectations
+
+For every generated protocol message extract where resolvable:
+
+- name/direction/namespace;
+- field numbers, names and types;
+- cardinality/oneof/enum values;
+- nested messages;
+- serializer/deserializer;
+- protocol queue method;
+- handler;
+- feature family or explicit `UNCLASSIFIED`;
+- first live experiment;
+- current-client SHA.
+
+For runtime/QMeta census preserve methods/signals/properties and dependency relationships rather than only a flat list.
+
+## Machine-readable durable state
+
+Future execution must create/reuse one canonical Track A evidence root containing logical datasets equivalent to:
 
 ```text
-Refresh PR #293 exact head and exact-head CI after this handover commit. Keep the PR/task open until required documentation validation/CI is green and programme lifecycle rules permit terminal closeout. For runtime continuation, a fresh Track A worker must then resolve live runner/login ownership, current client SHA, structural IN_GAME and execute E51/E52 before relying on the old filtered inventories.
+capabilities.jsonl
+protocol_messages.jsonl
+runtime_types.jsonl
+experiments/<experiment_id>.yaml
+```
+
+Search existing conventions first; do not create duplicate evidence roots.
+
+Human-readable Markdown summarizes the result. Large/raw traces remain referenced artifacts when policy requires.
+
+## Quantitative coverage
+
+Track at least:
+
+```text
+protocol_message_classification_pct
+qmeta_type_classification_pct
+p0_capabilities_with_experiment_pct
+p0_reads_terminal_pct
+p0_actions_terminal_pct
+unknown_inbound_count
+unclassified_runtime_type_count
+restart_validated_capability_count
+```
+
+Every generated message/runtime census entry must be classified or explicitly unclassified/ignored-with-reason. Every P0 capability needs an experiment or explicit blocker/unsupported rationale.
+
+## World/Server Event Intelligence
+
+Treat incoming information as first-class state, not a chat footnote.
+
+Target families include:
+
+- server/system messages;
+- server-save/restart/shutdown/maintenance warnings;
+- forced logout/session invalidation;
+- disconnect/reconnect/kick/death/modal state;
+- raid/world-event/boss announcements;
+- action rejection/errors;
+- private/channel/NPC messages;
+- combat/damage/heal/XP/loot notifications;
+- quest/reward/prey/bestiary/forge notifications;
+- social/party/guild/VIP notifications;
+- every unknown inbound family.
+
+For rare events use:
+
+```text
+STATIC_REACHABLE
+LIVE_OBSERVED
+REPLAY_CONFIRMED
+NOT_OBSERVED
+```
+
+Do not keep workers waiting for a naturally rare event. Investigate sessiondump only as a safe deterministic replay lead.
+
+## Privacy boundary
+
+Do not commit raw unrelated-player private messages or unnecessary player identity data.
+
+Prefer normalized/redacted evidence:
+
+```text
+message type
+channel/type ID
+length
+flags
+hashed/anonymized actor when needed
+sequence/time metadata
+semantic fields
+```
+
+Plain text is limited to owner/test/NPC-generated experiment content or explicitly redacted evidence. Never commit credentials, auth/session tokens, cookies or secret-bearing traces/screenshots.
+
+## Safety boundary
+
+Default live tests to read-only/reversible/no-cost.
+
+Do not for proof alone:
+
+- spend Tibia Coins or substantial gold;
+- destroy/fuse/transfer valuable equipment;
+- spend/reset Forge/Charm/Prey/Wheel resources;
+- create Market purchases/offers;
+- risk valuable items in trade;
+- disturb unrelated players;
+- bypass anti-cheat/client checks;
+- consume owner-funded AI quota without explicit permission for that exact use.
+
+Use `BLOCKED_REQUIRES_OWNER_AUTHORIZATION` when an otherwise useful proof requires a larger irreversible/cost budget.
+
+## Exact next programme action after design merge
+
+```text
+1. Resolve the current official Linux client binary/version/SHA.
+2. Execute S1 exhaustive generated-message census without regex filtering.
+3. Execute S1 exhaustive Tibia-owned QMeta/runtime census.
+4. Build S2 dependency graph and machine-readable registries; classify all entries.
+5. Rank P0 probes by information gain.
+6. Only then resolve live runner/login ownership, enter the world through the approved path and structurally prove IN_GAME.
+7. Start L1 with competing inbound/outbound topology hypotheses plus the causal/noise recorder.
+8. Promote player position + HP/mana + map + CreatureStorage + inventory/containers + chat/world events first.
+9. Persist every material experiment and exactly one continuation action.
 ```

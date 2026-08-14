@@ -17,7 +17,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Find relocation and instruction xrefs to high-value GameAction signals
+      - name: Find instruction xrefs to high-value GameAction signals
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,15 +28,24 @@ jobs:
           toolroot="$state/toolroot"
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
-          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
-          objdump="$toolroot/usr/bin/objdump"; readelf="$toolroot/usr/bin/readelf"
-          [[ -x "$objdump" && -x "$readelf" ]]
           tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
           echo 'TRACK_A_GAMEACTION_SIGNAL_XREF_BEGIN=true'
-          "$readelf" -rW "$client" > "$tmp/relocs.txt"
-          "$objdump" -d -M intel --no-show-raw-insn "$client" > "$tmp/disasm.txt"
-          # Exact function/static-metaobject VAs are independently pinned by successful run 31793188185/job 94744455372.
+
+          # Binutils in the recovered toolroot is not assumed compatible with its injected
+          # LD_LIBRARY_PATH. Prefer the runner's objdump when present, otherwise the toolroot copy.
+          if command -v objdump >/dev/null 2>&1; then objdump="$(command -v objdump)"; else objdump="$toolroot/usr/bin/objdump"; fi
+          [[ -x "$objdump" ]]
+          echo "OBJDUMP_PATH=$objdump"
+          "$objdump" --version | head -n 1 || true
+          set +e
+          "$objdump" -d -M intel "$client" > "$tmp/disasm.txt" 2> "$tmp/objdump.err"
+          obj_rc=$?
+          set -e
+          echo "OBJDUMP_RC=$obj_rc"
+          echo "OBJDUMP_LINES=$(wc -l < "$tmp/disasm.txt")"
+          if [[ -s "$tmp/objdump.err" ]]; then head -n 20 "$tmp/objdump.err"; fi
+          [[ -s "$tmp/disasm.txt" ]]
+
           declare -A targets=(
             [Creatures_sendAttack]=d166f0
             [Creatures_sendFollow]=d164e0
@@ -54,12 +63,10 @@ jobs:
           for name in Creatures_sendAttack Creatures_sendFollow Chat_sendTalkMessage Container_sendMoveObject PlayerTrade_sendTradeObject WorldMap_sendMoveObject Creatures_staticMetaObject Chat_staticMetaObject Container_staticMetaObject PlayerTrade_staticMetaObject WorldMap_staticMetaObject Player_staticMetaObject; do
             hex="${targets[$name]}"
             echo "XREF_TARGET_BEGIN name=$name va=0x$hex"
-            rel_count="$(grep -Eic "(^|[^0-9a-f])0*${hex}([^0-9a-f]|$)|[+]0*${hex}([^0-9a-f]|$)" "$tmp/relocs.txt" || true)"
-            ins_count="$(grep -Eic "(^|[^0-9a-f])0x0*${hex}([^0-9a-f]|$)|(^|[^0-9a-f])0*${hex}([^0-9a-f]|$)" "$tmp/disasm.txt" || true)"
-            echo "RELOCATION_MATCH_COUNT=$rel_count"
-            grep -Ei "(^|[^0-9a-f])0*${hex}([^0-9a-f]|$)|[+]0*${hex}([^0-9a-f]|$)" "$tmp/relocs.txt" | head -n 40 || true
-            echo "INSTRUCTION_MATCH_COUNT=$ins_count"
-            grep -Ein -B3 -A3 "(^|[^0-9a-f])0x0*${hex}([^0-9a-f]|$)|(^|[^0-9a-f])0*${hex}([^0-9a-f]|$)" "$tmp/disasm.txt" | head -n 160 || true
+            # Match resolved target operands/comments, not the instruction line whose own address equals the target.
+            grep -Ein -B4 -A4 "[[:space:],<+#]0*x*0*${hex}([[:space:],>+#]|$)|# [[:space:]]*0*x*0*${hex}([[:space:],>+#]|$)" "$tmp/disasm.txt" \
+              | grep -Ev "^[0-9:-]*[[:space:]]*0*${hex}:" \
+              | head -n 240 || true
             echo "XREF_TARGET_END name=$name"
           done
           echo 'TRACK_A_GAMEACTION_SIGNAL_XREF_COMPLETE=true'

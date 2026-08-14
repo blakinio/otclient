@@ -84,6 +84,8 @@ jobs:
           client="$runtime/bin/client"
           path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
           lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          pxbackend="$(find "$root" \( -type f -o -type l \) -name 'libpxbackend-1.0.so' -print -quit)"
+          [[ -n "$pxbackend" ]]; lib="$lib:${pxbackend%/*}"
           cfg="$root/usr/share/defaults/at-spi2/accessibility.conf"
           registry="$(find "$root" -type f -name at-spi2-registryd -perm -u+x -print -quit)"
           py_path="$root/usr/lib/python3/dist-packages"

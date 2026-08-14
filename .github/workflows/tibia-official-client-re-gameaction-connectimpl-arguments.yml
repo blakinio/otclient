@@ -1,0 +1,106 @@
+name: Track A GameAction connectImpl argument neighborhoods
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-gameaction-connectimpl-arguments.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Disassemble tightly correlated connectImpl argument setup
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+
+          python3 -u - "$client" > "$tmp/candidates.tsv" <<'PY'
+          import struct
+          import sys
+
+          data = open(sys.argv[1], 'rb').read()
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          execs = []
+          for index in range(phnum):
+              offset = phoff + index * phentsz
+              typ, flags, file_offset, va, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', data, offset)
+              if typ == 1 and flags & 1 and filesz:
+                  execs.append((file_offset, file_offset + filesz, va))
+
+          connect_impl_plt = 0x4dd800
+          metaobjects = {
+              0x3085060: 'Creatures',
+              0x30851a0: 'Chat',
+              0x30850a0: 'Container',
+              0x3085360: 'PlayerTrade',
+              0x30850e0: 'WorldMap',
+              0x30852a0: 'Player',
+          }
+          calls = []
+          for file_start, file_end, va_start in execs:
+              for call_offset in range(file_start, file_end - 4):
+                  if data[call_offset] != 0xe8:
+                      continue
+                  callsite = va_start + call_offset - file_start
+                  relative = struct.unpack_from('<i', data, call_offset + 1)[0]
+                  if callsite + 5 + relative != connect_impl_plt:
+                      continue
+                  refs = []
+                  for offset in range(max(file_start, call_offset - 64), call_offset - 6):
+                      if not (0x40 <= data[offset] <= 0x4f and data[offset + 1] == 0x8d):
+                          continue
+                      if data[offset + 2] & 0xc7 != 0x05:
+                          continue
+                      instruction_va = va_start + offset - file_start
+                      displacement = struct.unpack_from('<i', data, offset + 3)[0]
+                      target = instruction_va + 7 + displacement
+                      if target in metaobjects:
+                          refs.append((instruction_va, target, metaobjects[target]))
+                  if refs:
+                      instruction_va, target, family = max(refs)
+                      calls.append((callsite, instruction_va, target, family))
+
+          for callsite, instruction_va, target, family in sorted(calls):
+              print(f'{callsite:#x}\t{instruction_va:#x}\t{callsite-instruction_va}\t{family}\t{target:#x}')
+          PY
+
+          echo 'TRACK_A_GAMEACTION_CONNECTIMPL_ARGUMENTS_BEGIN=true'
+          count="$(wc -l < "$tmp/candidates.tsv")"
+          echo "TIGHT_CANDIDATE_COUNT=$count"
+          [[ "$count" -eq 31 ]]
+          while IFS=$'\t' read -r call meta_ref distance family metaobject; do
+            start=$(printf '0x%x' $((call-160)))
+            end=$(printf '0x%x' $((call+16)))
+            echo "ARGUMENT_CANDIDATE_BEGIN call=$call family=$family meta_ref=$meta_ref distance=$distance metaobject=$metaobject"
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end"
+            echo "ARGUMENT_CANDIDATE_END call=$call"
+          done < "$tmp/candidates.tsv"
+          echo 'CONNECTIMPL_SYSV_ARGS=rdi:sender,rsi:signal,rdx:receiver,rcx:slot,r8:slot_object,r9:connection_type,stack7:types,stack8:sender_metaobject'
+          echo 'TRACK_A_GAMEACTION_CONNECTIMPL_ARGUMENTS_COMPLETE=true'

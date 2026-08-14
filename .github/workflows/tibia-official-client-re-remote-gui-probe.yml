@@ -43,11 +43,16 @@ jobs:
           else
             echo TRACK_A_CLIENT_RUNNING=false
           fi
-          for cmd in x11vnc x0vncserver Xtigervnc vncserver websockify novnc_proxy socat python3; do
-            if command -v "$cmd" >/dev/null 2>&1; then echo "TRACK_A_CMD_${cmd//[^A-Za-z0-9]/_}=true"; else echo "TRACK_A_CMD_${cmd//[^A-Za-z0-9]/_}=false"; fi
+          root="$state/toolroot"
+          path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          for cmd in x11vnc x0vncserver Xtigervnc vncserver websockify novnc_proxy socat python3 xdotool xwd import convert ffmpeg curl wget apt-get dpkg docker; do
+            if PATH="$path" command -v "$cmd" >/dev/null 2>&1; then echo "TRACK_A_CMD_${cmd//[^A-Za-z0-9]/_}=true"; else echo "TRACK_A_CMD_${cmd//[^A-Za-z0-9]/_}=false"; fi
           done
+          if [[ -S /var/run/docker.sock ]]; then echo TRACK_A_DOCKER_SOCKET=true; else echo TRACK_A_DOCKER_SOCKET=false; fi
+          if [[ -r /proc/1/cgroup ]]; then echo TRACK_A_CGROUP="$(tr '\n' ' ' </proc/1/cgroup | head -c 300)"; fi
           echo TRACK_A_HOSTNAME="$(hostname)"
           echo TRACK_A_IPS="$(hostname -I 2>/dev/null | xargs || true)"
+          echo TRACK_A_ROUTE="$(ip route show default 2>/dev/null | head -n1 || true)"
           if command -v ss >/dev/null 2>&1; then
             echo TRACK_A_PORT_5900_LISTENING="$(ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)5900$' && echo true || echo false)"
             echo TRACK_A_PORT_6080_LISTENING="$(ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)6080$' && echo true || echo false)"

@@ -1,0 +1,176 @@
+name: Track A official login receiver runtime probe
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-login-receiver-runtime.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      DISPLAY: ':99'
+      HOME: /home/runner/tibia-receiver-probe-home
+      PACKAGE_BASE: https://static.tibia.com/launcher/tibiaclient-linux-current
+      ASSET_BASE: https://static.tibia.com/launcher/assets-current
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      PROVEN_RUNTIME_COMMIT: 67ae00936cd54b0236035613c313f8d5d3e6598e
+    steps:
+      - name: Reconstruct exact pre-login runtime from pinned proven recipe
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ca-certificates curl python3-yaml
+          mkdir -p /tmp/tibia-runtime /tmp/tibia-proven-steps
+          recipe=/tmp/tibia-proven-v4.yml
+          curl -fsSL --retry 3 --retry-all-errors \
+            "https://raw.githubusercontent.com/blakinio/otclient/${PROVEN_RUNTIME_COMMIT}/.github/workflows/tibia-hosted-complete-assets-no-ocr-login-v4.yml" \
+            -o "$recipe"
+          python3 - "$recipe" <<'PY'
+          import pathlib,sys,yaml
+          p=pathlib.Path(sys.argv[1])
+          doc=yaml.safe_load(p.read_text())
+          steps=doc['jobs']['world-entry']['steps']
+          out=pathlib.Path('/tmp/tibia-proven-steps')
+          wanted={
+              'Install strict no-OCR runtime':'01-install.sh',
+              'Establish pinned userspace WARP':'02-warp.sh',
+              'Reconstruct official package and preserve packed runtime assets':'03-runtime.sh',
+          }
+          seen=set()
+          for step in steps:
+              name=step.get('name')
+              if name not in wanted:
+                  continue
+              run=step.get('run')
+              if not isinstance(run,str):
+                  raise SystemExit(f'missing run body for {name}')
+              path=out/wanted[name]
+              path.write_text(run)
+              path.chmod(0o700)
+              seen.add(name)
+          missing=set(wanted)-seen
+          if missing:
+              raise SystemExit('missing pinned runtime steps: '+','.join(sorted(missing)))
+          print('PINNED_PRELOGIN_RECIPE_EXTRACTED=true')
+          PY
+          for s in 01-install.sh 02-warp.sh 03-runtime.sh; do
+            /usr/bin/bash --noprofile --norc -e -o pipefail "/tmp/tibia-proven-steps/$s"
+          done
+          client="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo EXACT_CLIENT_PRELOGIN_RUNTIME_READY=true
+
+      - name: Recover primary receiver vptr and vtable plus 0x68 target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          report=/tmp/tibia-runtime/receiver-runtime-report.txt
+          : >"$report"
+          exec > >(tee -a "$report") 2>&1
+          nohup Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/tibia-runtime/xvfb.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do xdpyinfo -display :99 >/dev/null 2>&1 && break; sleep 1; done
+          xdpyinfo -display :99 >/dev/null
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          pkg="$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          export CLIENT_PATH="$pkg/bin/client"
+          cd "$pkg"
+          ! ldd "$CLIENT_PATH" | grep -q 'not found'
+
+          cat >/tmp/tibia-runtime/receiver-runtime.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set startup-with-shell off
+          starti
+          python
+          import gdb, os
+          pid=gdb.selected_inferior().pid
+          client=os.environ['CLIENT_PATH']
+          rows=[]
+          for line in open(f'/proc/{pid}/maps',errors='replace'):
+              parts=line.rstrip().split(maxsplit=5)
+              if len(parts)<6:
+                  continue
+              pathname=parts[5]
+              if pathname != client and not pathname.endswith('/Tibia/bin/client'):
+                  continue
+              lo,hi=(int(x,16) for x in parts[0].split('-'))
+              off=int(parts[2],16)
+              rows.append((lo,hi,off,parts[1],pathname))
+          if not rows:
+              raise gdb.GdbError('exact client mapping not found')
+          exec_rows=[r for r in rows if 'x' in r[3]]
+          if not exec_rows:
+              raise gdb.GdbError('exact client executable mapping not found')
+          lo,hi,off,perms,path=exec_rows[0]
+          bias=lo-off
+          module_lo=min(r[0] for r in rows)
+          module_hi=max(r[1] for r in rows)
+          gdb.write(f'LOAD_BIAS=0x{bias:x}\n')
+          gdb.write(f'CLIENT_MAP_START=0x{module_lo:x}\n')
+          gdb.write(f'CLIENT_MAP_END=0x{module_hi:x}\n')
+          gdb.execute(f'set $track_bias = 0x{bias:x}')
+          gdb.execute(f'set $track_module_lo = 0x{module_lo:x}')
+          gdb.execute(f'set $track_module_hi = 0x{module_hi:x}')
+          gdb.Breakpoint(f'*0x{bias+0x7d564f:x}')
+          end
+          continue
+          printf "PRIMARY_CONNECT_HIT=true\n"
+          set $receiver = $rcx
+          set $signal_pmf = *(unsigned long long*)$rdx
+          set $slot_pmf = *(unsigned long long*)$r8
+          set $vptr = *(unsigned long long*)$receiver
+          set $target = *(unsigned long long*)($vptr + 0x68)
+          printf "RECEIVER_RUNTIME=0x%lx\n", (unsigned long)$receiver
+          printf "SIGNAL_PMF_RUNTIME=0x%lx\n", (unsigned long)$signal_pmf
+          printf "SIGNAL_PMF_RVA=0x%lx\n", (unsigned long)$signal_pmf-(unsigned long)$track_bias
+          printf "SLOT_PMF_RUNTIME=0x%lx\n", (unsigned long)$slot_pmf
+          printf "SLOT_PMF_RVA=0x%lx\n", (unsigned long)$slot_pmf-(unsigned long)$track_bias
+          printf "RECEIVER_VPTR_RUNTIME=0x%lx\n", (unsigned long)$vptr
+          printf "RECEIVER_VPTR_RVA=0x%lx\n", (unsigned long)$vptr-(unsigned long)$track_bias
+          printf "VTABLE_PLUS_0X68_TARGET_RUNTIME=0x%lx\n", (unsigned long)$target
+          printf "VTABLE_PLUS_0X68_TARGET_RVA=0x%lx\n", (unsigned long)$target-(unsigned long)$track_bias
+          printf "TARGET_IN_CLIENT_MODULE=%d\n", ((unsigned long)$target >= (unsigned long)$track_module_lo && (unsigned long)$target < (unsigned long)$track_module_hi)
+          printf "TARGET_DISASSEMBLY_BEGIN=true\n"
+          x/96i $target
+          printf "TARGET_DISASSEMBLY_END=true\n"
+          detach
+          quit
+          GDB
+
+          rm -f /tmp/tibia-runtime/gdb-runtime.log
+          set +e
+          timeout 90s proxychains4 -f /tmp/tibia-runtime/proxychains.conf \
+            gdb -q -nx "$CLIENT_PATH" -x /tmp/tibia-runtime/receiver-runtime.gdb \
+            > /tmp/tibia-runtime/gdb-runtime.log 2>&1
+          rc=$?
+          set -e
+          cat /tmp/tibia-runtime/gdb-runtime.log
+          [[ "$rc" == 0 ]]
+          grep -q '^PRIMARY_CONNECT_HIT=true$' /tmp/tibia-runtime/gdb-runtime.log
+          grep -q '^SIGNAL_PMF_RVA=0xcf2950$' /tmp/tibia-runtime/gdb-runtime.log
+          grep -q '^SLOT_PMF_RVA=0xbd36a0$' /tmp/tibia-runtime/gdb-runtime.log
+          grep -q '^TARGET_IN_CLIENT_MODULE=1$' /tmp/tibia-runtime/gdb-runtime.log
+          grep -q '^TARGET_DISASSEMBLY_END=true$' /tmp/tibia-runtime/gdb-runtime.log
+          echo TRACK_A_LOGIN_RECEIVER_RUNTIME_PROBE_COMPLETE=true
+
+      - name: Upload non-secret structural report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-login-receiver-runtime-${{ github.run_id }}
+          path: |
+            /tmp/tibia-runtime/receiver-runtime-report.txt
+            /tmp/tibia-runtime/gdb-runtime.log
+          if-no-files-found: warn
+          retention-days: 7

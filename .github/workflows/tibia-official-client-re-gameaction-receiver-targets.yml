@@ -48,5 +48,7 @@ jobs:
           0xbf3cd0 Creatures-early-receiver
           0xbd3be0 WorldMap-receiver
           0xbcfff0 PlayerTrade-early-receiver
+          0xbc6e20 shared-receiver-submit
+          0x1ab2600 shared-message-selector
           EOF
           echo 'TRACK_A_GAMEACTION_RECEIVER_TARGETS_COMPLETE=true'

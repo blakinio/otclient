@@ -1,4 +1,4 @@
-name: Track A parser caller enumeration
+name: Track A post-map handler disassembly
 on:
   push:
     branches:
@@ -17,7 +17,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Enumerate calls to proven map thing parser
+      - name: Inspect handlers after strip/floor parser group
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,9 +27,10 @@ jobs:
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          gdb_bin="$toolroot/usr/bin/gdb"
-          "$gdb_bin" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex 'disassemble 0xcd7000,0xce3000' > /tmp/track-a-callers.txt 2>&1
-          echo TRACK_A_CALLERS_BEGIN=true
-          grep -n -B18 -A22 -E 'call[[:space:]]+0x19a8a80' /tmp/track-a-callers.txt || true
-          echo TRACK_A_CALLERS_END=true
-          echo TRACK_A_PARSER_CALLERS_ENUMERATED=true
+          "$toolroot/usr/bin/gdb" -q -nx -batch "$client" \
+            -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble 0xcdbf60,0xcdc900' > /tmp/track-a-post-map.txt 2>&1
+          echo TRACK_A_POST_MAP_BEGIN=true
+          cat /tmp/track-a-post-map.txt
+          echo TRACK_A_POST_MAP_END=true
+          echo TRACK_A_POST_MAP_HANDLERS_CAPTURED=true

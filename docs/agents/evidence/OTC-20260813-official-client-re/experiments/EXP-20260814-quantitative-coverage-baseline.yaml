@@ -1,0 +1,63 @@
+schema: otclient.tibia-re.coverage-baseline.v1
+experiment_id: EXP-20260814-quantitative-coverage-baseline
+track: official-client-re
+client:
+  version: 15.32.df7b29
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+source_evidence:
+  protocol_inventory: ../20260814-official-client-protocol-surface-inventory.md
+  qmeta_handler_census: ../20260814-qmeta-handler-census-and-dispatch-map.md
+  qt_connect_census: ../20260814-qt-connect-callsite-census.md
+  gameaction_arguments: ../20260814-gameaction-connectimpl-arguments.md
+metrics:
+  protocol_identifier_inventory:
+    denominator: 349
+    numerator: 349
+    percent: 100.0
+    scope: unique named inbound and outbound Game*Message identifiers only
+    classification: FACT
+    does_not_mean: semantic protocol classification or wire coverage
+  protocol_handler_qmeta_records:
+    denominator: 47
+    numerator: 47
+    percent: 100.0
+    scope: independently inventoried ProtocolMessageHandler classes recovered as relocation-backed QMeta records
+    classification: FACT
+  legacy_qobject_connect_edges:
+    denominator: 41
+    numerator: 40
+    percent: 97.5609756098
+    unclassified: 1
+    scope: legacy string-based QObject::connect callsites only
+    classification: FACT
+  high_information_gameaction_sender_metaobjects:
+    denominator: 31
+    numerator: 29
+    percent: 93.5483870968
+    mismatch: 1
+    unresolved: 1
+    scope: bounded high-information GameAction connectImpl candidate set only
+    classification: FACT
+  direct_qt_connection_semantic_classification:
+    denominator: 2184
+    numerator: UNKNOWN
+    percent: UNKNOWN
+    scope: all direct connectImpl, legacy-connect and disconnectImpl callsites
+    classification: UNKNOWN
+  generated_message_semantic_classification:
+    denominator: 349
+    numerator: UNKNOWN
+    percent: UNKNOWN
+    scope: all named inbound and outbound messages
+    classification: UNKNOWN
+  p0_live_read_coverage:
+    denominator: UNKNOWN
+    numerator: UNKNOWN
+    percent: UNKNOWN
+    classification: UNKNOWN
+rules:
+  - inventory completeness is not semantic-classification completeness
+  - selected-subset percentages must never be presented as global protocol or QMeta coverage
+  - unknown denominators or numerators remain UNKNOWN rather than being estimated
+  - final 95-percent claims require a canonical denominator and item-level classification registry
+next_action: build item-level protocol and Tibia-owned QMeta registries from durable exact-version evidence after the active P2 framing experiment

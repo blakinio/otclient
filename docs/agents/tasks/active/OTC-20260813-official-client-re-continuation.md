@@ -197,6 +197,7 @@ last_progress:
   - persisted the bounded experiment record and selected legacy string-connect neighborhood reconstruction
   - isolated legacy-neighborhood run 31799979849 failure to unavailable system objdump and reused the proven Track A toolroot GDB path
   - completed GDB neighborhood run 31800072490 for all 41 legacy string-connect callsites
+  - completed string-edge run 31800240820 with 40 classified UI/controller edges and one explicit UNCLASSIFIED callsite
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 3
@@ -214,19 +215,19 @@ recovery:
   session_started_at: 2026-08-14T14:00:00+02:00
   checkpointed_at: 2026-08-14T14:17:00+02:00
   last_progress_at: 2026-08-14T14:17:00+02:00
-  phase: static-qt-legacy-connect-string-edges
-  exact_head: 1f73c81a40615b55d81c96283230ac4f2cf67867
+  phase: static-gameaction-connectimpl-correlation
+  exact_head: 5b72f60a17dc67e2e02901a69362f43da0f4c8c4
   pull_request: 289
-  active_operation: persist and push legacy QObject string-edge reconstruction
-  external_run_ids: [31799755489, 31799979849, 31800072490]
+  active_operation: persist legacy string-edge result and prepare GameAction connectImpl correlation
+  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
   checks_used: 2
   status: active
   safe_to_resume: true
-  resume_condition: legacy string-edge workflow is pushed and reaches terminal state
-  next_action: commit and push the legacy string-edge experiment, then inspect its terminal result once
+  resume_condition: high-value connectImpl correlation experiment is implemented and pushed
+  next_action: cross-correlate connectImpl callsites with nearby exact GameAction static-metaobject references
 ```
 
 ## Context checkpoint
@@ -234,7 +235,7 @@ recovery:
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-08-14T12:17:00Z
-head: 1f73c81a40615b55d81c96283230ac4f2cf67867
+head: 5b72f60a17dc67e2e02901a69362f43da0f4c8c4
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: investigating
@@ -250,10 +251,12 @@ proven:
   - synology-otclient-01 is online and successful adjacent Track A workflows select it with otclient/synology
   - repaired callsite census run 31799755489 enumerated 2184 direct calls across three exact PLT targets
   - GDB neighborhood run 31800072490 emitted all 41 bounded legacy callsite disassemblies
+  - string-edge run 31800240820 classified 40 legacy UI/controller edges and retained one explicit UNCLASSIFIED callsite
 derived:
   - the 41 legacy string-based connect calls are the smallest high-information subset for argument reconstruction
+  - high-value GameAction send signals are absent from the recovered legacy string-edge set and should be tested against connectImpl/wrapper paths
 unknown:
-  - validated signal/slot strings and sender/receiver identities for every recovered callsite
+  - receiver identities for the six high-value GameAction send signals
 conflicts: []
 first_failure:
   marker: legacy_neighborhood_disassembler_unavailable
@@ -268,12 +271,13 @@ changed_paths:
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-connect-callsite-census.yaml
+  - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-legacy-connect-string-edges.yaml
 validation:
   - command: YAML safe_load and git diff --check
     result: PASS
     evidence: local exact working tree
 blockers: []
-next_action: commit and push the legacy string-edge experiment, then inspect its terminal result once
+next_action: cross-correlate connectImpl callsites with nearby exact GameAction static-metaobject references
 ```
 
 ## Rejected interpretations
@@ -288,5 +292,5 @@ next_action: commit and push the legacy string-edge experiment, then inspect its
 ## Next action
 
 ```text
-Commit and push the legacy string-edge experiment, then inspect its terminal result once and persist every recovered candidate edge or explicit unclassified callsite.
+Cross-correlate the 2,078 direct `QObject::connectImpl` callsites with nearby exact references to the six version-fenced GameAction static metaobjects, persist every match or a bounded negative result, and avoid broad callsite disassembly until this filter is tested.
 ```

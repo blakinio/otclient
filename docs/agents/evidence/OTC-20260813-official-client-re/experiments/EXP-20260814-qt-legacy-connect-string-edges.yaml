@@ -1,0 +1,47 @@
+experiment_id: EXP-20260814-qt-legacy-connect-string-edges
+objective: Recover candidate signal and slot strings for every direct legacy QObject connect callsite.
+falsifiable_hypothesis: At least one of the 41 legacy string-based QObject connect callsites loads printable signal and slot strings directly before the call.
+client_version: 15.32.df7b29
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+runner: synology-otclient-01
+runtime: native Linux static binary analysis
+pid: not_applicable
+pie_base: not_applicable
+session_epoch: not_applicable
+preconditions:
+  - exact binary SHA check passes
+  - legacy QObject connect PLT target is version-fenced
+runtime_objects: []
+authorized_effects: read-only static analysis
+side_effect_budget:
+  max_gold: 0
+  max_tibia_coins: 0
+  max_items_at_risk: 0
+  max_irreversible_changes: 0
+allowed_targets:
+  - exact official native Linux client binary
+baseline: callsite census run 31799755489 and GDB neighborhood run 31800072490
+stimulus: none
+expected_structural_evidence:
+  - callsite with printable candidate signal and slot strings
+  - explicit UNCLASSIFIED record when either string cannot be resolved
+abort_conditions:
+  - binary SHA mismatch
+  - runner identity mismatch
+rollback: not_applicable
+observed_evidence:
+  run: 31800240820
+  head: 5b72f60a17dc67e2e02901a69362f43da0f4c8c4
+  total: 41
+  classified: 40
+  unclassified: 1
+  unclassified_callsite: 0x84e2a0
+negative_control: printable-string validation rejects non-ASCII and unmapped targets
+repeatability: exact-version deterministic scan
+restart_test: not_applicable_static_enumeration
+result: PROVEN
+confidence_boundary: Candidate legacy Qt UI/controller string edges only; sender/receiver class ownership and protocol/action semantics remain unproven.
+privacy_redactions: none_required
+artifacts:
+  - GitHub Actions run 31800240820
+next_action: Cross-correlate direct QObject connectImpl callsites with nearby exact references to the six high-value GameAction static metaobjects.

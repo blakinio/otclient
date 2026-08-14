@@ -39,3 +39,28 @@ The exact completion markers were `TOTAL_QT_CONNECT_CALLSITES=2184` and `TRACK_A
 Run `31800072490` / job `94765746423` successfully produced all 41 bounded GDB neighborhoods after one failed system-`objdump` availability hypothesis (`31799979849`). The neighborhoods prove that candidate legacy calls commonly load signal and slot string pointers into `rdx` and `r8` immediately before the call, but the raw neighborhood log does not itself validate every pointed-to string.
 
 Next, structurally resolve the nearest printable C-string targets loaded into `rdx` and `r8` for every legacy callsite. Classify every callsite as a recovered candidate edge or explicit `UNCLASSIFIED`, then decide whether any edge belongs to a high-value Tibia protocol/storage/controller path before attempting the larger `connectImpl` population.
+
+## Legacy string-edge result
+
+Run `31800240820` completed on exact head `5b72f60a17dc67e2e02901a69362f43da0f4c8c4` and classified 40 of 41 legacy callsites by resolving the nearest printable C strings loaded into the legacy API's signal (`rdx`) and slot (`r8`) arguments. Ordinal 2 / call `0x84e2a0` remains explicitly `UNCLASSIFIED` because only a `positionInSidebarChanged()` slot candidate was recovered.
+
+All ordinals are accounted for:
+
+| Ordinals | Family | Recovered semantic edge group |
+|---|---|---|
+| 0-1 | chat input | bind/release chat focus |
+| 2 | unclassified | incomplete sidebar-position candidate |
+| 3-7 | world map UI | click, drag start/drop, target selection, unused width |
+| 8 | generic dialog | any-button close request |
+| 9-17 | slot/container UI | click/hover/paging/drag/target/search |
+| 18-19 | chat UI | primary/secondary chat scroll-to-end |
+| 20-23 | context/player UI | context menu, tooltip, store XP boost, stat details |
+| 24-25 | mouse filter | enter/exit |
+| 26-28 | creature UI | hovered/clicked/target-selected creature |
+| 29 | window state | apply window bounds |
+| 30-36 | slot/action UI | repeated slot edges plus `stopClicked -> onStopButtonClicked` |
+| 37-40 | sidebar/layout | maximize/content-size/sidebar-position edges |
+
+These are static UI/controller signal candidates. They do not prove protocol messages, receiver implementation addresses, ABI layouts, server acceptance, or action gates above `A0`.
+
+The absence of the six high-value `send*` GameAction signals from the legacy string-edge set supports a bounded next hypothesis: their receiver connections use `QObject::connectImpl` or a wrapper/indirect path. Cross-correlate the 2,078 `connectImpl` callsites with nearby exact references to the six version-fenced GameAction static metaobjects before broad disassembly.

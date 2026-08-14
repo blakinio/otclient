@@ -1,0 +1,24 @@
+experiment_id: EXP-20260814-protocol-queue-action-builders
+track: A
+client_version: 15.32.df7b29
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+result: PASS
+qmeta_run: 31802808290
+dispatch_run: 31802935253
+builder_run: 31803012968
+facts:
+  class: tibia::protocol::TProtocolMessageQueue
+  qmeta_method_count: 355
+  mapped_action_methods: 14
+  discriminators:
+    go_path: 0x64
+    go_north: 0x65
+    move_object: 0x78
+    trade_object: 0x7d
+    talk: 0x96
+    attack: 0xa1
+    follow: 0xa2
+limits:
+  - discriminators are not promoted to final wire bytes before serializer framing is recovered
+  - exact field layouts remain partially unresolved
+

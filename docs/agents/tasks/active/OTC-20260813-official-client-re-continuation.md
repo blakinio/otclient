@@ -216,11 +216,11 @@ recovery:
   session_started_at: 2026-08-14T14:00:00+02:00
   checkpointed_at: 2026-08-14T16:00:00+02:00
   last_progress_at: 2026-08-14T16:00:00+02:00
-  phase: static-gameaction-receiver-builder-convergence
-  exact_head: d783d609dcb07f29980b5af18bb2df2507a97306
+  phase: static-protocol-queue-serializer-convergence
+  exact_head: 79adf63ea51194d101a279f8d7ba55ff82c858bd
   pull_request: 289
   active_operation: none
-  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307, 31801334150, 31801505722, 31801581157, 31801659100, 31801723690, 31801845276, 31802254026, 31802346130, 31802470787]
+  external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781, 31800999307, 31801334150, 31801505722, 31801581157, 31801659100, 31801723690, 31801845276, 31802254026, 31802346130, 31802470787, 31802657753, 31802808290, 31802935253, 31803012968, 31803088165]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
@@ -228,15 +228,15 @@ recovery:
   status: ready
   safe_to_resume: true
   resume_condition: slot provenance and invoker semantics are committed and pushed
-  next_action: classify the early direct receiver callees and follow the internal-router re-emission edges toward builders and serializers
+  next_action: follow TProtocolMessageQueue sendMessage and queue-processing helpers to exact serializer and network framing
 ```
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-14T14:30:00Z
-head: d783d609dcb07f29980b5af18bb2df2507a97306
+updated_at: 2026-08-14T15:15:00Z
+head: 79adf63ea51194d101a279f8d7ba55ff82c858bd
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
 status: ready
@@ -259,13 +259,15 @@ proven:
   - invoker run 31801845276 proved selected invoke addresses are generic QSlotObject operation/member-pointer dispatchers rather than receiver serializers
   - payload run 31802254026 resolved both slot payload words for all 29 proven sender sites with zero unresolved values
   - QMeta run 31802470787 identifies shared receiver 0x8332d0 as tibia::game::TInternalGameActionRouter, an internal re-emitter rather than serializer
+  - QMeta run 31802808290 identifies tibia::protocol::TProtocolMessageQueue and exact indices for queue, movement and high-value action methods
+  - dispatch/build runs 31802935253 and 31803012968 map concrete builder bodies and internal discriminators for movement, MoveObject, Talk, Attack, Follow and TradeObject
 derived:
   - the 41 legacy string-based connect calls are the smallest high-information subset for argument reconstruction
   - high-value GameAction send signals are absent from the recovered legacy string-edge set and should be tested against connectImpl/wrapper paths
 unknown:
   - receiver identities for the six high-value GameAction send signals
-  - builder/serializer identities downstream of early receivers 0xbf3cd0, 0xbd3be0 and 0xbcfff0
-  - downstream subscribers of TInternalGameActionRouter re-emissions
+  - exact serializer/framing and final network-send path downstream of TProtocolMessageQueue::sendMessage
+  - whether proven internal message discriminators are preserved as final wire bytes
   - pointer-to-member signal indices for the proven sender-metaobject sites
 conflicts: []
 first_failure:
@@ -284,6 +286,8 @@ changed_paths:
   - .github/workflows/tibia-official-client-re-gameaction-slot-invokers.yml
   - .github/workflows/tibia-official-client-re-gameaction-receiver-targets.yml
   - .github/workflows/tibia-official-client-re-shared-receiver-qmeta.yml
+  - .github/workflows/tibia-official-client-re-gameaction-receiver-callee-xrefs.yml
+  - .github/workflows/tibia-official-client-re-protocol-queue-action-dispatch.yml
   - docs/agents/tasks/active/OTC-20260813-official-client-re-continuation.md
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-qt-connect-callsite-census.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-qt-connect-callsite-census.yaml
@@ -293,12 +297,14 @@ changed_paths:
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-gameaction-connectimpl-arguments.yaml
   - docs/agents/evidence/OTC-20260813-official-client-re/20260814-gameaction-slot-provenance.md
   - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-gameaction-slot-provenance.yaml
+  - docs/agents/evidence/OTC-20260813-official-client-re/20260814-protocol-queue-action-builders.md
+  - docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-protocol-queue-action-builders.yaml
 validation:
   - command: YAML safe_load and git diff --check
     result: PASS
     evidence: local exact working tree
 blockers: []
-next_action: classify early direct receiver callees and follow internal-router re-emission edges toward builders and serializers
+next_action: follow TProtocolMessageQueue sendMessage and queue-processing helpers to exact serializer and network framing
 ```
 
 ## Rejected interpretations
@@ -313,5 +319,5 @@ next_action: classify early direct receiver callees and follow internal-router r
 ## Next action
 
 ```text
-Classify the exact callees of early direct receivers `0xbf3cd0`, `0xbd3be0`, and `0xbcfff0`, and follow `TInternalGameActionRouter` re-emission connections until concrete builders or serializers are structurally proven.
+Follow `TProtocolMessageQueue::sendMessage` body `0xde6de0` and queue-processing helpers `0xbc6750`/`0xbc6f00` to the exact serializer, framing and final network-send path; determine whether the internal discriminators are preserved as wire bytes.
 ```

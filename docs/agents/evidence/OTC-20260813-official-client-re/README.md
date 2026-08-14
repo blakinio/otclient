@@ -82,6 +82,11 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - proves the selected invoke functions are generic operation/pointer-to-member dispatchers rather than receiver serializers;
    - redirects concrete receiver recovery to the two-word slot payload.
 
+16. `20260814-protocol-queue-action-builders.md`
+   - identifies `TProtocolMessageQueue`, its 355-method QMeta table and exact selected method indices;
+   - maps movement, MoveObject, Talk, Attack, Follow and TradeObject case entries to concrete builder bodies;
+   - recovers exact internal message discriminators while retaining the wire-byte boundary until serializer convergence.
+
 Current continuation rule:
 
 ```text

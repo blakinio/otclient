@@ -152,19 +152,27 @@ Therefore this direct write site is a file-output path, not the final game-netwo
 
 ## Relation to the previously recovered network owner — UNKNOWN
 
-Existing Track A evidence independently records:
+Canonical Track A task evidence independently records this exact outbound convergence:
 
 ```text
-network owner vtable:          0x2f66350
-network owner slot +0xb0:      0xb5b0f0
-contained subobject +0x88
-contained subobject vtable:    0x2f66288
-contained subobject slot +0xb8: 0xb5b880
-queue object +0x330
-queue helper:                  0x46a7d0
+primary network-owner vtable:        0x308c408
+primary owner slot +0x90:            0x8409d0
+contained subobject at owner +0x88
+contained subobject vtable:          0x2f66288
+contained subobject slot +0xb8:      0xb5b880
 ```
 
-No relation between those vtables and `0xb40630` has yet been proven. In particular, do not infer that either previously recovered `+0x88` object is the same object as the primary login receiver loaded from `[rbx+0x88]` at `0x7d55c8`.
+Source run/job for that promoted convergence:
+
+```yaml
+run_id: 31812572191
+job_id: 94806473825
+result: SUCCESS
+```
+
+No relation between either `0x308c408` or `0x2f66288` and `0xb40630` has yet been proven. In particular, do not infer that the contained network subobject at owner `+0x88` is the same object as the primary login receiver loaded from `[rbx+0x88]` at `0x7d55c8`; identical member offsets in unrelated enclosing classes are not identity evidence.
+
+A short-lived draft of this evidence incorrectly named `0x2f66350` as the primary network-owner vtable. Reconciliation against the canonical active task corrected that mistake before any writer-vtable conclusion was promoted. The canonical primary network-owner address point is `0x308c408`.
 
 ## Corrected proof boundary
 
@@ -174,16 +182,17 @@ No relation between those vtables and `0xb40630` has yet been proven. In particu
 - `0xd0868f` is a QFile write path and can be excluded from the game-socket sink search;
 - Candidate A (`0x7dd3f0`) structurally compares an object's `vtable+0xd0` target against Candidate B (`0xb40630`) before a direct QIODevice write path;
 - the primary login connect call belongs to FDE `0x7d0fe0..0x7d5e4d`;
-- there are zero direct executable calls to slot PMF target `0xbd36a0` in this scan.
+- there are zero direct executable calls to slot PMF target `0xbd36a0` in this scan;
+- canonical outbound evidence promotes primary owner vtable `0x308c408` and contained subobject vtable `0x2f66288`.
 
 ### UNKNOWN
 
 - which remaining QIODevice writer is used by the game connection;
 - class/vtable owning virtual target `0xb40630`;
-- whether `0xb40630` occurs in either known network-owner vtable `0x2f66350` or `0x2f66288`;
+- whether `0xb40630` occurs in either canonical network vtable `0x308c408` or `0x2f66288`;
 - structural relation between the primary login adapter path and the final Qt writer;
 - actual 15.32 game-login wire field order and version representation.
 
 ## Next action
 
-Perform an exact-SHA static vtable/data-reference census centered on `0xb40630`, with explicit reads of known network-owner vtables `0x2f66350` and `0x2f66288` through at least slot `+0xd0`. Recover all direct and RIP/data references to Candidate A/B, resolve any candidate vtable/typeinfo context, and disassemble only the proven callers/owners. If a known network vtable contains `0xb40630`, promote that structural bridge; otherwise keep the paths separate and continue caller/vtable provenance without guessing.
+Perform an exact-SHA static vtable/data-reference census centered on `0xb40630`, with explicit reads of canonical network-owner vtables `0x308c408` and `0x2f66288` through at least slot `+0xd0`. Recover all direct/data references to Candidate A/B, resolve any candidate vtable/typeinfo context, and disassemble only proven callers/owners. If a canonical network vtable contains `0xb40630`, promote that structural bridge; otherwise keep the paths separate and continue caller/vtable provenance without guessing.

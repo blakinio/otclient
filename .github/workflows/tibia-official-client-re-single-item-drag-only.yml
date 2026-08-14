@@ -18,12 +18,13 @@ jobs:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_DISPLAY: ':98'
+      TRACK_WARP_PORT: '25354'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-      - name: Verify Track A and send exactly one adjacent-tile drag
+      - name: Verify connected Track A and send exactly one adjacent-tile drag
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -45,6 +46,34 @@ jobs:
           grep -azFxq "$marker" "/proc/$gp/environ"
           [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
           [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")" == "$gp" ]]
+
+          python3 - "$pid" "$TRACK_WARP_PORT" <<'PY'
+          import os, pathlib, sys
+          pid, port = sys.argv[1], int(sys.argv[2])
+          inodes = set()
+          for fd in pathlib.Path('/proc', pid, 'fd').iterdir():
+              try: target = os.readlink(fd)
+              except OSError: continue
+              if target.startswith('socket:['): inodes.add(target[8:-1])
+          local = direct = udp = 0
+          for name, is_udp in [('tcp',False),('tcp6',False),('udp',True),('udp6',True)]:
+              try: rows = pathlib.Path('/proc',pid,'net',name).read_text().splitlines()[1:]
+              except OSError: continue
+              for row in rows:
+                  c = row.split()
+                  if len(c) < 10 or c[9] not in inodes: continue
+                  rp = int(c[2].rsplit(':',1)[1],16)
+                  if is_udp: udp += 1
+                  elif c[3] == '01':
+                      if rp == port: local += 1
+                      else: direct += 1
+          print(f'TRACK_A_PRE_DRAG_LOCAL_SOCKS_ESTABLISHED={local}')
+          print(f'TRACK_A_PRE_DRAG_DIRECT_ESTABLISHED={direct}')
+          print(f'TRACK_A_PRE_DRAG_UDP_SOCKET_COUNT={udp}')
+          if local < 1 or direct or udp: raise SystemExit(43)
+          PY
+          echo TRACK_A_CONNECTED_WORLD_GATE_PASSED=true
+
           ev="$runtime/map-provenance-persistent-events.tsv"
           strips="$runtime/map-provenance-persistent-strips.tsv"
           [[ -r "$ev" && -r "$strips" ]]
@@ -82,15 +111,15 @@ jobs:
           "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
           "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$out/before.xwd"
           printf '%s\n' "$(date +%s%N)" >"$out/drag-begin-ns.txt"
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 270 205 mousedown 1
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 526 397 mousedown 1
           sleep .25
-          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 302 205
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 526 365
           sleep .25
           "$toolroot/usr/bin/xdotool" mouseup 1
           printf '%s\n' "$(date +%s%N)" >"$out/drag-end-ns.txt"
           echo TRACK_A_SINGLE_ITEM_DRAG_SENT=true
-          echo TRACK_A_SINGLE_ITEM_DRAG_SOURCE=270,205
-          echo TRACK_A_SINGLE_ITEM_DRAG_DESTINATION=302,205
+          echo TRACK_A_SINGLE_ITEM_DRAG_SOURCE=526,397
+          echo TRACK_A_SINGLE_ITEM_DRAG_DESTINATION=526,365
           sleep 3
           kill -0 "$pid"
           kill -0 "$gp"

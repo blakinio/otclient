@@ -66,6 +66,18 @@ jobs:
               while position != -1:
                   slots.add(va_start + position - file_start)
                   position = data.find(needle, position + 1, file_end)
+          shoff = struct.unpack_from('<Q', data, 0x28)[0]
+          shentsz = struct.unpack_from('<H', data, 0x3a)[0]
+          shnum = struct.unpack_from('<H', data, 0x3c)[0]
+          for index in range(shnum):
+              offset = shoff + index * shentsz
+              _, typ, _, _, section_offset, size, _, _, _, entry_size = struct.unpack_from('<IIQQQQIIQQ', data, offset)
+              if typ != 4 or not entry_size:
+                  continue
+              for position in range(section_offset, section_offset + size, entry_size):
+                  relocation_offset, _, addend = struct.unpack_from('<QQq', data, position)
+                  if addend == send_message:
+                      slots.add(relocation_offset)
 
           candidates = {send_message} | slots
           for file_start, file_end, va_start in execs:

@@ -22,12 +22,33 @@ Read these checkpoints chronologically and treat newer directly verified evidenc
    - defines the provenance architecture required before writing canonical OTBM;
    - defines the exact next controlled experiment.
 
+3. `20260814-dynamic-map-callback-live-discrimination.md`
+   - records live discrimination of dynamic map callback candidates;
+   - preserves the exact-version boundary for the promoted dynamic observer.
+
+4. `20260814-official-client-protocol-surface-inventory.md`
+   - exact-binary inventory of `ProtocolMessageHandler`, `handle*Message`, inbound `GameserverMessage*` and outbound `GameclientMessage*` surfaces;
+   - establishes broad structural coverage for map, creature, player, inventory/container, chat, party, trade, market, quest, effects and native actions;
+   - does not claim opcodes, layouts or callable offsets from names alone.
+
+5. `20260814-protocol-handler-qmeta-neighborhoods.md`
+   - maps compact class-local method-name clusters for Chat, Container, Effect, Market, NPC Trade, Player Trade, Quest and Game Event;
+   - records that stripped symbols do not expose `qt_static_metacall` / `staticMetaObject` directly;
+   - keeps Creature/Player handler ownership unresolved where proximity is ambiguous.
+
+6. `20260814-capability-observation-matrix.md`
+   - converts the proven exact-binary surfaces into a conservative observation/action capability matrix;
+   - separates `present`/`clustered` evidence from still-unknown executable offsets, field layouts and runtime invocation proof;
+   - prioritizes MoveCreature/player state/chat/container and movement/MoveObject/Attack/Follow/Trade builder gates.
+
 Current continuation rule:
 
 ```text
-Verify actual in-world state first.
+Verify actual in-world state first before any live-world mutation experiment.
 If logged out/server-save/crashed, use the canonical full restart/login recipe.
 Do not use pre-world GDB attach or bypass BattlEye.
-Post-login, arm the dynamic mutation candidate callbacks before asking the owner to move another item.
+Post-login, preserve the promoted dynamic-map observer until a controlled mutation is available.
+For protocol/action RE, prefer exact-binary static metadata/xref mapping before any invasive runtime action.
+Do not promote string offsets as function offsets and do not promote message names as wire opcodes or field layouts.
 Do not write every observed world object directly into canonical OTBM.
 ```

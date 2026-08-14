@@ -1,0 +1,123 @@
+name: Track A GameAction slot provenance
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-gameaction-slot-provenance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Recover slot invoke and signal-storage provenance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+
+          cat > "$tmp/candidates.tsv" <<'EOF'
+          0x7d6876 Creatures 0x3085060
+          0x7d7857 WorldMap 0x30850e0
+          0x7d858e Player 0x30852a0
+          0x7d8b66 PlayerTrade 0x3085360
+          0x7f8f84 Player 0x30852a0
+          0x7f9016 Player 0x30852a0
+          0x7f90a8 Player 0x30852a0
+          0x7f913a Player 0x30852a0
+          0x7f91cc Player 0x30852a0
+          0x7f925e Player 0x30852a0
+          0x7f92f0 Player 0x30852a0
+          0x7f9382 Player 0x30852a0
+          0x7f9414 Player 0x30852a0
+          0x7f94a6 Player 0x30852a0
+          0x7f9538 Player 0x30852a0
+          0x7f95ca Player 0x30852a0
+          0x7f965c Player 0x30852a0
+          0x7f96ee Player 0x30852a0
+          0x7f9780 Player 0x30852a0
+          0x7ff2c3 Creatures 0x3085060
+          0x7ff3e1 PlayerTrade 0x3085360
+          0x7ff470 Player 0x30852a0
+          0x7ff58e Chat 0x30851a0
+          0x7ffb24 Container 0x30850a0
+          0x804f25 Player 0x30852a0
+          0x8baa7a Player 0x30852a0
+          0x8e6a10 Player 0x30852a0
+          0x927efc Player 0x30852a0
+          0x9ea484 Player 0x30852a0
+          EOF
+
+          echo 'TRACK_A_GAMEACTION_SLOT_PROVENANCE_BEGIN=true'
+          count="$(wc -l < "$tmp/candidates.tsv")"; echo "PROVEN_SENDER_CANDIDATE_COUNT=$count"; [[ "$count" -eq 29 ]]
+          while read -r call family metaobject; do
+            start=$(printf '0x%x' $((call-1024)))
+            end=$(printf '0x%x' $((call+8)))
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end" > "$tmp/gdb.out"
+            python3 -u - "$tmp/gdb.out" "$call" "$family" "$metaobject" <<'PY'
+          import re
+          import sys
+
+          path, call, family, metaobject = sys.argv[1:]
+          rows = []
+          for line in open(path, encoding='utf-8', errors='replace'):
+              match = re.match(r'\s*(0x[0-9a-f]+):\s+(?:[0-9a-f]{2}\s+)+\s*(.*)$', line)
+              if match:
+                  rows.append((int(match.group(1), 16), match.group(2).strip()))
+          call_va = int(call, 16)
+          rows = [(va, text) for va, text in rows if va <= call_va]
+
+          def last_write(register):
+              pattern = re.compile(r'^(?:mov|lea)\s+' + re.escape(register) + r',(.+)$')
+              for va, text in reversed(rows[:-1]):
+                  match = pattern.match(text)
+                  if match:
+                      return f'0x{va:x}:{text}'
+              return 'UNRESOLVED'
+
+          invoker = 'UNRESOLVED'
+          for index in range(len(rows) - 2, -1, -1):
+              va, text = rows[index]
+              stored = re.match(r'^mov\s+QWORD PTR \[(?:rax|r9)\+0x8\],([a-z0-9]+)$', text)
+              if not stored:
+                  continue
+              source = stored.group(1)
+              for source_va, source_text in reversed(rows[:index]):
+                  loaded = re.match(r'^lea\s+' + re.escape(source) + r',.*# (0x[0-9a-f]+)$', source_text)
+                  if loaded:
+                      invoker = f'{loaded.group(1)}@0x{source_va:x}'
+                      break
+              break
+
+          print(
+              f'PROVEN_SITE call={call} family={family} sender_metaobject={metaobject} '
+              f'invoker={invoker} sender_source="{last_write("rsi")}" '
+              f'signal_storage="{last_write("rdx")}" receiver_source="{last_write("rcx")}" '
+              f'slot_storage="{last_write("r8")}" slot_object="{last_write("r9")}"'
+          )
+          PY
+          done < "$tmp/candidates.tsv"
+          echo 'TRACK_A_GAMEACTION_SLOT_PROVENANCE_COMPLETE=true'

@@ -54,7 +54,7 @@ jobs:
             for _ in $(seq 1 30); do kill -0 "$old_gdb" 2>/dev/null || break; sleep .1; done
           fi
 
-          base="$(awk -v exe="$client" '$6==exe && $3 ~ /^00000000/ {split($1,a,"-"); print "0x" a[1]; exit}' "/proc/$pid/maps")"
+          base="$(awk -v exe="$client" 'index($0,exe) && $3=="00000000" {split($1,a,"-"); print "0x" a[1]; exit}' "/proc/$pid/maps")"
           [[ "$base" =~ ^0x[0-9a-fA-F]+$ ]]
           echo TRACK_A_CLIENT_PIE_BASE="$base"
 

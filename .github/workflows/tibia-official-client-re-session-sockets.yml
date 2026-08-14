@@ -1,4 +1,4 @@
-name: Track A post-map handler disassembly
+name: Track A map opcode dispatcher anchor
 on:
   push:
     branches:
@@ -11,13 +11,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 3
+    timeout-minutes: 4
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Inspect handlers after strip/floor parser group
+      - name: Find callers of proven row handlers near runtime dispatcher frame
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,10 +27,14 @@ jobs:
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          out=/tmp/track-a-dispatch-anchor.txt
           "$toolroot/usr/bin/gdb" -q -nx -batch "$client" \
             -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
-            -ex 'disassemble 0xcdbf60,0xcdc900' > /tmp/track-a-post-map.txt 2>&1
-          echo TRACK_A_POST_MAP_BEGIN=true
-          cat /tmp/track-a-post-map.txt
-          echo TRACK_A_POST_MAP_END=true
-          echo TRACK_A_POST_MAP_HANDLERS_CAPTURED=true
+            -ex 'disassemble 0xde0000,0xdf0000' > "$out" 2>&1
+          echo TRACK_A_DISPATCH_ANCHOR_CALLS_BEGIN=true
+          grep -n -B25 -A35 -E 'call[[:space:]]+0xcdbad0|call[[:space:]]+0xcdbb40|call[[:space:]]+0xcdbbb0|call[[:space:]]+0xcdbc20|call[[:space:]]+0xcdbc90|call[[:space:]]+0xcdbe20' "$out" || true
+          echo TRACK_A_DISPATCH_ANCHOR_CALLS_END=true
+          echo TRACK_A_FRAME3_CONTEXT_BEGIN=true
+          grep -n -B160 -A160 'de6fb5' "$out" || true
+          echo TRACK_A_FRAME3_CONTEXT_END=true
+          echo TRACK_A_DISPATCH_ANCHOR_SCAN_PROVEN=true

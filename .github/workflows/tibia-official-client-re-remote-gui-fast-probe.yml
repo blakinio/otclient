@@ -32,7 +32,5 @@ jobs:
           for cmd in x11vnc websockify; do command -v "$cmd" >/dev/null 2>&1 && echo "TRACK_A_CMD_${cmd}=true" || echo "TRACK_A_CMD_${cmd}=false"; done
           for pkg in x11vnc novnc websockify; do dpkg -s "$pkg" >/dev/null 2>&1 && echo "TRACK_A_PKG_${pkg}=installed" || echo "TRACK_A_PKG_${pkg}=missing"; done
           [[ -d /usr/share/novnc ]] && echo TRACK_A_NOVNC_WEBROOT=true || echo TRACK_A_NOVNC_WEBROOT=false
-          [[ -S /var/run/docker.sock ]] && echo TRACK_A_DOCKER_SOCKET=true || echo TRACK_A_DOCKER_SOCKET=false
-          echo TRACK_A_SELF_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$(hostname)")"
-          echo TRACK_A_SELF_NETWORKS="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(hostname)" | xargs)"
-          ps -eo pid,comm,args | grep -E '[a]pt-get|[d]pkg' | head -n10 || true
+          ps -eo pid,etime,stat,wchan:24,comm,args | grep -E '[a]pt-get|[d]pkg' | head -n10 || true
+          dpkg --audit 2>/dev/null | head -n20 || true

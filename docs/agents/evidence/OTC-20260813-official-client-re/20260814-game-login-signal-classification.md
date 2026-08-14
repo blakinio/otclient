@@ -32,12 +32,12 @@ The `IndexOfMethod` path compares the supplied pointer-to-member against the exa
 
 ```text
 PMF 0xcf2950 -> method/signal index 0
-PMF 0xcf2980 -> method/signal index 1
-PMF 0xcf29b0 -> method/signal index 2
-PMF 0xcf29d0 -> method/signal index 3
-PMF 0xcf2a10 -> method/signal index 4
-PMF 0xcf2a50 -> method/signal index 5
-PMF 0xcf2a80 -> method/signal index 6
+PMF 0xcf2980 -> index 1
+PMF 0xcf29b0 -> 2
+PMF 0xcf29d0 -> 3
+PMF 0xcf2a10 -> 4
+PMF 0xcf2a50 -> 5
+PMF 0xcf2a80 -> 6
 ```
 
 The functions also directly confirm their signal indices through `QMetaObject::activate`:
@@ -47,7 +47,7 @@ The functions also directly confirm their signal indices through `QMetaObject::a
 0xcf2980 -> QMetaObject::activate(..., signal_index=1, ...)
 ```
 
-Combining that result with the previously recovered QMeta method order proves:
+Combining that result with the recovered QMeta method order proves:
 
 ```text
 sendLoginMessage          -> signal PMF 0xcf2950
@@ -72,7 +72,7 @@ This corrected interpretation supersedes older provisional register labels from 
 
 ## Primary and secondary consumer paths — PROVEN
 
-The focused connect provenance plus the PMF map now prove the following exact-version paths:
+The focused connect provenance plus the PMF map prove:
 
 ```text
 sendLoginMessage
@@ -90,69 +90,90 @@ sendSecondaryLoginMessage
   slot PMF target:  0xbf3990
 ```
 
-At the primary connect setup, the binary materializes `0xbd36a0` into the slot-PMF storage and `0xcf2950` into the signal-PMF storage before `QObject::connectImpl`. The secondary connect similarly materializes `0xbf3990` and `0xcf2980`.
+At the primary connect setup the receiver is loaded from the enclosing object's `[rbx+0x88]`; the sender is loaded from `[rbx+0x9c0]`.
 
-The `0x7d42xx`/`0x7d41xx` functions are Qt slot-object management/invocation trampolines. The semantically relevant receiver candidate is therefore the captured slot PMF target, not the trampoline.
+## Primary slot-target analysis — PROVEN
+
+Exact-SHA workflow run `31821003485`, job `94833872467`, on `synology-otclient-01` completed successfully and disassembled the primary target `0xbd36a0` plus a secondary control target `0xbf3990`.
+
+The primary function is an adapter/delegator, not a proven final wire serializer. It allocates and initializes a `0x50`-byte intermediate object, transforms/copies selected fields from the signal argument, then dispatches the resulting object through a virtual method on the receiver:
+
+```asm
+0xbd37f3: mov rax,QWORD PTR [r12]
+0xbd37f7: mov rax,QWORD PTR [rax+0x68]
+...
+0xbd381e: mov rdi,r12
+0xbd3821: call rax
+```
+
+At function entry the receiver is preserved in `r12`, so the next exact semantic target is:
+
+```text
+receiver = primary connect receiver loaded from [enclosing_object+0x88]
+receiver_vptr = *(receiver)
+next_target = *(receiver_vptr + 0x68)
+```
+
+Other directly observed adapter structure includes:
+
+```text
+intermediate allocation size: 0x50
+signal argument flags tested at +0x10: bits 0x1, 0x2, 0x4
+signal argument fields structurally accessed: +0x18, +0x20, +0x28, +0x30
+intermediate +0x38 OR=0x2
+intermediate +0x48 = 0x0a
+```
+
+These offsets/flags are structural observations only; their protocol meanings are UNKNOWN and must not be named from guesswork.
+
+The secondary target `0xbf3990` is also adapter-like, which supports treating the `0xbd36a0` virtual dispatch as the next boundary rather than treating the Qt slot itself as the serializer.
 
 ## Corrected claim boundary
 
 ### FACT
 
-- `sendLoginMessage` is QMeta signal index 0.
-- its actual signal PMF is `0xcf2950`.
-- it is connected through `connectImpl @ 0x7d564f`.
-- the connection captures real slot PMF target `0xbd36a0`.
-- `0xcf2ca0` is an InvokeMetaMethod case entry for signal index 0, not a proven serializer.
+- `sendLoginMessage` is QMeta signal index 0 with actual signal PMF `0xcf2950`.
+- it is connected through `connectImpl @ 0x7d564f` to captured slot PMF `0xbd36a0`.
+- `0xcf2ca0` is an InvokeMetaMethod case entry, not the packet builder.
+- `0xbd36a0` constructs an intermediate object and invokes `receiver->vtable[+0x68]`.
+- primary receiver source at connect setup is `[enclosing_object+0x88]`.
 
 ### DISPROVEN
 
 - `0xcf2ca0` is the official game-login packet builder.
-- the `0x7d4220` QSlotObject trampoline itself is the semantic packet serializer.
+- `0x7d4220` QSlotObject trampoline is the semantic serializer.
+- `0xbd36a0` has been proven to be the final wire serializer.
 
 ### UNKNOWN
 
-Until `0xbd36a0` and its downstream calls are structurally analyzed, these remain unknown:
-
-- whether `0xbd36a0` directly serializes the packet or delegates to another function;
-- ordered public/pre-secret fields and widths;
+- exact primary receiver class/vptr;
+- exact function address stored at receiver vtable slot `+0x68`;
+- whether that virtual target directly serializes or delegates further;
+- ordered public/pre-secret wire fields and widths;
 - exact game-socket version representation;
-- asset identifier source/encoding/placement;
-- preview-state presence/placement;
-- RSA-block boundary;
-- checksum/sequence/framing state for the first game-login message.
-
-## Active receiver-target experiment
-
-Track A commit `ba89cb8affc8106974ae1054cb8c3c648bbabf2b` adds:
-
-`.github/workflows/tibia-official-client-re-login-slot-target.yml`
-
-Run `31821003485` is the exact-SHA bounded analysis of:
-
-- primary slot PMF target `0xbd36a0`;
-- secondary control target `0xbf3990`;
-- their direct call graph neighborhoods and non-secret static references.
-
-No result from that run is promoted here until it completes successfully and is inspected.
+- asset identifier placement;
+- RSA boundary and checksum/sequence/framing state.
 
 ## Cross-track promotion contract
 
-Track B may consume this immediately:
+Track B may consume:
 
 ```yaml
 exact_client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-login_message_qmeta: 0x3084fa0
 send_login_message_qmeta_index: 0
 send_login_message_signal_pmf: 0xcf2950
 send_login_message_static_metacall_case: 0xcf2ca0
 send_login_message_connect_call: 0x7d564f
 send_login_message_slot_invoker: 0x7d4220
 send_login_message_slot_target: 0xbd36a0
+send_login_message_receiver_source: enclosing_object_plus_0x88
+slot_target_role: adapter_delegator
+adapter_intermediate_size: 0x50
+adapter_virtual_dispatch_offset: 0x68
+adapter_virtual_dispatch_target: UNKNOWN
 serializer_or_builder_address: UNKNOWN
 ```
 
-Track B must not infer field layout from names or offsets alone. The next promotable protocol contract must come from structural analysis of `0xbd36a0` and its downstream callees.
-
 ## Next action
 
-Analyze `0xbd36a0` as the exact primary receiver candidate, follow its outbound serialization/send callees, derive only non-secret version-fenced structural fields, and then compare that contract field-by-field with Track B `ProtocolGame::sendLoginPacket()`.
+Resolve the exact receiver vptr and `*(vptr+0x68)` target, preferably through an exact-SHA no-credential structural runtime probe or a statically proven receiver-vtable mapping. Then disassemble that target and continue until the actual outbound writer/serializer boundary is proven. Promote only non-secret, version-fenced structural facts to Track B.

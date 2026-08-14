@@ -1,0 +1,155 @@
+name: Track A protobuf descriptor census
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-protobuf-descriptor-census.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Census embedded FileDescriptorProto records
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import re,sys
+          data=open(sys.argv[1],'rb').read()
+          TARGETS={
+            'GameserverMessageMoveCreature','GameserverMessagePlayerDataCurrent',
+            'GameserverMessageContainer','GameserverMessageTalk',
+            'GameclientMessageMoveObject','GameclientMessageAttack','GameclientMessageFollow',
+            'GameclientMessageTalk','GameclientMessageTradeObject','GameclientMessageGoPath',
+            'WorldmapObjectPosition','ObjectIdentifierAndPosition','Coordinate'
+          }
+          def varint(buf,p,end):
+              v=0;s=0
+              for _ in range(10):
+                  if p>=end: raise ValueError('eof')
+                  b=buf[p];p+=1;v|=(b&0x7f)<<s
+                  if not (b&0x80): return v,p
+                  s+=7
+              raise ValueError('varint')
+          def fields(buf,start,end,limit=100000):
+              out=[];p=start;n=0
+              while p<end and n<limit:
+                  n+=1; key,p2=varint(buf,p,end); p=p2
+                  num=key>>3; wt=key&7
+                  if num==0: raise ValueError('zero field')
+                  if wt==0:
+                      v,p=varint(buf,p,end); out.append((num,wt,v,None))
+                  elif wt==1:
+                      if p+8>end: raise ValueError('64')
+                      out.append((num,wt,None,(p,p+8)));p+=8
+                  elif wt==2:
+                      ln,p=varint(buf,p,end)
+                      if ln<0 or p+ln>end: raise ValueError('len')
+                      out.append((num,wt,None,(p,p+ln)));p+=ln
+                  elif wt==5:
+                      if p+4>end: raise ValueError('32')
+                      out.append((num,wt,None,(p,p+4)));p+=4
+                  else: raise ValueError('wire')
+              return out,p
+          def text(span):
+              a,b=span
+              try:return data[a:b].decode('utf-8')
+              except:return None
+          def parse_field(a,b):
+              try:fs,p=fields(data,a,b)
+              except:return None
+              if p!=b:return None
+              d={}
+              for n,w,v,sp in fs:
+                  if n in (1,6) and w==2:
+                      s=text(sp)
+                      if s is not None:d[n]=s
+                  elif n in (3,4,5) and w==0:d[n]=v
+              if not isinstance(d.get(1),str) or not d[1]:return None
+              if 3 not in d:return None
+              return {'name':d[1],'number':d[3],'label':d.get(4),'type':d.get(5),'type_name':d.get(6)}
+          def parse_msg(a,b):
+              try:fs,p=fields(data,a,b)
+              except:return None
+              if p!=b:return None
+              name=None; fl=[]
+              for n,w,v,sp in fs:
+                  if n==1 and w==2:name=text(sp)
+                  elif n==2 and w==2:
+                      f=parse_field(*sp)
+                      if f:fl.append(f)
+              if not name or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*',name):return None
+              return {'name':name,'fields':fl}
+          def parse_file(start,max_end):
+              try:fs,p=fields(data,start,max_end,limit=10000)
+              except:return None
+              name=None;package=None;msgs=[]
+              for n,w,v,sp in fs:
+                  if n==1 and w==2 and name is None:name=text(sp)
+                  elif n==2 and w==2 and package is None:package=text(sp)
+                  elif n==4 and w==2:
+                      m=parse_msg(*sp)
+                      if m:msgs.append(m)
+                  elif n not in (1,2,3,4,5,6,7,8,9,10,11,12,15):
+                      break
+              if not name or not name.endswith('.proto'):return None
+              if not re.fullmatch(r'[A-Za-z0-9_./-]+\.proto',name):return None
+              if not msgs:return None
+              return {'name':name,'package':package,'messages':msgs}
+          # Locate candidate starts by exact protobuf field-1 framing immediately before each *.proto string.
+          candidates=set()
+          for m in re.finditer(rb'[A-Za-z0-9_./-]{1,120}\.proto',data):
+              s=m.group();pos=m.start()
+              for back in range(2,12):
+                  st=pos-back
+                  if st<0 or data[st]!=0x0a:continue
+                  try:ln,p=varint(data,st+1,pos)
+                  except:continue
+                  if p==pos and ln==len(s):candidates.add(st)
+          valid=[]
+          for st in sorted(candidates):
+              # A descriptor is followed by unrelated binary data, so try bounded endings and retain parse with most messages.
+              best=None
+              for span in (4096,8192,16384,32768,65536,131072):
+                  end=min(len(data),st+span)
+                  f=parse_file(st,end)
+                  if f and (best is None or len(f['messages'])>len(best['messages'])):best=f
+              if best: valid.append((st,best))
+          # Deduplicate equivalent descriptors by filename/message signature.
+          uniq=[];seen=set()
+          for st,f in valid:
+              sig=(f['name'],tuple(m['name'] for m in f['messages']))
+              if sig in seen:continue
+              seen.add(sig);uniq.append((st,f))
+          print('TRACK_A_PROTOBUF_DESCRIPTOR_CENSUS_BEGIN=true')
+          print(f'DESCRIPTOR_COUNT={len(uniq)}')
+          found={t:[] for t in TARGETS}
+          for st,f in uniq:
+              print(f'DESCRIPTOR off=0x{st:x} name={f["name"]} package={f["package"] or ""} messages={len(f["messages"])}')
+              for m in f['messages']:
+                  if m['name'] in TARGETS:
+                      found[m['name']].append((f,m))
+                      print(f' TARGET_MESSAGE file={f["name"]} package={f["package"] or ""} name={m["name"]} fields={len(m["fields"])}')
+                      for x in m['fields']:
+                          print('  FIELD name={name} number={number} label={label} type={type} type_name={type_name}'.format(**x))
+          for t in sorted(TARGETS):
+              print(f'TARGET name={t} embedded_descriptor={str(bool(found[t])).lower()}')
+          missing=[t for t in TARGETS if not found[t]]
+          print('TARGET_DESCRIPTOR_NOT_EMBEDDED='+str(bool(missing)).lower())
+          if missing:print('MISSING_TARGETS='+','.join(sorted(missing)))
+          print('TRACK_A_PROTOBUF_DESCRIPTOR_CENSUS_COMPLETE=true')
+          PY

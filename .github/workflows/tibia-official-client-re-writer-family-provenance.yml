@@ -1,0 +1,171 @@
+name: Track A Qt writer family provenance
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-writer-family-provenance.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Recover full relocation and executable provenance for writer family
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          report="$RUNNER_TEMP/track-a-writer-family-provenance.txt"
+          relocs="$RUNNER_TEMP/track-a-writer-family-relocs.txt"
+          frames="$RUNNER_TEMP/track-a-writer-family-frames.txt"
+          : >"$report"
+          exec > >(tee -a "$report") 2>&1
+
+          echo TRACK_A_WRITER_FAMILY_PROVENANCE_BEGIN=true
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo "CLIENT_SIZE=$EXPECTED_CLIENT_SIZE"
+          readelf -WrC "$client" >"$relocs"
+          readelf --debug-dump=frames "$client" >"$frames"
+
+          python3 -u - "$client" "$relocs" "$frames" <<'PY'
+          import re,struct,sys
+          client,reloc_path,frames_path=sys.argv[1:]
+          data=open(client,'rb').read()
+          targets={
+            'TABLE_AP':0x3084c70,
+            'WRITER_SLOT_DEST':0x3084d40,
+            'TABLE_AUX':0x3080678,
+            'HEAD0':0x7dcbd0,
+            'HEAD1':0x7dcbe0,
+            'WRITER0':0xb40630,
+            'WRITER1':0xb40690,
+            'WRITER2':0xb40710,
+          }
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,filesz,memsz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and filesz:loads.append((fo,fo+filesz,va,va+filesz,flags))
+          def off_to_va(off):
+              for fs,fe,base,end,flags in loads:
+                  if fs<=off<fe:return base+off-fs
+          execs=[x for x in loads if x[4]&1]
+
+          # Full readelf relocation lines that touch the local table block.
+          lines=open(reloc_path,errors='replace').read().splitlines()
+          print('TABLE_BLOCK_RELOCATIONS_BEGIN=true')
+          count=0
+          for line in lines:
+              m=re.match(r'^\s*([0-9a-fA-F]+)\s+',line)
+              if not m:continue
+              off=int(m.group(1),16)
+              if 0x3084c00 <= off < 0x3084dc0:
+                  print('RELOC '+line.strip())
+                  count+=1
+          print(f'TABLE_BLOCK_RELOCATION_COUNT={count}')
+          print('TABLE_BLOCK_RELOCATIONS_END=true')
+
+          # Relocation records mentioning one of our target values as addends/text.
+          print('TARGET_RELOCATION_MENTIONS_BEGIN=true')
+          for name,target in targets.items():
+              pat=re.compile(r'(?i)(?:\+\s*)?'+format(target,'x')+r'(?:\b|$)')
+              hits=[line.strip() for line in lines if pat.search(line)]
+              print(f'TARGET_RELOCATION_MENTION_COUNT name={name} target=0x{target:x} count={len(hits)}')
+              for line in hits[:128]:print(f'TARGET_RELOCATION_MENTION name={name} {line}')
+          print('TARGET_RELOCATION_MENTIONS_END=true')
+
+          # Parse FDEs and direct relative calls to executable family members.
+          fdes=[]
+          for line in open(frames_path,errors='replace'):
+              m=re.search(r'pc=([0-9a-fA-F]+)\.\.([0-9a-fA-F]+)',line)
+              if m:fdes.append((int(m.group(1),16),int(m.group(2),16)))
+          def containing(addr):return [(a,b) for a,b in fdes if a<=addr<b]
+          def direct_calls(target):
+              out=[]
+              for fs,fe,base,end,flags in execs:
+                  blob=data[fs:fe];p=0
+                  while True:
+                      p=blob.find(b'\xe8',p)
+                      if p<0:break
+                      if p+5<=len(blob):
+                          site=base+p
+                          got=(site+5+struct.unpack_from('<i',blob,p+1)[0])&0xffffffffffffffff
+                          if got==target:out.append(site)
+                      p+=1
+              return out
+          for name in ('HEAD0','HEAD1','WRITER0','WRITER1','WRITER2'):
+              target=targets[name]
+              print(f'FDE name={name} target=0x{target:x} ranges='+(','.join(f'0x{a:x}-0x{b:x}' for a,b in containing(target)) or 'none'))
+              calls=direct_calls(target)
+              print(f'DIRECT_CALLS name={name} count={len(calls)} sites='+(','.join(hex(x) for x in calls) or 'none'))
+              for site in calls:
+                  print(f'DIRECT_CALLER_FDE name={name} site=0x{site:x} ranges='+(','.join(f'0x{a:x}-0x{b:x}' for a,b in containing(site)) or 'none'))
+
+          # Common RIP-relative LEA and MOV references to the table/data addresses.
+          print('RIP_REFERENCE_CENSUS_BEGIN=true')
+          refs={k:[] for k in ('TABLE_AP','WRITER_SLOT_DEST','TABLE_AUX')}
+          for fs,fe,base,end,flags in execs:
+              blob=data[fs:fe]
+              for p in range(0,len(blob)-7):
+                  # REX + LEA/MOV with mod=00,r/m=101 and disp32.
+                  if not (0x40<=blob[p]<=0x4f and blob[p+1] in (0x8d,0x8b) and (blob[p+2]&0xc7)==0x05):continue
+                  site=base+p
+                  dest=(site+7+struct.unpack_from('<i',blob,p+3)[0])&0xffffffffffffffff
+                  for name in refs:
+                      if dest==targets[name]:refs[name].append((site,blob[p+1]))
+          for name,items in refs.items():
+              print(f'RIP_REF_COUNT name={name} count={len(items)} refs='+(','.join(f'0x{s:x}:{"lea" if op==0x8d else "mov"}' for s,op in items) or 'none'))
+          print('RIP_REFERENCE_CENSUS_END=true')
+          PY
+
+          for spec in \
+            'HEAD0 0x7dcbd0 0x7dcc40' \
+            'HEAD1 0x7dcbe0 0x7dcc80' \
+            'WRITER0 0xb40630 0xb40690' \
+            'WRITER1 0xb40690 0xb40710' \
+            'WRITER2 0xb40710 0xb407b0'; do
+            set -- $spec
+            echo "DISASSEMBLY_BEGIN name=$1 lo=$2 hi=$3"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $2,$3" || true
+            echo "DISASSEMBLY_END name=$1"
+          done
+
+          echo TABLE_MEMORY_SYMBOL_CONTEXT_BEGIN=true
+          "$gdb" -q -nx -batch "$client" -ex 'set pagination off' \
+            -ex 'info symbol 0x3084c70' -ex 'info symbol 0x3084d40' -ex 'info symbol 0x3080678' \
+            -ex 'info symbol 0x7dcbd0' -ex 'info symbol 0x7dcbe0' \
+            -ex 'info symbol 0xb40630' -ex 'info symbol 0xb40690' -ex 'info symbol 0xb40710' || true
+          echo TABLE_MEMORY_SYMBOL_CONTEXT_END=true
+          echo TRACK_A_WRITER_FAMILY_PROVENANCE_COMPLETE=true
+          grep -q '^TRACK_A_WRITER_FAMILY_PROVENANCE_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version writer-family report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-writer-family-provenance-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-writer-family-provenance.txt
+          if-no-files-found: error
+          retention-days: 7

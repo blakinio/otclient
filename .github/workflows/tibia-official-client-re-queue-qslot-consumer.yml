@@ -1,0 +1,163 @@
+name: Track A queue QSlot consumer
+
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-chatgpt-framing-recovery]
+    paths: [.github/workflows/tibia-official-client-re-queue-qslot-consumer.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Recover QSlotObject consumer semantics
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then
+            state="$LEGACY_IMAGE_STATE"
+          else
+            state="$CANONICAL_STATE"
+          fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          env LD_LIBRARY_PATH="$tool_lib" "$gdb" --version >/dev/null
+          report="$RUNNER_TEMP/track-a-queue-qslot-consumer.txt"
+          exec > >(tee -a "$report") 2>&1
+
+          echo 'TRACK_A_QUEUE_QSLOT_CONSUMER_BEGIN=true'
+          echo 'CONNECTION_SITE=0x19716a3'
+          echo 'QUEUE_SIGNAL_WRAPPER=0xde91b0'
+          echo 'QSLOT_INVOKER=0x7dd630'
+          echo 'NEARBY_QIODEVICE_WRITE_CALL=0x7dd563'
+          echo 'QIODEVICE_WRITE_PLT=0x4de370'
+
+          python3 -u - "$client" <<'PY'
+          import hashlib
+          import struct
+          import sys
+
+          data = open(sys.argv[1], 'rb').read()
+          invoker = 0x7dd630
+          write_site = 0x7dd563
+          write_plt = 0x4de370
+          signal = 0xde91b0
+          connection = 0x19716a3
+
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          segments = []
+          for index in range(phnum):
+              off = phoff + index * phentsz
+              typ, flags, file_off, va, _, file_size, mem_size, _ = struct.unpack_from('<IIQQQQQQ', data, off)
+              if typ == 1 and file_size:
+                  segments.append((file_off, file_off + file_size, va, va + mem_size, flags))
+
+          def va_to_off(va):
+              for file_start, file_end, base, mem_end, flags in segments:
+                  if base <= va < base + (file_end - file_start):
+                      return file_start + (va - base)
+              return None
+
+          def executable(va):
+              for file_start, file_end, base, mem_end, flags in segments:
+                  if base <= va < mem_end:
+                      return bool(flags & 1)
+              return False
+
+          print(f'CLIENT_SHA256={hashlib.sha256(data).hexdigest()}')
+          print(f'WRITE_TO_INVOKER_DISTANCE={invoker-write_site}')
+
+          for name, start, size in (
+              ('consumer_cluster', 0x7dd400, 0x400),
+              ('invoker', 0x7dd630, 0x180),
+              ('signal_wrapper', 0xde9180, 0xc0),
+          ):
+              off = va_to_off(start)
+              calls = []
+              jumps = []
+              if off is not None:
+                  blob = data[off:off + size]
+                  for pos in range(0, max(0, len(blob) - 5)):
+                      if blob[pos] not in (0xE8, 0xE9):
+                          continue
+                      site = start + pos
+                      target = site + 5 + struct.unpack_from('<i', blob, pos + 1)[0]
+                      row = (site, target, executable(target))
+                      (calls if blob[pos] == 0xE8 else jumps).append(row)
+              print(f'WINDOW name={name} start=0x{start:x} size=0x{size:x} direct_calls={len(calls)} direct_jumps={len(jumps)}')
+              for site, target, is_exec in calls:
+                  print(f'CALL window={name} site=0x{site:x} target=0x{target:x} executable={str(is_exec).lower()}')
+              for site, target, is_exec in jumps:
+                  print(f'JUMP window={name} site=0x{site:x} target=0x{target:x} executable={str(is_exec).lower()}')
+
+          # Direct executable references to the invoker and signal wrapper.
+          for target_name, target in (('invoker', invoker), ('signal', signal), ('write_plt', write_plt)):
+              refs = []
+              for file_start, file_end, base, mem_end, flags in segments:
+                  if not flags & 1:
+                      continue
+                  blob = data[file_start:file_end]
+                  for pos in range(0, max(0, len(blob) - 7)):
+                      site = base + pos
+                      if blob[pos] == 0xE8:
+                          resolved = site + 5 + struct.unpack_from('<i', blob, pos + 1)[0]
+                          if resolved == target:
+                              refs.append(('call', site))
+                      if 0x40 <= blob[pos] <= 0x4F and blob[pos + 1] == 0x8D and blob[pos + 2] & 0xC7 == 0x05:
+                          resolved = site + 7 + struct.unpack_from('<i', blob, pos + 3)[0]
+                          if resolved == target:
+                              refs.append(('lea', site))
+              print(f'TARGET_REFS name={target_name} target=0x{target:x} count={len(refs)} refs={",".join(kind+":"+hex(site) for kind,site in refs[:128]) if refs else "none"}')
+
+          # Exact bytes around the two closest transport-relevant points.
+          for name, va in (('write_site', write_site), ('invoker', invoker), ('connection', connection)):
+              off = va_to_off(va)
+              blob = data[max(0, off - 32):off + 64] if off is not None else b''
+              print(f'BYTES name={name} va=0x{va:x} minus32_plus64={blob.hex()}')
+          print('TRACK_A_QUEUE_QSLOT_STATIC_COMPLETE=true')
+          PY
+
+          for spec in \
+            'consumer-cluster:0x7dd3c0:0x7dd720' \
+            'invoker-entry:0x7dd610:0x7dd700' \
+            'signal-wrapper:0xde9160:0xde9250' \
+            'connection-exact:0x1971628:0x19716b0'; do
+            name=${spec%%:*}
+            rest=${spec#*:}
+            lo=${rest%%:*}
+            hi=${rest##*:}
+            echo "TARGETED_DISASSEMBLY_BEGIN name=$name lo=$lo hi=$hi"
+            env LD_LIBRARY_PATH="$tool_lib" "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $lo,$hi"
+            echo "TARGETED_DISASSEMBLY_END name=$name"
+          done
+
+          echo 'TRACK_A_QUEUE_QSLOT_CONSUMER_COMPLETE=true'
+          grep -q '^TRACK_A_QUEUE_QSLOT_CONSUMER_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version QSlot consumer report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-queue-qslot-consumer-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-queue-qslot-consumer.txt
+          if-no-files-found: error
+          retention-days: 7

@@ -11,10 +11,11 @@ completion_scope: research_design_only
 merged_design_pr: 293
 merged_design_commit: 42226155ee3afdcef380f6400a2fefc52061ada3
 archive_pr: 294
+archive_merge_commit: 20919503467b7ea4812ac7176f4728be052e90bc
 runtime_claims_by_this_task: none
 runtime_e2e: NOT_APPLICABLE_WITH_REASON
 ownership_release_state: released
-archive_closeout_state: pending_archive_pr_merge
+archive_closeout_state: merged_and_terminal
 ```
 
 ## Result
@@ -72,19 +73,21 @@ The independent audit found exactly these material closeout gaps:
 1. `P1`: the archived record did not persist the independent-audit identity/result before declaring completion;
 2. `P2`: the archived record did not explicitly prove release of the seven formerly owned paths.
 
-Both findings are remediated by this archive-record revision. The audit is therefore recorded as:
+Both findings were remediated in `1c2221c1f77d95fe319d4d2fc73ce184165b359a` before archive merge. Final audit state:
 
 ```yaml
 audit_status: findings_remediated
 open_material_findings_after_remediation: 0
-follow_up_requirement: exact-head CI plus resolution of both review threads before archive PR merge
+review_threads_resolved_before_merge: true
+exact_head_ci_required_job: 94716130408
+exact_head_ci_result: success
 ```
 
 The original design-review report remains design rationale; it is **not** being misrepresented as the independent post-implementation audit. The independent audit evidence is the PR #294 review above.
 
 ## Ownership release
 
-The design task no longer owns any implementation/research path. The following former advisory locks are explicitly released for future correctly claimed Track A tasks after this archive PR merges:
+The design task no longer owns any implementation/research path. The following former advisory locks are explicitly released for future correctly claimed Track A tasks:
 
 ```yaml
 former_owned_paths:
@@ -97,8 +100,8 @@ former_owned_paths:
   - docs/agents/tasks/active/OTC-20260814-official-client-capability-experiment-sweep.md
 ownership:
   state: released
-  reason: research-design PR 293 merged; future runtime work belongs to bounded OTCLIENT-TIBIA-RE execution tasks
-  released_effective_on: merge of archive PR 294
+  reason: research-design PR 293 and archive PR 294 merged; future runtime work belongs to bounded OTCLIENT-TIBIA-RE execution tasks
+  released_effective_on: 20919503467b7ea4812ac7176f4728be052e90bc
 ```
 
 No future worker may treat this archived task as an active ownership claim.
@@ -135,4 +138,4 @@ Exact next programme action:
 Resolve the current official Linux client version/SHA, execute the exhaustive unfiltered S1 protocol/QMeta/runtime census, build the S2 dependency graph and machine-readable registries, rank P0 probes by information gain, then resolve the approved live login/recovery path, structurally prove IN_GAME, and begin L1 causal inbound/outbound topology correlation before promoting position/HP/mana/map/creature/inventory/container/chat/world-event reads.
 ```
 
-No further action belongs to this archived design task after PR #294 merges and its review threads are resolved.
+No further action belongs to this archived design task. PR #294 is merged, both audit findings are remediated, both review threads are resolved, ownership is released, and this archive record is terminal.

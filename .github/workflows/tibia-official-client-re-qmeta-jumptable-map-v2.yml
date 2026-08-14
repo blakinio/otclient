@@ -1,0 +1,64 @@
+name: Track A QMeta jump-table map v2
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-jumptable-map-v2.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Decode exact QMeta case entries with bounded tail search
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0];phentsz=struct.unpack_from('<H',data,0x36)[0];phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def s32(v):return struct.unpack_from('<i',data,va2off(v))[0]
+          groups={
+            'Chat':(0x1d6de6c,['currentlyAvailableChannels','publishGameAction','handleTalkMessage','handleMessageMessage','handleOpenChannelMessage','handleOpenOwnChannelMessage','handleCloseChannelMessage','handleChannelsMessage','handlePrivateChannelMessage','handleChannelEventMessage','handleNpcTalkPartersMessage','onChatProtocolMessageHandlerOptionsChanged','onPlayerCreatureAddedToCreatureStorage'],0xd06130),
+            'Container':(0x1d714b8,['publishGameAction','sendCloseContainerMessage','sendUpContainerMessage','sendSeekInContainerMessage','sendGetObjectInfoMessage','sendContainerActionMessage','requestShowStashMessageDialog','requestShowOrRefreshStashDialog','requestCloseStashDialog','requestOpenDepotSearchWidget','requestCloseDepotSearchWidget','handleSetInventoryMessage','handleDeleteInventoryMessage','handlePlayerInventoryMessage','handleContainerMessage','handleCloseContainerMessage','handleChangeInContainerMessage','handleDeleteInContainerMessage','handleCreateInContainerMessage','handleObjectInfoMessage','handleStashMessage','handleShowMessageDialogMessage','handleSpecialContainersAvailableMessage','handleDepotSearchResultMessage','handleDepotSearchDetailListMessage','handleCloseDepotSearchMessage','requestCloseContainer','requestUpContainer','requestNextPageForContainer','requestPreviousPageForContainer','requestUpdateContainer','requestGetObjectsInfo','requestGetObjectInfo','requestSortContainer','requestMoveContentToManagedContainers'],0xd1e5e0),
+          }
+          print('TRACK_A_QMETA_JUMPTABLE_MAP_V2_BEGIN=true')
+          for cls,(table,names,function_end) in groups.items():
+              entries=[(table+s32(table+i*4))&0xffffffffffffffff for i in range(len(names))]
+              boundaries=sorted(set(entries+[function_end]))
+              print(f'CLASS name={cls} table=0x{table:x} count={len(names)}')
+              for i,(name,entry) in enumerate(zip(names,entries)):
+                  larger=[x for x in boundaries if x>entry]
+                  end=min(larger) if larger else function_end
+                  # Never scan beyond this case's next distinct entry.
+                  o=va2off(entry); tail=None; jmp_at=None
+                  if o is not None and end>entry:
+                      for d in range(max(0,min(end-entry,64)-4)):
+                          if data[o+d]==0xe9 and d+5<=end-entry:
+                              disp=struct.unpack_from('<i',data,o+d+1)[0]
+                              tail=entry+d+5+disp;jmp_at=entry+d;break
+                  print(f' CASE class={cls} index={i} method={name} entry=0x{entry:x} block_end=0x{end:x} direct_jmp={"0x%x"%tail if tail is not None else "none"} jmp_at={"0x%x"%jmp_at if jmp_at is not None else "none"}')
+          print('TRACK_A_QMETA_JUMPTABLE_MAP_V2_COMPLETE=true')
+          PY

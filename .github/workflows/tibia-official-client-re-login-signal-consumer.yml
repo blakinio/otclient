@@ -1,0 +1,193 @@
+name: Track A official login signal consumer provenance
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-login-signal-consumer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: "51965216"
+      LOGIN_QMETA: "0x3084fa0"
+      CONNECT_IMPL_PLT: "0x4dd800"
+    steps:
+      - name: Recover login-signal connectImpl consumers
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+
+          report="$RUNNER_TEMP/track-a-login-signal-consumer.txt"
+          candidates="$RUNNER_TEMP/login-connect-candidates.tsv"
+          : >"$report"; : >"$candidates"
+          exec > >(tee -a "$report") 2>&1
+
+          echo 'TRACK_A_LOGIN_SIGNAL_CONSUMER_BEGIN=true'
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo "LOGIN_QMETA=$LOGIN_QMETA"
+
+          python3 -u - "$client" "$candidates" <<'PY'
+          import struct,sys
+          path,out_path=sys.argv[1:]
+          data=open(path,'rb').read()
+          qmeta=0x3084fa0
+          connect=0x4dd800
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          segs=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,fsz,msz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fsz:
+                  segs.append((fo,fo+fsz,va,flags))
+          execs=[x for x in segs if x[3]&1]
+          def off_to_va(off):
+              for fs,fe,base,flags in segs:
+                  if fs<=off<fe:return base+(off-fs)
+          def va_to_off(va):
+              for fs,fe,base,flags in segs:
+                  if base<=va<base+(fe-fs):return fs+(va-base)
+          calls=[]
+          for fs,fe,base,flags in execs:
+              blob=data[fs:fe]
+              for p in range(0,len(blob)-4):
+                  if blob[p]!=0xe8:continue
+                  site=base+p
+                  dst=site+5+struct.unpack_from('<i',blob,p+1)[0]
+                  if dst==connect:calls.append(site)
+          print(f'CONNECT_IMPL_DIRECT_CALL_COUNT={len(calls)}')
+          candidates=[]
+          for call in calls:
+              lo=max(call-0x380,0)
+              off0=va_to_off(lo); off1=va_to_off(call+5)
+              if off0 is None or off1 is None:continue
+              blob=data[off0:off1]
+              refs=[]
+              for p in range(0,max(0,len(blob)-7)):
+                  site=lo+p
+                  # REX + LEA/MOV reg,[RIP+disp32]
+                  if 0x40<=blob[p]<=0x4f and p+7<=len(blob) and blob[p+1] in (0x8d,0x8b):
+                      modrm=blob[p+2]
+                      if (modrm & 0xc7)==0x05:
+                          dst=site+7+struct.unpack_from('<i',blob,p+3)[0]
+                          if dst==qmeta:refs.append(site)
+                  # no-REX LEA/MOV reg,[RIP+disp32]
+                  if p+6<=len(blob) and blob[p] in (0x8d,0x8b):
+                      modrm=blob[p+1]
+                      if (modrm & 0xc7)==0x05:
+                          dst=site+6+struct.unpack_from('<i',blob,p+2)[0]
+                          if dst==qmeta:refs.append(site)
+              if refs:
+                  candidates.append((call,sorted(set(refs))))
+          with open(out_path,'w') as f:
+              for call,refs in candidates:
+                  f.write(f'0x{call:x}\t'+','.join(f'0x{x:x}' for x in refs)+'\n')
+          print(f'LOGIN_QMETA_CONNECT_CANDIDATE_COUNT={len(candidates)}')
+          for call,refs in candidates:
+              print(f'LOGIN_QMETA_CONNECT_CANDIDATE call=0x{call:x} refs={",".join(hex(x) for x in refs)}')
+          print('LOGIN_QMETA_CONNECT_SCAN_COMPLETE=true')
+          PY
+
+          count=$(wc -l < "$candidates")
+          echo "LOGIN_CONNECT_CANDIDATE_LINES=$count"
+          [[ "$count" -gt 0 ]]
+
+          ordinal=0
+          while IFS=$'\t' read -r call refs; do
+            [[ "$call" =~ ^0x[0-9a-f]+$ ]] || continue
+            (( ordinal += 1 ))
+            (( ordinal <= 48 )) || break
+            start=$(printf '0x%x' $((call-4096)))
+            end=$(printf '0x%x' $((call+16)))
+            dis="$RUNNER_TEMP/login-connect-$ordinal.dis"
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end" > "$dis"
+            echo "LOGIN_CONNECT_PROVENANCE_BEGIN ordinal=$ordinal call=$call qmeta_refs=$refs"
+            python3 -u - "$dis" "$call" <<'PY'
+          import re,sys
+          path,call=sys.argv[1:]
+          call_va=int(call,16)
+          rows=[]
+          for line in open(path,encoding='utf-8',errors='replace'):
+              m=re.match(r'\s*(0x[0-9a-f]+):\s+(?:[0-9a-f]{2}\s+)+\s*(.*)$',line)
+              if m:rows.append((int(m.group(1),16),m.group(2).strip()))
+          rows=[r for r in rows if r[0]<=call_va]
+          regs=r'r(?:ax|bx|cx|dx|si|di|bp|sp|8|9|1[0-5])'
+          def resolve_reg(reg,before,seen=None):
+              seen=set() if seen is None else set(seen)
+              if reg in seen:return f'UNRESOLVED(cycle:{reg})'
+              seen.add(reg)
+              for idx in range(before-1,-1,-1):
+                  va,text=rows[idx]
+                  m=re.match(r'^(?:lea|mov)\s+'+re.escape(reg)+r',(.+)$',text)
+                  if not m:continue
+                  rhs=m.group(1).strip()
+                  targ=re.search(r'# (0x[0-9a-f]+)$',rhs)
+                  if text.startswith('lea ') and targ:return f'{targ.group(1)}@0x{va:x}'
+                  if re.fullmatch(regs,rhs):return resolve_reg(rhs,idx,seen)
+                  if re.fullmatch(r'0x[0-9a-f]+',rhs):return f'{rhs}@0x{va:x}'
+                  return f'UNRESOLVED(0x{va:x}:{text})'
+              return f'UNRESOLVED(no-write:{reg})'
+          invoker='UNRESOLVED(no-invoker-store)'
+          invoker_store='NONE'
+          for idx in range(len(rows)-2,-1,-1):
+              va,text=rows[idx]
+              m=re.match(r'^mov\s+QWORD PTR \[(?:rax|r9)\+0x8\],('+regs+r')$',text)
+              if not m:continue
+              invoker=resolve_reg(m.group(1),idx)
+              invoker_store=f'0x{va:x}:{text}'
+              break
+          def last_write(reg):
+              pat=re.compile(r'^(?:mov|lea)\s+'+re.escape(reg)+r',(.+)$')
+              for va,text in reversed(rows[:-1]):
+                  if pat.match(text):return f'0x{va:x}:{text}'
+              return 'UNRESOLVED'
+          # Recover final three stack pushes immediately preceding connectImpl.
+          pushes=[]
+          for va,text in reversed(rows[:-1]):
+              if text.startswith('push '):
+                  pushes.append(f'0x{va:x}:{text}')
+                  if len(pushes)==3:break
+              elif pushes and va < call_va-0x80:
+                  break
+          print(f'LOGIN_CONNECT_RESULT call={call} slot_invoker={invoker} invoker_store="{invoker_store}" sender_source="{last_write("rsi")}" signal_storage="{last_write("rdx")}" receiver_source="{last_write("rcx")}" slot_storage="{last_write("r8")}" slot_object="{last_write("r9")}" stack_pushes="{" | ".join(reversed(pushes)) if pushes else "UNRESOLVED"}"')
+          PY
+            echo "LOGIN_CONNECT_PROVENANCE_END ordinal=$ordinal"
+          done < "$candidates"
+
+          echo 'TRACK_A_LOGIN_SIGNAL_CONSUMER_COMPLETE=true'
+          grep -q '^TRACK_A_LOGIN_SIGNAL_CONSUMER_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version login consumer report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-login-signal-consumer-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-login-signal-consumer.txt
+          if-no-files-found: error
+          retention-days: 7

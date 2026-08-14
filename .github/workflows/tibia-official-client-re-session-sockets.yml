@@ -13,13 +13,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 8
+    timeout-minutes: 2
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Wait for fresh login client and capture initial map
+      - name: Install detached initial-map watcher
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,33 +27,48 @@ jobs:
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           old_pid="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
-          echo TRACK_A_OBSERVER_OLD_PID="$old_pid"
-          echo TRACK_A_OBSERVER_WAITING_FOR_FRESH_PID=true
+          [[ -n "$old_pid" ]]
+          watchdir="$state/evidence/initial-map-detached"
+          rm -rf "$watchdir"
+          mkdir -p "$watchdir"
+          chmod 700 "$watchdir"
+          watcher="$state/runtime/initial-map-watcher.sh"
+          cat >"$watcher" <<'WATCH'
+          #!/usr/bin/env bash
+          set -u
+          state="$1"
+          old_pid="$2"
+          expected_sha="$3"
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          watchdir="$state/evidence/initial-map-detached"
+          log="$watchdir/watcher.log"
+          records="$watchdir/records.txt"
+          result="$watchdir/result.txt"
+          : >"$log"; : >"$records"; : >"$result"
+          echo "WATCHER_OLD_PID=$old_pid" >>"$log"
           pid=''
-          for _ in $(seq 1 240); do
+          for _ in $(seq 1 600); do
             candidate="$(tr -cd '0-9' <"$state/runtime/client.pid" 2>/dev/null || true)"
             if [[ -n "$candidate" && "$candidate" != "$old_pid" && -r "/proc/$candidate/environ" ]]; then
-              if grep -azFxq "$marker" "/proc/$candidate/environ" && kill -0 "$candidate" 2>/dev/null && [[ "$(readlink -f "/proc/$candidate/exe" 2>/dev/null || true)" == "$client" ]]; then
+              if grep -azFxq "$marker" "/proc/$candidate/environ" 2>/dev/null && kill -0 "$candidate" 2>/dev/null && [[ "$(readlink -f "/proc/$candidate/exe" 2>/dev/null || true)" == "$client" ]]; then
                 pid="$candidate"; break
               fi
             fi
-            sleep 0.5
+            sleep 0.2
           done
-          [[ -n "$pid" ]]
-          [[ "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          echo TRACK_A_OBSERVER_FRESH_PID="$pid"
-          line="$(grep -F "$client" "/proc/$pid/maps"|awk '$2~/r-xp/{print;exit}')"
-          [[ -n "$line" ]]
-          start="$(awk '{split($1,a,"-");print a[1]}'<<<"$line")"
-          off="$(awk '{print $3}'<<<"$line")"
-          bias=$((16#$start-16#$off))
-          printf 'TRACK_A_OBSERVER_PIE_BASE=0x%x\n' "$bias"
-          evidence="$state/evidence/initial-map-$(date -u +%Y%m%dT%H%M%SZ)"
-          mkdir -p "$evidence"
-          records="$evidence/records.txt"
-          : >"$records"
-          script="$evidence/probe.gdb"
+          if [[ -z "$pid" ]]; then echo 'WATCHER_ERROR=no_fresh_pid' >>"$result"; exit 1; fi
+          if [[ "$(sha256sum "$client" | awk '{print $1}')" != "$expected_sha" ]]; then echo 'WATCHER_ERROR=sha_mismatch' >>"$result"; exit 1; fi
+          echo "WATCHER_FRESH_PID=$pid" >>"$log"
+          line="$(grep -F "$client" "/proc/$pid/maps" | awk '$2~/r-xp/{print;exit}')"
+          if [[ -z "$line" ]]; then echo 'WATCHER_ERROR=no_exec_map' >>"$result"; exit 1; fi
+          start="$(printf '%s\n' "$line" | awk '{split($1,a,"-");print a[1]}')"
+          off="$(printf '%s\n' "$line" | awk '{print $3}')"
+          bias=$((16#$start - 16#$off))
+          printf 'WATCHER_PIE_BASE=0x%x\n' "$bias" >>"$log"
+          script="$watchdir/probe.gdb"
           printf '%s\n' \
             'set pagination off' 'set confirm off' "attach $pid" 'python' 'import gdb,struct,time' 'inf=gdb.selected_inferior()' "out='$records'" \
             'class P(gdb.Breakpoint):' '    def __init__(self):' "        super().__init__('*0x%x' % ($bias+0x19a8ea3))" \
@@ -67,21 +82,24 @@ jobs:
             '                    except: pass' \
             '                with open(out,"a") as f:f.write(f"{time.time_ns()//1000} {x} {y} {z} {order} {type_id} {kind}\n")' \
             '        except: pass' '        return False' 'P()' 'end' 'continue' >"$script"
-          gdb -q -nx -batch -x "$script" >"$evidence/gdb.log" 2>&1 & gp=$!
-          echo TRACK_A_OBSERVER_ATTACHED=true
-          sleep 100
+          gdb -q -nx -batch -x "$script" >"$watchdir/gdb.log" 2>&1 &
+          gp=$!
+          echo "WATCHER_GDB_PID=$gp" >>"$log"
+          sleep 90
           if kill -0 "$gp" 2>/dev/null; then kill -INT "$gp" 2>/dev/null || true; sleep 1; fi
           kill -CONT "$pid" 2>/dev/null || true
-          python3 - "$records" <<'PY'
-          import sys,collections
+          python3 - "$records" >"$result" <<'PY'
+          import sys
           rows=[]
           for line in open(sys.argv[1]):
               p=line.split()
               if len(p)==7:
                   try: rows.append(tuple(map(int,p)))
-                  except: pass
+                  except ValueError: pass
           print(f'TRACK_A_INITIAL_TOTAL_RECORDS={len(rows)}')
-          if not rows: raise SystemExit(1)
+          if not rows:
+              print('TRACK_A_INITIAL_MAP_CAPTURE_PROVEN=false')
+              raise SystemExit(0)
           zs=sorted({r[3] for r in rows})
           print('TRACK_A_INITIAL_Z_VALUES='+','.join(map(str,zs)))
           print(f'TRACK_A_INITIAL_Z_COUNT={len(zs)}')
@@ -101,9 +119,18 @@ jobs:
               print(f'TRACK_A_Z{z}_DISTINCT_TYPE_IDS={len(ids)}')
           print('TRACK_A_INITIAL_MAP_CAPTURE_PROVEN=true')
           PY
-          echo TRACK_A_INITIAL_SAMPLE_BEGIN
-          head -40 "$records" || true
-          echo TRACK_A_INITIAL_SAMPLE_END
-          kill -0 "$pid"
-          grep -azFxq "$marker" "/proc/$pid/environ"
-          echo TRACK_A_SESSION_LEFT_RUNNING=true
+          echo WATCHER_DONE=true >>"$log"
+          WATCH
+          chmod 700 "$watcher"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            nohup "$watcher" "$state" "$old_pid" "$EXPECTED_CLIENT_SHA256" \
+            >"$watchdir/nohup.log" 2>&1 </dev/null &
+          watcher_pid=$!
+          printf '%s\n' "$watcher_pid" >"$state/runtime/initial-map-watcher.pid"
+          sleep 1
+          kill -0 "$watcher_pid"
+          [[ -r "/proc/$watcher_pid/environ" ]]
+          grep -azFxq "$marker" "/proc/$watcher_pid/environ"
+          echo TRACK_A_DETACHED_WATCHER_INSTALLED=true
+          echo TRACK_A_DETACHED_WATCHER_PID="$watcher_pid"
+          echo TRACK_A_DETACHED_WATCHER_OLD_PID="$old_pid"

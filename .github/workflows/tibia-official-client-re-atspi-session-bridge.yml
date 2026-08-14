@@ -43,10 +43,12 @@ jobs:
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           root="$state/toolroot"; aptroot="$state/cache/bridge-build-apt"
           mkdir -p "$root" "$aptroot/lists/partial" "$aptroot/archives/partial"; : >"$aptroot/status"
-          apt_opts=(-o "Dir::State::lists=$aptroot/lists" -o "Dir::State::status=$aptroot/status" -o "Dir::Cache::archives=$aptroot/archives" -o APT::Get::List-Cleanup=0)
-          find "$aptroot/lists" -maxdepth 1 -type f -size +0c -print -quit | grep -q . || apt-get "${apt_opts[@]}" update
-          apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install build-essential cmake ninja-build pkg-config qt6-base-dev
-          for archive in "$aptroot"/archives/*.deb; do dpkg-deb -x "$archive" "$root"; done
+          if [[ ! -x "$root/usr/bin/g++" || ! -x "$root/usr/bin/cmake" || ! -d "$root/usr/lib/x86_64-linux-gnu/cmake/Qt6" ]]; then
+            apt_opts=(-o "Dir::State::lists=$aptroot/lists" -o "Dir::State::status=$aptroot/status" -o "Dir::Cache::archives=$aptroot/archives" -o APT::Get::List-Cleanup=0)
+            find "$aptroot/lists" -maxdepth 1 -type f -size +0c -print -quit | grep -q . || apt-get "${apt_opts[@]}" update
+            apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install build-essential cmake ninja-build pkg-config qt6-base-dev
+            for archive in "$aptroot"/archives/*.deb; do dpkg-deb -x "$archive" "$root"; done
+          fi
           mkdir -p "$root/lib/x86_64-linux-gnu"
           for source in "$root/usr/lib/x86_64-linux-gnu"/*; do
             name="${source##*/}"; [[ -e "$root/lib/x86_64-linux-gnu/$name" ]] || ln -s "../../usr/lib/x86_64-linux-gnu/$name" "$root/lib/x86_64-linux-gnu/$name"

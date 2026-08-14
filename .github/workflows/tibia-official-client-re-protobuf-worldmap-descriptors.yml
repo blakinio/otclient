@@ -1,4 +1,4 @@
-name: Track A embedded map proto descriptor decode
+name: Track A embedded worldmap proto descriptor enumeration
 on:
   push:
     branches:
@@ -11,13 +11,13 @@ permissions:
 jobs:
   inspect:
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 6
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Decode serialized FileDescriptorProto for map.proto
+      - name: Enumerate serialized FileDescriptorProto records containing worldmap messages
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -29,34 +29,26 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
 
           python3 - "$client" <<'PY'
-          import sys
+          import re,sys
           data=open(sys.argv[1],'rb').read()
-          marker=b'\x0a\x09map.proto'
-          starts=[]; p=0
-          while True:
-              p=data.find(marker,p)
-              if p<0: break
-              starts.append(p); p+=1
-          print('TRACK_A_MAP_PROTO_MARKERS='+','.join(hex(x) for x in starts))
-
-          def varint(buf,p,end):
-              v=0; s=0
+          def varint(p,end):
+              v=0;s=0
               while p<end and s<70:
-                  c=buf[p]; p+=1; v|=(c&0x7f)<<s
+                  c=data[p];p+=1;v|=(c&0x7f)<<s
                   if not c&0x80:return v,p
                   s+=7
-              raise ValueError('bad varint')
-          def fields(buf,start,end,limit=10000):
-              p=start; out=[]
+              raise ValueError
+          def fields(start,end,limit=200000):
+              p=start;out=[]
               for _ in range(limit):
-                  if p>=end: break
-                  try:k,np=varint(buf,p,end)
+                  if p>=end:break
+                  try:k,p2=varint(p,end)
                   except:break
-                  no=k>>3; wt=k&7
+                  no=k>>3;wt=k&7
                   if no==0 or wt not in (0,1,2,5):break
-                  p=np
+                  p=p2
                   if wt==0:
-                      try:v,p=varint(buf,p,end)
+                      try:v,p=varint(p,end)
                       except:break
                       out.append((no,wt,v,None))
                   elif wt==1:
@@ -66,74 +58,77 @@ jobs:
                       if p+4>end:break
                       out.append((no,wt,None,(p,p+4)));p+=4
                   else:
-                      try:n,p2=varint(buf,p,end)
+                      try:n,p2=varint(p,end)
                       except:break
-                      if n>50_000_000 or p2+n>end:break
+                      if n>20_000_000 or p2+n>end:break
                       out.append((no,wt,n,(p2,p2+n)));p=p2+n
               return out,p
-          def text(span):
-              if not span:return ''
-              b=data[span[0]:span[1]]
-              try:return b.decode('utf-8')
+          def txt(sp):
+              if not sp:return ''
+              try:return data[sp[0]:sp[1]].decode('utf-8')
               except:return ''
-          def parse_field_descriptor(a,b):
-              fs,_=fields(data,a,b)
-              d={}
-              for no,wt,v,sp in fs:
-                  if no in (1,2,6) and wt==2:d[no]=text(sp)
-                  elif no in (3,4,5) and wt==0:d[no]=v
+          def parse_field(sp):
+              fs,_=fields(sp[0],sp[1]);d={}
+              for no,wt,v,s in fs:
+                  if no in (1,2,6) and wt==2:d[no]=txt(s)
+                  elif no in (3,4,5,9) and wt==0:d[no]=v
               return d
-          def parse_descriptor(a,b):
-              fs,_=fields(data,a,b)
-              name=''; fds=[]
+          def parse_msg(sp):
+              fs,_=fields(sp[0],sp[1]);name='';fds=[];nested=[];oneofs=[]
+              for no,wt,v,s in fs:
+                  if no==1 and wt==2:name=txt(s)
+                  elif no==2 and wt==2:fds.append(parse_field(s))
+                  elif no==3 and wt==2:nested.append(parse_msg(s))
+                  elif no==8 and wt==2:
+                      os,_=fields(s[0],s[1]);on=''
+                      for a,b,c,d in os:
+                          if a==1 and b==2:on=txt(d)
+                      oneofs.append(on)
+              return name,fds,nested,oneofs
+
+          # Find plausible FileDescriptorProto starts: field 1 string ending .proto.
+          starts=[]
+          for m in re.finditer(rb'([A-Za-z0-9_./-]{1,120}\.proto)',data):
+              name=m.group(1);n=len(name); pos=m.start()
+              # Search up to 6 bytes backward for tag 0x0a + varint(len).
+              for st in range(max(0,pos-6),pos):
+                  try:
+                      if data[st]!=0x0a:continue
+                      ln,p2=varint(st+1,pos+1)
+                      if p2==pos and ln==n:
+                          starts.append((st,name.decode()));break
+                  except:pass
+          # de-dup starts
+          uniq=[];seen=set()
+          for x in starts:
+              if x[0] not in seen:seen.add(x[0]);uniq.append(x)
+          print(f'TRACK_A_PROTO_DESCRIPTOR_CANDIDATE_COUNT={len(uniq)}')
+          targets={'WorldmapObjectPosition','ObjectPosition','ObjectIdentifierAndPosition','GameserverMessageCreateOnMap','GameserverMessageChangeOnMap','GameserverMessageDeleteOnMap','MapField','MapFieldData','Coordinate'}
+          matched=[]
+          for st,hint in uniq:
+              fs,endp=fields(st,min(len(data),st+2_000_000))
+              fname='';pkg='';msgs=[]
               for no,wt,v,sp in fs:
-                  if no==1 and wt==2:name=text(sp)
-                  elif no==2 and wt==2:fds.append(parse_field_descriptor(*sp))
-              return name,fds
-
-          # Try protobuf runtime first; use candidate lengths until a descriptor parses and
-          # contains the map-position messages we care about.
-          found=False
-          try:
-              from google.protobuf import descriptor_pb2
-              for st in starts:
-                  for size in range(512,200000,256):
-                      if st+size>len(data):break
-                      fd=descriptor_pb2.FileDescriptorProto()
-                      try:fd.ParseFromString(data[st:st+size])
-                      except:continue
-                      names={m.name for m in fd.message_type}
-                      if fd.name=='map.proto' and ('WorldmapObjectPosition' in names or 'ObjectPosition' in names):
-                          print(f'TRACK_A_MAP_PROTO_RUNTIME_PARSE=true start=0x{st:x} trial_size={size} package={fd.package}')
-                          for m in fd.message_type:
-                              if m.name in {'WorldmapObjectPosition','ObjectPosition','ObjectIdentifierAndPosition','MapField','MapFieldData','Coordinate'}:
-                                  print(f'MESSAGE name={m.name}')
-                                  for f in m.field:
-                                      print(f' FIELD name={f.name} number={f.number} label={f.label} type={f.type} type_name={f.type_name} oneof={f.oneof_index if f.HasField("oneof_index") else -1}')
-                          found=True;break
-                  if found:break
-          except Exception as e:
-              print('TRACK_A_PROTOBUF_RUNTIME_UNAVAILABLE_OR_FAILED='+repr(e))
-
-          # Manual top-level recovery: parse from every exact marker and print every nested
-          # DescriptorProto-looking field #4 entry whose name matches target messages.
-          print('TRACK_A_MAP_PROTO_MANUAL_PARSE_BEGIN=true')
-          targets={'WorldmapObjectPosition','ObjectPosition','ObjectIdentifierAndPosition','MapField','MapFieldData','Coordinate'}
-          for st in starts:
-              top,endp=fields(data,st,min(len(data),st+300000))
-              top_name=''; package=''; msgs=[]
-              for no,wt,v,sp in top:
-                  if no==1 and wt==2:top_name=text(sp)
-                  elif no==2 and wt==2:package=text(sp)
+                  if no==1 and wt==2:fname=txt(sp)
+                  elif no==2 and wt==2:pkg=txt(sp)
                   elif no==4 and wt==2:
-                      nm,fds=parse_descriptor(*sp)
-                      if nm:msgs.append((nm,fds,sp))
-              print(f'FILE start=0x{st:x} parsed_end=0x{endp:x} name={top_name!r} package={package!r} message_count={len(msgs)}')
-              for nm,fds,sp in msgs:
-                  if nm in targets:
-                      print(f'MESSAGE name={nm} span=0x{sp[0]:x}-0x{sp[1]:x}')
+                      m=parse_msg(sp)
+                      if m[0]:msgs.append(m)
+              names={m[0] for m in msgs}
+              hit=sorted(names & targets)
+              if hit:
+                  matched.append((st,fname,pkg,hit,msgs,endp))
+          print(f'TRACK_A_PROTO_DESCRIPTOR_MATCH_COUNT={len(matched)}')
+          for st,fname,pkg,hit,msgs,endp in matched:
+              print(f'FILE start=0x{st:x} end=0x{endp:x} name={fname!r} package={pkg!r} hits={",".join(hit)} messages={len(msgs)}')
+              for name,fds,nested,oneofs in msgs:
+                  if name in targets:
+                      print(f'MESSAGE name={name} oneofs={oneofs!r}')
                       for f in fds:
                           print(' FIELD '+ ' '.join(f'{k}={v!r}' for k,v in sorted(f.items())))
-          print('TRACK_A_MAP_PROTO_MANUAL_PARSE_END=true')
-          print('TRACK_A_MAP_PROTO_DESCRIPTOR_DECODE_COMPLETE=true')
+                      for nn,nfds,nnested,noneofs in nested:
+                          print(f' NESTED name={nn} oneofs={noneofs!r}')
+                          for f in nfds:
+                              print('  FIELD '+ ' '.join(f'{k}={v!r}' for k,v in sorted(f.items())))
+          print('TRACK_A_PROTO_DESCRIPTOR_ENUMERATION_COMPLETE=true')
           PY

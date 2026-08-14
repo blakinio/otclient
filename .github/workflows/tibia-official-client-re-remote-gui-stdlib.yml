@@ -1,4 +1,4 @@
-name: Track A dependency-free remote GUI
+name: Track A low-latency noVNC GUI
 
 on:
   push:
@@ -12,111 +12,149 @@ permissions:
 jobs:
   enable:
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Relaunch official client with bundled Qt and verify nonblack browser view
+      - name: Replace BMP polling bridge with x11vnc and noVNC
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ -S /var/run/docker.sock ]]
           [[ -S /tmp/.X11-unix/X98 ]]
+
           state=/work/_otclient_tibia_re_state
           [[ -d "$state" ]] || state=/home/runner/_work/_otclient_tibia_re_state
           root="$state/toolroot"
           runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
           client="$runtime/bin/client"
-          client_lib="$runtime/bin/lib"
-          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
-          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
-          xwd="$root/usr/bin/xwd"
-          xdotool="$root/usr/bin/xdotool"
-          server="$state/runtime/track-a-remote-gui.py"
-          [[ -x "$client" && -d "$client_lib" && -x "$xwd" && -x "$xdotool" && -s "$server" ]]
+          [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          echo TRACK_A_EXACT_CLIENT_VERIFIED=true
 
-          # Stop only an exact stale official-client process, never Xvfb or the GUI bridge.
+          # Do not restart or replace the game client. Require an exact live official client.
+          client_pid=''
           for e in /proc/[0-9]*/exe; do
             [[ -e "$e" ]] || continue
             if [[ "$(readlink -f "$e" 2>/dev/null || true)" == "$client" ]]; then
-              p="${e#/proc/}"; p="${p%/exe}"; kill "$p" 2>/dev/null || true
+              client_pid="${e#/proc/}"; client_pid="${client_pid%/exe}"; break
             fi
           done
-          sleep 1
+          [[ -n "$client_pid" ]]
+          kill -0 "$client_pid"
+          echo TRACK_A_OFFICIAL_CLIENT_REUSED_PID="$client_pid"
 
-          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
-          proxy_conf="$state/config/proxychains.conf"
-          [[ -n "$proxy_lib" && -s "$proxy_conf" ]]
-
-          # The official client bundles Qt 6.9 under Tibia/bin/lib. It MUST precede toolroot,
-          # otherwise toolroot's older libQt6Core is selected and the client exits immediately.
-          cd "$runtime"
-          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-            HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
-            LD_LIBRARY_PATH="$client_lib:$tool_lib" \
-            QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
-            XDG_DATA_DIRS="$root/usr/share:/usr/share" \
-            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
-            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
-            nohup "$client" >"$state/runtime/client-gui.log" 2>&1 </dev/null &
-          pid=$!
-          printf '%s\n' "$pid" >"$state/runtime/client.pid"
-          chmod 600 "$state/runtime/client.pid"
-          echo TRACK_A_CLIENT_STARTED_PID="$pid"
-
-          sleep 12
-          if ! kill -0 "$pid" 2>/dev/null; then
-            echo TRACK_A_CLIENT_START_FAILED=true
-            tail -n 160 "$state/runtime/client-gui.log" || true
-            exit 30
-          fi
-          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
-          echo TRACK_A_OFFICIAL_CLIENT_RUNNING=true
-
-          probe=/tmp/track-a-live.xwd
-          DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xwd" -root -silent -out "$probe"
+          # Prove the display is painted before touching the old browser bridge.
+          tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
+          probe=/tmp/track-a-pre-vnc.xwd
+          DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$root/usr/bin/xwd" -root -silent -out "$probe"
           python3 - "$probe" <<'PY'
           import struct,sys
           d=open(sys.argv[1],'rb').read(); h=struct.unpack('>25I',d[:100])
           assert (h[4],h[5]) == (1920,1080)
           off=h[0]+h[19]*12; payload=d[off:off+h[12]*h[5]]
           nz=sum(1 for b in payload[::64] if b)
-          print(f'TRACK_A_XWD_NONZERO_SAMPLE={nz}')
+          print(f'TRACK_A_PRE_VNC_NONZERO_SAMPLE={nz}')
           assert nz > 100
-          print('TRACK_A_XWD_NONBLACK=true')
           PY
           rm -f "$probe"
+
+          # Download-only + dpkg-deb extraction: never mutate the runner package database.
+          vncroot="$state/runtime/novnc-root"
+          aptroot="$state/cache/novnc-apt"
+          mkdir -p "$vncroot" "$aptroot/lists/partial" "$aptroot/archives/partial"
+          if [[ ! -x "$vncroot/usr/bin/x11vnc" || ! -d "$vncroot/usr/share/novnc" ]]; then
+            rm -f "$aptroot/archives"/*.deb
+            apt_opts=(
+              -o "Dir::State::lists=$aptroot/lists"
+              -o "Dir::Cache::archives=$aptroot/archives"
+              -o APT::Get::List-Cleanup=0
+            )
+            find "$aptroot/lists" -maxdepth 1 -type f -size +0c -print -quit | grep -q . || apt-get "${apt_opts[@]}" update
+            apt-get "${apt_opts[@]}" --yes --download-only --no-install-recommends install x11vnc novnc websockify
+            for archive in "$aptroot"/archives/*.deb; do dpkg-deb -x "$archive" "$vncroot"; done
+          fi
+
+          x11vnc="$vncroot/usr/bin/x11vnc"
+          novnc_web="$vncroot/usr/share/novnc"
+          websockify="$vncroot/usr/bin/websockify"
+          [[ -x "$x11vnc" && -d "$novnc_web" ]]
+          [[ -x "$websockify" ]] || websockify="$(find "$vncroot" -type f -path '*/bin/websockify' -perm -u+x -print -quit)"
+          [[ -n "$websockify" && -x "$websockify" ]]
+
+          vnc_lib="$vncroot/usr/lib/x86_64-linux-gnu:$vncroot/lib/x86_64-linux-gnu:$tool_lib"
+          py_path="$vncroot/usr/lib/python3/dist-packages"
+          mkdir -p "$state/runtime"
+
+          # Root URL stays user-friendly and automatically connects with latency-oriented settings.
+          cat >"$novnc_web/index.html" <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>Track A Tibia noVNC</title>
+          <script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=6&compression=6&show_dot=true&path=websockify');</script>
+          <noscript><a href="/vnc.html?autoconnect=1&resize=scale&quality=6&compression=6&show_dot=true&path=websockify">Open Track A Tibia</a></noscript>
+          HTML
+
+          # Stop only our previous remote-view helpers; never touch Tibia/Xvfb/WARP.
+          old_vnc="$(tr -cd '0-9' <"$state/runtime/x11vnc.pid" 2>/dev/null || true)"
+          old_ws="$(tr -cd '0-9' <"$state/runtime/novnc-websockify.pid" 2>/dev/null || true)"
+          [[ -z "$old_vnc" ]] || kill "$old_vnc" 2>/dev/null || true
+          [[ -z "$old_ws" ]] || kill "$old_ws" 2>/dev/null || true
+          pkill -f '[t]rack-a-remote-gui.py' 2>/dev/null || true
+          sleep 1
+
+          DISPLAY="$TRACK_DISPLAY" LD_LIBRARY_PATH="$vnc_lib" \
+            nohup "$x11vnc" -display "$TRACK_DISPLAY" -rfbport 5901 -localhost \
+              -forever -shared -nopw -xkb -repeat -wait 5 -defer 5 \
+              -o "$state/runtime/x11vnc.log" >/dev/null 2>&1 </dev/null &
+          vnc_pid=$!
+          printf '%s\n' "$vnc_pid" >"$state/runtime/x11vnc.pid"
+
+          PYTHONPATH="$py_path" PATH="$vncroot/usr/bin:$PATH" \
+            nohup "$websockify" --web "$novnc_web" 0.0.0.0:6081 127.0.0.1:5901 \
+              >"$state/runtime/novnc-websockify.log" 2>&1 </dev/null &
+          ws_pid=$!
+          printf '%s\n' "$ws_pid" >"$state/runtime/novnc-websockify.pid"
+
+          sleep 3
+          kill -0 "$vnc_pid"
+          kill -0 "$ws_pid"
+
+          # Verify the VNC server handshake.
+          python3 - <<'PY'
+          import socket
+          s=socket.create_connection(('127.0.0.1',5901),3)
+          banner=s.recv(12)
+          s.close()
+          print('TRACK_A_VNC_BANNER='+banner.decode('ascii','replace').strip())
+          assert banner.startswith(b'RFB ')
+          PY
+
+          # Verify HTTP noVNC assets and a real WebSocket upgrade to websockify.
+          curl -fsS --max-time 5 http://127.0.0.1:6081/ | grep -q 'Track A Tibia noVNC'
+          curl -fsS --max-time 5 http://127.0.0.1:6081/vnc.html | grep -qi 'noVNC'
+          python3 - <<'PY'
+          import base64,os,socket
+          key=base64.b64encode(os.urandom(16)).decode()
+          req=(
+              'GET /websockify HTTP/1.1\r\nHost: 127.0.0.1:6081\r\n'
+              'Upgrade: websocket\r\nConnection: Upgrade\r\n'
+              f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n'
+          ).encode()
+          s=socket.create_connection(('127.0.0.1',6081),3); s.sendall(req); data=s.recv(4096); s.close()
+          first=data.split(b'\r\n',1)[0]
+          print('TRACK_A_WEBSOCKET_STATUS='+first.decode('ascii','replace'))
+          assert b' 101 ' in first
+          PY
 
           self="$(hostname)"
           runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
           image="$(docker inspect -f '{{.Config.Image}}' "$self")"
-          if ! curl -fsS --max-time 3 http://127.0.0.1:6081/ | grep -q 'Track A'; then
-            docker exec -d -u 0 \
-              -e DISPLAY="$TRACK_DISPLAY" -e TRACK_A_XWD="$xwd" -e TRACK_A_XDOTOOL="$xdotool" \
-              -e TRACK_A_TOOL_LIB="$tool_lib" -e TRACK_A_TOOL_PATH="$tool_path" -e TRACK_A_GUI_PORT=6081 \
-              "$self" python3 "$server"
-          fi
-          for _ in $(seq 1 20); do
-            curl -fsS --max-time 2 http://127.0.0.1:6081/ | grep -q 'Track A' && break
-            sleep 1
-          done
-          code="$(curl -sS --max-time 15 -o /tmp/view.bmp -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)"
-          [[ "$code" == 200 && "$(head -c2 /tmp/view.bmp)" == BM ]]
-          python3 - /tmp/view.bmp <<'PY'
-          import sys
-          d=open(sys.argv[1],'rb').read(); off=int.from_bytes(d[10:14],'little')
-          nz=sum(1 for b in d[off::64] if b)
-          print(f'TRACK_A_BROWSER_NONZERO_SAMPLE={nz}')
-          assert nz > 100
-          print('TRACK_A_BROWSER_VIEW_NONBLACK=true')
-          PY
-          rm -f /tmp/view.bmp
+          [[ -n "$runner_ip" && -n "$image" ]]
+          timeout 15s docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
+            "curl -fsS --max-time 5 http://${runner_ip}:6081/ | grep -q 'Track A Tibia noVNC'"
 
-          timeout 20s docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
-            "curl -fsS --max-time 8 http://${runner_ip}:6081/ | grep -q 'Track A'"
+          echo TRACK_A_X11VNC_READY=true
+          echo TRACK_A_NOVNC_READY=true
           echo TRACK_A_DSM_TARGET_VERIFIED="http://${runner_ip}:6081"
           echo TRACK_A_USER_URL=http://synology:6082

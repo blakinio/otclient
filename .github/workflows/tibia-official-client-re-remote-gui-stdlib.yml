@@ -90,7 +90,7 @@ jobs:
 
           ready=false
           for _ in $(seq 1 20); do
-            if curl -fsS --max-time 1 http://127.0.0.1:6081/ 2>/dev/null | grep -q 'Track A Tibia noVNC'; then ready=true; break; fi
+            if curl -fsS --max-time 1 -o /tmp/track-a-root.html http://127.0.0.1:6081/ 2>/dev/null && grep -q 'Track A Tibia noVNC' /tmp/track-a-root.html; then ready=true; break; fi
             sleep .5
           done
           if [[ "$ready" != true ]]; then
@@ -108,7 +108,8 @@ jobs:
           print('TRACK_A_VNC_BANNER='+banner.decode('ascii','replace').strip())
           assert banner.startswith(b'RFB ')
           PY
-          curl -fsS --max-time 5 http://127.0.0.1:6081/vnc.html | grep -qi 'noVNC'
+          curl -fsS --max-time 5 -o /tmp/track-a-vnc.html http://127.0.0.1:6081/vnc.html
+          grep -qi 'noVNC' /tmp/track-a-vnc.html
           python3 - <<'PY'
           import base64,os,socket
           key=base64.b64encode(os.urandom(16)).decode()
@@ -124,7 +125,7 @@ jobs:
           runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
           image="$(docker inspect -f '{{.Config.Image}}' "$self")"
           timeout 15s docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
-            "curl -fsS --max-time 5 http://${runner_ip}:6081/ | grep -q 'Track A Tibia noVNC'"
+            "curl -fsS --max-time 5 -o /tmp/track-a-dsm-root.html http://${runner_ip}:6081/ && grep -q 'Track A Tibia noVNC' /tmp/track-a-dsm-root.html"
 
           echo TRACK_A_X11VNC_READY=true
           echo TRACK_A_NOVNC_READY=true

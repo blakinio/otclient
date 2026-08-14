@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260813-official-client-re-continuation
-status: investigating
+status: ready
 track_id: official-client-re
 alias: OTCLIENT-TIBIA-RE
 branch: ci/OTC-20260813-official-client-re-continuation
@@ -184,11 +184,11 @@ callsite_census:
 
 ```yaml
 checkpoint_version: 5
-updated_at: 2026-08-14T14:17:00+02:00
+updated_at: 2026-08-14T14:30:00+02:00
 owner_resume: explicit
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
-status: investigating
+status: ready
 last_progress:
   - verified xref-v2 run 31789670398 PASS with zero direct selected-literal RIP references
   - verified Qt connect symbol census run 31793668176 PASS
@@ -214,18 +214,18 @@ recovery:
   generation: 1
   session_id: 20260814-track-a-gemma-continuation
   session_started_at: 2026-08-14T14:00:00+02:00
-  checkpointed_at: 2026-08-14T14:17:00+02:00
-  last_progress_at: 2026-08-14T14:17:00+02:00
+  checkpointed_at: 2026-08-14T14:30:00+02:00
+  last_progress_at: 2026-08-14T14:30:00+02:00
   phase: static-gameaction-connectimpl-argument-reconstruction
-  exact_head: 2bebb9615e9cb93fd26014df1f8b36b9ca4bc1ce
+  exact_head: a460030dd2d8b26ccc755cb3e57da3718f063542
   pull_request: 289
-  active_operation: persist GameAction connectImpl correlation result
+  active_operation: none
   external_run_ids: [31799755489, 31799979849, 31800072490, 31800240820, 31800490781]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
   checks_used: 2
-  status: active
+  status: ready
   safe_to_resume: true
   resume_condition: correlation result is committed and pushed
   next_action: disassemble the 31 near candidates and reconstruct connectImpl arguments
@@ -235,11 +235,11 @@ recovery:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-14T12:17:00Z
-head: 2bebb9615e9cb93fd26014df1f8b36b9ca4bc1ce
+updated_at: 2026-08-14T12:30:00Z
+head: a460030dd2d8b26ccc755cb3e57da3718f063542
 branch: ci/OTC-20260813-official-client-re-continuation
 pr: 289
-status: investigating
+status: ready
 context_routes:
   - docs/agents/TIBIA_RESEARCH_TRACKS.md
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md

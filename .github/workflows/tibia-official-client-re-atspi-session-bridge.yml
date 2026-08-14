@@ -183,7 +183,11 @@ jobs:
           pid=$!
           printf '%s\n' "$pid" >"$state/runtime/client.pid"; chmod 600 "$state/runtime/client.pid"
           sleep 10
-          kill -0 "$pid"
+          if ! kill -0 "$pid" 2>/dev/null; then
+            echo TRACK_A_BRIDGED_CLIENT_EARLY_EXIT=true
+            tail -n 120 "$state/runtime/client.log" || true
+            exit 1
+          fi
           [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
           echo TRACK_A_OFFICIAL_CLIENT_RUNNING=true
 

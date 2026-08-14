@@ -17,7 +17,7 @@ jobs:
       TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Enable x11vnc and noVNC on existing Track A display
+      - name: Enable persistent x11vnc and noVNC on Track A
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -40,8 +40,7 @@ jobs:
               client_pid="${e#/proc/}"; client_pid="${client_pid%/exe}"; break
             fi
           done
-          [[ -n "$client_pid" ]]
-          kill -0 "$client_pid"
+          [[ -n "$client_pid" ]]; kill -0 "$client_pid"
           echo TRACK_A_OFFICIAL_CLIENT_REUSED_PID="$client_pid"
 
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
@@ -61,13 +60,9 @@ jobs:
 
           x11vnc="$(command -v x11vnc)"
           websockify="$(command -v websockify)"
-          novnc_web=/usr/share/novnc
-          [[ -x "$x11vnc" && -x "$websockify" && -d "$novnc_web" ]]
-          echo TRACK_A_SYSTEM_X11VNC="$x11vnc"
-          echo TRACK_A_SYSTEM_WEBSOCKIFY="$websockify"
-
+          [[ -x "$x11vnc" && -x "$websockify" && -d /usr/share/novnc ]]
           mkdir -p "$state/runtime/novnc-web"
-          cp -a "$novnc_web"/. "$state/runtime/novnc-web/"
+          cp -a /usr/share/novnc/. "$state/runtime/novnc-web/"
           novnc_web="$state/runtime/novnc-web"
           cat >"$novnc_web/index.html" <<'HTML'
           <!doctype html><meta charset="utf-8"><title>Track A Tibia noVNC</title>
@@ -75,47 +70,50 @@ jobs:
           <noscript><a href="/vnc.html?autoconnect=1&resize=scale&quality=6&compression=6&show_dot=true&path=websockify">Open Track A Tibia</a></noscript>
           HTML
 
-          old_vnc="$(tr -cd '0-9' <"$state/runtime/x11vnc.pid" 2>/dev/null || true)"
-          old_ws="$(tr -cd '0-9' <"$state/runtime/novnc-websockify.pid" 2>/dev/null || true)"
-          [[ -z "$old_vnc" ]] || kill "$old_vnc" 2>/dev/null || true
-          [[ -z "$old_ws" ]] || kill "$old_ws" 2>/dev/null || true
+          if [[ -f "$state/runtime/x11vnc.pid" ]]; then kill "$(cat "$state/runtime/x11vnc.pid")" 2>/dev/null || true; fi
+          if [[ -f "$state/runtime/novnc-websockify.pid" ]]; then kill "$(cat "$state/runtime/novnc-websockify.pid")" 2>/dev/null || true; fi
           pkill -f '[t]rack-a-remote-gui.py' 2>/dev/null || true
           sleep 1
 
-          DISPLAY="$TRACK_DISPLAY" \
+          env -u RUNNER_TRACKING_ID DISPLAY="$TRACK_DISPLAY" \
             nohup "$x11vnc" -display "$TRACK_DISPLAY" -rfbport 5901 -localhost \
               -forever -shared -nopw -xkb -repeat -wait 5 -defer 5 \
               -o "$state/runtime/x11vnc.log" >/dev/null 2>&1 </dev/null &
           vnc_pid=$!
           printf '%s\n' "$vnc_pid" >"$state/runtime/x11vnc.pid"
 
-          nohup "$websockify" --web "$novnc_web" 0.0.0.0:6081 127.0.0.1:5901 \
-            >"$state/runtime/novnc-websockify.log" 2>&1 </dev/null &
+          env -u RUNNER_TRACKING_ID \
+            nohup "$websockify" --web "$novnc_web" --verbose 6081 127.0.0.1:5901 \
+              >"$state/runtime/novnc-websockify.log" 2>&1 </dev/null &
           ws_pid=$!
           printf '%s\n' "$ws_pid" >"$state/runtime/novnc-websockify.pid"
 
-          sleep 3
-          if ! kill -0 "$vnc_pid" 2>/dev/null; then cat "$state/runtime/x11vnc.log" || true; exit 31; fi
-          if ! kill -0 "$ws_pid" 2>/dev/null; then cat "$state/runtime/novnc-websockify.log" || true; exit 32; fi
+          ready=false
+          for _ in $(seq 1 20); do
+            if curl -fsS --max-time 1 http://127.0.0.1:6081/ 2>/dev/null | grep -q 'Track A Tibia noVNC'; then ready=true; break; fi
+            sleep .5
+          done
+          if [[ "$ready" != true ]]; then
+            echo TRACK_A_NOVNC_LISTENER_FAILED=true
+            ss -ltnp 2>/dev/null | grep -E ':(5901|6081)\b' || true
+            echo X11VNC_LOG_BEGIN; cat "$state/runtime/x11vnc.log" 2>/dev/null || true; echo X11VNC_LOG_END
+            echo WEBSOCKIFY_LOG_BEGIN; cat "$state/runtime/novnc-websockify.log" 2>/dev/null || true; echo WEBSOCKIFY_LOG_END
+            exit 33
+          fi
+          kill -0 "$vnc_pid"; kill -0 "$ws_pid"
 
           python3 - <<'PY'
           import socket
-          s=socket.create_connection(('127.0.0.1',5901),3)
-          banner=s.recv(12); s.close()
+          s=socket.create_connection(('127.0.0.1',5901),3); banner=s.recv(12); s.close()
           print('TRACK_A_VNC_BANNER='+banner.decode('ascii','replace').strip())
           assert banner.startswith(b'RFB ')
           PY
-
-          curl -fsS --max-time 5 http://127.0.0.1:6081/ | grep -q 'Track A Tibia noVNC'
           curl -fsS --max-time 5 http://127.0.0.1:6081/vnc.html | grep -qi 'noVNC'
           python3 - <<'PY'
           import base64,os,socket
           key=base64.b64encode(os.urandom(16)).decode()
-          req=(
-              'GET /websockify HTTP/1.1\r\nHost: 127.0.0.1:6081\r\n'
-              'Upgrade: websocket\r\nConnection: Upgrade\r\n'
-              f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n'
-          ).encode()
+          req=('GET /websockify HTTP/1.1\r\nHost: 127.0.0.1:6081\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
+               f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
           s=socket.create_connection(('127.0.0.1',6081),3); s.sendall(req); data=s.recv(4096); s.close()
           first=data.split(b'\r\n',1)[0]
           print('TRACK_A_WEBSOCKET_STATUS='+first.decode('ascii','replace'))

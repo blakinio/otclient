@@ -1,0 +1,143 @@
+name: Track A official login slot target
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-login-slot-target.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: "51965216"
+      PRIMARY_SIGNAL_PMF: "0xcf2950"
+      PRIMARY_SLOT_TARGET: "0xbd36a0"
+      SECONDARY_SIGNAL_PMF: "0xcf2980"
+      SECONDARY_SLOT_TARGET: "0xbf3990"
+    steps:
+      - name: Inspect exact-version login slot targets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$gdb" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+
+          report="$RUNNER_TEMP/track-a-login-slot-target.txt"
+          exec > >(tee -a "$report") 2>&1
+
+          echo 'TRACK_A_LOGIN_SLOT_TARGET_BEGIN=true'
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo "PRIMARY_SIGNAL_PMF=$PRIMARY_SIGNAL_PMF"
+          echo "PRIMARY_SLOT_TARGET=$PRIMARY_SLOT_TARGET"
+          echo "SECONDARY_SIGNAL_PMF=$SECONDARY_SIGNAL_PMF"
+          echo "SECONDARY_SLOT_TARGET=$SECONDARY_SLOT_TARGET"
+          echo 'PRIMARY_SIGNAL_MAP=sendLoginMessage:index0:pmf_0xcf2950:connect_0x7d564f:invoker_0x7d4220:slot_0xbd36a0'
+          echo 'SECONDARY_SIGNAL_MAP=sendSecondaryLoginMessage:index1:pmf_0xcf2980:connect_0x7d56e7:invoker_0x7d4190:slot_0xbf3990'
+
+          dump_range() {
+            local label="$1" start="$2" end="$3"
+            echo "${label}_BEGIN=true"
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end"
+            echo "${label}_END=true"
+          }
+
+          dump_range PRIMARY_SLOT_NEIGHBORHOOD 0xbd3500 0xbd4100
+          dump_range SECONDARY_SLOT_NEIGHBORHOOD 0xbf3800 0xbf4400
+
+          python3 -u - "$client" <<'PY'
+          import struct,sys,string
+          path=sys.argv[1]
+          data=open(path,'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0]
+          phentsz=struct.unpack_from('<H',data,0x36)[0]
+          phnum=struct.unpack_from('<H',data,0x38)[0]
+          segs=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,fsz,msz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fsz:
+                  segs.append((fo,fo+fsz,va,flags))
+          def va_to_off(va):
+              for fs,fe,base,flags in segs:
+                  if base <= va < base+(fe-fs):
+                      return fs+(va-base)
+          def read_ascii(va,limit=160):
+              off=va_to_off(va)
+              if off is None:return None
+              out=[]
+              for b in data[off:off+limit]:
+                  if b==0:break
+                  if 32 <= b < 127 or b in (9,10,13):out.append(chr(b))
+                  else:return None
+              s=''.join(out)
+              return s if len(s)>=4 else None
+          def analyze(label,start,end):
+              off0=va_to_off(start); off1=va_to_off(end-1)
+              if off0 is None or off1 is None:
+                  print(f'{label}_ANALYSIS_FAILED=range_unmapped'); return
+              blob=data[off0:off1+1]
+              calls=[]; riprefs=[]
+              for p in range(len(blob)-7):
+                  va=start+p
+                  if blob[p]==0xe8 and p+5<=len(blob):
+                      dst=va+5+struct.unpack_from('<i',blob,p+1)[0]
+                      calls.append((va,dst))
+                  # common RIP-relative LEA/MOV, with/without REX
+                  if 0x40<=blob[p]<=0x4f and blob[p+1] in (0x8d,0x8b):
+                      modrm=blob[p+2]
+                      if (modrm & 0xc7)==0x05:
+                          dst=va+7+struct.unpack_from('<i',blob,p+3)[0]
+                          riprefs.append((va,dst))
+                  if blob[p] in (0x8d,0x8b):
+                      modrm=blob[p+1]
+                      if (modrm & 0xc7)==0x05:
+                          dst=va+6+struct.unpack_from('<i',blob,p+2)[0]
+                          riprefs.append((va,dst))
+              print(f'{label}_DIRECT_CALL_COUNT={len(calls)}')
+              for site,dst in calls[:160]:
+                  print(f'{label}_CALL site=0x{site:x} target=0x{dst:x}')
+              seen=set()
+              for site,dst in riprefs:
+                  if dst in seen:continue
+                  seen.add(dst)
+                  s=read_ascii(dst)
+                  if s is not None:
+                      safe=s.replace('\\','\\\\').replace('\n','\\n').replace('\r','\\r').replace('\t','\\t')
+                      print(f'{label}_ASCII_REF site=0x{site:x} target=0x{dst:x} text={safe[:140]}')
+          analyze('PRIMARY',0xbd3500,0xbd4100)
+          analyze('SECONDARY',0xbf3800,0xbf4400)
+          PY
+
+          echo 'TRACK_A_LOGIN_SLOT_TARGET_COMPLETE=true'
+
+      - name: Upload exact-version login slot report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-login-slot-target-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-login-slot-target.txt
+          if-no-files-found: error
+          retention-days: 7

@@ -50,6 +50,24 @@ jobs:
                   execs.append((file_offset, file_offset + filesz, va))
           connect_impl = 0x4dd800
           send_message = 0xde6de0
+          slots = set()
+          for file_start, file_end, va_start in execs:
+              pass
+          # Search every mapped PT_LOAD for an exact absolute qword containing the signal wrapper.
+          all_loads = []
+          for index in range(phnum):
+              offset = phoff + index * phentsz
+              typ, flags, file_offset, va, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', data, offset)
+              if typ == 1 and filesz:
+                  all_loads.append((file_offset, file_offset + filesz, va))
+          needle = struct.pack('<Q', send_message)
+          for file_start, file_end, va_start in all_loads:
+              position = data.find(needle, file_start, file_end)
+              while position != -1:
+                  slots.add(va_start + position - file_start)
+                  position = data.find(needle, position + 1, file_end)
+
+          candidates = {send_message} | slots
           for file_start, file_end, va_start in execs:
               refs = []
               calls = []
@@ -61,17 +79,17 @@ jobs:
                           calls.append(site)
                   if 0x40 <= data[offset] <= 0x4f and data[offset + 1] == 0x8d and data[offset + 2] & 0xc7 == 0x05:
                       target = site + 7 + struct.unpack_from('<i', data, offset + 3)[0]
-                      if target == send_message:
-                          refs.append(site)
-              for ref in refs:
+                      if target in candidates:
+                          refs.append((site, target))
+              for ref, target in refs:
                   nearby = [call for call in calls if ref < call <= ref + 512]
                   call = min(nearby) if nearby else 0
-                  print(f'0x{ref:x}\t0x{call:x}\t{call-ref if call else -1}')
+                  print(f'0x{ref:x}\t0x{target:x}\t0x{call:x}\t{call-ref if call else -1}')
           PY
           echo 'TRACK_A_PROTOCOL_QUEUE_SENDMESSAGE_CONNECT_BEGIN=true'
           echo "SENDMESSAGE_REF_COUNT=$(wc -l < "$tmp/sites.tsv")"
-          while IFS=$'\t' read -r ref call distance; do
-            echo "SENDMESSAGE_REF ref=$ref next_connect=$call distance=$distance"
+          while IFS=$'\t' read -r ref target call distance; do
+            echo "SENDMESSAGE_REF ref=$ref target=$target next_connect=$call distance=$distance"
             [[ "$call" != 0x0 ]] || continue
             start=$(printf '0x%x' $((ref-64)))
             end=$(printf '0x%x' $((call+16)))

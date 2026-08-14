@@ -56,6 +56,10 @@ jobs:
           table_offset = va2off(table)
           assert table_offset is not None
           names = {
+              0: 'sendMessage',
+              191: 'clientMessageReadyToProcess',
+              192: 'fireEmitSignalForNewProtocolMessage',
+              193: 'fireEmitSignalForNewClientProtocolMessage',
               194: 'prepareAndEnqueueGameclientMessage',
               195: 'handleGameAction',
               201: 'sendGoNorth', 202: 'sendGoEast', 203: 'sendGoSouth', 204: 'sendGoWest',

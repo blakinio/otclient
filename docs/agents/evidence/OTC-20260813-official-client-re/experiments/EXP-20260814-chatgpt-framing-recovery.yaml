@@ -1,0 +1,62 @@
+schema: otclient.tibia-re.experiment.v1
+experiment_id: EXP-20260814-chatgpt-framing-recovery
+track: official-client-re
+alias: OTCLIENT-TIBIA-RE
+repository: blakinio/otclient
+source_pr: 289
+source_pr_head: e4c8334e73b04668a69b4cd2372b865248561ad5
+recovery_branch: ci/OTC-20260814-track-a-chatgpt-framing-recovery
+created_at: 2026-08-14T18:42:00+02:00
+completion_claim: incomplete
+client:
+  version: 15.32.df7b29
+  size: 51965216
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+p2:
+  workflow: .github/workflows/tibia-official-client-re-outgoing-payload-consumers.yml
+  head: c15899ebef7cadb7ce6f4a302a28dff064f6b537
+  run: 31815819731
+  job: 94817115581
+  result: SUCCESS
+  runner: synology-otclient-01
+  artifact:
+    id: 9225203231
+    digest: sha256:e0ca5a09b4ad7ea57a78833ceefa737a8330db837aedfc4218efb53d9b126f86
+    report_size_bytes: 345729
+facts:
+  primary_owner_vtable: '0x308c408'
+  primary_slot_90: '0x8409d0'
+  subobject_vtable: '0x2f66288'
+  subobject_slot_b8: '0xb5b880'
+  qiodevice_write_qbytearray_plt: '0x4de370'
+  qtcpsocket_ctor_plt: '0x4ddbc0'
+  exact_literal_absent:
+    - OutGoingMessagePayload
+    - OutgoingMessagePayload
+    - MessageBody
+    - SerializeWithCachedSizesToArray
+    - SerializeToArray
+    - ByteSizeLong
+  bounded_direct_write_call_from_b5b880_window: false
+  bounded_direct_write_call_from_b222a0_window: false
+unknowns:
+  - whether 0xb222a0 is structurally downstream of 0xb5b880
+  - exact serializer
+  - exact framing transform
+  - exact encryption/compression transform if present on this path
+  - final QIODevice/QTcpSocket write caller
+  - indirect/virtual write edge if no direct rel32 path exists
+ci:
+  source_head_run: 31818176071
+  result: FAILURE
+  failing_job: 94824765433
+  fatal_gate: yamllint
+  fatal_file: docs/agents/evidence/OTC-20260813-official-client-re/experiments/EXP-20260814-quantitative-coverage-baseline.yaml
+  fatal_reason: missing final newline
+next_action: >-
+  globally enumerate direct QIODevice::write callsites, build bounded reverse caller graph,
+  build forward call graph from 0xb5b880, intersect them, then inspect indirect/virtual
+  calls only if direct graph intersection is empty
+safety:
+  effect: static_read_only
+  track_b_runtime: OUT_OF_SCOPE

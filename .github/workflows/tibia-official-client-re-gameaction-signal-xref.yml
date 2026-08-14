@@ -17,7 +17,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Find instruction xrefs to high-value GameAction signals
+      - name: Find and validate instruction xrefs to high-value GameAction signals
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -34,48 +34,85 @@ jobs:
           tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
           echo 'TRACK_A_GAMEACTION_SIGNAL_XREF_BEGIN=true'
 
-          read -r exec_start exec_end < <(python3 - "$client" <<'PY'
+          python3 - "$client" > "$tmp/candidates.tsv" <<'PY'
           import struct,sys
-          d=open(sys.argv[1],'rb').read()
-          phoff=struct.unpack_from('<Q',d,0x20)[0]; entsz=struct.unpack_from('<H',d,0x36)[0]; n=struct.unpack_from('<H',d,0x38)[0]
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; entsz=struct.unpack_from('<H',data,0x36)[0]; n=struct.unpack_from('<H',data,0x38)[0]
           segs=[]
           for i in range(n):
               o=phoff+i*entsz
-              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',d,o)
-              if typ==1 and flags&1 and filesz: segs.append((va,va+filesz))
-          assert segs
-          print(hex(min(x for x,y in segs)),hex(max(y for x,y in segs)))
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and flags&1 and filesz: segs.append((off,off+filesz,va))
+          targets={
+            'Creatures_sendAttack':0xd166f0,
+            'Creatures_sendFollow':0xd164e0,
+            'Chat_sendTalkMessage':0xcffb90,
+            'Container_sendMoveObject':0xd1df30,
+            'PlayerTrade_sendTradeObject':0xded060,
+            'WorldMap_sendMoveObject':0xdedac0,
+            'Creatures_staticMetaObject':0x3085060,
+            'Chat_staticMetaObject':0x30851a0,
+            'Container_staticMetaObject':0x30850a0,
+            'PlayerTrade_staticMetaObject':0x3085360,
+            'WorldMap_staticMetaObject':0x30850e0,
+            'Player_staticMetaObject':0x30852a0,
+          }
+          byva={v:k for k,v in targets.items()}
+          found=set()
+          for lo,hi,base in segs:
+              blob=data[lo:hi]
+              # Candidate direct CALL/JMP rel32. These are only candidates until GDB validates them.
+              for j in range(0,len(blob)-5):
+                  op=blob[j]
+                  if op not in (0xe8,0xe9): continue
+                  site=base+j
+                  disp=struct.unpack_from('<i',blob,j+1)[0]
+                  target=site+5+disp
+                  if target in byva:
+                      row=(byva[target],site,'call_rel32' if op==0xe8 else 'jmp_rel32',target)
+                      if row not in found:
+                          found.add(row); print(f'{row[0]}\t0x{site:x}\t{row[2]}\t0x{target:x}')
+              # Candidate RIP-relative LEA: optional REX 0x40..0x4f, opcode 8d,
+              # ModRM mod=00 r/m=101, disp32 follows. This is a syntactically constrained scan;
+              # GDB validation below is authoritative.
+              for j in range(0,len(blob)-7):
+                  if not (0x40 <= blob[j] <= 0x4f and blob[j+1]==0x8d): continue
+                  modrm=blob[j+2]
+                  if (modrm & 0xc7) != 0x05: continue
+                  site=base+j
+                  disp=struct.unpack_from('<i',blob,j+3)[0]
+                  target=site+7+disp
+                  if target in byva:
+                      row=(byva[target],site,'lea_riprel',target)
+                      if row not in found:
+                          found.add(row); print(f'{row[0]}\t0x{site:x}\t{row[2]}\t0x{target:x}')
           PY
-          )
-          echo "EXEC_RANGE start=$exec_start end=$exec_end"
-          "$gdb" -q -nx -batch "$client" \
-            -ex 'set pagination off' \
-            -ex 'set disassembly-flavor intel' \
-            -ex "disassemble $exec_start,$exec_end" > "$tmp/disasm.txt"
-          echo "GDB_DISASSEMBLY_LINES=$(wc -l < "$tmp/disasm.txt")"
-          [[ -s "$tmp/disasm.txt" ]]
 
-          declare -A targets=(
-            [Creatures_sendAttack]=d166f0
-            [Creatures_sendFollow]=d164e0
-            [Chat_sendTalkMessage]=cffb90
-            [Container_sendMoveObject]=d1df30
-            [PlayerTrade_sendTradeObject]=ded060
-            [WorldMap_sendMoveObject]=dedac0
-            [Creatures_staticMetaObject]=3085060
-            [Chat_staticMetaObject]=30851a0
-            [Container_staticMetaObject]=30850a0
-            [PlayerTrade_staticMetaObject]=3085360
-            [WorldMap_staticMetaObject]=30850e0
-            [Player_staticMetaObject]=30852a0
-          )
-          for name in Creatures_sendAttack Creatures_sendFollow Chat_sendTalkMessage Container_sendMoveObject PlayerTrade_sendTradeObject WorldMap_sendMoveObject Creatures_staticMetaObject Chat_staticMetaObject Container_staticMetaObject PlayerTrade_staticMetaObject WorldMap_staticMetaObject Player_staticMetaObject; do
-            hex="${targets[$name]}"
-            echo "XREF_TARGET_BEGIN name=$name va=0x$hex"
-            # GDB resolves direct branches and RIP-relative operands to absolute hexadecimal targets.
-            grep -Ein -B4 -A4 "0x0*${hex}([^0-9a-f]|$)" "$tmp/disasm.txt" \
-              | grep -Ev "^[0-9:-]*[[:space:]]*0x0*${hex}[[:space:]]" \
-              | head -n 240 || true
-            echo "XREF_TARGET_END name=$name"
-          done
+          echo "CANDIDATE_COUNT=$(wc -l < "$tmp/candidates.tsv")"
+          cat "$tmp/candidates.tsv"
+          validated=0
+          while IFS=$'\t' read -r name site kind target; do
+            [[ -n "$name" ]] || continue
+            start=$(printf '0x%x' $((site-16)))
+            end=$(printf '0x%x' $((site+32)))
+            echo "XREF_CANDIDATE_BEGIN name=$name site=$site kind=$kind target=$target"
+            set +e
+            "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' \
+              -ex 'set disassembly-flavor intel' \
+              -ex "disassemble /r $start,$end" > "$tmp/gdb.out" 2>&1
+            rc=$?
+            set -e
+            echo "GDB_RC=$rc"
+            cat "$tmp/gdb.out"
+            if grep -Eiq "^[[:space:]]*${site}[[:space:]]|^[[:space:]]*0x0*$(echo "$site" | sed 's/^0x//')[[:space:]]" "$tmp/gdb.out" \
+               && grep -Eiq "0x0*$(echo "$target" | sed 's/^0x//')([^0-9a-f]|$)" "$tmp/gdb.out"; then
+              echo "XREF_VALIDATED=true"
+              validated=$((validated+1))
+            else
+              echo "XREF_VALIDATED=false"
+            fi
+            echo "XREF_CANDIDATE_END name=$name"
+          done < "$tmp/candidates.tsv"
+          echo "VALIDATED_XREF_COUNT=$validated"
           echo 'TRACK_A_GAMEACTION_SIGNAL_XREF_COMPLETE=true'

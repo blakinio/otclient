@@ -37,6 +37,10 @@ jobs:
           "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
             -ex 'disassemble /r 0x84a900,0x84ab30'
           echo 'CONNECTION_SITE_END=0x84ab30'
+          echo 'CLIENT_READY_CONNECTION_BEGIN=0x1971500'
+          "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' \
+            -ex 'disassemble /r 0x1971500,0x1971710'
+          echo 'CLIENT_READY_CONNECTION_END=0x1971710'
           echo 'TARGET_XREFS_BEGIN=true'
           python3 -u - "$client" <<'PY'
           import struct, sys

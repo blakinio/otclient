@@ -29,10 +29,13 @@ jobs:
           [[ -x "$client" ]]; [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           pid="$(tr -cd '0-9' <"$runtime/client.pid")"; [[ -r "/proc/$pid/environ" ]]
           tr '\0' '\n' <"/proc/$pid/environ" | grep -qx 'OTCLIENT_TIBIA_RE_TRACK=official-client-re'
-          observer="$(tr -cd '0-9' <"$runtime/map-provenance-gdb.pid")"
-          [[ -r "/proc/$observer/environ" ]]; tr '\0' '\n' <"/proc/$observer/environ" | grep -qx 'OTCLIENT_TIBIA_RE_TRACK=official-client-re'
-          kill -TERM "$observer"; for _ in $(seq 1 50); do [[ ! -d "/proc/$observer" ]] && break; sleep 0.1; done
-          [[ ! -d "/proc/$observer" ]]; kill -0 "$pid"
+          observer="$(tr -cd '0-9' <"$runtime/map-provenance-gdb.pid" 2>/dev/null || true)"
+          if [[ -n "$observer" && -r "/proc/$observer/environ" ]]; then
+            tr '\0' '\n' <"/proc/$observer/environ" | grep -qx 'OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+            kill -TERM "$observer"; for _ in $(seq 1 50); do [[ ! -d "/proc/$observer" ]] && break; sleep 0.1; done
+            [[ ! -d "/proc/$observer" ]]
+          fi
+          kill -CONT "$pid" 2>/dev/null || true; kill -0 "$pid"
           base="$(awk -v exe="$client" '$6==exe && $3=="00000000" {print "0x"$1; exit}' "/proc/$pid/maps" | cut -d- -f1)"
           [[ "$base" =~ ^0x[0-9a-f]+$ ]]
           gcmd="$(mktemp)"; gout="$(mktemp)"; trap 'rm -f "$gcmd" "$gout"' EXIT
@@ -60,7 +63,7 @@ jobs:
           end
           continue
           GDB
-          (sleep 3; DISPLAY=:98 xdotool key Up; sleep 1; DISPLAY=:98 xdotool key Down) & stimulus=$!
+          (sleep 3; DISPLAY=:98 "$toolroot/usr/bin/xdotool" key Up; sleep 1; DISPLAY=:98 "$toolroot/usr/bin/xdotool" key Down) & stimulus=$!
           export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
           export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
           "$toolroot/usr/bin/gdb" -q -nx -batch -x "$gcmd" "$client"

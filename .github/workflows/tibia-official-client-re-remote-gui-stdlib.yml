@@ -18,7 +18,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_DISPLAY: ':98'
     steps:
-      - name: Expose existing Track A browser bridge on trusted LAN
+      - name: Publish Track A GUI on DSM loopback
         shell: bash
         run: |
           set +x
@@ -34,12 +34,13 @@ jobs:
             kill -0 "$pid"
           done
           [[ -e /tmp/.X11-unix/X98 ]]
+
           curl -fsS --max-time 5 http://127.0.0.1:6081/ | grep -q 'Track A'
-          status="$(curl -sS --max-time 10 -o /tmp/track-a-lan-screen.bin -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)"
+          status="$(curl -sS --max-time 10 -o /tmp/track-a-loopback-screen.bin -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)"
           [[ "$status" == 200 ]]
-          [[ "$(head -c2 /tmp/track-a-lan-screen.bin)" == BM ]]
-          rm -f /tmp/track-a-lan-screen.bin
-          echo TRACK_A_EXISTING_BROWSER_BRIDGE_VERIFIED=true
+          [[ "$(head -c2 /tmp/track-a-loopback-screen.bin)" == BM ]]
+          rm -f /tmp/track-a-loopback-screen.bin
+          echo TRACK_A_BACKEND_VERIFIED=true
 
           root="$state/toolroot"
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
@@ -48,16 +49,27 @@ jobs:
           self="$(hostname)"
           runner_ip="$(hostname -I | awk '{print $1}')"
           image="$(docker inspect -f '{{.Config.Image}}' "$self")"
-          bridge=otclient-track-a-browser-lan
-          docker rm -f "$bridge" >/dev/null 2>&1 || true
-          docker run -d --name "$bridge" --restart unless-stopped --network host --volumes-from "$self" --entrypoint /bin/sh "$image" \
-            -lc "exec '$socat' TCP-LISTEN:6082,bind=0.0.0.0,reuseaddr,fork TCP:${runner_ip}:6081" >/dev/null
-          sleep 2
-          [[ "$(docker inspect -f '{{.State.Running}}' "$bridge")" == true ]]
+          network="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$self")"
+          [[ -n "$network" ]]
 
-          # Verify the LAN-facing listener from host networking.
-          host_ip="$(docker run --rm --network host --entrypoint /bin/sh "$image" -lc 'hostname -I 2>/dev/null' | tr ' ' '\n' | grep '^192\.168\.1\.' | head -n1)"
-          [[ -n "$host_ip" ]]
-          docker run --rm --network host --entrypoint /bin/sh "$image" -lc "curl -fsS --max-time 5 http://${host_ip}:6082/ | grep -q 'Track A'"
-          echo TRACK_A_LAN_BROWSER_BRIDGE_READY=true
-          echo TRACK_A_LAN_URL="http://${host_ip}:6082/"
+          # Remove previous experimental publishers only; do not touch the Tibia client container.
+          docker rm -f otclient-track-a-browser-lan otclient-track-a-browser-loopback otclient-track-a-dsm-proxy >/dev/null 2>&1 || true
+
+          docker run -d --name otclient-track-a-dsm-proxy --restart unless-stopped \
+            --network "$network" \
+            -p 127.0.0.1:6081:6081 \
+            --volumes-from "$self" --entrypoint /bin/sh "$image" \
+            -lc "exec '$socat' TCP-LISTEN:6081,bind=0.0.0.0,reuseaddr,fork TCP:${runner_ip}:6081" >/dev/null
+
+          sleep 3
+          [[ "$(docker inspect -f '{{.State.Running}}' otclient-track-a-dsm-proxy)" == true ]]
+          published="$(docker port otclient-track-a-dsm-proxy 6081/tcp)"
+          echo TRACK_A_DOCKER_PUBLISHED="$published"
+          [[ "$published" == 127.0.0.1:6081 ]]
+
+          # Verify from a fresh host-network namespace that DSM loopback reaches the published port.
+          docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
+            "curl -fsS --max-time 8 http://127.0.0.1:6081/ | grep -q 'Track A'"
+          echo TRACK_A_DSM_LOOPBACK_READY=true
+          echo TRACK_A_DSM_PROXY_TARGET=http://127.0.0.1:6081
+          echo TRACK_A_USER_URL=http://synology:6082

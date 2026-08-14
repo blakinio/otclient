@@ -1,0 +1,74 @@
+name: Track A QMeta jump-table map
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-jumptable-map.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Decode QMeta jump tables and method entries
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0];phentsz=struct.unpack_from('<H',data,0x36)[0];phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1:loads.append((off,off+filesz,va,va+filesz,flags))
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+          def read_s32(v):
+              o=va2off(v);return struct.unpack_from('<i',data,o)[0]
+          def first_direct_jmp_target(entry,limit=48):
+              o=va2off(entry)
+              if o is None:return None
+              for i in range(limit-5):
+                  if data[o+i]==0xe9:
+                      disp=struct.unpack_from('<i',data,o+i+1)[0]
+                      return entry+i+5+disp
+              return None
+          cases={
+            'Chat':{
+              'table':0x1d6de6c,
+              'methods':['currentlyAvailableChannels','publishGameAction','handleTalkMessage','handleMessageMessage','handleOpenChannelMessage','handleOpenOwnChannelMessage','handleCloseChannelMessage','handleChannelsMessage','handlePrivateChannelMessage','handleChannelEventMessage','handleNpcTalkPartersMessage','onChatProtocolMessageHandlerOptionsChanged','onPlayerCreatureAddedToCreatureStorage']},
+            'Container':{
+              'table':0x1d714b8,
+              'methods':['publishGameAction','sendCloseContainerMessage','sendUpContainerMessage','sendSeekInContainerMessage','sendGetObjectInfoMessage','sendContainerActionMessage','requestShowStashMessageDialog','requestShowOrRefreshStashDialog','requestCloseStashDialog','requestOpenDepotSearchWidget','requestCloseDepotSearchWidget','handleSetInventoryMessage','handleDeleteInventoryMessage','handlePlayerInventoryMessage','handleContainerMessage','handleCloseContainerMessage','handleChangeInContainerMessage','handleDeleteInContainerMessage','handleCreateInContainerMessage','handleObjectInfoMessage','handleStashMessage','handleShowMessageDialogMessage','handleSpecialContainersAvailableMessage','handleDepotSearchResultMessage','handleDepotSearchDetailListMessage','handleCloseDepotSearchMessage','requestCloseContainer','requestUpContainer','requestNextPageForContainer','requestPreviousPageForContainer','requestUpdateContainer','requestGetObjectsInfo','requestGetObjectInfo','requestSortContainer','requestMoveContentToManagedContainers']},
+          }
+          print('TRACK_A_QMETA_JUMPTABLE_MAP_BEGIN=true')
+          for cls,c in cases.items():
+              base=c['table']; methods=c['methods']
+              print(f'CLASS name={cls} table=0x{base:x} count={len(methods)}')
+              for i,name in enumerate(methods):
+                  rel=read_s32(base+i*4);entry=(base+rel)&0xffffffffffffffff
+                  tail=first_direct_jmp_target(entry)
+                  print(f' CASE class={cls} index={i} method={name} rel={rel:+#x} entry=0x{entry:x} direct_jmp={"0x%x"%tail if tail is not None else "none"}')
+          # Directly proven simple dispatches from static-metacall disassembly.
+          print('DIRECT class=GameEvent index=0 method=publishGameAction entry=0xd20848 tail=QMetaObject::activate')
+          print('DIRECT class=GameEvent index=1 method=handleGameEventMessage entry=0xd2080d tail=0x8374e0')
+          print('DIRECT class=Effect index=0 method=handleRemoveGraphicalEffectMessage entry=0xd339a8 tail=none')
+          print('DIRECT class=Effect index=1 method=handleGraphicalEffectsMessage entry=0xd338f4 tail=none')
+          print('TRACK_A_QMETA_JUMPTABLE_MAP_COMPLETE=true')
+          PY

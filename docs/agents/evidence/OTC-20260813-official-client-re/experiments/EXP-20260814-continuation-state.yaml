@@ -3,20 +3,16 @@ kind: continuation_checkpoint
 track: official-client-re
 alias: OTCLIENT-TIBIA-RE
 repository: blakinio/otclient
-pr: 289
-branch: ci/OTC-20260813-official-client-re-continuation
-created_at: 2026-08-14T16:52:00+02:00
-updated_at: 2026-08-14T17:43:00+02:00
-source_head_before_checkpoint: fd206d429c48ddcdb32ba2d43c29d071a671b266
-latest_recovery_head: f4c073d78834848b52affbc51d3396907c6cb7cb
+source_pr: 289
+branch: ci/OTC-20260814-official-client-re-receiver-recovery
+base_branch: ci/OTC-20260813-official-client-re-continuation
+updated_at: 2026-08-14T17:58:00+02:00
 completion_claim: incomplete
-
 client:
   version: 15.32.df7b29
   size: 51965216
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
   platform: native_linux_only
-
 runtime:
   runner: synology-otclient-01
   canonical_state: /home/runner/_work/_otclient_tibia_re_state
@@ -24,30 +20,24 @@ runtime:
   display: ':98'
   warp_socks_port: 25354
   process_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
-
 recovery:
   generation: 2
   attempts: 2
-  state: active_external_operation
-  active_run: 31815819731
-  active_workflow: Track A outgoing payload consumer provenance
-  active_head: c15899ebef7cadb7ce6f4a302a28dff064f6b537
-  first_observed_status: queued
-  wait_deadline_at: 2026-08-14T18:27:34+02:00
-  durable_checkpoint: ../20260814-chatgpt-recovery-generation-2.md
-
+  state: isolated_branch_preparing_exact_target
+  source_branch_conflict_head: 8ac9c72ee16427a8d79526184cb525f6a2114e8e
+  source_branch_active_run: 31816876078
+  source_branch_active_run_status: queued
+  completed_run: 31815819731
+  completed_job: 94817115581
+  completed_result: SUCCESS
+  completed_artifact: 9225203231
+  completed_artifact_digest: sha256:e0ca5a278d7235e1755105775ed235a4f5ee501db2e5cb473b6d008e8f9831a3
 facts:
   protocol_census:
     protocol_handler_classes: 47
     handle_message_names: 146
     inbound_gameserver_messages: 189
     outbound_gameclient_messages: 160
-  protobuf:
-    valid_embedded_file_descriptors: 7
-    coordinate:
-      x: {field_number: 1, type: uint32}
-      y: {field_number: 2, type: uint32}
-      z: {field_number: 3, type: uint32}
   qt_connections:
     QObject_connectImpl: 2078
     QObject_connect_legacy_string_api: 41
@@ -58,44 +48,39 @@ facts:
     high_information_gameaction_candidates: 31
     proven_sender_metaobjects: 29
   gameaction:
-    internal_router:
-      exact_build_address: '0x8332d0'
-      class: tibia::game::TInternalGameActionRouter
-      classification: FACT
-      not_serializer: true
+    internal_router_address: '0x8332d0'
+    internal_router_class: tibia::game::TInternalGameActionRouter
+    internal_router_is_serializer: false
   outbound_builders:
-    recovered_families:
-      - movement
-      - MoveObject
-      - Talk
-      - Attack
-      - Follow
-      - TradeObject
-    exact_build_convergence:
-      sendMessage_entry: '0xdf7930'
-      sendMessage_body: '0xde6de0'
-      prepareAndEnqueueGameclientMessage_entry: '0xdf6b99'
-      prepareAndEnqueueGameclientMessage_body: '0xbc6e20'
-      queue_processing_helpers:
-        - '0xde91b0'
-        - '0xbc6f00'
-        - '0xbc6750'
+    recovered_families: [movement, MoveObject, Talk, Attack, Follow, TradeObject]
+    sendMessage_entry: '0xdf7930'
+    sendMessage_body: '0xde6de0'
+    prepareAndEnqueue_entry: '0xdf6b99'
+    prepareAndEnqueue_body: '0xbc6e20'
+    queue_helpers: ['0xde91b0', '0xbc6f00', '0xbc6750']
     internal_discriminators_are_final_wire_bytes: UNKNOWN
   outbound_handoff:
-    chain: semantic_action -> action_router -> TProtocolMessageQueue -> clientMessageReadyToProcess -> containing_network_owner -> primary_slot_plus_0x90 -> contained_subobject_slot_plus_0xb8
-    primary_network_owner_vtable_address_point: '0x308c408'
-    primary_network_owner_slot_0x90: '0x8409d0'
-    primary_slot_classification: delegating_thunk
-    contained_subobject_offset: '+0x88'
-    contained_subobject_vtable_address_point: '0x2f66288'
-    contained_subobject_slot_0xb8: '0xb5b880'
-    downstream_helper_lead: '0xb222a0'
-    source_run: 31812572191
-    source_job: 94806473825
-    source_result: SUCCESS
-    exact_serializer: UNKNOWN
-    exact_framing: UNKNOWN
+    proven_chain: semantic_action -> action_router -> TProtocolMessageQueue -> clientMessageReadyToProcess -> containing_owner_virtual_slot_plus_0x90
+    connect_site: '0x7e7470'
+    receiver_pointer_to_member_encoding: '0x91'
+    receiver_virtual_slot_offset: '+0x90'
+    owner_setup_constructs_QTcpSocket: true
+    concrete_receiver_target: UNKNOWN
+    primary_owner_vtable: UNKNOWN
+    serializer: UNKNOWN
+    framing: UNKNOWN
     final_network_write: UNKNOWN
+  p2_correction:
+    run: 31815819731
+    job: 94817115581
+    artifact: 9225203231
+    result: SUCCESS
+    exact_0x8409d0_nontrivial_function: true
+    exact_0x8409d0_uses_owner_plus_0x118: true
+    exact_0x8409d0_calls_vslots: ['+0x60', '+0x68']
+    outGoingMessagePayload_literal_count: 0
+    outgoingMessagePayload_literal_count: 0
+    alleged_0xb5b880_instruction_boundary: false
   live_world:
     structural_world_proven: true
     floor: 7
@@ -104,104 +89,58 @@ facts:
       - [32546, 32509, 7]
       - [32546, 32510, 7]
     current_floor_aware_range: [18, 14]
-    player_position:
-      status: DERIVED
-      derivation: fixed viewport center from authoritative decoded map strips
-      direct_member: UNKNOWN
+    player_position: DERIVED_FROM_VIEWPORT_CENTER
+    direct_player_position_member: UNKNOWN
   bridge:
     source_build_proven: true
     run: 31809994339
     live_correlation: UNKNOWN
-    current_failure:
-      classification: environment_library_path
-      exact_error: 'libQt6Core.so.6: version Qt_6.9 not found'
-      cause: extracted Ubuntu Qt 6.4 runtime shadowed official client bundled Qt 6.9
-      deterministic_recovery: keep extracted build/sysroot libraries out of client LD_LIBRARY_PATH and launch client with bundled Qt 6.9 before querying bridge session-status
+    failure: toolroot Qt 6.4 shadowed official bundled Qt 6.9
   single_item_drag:
-    branch: ci/OTC-20260814-track-a-single-item-drag
-    head: b4eab37373b6ef5901caaa0a59a42b07eb5e96b8
     run: 31806475888
     job: 94786521265
     workflow_result: SUCCESS
-    confinement:
-      local_socks_established: 2
-      direct_established: 0
-      udp_socket_count: 0
-    stimulus:
-      source_window_xy: [526, 397]
-      destination_window_xy: [526, 365]
-    observation:
-      changed_pixels: 35335
-      events_delta: 0
-      strips_delta: 0
-    classification:
-      stimulus_delivered: FACT
-      moveobject_server_confirmed: false
-      action_gate: below_A3
-  ci:
-    exact_head_60323a1:
-      run: 31812575746
-      result: FAILURE
-      first_failed_job: 94807088316
-      failed_step: Run yamllint
-      semantic_track_a_run_same_source_head: 31812572191
-      semantic_track_a_result: SUCCESS
-
+    stimulus_delivered: FACT
+    server_confirmed_moveobject: false
+    action_gate: below_A3
+conflicts_and_rejections:
+  - TInternalGameActionRouter is not the serializer
+  - changed pixels alone do not prove MoveObject success
+  - internal builder discriminators are not final wire opcodes without framing proof
+  - exact 0x8409d0 is not a simple owner+0x88 to slot+0xb8 forwarding thunk
+  - inherited 0x2f66288:+0xb8 -> 0xb5b880 chain is not accepted without re-derivation
+  - OutGoingMessagePayload named envelope is not reproduced in exact-binary literal census
 unknowns:
-  - exact serializer semantics downstream of 0xb5b880
-  - exact framing and final network-send/write path
-  - final wire-byte relationship of internal GameclientMessage discriminators
-  - any OutGoingMessagePayload or equivalent envelope relationship not independently reproduced by the current exact-SHA experiment
+  - primary network-owner vptr and concrete virtual +0x90 target
+  - exact serializer and framing
+  - final network send/write path
   - bridge session-status correlation with decoded structural world state
   - direct standalone player-position member
-  - HP and maxHP authoritative live read
-  - mana and maxMana authoritative live read
-  - player identity/state authoritative live read
-  - CreatureStorage live object/lifecycle bridge
-  - battle target live bridge
-  - inventory/equipment live bridge
-  - containers live bridge
-  - structured chat and world/server event bridge
+  - HP/maxHP and mana/maxMana authoritative reads
+  - player identity/state and CreatureStorage lifecycle
+  - battle target, inventory/equipment and containers
+  - structured chat and world/server events
   - server-confirmed semantic MoveObject
-  - complete quantitative S1/S2 classification and coverage
-
-rejected_or_disproven:
-  - stripped GDB symbol table is sufficient for Qt handler recovery
-  - TInternalGameActionRouter is the serializer
-  - GameAction send signal wrapper itself is a direct serializer
-  - changed pixels alone prove MoveObject success
-  - internal GameclientMessage discriminator may be called a final wire opcode without framing proof
-  - primary network-owner slot +0x90 is itself the serializer; exact disassembly proves it delegates through the contained subobject
-
+  - complete item-level protocol/QMeta/P0 coverage
 next_actions:
   - priority: 1
-    action: finish run 31815819731 and persist exact-SHA provenance from 0xb5b880 through framing/final-write candidates
+    action: run exact-target receiver reconstruction from connect site 0x7e7470 and setup/constructor vptr provenance on isolated recovery branch
   - priority: 2
-    action: recover live read-only bridge correlation by separating build sysroot libraries from official client Qt 6.9 runtime
+    action: continue serializer/framing/final-write convergence only from independently re-proven receiver target
   - priority: 3
-    action: promote one safest reversible semantic action, preferably movement, through reference parity to server-confirmed A3 and bridge A4
+    action: recover bridge live correlation with official bundled Qt 6.9 runtime
   - priority: 4
-    action: recover P0 live reads for HP/mana/player identity/CreatureStorage/target/inventory/containers/chat/world events with causal and restart-stable evidence
+    action: recover P0 live reads and safest reversible A3/A4 action parity
   - priority: 5
-    action: complete generated-message and Tibia-owned QMeta/runtime classification registries and quantitative coverage
-  - priority: 6
-    action: repair workflow yamllint failures, reconcile acceptance, run exact-head CI/PR hygiene, and merge/archive only when policy permits
-
+    action: complete item-level registries, exact-head CI/PR hygiene and reconcile recovery branch after source ownership clears
 safety:
   default_effect_budget: read_only_or_reversible_no_cost
   forbid_unapproved_owner_funded_ai: true
   forbid_credentials_in_evidence: true
   forbid_private_unrelated_player_messages: true
   costly_or_irreversible_actions: BLOCKED_REQUIRES_OWNER_AUTHORIZATION
-
 references:
-  - ../20260814-chatgpt-continuation-handover.md
-  - ../20260814-chatgpt-recovery-generation-2.md
-  - ../20260814-protocol-queue-action-builders.md
   - ../20260814-protocol-queue-network-handoff.md
-  - ../20260814-live-structural-world-and-reversible-movement.md
-  - ../20260814-qt-connect-callsite-census.md
-  - ../20260814-gameaction-connectimpl-arguments.md
-  - ../20260814-gameaction-slot-provenance.md
-  - EXP-20260814-live-reversible-movement.yaml
-  - EXP-20260814-protocol-queue-network-handoff.yaml
+  - ../20260814-outgoing-payload-consumer-provenance.md
+  - ../20260814-chatgpt-recovery-generation-2.md
+  - EXP-20260814-quantitative-coverage-baseline.yaml

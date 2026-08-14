@@ -38,22 +38,15 @@ jobs:
           grep -azFxq "$marker" "/proc/$xvfb_pid/environ"
           kill -0 "$xvfb_pid"
           echo TRACK_A_XVFB_RUNNING=true
-          if [[ -n "$client_pid" && -r "/proc/$client_pid/environ" ]] && grep -azFxq "$marker" "/proc/$client_pid/environ" && kill -0 "$client_pid" 2>/dev/null; then
-            echo TRACK_A_CLIENT_RUNNING=true
-          else
-            echo TRACK_A_CLIENT_RUNNING=false
-          fi
-          root="$state/toolroot"
-          path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
-          for cmd in x11vnc x0vncserver Xtigervnc vncserver websockify novnc_proxy socat python3 xdotool xwd import convert ffmpeg curl wget apt-get dpkg docker; do
-            if PATH="$path" command -v "$cmd" >/dev/null 2>&1; then echo "TRACK_A_CMD_${cmd//[^A-Za-z0-9]/_}=true"; else echo "TRACK_A_CMD_${cmd//[^A-Za-z0-9]/_}=false"; fi
+          if [[ -n "$client_pid" && -r "/proc/$client_pid/environ" ]] && grep -azFxq "$marker" "/proc/$client_pid/environ" && kill -0 "$client_pid" 2>/dev/null; then echo TRACK_A_CLIENT_RUNNING=true; else echo TRACK_A_CLIENT_RUNNING=false; fi
+          for cmd in x11vnc websockify socat python3 xdotool xwd docker; do
+            if command -v "$cmd" >/dev/null 2>&1; then echo "TRACK_A_CMD_${cmd}=true"; else echo "TRACK_A_CMD_${cmd}=false"; fi
           done
-          if [[ -S /var/run/docker.sock ]]; then echo TRACK_A_DOCKER_SOCKET=true; else echo TRACK_A_DOCKER_SOCKET=false; fi
-          if [[ -r /proc/1/cgroup ]]; then echo TRACK_A_CGROUP="$(tr '\n' ' ' </proc/1/cgroup | head -c 300)"; fi
-          echo TRACK_A_HOSTNAME="$(hostname)"
+          for pkg in x11vnc novnc websockify; do
+            if dpkg -s "$pkg" >/dev/null 2>&1; then echo "TRACK_A_PKG_${pkg}=installed"; else echo "TRACK_A_PKG_${pkg}=missing"; fi
+          done
+          [[ -d /usr/share/novnc ]] && echo TRACK_A_NOVNC_WEBROOT=true || echo TRACK_A_NOVNC_WEBROOT=false
+          self="$(hostname)"
+          echo TRACK_A_SELF_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$self")"
+          echo TRACK_A_SELF_NETWORKS="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$self" | xargs)"
           echo TRACK_A_IPS="$(hostname -I 2>/dev/null | xargs || true)"
-          echo TRACK_A_ROUTE="$(ip route show default 2>/dev/null | head -n1 || true)"
-          if command -v ss >/dev/null 2>&1; then
-            echo TRACK_A_PORT_5900_LISTENING="$(ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)5900$' && echo true || echo false)"
-            echo TRACK_A_PORT_6080_LISTENING="$(ss -lntH 2>/dev/null | awk '{print $4}' | grep -Eq '(^|:)6080$' && echo true || echo false)"
-          fi

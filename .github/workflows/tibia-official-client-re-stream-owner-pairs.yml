@@ -1,0 +1,164 @@
+name: Track A stream owner pair mapping
+
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-chatgpt-framing-recovery]
+    paths: [.github/workflows/tibia-official-client-re-stream-owner-pairs.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Map owner stream pairs and constructors
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+
+          report="$RUNNER_TEMP/track-a-stream-owner-pairs.txt"
+          exec > >(tee "$report") 2>&1
+          echo 'TRACK_A_STREAM_OWNER_PAIRS_BEGIN=true'
+          echo 'SETUP_WINDOW=0x1970600..0x1971800'
+          echo 'KNOWN_RAW_STREAM_VTABLE=0x3084c58'
+          echo 'KNOWN_RAW_STREAM_RTTI=0x3080660'
+
+          python3 -u - "$client" <<'PY'
+          import struct,sys
+          data=open(sys.argv[1],'rb').read()
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phes=struct.unpack_from('<H',data,0x36)[0]; phn=struct.unpack_from('<H',data,0x38)[0]
+          seg=[]
+          for i in range(phn):
+              o=phoff+i*phes
+              typ,flags,fo,va,_,fs,ms,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fs:seg.append((fo,fo+fs,va,va+ms,flags))
+          def off(va):
+              for fs,fe,b,e,f in seg:
+                  if b<=va<b+(fe-fs):return fs+va-b
+          def flags(va):
+              for fs,fe,b,e,f in seg:
+                  if b<=va<e:return f
+              return 0
+          def rawq(va):
+              p=off(va)
+              return struct.unpack_from('<Q',data,p)[0] if p is not None and p+8<=len(data) else None
+          def cstr(va,lim=400):
+              p=off(va)
+              if p is None:return None
+              e=data.find(b'\0',p,min(len(data),p+lim))
+              return data[p:e].decode('utf-8','replace') if e>=0 else None
+
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shes=struct.unpack_from('<H',data,0x3a)[0]; shn=struct.unpack_from('<H',data,0x3c)[0]
+          sections=[]
+          for i in range(shn):sections.append(struct.unpack_from('<IIQQQQIIQQ',data,shoff+i*shes))
+          symtabs={}
+          for i,s in enumerate(sections):
+              _,typ,_,_,so,ss,link,_,_,ents=s
+              if typ not in (2,11) or not ents:continue
+              st=sections[link]; strings=data[st[4]:st[4]+st[5]]; arr=[]
+              for p in range(so,so+ss,ents):
+                  sn,si,sother,shndx,sv,sz=struct.unpack_from('<IBBHQQ',data,p)
+                  z=strings.find(b'\0',sn); nm=strings[sn:z].decode('utf-8','replace') if z>=0 else ''
+                  arr.append((nm,sv))
+              symtabs[i]=arr
+          rel={}
+          for i,s in enumerate(sections):
+              _,typ,_,_,so,ss,link,_,_,ents=s
+              if typ!=4 or not ents:continue
+              syms=symtabs.get(link,[])
+              for p in range(so,so+ss,ents):
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p); idx=ri>>32; rt=ri&0xffffffff
+                  nm,sv=syms[idx] if idx<len(syms) else ('',0)
+                  rel.setdefault(ro,[]).append((rt,nm,sv,ra))
+          def resolvedq(va):
+              v=rawq(va) or 0
+              for rt,nm,sv,ra in rel.get(va,[]):
+                  if rt==8:v=ra & 0xffffffffffffffff
+                  elif sv:v=(sv+ra)&0xffffffffffffffff
+              return v
+          def relocstr(va):
+              return ';'.join(f't={rt},sym={nm or "-"},sv=0x{sv:x},a={ra}' for rt,nm,sv,ra in rel.get(va,[])) or 'none'
+          def rtti_name(rt):
+              if not rt or not flags(rt) or flags(rt)&1:return None
+              np=resolvedq(rt+8)
+              return cstr(np) if np else None
+
+          # Enumerate every conventional Itanium address point referenced by LEA
+          # in the setup window and decode its RTTI when possible.
+          lo,hi=0x1970600,0x1971800; p0=off(lo); blob=data[p0:p0+(hi-lo)]
+          refs=[]
+          for p in range(0,len(blob)-7):
+              if not (0x40<=blob[p]<=0x4f and blob[p+1]==0x8d and (blob[p+2]&0xc7)==0x05):continue
+              site=lo+p; target=site+7+struct.unpack_from('<i',blob,p+3)[0]
+              refs.append((site,target))
+          seen=set()
+          for site,target in refs:
+              if target in seen:continue
+              seen.add(target)
+              rt=resolvedq(target-8); ot=rawq(target-16)
+              nm=rtti_name(rt)
+              if nm or target==0x3084c58:
+                  print(f'SETUP_LEA_RTTI first_site=0x{site:x} target=0x{target:x} offset_to_top_raw=0x{(ot or 0):x} rtti=0x{rt:x} rtti_name={nm or "unknown"}')
+
+          # Direct owner-field displacement recall across setup range. Raw hits are
+          # just anchors; authoritative semantics come from GDB disassembly.
+          for fld in (0x9e0,0x9e8,0x9f0,0x9f8,0xa00,0xa08,0xa10,0xa18,0xc18,0xc20):
+              nd=struct.pack('<I',fld); hits=[]; p=0
+              while True:
+                  p=blob.find(nd,p)
+                  if p<0:break
+                  hits.append(lo+p); p+=1
+              print(f'OWNER_FIELD_RECALL field=0x{fld:x} hits={len(hits)} sites={",".join(hex(x) for x in hits[:128]) if hits else "none"}')
+
+          # Relevant known class names around transport RTTI table.
+          for rt in range(0x3080600,0x3080780,8):
+              nm=rtti_name(rt)
+              if nm and ('tibia' in nm or 'Buffer' in nm or 'Socket' in nm or 'Stream' in nm):
+                  print(f'NEARBY_RTTI rtti=0x{rt:x} name={nm}')
+
+          print('TRACK_A_STREAM_OWNER_STATIC_COMPLETE=true')
+          PY
+
+          for range in \
+            '0x1970600,0x1970a00' \
+            '0x1970a00,0x1970e00' \
+            '0x1970e00,0x1971200' \
+            '0x1971200,0x1971800' \
+            '0xb55380,0xb55580'; do
+            echo "DISASSEMBLY_BEGIN=$range"
+            env LD_LIBRARY_PATH="$tool_lib" "$gdb" -q -nx -batch "$client" \
+              -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $range"
+            echo "DISASSEMBLY_END=$range"
+          done
+
+          # Symbol/version clues around socket APIs imported by the exact client.
+          echo 'SOCKET_SYMBOLS_BEGIN=true'
+          readelf -Ws "$client" | grep -E 'QTcpSocket|QAbstractSocket|QSslSocket|QIODevice.*write|QBuffer' | head -n 300 || true
+          echo 'SOCKET_SYMBOLS_END=true'
+          echo 'TRACK_A_STREAM_OWNER_PAIRS_COMPLETE=true'
+          grep -q '^TRACK_A_STREAM_OWNER_PAIRS_COMPLETE=true$' "$report"
+
+      - name: Upload exact-version owner pair report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-stream-owner-pairs-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-stream-owner-pairs.txt
+          if-no-files-found: error
+          retention-days: 7

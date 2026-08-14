@@ -195,9 +195,10 @@ last_progress:
   - isolated the queued callsite census to a runner-label mismatch and aligned it with successful adjacent Track A workflows
   - completed repaired callsite census run 31799755489 with 2184 direct calls
   - persisted the bounded experiment record and selected legacy string-connect neighborhood reconstruction
+  - isolated legacy-neighborhood run 31799979849 failure to unavailable system objdump and reused the proven Track A toolroot GDB path
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 3
 stall_warnings: 0
 blockers: []
 ```
@@ -216,7 +217,7 @@ recovery:
   exact_head: 3d0a54a9edd658555df44929494c902abfd846ec
   pull_request: 289
   active_operation: persist and push legacy QObject connect neighborhood experiment
-  external_run_ids: [31799755489]
+  external_run_ids: [31799755489, 31799979849]
   operation_started_at: null
   wait_deadline_at: null
   check_generation: experiment
@@ -253,10 +254,11 @@ unknown:
   - sender/receiver and signal/slot identities for every recovered callsite
 conflicts: []
 first_failure:
-  marker: queued_runner_label_mismatch
-  evidence: runs 31794273375, 31798163007, and 31799696037 remained queued while runner 21 was online and idle; successful adjacent workflows select only otclient/synology
+  marker: legacy_neighborhood_disassembler_unavailable
+  evidence: run 31799979849 job 94765445120 stopped before Python output at command -v objdump
 rejected_hypotheses:
   - runner unavailable: GitHub runner API reports synology-otclient-01 online and idle
+  - system objdump available: run 31799979849 exited at the explicit availability check
 changed_paths:
   - .github/workflows/tibia-official-client-re-qt-connect-callsite-census.yml
   - .github/workflows/tibia-official-client-re-qt-legacy-connect-neighborhoods.yml

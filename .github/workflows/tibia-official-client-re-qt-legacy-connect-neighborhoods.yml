@@ -28,15 +28,20 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
           client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
           [[ -x "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-          command -v objdump >/dev/null
-          python3 - "$client" <<'PY'
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$gdb" ]]
+          python3 - "$client" "$gdb" <<'PY'
           import struct
           import subprocess
           import sys
 
           client = sys.argv[1]
+          gdb = sys.argv[2]
           data = open(client, 'rb').read()
           phoff = struct.unpack_from('<Q', data, 0x20)[0]
           phentsz = struct.unpack_from('<H', data, 0x36)[0]
@@ -67,8 +72,10 @@ jobs:
               stop = callsite + 0x10
               print(f'NEIGHBORHOOD_BEGIN ordinal={ordinal} call=0x{callsite:x} start=0x{start:x} stop=0x{stop:x}')
               subprocess.run([
-                  'objdump', '-d', '-M', 'intel',
-                  f'--start-address=0x{start:x}', f'--stop-address=0x{stop:x}', client,
+                  gdb, '-q', '-nx', '-batch', client,
+                  '-ex', 'set pagination off',
+                  '-ex', 'set disassembly-flavor intel',
+                  '-ex', f'disassemble /r 0x{start:x},0x{stop:x}',
               ], check=True)
               print(f'NEIGHBORHOOD_END ordinal={ordinal} call=0x{callsite:x}')
           print('TRACK_A_QT_LEGACY_CONNECT_NEIGHBORHOODS_COMPLETE=true')

@@ -12,50 +12,98 @@ permissions:
 jobs:
   enable:
     runs-on: [otclient, synology]
-    timeout-minutes: 3
+    timeout-minutes: 5
     env:
       TRACK_DISPLAY: ':98'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     steps:
-      - name: Verify restored Track A client and browser view
+      - name: Relaunch official client with bundled Qt and verify nonblack browser view
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ -S /var/run/docker.sock ]]
           [[ -S /tmp/.X11-unix/X98 ]]
           state=/work/_otclient_tibia_re_state
           [[ -d "$state" ]] || state=/home/runner/_work/_otclient_tibia_re_state
           root="$state/toolroot"
           runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
           client="$runtime/bin/client"
+          client_lib="$runtime/bin/lib"
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
           tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
-          [[ -x "$client" ]]
+          xwd="$root/usr/bin/xwd"
+          xdotool="$root/usr/bin/xdotool"
+          server="$state/runtime/track-a-remote-gui.py"
+          [[ -x "$client" && -d "$client_lib" && -x "$xwd" && -x "$xdotool" && -s "$server" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_EXACT_CLIENT_VERIFIED=true
 
-          pid=''
+          # Stop only an exact stale official-client process, never Xvfb or the GUI bridge.
           for e in /proc/[0-9]*/exe; do
             [[ -e "$e" ]] || continue
-            if [[ "$(readlink -f "$e" 2>/dev/null || true)" == "$client" ]]; then pid="${e#/proc/}"; pid="${pid%/exe}"; break; fi
+            if [[ "$(readlink -f "$e" 2>/dev/null || true)" == "$client" ]]; then
+              p="${e#/proc/}"; p="${p%/exe}"; kill "$p" 2>/dev/null || true
+            fi
           done
-          [[ -n "$pid" ]]
-          kill -0 "$pid"
-          echo TRACK_A_OFFICIAL_CLIENT_RUNNING_PID="$pid"
+          sleep 1
 
-          probe=/tmp/track-a-verify.xwd
-          DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$root/usr/bin/xwd" -root -silent -out "$probe"
+          proxy_lib="$(find "$root" -type f -name 'libproxychains.so.4' -print -quit)"
+          proxy_conf="$state/config/proxychains.conf"
+          [[ -n "$proxy_lib" && -s "$proxy_conf" ]]
+
+          # The official client bundles Qt 6.9 under Tibia/bin/lib. It MUST precede toolroot,
+          # otherwise toolroot's older libQt6Core is selected and the client exits immediately.
+          cd "$runtime"
+          env -u RUNNER_TRACKING_ID OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" \
+            LD_LIBRARY_PATH="$client_lib:$tool_lib" \
+            QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+            XDG_DATA_DIRS="$root/usr/share:/usr/share" \
+            FONTCONFIG_PATH="$root/etc/fonts" FONTCONFIG_FILE="$root/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$client" >"$state/runtime/client-gui.log" 2>&1 </dev/null &
+          pid=$!
+          printf '%s\n' "$pid" >"$state/runtime/client.pid"
+          chmod 600 "$state/runtime/client.pid"
+          echo TRACK_A_CLIENT_STARTED_PID="$pid"
+
+          sleep 12
+          if ! kill -0 "$pid" 2>/dev/null; then
+            echo TRACK_A_CLIENT_START_FAILED=true
+            tail -n 160 "$state/runtime/client-gui.log" || true
+            exit 30
+          fi
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          echo TRACK_A_OFFICIAL_CLIENT_RUNNING=true
+
+          probe=/tmp/track-a-live.xwd
+          DISPLAY="$TRACK_DISPLAY" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" "$xwd" -root -silent -out "$probe"
           python3 - "$probe" <<'PY'
           import struct,sys
           d=open(sys.argv[1],'rb').read(); h=struct.unpack('>25I',d[:100])
-          assert (h[4],h[5])==(1920,1080)
+          assert (h[4],h[5]) == (1920,1080)
           off=h[0]+h[19]*12; payload=d[off:off+h[12]*h[5]]
           nz=sum(1 for b in payload[::64] if b)
           print(f'TRACK_A_XWD_NONZERO_SAMPLE={nz}')
-          assert nz>100
+          assert nz > 100
+          print('TRACK_A_XWD_NONBLACK=true')
           PY
           rm -f "$probe"
 
-          curl -fsS --max-time 5 http://127.0.0.1:6081/ | grep -q 'Track A'
+          self="$(hostname)"
+          runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
+          image="$(docker inspect -f '{{.Config.Image}}' "$self")"
+          if ! curl -fsS --max-time 3 http://127.0.0.1:6081/ | grep -q 'Track A'; then
+            docker exec -d -u 0 \
+              -e DISPLAY="$TRACK_DISPLAY" -e TRACK_A_XWD="$xwd" -e TRACK_A_XDOTOOL="$xdotool" \
+              -e TRACK_A_TOOL_LIB="$tool_lib" -e TRACK_A_TOOL_PATH="$tool_path" -e TRACK_A_GUI_PORT=6081 \
+              "$self" python3 "$server"
+          fi
+          for _ in $(seq 1 20); do
+            curl -fsS --max-time 2 http://127.0.0.1:6081/ | grep -q 'Track A' && break
+            sleep 1
+          done
           code="$(curl -sS --max-time 15 -o /tmp/view.bmp -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)"
           [[ "$code" == 200 && "$(head -c2 /tmp/view.bmp)" == BM ]]
           python3 - /tmp/view.bmp <<'PY'
@@ -63,14 +111,12 @@ jobs:
           d=open(sys.argv[1],'rb').read(); off=int.from_bytes(d[10:14],'little')
           nz=sum(1 for b in d[off::64] if b)
           print(f'TRACK_A_BROWSER_NONZERO_SAMPLE={nz}')
-          assert nz>100
+          assert nz > 100
+          print('TRACK_A_BROWSER_VIEW_NONBLACK=true')
           PY
           rm -f /tmp/view.bmp
-          echo TRACK_A_BROWSER_VIEW_NONBLACK=true
 
-          self="$(hostname)"
-          ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
-          image="$(docker inspect -f '{{.Config.Image}}' "$self")"
-          timeout 15s docker run --rm --network host --entrypoint /bin/sh "$image" -lc "curl -fsS --max-time 5 http://${ip}:6081/ | grep -q 'Track A'"
-          echo TRACK_A_DSM_TARGET_VERIFIED="http://${ip}:6081"
+          timeout 20s docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
+            "curl -fsS --max-time 8 http://${runner_ip}:6081/ | grep -q 'Track A'"
+          echo TRACK_A_DSM_TARGET_VERIFIED="http://${runner_ip}:6081"
           echo TRACK_A_USER_URL=http://synology:6082

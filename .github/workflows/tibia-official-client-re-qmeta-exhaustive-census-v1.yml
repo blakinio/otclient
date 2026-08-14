@@ -1,0 +1,158 @@
+name: Track A exhaustive QMeta structural census v1
+on:
+  push:
+    branches:
+      - ci/OTC-20260813-official-client-re-continuation
+    paths:
+      - .github/workflows/tibia-official-client-re-qmeta-exhaustive-census-v1.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Structurally enumerate every valid QMeta record
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          actual_sha="$(sha256sum "$client" | awk '{print $1}')"
+          [[ "$actual_sha" == "$EXPECTED_CLIENT_SHA256" ]]
+          python3 - "$client" "$actual_sha" <<'PY'
+          import json,struct,sys
+          path,sha=sys.argv[1:3]
+          data=open(path,'rb').read()
+
+          # ELF load segments, with executable/read-only ownership used as structural validation.
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phentsz=struct.unpack_from('<H',data,0x36)[0]; phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,off,va,paddr,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1: loads.append((off,off+filesz,va,va+filesz,flags))
+          def va2off(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return lo+(v-va)
+              return None
+          def segflags(v):
+              for lo,hi,va,vhi,fl in loads:
+                  if va<=v<vhi:return fl
+              return None
+
+          # Collect every RELA relocation.  r_info low 32 bits is the relocation type on ELF64 x86-64.
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shentsz=struct.unpack_from('<H',data,0x3a)[0]; shnum=struct.unpack_from('<H',data,0x3c)[0]
+          relas={}
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              name,typ,flags,addr,so,ss,link,info,align,se=struct.unpack_from('<IIQQQQIIQQ',data,o)
+              if typ!=4 or not se:continue
+              for p in range(so,so+ss,se):
+                  if p+24>len(data):break
+                  ro,ri,ra=struct.unpack_from('<QQq',data,p)
+                  relas[ro]=(ri&0xffffffff,ri>>32,ra)
+
+          def decode_string_table(base):
+              o=va2off(base)
+              if o is None or o+8>len(data): return None
+              first,ln0=struct.unpack_from('<II',data,o)
+              if first==0 or first%8 or first>0x10000:return None
+              count=first//8
+              if count>4096 or o+first>len(data):return None
+              out=[]
+              for i in range(count):
+                  rel,ln=struct.unpack_from('<II',data,o+i*8)
+                  if ln>4096 or rel<first:return None
+                  start=o+rel
+                  if start+ln>len(data):return None
+                  raw=data[start:start+ln]
+                  try:s=raw.decode('utf-8')
+                  except:return None
+                  if '\x00' in s:return None
+                  out.append(s)
+              return out
+
+          def decode_meta(base,strings):
+              o=va2off(base)
+              if o is None or o+56>len(data):return None
+              hdr=list(struct.unpack_from('<14I',data,o))
+              rev,class_idx,ci_count,ci_data,m_count,m_data,p_count,p_data,e_count,e_data,c_count,c_data,flags,signal_count=hdr
+              if rev!=13 or class_idx>=len(strings):return None
+              if m_count>4096 or signal_count>m_count:return None
+              if m_data>100000 or p_count>10000 or e_count>10000:return None
+              methods=[]
+              for j in range(m_count):
+                  pos=o+(m_data+j*6)*4
+                  if pos+24>len(data):return None
+                  vals=struct.unpack_from('<6I',data,pos)
+                  ni,argc,param_off,tag_idx,mflags,meta_off=vals
+                  if ni>=len(strings) or tag_idx>=len(strings):return None
+                  methods.append({'index':j,'name':strings[ni],'argc':argc,'flags':mflags,'parameter_offset':param_off,'metatype_offset':meta_off})
+              return {'revision':rev,'class_name':strings[class_idx],'method_count':m_count,'signal_count':signal_count,'property_count':p_count,'enum_count':e_count,'constructor_count':c_count,'flags':flags,'methods':methods}
+
+          # Calibrated record layout: +0x08 stringdata RELATIVE, +0x10 metadata RELATIVE,
+          # +0x18 static_metacall RELATIVE into executable segment, +0x28 associated data RELATIVE.
+          # Enumerate from relocation structure first; class-name/namespace is decoded only after validation.
+          candidates=[]
+          for string_slot,(t1,sym1,string_ptr) in relas.items():
+              if t1!=8:continue  # R_X86_64_RELATIVE
+              base=string_slot-8
+              rmeta=relas.get(base+0x10); rcall=relas.get(base+0x18); rdata=relas.get(base+0x28)
+              if not rmeta or not rcall or not rdata:continue
+              if rmeta[0]!=8 or rcall[0]!=8 or rdata[0]!=8:continue
+              # static_metacall must resolve into executable PT_LOAD.
+              fl=segflags(rcall[2])
+              if fl is None or not (fl&1):continue
+              strings=decode_string_table(string_ptr)
+              if strings is None:continue
+              meta=decode_meta(rmeta[2],strings)
+              if meta is None:continue
+              candidates.append((base,string_ptr,rmeta[2],rcall[2],rdata[2],meta))
+
+          # De-duplicate exact record bases.
+          uniq={c[0]:c for c in candidates}
+          records=[uniq[k] for k in sorted(uniq)]
+          tibia=[];other=[]
+          for base,sb,mb,fn,db,meta in records:
+              cls=meta['class_name']
+              rec={'type_name':cls,'namespace':cls.rsplit('::',1)[0] if '::' in cls else '',
+                   'kind':'QMETA','methods':meta['methods'],'signals_count':meta['signal_count'],
+                   'properties_count':meta['property_count'],'enums_count':meta['enum_count'],
+                   'relationships':{'qmeta_record_va':hex(base),'stringdata_va':hex(sb),'metadata_va':hex(mb),'static_metacall_va':hex(fn),'associated_data_va':hex(db)},
+                   'current_client_sha':sha}
+              if cls.startswith('tibia::'):
+                  parts=cls.split('::')
+                  family=parts[1] if len(parts)>2 and parts[1] else None
+                  if cls.endswith('ProtocolMessageHandler'):kind_detail='HANDLER'
+                  elif cls.endswith('GameActionHandler'):kind_detail='ACTION_HANDLER'
+                  elif 'Storage' in cls:kind_detail='STORAGE'
+                  elif 'Controller' in cls:kind_detail='CONTROLLER'
+                  else:kind_detail='OTHER_QMETA'
+                  rec['kind_detail']=kind_detail
+                  rec['feature_family']=family
+                  rec['classification_status']='CLASSIFIED' if family else 'UNCLASSIFIED'
+                  tibia.append(rec)
+              else:
+                  rec['ignored_reason']='decoded QMeta class is not in tibia:: namespace'
+                  other.append(rec)
+
+          print('TRACK_A_QMETA_EXHAUSTIVE_BEGIN=true')
+          print(f'TRACK_A_QMETA_STRUCTURAL_RECORD_COUNT={len(records)}')
+          print(f'TRACK_A_QMETA_TIBIA_OWNED_COUNT={len(tibia)}')
+          print(f'TRACK_A_QMETA_NON_TIBIA_COUNT={len(other)}')
+          unclassified=sum(1 for r in tibia if r['classification_status']=='UNCLASSIFIED')
+          print(f'TRACK_A_QMETA_TIBIA_UNCLASSIFIED_COUNT={unclassified}')
+          for r in tibia:
+              # Compact but machine-readable output. All recovered Tibia-owned records are emitted.
+              print('QMETA_JSON '+json.dumps(r,separators=(',',':'),ensure_ascii=True))
+          print('TRACK_A_QMETA_EXHAUSTIVE_COMPLETE=true')
+          PY

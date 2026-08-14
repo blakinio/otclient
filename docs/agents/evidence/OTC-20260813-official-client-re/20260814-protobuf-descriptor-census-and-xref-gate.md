@@ -87,31 +87,60 @@ The Python scan nevertheless emitted `TRACK_A_XREF_GRAPH_COMPLETE=true` before G
 
 For every scanned occurrence of the selected handler/method/outbound message literal strings, the experiment reported `qword_refs=0`. This includes the compact Chat/Container/Creature/Player/Effect/Market/Trade/Quest/GameEvent targets and the outbound `MoveObject`, `Attack`, `Follow`, `Talk`, `TradeObject`, `GoPath` names.
 
-No `DIRECT_RIPREFS` line was emitted for the scanned literal-string addresses.
-
 ### LIMITATION
 
 The v1 implementation rescanned the entire executable range for each literal occurrence, making it O(target-occurrences × executable-size). It completed the Python output only near the workflow timeout and the job was then cancelled. This is an implementation-performance failure, not evidence that broader metadata/code xrefs do not exist.
 
-## Replacement xref gate
+## Linear direct-RIP xref gate
 
-A linear one-pass replacement is now versioned as:
+Replacement experiment:
 
 ```text
 .github/workflows/tibia-official-client-re-xref-graph-v2.yml
-head introducing workflow: cfbe04c03de34f83646a82569c90dafaf342c129
+head: cfbe04c03de34f83646a82569c90dafaf342c129
 run: 31789670398
+job: 94733517691
+runner: synology-otclient-01
+result: SUCCESS
+scanner: one linear executable pass
 ```
 
-It scans executable RIP-relative LEA/MOV references once and indexes only the selected literal VAs. This removes the multiplicative full-binary rescans from v1.
+### FACT — tested literal addresses have zero direct RIP-relative LEA/MOV references
+
+The linear scanner completed in seconds and reported:
+
+```text
+TOTAL_DIRECT_RIPREFS=0
+TRACK_A_XREF_V2_COMPLETE=true
+```
+
+Every tested occurrence had `direct_riprefs=0`, including:
+
+- handler class literals for Chat, Container, Creature, Player, Effect, Market, NPC Trade, Player Trade, Quest and Game Event;
+- selected `handle*Message` literals;
+- outbound `GameclientMessageMoveObject`, `Attack`, `Follow`, `Talk`, `TradeObject`, `GoPath`;
+- inbound `GameserverMessageMoveCreature`, `PlayerDataCurrent`, `Container`, `Talk`.
+
+This validates the v1 observation with an efficient successful run: the tested code is not reached through a simple executable RIP-relative reference to the exact literal address in the LEA/MOV forms scanned.
+
+### Boundary
+
+This does **not** prove that code has no relationship to these names. Generated Qt/protobuf metadata commonly references a base table/blob and addresses individual strings by integer offsets, or references descriptor/type tables rather than each literal separately. Therefore another literal-string xref variant is not justified without a materially new representation hypothesis.
 
 ## Research consequence
 
-The direct path `literal string -> absolute qword pointer -> code` is rejected for the tested literals. The next deterministic routes are:
+The direct paths below are now rejected for the selected literals:
 
-1. consume the linear RIP-reference v2 result;
-2. reconstruct Qt metadata structures from compact string tables and their integer offsets rather than assuming absolute string pointers;
-3. locate generated protobuf descriptor/default-instance/accessor code for high-value messages whose serialized file descriptors are not embedded;
-4. continue runtime validation only with version-fenced concrete entry points.
+```text
+literal -> absolute qword pointer
+literal -> direct executable RIP-relative LEA/MOV
+```
+
+The next deterministic routes are:
+
+1. reconstruct Qt/QMeta string-data bases and integer-offset metadata rather than xrefing individual strings;
+2. locate generated protobuf descriptor/default-instance/accessor tables for high-value message types whose serialized file descriptors are not embedded;
+3. derive C++ object layouts from those generated tables/accessors and then validate only selected fields at runtime;
+4. continue live-world mutation validation only with version-fenced concrete entry points.
 
 No client login, packet injection, runtime attach, or owner interaction was required for these static experiments.

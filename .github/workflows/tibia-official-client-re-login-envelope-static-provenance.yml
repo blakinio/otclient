@@ -1,0 +1,365 @@
+name: Track A login envelope static provenance
+
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-login-envelope-static-provenance.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 15
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: "51965216"
+    steps:
+      - name: Recover receiver, exact FDEs, vtables and write callers
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          readelf_bin=$(command -v readelf || true)
+          objdump_bin=$(command -v objdump || true)
+          [[ -n "$readelf_bin" && -x "$readelf_bin" ]]
+          [[ -n "$objdump_bin" && -x "$objdump_bin" ]]
+
+          report="$RUNNER_TEMP/track-a-login-envelope-static-provenance.txt"
+          frames="$RUNNER_TEMP/track-a-login-envelope-frames.txt"
+          disasm="$RUNNER_TEMP/track-a-login-envelope-disasm.txt"
+          : >"$report"
+          exec > >(tee -a "$report") 2>&1
+
+          echo 'TRACK_A_LOGIN_ENVELOPE_STATIC_PROVENANCE_BEGIN=true'
+          echo "WORKFLOW_SOURCE_SHA=$GITHUB_SHA"
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo "CLIENT_SIZE=$EXPECTED_CLIENT_SIZE"
+          echo "READELF=$readelf_bin"
+          echo "OBJDUMP=$objdump_bin"
+          echo 'CONNECT_PRE_CALL_SITE=0x7d564f'
+          echo 'CONNECT_IMPL_CALL_SITE=0x7d5669'
+          echo 'RECEIVER_SLOT_TARGET=0xbd36a0'
+          echo 'QIODEVICE_WRITE_QBYTEARRAY_PLT=0x4de370'
+          echo 'PRIMARY_OWNER_VTABLE=0x308c408'
+          echo 'PRIMARY_SLOT_90=0x8409d0'
+          echo 'QUEUE_DELEGATE=0x840650'
+          echo 'SUBOBJECT_VTABLE=0x2f66288'
+          echo 'SUBOBJECT_SLOT_B8=0xb5b880'
+          echo 'KNOWN_LINE_WRITER=0xb46bd0'
+
+          "$readelf_bin" -W -wf "$client" > "$frames"
+          "$objdump_bin" -d -M intel --no-show-raw-insn "$client" > "$disasm"
+
+          python3 -u - "$client" "$frames" "$disasm" <<'PY'
+          import bisect
+          import re
+          import struct
+          import sys
+          from collections import defaultdict
+
+          client_path, frames_path, disasm_path = sys.argv[1:]
+          data = open(client_path, 'rb').read()
+
+          # ELF PT_LOAD mapping helpers.
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          loads = []
+          for i in range(phnum):
+              o = phoff + i * phentsz
+              typ, flags, fo, va, _, fsz, msz, _ = struct.unpack_from('<IIQQQQQQ', data, o)
+              if typ == 1 and fsz:
+                  loads.append((fo, fo + fsz, va, va + msz, flags))
+
+          def va_to_off(va):
+              for fs, fe, base, vend, flags in loads:
+                  file_ve = base + (fe - fs)
+                  if base <= va < file_ve:
+                      return fs + (va - base)
+              return None
+
+          def off_to_va(off):
+              for fs, fe, base, vend, flags in loads:
+                  if fs <= off < fe:
+                      return base + (off - fs)
+              return None
+
+          def read_qword(va):
+              o = va_to_off(va)
+              if o is None or o + 8 > len(data):
+                  return None
+              return struct.unpack_from('<Q', data, o)[0]
+
+          def read_sqword(va):
+              o = va_to_off(va)
+              if o is None or o + 8 > len(data):
+                  return None
+              return struct.unpack_from('<q', data, o)[0]
+
+          def read_cstr(va, limit=240):
+              o = va_to_off(va)
+              if o is None:
+                  return None
+              end = data.find(b'\0', o, min(len(data), o + limit))
+              if end < 0:
+                  return None
+              raw = data[o:end]
+              if not raw:
+                  return ''
+              try:
+                  s = raw.decode('utf-8')
+              except UnicodeDecodeError:
+                  return None
+              good = sum(ch.isprintable() or ch in '\t\r\n' for ch in s)
+              if good < max(1, int(len(s) * 0.90)):
+                  return None
+              return s
+
+          # Parse exact .eh_frame FDE ranges from readelf output.
+          fde_re = re.compile(r'\bFDE\b.*\bpc=(?:0x)?([0-9a-fA-F]+)\.\.(?:0x)?([0-9a-fA-F]+)')
+          fdes = []
+          for line in open(frames_path, errors='replace'):
+              m = fde_re.search(line)
+              if m:
+                  lo, hi = int(m.group(1), 16), int(m.group(2), 16)
+                  if hi > lo:
+                      fdes.append((lo, hi, line.strip()))
+          fdes.sort()
+          starts = [x[0] for x in fdes]
+          print(f'FDE_COUNT={len(fdes)}')
+
+          def containing_fde(addr):
+              i = bisect.bisect_right(starts, addr) - 1
+              if i >= 0:
+                  lo, hi, raw = fdes[i]
+                  if lo <= addr < hi:
+                      return (lo, hi, raw)
+              return None
+
+          # Parse instruction-aligned objdump output only.
+          insn_re = re.compile(r'^\s*([0-9a-fA-F]+):\s+(.+?)\s*$')
+          direct_call_re = re.compile(r'\bcall\w*\s+([0-9a-fA-F]+)\b')
+          rip_target_re = re.compile(r'#\s*(?:0x)?([0-9a-fA-F]+)\b')
+          instructions = []
+          direct_calls = []
+          calls_by_fde = defaultdict(list)
+          offset88 = []
+          offset88_stores = []
+          qio_calls = []
+          for line in open(disasm_path, errors='replace'):
+              m = insn_re.match(line)
+              if not m:
+                  continue
+              addr = int(m.group(1), 16)
+              text = m.group(2)
+              instructions.append((addr, text))
+              cm = direct_call_re.search(text)
+              if cm:
+                  target = int(cm.group(1), 16)
+                  direct_calls.append((addr, target, text))
+                  f = containing_fde(addr)
+                  if f:
+                      calls_by_fde[(f[0], f[1])].append((addr, target, text))
+                  if target == 0x4de370:
+                      qio_calls.append((addr, text, f))
+              norm = text.replace(' ', '').lower()
+              if '+0x88]' in norm:
+                  offset88.append((addr, text, containing_fde(addr)))
+                  mnemonic = text.lstrip().split(None, 1)[0].lower() if text.strip() else ''
+                  operands = text.strip().split(None, 1)[1] if len(text.strip().split(None, 1)) > 1 else ''
+                  first = operands.split(',', 1)[0].replace(' ', '').lower()
+                  if mnemonic.startswith(('mov', 'lea', 'xchg', 'cmpxchg')) and '+0x88]' in first:
+                      offset88_stores.append((addr, text, containing_fde(addr)))
+
+          addrs = [x[0] for x in instructions]
+          def insns_in(lo, hi):
+              a = bisect.bisect_left(addrs, lo)
+              b = bisect.bisect_left(addrs, hi)
+              return instructions[a:b]
+
+          def printable_target_from_line(text):
+              m = rip_target_re.search(text)
+              if not m:
+                  return None
+              va = int(m.group(1), 16)
+              return va, read_cstr(va)
+
+          def emit_fde(name, addr):
+              f = containing_fde(addr)
+              print(f'FDE_LOOKUP name={name} addr=0x{addr:x} found={str(bool(f)).lower()}')
+              if not f:
+                  return None
+              lo, hi, raw = f
+              print(f'FDE_RANGE name={name} lo=0x{lo:x} hi=0x{hi:x} size=0x{hi-lo:x}')
+              print(f'FDE_DISASSEMBLY_BEGIN name={name}')
+              for ia, text in insns_in(lo, hi):
+                  suffix = ''
+                  pt = printable_target_from_line(text)
+                  if pt and pt[1] is not None:
+                      suffix = f' ; RIP_STRING@0x{pt[0]:x}={pt[1]!r}'
+                  print(f'0x{ia:x}: {text}{suffix}')
+              print(f'FDE_DISASSEMBLY_END name={name}')
+              calls = calls_by_fde.get((lo, hi), [])
+              print(f'FDE_DIRECT_CALL_COUNT name={name} count={len(calls)}')
+              for site, target, text in calls:
+                  print(f'FDE_DIRECT_CALL name={name} site=0x{site:x} target=0x{target:x} insn={text!r}')
+              return f
+
+          targets = [
+              ('connect_pre_call', 0x7d564f),
+              ('connect_impl_call', 0x7d5669),
+              ('receiver_slot_target', 0xbd36a0),
+              ('queue_delegate', 0x840650),
+              ('primary_slot90', 0x8409d0),
+              ('subobject_slot_b8', 0xb5b880),
+              ('known_line_writer', 0xb46bd0),
+          ]
+          target_fdes = {}
+          for name, addr in targets:
+              target_fdes[name] = emit_fde(name, addr)
+
+          # Exact instruction-aligned QIODevice::write(QByteArray const&) caller census.
+          print(f'QIODEVICE_WRITE_DIRECT_CALL_COUNT={len(qio_calls)}')
+          caller_ranges = []
+          for site, text, f in qio_calls:
+              if f:
+                  fr = (f[0], f[1])
+                  if fr not in caller_ranges:
+                      caller_ranges.append(fr)
+                  print(f'QIODEVICE_WRITE_DIRECT_CALL site=0x{site:x} caller_fde=0x{f[0]:x}..0x{f[1]:x} insn={text!r}')
+              else:
+                  print(f'QIODEVICE_WRITE_DIRECT_CALL site=0x{site:x} caller_fde=none insn={text!r}')
+          for idx, (lo, hi) in enumerate(caller_ranges):
+              print(f'QIODEVICE_CALLER_FDE_BEGIN index={idx} lo=0x{lo:x} hi=0x{hi:x}')
+              for ia, text in insns_in(lo, hi):
+                  suffix = ''
+                  pt = printable_target_from_line(text)
+                  if pt and pt[1] is not None:
+                      suffix = f' ; RIP_STRING@0x{pt[0]:x}={pt[1]!r}'
+                  print(f'0x{ia:x}: {text}{suffix}')
+              print(f'QIODEVICE_CALLER_FDE_END index={idx}')
+
+          # Receiver field provenance: all instruction-aligned +0x88 uses/stores,
+          # plus an explicit subset within the connect FDE.
+          print(f'OFFSET_88_USE_COUNT={len(offset88)}')
+          print(f'OFFSET_88_STORE_COUNT={len(offset88_stores)}')
+          connect_fde = target_fdes.get('connect_pre_call')
+          if connect_fde:
+              clo, chi = connect_fde[:2]
+              local = [(a, t) for a, t, f in offset88 if clo <= a < chi]
+              print(f'CONNECT_FDE_OFFSET_88_COUNT={len(local)}')
+              for a, t in local:
+                  print(f'CONNECT_FDE_OFFSET_88 site=0x{a:x} insn={t!r}')
+          by_store_fde = defaultdict(list)
+          for a, t, f in offset88_stores:
+              key = (f[0], f[1]) if f else (0, 0)
+              by_store_fde[key].append((a, t))
+          print(f'OFFSET_88_STORE_FDE_COUNT={len(by_store_fde)}')
+          for (lo, hi), rows in sorted(by_store_fde.items(), key=lambda kv: kv[0])[:256]:
+              print(f'OFFSET_88_STORE_FDE lo=0x{lo:x} hi=0x{hi:x} count={len(rows)}')
+              for a, t in rows[:16]:
+                  print(f'OFFSET_88_STORE site=0x{a:x} insn={t!r}')
+
+          # Exact aligned qword xrefs in loaded file data to key function pointers.
+          ptr_targets = {
+              0xbd36a0: 'receiver_slot_target',
+              0x840650: 'queue_delegate',
+              0x8409d0: 'primary_slot90',
+              0xb5b880: 'subobject_slot_b8',
+              0xb46bd0: 'known_line_writer',
+          }
+          ptr_xrefs = defaultdict(list)
+          for fs, fe, base, vend, flags in loads:
+              start = (fs + 7) & ~7
+              for o in range(start, fe - 7, 8):
+                  q = struct.unpack_from('<Q', data, o)[0]
+                  if q in ptr_targets:
+                      va = off_to_va(o)
+                      if va is not None:
+                          ptr_xrefs[q].append(va)
+          for target, label in ptr_targets.items():
+              xs = ptr_xrefs.get(target, [])
+              print(f'ALIGNED_PTR_XREF target_name={label} target=0x{target:x} count={len(xs)} vas={",".join(hex(x) for x in xs) if xs else "none"}')
+
+          # Itanium ABI vtable/typeinfo heuristic around every key function-pointer xref.
+          def typeinfo_name(typeinfo_va):
+              name_ptr = read_qword(typeinfo_va + 8)
+              if name_ptr is None:
+                  return None
+              return read_cstr(name_ptr)
+
+          def candidate_vtables_near(xref_va):
+              out = []
+              lo = max(0, xref_va - 0x300)
+              lo = (lo + 7) & ~7
+              hi = xref_va + 8
+              for p in range(lo, hi, 8):
+                  off_to_top = read_sqword(p)
+                  ti = read_qword(p + 8)
+                  if off_to_top is None or ti is None:
+                      continue
+                  if not (-0x10000 <= off_to_top <= 0x10000):
+                      continue
+                  name = typeinfo_name(ti)
+                  if name and len(name) <= 220:
+                      out.append((p, p + 16, off_to_top, ti, name))
+              dedup = []
+              seen = set()
+              for row in out:
+                  if row[0] not in seen:
+                      dedup.append(row); seen.add(row[0])
+              return dedup[-12:]
+
+          for target, label in ptr_targets.items():
+              for xva in ptr_xrefs.get(target, []):
+                  print(f'VTABLE_CONTEXT_BEGIN target_name={label} xref_va=0x{xva:x}')
+                  for p in range(max(0, xva - 0x40), xva + 0x48, 8):
+                      q = read_qword(p)
+                      if q is not None:
+                          s = read_cstr(q)
+                          extra = f' string={s!r}' if s is not None and s != '' else ''
+                          print(f'VTABLE_QWORD va=0x{p:x} value=0x{q:x}{extra}')
+                  for hdr, ap, oto, ti, name in candidate_vtables_near(xva):
+                      print(f'VTABLE_CANDIDATE header=0x{hdr:x} address_point=0x{ap:x} offset_to_top={oto} typeinfo=0x{ti:x} type_name={name!r}')
+                  print(f'VTABLE_CONTEXT_END target_name={label} xref_va=0x{xva:x}')
+
+          # Canonical known vtable address points: recover ABI header/type names directly.
+          for ap, label in [(0x308c408, 'primary_owner_vtable'), (0x2f66288, 'subobject_vtable')]:
+              oto = read_sqword(ap - 16)
+              ti = read_qword(ap - 8)
+              name = typeinfo_name(ti) if ti is not None else None
+              print(f'KNOWN_VTABLE address_point=0x{ap:x} name={label} offset_to_top={oto} typeinfo={hex(ti) if ti is not None else "none"} type_name={name!r}')
+              for p in range(ap - 0x20, ap + 0xa0, 8):
+                  q = read_qword(p)
+                  if q is not None:
+                      print(f'KNOWN_VTABLE_QWORD name={label} va=0x{p:x} value=0x{q:x}')
+
+          print('STATIC_ANALYSIS_PYTHON_COMPLETE=true')
+          PY
+
+          echo 'TRACK_A_LOGIN_ENVELOPE_STATIC_PROVENANCE_COMPLETE=true'
+          grep -q '^STATIC_ANALYSIS_PYTHON_COMPLETE=true$' "$report"
+          grep -q '^TRACK_A_LOGIN_ENVELOPE_STATIC_PROVENANCE_COMPLETE=true$' "$report"
+
+      - name: Upload static provenance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-login-envelope-static-provenance-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-login-envelope-static-provenance.txt
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,50 @@
+name: Track A inspect backpack for provenance item
+on:
+  push:
+    branches: [ci/OTC-20260814-track-a-single-item-drag]
+    paths: [.github/workflows/tibia-official-client-re-open-backpack-inspect.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Open only backpack and capture result
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient && "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'; runtime="$state/runtime"; toolroot="$state/toolroot"
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          pid="$(tr -cd '0-9' <"$runtime/client.pid")"; gp="$(tr -cd '0-9' <"$runtime/map-provenance-gdb.pid")"
+          kill -0 "$pid"; kill -0 "$gp"; grep -azFxq "$marker" "/proc/$pid/environ"; grep -azFxq "$marker" "/proc/$gp/environ"
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$client" && "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")" == "$gp" ]]
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          window=''; best=0
+          for w in $("$toolroot/usr/bin/xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do g="$("$toolroot/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null || true)"; width="$(sed -n 's/^WIDTH=//p'<<<"$g")"; height="$(sed -n 's/^HEIGHT=//p'<<<"$g")"; [[ -n "$width" && -n "$height" ]] || continue; area=$((width*height)); ((area>best)) && { best=$area; window=$w; }; done
+          [[ -n "$window" && "$best" -eq 663000 ]]
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/backpack-inspect"
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$GITHUB_WORKSPACE/artifacts/backpack-inspect/before.xwd"
+          "$toolroot/usr/bin/xdotool" windowactivate --sync "$window" 2>/dev/null || true; "$toolroot/usr/bin/xdotool" windowfocus --sync "$window"
+          "$toolroot/usr/bin/xdotool" mousemove --window "$window" 944 108 click --repeat 2 --delay 120 1
+          echo TRACK_A_BACKPACK_OPEN_DOUBLECLICK_SENT=true
+          sleep 2
+          kill -0 "$pid"; kill -0 "$gp"; [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")" == "$gp" ]]
+          "$toolroot/usr/bin/xwd" -silent -id "$window" -out "$GITHUB_WORKSPACE/artifacts/backpack-inspect/after.xwd"
+          echo TRACK_A_SESSION_LEFT_RUNNING=true
+      - name: Upload backpack evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-backpack-inspect
+          path: artifacts/backpack-inspect/*.xwd
+          if-no-files-found: ignore
+          retention-days: 7

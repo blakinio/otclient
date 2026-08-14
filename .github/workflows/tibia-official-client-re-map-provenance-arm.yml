@@ -1,0 +1,108 @@
+name: Track A arm persistent map provenance observer
+on:
+  push:
+    branches: [ci/OTC-20260813-official-client-re-continuation]
+    paths: [.github/workflows/tibia-official-client-re-map-provenance-arm.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+jobs:
+  arm:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      TRACK_DISPLAY: ':98'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Arm post-login observer and leave it attached
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient && "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'; runtime="$state/runtime"; toolroot="$state/toolroot"
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          export HOME="$state/home" DISPLAY="$TRACK_DISPLAY" PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin" LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          [[ -x "$client" && "$(sha256sum "$client"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          pid="$(tr -cd '0-9' <"$runtime/client.pid")"; kill -0 "$pid"; grep -azFxq "$marker" "/proc/$pid/environ"; [[ "$(readlink -f "/proc/$pid/exe")" == "$client" ]]
+          tracer="$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")"; known=''
+          for f in "$runtime/map-provenance-gdb.pid" "$runtime/dynamic-map-gdb.pid" "$runtime/worldmap-mutation-gdb.pid"; do [[ -r "$f" ]] && known="$(tr -cd '0-9' <"$f")"; done
+          if [[ "$tracer" != 0 && -n "$known" && "$tracer" == "$known" && -r "/proc/$tracer/environ" ]] && grep -azFxq "$marker" "/proc/$tracer/environ"; then
+            kill -INT "$tracer" 2>/dev/null || true; for _ in $(seq 1 30); do kill -0 "$tracer" 2>/dev/null || break; sleep .1; done
+            tracer="$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")"
+          fi
+          if [[ "$tracer" != 0 ]]; then echo "TRACK_A_RUNTIME_BLOCKED_FOREIGN_TRACER=$tracer"; exit 42; fi
+          line="$(grep -F "$client" "/proc/$pid/maps"|awk '$2~/r-xp/{print;exit}')"; start="$(awk '{split($1,a,"-");print a[1]}'<<<"$line")"; off="$(awk '{print $3}'<<<"$line")"; bias=$((16#$start-16#$off))
+          ev="$runtime/map-provenance-persistent-events.tsv"; raw="$runtime/map-provenance-persistent-raw.log"; strips="$runtime/map-provenance-persistent-strips.tsv"; gcmd="$runtime/map-provenance-persistent.gdb"; gout="$runtime/map-provenance-persistent-gdb.stdout"
+          :>"$ev"; :>"$raw"; :>"$strips"; :>"$gout"; chmod 600 "$ev" "$raw" "$strips" "$gout"
+          python3 - "$gcmd" "$pid" "$bias" "$ev" "$raw" "$strips" <<'PY'
+          import sys
+          out,pid,bias,ev,raw,strips=sys.argv[1:]
+          t=r'''set pagination off
+          set confirm off
+          attach @PID@
+          python
+          import gdb,struct,time
+          inf=gdb.selected_inferior(); ev=r'@EV@'; raw=r'@RAW@'; strips=r'@STRIPS@'
+          def mem(a,n):
+            try:return bytes(inf.read_memory(a,n))
+            except:return None
+          def dump(label,a,n=256):
+            if not a:return
+            b=mem(a,n)
+            if b is not None:
+              with open(raw,'a') as f:f.write(f'{time.time_ns()} {label} 0x{a:x} '+b.hex()+'\n')
+          class M(gdb.Breakpoint):
+            def __init__(self,o,n):self.n=n;super().__init__('*0x%x'%(@BIAS@+o),internal=False)
+            def stop(self):
+              try:
+                ns=time.time_ns(); regs={r:int(gdb.parse_and_eval('$'+r)) for r in ('rdi','rsi','rdx','rcx','r8','r9','rsp')}
+                with open(ev,'a') as f:f.write(str(ns)+'\t'+self.n+'\t'+'\t'.join(f'{k}=0x{v:x}' for k,v in regs.items())+'\n')
+                for r,v in regs.items():
+                  if r!='rsp':
+                    dump(self.n+':'+r,v)
+                    b=mem(v,64)
+                    if b:
+                      for i in range(0,64,8):
+                        p=struct.unpack_from('<Q',b,i)[0]
+                        if 0x10000<p<0x800000000000:dump(self.n+f':{r}+{i:#x}->',p,128)
+              except Exception as e:
+                with open(raw,'a') as f:f.write(f'{time.time_ns()} ERROR {self.n} {e}\n')
+              return False
+          M(0xcecc70,'CreateOnMap');M(0xcecf40,'ChangeOnMap');M(0xcd4e20,'DeleteOnMap');M(0xcec8d0,'FullMap')
+          class S(gdb.Breakpoint):
+            def __init__(self):super().__init__('*0x%x'%(@BIAS@+0x19a8ea3),internal=False)
+            def stop(self):
+              try:
+                ns=time.time_ns();rsp=int(gdb.parse_and_eval('$rsp'));order=int(gdb.parse_and_eval('$rbp'))&0xffffffff;obj=int(gdb.parse_and_eval('$rbx'));b=mem(rsp+0x88,12)
+                if b:
+                  x,y,z=struct.unpack('<III',b)
+                  if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                    ob=mem(obj,128) if obj else None
+                    with open(strips,'a') as f:f.write(f'{ns}\t{x}\t{y}\t{z}\t{order}\t0x{obj:x}\t{ob.hex() if ob else ""}\n')
+              except:pass
+              return False
+          S()
+          end
+          continue
+          '''
+          open(out,'w').write(t.replace('@PID@',pid).replace('@BIAS@',bias).replace('@EV@',ev).replace('@RAW@',raw).replace('@STRIPS@',strips))
+          PY
+          chmod 600 "$gcmd"
+          gdb="$toolroot/usr/bin/gdb"; [[ -x "$gdb" ]]
+          export RUNNER_TRACKING_ID=''
+          nohup setsid env OTCLIENT_TIBIA_RE_TRACK=official-client-re RUNNER_TRACKING_ID= "$gdb" -q -nx -batch -x "$gcmd" >"$gout" 2>&1 </dev/null & gp=$!
+          echo "$gp" >"$runtime/map-provenance-gdb.pid"; chmod 600 "$runtime/map-provenance-gdb.pid"
+          sleep 2; kill -0 "$pid"; kill -0 "$gp"; actual_tracer="$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")"; [[ "$actual_tracer" == "$gp" ]]
+          echo TRACK_A_MAP_PROVENANCE_PERSISTENT_ARMED=true
+          echo TRACK_A_CLIENT_PID="$pid"
+          echo TRACK_A_OBSERVER_PID="$gp"
+          echo TRACK_A_PIE_BIAS="$(printf '0x%x' "$bias")"
+          echo TRACK_A_BASELINE_EVENT_COUNT="$(wc -l <"$ev")"
+          echo TRACK_A_BASELINE_STRIP_COUNT="$(wc -l <"$strips")"
+          disown "$gp" 2>/dev/null || true

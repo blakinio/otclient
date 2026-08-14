@@ -18,7 +18,7 @@ jobs:
       LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
       TRACK_DISPLAY: ':98'
     steps:
-      - name: Expose DSM-reachable Track A sidecar
+      - name: Publish Track A GUI on DSM host loopback
         shell: bash
         run: |
           set +x
@@ -35,6 +35,7 @@ jobs:
           done
           [[ -e /tmp/.X11-unix/X98 ]]
 
+          # Existing GUI service inside the runner must still be healthy.
           curl -fsS --max-time 5 http://127.0.0.1:6081/ | grep -q 'Track A'
           status="$(curl -sS --max-time 10 -o /tmp/track-a-direct-screen.bin -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)"
           [[ "$status" == 200 ]]
@@ -44,33 +45,37 @@ jobs:
 
           root="$state/toolroot"
           tool_path="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin"
+          tool_lib="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu"
           socat="$(PATH="$tool_path" command -v socat)"
           [[ -x "$socat" ]]
           self="$(hostname)"
           runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
           image="$(docker inspect -f '{{.Config.Image}}' "$self")"
-          network="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' "$self")"
-          [[ -n "$runner_ip" && -n "$network" ]]
+          [[ -n "$runner_ip" ]]
           echo TRACK_A_RUNNER_IP="$runner_ip"
-          echo TRACK_A_NETWORK="$network"
 
-          # Recreate only the proxy sidecar. The Tibia client container is untouched.
+          # Remove only experimental proxy containers; the Tibia client stays untouched.
           docker rm -f otclient-track-a-browser-lan otclient-track-a-browser-loopback otclient-track-a-dsm-proxy >/dev/null 2>&1 || true
-          docker run -d --name otclient-track-a-dsm-proxy --restart unless-stopped \
-            --network "$network" \
-            --volumes-from "$self" --entrypoint /bin/sh "$image" \
-            -lc "exec '$socat' TCP-LISTEN:6081,bind=0.0.0.0,reuseaddr,fork TCP:${runner_ip}:6081" >/dev/null
-          sleep 3
-          [[ "$(docker inspect -f '{{.State.Running}}' otclient-track-a-dsm-proxy)" == true ]]
-          proxy_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' otclient-track-a-dsm-proxy)"
-          [[ -n "$proxy_ip" ]]
-          echo TRACK_A_DSM_PROXY_IP="$proxy_ip"
 
-          # Verify the host can reach the sidecar directly; DSM reverse proxy shares host reachability.
+          # Host-network proxy. Crucially, vendored socat needs the same library path as the Track A tools.
+          docker run -d --name otclient-track-a-dsm-proxy --restart unless-stopped \
+            --network host --volumes-from "$self" --entrypoint /bin/sh "$image" \
+            -lc "export PATH='$tool_path'; export LD_LIBRARY_PATH='$tool_lib'; exec '$socat' TCP-LISTEN:6081,bind=127.0.0.1,reuseaddr,fork TCP:${runner_ip}:6081" >/dev/null
+          sleep 3
+
+          running="$(docker inspect -f '{{.State.Running}}' otclient-track-a-dsm-proxy 2>/dev/null || true)"
+          echo TRACK_A_DSM_PROXY_RUNNING="$running"
+          if [[ "$running" != true ]]; then
+            docker logs otclient-track-a-dsm-proxy 2>&1 | tail -n 50 || true
+            exit 1
+          fi
+
+          # Verify actual DSM host-loopback reachability from an independent host-network namespace.
           docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
-            "curl -fsS --max-time 8 http://${proxy_ip}:6081/ | grep -q 'Track A'"
+            "curl -fsS --max-time 8 http://127.0.0.1:6081/ | grep -q 'Track A'"
           docker run --rm --network host --entrypoint /bin/sh "$image" -lc \
-            "test \"\$(curl -sS --max-time 10 -o /tmp/s.bin -w '%{http_code}' http://${proxy_ip}:6081/screen.bmp)\" = 200 && test \"\$(head -c2 /tmp/s.bin)\" = BM"
-          echo TRACK_A_DSM_DIRECT_REACHABILITY_VERIFIED=true
-          echo TRACK_A_DSM_PROXY_TARGET="http://${proxy_ip}:6081"
-          echo TRACK_A_USER_SOURCE=http://synology:6082
+            "test \"\$(curl -sS --max-time 10 -o /tmp/s.bin -w '%{http_code}' http://127.0.0.1:6081/screen.bmp)\" = 200 && test \"\$(head -c2 /tmp/s.bin)\" = BM"
+
+          echo TRACK_A_DSM_LOOPBACK_READY=true
+          echo TRACK_A_DSM_PROXY_TARGET=http://127.0.0.1:6081
+          echo TRACK_A_USER_URL=http://synology:6082

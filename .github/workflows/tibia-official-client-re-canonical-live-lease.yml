@@ -2,7 +2,9 @@ name: Track A canonical live controller lease
 
 on:
   push:
-    branches: [feat/OTC-20260815-track-a-live-runtime-lease-manager]
+    branches:
+      - feat/OTC-20260815-track-a-live-runtime-lease-manager
+      - fix/OTC-20260815-track-a-live-runtime-lease-normal-exit
     paths:
       - .github/scripts/tibia-official-client-re-canonical-live-lease
       - .github/scripts/tibia-official-client-re-canonical-live-lease.py

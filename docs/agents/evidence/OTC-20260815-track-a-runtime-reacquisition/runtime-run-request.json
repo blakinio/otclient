@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "task_id": "OTC-20260815-track-a-runtime-reacquisition",
+  "track_id": "official-client-re",
+  "requested_at": "2026-08-15T14:07:00+02:00",
+  "reason": "resume_after_p0_runtime_lane_release",
+  "base_main": "8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45",
+  "runtime_code_bearing_head": "4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4",
+  "expected_client": {
+    "version_mapping": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official_native_linux_only"
+  },
+  "released_prerequisite": {
+    "p0_pr": 302,
+    "p0_head": "16758d5a7ed5c5271be059a2aca41f471f03f29d",
+    "stale_run": 31880617510,
+    "stale_run_state": "cancelled_by_owner_after_exact_identity_fence",
+    "runner_proof_run": 31883178675,
+    "runner_name": "synology-otclient-01",
+    "live_process_discriminator_run": 31883422477,
+    "live_process_discriminator_job": 95009054487,
+    "live_exact_track_clients": 0
+  },
+  "authorized_effects": [
+    "isolated task-owned client launch",
+    "protected login and character activation",
+    "read-only structural Worldmap observation",
+    "clean task-owned restart and relogin"
+  ],
+  "forbidden_effects": [
+    "market",
+    "trade",
+    "forge",
+    "currency spending",
+    "irreversible gameplay action",
+    "Track B process or state access"
+  ],
+  "required_result": "two exact-build generations with structural IN_GAME evidence, fresh PID/PIE, credential-free persistent child environments, WARP/SOCKS confinement, and fail-closed cleanup; otherwise persist exact blocker"
+}

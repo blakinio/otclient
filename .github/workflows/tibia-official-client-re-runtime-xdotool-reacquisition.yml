@@ -156,10 +156,10 @@ jobs:
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"
           out=artifacts/runtime-xdotool-reacquisition
           mkdir -p "$out"
-          python3 - "$root" "$out" <<'PY'
+          python3 - "$root" "$out" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$EXPECTED_CLIENT_SHA256" <<'PY'
           from pathlib import Path
           import re,shutil,sys
-          root,out=map(Path,sys.argv[1:])
+          root,out=map(Path,sys.argv[1:3]); run_id,head,expected_sha=sys.argv[3:6]
           email=re.compile(r'(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}')
           for gen in (1,2):
               g=root/f'generation-{gen}'
@@ -179,11 +179,8 @@ jobs:
           c=root/'comparison.txt'
           if c.is_file(): shutil.copyfile(c,out/'comparison.txt')
           (out/'terminal.txt').write_text(
-              f'run_id={Path("/proc/self").exists() and "${GITHUB_RUN_ID}"}\n'
-              f'head=${{GITHUB_SHA}}\n'
-              'xdotool_loader_repaired=true\n'
-              'cache_seeded=false\n'
-              f'expected_sha={"${EXPECTED_CLIENT_SHA256}"}\n',encoding='utf-8')
+              f'run_id={run_id}\nhead={head}\nxdotool_loader_repaired=true\ncache_seeded=false\nexpected_sha={expected_sha}\n',
+              encoding='utf-8')
           PY
 
       - name: Clean exact current-run runtime processes and ephemeral state

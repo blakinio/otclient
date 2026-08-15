@@ -1,8 +1,8 @@
 ---
 task_id: OTC-20260815-track-a-p2-post-serialization-buffer-boundary
-status: active
-agent: ChatGPT
-session_id: chatgpt-p2-buffer-researcher-20260815-2128
+status: ready
+agent: unassigned
+session_id: null
 session_role: researcher
 session_rotation_count: 3
 project_lane: otclient
@@ -18,8 +18,8 @@ worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 308
 created: 2026-08-15T17:49:00+02:00
-updated: 2026-08-15T21:28:00+02:00
-lease_expires_at: 2026-08-15T22:13:00+02:00
+updated: 2026-08-15T21:31:00+02:00
+lease_released_at: 2026-08-15T21:31:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-p2-post-serialization-buffer-boundary.md
   - docs/agents/evidence/OTC-20260815-track-a-p2-post-serialization-buffer-boundary/**
@@ -33,74 +33,77 @@ policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
 execution_mode: github-only
-execution_reason: final artifact classification and Draft handoff after hardened exact-build static ELF proof
+execution_reason: hardened static exact-build P2 data-flow proof completed and released for coordinator review
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
 implementation_authorized: true
-invocation_started_at: 2026-08-15T21:28:00+02:00
-last_progress_at: 2026-08-15T21:28:00+02:00
+last_progress_at: 2026-08-15T21:31:00+02:00
 code_bearing_head: 34f73b0c48198ba452caa505b4c0f3ae7e5b61d7
 supporting_semantic_run: 31903141897
 supporting_semantic_run_state: success
-supporting_semantic_run_job: 95056868281
 supporting_semantic_artifact: 9251635451
-supporting_semantic_artifact_digest: sha256:118810016d53f5bc234f6216b1d2f45876422041d7539b32a942a285317c6c32
 supporting_semantic_result: BUFFER_DATAFLOW_PROVEN
 hardened_semantic_run: 31903490468
 hardened_semantic_run_state: success
-exact_head_ci_run: 31903493799
-exact_head_ci_state: success
+hardened_semantic_artifact: 9251725866
+hardened_semantic_artifact_digest: sha256:f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e
+hardened_artifact_digest_rechecked: true
+hardened_semantic_result: BUFFER_DATAFLOW_PROVEN
+persistent_tprotocolwriter_qbuffer_binding: PROVEN
+code_bearing_ci_run: 31903493799
+code_bearing_ci_state: success
+release_head_ci_state: pending_after_release_commit
 ci_checks_for_current_head: 0
-ci_check_generation: final-handoff-docs
+ci_check_generation: final-release-head
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
-active_operation: download and classify hardened semantic artifact, persist final bounded evidence, then release Draft ready for coordinator review
-next_action: inspect artifact from hardened run 31903490468 and require BUFFER_DATAFLOW_PROVEN plus persistent_tprotocolwriter_qbuffer_binding=PROVEN; persist exact evidence and UNKNOWN boundaries; then perform final docs-only handoff with exact-head CI semantics recorded
+final_evidence: docs/agents/evidence/OTC-20260815-track-a-p2-post-serialization-buffer-boundary/20260815-hardened-persistent-qbuffer-writer.md
+promotion_status: DRAFT_NOT_PROMOTED
+next_action: coordinator PR #300 must verify exact release-head repository CI terminal green and independently review this evidence; if accepted, promote bounded QBuffer-backed QDataStream retained-writer facts and keep protocol-stage order/framing/sequence/compression/encryption/final egress/harness UNKNOWN
 ---
 
-# Objective
+# Final research result
 
-Determine the next concrete representation/data-flow boundary after the coordinator-promoted QDataStream serialization facts for the exact official native Linux Tibia client:
+`PROMOTION_CANDIDATE / BUFFER_DATAFLOW_PROVEN`
+
+The hardened artifact for run `31903490468` was downloaded and its ZIP SHA-256 independently rechecked against GitHub's artifact digest. `result.txt` and `result.json` explicitly prove:
 
 ```text
-TProtocolClientMessageProcessor
-  -> retained intermediate AP 0x2f69e30 / RTTI 0x3080748
-  -> retained TProtocolWriter AP 0x2f69dd0 / RTTI 0x3080728
-  -> QDataStream serialization at 0xc10960 and 0xc20290
+HELPER_QIODEVICE_QDATASTREAM_BINDING=PROVEN
+LOCAL_QBUFFER_BYTEFLOW=PROVEN
+PERSISTENT_TPROTOCOLWRITER_QBUFFER_BINDING=PROVEN
+COMMON_QBUFFER_QDATASTREAM_BINDING=PROVEN
 ```
 
-Research output remains Draft-only. Promotion authority is coordinator PR #300.
+The strengthened validation log proves the persistent chain:
 
-# Accepted supporting evidence
+```text
+QBuffer shared pair
+  -> helper 0x1960340 / TIODeviceWriter
+  -> TProtocolWriter+0x18/+0x20
+  -> retained intermediate writer
+  -> TProtocolClientMessageProcessor retained intermediate
+```
 
-Supporting run `31903141897` / job `95056868281` on head `5d7f4bb1aadc782f9bc69b1e292577d88fe0c4a2` completed `SUCCESS` with semantic result `BUFFER_DATAFLOW_PROVEN`. It proves QBuffer construction, QBuffer-as-QIODevice binding into helper `0x1960340`, retained QDataStream state and local serialization, but the strengthened persistent writer provenance still required an exact checker gate.
+and revalidates serializer slots `0xc10960` and `0xc20290` plus local QBuffer slot `0xc20c70`.
 
-# Hardened gate now terminal
+The only directly proven ordering claim is object lifecycle: QBuffer/QDataStream binding is constructed before serializer use. The task does not prove overall protocol-stage ordering.
 
-Hardened semantic run `31903490468` on exact code-bearing head `34f73b0c48198ba452caa505b4c0f3ae7e5b61d7` is terminal `SUCCESS`. Repository CI run `31903493799` on the same code-bearing head is terminal `SUCCESS`. The final worker rotation must inspect the sanitized artifact rather than infer semantics from run conclusion.
-
-# Exact client fence
+# Explicit UNKNOWN boundary
 
 ```yaml
-version_mapping: 15.32.df7b29
-size: 51965216
-sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-platform: official_native_linux_only
-runner: synology-otclient-01
+protocol_stage_order: UNKNOWN
+protocol_framing: UNKNOWN
+sequence: UNKNOWN
+compression: UNKNOWN
+encryption: UNKNOWN
+final_binary_egress: UNKNOWN
+causal_local_harness: UNKNOWN
 ```
 
-# Required final acceptance
-
-- hardened artifact semantic result is `BUFFER_DATAFLOW_PROVEN`;
-- hardened artifact explicitly marks `persistent_tprotocolwriter_qbuffer_binding=PROVEN`;
-- exact client SHA/size and promoted writer/intermediate anchors remain pinned;
-- local object lifecycle order may be promoted only where directly proved;
-- overall protocol-stage order, framing, sequence, compression, encryption, final egress and causal harness remain UNKNOWN unless separately proven;
-- no proprietary client bytes, credentials, account state or secret payloads are persisted;
-- final evidence saved under task-owned evidence path;
-- Draft released `ready` for coordinator review, not merged.
+No login, attach, live traffic, credentials, gameplay, account state or runtime mutation was used. Research remains Draft-only until coordinator promotion.

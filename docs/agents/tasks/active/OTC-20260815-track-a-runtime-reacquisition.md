@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T21:26:00+02:00
+updated: 2026-08-15T21:31:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -25,7 +25,7 @@ owned_paths:
   - .github/workflows/tibia-official-client-re-runtime-cache-classification.yml
   - .github/workflows/tibia-official-client-re-runtime-cache-window.yml
   - .github/workflows/tibia-official-client-re-runtime-cache-window-replay.yml
-  - .github/workflows/tibia-official-client-re-runtime-cache-reacquisition.yml
+  - .github/workflows/tibia-official-client-re-runtime-xdotool-reacquisition.yml
   - .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
 depends_on:
   - coordinator-retained exact-build structural world evidence
@@ -41,24 +41,24 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
 runtime_code_bearing_head: 1147062b1f91298055f8623043457298c5797600
-workflow_quality_head: b71fabd4923e77f116fc466c1bd4dde4309bc142
+workflow_quality_head: 20229fc50efc57116dfb72be36744f053fa1c704
 invocation_started_at: 2026-08-15T21:05:00+02:00
-last_progress_at: 2026-08-15T21:26:00+02:00
+last_progress_at: 2026-08-15T21:31:00+02:00
 ci_checks_for_current_head: 1
-ci_check_generation: cache_seed_full_reacquisition
+ci_check_generation: xdotool_repaired_full_reacquisition
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 2
 stop_reason: null
 active_operation:
-  type: full_gen1_gen2_reacquisition_with_classified_task_local_cache
-  causal_window_run: 31903793288
-  causal_window_job: 95058443760
-next_action: replay the established #303 setup/login/verify/restart/compare contract with one proven change only: seed the classified 6937-byte shader/GPU cache into each fresh task-local HOME; preserve protected-login, exact-SHA, WARP/SOCKS, structural observer and exact cleanup semantics
+  type: full_gen1_gen2_reacquisition_with_xdotool_loader_repaired
+  no_cache_control_run: 31903986899
+  no_cache_control_job: 95058901925
+next_action: execute the established #303 gen1-login-verify-stop-gen2-login-verify-compare contract with no cache seed and no client behavior change, but rewrite only effective-helper xdotool invocations to use toolroot loader libraries; preserve protected secrets, exact SHA, WARP/SOCKS, GDB observer, restart and cleanup semantics
 ---
 
 # Objective
 
-Prove restart/relogin/reacquisition stability for official native Linux Tibia and hand promotable evidence to coordinator PR #300. Final completion additionally requires the accepted position/record-format/privacy/network/live-session gates from the original prompt.
+Prove restart/relogin/reacquisition stability for official native Linux Tibia and hand promotable evidence to coordinator PR #300. Final completion additionally requires the original structural position/record-format/privacy/network/live-session gates.
 
 # Exact fence
 
@@ -67,32 +67,35 @@ Prove restart/relogin/reacquisition stability for official native Linux Tibia an
 # Accepted controls
 
 - world/login run `31730884814`, successful attempt-13 `94716022704` and attempt-14 `94785048338`: world transition, local SOCKS only, direct TCP `0`, UDP `0`, session left running;
-- structural Worldmap run `31806312967` / `94785974126`: real `(x,y,z,order)` records, strip counts `0,33,88`, reversible `Up` then `Down`; `(32546,32510,7) -> (32546,32509,7) -> (32546,32510,7)` remains DERIVED rather than direct TPlayerData position;
+- structural run `31806312967` / `94785974126`: real `(x,y,z,order)` records, strip counts `0,33,88`, reversible `Up` then `Down`; `(32546,32510,7) -> (32546,32509,7) -> (32546,32510,7)` is DERIVED only;
 - direct authoritative P0 XYZ remains UNKNOWN.
 
-# Reacquisition finding
+# Corrected root cause — FACT
 
-Runs #26-#30 established that exact client, WARP, relay, Xvfb, loader, qxcb/GLX dependencies, QML assets, HTTPS and software render thread can all be healthy while fresh HOME still produces no window. Multiple path/Xvfb/crashdump hypotheses were falsified.
+Runs #26-#30 reported `client_gen_1_window_missing`, but the helper's `resolve_window()` and login path invoke private toolroot `xdotool` without toolroot `LD_LIBRARY_PATH`, while errors are redirected and converted to empty search results. Independent cache-window run `31903627907` exposed the same tool failure as shell exit `127`.
 
-Canonical HOME cache was classified as exactly three `.qsb` shader files (`2309`, `2162`, `2386` B) plus one 80-B GPU/generic cache file, total `4` files / `6937` B, with no sensitive path keywords.
+Run `31903793288` / job `95058443760` added xdotool loader support and showed 4 PID windows / 2 visible windows with a cache-seeded HOME. That result was initially confounded by the cache seed.
 
-Cache-window replay run `31903793288` / job `95058443760` used the exact prior test with only the X11 probe loader repaired. After the bounded non-output sensitive-marker scan and task-local cache seed it proved:
+The required no-cache control run `31903986899` / job `95058901925` removed the cache seed while retaining the xdotool loader repair and completed SUCCESS:
 
 ```text
+TRACK_A_NO_CACHE_CONTROL=true
 TRACK_A_CACHE_WINDOW_EXACT_CLIENT_VERIFIED=true
 TRACK_A_CACHE_WINDOW_UPSTREAM_WARP_VERIFIED=true
-TRACK_A_CACHE_WINDOW_CLASSIFIED_CACHE_SEEDED=true files=4 bytes=6937
 TRACK_A_CACHE_WINDOW_TASK_RELAY_VERIFIED=true
 TRACK_A_CACHE_WINDOW_XVFB_VERIFIED=true
-TRACK_A_CACHE_WINDOW_CLIENT_RUNNING=true pid=13789
+TRACK_A_CACHE_WINDOW_CLIENT_RUNNING=true pid=15240
 TRACK_A_CACHE_WINDOW_ALL_PID_WINDOWS=4
 TRACK_A_CACHE_WINDOW_VISIBLE_PID_WINDOWS=2
 TRACK_A_CACHE_WINDOW_ID=2097162
-X=0 Y=0 WIDTH=1920 HEIGHT=1080
-TRACK_A_CLASSIFIED_CACHE_WINDOW_PROVEN=true
+X=0 Y=0 WIDTH=1020 HEIGHT=650
 ```
 
-Therefore the classified canonical shader/GPU cache is **causal/sufficient for the fresh task-owned visible-window gate under the tested environment**. The next full reacquisition run may seed only this validated cache into task-local fresh HOME; canonical cache remains unmodified.
+Therefore the canonical shader/GPU cache is **not required for the visible-window gate**. The actual proven blocker was the X11 observer/control tool loader. The cache must not be added to the full reacquisition path.
+
+# Remaining action
+
+Run full two-generation reacquisition with only effective-helper `xdotool` invocations wrapped in the toolroot loader environment. If gen1/gen2 succeed structurally, proceed to a final live-session run rather than stopping at GUI proof.
 
 # Acceptance
 
@@ -103,5 +106,5 @@ Therefore the classified canonical shader/GPU cache is **causal/sufficient for t
 - [ ] accepted final position proof and original literal `REC x=... y=... z=... order=... raw28=... raw30=...` boundary;
 - [ ] privacy-safe screenshot;
 - [ ] final accepted session intentionally left logged in after observer detach;
-- [x] cache causal window gate proven without credentials/gameplay effect;
+- [x] no-cache visible-window gate proven;
 - [ ] final exact-head CI green.

@@ -131,6 +131,8 @@ prepare = r"""prepare_generation() {
   local gdir launcher gdb gp pid window baseline
   root="$(run_root)"; package="$(generation_package "$gen")"; client="$package/bin/client"; td="$(toolroot)"
   tool_path="$td/usr/bin:$td/usr/sbin:/usr/bin:/bin"
+  # Preserve the runner support-loader fence validated by the source materializer:
+  # /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy
   tool_lib="$td/usr/lib/x86_64-linux-gnu:$td/usr/lib/x86_64-linux-gnu/libproxy:$td/lib/x86_64-linux-gnu"
   proxy_lib="$(find "$td" -type f -name libproxychains.so.4 -print -quit)"
   vk_icd="$(find "$td/usr/share/vulkan/icd.d" -type f -name 'lvp_icd*.json' -print -quit)"
@@ -139,6 +141,7 @@ prepare = r"""prepare_generation() {
   dri="$(dirname "$swrast")"
   [[ -d "$package" && ! -L "$package" ]] || die physical_canonical_package_missing
   verify_client "$client"
+  printf 'TRACK_A_RUNTIME_PHYSICAL_CANONICAL_PACKAGE_LAUNCH generation=%s path=%s\n' "$gen" "$package"
   role_owned "$(read_pid xvfb)" xvfb || die xvfb_not_owned
   role_owned "$(read_pid socks-relay)" socks-relay || die relay_not_owned
 
@@ -162,8 +165,7 @@ export PATH="$tool_path"
 export LD_LIBRARY_PATH="$package/bin/lib:$tool_lib"
 export LIBGL_ALWAYS_SOFTWARE=1
 export LIBGL_DRIVERS_PATH="$dri"
-export QT_QUICK_BACKEND=software
-export QT_XCB_GL_INTEGRATION=none
+export QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none
 export XDG_DATA_DIRS="$td/usr/share:/usr/share"
 export FONTCONFIG_PATH="$td/etc/fonts"
 export FONTCONFIG_FILE="$td/etc/fonts/fonts.conf"

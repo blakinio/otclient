@@ -23,6 +23,65 @@ permissions:
   actions: write
 
 jobs:
+  static-elf-re:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'static')
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET: '0x308ca70'
+    steps:
+      - name: Checkout exact draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Analyze exact TPlayerData ELF neighborhood read-only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REF_NAME" == research/OTC-20260815-track-a-p0-direct-position ]]
+
+          if [[ -d /work && -w /work ]]; then
+            state="$LEGACY_IMAGE_STATE"
+          else
+            state="$CANONICAL_STATE"
+          fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(stat -c '%s' "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+
+          mkdir -p artifacts/p0-static-elf
+          python3 .github/scripts/tibia-official-client-re-p0-direct-position.py \
+            --static-only \
+            --client "$client" \
+            --expected-sha256 "$EXPECTED_CLIENT_SHA256" \
+            --expected-size "$EXPECTED_CLIENT_SIZE" \
+            --vptr-offset "$EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET" \
+            --static-vtable-slots 32 \
+            --static-xref-limit 24 \
+            --static-disasm-limit 12 \
+            | tee artifacts/p0-static-elf/static-elf-re.txt
+
+          grep -Fxq 'TRACK_A_P0_EXACT_CLIENT_FENCE=true' artifacts/p0-static-elf/static-elf-re.txt
+          grep -Fxq 'TRACK_A_P0_STATIC_PROBE_COMPLETE=true' artifacts/p0-static-elf/static-elf-re.txt
+          echo TRACK_A_P0_STATIC_JOB_COMPLETE=true
+
+      - name: Upload sanitized exact ELF static evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p0-static-elf-${{ github.run_id }}
+          path: artifacts/p0-static-elf/**
+          if-no-files-found: ignore
+          retention-days: 7
+
   cancel-stale-p0-run:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live'
     runs-on: ubuntu-latest

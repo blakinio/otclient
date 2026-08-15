@@ -69,8 +69,139 @@ jobs:
             --static-disasm-limit 12 \
             | tee artifacts/p0-static-elf/static-elf-re.txt
 
+          python3 - "$client" artifacts/p0-static-elf <<'PY' \
+            | tee artifacts/p0-static-elf/player-position-graph.txt
+          import importlib.util
+          import sys
+          from pathlib import Path
+
+          client = Path(sys.argv[1])
+          out = Path(sys.argv[2])
+          script = Path('.github/scripts/tibia-official-client-re-p0-direct-position.py')
+          spec = importlib.util.spec_from_file_location('track_a_p0_probe', script)
+          if spec is None or spec.loader is None:
+              raise SystemExit('TRACK_A_P0_GRAPH_ERROR=module_load_failed')
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = module
+          spec.loader.exec_module(module)
+          elf = module.Elf64(client)
+
+          needles = {
+              'playerPosition': b'playerPosition',
+              'worldmap_render_provider_rtti': b'N5tibia8worldmap23TWorldMapRenderProviderE',
+              'worldmap_viewport_rtti': b'N5tibia8worldmap17TWorldMapViewportE',
+              'iplayer_data_provider_rtti': b'N5tibia4game19IPlayerDataProviderE',
+              'tplayer_data_rtti': b'N5tibia4game11TPlayerDataE',
+          }
+          anchors = {}
+          for label, needle in needles.items():
+              hits = elf.find_bytes(needle)
+              print(f'TRACK_A_P0_GRAPH_ANCHOR_COUNT label={label} count={len(hits)}')
+              for index, file_offset in enumerate(hits[:8]):
+                  va = elf.offset_to_vaddr(file_offset)
+                  if va is None:
+                      continue
+                  key = f'{label}[{index}]'
+                  anchors[key] = va
+                  print(
+                      f'TRACK_A_P0_GRAPH_ANCHOR label={key} '
+                      f'file_offset=0x{file_offset:x} vaddr=0x{va:x}'
+                  )
+
+          targets = set(anchors.values())
+          xrefs = elf.find_rip_xrefs(targets, limit=256)
+          print(f'TRACK_A_P0_GRAPH_RIP_XREF_COUNT={len(xrefs)}')
+          for address, target, kind in xrefs:
+              labels = ','.join(sorted(key for key, value in anchors.items() if value == target))
+              print(
+                  f'TRACK_A_P0_GRAPH_RIP_XREF address=0x{address:x} '
+                  f'target=0x{target:x} kind={kind} labels={labels}'
+              )
+
+          mask = (1 << 64) - 1
+          data_refs = []
+          for location, relas in elf.relocations.items():
+              for rela in relas:
+                  resolved = rela.addend & mask
+                  if rela.r_type == module.R_X86_64_RELATIVE and resolved in targets:
+                      data_refs.append((location, resolved, rela.section))
+          data_refs = sorted(set(data_refs))
+          print(f'TRACK_A_P0_GRAPH_RELOCATION_REF_COUNT={len(data_refs)}')
+          for location, target, section in data_refs[:128]:
+              labels = ','.join(sorted(key for key, value in anchors.items() if value == target))
+              owner_section = elf.section_for_vaddr(location)
+              print(
+                  f'TRACK_A_P0_GRAPH_RELOCATION_REF location=0x{location:x} '
+                  f'target=0x{target:x} rela_section={section} '
+                  f'owner_section={owner_section.name if owner_section else "unknown"} '
+                  f'labels={labels}'
+              )
+
+          for key, va in anchors.items():
+              if not key.startswith('playerPosition['):
+                  continue
+              file_offset = elf.vaddr_to_offset(va)
+              lo = max(0, file_offset - 0x600)
+              hi = min(len(elf.data), file_offset + 0x1000)
+              local_strings = module.extract_ascii_strings(elf.data[lo:hi], min_len=3)
+              print(f'TRACK_A_P0_GRAPH_LOCAL_STRING_WINDOW anchor={key} lo=0x{lo:x} hi=0x{hi:x}')
+              for relative, text in local_strings[:220]:
+                  compact = text if len(text) <= 180 else text[:177] + '...'
+                  print(
+                      f'TRACK_A_P0_GRAPH_LOCAL_STRING file_offset=0x{lo + relative:x} '
+                      f'text={compact}'
+                  )
+
+          disasm = []
+          for address, _target, _kind in xrefs:
+              if address not in disasm:
+                  disasm.append(address)
+          for slot in (0, 1, 2, 3, 4, 12, 13, 14, 15):
+              try:
+                  target, _relas = elf.resolved_qword(0x308CA70 + slot * 8)
+              except RuntimeError:
+                  continue
+              if elf.is_exec_vaddr(target) and target not in disasm:
+                  disasm.append(target)
+          disasm = disasm[:24]
+          (out / 'player-position-disasm-addresses.txt').write_text(
+              ''.join(f'0x{address:x}\n' for address in disasm),
+              encoding='utf-8',
+          )
+          print(f'TRACK_A_P0_GRAPH_DISASM_ADDRESS_COUNT={len(disasm)}')
+          print('TRACK_A_P0_GRAPH_COMPLETE=true')
+          PY
+
+          gdb_bin="$(command -v gdb 2>/dev/null || true)"
+          if [[ -z "$gdb_bin" && -x "$state/toolroot/usr/bin/gdb" ]]; then
+            gdb_bin="$state/toolroot/usr/bin/gdb"
+          fi
+          if [[ -n "$gdb_bin" ]]; then
+            echo "TRACK_A_P0_GRAPH_GDB=$gdb_bin" \
+              | tee artifacts/p0-static-elf/player-position-disasm.txt
+            while IFS= read -r address; do
+              [[ "$address" =~ ^0x[0-9a-f]+$ ]]
+              start="$(printf '0x%x' "$((address - 64))")"
+              stop="$(printf '0x%x' "$((address + 192))")"
+              {
+                echo "TRACK_A_P0_GRAPH_DISASM_BEGIN=$address"
+                if ! "$gdb_bin" --batch -nx \
+                  -ex 'set disassembly-flavor intel' \
+                  -ex "file $client" \
+                  -ex "disassemble /r $start,$stop"; then
+                  echo "TRACK_A_P0_GRAPH_DISASM_COMMAND_FAILED=$address"
+                fi
+                echo "TRACK_A_P0_GRAPH_DISASM_END=$address"
+              } >> artifacts/p0-static-elf/player-position-disasm.txt
+            done < artifacts/p0-static-elf/player-position-disasm-addresses.txt
+          else
+            echo TRACK_A_P0_GRAPH_GDB=unavailable \
+              | tee artifacts/p0-static-elf/player-position-disasm.txt
+          fi
+
           grep -Fxq 'TRACK_A_P0_EXACT_CLIENT_FENCE=true' artifacts/p0-static-elf/static-elf-re.txt
           grep -Fxq 'TRACK_A_P0_STATIC_PROBE_COMPLETE=true' artifacts/p0-static-elf/static-elf-re.txt
+          grep -Fxq 'TRACK_A_P0_GRAPH_COMPLETE=true' artifacts/p0-static-elf/player-position-graph.txt
           echo TRACK_A_P0_STATIC_JOB_COMPLETE=true
 
       - name: Upload sanitized exact ELF static evidence

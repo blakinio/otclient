@@ -123,11 +123,17 @@ jobs:
           PY
           bash -n "$effective"
           grep -Fq "$PX_BACKEND_DIR" "$effective"
-          grep -Fq 'LD_LIBRARY_PATH="$package/bin/lib:$tool_lib"' "$effective"
+          grep -Fq "LD_LIBRARY_PATH=\"\$package/bin/lib:\$tool_lib\"" "$effective"
           grep -Fq 'QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none' "$effective"
           grep -Fq '1920x1080x24' "$effective"
-          ! grep -Fq '1280x800x24' "$effective"
-          ! grep -Fq '+extension GLX +iglx +render' "$effective"
+          if grep -Fq '1280x800x24' "$effective"; then
+            echo TRACK_A_RUNTIME_ERROR=stale_xvfb_screen >&2
+            exit 1
+          fi
+          if grep -Fq '+extension GLX +iglx +render' "$effective"; then
+            echo TRACK_A_RUNTIME_ERROR=stale_xvfb_flags >&2
+            exit 1
+          fi
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$effective" >> "$GITHUB_ENV"
 
           scaffold="$RUNNER_TEMP/prepare-track-a-minimal-home.sh"
@@ -188,7 +194,10 @@ jobs:
             pid="$(tr -cd '0-9' <"$runtime/$role.pid")"; kill -0 "$pid"
             grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ"; grep -azFxq "$TASK_MARKER" "/proc/$pid/environ"
             grep -azFxq "$run_marker" "/proc/$pid/environ"; grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ"
-            ! grep -azEq '^(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD)=' "/proc/$pid/environ"
+            if grep -azEq '^(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD)=' "/proc/$pid/environ"; then
+              echo "TRACK_A_RUNTIME_ERROR=credential_env_present role=$role" >&2
+              exit 1
+            fi
           done
           bash "$scaffold" 1
           bash "$effective" prepare 1
@@ -211,7 +220,13 @@ jobs:
           bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" stop 1
           runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/runtime"
           pidfile="$runtime/observer-gen-1.pid"
-          if [[ -r "$pidfile" ]]; then pid="$(tr -cd '0-9' <"$pidfile")"; [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; fi
+          if [[ -r "$pidfile" ]]; then
+            pid="$(tr -cd '0-9' <"$pidfile")"
+            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+              echo TRACK_A_RUNTIME_ERROR=observer_gen_1_still_alive >&2
+              exit 1
+            fi
+          fi
           bash "$TRACK_A_RUNTIME_HOME_SCAFFOLD" 2
           bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" prepare 2
           echo TRACK_A_RUNTIME_GEN2_PREPARED=true
@@ -262,7 +277,16 @@ jobs:
           PY
           export DISPLAY=":$DISPLAY_NUM"
           if [[ -x "$td/usr/bin/xdotool" ]]; then
-            { count=0; for w in $("$td/usr/bin/xdotool" search --onlyvisible --name '.*' 2>/dev/null || true); do count=$((count+1)); wp="$("$td/usr/bin/xdotool" getwindowpid "$w" 2>/dev/null || true)"; wn="$("$td/usr/bin/xdotool" getwindowname "$w" 2>/dev/null | tr '\n\r\t' ' ' || true)"; printf 'window=%s pid=%s name=%q\n' "$w" "${wp:-none}" "$wn"; done; echo "visible_window_count=$count"; } > "$out/x11-visible-windows.txt"
+            {
+              count=0
+              for w in $("$td/usr/bin/xdotool" search --onlyvisible --name '.*' 2>/dev/null || true); do
+                count=$((count+1))
+                wp="$("$td/usr/bin/xdotool" getwindowpid "$w" 2>/dev/null || true)"
+                wn="$("$td/usr/bin/xdotool" getwindowname "$w" 2>/dev/null | tr '\n\r\t' ' ' || true)"
+                printf 'window=%s pid=%s name=%q\n' "$w" "${wp:-none}" "$wn"
+              done
+              echo "visible_window_count=$count"
+            } > "$out/x11-visible-windows.txt"
           fi
           {
             echo "workflow_status=${{ job.status }}"; echo "workflow_run_id=$GITHUB_RUN_ID"; echo "workflow_head=$GITHUB_SHA"; echo "runner=$RUNNER_NAME"
@@ -275,11 +299,51 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"; runtime="$root/runtime"; run_marker="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"
-          owned(){ local pid="$1" role="$2"; [[ -r "/proc/$pid/environ" ]] && grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" && grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" && grep -azFxq "$run_marker" "/proc/$pid/environ" && grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ"; }
-          stop(){ local role="$1" file="$runtime/$role.pid" pid=''; [[ -r "$file" ]] && pid="$(tr -cd '0-9' <"$file" 2>/dev/null || true)"; [[ -n "$pid" ]] || return 0; if kill -0 "$pid" 2>/dev/null; then owned "$pid" "$role" || exit 1; kill -CONT "$pid" 2>/dev/null || true; kill -TERM "$pid" 2>/dev/null || true; for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done; kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true; for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done; ! kill -0 "$pid" 2>/dev/null || exit 1; fi; }
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"
+          runtime="$root/runtime"
+          run_marker="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"
+          owned() {
+            local pid="$1"
+            local role="$2"
+            [[ -r "/proc/$pid/environ" ]] || return 1
+            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || return 1
+            grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" || return 1
+            grep -azFxq "$run_marker" "/proc/$pid/environ" || return 1
+            grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ"
+          }
+          stop() {
+            local role="$1"
+            local file
+            local pid=''
+            file="$runtime/$role.pid"
+            if [[ -r "$file" ]]; then
+              pid="$(tr -cd '0-9' <"$file" 2>/dev/null || true)"
+            fi
+            [[ -n "$pid" ]] || return 0
+            if kill -0 "$pid" 2>/dev/null; then
+              owned "$pid" "$role" || exit 1
+              kill -CONT "$pid" 2>/dev/null || true
+              kill -TERM "$pid" 2>/dev/null || true
+              for _ in $(seq 1 50); do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep .1
+              done
+              if kill -0 "$pid" 2>/dev/null; then
+                kill -KILL "$pid" 2>/dev/null || true
+              fi
+              for _ in $(seq 1 20); do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep .1
+              done
+              if kill -0 "$pid" 2>/dev/null; then
+                exit 1
+              fi
+            fi
+          }
           xvfb_pid="$(tr -cd '0-9' <"$runtime/xvfb.pid" 2>/dev/null || true)"
-          for role in observer-gen-1 observer-gen-2 client-gen-1 client-gen-2 xvfb socks-relay; do stop "$role"; done
+          for role in observer-gen-1 observer-gen-2 client-gen-1 client-gen-2 xvfb socks-relay; do
+            stop "$role"
+          done
           python3 - "$TASK_SOCKS_PORT" <<'PY'
           import pathlib,sys
           needle=f"{int(sys.argv[1]):04X}"
@@ -290,10 +354,30 @@ jobs:
                   f=row.split()
                   if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==needle and f[3]=='0A': raise SystemExit(1)
           PY
-          lock="/tmp/.X${DISPLAY_NUM}-lock"; sock="/tmp/.X11-unix/X${DISPLAY_NUM}"
-          if [[ -e "$lock" ]]; then lp="$(tr -cd '0-9' <"$lock" 2>/dev/null || true)"; [[ -n "$xvfb_pid" && "$lp" == "$xvfb_pid" ]] || exit 1; ! kill -0 "$lp" 2>/dev/null || exit 1; rm -f "$lock"; fi
-          if [[ -e "$sock" ]]; then [[ -n "$xvfb_pid" ]] || exit 1; ! kill -0 "$xvfb_pid" 2>/dev/null || exit 1; grep -Fq "$sock" /proc/net/unix 2>/dev/null && exit 1; rm -f "$sock"; fi
-          if [[ -r "$root/task-id" ]]; then [[ "$(cat "$root/task-id")" == "$TASK_ID" ]] || exit 1; rm -rf -- "$root"; fi
+          lock="/tmp/.X${DISPLAY_NUM}-lock"
+          sock="/tmp/.X11-unix/X${DISPLAY_NUM}"
+          if [[ -e "$lock" ]]; then
+            lp="$(tr -cd '0-9' <"$lock" 2>/dev/null || true)"
+            [[ -n "$xvfb_pid" && "$lp" == "$xvfb_pid" ]] || exit 1
+            if kill -0 "$lp" 2>/dev/null; then
+              exit 1
+            fi
+            rm -f "$lock"
+          fi
+          if [[ -e "$sock" ]]; then
+            [[ -n "$xvfb_pid" ]] || exit 1
+            if kill -0 "$xvfb_pid" 2>/dev/null; then
+              exit 1
+            fi
+            if grep -Fq "$sock" /proc/net/unix 2>/dev/null; then
+              exit 1
+            fi
+            rm -f "$sock"
+          fi
+          if [[ -r "$root/task-id" ]]; then
+            [[ "$(cat "$root/task-id")" == "$TASK_ID" ]] || exit 1
+            rm -rf -- "$root"
+          fi
           echo TRACK_A_RUNTIME_CURRENT_RUN_CLEANUP_COMPLETE=true
 
       - name: Upload sanitized runtime reacquisition evidence

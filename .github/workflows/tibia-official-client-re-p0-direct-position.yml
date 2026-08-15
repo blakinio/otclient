@@ -8,6 +8,15 @@ on:
       - .github/workflows/tibia-official-client-re-p0-direct-position.yml
       - .github/scripts/tibia-official-client-re-p0-direct-position.py
   workflow_dispatch:
+    inputs:
+      mode:
+        description: P0 probe mode
+        required: true
+        type: choice
+        default: static
+        options:
+          - static
+          - live
 
 permissions:
   contents: read
@@ -15,6 +24,7 @@ permissions:
 
 jobs:
   cancel-stale-p0-run:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     env:
@@ -84,6 +94,7 @@ jobs:
           PY
 
   passive-probe:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live'
     needs: cancel-stale-p0-run
     concurrency:
       group: official-client-re-runtime
@@ -100,7 +111,7 @@ jobs:
 
     steps:
       - name: Checkout exact draft head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 

@@ -14,7 +14,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T13:12:53+02:00
+updated: 2026-08-15T13:28:53+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -22,11 +22,11 @@ owned_paths:
   - .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
 depends_on:
   - coordinator-retained exact-build structural world evidence
-  - historical login procedure in PR #290 as untrusted/revalidation-required input only
-  - PR #283 bridge evidence as reference only; no ownership of its paths
+  - historical login procedure in PR #290 as revalidation-required input only
+  - PR #283 bridge evidence as read-only reference only
 blocks:
-  - separately owned P0 run 31880617510 / job 95002559098 is queued with runner_id=0 in the same official-client-re-runtime concurrency group
-  - runtime run 31881287155 has not materialized/assigned its self-hosted reacquire job; direct runner inventory is unavailable through the current GitHub integration (HTTP 403)
+  - separately owned P0 run 31880617510 / job 95002559098 is still queued with runner_id=0 in the same official-client-re-runtime concurrency group
+  - runtime self-hosted reacquisition cannot execute until that serialized lane is assigned; direct runner inventory remains unavailable through the current GitHub integration (HTTP 403)
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
@@ -35,36 +35,15 @@ run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
-last_checkpoint: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-runtime-reacquisition-waiting.md
-code_bearing_head: 9d5734ced2155cf01ab6cbdfabfb2eb2707b7152
+code_bearing_head: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
+last_checkpoint:
+  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-runtime-reacquisition-waiting.md
+  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-observer-cleanup-hardening.md
 ---
 
 # Objective
 
-Prove or disprove restart/relogin/reacquisition stability for the already-established Track A exact-build structural world read path, without repeating basic world-entry or one-off movement proof as the hypothesis.
-
-# Dispatch contract
-
-```yaml
-TASK_ID: OTC-20260815-track-a-runtime-reacquisition
-TASK_RECORD: docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
-PROJECT_LANE: otclient
-LANE: RUNTIME
-BASE_MAIN: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
-BRANCH: research/OTC-20260815-track-a-runtime-reacquisition
-WORKTREE: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track-a-runtime-reacquisition
-OWNED_PATHS:
-  - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
-  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
-  - .github/workflows/tibia-official-client-re-runtime-reacquisition.yml
-  - .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
-DEPENDENCIES:
-  - exact-build structural world evidence retained by coordinator PR #300
-  - PR #290 procedure is evidence input only, not authority
-  - PR #283 bridge/profile evidence is reference-only
-```
-
-Research output is DRAFT-ONLY. Promotion belongs to coordinator PR #300.
+Prove or disprove restart/relogin/reacquisition stability for the existing exact-build structural Worldmap read path in the official native Linux Tibia client. The task must not promote canonical Track A claims; promotion belongs to coordinator PR #300.
 
 # Exact client fence
 
@@ -76,124 +55,107 @@ platform: official_native_linux_only
 runner: synology-otclient-01
 ```
 
-# Starting facts and safety corrections
+Every live generation must recheck this exact identity before build-specific offsets are used.
 
-- later exact-build evidence proves `synology-otclient-01` has executed Track A jobs; old #280/#281 'no self-hosted runner available' checkpoints are not current facts;
-- a single live structural world observer + reversible transition was previously proven for this exact build;
-- historical login/session procedure in #290 is `REVALIDATION_REQUIRED`, not current runtime proof;
-- rejected #289 contains a material safety finding: credentials must **not** be job-scoped into persistent child process environments;
-- rejected #289 also demonstrates that shared X display sockets/locks must never be deleted without task ownership proof.
-
-# Hypothesis
-
-A task-owned Track A runtime can be restarted and, when protected credentials are available through repository secrets, relogged into the world such that the structural world observer/read path is deterministically reacquired without reusing stale PID/PIE/object state.
-
-# Required discrimination
-
-Test at least two generations of runtime identity when authorized state exists:
-
-```text
-generation N structural IN_GAME/read proof
--> clean task-owned client/observer teardown
--> fresh client start/login under the same isolated task namespace
--> fresh PID/PIE/profile/observer acquisition
--> generation N+1 structural IN_GAME/read proof
-```
-
-If credentials or safe login prerequisites are unavailable, stop with an exact evidence-backed WAITING/BLOCKED classification; do not fabricate restart stability from process-only checks.
-
-# Credential and namespace rules
-
-- credentials may exist only as protected secret inputs to the minimal login helper invocation;
-- do not define credentials at job scope;
-- explicitly ensure persistent X/DBus/client/observer processes are launched without credential values in their environments;
-- never print, persist, OCR, artifact, or inspect credential values;
-- task must use only its own display/socket/state/PID files and verify ownership before cleanup;
-- do not touch Track B runtime/state/display/ports/processes.
-
-# Live runtime namespace
-
-The following concrete namespace is reserved by this task for its bounded validation run:
+# Runtime ownership
 
 ```yaml
-runtime_namespace:
-  state_directory: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition
-  display: ':115'
-  task_socks_port: 25415
-  upstream_track_a_socks_port: 25354
-  upstream_track_a_socks_mode: read_only_dependency
-  process_marker: OTCLIENT_TIBIA_RE_TASK=OTC-20260815-track-a-runtime-reacquisition
-  track_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
-  concurrency_group: official-client-re-runtime
-cleanup_contract:
-  - never delete an X11 lock or socket that pre-existed this task
-  - never signal a process without both the task marker and expected executable/role evidence
-  - never stop or reconfigure the shared upstream Track A WARP/wireproxy process
-  - task client connects only to the task-local relay port 25415
+state_directory: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition
+display: ':115'
+task_socks_port: 25415
+upstream_track_a_socks_port: 25354
+process_marker: OTCLIENT_TIBIA_RE_TASK=OTC-20260815-track-a-runtime-reacquisition
+track_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
+concurrency_group: official-client-re-runtime
 ```
 
-Active Track A draft contracts #301, #302 and #304 use disjoint repository-owned paths; #301/#304 are static, while #302 is a passive runtime reader serialized by `official-client-re-runtime`. Track B #284 is outside authority and uses its own container/display namespace. Any unexpected live collision on `:115`, port `25415`, or the task state directory is an abort condition rather than a cleanup target.
+The task never owns the shared upstream Track A wireproxy process. It must not touch Track B state/processes, pre-existing X11 locks/sockets or a process whose task role/executable markers cannot be verified.
+
+# Credential and effect boundary
+
+Credentials may exist only in protected secret inputs to the minimal login step. Persistent client/X/observer/relay processes are launched without `TIBIA_TEST_EMAIL` or `TIBIA_TEST_PASSWORD`, and their environments are checked before semantic use. Secret values must never be printed, persisted, OCRed, inspected or artifacted.
+
+Allowed side effects are login/session recovery and clean task-owned process restart only. No market, trade, forge, currency or irreversible gameplay effect is authorized. Movement is not part of this hypothesis.
+
+# Planned discriminator
+
+For each generation:
+
+1. verify exact client SHA/size and task-local WARP/SOCKS confinement;
+2. launch a fresh client with task-local HOME/display/relay and no credential variables in its environment;
+3. arm the exact-build structural Worldmap breakpoint at static offset `0x19a8ea3` before login;
+4. require a bounded logged-out `NO_STIMULUS` baseline with zero valid Worldmap records;
+5. use protected credentials only in the login step;
+6. require multiple validated `(x,y,z,order)` Worldmap records plus sustained task-local SOCKS use with zero direct client TCP/UDP escape;
+7. cleanly stop the task-owned observer/client;
+8. repeat with a fresh PID and PIE base;
+9. accept only if both generations independently satisfy the structural gate and PID/PIE are fresh.
+
+A running process, click/key submission or socket existence is not `IN_GAME` proof.
+
+# Safety repair
+
+At code-bearing head `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`, the workflow was hardened around a fail-open cleanup edge:
+
+- generation-1 stop now verifies the run-local observer PID is no longer alive before generation 2 begins;
+- final cleanup invokes both generation stops without suppressing failure;
+- each observer PID is rechecked before namespace deletion;
+- task-root cleanup is reached only after those stop checks pass.
+
+This preserves task-local recovery evidence when observer shutdown or ownership cannot be proven. The repair is documented in `20260815-observer-cleanup-hardening.md`. It does not constitute runtime semantic evidence.
+
+# Current verified state
+
+### FACT
+
+- `main` remains `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45` at this checkpoint.
+- Draft PR #303 remains the sole RUNTIME research PR for this task.
+- Previous code-bearing PR CI at `9d5734ced2155cf01ab6cbdfabfb2eb2707b7152` completed successfully in run `31881289268`.
+- Previous checkpoint-head CI at `0270b1f3b6e75c995649b405758f058bae026c88` completed successfully in run `31881523546`.
+- Runtime run `31881287155` never produced a self-hosted `reacquire` job in the observed jobs inventory and therefore provides no runtime semantic result.
+- P0 run `31880617510` remains queued on the same serialized Track A runtime group; it is separately owned and must not be cancelled or bypassed by this task.
+- cleanup hardening was committed at `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`; exact-head CI for the subsequent documentation checkpoint is the remaining repository validation gate.
+
+### UNKNOWN
+
+- current `synology-otclient-01` online/busy state;
+- whether protected Tibia login secrets are currently populated and accepted;
+- generation-1 structural `IN_GAME`;
+- generation-2 fresh PID/PIE and structural read reacquisition;
+- live runtime credential-environment assertions;
+- final runtime cleanup outcome;
+- bridge `session_epoch` / R4 semantics;
+- A3 and A4.
 
 # Acceptance gate
 
 - [ ] exact client SHA/size rechecked on every generation;
-- [ ] fresh PID and PIE base proven after restart; no stale address reuse;
-- [ ] WARP/SOCKS confinement verified, with no direct client TCP and no client UDP where the canonical login model requires it;
-- [ ] structural `IN_GAME`/world state proved independently of keypress/socket existence;
-- [ ] structural observer/read path reacquired after at least one clean restart/relogin cycle, or an exact prerequisite blocker recorded;
-- [ ] persistent child environments verified free of credential variables;
-- [ ] task-owned namespace cleanup cannot delete another task's display/socket/state;
-- [ ] no gameplay action beyond what is strictly required for safe read discrimination;
-- [ ] exact-head CI terminal before Draft handoff.
-
-# Side-effect budget
-
-Login/session recovery and clean process restart only. No market/trade/forge/currency effects. Movement is not part of the hypothesis and should not be repeated unless a single reversible step is necessary solely to distinguish live structural world state; if used, verify inverse restoration.
-
-# Planned discriminator
-
-For each generation, arm the exact-build structural Worldmap breakpoint at static offset `0x19a8ea3` before credentials are supplied. Require a bounded logged-out `NO_STIMULUS` baseline with zero valid Worldmap records, then use the protected login helper and require multiple validated `(x,y,z,order)` Worldmap records after character activation. This tests the existing structural read path without repeating movement. Repeat the same resolver procedure after a clean task-owned client/observer restart and require a fresh PID/PIE.
-
-# Current checkpoint
-
-### FACT
-
-- Draft PR #303 remains open and Draft-only on `research/OTC-20260815-track-a-runtime-reacquisition` against `main@8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
-- The task-owned helper/workflow are implemented at code-bearing head `9d5734ced2155cf01ab6cbdfabfb2eb2707b7152` with the credential, namespace, transport, negative-control and fresh-PID/PIE fences described above.
-- Standard PR CI for that code-bearing head completed `success` in run `31881289268`.
-- Earlier runtime workflow runs `31880945751` and `31881193523` were cancelled before a task self-hosted runtime job appeared in the GitHub jobs inventory; they provide no runtime semantic evidence.
-- Current runtime run `31881287155` targets the code-bearing head and is `in_progress`, but its jobs inventory contains only auxiliary `luacheck`/`cppcheck` check-runs; no `reacquire` self-hosted job has yet materialized/been assigned.
-- Separately owned P0 run `31880617510` / job `95002559098` remains `queued` with `runner_id=0` and uses the same `official-client-re-runtime` concurrency group. Its own task record is `waiting` on that job.
-- Direct self-hosted runner inventory returned HTTP `403 Resource not accessible by integration`; current `online/busy` runner state cannot be verified through this connector.
-- Durable waiting evidence is recorded at `docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-runtime-reacquisition-waiting.md`.
-
-### UNKNOWN
-
-- Current online/busy state of a matching self-hosted runner.
-- Whether protected login secrets are currently populated and accepted; the protected login step has not executed.
-- Generation 1 structural `IN_GAME`, generation 2 fresh PID/PIE, restart/relogin reacquisition, runtime credential-environment assertions and runtime cleanup outcome.
-- Bridge `session_epoch` / R4 semantics.
-- Action gates A3 and A4; historical reversible GUI movement is not sufficient to promote them.
-
-# Resume condition
-
-Resume when the serialized Track A runtime lane can assign this task's `reacquire` job on `synology-otclient-01` without cancelling/bypassing separately owned P0 work. Re-fetch current `main`, PR/task ownership and the exact Draft head before execution. Inspect exact runtime logs/artifacts before classifying any semantic claim.
+- [ ] fresh PID and PIE proven after restart;
+- [ ] WARP/SOCKS confinement proved with no forbidden direct client transport;
+- [ ] structural `IN_GAME` proved independently of GUI/network liveness;
+- [ ] structural read reacquired after at least one clean restart/relogin cycle, or an exact prerequisite blocker retained;
+- [ ] persistent child environments proved credential-variable-free;
+- [x] workflow cleanup fails closed before deleting task-local state when observer stop cannot be proven;
+- [ ] no unauthorized gameplay effect occurred;
+- [ ] exact final-head repository CI terminal before Draft handoff.
 
 # Execution-budget checkpoint
 
 ```yaml
-invocation_started_at: 2026-08-15T12:49:00+02:00
-checkpoint_at: 2026-08-15T13:12:53+02:00
-code_bearing_head: 9d5734ced2155cf01ab6cbdfabfb2eb2707b7152
-ordinary_exact_head_checks: 1
-repair_cycles: 2
+invocation_started_at: 2026-08-15T13:20:00+02:00
+last_progress_at: 2026-08-15T13:28:53+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: draft
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
 identical_failure_retries: 0
+repair_cycles_for_current_gate: 1
+context_reconstruction_attempts: 1
+stall_warnings: 0
 runtime_semantic_runs_completed: 0
-no_progress_state: false
-context_pressure: medium
-next_action: resume exact runtime run only after the separately owned queued P0/self-hosted lane releases; do not poll indefinitely or bypass ownership
 ```
 
-# Deliverable
+# Next action
 
-Draft PR only with the task-scoped workflow/helper and sanitized evidence. Preserve failures and unavailable credentials/prerequisites as explicit WAITING/BLOCKED results rather than weakening the gate.
+When the separately owned P0/self-hosted lane releases, inspect the existing/new serialized RUNTIME run on the exact current Draft head. Classify generation 1/2 only from exact logs/artifacts; do not create a conceptual duplicate, cancel P0 or weaken the acceptance gate.

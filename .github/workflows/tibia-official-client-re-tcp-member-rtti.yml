@@ -1,0 +1,286 @@
+name: Track A TCP member RTTI resolution
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 14
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Resolve exact TCP member and writer RTTI
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+
+          if [[ -d /work && -w /work ]]; then
+            state="$LEGACY_IMAGE_STATE"
+          else
+            state="$CANONICAL_STATE"
+          fi
+
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          readelf_bin="$toolroot/usr/bin/readelf"
+          strings_bin="$toolroot/usr/bin/strings"
+          [[ -x "$client" && -x "$gdb" && -x "$readelf_bin" ]]
+
+          actual_size="$(stat -c %s "$client")"
+          actual_sha="$(sha256sum "$client" | awk '{print $1}')"
+          [[ "$actual_size" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$actual_sha" == "$EXPECTED_CLIENT_SHA256" ]]
+
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+
+          report="$RUNNER_TEMP/track-a-tcp-member-rtti.txt"
+          relocs="$RUNNER_TEMP/track-a-tcp-member-rtti-relocs.txt"
+          plan="$RUNNER_TEMP/track-a-tcp-member-rtti-plan.txt"
+          : >"$report"
+          : >"$plan"
+          exec > >(tee -a "$report") 2>&1
+
+          echo TRACK_A_TCP_MEMBER_RTTI_BEGIN=true
+          echo "CLIENT_VERSION_MAPPING=$EXPECTED_CLIENT_VERSION"
+          echo "CLIENT_SIZE=$actual_size"
+          echo "CLIENT_SHA256=$actual_sha"
+          if [[ -x "$strings_bin" ]]; then
+            version_hits="$($strings_bin -a "$client" | grep -Fxc "$EXPECTED_CLIENT_VERSION" || true)"
+          else
+            version_hits=UNAVAILABLE
+          fi
+          echo "CLIENT_VERSION_STRING_EXACT_LINE_HITS=$version_hits"
+          echo CLIENT_FENCE_SHA_SIZE_VERIFIED=true
+
+          "$readelf_bin" -WrC "$client" >"$relocs"
+
+          python3 -u - "$client" "$relocs" "$plan" <<'PY'
+          import re
+          import struct
+          import sys
+
+          client, reloc_path, plan_path = sys.argv[1:]
+          data = open(client, 'rb').read()
+
+          phoff = struct.unpack_from('<Q', data, 0x20)[0]
+          phentsz = struct.unpack_from('<H', data, 0x36)[0]
+          phnum = struct.unpack_from('<H', data, 0x38)[0]
+          loads = []
+          for i in range(phnum):
+              off = phoff + i * phentsz
+              typ, flags, file_off, va, _, fsz, _, _ = struct.unpack_from('<IIQQQQQQ', data, off)
+              if typ == 1 and fsz:
+                  loads.append((file_off, file_off + fsz, va, va + fsz, flags))
+          execs = [(a, b, c, d, f) for a, b, c, d, f in loads if f & 1]
+
+          def va_to_off(va):
+              for fs, fe, base, end, _ in loads:
+                  if base <= va < end:
+                      return fs + va - base
+              return None
+
+          def is_exec(va):
+              return va is not None and any(base <= va < end for _, _, base, end, _ in execs)
+
+          rel = {}
+          for line in open(reloc_path, errors='replace'):
+              m = re.match(r'^\s*([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s+R_X86_64_RELATIVE\s+([0-9a-fA-F]+)', line)
+              if m:
+                  rel[int(m.group(1), 16)] = int(m.group(2), 16)
+
+          def qword(va):
+              if va in rel:
+                  return rel[va]
+              off = va_to_off(va)
+              if off is None or off + 8 > len(data):
+                  return None
+              return struct.unpack_from('<Q', data, off)[0]
+
+          def signed64(value):
+              if value is None:
+                  return None
+              return value - (1 << 64) if value & (1 << 63) else value
+
+          def u32(va):
+              off = va_to_off(va)
+              if off is None or off + 4 > len(data):
+                  return None
+              return struct.unpack_from('<I', data, off)[0]
+
+          def cstring(va, limit=512):
+              off = va_to_off(va)
+              if off is None:
+                  return None
+              end = data.find(b'\0', off, min(len(data), off + limit))
+              if end < 0:
+                  return None
+              return data[off:end].decode('utf-8', 'replace')
+
+          def rip_refs(target):
+              out = []
+              for fs, fe, base, _, _ in execs:
+                  blob = data[fs:fe]
+                  for p in range(0, len(blob) - 7):
+                      if 0x40 <= blob[p] <= 0x4f and blob[p + 1] in (0x8d, 0x8b) and (blob[p + 2] & 0xc7) == 0x05:
+                          site = base + p
+                          got = (site + 7 + struct.unpack_from('<i', blob, p + 3)[0]) & 0xffffffffffffffff
+                          if got == target:
+                              out.append(site)
+              return out
+
+          def is_vtable_typeinfo_slot(type_slot, rtti):
+              if qword(type_slot) != rtti:
+                  return False
+              offset_to_top = signed64(qword(type_slot - 8))
+              first = qword(type_slot + 8)
+              # Itanium vtable header: a bounded ptrdiff_t offset-to-top immediately
+              # precedes the RTTI pointer, and the address point starts with code.
+              return (
+                  offset_to_top is not None
+                  and abs(offset_to_top) <= 0x100000
+                  and is_exec(first)
+              )
+
+          def require(condition, message):
+              if not condition:
+                  print(f'REQUIRED_FACT_FAIL={message}')
+                  raise SystemExit(2)
+              print(f'REQUIRED_FACT_OK={message}')
+
+          rttis = {
+              'TGameserverTCPConnection': 0x3080630,
+              'TGameserverNetworkPacketConnection': 0x3080648,
+              'TIODeviceWriter': 0x3080718,
+              'TProtocolWriter': 0x3080728,
+          }
+          expected_names = {
+              'TGameserverTCPConnection': 'N5tibia7network24TGameserverTCPConnectionE',
+              'TIODeviceWriter': 'N5tibia6shared15TIODeviceWriterE',
+              'TProtocolWriter': 'N5tibia8protocol15TProtocolWriterE',
+          }
+          expected_address_points = {
+              'TGameserverTCPConnection': 0x3084b38,
+              'TIODeviceWriter': 0x2f69d48,
+              'TProtocolWriter': 0x2f69dd0,
+          }
+
+          planned = set()
+          valid_typeinfo_slots = {}
+          resolved_names = {}
+          for label, rtti in rttis.items():
+              name_ptr = qword(rtti + 8)
+              type_name = cstring(name_ptr) if name_ptr else None
+              resolved_names[label] = type_name
+              print(f'RTTI label={label} addr=0x{rtti:x} name_ptr={hex(name_ptr) if name_ptr is not None else "UNMAPPED"} name={type_name!r}')
+
+              all_refs = sorted(addr for addr, value in rel.items() if value == rtti)
+              slots = [addr for addr in all_refs if is_vtable_typeinfo_slot(addr, rtti)]
+              non_vtable_refs = [addr for addr in all_refs if addr not in slots]
+              valid_typeinfo_slots[label] = slots
+              print(f'RTTI_RELOCATION_REF_COUNT label={label} count={len(all_refs)} refs={",".join(hex(x) for x in all_refs) if all_refs else "none"}')
+              print(f'RTTI_VALID_VTABLE_TYPEINFO_SLOT_COUNT label={label} count={len(slots)} slots={",".join(hex(x) for x in slots) if slots else "none"}')
+              for ref in non_vtable_refs:
+                  source_labels = [source for source, source_rtti in rttis.items() if ref == source_rtti + 0x10]
+                  if source_labels:
+                      print(f'RTTI_BASE_REFERENCE source={source_labels[0]} target={label} slot=0x{ref:x}')
+                  else:
+                      print(f'RTTI_NON_VTABLE_REFERENCE target={label} slot=0x{ref:x}')
+
+              for type_slot in slots:
+                  ap = type_slot + 8
+                  offset_to_top = signed64(qword(ap - 0x10))
+                  first = qword(ap)
+                  refs = rip_refs(ap)
+                  print(f'VTABLE label={label} address_point=0x{ap:x} offset_to_top={offset_to_top} typeinfo=0x{rtti:x} first={hex(first) if first is not None else "UNMAPPED"} first_exec={int(is_exec(first))} rip_refs={",".join(hex(x) for x in refs) if refs else "none"}')
+                  for rel_off in range(0, 0x200, 8):
+                      value = qword(ap + rel_off)
+                      if not is_exec(value):
+                          print(f'VTABLE_END label={label} address_point=0x{ap:x} rel=0x{rel_off:x} next={hex(value) if value is not None else "UNMAPPED"}')
+                          break
+                      print(f'VTABLE_SLOT label={label} address_point=0x{ap:x} rel=0x{rel_off:x} value=0x{value:x} exec=1')
+                      planned.add(value)
+
+          for label, expected_name in expected_names.items():
+              require(resolved_names.get(label) == expected_name, f'{label}_RTTI_NAME')
+
+          for label, expected_ap in expected_address_points.items():
+              require(expected_ap - 8 in valid_typeinfo_slots.get(label, []), f'{label}_EXPECTED_VTABLE_ADDRESS_POINT')
+              require(qword(expected_ap - 8) == rttis[label], f'{label}_VTABLE_TYPEINFO')
+              require(is_exec(qword(expected_ap)), f'{label}_VTABLE_FIRST_ENTRY_EXEC')
+
+          expected_tcp_ap = expected_address_points['TGameserverTCPConnection']
+          expected_typeinfo = qword(expected_tcp_ap - 8)
+          tcp_matches = expected_typeinfo == rttis['TGameserverTCPConnection']
+          print('EXPECTED_TCP_VPTR ' f'address_point=0x{expected_tcp_ap:x} ' f'offset_to_top={signed64(qword(expected_tcp_ap - 0x10))} ' f'typeinfo={hex(expected_typeinfo) if expected_typeinfo is not None else "UNMAPPED"} ' f'matches_TGameserverTCPConnection={int(tcp_matches)}')
+          require(tcp_matches, 'EXPECTED_TCP_VPTR_MATCH')
+
+          protocol_base = qword(rttis['TProtocolWriter'] + 0x10)
+          print(f'EXPECTED_PROTOCOL_WRITER_BASE slot=0x{rttis["TProtocolWriter"] + 0x10:x} value={hex(protocol_base) if protocol_base is not None else "UNMAPPED"}')
+          require(protocol_base == rttis['TIODeviceWriter'], 'TProtocolWriter_BASE_TIODeviceWriter')
+
+          qmeta = 0x30b7d00
+          qmeta_data = qword(qmeta + 0x10)
+          qmeta_strings = qword(qmeta + 8)
+          qmeta_metacall = qword(qmeta + 0x18)
+          require(qmeta_data is not None, 'TGameserverTCPConnection_QMETA_DATA_MAPPED')
+          require(qmeta_strings is not None, 'TGameserverTCPConnection_QMETA_STRINGDATA_MAPPED')
+          require(qmeta_metacall == 0xdd1cc0, 'TGameserverTCPConnection_QMETA_STATIC_METACALL')
+          print(f'QMETA address=0x{qmeta:x} data=0x{qmeta_data:x} stringdata=0x{qmeta_strings:x} static_metacall=0x{qmeta_metacall:x}')
+          print('QMETA_DATA_U32_BEGIN=true')
+          for i in range(96):
+              value = u32(qmeta_data + i * 4)
+              if value is None:
+                  break
+              print(f'QMETA_DATA_U32 index={i} value=0x{value:08x}')
+          print('QMETA_DATA_U32_END=true')
+          print('QMETA_STRINGDATA_U32_BEGIN=true')
+          for i in range(64):
+              value = u32(qmeta_strings + i * 4)
+              if value is None:
+                  break
+              print(f'QMETA_STRINGDATA_U32 index={i} value=0x{value:08x}')
+          print('QMETA_STRINGDATA_U32_END=true')
+
+          with open(plan_path, 'w') as plan:
+              for addr in sorted(planned):
+                  plan.write(f'0x{addr:x} 0x{addr + 0x80:x}\n')
+              plan.write('0xb46bd0 0xb46cce\n')
+              plan.write('0xdd1cc0 0xdd1ea9\n')
+              plan.write('0x196fee0 0x1970680\n')
+
+          print('EXPECTED_RTTI_FACTS_VERIFIED=true')
+          print('TRACK_A_TCP_MEMBER_RTTI_STATIC_COMPLETE=true')
+          PY
+
+          while read -r lo hi; do
+            [[ "$lo" =~ ^0x[0-9a-f]+$ && "$hi" =~ ^0x[0-9a-f]+$ ]] || continue
+            echo "DISASSEMBLY_BEGIN lo=$lo hi=$hi"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi" || true
+            echo "DISASSEMBLY_END lo=$lo hi=$hi"
+          done <"$plan"
+
+          grep -q '^CLIENT_FENCE_SHA_SIZE_VERIFIED=true$' "$report"
+          grep -q '^EXPECTED_RTTI_FACTS_VERIFIED=true$' "$report"
+          grep -q '^TRACK_A_TCP_MEMBER_RTTI_STATIC_COMPLETE=true$' "$report"
+          echo TRACK_A_TCP_MEMBER_RTTI_COMPLETE=true
+
+      - name: Upload exact-build TCP member RTTI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-tcp-member-rtti-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-tcp-member-rtti.txt
+          if-no-files-found: error
+          retention-days: 7

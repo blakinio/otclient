@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "disposition": "ACCEPT_WITH_EDITS",
+  "source_pr": 306,
+  "source_final_head": "c13e6d8946d1407c880a07d76fcfd5f4bf07c80b",
+  "source_final_static_run": 31893391887,
+  "source_final_ci_run": 31893395016,
+  "source_final_artifact": 9249137864,
+  "source_final_artifact_digest": "sha256:c80014c2cc9b3db5b3406540e7d6d4efeef0301f63fd5858379614179b59398d",
+  "exact_client": {
+    "version_mapping": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official_native_linux_only"
+  },
+  "semantic_result": "SERIALIZATION_ONLY_PROVEN",
+  "facts": {
+    "processor_retains_intermediate_shared_pair": true,
+    "intermediate_address_point": "0x2f69e30",
+    "intermediate_rtti": "0x3080748",
+    "intermediate_retains_writer_shared_pair": true,
+    "writer_address_point": "0x2f69dd0",
+    "writer_rtti": "0x3080728",
+    "lifecycle_slots": ["0x7de7f0", "0x7dfd60"],
+    "first_concrete_non_lifecycle_slot_in_identified_vtable": "0xc10960",
+    "first_concrete_slot_operation": "QDataStream::operator<<(signed char)",
+    "first_concrete_slot_writer_member": "+0x18",
+    "next_serializer_slot": "0xc20290",
+    "next_serializer_fields": ["+0x30", "+0x34"],
+    "next_serializer_operation": "QDataStream::operator<<(signed short)",
+    "adjacent_qbuffer_slot": "0xc20c70",
+    "adjacent_qbuffer_fact": "constructs QBuffer"
+  },
+  "promoted_representation_boundary": "STRUCTURED_OR_TYPED_OBJECT_ARGUMENT_TO_RETAINED_TPROTOCOLWRITER_ASSOCIATED_QDATASTREAM_SERIALIZATION_SINK",
+  "coordinator_edit": "FIRST_IS_LOCAL_VTABLE_EVIDENCE_ONLY_NOT_GLOBAL_TEMPORAL_PIPELINE_ORDER",
+  "unknown": {
+    "temporal_first_in_entire_outbound_pipeline": true,
+    "qbuffer_order_relative_to_serialization": true,
+    "framing_order": true,
+    "sequence_order": true,
+    "compression_order": true,
+    "encryption_order": true,
+    "final_binary_egress": true,
+    "causal_local_harness": true
+  },
+  "not_proven": {
+    "direct_dualconnection_writer_ownership": true
+  }
+}

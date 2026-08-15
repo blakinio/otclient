@@ -10,8 +10,22 @@ operation=''
 task_id=''
 token_file=''
 expect=''
+after_delimiter=false
 
 for arg in "$@"; do
+  if [[ "$after_delimiter" == true ]]; then
+    continue
+  fi
+
+  if [[ "$arg" == -- ]]; then
+    [[ -z "$expect" ]] || {
+      echo 'TRACK_A_CANONICAL_LEASE_ERROR=missing_option_value' >&2
+      exit 64
+    }
+    after_delimiter=true
+    continue
+  fi
+
   if [[ -n "$expect" ]]; then
     case "$expect" in
       task_id) task_id="$arg" ;;

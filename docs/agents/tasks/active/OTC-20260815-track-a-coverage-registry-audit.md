@@ -1,12 +1,12 @@
 ---
 task_id: OTC-20260815-track-a-coverage-registry-audit
-status: ready
-agent: unassigned_draft_only_researcher
+status: validating
+agent: chatgpt-coverage-auditor
 project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: static-research-audit
-phase: item-level-registry-baseline
+phase: exact-head-ci-validation
 branch: research/OTC-20260815-track-a-coverage-registry-audit
 base_branch: main
 base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
@@ -111,16 +111,16 @@ Where applicable include exact client identity, evidence file/run/job/artifact, 
 
 # Acceptance gate
 
-- [ ] denominator definition is explicit for every percentage;
-- [ ] all 349 named generated messages are represented individually or an exact machine-verifiable source proves the item set;
-- [ ] all protocol-handler QMeta records used in the denominator are represented individually;
-- [ ] known 2184 direct Qt connection callsites are either itemized/classified or explicitly separated into a raw-census denominator with semantic numerator UNKNOWN;
-- [ ] P0 read families receive a canonical finite denominator derived from repository programme requirements, or remain UNKNOWN with the precise missing denominator decision recorded;
-- [ ] accepted negative evidence (`DISPROVEN/SUPERSEDED`) is retained, including the obsolete `0xb5b880` P2 model;
-- [ ] inventory completeness and semantic completeness are reported separately;
-- [ ] no selected subset percentage is labeled as global protocol/QMeta/P0 coverage;
-- [ ] each missing high-value item maps to one concrete follow-up hypothesis rather than a generic 'more RE needed';
-- [ ] deterministic validation checks duplicate IDs, invalid classifications, missing provenance, denominator mismatch and percentage arithmetic;
+- [x] denominator definition is explicit for every percentage;
+- [x] all 349 named generated messages are represented individually or an exact machine-verifiable source proves the item set;
+- [x] all protocol-handler QMeta records used in the denominator are represented individually;
+- [x] known 2184 direct Qt connection callsites are either itemized/classified or explicitly separated into a raw-census denominator with semantic numerator UNKNOWN;
+- [x] P0 read families receive a canonical finite denominator derived from repository programme requirements, or remain UNKNOWN with the precise missing denominator decision recorded;
+- [x] accepted negative evidence (`DISPROVEN/SUPERSEDED`) is retained, including the obsolete `0xb5b880` P2 model;
+- [x] inventory completeness and semantic completeness are reported separately;
+- [x] no selected subset percentage is labeled as global protocol/QMeta/P0 coverage;
+- [x] each missing high-value item maps to one concrete follow-up hypothesis rather than a generic 'more RE needed';
+- [x] deterministic validation checks duplicate IDs, invalid classifications, missing provenance, denominator mismatch and percentage arithmetic;
 - [ ] exact-head repository CI is terminal before Draft handoff.
 
 # Runtime boundary
@@ -130,3 +130,31 @@ No runtime execution, login, action, secret access or client mutation is authori
 # Deliverable
 
 Draft PR only with task-scoped machine-readable registries, validation evidence and a summary of exact remaining coverage gaps. The coordinator decides which registry slices become canonical.
+
+# Execution checkpoint — 2026-08-15
+
+Evidence root: `docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/`.
+
+Static registry validation is terminal locally with `COVERAGE_AUDIT_VALIDATION=PASS`. The validator now enforces record-ID uniqueness, allowed classifications, provenance references, exact census/hash denominators, selected-subset arithmetic, percentage arithmetic and retained `0xb5b880` supersession evidence.
+
+Verified bounded results:
+
+```yaml
+protocol_messages: 349
+protocol_inbound: 189
+protocol_outbound: 160
+protocol_direct_qmeta_case_links: 27/349
+protocol_handler_qmeta_records: 47/47
+direct_qt_raw_census: 2184/2184
+direct_qt_semantic_classification: UNKNOWN/2184
+legacy_qobject_connect_edges: 40/41
+high_information_gameaction_sender_metaobjects: 29/31
+p0_top_level_requirement_groups: 16/16
+p0_live_read_coverage: UNKNOWN/UNKNOWN
+bridge_v1_profile_targets: 7/7
+p1_overall_field_evidence_coverage: UNKNOWN/UNKNOWN
+p2_chain_closure: UNKNOWN/5
+restart_relogin_stability: UNKNOWN/1
+```
+
+No runtime/login/action experiment was performed. Next gate is exact-head repository CI; promotion remains coordinator-only under PR #300.

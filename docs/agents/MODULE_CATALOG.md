@@ -1,6 +1,6 @@
 # OTClient Module and System Catalogue
 
-Last reviewed: 2026-08-04
+Last reviewed: 2026-08-13
 
 This catalogue makes reusable work visible across the greenfield Rust client and existing OTClient. Verify source, manifests, tasks, tests and open PR state before use.
 
@@ -60,6 +60,12 @@ Detailed maintenance boundaries are in `docs/architecture/LEGACY_OTCLIENT_ARCHIT
 | TestEnvironment/fakes | maintained legacy | Deterministic lifecycle and substitutes for global resources/game state | `tests/support/test_environment/**`, `tests/support/mocks/**` | Prefer over another legacy global mocking layer. Rust gets independent typed fakes. |
 | Lua runner/stubs | maintained legacy | Named assertions, deterministic failure and minimal globals | `tests/lua/helpers/**` | Add focused legacy tests to the existing runner/contracts. |
 | Protocol loopback | maintained legacy | Bounded local socket integration for framed packets | `tests/integration/protocol/loopback_packet_test.cpp` | Extend for legacy regressions. Does not prove Rust adapter compatibility. |
+
+## Official-client research tooling
+
+| Tool/system | Status | Responsibility/public surface | Source/docs | Reuse/safety notes |
+|---|---|---|---|---|
+| Tibia worldmap reconstruction pipeline | PR #279 | Deterministic neutral observation/catalog/mapping pipeline; reconstructs internally consistent snapshots, compares normalized references and emits fail-closed OTBM-ready plans | `tools/tibia_worldmap_reconstruction/**`, `tests/tools/tibia_worldmap_reconstruction/**`, `docs/agents/reports/OTC-20260812-worldmap-reconstruction.md` | Exact client/OTB version and explicit evidence fencing; dynamic entities stay separate; snapshot validation proves schema/internal consistency, not cryptographic provenance. Real live observations and appearance/OTB mappings remain separate evidence inputs owned by the runtime programme. |
 
 ## Current governance work
 

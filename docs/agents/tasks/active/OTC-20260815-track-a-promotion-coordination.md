@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T14:25:00+02:00
+updated: 2026-08-15T14:28:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,7 +47,7 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T14:25:00+02:00
+last_progress_at: 2026-08-15T14:28:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: current
 terminal_ci_wait_started_at: null
@@ -61,7 +61,7 @@ stall_warnings: 0
 
 # Objective
 
-Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Research branches remain Draft-only; this task alone performs campaign promotion/integration. Track B remains outside mutation authority.
+Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Research branches remain Draft-only; this task alone promotes accepted evidence. Track B remains outside mutation authority.
 
 # Exact client fence
 
@@ -75,21 +75,34 @@ platform: official_native_linux_only
 # Promotion ledger
 
 ## ACCEPT
-- #283 bounded read-only runtime bridge implementation; live authority/session epoch still unproven.
+- #283 bounded read-only runtime bridge; live authority/session epoch remains UNKNOWN.
 - exact-build reversible structural world transition from run `31806312967` / job `94785974126`; standalone player XYZ and A3/A4 remain unproven.
 
 ## ACCEPT_WITH_EDITS
 - #279 fail-closed worldmap reconstruction tooling; real capture/mappings/complete OTBM remain UNKNOWN.
 - #290 bounded historical login/recovery procedure retained as revalidation input.
 - #304 bounded quantitative coverage baseline; exact source snapshot promoted; source Draft closed unmerged.
-- #301 bounded P2 writer retention: exact source snapshot promoted; source Draft closed unmerged; coordinator head `e6aab7a1898643f3a139413048af709a0ee04cf7` passed CI `31883767739`.
+- #301 bounded P2 writer retention; exact source snapshot promoted; source Draft closed unmerged; coordinator CI `31883767739` SUCCESS.
+- #305 bounded P2 intermediate-vtable/type correction. Exact source final head `9329e338235b7f9997d74d4db5313f329662378b`; final task-specific run `31884379539` SUCCESS; final PR CI `31884381191` including `CI / Required` SUCCESS; review threads 0. Exact source blobs copied under coordinator-owned `p2-writer-vtable-group/source-snapshot/` in commit `a5ba8557e54b2d5345b48b816167a5b8131d2084`; campaign report updated in `8dacacba5d13c39e490108e6cedb0fcebdc2dd52`.
 
-## REVIEW_REQUIRED_THIS_ROTATION
-- #305 exact final head `9329e338235b7f9997d74d4db5313f329662378b`; researcher proposal `ACCEPT_WITH_EDITS`; final task-specific run `31884379539` SUCCESS; final standard PR CI `31884381191`, including `CI / Required`, SUCCESS; changed paths confined; review threads 0. Must be independently reviewed before promotion.
+Accepted #305 boundary:
+```yaml
+intermediate_vptr_0x2f69e30: FACT
+intermediate_typeinfo_0x3080748: FACT
+separate_allocated_object_receives_vptr: FACT
+simple_secondary_TProtocolWriter_interpretation: DISPROVEN
+0x7de7f0_0x7dfd60_role: INFERENCE_TEARDOWN_LIKE
+rtti_0x3080748_semantic_name: UNKNOWN
+rtti_0x3080748_base_relation: UNKNOWN
+first_writer_transform_boundary: UNKNOWN
+framing_order: UNKNOWN
+final_binary_egress: UNKNOWN
+P2_complete: false
+```
 
 ## LIVE STATE
-- #302 P0: corrected self-hosted run `31883521701` / job `95009093099` ran on `synology-otclient-01` and found zero matching live exact-client Track A PIDs; direct player XYZ remains UNKNOWN.
-- #303 RUNTIME: separately active researcher. Selector repair reached `synology-otclient-01`, but run `31884181155` / job `95010941902` failed at bootstrap with `TRACK_A_RUNTIME_ERROR=upstream_wireproxy_unavailable`; cleanup completed without X11 residue. Current exact #303 state must be refetched after the active researcher repairs or checkpoints this new transport bootstrap blocker.
+- #302 P0: corrected self-hosted run `31883521701` / job `95009093099` found zero matching live exact-client Track A PIDs; direct authoritative XYZ remains UNKNOWN.
+- #303 RUNTIME: independently active researcher. Selector repair reached `synology-otclient-01`; run `31884181155` / job `95010941902` failed before client start with `TRACK_A_RUNTIME_ERROR=upstream_wireproxy_unavailable`; task-owned cleanup completed without X11 residue. Do not mutate #303 while active.
 
 ## RETURN_FOR_EVIDENCE
 - #295 material review findings plus Track B ownership collision.
@@ -103,7 +116,7 @@ platform: official_native_linux_only
 # Canonical non-completion boundary
 
 ```yaml
-P2: PARTIAL_writer_retention_proven_intermediate_type_structuring_under_review_transform_order_final_egress_harness_open
+P2: PARTIAL_writer_retention_and_intermediate_type_structure_proven_transform_order_final_egress_harness_open
 P1: PARTIAL_read_only_bridge_integrated_live_authority_unknown
 P0: PARTIAL_structural_world_transition_fact_direct_player_state_unknown
 RUNTIME: PARTIAL_one_generation_world_evidence_restart_relogin_unknown
@@ -128,6 +141,16 @@ p1_overall_field_evidence_coverage: UNKNOWN/UNKNOWN
 restart_relogin_stability: UNKNOWN/1
 ```
 
+# Acceptance inventory
+- [x] #305 independently reviewed and assigned `ACCEPT_WITH_EDITS`.
+- [x] exact #305 evidence/result/reproducer/workflow blobs promoted under coordinator ownership.
+- [x] campaign report updated with FACT/INFERENCE/DISPROVEN/UNKNOWN boundaries.
+- [ ] exact-head coordinator CI terminal for this integration generation.
+- [ ] #305 source Draft closed unmerged after validated promotion.
+- [ ] active #303 runtime result/blocker reconciled when researcher releases it.
+- [ ] next disjoint P2 serialization/transform hypothesis selected without duplicating queued final-socket run `31825417040`.
+- [ ] final programme audit/CI/PR hygiene/archive/ownership release complete.
+
 # Next action
 
-Independently review exact #305 final head `9329e338235b7f9997d74d4db5313f329662378b`, its exact source artifact digests, parser semantics, durable evidence, final CI, changed paths and zero review threads. Assign one coordinator disposition. If accepted, promote only the bounded distinct-type/vtable-group result under coordinator ownership, update the campaign report, validate coordinator exact head and close #305 unmerged. Then recheck active #303 and choose the next safe disjoint lane.
+Validate the exact current coordinator head. If green, close #305 Draft unmerged. Then inspect active #303 read-only for a newer checkpoint; while it remains independently owned, continue a disjoint P2 hypothesis only if it targets actual serialization/data-stream behavior rather than generic final-socket/QIODevice enumeration or vtable adjacency.

@@ -67,9 +67,11 @@ jobs:
           [[ -n "$objdump" && -x "$objdump" ]]
           "$objdump" --version >/dev/null
 
-          echo "TRACK_A_P2_CLIENT=$client" >> "$GITHUB_ENV"
-          echo "TRACK_A_P2_OBJDUMP=$objdump" >> "$GITHUB_ENV"
-          echo "TRACK_A_P2_STATE=$state" >> "$GITHUB_ENV"
+          {
+            echo "TRACK_A_P2_CLIENT=$client"
+            echo "TRACK_A_P2_OBJDUMP=$objdump"
+            echo "TRACK_A_P2_STATE=$state"
+          } >> "$GITHUB_ENV"
           echo "TRACK_A_P2_EXACT_HEAD=$GITHUB_SHA"
           echo "TRACK_A_P2_EXACT_CLIENT_VERIFIED=true"
           echo "TRACK_A_P2_OBJDUMP_VERIFIED=true"

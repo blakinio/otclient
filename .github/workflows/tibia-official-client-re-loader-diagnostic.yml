@@ -1,0 +1,98 @@
+name: Track A exact-client loader differential
+
+on:
+  push:
+    branches: [research/OTC-20260815-track-a-runtime-loader-diagnostic]
+    paths:
+      - .github/workflows/tibia-official-client-re-loader-diagnostic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Compare loader resolution without launching client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux && "$(uname -s)" == Linux ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          runtime="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$runtime/bin/client"
+          toolroot="$state/toolroot"
+          tool_lib="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          current_lib="$runtime/bin/lib:$toolroot/usr/lib/x86_64-linux-gnu/libproxy:$tool_lib"
+          positive_lib="$runtime/lib:$tool_lib"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_LOADER_EXACT_CLIENT_VERIFIED=true
+
+          interpreter="$(readelf -l "$client" | sed -n 's/.*Requesting program interpreter: \(.*\)]/\1/p' | head -n1)"
+          [[ -x "$interpreter" ]]
+          echo "TRACK_A_LOADER_INTERPRETER=$interpreter"
+          echo TRACK_A_LOADER_DYNAMIC_TAGS_BEGIN=true
+          readelf -d "$client" | grep -E '\((NEEDED|RPATH|RUNPATH)\)' || true
+          echo TRACK_A_LOADER_DYNAMIC_TAGS_END=true
+
+          echo TRACK_A_LOADER_LAYOUT_BEGIN=true
+          for d in "$runtime/lib" "$runtime/bin/lib" "$toolroot/usr/lib/x86_64-linux-gnu" "$toolroot/usr/lib/x86_64-linux-gnu/libproxy"; do
+            if [[ -d "$d" ]]; then
+              printf 'DIR %s\n' "$d"
+              find "$d" -maxdepth 1 \( -type f -o -type l \) \
+                \( -name 'libQt6*.so*' -o -name 'libEGL.so*' -o -name 'libGLX.so*' -o -name 'libGL.so*' -o -name 'libproxy*.so*' -o -name 'libpxbackend*.so*' \) \
+                -printf '%f\n' | sort
+            else
+              printf 'MISSING_DIR %s\n' "$d"
+            fi
+          done
+          echo TRACK_A_LOADER_LAYOUT_END=true
+
+          list_case() {
+            local label="$1" libs="$2" output
+            output="$RUNNER_TEMP/loader-$label.txt"
+            env -u LD_PRELOAD LD_LIBRARY_PATH="$libs" "$interpreter" --list "$client" >"$output" 2>&1
+            echo "TRACK_A_LOADER_CASE_BEGIN=$label"
+            sed -E 's/[[:space:]]+/ /g' "$output" | sed 's/^ //'
+            echo "TRACK_A_LOADER_CASE_END=$label"
+          }
+          list_case positive "$positive_lib"
+          list_case current "$current_lib"
+
+          python3 - "$RUNNER_TEMP/loader-positive.txt" "$RUNNER_TEMP/loader-current.txt" <<'PY'
+          import re,sys
+          def parse(path):
+              out={}
+              for line in open(path,encoding='utf-8',errors='replace'):
+                  m=re.match(r'\s*(\S+)\s+=>\s+(\S+)',line)
+                  if m: out[m.group(1)]=m.group(2)
+              return out
+          a=parse(sys.argv[1]); b=parse(sys.argv[2])
+          keys=sorted(set(a)|set(b))
+          diffs=[]
+          for k in keys:
+              av=a.get(k,'MISSING'); bv=b.get(k,'MISSING')
+              if av!=bv:
+                  diffs.append((k,av,bv))
+          print(f'TRACK_A_LOADER_RESOLUTION_DIFF_COUNT={len(diffs)}')
+          for k,av,bv in diffs:
+              print(f'LOADER_DIFF name={k} positive={av} current={bv}')
+          qt=[d for d in diffs if d[0].startswith('libQt6')]
+          gl=[d for d in diffs if d[0].startswith(('libEGL','libGL','libGLX'))]
+          proxy=[d for d in diffs if 'proxy' in d[0].lower() or 'pxbackend' in d[0].lower()]
+          print(f'TRACK_A_LOADER_QT_DIFF_COUNT={len(qt)}')
+          print(f'TRACK_A_LOADER_GL_DIFF_COUNT={len(gl)}')
+          print(f'TRACK_A_LOADER_PROXY_DIFF_COUNT={len(proxy)}')
+          print('TRACK_A_LOADER_DIFFERENTIAL_COMPLETE=true')
+          PY

@@ -2,7 +2,8 @@
 
 Date: 2026-08-14
 Track: A — official native Linux Tibia client reverse engineering
-Merge slice: `ci/OTC-20260814-track-a-verified-merge-slice`
+Integration slice: `ci/OTC-20260815-track-a-verified-merge-slice-v2`
+Supersedes integration attempt: PR `#297` / `ci/OTC-20260814-track-a-verified-merge-slice`
 
 ## Exact client fence
 
@@ -15,7 +16,7 @@ The exact-build workflows cited below hard-check client size and SHA-256 before 
 
 ## Branch reconciliation
 
-At continuation start, `main` was `20919503467b7ea4812ac7176f4728be052e90bc`. The recovery-derived working branch had accumulated hundreds of commits relative to the merge-base, so it was **not** merged wholesale. This small merge slice is rebuilt directly from `main` and contains current verified evidence plus durable, workflow-dispatch-only reproducer workflows for the TCP provenance and RTTI probes.
+At continuation start, `main` was `20919503467b7ea4812ac7176f4728be052e90bc`. The recovery-derived working branch had accumulated hundreds of commits relative to the merge-base, so it was **not** merged wholesale. The reviewed reconciliation was first isolated as PR `#297`. After the parallel-research coordination PR `#298` advanced `main`, repository rules required strict up-to-date `CI / Required`; rather than force/rebase the reviewed branch, this integration slice was rebuilt directly from `main@2b0a617ebea092afd21a0334337df9618a466386` with the same bounded evidence/reproducer payload plus the actionlint runner-label declaration.
 
 Track B is out of scope and untouched.
 

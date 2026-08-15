@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-novnc-display-diagnostic
-status: investigating
+status: waiting
 agent: ChatGPT
 session_id: chatgpt-novnc-display-diagnostic-20260815-2141
 session_role: researcher
@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: low
 related_pr: 309
-updated: 2026-08-15T21:41:00+02:00
+updated: 2026-08-15T21:44:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-novnc-display-diagnostic.md
   - docs/agents/evidence/OTC-20260815-track-a-novnc-display-diagnostic/**
@@ -28,7 +28,7 @@ blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: the successful Docker-gateway path exposes a new bounded discriminator: probe conventional direct RFB ports for displays 88/98/115 and compare sanitized RFB fingerprints with websockify 6082
+execution_reason: a bounded direct-RFB fingerprint discriminator was committed and dispatched to the dedicated Synology runner
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: checkpoint_only
@@ -39,16 +39,16 @@ context_score: 4
 estimate_confidence: high
 decomposition_decision: single
 invocation_started_at: 2026-08-15T21:41:00+02:00
-last_progress_at: 2026-08-15T21:41:00+02:00
-ci_checks_for_current_head: 0
+last_progress_at: 2026-08-15T21:43:14+02:00
+ci_checks_for_current_head: 2
 ci_check_generation: direct-rfb-fingerprint
-unchanged_state_checks: 0
+unchanged_state_checks: 2
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-stop_reason: null
-next_action: through the already-proven Docker default gateway, read-only probe direct RFB ports 5988/5998/6015 and compare protocol/server-init fingerprints against websockify 6082; do not authenticate with VNC credentials or mutate any runtime
+stop_reason: semantic_probe_queued_after_two_allowed_ordinary_state_checks
+next_action: when run 31904709435 leaves queued state, inspect job result once; if successful, classify direct ports 5988/5998/6015 and fingerprint equivalence against websockify 6082, then persist evidence without rerunning unchanged probes
 ---
 
 # Objective
@@ -65,21 +65,21 @@ PR #303 owns its runtime workflow, display `:115`, process lifecycle and task st
 
 - [x] Verify diagnostic jobs run on `synology-otclient-01`.
 - [x] Establish hostname `synology` is not resolvable from the runner container namespace.
-- [x] Inventory persistent X11 Unix sockets: exactly `:98` was present in both prior probes.
+- [x] Inventory persistent X11 Unix sockets: exactly `:98` was present in both completed probes.
 - [x] Derive the runner container default IPv4 gateway without printing the private address.
 - [x] Prove TCP `6082` is reachable through that gateway.
 - [x] Prove gateway `6082` serves HTTP noVNC, WebSocket `/websockify`, and unauthenticated RFB 3.8 metadata with framebuffer `1920x1080`.
-- [ ] Probe only conventional direct RFB ports `5988`, `5998`, `6015` corresponding to the disputed/relevant displays `:88`, `:98`, `:115`.
-- [ ] For any reachable direct RFB endpoint, compare a sanitized fingerprint of protocol version, security types, framebuffer dimensions, pixel format and hashed desktop name against the RFB stream exposed through `6082`.
-- [ ] Reclassify the backend mapping strictly from observed network equivalence; keep exact websockify target configuration `UNKNOWN` unless evidence directly proves it.
-- [ ] Persist the result and one exact next action if any ambiguity remains.
+- [x] Implement a bounded discriminator for conventional direct RFB ports `5988`, `5998`, `6015` corresponding to `:88`, `:98`, `:115`.
+- [x] Implement sanitized fingerprint comparison using protocol version, security types, framebuffer dimensions, pixel format and SHA-256 of desktop name; no raw desktop name is logged.
+- [ ] Execute and classify the dispatched direct-RFB fingerprint run.
+- [ ] Persist final evidence and exact next action.
 
 # Existing validation
 
 First runner probe: `31903692616` / `95058202023` PASS.  
 Docker-gateway probe: `31904447945` / `95059984786` PASS.
 
-Proven prior markers include:
+Prior proven markers include:
 
 ```text
 DOCKER_GATEWAY_TCP_6082_REACHABLE=true
@@ -91,10 +91,20 @@ DOCKER_GATEWAY_RFB_FRAMEBUFFER_HEIGHT=1080
 X11_SOCKET_DISPLAYS=:98
 ```
 
-Durable evidence:
+# Direct-RFB discriminator dispatch
 
-- `docs/agents/evidence/OTC-20260815-track-a-novnc-display-diagnostic/20260815-runner-probe.md`
-- `docs/agents/evidence/OTC-20260815-track-a-novnc-display-diagnostic/20260815-docker-gateway-probe.md`
+```text
+workflow_head=8d35ade31da5482603715013df05ccc11650cd07
+run=31904709435
+workflow=Track A noVNC display diagnostic
+run_number=3
+state_observation_1=queued
+state_observation_2=queued
+```
+
+The run is semantic evidence, not final merge CI. Repository anti-stall policy allows two ordinary state observations for one exact head; both have been consumed while the run remained queued. No third unchanged-state poll is permitted in this invocation.
+
+The probe, once scheduled, will test only the Docker-gateway ports `5988`, `5998`, `6015` and compare any successful RFB ServerInit fingerprint to the RFB stream exposed through `6082`. It uses no VNC password and performs no framebuffer/input mutation.
 
 # Comparison boundary
 
@@ -110,24 +120,25 @@ PR #303 run `31903196011` used task-owned `DISPLAY=:115` and failed before login
 
 ## Current unknown
 
-The RFB desktop name exposed through `6082` contains no numeric display hint. The exact websockify target remains unproven. The next network-equivalence probe is materially different from the completed gateway probe because it tests candidate direct RFB ports and compares their server fingerprints rather than repeating the 6082 handshake.
+The exact websockify target remains unproven until the direct-RFB discriminator completes or host-side process/config metadata becomes available.
 
 # Checkpoint
 
 ```yaml
-status: investigating
+status: waiting
 proven:
   - gateway:6082 is reachable and exposes noVNC/websockify/RFB 3.8 with a 1920x1080 framebuffer.
-  - exactly one persistent X11 Unix socket was visible during prior probes: :98.
+  - exactly one persistent X11 Unix socket was visible during completed probes: :98.
   - historical positive-control Track A used :98 and rendered the official client successfully.
   - PR #303 isolated :115 currently fails before login with no visible window.
+  - direct-RFB fingerprint workflow is committed at 8d35ade31da5482603715013df05ccc11650cd07 and dispatched as run 31904709435.
 derived:
-  - :98 is the strongest backend candidate.
+  - :98 remains the strongest backend candidate.
 unknown:
-  - whether gateway direct RFB port 5998 is reachable and fingerprint-equivalent to the RFB stream through 6082.
+  - results for gateway ports 5988/5998/6015 while run 31904709435 remains queued.
   - exact configured websockify target display/port.
   - provenance of the earlier :88 observation.
 conflicts: []
 blockers: []
-next_action: probe gateway direct RFB ports 5988/5998/6015 and compare sanitized fingerprints against 6082.
+next_action: inspect run 31904709435 only after it leaves queued state, then classify the direct-RFB fingerprint result and persist evidence.
 ```

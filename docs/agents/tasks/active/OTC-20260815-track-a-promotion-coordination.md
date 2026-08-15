@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T14:03:00+02:00
+updated: 2026-08-15T14:08:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,7 +47,7 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T14:03:00+02:00
+last_progress_at: 2026-08-15T14:08:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: current
 terminal_ci_wait_started_at: null
@@ -74,8 +74,6 @@ BRANCH: docs/OTC-20260815-track-a-promotion-coordination
 WORKTREE: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 ```
 
-Rotation 3 claimed after rotation 2 released this task to `ready` and P2 researcher #301 independently reached a `ready` handoff. Two intervening coordinator-owned login-revalidation evidence commits (`9ae9eeee...`, `d582548b...`) did not claim the task or modify the task record; they are retained and will be reviewed as part of final reconciliation.
-
 # Exact client fence
 
 ```yaml
@@ -95,14 +93,28 @@ platform: official_native_linux_only
 ## ACCEPT_WITH_EDITS
 
 - #279 fail-closed worldmap reconstruction tooling; real capture/mappings/complete OTBM remain UNKNOWN.
-- #290 bounded historical login/recovery procedure retained as `REVALIDATION_REQUIRED`.
-- #304 bounded exact-build quantitative coverage baseline; source head `43a60bd96cc644b656b200c9edbfb75578b330b6`, source CI `31882010038` SUCCESS, exact accepted blobs promoted under coordinator ownership, source Draft closed unmerged.
+- #290 bounded historical login/recovery procedure retained as `REVALIDATION_REQUIRED`; coordinator login-update evidence corrects the stale assumption that a newer child binary is currently required.
+- #304 bounded exact-build quantitative coverage baseline; exact accepted evidence snapshot is coordinator-owned; source Draft closed unmerged.
+- #301 bounded P2 writer-retention provenance; exact final source head `50e2d95c7dc8b0759eb6233a3751f73434958e88`; final provenance run `31883456870` SUCCESS; final required PR CI `31883459362` SUCCESS; review threads `0`; exact accepted evidence/result/reproducer/workflow blobs copied under coordinator-owned `p2-writer-ownership/source-snapshot/` in commit `6e299fdec0615b24db5512ff2813fe7d6cacafda`.
 
-## REVIEW_REQUIRED_THIS_ROTATION
+Accepted #301 boundary:
 
-- #301 final P2 writer-ownership handoff head `50e2d95c7dc8b0759eb6233a3751f73434958e88`: researcher proposes `ACCEPT_WITH_EDITS`; final task-specific provenance run `31883456870` SUCCESS and final required PR CI `31883459362` SUCCESS. Must be independently reviewed before promotion.
-- #302 P0 live state changed after prior checkpoint: stale run `31880617510` is now cancelled and branch head advanced to `ab22e9c495daea050f45e90b3e38b78062539d59`; do not retain the old queued-blocker statement without revalidation.
-- #303 RUNTIME must be rechecked after P0 lane state changed; existing cleanup hardening is safety evidence only.
+```yaml
+TProtocolClientMessageProcessor_retains_writer_branch: FACT
+writer_intermediate_class: UNKNOWN
+writer_relative_to_DualConnection: INFERENCE_UPSTREAM_ON_CLIENT_PROCESSOR_BRANCH
+direct_DualConnection_writer_member: NOT_PROVEN
+framing_order: UNKNOWN
+transform_boundary: UNKNOWN
+final_binary_egress: UNKNOWN
+causal_local_harness: UNKNOWN
+P2_complete: false
+```
+
+## REVALIDATION_REQUIRED
+
+- #302 P0 current state changed: old run `31880617510` is cancelled and branch advanced beyond the previously reviewed head; current exact task/runs must be refetched before disposition.
+- #303 RUNTIME must be refetched after the P0 serialized-lane state change; cleanup hardening remains safety evidence only.
 
 ## RETURN_FOR_EVIDENCE
 
@@ -132,12 +144,12 @@ p1_overall_field_evidence_coverage: UNKNOWN/UNKNOWN
 restart_relogin_stability: UNKNOWN/1
 ```
 
-Inventory completeness is not semantic completion.
+Inventory completeness is not semantic completion. The prior `p2_chain_closure: UNKNOWN/5` registry remains a historical quantitative baseline until its item mapping is explicitly reconciled with the newly accepted retention fact; no numerator is invented here.
 
 # Canonical non-completion boundary
 
 ```yaml
-P2: OPEN_writer_retention_review_transform_order_final_egress_harness
+P2: PARTIAL_writer_retention_proven_transform_order_final_egress_harness_open
 P1: PARTIAL_read_only_bridge_integrated_live_authority_unknown
 P0: PARTIAL_structural_world_transition_fact_direct_player_state_unknown
 RUNTIME: PARTIAL_one_generation_world_evidence_restart_relogin_unknown
@@ -145,6 +157,19 @@ ACTION: A3_A4_NOT_PROVEN
 COMPLETE: false
 ```
 
+# Acceptance inventory
+
+- [x] #301 exact final head independently reviewed after researcher release;
+- [x] #301 exact source final CI/provenance green and review threads clear;
+- [x] #301 bounded retention fact/inference promoted by exact Git blob SHA under coordinator ownership;
+- [x] campaign report updated without claiming direct DualConnection writer membership or P2 completion;
+- [ ] exact-head coordinator CI terminal for this P2 integration generation;
+- [ ] source #301 closed unmerged after validated promotion;
+- [ ] #302 current exact head/task/runs revalidated;
+- [ ] #303 current exact head/task/runs revalidated after P0 lane change;
+- [ ] next highest-information unresolved P2/P0/RUNTIME/ACTION hypothesis dispatched/executed;
+- [ ] final programme audit/CI/PR hygiene/task archive/ownership release complete.
+
 # Next action
 
-Independently review exact #301 head `50e2d95c7dc8b0759eb6233a3751f73434958e88`, its task/evidence/reproducer, changed paths, zero review threads, source artifact fence and final exact-head CI. Assign one coordinator disposition. If accepted, promote only the bounded writer-retention fact/inference under coordinator-owned evidence, update the campaign report, validate exact coordinator head and close #301 unmerged. Then immediately re-evaluate the changed P0/RUNTIME live state before choosing the next independent lane.
+Validate the exact coordinator integration head for the #301 promotion. If green, close #301 Draft unmerged. Then immediately refetch #302 and #303 exact live state/runs and continue whichever lane has new evidence or an executable unblocked hypothesis. Do not retain stale `queued`/serialization claims without current evidence.

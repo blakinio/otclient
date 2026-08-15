@@ -1,0 +1,91 @@
+name: Track A canonical live controller lease
+
+on:
+  push:
+    branches: [feat/OTC-20260815-track-a-live-runtime-lease-manager]
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-lease.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+      - .github/workflows/tibia-official-client-re-canonical-live-lease.yml
+      - docs/agents/tasks/active/OTC-20260815-track-a-live-runtime-lease-manager.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run deterministic lease tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+
+  isolated-selfhosted:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise lease transitions in task-owned state only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+
+          script="$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-canonical-live-lease.py"
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-live-runtime-lease-manager/selftest/$GITHUB_RUN_ID"
+          state="$root/state"
+          token_a="$root/a.token"
+          token_b="$root/b.token"
+          guard_out="$root/guard.out"
+          canonical="/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime"
+
+          [[ "$state" != "$canonical" ]]
+          mkdir -p "$root"
+          chmod 700 "$root"
+          trap 'rm -rf -- "$root"' EXIT
+
+          python3 "$script" --state-dir "$state" acquire \
+            --task-id OTC-selftest-a --session-id run-a --token-file "$token_a" --ttl-seconds 300
+          raw_token="$(cat "$token_a")"
+          [[ -n "$raw_token" ]]
+          [[ "$(stat -c %a "$token_a")" == 600 ]]
+          [[ "$(stat -c %a "$state/lease.json")" == 600 ]]
+          ! grep -Fq -- "$raw_token" "$state/lease.json"
+
+          set +e
+          conflict_output="$(python3 "$script" --state-dir "$state" acquire \
+            --task-id OTC-selftest-b --session-id run-b --token-file "$token_b" --ttl-seconds 300 2>&1)"
+          conflict_rc=$?
+          set -e
+          [[ "$conflict_rc" -eq 2 ]]
+          grep -Fq 'TRACK_A_CANONICAL_LEASE_ERROR=lease_conflict' <<<"$conflict_output"
+          [[ ! -e "$token_b" ]]
+
+          python3 "$script" --state-dir "$state" validate \
+            --task-id OTC-selftest-a --session-id run-a --token-file "$token_a"
+          python3 "$script" --state-dir "$state" renew \
+            --task-id OTC-selftest-a --session-id run-a --token-file "$token_a" --ttl-seconds 300
+          python3 "$script" --state-dir "$state" guard-run \
+            --task-id OTC-selftest-a --session-id run-a --token-file "$token_a" -- \
+            python3 -c "from pathlib import Path; Path('$guard_out').write_text('guarded')"
+          [[ "$(cat "$guard_out")" == guarded ]]
+
+          status_output="$(python3 "$script" --state-dir "$state" status --json)"
+          [[ "$status_output" != *"$raw_token"* ]]
+          [[ "$status_output" != *token_sha256* ]]
+          [[ "$status_output" != *'"token"'* ]]
+
+          python3 "$script" --state-dir "$state" release \
+            --task-id OTC-selftest-a --session-id run-a --token-file "$token_a"
+          [[ ! -e "$token_a" ]]
+
+          python3 "$script" --state-dir "$state" acquire \
+            --task-id OTC-selftest-b --session-id run-b --token-file "$token_b" --ttl-seconds 300
+          python3 "$script" --state-dir "$state" release \
+            --task-id OTC-selftest-b --session-id run-b --token-file "$token_b"
+
+          echo TRACK_A_CANONICAL_LEASE_SELFTEST_COMPLETE=true
+          echo TRACK_A_CANONICAL_LEASE_CANONICAL_STATE_UNTOUCHED=true

@@ -1,0 +1,122 @@
+name: Track A P2 post-serialization buffer boundary
+
+on:
+  push:
+    branches: [research/OTC-20260815-track-a-p2-post-serialization-buffer-boundary]
+    paths:
+      - .github/workflows/tibia-official-client-re-p2-post-serialization-buffer-boundary.yml
+      - .github/scripts/tibia-official-client-re-p2-post-serialization-buffer-boundary.py
+      - docs/agents/evidence/OTC-20260815-track-a-p2-post-serialization-buffer-boundary/**
+      - docs/agents/tasks/active/OTC-20260815-track-a-p2-post-serialization-buffer-boundary.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-buffer-boundary:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-p2-post-serialization-buffer-boundary
+    steps:
+      - name: Checkout exact Draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify exact client and static tool context
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-post-serialization-buffer-boundary.py
+
+          client=''
+          state=''
+          for candidate in /work/_otclient_tibia_re_state /home/runner/_work/_otclient_tibia_re_state; do
+            probe="$candidate/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+            [[ -x "$probe" ]] || continue
+            size="$(stat -c '%s' "$probe")"
+            sha="$(sha256sum "$probe" | awk '{print $1}')"
+            if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
+              client="$probe"
+              state="$candidate"
+              break
+            fi
+          done
+          [[ -n "$client" && -n "$state" ]]
+
+          objdump="$(command -v objdump || true)"
+          if [[ -z "$objdump" ]]; then
+            pinned="$state/toolroot/usr/bin/objdump"
+            [[ -x "$pinned" ]]
+            wrapper="$RUNNER_TEMP/track-a-p2-buffer-objdump"
+            cat > "$wrapper" <<SH
+          #!/usr/bin/env bash
+          exec env LD_LIBRARY_PATH="$state/toolroot/usr/lib/x86_64-linux-gnu:$state/toolroot/lib/x86_64-linux-gnu" "$pinned" "\$@"
+          SH
+            chmod 700 "$wrapper"
+            objdump="$wrapper"
+          fi
+          [[ -n "$objdump" && -x "$objdump" ]]
+          "$objdump" --version >/dev/null
+
+          {
+            echo "TRACK_A_P2_CLIENT=$client"
+            echo "TRACK_A_P2_OBJDUMP=$objdump"
+            echo "TRACK_A_P2_STATE=$state"
+          } >> "$GITHUB_ENV"
+          echo "TRACK_A_P2_EXACT_HEAD=$GITHUB_SHA"
+          echo "TRACK_A_P2_EXACT_CLIENT_VERIFIED=true"
+          echo "TRACK_A_P2_OBJDUMP_VERIFIED=true"
+
+      - name: Reproduce post-serialization buffer relationship
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/p2-post-serialization-buffer-boundary
+          mkdir -p "$out"
+          python3 .github/scripts/tibia-official-client-re-p2-post-serialization-buffer-boundary.py \
+            --client "$TRACK_A_P2_CLIENT" \
+            --objdump "$TRACK_A_P2_OBJDUMP" \
+            --output-json "$out/result.json" \
+            --output-text "$out/result.txt" \
+            --evidence "$out/evidence.txt" \
+            | tee "$out/validation.log"
+          grep -Fxq 'P2_POST_SERIALIZATION_COMPLETE=true' "$out/validation.log"
+          grep -Eq '^P2_POST_SERIALIZATION_RESULT=(BUFFER_DATAFLOW_PROVEN|SERIALIZATION_TARGET_PROVEN_BUFFER_ORDER_UNKNOWN|BUFFER_INDEPENDENT_OR_SPLIT|FRAMING_EDGE_PROVEN|INCONCLUSIVE)$' "$out/validation.log"
+          grep -Fxq 'P2_PROTOCOL_FRAMING=UNKNOWN' "$out/validation.log"
+          grep -Fxq 'P2_FINAL_BINARY_EGRESS=UNKNOWN' "$out/validation.log"
+          python3 - "$out/result.json" <<'PY'
+          import json, sys
+          data=json.load(open(sys.argv[1], encoding='utf-8'))
+          assert data['semantic_result'] in {
+              'BUFFER_DATAFLOW_PROVEN',
+              'SERIALIZATION_TARGET_PROVEN_BUFFER_ORDER_UNKNOWN',
+              'BUFFER_INDEPENDENT_OR_SPLIT',
+              'FRAMING_EDGE_PROVEN',
+              'INCONCLUSIVE',
+          }
+          assert data['exact_client']['sha256']=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          assert data['classification']['sequence']=='UNKNOWN'
+          assert data['classification']['compression']=='UNKNOWN'
+          assert data['classification']['encryption']=='UNKNOWN'
+          assert data['classification']['final_binary_egress']=='UNKNOWN'
+          assert not data['negative_controls']['vtable_adjacency_used_as_temporal_proof']
+          assert not data['negative_controls']['generic_qiodevice_census_used']
+          PY
+          echo TRACK_A_P2_POST_SERIALIZATION_VALIDATED=true
+
+      - name: Upload sanitized static evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-post-serialization-buffer-boundary-${{ github.run_id }}
+          path: artifacts/p2-post-serialization-buffer-boundary/**
+          if-no-files-found: error
+          retention-days: 7

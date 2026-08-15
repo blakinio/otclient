@@ -359,7 +359,8 @@ PY
 
 verify_generation() {
   require_context
-  local gen="$1" root="$(run_root)" td="$(toolroot)" gdir="$root/generation-$gen" client="$(package_dir)/bin/client"
+  local gen="$1" root td gdir client
+  root="$(run_root)"; td="$(toolroot)"; gdir="$root/generation-$gen"; client="$(package_dir)/bin/client"
   local pid gp records=0 local=0 direct=0 udp=0 streak=0 maxlocal=0
   pid="$(read_pid "client-gen-$gen")"; gp="$(read_pid "observer-gen-$gen")"
   role_owned "$pid" "client-gen-$gen" "$client" || die client_not_owned
@@ -409,7 +410,8 @@ stop_generation() {
 
 compare_generations() {
   require_context
-  local root="$(run_root)" g1="$root/generation-1" g2="$root/generation-2"
+  local root g1 g2
+  root="$(run_root)"; g1="$root/generation-1"; g2="$root/generation-2"
   local pid1="$(cat "$g1/pid.txt")" pid2="$(cat "$g2/pid.txt")" pie1="$(cat "$g1/pie-base.txt")" pie2="$(cat "$g2/pie-base.txt")"
   local r1="$(wc -l <"$g1/map-records.tsv")" r2="$(wc -l <"$g2/map-records.tsv")"
   [[ "$pid1" != "$pid2" ]] || die pid_not_fresh
@@ -428,7 +430,8 @@ compare_generations() {
 }
 
 cleanup_role() {
-  local role="$1" expected="$2" pid="$(read_pid "$role" 2>/dev/null || true)"
+  local role="$1" expected="$2" pid
+  pid="$(read_pid "$role" 2>/dev/null || true)"
   [[ -n "$pid" ]] || return 0; kill -0 "$pid" 2>/dev/null || return 0
   role_owned "$pid" "$role" "$expected" || die "refuse_foreign_cleanup_$role"
   kill -TERM "$pid" 2>/dev/null || true; for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done

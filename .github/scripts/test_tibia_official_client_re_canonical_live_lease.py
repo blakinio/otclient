@@ -262,6 +262,61 @@ class CanonicalLiveLeaseTests(unittest.TestCase):
             except ProcessLookupError:
                 pass
 
+    def test_guard_normal_launcher_exit_keeps_lock_in_background_child(self) -> None:
+        self.manager.acquire(self.a, self.token_a, 60)
+        pid_file = Path(self.temp.name) / "guard-background.pid"
+        done_file = Path(self.temp.name) / "guard-background.done"
+        child_code = (
+            "import os,time\n"
+            f"pid_file={str(pid_file)!r}\n"
+            f"done_file={str(done_file)!r}\n"
+            "pid=os.fork()\n"
+            "if pid == 0:\n"
+            "    time.sleep(1.5)\n"
+            "    open(done_file, 'w', encoding='utf-8').write('done')\n"
+            "    os._exit(0)\n"
+            "open(pid_file, 'w', encoding='utf-8').write(str(pid))\n"
+        )
+        result, rc = self.manager.guard_run(
+            self.a,
+            self.token_a,
+            [sys.executable, "-c", child_code],
+        )
+        self.assertEqual(result.generation, 1)
+        self.assertEqual(rc, 0)
+        self.assertTrue(pid_file.exists())
+        child_pid = int(pid_file.read_text(encoding="utf-8"))
+
+        lock_fd = os.open(self.manager.lock_path, os.O_RDWR)
+        try:
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            deadline = time.monotonic() + 5.0
+            while not done_file.exists():
+                if time.monotonic() >= deadline:
+                    self.fail("background guard child did not reach completion marker")
+                time.sleep(0.05)
+
+            while True:
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        self.fail("background guard child did not release inherited lock")
+                    time.sleep(0.05)
+        finally:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+            os.close(lock_fd)
+            try:
+                os.kill(child_pid, 9)
+            except ProcessLookupError:
+                pass
+
     def test_corrupt_state_fails_closed(self) -> None:
         self.root.mkdir(parents=True, mode=0o700)
         self.manager.state_path.write_text("not-json", encoding="utf-8")

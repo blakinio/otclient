@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: active
+status: ready
 agent: ChatGPT
 session_id: chatgpt-coordinator-20260815-1403
 session_role: coordinator
@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T14:08:00+02:00
+updated: 2026-08-15T14:14:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,32 +47,22 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T14:08:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: current
+last_progress_at: 2026-08-15T14:14:00+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: terminal
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 1
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 3
 stall_warnings: 0
+stop_reason: P2 writer-retention promotion is validated and source PR #301 is closed; P0/RUNTIME live lanes remain independently owned/blocked, while a disjoint static P2 vtable-group task #305 is READY and can be executed serially only after coordinator release
 ---
 
 # Objective
 
 Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Research branches remain Draft-only; this task alone performs campaign promotion/integration. Track B remains outside mutation authority.
-
-# Live-state contract
-
-```yaml
-TASK_ID: OTC-20260815-track-a-promotion-coordination
-TASK_RECORD: docs/agents/tasks/active/OTC-20260815-track-a-promotion-coordination.md
-PROJECT_LANE: otclient
-BASE_MAIN: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
-BRANCH: docs/OTC-20260815-track-a-promotion-coordination
-WORKTREE: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
-```
 
 # Exact client fence
 
@@ -86,46 +76,41 @@ platform: official_native_linux_only
 # Promotion ledger
 
 ## ACCEPT
-
-- #283 bounded read-only runtime bridge implementation; `session-status` remains DERIVED until live structural correlation.
+- #283 bounded read-only runtime bridge implementation; live authority/session epoch still unproven.
 - exact-build reversible structural world transition from run `31806312967` / job `94785974126`; standalone player XYZ and A3/A4 remain unproven.
 
 ## ACCEPT_WITH_EDITS
-
 - #279 fail-closed worldmap reconstruction tooling; real capture/mappings/complete OTBM remain UNKNOWN.
-- #290 bounded historical login/recovery procedure retained as `REVALIDATION_REQUIRED`; coordinator login-update evidence corrects the stale assumption that a newer child binary is currently required.
-- #304 bounded exact-build quantitative coverage baseline; exact accepted evidence snapshot is coordinator-owned; source Draft closed unmerged.
-- #301 bounded P2 writer-retention provenance; exact final source head `50e2d95c7dc8b0759eb6233a3751f73434958e88`; final provenance run `31883456870` SUCCESS; final required PR CI `31883459362` SUCCESS; review threads `0`; exact accepted evidence/result/reproducer/workflow blobs copied under coordinator-owned `p2-writer-ownership/source-snapshot/` in commit `6e299fdec0615b24db5512ff2813fe7d6cacafda`.
+- #290 bounded historical login/recovery procedure retained as revalidation input.
+- #304 bounded quantitative coverage baseline; exact source snapshot promoted; source Draft closed unmerged.
+- #301 bounded P2 writer retention: `TProtocolClientMessageProcessor -> retained intermediate object -> retained shared TProtocolWriter` FACT; writer position relative to `TGameserverDualConnection` is graph-relative upstream INFERENCE; direct DualConnection writer member NOT_PROVEN. Exact source snapshot promoted under coordinator ownership. Coordinator head `e6aab7a1898643f3a139413048af709a0ee04cf7` passed CI `31883767739`; source Draft #301 closed unmerged.
 
-Accepted #301 boundary:
+## LIVE STATE
+- #302 P0: old queued run `31880617510` is cancelled. Corrected self-hosted run `31883521701` / job `95009093099` executed on `synology-otclient-01` but found `TRACK_A_P0_MATCHING_LIVE_PIDS=0`; direct player position remains UNKNOWN, not disproven. Current P0 waits for a canonical live exact-client runtime window.
+- #303 RUNTIME: separately active researcher session. New run `31883846172` at head `950ce8f5f7cf22b457e82cdb20e9eec285438d9c` exists; job `95010096196` (`reacquire`) is currently queued. No runtime semantic result yet.
 
-```yaml
-TProtocolClientMessageProcessor_retains_writer_branch: FACT
-writer_intermediate_class: UNKNOWN
-writer_relative_to_DualConnection: INFERENCE_UPSTREAM_ON_CLIENT_PROCESSOR_BRANCH
-direct_DualConnection_writer_member: NOT_PROVEN
-framing_order: UNKNOWN
-transform_boundary: UNKNOWN
-final_binary_egress: UNKNOWN
-causal_local_harness: UNKNOWN
-P2_complete: false
-```
-
-## REVALIDATION_REQUIRED
-
-- #302 P0 current state changed: old run `31880617510` is cancelled and branch advanced beyond the previously reviewed head; current exact task/runs must be refetched before disposition.
-- #303 RUNTIME must be refetched after the P0 serialized-lane state change; cleanup hardening remains safety evidence only.
+## READY RESEARCH
+- #305 P2 writer-vtable-group: new disjoint Draft task on `research/OTC-20260815-track-a-p2-writer-vtable-group`, exact base main. Goal is to classify `0x2f69e30 / RTTI 0x3080748` structurally inside the canonical `TProtocolWriter` vtable group and narrow the first transform/framing boundary. It explicitly does not duplicate queued final-socket run `31825417040`.
 
 ## RETURN_FOR_EVIDENCE
-
 - #295 material review findings plus Track B ownership collision.
 
 ## REJECT/SUPERSEDE
-
 - #289 broad stale continuation and superseded P2 model;
 - #296 stale lifecycle Draft after accepted correction integration;
-- #277 stale Oteryn-dependent handover with unique negative history preserved;
+- #277 stale Oteryn-dependent handover;
 - #280 superseded only as active Track A dependency; broader infrastructure remains separately owned/open.
+
+# Canonical non-completion boundary
+
+```yaml
+P2: PARTIAL_writer_retention_proven_transform_order_final_egress_harness_open
+P1: PARTIAL_read_only_bridge_integrated_live_authority_unknown
+P0: PARTIAL_structural_world_transition_fact_direct_player_state_unknown
+RUNTIME: PARTIAL_one_generation_world_evidence_restart_relogin_unknown
+ACTION: A3_A4_NOT_PROVEN
+COMPLETE: false
+```
 
 # Quantitative baseline
 
@@ -144,32 +129,6 @@ p1_overall_field_evidence_coverage: UNKNOWN/UNKNOWN
 restart_relogin_stability: UNKNOWN/1
 ```
 
-Inventory completeness is not semantic completion. The prior `p2_chain_closure: UNKNOWN/5` registry remains a historical quantitative baseline until its item mapping is explicitly reconciled with the newly accepted retention fact; no numerator is invented here.
-
-# Canonical non-completion boundary
-
-```yaml
-P2: PARTIAL_writer_retention_proven_transform_order_final_egress_harness_open
-P1: PARTIAL_read_only_bridge_integrated_live_authority_unknown
-P0: PARTIAL_structural_world_transition_fact_direct_player_state_unknown
-RUNTIME: PARTIAL_one_generation_world_evidence_restart_relogin_unknown
-ACTION: A3_A4_NOT_PROVEN
-COMPLETE: false
-```
-
-# Acceptance inventory
-
-- [x] #301 exact final head independently reviewed after researcher release;
-- [x] #301 exact source final CI/provenance green and review threads clear;
-- [x] #301 bounded retention fact/inference promoted by exact Git blob SHA under coordinator ownership;
-- [x] campaign report updated without claiming direct DualConnection writer membership or P2 completion;
-- [ ] exact-head coordinator CI terminal for this P2 integration generation;
-- [ ] source #301 closed unmerged after validated promotion;
-- [ ] #302 current exact head/task/runs revalidated;
-- [ ] #303 current exact head/task/runs revalidated after P0 lane change;
-- [ ] next highest-information unresolved P2/P0/RUNTIME/ACTION hypothesis dispatched/executed;
-- [ ] final programme audit/CI/PR hygiene/task archive/ownership release complete.
-
 # Next action
 
-Validate the exact coordinator integration head for the #301 promotion. If green, close #301 Draft unmerged. Then immediately refetch #302 and #303 exact live state/runs and continue whichever lane has new evidence or an executable unblocked hypothesis. Do not retain stale `queued`/serialization claims without current evidence.
+Coordinator ownership is released (`status: ready`). Claim #305 as an isolated Draft researcher and execute only the `0x2f69e30 / RTTI 0x3080748` vtable-group/transform-boundary discriminator using reviewed exact-build artifacts. Do not write #300 while #305 is active. In parallel, observe active #303 read-only; when it yields a reviewable runtime result, return to #300 and reconcile it before P0/ACTION follow-up.

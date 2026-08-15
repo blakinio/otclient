@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T14:14:00+02:00
+updated: 2026-08-15T14:26:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -36,26 +36,30 @@ run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
-code_bearing_head: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
-resume_dispatch_head: 950ce8f5f7cf22b457e82cdb20e9eec285438d9c
+code_bearing_head: 972936ffef081318b6103a6c799feeb3ce36fc92
 invocation_started_at: 2026-08-15T14:14:00+02:00
-last_progress_at: 2026-08-15T14:14:00+02:00
+last_progress_at: 2026-08-15T14:26:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: runtime
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 2
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 1
 stall_warnings: 0
-claim_check: passed against waiting task, open Draft PR #303, exact main@8fca1c3 and seven changed files all inside declared RUNTIME ownership
+claim_check: passed against waiting task, open Draft PR #303, exact main@8fca1c3 and changed paths wholly inside declared RUNTIME ownership
 active_operation:
-  type: repair_verified_runner_selector_and_resume_exact_reacquisition
-  stale_run_id: 31883846172
-  stale_job_id: 95010096196
-  stale_head: 950ce8f5f7cf22b457e82cdb20e9eec285438d9c
-last_checkpoint: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-resume-dispatch-queued.md
+  type: execute_exact_runtime_reacquisition_after_selector_and_source_state_recovery
+  run_id: 31884531727
+  job_id: 95011797563
+  execution_head: 972936ffef081318b6103a6c799feeb3ce36fc92
+  runner_id: 21
+  runner_name: synology-otclient-01
+last_checkpoint:
+  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-runner-selector-recovery.md
+  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-upstream-source-state-recovery.md
+next_action: inspect the first material state transition from existing run 31884531727 only; do not dispatch a conceptual duplicate while job 95011797563 is active
 ---
 
 # Objective
@@ -84,26 +88,46 @@ track_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
 concurrency_group: official-client-re-runtime
 ```
 
-Credentials may exist only in protected login-step inputs. Persistent client/X/observer/relay environments must remain free of credential variables. The task must not touch Track B, shared upstream wireproxy ownership, foreign display locks/sockets, or irreversible gameplay/economic effects. Movement is not part of this hypothesis.
+Credentials may exist only in protected login-step inputs. Persistent client/X/observer/relay environments must remain free of credential variables. The task must not touch Track B, shared upstream wireproxy ownership, foreign display locks/sockets or irreversible gameplay/economic effects. Movement is not part of this hypothesis.
 
-# Proven selector mismatch — 2026-08-15 14:14 +02
+# Scheduling recovery — FACT
 
-### FACT
+Run `31883846172` / job `95010096196` requested `[self-hosted, otclient, synology]` and remained unassigned with `runner_id=0`. During the same interval P0 jobs using `[otclient, synology]` executed on runner id `21`, `synology-otclient-01`.
 
-- Previous RUNTIME resume run `31883846172` / `reacquire` job `95010096196` remains queued, has zero steps, `runner_id=0`, and requests `[self-hosted, otclient, synology]`.
-- The RUNTIME workflow still declares `runs-on: [self-hosted, otclient, synology]`.
-- During the same external-state interval, independently owned P0 static run `31883967070` / job `95010405800` requested `[otclient, synology]`, was assigned to runner id `21` / `synology-otclient-01`, and completed `SUCCESS`.
-- Earlier P0 runtime job `95008500800` also executed on runner id `21` with `[otclient, synology]`.
-- `main` remains exact `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
-- PR #303 remains open, Draft and mergeable; every changed path is inside this task's declared ownership.
+Workflow head `4f5314cfefa4dfeb150f4e5d912ef4180c4efc67` fenced and retired only that exact stale queued run and changed RUNTIME scheduling to the proven selector `[otclient, synology]`. New job `95010941902` was immediately assigned to runner id `21`. The selector blocker is closed.
 
-### INFERENCE
+Evidence: `20260815-runner-selector-recovery.md`.
 
-The RUNTIME queue is no longer correctly classified as generic runner availability. The extra `self-hosted` label is incompatible with the known working registration of `synology-otclient-01` and is the specific scheduling blocker to repair. Removing only that label restores the selector already proven by two independent P0 jobs without weakening repository, runner-name, branch, exact-client, run-request or runtime safety fences.
+# First executable bootstrap — FACT
 
-### UNKNOWN
+Run `31884181155` / job `95010941902` passed checkout, explicit run-request verification and exact helper syntax/blob fences. It then failed before generation 1 with:
 
-After scheduling is repaired, the first semantic runtime result remains unknown: protected-secret availability/acceptance, generation-1 structural `IN_GAME`, generation-2 fresh PID/PIE reacquisition, transport confinement, credential-environment assertions and cleanup outcome all still require execution.
+```text
+TRACK_A_RUNTIME_ERROR=upstream_wireproxy_unavailable
+```
+
+The concrete missing path was canonical `/home/runner/_work/_otclient_tibia_re_state/runtime/wireproxy.pid`. Login did not run. Cleanup completed successfully, reported no X11 residue and removed task-ephemeral state. No gameplay action occurred.
+
+Historical successful exact-build job `94785974126` on the same runner had selected `/work/_otclient_tibia_re_state` whenever `/work` was writable. This proves a runner-layout mismatch between source-state discovery and canonical task-state ownership.
+
+# Read-only source-state recovery — FACT
+
+Task-owned mutable state remains canonical. The workflow now derives a task-local effective helper from the exact hash-fenced repository helper and changes only source discovery:
+
+- source client must match exact SHA/size;
+- toolroot/client/Xvfb source may come from proven `/work/_otclient_tibia_re_state` or canonical state;
+- wireproxy PID files are inspected read-only;
+- exactly one distinct live upstream PID with the Track A marker is required;
+- SOCKS port `25354` must listen;
+- Cloudflare trace must report `warp=on` or `warp=plus`;
+- zero or multiple eligible upstream processes fail closed;
+- the task never starts/stops/rewrites the shared upstream wireproxy.
+
+Workflow head `4573900d7c3c4b042881f22c33ff00a19c684fd5` had a YAML serialization defect in embedded transform strings and never created a RUNTIME job. No runtime side effect occurred. Head `972936ffef081318b6103a6c799feeb3ce36fc92` corrected only that serialization defect.
+
+Run `31884531727` parsed correctly. Preflight `95011788055` succeeded and `reacquire` `95011797563` was assigned to runner id `21`, `synology-otclient-01`.
+
+Evidence: `20260815-upstream-source-state-recovery.md`.
 
 # Acceptance gate
 
@@ -117,6 +141,16 @@ After scheduling is repaired, the first semantic runtime result remains unknown:
 - [ ] no unauthorized gameplay effect occurred;
 - [ ] exact final-head repository CI terminal before Draft handoff.
 
+# Current UNKNOWN pending existing run
+
+- whether a single eligible upstream Track A wireproxy is still alive in the proven source state;
+- whether WARP through `25354` verifies;
+- source toolroot/Xvfb dependency availability;
+- protected login-secret availability/acceptance;
+- generation-1 structural `IN_GAME`;
+- generation-2 fresh PID/PIE and structural reacquisition;
+- final transport confinement and cleanup outcome.
+
 # Next action
 
-Fence and retire only the exact stale RUNTIME run `31883846172` if it is still queued, change only the runner selector to `[otclient, synology]`, preserve the explicit resume request and all runtime/credential/cleanup fences, then inspect the first material execution result. Do not dispatch conceptual duplicates or weaken semantic gates.
+Inspect the existing run `31884531727` / job `95011797563` when it makes a material state transition. Do not issue an identical retry while it is active. Repair only the first new evidence-backed failure, preserving all ownership, credential, transport and cleanup gates.

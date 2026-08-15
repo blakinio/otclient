@@ -45,6 +45,7 @@ jobs:
           canonical="/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime"
 
           [[ "$state" != "$canonical" ]]
+          bash -n "$entry"
 
           set +e
           override_output="$(bash "$entry" --state-dir "$root/forbidden" status 2>&1)"
@@ -106,6 +107,41 @@ jobs:
           python3 "$script" --state-dir "$state" release \
             --task-id OTC-selftest-b --session-id run-b --token-file "$token_b"
 
+          concurrent_state="$root/concurrent-state"
+          token_c="$root/c.token"
+          token_d="$root/d.token"
+          out_c="$root/c.out"
+          out_d="$root/d.out"
+
+          set +e
+          python3 "$script" --state-dir "$concurrent_state" acquire \
+            --task-id OTC-selftest-c --session-id run-c --token-file "$token_c" --ttl-seconds 300 \
+            >"$out_c" 2>&1 &
+          pid_c=$!
+          python3 "$script" --state-dir "$concurrent_state" acquire \
+            --task-id OTC-selftest-d --session-id run-d --token-file "$token_d" --ttl-seconds 300 \
+            >"$out_d" 2>&1 &
+          pid_d=$!
+          wait "$pid_c"; rc_c=$?
+          wait "$pid_d"; rc_d=$?
+          set -e
+
+          if [[ "$rc_c" -eq 0 && "$rc_d" -eq 2 ]]; then
+            grep -Fq 'TRACK_A_CANONICAL_LEASE_ACQUIRE=true' "$out_c"
+            grep -Fq 'TRACK_A_CANONICAL_LEASE_ERROR=lease_conflict' "$out_d"
+            python3 "$script" --state-dir "$concurrent_state" release \
+              --task-id OTC-selftest-c --session-id run-c --token-file "$token_c"
+          elif [[ "$rc_c" -eq 2 && "$rc_d" -eq 0 ]]; then
+            grep -Fq 'TRACK_A_CANONICAL_LEASE_ERROR=lease_conflict' "$out_c"
+            grep -Fq 'TRACK_A_CANONICAL_LEASE_ACQUIRE=true' "$out_d"
+            python3 "$script" --state-dir "$concurrent_state" release \
+              --task-id OTC-selftest-d --session-id run-d --token-file "$token_d"
+          else
+            echo "unexpected concurrent acquire return codes: c=$rc_c d=$rc_d" >&2
+            exit 1
+          fi
+
           echo TRACK_A_CANONICAL_LEASE_ENTRYPOINT_FENCED=true
+          echo TRACK_A_CANONICAL_LEASE_CONCURRENT_SERIALIZATION_PROVEN=true
           echo TRACK_A_CANONICAL_LEASE_SELFTEST_COMPLETE=true
           echo TRACK_A_CANONICAL_LEASE_CANONICAL_STATE_UNTOUCHED=true

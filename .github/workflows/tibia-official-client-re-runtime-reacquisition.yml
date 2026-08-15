@@ -182,88 +182,92 @@ jobs:
           out="$RUNNER_TEMP/tibia-official-client-re-runtime-reacquisition-effective.sh"
           python3 - "$src" "$out" <<'PY'
           from pathlib import Path
+          from textwrap import dedent
           import sys
 
           src, out = map(Path, sys.argv[1:])
           text = src.read_text(encoding='utf-8')
 
-          replacements = [
-              (
-                  "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\nTASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
-                  "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\n"
-                  "LEGACY_STATE='/work/_otclient_tibia_re_state'\n"
-                  "TASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
-              ),
-              (
-                  "toolroot() { printf '%s/toolroot\\n' \"$BASE_STATE\"; }",
-                  r'''source_state() {
-  local state client size sha
-  for state in "$LEGACY_STATE" "$BASE_STATE"; do
-    client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
-    [[ -x "$client" ]] || continue
-    size="$(stat -c '%s' "$client" 2>/dev/null || true)"
-    sha="$(sha256sum "$client" 2>/dev/null | awk '{print $1}')"
-    if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
-      printf '%s\n' "$state"
-      return 0
-    fi
-  done
-  die exact_source_state_unavailable
-}
-toolroot() { printf '%s/toolroot\n' "$(source_state)"; }''',
-              ),
-              (
-                  r'''verify_upstream_warp() {
-  local pid
-  pid="$(tr -cd '0-9' <"$BASE_STATE/runtime/wireproxy.pid" 2>/dev/null || true)"
-  [[ -n "$pid" && -r "/proc/$pid/environ" ]] || die upstream_wireproxy_unavailable
-  grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || die upstream_wireproxy_wrong_owner
-  kill -0 "$pid" || die upstream_wireproxy_dead
-  curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
-    https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \
-    || die upstream_warp_not_verified
-  printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s\n' "$pid"
-}''',
-                  r'''verify_upstream_warp() {
-  local source state pid selected_pid='' selected_state='' count=0
-  declare -A seen=()
-  source="$(source_state)"
-  for state in "$source" "$BASE_STATE" "$LEGACY_STATE"; do
-    [[ -r "$state/runtime/wireproxy.pid" ]] || continue
-    pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
-    [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue
-    grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || continue
-    kill -0 "$pid" 2>/dev/null || continue
-    [[ -z "${seen[$pid]:-}" ]] || continue
-    seen[$pid]=1
-    selected_pid="$pid"
-    selected_state="$state"
-    count=$((count+1))
-  done
-  (( count == 1 )) || {
-    (( count == 0 )) && die upstream_wireproxy_unavailable
-    die upstream_wireproxy_ambiguous
-  }
-  port_listening "$UPSTREAM_SOCKS_PORT" || die upstream_socks_not_listening
-  curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
-    https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \
-    || die upstream_warp_not_verified
-  printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s source_state=%s\n' "$selected_pid" "$selected_state"
-}''',
-              ),
-              (
-                  "  local td=\"$(toolroot)\" xvfb=\"$BASE_STATE/runtime/Xvfb-track-a\" pid",
-                  "  local source td xvfb pid\n  source=\"$(source_state)\"; td=\"$(toolroot)\"; xvfb=\"$source/runtime/Xvfb-track-a\"",
-              ),
-              (
-                  "  local root=\"$(run_root)\" src=\"$BASE_STATE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia\" dst",
-                  "  local root source src dst\n  root=\"$(run_root)\"; source=\"$(source_state)\"\n  src=\"$source/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia\"\n  printf 'TRACK_A_RUNTIME_SOURCE_STATE=%s\\n' \"$source\"",
-              ),
-              (
-                  "  local td=\"$(toolroot)\" xvfb=\"$BASE_STATE/runtime/Xvfb-track-a\" root=\"$(run_root)\"",
-                  "  local source td xvfb root\n  source=\"$(source_state 2>/dev/null || printf '%s\\n' \"$BASE_STATE\")\"\n  td=\"$source/toolroot\"; xvfb=\"$source/runtime/Xvfb-track-a\"; root=\"$(run_root)\"",
-              ),
-          ]
+          replacements = []
+          replacements.append((
+              "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\nTASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
+              "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\nLEGACY_STATE='/work/_otclient_tibia_re_state'\nTASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
+          ))
+          replacements.append((
+              "toolroot() { printf '%s/toolroot\\n' \"$BASE_STATE\"; }",
+              dedent('''\
+          source_state() {
+            local state client size sha
+            for state in "$LEGACY_STATE" "$BASE_STATE"; do
+              client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+              [[ -x "$client" ]] || continue
+              size="$(stat -c '%s' "$client" 2>/dev/null || true)"
+              sha="$(sha256sum "$client" 2>/dev/null | awk '{print $1}')"
+              if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
+                printf '%s\\n' "$state"
+                return 0
+              fi
+            done
+            die exact_source_state_unavailable
+          }
+          toolroot() { printf '%s/toolroot\\n' "$(source_state)"; }
+          '''),
+          ))
+          replacements.append((
+              dedent('''\
+          verify_upstream_warp() {
+            local pid
+            pid="$(tr -cd '0-9' <"$BASE_STATE/runtime/wireproxy.pid" 2>/dev/null || true)"
+            [[ -n "$pid" && -r "/proc/$pid/environ" ]] || die upstream_wireproxy_unavailable
+            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || die upstream_wireproxy_wrong_owner
+            kill -0 "$pid" || die upstream_wireproxy_dead
+            curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \\
+              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \\
+              || die upstream_warp_not_verified
+            printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s\\n' "$pid"
+          }
+          '''),
+              dedent('''\
+          verify_upstream_warp() {
+            local source state pid selected_pid='' selected_state='' count=0
+            declare -A seen=()
+            source="$(source_state)"
+            for state in "$source" "$BASE_STATE" "$LEGACY_STATE"; do
+              [[ -r "$state/runtime/wireproxy.pid" ]] || continue
+              pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+              [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || continue
+              kill -0 "$pid" 2>/dev/null || continue
+              [[ -z "${seen[$pid]:-}" ]] || continue
+              seen[$pid]=1
+              selected_pid="$pid"
+              selected_state="$state"
+              count=$((count+1))
+            done
+            (( count == 1 )) || {
+              (( count == 0 )) && die upstream_wireproxy_unavailable
+              die upstream_wireproxy_ambiguous
+            }
+            port_listening "$UPSTREAM_SOCKS_PORT" || die upstream_socks_not_listening
+            curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \\
+              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \\
+              || die upstream_warp_not_verified
+            printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s source_state=%s\\n' "$selected_pid" "$selected_state"
+          }
+          '''),
+          ))
+          replacements.append((
+              '  local td="$(toolroot)" xvfb="$BASE_STATE/runtime/Xvfb-track-a" pid',
+              '  local source td xvfb pid\n  source="$(source_state)"; td="$(toolroot)"; xvfb="$source/runtime/Xvfb-track-a"',
+          ))
+          replacements.append((
+              '  local root="$(run_root)" src="$BASE_STATE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia" dst',
+              '  local root source src dst\n  root="$(run_root)"; source="$(source_state)"\n  src="$source/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"\n  printf \'TRACK_A_RUNTIME_SOURCE_STATE=%s\\n\' "$source"',
+          ))
+          replacements.append((
+              '  local td="$(toolroot)" xvfb="$BASE_STATE/runtime/Xvfb-track-a" root="$(run_root)"',
+              '  local source td xvfb root\n  source="$(source_state 2>/dev/null || printf \'%s\\n\' "$BASE_STATE")"\n  td="$source/toolroot"; xvfb="$source/runtime/Xvfb-track-a"; root="$(run_root)"',
+          ))
 
           for old, new in replacements:
               count = text.count(old)

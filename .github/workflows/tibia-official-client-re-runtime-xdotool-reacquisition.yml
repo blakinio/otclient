@@ -1,0 +1,207 @@
+name: Track A runtime xdotool-repaired reacquisition
+
+on:
+  push:
+    branches: [research/OTC-20260815-track-a-runtime-reacquisition]
+    paths:
+      - .github/workflows/tibia-official-client-re-runtime-xdotool-reacquisition.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reacquire:
+    concurrency:
+      group: official-client-re-runtime
+      cancel-in-progress: false
+    runs-on: [otclient, synology]
+    timeout-minutes: 18
+    env:
+      EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-runtime-reacquisition
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      RUN_REQUEST: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/runtime-run-request.json
+      EXPECTED_HELPER_BLOB: c1b88d4cc17edf2684b93d7e516f9c694e37966a
+      EXPECTED_CODE_BEARING_HEAD: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
+      BASELINE_WORKFLOW_COMMIT: 527369447672a355b6fc0a3f8a4f9c2b39f33b67
+      BASELINE_WORKFLOW_BLOB: c382eab394cfbbed9a6fce93331d16fa2b0ecbbc
+      FAILED_RUN_TO_RECOVER: '31888683076'
+      BASELINE_RESIDUE_RUN_ID: '31885192604'
+      PX_BACKEND_DIR: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy
+      PX_BACKEND_FILE: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy/libpxbackend-1.0.so
+      TASK_ID: OTC-20260815-track-a-runtime-reacquisition
+      TRACK_MARKER: OTCLIENT_TIBIA_RE_TRACK=official-client-re
+      TASK_MARKER: OTCLIENT_TIBIA_RE_TASK=OTC-20260815-track-a-runtime-reacquisition
+      DISPLAY_NUM: '115'
+      TASK_SOCKS_PORT: '25415'
+      QT_DEBUG_PLUGINS: '1'
+      SOURCE_RUNTIME_WORKFLOW: .github/workflows/tibia-official-client-re-runtime-reacquisition.yml
+      EXPECTED_SOURCE_RUNTIME_BLOB: 248e08b09693311040106516fff5124b95895a4c
+
+    steps:
+      - name: Checkout exact draft head with bounded history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 60
+
+      - name: Materialize pinned source steps repair only xdotool loader and arm generation 1
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
+          [[ "$(git hash-object "$SOURCE_RUNTIME_WORKFLOW")" == "$EXPECTED_SOURCE_RUNTIME_BLOB" ]]
+
+          python3 - "$SOURCE_RUNTIME_WORKFLOW" "$RUNNER_TEMP" <<'PY'
+          from pathlib import Path
+          import sys
+          source=Path(sys.argv[1]); outdir=Path(sys.argv[2])
+          lines=source.read_text(encoding='utf-8').splitlines()
+          def extract(name, filename):
+              marker=f'      - name: {name}'
+              start=lines.index(marker)
+              run=None
+              for i in range(start+1,len(lines)):
+                  if lines[i].startswith('      - name: '): break
+                  if lines[i]=='        run: |':
+                      run=i+1; break
+              if run is None: raise SystemExit(f'run block missing for {name}')
+              body=[]
+              for line in lines[run:]:
+                  if line.startswith('      - name: '): break
+                  if line and not line.startswith('          '):
+                      raise SystemExit(f'unexpected indentation in {name}: {line!r}')
+                  body.append(line[10:] if line else '')
+              text='\n'.join(body)+'\n'
+              (outdir/filename).write_text(text,encoding='utf-8')
+          extract('Setup isolated runtime and arm generation 1','track-a-source-setup.sh')
+          extract('Verify generation 1 stop it and arm fresh generation 2','track-a-source-verify1.sh')
+          extract('Clean exact current-run runtime processes and ephemeral state','track-a-source-cleanup.sh')
+          PY
+
+          setup="$RUNNER_TEMP/track-a-source-setup.sh"
+          python3 - "$setup" <<'PY'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1]); text=path.read_text(encoding='utf-8')
+          anchor='bash -n "$effective"'
+          if text.count(anchor)!=1: raise SystemExit(f'effective syntax anchor count={text.count(anchor)}')
+          injection=r'''python3 - "$effective" <<'PY_XDOTOOL'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1]); text=path.read_text(encoding='utf-8')
+          old='"$td/usr/bin/xdotool"'
+          new='env LD_LIBRARY_PATH="$td/usr/lib/x86_64-linux-gnu:$td/usr/lib/x86_64-linux-gnu/libproxy:$td/lib/x86_64-linux-gnu" "$td/usr/bin/xdotool"'
+          count=text.count(old)
+          if count < 10:
+              raise SystemExit(f'xdotool invocation count unexpectedly low: {count}')
+          text=text.replace(old,new)
+          if text.count(old)!=count:
+              raise SystemExit('xdotool original invocation unexpectedly remains')
+          if text.count(new)!=count:
+              raise SystemExit('xdotool replacement count mismatch')
+          path.write_text(text,encoding='utf-8')
+          print(f'TRACK_A_EFFECTIVE_XDOTOOL_LOADER_PATCHED=true invocations={count}')
+          PY_XDOTOOL
+          '''
+          text=text.replace(anchor,injection+anchor,1)
+          path.write_text(text,encoding='utf-8')
+          PY
+          bash -n "$setup"
+          bash -n "$RUNNER_TEMP/track-a-source-verify1.sh"
+          bash -n "$RUNNER_TEMP/track-a-source-cleanup.sh"
+          echo "TRACK_A_RUNTIME_SOURCE_CLEANUP=$RUNNER_TEMP/track-a-source-cleanup.sh" >> "$GITHUB_ENV"
+          bash "$setup"
+
+      - name: Login generation 1 with protected inputs only
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" login 1
+
+      - name: Verify generation 1 stop it and arm fresh generation 2
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash "$RUNNER_TEMP/track-a-source-verify1.sh"
+
+      - name: Login generation 2 with protected inputs only
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" login 2
+
+      - name: Verify generation 2 and require restart stable reacquisition
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" verify 2
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" compare
+          echo TRACK_A_XDOTOOL_REPAIRED_REACQUISITION_PROVEN=true
+
+      - name: Snapshot sanitized reacquisition evidence before cleanup
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"
+          out=artifacts/runtime-xdotool-reacquisition
+          mkdir -p "$out"
+          python3 - "$root" "$out" <<'PY'
+          from pathlib import Path
+          import re,shutil,sys
+          root,out=map(Path,sys.argv[1:])
+          email=re.compile(r'(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}')
+          for gen in (1,2):
+              g=root/f'generation-{gen}'
+              if not g.is_dir(): continue
+              for name in ('map-records.tsv','baseline-count.txt','pie-base.txt','pid.txt','window.id'):
+                  src=g/name
+                  if src.is_file(): shutil.copyfile(src,out/f'gen{gen}-{name}')
+              for name in ('client.log','gdb.log'):
+                  src=g/name
+                  if not src.is_file(): continue
+                  lines=[]
+                  for line in src.read_text(errors='replace').splitlines()[-240:]:
+                      if 'TIBIA_TEST_EMAIL' in line or 'TIBIA_TEST_PASSWORD' in line:
+                          line='[REDACTED_SECRET_VARIABLE_LINE]'
+                      lines.append(email.sub('[REDACTED_EMAIL]',line))
+                  (out/f'gen{gen}-{name}').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+          c=root/'comparison.txt'
+          if c.is_file(): shutil.copyfile(c,out/'comparison.txt')
+          (out/'terminal.txt').write_text(
+              f'run_id={Path("/proc/self").exists() and "${GITHUB_RUN_ID}"}\n'
+              f'head=${{GITHUB_SHA}}\n'
+              'xdotool_loader_repaired=true\n'
+              'cache_seeded=false\n'
+              f'expected_sha={"${EXPECTED_CLIENT_SHA256}"}\n',encoding='utf-8')
+          PY
+
+      - name: Clean exact current-run runtime processes and ephemeral state
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -n "${TRACK_A_RUNTIME_SOURCE_CLEANUP:-}" && -r "$TRACK_A_RUNTIME_SOURCE_CLEANUP" ]]; then
+            bash "$TRACK_A_RUNTIME_SOURCE_CLEANUP"
+          else
+            echo TRACK_A_RUNTIME_CLEANUP_SCRIPT_UNAVAILABLE=true
+          fi
+
+      - name: Upload sanitized xdotool-repaired reacquisition evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-runtime-xdotool-reacquisition-${{ github.run_id }}
+          path: artifacts/runtime-xdotool-reacquisition/**
+          if-no-files-found: ignore
+          retention-days: 7

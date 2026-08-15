@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Read-only Track A canonical runtime candidate registration probe.
 
-The probe may inspect X11 window metadata, /proc process identity, exact executable
-identity, Linux boot identity and sanitized noVNC/RFB metadata. It never sends
-X11/VNC input, reads process environments/credentials, attaches with ptrace, or
+The probe inspects X11 window metadata, /proc executable/process-start identity,
+Linux boot identity and sanitized noVNC/RFB metadata. It never sends X11/VNC
+input, reads process environments/credentials/cmdlines, attaches with ptrace, or
 exports framebuffer contents.
 """
 
@@ -36,8 +36,19 @@ class ProbeError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class ProcessIdentity:
+    pid: int
+    process_start_ticks: int
+    boot_id_sha256: str
+    exact_executable: bool
+    executable_size: int
+    executable_sha256: str | None
+
+
+@dataclass(frozen=True)
 class WindowCandidate:
     window_id: int
+    visible: bool
     pid: int | None
     width: int | None
     height: int | None
@@ -74,7 +85,7 @@ def read_process_start_ticks(pid: int) -> int:
     if rparen < 0:
         raise ProbeError("invalid /proc stat format")
     fields_after_comm = text[rparen + 2 :].split()
-    # fields_after_comm[0] is field 3 (state); field 22 (starttime) is index 19.
+    # fields_after_comm[0] is Linux /proc stat field 3; field 22 is index 19.
     if len(fields_after_comm) <= 19:
         raise ProbeError("truncated /proc stat")
     return int(fields_after_comm[19])
@@ -87,6 +98,45 @@ def boot_id_digest() -> str:
     return hashlib.sha256(raw.encode("ascii")).hexdigest()
 
 
+def inspect_pid(pid: int, boot_digest: str, digest_cache: dict[tuple[int, int, int], str]) -> ProcessIdentity | None:
+    try:
+        exe = Path(f"/proc/{pid}/exe").resolve(strict=True)
+        st = exe.stat()
+        size = int(st.st_size)
+        if size != EXPECTED_SIZE:
+            return None
+        cache_key = (int(st.st_dev), int(st.st_ino), size)
+        digest = digest_cache.get(cache_key)
+        if digest is None:
+            digest = sha256_file(exe)
+            digest_cache[cache_key] = digest
+        if digest != EXPECTED_SHA256:
+            return None
+        start_ticks = read_process_start_ticks(pid)
+        return ProcessIdentity(
+            pid=pid,
+            process_start_ticks=start_ticks,
+            boot_id_sha256=boot_digest,
+            exact_executable=True,
+            executable_size=size,
+            executable_sha256=digest,
+        )
+    except (FileNotFoundError, PermissionError, ProcessLookupError, OSError, ProbeError, ValueError):
+        return None
+
+
+def enumerate_exact_processes(boot_digest: str) -> list[ProcessIdentity]:
+    digest_cache: dict[tuple[int, int, int], str] = {}
+    identities: list[ProcessIdentity] = []
+    for proc_dir in Path("/proc").iterdir():
+        if not proc_dir.name.isdigit():
+            continue
+        identity = inspect_pid(int(proc_dir.name), boot_digest, digest_cache)
+        if identity is not None:
+            identities.append(identity)
+    return sorted(identities, key=lambda item: (item.pid, item.process_start_ticks))
+
+
 def toolroot_from_state() -> Path:
     canonical = Path("/home/runner/_work/_otclient_tibia_re_state")
     legacy = Path("/work/_otclient_tibia_re_state")
@@ -97,16 +147,12 @@ def toolroot_from_state() -> Path:
 
 
 def xdotool_env(toolroot: Path) -> dict[str, str]:
-    env = {
+    return {
         "DISPLAY": TRACK_DISPLAY,
         "PATH": f"{toolroot}/usr/bin:{toolroot}/usr/sbin:/usr/bin:/bin",
-        "LD_LIBRARY_PATH": (
-            f"{toolroot}/usr/lib/x86_64-linux-gnu:"
-            f"{toolroot}/lib/x86_64-linux-gnu"
-        ),
+        "LD_LIBRARY_PATH": f"{toolroot}/usr/lib/x86_64-linux-gnu:{toolroot}/lib/x86_64-linux-gnu",
         "LC_ALL": "C",
     }
-    return env
 
 
 def run_xdotool(toolroot: Path, *args: str, check: bool = True) -> str:
@@ -128,6 +174,15 @@ def run_xdotool(toolroot: Path, *args: str, check: bool = True) -> str:
     return completed.stdout
 
 
+def parse_window_ids(text: str) -> set[int]:
+    values: set[int] = set()
+    for line in text.splitlines():
+        value = line.strip()
+        if value.isdigit() and int(value) > 0:
+            values.add(int(value))
+    return values
+
+
 def parse_geometry(text: str) -> tuple[int | None, int | None]:
     width = None
     height = None
@@ -139,51 +194,38 @@ def parse_geometry(text: str) -> tuple[int | None, int | None]:
     return width, height
 
 
-def inspect_window(toolroot: Path, window_id: int, boot_digest: str) -> WindowCandidate:
+def inspect_window(
+    toolroot: Path,
+    window_id: int,
+    visible: bool,
+    exact_process_by_pid: dict[int, ProcessIdentity],
+) -> WindowCandidate:
     pid: int | None = None
-    try:
-        raw_pid = run_xdotool(toolroot, "getwindowpid", str(window_id), check=False).strip()
-        if raw_pid.isdigit() and int(raw_pid) > 0:
-            pid = int(raw_pid)
-    except Exception:
-        pid = None
+    raw_pid = run_xdotool(toolroot, "getwindowpid", str(window_id), check=False).strip()
+    if raw_pid.isdigit() and int(raw_pid) > 0:
+        pid = int(raw_pid)
 
     width: int | None = None
     height: int | None = None
     try:
-        geometry = run_xdotool(toolroot, "getwindowgeometry", "--shell", str(window_id))
-        width, height = parse_geometry(geometry)
-    except Exception:
+        width, height = parse_geometry(
+            run_xdotool(toolroot, "getwindowgeometry", "--shell", str(window_id))
+        )
+    except ProbeError:
         pass
 
-    exact = False
-    size: int | None = None
-    digest: str | None = None
-    start_ticks: int | None = None
-    if pid is not None:
-        try:
-            exe_link = Path(f"/proc/{pid}/exe")
-            exe = exe_link.resolve(strict=True)
-            stat_result = exe.stat()
-            size = int(stat_result.st_size)
-            # Hash only a process executable that matches the expected immutable size.
-            if size == EXPECTED_SIZE:
-                digest = sha256_file(exe)
-                exact = digest == EXPECTED_SHA256
-            start_ticks = read_process_start_ticks(pid)
-        except (FileNotFoundError, PermissionError, ProcessLookupError, OSError, ProbeError, ValueError):
-            exact = False
-
+    identity = exact_process_by_pid.get(pid) if pid is not None else None
     return WindowCandidate(
         window_id=window_id,
+        visible=visible,
         pid=pid,
         width=width,
         height=height,
-        exact_executable=exact,
-        executable_size=size,
-        executable_sha256=digest,
-        process_start_ticks=start_ticks,
-        boot_id_sha256=boot_digest if pid is not None and start_ticks is not None else None,
+        exact_executable=identity is not None,
+        executable_size=identity.executable_size if identity else None,
+        executable_sha256=identity.executable_sha256 if identity else None,
+        process_start_ticks=identity.process_start_ticks if identity else None,
+        boot_id_sha256=identity.boot_id_sha256 if identity else None,
     )
 
 
@@ -263,7 +305,6 @@ def websocket_recv(sock: socket.socket) -> bytes:
         if opcode == 8:
             raise EOFError("websocket closed")
         if opcode == 9:
-            # A pong is protocol control, not framebuffer or input mutation.
             pong_mask = os.urandom(4)
             frame = bytearray([0x8A, 0x80 | len(payload)])
             frame.extend(pong_mask)
@@ -306,7 +347,7 @@ def rfb_server_metadata(stream: WebsocketRfbStream) -> tuple[str, int, int, str,
     stream.write(b"\x01")
     if stream.read(4) != b"\x00\x00\x00\x00":
         raise ProbeError("RFB security negotiation failed")
-    stream.write(b"\x01")  # ClientInit shared flag; no framebuffer/input request follows.
+    stream.write(b"\x01")
     server_init = stream.read(24)
     width, height = struct.unpack("!HH", server_init[:4])
     name_len = struct.unpack("!I", server_init[20:24])[0]
@@ -342,8 +383,7 @@ def inspect_rfb() -> RfbMetadata:
             if not chunk:
                 raise EOFError("websocket HTTP response closed")
             header.extend(chunk)
-        status_line = bytes(header).split(b"\r\n", 1)[0]
-        if b" 101 " not in status_line:
+        if b" 101 " not in bytes(header).split(b"\r\n", 1)[0]:
             raise ProbeError("websocket upgrade rejected")
         protocol, width, height, security, name = rfb_server_metadata(WebsocketRfbStream(sock))
         name_text = name.decode("utf-8", errors="replace")
@@ -367,12 +407,17 @@ def inspect_rfb() -> RfbMetadata:
             sock.close()
 
 
-def classify(candidates: list[WindowCandidate], display_present: bool) -> str:
-    exact = [candidate for candidate in candidates if candidate.exact_executable and candidate.pid is not None]
-    if exact:
+def classify(
+    candidates: list[WindowCandidate],
+    global_exact_processes: list[ProcessIdentity],
+    display_present: bool,
+) -> str:
+    if any(candidate.exact_executable for candidate in candidates):
         return "EXACT_LIVE_RUNTIME_CANDIDATE_PROVEN"
     if candidates:
         return "LIVE_CLIENT_IDENTITY_MISMATCH"
+    if global_exact_processes:
+        return "INCONCLUSIVE_EXACT_CLIENT_PROCESS_UNBOUND"
     if display_present:
         return "PERSISTENT_DISPLAY_NO_LIVE_CLIENT"
     return "INCONCLUSIVE"
@@ -392,37 +437,47 @@ def main() -> int:
     display_present = 98 in displays
     toolroot = toolroot_from_state()
     boot_digest = boot_id_digest()
+    global_exact_processes = enumerate_exact_processes(boot_digest)
+    exact_process_by_pid = {identity.pid: identity for identity in global_exact_processes}
 
-    window_ids: list[int] = []
+    all_window_ids: set[int] = set()
+    visible_window_ids: set[int] = set()
     if display_present:
-        raw = run_xdotool(toolroot, "search", "--onlyvisible", "--name", "^Tibia$", check=False)
-        for line in raw.splitlines():
-            value = line.strip()
-            if value.isdigit() and int(value) > 0:
-                window_ids.append(int(value))
-    window_ids = sorted(set(window_ids))
-    candidates = [inspect_window(toolroot, window_id, boot_digest) for window_id in window_ids]
+        all_window_ids = parse_window_ids(
+            run_xdotool(toolroot, "search", "--name", "^Tibia$", check=False)
+        )
+        visible_window_ids = parse_window_ids(
+            run_xdotool(toolroot, "search", "--onlyvisible", "--name", "^Tibia$", check=False)
+        )
+
+    candidates = [
+        inspect_window(toolroot, window_id, window_id in visible_window_ids, exact_process_by_pid)
+        for window_id in sorted(all_window_ids)
+    ]
     rfb = inspect_rfb()
-    semantic_result = classify(candidates, display_present)
+    semantic_result = classify(candidates, global_exact_processes, display_present)
 
     result: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "track": "official-client-re",
         "runtime_class": "canonical_live_candidate",
         "display": TRACK_DISPLAY,
         "persistent_x11_displays": [f":{value}" for value in displays],
         "display_98_present": display_present,
-        "visible_tibia_window_count": len(window_ids),
+        "tibia_window_count_all": len(all_window_ids),
+        "tibia_window_count_visible": len(visible_window_ids),
         "candidates": [asdict(candidate) for candidate in candidates],
+        "global_exact_client_processes": [asdict(identity) for identity in global_exact_processes],
         "exact_client_fence": {
             "version": EXPECTED_VERSION,
             "size": EXPECTED_SIZE,
             "sha256": EXPECTED_SHA256,
         },
         "rfb_6082": asdict(rfb),
+        "rfb_desktop_name_supports_display_98_mapping": rfb.desktop_name_references_display_98,
+        "exact_6082_backend_display": "UNKNOWN",
         "semantic_result": semantic_result,
         "display_98_is_canonical": False,
-        "exact_6082_backend_display": "PROVEN_98" if rfb.desktop_name_references_display_98 is True else "UNKNOWN",
         "read_only": True,
     }
 
@@ -433,15 +488,19 @@ def main() -> int:
     print(f"TRACK_A_CANONICAL_REGISTRATION_RESULT={semantic_result}")
     print(f"TRACK_A_CANONICAL_REGISTRATION_X11_DISPLAYS={','.join(result['persistent_x11_displays']) or 'none'}")
     print(f"TRACK_A_CANONICAL_REGISTRATION_DISPLAY98_PRESENT={str(display_present).lower()}")
-    print(f"TRACK_A_CANONICAL_REGISTRATION_VISIBLE_TIBIA_WINDOWS={len(window_ids)}")
-    print(f"TRACK_A_CANONICAL_REGISTRATION_EXACT_CANDIDATES={sum(1 for c in candidates if c.exact_executable)}")
+    print(f"TRACK_A_CANONICAL_REGISTRATION_TIBIA_WINDOWS_ALL={len(all_window_ids)}")
+    print(f"TRACK_A_CANONICAL_REGISTRATION_TIBIA_WINDOWS_VISIBLE={len(visible_window_ids)}")
+    print(f"TRACK_A_CANONICAL_REGISTRATION_EXACT_PROCESSES_GLOBAL={len(global_exact_processes)}")
+    print(f"TRACK_A_CANONICAL_REGISTRATION_EXACT_WINDOW_CANDIDATES={sum(1 for c in candidates if c.exact_executable)}")
     print(f"TRACK_A_CANONICAL_REGISTRATION_RFB_REACHABLE={str(rfb.reachable).lower()}")
     print(
-        "TRACK_A_CANONICAL_REGISTRATION_RFB_NAME_REFERENCES_DISPLAY98="
+        "TRACK_A_CANONICAL_REGISTRATION_RFB_NAME_SUPPORTS_DISPLAY98="
         + ("unknown" if rfb.desktop_name_references_display_98 is None else str(rfb.desktop_name_references_display_98).lower())
     )
+    print("TRACK_A_CANONICAL_REGISTRATION_6082_BACKEND_DISPLAY=UNKNOWN")
     print("TRACK_A_CANONICAL_REGISTRATION_FRAMEBUFFER_EXPORTED=false")
     print("TRACK_A_CANONICAL_REGISTRATION_PROCESS_ENV_READ=false")
+    print("TRACK_A_CANONICAL_REGISTRATION_PROCESS_CMDLINE_READ=false")
     print("TRACK_A_CANONICAL_REGISTRATION_PTRACE_USED=false")
     print("TRACK_A_CANONICAL_REGISTRATION_INPUT_SENT=false")
     return 0

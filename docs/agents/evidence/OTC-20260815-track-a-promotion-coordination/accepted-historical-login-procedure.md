@@ -45,6 +45,12 @@ The version mapping is repository metadata for the digest/size pair. Every curre
 - Old string locations/message-path offsets are historical leads only and must not be promoted without exact-build rediscovery.
 - Historical Oteryn repositories/runners/containers are not active Track A dependencies under the current repository isolation contract.
 
+## 2026-08-15 update/reconstruction correction
+
+Coordinator evidence `20260815-login-update-revalidation.md` resolves one stale prerequisite assumption. Historical launcher recovery run `31742909649` classified `Tibia` as `NotInstalled` and did not install a child, but independent official-manifest reconstruction run `31745572204` successfully reconstructed the exact fenced client SHA `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`. Later live-world run `31806312967` verified that same SHA before a reversible structural movement experiment and captured Worldmap strip changes.
+
+Therefore a newer child binary is **not** currently a prerequisite for PR #303. The current task must first revalidate the exact fenced build in a fresh task-owned runtime. A new binary identity becomes relevant only if that revalidation independently proves an exact-build mismatch/rejection; any such new SHA would require fresh build-specific rediscovery rather than reuse of old offsets.
+
 ## Current consumer
 
 Active Draft task `OTC-20260815-track-a-runtime-reacquisition` / PR `#303` may use this procedure only as revalidation input. Its own acceptance gate must independently prove fresh PID/PIE, structural world-state reacquisition, secret-free persistent child environments and task-owned namespace safety across restart/relogin.

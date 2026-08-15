@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T17:48:00+02:00
+updated: 2026-08-15T17:51:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,9 +47,9 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T17:45:00+02:00
-last_progress_at: 2026-08-15T17:48:00+02:00
+last_progress_at: 2026-08-15T17:51:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: p2-serialization-promotion
+ci_check_generation: p2-serialization-promotion-and-dispatch
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -61,7 +61,7 @@ last_verified_integration_head: da96c97b91c236be6f97e4edf80214f77b4b2492
 last_verified_integration_ci_run: 31893397505
 last_verified_integration_ci_state: success
 active_operation:
-  type: dispatch_next_p2_post_serialization_boundary
+  type: exact_head_validation_after_p2_promotion_and_dispatch
 last_promotion:
   source_pr: 306
   disposition: ACCEPT_WITH_EDITS
@@ -71,6 +71,12 @@ last_promotion:
   source_final_artifact: 9249137864
   source_final_artifact_digest: sha256:c80014c2cc9b3db5b3406540e7d6d4efeef0301f63fd5858379614179b59398d
   semantic_result: SERIALIZATION_ONLY_PROVEN
+next_research_dispatch:
+  task_id: OTC-20260815-track-a-p2-post-serialization-buffer-boundary
+  pr: 308
+  branch: research/OTC-20260815-track-a-p2-post-serialization-buffer-boundary
+  state: ready_unassigned
+  base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 ---
 
 # Objective
@@ -95,15 +101,16 @@ platform: official_native_linux_only
 ## ACCEPT_WITH_EDITS
 - #279 fail-closed worldmap reconstruction tooling; real capture/mappings/complete OTBM remain UNKNOWN.
 - #290 bounded historical login/recovery procedure retained only as revalidation input.
-- #304 bounded quantitative coverage baseline; exact source snapshot promoted; source Draft closed unmerged.
-- #301 bounded P2 writer-retention evidence; exact source snapshot promoted; source Draft closed unmerged.
-- #305 bounded P2 intermediate-vtable/type correction; exact source snapshot promoted; source Draft closed unmerged.
+- #304 bounded quantitative coverage baseline; source Draft closed unmerged.
+- #301 bounded P2 writer-retention evidence; source Draft closed unmerged.
+- #305 bounded P2 intermediate-vtable/type correction; source Draft closed unmerged.
 - #302 bounded static P0 slice; direct authoritative XYZ remains UNKNOWN.
-- **#306 bounded first concrete retained-writer serialization evidence.** Exact source final static run `31893391887` SUCCESS; final source CI `31893395016` SUCCESS; review threads 0; final artifact `9249137864`, digest `sha256:c80014c2cc9b3db5b3406540e7d6d4efeef0301f63fd5858379614179b59398d`. Promoted FACT: processor retains distinct intermediate AP `0x2f69e30` / RTTI `0x3080748`; intermediate retains TProtocolWriter AP `0x2f69dd0` / RTTI `0x3080728`; first two intermediate slots are lifecycle-like; slot `+0x10 -> 0xc10960` accesses retained writer at `+0x18` and invokes `QDataStream::operator<<(signed char)` on a message-derived value; slot `+0x18 -> 0xc20290` serializes structured fields `+0x30/+0x34` through `QDataStream::operator<<(signed short)`; adjacent `+0x20 -> 0xc20c70` constructs QBuffer. Coordinator EDIT: "first" means the first concrete non-lifecycle slot directly demonstrated in this intermediate vtable, **not** the temporally first transform in the complete outbound pipeline. Durable boundary: `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/p2-first-serialization-boundary/PROMOTION_BOUNDARY.md`.
+- #306 bounded first concrete retained-writer serialization evidence. Source Draft closed unmerged after promotion. Final source static run `31893391887` SUCCESS, final source CI `31893395016` SUCCESS, review threads 0, final artifact `9249137864` digest `sha256:c80014c2cc9b3db5b3406540e7d6d4efeef0301f63fd5858379614179b59398d`. Promoted FACT: processor retains intermediate AP `0x2f69e30` / RTTI `0x3080748`; intermediate retains TProtocolWriter AP `0x2f69dd0` / RTTI `0x3080728`; intermediate `+0x10 -> 0xc10960` serializes a message-derived value through `QDataStream::operator<<(signed char)` using retained writer member `+0x18`; `+0x18 -> 0xc20290` serializes structured fields `+0x30/+0x34` through `QDataStream::operator<<(signed short)`; adjacent `+0x20 -> 0xc20c70` constructs QBuffer. EDIT: "first" is local to the first concrete non-lifecycle slot demonstrated in this intermediate vtable, not global temporal order. Durable canonical boundary: `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/p2-first-serialization-boundary/PROMOTION_BOUNDARY.md`.
 
-## ACTIVE / WAITING RESEARCH
+## ACTIVE / READY / WAITING RESEARCH
+- #303 RUNTIME is actively and independently owned by `chatgpt-runtime-researcher-20260815-1730`; current source head observed `4cb98e0b149a5eae21261be468618ec269a8a976`. Its current discriminator changes only task-owned Xvfb cwd provenance on isolated display `:115`. Coordinator must not mutate it. Restart/relogin remains UNKNOWN.
 - #302 P0 remains `RETURN_FOR_EVIDENCE / WAITING_ON_RUNTIME` for direct authoritative XYZ and causal live controls.
-- #303 RUNTIME remains independently owned; do not mutate its branch/runtime. Restart/relogin semantic proof remains UNKNOWN.
+- #308 P2 post-serialization buffer boundary is `ready/unassigned`, Draft/open/mergeable, exact base main. It must trace actual shared/split state from proven QDataStream serialization toward QBuffer/byte-container state; vtable adjacency alone is forbidden.
 
 ## RETURN_FOR_EVIDENCE
 - #295 remains blocked by four material review threads plus overlapping/stale Track B ownership lifecycle.
@@ -126,18 +133,7 @@ structured/typed object argument
   -> retained TProtocolWriter-associated QDataStream serialization sink
 ```
 
-Explicitly still `UNKNOWN`:
-
-- temporal first operation in complete outbound pipeline;
-- QBuffer temporal/data-flow relation to proven serializers;
-- framing order;
-- sequence-number order;
-- compression boundary/order;
-- encryption boundary/order;
-- final binary egress/socket ownership for this retained branch;
-- causal local harness.
-
-Direct DualConnection writer ownership remains `NOT_PROVEN`.
+Explicitly still UNKNOWN: temporal first operation in complete outbound pipeline; QBuffer temporal/data-flow relation; framing; sequence; compression; encryption; final binary egress/socket ownership; causal local harness. Direct DualConnection writer ownership remains NOT_PROVEN.
 
 # Quantitative baseline
 
@@ -157,26 +153,17 @@ p1_overall_field_evidence_coverage: UNKNOWN/UNKNOWN
 restart_relogin_stability: UNKNOWN/1
 ```
 
-# Coordinator integration validation retained
-
-- main reverified at `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
-- integration head `6fd1df4f1687e4ca0c1196caad4d4d1d1916079f` passed CI `31892866367`.
-- unrelated W7/OTClient-v2 catalogue drift was removed from coordinator scope.
-- repaired integration head `da96c97b91c236be6f97e4edf80214f77b4b2492` passed exact-head CI `31893397505`.
-- source #306 final handoff gates were independently verified before promotion.
-
 # Acceptance inventory
 
 - [x] #304 independently reviewed/promoted boundedly.
 - [x] #301 independently reviewed/promoted boundedly.
 - [x] #305 independently reviewed/promoted boundedly.
 - [x] #302 bounded static slice independently reviewed/promoted; overall P0 stays open.
-- [x] #306 independently reviewed and promoted `ACCEPT_WITH_EDITS` with global temporal-order correction.
-- [ ] close #306 source Draft unmerged after promotion bookkeeping.
-- [ ] dispatch next disjoint P2 post-serialization buffer/data-flow/framing hypothesis to a fresh Draft; coordinator must not research it serially.
-- [ ] exact-head coordinator CI terminal green after #306 promotion/dispatch bookkeeping.
-- [ ] reconcile #303 after independent researcher handoff.
-- [ ] P2 pipeline order/final egress/causal harness closeout.
+- [x] #306 independently reviewed/promoted `ACCEPT_WITH_EDITS`; source Draft closed unmerged.
+- [x] next disjoint post-serialization P2 hypothesis dispatched as Draft #308 and left `ready/unassigned`.
+- [ ] latest coordinator promotion/dispatch head exact-head CI terminal green.
+- [ ] reconcile #303 after its independent researcher releases a reviewable handoff.
+- [ ] P2 buffer/framing/pipeline order/final egress/causal harness closeout.
 - [ ] P0 direct authoritative reads and P1 live authority/restart stability.
 - [ ] A3/A4 action parity.
 - [ ] semantic protocol/QMeta coverage and finite P0/P1 denominators.
@@ -185,4 +172,4 @@ restart_relogin_stability: UNKNOWN/1
 
 # Next action
 
-Close source #306 unmerged, dispatch a fresh independent P2 task that traces exact data flow from the proven QDataStream serialization state toward the adjacent QBuffer/byte-container boundary without inferring order from vtable adjacency, then validate the coordinator exact head. Preserve framing/sequence/compression/encryption/final egress/harness as UNKNOWN until directly discriminated.
+Require exact-head repository CI on this coordinator generation. If green and no new reviewable #303 result has appeared, release coordinator ownership as waiting: #303 remains independently active, #308 is ready for a fresh independent researcher, #302 waits on #303, and #295 remains outside safe mutation authority. Reacquire when #303 or #308 releases a reviewable handoff.

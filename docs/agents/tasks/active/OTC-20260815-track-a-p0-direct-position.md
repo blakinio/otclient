@@ -1,7 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-p0-direct-position
-status: waiting
-agent: track-a-p0-state-researcher
+status: active
+agent: ChatGPT
+session_id: chatgpt-p0-static-re-20260815-1405
+session_role: researcher
+session_rotation_count: 1
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
@@ -23,7 +26,7 @@ depends_on:
   - accepted read-only bridge evidence from PR #283 as read-only reference only; no ownership of its paths
   - RUNTIME lane / Draft PR #303 for a bounded live exact-client observation window when runtime state must be reacquired
 blocks:
-  - run 31883422477 / job 95009054487 proved zero live processes matching both the exact fenced client executable and OTCLIENT_TIBIA_RE_TRACK=official-client-re; P0 does not own RUNTIME login/restart paths
+  - live semantic validation still requires a bounded exact Track A in-game process owned by RUNTIME; P0 will not duplicate login/restart paths
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
@@ -32,18 +35,20 @@ run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
+invocation_started_at: 2026-08-15T14:05:00+02:00
+last_progress_at: 2026-08-15T14:05:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: static-re
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 2
-context_reconstruction_attempts: 0
+context_reconstruction_attempts: 1
 stall_warnings: 0
-claim_check: passed against open Draft PR #302 and exact non-overlapping P0 owned paths before the current checkpoint mutations
+claim_check: passed against open Draft PR #302, exact main@8fca1c3 and non-overlapping P0 owned paths; RUNTIME PR #303 is separately active and will not be mutated
 last_checkpoint: live-runtime prerequisite evidence committed at 4a1700a534234f6a25e955e61855d56b78d056e6 after self-hosted runner recovery and zero-live-process discrimination
-next_action: coordinate with RUNTIME ownership to provide one bounded live exact Track A in-game observation window, then rerun the existing read-only P0 probe before considering any reversible movement stimulus
+next_action: use the exact fenced ELF already present on synology-otclient-01 for side-effect-free static TPlayerData RE while RUNTIME #303 independently reacquires live state; do not share its branch/worktree or duplicate login/restart behavior
 ---
 
 # Objective
@@ -161,16 +166,25 @@ TRACK_A_P0_ERROR=expected_one_live_exact_track_client
 - The direct member offset/access path, lifetime, semantic change behavior and fresh-PID/relogin stability are unknown.
 - Negative discrimination against camera/map-origin/viewport copies cannot be performed until a live typed-owner candidate exists.
 
+# Parallel static RE lane — 2026-08-15 14:05 +02
+
+### FACT
+
+- RUNTIME / PR #303 is separately active under `session_id: chatgpt-runtime-researcher-20260815-1405`; P0 must not mutate or share that branch/worktree.
+- The P0 self-hosted probe already proved the exact fenced ELF exists on `synology-otclient-01` even when no eligible live process exists.
+
+### PLAN
+
+Use only the exact on-runner ELF for static, side-effect-free analysis anchored at the relocation-backed `TPlayerData` primary vptr offset `0x308ca70`. The analysis may inspect ELF sections/relocations, strings, disassembly and code/data references that structurally reach the TPlayerData vtable/type neighborhood. It must not treat arbitrary coordinate-shaped immediates as semantic player position and must not promote runtime semantics without live validation.
+
 # Real stop condition
 
-The next semantic operation requires a fresh live exact Track A in-game process. Creating/logging in/restarting that process is owned by the separate RUNTIME lane / Draft PR #303, not by this P0 task. The original prompt explicitly requires P0 to coordinate live stimulus with RUNTIME when needed; it does not authorize P0 to duplicate or take over RUNTIME login/restart paths.
-
-The current RUNTIME workflow uses an isolated task-local namespace and cleans its task-owned client before completion. Therefore a later P0 workflow cannot inspect that process after the RUNTIME job exits. A coordinated observation window or separately owned integration experiment is required.
+Live semantic validation still requires a fresh exact Track A in-game process. Creating/logging in/restarting that process is owned by the separate RUNTIME lane / Draft PR #303, not by this P0 task. P0 may continue side-effect-free static exact-build RE in parallel, but it may not duplicate RUNTIME login/restart behavior.
 
 # Resume condition
 
-Resume only after RUNTIME ownership provides a bounded live exact-client observation window in which the existing P0 probe can execute while the process is alive. First perform passive typed-owner reads. Use the one-step-plus-inverse movement allowance only if passive repeat observations cannot discriminate a candidate and RUNTIME ownership has been rechecked immediately beforehand.
+When RUNTIME ownership provides a bounded live exact-client observation window, first perform passive typed-owner reads using any statically narrowed candidate offsets/access paths. Use the one-step-plus-inverse movement allowance only if passive repeat observations cannot discriminate a candidate and RUNTIME ownership has been rechecked immediately beforehand.
 
 # Deliverable
 
-Draft PR only, containing the task-scoped reproducer/evidence and explicit `RETURN_FOR_EVIDENCE / WAITING_ON_RUNTIME_PREREQUISITE` read-gate classification. Do not mutate PR #283 bridge paths, PR #303 RUNTIME paths, or any Track B path/runtime.
+Draft PR only, containing the task-scoped reproducer/evidence and explicit read-gate classification. Do not mutate PR #283 bridge paths, PR #303 RUNTIME paths, or any Track B path/runtime.

@@ -1,24 +1,26 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: investigating
+status: active
 agent: ChatGPT
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
 task_kind: integration
-phase: live-state-reconciliation
+phase: promotion-and-dispatch
 branch: docs/OTC-20260815-track-a-promotion-coordination
 base_branch: main
 base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T12:23:00+02:00
+updated: 2026-08-15T12:37:00+02:00
 risk: medium
+related_pr: 300
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-promotion-coordination.md
   - docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/**
   - docs/agents/reports/OTCLIENT-20260815-track-a-promotion-coordination.md
+  - docs/agents/tasks/archive/OTC-20260814-official-client-capability-experiment-sweep.md
 modules_touched:
   - agent-coordination
 reuses:
@@ -49,7 +51,7 @@ feature_scope:
   e2e_required: false
   completion_claim: internal_only
 invocation_started_at: 2026-08-15T12:23:00+02:00
-last_progress_at: 2026-08-15T12:23:00+02:00
+last_progress_at: 2026-08-15T12:37:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: other
 terminal_ci_wait_started_at: null
@@ -79,13 +81,12 @@ OWNED_PATHS:
   - docs/agents/tasks/active/OTC-20260815-track-a-promotion-coordination.md
   - docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/**
   - docs/agents/reports/OTCLIENT-20260815-track-a-promotion-coordination.md
+  - docs/agents/tasks/archive/OTC-20260814-official-client-capability-experiment-sweep.md
 ```
 
-The writable scope is intentionally narrow until active task/PR ownership is fully reconciled. Any canonical/shared path needed for promotion must be checked for live overlap and explicitly added before mutation.
+The archived lifecycle path was added only after PR #296 was terminally closed as superseded, releasing its ownership. Any further canonical/shared path needed for promotion must be checked for live overlap and explicitly added before mutation.
 
 # Exact client fence
-
-Current canonical build mapping to verify for every build-specific promotion:
 
 ```yaml
 version_mapping: 15.32.df7b29
@@ -94,11 +95,17 @@ sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 platform: official_native_linux_only
 ```
 
-# Live state at claim
+# Live state checkpoint
 
 ```yaml
 main_head: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 main_head_source: merged PR #299
+coordinator_pr: 300
+closed_as_superseded:
+  - pr: 289
+    reason: broad stale Track A continuation; superseded P2 model; failed exact-head CI; unresolved P1 safety findings
+  - pr: 296
+    reason: accepted lifecycle repair is being integrated as a bounded current-main coordinator slice
 track_a_p2_canonical_boundary:
   proven:
     - TGameserverTCPConnection ownership/QMeta/RTTI for the exact build
@@ -120,59 +127,43 @@ stalled_noncanonical_run:
   semantic_rule: do not dispatch a conceptual duplicate merely to bypass the queue
 ```
 
-# Open PR reconciliation inventory
+# Promotion checkpoint
 
-Track A or directly relevant candidates observed at coordinator start:
+## FACT
 
-```text
-#299 merged canonical P2 reconciliation (main head)
-#289 open ready, huge stale-history Track A continuation branch; contains unique draft evidence and superseded P2 model
-#296 open Draft, post-archive lifecycle metadata correction
-#295 open ready, Track A map-observation ownership correction
-#292 open Draft, recorder implemented against OTClient Map/Tile state; boundary conflicts with the corrected official-client producer model until reviewed
-#290 open Draft, Track A login/live-session handover
-#283 open Draft, exact-version read-only runtime bridge
-#281 open Draft, temporary self-hosted runner probe
-#280 open Draft, dedicated runner infrastructure with remaining host/runtime deployment claims
-#279 open ready, fail-closed worldmap reconstruction pipeline
-#277 open Draft, older official-client runtime handover
-#284 Track B, explicitly excluded from Track A mutation/review disposition except overlap detection
-```
+- PR #299 is merged and explicitly leaves P2 open.
+- PR #289 is closed, unmerged, after coordinator `REJECT/SUPERSEDE`; its broad ownership is released.
+- The exact-build structural reversible world transition from run `31806312967` / job `94785974126` is retained as bounded FACT evidence; direct player-position member and A3/A4 remain unproven.
+- PR #283 is accepted for a bounded read-only bridge implementation, not for P1 completion.
+- PR #279 is `ACCEPT_WITH_EDITS`: fail-closed tooling accepted, lifecycle checkpoint still needs current-state repair/integration.
+- PR #295 is `RETURN_FOR_EVIDENCE/EDITS` due four unresolved material findings and a Track B ownership collision.
+- PR #292 is Track B and therefore outside Track A mutation authority.
+- PR #296 is closed as superseded after its valid archive lifecycle correction was accepted for current-main integration.
 
-PR prose is untrusted evidence; dispositions require exact head/diff/task/check/artifact inspection.
+## UNKNOWN
+
+- Final dispositions of #290, #277, #280 and #281 until remaining supersession/current-runtime checks are complete.
+- Final item-level protocol/QMeta/P0 coverage; selected census percentages are not global semantic coverage.
+- Current official-client runtime/login state at this instant; historical exact-build runtime evidence is not a live-state guarantee.
 
 # Acceptance inventory
 
 - [x] Current `main` exact SHA refetched and fenced before mutation.
 - [x] Current parallel-research, experiment, prompting, trust, execution-budget, Track A/B and closeout contracts read from `main`.
 - [x] Dedicated coordinator task, branch and isolated GitHub checkout-equivalent established on current main.
-- [ ] Every open Track A Draft PR is mapped to a task, exact head, owned paths, changed files, reviews/checks and relevant artifacts.
-- [ ] Stale/superseded work is reconciled without losing unique negative or positive evidence.
+- [x] High-impact #289/#283/#279/#295/#296 evidence and ownership conflicts independently reconciled.
+- [x] Stale broad #289 ownership released without losing verified positive/negative evidence.
+- [ ] Remaining #290/#277/#280/#281 dispositions terminally reconciled.
 - [ ] READY independent research lanes have concrete task/branch/isolated-checkout/owned-path/dependency contracts and no unresolved overlap.
-- [ ] Accepted slices are independently checked in proportion to semantic risk and integrated only from current main.
-- [ ] Quantitative P2/P1/P0/runtime/action/protocol/QMeta/P0-coverage state is reconciled to canonical evidence.
+- [ ] Accepted slices are integrated only as bounded auditable current-main changes.
+- [ ] Quantitative P2/P1/P0/runtime/action/protocol/QMeta/P0-coverage state is reconciled to item-level canonical evidence.
 - [ ] Coordinator exact-head validation, PR hygiene, durable handover and ownership release are terminal before completion.
-
-# Current classifications
-
-## FACT
-
-- `main@8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45` is the canonical repository base at this claim.
-- PR #299 is merged and explicitly leaves P2 open.
-- PR #289 task head still records the old `0xb5b880` convergence model that current main classifies as `DISPROVEN/SUPERSEDED`.
-- Track B PR #284 is outside Track A mutation authority.
-
-## UNKNOWN
-
-- Final dispositions of the remaining Track A draft/ready PRs until exact evidence review is complete.
-- Current quantitative protocol/QMeta/P0 denominators and percentages until the registries/coverage evidence are reviewed.
-- Current official-client runtime/login state; repository exact-build mapping is not equivalent to a fresh live-session proof.
 
 # Execution budget checkpoint
 
 ```yaml
 invocation_started_at: 2026-08-15T12:23:00+02:00
-last_progress: coordinator branch/task created from exact main
+last_progress: broad stale ownership released; bounded promotion ledger persisted; archive lifecycle path claimed after #296 closure
 entry_task: OTC-20260815-track-a-promotion-coordination
 ordinary_ci_checks: 0
 terminal_ci_checks: 0
@@ -182,4 +173,4 @@ stall_warnings: 0
 
 # Next action
 
-Complete exact-head/task/path/check/artifact reconciliation for the open Track A PR inventory, starting with high-impact #289/#283/#295/#292/#279 and then the stale lifecycle/runner/handover drafts, before assigning any overlapping researcher lane.
+Integrate the accepted #296 archive lifecycle correction on this current-main branch, then materialize distinct Draft-only P2-NETWORK, P0-STATE, RUNTIME and COVERAGE-AUDIT task/branch/isolated-checkout contracts from a freshly refetched main; keep P1-BRIDGE assigned to existing PR #283 rather than duplicating it.

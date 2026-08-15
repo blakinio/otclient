@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: ready
+status: active
 agent: ChatGPT
-session_id: chatgpt-coordinator-20260815-1403
+session_id: chatgpt-coordinator-20260815-1425
 session_role: coordinator
-session_rotation_count: 3
+session_rotation_count: 4
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T14:14:00+02:00
+updated: 2026-08-15T14:25:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,17 +47,16 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T14:14:00+02:00
-ci_checks_for_current_head: 1
-ci_check_generation: terminal
+last_progress_at: 2026-08-15T14:25:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: current
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 1
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 3
+context_reconstruction_attempts: 4
 stall_warnings: 0
-stop_reason: P2 writer-retention promotion is validated and source PR #301 is closed; P0/RUNTIME live lanes remain independently owned/blocked, while a disjoint static P2 vtable-group task #305 is READY and can be executed serially only after coordinator release
 ---
 
 # Objective
@@ -83,14 +82,14 @@ platform: official_native_linux_only
 - #279 fail-closed worldmap reconstruction tooling; real capture/mappings/complete OTBM remain UNKNOWN.
 - #290 bounded historical login/recovery procedure retained as revalidation input.
 - #304 bounded quantitative coverage baseline; exact source snapshot promoted; source Draft closed unmerged.
-- #301 bounded P2 writer retention: `TProtocolClientMessageProcessor -> retained intermediate object -> retained shared TProtocolWriter` FACT; writer position relative to `TGameserverDualConnection` is graph-relative upstream INFERENCE; direct DualConnection writer member NOT_PROVEN. Exact source snapshot promoted under coordinator ownership. Coordinator head `e6aab7a1898643f3a139413048af709a0ee04cf7` passed CI `31883767739`; source Draft #301 closed unmerged.
+- #301 bounded P2 writer retention: exact source snapshot promoted; source Draft closed unmerged; coordinator head `e6aab7a1898643f3a139413048af709a0ee04cf7` passed CI `31883767739`.
+
+## REVIEW_REQUIRED_THIS_ROTATION
+- #305 exact final head `9329e338235b7f9997d74d4db5313f329662378b`; researcher proposal `ACCEPT_WITH_EDITS`; final task-specific run `31884379539` SUCCESS; final standard PR CI `31884381191`, including `CI / Required`, SUCCESS; changed paths confined; review threads 0. Must be independently reviewed before promotion.
 
 ## LIVE STATE
-- #302 P0: old queued run `31880617510` is cancelled. Corrected self-hosted run `31883521701` / job `95009093099` executed on `synology-otclient-01` but found `TRACK_A_P0_MATCHING_LIVE_PIDS=0`; direct player position remains UNKNOWN, not disproven. Current P0 waits for a canonical live exact-client runtime window.
-- #303 RUNTIME: separately active researcher session. New run `31883846172` at head `950ce8f5f7cf22b457e82cdb20e9eec285438d9c` exists; job `95010096196` (`reacquire`) is currently queued. No runtime semantic result yet.
-
-## READY RESEARCH
-- #305 P2 writer-vtable-group: new disjoint Draft task on `research/OTC-20260815-track-a-p2-writer-vtable-group`, exact base main. Goal is to classify `0x2f69e30 / RTTI 0x3080748` structurally inside the canonical `TProtocolWriter` vtable group and narrow the first transform/framing boundary. It explicitly does not duplicate queued final-socket run `31825417040`.
+- #302 P0: corrected self-hosted run `31883521701` / job `95009093099` ran on `synology-otclient-01` and found zero matching live exact-client Track A PIDs; direct player XYZ remains UNKNOWN.
+- #303 RUNTIME: separately active researcher. Selector repair reached `synology-otclient-01`, but run `31884181155` / job `95010941902` failed at bootstrap with `TRACK_A_RUNTIME_ERROR=upstream_wireproxy_unavailable`; cleanup completed without X11 residue. Current exact #303 state must be refetched after the active researcher repairs or checkpoints this new transport bootstrap blocker.
 
 ## RETURN_FOR_EVIDENCE
 - #295 material review findings plus Track B ownership collision.
@@ -104,7 +103,7 @@ platform: official_native_linux_only
 # Canonical non-completion boundary
 
 ```yaml
-P2: PARTIAL_writer_retention_proven_transform_order_final_egress_harness_open
+P2: PARTIAL_writer_retention_proven_intermediate_type_structuring_under_review_transform_order_final_egress_harness_open
 P1: PARTIAL_read_only_bridge_integrated_live_authority_unknown
 P0: PARTIAL_structural_world_transition_fact_direct_player_state_unknown
 RUNTIME: PARTIAL_one_generation_world_evidence_restart_relogin_unknown
@@ -131,4 +130,4 @@ restart_relogin_stability: UNKNOWN/1
 
 # Next action
 
-Coordinator ownership is released (`status: ready`). Claim #305 as an isolated Draft researcher and execute only the `0x2f69e30 / RTTI 0x3080748` vtable-group/transform-boundary discriminator using reviewed exact-build artifacts. Do not write #300 while #305 is active. In parallel, observe active #303 read-only; when it yields a reviewable runtime result, return to #300 and reconcile it before P0/ACTION follow-up.
+Independently review exact #305 final head `9329e338235b7f9997d74d4db5313f329662378b`, its exact source artifact digests, parser semantics, durable evidence, final CI, changed paths and zero review threads. Assign one coordinator disposition. If accepted, promote only the bounded distinct-type/vtable-group result under coordinator ownership, update the campaign report, validate coordinator exact head and close #305 unmerged. Then recheck active #303 and choose the next safe disjoint lane.

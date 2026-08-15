@@ -65,7 +65,18 @@ jobs:
 
       - name: Cleanly stop generation 1 task-owned client and observer
         shell: bash
-        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh stop 1
+        run: |
+          set -Eeuo pipefail
+          helper=.github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+          bash "$helper" stop 1
+          pidfile="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID/runtime/observer-gen-1.pid"
+          if [[ -r "$pidfile" ]]; then
+            pid="$(tr -cd '0-9' <"$pidfile")"
+            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+              echo 'TRACK_A_RUNTIME_ERROR=observer_cleanup_timeout_gen_1' >&2
+              exit 1
+            fi
+          fi
 
       - name: Prepare generation 2 with fresh PID PIE and observer
         shell: bash
@@ -91,7 +102,22 @@ jobs:
       - name: Clean task-owned runtime processes and ephemeral state
         if: always()
         shell: bash
-        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh cleanup
+        run: |
+          set -Eeuo pipefail
+          helper=.github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+          runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID/runtime"
+          for gen in 1 2; do
+            bash "$helper" stop "$gen"
+            pidfile="$runtime/observer-gen-$gen.pid"
+            if [[ -r "$pidfile" ]]; then
+              pid="$(tr -cd '0-9' <"$pidfile")"
+              if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+                echo "TRACK_A_RUNTIME_ERROR=observer_cleanup_timeout_gen_$gen" >&2
+                exit 1
+              fi
+            fi
+          done
+          bash "$helper" cleanup
 
       - name: Record sanitized workflow terminal marker
         if: always()

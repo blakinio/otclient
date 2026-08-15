@@ -1,4 +1,4 @@
-name: Track A runtime cache-window probe replay
+name: Track A runtime no-cache window control
 
 on:
   push:
@@ -36,14 +36,14 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Replay identical cache probe with only xdotool loader repaired
+      - name: Replay with cache removed and xdotool loader repaired
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$(git hash-object "$SOURCE_WORKFLOW")" == "$EXPECTED_SOURCE_BLOB" ]]
-          out="$RUNNER_TEMP/cache-window-replay.sh"
+          out="$RUNNER_TEMP/no-cache-window-control.sh"
           python3 - "$SOURCE_WORKFLOW" "$out" <<'PY'
           from pathlib import Path
           import sys
@@ -60,19 +60,30 @@ jobs:
           if run is None: raise SystemExit('source run block missing')
           body=[]
           for line in lines[run:]:
-              if lines[i].startswith('      - name: '):
-                  break
+              if line.startswith('      - name: '): break
               if line and not line.startswith('          '):
                   raise SystemExit(f'unexpected source indentation: {line!r}')
               body.append(line[10:] if line else '')
           text='\n'.join(body)+'\n'
-          anchor='export DISPLAY="$TRACK_DISPLAY"'
-          if text.count(anchor)!=1:
-              raise SystemExit(f'DISPLAY anchor count={text.count(anchor)}')
-          text=text.replace(anchor,anchor+'\nexport LD_LIBRARY_PATH="$tool_lib"',1)
+
+          cache_start='python3 - "$source_cache" "$home/.cache/CipSoft GmbH" <<\'PY\''
+          next_anchor='python3 - "$source_meta" <<\'PY\''
+          a=text.find(cache_start)
+          b=text.find(next_anchor,a+1)
+          if a < 0 or b < 0 or b <= a:
+              raise SystemExit('cache block anchors missing')
+          text=text[:a]+'echo TRACK_A_NO_CACHE_CONTROL=true\n\n'+text[b:]
+
+          display_anchor='export DISPLAY="$TRACK_DISPLAY"'
+          if text.count(display_anchor)!=1:
+              raise SystemExit(f'DISPLAY anchor count={text.count(display_anchor)}')
+          text=text.replace(display_anchor,display_anchor+'\nexport LD_LIBRARY_PATH="$tool_lib"',1)
+          if 'TRACK_A_CACHE_WINDOW_CLASSIFIED_CACHE_SEEDED' in text:
+              raise SystemExit('cache seed unexpectedly remains')
           out.write_text(text,encoding='utf-8')
           PY
           bash -n "$out"
+          grep -Fq 'TRACK_A_NO_CACHE_CONTROL=true' "$out"
           grep -Fq 'export LD_LIBRARY_PATH="$tool_lib"' "$out"
-          echo TRACK_A_CACHE_WINDOW_REPLAY_XDOTOOL_LOADER_REPAIRED=true
+          echo TRACK_A_NO_CACHE_WINDOW_CONTROL_ARMED=true
           bash "$out"

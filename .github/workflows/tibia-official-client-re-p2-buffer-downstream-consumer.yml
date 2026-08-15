@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  typed-downstream-probe:
+  targeted-downstream-probe:
     runs-on: [otclient, synology]
     timeout-minutes: 8
     env:
@@ -75,7 +75,7 @@ jobs:
           echo "TRACK_A_P2_DOWNSTREAM_EXACT_HEAD=$GITHUB_SHA"
           echo "TRACK_A_P2_DOWNSTREAM_EXACT_CLIENT_VERIFIED=true"
 
-      - name: Inventory typed downstream candidates
+      - name: Capture exact processor flow and corrected writer boundary
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -89,14 +89,23 @@ jobs:
             --evidence "$out/evidence.txt" \
             | tee "$out/validation.log"
           grep -Fxq 'P2_DOWNSTREAM_COMPLETE=true' "$out/validation.log"
-          grep -Eq '^P2_DOWNSTREAM_RESULT=(TYPED_DOWNSTREAM_CANDIDATES_INVENTORIED|BOUNDED_TYPED_INVENTORY_NO_CONSUMER_PROVEN)$' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_RESULT=TARGETED_PROCESSOR_FLOW_CAPTURED' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_TPROTOCOLWRITER_SLOT_BOUNDARY=PROVEN_SLOT4_ZERO' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_CONNECTION_INVOKER_EDGE=PROVEN' "$out/validation.log"
           grep -Fxq 'P2_DOWNSTREAM_PROTOCOL_STAGE_ORDER=UNKNOWN' "$out/validation.log"
           grep -Fxq 'P2_DOWNSTREAM_FINAL_BINARY_EGRESS=UNKNOWN' "$out/validation.log"
           python3 - "$out/result.json" <<'PY'
-          import json, sys
+          import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d['schema_version']==2
           assert d['exact_client']['sha256']=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
           assert d['exact_client']['size']==51965216
+          assert d['false_positive_correction']['writer_stops_at_slot4_zero']
+          assert d['false_positive_correction']['0xd114c0_is_not_tprotocolwriter_slot8']
+          assert d['connection']['site']=='0x19716a3'
+          assert d['connection']['invoker']=='0x7dd630'
+          assert d['connection']['connect_impl']=='0x4dd800'
+          assert d['classification']['first_downstream_consumer'] in ('CANDIDATE','UNKNOWN')
           assert d['classification']['protocol_stage_order']=='UNKNOWN'
           assert d['classification']['framing']=='UNKNOWN'
           assert d['classification']['final_binary_egress']=='UNKNOWN'
@@ -105,7 +114,7 @@ jobs:
           assert not d['negative_controls']['vtable_adjacency_used_as_temporal_proof']
           assert not d['negative_controls']['historical_final_socket_run_used_as_proof']
           PY
-          echo TRACK_A_P2_DOWNSTREAM_VALIDATED=true
+          echo TRACK_A_P2_DOWNSTREAM_TARGETED_VALIDATED=true
 
       - name: Upload sanitized static evidence only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

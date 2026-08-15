@@ -1,0 +1,39 @@
+{
+  "classification": {
+    "causal_local_harness": "UNKNOWN",
+    "common_outer_owner_graph": "FACT",
+    "compression_encryption_sequence_boundary": "UNKNOWN",
+    "dualconnection_to_writer_reachability": "INFERENCE_FROM_CANONICAL_OUTBOUND_GRAPH",
+    "final_binary_egress": "UNKNOWN",
+    "framing_order": "UNKNOWN",
+    "tgameserverdualconnection_direct_writer_member": "NOT_PROVEN",
+    "tprotocolclientmessageprocessor_writer_ownership": "FACT",
+    "writer_location_relative_to_dualconnection": "UPSTREAM_ON_TPROTOCOLCLIENTMESSAGEPROCESSOR_BRANCH"
+  },
+  "exact_client_sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+  "facts": {
+    "dualconnection_retained_outer_c18_c20": true,
+    "outer_a00_a08_canonical_type": "TProtocolClientMessageProcessor",
+    "outer_c18_c20_canonical_type": "TGameserverDualConnection",
+    "tprotocolwriter_constructed_same_setup_fde": true,
+    "writer_branch_installed_outer_a00_a08": true,
+    "writer_shared_pair_retained_by_intermediate_object": true
+  },
+  "negative_controls": {
+    "b46bd0_binary_gameplay_sink": "DISPROVEN",
+    "b5b880_gameplay_endpoint": "SUPERSEDED"
+  },
+  "semantic_result": "PROVEN_WRITER_RETAINED_UPSTREAM_BY_TPROTOCOLCLIENTMESSAGEPROCESSOR",
+  "setup_fde": "0x196fee0..0x1972517",
+  "tgameservertcpconnection_vptr": "0x3084b38",
+  "tprotocolwriter_vptr": "0x2f69dd0",
+  "source": {
+    "successful_run": 31883231486,
+    "successful_job": 95008610322,
+    "research_head": "e603691ac4458efb4132e485f36538fef6a277dd",
+    "source_artifact_id": 9229609330,
+    "source_artifact_zip_sha256": "bc5604ffbcf7e75a6b00dad227aefaa0036ea4792efb61ce85de488b6877782c",
+    "sanitized_result_artifact_id": 9246558034,
+    "sanitized_result_artifact_zip_sha256": "d6a08baa10ff6fd7edf7e6e6a21dcaaa0244e2b69a9adc26417bab00a831759a"
+  }
+}

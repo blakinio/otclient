@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   passive-probe:
-    runs-on: [self-hosted, otclient, synology]
+    runs-on: [otclient, synology]
     timeout-minutes: 6
     env:
       CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state

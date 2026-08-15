@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-novnc-display-diagnostic
-status: investigating
+status: blocked
 agent: ChatGPT
 session_id: chatgpt-novnc-display-diagnostic-20260815-2135
 session_role: researcher
@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: low
 related_pr: 309
-updated: 2026-08-15T21:35:00+02:00
+updated: 2026-08-15T21:40:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-novnc-display-diagnostic.md
   - docs/agents/evidence/OTC-20260815-track-a-novnc-display-diagnostic/**
@@ -28,7 +28,7 @@ blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: a materially new read-only access path is available by probing the runner container default gateway, which may be the Synology Docker host, without taking ownership of PR #303 runtime
+execution_reason: a materially new read-only Docker-default-gateway access path was tested on the dedicated Synology runner without taking ownership of PR #303 runtime
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: checkpoint_only
@@ -39,16 +39,16 @@ context_score: 4
 estimate_confidence: high
 decomposition_decision: single
 invocation_started_at: 2026-08-15T21:35:00+02:00
-last_progress_at: 2026-08-15T21:35:00+02:00
-ci_checks_for_current_head: 0
+last_progress_at: 2026-08-15T21:40:00+02:00
+ci_checks_for_current_head: 1
 ci_check_generation: docker-gateway-diagnostic
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-stop_reason: null
-next_action: extend the existing read-only workflow to derive the runner container default IPv4 gateway without printing the private address, probe only TCP/HTTP/WebSocket port 6082 on that gateway, and if reachable perform the same sanitized unauthenticated RFB metadata handshake to determine whether the backend exposes an X display hint
+stop_reason: host_listener_mapping_unavailable_from_runner_namespace
+next_action: from the Synology host or another authorized host/LAN tool, inspect read-only the listener/process/config owning TCP 6082 and record its websockify/RFB target display or VNC port without restarting, signalling, authenticating to, or reconfiguring any VNC/X11/runtime process
 ---
 
 # Objective
@@ -57,37 +57,27 @@ Determine whether the owner's `synology:6082` noVNC endpoint can be mapped to a 
 
 # Authority and safety boundary
 
-This is a read-only discovery task. It may add or refine a temporary branch-local workflow and inspect only non-secret runtime/network metadata from `synology-otclient-01`.
+This is a read-only discovery task. The diagnostic did not launch or stop the Tibia client, use credentials, signal/attach to processes, restart or reconfigure X/VNC, control Docker, enter the host namespace, perform gameplay actions, read another task's environment, or touch Track B.
 
-Forbidden:
-
-- launching or stopping the Tibia client;
-- login, account credentials, cookies or session material;
-- signalling or attaching to processes;
-- modifying, removing or restarting any X server, VNC service, container or port;
-- Docker control or host-namespace mutation;
-- gameplay or account effects;
-- reading another task's process environment;
-- touching Track B state or paths.
-
-PR #303 owns its runtime workflow, display `:115`, process lifecycle and task state. This task does not mutate those paths or processes.
+PR #303 owns its runtime workflow, display `:115`, process lifecycle and task state. This task did not mutate those paths or processes.
 
 # Acceptance inventory
 
-- [x] Verify the first diagnostic job ran on `synology-otclient-01`.
-- [x] Resolve whether hostname `synology` is reachable from the runner: it is not resolvable in the runner network namespace.
-- [x] Attempt the bounded HTTP/WebSocket/RFB probe without authentication or secret access; direct hostname access failed at DNS resolution.
-- [x] Inventory currently visible X11 Unix display sockets: exactly `:98` was present during the first probe.
-- [x] Record whether first-probe metadata directly identifies the X display behind `6082`: it does not.
-- [x] Compare against PR #303: historical positive control is `:98`; fresh isolated failing reacquisition is `:115`.
-- [ ] Test the materially new Docker-default-gateway access path to TCP `6082` without printing the gateway address.
-- [ ] If gateway `6082` is reachable, perform only sanitized HTTP/WebSocket/RFB metadata negotiation and record a display hint if the unauthenticated protocol exposes one.
-- [ ] Reclassify `6082 -> :98` as PROVEN, DISPROVEN, or still UNKNOWN from direct evidence.
-- [ ] Preserve one concrete next action while any required mapping remains UNKNOWN.
+- [x] Verify diagnostic jobs run on `synology-otclient-01`.
+- [x] Establish that hostname `synology` is not resolvable from the runner container namespace.
+- [x] Inventory persistent X11 Unix sockets: exactly `:98` was present in both probes.
+- [x] Derive the runner container default IPv4 gateway without printing the private gateway address.
+- [x] Prove TCP `6082` is reachable through that gateway.
+- [x] Prove gateway `6082` serves HTTP noVNC and accepts `/websockify` WebSocket upgrade.
+- [x] Complete a sanitized unauthenticated RFB metadata handshake without using a VNC password.
+- [x] Record framebuffer dimensions and whether RFB metadata directly exposes an X display hint.
+- [x] Reclassify `6082 -> :98`: still `UNKNOWN`; direct numeric binding was not exposed by RFB metadata.
+- [x] Compare against PR #303: historical positive control remains `:98`; fresh isolated failing reacquisition remains `:115`.
+- [x] Preserve one concrete next action while mapping remains UNKNOWN.
 
-# Validation to date
+# Validation
 
-First read-only diagnostic workflow:
+## First runner probe
 
 ```text
 head=fe57c76db37056f3df0e66b5c6bcb71f96565d3b
@@ -97,22 +87,49 @@ runner=synology-otclient-01
 job_result=SUCCESS
 ```
 
-Sanitized material results:
+Material result: hostname `synology` was not resolvable and the runner exposed exactly one X11 socket, `:98`.
 
-```text
-SYNLOGY_HOSTNAME_RESOLVED=false
-NOVNC_HTTP_REACHABLE=false
-WEBSOCKIFY_RFB_PROBE_COMPLETE=false
-X11_SOCKET_DISPLAY_COUNT=1
-X11_SOCKET_DISPLAYS=:98
-XDPYINFO_AVAILABLE=true
-X11_DISPLAY_98_QUERY=unavailable
-TRACK_A_NOVNC_READONLY_PROBE_COMPLETE=true
-```
-
-Durable evidence:
+Evidence:
 
 `docs/agents/evidence/OTC-20260815-track-a-novnc-display-diagnostic/20260815-runner-probe.md`
+
+## Docker-gateway probe
+
+```text
+head=dff39e99d4669229a66826e5f51805a95be10185
+run=31904447945
+job=95059984786
+runner=synology-otclient-01
+job_result=SUCCESS
+```
+
+Material markers:
+
+```text
+DOCKER_DEFAULT_GATEWAY_FOUND=true
+DOCKER_GATEWAY_TCP_6082_REACHABLE=true
+DOCKER_GATEWAY_NOVNC_HTTP_RESPONSE=true
+DOCKER_GATEWAY_NOVNC_HTTP_STATUS=200
+DOCKER_GATEWAY_WEBSOCKIFY_UPGRADE_STATUS=101
+DOCKER_GATEWAY_WEBSOCKIFY_REACHABLE=true
+DOCKER_GATEWAY_RFB_PROTOCOL_VERSION=003.008
+DOCKER_GATEWAY_RFB_SECURITY_NONE_AVAILABLE=true
+DOCKER_GATEWAY_RFB_SECURITY_VNC_AUTH_AVAILABLE=false
+DOCKER_GATEWAY_RFB_AUTH_REQUIRED=false
+DOCKER_GATEWAY_RFB_SECURITY_RESULT=0
+DOCKER_GATEWAY_RFB_FRAMEBUFFER_WIDTH=1920
+DOCKER_GATEWAY_RFB_FRAMEBUFFER_HEIGHT=1080
+DOCKER_GATEWAY_RFB_DISPLAY_HINT=unknown
+DOCKER_GATEWAY_RFB_DESKTOP_NAME_HAS_X11_TOKEN=false
+DOCKER_GATEWAY_WEBSOCKIFY_RFB_PROBE_COMPLETE=true
+X11_SOCKET_DISPLAY_COUNT=1
+X11_SOCKET_DISPLAYS=:98
+X11_DISPLAY_98_QUERY=unavailable
+```
+
+Evidence:
+
+`docs/agents/evidence/OTC-20260815-track-a-novnc-display-diagnostic/20260815-docker-gateway-probe.md`
 
 # Comparison boundary
 
@@ -122,44 +139,44 @@ Historical positive-control run `31730884814`, attempt 14, job `94785048338` use
 
 PR #303 run `31903196011` used task-owned `DISPLAY=:115` and failed before login with `client_gen_1_window_missing`; its sanitized display-wide census recorded `visible_window_count=0`.
 
-At the first noVNC diagnostic time, the dedicated runner namespace exposed exactly one X11 Unix socket, `:98`. Neither `:88` nor `:115` was present.
+The Docker-gateway probe directly reached port `6082`, received HTTP `200`, WebSocket `101`, RFB `003.008`, no-auth success, and a `1920x1080` framebuffer. At the same time the runner namespace exposed only X11 socket `:98`.
 
 ## INFERENCE — high confidence
 
-`:98` is the strongest current candidate for the persistent GUI environment the owner expects to observe because it is both the verified historical working display and the only persistent X11 socket visible to the dedicated runner.
+The Docker-default-gateway `:6082` endpoint is the same host-side noVNC service the owner reaches as `synology:6082`: it is the runner's host-facing default gateway on the same port and presents the expected noVNC/websockify/RFB stack while preserving `Host: synology:6082` in the protocol probe.
+
+`:98` is the strongest candidate for the served GUI because it is the historical working Track A display, the only persistent X11 socket visible to the runner, and its known-good profile is `1920x1080`, matching the RFB framebuffer dimensions.
 
 ## UNKNOWN
 
-`6082 -> :98` is not yet proven. The browser-facing hostname `synology` did not resolve from the GitHub Actions runner network namespace and the repository contains no canonical `6082`/websockify mapping.
+`6082 -> :98` is not directly proven. The RFB desktop name has no X11 token or numeric display hint, and `xdpyinfo :98` is unavailable from the runner job. A VNC/websockify process in another namespace could theoretically expose the same framebuffer shape.
 
-The owner's earlier observation involving `:88` remains unverified in current canonical repository/runtime evidence.
+The owner's earlier `:88` observation remains unverified in current canonical evidence.
 
-# Continuation discriminator
+# Blocker
 
-The previous blocker is narrowed by a new non-destructive hypothesis: `synology-otclient-01` runs inside a container and its default IPv4 route may terminate at the Synology Docker host. The next probe may derive that gateway from `/proc/net/route`, keep the private address out of logs, and test only whether port `6082` presents the expected noVNC/WebSocket/RFB service. This is a materially new access path, not an identical retry of hostname resolution.
-
-No host process inspection, Docker API use, namespace entry, client launch, VNC authentication, process control or configuration mutation is authorized.
+The remaining discriminator is host-side listener/process/config metadata for TCP `6082`. The runner can now reach the service over the Docker gateway but cannot inspect the host process/configuration that determines its RFB target. Repeating network handshakes cannot prove the target display number because the server does not expose it in RFB metadata.
 
 # Checkpoint
 
 ```yaml
-status: investigating
+status: blocked
 proven:
-  - current main remains 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45 at continuation start.
-  - PR #309 remains Draft/open and task-owned at prior head d19b4c177750364a21a046167ab2cc90fcb1accf before this checkpoint.
-  - first diagnostic run 31903692616 job 95058202023 succeeded on synology-otclient-01.
-  - runner namespace could not resolve hostname synology.
-  - exactly one X11 Unix socket was visible during the first probe: :98.
+  - main remained 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45 at continuation start.
+  - gateway diagnostic run 31904447945 job 95059984786 succeeded on exact tested head dff39e99d4669229a66826e5f51805a95be10185.
+  - runner default gateway exposes the noVNC/websockify/RFB service on TCP 6082.
+  - endpoint RFB framebuffer is 1920x1080 and permits the bounded no-auth metadata handshake.
+  - exactly one X11 Unix socket was visible at the same probe time: :98.
   - historical positive-control Track A runtime used :98 and created the visible official-client window.
   - PR #303 fresh isolated runtime uses :115 and currently fails before login with no visible window.
 derived:
-  - :98 is the strongest current candidate for the persistent GUI environment, but it is not a proven 6082 backend mapping.
+  - gateway:6082 is the host-side service corresponding to the owner's synology:6082 with high confidence.
+  - :98 is the strongest current backend-display candidate, but not a directly proven mapping.
 unknown:
-  - whether the runner container default gateway is the host path exposing port 6082.
-  - exact X display served by browser endpoint synology:6082.
-  - host-side websockify/RFB listener target and configuration.
+  - exact X display or VNC target port configured behind host TCP 6082.
   - provenance of the owner's earlier :88 observation in current canonical state.
 conflicts: []
-blockers: []
-next_action: derive and probe only the runner default gateway port 6082 through the bounded read-only workflow and classify the resulting noVNC/RFB evidence.
+blockers:
+  - no available authorized host-side process/config inspection path from this runner namespace.
+next_action: inspect only the Synology host listener/process/config for TCP 6082 and record its websockify/RFB target display or VNC port.
 ```

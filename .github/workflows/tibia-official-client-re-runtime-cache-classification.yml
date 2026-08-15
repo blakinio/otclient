@@ -1,0 +1,83 @@
+name: Track A runtime canonical cache classification
+
+on:
+  push:
+    branches: [research/OTC-20260815-track-a-runtime-reacquisition]
+    paths:
+      - .github/workflows/tibia-official-client-re-runtime-cache-classification.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Classify path metadata without reading cache payloads
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          home="$state/home"
+          client="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          cache="$home/.cache/CipSoft GmbH"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          [[ -d "$cache" && ! -L "$cache" ]]
+          echo TRACK_A_CACHE_EXACT_CLIENT_VERIFIED=true
+          python3 - "$cache" <<'PY'
+          from pathlib import Path
+          import hashlib, os, re, sys
+
+          root=Path(sys.argv[1])
+          sensitive=re.compile(r'(?i)(cookie|password|credential|access.?token|refresh.?token|email|account|session|auth)')
+          classes={
+              'qml': re.compile(r'(?i)qml'),
+              'shader': re.compile(r'(?i)shader'),
+              'webengine': re.compile(r'(?i)(webengine|chromium)'),
+              'http': re.compile(r'(?i)(http|network)'),
+              'gpu': re.compile(r'(?i)(gpu|gl|vulkan)'),
+              'storage': re.compile(r'(?i)(storage|database|leveldb)'),
+              'generic_cache': re.compile(r'(?i)cache'),
+          }
+          files=[]
+          sensitive_name_hits=0
+          print('TRACK_A_CACHE_METADATA_BEGIN=true')
+          for p in sorted(root.rglob('*')):
+              rel=str(p.relative_to(root))
+              st=p.lstat()
+              if p.is_symlink():
+                  kind='symlink'
+              elif p.is_dir():
+                  kind='dir'
+              elif p.is_file():
+                  kind='file'
+              else:
+                  kind='other'
+              if sensitive.search(rel): sensitive_name_hits += 1
+              flags=[k for k,rx in classes.items() if rx.search(rel)]
+              digest=hashlib.sha256(rel.encode('utf-8','surrogateescape')).hexdigest()[:16]
+              depth=len(Path(rel).parts)
+              suffix=p.suffix.lower()
+              if not re.fullmatch(r'\.[a-z0-9_-]{1,12}',suffix): suffix='none'
+              if kind=='file': files.append((p,st.st_size))
+              print(f'ENTRY path_hash={digest} depth={depth} type={kind} size={st.st_size} suffix={suffix} classes={"+".join(flags) if flags else "none"}')
+          total=sum(size for _,size in files)
+          print(f'TRACK_A_CACHE_FILE_COUNT={len(files)}')
+          print(f'TRACK_A_CACHE_TOTAL_BYTES={total}')
+          print(f'TRACK_A_CACHE_SENSITIVE_PATH_KEYWORD_HITS={sensitive_name_hits}')
+          print('TRACK_A_CACHE_PAYLOAD_READ=false')
+          print('TRACK_A_CACHE_METADATA_END=true')
+          if len(files) != 4 or total != 6937:
+              raise SystemExit('canonical cache metadata changed from prior bounded census')
+          PY

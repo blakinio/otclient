@@ -1,0 +1,107 @@
+name: Track A P2 first transform boundary
+
+on:
+  push:
+    branches: [research/OTC-20260815-track-a-p2-first-transform-boundary]
+    paths:
+      - .github/workflows/tibia-official-client-re-p2-first-transform-boundary.yml
+      - .github/scripts/tibia-official-client-re-p2-first-transform-boundary.py
+      - docs/agents/evidence/OTC-20260815-track-a-p2-first-transform-boundary/**
+      - docs/agents/tasks/active/OTC-20260815-track-a-p2-first-transform-boundary.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-boundary:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-p2-first-transform-boundary
+    steps:
+      - name: Checkout exact Draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify exact client and static tool context
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-first-transform-boundary.py
+
+          client=''
+          state=''
+          for candidate in /work/_otclient_tibia_re_state /home/runner/_work/_otclient_tibia_re_state; do
+            probe="$candidate/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+            [[ -x "$probe" ]] || continue
+            size="$(stat -c '%s' "$probe")"
+            sha="$(sha256sum "$probe" | awk '{print $1}')"
+            if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
+              client="$probe"
+              state="$candidate"
+              break
+            fi
+          done
+          [[ -n "$client" && -n "$state" ]]
+
+          objdump="$(command -v objdump || true)"
+          if [[ -z "$objdump" && -x "$state/toolroot/usr/bin/objdump" ]]; then
+            objdump="$state/toolroot/usr/bin/objdump"
+          fi
+          [[ -n "$objdump" && -x "$objdump" ]]
+
+          echo "TRACK_A_P2_CLIENT=$client" >> "$GITHUB_ENV"
+          echo "TRACK_A_P2_OBJDUMP=$objdump" >> "$GITHUB_ENV"
+          echo "TRACK_A_P2_STATE=$state" >> "$GITHUB_ENV"
+          echo "TRACK_A_P2_EXACT_HEAD=$GITHUB_SHA"
+          echo "TRACK_A_P2_EXACT_CLIENT_VERIFIED=true"
+          echo "TRACK_A_P2_RUNNER=$RUNNER_NAME"
+
+      - name: Reproduce first concrete retained-writer serialization boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/p2-first-transform-boundary
+          mkdir -p "$out"
+          python3 .github/scripts/tibia-official-client-re-p2-first-transform-boundary.py \
+            --client "$TRACK_A_P2_CLIENT" \
+            --objdump "$TRACK_A_P2_OBJDUMP" \
+            --output-json "$out/result.json" \
+            --output-text "$out/result.txt" \
+            --evidence "$out/evidence.txt" \
+            | tee "$out/validation.log"
+          grep -Fxq 'P2_FIRST_TRANSFORM_COMPLETE=true' "$out/validation.log"
+          grep -Fxq 'P2_FIRST_TRANSFORM_RESULT=SERIALIZATION_ONLY_PROVEN' "$out/validation.log"
+          grep -Fxq 'P2_FIRST_CONCRETE_SLOT=0xc10960' "$out/validation.log"
+          grep -Fxq 'P2_FRAMING_ORDER=UNKNOWN' "$out/validation.log"
+          grep -Fxq 'P2_FINAL_BINARY_EGRESS=UNKNOWN' "$out/validation.log"
+          python3 - "$out/result.json" <<'PY'
+          import json, sys
+          data=json.load(open(sys.argv[1], encoding='utf-8'))
+          assert data['semantic_result']=='SERIALIZATION_ONLY_PROVEN'
+          assert data['exact_client']['sha256']=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          assert data['facts']['first_concrete_non_lifecycle_slot']=='0xc10960'
+          assert data['classification']['framing_order']=='UNKNOWN'
+          assert data['classification']['compression_order']=='UNKNOWN'
+          assert data['classification']['encryption_order']=='UNKNOWN'
+          assert data['classification']['final_binary_egress']=='UNKNOWN'
+          assert not data['negative_controls']['generic_qiodevice_enumeration_used_as_discriminator']
+          assert not data['negative_controls']['vtable_adjacency_alone_used_as_proof']
+          PY
+          echo TRACK_A_P2_FIRST_TRANSFORM_VALIDATED=true
+
+      - name: Upload sanitized static evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-first-transform-boundary-${{ github.run_id }}
+          path: artifacts/p2-first-transform-boundary/**
+          if-no-files-found: error
+          retention-days: 7

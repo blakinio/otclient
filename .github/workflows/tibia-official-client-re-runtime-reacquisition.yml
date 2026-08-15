@@ -12,117 +12,56 @@ permissions:
   contents: read
 
 jobs:
-  diagnose-xvfb-failure:
+  diagnose-xkb-toolroot:
     runs-on: [otclient, synology]
     timeout-minutes: 5
-    env:
-      TASK_ID: OTC-20260815-track-a-runtime-reacquisition
-      FAILED_RUN_ID: '31884912160'
-      TRACK_MARKER: OTCLIENT_TIBIA_RE_TRACK=official-client-re
-      TASK_MARKER: OTCLIENT_TIBIA_RE_TASK=OTC-20260815-track-a-runtime-reacquisition
-      DISPLAY_NUM: '115'
     steps:
       - name: Checkout exact diagnostic head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
-      - name: Inspect failed run residue read-only
+      - name: Locate Xvfb XKB compiler dependencies read-only
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$GITHUB_REF_NAME" == research/OTC-20260815-track-a-runtime-reacquisition ]]
-
-          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$FAILED_RUN_ID"
-          runtime="$root/runtime"
-          [[ "$root" == "/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31884912160" ]]
+          source_state=/work/_otclient_tibia_re_state
+          toolroot="$source_state/toolroot"
+          xvfb="$source_state/runtime/Xvfb-track-a"
           mkdir -p artifacts/runtime-reacquisition-diagnostic
-          out=artifacts/runtime-reacquisition-diagnostic/diagnostic.txt
-
+          out=artifacts/runtime-reacquisition-diagnostic/xkb-toolroot.txt
           {
-            echo TRACK_A_RUNTIME_DIAGNOSTIC_READ_ONLY=true
-            echo "failed_run_id=$FAILED_RUN_ID"
-            echo "root_exists=$([[ -d "$root" ]] && echo true || echo false)"
-            for file in xvfb.log relay.log xvfb.pid socks-relay.pid; do
-              path="$runtime/$file"
+            echo TRACK_A_RUNTIME_XKB_DIAGNOSTIC_READ_ONLY=true
+            echo "toolroot_exists=$([[ -d "$toolroot" ]] && echo true || echo false)"
+            echo "xvfb_exists=$([[ -x "$xvfb" ]] && echo true || echo false)"
+            for path in \
+              "$toolroot/usr/bin/xkbcomp" \
+              "$toolroot/bin/xkbcomp" \
+              "$toolroot/usr/libexec/xkbcomp" \
+              "$source_state/runtime/xkbcomp"; do
+              echo "candidate=$path exists=$([[ -e "$path" ]] && echo true || echo false) executable=$([[ -x "$path" ]] && echo true || echo false)"
               if [[ -e "$path" ]]; then
-                echo "file=$file exists=true size=$(stat -c '%s' "$path" 2>/dev/null || echo unknown)"
-              else
-                echo "file=$file exists=false"
+                echo "candidate_size=$(stat -c '%s' "$path" 2>/dev/null || echo unknown)"
+                file "$path" 2>/dev/null | sed 's/^/candidate_file=/' || true
               fi
             done
-
-            for role in xvfb socks-relay; do
-              pidfile="$runtime/$role.pid"
-              pid="$(tr -cd '0-9' <"$pidfile" 2>/dev/null || true)"
-              echo "role=$role pid=${pid:-none} alive=$([[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && echo true || echo false)"
-              if [[ -n "$pid" && -r "/proc/$pid/environ" ]]; then
-                track=false; task=false; role_ok=false
-                grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" && track=true || true
-                grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" && task=true || true
-                grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ" && role_ok=true || true
-                echo "role=$role track_marker=$track task_marker=$task role_marker=$role_ok"
-              fi
-            done
-
-            lock="/tmp/.X${DISPLAY_NUM}-lock"
-            sock="/tmp/.X11-unix/X${DISPLAY_NUM}"
-            echo "x11_lock_exists=$([[ -e "$lock" ]] && echo true || echo false)"
-            echo "x11_socket_exists=$([[ -e "$sock" ]] && echo true || echo false)"
-            if [[ -r "$lock" ]]; then
-              lock_pid="$(tr -cd '0-9' <"$lock" 2>/dev/null || true)"
-              echo "x11_lock_pid=${lock_pid:-none} alive=$([[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null && echo true || echo false)"
-            fi
-            if [[ -e "$sock" ]]; then
-              grep -Fq "$sock" /proc/net/unix 2>/dev/null && echo x11_socket_active=true || echo x11_socket_active=false
-            fi
-
-            source_state=/work/_otclient_tibia_re_state
-            xvfb="$source_state/runtime/Xvfb-track-a"
-            echo "source_xvfb_exists=$([[ -x "$xvfb" ]] && echo true || echo false)"
-            if [[ -e "$xvfb" ]]; then
-              echo "source_xvfb_size=$(stat -c '%s' "$xvfb" 2>/dev/null || echo unknown)"
-              file "$xvfb" 2>/dev/null | sed 's/^/source_xvfb_file=/' || true
-            fi
+            echo 'find_results_begin=true'
+            find "$toolroot" -maxdepth 5 -type f -name xkbcomp -print 2>/dev/null | head -20 | sed 's/^/xkbcomp_found=/'
+            echo 'find_results_end=true'
+            echo 'xvfb_xkb_strings_begin=true'
+            strings "$xvfb" 2>/dev/null | grep -E 'xkbcomp|XKB_BIN|xkbdir|XKB' | head -80 | sed 's/^/xvfb_string=/' || true
+            echo 'xvfb_xkb_strings_end=true'
           } | tee "$out"
+          grep -Fxq 'TRACK_A_RUNTIME_XKB_DIAGNOSTIC_READ_ONLY=true' "$out"
+          echo TRACK_A_RUNTIME_XKB_DIAGNOSTIC_COMPLETE=true
 
-          python3 - "$runtime/xvfb.log" "$out" <<'PY'
-          import re
-          import sys
-          from pathlib import Path
-
-          source = Path(sys.argv[1])
-          out = Path(sys.argv[2])
-          if not source.is_file():
-              with out.open('a', encoding='utf-8') as handle:
-                  handle.write('xvfb_log_unavailable=true\n')
-              raise SystemExit(0)
-
-          text = source.read_text(errors='replace')
-          lines = text.splitlines()[-120:]
-          email = re.compile(r'(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}')
-          redacted = []
-          for line in lines:
-              if 'TIBIA_TEST_EMAIL' in line or 'TIBIA_TEST_PASSWORD' in line:
-                  line = '[REDACTED_SECRET_VARIABLE_LINE]'
-              line = email.sub('[REDACTED_EMAIL]', line)
-              redacted.append(line)
-          with out.open('a', encoding='utf-8') as handle:
-              handle.write('xvfb_log_tail_begin=true\n')
-              for line in redacted:
-                  handle.write(f'xvfb_log={line}\n')
-              handle.write('xvfb_log_tail_end=true\n')
-          PY
-
-          cat "$out"
-          echo TRACK_A_RUNTIME_DIAGNOSTIC_COMPLETE=true
-
-      - name: Upload sanitized Xvfb diagnostic
+      - name: Upload sanitized XKB diagnostic
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: track-a-runtime-xvfb-diagnostic-${{ github.run_id }}
+          name: track-a-runtime-xkb-diagnostic-${{ github.run_id }}
           path: artifacts/runtime-reacquisition-diagnostic/**
           if-no-files-found: error
           retention-days: 7

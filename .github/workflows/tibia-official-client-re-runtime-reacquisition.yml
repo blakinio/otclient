@@ -12,111 +12,9 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
-  retire-stale-selector-run:
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      allow_reacquire: ${{ steps.retire.outputs.allow_reacquire }}
-    env:
-      GH_TOKEN: ${{ github.token }}
-      STALE_RUN_ID: '31883846172'
-      STALE_HEAD_SHA: '950ce8f5f7cf22b457e82cdb20e9eec285438d9c'
-    steps:
-      - name: Fence and retire only the stale selector run
-        id: retire
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-          import time
-          import urllib.error
-          import urllib.request
-
-          repo = os.environ['GITHUB_REPOSITORY']
-          run_id = os.environ['STALE_RUN_ID']
-          expected_sha = os.environ['STALE_HEAD_SHA']
-          token = os.environ['GH_TOKEN']
-          output = os.environ['GITHUB_OUTPUT']
-          base = f'https://api.github.com/repos/{repo}/actions/runs/{run_id}'
-          headers = {
-              'Accept': 'application/vnd.github+json',
-              'Authorization': f'Bearer {token}',
-              'X-GitHub-Api-Version': '2022-11-28',
-          }
-
-          def request(url: str, method: str = 'GET'):
-              req = urllib.request.Request(url, headers=headers, method=method)
-              with urllib.request.urlopen(req, timeout=20) as response:
-                  return response.status, response.read()
-
-          def get_run():
-              _, raw = request(base)
-              return json.loads(raw)
-
-          run = get_run()
-          expected = {
-              'id': int(run_id),
-              'name': 'Track A runtime restart/relogin reacquisition',
-              'head_branch': 'research/OTC-20260815-track-a-runtime-reacquisition',
-              'head_sha': expected_sha,
-              'path': '.github/workflows/tibia-official-client-re-runtime-reacquisition.yml',
-          }
-          for key, value in expected.items():
-              if run.get(key) != value:
-                  raise SystemExit(f'stale-runtime-run fence mismatch for {key}: {run.get(key)!r}')
-
-          status = run.get('status')
-          if status == 'completed':
-              print(f'TRACK_A_RUNTIME_STALE_RUN_ALREADY_TERMINAL={run.get("conclusion")}')
-              with open(output, 'a', encoding='utf-8') as handle:
-                  handle.write('allow_reacquire=true\n')
-              raise SystemExit(0)
-
-          if status != 'queued':
-              print(f'TRACK_A_RUNTIME_STALE_RUN_NOT_CANCELLED_STATUS={status}')
-              print('TRACK_A_RUNTIME_NEW_REACQUIRE_SUPPRESSED=true')
-              with open(output, 'a', encoding='utf-8') as handle:
-                  handle.write('allow_reacquire=false\n')
-              raise SystemExit(0)
-
-          try:
-              code, _ = request(base + '/cancel', method='POST')
-          except urllib.error.HTTPError as exc:
-              if exc.code == 409:
-                  current = get_run()
-                  current_status = current.get('status')
-                  print(f'TRACK_A_RUNTIME_STALE_CANCEL_RACE_STATUS={current_status}')
-                  allow = 'true' if current_status == 'completed' else 'false'
-                  with open(output, 'a', encoding='utf-8') as handle:
-                      handle.write(f'allow_reacquire={allow}\n')
-                  raise SystemExit(0)
-              raise
-          if code != 202:
-              raise SystemExit(f'unexpected cancel response: {code}')
-          print('TRACK_A_RUNTIME_STALE_RUN_CANCEL_REQUESTED=true')
-
-          terminal = False
-          for _ in range(10):
-              current = get_run()
-              if current.get('status') == 'completed':
-                  terminal = True
-                  print(f'TRACK_A_RUNTIME_STALE_RUN_TERMINAL={current.get("conclusion")}')
-                  break
-              time.sleep(1)
-          with open(output, 'a', encoding='utf-8') as handle:
-              handle.write(f'allow_reacquire={"true" if terminal else "false"}\n')
-          if not terminal:
-              print('TRACK_A_RUNTIME_STALE_RUN_CANCEL_PENDING=true')
-          PY
-
   reacquire:
-    if: needs.retire-stale-selector-run.outputs.allow_reacquire == 'true'
-    needs: retire-stale-selector-run
     concurrency:
       group: official-client-re-runtime
       cancel-in-progress: false
@@ -129,6 +27,13 @@ jobs:
       RUN_REQUEST: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/runtime-run-request.json
       EXPECTED_HELPER_BLOB: c1b88d4cc17edf2684b93d7e516f9c694e37966a
       EXPECTED_CODE_BEARING_HEAD: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
+      FAILED_RUN_TO_RECOVER: '31884531727'
+      TASK_ID: OTC-20260815-track-a-runtime-reacquisition
+      TRACK_MARKER: OTCLIENT_TIBIA_RE_TRACK=official-client-re
+      TASK_MARKER: OTCLIENT_TIBIA_RE_TASK=OTC-20260815-track-a-runtime-reacquisition
+      DISPLAY_NUM: '115'
+      TASK_SOCKS_PORT: '25415'
+
     steps:
       - name: Checkout exact draft head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -144,6 +49,7 @@ jobs:
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
           test -s "$RUN_REQUEST"
           [[ "$(git hash-object .github/scripts/tibia-official-client-re-runtime-reacquisition.sh)" == "$EXPECTED_HELPER_BLOB" ]]
+          command -v setsid >/dev/null
           python3 - "$RUN_REQUEST" "$EXPECTED_CLIENT_SHA256" "$EXPECTED_CLIENT_SIZE" "$EXPECTED_CODE_BEARING_HEAD" <<'PY'
           import json, sys
           path, expected_sha, expected_size, expected_code_head = sys.argv[1:]
@@ -174,7 +80,7 @@ jobs:
           echo "TRACK_A_RUNTIME_EXACT_HEAD=$GITHUB_SHA"
           echo "TRACK_A_RUNTIME_CODE_BEARING_HEAD=$EXPECTED_CODE_BEARING_HEAD"
 
-      - name: Materialize exact runner-layout compatibility helper
+      - name: Materialize exact runner-layout and lifecycle compatibility helper
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -187,7 +93,6 @@ jobs:
 
           src, out = map(Path, sys.argv[1:])
           text = src.read_text(encoding='utf-8')
-
           replacements = []
           replacements.append((
               "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\nTASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
@@ -268,24 +173,134 @@ jobs:
               '  local td="$(toolroot)" xvfb="$BASE_STATE/runtime/Xvfb-track-a" root="$(run_root)"',
               '  local source td xvfb root\n  source="$(source_state 2>/dev/null || printf \'%s\\n\' "$BASE_STATE")"\n  td="$source/toolroot"; xvfb="$source/runtime/Xvfb-track-a"; root="$(run_root)"',
           ))
-
+          replacements.extend([
+              ('    nohup python3 "$relay"', '    nohup setsid python3 "$relay"'),
+              ('    nohup "$xvfb" "$TRACK_DISPLAY"', '    nohup setsid "$xvfb" "$TRACK_DISPLAY"'),
+              ('    nohup "$client" >"$gdir/client.log"', '    nohup setsid "$client" >"$gdir/client.log"'),
+              ('    nohup "$gdb" -q -nx -batch -x "$gdir/world.gdb"', '    nohup setsid "$gdb" -q -nx -batch -x "$gdir/world.gdb"'),
+          ])
           for old, new in replacements:
               count = text.count(old)
               if count != 1:
-                  raise SystemExit(f'compatibility transform match count {count}, expected 1: {old[:80]!r}')
+                  raise SystemExit(f'compatibility transform match count {count}, expected 1: {old[:100]!r}')
               text = text.replace(old, new, 1)
-
           out.write_text(text, encoding='utf-8')
           PY
           chmod 700 "$out"
           bash -n "$out"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$out" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER_SHA256=$(sha256sum "$out" | awk '{print $1}')"
-          echo TRACK_A_RUNTIME_RUNNER_LAYOUT_COMPATIBILITY_MATERIALIZED=true
+          echo TRACK_A_RUNTIME_COMPATIBILITY_MATERIALIZED=true
+
+      - name: Recover only task-owned residue from failed generation-1 preparation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          old_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$FAILED_RUN_TO_RECOVER"
+          old_runtime="$old_root/runtime"
+          [[ "$old_root" == "/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31884531727" ]]
+
+          owned() {
+            local pid="$1" role="$2"
+            [[ -r "/proc/$pid/environ" ]] || return 1
+            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || return 1
+            grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" || return 1
+            grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ" || return 1
+          }
+          stop_owned() {
+            local role="$1" file="$old_runtime/$role.pid" pid=''
+            [[ -r "$file" ]] && pid="$(tr -cd '0-9' <"$file" 2>/dev/null || true)"
+            [[ -n "$pid" ]] || return 0
+            if kill -0 "$pid" 2>/dev/null; then
+              owned "$pid" "$role" || { echo "TRACK_A_RUNTIME_ERROR=foreign_residue_$role" >&2; exit 1; }
+              kill -TERM "$pid"
+              for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
+              if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid"; fi
+              for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
+              ! kill -0 "$pid" 2>/dev/null || { echo "TRACK_A_RUNTIME_ERROR=residue_stop_timeout_$role" >&2; exit 1; }
+              echo "TRACK_A_RUNTIME_RESIDUE_STOPPED role=$role pid=$pid"
+            fi
+          }
+
+          old_xvfb_pid="$(tr -cd '0-9' <"$old_runtime/xvfb.pid" 2>/dev/null || true)"
+          for role in observer-gen-1 observer-gen-2 client-gen-1 client-gen-2 xvfb socks-relay; do
+            stop_owned "$role"
+          done
+          python3 - "$TASK_SOCKS_PORT" <<'PY'
+          import pathlib, sys
+          needle=f"{int(sys.argv[1]):04X}"
+          for name in ('tcp','tcp6'):
+              p=pathlib.Path('/proc/net')/name
+              if not p.exists(): continue
+              for row in p.read_text().splitlines()[1:]:
+                  f=row.split()
+                  if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==needle and f[3]=='0A':
+                      raise SystemExit('TRACK_A_RUNTIME_ERROR=residue_socks_port_still_listening')
+          PY
+
+          lock="/tmp/.X${DISPLAY_NUM}-lock"
+          sock="/tmp/.X11-unix/X${DISPLAY_NUM}"
+          if [[ -e "$lock" ]]; then
+            lock_pid="$(tr -cd '0-9' <"$lock" 2>/dev/null || true)"
+            [[ -n "$old_xvfb_pid" && "$lock_pid" == "$old_xvfb_pid" ]] || {
+              echo TRACK_A_RUNTIME_ERROR=display_lock_not_attributable_to_failed_run >&2; exit 1;
+            }
+            ! kill -0 "$lock_pid" 2>/dev/null || {
+              echo TRACK_A_RUNTIME_ERROR=display_lock_pid_still_alive >&2; exit 1;
+            }
+            rm -f "$lock"
+            echo "TRACK_A_RUNTIME_STALE_X11_LOCK_REMOVED pid=$lock_pid"
+          fi
+          if [[ -e "$sock" ]]; then
+            [[ -n "$old_xvfb_pid" ]] || { echo TRACK_A_RUNTIME_ERROR=x11_socket_without_old_xvfb_pid >&2; exit 1; }
+            ! kill -0 "$old_xvfb_pid" 2>/dev/null || { echo TRACK_A_RUNTIME_ERROR=x11_socket_old_xvfb_alive >&2; exit 1; }
+            if grep -Fq "$sock" /proc/net/unix 2>/dev/null; then
+              echo TRACK_A_RUNTIME_ERROR=x11_socket_still_active >&2; exit 1
+            fi
+            rm -f "$sock"
+            echo TRACK_A_RUNTIME_STALE_X11_SOCKET_REMOVED=true
+          fi
+          rm -rf -- "$old_root"
+          echo TRACK_A_RUNTIME_FAILED_RUN_RESIDUE_RECOVERED=true
 
       - name: Bootstrap isolated no-secret runtime namespace
         shell: bash
         run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" bootstrap
+
+      - name: Verify persistent bootstrap children survived step boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/runtime"
+          owned() {
+            local pid="$1" role="$2"
+            [[ -r "/proc/$pid/environ" ]] || return 1
+            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || return 1
+            grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" || return 1
+            grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ" || return 1
+            ! grep -azEq '^(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD)=' "/proc/$pid/environ"
+          }
+          for role in socks-relay xvfb; do
+            pid="$(tr -cd '0-9' <"$runtime/$role.pid" 2>/dev/null || true)"
+            [[ -n "$pid" ]] || { echo "TRACK_A_RUNTIME_ERROR=missing_persistent_${role}_pid" >&2; exit 1; }
+            kill -0 "$pid" 2>/dev/null || { echo "TRACK_A_RUNTIME_ERROR=persistent_${role}_dead" >&2; exit 1; }
+            owned "$pid" "$role" || { echo "TRACK_A_RUNTIME_ERROR=persistent_${role}_ownership_lost" >&2; exit 1; }
+            echo "TRACK_A_RUNTIME_PERSISTENT_CHILD_VERIFIED role=$role pid=$pid"
+          done
+          [[ -e "/tmp/.X11-unix/X${DISPLAY_NUM}" ]] || { echo TRACK_A_RUNTIME_ERROR=persistent_xvfb_socket_missing >&2; exit 1; }
+          python3 - "$TASK_SOCKS_PORT" <<'PY'
+          import pathlib, sys
+          needle=f"{int(sys.argv[1]):04X}"
+          for name in ('tcp','tcp6'):
+              p=pathlib.Path('/proc/net')/name
+              if not p.exists(): continue
+              for row in p.read_text().splitlines()[1:]:
+                  f=row.split()
+                  if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==needle and f[3]=='0A':
+                      print('TRACK_A_RUNTIME_PERSISTENT_RELAY_LISTENING=true')
+                      raise SystemExit(0)
+          raise SystemExit('TRACK_A_RUNTIME_ERROR=persistent_relay_not_listening')
+          PY
 
       - name: Prepare generation 1 and arm logged-out structural observer
         shell: bash
@@ -310,11 +325,11 @@ jobs:
           set -Eeuo pipefail
           helper="$TRACK_A_RUNTIME_EFFECTIVE_HELPER"
           bash "$helper" stop 1
-          pidfile="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID/runtime/observer-gen-1.pid"
+          pidfile="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/runtime/observer-gen-1.pid"
           if [[ -r "$pidfile" ]]; then
             pid="$(tr -cd '0-9' <"$pidfile")"
             if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-              echo 'TRACK_A_RUNTIME_ERROR=observer_cleanup_timeout_gen_1' >&2
+              echo TRACK_A_RUNTIME_ERROR=observer_cleanup_timeout_gen_1 >&2
               exit 1
             fi
           fi
@@ -346,7 +361,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           helper="${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-.github/scripts/tibia-official-client-re-runtime-reacquisition.sh}"
-          runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID/runtime"
+          runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/runtime"
           for gen in 1 2; do
             bash "$helper" stop "$gen"
             pidfile="$runtime/observer-gen-$gen.pid"

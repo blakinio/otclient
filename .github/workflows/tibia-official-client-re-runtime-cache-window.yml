@@ -1,0 +1,259 @@
+name: Track A runtime classified-cache window discriminator
+
+on:
+  push:
+    branches: [research/OTC-20260815-track-a-runtime-reacquisition]
+    paths:
+      - .github/workflows/tibia-official-client-re-runtime-cache-window.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    concurrency:
+      group: official-client-re-runtime
+      cancel-in-progress: false
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      TASK_ID: OTC-20260815-track-a-runtime-reacquisition
+      TRACK_DISPLAY: ':115'
+      DISPLAY_NUM: '115'
+      TASK_SOCKS_PORT: '25415'
+      UPSTREAM_SOCKS_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      BASE_STATE: /work/_otclient_tibia_re_state
+      QT_DEBUG_PLUGINS: '1'
+    steps:
+      - name: Probe visible window with only classified task-local cache seeded
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          state="$BASE_STATE"
+          td="$state/toolroot"
+          source_home="$state/home"
+          source_package="$source_home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          source_meta="$source_home/.local/share/CipSoft GmbH/Tibia/launchermetadata.json"
+          source_cache="$source_home/.cache/CipSoft GmbH"
+          root="$state/tasks/$TASK_ID/cache-window-$GITHUB_RUN_ID"
+          home="$root/home"
+          package="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          runtime="$root/runtime"
+          proxy_conf="$root/proxychains.conf"
+          run_marker="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"
+          track_marker='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
+          task_marker="OTCLIENT_TIBIA_RE_TASK=$TASK_ID"
+          mkdir -p "$runtime" "$home/.local/share/CipSoft GmbH/Tibia/packages"
+          printf '%s\n' "$TASK_ID" > "$root/task-id"
+
+          cleanup() {
+            set +e
+            for role in client xvfb socks-relay; do
+              file="$runtime/$role.pid"
+              [[ -r "$file" ]] || continue
+              pid="$(tr -cd '0-9' < "$file" 2>/dev/null || true)"
+              [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$track_marker" "/proc/$pid/environ" || continue
+              grep -azFxq "$task_marker" "/proc/$pid/environ" || continue
+              grep -azFxq "$run_marker" "/proc/$pid/environ" || continue
+              kill -TERM "$pid" 2>/dev/null || true
+              for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
+              kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true
+            done
+            lock="/tmp/.X${DISPLAY_NUM}-lock"; sock="/tmp/.X11-unix/X${DISPLAY_NUM}"
+            xvfb_pid="$(tr -cd '0-9' < "$runtime/xvfb.pid" 2>/dev/null || true)"
+            if [[ -e "$lock" ]]; then
+              lp="$(tr -cd '0-9' < "$lock" 2>/dev/null || true)"
+              [[ -n "$xvfb_pid" && "$lp" == "$xvfb_pid" ]] && ! kill -0 "$lp" 2>/dev/null && rm -f "$lock"
+            fi
+            if [[ -e "$sock" && -n "$xvfb_pid" ]] && ! kill -0 "$xvfb_pid" 2>/dev/null; then
+              grep -Fq "$sock" /proc/net/unix 2>/dev/null || rm -f "$sock"
+            fi
+            [[ -r "$root/task-id" && "$(cat "$root/task-id")" == "$TASK_ID" ]] && rm -rf -- "$root"
+          }
+          trap cleanup EXIT
+
+          [[ -x "$source_package/bin/client" && -f "$source_meta" && -d "$source_cache" ]]
+          [[ "$(stat -c %s "$source_package/bin/client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$source_package/bin/client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_CACHE_WINDOW_EXACT_CLIENT_VERIFIED=true
+
+          warp_pid="$(tr -cd '0-9' < "$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+          [[ -n "$warp_pid" && -r "/proc/$warp_pid/environ" ]]
+          grep -azFxq "$track_marker" "/proc/$warp_pid/environ"
+          kill -0 "$warp_pid"
+          curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo TRACK_A_CACHE_WINDOW_UPSTREAM_WARP_VERIFIED=true
+
+          python3 - "$source_cache" "$home/.cache/CipSoft GmbH" <<'PY'
+          from pathlib import Path
+          import re, shutil, sys
+          src,dst=map(Path,sys.argv[1:])
+          files=[p for p in src.rglob('*') if p.is_file() and not p.is_symlink()]
+          assert len(files)==4 and sum(p.stat().st_size for p in files)==6937
+          qsb=[p for p in files if p.suffix.lower()=='.qsb']
+          other=[p for p in files if p.suffix.lower()!='.qsb']
+          assert sorted(p.stat().st_size for p in qsb)==[2162,2309,2386]
+          assert len(other)==1 and other[0].stat().st_size==80
+          bad_path=re.compile(r'(?i)(cookie|password|credential|access.?token|refresh.?token|email|account|session|auth)')
+          bad_bytes=(b'cookie',b'password',b'credential',b'access_token',b'refresh_token',b'authorization',b'session',b'email')
+          for p in files:
+              rel=str(p.relative_to(src))
+              assert not bad_path.search(rel)
+              data=p.read_bytes()
+              low=data.lower()
+              assert not any(x in low for x in bad_bytes)
+          dst.parent.mkdir(parents=True,exist_ok=True)
+          shutil.copytree(src,dst,symlinks=False)
+          copied=[p for p in dst.rglob('*') if p.is_file()]
+          assert len(copied)==4 and sum(p.stat().st_size for p in copied)==6937
+          print('TRACK_A_CACHE_WINDOW_CLASSIFIED_CACHE_SEEDED=true files=4 bytes=6937')
+          PY
+
+          python3 - "$source_meta" <<'PY'
+          import json,re,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert set(d)=={'launcher','packages','hardwaresurvey','hints'}
+          bad=re.compile(r'(?i)(password|credential|access[_-]?token|refresh[_-]?token|email|cookie|session)')
+          def walk(x):
+              if isinstance(x,dict):
+                  for k,v in x.items(): assert not bad.search(str(k)); walk(v)
+              elif isinstance(x,list):
+                  for v in x: walk(v)
+          walk(d)
+          PY
+          install -m 600 "$source_meta" "$home/.local/share/CipSoft GmbH/Tibia/launchermetadata.json"
+          : > "$home/.local/share/CipSoft GmbH/Tibia/.running"
+          chmod 600 "$home/.local/share/CipSoft GmbH/Tibia/.running"
+          cp -a -- "$source_package" "$package"
+          [[ ! -L "$package" && -x "$package/bin/client" ]]
+          [[ "$(sha256sum "$package/bin/client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+
+          cat > "$root/relay.py" <<'PY'
+          import socket,sys,threading
+          lp,up=map(int,sys.argv[1:])
+          def pump(a,b):
+              try:
+                  while True:
+                      d=a.recv(65536)
+                      if not d: break
+                      b.sendall(d)
+              except OSError: pass
+              finally:
+                  try:b.shutdown(socket.SHUT_WR)
+                  except OSError:pass
+          def handle(c):
+              u=socket.socket()
+              try:
+                  u.connect(('127.0.0.1',up))
+                  a=threading.Thread(target=pump,args=(c,u),daemon=True); b=threading.Thread(target=pump,args=(u,c),daemon=True)
+                  a.start(); b.start(); a.join(); b.join()
+              finally:u.close(); c.close()
+          s=socket.socket(); s.bind(('127.0.0.1',lp)); s.listen(32)
+          while True:
+              c,_=s.accept(); threading.Thread(target=handle,args=(c,),daemon=True).start()
+          PY
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_TASK="$TASK_ID" \
+            OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" OTCLIENT_TIBIA_RE_ROLE=socks-relay \
+            nohup python3 "$root/relay.py" "$TASK_SOCKS_PORT" "$UPSTREAM_SOCKS_PORT" >"$runtime/relay.log" 2>&1 </dev/null &
+          relay_pid=$!; printf '%s\n' "$relay_pid" > "$runtime/socks-relay.pid"
+          for _ in $(seq 1 50); do
+            kill -0 "$relay_pid" 2>/dev/null || exit 1
+            python3 - "$TASK_SOCKS_PORT" <<'PY' && break || true
+          import pathlib,sys
+          n=f'{int(sys.argv[1]):04X}'
+          for name in ('tcp','tcp6'):
+              p=pathlib.Path('/proc/net')/name
+              if not p.exists():continue
+              for row in p.read_text().splitlines()[1:]:
+                  f=row.split()
+                  if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==n and f[3]=='0A':raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+            sleep .1
+          done
+          curl --socks5-hostname "127.0.0.1:$TASK_SOCKS_PORT" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo TRACK_A_CACHE_WINDOW_TASK_RELAY_VERIFIED=true
+
+          xvfb="$state/runtime/Xvfb-track-a"; [[ -x "$xvfb" ]] || xvfb="$td/usr/bin/Xvfb"; [[ -x "$xvfb" ]]
+          [[ ! -e "/tmp/.X${DISPLAY_NUM}-lock" && ! -e "/tmp/.X11-unix/X${DISPLAY_NUM}" ]]
+          (
+            cd "$td/usr/bin"
+            env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+              OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_TASK="$TASK_ID" \
+              OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" OTCLIENT_TIBIA_RE_ROLE=xvfb HOME="$home" \
+              PATH="$td/usr/bin:$td/usr/sbin:/usr/bin:/bin" \
+              LD_LIBRARY_PATH="$td/usr/lib/x86_64-linux-gnu:$td/lib/x86_64-linux-gnu" \
+              XKB_CONFIG_ROOT="$td/usr/share/X11/xkb" \
+              nohup "$xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \
+              -xkbdir "$td/usr/share/X11/xkb" -nolisten tcp -noreset >"$runtime/xvfb.log" 2>&1 </dev/null &
+            echo $! > "$runtime/xvfb.pid"
+          )
+          xvfb_pid="$(cat "$runtime/xvfb.pid")"
+          for _ in $(seq 1 60); do
+            [[ -e "/tmp/.X11-unix/X${DISPLAY_NUM}" ]] && break
+            kill -0 "$xvfb_pid" 2>/dev/null || exit 1
+            sleep .25
+          done
+          [[ -e "/tmp/.X11-unix/X${DISPLAY_NUM}" ]]
+          echo TRACK_A_CACHE_WINDOW_XVFB_VERIFIED=true
+
+          cat > "$proxy_conf" <<EOF
+          strict_chain
+          proxy_dns
+          remote_dns_subnet 224
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 $TASK_SOCKS_PORT
+          EOF
+          proxy_lib="$(find "$td" -type f -name libproxychains.so.4 -print -quit)"
+          [[ -n "$proxy_lib" ]]
+          tool_lib="$td/usr/lib/x86_64-linux-gnu:/work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy:$td/lib/x86_64-linux-gnu"
+          cd "$package"
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_TASK="$TASK_ID" \
+            OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" OTCLIENT_TIBIA_RE_ROLE=client \
+            HOME="$home" DISPLAY="$TRACK_DISPLAY" PATH="$td/usr/bin:$td/usr/sbin:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$package/bin/lib:$tool_lib" \
+            QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none QT_DEBUG_PLUGINS=1 \
+            XDG_DATA_DIRS="$td/usr/share:/usr/share" FONTCONFIG_PATH="$td/etc/fonts" FONTCONFIG_FILE="$td/etc/fonts/fonts.conf" \
+            LD_PRELOAD="$proxy_lib" PROXYCHAINS_CONF_FILE="$proxy_conf" \
+            nohup "$package/bin/client" >"$runtime/client.log" 2>&1 </dev/null &
+          client_pid=$!; printf '%s\n' "$client_pid" > "$runtime/client.pid"
+          sleep 2
+          kill -0 "$client_pid"
+          grep -azFxq "$track_marker" "/proc/$client_pid/environ"
+          grep -azFxq "$task_marker" "/proc/$client_pid/environ"
+          grep -azFxq "$run_marker" "/proc/$client_pid/environ"
+          if grep -azEq '^(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD)=' "/proc/$client_pid/environ"; then exit 1; fi
+          echo "TRACK_A_CACHE_WINDOW_CLIENT_RUNNING=true pid=$client_pid"
+
+          export DISPLAY="$TRACK_DISPLAY"
+          visible=''
+          for _ in $(seq 1 100); do
+            visible="$("$td/usr/bin/xdotool" search --onlyvisible --pid "$client_pid" --name '^Tibia$' 2>/dev/null | head -n1 || true)"
+            [[ -n "$visible" ]] && break
+            sleep .3
+          done
+          all_count="$("$td/usr/bin/xdotool" search --pid "$client_pid" --name '.*' 2>/dev/null | wc -l)"
+          visible_count="$("$td/usr/bin/xdotool" search --onlyvisible --pid "$client_pid" --name '.*' 2>/dev/null | wc -l)"
+          echo "TRACK_A_CACHE_WINDOW_ALL_PID_WINDOWS=$all_count"
+          echo "TRACK_A_CACHE_WINDOW_VISIBLE_PID_WINDOWS=$visible_count"
+          if [[ -z "$visible" ]]; then
+            echo TRACK_A_CACHE_WINDOW_RESULT=window_missing
+            grep -E 'QXcbIntegration|QSGSoftwareRenderThread|Asset loading complete|Cannot create children|loaded library|Cannot load library|failed' "$runtime/client.log" | tail -n 80 || true
+            exit 2
+          fi
+          geometry="$("$td/usr/bin/xdotool" getwindowgeometry --shell "$visible" 2>/dev/null || true)"
+          echo "TRACK_A_CACHE_WINDOW_ID=$visible"
+          printf '%s\n' "$geometry" | grep -E '^(WIDTH|HEIGHT|X|Y)=' || true
+          echo TRACK_A_CLASSIFIED_CACHE_WINDOW_PROVEN=true

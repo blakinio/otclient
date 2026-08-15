@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: waiting
-agent: unassigned
-session_id: null
+status: active
+agent: ChatGPT
+session_id: chatgpt-coordinator-20260815-2352
 session_role: coordinator
-session_rotation_count: 13
+session_rotation_count: 14
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -12,12 +12,12 @@ task_kind: integration
 phase: promotion-review-integration
 branch: docs/OTC-20260815-track-a-promotion-coordination
 base_branch: main
-base_main: 3575cc0c0a0b4efbcd9fc860d3226002fe40e70f
+base_main: f6fa2264904c6ffb3734d4a63e1edbb29260fcc1
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T23:24:00+02:00
-lease_released_at: 2026-08-15T23:24:00+02:00
+updated: 2026-08-15T23:52:00+02:00
+lease_released_at: null
 risk: medium
 related_pr: 300
 owned_paths:
@@ -38,70 +38,70 @@ run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
-last_progress_at: 2026-08-15T23:24:00+02:00
-ci_check_generation: coordinator-rotation-13-novnc-classification
+last_progress_at: 2026-08-15T23:52:00+02:00
+ci_check_generation: coordinator-rotation-14-runtime-registration
 context_reconstruction_attempts: 1
-stop_reason: PR309 bounded classification promoted and source closed unmerged; coordinator ownership released while PR311 protection gate and RUNTIME proceed independently
+stop_reason: null
 last_promotion:
   source_pr: 309
   source_pr_state: closed_unmerged
   disposition: ACCEPT_WITH_EDITS
-  source_head: 717a23092e0cb43c04fd71b3471bf3eaee81b6f1
-  semantic_run: 31904709435
-  semantic_job: 95060619492
-  source_ci_run: 31909081449
-  source_ci_required_job: 95071474364
+active_review:
+  source_pr: 315
+  source_final_head: 129b440195439e7fd813e548d55c76a23ede88a7
+  semantic_code_head: 60c19331703d68fa455b14227c8a9aad8a76d26f
+  semantic_run: 31910131938
+  semantic_job: 95073832354
+  repository_ci_run: 31910340819
+  repository_ci_required_job: 95074702295
   review_threads: 0
-  canonical_evidence: docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/canonical-live-display-candidate/20260815-pr309-disposition.md
-next_action: once PR311 auto-merge completes, open a disjoint read-only canonical-runtime registration task that consumes merged lease governance and this bounded display-candidate evidence; do not declare :98 canonical without new identity/provenance proof and do not collide with active PR303 runtime ownership
+  proposed_disposition: ACCEPT_WITH_EDITS
+next_action: independently promote bounded PR315 current-state registration result, close source unmerged, then continue only disjoint planning while PR316 remains actively owned; PR311 stays fail-closed Draft until PR316 plus bootstrap-boundary reconciliation
 ---
 
 # Objective
 
 Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Research Drafts are promoted only after independent coordinator review. Track B remains outside mutation authority.
 
-# Rotation 13 result — PR #309
+# Rotation 14 — PR #315 registration review
 
-`ACCEPT_WITH_EDITS`; source Draft closed unmerged.
+Source final handoff head `129b440195439e7fd813e548d55c76a23ede88a7` has repository CI `31910340819`, including `CI / Required` job `95074702295`, SUCCESS and zero review threads.
 
-Promoted FACT:
+Final semantic code head `60c19331703d68fa455b14227c8a9aad8a76d26f`, run `31910131938`, job `95073832354`, SUCCESS on `synology-otclient-01`.
+
+Independent review rejects the first-pass overclaim that RFB desktop-name text proves exact backend mapping. Final source correctly performs visible+hidden X11 window census plus global exact-client `/proc/*/exe` size/SHA census without environ/cmdline/ptrace/input/framebuffer export.
+
+Promotable FACT:
 
 ```yaml
-gateway_6082_novnc_websockify_rfb: true
-rfb_protocol_version: "003.008"
-rfb_framebuffer: "1920x1080"
+semantic_result: PERSISTENT_DISPLAY_NO_LIVE_CLIENT
 persistent_x11_socket_set:
   - ":98"
-direct_rfb_5988: CONNECTION_REFUSED
-direct_rfb_5998: CONNECTION_REFUSED
-direct_rfb_6015: CONNECTION_REFUSED
-historical_working_track_a_display: ":98"
+display_98_present: true
+tibia_window_count_all: 0
+tibia_window_count_visible: 0
+global_exact_client_process_count: 0
+exact_window_candidate_count: 0
+rfb_6082_reachable: true
+rfb_protocol_version: "003.008"
+rfb_framebuffer: "1920x1080"
+rfb_desktop_name_supports_display_98: true
 ```
 
-Promoted INFERENCE:
+Promotable interpretation:
+- historical successful `:98` login/world evidence remains valid;
+- that historical exact-client process/session is not running now;
+- there is no current exact-fenced client process anywhere on the runner at observation time.
+
+Preserved boundary:
 
 ```yaml
-display_98_is_strongest_persistent_backend_candidate: HIGH_CONFIDENCE
+exact_6082_backend_display: UNKNOWN
+display_98_is_canonical: false
+current_canonical_live_pid: none_observed
+current_live_world_session: none_observed
 ```
 
-Preserved UNKNOWN / NOT_PROVEN:
+The desktop name supporting `98` strengthens the mapping inference only; it is not authoritative backend configuration.
 
-```yaml
-exact_websockify_6082_backend_display: UNKNOWN
-exact_websockify_backend_transport: UNKNOWN
-current_canonical_live_pid: UNKNOWN
-current_canonical_live_session_state: UNKNOWN
-display_98_is_canonical: NOT_PROVEN
-```
-
-The direct-port probe is complete and must not be repeated unchanged. Future canonical-runtime registration must use a different read-only discriminator or authoritative host-side service metadata.
-
-# Current programme boundary
-
-- #312 canonical-live lease manager is merged on main as `3575cc0c0a0b4efbcd9fc860d3226002fe40e70f`.
-- #311 governance is Ready, material review thread resolved, and protected auto-merge is enabled; final required CI is externally delayed by GitHub-hosted LuaJIT setup on the current ready-generation.
-- #303 RUNTIME has corrected the old no-window diagnosis; current blocker is a Yama-compatible structural observer model, not GUI creation.
-- a current valid lease grants mutation authority only, not concrete runtime identity.
-- `:98` remains candidate only until a separate registration/provenance proof.
-
-Track A remains incomplete.
+Programme consequence: there is currently no live runtime to register/reuse. Initial canonical-session creation is therefore a distinct future mutation transition and must not be smuggled through the reuse gate. PR #311 remains Draft while that bootstrap boundary and active PR #316 supervisor remediation are unresolved.

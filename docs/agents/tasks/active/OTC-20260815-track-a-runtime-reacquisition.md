@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-runtime-reacquisition
-status: ready
+status: active
 agent: ChatGPT
-session_id: chatgpt-runtime-researcher-20260815-1529
+session_id: chatgpt-runtime-researcher-20260815-1706
 session_role: researcher
-session_rotation_count: 3
+session_rotation_count: 4
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T16:09:00+02:00
+updated: 2026-08-15T17:06:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -37,25 +37,30 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
 runtime_code_bearing_head: 3327b8731e7c9babb53e9cc9c0f27428ede8ee5c
-invocation_started_at: 2026-08-15T15:29:00+02:00
-last_progress_at: 2026-08-15T16:09:00+02:00
+invocation_started_at: 2026-08-15T17:06:00+02:00
+last_progress_at: 2026-08-15T17:06:00+02:00
 ci_checks_for_current_head: 1
-ci_check_generation: draft
+ci_check_generation: defect-isolation
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 5
+repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-stop_reason: anti-stall repair-cycle limit reached for the visible-window/runtime-bootstrap gate after distinct loader, Qt-runtime, renderer, minimal-HOME and Xvfb-profile hypotheses; current exact-head CI also has deterministic actionlint findings requiring a fresh defect-isolation session before another semantic run
+claim_check: fresh rotation claimed from ready state after live main remained 8fca1c3, PR #303 remained open Draft/mergeable at head 0f48a570dea462b65e3a6517cd944a2eed24dacf, review threads were zero, and the previous researcher lease was explicitly released
+active_operation:
+  type: repair_actionlint_then_test_canonical_home_package_launch_path
+  previous_runtime_run: 31888992382
+  previous_runtime_job: 95022321212
+  previous_runtime_head: 3327b8731e7c9babb53e9cc9c0f27428ede8ee5c
 last_checkpoint:
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-bundled-qt-loader-shadow.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-software-backend-required.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-x11-home-state-discriminator.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-minimal-home-falsified-xvfb-profile.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-xvfb-profile-falsified-rotation.md
-next_action: fresh #303 defect-isolation session must first repair only the current workflow actionlint/shellcheck findings without changing runtime semantics, rerun exact-head CI, then resume from the documented canonical-HOME-package launch-path discriminator
+next_action: repair only current actionlint/shellcheck findings without changing runtime semantics, require exact-head CI green, then execute one canonical-HOME-package path/cwd discriminator while preserving all exact-client, no-secret, WARP/SOCKS, Xvfb, structural and effect fences
 ---
 
 # Objective
@@ -137,9 +142,9 @@ A fresh session may test only this difference: launch the existing task-owned co
 
 # Exact-head repository CI
 
-Current exact-head CI run `31888994157` is `FAILURE` because `Fast Checks / Syntax and workflow validation` failed in actionlint/shellcheck after `yamllint` passed. Findings are SC2016, SC2251, SC2015 and SC2318 in the compact workflow shell; they are repository-quality defects, not runtime-semantic evidence.
+Current exact-head CI run `31889237436` at pre-claim head `0f48a570dea462b65e3a6517cd944a2eed24dacf` is `FAILURE` because `Fast Checks / Syntax and workflow validation` fails in actionlint/shellcheck after `yamllint` passes. Findings are SC2016, SC2251, SC2015 and SC2318 in the compact workflow shell; they are repository-quality defects, not runtime-semantic evidence.
 
-The next session must repair those deterministic lint findings before launching another semantic runtime run.
+This rotation must repair those deterministic lint findings before launching another semantic runtime run.
 
 # Acceptance gate
 
@@ -150,9 +155,9 @@ The next session must repair those deterministic lint findings before launching 
 - [ ] structural read reacquired after clean restart/relogin;
 - [x] runner/source/WARP/relay/Xvfb prerequisites recovered and independently evidenced;
 - [x] loader, bundled Qt, software renderer, visible-window census, minimal-HOME and Xvfb-profile hypotheses discriminated;
-- [x] no unauthorized gameplay effect occurred during this rotation;
+- [x] no unauthorized gameplay effect occurred during prior rotation;
 - [ ] final exact-head CI terminal green before Draft handoff.
 
-# Rotation boundary
+# Rotation 4 claim
 
-Anti-stall repair-cycle limits for the current visible-window/runtime-bootstrap gate are exhausted. This task remains `ready` on the same branch and Draft PR for a fresh defect-isolation session; no further semantic retry is authorized in this session.
+This fresh session owns only the existing #303 RUNTIME task/branch. It must first repair workflow lint with no semantic runtime changes. Only after exact-head repository CI is green may it perform one new canonical package launch-path/cwd discriminator.

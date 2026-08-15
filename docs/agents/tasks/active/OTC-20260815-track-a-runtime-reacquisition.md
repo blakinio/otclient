@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260815-track-a-runtime-reacquisition
-status: ready
-agent: unassigned_draft_only_researcher
+status: validating
+agent: chatgpt-runtime-researcher
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
@@ -13,6 +13,8 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track-a-runtime-reacquisition
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
+related_pr: 303
+updated: 2026-08-15T12:55:16+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -105,6 +107,29 @@ If credentials or safe login prerequisites are unavailable, stop with an exact e
 - task must use only its own display/socket/state/PID files and verify ownership before cleanup;
 - do not touch Track B runtime/state/display/ports/processes.
 
+# Live runtime namespace
+
+The following concrete namespace is reserved by this task for its bounded validation run:
+
+```yaml
+runtime_namespace:
+  state_directory: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition
+  display: ':115'
+  task_socks_port: 25415
+  upstream_track_a_socks_port: 25354
+  upstream_track_a_socks_mode: read_only_dependency
+  process_marker: OTCLIENT_TIBIA_RE_TASK=OTC-20260815-track-a-runtime-reacquisition
+  track_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
+  concurrency_group: official-client-re-runtime
+cleanup_contract:
+  - never delete an X11 lock or socket that pre-existed this task
+  - never signal a process without both the task marker and expected executable/role evidence
+  - never stop or reconfigure the shared upstream Track A WARP/wireproxy process
+  - task client connects only to the task-local relay port 25415
+```
+
+Active Track A draft contracts #301, #302 and #304 use disjoint repository-owned paths; #301/#304 are static, while #302 is a passive runtime reader serialized by `official-client-re-runtime`. Track B #284 is outside authority and uses its own container/display namespace. Any unexpected live collision on `:115`, port `25415`, or the task state directory is an abort condition rather than a cleanup target.
+
 # Acceptance gate
 
 - [ ] exact client SHA/size rechecked on every generation;
@@ -120,6 +145,23 @@ If credentials or safe login prerequisites are unavailable, stop with an exact e
 # Side-effect budget
 
 Login/session recovery and clean process restart only. No market/trade/forge/currency effects. Movement is not part of the hypothesis and should not be repeated unless a single reversible step is necessary solely to distinguish live structural world state; if used, verify inverse restoration.
+
+# Planned discriminator
+
+For each generation, arm the exact-build structural Worldmap breakpoint at static offset `0x19a8ea3` before credentials are supplied. Require a bounded logged-out `NO_STIMULUS` baseline with zero valid Worldmap records, then use the protected login helper and require multiple validated `(x,y,z,order)` Worldmap records after character activation. This tests the existing structural read path without repeating movement. Repeat the same resolver procedure after a clean task-owned client/observer restart and require a fresh PID/PIE.
+
+# Execution-budget checkpoint
+
+```yaml
+invocation_started_at: 2026-08-15T12:49:00+02:00
+checkpoint_at: 2026-08-15T12:55:16+02:00
+ordinary_exact_head_checks: 0
+repair_cycles: 0
+identical_failure_retries: 0
+no_progress_state: false
+context_pressure: medium
+next_action: implement the task-owned no-secret prepare/login/verify/restart workflow and run it on the exact draft head
+```
 
 # Deliverable
 

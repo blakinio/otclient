@@ -29,8 +29,8 @@ jobs:
       EXPECTED_CODE_BEARING_HEAD: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
       BASELINE_WORKFLOW_COMMIT: 527369447672a355b6fc0a3f8a4f9c2b39f33b67
       BASELINE_WORKFLOW_BLOB: c382eab394cfbbed9a6fce93331d16fa2b0ecbbc
-      FAILED_RUN_TO_RECOVER: '31885896845'
-      PREVIOUS_FAILED_RUN_ID: '31885192604'
+      FAILED_RUN_TO_RECOVER: '31887680537'
+      BASELINE_RESIDUE_RUN_ID: '31885192604'
       PX_BACKEND_DIR: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy
       PX_BACKEND_FILE: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy/libpxbackend-1.0.so
       TASK_ID: OTC-20260815-track-a-runtime-reacquisition
@@ -46,7 +46,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 60
 
-      - name: Validate exact request baseline and proven loader dependency
+      - name: Validate exact request baseline and proven runtime dependencies
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -84,9 +84,9 @@ jobs:
           print('TRACK_A_RUNTIME_RESUME_REQUEST_VERIFIED=true')
           PY
           bash -n .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
-          echo TRACK_A_RUNTIME_BASELINE_AND_PXBACKEND_VERIFIED=true
+          echo TRACK_A_RUNTIME_DEPENDENCY_FENCES_VERIFIED=true
 
-      - name: Rehydrate proven runtime materializer and add exact libproxy path
+      - name: Rehydrate proven runtime materializer and enforce bundled Qt precedence
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -131,27 +131,34 @@ jobs:
           import sys
           path, backend = Path(sys.argv[1]), sys.argv[2]
           text = path.read_text(encoding='utf-8')
-          old = '  tool_lib="$td/usr/lib/x86_64-linux-gnu:$td/lib/x86_64-linux-gnu"'
-          new = f'  tool_lib="$td/usr/lib/x86_64-linux-gnu:{backend}:$td/lib/x86_64-linux-gnu"'
-          if text.count(old) != 1:
-              raise SystemExit(f'client loader-path anchor count={text.count(old)}, expected 1')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          old_tool_lib = '  tool_lib="$td/usr/lib/x86_64-linux-gnu:$td/lib/x86_64-linux-gnu"'
+          new_tool_lib = f'  tool_lib="$td/usr/lib/x86_64-linux-gnu:{backend}:$td/lib/x86_64-linux-gnu"'
+          if text.count(old_tool_lib) != 1:
+              raise SystemExit(f'client support-loader anchor count={text.count(old_tool_lib)}, expected 1')
+          text = text.replace(old_tool_lib, new_tool_lib, 1)
+          old_client_ld = '    PATH="$tool_path" LD_LIBRARY_PATH="$package/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\'
+          new_client_ld = '    PATH="$tool_path" LD_LIBRARY_PATH="$package/bin/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\'
+          if text.count(old_client_ld) != 1:
+              raise SystemExit(f'client bundled-Qt anchor count={text.count(old_client_ld)}, expected 1')
+          text = text.replace(old_client_ld, new_client_ld, 1)
+          path.write_text(text, encoding='utf-8')
           PY
           bash -n "$effective"
           grep -Fq "$PX_BACKEND_DIR" "$effective"
+          grep -Fq 'LD_LIBRARY_PATH="$package/bin/lib:$tool_lib"' "$effective"
           echo "TRACK_A_RUNTIME_BASELINE_WORKFLOW=$baseline" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_STEP_EXTRACTOR=$extractor" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$effective" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER_SHA256=$(sha256sum "$effective" | awk '{print $1}')"
-          echo TRACK_A_RUNTIME_PXBACKEND_PATH_MATERIALIZED=true
+          echo TRACK_A_RUNTIME_BUNDLED_QT_PRECEDENCE_MATERIALIZED=true
 
-      - name: Recover only exact task-owned residue from run 16
+      - name: Recover only exact task-owned residue from run 18
         shell: bash
         run: |
           set -Eeuo pipefail
           step="$RUNNER_TEMP/recover-track-a-runtime-residue.sh"
           python3 "$TRACK_A_RUNTIME_STEP_EXTRACTOR" "$TRACK_A_RUNTIME_BASELINE_WORKFLOW" 'Recover only exact task-owned residue from failed client launch' "$step"
-          python3 - "$step" "$PREVIOUS_FAILED_RUN_ID" "$FAILED_RUN_TO_RECOVER" <<'PY'
+          python3 - "$step" "$BASELINE_RESIDUE_RUN_ID" "$FAILED_RUN_TO_RECOVER" <<'PY'
           from pathlib import Path
           import sys
           path, old, new = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
@@ -225,39 +232,118 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          if [[ -r "${TRACK_A_RUNTIME_STEP_EXTRACTOR:-}" && -r "${TRACK_A_RUNTIME_BASELINE_WORKFLOW:-}" ]]; then
-            step="$RUNNER_TEMP/snapshot-track-a-runtime.sh"
-            python3 "$TRACK_A_RUNTIME_STEP_EXTRACTOR" "$TRACK_A_RUNTIME_BASELINE_WORKFLOW" 'Snapshot sanitized runtime evidence before cleanup' "$step"
-            bash "$step"
-          else
-            mkdir -p artifacts/runtime-reacquisition
-            {
-              echo "workflow_status=${{ job.status }}"
-              echo "workflow_run_id=$GITHUB_RUN_ID"
-              echo "workflow_head=$GITHUB_SHA"
-              echo "runner=$RUNNER_NAME"
-              echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"
-              echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
-              echo "support_rehydration=false"
-            } > artifacts/runtime-reacquisition/workflow-terminal.txt
-          fi
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"
+          out=artifacts/runtime-reacquisition
+          mkdir -p "$out"
+          python3 - "$root" "$out" <<'PY'
+          import re, shutil, sys
+          from pathlib import Path
+          root, out = map(Path, sys.argv[1:])
+          email = re.compile(r'(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}')
+          for gen in (1, 2):
+              g = root / f'generation-{gen}'
+              if not g.is_dir():
+                  continue
+              for name in ('map-records.tsv','baseline-count.txt','pie-base.txt','window.id'):
+                  src = g / name
+                  if src.is_file():
+                      shutil.copyfile(src, out / f'gen{gen}-{name}')
+              for name in ('client.log','gdb.log'):
+                  src = g / name
+                  if not src.is_file():
+                      continue
+                  lines=[]
+                  for line in src.read_text(errors='replace').splitlines()[-160:]:
+                      if 'TIBIA_TEST_EMAIL' in line or 'TIBIA_TEST_PASSWORD' in line:
+                          line='[REDACTED_SECRET_VARIABLE_LINE]'
+                      line=email.sub('[REDACTED_EMAIL]', line)
+                      lines.append(line)
+                  (out / f'gen{gen}-{name}').write_text('\n'.join(lines)+'\n', encoding='utf-8')
+          comparison = root / 'comparison.txt'
+          if comparison.is_file():
+              shutil.copyfile(comparison, out / 'comparison.txt')
+          PY
+          {
+            echo "workflow_status=${{ job.status }}"
+            echo "workflow_run_id=$GITHUB_RUN_ID"
+            echo "workflow_head=$GITHUB_SHA"
+            echo "runner=$RUNNER_NAME"
+            echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"
+            echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
+            echo "current_run_ownership=true"
+            echo "bundled_qt_precedence=true"
+            if [[ -n "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" && -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
+              echo "effective_helper_sha256=$(sha256sum "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" | awk '{print $1}')"
+            fi
+          } > "$out/workflow-terminal.txt"
 
-      - name: Clean task-owned runtime processes and ephemeral state
+      - name: Clean exact current-run runtime processes and ephemeral state
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
-          if [[ -z "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" || ! -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
-            echo TRACK_A_RUNTIME_CLEANUP_SKIPPED_NO_EFFECTIVE_HELPER=true
-            exit 0
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"
+          runtime="$root/runtime"
+          run_marker="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"
+          owned_current() {
+            local pid="$1" role="$2"
+            [[ -r "/proc/$pid/environ" ]] || return 1
+            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || return 1
+            grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" || return 1
+            grep -azFxq "$run_marker" "/proc/$pid/environ" || return 1
+            grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ" || return 1
+          }
+          stop_current() {
+            local role="$1" file="$runtime/$role.pid" pid=''
+            [[ -r "$file" ]] && pid="$(tr -cd '0-9' <"$file" 2>/dev/null || true)"
+            [[ -n "$pid" ]] || return 0
+            if kill -0 "$pid" 2>/dev/null; then
+              owned_current "$pid" "$role" || { echo "TRACK_A_RUNTIME_ERROR=foreign_current_$role" >&2; exit 1; }
+              kill -CONT "$pid" 2>/dev/null || true
+              kill -TERM "$pid" 2>/dev/null || true
+              for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
+              if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; fi
+              for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
+              ! kill -0 "$pid" 2>/dev/null || { echo "TRACK_A_RUNTIME_ERROR=current_stop_timeout_$role" >&2; exit 1; }
+              echo "TRACK_A_RUNTIME_CURRENT_PROCESS_STOPPED role=$role pid=$pid"
+            fi
+          }
+          xvfb_pid="$(tr -cd '0-9' <"$runtime/xvfb.pid" 2>/dev/null || true)"
+          for role in observer-gen-1 observer-gen-2 client-gen-1 client-gen-2 xvfb socks-relay; do
+            stop_current "$role"
+          done
+          python3 - "$TASK_SOCKS_PORT" <<'PY'
+          import pathlib, sys
+          needle=f"{int(sys.argv[1]):04X}"
+          for name in ('tcp','tcp6'):
+              p=pathlib.Path('/proc/net')/name
+              if not p.exists():
+                  continue
+              for row in p.read_text().splitlines()[1:]:
+                  f=row.split()
+                  if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==needle and f[3]=='0A':
+                      raise SystemExit('TRACK_A_RUNTIME_ERROR=current_socks_port_still_listening')
+          PY
+          lock="/tmp/.X${DISPLAY_NUM}-lock"
+          sock="/tmp/.X11-unix/X${DISPLAY_NUM}"
+          if [[ -e "$lock" ]]; then
+            lock_pid="$(tr -cd '0-9' <"$lock" 2>/dev/null || true)"
+            [[ -n "$xvfb_pid" && "$lock_pid" == "$xvfb_pid" ]] || { echo TRACK_A_RUNTIME_ERROR=foreign_current_display_lock >&2; exit 1; }
+            ! kill -0 "$lock_pid" 2>/dev/null || { echo TRACK_A_RUNTIME_ERROR=current_display_lock_pid_alive >&2; exit 1; }
+            rm -f "$lock"
           fi
-          if [[ -r "${TRACK_A_RUNTIME_STEP_EXTRACTOR:-}" && -r "${TRACK_A_RUNTIME_BASELINE_WORKFLOW:-}" ]]; then
-            step="$RUNNER_TEMP/cleanup-track-a-runtime.sh"
-            python3 "$TRACK_A_RUNTIME_STEP_EXTRACTOR" "$TRACK_A_RUNTIME_BASELINE_WORKFLOW" 'Clean task-owned runtime processes and ephemeral state' "$step"
-            bash "$step"
-          else
-            echo TRACK_A_RUNTIME_CLEANUP_SKIPPED_NO_BASELINE_SUPPORT=true
+          if [[ -e "$sock" ]]; then
+            [[ -n "$xvfb_pid" ]] || { echo TRACK_A_RUNTIME_ERROR=current_x11_socket_without_xvfb >&2; exit 1; }
+            ! kill -0 "$xvfb_pid" 2>/dev/null || { echo TRACK_A_RUNTIME_ERROR=current_x11_socket_xvfb_alive >&2; exit 1; }
+            grep -Fq "$sock" /proc/net/unix 2>/dev/null && { echo TRACK_A_RUNTIME_ERROR=current_x11_socket_still_active >&2; exit 1; }
+            rm -f "$sock"
           fi
+          if [[ -r "$root/task-id" ]]; then
+            [[ "$(cat "$root/task-id")" == "$TASK_ID" ]] || { echo TRACK_A_RUNTIME_ERROR=foreign_current_root >&2; exit 1; }
+            [[ "$root" == "/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID" ]] || { echo TRACK_A_RUNTIME_ERROR=current_root_outside_namespace >&2; exit 1; }
+            rm -rf -- "$root"
+          fi
+          echo TRACK_A_RUNTIME_CURRENT_RUN_CLEANUP_COMPLETE=true
 
       - name: Upload sanitized runtime reacquisition evidence
         if: always()

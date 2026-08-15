@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-runtime-reacquisition.yml
       - .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+      - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/runtime-run-request.json
   workflow_dispatch:
 
 permissions:
@@ -24,23 +25,54 @@ jobs:
       EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-runtime-reacquisition
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
       EXPECTED_CLIENT_SIZE: '51965216'
+      RUN_REQUEST: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/runtime-run-request.json
+      EXPECTED_HELPER_BLOB: c1b88d4cc17edf2684b93d7e516f9c694e37966a
+      EXPECTED_CODE_BEARING_HEAD: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
     steps:
       - name: Checkout exact draft head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
-      - name: Validate task helper and exact execution context
+      - name: Validate explicit resume request and exact execution context
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
+          test -s "$RUN_REQUEST"
+          [[ "$(git hash-object .github/scripts/tibia-official-client-re-runtime-reacquisition.sh)" == "$EXPECTED_HELPER_BLOB" ]]
+          python3 - "$RUN_REQUEST" "$EXPECTED_CLIENT_SHA256" "$EXPECTED_CLIENT_SIZE" "$EXPECTED_CODE_BEARING_HEAD" <<'PY'
+          import json, sys
+          path, expected_sha, expected_size, expected_code_head = sys.argv[1:]
+          data = json.load(open(path, encoding='utf-8'))
+          assert data['schema_version'] == 1
+          assert data['task_id'] == 'OTC-20260815-track-a-runtime-reacquisition'
+          assert data['track_id'] == 'official-client-re'
+          assert data['reason'] == 'resume_after_p0_runtime_lane_release'
+          assert data['base_main'] == '8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45'
+          assert data['runtime_code_bearing_head'] == expected_code_head
+          client = data['expected_client']
+          assert client['sha256'] == expected_sha
+          assert client['size'] == int(expected_size)
+          assert client['version_mapping'] == '15.32.df7b29'
+          assert client['platform'] == 'official_native_linux_only'
+          released = data['released_prerequisite']
+          assert released['p0_pr'] == 302
+          assert released['p0_head'] == '16758d5a7ed5c5271be059a2aca41f471f03f29d'
+          assert released['stale_run'] == 31880617510
+          assert released['runner_proof_run'] == 31883178675
+          assert released['runner_name'] == 'synology-otclient-01'
+          assert released['live_process_discriminator_run'] == 31883422477
+          assert released['live_process_discriminator_job'] == 95009054487
+          assert released['live_exact_track_clients'] == 0
+          print('TRACK_A_RUNTIME_RESUME_REQUEST_VERIFIED=true')
+          PY
           bash -n .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
-          test -x /bin/bash
           echo TRACK_A_RUNTIME_HELPER_SYNTAX_PASS=true
           echo "TRACK_A_RUNTIME_EXACT_HEAD=$GITHUB_SHA"
+          echo "TRACK_A_RUNTIME_CODE_BEARING_HEAD=$EXPECTED_CODE_BEARING_HEAD"
 
       - name: Bootstrap isolated no-secret runtime namespace
         shell: bash
@@ -132,6 +164,8 @@ jobs:
             echo "runner=$RUNNER_NAME"
             echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"
             echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
+            echo "code_bearing_head=$EXPECTED_CODE_BEARING_HEAD"
+            echo "resume_request_verified=true"
           } > artifacts/runtime-reacquisition/workflow-terminal.txt
 
       - name: Upload sanitized runtime reacquisition evidence

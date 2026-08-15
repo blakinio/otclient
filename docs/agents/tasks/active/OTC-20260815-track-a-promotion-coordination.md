@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: ready
+status: active
 agent: ChatGPT
-session_id: chatgpt-coordinator-20260815-125938
+session_id: chatgpt-coordinator-20260815-1330
 session_role: coordinator
-session_rotation_count: 1
+session_rotation_count: 2
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T13:27:26+02:00
+updated: 2026-08-15T13:30:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,7 +47,7 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T13:27:26+02:00
+last_progress_at: 2026-08-15T13:30:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: other
 terminal_ci_wait_started_at: null
@@ -55,13 +55,13 @@ terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 1
+context_reconstruction_attempts: 2
 stall_warnings: 0
 ---
 
 # Objective
 
-Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete while researchers remain Draft-only and the coordinator alone promotes accepted evidence. Track B is outside mutation authority.
+Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Researchers remain Draft-only; this task alone performs campaign-level promotion/integration subject to repository gates. Track B remains outside mutation authority.
 
 # Live-state contract
 
@@ -74,6 +74,8 @@ BRANCH: docs/OTC-20260815-track-a-promotion-coordination
 WORKTREE: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 ```
 
+The previous coordinator session checkpointed `READY`; this session is a rotation on the same task/branch after refetching the exact live branch head `fd52b138658056727978dbfeed6857f0e4cb7dc7`. No researcher branch/worktree is shared.
+
 # Exact client fence
 
 ```yaml
@@ -83,29 +85,35 @@ sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 platform: official_native_linux_only
 ```
 
-# Durable campaign checkpoint
+# Promotion ledger
 
-## Integrated accepted evidence
+## ACCEPT
 
-- PR #279 `ACCEPT_WITH_EDITS`: source closed unmerged at `04356aa9c042ce19d9d8431b91f18567e410a5e5`; exact accepted worldmap tool/test blobs rebuilt on #300; source exact-head CI `31681889560` SUCCESS; 23/23 focused tests, syntax and synthetic reconstruct/compare/plan evidence retained. Real capture/mappings/complete OTBM remain UNKNOWN.
-- PR #283 `ACCEPT`: source closed unmerged at `d93ccb34f66af7d3198a50a46e706b4f902ae637`; exact accepted read-only bridge/test blobs rebuilt on #300; source exact-head CI `31680615776` SUCCESS; exact runtime validation `31654823776` / `94306874981` retained. `session-status` remains DERIVED until live structural correlation; authoritative position/restart/write API remain UNKNOWN.
-- PR #290 `ACCEPT_WITH_EDITS`: bounded historical login/recovery procedure preserved as `REVALIDATION_REQUIRED`; source closed.
-- bounded exact-build reversible structural world transition from run `31806312967` / job `94785974126` retained as FACT world-state evidence only; A3/A4 remain unproven.
+- PR #283: bounded read-only runtime bridge implementation only. Source closed unmerged at `d93ccb34f66af7d3198a50a46e706b4f902ae637`; exact accepted blobs rebuilt on #300. `session-status` remains DERIVED pending live structural correlation.
+- Exact-build reversible structural world transition from run `31806312967` / job `94785974126`; standalone player XYZ and A3/A4 remain unproven.
 
-## Rejected/superseded
+## ACCEPT_WITH_EDITS
 
-- #289 stale broad continuation / superseded P2 model;
-- #296 stale lifecycle draft after accepted correction integration;
-- #277 stale Oteryn-dependent handover; unique negative history preserved;
-- #280 superseded only as an active Track A dependency; broader infrastructure PR remains separately owned/open.
+- PR #279: fail-closed worldmap reconstruction tooling; exact accepted blobs rebuilt on current-main integration branch. Real capture/mappings/complete OTBM remain UNKNOWN.
+- PR #290: bounded historical login/recovery procedure retained as `REVALIDATION_REQUIRED`.
 
-## Return for evidence
+## RETURN_FOR_EVIDENCE
 
 - #295: material review findings plus Track B ownership collision.
-- #301 P2-NETWORK: current head `29ca506501efc716330a80ab2b96eaf9bbe3d4d5`; dispatch contract only; READY/unassigned, no experiment result.
-- #302 P0-STATE: current head `e45b126923495b209c08a77e9a3db96b44ad71a4`; typed read-only probe exists but run `31880617510` job `95002559098` remains queued; no semantic result.
-- #303 RUNTIME: current head `0270b1f3b6e75c995649b405758f058bae026c88`; no self-hosted reacquire semantic job executed; serialized behind #302.
-- #304 COVERAGE-AUDIT: current head `7eec15079e54bc163785013025cdea47d30e57c7`; dispatch contract only; READY/unassigned, no registries/validator.
+- #301 P2-NETWORK: contract-only head `29ca506501efc716330a80ab2b96eaf9bbe3d4d5`; no experiment delivered.
+- #302 P0-STATE: typed read-only probe exists, but self-hosted run `31880617510` remains queued; no semantic direct-position result.
+- #303 RUNTIME: runtime semantic run remains blocked behind #302. During this rotation the RUNTIME workflow was additionally hardened fail-closed for observer cleanup on code head `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`; this is safety repair only, not semantic evidence.
+
+## REVIEW_REQUIRED_THIS_SESSION
+
+- #304 COVERAGE-AUDIT: new reviewable worker handoff at exact Draft head `43a60bd96cc644b656b200c9edbfb75578b330b6` with deterministic validator and exact-head CI `31882010038` reported SUCCESS. Must be independently reviewed against canonical evidence before disposition.
+
+## REJECT/SUPERSEDE
+
+- #289 broad stale continuation and superseded P2 model;
+- #296 stale lifecycle Draft after accepted correction integration;
+- #277 stale Oteryn-dependent handover with unique negative history preserved;
+- #280 superseded only as an active Track A dependency; broader infrastructure remains separately owned/open.
 
 # Canonical non-completion boundary
 
@@ -121,31 +129,34 @@ P0_COVERAGE: UNKNOWN/UNKNOWN
 COMPLETE: false
 ```
 
-# Validation checkpoint
+# Integration validation carried forward
 
-Coordinator integration checkpoint `941921ae6c481d2ad6d94c0b182fba8c1bd40f68` was audited for changed paths and exact source-blob identity:
+Coordinator integration checkpoint `941921ae6c481d2ad6d94c0b182fba8c1bd40f68` was previously audited for changed paths and exact source-blob identity. Worldmap and runtime-bridge integrated product/test blobs match the accepted source blobs. Exact-head CI run `31882005845` was in progress when the previous session exhausted its two ordinary checks; this rotation will not treat that as semantic proof and will use fresh final-head validation only after any new accepted integration change.
 
-- all 23 changed files are within declared Track A coordinator/integration scope;
-- current worldmap tool/test blob SHAs exactly equal the accepted #279 source blobs;
-- current runtime-bridge tool/test/profile blob SHAs exactly equal the accepted #283 source blobs;
-- `main` was still `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45` immediately before exact-head validation;
-- exact-head CI run `31882005845` progressed from `pending` to `in_progress` across the two ordinary checks allowed for that SHA; no third poll is permitted by the anti-stall contract.
+# Acceptance inventory
 
-This task is not marked completed and #300 remains Draft because independent researcher evidence and programme gates are outstanding. The current checkpoint commit is documentation-only after the audited integration head; no product/tool/test blob changed after `941921ae...`.
+- [x] current main and governance refetched;
+- [x] coordinator task/branch ownership rotated safely after prior `READY` checkpoint;
+- [x] #279/#283/#290 accepted bounded slices integrated/preserved;
+- [x] #301/#302 current dispositions evidence-backed;
+- [ ] #304 new evidence head reviewed and assigned one exact disposition;
+- [ ] accepted coverage evidence, if any, integrated only as a bounded canonical slice;
+- [ ] P2/P0/RUNTIME live gates satisfied or left explicitly incomplete with durable blockers;
+- [ ] quantitative coverage state reconciled item-by-item without overstating inventory percentages;
+- [ ] final audit/E2E/exact-head CI/PR hygiene/task archive/ownership release complete.
 
-# Execution budget state
+# Execution budget
 
 ```yaml
-invocation_started_at: 2026-08-15T12:48:00+02:00
-checkpoint_at: 2026-08-15T13:27:26+02:00
-elapsed_minutes_approx: 39
-ordinary_ci_checks_for_941921ae: 2
+session_rotation_count: 2
+last_progress_at: 2026-08-15T13:30:00+02:00
+ordinary_ci_checks_for_current_head: 0
+terminal_ci_checks: 0
 repair_cycles: 0
-context_reconstruction_attempts: 1
+context_reconstruction_attempts: 2
 stall_warnings: 0
-stop_reason: current coordinator-safe work exhausted; runtime lanes are waiting and READY P2/coverage tasks require separate Draft-only researcher sessions, but the available toolset cannot spawn an independent worker and coordinator role must not impersonate them
 ```
 
 # Next action
 
-A separate Draft-only researcher session must claim `OTC-20260815-track-a-p2-writer-ownership` / PR #301 first (highest information gain) and execute its exact-client writer-ownership hypothesis without reviving the superseded models. In parallel, #302/#303 may resume only when the serialized self-hosted runtime lane assigns their jobs, and another independent static researcher may claim #304. The next coordinator session must refetch main/PR heads, review only newly produced evidence, and continue promotion from this checkpoint.
+Review exact #304 head `43a60bd96cc644b656b200c9edbfb75578b330b6`: verify owned paths, validator/provenance, exact-head CI and whether every percentage/UNKNOWN boundary is supportable. Assign one coordinator disposition, then integrate only the accepted bounded coverage slice if warranted.

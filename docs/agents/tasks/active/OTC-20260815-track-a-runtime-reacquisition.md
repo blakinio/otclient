@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T17:06:00+02:00
+updated: 2026-08-15T17:12:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -37,10 +37,11 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
 runtime_code_bearing_head: 3327b8731e7c9babb53e9cc9c0f27428ede8ee5c
+workflow_quality_head: 5bbdb13b70f66685e067d5088bd0f4efe9b9de09
 invocation_started_at: 2026-08-15T17:06:00+02:00
-last_progress_at: 2026-08-15T17:06:00+02:00
-ci_checks_for_current_head: 1
-ci_check_generation: defect-isolation
+last_progress_at: 2026-08-15T17:12:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: post-lint
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -48,19 +49,19 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-claim_check: fresh rotation claimed from ready state after live main remained 8fca1c3, PR #303 remained open Draft/mergeable at head 0f48a570dea462b65e3a6517cd944a2eed24dacf, review threads were zero, and the previous researcher lease was explicitly released
+claim_check: fresh rotation claimed from ready state after live main remained 8fca1c3, PR #303 remained open Draft/mergeable, review threads were zero, and the previous researcher lease was explicitly released
 active_operation:
-  type: repair_actionlint_then_test_canonical_home_package_launch_path
-  previous_runtime_run: 31888992382
-  previous_runtime_job: 95022321212
-  previous_runtime_head: 3327b8731e7c9babb53e9cc9c0f27428ede8ee5c
+  type: validate_lint_repair_before_canonical_home_package_launch
+  lint_logic_commit: da33ac9dcc1e0bb5f937c41ebcef8353c702506e
+  final_newline_commit: 5bbdb13b70f66685e067d5088bd0f4efe9b9de09
+  incidental_runtime_run: 31891922805
 last_checkpoint:
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-bundled-qt-loader-shadow.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-software-backend-required.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-x11-home-state-discriminator.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-minimal-home-falsified-xvfb-profile.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-xvfb-profile-falsified-rotation.md
-next_action: repair only current actionlint/shellcheck findings without changing runtime semantics, require exact-head CI green, then execute one canonical-HOME-package path/cwd discriminator while preserving all exact-client, no-secret, WARP/SOCKS, Xvfb, structural and effect fences
+next_action: require the task-only exact-head PR CI generation to pass yamllint/actionlint; if green, execute one canonical-HOME-package path/cwd discriminator while preserving all exact-client, no-secret, WARP/SOCKS, Xvfb, structural and effect fences
 ---
 
 # Objective
@@ -138,13 +139,17 @@ Historical run `31730884814`, attempt 14, job `94785048338`, is independently te
 
 The remaining high-information difference is the package launch path/cwd/argv surface. Attempt 14 executed the client directly from `$HOME/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client`, whereas the isolated task currently launches the physical task-run-root package and only exposes it into task-local HOME through a symlink.
 
-A fresh session may test only this difference: launch the existing task-owned copied package through the task-local canonical HOME package path/cwd while preserving the exact SHA, bundled Qt, software backend, task-local Xvfb, SOCKS, no-secret and visible-window gates. Do not copy broader persistent HOME or reuse/modify display `:98`.
+After lint validation, this rotation may test only this difference: launch the existing task-owned copied package through the task-local canonical HOME package path/cwd while preserving the exact SHA, bundled Qt, software backend, task-local Xvfb, SOCKS, no-secret and visible-window gates. Do not copy broader persistent HOME or reuse/modify display `:98`.
 
-# Exact-head repository CI
+# Workflow lint repair
 
-Current exact-head CI run `31889237436` at pre-claim head `0f48a570dea462b65e3a6517cd944a2eed24dacf` is `FAILURE` because `Fast Checks / Syntax and workflow validation` fails in actionlint/shellcheck after `yamllint` passes. Findings are SC2016, SC2251, SC2015 and SC2318 in the compact workflow shell; they are repository-quality defects, not runtime-semantic evidence.
+- `da33ac9dcc1e0bb5f937c41ebcef8353c702506e` removes the prior SC2016/SC2251/SC2015/SC2318 findings with equivalent explicit shell control flow; its CI exposed only a missing final LF.
+- `5bbdb13b70f66685e067d5088bd0f4efe9b9de09` adds only the missing final LF with `[skip ci]`, and did not create a second runtime workflow run.
+- this task-only checkpoint intentionally triggers repository PR CI without matching the runtime workflow `paths` filter.
 
-This rotation must repair those deterministic lint findings before launching another semantic runtime run.
+# Incidental runtime run #25
+
+The workflow edit at `da33ac9d...` necessarily auto-triggered run `31891922805`; the available GitHub connector exposes no workflow-cancel mutation. It is not an authorized new hypothesis and must not be used to expand the evidence boundary. If it executes, classify it only as a duplicate pre-discriminator run and do not treat a repeated visible-window failure as a new repair cycle.
 
 # Acceptance gate
 
@@ -155,9 +160,7 @@ This rotation must repair those deterministic lint findings before launching ano
 - [ ] structural read reacquired after clean restart/relogin;
 - [x] runner/source/WARP/relay/Xvfb prerequisites recovered and independently evidenced;
 - [x] loader, bundled Qt, software renderer, visible-window census, minimal-HOME and Xvfb-profile hypotheses discriminated;
+- [x] workflow SC2016/SC2251/SC2015/SC2318 findings repaired without intended runtime-semantic change;
 - [x] no unauthorized gameplay effect occurred during prior rotation;
+- [ ] post-lint exact-head CI terminal green before the canonical launch-path discriminator;
 - [ ] final exact-head CI terminal green before Draft handoff.
-
-# Rotation 4 claim
-
-This fresh session owns only the existing #303 RUNTIME task/branch. It must first repair workflow lint with no semantic runtime changes. Only after exact-head repository CI is green may it perform one new canonical package launch-path/cwd discriminator.

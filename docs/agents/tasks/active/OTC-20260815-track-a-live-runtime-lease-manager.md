@@ -1,15 +1,15 @@
 ---
 task_id: OTC-20260815-track-a-live-runtime-lease-manager
-status: active
-agent: ChatGPT
-session_id: chatgpt-live-runtime-lease-promotion-20260815-2257
+status: ready
+agent: unassigned
+session_id: null
 session_role: promotion-worker
 session_rotation_count: 2
 project_lane: otclient
 lane: track-a-runtime-governance
 track_id: official-client-re
 task_kind: implementation
-phase: coordinator-accepted-promotion-edits
+phase: promotion-ready
 branch: feat/OTC-20260815-track-a-live-runtime-lease-manager
 base_branch: main
 base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
@@ -18,8 +18,8 @@ worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 312
 created: 2026-08-15T22:04:00+02:00
-updated: 2026-08-15T22:57:00+02:00
-lease_released_at: null
+updated: 2026-08-15T23:03:00+02:00
+lease_released_at: 2026-08-15T23:03:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-live-runtime-lease-manager.md
   - docs/agents/evidence/OTC-20260815-track-a-live-runtime-lease-manager/**
@@ -48,8 +48,8 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: low_noise
 implementation_authorized: true
-last_progress_at: 2026-08-15T22:57:00+02:00
-ci_check_generation: promotion-discovery-metadata
+last_progress_at: 2026-08-15T23:03:00+02:00
+ci_check_generation: final-release-head
 last_verified_code_head: e368173086ba8bb1235218b3ec11e046e2c909cb
 semantic_run: 31907695244
 semantic_unit_job: 95067968895
@@ -58,24 +58,28 @@ semantic_state: success
 repository_ci_run: 31907697738
 repository_ci_required_job: 95068323632
 repository_ci_state: success
+promotion_metadata_head: 46651d89db2d1a79bf4f66df005b8bcd7267959c
+promotion_metadata_ci_run: 31908198411
+promotion_metadata_ci_required_job: 95069317568
+promotion_metadata_ci_state: success
 coordinator_disposition: ACCEPT_WITH_EDITS
 coordinator_evidence: docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/canonical-live-lease-manager/20260815-pr312-disposition.md
 delegated_paths:
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
 review_threads: 0
-stop_reason: null
+stop_reason: promotion-ready handoff; final task-only release head checks are the protected merge gate
 ---
 
 # Objective
 
-Promote the coordinator-accepted canonical-live controller lease manager by adding only the required same-PR reusable-tool discovery metadata, then pass final exact-head validation and protected merge.
+Promote the coordinator-accepted canonical-live controller lease manager with required reusable-tool discovery metadata, without claiming or mutating a canonical Tibia runtime.
 
 # Coordinator disposition — FACT
 
 Coordinator PR #300 independently re-reviewed the corrected implementation and assigned `ACCEPT_WITH_EDITS`. The prior material stale-release bypass was repaired on code head `e368173086ba8bb1235218b3ec11e046e2c909cb` and validated by custom run `31907695244` plus repository CI `31907697738`, both SUCCESS.
 
-The only required promotion edits are bounded entries to `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md`. Coordinator #300 explicitly removed those paths from its active ownership and delegated them to this PR before releasing its lease. No other #300 path is owned here.
+Coordinator delegated only `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md` to this source promotion slice. Both bounded discovery edits are now present; the changelog diff was rechecked after an intermediate rewrite error and final diff preserves all historical content plus exactly one new Track A entry.
 
 # Accepted implementation FACT
 
@@ -89,10 +93,33 @@ Authoritative state:
 
 The manager provides serialized `acquire`, `renew`, `validate`, `release`, redacted `status`, and lock-held `guard-run`; fixed production state path; task-local token confinement; atomic mode-0600 state; SHA-256 token digest only in shared state; explicit stale takeover reason; generation fencing; and rejection of renew/validate/release by expired holders.
 
+# Exact validation — FACT
+
+Corrected semantic code head:
+
+```text
+head=e368173086ba8bb1235218b3ec11e046e2c909cb
+custom_run=31907695244
+unit_job=95067968895 SUCCESS
+selfhosted_job=95067968820 SUCCESS
+repository_ci=31907697738 SUCCESS
+ci_required_job=95068323632 SUCCESS
+```
+
+Promotion metadata head:
+
+```text
+head=46651d89db2d1a79bf4f66df005b8bcd7267959c
+repository_ci=31908198411 SUCCESS
+ci_required_job=95069317568 SUCCESS
+```
+
+Final task-only release commit is intentionally the remaining protected merge gate; it changes no runtime code or discovery metadata.
+
 # Safety / non-claims
 
 - No canonical live state directory was created or modified by validation.
-- No Tibia client process, display `:98`, display `:115`, login/account/session, input, attach, signal, VNC/noVNC, or gameplay state is mutated by this promotion edit.
+- No Tibia client process, display `:98`, display `:115`, login/account/session, input, attach, signal, VNC/noVNC, or gameplay state is mutated by this PR.
 - `:98` is NOT canonicalized by this PR.
 - This is a cooperative same-UID programme-governance fence, not a hostile-user security boundary.
 - PR #311 remains fail-closed until this manager is actually on `main` and its policy/review is reconciled.
@@ -102,14 +129,15 @@ The manager provides serialized `acquire`, `renew`, `validate`, `release`, redac
 - [x] coordinator disposition `ACCEPT_WITH_EDITS` recorded;
 - [x] corrected semantic code and stale-release regression validated;
 - [x] `MODULE_CATALOG.md` / `CHANGELOG.md` ownership delegated from #300;
-- [ ] add bounded catalogue entry;
-- [ ] add bounded changelog entry;
-- [ ] final exact-head custom validation SUCCESS;
-- [ ] final exact-head repository `CI / Required` SUCCESS;
-- [ ] review threads zero/material findings resolved for #312;
+- [x] bounded catalogue entry added and patch reviewed;
+- [x] bounded changelog entry added; accidental intermediate rewrite repaired and patch reviewed;
+- [x] promotion metadata head `CI / Required` SUCCESS;
+- [x] review threads zero at promotion review;
+- [ ] final task-only release head custom validation terminal SUCCESS;
+- [ ] final task-only release head repository `CI / Required` terminal SUCCESS;
 - [ ] protected merge #312 to `main`;
-- [ ] source task archived/released after merge.
+- [ ] source task archived in post-merge governance cleanup.
 
 # Next action
 
-Add only the delegated discovery metadata, then require final exact-head custom validation and repository CI before protected merge. After #312 reaches `main`, return to PR #311 governance reconciliation; do not register `:98` canonical in this PR.
+Do not edit the source again. Observe only the final task-release head custom validation and repository `CI / Required`; if both are SUCCESS and the PR remains mergeable with no new material review findings, perform the protected merge. Then return to PR #311 governance reconciliation without declaring `:98` canonical.

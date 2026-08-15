@@ -2,9 +2,9 @@
 task_id: OTC-20260815-track-a-runtime-reacquisition
 status: active
 agent: ChatGPT
-session_id: chatgpt-runtime-researcher-20260815-1414
+session_id: chatgpt-runtime-researcher-20260815-1529
 session_role: researcher
-session_rotation_count: 2
+session_rotation_count: 3
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T14:43:00+02:00
+updated: 2026-08-15T15:29:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -37,30 +37,27 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
 runtime_code_bearing_head: e5d73eb092968479782bd77061ca12c449b9f62f
-invocation_started_at: 2026-08-15T14:14:00+02:00
-last_progress_at: 2026-08-15T14:43:00+02:00
+invocation_started_at: 2026-08-15T15:29:00+02:00
+last_progress_at: 2026-08-15T15:29:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: runtime
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 2
+unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 5
+repair_cycles_for_current_gate: 6
 context_reconstruction_attempts: 1
 stall_warnings: 0
-claim_check: passed against released task, open Draft PR #303, exact main@8fca1c3 and RUNTIME-only paths
+claim_check: takeover after prior task checkpoint lease expired; live main remained 8fca1c3, PR #303 remained open Draft/mergeable, run #17 was terminal SUCCESS, PR head d0e11895415266b1f3cf8904d67f5e3a8aa54577 had no newer active operation, and all planned writes remain inside RUNTIME ownership
 active_operation:
-  type: read_only_client_pid_marker_discriminator
-  run_id: 31885303986
-  job_id: 95013631491
-  execution_head: c632cb8f519c78f85e4209a0ef3c8484f2193ef2
-  runner_id: 21
-  runner_name: synology-otclient-01
+  type: repair_exact_client_loader_path_and_resume_reacquisition
+  discriminator_run_id: 31886223175
+  discriminator_job_id: 95015803600
+  discriminator_head: 5b213ca776cbf55a235742f8a799000d41e4dc02
+  exact_libpxbackend: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy/libpxbackend-1.0.so
 last_checkpoint:
-  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-xkbcomp-root-cause.md
-  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-xkbcomp-location.md
-  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-xkb-recovered-client-ownership-failure.md
-next_action: consume only diagnostic run 31885303986; repair the exact client PID/marker lifecycle failure it proves, then resume generation-1 preparation without changing login semantics
+  - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-client-loader-pxbackend-failure.md
+next_action: add only the proven libproxy directory to the exact-client loader path, restore the full bounded reacquisition workflow with all prior safety/materialization gates, recover only exact task-owned residue, and inspect the next semantic run
 ---
 
 # Objective
@@ -97,52 +94,27 @@ Credentials may exist only in protected login steps. Persistent runtime processe
 
 # Run #12 — first exact-client generation launch
 
-Run `31885192604` / job `95013369670`, head `e5d73eb092968479782bd77061ca12c449b9f62f`, reached farther than all prior recovery runs.
+Run `31885192604` / job `95013369670`, head `e5d73eb092968479782bd77061ca12c449b9f62f`, reached the exact client launch after all infrastructure gates. It failed before login at client ownership discovery. No credentials or gameplay effects occurred.
 
-Completed `SUCCESS` before generation launch:
+# Run #16 — exact loader failure
 
-1. exact resume-request/helper fences;
-2. XKB/lifecycle compatibility materialization;
-3. exact failed-run residue recovery;
-4. source/WARP/exact-client bootstrap;
-5. task relay and Xvfb startup;
-6. cross-step persistence gate for relay and Xvfb.
-
-Key proof:
+Run `31885896845` / job `95015034558`, head `527369447672a355b6fc0a3f8a4f9c2b39f33b67`, passed helper materialization, residue recovery, bootstrap and persistence, then failed before login with:
 
 ```text
-TRACK_A_RUNTIME_PERSISTENT_CHILD_VERIFIED role=socks-relay pid=23997
-TRACK_A_RUNTIME_PERSISTENT_CHILD_VERIFIED role=xvfb pid=24032
-TRACK_A_RUNTIME_PERSISTENT_RELAY_LISTENING=true
+client: error while loading shared libraries: libpxbackend-1.0.so: cannot open shared object file: No such file or directory
 ```
 
-`Prepare generation 1` then reverified the exact package client and failed after launch/PID capture but before window/GDB/login:
+Evidence: `20260815-client-loader-pxbackend-failure.md`.
+
+# Run #17 — loader discriminator result
+
+Read-only run `31886223175` / job `95015803600`, head `5b213ca776cbf55a235742f8a799000d41e4dc02`, completed `SUCCESS` and proved the required existing library at:
 
 ```text
-TRACK_A_EXACT_CLIENT_VERIFIED size=51965216 sha256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-TRACK_A_RUNTIME_ERROR=client_gen_1_ownership_failed
+/work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy/libpxbackend-1.0.so
 ```
 
-Artifact id `9247072540`, ZIP SHA-256 `dacb6fe4ac20eece815003dcb409fc393b32e749883234f0d8edcb4986c12f46`.
-
-No login step ran. No credential values were injected into the client launch. No movement/gameplay/economic action occurred. Generation-1 GDB observer was not armed. Generation 2 was not attempted.
-
-Evidence: `20260815-xkb-recovered-client-ownership-failure.md`.
-
-# Current discriminator
-
-The helper failure occurs after `$!` is written to `client-gen-1.pid`, after `/proc/$pid/maps` becomes readable, at `role_owned "$pid" "client-gen-1" "$client"`.
-
-### UNKNOWN
-
-Current evidence does not yet distinguish whether:
-
-- `$!` is a transient `setsid`/wrapper PID while the marked client is a child;
-- client startup re-execs/forks to another PID;
-- exact executable identity differs at the recorded PID;
-- one Track/Task/Role marker is absent.
-
-Read-only diagnostic run `31885303986` / job `95013631491` is inspecting exact failed-run residue: recorded PID, PID/exe/PPID, exact task/role matches across `/proc`, immediate children, Xvfb/relay state, X11 residue and sanitized `client.log`. It does not start/stop/signal processes and does not access credentials.
+The exact failed-run residue at observation time contained one task-owned live SOCKS relay, dead Xvfb/client, no active X11 lock/socket, and the task-local SOCKS port still listening. The next repair must reuse this existing library; installing/downloading a replacement is not authorized or necessary.
 
 # Acceptance gate
 
@@ -153,9 +125,10 @@ Read-only diagnostic run `31885303986` / job `95013631491` is inspecting exact f
 - [ ] structural read reacquired after clean restart/relogin;
 - [x] runner/source/WARP/relay/Xvfb prerequisites recovered and independently evidenced;
 - [x] persistent relay/Xvfb survive a step boundary with no-secret ownership proof;
+- [x] exact missing `libpxbackend-1.0.so` location proven read-only;
 - [x] no unauthorized gameplay effect has occurred;
 - [ ] final exact-head CI terminal before Draft handoff.
 
 # Next action
 
-Consume the existing read-only client-ownership diagnostic only. Apply one evidence-backed PID/marker lifecycle repair, recover only exact task-owned run #12 residue, and resume generation-1 preparation. Do not change protected login semantics or dispatch an identical runtime retry without the discriminator result.
+Patch only the exact-client loader search path with the proven `toolroot/usr/lib/x86_64-linux-gnu/libproxy` directory, restore and execute the full bounded reacquisition workflow, and classify the first new semantic result. Do not change protected login semantics, exact client fence, Track B isolation, or effect budget.

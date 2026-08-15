@@ -119,6 +119,16 @@ jobs:
                'QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none','software-backend')
           once('1280x800x24','1920x1080x24','xvfb-screen')
           once(' +extension GLX +iglx +render -nolisten tcp -noreset',' -nolisten tcp -noreset','xvfb-flags')
+          once(
+              '  client="$package/bin/client"; td="$(toolroot)"',
+              '\n'.join([
+                  '  package="$root/home-gen-$gen/.local/share/CipSoft GmbH/Tibia/packages/Tibia"',
+                  '  [[ -L "$package" ]] || die canonical_package_symlink_missing',
+                  '  [[ "$(readlink -f "$package")" == "$(readlink -f "$(package_dir)")" ]] || die canonical_package_target_mismatch',
+                  '  client="$package/bin/client"; td="$(toolroot)"',
+                  '  printf \'TRACK_A_RUNTIME_CANONICAL_PACKAGE_LAUNCH generation=%s path=%s\\n\' "$gen" "$package"',
+              ]),
+              'canonical-home-package-launch')
           path.write_text(text,encoding='utf-8')
           PY
           bash -n "$effective"
@@ -126,6 +136,7 @@ jobs:
           grep -Fq "LD_LIBRARY_PATH=\"\$package/bin/lib:\$tool_lib\"" "$effective"
           grep -Fq 'QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none' "$effective"
           grep -Fq '1920x1080x24' "$effective"
+          grep -Fq 'TRACK_A_RUNTIME_CANONICAL_PACKAGE_LAUNCH' "$effective"
           if grep -Fq '1280x800x24' "$effective"; then
             echo TRACK_A_RUNTIME_ERROR=stale_xvfb_screen >&2
             exit 1
@@ -257,7 +268,7 @@ jobs:
           python3 - "$root" "$out" <<'PY'
           import re,shutil,sys
           from pathlib import Path
-          root,out=map(Path,sys.argv[1:]); email=re.compile(r'(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}')
+          root,out=map(Path,sys.argv[1:]); email=re.compile(r'(?i)[A-Z0-9._%+-]+@[A-Z]{0,0}[A-Z0-9.-]+\.[A-Z]{2,}')
           for gen in (1,2):
               g=root/f'generation-{gen}'
               if not g.is_dir(): continue
@@ -291,7 +302,7 @@ jobs:
           {
             echo "workflow_status=${{ job.status }}"; echo "workflow_run_id=$GITHUB_RUN_ID"; echo "workflow_head=$GITHUB_SHA"; echo "runner=$RUNNER_NAME"
             echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"; echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
-            echo "current_run_ownership=true"; echo "bundled_qt_precedence=true"; echo "software_backend=true"; echo "minimal_launcher_home=true"; echo "known_good_xvfb_profile=true"
+            echo "current_run_ownership=true"; echo "bundled_qt_precedence=true"; echo "software_backend=true"; echo "minimal_launcher_home=true"; echo "known_good_xvfb_profile=true"; echo "canonical_home_package_launch=true"
           } > "$out/workflow-terminal.txt"
 
       - name: Clean exact current-run runtime processes and ephemeral state

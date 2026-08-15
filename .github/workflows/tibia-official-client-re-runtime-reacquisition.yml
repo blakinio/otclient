@@ -29,7 +29,7 @@ jobs:
       EXPECTED_CODE_BEARING_HEAD: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
       BASELINE_WORKFLOW_COMMIT: 527369447672a355b6fc0a3f8a4f9c2b39f33b67
       BASELINE_WORKFLOW_BLOB: c382eab394cfbbed9a6fce93331d16fa2b0ecbbc
-      FAILED_RUN_TO_RECOVER: '31887680537'
+      FAILED_RUN_TO_RECOVER: '31887917603'
       BASELINE_RESIDUE_RUN_ID: '31885192604'
       PX_BACKEND_DIR: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy
       PX_BACKEND_FILE: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy/libpxbackend-1.0.so
@@ -86,7 +86,7 @@ jobs:
           bash -n .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
           echo TRACK_A_RUNTIME_DEPENDENCY_FENCES_VERIFIED=true
 
-      - name: Rehydrate proven runtime materializer and enforce bundled Qt precedence
+      - name: Rehydrate proven runtime materializer with bundled Qt software backend
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -141,18 +141,25 @@ jobs:
           if text.count(old_client_ld) != 1:
               raise SystemExit(f'client bundled-Qt anchor count={text.count(old_client_ld)}, expected 1')
           text = text.replace(old_client_ld, new_client_ld, 1)
+          old_render = '    LIBGL_DRIVERS_PATH="$dri" QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" VK_DRIVER_FILES="$vk_icd" \\'
+          new_render = '    LIBGL_DRIVERS_PATH="$dri" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \\'
+          if text.count(old_render) != 1:
+              raise SystemExit(f'client render-backend anchor count={text.count(old_render)}, expected 1')
+          text = text.replace(old_render, new_render, 1)
           path.write_text(text, encoding='utf-8')
           PY
           bash -n "$effective"
           grep -Fq "$PX_BACKEND_DIR" "$effective"
           grep -Fq 'LD_LIBRARY_PATH="$package/bin/lib:$tool_lib"' "$effective"
+          grep -Fq 'QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none' "$effective"
+          ! grep -Fq 'QSG_RHI_BACKEND=vulkan' "$effective"
           echo "TRACK_A_RUNTIME_BASELINE_WORKFLOW=$baseline" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_STEP_EXTRACTOR=$extractor" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$effective" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER_SHA256=$(sha256sum "$effective" | awk '{print $1}')"
-          echo TRACK_A_RUNTIME_BUNDLED_QT_PRECEDENCE_MATERIALIZED=true
+          echo TRACK_A_RUNTIME_SOFTWARE_BACKEND_MATERIALIZED=true
 
-      - name: Recover only exact task-owned residue from run 18
+      - name: Recover only exact task-owned residue from run 19
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -272,6 +279,7 @@ jobs:
             echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
             echo "current_run_ownership=true"
             echo "bundled_qt_precedence=true"
+            echo "software_backend=true"
             if [[ -n "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" && -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
               echo "effective_helper_sha256=$(sha256sum "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" | awk '{print $1}')"
             fi

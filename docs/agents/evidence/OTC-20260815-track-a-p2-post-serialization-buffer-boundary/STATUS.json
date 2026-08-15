@@ -1,0 +1,15 @@
+{
+  "classification": "UNEXECUTED",
+  "execution": "NOT_RUN",
+  "semantic_result": "UNKNOWN",
+  "qdatastream_sink_proven": false,
+  "qbuffer_state_proven": false,
+  "common_dataflow": "UNKNOWN",
+  "temporal_order": "UNKNOWN",
+  "framing_order": "UNKNOWN",
+  "sequence_order": "UNKNOWN",
+  "compression_order": "UNKNOWN",
+  "encryption_order": "UNKNOWN",
+  "final_binary_egress": "UNKNOWN",
+  "draft_not_promoted": true
+}

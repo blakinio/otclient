@@ -29,7 +29,7 @@ jobs:
       EXPECTED_CODE_BEARING_HEAD: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
       BASELINE_WORKFLOW_COMMIT: 527369447672a355b6fc0a3f8a4f9c2b39f33b67
       BASELINE_WORKFLOW_BLOB: c382eab394cfbbed9a6fce93331d16fa2b0ecbbc
-      FAILED_RUN_TO_RECOVER: '31888185244'
+      FAILED_RUN_TO_RECOVER: '31888421091'
       BASELINE_RESIDUE_RUN_ID: '31885192604'
       PX_BACKEND_DIR: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy
       PX_BACKEND_FILE: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy/libpxbackend-1.0.so
@@ -86,7 +86,7 @@ jobs:
           bash -n .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
           echo TRACK_A_RUNTIME_DEPENDENCY_FENCES_VERIFIED=true
 
-      - name: Rehydrate proven runtime materializer with bundled Qt software backend
+      - name: Rehydrate proven runtime materializer with bounded launcher HOME scaffold
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -153,13 +153,60 @@ jobs:
           grep -Fq 'LD_LIBRARY_PATH="$package/bin/lib:$tool_lib"' "$effective"
           grep -Fq 'QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none' "$effective"
           ! grep -Fq 'QSG_RHI_BACKEND=vulkan' "$effective"
+
+          scaffold="$RUNNER_TEMP/prepare-track-a-minimal-home.sh"
+          cat > "$scaffold" <<'SH'
+          #!/usr/bin/env bash
+          set -Eeuo pipefail
+          gen="${1:?generation}"
+          [[ "$gen" == 1 || "$gen" == 2 ]]
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID"
+          package="$root/package"
+          home="$root/home-gen-$gen"
+          tibia="$home/.local/share/CipSoft GmbH/Tibia"
+          source_meta="/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/launchermetadata.json"
+          [[ -d "$package" && -x "$package/bin/client" ]]
+          [[ -f "$source_meta" && ! -L "$source_meta" ]]
+          [[ "$(stat -c '%s' "$source_meta")" == 2485 ]]
+          python3 - "$source_meta" <<'PY'
+          import json, re, sys
+          path=sys.argv[1]
+          data=json.load(open(path, encoding='utf-8'))
+          assert set(data) == {'launcher','packages','hardwaresurvey','hints'}
+          forbidden=re.compile(r'(?i)(password|credential|access[_-]?token|refresh[_-]?token|email|cookie|session)')
+          def walk(obj):
+              if isinstance(obj, dict):
+                  for key, value in obj.items():
+                      assert not forbidden.search(str(key)), f'forbidden metadata key: {key}'
+                      walk(value)
+              elif isinstance(obj, list):
+                  for value in obj: walk(value)
+          walk(data)
+          assert isinstance(data['packages'], list) and data['packages']
+          assert isinstance(data['launcher'], dict)
+          print('TRACK_A_RUNTIME_LAUNCHER_METADATA_STRUCTURE_VERIFIED=true')
+          PY
+          mkdir -p "$tibia/packages"
+          [[ ! -e "$tibia/launchermetadata.json" && ! -e "$tibia/.running" && ! -e "$tibia/packages/Tibia" ]]
+          install -m 600 "$source_meta" "$tibia/launchermetadata.json"
+          : > "$tibia/.running"
+          chmod 600 "$tibia/.running"
+          ln -s "$package" "$tibia/packages/Tibia"
+          [[ "$(stat -c '%s' "$tibia/launchermetadata.json")" == 2485 ]]
+          [[ ! -s "$tibia/.running" ]]
+          [[ "$(readlink -f "$tibia/packages/Tibia")" == "$(readlink -f "$package")" ]]
+          echo "TRACK_A_RUNTIME_MINIMAL_HOME_READY generation=$gen metadata_sha256=$(sha256sum "$tibia/launchermetadata.json" | awk '{print $1}')"
+          SH
+          chmod 700 "$scaffold"
+          bash -n "$scaffold"
           echo "TRACK_A_RUNTIME_BASELINE_WORKFLOW=$baseline" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_STEP_EXTRACTOR=$extractor" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$effective" >> "$GITHUB_ENV"
+          echo "TRACK_A_RUNTIME_HOME_SCAFFOLD=$scaffold" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER_SHA256=$(sha256sum "$effective" | awk '{print $1}')"
-          echo TRACK_A_RUNTIME_SOFTWARE_BACKEND_MATERIALIZED=true
+          echo TRACK_A_RUNTIME_MINIMAL_HOME_SCAFFOLD_MATERIALIZED=true
 
-      - name: Recover only exact task-owned residue from run 20
+      - name: Recover only exact task-owned residue from run 21
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -188,6 +235,10 @@ jobs:
           python3 "$TRACK_A_RUNTIME_STEP_EXTRACTOR" "$TRACK_A_RUNTIME_BASELINE_WORKFLOW" 'Verify persistent bootstrap children survived step boundary' "$step"
           bash "$step"
 
+      - name: Build minimal non-secret launcher HOME for generation 1
+        shell: bash
+        run: bash "$TRACK_A_RUNTIME_HOME_SCAFFOLD" 1
+
       - name: Prepare generation 1 and arm logged-out structural observer
         shell: bash
         run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" prepare 1
@@ -212,6 +263,10 @@ jobs:
           step="$RUNNER_TEMP/stop-track-a-runtime-generation1.sh"
           python3 "$TRACK_A_RUNTIME_STEP_EXTRACTOR" "$TRACK_A_RUNTIME_BASELINE_WORKFLOW" 'Cleanly stop generation 1 task-owned client and observer' "$step"
           bash "$step"
+
+      - name: Build minimal non-secret launcher HOME for generation 2
+        shell: bash
+        run: bash "$TRACK_A_RUNTIME_HOME_SCAFFOLD" 2
 
       - name: Prepare generation 2 with fresh PID PIE and observer
         shell: bash
@@ -318,7 +373,7 @@ jobs:
             echo "current_run_ownership=true"
             echo "bundled_qt_precedence=true"
             echo "software_backend=true"
-            echo "x11_home_diagnostic=true"
+            echo "minimal_launcher_home=true"
             if [[ -n "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" && -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
               echo "effective_helper_sha256=$(sha256sum "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" | awk '{print $1}')"
             fi

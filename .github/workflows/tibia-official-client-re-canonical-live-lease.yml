@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run deterministic lease tests
-        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+        run: python3 .github/scripts/test_tibia_official_client_re-canonical-live-lease.py
 
   isolated-selfhosted:
     runs-on: [otclient, synology]
@@ -62,6 +62,15 @@ jobs:
           set -e
           [[ "$token_path_rc" -eq 64 ]]
           grep -Fq 'TRACK_A_CANONICAL_LEASE_ERROR=token_path_outside_task_state' <<<"$token_path_output"
+
+          traversal="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-selftest-a/../escaped.token"
+          set +e
+          traversal_output="$(bash "$entry" acquire \
+            --task-id OTC-selftest-a --session-id run-a --token-file "$traversal" 2>&1)"
+          traversal_rc=$?
+          set -e
+          [[ "$traversal_rc" -eq 64 ]]
+          grep -Fq 'TRACK_A_CANONICAL_LEASE_ERROR=token_path_outside_task_state' <<<"$traversal_output"
 
           mkdir -p "$root"
           chmod 700 "$root"
@@ -142,6 +151,7 @@ jobs:
           fi
 
           echo TRACK_A_CANONICAL_LEASE_ENTRYPOINT_FENCED=true
+          echo TRACK_A_CANONICAL_LEASE_TOKEN_PATH_TRAVERSAL_REJECTED=true
           echo TRACK_A_CANONICAL_LEASE_CONCURRENT_SERIALIZATION_PROVEN=true
           echo TRACK_A_CANONICAL_LEASE_SELFTEST_COMPLETE=true
           echo TRACK_A_CANONICAL_LEASE_CANONICAL_STATE_UNTOUCHED=true

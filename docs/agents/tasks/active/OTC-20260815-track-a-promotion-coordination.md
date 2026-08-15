@@ -2,9 +2,9 @@
 task_id: OTC-20260815-track-a-promotion-coordination
 status: active
 agent: ChatGPT
-session_id: chatgpt-coordinator-20260815-1425
+session_id: chatgpt-coordinator-20260815-1708
 session_role: coordinator
-session_rotation_count: 4
+session_rotation_count: 5
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T14:28:00+02:00
+updated: 2026-08-15T17:08:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -46,16 +46,16 @@ user_communication: low_noise
 context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
-invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T14:28:00+02:00
+invocation_started_at: 2026-08-15T17:07:00+02:00
+last_progress_at: 2026-08-15T17:08:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: current
+ci_check_generation: coordinator-rotation-5
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 4
+context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
 
@@ -83,7 +83,7 @@ platform: official_native_linux_only
 - #290 bounded historical login/recovery procedure retained as revalidation input.
 - #304 bounded quantitative coverage baseline; exact source snapshot promoted; source Draft closed unmerged.
 - #301 bounded P2 writer retention; exact source snapshot promoted; source Draft closed unmerged; coordinator CI `31883767739` SUCCESS.
-- #305 bounded P2 intermediate-vtable/type correction. Exact source final head `9329e338235b7f9997d74d4db5313f329662378b`; final task-specific run `31884379539` SUCCESS; final PR CI `31884381191` including `CI / Required` SUCCESS; review threads 0. Exact source blobs copied under coordinator-owned `p2-writer-vtable-group/source-snapshot/` in commit `a5ba8557e54b2d5345b48b816167a5b8131d2084`; campaign report updated in `8dacacba5d13c39e490108e6cedb0fcebdc2dd52`.
+- #305 bounded P2 intermediate-vtable/type correction. Exact source final head `9329e338235b7f9997d74d4db5313f329662378b`; final task-specific run `31884379539` SUCCESS; final PR CI `31884381191` including `CI / Required` SUCCESS; review threads 0. Exact source blobs copied under coordinator-owned `p2-writer-vtable-group/source-snapshot/` in commit `a5ba8557e54b2d5345b48b816167a5b8131d2084`; campaign report updated in `8dacacba5d13c39e490108e6cedb0fcebdc2dd52` and coordinator integration checkpoint `0ade6404c5b43f5fe468b8dd748846406d4c856e` passed CI run `31884644268`.
 
 Accepted #305 boundary:
 ```yaml
@@ -101,8 +101,8 @@ P2_complete: false
 ```
 
 ## LIVE STATE
-- #302 P0: corrected self-hosted run `31883521701` / job `95009093099` found zero matching live exact-client Track A PIDs; direct authoritative XYZ remains UNKNOWN.
-- #303 RUNTIME: independently active researcher. Selector repair reached `synology-otclient-01`; run `31884181155` / job `95010941902` failed before client start with `TRACK_A_RUNTIME_ERROR=upstream_wireproxy_unavailable`; task-owned cleanup completed without X11 residue. Do not mutate #303 while active.
+- #302 P0: independently active rotation on Draft head `9060e83036c6a50a59f055c5248b4071aa47b946`. Exact-ELF static work recovered `TPlayerData` / `playerPosition` / `IPlayerDataProvider` structural leads while direct authoritative XYZ remains UNKNOWN. Runtime ownership remains with #303; coordinator must not mutate #302 while active.
+- #303 RUNTIME: independently active rotation on Draft head `5b7a9707e5b1594f5cc62fb0a1ad67f7556226eb`. Prior exact-client launch prerequisites, loader, bundled Qt, software renderer, X11/HOME and Xvfb hypotheses are bounded; latest durable checkpoint requires lint repair before one canonical-HOME-package-path/cwd discriminator. Restart/relogin stability remains UNKNOWN. Coordinator must not mutate #303 while active.
 
 ## RETURN_FOR_EVIDENCE
 - #295 material review findings plus Track B ownership collision.
@@ -142,15 +142,21 @@ restart_relogin_stability: UNKNOWN/1
 ```
 
 # Acceptance inventory
+- [x] #304 independently reviewed, accepted with edits, promoted as a bounded source snapshot and source Draft closed unmerged.
+- [x] #301 independently reviewed, accepted with edits, promoted as a bounded source snapshot and source Draft closed unmerged.
 - [x] #305 independently reviewed and assigned `ACCEPT_WITH_EDITS`.
 - [x] exact #305 evidence/result/reproducer/workflow blobs promoted under coordinator ownership.
 - [x] campaign report updated with FACT/INFERENCE/DISPROVEN/UNKNOWN boundaries.
-- [ ] exact-head coordinator CI terminal for this integration generation.
-- [ ] #305 source Draft closed unmerged after validated promotion.
-- [ ] active #303 runtime result/blocker reconciled when researcher releases it.
-- [ ] next disjoint P2 serialization/transform hypothesis selected without duplicating queued final-socket run `31825417040`.
+- [x] coordinator integration head `0ade6404c5b43f5fe468b8dd748846406d4c856e` passed CI run `31884644268` before this rotation checkpoint.
+- [x] #305 source Draft closed unmerged after validated promotion.
+- [ ] active #302 and #303 results reconciled when their current researchers release ownership.
+- [ ] next disjoint P2 serialization/transform hypothesis dispatched without duplicating queued final-socket run `31825417040`.
+- [ ] P2 actual transform/framing order, final binary egress and causal harness closed.
+- [ ] P0 direct authoritative reads and P1 live authority/restart stability closed.
+- [ ] A3/A4 action parity closed where required.
+- [ ] semantic protocol/QMeta coverage and finite P0/P1 item-level denominators closed.
 - [ ] final programme audit/CI/PR hygiene/archive/ownership release complete.
 
 # Next action
 
-Validate the exact current coordinator head. If green, close #305 Draft unmerged. Then inspect active #303 read-only for a newer checkpoint; while it remains independently owned, continue a disjoint P2 hypothesis only if it targets actual serialization/data-stream behavior rather than generic final-socket/QIODevice enumeration or vtable adjacency.
+Create one disjoint Draft-only P2 dispatch from exact `main@8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45` for the first concrete serialization/transform boundary on the accepted `TProtocolClientMessageProcessor -> retained writer` branch. It must consume coordinator PR #300 accepted P2 evidence only as a pinned unmerged dependency, avoid final-socket run `31825417040`, generic QIODevice enumeration, vtable adjacency and superseded sink models, and use unique task/evidence/workflow/script ownership.

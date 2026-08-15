@@ -1,0 +1,74 @@
+name: Track A canonical support-state metadata
+
+on:
+  push:
+    branches: [research/OTC-20260815-track-a-runtime-loader-diagnostic]
+    paths:
+      - .github/workflows/tibia-official-client-re-support-state-diagnostic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Inventory metadata only without reading values
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          home="$state/home"
+          client="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          [[ -x "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          echo TRACK_A_SUPPORT_EXACT_CLIENT_VERIFIED=true
+
+          python3 - "$home" <<'PY'
+          from pathlib import Path
+          import os,re,sys
+          home=Path(sys.argv[1])
+          wanted=re.compile(r'(?i)(tibia|cipsoft|qtwebengine|qtproject|qt6)')
+          print('TRACK_A_SUPPORT_METADATA_BEGIN=true')
+          matches=0
+          for base_name in ('.config','.cache'):
+              base=home/base_name
+              if not base.is_dir():
+                  print(f'BASE {base_name} present=false')
+                  continue
+              print(f'BASE {base_name} present=true')
+              # Only relevant immediate children are named; contents/values are never read.
+              for child in sorted(base.iterdir(), key=lambda p:p.name.lower()):
+                  if not wanted.search(child.name):
+                      continue
+                  matches += 1
+                  try:
+                      st=child.lstat()
+                  except OSError:
+                      continue
+                  kind='symlink' if child.is_symlink() else ('dir' if child.is_dir() else 'file')
+                  if kind=='dir':
+                      count=0; total=0
+                      for root,dirs,files in os.walk(child, followlinks=False):
+                          # Never emit nested names.
+                          count += len(files)
+                          for name in files:
+                              try: total += (Path(root)/name).lstat().st_size
+                              except OSError: pass
+                      print(f'ENTRY base={base_name} name={child.name!r} type=dir file_count={count} total_bytes={total} mode={st.st_mode & 0o777:o}')
+                  else:
+                      print(f'ENTRY base={base_name} name={child.name!r} type={kind} size={st.st_size} mode={st.st_mode & 0o777:o}')
+          print(f'TRACK_A_SUPPORT_RELEVANT_ENTRY_COUNT={matches}')
+          print('TRACK_A_SUPPORT_METADATA_END=true')
+          PY
+          echo TRACK_A_SUPPORT_METADATA_ONLY=true

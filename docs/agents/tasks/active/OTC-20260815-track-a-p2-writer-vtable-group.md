@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-p2-writer-vtable-group
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-p2-vtable-researcher-20260815-1415
 project_lane: otclient
@@ -15,7 +15,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: low
 related_pr: 305
-updated: 2026-08-15T14:20:00+02:00
+updated: 2026-08-15T14:23:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-p2-writer-vtable-group.md
   - docs/agents/evidence/OTC-20260815-track-a-p2-writer-vtable-group/**
@@ -43,6 +43,10 @@ successful_run: 31884166982
 successful_job: 95010894063
 sanitized_result_artifact_id: 9246799418
 sanitized_result_artifact_sha256: d0bf06e8c973f351fe96037445de0586f30e5044f5d1a097bfc866b85c0df48f
+validated_checkpoint_head: dcf5e1e11d30cd42608c4e071618f521729ee4e0
+validated_checkpoint_task_run: 31884286098
+validated_checkpoint_pr_ci: 31884288165
+stop_reason: bounded vtable-group hypothesis resolved; intermediate object is structurally distinct from canonical TProtocolWriter by typeinfo/object provenance, but semantic RTTI name and transform/framing boundary remain UNKNOWN
 ---
 
 # Objective
@@ -58,19 +62,16 @@ sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 platform: official_native_linux_only
 ```
 
-# Successful discriminator
-
-Task-specific workflow:
+# Result
 
 ```text
-Track A P2 writer vtable-group identity
-run 31884166982
-job 95010894063
-executed head c479f58a1b45d6a4a2d4063d07ea83057532b8f7
-result SUCCESS
+P2_VTABLE_GROUP_RESULT=PROVEN_DISTINCT_ADJACENT_ITANIUM_VTABLE_IDENTITY_NAME_UNKNOWN
+P2_FIRST_WRITER_TRANSFORM_BOUNDARY=UNKNOWN
 ```
 
-The workflow independently fetched and SHA-verified all reviewed source artifacts before parsing:
+Successful semantic workflow: run `31884166982`, job `95010894063`, exact executed head `c479f58a1b45d6a4a2d4063d07ea83057532b8f7`.
+
+The workflow SHA-verifies three reviewed exact-build text artifacts before parsing:
 
 ```text
 9231716774 / d99919403c001fbcc2a959346443c405f8a2234fb81438fbc6a626a1833edb82
@@ -78,85 +79,53 @@ The workflow independently fetched and SHA-verified all reviewed source artifact
 9229251044 / 4b914f65d4a4eb3c91a39ce9918e8e4f865fadcf4853ab4af25ffa5d5f519520
 ```
 
-Sanitized result artifact:
+# FACT
 
-```text
-id 9246799418
-sha256 d0bf06e8c973f351fe96037445de0586f30e5044f5d1a097bfc866b85c0df48f
-```
-
-# FACT — distinct typed address point
-
-Canonical `TProtocolWriter` remains:
-
-```text
-RTTI 0x3080728
-primary address point 0x2f69dd0
-offset-to-top 0
-base TIODeviceWriter RTTI 0x3080718
-```
+Canonical `TProtocolWriter` remains RTTI `0x3080728`, primary address point `0x2f69dd0`, base `TIODeviceWriter` RTTI `0x3080718`.
 
 The reviewed vtable window immediately following it resolves to a fresh normal Itanium tuple:
 
 ```text
-0x2f69e20 = 0                  # offset-to-top
-0x2f69e28 = 0x3080748         # distinct typeinfo
-0x2f69e30 = 0x7de7f0          # first virtual target
-0x2f69e38 = 0x7dfd60          # second virtual target
+0x2f69e20 = 0
+0x2f69e28 = 0x3080748
+0x2f69e30 = 0x7de7f0
+0x2f69e38 = 0x7dfd60
 ```
 
-The setup artifact independently proves a separately allocated `0x250`-byte shared object whose actual object starts at allocation `+0x10` and receives vptr `0x2f69e30`.
+A separate reviewed setup artifact proves a separately allocated `0x250`-byte shared object receives vptr `0x2f69e30` at its actual object start.
 
-Therefore `0x2f69e30` is not merely an address-adjacent scanner artifact.
-
-# DISPROVEN
-
-The simple hypothesis that `0x2f69e30` is just a secondary/base address point of canonical `TProtocolWriter` is rejected for the current evidence model:
-
-- its typeinfo `0x3080748` differs from `TProtocolWriter` RTTI `0x3080728`;
-- it also differs from `TIODeviceWriter` RTTI `0x3080718`;
-- a distinct separately allocated object receives this vptr.
-
-Do not collapse this object into canonical `TProtocolWriter` based on table adjacency.
-
-# INFERENCE
-
-Functions `0x7de7f0` and `0x7dfd60` are bounded as `TEARDOWN_LIKE`:
-
-- both install `0x2f69e30` into `[this]`;
-- `0x7de7f0` additionally releases linked/list state and clears object storage around `+0x208..+0x238`.
-
-This is not a semantic symbol/name or transform-stage claim.
-
-# UNKNOWN
-
-- semantic type name for RTTI `0x3080748`;
-- base/inheritance relationship represented by RTTI `0x3080748`;
-- first writer transform/framing boundary;
-- gameplay framing/serialization order;
-- final binary QIODevice/socket egress;
-- relationship of historical `0x3084c70 -> +0xd0 -> 0xb40630` family to canonical writer branch.
-
-The historical `0x3084c70` lead remains structurally separate: its reviewed artifact has RTTI zero, no direct LEA xrefs, and `+0xd0 -> 0xb40630`. No provenance intersection is claimed.
-
-# Effect on accepted PR #301
-
-The accepted retention relation remains valid:
-
-```text
-TProtocolClientMessageProcessor
- -> retained intermediate object
- -> retained shared TProtocolWriter
-```
-
-The intermediate object can now be sharpened to:
+Thus the PR #301 intermediate object is structurally sharpened to:
 
 ```text
 vptr 0x2f69e30
 Itanium typeinfo 0x3080748
 semantic type name UNKNOWN
-not collapsible into canonical TProtocolWriter by adjacency
+separately allocated object
 ```
+
+# DISPROVEN
+
+The simple hypothesis that `0x2f69e30` should be treated as merely a secondary/base address point of canonical `TProtocolWriter` from table adjacency is rejected:
+
+- its typeinfo differs from canonical `TProtocolWriter` and `TIODeviceWriter` typeinfo;
+- a distinct separately allocated object receives this vptr.
+
+# INFERENCE
+
+`0x7de7f0` / `0x7dfd60` are bounded as teardown-like: both install `0x2f69e30`; `0x7de7f0` also releases linked/list state and clears object storage around `+0x208..+0x238`.
+
+No semantic type symbol or writer-transform stage is inferred from that cleanup behavior.
+
+# UNKNOWN
+
+- semantic name for RTTI `0x3080748`;
+- inheritance/base relationship of RTTI `0x3080748`;
+- first writer transform/framing boundary;
+- gameplay framing/serialization order;
+- final binary QIODevice/socket egress;
+- relationship of historical `0x3084c70 -> +0xd0 -> 0xb40630` to the canonical writer branch.
+
+Historical `0x3084c70` remains separate: reviewed evidence reports RTTI zero, no direct LEA xrefs and `+0xd0 -> 0xb40630`.
 
 # Evidence
 
@@ -165,24 +134,23 @@ not collapsible into canonical TProtocolWriter by adjacency
 - `.github/scripts/tibia-official-client-re-p2-writer-vtable-group.py`
 - `.github/workflows/tibia-official-client-re-p2-writer-vtable-group.yml`
 
-# Acceptance gate
+# Validation
 
-- [x] exact source artifact digests verified before parsing;
-- [x] `0x2f69e30` classified from Itanium preamble/address layout rather than resemblance;
-- [x] RTTI name/base relation left UNKNOWN because reviewed artifacts do not provide a proven name/relationship;
-- [x] `0x7de7f0/0x7dfd60` role bounded without overclaiming;
-- [x] relationship to PR #301 sharpened without collapsing distinct objects;
-- [x] `0x3084c70/0xb40630` kept separate absent provenance;
-- [x] framing/transform/final-egress remain UNKNOWN;
-- [x] no proprietary client bytes, credentials or account state committed/uploaded;
-- [ ] exact final-head task-specific workflow and standard PR CI terminal after durable evidence checkpoint.
+Durable checkpoint head `dcf5e1e11d30cd42608c4e071618f521729ee4e0`:
 
-# Proposed researcher disposition
+- task-specific run `31884286098` = SUCCESS;
+- standard PR CI `31884288165`, including `CI / Required` = SUCCESS;
+- changed paths confined to declared task roots;
+- review threads = 0.
+
+This final `status: ready` commit changes task handoff bookkeeping only and requires its own exact-head validation before coordinator consumption.
+
+# Proposed disposition
 
 `ACCEPT_WITH_EDITS` as bounded negative/type-structure evidence.
 
-P2 remains incomplete. The next transform-order hypothesis must use actual serialization/data-stream behavior or independently recover the semantic role of RTTI `0x3080748`; vtable adjacency alone is insufficient.
+P2 remains incomplete. A later transform-order hypothesis must use actual serialization/data-stream behavior or independently recover RTTI `0x3080748` semantics; vtable adjacency alone is insufficient.
 
-# Next action
+# Handoff
 
-Validate the current durable checkpoint head with both the task-specific provenance workflow and standard PR CI. If terminal green, set task status `ready`, validate the final bookkeeping head, and hand the Draft back to coordinator #300 for independent review.
+Researcher ownership is released by `status: ready`. Coordinator PR #300 must refetch the exact final #305 head and final-head validation before authoritative promotion. Researcher proposal is not canonical authority.

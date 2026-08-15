@@ -37,7 +37,8 @@ Do not revive without direct contradictory proof:
 
 - `clientMessageReadyToProcess -> owner+0x88 -> 0xb5b880` as gameplay endpoint;
 - `0xb46bd0` as binary gameplay-frame sink;
-- `0xc33259` as network/gameplay binary sink.
+- `0xc33259` as network/gameplay binary sink;
+- stale `TProtocolWriter` RTTI `0x3080700`.
 
 ### UNKNOWN
 
@@ -53,15 +54,7 @@ Do not revive without direct contradictory proof:
 
 **PR #283 — bounded read-only runtime bridge implementation.**
 
-Source PR is closed unmerged at `d93ccb34f66af7d3198a50a46e706b4f902ae637`. Coordinator independently verified:
-
-- exact implementation runtime-validation head `89e13819e6f53026b831b7e8e4c8fab228d1626c`;
-- run `31654823776`, job `94306874981`: 12 focused tests PASS, Python compile PASS, standalone bridge build PASS, exact runtime reconstruction/profile rediscovery PASS, owner-only IPC mode `0600`, exact-client no-credential E2E PASS;
-- compare `89e13819... -> d93ccb34...` changes only the task Markdown, no product/tool/test file;
-- source exact-head CI `31680615776` SUCCESS;
-- zero unresolved review threads.
-
-Accepted evidence is preserved at `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/accepted-read-only-runtime-bridge.md`. Exact accepted tool/test blobs are rebuilt on #300 under `tools/tibia_runtime_bridge/**` and `tests/tools/tibia_runtime_bridge/**`.
+Source PR was closed unmerged at `d93ccb34f66af7d3198a50a46e706b4f902ae637`. Coordinator independently verified the exact implementation/runtime evidence, source exact-head CI and zero unresolved review threads, then rebuilt the exact accepted tool/test blobs under `tools/tibia_runtime_bridge/**` and `tests/tools/tibia_runtime_bridge/**` on #300.
 
 Promotion boundary:
 
@@ -84,92 +77,118 @@ Run `31806312967`, job `94785974126` remains accepted for the exact-build revers
 
 **PR #279 — fail-closed worldmap reconstruction tooling.**
 
-Source PR is closed unmerged at `04356aa9c042ce19d9d8431b91f18567e410a5e5`. Verified source evidence: repaired 23/23 focused tests, Python syntax PASS, synthetic `reconstruct -> compare -> plan-otbm` PASS, both material audit findings repaired, source exact-head CI run `31681889560` SUCCESS, zero unresolved review threads.
-
-Rather than merge the stale source branch, #300 rebuilt exact accepted source blobs on current main and reconciled report/catalogue/changelog state. Current integration includes `tools/tibia_worldmap_reconstruction/**`, its focused test and `docs/agents/reports/OTC-20260812-worldmap-reconstruction.md`.
-
-Not promoted: real official-client capture coverage, complete appearance-role mapping, complete client-ID -> OTB mapping, spawn definitions or complete binary OTBM.
+Source PR was closed unmerged at `04356aa9c042ce19d9d8431b91f18567e410a5e5`. The accepted fail-closed tool/test slice was rebuilt on current-main #300. Real official-client capture coverage, complete appearance-role mapping, complete client-ID -> OTB mapping, spawn definitions and complete binary OTBM remain UNKNOWN.
 
 **PR #290 — historical login/session recovery procedure.**
 
-Source PR is closed unmerged. Only the corrected historical native-Linux procedure is retained as `REVALIDATION_REQUIRED` at `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/accepted-historical-login-procedure.md`. OCR is explicitly limited to historical character-selection bootstrap; it is not world-semantic evidence. Current login/restart stability requires fresh runtime proof.
+Only the corrected historical native-Linux procedure is retained as `REVALIDATION_REQUIRED` at `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/accepted-historical-login-procedure.md`. OCR is limited to historical character-selection bootstrap; it is not world-semantic evidence. Current login/restart stability requires fresh runtime proof.
+
+**PR #304 — item-level quantitative coverage baseline.**
+
+Reviewed exact Draft head: `43a60bd96cc644b656b200c9edbfb75578b330b6`. Exact-head CI run `31882010038` completed `SUCCESS`, changed paths are task-owned, and there are no unresolved inline review threads.
+
+Coordinator independently checked the load-bearing exact-build source evidence:
+
+- protocol-surface run `31787489302` / job `94726575137` on `synology-otclient-01` rechecked the exact client SHA and emitted the full `189` inbound + `160` outbound identifier inventory plus the independent `47` handler literal census;
+- QMeta census run `31790619327` / job `94736463933` recovered all `47` protocol-handler QMeta records under the relocation-backed structural gate;
+- Qt callsite census run `31799755489` / job `94764705414` counted `2078` direct `connectImpl`, `41` legacy connect and `65` disconnectImpl callsites = `2184`, while explicitly leaving semantic ownership UNKNOWN.
+
+The reviewed registry validator enforces record-ID uniqueness, allowed classifications, registered provenance references, message-list decode/hash/count/uniqueness, selected-set denominators, percentage arithmetic and retained `DISPROVEN/SUPERSEDED` evidence. Its boundary is internal registry integrity; it does not cryptographically regenerate every compressed record from every historical source log.
+
+The exact accepted source blobs are copied unchanged under:
+
+`docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/coverage-audit/source-snapshot/`
+
+with the coordinator promotion boundary at:
+
+`docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/coverage-audit/PROMOTION_BOUNDARY.md`
+
+Accepted quantitative baseline:
+
+```yaml
+protocol_identifier_inventory: 349/349          # 189 inbound + 160 outbound; inventory only
+protocol_direct_qmeta_links: 27/349
+generated_message_semantic_support: UNKNOWN/349
+protocol_handler_qmeta_records: 47/47
+direct_qt_connection_raw_census: 2184/2184
+direct_qt_connection_semantic_classification: UNKNOWN/2184
+legacy_qobject_connect_edges: 40/41
+high_information_gameaction_sender_metaobjects: 29/31
+p0_top_level_requirement_registry: 16/16
+p0_live_read_coverage: UNKNOWN/UNKNOWN
+bridge_v1_profile_target_inventory: 7/7
+p1_overall_field_evidence_coverage: UNKNOWN/UNKNOWN
+p2_chain_closure: UNKNOWN/5
+restart_relogin_stability: UNKNOWN/1
+```
+
+None of the 100% inventory rows is programme-semantic completion.
 
 ### RETURN_FOR_EVIDENCE
 
 **PR #295 — map-observation ownership correction.**
 
-Still not promotable: four material unresolved review threads plus Track B ownership collision remain. Required corrections include restoring blanket raw-packet prohibition, explicit non-negative integer `producer.protocol_version`, separate authorization for external Atlas transfer, Track B ownership release and exact-head CI.
+Still not promotable: material unresolved review findings and Track B ownership collision remain.
 
 **PR #301 — P2 writer ownership.**
 
-Current head `29ca506501efc716330a80ab2b96eaf9bbe3d4d5` contains only the approved dispatch/task contract. No evidence report, reproducer or executed hypothesis exists yet. It remains READY for an independent Draft-only researcher; coordinator will reconsider after concrete exact-client writer-ownership discrimination and terminal exact-head CI.
+Current reviewed head `29ca506501efc716330a80ab2b96eaf9bbe3d4d5` contains only the approved dispatch/task contract. No evidence report, reproducer or executed hypothesis exists yet. Required next evidence is the exact-client `TGameserverDualConnection -> TProtocolWriter/TIODeviceWriter` ownership/dispatch discriminator without reviving superseded sink models.
 
 **PR #302 — direct player position.**
 
-Current head `e45b126923495b209c08a77e9a3db96b44ad71a4` contains a bounded read-only typed `TPlayerData` probe, but material runtime run `31880617510` job `95002559098` remains queued. No direct-position semantic result exists. Required before promotion: actual runtime evidence, typed provenance, negative controls, at least two observations, independent structural-world comparison and terminal exact-head CI.
+Current reviewed head `e45b126923495b209c08a77e9a3db96b44ad71a4` contains a bounded read-only typed `TPlayerData` probe, but material runtime run `31880617510` / job `95002559098` remains queued on the serialized self-hosted lane. No direct-position semantic result exists.
 
 **PR #303 — restart/relogin reacquisition.**
 
-Current head `0270b1f3b6e75c995649b405758f058bae026c88` contains an isolated namespace/credential-safe workflow design, but run `31881287155` has materialized only auxiliary static jobs; no self-hosted `reacquire` semantic job has executed. It is serialized behind #302 in the same `official-client-re-runtime` concurrency lane. Restart/relogin stability remains UNKNOWN.
-
-**PR #304 — item-level coverage audit.**
-
-Current head `7eec15079e54bc163785013025cdea47d30e57c7` contains only the approved dispatch/task contract. No registries/validator/summary exist yet. It remains READY for an independent Draft-only static researcher; selected inventory percentages cannot be upgraded to semantic coverage.
+Runtime semantic execution remains blocked behind #302. During the current campaign rotation, #303 was additionally hardened fail-closed so a surviving task-owned GDB observer prevents task-root deletion. Code-bearing safety-repair head: `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`; task checkpoint head after durable evidence update: `2b6350abeb4de37180247c585b90bd1e4c0a9d0f`. This is cleanup safety evidence only, not restart/relogin semantic proof.
 
 ### REJECT / SUPERSEDE
 
-- **PR #289** — broad stale continuation branch; superseded P2 model, failed exact-head CI and unresolved safety findings. Unique positive/negative evidence was preserved before closure.
+- **PR #289** — broad stale continuation branch; superseded P2 model and unresolved safety findings. Bounded positive/negative evidence was retained before closure.
 - **PR #296** — stale lifecycle draft after its valid archive correction was integrated as a bounded current-main coordinator slice.
-- **PR #277** — stale Oteryn-dependent Track A continuation handover. Unique negative runtime history is retained at `superseded-pr277-negative-runtime-history.md`; historical Oteryn continuation instructions are not authoritative.
-- **PR #280 as an active Track A dependency only** — its broader infrastructure PR intentionally remains open under separate ownership. Track A does not wait on it; later evidence already proves `synology-otclient-01` executed Track A jobs, and current Track A isolation forbids historical `oteryn-staging` as an active dependency.
-
-## Quantitative coverage checkpoint
-
-These are scope-limited inventory checkpoints, not global semantic completion:
-
-```yaml
-protocol_identifier_inventory: 349/349
-protocol_handler_qmeta_records: 47/47
-legacy_qobject_connect_edges: 40/41
-high_information_gameaction_sender_metaobjects: 29/31
-direct_qt_connection_semantic_classification: UNKNOWN/2184
-generated_message_semantic_classification: UNKNOWN/349
-p0_live_read_coverage: UNKNOWN/UNKNOWN
-```
-
-Final programme requirements for item-level `capabilities`, `protocol_messages`, `runtime_types`, finite P0 denominators and terminal read/action gates remain unsatisfied.
+- **PR #277** — stale Oteryn-dependent Track A continuation handover; unique negative runtime history retained.
+- **PR #280 as an active Track A dependency only** — broader infrastructure PR remains separately owned/open; Track A does not wait on it.
 
 ## Current lane state
 
 ```yaml
 P2_NETWORK:
   pr: 301
-  task_status: ready
-  agent: unassigned_draft_only_researcher
   disposition: RETURN_FOR_EVIDENCE / DISPATCH_READY
+  semantic_result: none
 P0_STATE:
   pr: 302
-  task_status: waiting
-  blocker: self-hosted passive-probe job 95002559098 queued
   disposition: RETURN_FOR_EVIDENCE
+  blocker: run 31880617510 / job 95002559098 queued
 P1_BRIDGE:
   source_pr: 283 closed unmerged after ACCEPT
-  current_main_integration: present on PR 300
+  integration: present on PR 300
   completion: partial
 RUNTIME:
   pr: 303
-  task_status: waiting
-  blocker: serialized behind queued P0 runtime lane; no reacquire semantic job executed
   disposition: RETURN_FOR_EVIDENCE
+  blocker: serialized behind P0; no self-hosted reacquire semantic job executed
+  cleanup_safety_repair: integrated only on Draft #303, not a semantic capability
 COVERAGE_AUDIT:
-  pr: 304
-  task_status: ready
-  agent: unassigned_draft_only_researcher
-  disposition: RETURN_FOR_EVIDENCE / DISPATCH_READY
+  source_pr: 304
+  disposition: ACCEPT_WITH_EDITS
+  exact_source_head: 43a60bd96cc644b656b200c9edbfb75578b330b6
+  source_ci: 31882010038 SUCCESS
+  coordinator_snapshot: present
 ```
 
 ## Completion state
 
 Track A is **not COMPLETE/100%**.
 
-Open programme gates include P2 writer/transform/final-egress proof, authoritative P0 direct reads, live bridge authority/reacquisition, A3/A4 action parity, item-level quantitative coverage and final closeout. The coordinator must not self-research every independent lane merely to remove those UNKNOWNs; the repository operating model requires isolated Draft-only research workers and coordinator promotion review.
+Material open programme gates are:
+
+1. P2 writer ownership, transform/framing order, final egress and causal harness;
+2. authoritative P0 direct player/state reads with semantic discrimination;
+3. live bridge authority/session epoch and restart/relogin read reacquisition;
+4. A3/A4 action parity with authoritative before/after state;
+5. full message/QMeta semantic classification beyond the now-canonical bounded inventories;
+6. finite item-level P0/P1 read-field denominator where currently `UNKNOWN/UNKNOWN`;
+7. final exact-head integration validation, PR hygiene and programme closeout.
+
+The coordinator must preserve these UNKNOWNs rather than converting inventory completeness into a false completion claim.

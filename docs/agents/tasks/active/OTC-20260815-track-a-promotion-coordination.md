@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: waiting
-agent: unassigned
-session_id: null
+status: active
+agent: ChatGPT
+session_id: chatgpt-coordinator-20260815-2254
 session_role: coordinator
-session_rotation_count: 11
+session_rotation_count: 12
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -16,8 +16,8 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T21:39:00+02:00
-lease_released_at: 2026-08-15T21:39:00+02:00
+updated: 2026-08-15T22:54:00+02:00
+lease_released_at: null
 risk: medium
 related_pr: 300
 owned_paths:
@@ -40,15 +40,15 @@ run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
-last_progress_at: 2026-08-15T21:39:00+02:00
+last_progress_at: 2026-08-15T22:54:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: coordinator-rotation-11-post-p2-promotion
+ci_check_generation: coordinator-rotation-12-live-lease-promotion
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-stop_reason: serial programme rotation into new non-overlapping P2 downstream-consumer research lane; coordinator ownership deliberately released before researcher task initialization
+stop_reason: null
 last_verified_integration_head: ce933e8fe28ea61669da28ffcc10cf21675a62b0
 last_verified_integration_ci_run: 31893876568
 last_verified_integration_ci_state: success
@@ -60,12 +60,35 @@ last_promotion:
   source_release_head_ci_run: 31903882606
   source_release_head_ci_state: success
   canonical_evidence: docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/p2-buffer-boundary/20260815-pr308-disposition.md
-next_action: initialize and execute isolated P2 task `OTC-20260815-track-a-p2-buffer-downstream-consumer` from exact main, using #308 promoted facts only as pinned unmerged dependency; recover the first exact downstream consumer/transform of the retained QBuffer-backed byte container without generic census or final-socket shortcut
+active_review:
+  source_pr: 312
+  purpose: authoritative canonical-live controller lease manager required by PR311 policy-v3 fail-closed gate
+  corrected_code_head: e368173086ba8bb1235218b3ec11e046e2c909cb
+  custom_run: 31907695244
+  custom_unit_job: 95067968895
+  custom_selfhosted_job: 95067968820
+  repository_ci_run: 31907697738
+  repository_ci_required_job: 95068323632
+  source_task_state: corrected_ready_unassigned
+  prior_disposition: RETURN_FOR_EVIDENCE
+  prior_material_finding: expired release bypassed explicit stale-takeover reason path
+  repaired: true
+next_action: independently re-review corrected PR #312 source/evidence/CI; if accepted, transfer bounded MODULE_CATALOG.md and CHANGELOG.md ownership to the #312 promotion slice, validate exact promotion head, merge protected #312 to main, then re-evaluate PR #311 governance gate without declaring :98 canonical
 ---
 
 # Objective
 
-Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Researchers remain Draft-only. Coordinator owns promotion/integration. Track B remains outside mutation authority.
+Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Researchers/implementation workers remain Draft-only. Coordinator owns promotion/integration. Track B remains outside mutation authority.
+
+# Rotation 12 — canonical live lease manager review
+
+PR #311 policy v3 intentionally disables canonical-live mutation/reuse until `main` contains a reviewed authoritative serialized lease primitive. PR #312 is the disjoint implementation candidate.
+
+Independent coordinator source review of #312's first handoff found one material defect: an expired holder could call `release` and then reacquire normally, bypassing the explicit stale-takeover reason/audit path. The source was returned for evidence instead of being promoted merely because CI was green.
+
+Corrected source head `e368173086ba8bb1235218b3ec11e046e2c909cb` now rejects expired release with `lease_expired`, preserves active/expired state until explicit takeover, and proves on Synology that a reason is required before generation 2 can be acquired. Corrected custom workflow `31907695244` and repository CI `31907697738` including `CI / Required` job `95068323632` are SUCCESS.
+
+Before merge, reusable-tool governance requires shared `MODULE_CATALOG.md` and `CHANGELOG.md` integration. Those paths remain coordinator-owned until this review assigns an accepting disposition and explicitly delegates only that bounded update to PR #312.
 
 # Current promoted P2 boundary
 
@@ -85,9 +108,11 @@ Still UNKNOWN: first downstream consumer/transform of the retained byte containe
 # Other durable boundaries
 
 - #307 loader/plugin diagnostics promoted and source closed unmerged; cache state remains non-causal/UNKNOWN.
-- #303 RUNTIME remains separately owned. Cache-seed run `31903627907` is `INCONCLUSIVE_HARNESS_FAILURE`, and coordinator comment `5303842133` requires no-payload X11/Qt diagnostics. Do not mutate #303 while owned.
+- #303 RUNTIME remains separately owned; do not mutate it while owned.
 - #302 P0 waits on live exact-client in-game RUNTIME observation; direct player XYZ remains `UNKNOWN/INCONCLUSIVE`.
-- #295 remains ownership-lifecycle blocked by merged #291 stale active contract ownership; four material review threads remain unresolved.
+- #295 remains ownership-lifecycle blocked by merged #291 stale active contract ownership; material review threads remain unresolved.
+- #311 remains Draft/policy-v3 and must stay fail-closed until an accepted lease manager is on `main`.
+- `:98` remains only the strongest historical/persistent display candidate; canonical registration is a separate read-only proof step.
 
 # Canonical non-completion boundary
 

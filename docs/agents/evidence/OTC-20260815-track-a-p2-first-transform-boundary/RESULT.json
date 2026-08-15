@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "provenance": {
+    "workflow_run": 31893080162,
+    "workflow_job": 95032159933,
+    "workflow_head": "f471bfc0b67046bdd917ea6e10a2e22af7f8d00f",
+    "runner": "synology-otclient-01",
+    "artifact_id": 9249061176,
+    "artifact_digest": "sha256:2604ddaddd7381de0797ccfdc1c027ac49f66175485012647a4804a98e100130",
+    "execution_success": true
+  },
+  "exact_client": {
+    "platform": "official_native_linux_only",
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "size": 51965216,
+    "version_mapping": "15.32.df7b29"
+  },
+  "semantic_result": "SERIALIZATION_ONLY_PROVEN",
+  "facts": {
+    "tprotocolwriter_address_point": "0x2f69dd0",
+    "tprotocolwriter_rtti": "0x3080728",
+    "intermediate_address_point": "0x2f69e30",
+    "intermediate_rtti": "0x3080748",
+    "processor_address_point": "0x2f6a208",
+    "processor_retains_intermediate_shared_pair": true,
+    "intermediate_retains_writer_shared_pair": true,
+    "first_two_intermediate_slots": ["0x7de7f0", "0x7dfd60"],
+    "first_concrete_non_lifecycle_slot": "0xc10960",
+    "first_concrete_slot_rel": "0x10",
+    "first_concrete_slot_reads_retained_writer_member": "+0x18",
+    "first_concrete_slot_operation": "QDataStream::operator<<(signed char)",
+    "next_concrete_serializer_slot": "0xc20290",
+    "next_serializer_reads_argument_fields": ["+0x30", "+0x34"],
+    "next_serializer_operation": "QDataStream::operator<<(signed short)",
+    "adjacent_buffer_slot": "0xc20c70",
+    "adjacent_buffer_fact": "constructs QBuffer"
+  },
+  "classification": {
+    "first_concrete_boundary": "STRUCTURED_OBJECT_ARGUMENT_TO_QDATASTREAM_SERIALIZATION",
+    "input_representation": "STRUCTURED_OR_TYPED_OBJECT_ARGUMENT",
+    "output_representation": "QDATASTREAM_SERIALIZATION_SINK",
+    "temporal_first_in_entire_outbound_pipeline": "UNKNOWN",
+    "qbuffer_order_relative_to_serialization": "UNKNOWN",
+    "framing_order": "UNKNOWN",
+    "sequence_order": "UNKNOWN",
+    "compression_order": "UNKNOWN",
+    "encryption_order": "UNKNOWN",
+    "final_binary_egress": "UNKNOWN",
+    "causal_local_harness": "UNKNOWN"
+  },
+  "negative_controls": {
+    "first_two_slots_are_lifecycle_like": true,
+    "generic_qiodevice_enumeration_used_as_discriminator": false,
+    "vtable_adjacency_alone_used_as_proof": false,
+    "b5b880_promoted": false,
+    "b46bd0_promoted": false,
+    "c33259_promoted": false
+  },
+  "draft_not_promoted": true
+}

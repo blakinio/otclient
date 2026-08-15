@@ -174,13 +174,118 @@ jobs:
           echo "TRACK_A_RUNTIME_EXACT_HEAD=$GITHUB_SHA"
           echo "TRACK_A_RUNTIME_CODE_BEARING_HEAD=$EXPECTED_CODE_BEARING_HEAD"
 
+      - name: Materialize exact runner-layout compatibility helper
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          src=.github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+          out="$RUNNER_TEMP/tibia-official-client-re-runtime-reacquisition-effective.sh"
+          python3 - "$src" "$out" <<'PY'
+          from pathlib import Path
+          import sys
+
+          src, out = map(Path, sys.argv[1:])
+          text = src.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\nTASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
+                  "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\n"
+                  "LEGACY_STATE='/work/_otclient_tibia_re_state'\n"
+                  "TASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
+              ),
+              (
+                  "toolroot() { printf '%s/toolroot\\n' \"$BASE_STATE\"; }",
+                  r'''source_state() {
+  local state client size sha
+  for state in "$LEGACY_STATE" "$BASE_STATE"; do
+    client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+    [[ -x "$client" ]] || continue
+    size="$(stat -c '%s' "$client" 2>/dev/null || true)"
+    sha="$(sha256sum "$client" 2>/dev/null | awk '{print $1}')"
+    if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
+      printf '%s\n' "$state"
+      return 0
+    fi
+  done
+  die exact_source_state_unavailable
+}
+toolroot() { printf '%s/toolroot\n' "$(source_state)"; }''',
+              ),
+              (
+                  r'''verify_upstream_warp() {
+  local pid
+  pid="$(tr -cd '0-9' <"$BASE_STATE/runtime/wireproxy.pid" 2>/dev/null || true)"
+  [[ -n "$pid" && -r "/proc/$pid/environ" ]] || die upstream_wireproxy_unavailable
+  grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || die upstream_wireproxy_wrong_owner
+  kill -0 "$pid" || die upstream_wireproxy_dead
+  curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
+    https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \
+    || die upstream_warp_not_verified
+  printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s\n' "$pid"
+}''',
+                  r'''verify_upstream_warp() {
+  local source state pid selected_pid='' selected_state='' count=0
+  declare -A seen=()
+  source="$(source_state)"
+  for state in "$source" "$BASE_STATE" "$LEGACY_STATE"; do
+    [[ -r "$state/runtime/wireproxy.pid" ]] || continue
+    pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
+    [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue
+    grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || continue
+    kill -0 "$pid" 2>/dev/null || continue
+    [[ -z "${seen[$pid]:-}" ]] || continue
+    seen[$pid]=1
+    selected_pid="$pid"
+    selected_state="$state"
+    count=$((count+1))
+  done
+  (( count == 1 )) || {
+    (( count == 0 )) && die upstream_wireproxy_unavailable
+    die upstream_wireproxy_ambiguous
+  }
+  port_listening "$UPSTREAM_SOCKS_PORT" || die upstream_socks_not_listening
+  curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
+    https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \
+    || die upstream_warp_not_verified
+  printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s source_state=%s\n' "$selected_pid" "$selected_state"
+}''',
+              ),
+              (
+                  "  local td=\"$(toolroot)\" xvfb=\"$BASE_STATE/runtime/Xvfb-track-a\" pid",
+                  "  local source td xvfb pid\n  source=\"$(source_state)\"; td=\"$(toolroot)\"; xvfb=\"$source/runtime/Xvfb-track-a\"",
+              ),
+              (
+                  "  local root=\"$(run_root)\" src=\"$BASE_STATE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia\" dst",
+                  "  local root source src dst\n  root=\"$(run_root)\"; source=\"$(source_state)\"\n  src=\"$source/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia\"\n  printf 'TRACK_A_RUNTIME_SOURCE_STATE=%s\\n' \"$source\"",
+              ),
+              (
+                  "  local td=\"$(toolroot)\" xvfb=\"$BASE_STATE/runtime/Xvfb-track-a\" root=\"$(run_root)\"",
+                  "  local source td xvfb root\n  source=\"$(source_state 2>/dev/null || printf '%s\\n' \"$BASE_STATE\")\"\n  td=\"$source/toolroot\"; xvfb=\"$source/runtime/Xvfb-track-a\"; root=\"$(run_root)\"",
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'compatibility transform match count {count}, expected 1: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          out.write_text(text, encoding='utf-8')
+          PY
+          chmod 700 "$out"
+          bash -n "$out"
+          echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$out" >> "$GITHUB_ENV"
+          echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER_SHA256=$(sha256sum "$out" | awk '{print $1}')"
+          echo TRACK_A_RUNTIME_RUNNER_LAYOUT_COMPATIBILITY_MATERIALIZED=true
+
       - name: Bootstrap isolated no-secret runtime namespace
         shell: bash
-        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh bootstrap
+        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" bootstrap
 
       - name: Prepare generation 1 and arm logged-out structural observer
         shell: bash
-        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh prepare 1
+        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" prepare 1
 
       - name: Login generation 1 with protected inputs only
         shell: bash
@@ -189,17 +294,17 @@ jobs:
           TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
         run: |
           set +x
-          bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh login 1
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" login 1
 
       - name: Verify generation 1 structural world state and confinement
         shell: bash
-        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh verify 1
+        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" verify 1
 
       - name: Cleanly stop generation 1 task-owned client and observer
         shell: bash
         run: |
           set -Eeuo pipefail
-          helper=.github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+          helper="$TRACK_A_RUNTIME_EFFECTIVE_HELPER"
           bash "$helper" stop 1
           pidfile="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID/runtime/observer-gen-1.pid"
           if [[ -r "$pidfile" ]]; then
@@ -212,7 +317,7 @@ jobs:
 
       - name: Prepare generation 2 with fresh PID PIE and observer
         shell: bash
-        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh prepare 2
+        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" prepare 2
 
       - name: Login generation 2 with protected inputs only
         shell: bash
@@ -221,22 +326,22 @@ jobs:
           TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
         run: |
           set +x
-          bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh login 2
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" login 2
 
       - name: Verify generation 2 structural world state and confinement
         shell: bash
-        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh verify 2
+        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" verify 2
 
       - name: Compare generations and require restart stable reacquisition
         shell: bash
-        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh compare
+        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" compare
 
       - name: Clean task-owned runtime processes and ephemeral state
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
-          helper=.github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+          helper="${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-.github/scripts/tibia-official-client-re-runtime-reacquisition.sh}"
           runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID/runtime"
           for gen in 1 2; do
             bash "$helper" stop "$gen"
@@ -266,6 +371,9 @@ jobs:
             echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
             echo "code_bearing_head=$EXPECTED_CODE_BEARING_HEAD"
             echo "resume_request_verified=true"
+            if [[ -n "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" && -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
+              echo "effective_helper_sha256=$(sha256sum "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" | awk '{print $1}')"
+            fi
           } > artifacts/runtime-reacquisition/workflow-terminal.txt
 
       - name: Upload sanitized runtime reacquisition evidence

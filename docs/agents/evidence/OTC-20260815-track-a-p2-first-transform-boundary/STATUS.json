@@ -1,1 +1,22 @@
-{"classification":"UNKNOWN","execution":"NOT_RUN","semantic_result":"UNKNOWN","first_transform_boundary":"UNKNOWN","framing_order":"UNKNOWN","sequence_boundary":"UNKNOWN","compression_boundary":"UNKNOWN","encryption_boundary":"UNKNOWN","final_binary_egress":"OUT_OF_SCOPE_UNLESS_REACHED_INDEPENDENTLY","draft_not_promoted":true}
+{
+  "classification": "SERIALIZATION_ONLY_PROVEN",
+  "execution": "SUCCESS",
+  "semantic_result": "SERIALIZATION_ONLY_PROVEN",
+  "first_transform_boundary": "STRUCTURED_OBJECT_ARGUMENT_TO_QDATASTREAM_SERIALIZATION",
+  "first_concrete_slot": "0xc10960",
+  "next_serializer_slot": "0xc20290",
+  "adjacent_qbuffer_slot": "0xc20c70",
+  "temporal_first_in_entire_outbound_pipeline": "UNKNOWN",
+  "framing_order": "UNKNOWN",
+  "sequence_boundary": "UNKNOWN",
+  "compression_boundary": "UNKNOWN",
+  "encryption_boundary": "UNKNOWN",
+  "qbuffer_order_relative_to_serialization": "UNKNOWN",
+  "final_binary_egress": "UNKNOWN",
+  "causal_local_harness": "UNKNOWN",
+  "workflow_run": 31893080162,
+  "workflow_job": 95032159933,
+  "artifact_id": 9249061176,
+  "artifact_digest": "sha256:2604ddaddd7381de0797ccfdc1c027ac49f66175485012647a4804a98e100130",
+  "draft_not_promoted": true
+}

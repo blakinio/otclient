@@ -113,13 +113,13 @@ jobs:
               size="$(stat -c '%s' "$client" 2>/dev/null || true)"
               sha="$(sha256sum "$client" 2>/dev/null | awk '{print $1}')"
               if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
-                printf '%s\\n' "$state"
+                printf '%s\n' "$state"
                 return 0
               fi
             done
             die exact_source_state_unavailable
           }
-          toolroot() { printf '%s/toolroot\\n' "$(source_state)"; }
+          toolroot() { printf '%s/toolroot\n' "$(source_state)"; }
           '''),
           ))
           replacements.append((
@@ -157,7 +157,7 @@ jobs:
               done
               (( count <= 1 )) || die "ambiguous_${role}_processes"
               if (( count == 1 )); then
-                printf '%s\\n' "$found"
+                printf '%s\n' "$found"
                 return 0
               fi
               sleep .2
@@ -174,10 +174,10 @@ jobs:
             [[ -n "$pid" && -r "/proc/$pid/environ" ]] || die upstream_wireproxy_unavailable
             grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || die upstream_wireproxy_wrong_owner
             kill -0 "$pid" || die upstream_wireproxy_dead
-            curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \\
-              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \\
+            curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
+              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \
               || die upstream_warp_not_verified
-            printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s\\n' "$pid"
+            printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s\n' "$pid"
           }
           '''),
               dedent('''\
@@ -202,10 +202,10 @@ jobs:
               die upstream_wireproxy_ambiguous
             }
             port_listening "$UPSTREAM_SOCKS_PORT" || die upstream_socks_not_listening
-            curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \\
-              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \\
+            curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
+              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \
               || die upstream_warp_not_verified
-            printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s source_state=%s\\n' "$selected_pid" "$selected_state"
+            printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s source_state=%s\n' "$selected_pid" "$selected_state"
           }
           '''),
           ))
@@ -221,8 +221,6 @@ jobs:
               '  local td="$(toolroot)" xvfb="$BASE_STATE/runtime/Xvfb-track-a" root="$(run_root)"',
               '  local source td xvfb root\n  source="$(source_state 2>/dev/null || printf \'%s\\n\' "$BASE_STATE")"\n  td="$source/toolroot"; xvfb="$source/runtime/Xvfb-track-a"; root="$(run_root)"',
           ))
-
-          # Every task-owned persistent role gets a current-run marker.
           replacements.extend([
               (
                   '    OTCLIENT_TIBIA_RE_ROLE=socks-relay \\\n    nohup python3 "$relay"',
@@ -236,57 +234,47 @@ jobs:
                   '    nohup "$xvfb" "$TRACK_DISPLAY"',
                   '    sh -c \'cd "$1" && shift && exec "$@"\' sh "$td/usr/bin" nohup setsid "$xvfb" "$TRACK_DISPLAY"',
               ),
+              (
+                  '    OTCLIENT_TIBIA_RE_ROLE="client-gen-$gen" HOME="$root/home-gen-$gen" DISPLAY="$TRACK_DISPLAY" \\',
+                  '    OTCLIENT_TIBIA_RE_ROLE="client-gen-$gen" OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" HOME="$root/home-gen-$gen" DISPLAY="$TRACK_DISPLAY" \\',
+              ),
+              (
+                  '    nohup "$client" >"$gdir/client.log" 2>&1 </dev/null &',
+                  '    nohup setsid "$client" >"$gdir/client.log" 2>&1 </dev/null &',
+              ),
+              (
+                  '    OTCLIENT_TIBIA_RE_ROLE="observer-gen-$gen" HOME="$root/home" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \\',
+                  '    OTCLIENT_TIBIA_RE_ROLE="observer-gen-$gen" OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" HOME="$root/home" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \\',
+              ),
+              (
+                  '    nohup "$gdb" -q -nx -batch -x "$gdir/world.gdb" >"$gdir/gdb.log" 2>&1 </dev/null &',
+                  '    nohup setsid "$gdb" -q -nx -batch -x "$gdir/world.gdb" >"$gdir/gdb.log" 2>&1 </dev/null &',
+              ),
           ])
-
-          old_client = dedent('''\
-              OTCLIENT_TIBIA_RE_ROLE="client-gen-$gen" HOME="$root/home-gen-$gen" DISPLAY="$TRACK_DISPLAY" \\
-              PATH="$tool_path" LD_LIBRARY_PATH="$package/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\
-              LIBGL_DRIVERS_PATH="$dri" QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" VK_DRIVER_FILES="$vk_icd" \\
-              XDG_DATA_DIRS="$td/usr/share:/usr/share" FONTCONFIG_PATH="$td/etc/fonts" \\
-              FONTCONFIG_FILE="$td/etc/fonts/fonts.conf" LD_PRELOAD="$proxy_lib" \\
-              PROXYCHAINS_CONF_FILE="$root/proxychains.conf" \\
-              nohup "$client" >"$gdir/client.log" 2>&1 </dev/null &
-            pid=$!; printf '%s\\n' "$pid" >"$(pidfile "client-gen-$gen")"
-            for _ in $(seq 1 80); do kill -0 "$pid" 2>/dev/null || die "client_gen_${gen}_exited"; [[ -r "/proc/$pid/maps" ]] && break; sleep .25; done
-            role_owned "$pid" "client-gen-$gen" "$client" || die "client_gen_${gen}_ownership_failed"
-            assert_no_secret_env "$pid" "client-gen-$gen"
-          ''')
-          new_client = dedent('''\
-              OTCLIENT_TIBIA_RE_ROLE="client-gen-$gen" OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" HOME="$root/home-gen-$gen" DISPLAY="$TRACK_DISPLAY" \\
-              PATH="$tool_path" LD_LIBRARY_PATH="$package/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\
-              LIBGL_DRIVERS_PATH="$dri" QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" VK_DRIVER_FILES="$vk_icd" \\
-              XDG_DATA_DIRS="$td/usr/share:/usr/share" FONTCONFIG_PATH="$td/etc/fonts" \\
-              FONTCONFIG_FILE="$td/etc/fonts/fonts.conf" LD_PRELOAD="$proxy_lib" \\
-              PROXYCHAINS_CONF_FILE="$root/proxychains.conf" \\
-              nohup setsid "$client" >"$gdir/client.log" 2>&1 </dev/null &
-            launcher_pid=$!
-            pid="$(discover_role_pid "client-gen-$gen" "$client" 100)" || die "client_gen_${gen}_not_discovered"
-            printf '%s\\n' "$pid" >"$(pidfile "client-gen-$gen")"
-            assert_no_secret_env "$pid" "client-gen-$gen"
-            printf 'TRACK_A_RUNTIME_ROLE_DISCOVERED role=client-gen-%s pid=%s launcher_pid=%s\\n' "$gen" "$pid" "$launcher_pid"
-          ''')
-          replacements.append((old_client, new_client))
-
-          old_observer = dedent('''\
-              OTCLIENT_TIBIA_RE_ROLE="observer-gen-$gen" HOME="$root/home" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \\
-              nohup "$gdb" -q -nx -batch -x "$gdir/world.gdb" >"$gdir/gdb.log" 2>&1 </dev/null &
-            gp=$!; printf '%s\\n' "$gp" >"$(pidfile "observer-gen-$gen")"
-            for _ in $(seq 1 50); do [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")" == "$gp" ]] && break; kill -0 "$gp" 2>/dev/null || die observer_exited; sleep .15; done
-            role_owned "$gp" "observer-gen-$gen" "$gdb" || die observer_ownership_failed
-            assert_no_secret_env "$gp" "observer-gen-$gen"
-          ''')
-          new_observer = dedent('''\
-              OTCLIENT_TIBIA_RE_ROLE="observer-gen-$gen" OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" HOME="$root/home" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \\
-              nohup setsid "$gdb" -q -nx -batch -x "$gdir/world.gdb" >"$gdir/gdb.log" 2>&1 </dev/null &
-            observer_launcher_pid=$!
-            gp="$(discover_role_pid "observer-gen-$gen" "$gdb" 100)" || die observer_not_discovered
-            printf '%s\\n' "$gp" >"$(pidfile "observer-gen-$gen")"
-            for _ in $(seq 1 50); do [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")" == "$gp" ]] && break; kill -0 "$gp" 2>/dev/null || die observer_exited; sleep .15; done
-            role_owned "$gp" "observer-gen-$gen" "$gdb" || die observer_ownership_failed
-            assert_no_secret_env "$gp" "observer-gen-$gen"
-            printf 'TRACK_A_RUNTIME_ROLE_DISCOVERED role=observer-gen-%s pid=%s launcher_pid=%s\\n' "$gen" "$gp" "$observer_launcher_pid"
-          ''')
-          replacements.append((old_observer, new_observer))
+          replacements.append((
+              '  pid=$!; printf \'%s\\n\' "$pid" >"$(pidfile "client-gen-$gen")"\n'
+              '  for _ in $(seq 1 80); do kill -0 "$pid" 2>/dev/null || die "client_gen_${gen}_exited"; [[ -r "/proc/$pid/maps" ]] && break; sleep .25; done\n'
+              '  role_owned "$pid" "client-gen-$gen" "$client" || die "client_gen_${gen}_ownership_failed"\n'
+              '  assert_no_secret_env "$pid" "client-gen-$gen"',
+              '  launcher_pid=$!\n'
+              '  pid="$(discover_role_pid "client-gen-$gen" "$client" 100)" || die "client_gen_${gen}_not_discovered"\n'
+              '  printf \'%s\\n\' "$pid" >"$(pidfile "client-gen-$gen")"\n'
+              '  assert_no_secret_env "$pid" "client-gen-$gen"\n'
+              '  printf \'TRACK_A_RUNTIME_ROLE_DISCOVERED role=client-gen-%s pid=%s launcher_pid=%s\\n\' "$gen" "$pid" "$launcher_pid"',
+          ))
+          replacements.append((
+              '  gp=$!; printf \'%s\\n\' "$gp" >"$(pidfile "observer-gen-$gen")"\n'
+              '  for _ in $(seq 1 50); do [[ "$(awk \'/^TracerPid:/{print $2}\' "/proc/$pid/status")" == "$gp" ]] && break; kill -0 "$gp" 2>/dev/null || die observer_exited; sleep .15; done\n'
+              '  role_owned "$gp" "observer-gen-$gen" "$gdb" || die observer_ownership_failed\n'
+              '  assert_no_secret_env "$gp" "observer-gen-$gen"',
+              '  observer_launcher_pid=$!\n'
+              '  gp="$(discover_role_pid "observer-gen-$gen" "$gdb" 100)" || die observer_not_discovered\n'
+              '  printf \'%s\\n\' "$gp" >"$(pidfile "observer-gen-$gen")"\n'
+              '  for _ in $(seq 1 50); do [[ "$(awk \'/^TracerPid:/{print $2}\' "/proc/$pid/status")" == "$gp" ]] && break; kill -0 "$gp" 2>/dev/null || die observer_exited; sleep .15; done\n'
+              '  role_owned "$gp" "observer-gen-$gen" "$gdb" || die observer_ownership_failed\n'
+              '  assert_no_secret_env "$gp" "observer-gen-$gen"\n'
+              '  printf \'TRACK_A_RUNTIME_ROLE_DISCOVERED role=observer-gen-%s pid=%s launcher_pid=%s\\n\' "$gen" "$gp" "$observer_launcher_pid"',
+          ))
 
           for old, new in replacements:
               count = text.count(old)
@@ -493,7 +481,11 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          helper="${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-.github/scripts/tibia-official-client-re-runtime-reacquisition.sh}"
+          if [[ -z "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" || ! -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
+            echo TRACK_A_RUNTIME_CLEANUP_SKIPPED_NO_EFFECTIVE_HELPER=true
+            exit 0
+          fi
+          helper="$TRACK_A_RUNTIME_EFFECTIVE_HELPER"
           runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/runtime"
           for gen in 1 2; do
             bash "$helper" stop "$gen"

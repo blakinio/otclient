@@ -39,12 +39,66 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
           echo TRACK_A_LOADER_EXACT_CLIENT_VERIFIED=true
 
-          interpreter="$(readelf -l "$client" | sed -n 's/.*Requesting program interpreter: \(.*\)]/\1/p' | head -n1)"
+          interpreter_file="$RUNNER_TEMP/track-a-interpreter.txt"
+          python3 - "$client" "$interpreter_file" <<'PY'
+          import struct,sys
+          path,out=sys.argv[1:]
+          data=open(path,'rb').read()
+          if data[:4] != b'\x7fELF' or data[4] != 2 or data[5] != 1:
+              raise SystemExit('expected little-endian ELF64')
+          phoff=struct.unpack_from('<Q',data,32)[0]
+          phentsize=struct.unpack_from('<H',data,54)[0]
+          phnum=struct.unpack_from('<H',data,56)[0]
+          ph=[]
+          for i in range(phnum):
+              off=phoff+i*phentsize
+              p_type,p_flags,p_offset,p_vaddr,p_paddr,p_filesz,p_memsz,p_align=struct.unpack_from('<IIQQQQQQ',data,off)
+              ph.append((p_type,p_offset,p_vaddr,p_filesz,p_memsz))
+          interp=''
+          dynamic=None
+          loads=[]
+          for p_type,p_offset,p_vaddr,p_filesz,p_memsz in ph:
+              if p_type==3:
+                  interp=data[p_offset:p_offset+p_filesz].split(b'\0',1)[0].decode()
+              elif p_type==2:
+                  dynamic=(p_offset,p_filesz)
+              elif p_type==1:
+                  loads.append((p_vaddr,p_vaddr+p_memsz,p_offset,p_filesz))
+          if not interp or dynamic is None:
+              raise SystemExit('missing ELF interpreter/dynamic segment')
+          def va_to_off(va):
+              for lo,hi,fo,fs in loads:
+                  if lo <= va < hi and va-lo < fs:
+                      return fo+(va-lo)
+              raise SystemExit(f'unmapped VA 0x{va:x}')
+          entries=[]; strtab_va=None; strsz=None
+          doff,dsize=dynamic
+          for off in range(doff,doff+dsize,16):
+              tag,val=struct.unpack_from('<qQ',data,off)
+              if tag==0: break
+              entries.append((tag,val))
+              if tag==5: strtab_va=val
+              elif tag==10: strsz=val
+          if strtab_va is None or strsz is None:
+              raise SystemExit('missing dynamic string table')
+          so=va_to_off(strtab_va); strings=data[so:so+strsz]
+          def dynstr(idx):
+              end=strings.find(b'\0',idx)
+              if end < 0: end=len(strings)
+              return strings[idx:end].decode('utf-8','replace')
+          needed=[dynstr(v) for t,v in entries if t==1]
+          rpath=[dynstr(v) for t,v in entries if t==15]
+          runpath=[dynstr(v) for t,v in entries if t==29]
+          open(out,'w',encoding='utf-8').write(interp+'\n')
+          print(f'TRACK_A_LOADER_INTERPRETER={interp}')
+          print('TRACK_A_LOADER_DYNAMIC_TAGS_BEGIN=true')
+          for value in needed: print(f'NEEDED {value}')
+          for value in rpath: print(f'RPATH {value}')
+          for value in runpath: print(f'RUNPATH {value}')
+          print('TRACK_A_LOADER_DYNAMIC_TAGS_END=true')
+          PY
+          interpreter="$(head -n1 "$interpreter_file")"
           [[ -x "$interpreter" ]]
-          echo "TRACK_A_LOADER_INTERPRETER=$interpreter"
-          echo TRACK_A_LOADER_DYNAMIC_TAGS_BEGIN=true
-          readelf -d "$client" | grep -E '\((NEEDED|RPATH|RUNPATH)\)' || true
-          echo TRACK_A_LOADER_DYNAMIC_TAGS_END=true
 
           echo TRACK_A_LOADER_LAYOUT_BEGIN=true
           for d in "$runtime/lib" "$runtime/bin/lib" "$toolroot/usr/lib/x86_64-linux-gnu" "$toolroot/usr/lib/x86_64-linux-gnu/libproxy"; do
@@ -83,11 +137,9 @@ jobs:
           diffs=[]
           for k in keys:
               av=a.get(k,'MISSING'); bv=b.get(k,'MISSING')
-              if av!=bv:
-                  diffs.append((k,av,bv))
+              if av!=bv: diffs.append((k,av,bv))
           print(f'TRACK_A_LOADER_RESOLUTION_DIFF_COUNT={len(diffs)}')
-          for k,av,bv in diffs:
-              print(f'LOADER_DIFF name={k} positive={av} current={bv}')
+          for k,av,bv in diffs: print(f'LOADER_DIFF name={k} positive={av} current={bv}')
           qt=[d for d in diffs if d[0].startswith('libQt6')]
           gl=[d for d in diffs if d[0].startswith(('libEGL','libGL','libGLX'))]
           proxy=[d for d in diffs if 'proxy' in d[0].lower() or 'pxbackend' in d[0].lower()]

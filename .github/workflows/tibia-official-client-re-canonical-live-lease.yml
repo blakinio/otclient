@@ -4,6 +4,7 @@ on:
   push:
     branches: [feat/OTC-20260815-track-a-live-runtime-lease-manager]
     paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-lease
       - .github/scripts/tibia-official-client-re-canonical-live-lease.py
       - .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
       - .github/workflows/tibia-official-client-re-canonical-live-lease.yml
@@ -34,6 +35,7 @@ jobs:
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
 
+          entry="$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-canonical-live-lease"
           script="$GITHUB_WORKSPACE/.github/scripts/tibia-official-client-re-canonical-live-lease.py"
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-live-runtime-lease-manager/selftest/$GITHUB_RUN_ID"
           state="$root/state"
@@ -43,6 +45,23 @@ jobs:
           canonical="/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime"
 
           [[ "$state" != "$canonical" ]]
+
+          set +e
+          override_output="$(bash "$entry" --state-dir "$root/forbidden" status 2>&1)"
+          override_rc=$?
+          set -e
+          [[ "$override_rc" -eq 64 ]]
+          grep -Fq 'TRACK_A_CANONICAL_LEASE_ERROR=noncanonical_state_override_forbidden' <<<"$override_output"
+          [[ ! -e "$root/forbidden" ]]
+
+          set +e
+          token_path_output="$(bash "$entry" acquire \
+            --task-id OTC-selftest-a --session-id run-a --token-file /tmp/not-task-owned.token 2>&1)"
+          token_path_rc=$?
+          set -e
+          [[ "$token_path_rc" -eq 64 ]]
+          grep -Fq 'TRACK_A_CANONICAL_LEASE_ERROR=token_path_outside_task_state' <<<"$token_path_output"
+
           mkdir -p "$root"
           chmod 700 "$root"
           trap 'rm -rf -- "$root"' EXIT
@@ -87,5 +106,6 @@ jobs:
           python3 "$script" --state-dir "$state" release \
             --task-id OTC-selftest-b --session-id run-b --token-file "$token_b"
 
+          echo TRACK_A_CANONICAL_LEASE_ENTRYPOINT_FENCED=true
           echo TRACK_A_CANONICAL_LEASE_SELFTEST_COMPLETE=true
           echo TRACK_A_CANONICAL_LEASE_CANONICAL_STATE_UNTOUCHED=true

@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260815-track-a-p0-direct-position
-status: ready
-agent: unassigned_draft_only_researcher
+status: active
+agent: track-a-p0-state-researcher
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
@@ -30,6 +30,8 @@ run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
+claim_check: passed against open Draft PR #302, exact branch/head and non-overlapping owned paths before the current checkpoint mutation
+last_checkpoint: passive exact-build TPlayerData probe committed at 7493983ca230c789f2d423cb073e036f4e29570e; workflow run 31880617510 remains queued awaiting a matching self-hosted runner
 ---
 
 # Objective
@@ -111,6 +113,20 @@ The experiment must distinguish:
 # Side-effect budget
 
 Prefer read-only runtime observation. If a state transition is strictly necessary for discrimination, use at most one previously proven reversible adjacent movement plus inverse and verify restoration. Do not use attack, use, move-object, market, trade, forge or currency effects.
+
+# Current checkpoint
+
+### FACT
+
+- Draft PR #302 is open and remains Draft-only on `research/OTC-20260815-track-a-p0-direct-position` against `main@8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
+- The passive reproducer resolves the exact-build `TPlayerData` primary vptr from the accepted offset `0x308ca70`, scans only typed owner objects and one pointer hop for plausible position-shaped fields, and uses structural strip data only as an independent semantic oracle.
+- The reproducer performs process reads only; it does not write process memory or issue gameplay input.
+- GitHub Actions run `31880617510` was created for exact head `7493983ca230c789f2d423cb073e036f4e29570e` and is queued. The required self-hosted job has not executed, so there is no runtime result to classify yet.
+
+### UNKNOWN
+
+- Whether a matching self-hosted runner will be assigned to run `31880617510` during this execution budget.
+- Whether the live `TPlayerData` graph contains a direct authoritative position field.
 
 # Deliverable
 

@@ -199,6 +199,16 @@ jobs:
           bash "$recover"
 
           bash "$effective" bootstrap
+          task_package="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/package"
+          task_crash="$task_package/crashdump"
+          [[ -d "$task_crash" ]] || { echo TRACK_A_RUNTIME_ERROR=task_crashdump_missing >&2; exit 1; }
+          crash_entries_before="$(find "$task_crash" -xdev -mindepth 1 -print 2>/dev/null | wc -l)"
+          find "$task_crash" -xdev -mindepth 1 -delete
+          if [[ -n "$(find "$task_crash" -xdev -mindepth 1 -print -quit 2>/dev/null)" ]]; then
+            echo TRACK_A_RUNTIME_ERROR=task_crashdump_not_empty >&2
+            exit 1
+          fi
+          echo "TRACK_A_RUNTIME_TASK_CRASHDUMP_CLEARED=true prior_entries=$crash_entries_before"
           runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/runtime"
           run_marker="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"
           for role in socks-relay xvfb; do
@@ -302,7 +312,7 @@ jobs:
           {
             echo "workflow_status=${{ job.status }}"; echo "workflow_run_id=$GITHUB_RUN_ID"; echo "workflow_head=$GITHUB_SHA"; echo "runner=$RUNNER_NAME"
             echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"; echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
-            echo "current_run_ownership=true"; echo "bundled_qt_precedence=true"; echo "software_backend=true"; echo "minimal_launcher_home=true"; echo "known_good_xvfb_profile=true"; echo "canonical_home_package_launch=true"
+            echo "current_run_ownership=true"; echo "bundled_qt_precedence=true"; echo "software_backend=true"; echo "minimal_launcher_home=true"; echo "known_good_xvfb_profile=true"; echo "canonical_home_package_launch=true"; echo "task_local_crashdump_cleared=true"
           } > "$out/workflow-terminal.txt"
 
       - name: Clean exact current-run runtime processes and ephemeral state

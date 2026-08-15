@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-p0-direct-position
-status: active
+status: waiting
 agent: track-a-p0-state-researcher
 project_lane: otclient
 lane: P0-STATE
@@ -21,7 +21,8 @@ owned_paths:
 depends_on:
   - exact-build structural world evidence retained by coordinator PR #300
   - accepted read-only bridge evidence from PR #283 as read-only reference only; no ownership of its paths
-blocks: []
+blocks:
+  - self-hosted runtime job 95002559098 in run 31880617510 is queued with runner_id=0; direct runner inventory is unavailable through the current connector (HTTP 403)
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
@@ -30,8 +31,8 @@ run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
-claim_check: passed against open Draft PR #302, exact branch/head and non-overlapping owned paths before the current checkpoint mutation
-last_checkpoint: passive exact-build TPlayerData probe committed at 7493983ca230c789f2d423cb073e036f4e29570e; workflow run 31880617510 remains queued awaiting a matching self-hosted runner
+claim_check: passed against open Draft PR #302, exact branch/head and non-overlapping owned paths before the waiting checkpoint mutation
+last_checkpoint: evidence checkpoint committed at a8e0e74b1ae529a23476c25aba4b09173e872904; passive code-bearing run 31880617510 remains queued and has produced no runtime semantic result
 ---
 
 # Objective
@@ -121,12 +122,19 @@ Prefer read-only runtime observation. If a state transition is strictly necessar
 - Draft PR #302 is open and remains Draft-only on `research/OTC-20260815-track-a-p0-direct-position` against `main@8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
 - The passive reproducer resolves the exact-build `TPlayerData` primary vptr from the accepted offset `0x308ca70`, scans only typed owner objects and one pointer hop for plausible position-shaped fields, and uses structural strip data only as an independent semantic oracle.
 - The reproducer performs process reads only; it does not write process memory or issue gameplay input.
-- GitHub Actions run `31880617510` was created for exact head `7493983ca230c789f2d423cb073e036f4e29570e` and is queued. The required self-hosted job has not executed, so there is no runtime result to classify yet.
+- GitHub Actions run `31880617510` was created for code-bearing head `7493983ca230c789f2d423cb073e036f4e29570e`. Required job `95002559098` remains queued with `runner_id=0`; it has not executed and has produced no runtime result.
+- Standard PR CI for checkpoint head `180e4a12e7016a6bea0dc8bbfe34b59aa8204dd9` completed successfully in run `31880797651`.
+- Durable execution evidence is recorded at `docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/20260815-passive-tplayerdata-probe.md`.
 
 ### UNKNOWN
 
-- Whether a matching self-hosted runner will be assigned to run `31880617510` during this execution budget.
+- Current online/offline state of a matching self-hosted runner; direct runner inventory returned HTTP 403 through the available connector.
 - Whether the live `TPlayerData` graph contains a direct authoritative position field.
+- Repeatability and fresh-PID/relogin stability for a direct position read.
+
+# Resume condition
+
+Resume when run `31880617510` / job `95002559098` is assigned to a matching self-hosted runner. Inspect the exact logs before deciding whether passive evidence is sufficient or whether one bounded reversible movement plus inverse is necessary. Recheck RUNTIME-lane ownership before any stimulus.
 
 # Deliverable
 

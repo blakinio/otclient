@@ -1,62 +1,45 @@
 #!/usr/bin/env python3
-"""Patch the materialized Track-A runtime helper for Yama-safe parent tracing.
-
-This patch is intentionally runtime-local: it never writes ptrace_scope/sysctl and
-keeps the exact client/network/login/Worldmap contracts.  It replaces the old
-"launch client, then gdb attach" model with "task-owned gdb launches client as
-its child", preserves ASLR, repairs the private toolroot xdotool loader, and
-uses generation-local physical canonical-HOME client paths consistently.
-"""
-from __future__ import annotations
-
+"""Patch materialized Track-A helper for Yama-safe parent tracing."""
 from pathlib import Path
 import sys
 
 
-def replace_between(text: str, start: str, end: str, replacement: str, label: str) -> str:
+def replace_between(text, start, end, replacement, label):
     if text.count(start) != 1:
-        raise SystemExit(f"{label}: start anchor count={text.count(start)}, expected 1")
+        raise SystemExit(f"{label}: start count={text.count(start)}")
     if text.count(end) != 1:
-        raise SystemExit(f"{label}: end anchor count={text.count(end)}, expected 1")
+        raise SystemExit(f"{label}: end count={text.count(end)}")
     a = text.index(start)
     b = text.index(end, a + len(start))
     return text[:a] + replacement.rstrip() + "\n\n" + text[b:]
 
 
-def replace_once(text: str, old: str, new: str, label: str) -> str:
+def replace_once(text, old, new, label):
     n = text.count(old)
     if n != 1:
-        raise SystemExit(f"{label}: anchor count={n}, expected 1")
+        raise SystemExit(f"{label}: anchor count={n}")
     return text.replace(old, new, 1)
 
 
 if len(sys.argv) != 2:
-    raise SystemExit("usage: tibia-official-client-re-parent-gdb-patch.py EFFECTIVE_HELPER")
-
+    raise SystemExit("usage: parent-gdb-patch.py EFFECTIVE_HELPER")
 path = Path(sys.argv[1])
 text = path.read_text(encoding="utf-8")
 
-# The private toolroot utilities are not host-self-contained.  Without this,
-# xdotool exits 127 and resolve_window() silently converts it to a false
-# window-missing result.  Repair every helper invocation, not client loading.
-xdotool_old = '"$td/usr/bin/xdotool"'
-xdotool_new = (
+old = '"$td/usr/bin/xdotool"'
+new = (
     'env LD_LIBRARY_PATH="$td/usr/lib/x86_64-linux-gnu:'
     '$td/usr/lib/x86_64-linux-gnu/libproxy:$td/lib/x86_64-linux-gnu" '
     '"$td/usr/bin/xdotool"'
 )
-xdotool_count = text.count(xdotool_old)
+xdotool_count = text.count(old)
 if xdotool_count < 10:
-    raise SystemExit(f"xdotool invocation count unexpectedly low: {xdotool_count}")
-text = text.replace(xdotool_old, xdotool_new)
-if text.count(xdotool_old) != xdotool_count:
-    # xdotool_old is a suffix inside xdotool_new, so exact residual counting is
-    # not useful after replacement; verify the full wrapper count instead.
-    pass
-if text.count(xdotool_new) != xdotool_count:
-    raise SystemExit("xdotool loader wrapper count mismatch")
+    raise SystemExit(f"xdotool invocation count too low: {xdotool_count}")
+text = text.replace(old, new)
+if text.count(new) != xdotool_count:
+    raise SystemExit("xdotool replacement count mismatch")
 
-parent_gdb = r'''generation_package() {
+parent_gdb = r"""generation_package() {
   local gen="$1"
   printf '%s/home-gen-%s/.local/share/CipSoft GmbH/Tibia/packages/Tibia\n' "$(run_root)" "$gen"
 }
@@ -67,14 +50,19 @@ make_gdb_script() {
 import os, shlex, sys
 out, launcher, client, records, pid_out, pie_out, offset = sys.argv[1:]
 client = os.path.realpath(client)
-text = f'''set pagination off
+gdb_text = f'''set pagination off
 set confirm off
 set startup-with-shell off
 set disable-randomization off
 set follow-exec-mode same
 handle SIGTERM pass nostop noprint
-handle SIGINT pass nostop noprint
 file /bin/bash
+unset environment LD_LIBRARY_PATH
+unset environment LD_PRELOAD
+unset environment PROXYCHAINS_CONF_FILE
+unset environment RUNNER_TRACKING_ID
+unset environment TIBIA_TEST_EMAIL
+unset environment TIBIA_TEST_PASSWORD
 set args {shlex.quote(launcher)}
 catch exec
 run
@@ -101,7 +89,7 @@ for _ in range(60):
         break
     time.sleep(0.05)
 if not line:
-    raise gdb.GdbError('exact client executable mapping not found after exec')
+    raise gdb.GdbError('exact client mapping not found after exec')
 start = int(line[0].split('-',1)[0], 16)
 file_off = int(line[2], 16)
 bias = start - file_off
@@ -129,21 +117,15 @@ gdb.write(f'TRACK_A_PARENT_GDB_CHILD_READY pid={{pid}} pie=0x{{bias:x}} offset=0
 end
 continue
 '''
-open(out, 'w', encoding='utf-8').write(text)
+open(out, 'w', encoding='utf-8').write(gdb_text)
 PY
   chmod 600 "$out"
 }
-'''
+"""
+text = replace_between(text, "make_gdb_script() {", "prepare_generation() {",
+                       parent_gdb, "parent-gdb-generator")
 
-text = replace_between(
-    text,
-    "make_gdb_script() {",
-    "prepare_generation() {",
-    parent_gdb,
-    "parent-gdb-generator",
-)
-
-prepare = r'''prepare_generation() {
+prepare = r"""prepare_generation() {
   require_context
   local gen="$1" root package client td tool_path tool_lib proxy_lib vk_icd swrast dri
   local gdir launcher gdb gp pid window baseline
@@ -231,31 +213,24 @@ EOF
   printf 'TRACK_A_GENERATION_PREPARED generation=%s pid=%s pie=%s observer=%s parent_tracer=true\n' \
     "$gen" "$pid" "$(cat "$gdir/pie-base.txt")" "$gp"
 }
-'''
-text = replace_between(
-    text,
-    "prepare_generation() {",
-    "login_generation() {",
-    prepare,
-    "parent-gdb-prepare",
-)
+"""
+text = replace_between(text, "prepare_generation() {", "login_generation() {",
+                       prepare, "parent-gdb-prepare")
 
-# Physical canonical-HOME package paths must be used consistently after the
-# materializer changed prepare_generation away from run_root/package.
 text = replace_once(
     text,
     'email="$TIBIA_TEST_EMAIL"; password="$TIBIA_TEST_PASSWORD"; client="$(package_dir)/bin/client"',
     'email="$TIBIA_TEST_EMAIL"; password="$TIBIA_TEST_PASSWORD"; client="$(generation_package "$gen")/bin/client"',
-    "login-generation-client-path",
+    "login-client-path",
 )
 text = replace_once(
     text,
     'root="$(run_root)"; td="$(toolroot)"; gdir="$root/generation-$gen"; client="$(package_dir)/bin/client"',
     'root="$(run_root)"; td="$(toolroot)"; gdir="$root/generation-$gen"; client="$(generation_package "$gen")/bin/client"',
-    "verify-generation-client-path",
+    "verify-client-path",
 )
 
-stop = r'''stop_generation() {
+stop = r"""stop_generation() {
   require_context
   local gen="$1" root td client gp pid
   root="$(run_root)"; td="$(toolroot)"; client="$(generation_package "$gen")/bin/client"
@@ -281,32 +256,16 @@ stop = r'''stop_generation() {
   fi
   printf 'TRACK_A_GENERATION_STOPPED generation=%s parent_tracer=true\n' "$gen"
 }
-'''
-text = replace_between(
-    text,
-    "stop_generation() {",
-    "compare_generations() {",
-    stop,
-    "parent-gdb-stop",
-)
+"""
+text = replace_between(text, "stop_generation() {", "compare_generations() {",
+                       stop, "parent-gdb-stop")
 
-# The old attach-only guard must not survive anywhere in the effective helper.
-for forbidden in (
-    "ptrace_scope_not_zero",
-    "attach {pid}",
-):
+for forbidden in ("ptrace_scope_not_zero", "attach {pid}"):
     if forbidden in text:
-        raise SystemExit(f"forbidden attach-era fragment remains: {forbidden}")
-
-if "set disable-randomization off" not in text:
-    raise SystemExit("ASLR-preserving GDB setting missing")
-if "TRACK_A_PARENT_GDB_CHILD_READY" not in text:
-    raise SystemExit("parent-GDB readiness marker missing")
-if "generation_package" not in text:
-    raise SystemExit("generation-local client path helper missing")
+        raise SystemExit(f"attach-era fragment remains: {forbidden}")
+for required in ("set disable-randomization off", "TRACK_A_PARENT_GDB_CHILD_READY", "generation_package"):
+    if required not in text:
+        raise SystemExit(f"required fragment missing: {required}")
 
 path.write_text(text, encoding="utf-8")
-print(
-    f"TRACK_A_PARENT_GDB_PATCH_APPLIED=true xdotool_invocations={xdotool_count} "
-    "host_ptrace_scope_unchanged=true aslr_preserved=true"
-)
+print(f"TRACK_A_PARENT_GDB_PATCH_APPLIED=true xdotool_invocations={xdotool_count} host_ptrace_scope_unchanged=true aslr_preserved=true")

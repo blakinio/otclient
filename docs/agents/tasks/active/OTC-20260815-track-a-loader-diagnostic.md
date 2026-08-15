@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-loader-diagnostic
-status: investigating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-loader-diagnostic-20260815-1706
 session_role: researcher
@@ -16,7 +16,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: low
 related_pr: 307
-updated: 2026-08-15T18:00:00+02:00
+updated: 2026-08-15T18:02:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-loader-diagnostic.md
   - docs/agents/evidence/OTC-20260815-track-a-loader-diagnostic/**
@@ -33,53 +33,42 @@ run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: low_noise
-last_progress_at: 2026-08-15T18:00:00+02:00
 loader_evidence_run: 31893811826
 loader_evidence_job: 95033921299
 qt_plugin_evidence_run: 31893939190
 qt_plugin_evidence_job: 95034223662
+support_state_run: 31894272272
+support_state_job: 95035023704
 ---
 
 # Objective
 
-Determine, without launching or mutating the official client, whether base dynamic loading, Qt XCB/GLX plugin dependencies, or missing canonical HOME support-state metadata explains PR #303's `client_gen_1_window_missing` failure.
+Provide a read-only differential for PR #303's `client_gen_1_window_missing` failure without launching the official client or reading account/session data.
 
-# Exact client fence
+# Exact fence
 
-```yaml
-version_mapping: 15.32.df7b29
-size: 51965216
-sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-platform: official_native_linux_only
-runner: synology-otclient-01
-```
+`15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`, native Linux, `synology-otclient-01`.
 
-# Ownership and safety
+# Result
 
-This task is read-only with respect to Track A runtime state. It must not launch the client, use credentials, signal processes, touch displays/ports or read account/session values. Support-state inspection is metadata-only: relevant directory names, file counts, aggregate bytes and configuration basenames/sizes only; no file contents or cookies/cache payloads.
+- **Base loader FACT:** run `31893811826` / job `95033921299` — current #303 loader resolves completely (`RC=0`) with client-bundled Qt and toolroot libproxy/EGL/GLX/X11. Reverting to the historical literal loader path is disproven on today's toolroot.
+- **Qt platform FACT:** run `31893939190` / job `95034223662` — `qt.conf`, `libqxcb.so` and `libqxcb-glx-integration.so` are present; both plugin dependency chains resolve `RC=0`. Missing qxcb/GLX plugin bytes/dependencies are disproven.
+- **Support-state FACT:** metadata-only run `31894272272` / job `95035023704` — canonical HOME has no `.config`, but has `.cache/CipSoft GmbH` containing 4 files / 6937 aggregate bytes. No cache contents were read or copied. This is the first concrete persistent-HOME support-state difference not reproduced by #303's fresh HOME, but its purpose/sensitivity remains UNKNOWN.
 
-# Proven result
-
-## Base ELF loader — FACT
-
-Run `31893811826` / job `95033921299` completed `SUCCESS`: exact client `RUNPATH $ORIGIN/lib`; current #303 loader path resolves completely (`RC=0`) with bundled Qt and toolroot libproxy/EGL/GLX/X11. Historical literal loader replay against today's mutable toolroot fails (`RC=127`). Undoing bundled-Qt/libproxy precedence is DISPROVEN as the next fix.
-
-## Qt platform/plugin chain — FACT
-
-Run `31893939190` / job `95034223662` completed `SUCCESS`: `bin/qt.conf` has `Prefix=.`, `libqxcb.so` and `libqxcb-glx-integration.so` are present, and both dependency chains resolve `RC=0` under the current loader fence. Missing base qxcb/GLX plugin bytes or dependencies are DISPROVEN.
-
-Durable report: `docs/agents/evidence/OTC-20260815-track-a-loader-diagnostic/20260815-loader-differential.md`.
+Durable evidence:
+- `docs/agents/evidence/OTC-20260815-track-a-loader-diagnostic/20260815-loader-differential.md`
+- `docs/agents/evidence/OTC-20260815-track-a-loader-diagnostic/20260815-support-state-metadata.md`
 
 # Acceptance
 
-- [x] exact client SHA/size verified;
-- [x] ELF/search-path and Qt plugin dependency chain classified;
-- [x] no client launch or secret access;
-- [x] loader/plugin results handed to PR #303;
-- [ ] metadata-only canonical HOME support-state census completed;
-- [ ] any support-state difference classified without reading values;
-- [ ] final exact-head repository CI after final checkpoint.
+- [x] exact client fence verified;
+- [x] base ELF/search-path chain classified;
+- [x] qxcb/GLX plugin chain classified;
+- [x] canonical HOME support-state metadata classified without reading values;
+- [x] no client launch, credentials, process/display/port mutation or cache payload read;
+- [x] loader/plugin findings handed to PR #303;
+- [ ] final exact-head CI for this final checkpoint.
 
 # Next action
 
-Run one metadata-only census of canonical `~/.config`/`~/.cache` application/Qt support state and hand the bounded result to PR #303; do not copy or inspect sensitive values.
+PR #303 should first capture sanitized runtime `QT_DEBUG_PLUGINS=1` plus all mapped/unmapped X11 windows/extensions. Treat `.cache/CipSoft GmbH` only as a bounded candidate and do not copy/read its payloads unless a separate fail-closed sensitivity classification is authorized and runtime evidence makes it causal.

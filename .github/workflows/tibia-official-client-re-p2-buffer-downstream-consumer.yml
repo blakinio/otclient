@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  targeted-downstream-probe:
+  hardened-post-serialization-chain:
     runs-on: [otclient, synology]
     timeout-minutes: 8
     env:
@@ -45,9 +45,7 @@ jobs:
             size="$(stat -c '%s' "$probe")"
             sha="$(sha256sum "$probe" | awk '{print $1}')"
             if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
-              client="$probe"
-              state="$candidate"
-              break
+              client="$probe"; state="$candidate"; break
             fi
           done
           [[ -n "$client" && -n "$state" ]]
@@ -66,16 +64,14 @@ jobs:
           fi
           [[ -n "$objdump" && -x "$objdump" ]]
           "$objdump" --version >/dev/null
-
           {
             echo "TRACK_A_P2_CLIENT=$client"
             echo "TRACK_A_P2_OBJDUMP=$objdump"
-            echo "TRACK_A_P2_STATE=$state"
           } >> "$GITHUB_ENV"
           echo "TRACK_A_P2_DOWNSTREAM_EXACT_HEAD=$GITHUB_SHA"
-          echo "TRACK_A_P2_DOWNSTREAM_EXACT_CLIENT_VERIFIED=true"
+          echo TRACK_A_P2_DOWNSTREAM_EXACT_CLIENT_VERIFIED=true
 
-      - name: Capture exact processor flow and corrected writer boundary
+      - name: Prove persistent QBuffer downstream processor chain
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -88,48 +84,36 @@ jobs:
             --output-text "$out/result.txt" \
             --evidence "$out/evidence.txt" \
             | tee "$out/validation.log"
+
           grep -Fxq 'P2_DOWNSTREAM_COMPLETE=true' "$out/validation.log"
-          grep -Fxq 'P2_DOWNSTREAM_RESULT=TARGETED_PROCESSOR_FLOW_CAPTURED' "$out/validation.log"
-          grep -Fxq 'P2_DOWNSTREAM_TPROTOCOLWRITER_SLOT_BOUNDARY=PROVEN_SLOT4_ZERO' "$out/validation.log"
-          grep -Fxq 'P2_DOWNSTREAM_CONNECTION_INVOKER_EDGE=PROVEN' "$out/validation.log"
-          grep -Fxq 'P2_DOWNSTREAM_PROTOCOL_STAGE_ORDER=UNKNOWN' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_RESULT=POST_SERIALIZATION_PROCESSOR_CHAIN_PROVEN' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_PERSISTENT_QBUFFER_DIRECT_READALL=PROVEN' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_FIRST_CONSUMER=PROVEN' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_FIRST_TRANSFORM=PROVEN' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_SAME_MESSAGE_TO_DUALCONNECTION=PROVEN' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_PROTOCOL_STAGE_ORDER=PROVEN_PARTIAL' "$out/validation.log"
+          grep -Fxq 'P2_DOWNSTREAM_PROTOCOL_FRAMING=UNKNOWN' "$out/validation.log"
           grep -Fxq 'P2_DOWNSTREAM_FINAL_BINARY_EGRESS=UNKNOWN' "$out/validation.log"
+
           python3 - "$out/result.json" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
-          assert d['schema_version']==2
+          assert d['schema_version']==3
           assert d['exact_client']['sha256']=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
           assert d['exact_client']['size']==51965216
-          assert d['false_positive_correction']['writer_stops_at_slot4_zero']
-          assert d['false_positive_correction']['0xd114c0_is_not_tprotocolwriter_slot8']
-          assert d['connection']['site']=='0x19716a3'
-          assert d['connection']['invoker']=='0x7dd630'
-          assert d['connection']['connect_impl']=='0x4dd800'
-          assert d['classification']['first_downstream_consumer'] in ('CANDIDATE','UNKNOWN')
-          assert d['classification']['protocol_stage_order']=='UNKNOWN'
-          assert d['classification']['framing']=='UNKNOWN'
-          assert d['classification']['final_binary_egress']=='UNKNOWN'
-          assert not d['negative_controls']['generic_qiodevice_census_used_as_proof']
-          assert not d['negative_controls']['generic_qbuffer_census_used_as_proof']
-          assert not d['negative_controls']['vtable_adjacency_used_as_temporal_proof']
-          assert not d['negative_controls']['historical_final_socket_run_used_as_proof']
+          assert d['semantic_result']=='POST_SERIALIZATION_PROCESSOR_CHAIN_PROVEN'
+          c=d['classification']
+          assert c['persistent_qbuffer_direct_readall']=='PROVEN'
+          assert c['first_downstream_consumer'].startswith('PROVEN:')
+          assert c['first_downstream_transform'].startswith('PROVEN:')
+          assert c['same_message_handoff_to_dualconnection']=='PROVEN'
+          assert c['protocol_stage_order']=='PROVEN_PARTIAL'
+          for k in ('framing','sequence','compression','encryption','final_binary_egress','causal_local_harness'):
+              assert c[k]=='UNKNOWN'
+          n=d['negative_controls']
+          assert not any(n.values())
           PY
-
-          # Preserve exact, narrow argument/return flow windows. These are evidence only;
-          # no semantic assertion is made from their mere presence.
-          {
-            echo
-            echo '# Exact invoker argument flow 0x7dd630..0x7dd720'
-            "$TRACK_A_P2_OBJDUMP" -d -Mintel --no-show-raw-insn --start-address=0x7dd630 --stop-address=0x7dd720 "$TRACK_A_P2_CLIENT"
-            echo
-            echo '# Exact TProtocolClientMessageProcessor entry 0xc2df80..0xc2e080'
-            "$TRACK_A_P2_OBJDUMP" -d -Mintel --no-show-raw-insn --start-address=0xc2df80 --stop-address=0xc2e080 "$TRACK_A_P2_CLIENT"
-            echo
-            echo '# Exact RawDataProcessor entry 0xb47130..0xb47320'
-            "$TRACK_A_P2_OBJDUMP" -d -Mintel --no-show-raw-insn --start-address=0xb47130 --stop-address=0xb47320 "$TRACK_A_P2_CLIENT"
-          } >> "$out/evidence.txt"
-          echo TRACK_A_P2_DOWNSTREAM_EXACT_ARGUMENT_FLOW_PRESERVED=true
-          echo TRACK_A_P2_DOWNSTREAM_TARGETED_VALIDATED=true
+          echo TRACK_A_P2_DOWNSTREAM_HARDENED_VALIDATED=true
 
       - name: Upload sanitized static evidence only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

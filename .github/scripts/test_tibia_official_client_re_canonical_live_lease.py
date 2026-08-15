@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import fcntl
 import importlib.util
 import json
 import os
@@ -9,7 +10,10 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from contextlib import contextmanager
+from unittest import mock
 
 SCRIPT = Path(__file__).with_name("tibia-official-client-re-canonical-live-lease.py")
 SPEC = importlib.util.spec_from_file_location("track_a_lease", SCRIPT)
@@ -188,6 +192,75 @@ class CanonicalLiveLeaseTests(unittest.TestCase):
         self.assertEqual(result.generation, 1)
         self.assertEqual(rc, 0)
         self.assertEqual(output.read_text(), "ok")
+
+    def test_all_time_sensitive_operations_recheck_time_after_lock_acquisition(self) -> None:
+        self.manager.acquire(self.a, self.token_a, 60, now=100)
+        fake_now = [100.0]
+
+        @contextmanager
+        def delayed_lock():
+            self.manager._prepare()
+            fd = os.open(self.manager.lock_path, os.O_RDWR)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                fake_now[0] = 161.0
+                yield fd
+            finally:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+                os.close(fd)
+
+        with (
+            mock.patch.object(self.manager, 'locked', delayed_lock),
+            mock.patch.object(lease.time, 'time', side_effect=lambda: fake_now[0]),
+        ):
+            for operation, call in (
+                ('renew', lambda: self.manager.renew(self.a, self.token_a, 60)),
+                ('release', lambda: self.manager.release(self.a, self.token_a)),
+                ('validate', lambda: self.manager.validate(self.a, self.token_a)),
+                ('guard-run', lambda: self.manager.guard_run(self.a, self.token_a, [sys.executable, '-c', 'raise SystemExit(99)'])),
+            ):
+                with self.subTest(operation=operation):
+                    fake_now[0] = 100.0
+                    self.assertLeaseError('lease_expired', call)
+
+            fake_now[0] = 100.0
+            self.assertTrue(self.manager.status()['expired'])
+            fake_now[0] = 100.0
+            self.assertLeaseError('stale_takeover_reason_required', self.manager.acquire, self.b, self.token_b, 60)
+
+    def test_guard_child_inherits_lock_if_guard_parent_is_killed(self) -> None:
+        self.manager.acquire(self.a, self.token_a, 60)
+        guard = subprocess.Popen(
+            [sys.executable, str(SCRIPT), '--state-dir', str(self.root), 'guard-run', '--task-id', self.a.task_id, '--session-id', self.a.session_id, '--token-file', str(self.token_a), '--', sys.executable, '-c', "import os,time; print(os.getpid(), flush=True); time.sleep(2.0)"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        assert guard.stdout is not None
+        child_pid = int(guard.stdout.readline().strip())
+        guard.kill()
+        guard.wait(timeout=5)
+        lock_fd = os.open(self.manager.lock_path, os.O_RDWR)
+        try:
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            deadline = time.monotonic() + 5.0
+            while True:
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        self.fail('guard child did not eventually release inherited lock')
+                    time.sleep(0.05)
+        finally:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+            os.close(lock_fd)
+            try:
+                os.kill(child_pid, 9)
+            except ProcessLookupError:
+                pass
 
     def test_corrupt_state_fails_closed(self) -> None:
         self.root.mkdir(parents=True, mode=0o700)

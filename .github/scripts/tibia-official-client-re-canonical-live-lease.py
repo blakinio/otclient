@@ -148,12 +148,12 @@ class LeaseManager:
         os.chmod(self.lock_path, 0o600)
 
     @contextmanager
-    def locked(self) -> Iterator[None]:
+    def locked(self) -> Iterator[int]:
         self._prepare()
         fd = os.open(self.lock_path, os.O_RDWR)
         try:
             fcntl.flock(fd, fcntl.LOCK_EX)
-            yield
+            yield fd
         finally:
             fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
@@ -218,9 +218,9 @@ class LeaseManager:
         stale_reason: str | None = None,
         now: float | None = None,
     ) -> LeaseResult:
-        now_epoch = _now_epoch(now)
         stale_reason = _validate_reason(stale_reason)
         with self.locked():
+            now_epoch = _now_epoch(now)
             previous = self._load_state_unlocked()
             if previous is not None and self._active_and_fresh(previous, now_epoch):
                 if self._identity_matches(previous, identity) and token_file.exists():
@@ -292,9 +292,9 @@ class LeaseManager:
         *,
         now: float | None = None,
     ) -> LeaseResult:
-        now_epoch = _now_epoch(now)
         token = _read_private_token(token_file)
         with self.locked():
+            now_epoch = _now_epoch(now)
             state = self._load_state_unlocked()
             self._require_current_unlocked(state, identity, token, now_epoch)
             assert state is not None
@@ -310,9 +310,9 @@ class LeaseManager:
         *,
         now: float | None = None,
     ) -> LeaseResult:
-        now_epoch = _now_epoch(now)
         token = _read_private_token(token_file)
         with self.locked():
+            now_epoch = _now_epoch(now)
             state = self._load_state_unlocked()
             if state is None or state.get("status") != "active":
                 raise LeaseError("lease_not_active", "no active lease exists")
@@ -350,9 +350,9 @@ class LeaseManager:
         *,
         now: float | None = None,
     ) -> LeaseResult:
-        now_epoch = _now_epoch(now)
         token = _read_private_token(token_file)
         with self.locked():
+            now_epoch = _now_epoch(now)
             state = self._load_state_unlocked()
             self._require_current_unlocked(state, identity, token, now_epoch)
             assert state is not None
@@ -375,8 +375,8 @@ class LeaseManager:
             raise LeaseError("lease_expired", "controller lease has expired")
 
     def status(self, *, now: float | None = None) -> dict[str, Any]:
-        now_epoch = _now_epoch(now)
         with self.locked():
+            now_epoch = _now_epoch(now)
             state = self._load_state_unlocked()
             if state is None:
                 return {
@@ -418,14 +418,18 @@ class LeaseManager:
     ) -> tuple[LeaseResult, int]:
         if not command:
             raise LeaseError("guard_command_missing", "guard-run requires a command")
-        now_epoch = _now_epoch(now)
         token = _read_private_token(token_file)
-        with self.locked():
+        with self.locked() as lock_fd:
+            now_epoch = _now_epoch(now)
             state = self._load_state_unlocked()
             self._require_current_unlocked(state, identity, token, now_epoch)
             assert state is not None
             result = LeaseResult(int(state["generation"]), int(state["expires_at"]))
-            completed = subprocess.run(list(command), check=False)
+            completed = subprocess.run(
+                list(command),
+                check=False,
+                pass_fds=(lock_fd,),
+            )
             return result, int(completed.returncode)
 
 

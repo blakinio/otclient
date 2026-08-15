@@ -148,3 +148,41 @@ jobs:
           print('TRACK_A_LOADER_DIFFERENTIAL_COMPLETE=true')
           if brc != 0: raise SystemExit('current-style loader resolution failed')
           PY
+
+          echo TRACK_A_QT_PLATFORM_CONFIG_BEGIN=true
+          for q in "$runtime/bin/qt.conf" "$runtime/qt.conf"; do
+            if [[ -f "$q" ]]; then
+              echo "QT_CONF $q"
+              if grep -Eiq '(password|credential|token|cookie|session|email)' "$q"; then
+                echo TRACK_A_QT_CONF_REJECTED_SENSITIVE_KEY=true
+                exit 1
+              fi
+              sed -n '1,80p' "$q"
+            fi
+          done
+          echo TRACK_A_QT_PLATFORM_CONFIG_END=true
+
+          echo TRACK_A_QT_PLATFORM_PLUGINS_BEGIN=true
+          find "$runtime/bin" -maxdepth 5 -type f \
+            \( -name 'libqxcb.so' -o -name 'libqxcb-glx-integration.so' -o -name 'libqxcb-egl-integration.so' -o -name 'libqoffscreen.so' -o -name 'libqminimal.so' \) \
+            -printf '%P\n' | sort
+          echo TRACK_A_QT_PLATFORM_PLUGINS_END=true
+
+          if command -v ldd >/dev/null 2>&1; then
+            while IFS= read -r plugin; do
+              [[ -n "$plugin" ]] || continue
+              path="$runtime/bin/$plugin"
+              echo "TRACK_A_QT_PLUGIN_LDD_BEGIN=$plugin"
+              set +e
+              env -u LD_PRELOAD LD_LIBRARY_PATH="$current_lib" ldd "$path" 2>&1 \
+                | grep -E 'libQt6|libEGL|libGLX|libOpenGL|libX11|libxcb|not found' || true
+              rc=${PIPESTATUS[0]}
+              set -e
+              echo "TRACK_A_QT_PLUGIN_LDD_RC=$plugin:$rc"
+              echo "TRACK_A_QT_PLUGIN_LDD_END=$plugin"
+            done < <(find "$runtime/bin" -maxdepth 5 -type f \
+              \( -name 'libqxcb.so' -o -name 'libqxcb-glx-integration.so' -o -name 'libqxcb-egl-integration.so' \) -printf '%P\n' | sort)
+          else
+            echo TRACK_A_QT_PLUGIN_LDD_UNAVAILABLE=true
+          fi
+          echo TRACK_A_QT_PLATFORM_DIAGNOSTIC_COMPLETE=true

@@ -1,10 +1,11 @@
-name: Track A runtime xdotool-repaired reacquisition
+name: Track A runtime Yama-safe parent-GDB reacquisition
 
 on:
   push:
     branches: [research/OTC-20260815-track-a-runtime-reacquisition]
     paths:
       - .github/workflows/tibia-official-client-re-runtime-xdotool-reacquisition.yml
+      - .github/scripts/tibia-official-client-re-parent-gdb-patch.py
   workflow_dispatch:
 
 permissions:
@@ -38,6 +39,7 @@ jobs:
       QT_DEBUG_PLUGINS: '1'
       SOURCE_RUNTIME_WORKFLOW: .github/workflows/tibia-official-client-re-runtime-reacquisition.yml
       EXPECTED_SOURCE_RUNTIME_BLOB: 248e08b09693311040106516fff5124b95895a4c
+      PARENT_GDB_PATCH: .github/scripts/tibia-official-client-re-parent-gdb-patch.py
 
     steps:
       - name: Checkout exact draft head with bounded history
@@ -46,7 +48,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 60
 
-      - name: Materialize pinned source steps repair only xdotool loader and arm generation 1
+      - name: Materialize source setup apply parent-GDB patch and arm generation 1
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -54,6 +56,7 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
           [[ "$(git hash-object "$SOURCE_RUNTIME_WORKFLOW")" == "$EXPECTED_SOURCE_RUNTIME_BLOB" ]]
+          [[ -r "$PARENT_GDB_PATCH" ]]
 
           python3 - "$SOURCE_RUNTIME_WORKFLOW" "$RUNNER_TEMP" <<'PY'
           from pathlib import Path
@@ -75,45 +78,30 @@ jobs:
                   if line and not line.startswith('          '):
                       raise SystemExit(f'unexpected indentation in {name}: {line!r}')
                   body.append(line[10:] if line else '')
-              text='\n'.join(body)+'\n'
-              (outdir/filename).write_text(text,encoding='utf-8')
+              (outdir/filename).write_text('\n'.join(body)+'\n',encoding='utf-8')
           extract('Setup isolated runtime and arm generation 1','track-a-source-setup.sh')
           extract('Verify generation 1 stop it and arm fresh generation 2','track-a-source-verify1.sh')
           extract('Clean exact current-run runtime processes and ephemeral state','track-a-source-cleanup.sh')
           PY
 
           setup="$RUNNER_TEMP/track-a-source-setup.sh"
-          python3 - "$setup" <<'PY'
+          python3 - "$setup" "$GITHUB_WORKSPACE/$PARENT_GDB_PATCH" <<'PY'
           from pathlib import Path
-          import sys
-          path=Path(sys.argv[1]); text=path.read_text(encoding='utf-8')
+          import shlex,sys
+          path=Path(sys.argv[1]); patch=Path(sys.argv[2])
+          text=path.read_text(encoding='utf-8')
           anchor='bash -n "$effective"'
-          if text.count(anchor)!=1: raise SystemExit(f'effective syntax anchor count={text.count(anchor)}')
-          injection=r'''python3 - "$effective" <<'PY_XDOTOOL'
-          from pathlib import Path
-          import sys
-          path=Path(sys.argv[1]); text=path.read_text(encoding='utf-8')
-          old='"$td/usr/bin/xdotool"'
-          new='env LD_LIBRARY_PATH="$td/usr/lib/x86_64-linux-gnu:$td/usr/lib/x86_64-linux-gnu/libproxy:$td/lib/x86_64-linux-gnu" "$td/usr/bin/xdotool"'
-          count=text.count(old)
-          if count < 10:
-              raise SystemExit(f'xdotool invocation count unexpectedly low: {count}')
-          text=text.replace(old,new)
-          if text.count(old)!=count:
-              raise SystemExit('xdotool original invocation unexpectedly remains')
-          if text.count(new)!=count:
-              raise SystemExit('xdotool replacement count mismatch')
-          path.write_text(text,encoding='utf-8')
-          print(f'TRACK_A_EFFECTIVE_XDOTOOL_LOADER_PATCHED=true invocations={count}')
-          PY_XDOTOOL
-          '''
-          text=text.replace(anchor,injection+anchor,1)
+          if text.count(anchor)!=1:
+              raise SystemExit(f'effective syntax anchor count={text.count(anchor)}')
+          invocation=f'python3 {shlex.quote(str(patch))} "$effective"\n'
+          text=text.replace(anchor,invocation+anchor,1)
           path.write_text(text,encoding='utf-8')
           PY
           bash -n "$setup"
           bash -n "$RUNNER_TEMP/track-a-source-verify1.sh"
           bash -n "$RUNNER_TEMP/track-a-source-cleanup.sh"
           echo "TRACK_A_RUNTIME_SOURCE_CLEANUP=$RUNNER_TEMP/track-a-source-cleanup.sh" >> "$GITHUB_ENV"
+          echo "TRACK_A_HOST_PTRACE_SCOPE=$(cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || echo unknown)"
           bash "$setup"
 
       - name: Login generation 1 with protected inputs only
@@ -146,7 +134,7 @@ jobs:
           set -Eeuo pipefail
           bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" verify 2
           bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" compare
-          echo TRACK_A_XDOTOOL_REPAIRED_REACQUISITION_PROVEN=true
+          echo TRACK_A_YAMA_SAFE_RESTART_RELOGIN_REACQUISITION_PROVEN=true
 
       - name: Snapshot sanitized reacquisition evidence before cleanup
         if: always()
@@ -154,7 +142,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"
-          out=artifacts/runtime-xdotool-reacquisition
+          out=artifacts/runtime-parent-gdb-reacquisition
           mkdir -p "$out"
           python3 - "$root" "$out" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$EXPECTED_CLIENT_SHA256" <<'PY'
           from pathlib import Path
@@ -167,19 +155,21 @@ jobs:
               for name in ('map-records.tsv','baseline-count.txt','pie-base.txt','pid.txt','window.id'):
                   src=g/name
                   if src.is_file(): shutil.copyfile(src,out/f'gen{gen}-{name}')
-              for name in ('client.log','gdb.log'):
+              for name in ('client.log','gdb.log','world.gdb','client-launcher.sh'):
                   src=g/name
                   if not src.is_file(): continue
                   lines=[]
-                  for line in src.read_text(errors='replace').splitlines()[-240:]:
+                  for line in src.read_text(errors='replace').splitlines()[-320:]:
                       if 'TIBIA_TEST_EMAIL' in line or 'TIBIA_TEST_PASSWORD' in line:
                           line='[REDACTED_SECRET_VARIABLE_LINE]'
                       lines.append(email.sub('[REDACTED_EMAIL]',line))
                   (out/f'gen{gen}-{name}').write_text('\n'.join(lines)+'\n',encoding='utf-8')
-          c=root/'comparison.txt'
-          if c.is_file(): shutil.copyfile(c,out/'comparison.txt')
+          for name in ('comparison.txt','result.txt'):
+              for src in (root/name, Path('artifacts/runtime-reacquisition')/name):
+                  if src.is_file():
+                      shutil.copyfile(src,out/name); break
           (out/'terminal.txt').write_text(
-              f'run_id={run_id}\nhead={head}\nxdotool_loader_repaired=true\ncache_seeded=false\nexpected_sha={expected_sha}\n',
+              f'run_id={run_id}\nhead={head}\nparent_gdb=true\nxdotool_loader_repaired=true\ncache_seeded=false\nexpected_sha={expected_sha}\n',
               encoding='utf-8')
           PY
 
@@ -188,17 +178,19 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          if [[ -n "${TRACK_A_RUNTIME_SOURCE_CLEANUP:-}" && -r "$TRACK_A_RUNTIME_SOURCE_CLEANUP" ]]; then
+          if [[ -n "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" && -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
+            bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" cleanup
+          elif [[ -n "${TRACK_A_RUNTIME_SOURCE_CLEANUP:-}" && -r "$TRACK_A_RUNTIME_SOURCE_CLEANUP" ]]; then
             bash "$TRACK_A_RUNTIME_SOURCE_CLEANUP"
           else
             echo TRACK_A_RUNTIME_CLEANUP_SCRIPT_UNAVAILABLE=true
           fi
 
-      - name: Upload sanitized xdotool-repaired reacquisition evidence
+      - name: Upload sanitized parent-GDB reacquisition evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: track-a-runtime-xdotool-reacquisition-${{ github.run_id }}
-          path: artifacts/runtime-xdotool-reacquisition/**
+          name: track-a-runtime-parent-gdb-reacquisition-${{ github.run_id }}
+          path: artifacts/runtime-parent-gdb-reacquisition/**
           if-no-files-found: ignore
           retention-days: 7

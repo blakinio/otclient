@@ -15,7 +15,7 @@ The exact-build workflows cited below hard-check client size and SHA-256 before 
 
 ## Branch reconciliation
 
-At continuation start, `main` was `20919503467b7ea4812ac7176f4728be052e90bc`. The recovery-derived working branch had accumulated hundreds of commits relative to the merge-base, so it was **not** merged wholesale. This small merge slice is rebuilt directly from `main` and contains only current verified evidence plus the reproducible RTTI probe.
+At continuation start, `main` was `20919503467b7ea4812ac7176f4728be052e90bc`. The recovery-derived working branch had accumulated hundreds of commits relative to the merge-base, so it was **not** merged wholesale. This small merge slice is rebuilt directly from `main` and contains current verified evidence plus durable, workflow-dispatch-only reproducer workflows for the TCP provenance and RTTI probes.
 
 Track B is out of scope and untouched.
 
@@ -68,6 +68,8 @@ Primary exact-build workflow `tibia-official-client-re-gameserver-tcp-writer-pro
 - artifact id `9229609330`
 - artifact digest `sha256:bc5604ffbcf7e75a6b00dad227aefaa0036ea4792efb61ce85de488b6877782c`
 
+The merge slice now preserves a hardened, `workflow_dispatch`-only version of this provenance probe at `.github/workflows/tibia-official-client-re-gameserver-tcp-writer-provenance.yml`. The historical run/artifact above remains the provenance of the historical observation; the preserved workflow is the durable reproducer and adds fail-closed checks for its key static invariants.
+
 ### FACT — QMeta/type ownership
 
 - QMetaObject `0x30b7d00`
@@ -107,9 +109,22 @@ RTTI 0x3080630 -> tibia::network::TGameserverTCPConnection
 
 Therefore the object whose vptr is `0x3084b38` is directly proven to be `TGameserverTCPConnection`, and its `+0x10` member is the concrete QTcpSocket constructed in the two constructor paths above.
 
+### Review correction — RTTI relocation classification
+
+The first reproducer revision treated every relocation whose addend equalled a target RTTI address as a possible vtable typeinfo slot. That generic enumeration could also include an Itanium RTTI base-class reference (notably `TProtocolWriter`'s base pointer to `TIODeviceWriter`) and therefore could emit a spurious vtable candidate from adjacent RTTI data.
+
+This does **not** promote that spurious candidate into canonical evidence. The merge-slice workflow is corrected to:
+
+- separate RTTI base/non-vtable references from validated vtable typeinfo slots;
+- require a plausible Itanium vtable header and executable first entry before emitting a vtable;
+- stop vtable-slot enumeration at the first non-executable entry rather than scanning into adjacent RTTI/vtables;
+- fail closed unless the expected TCP/writer type names, validated address points, TCP typeinfo match, `TProtocolWriter -> TIODeviceWriter` base relationship, and QMeta static-metacall facts resolve.
+
+The historical run remains evidence for its directly inspected fields, not for any unvalidated generic candidate emitted by the older enumeration logic.
+
 ### FACT — writer RTTI hierarchy
 
-The same exact-build artifact directly resolves:
+The exact-build artifact directly resolves:
 
 ```text
 TIODeviceWriter
@@ -168,14 +183,14 @@ The next bounded experiment should therefore trace the actual `TProtocolWriter`/
 
 ## Active stalled run
 
-Run `31825417040` (`Track A final socket write resolution`) remained `queued` on the most recent observation. Per anti-stall rules, no duplicate is dispatched; independent evidence work continues. If it becomes terminal, its artifact must still be consumed and reconciled.
+Run `31825417040` (`Track A final socket write resolution`) remained `queued` on the most recent observation recorded by this reconciliation. Per anti-stall rules, no conceptual duplicate should be dispatched merely to bypass the queue; independent evidence work continues. If the run becomes terminal, its artifact must still be consumed and reconciled.
 
-## Repository gap
+## Repository-model reconciliation
 
-### UNKNOWN
+### SUPERSEDED documentation gap
 
-`docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md` was requested by the continuation context but is absent from inspected repository trees. This is recorded as a documentation gap, not as evidence that its contents exist elsewhere.
+An earlier continuation snapshot reported `docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md` as absent. Current `main` contains that normative execution model. The earlier absence report is therefore **SUPERSEDED** and must not be treated as a current repository gap.
 
 ## Durable continuation rule
 
-Do not claim full Track A completion from this evidence alone. P2 remains open, and P1/P0/action/coverage/final-validation acceptance slices remain to be closed after P2. Every promotion must preserve the exact client fence and FACT/INFERENCE/DISPROVEN/UNKNOWN classifications.
+Do not claim full Track A completion from this evidence alone. P2 remains open, and P1/P0/action/coverage/final-validation acceptance slices remain to be closed. Every promotion must preserve the exact client fence and FACT/INFERENCE/ASSUMPTION/RECOMMENDATION/UNKNOWN/DISPROVEN/SUPERSEDED classifications.

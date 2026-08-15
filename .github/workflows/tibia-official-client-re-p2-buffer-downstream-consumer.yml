@@ -114,6 +114,21 @@ jobs:
           assert not d['negative_controls']['vtable_adjacency_used_as_temporal_proof']
           assert not d['negative_controls']['historical_final_socket_run_used_as_proof']
           PY
+
+          # Preserve exact, narrow argument/return flow windows. These are evidence only;
+          # no semantic assertion is made from their mere presence.
+          {
+            echo
+            echo '# Exact invoker argument flow 0x7dd630..0x7dd720'
+            "$TRACK_A_P2_OBJDUMP" -d -Mintel --no-show-raw-insn --start-address=0x7dd630 --stop-address=0x7dd720 "$TRACK_A_P2_CLIENT"
+            echo
+            echo '# Exact TProtocolClientMessageProcessor entry 0xc2df80..0xc2e080'
+            "$TRACK_A_P2_OBJDUMP" -d -Mintel --no-show-raw-insn --start-address=0xc2df80 --stop-address=0xc2e080 "$TRACK_A_P2_CLIENT"
+            echo
+            echo '# Exact RawDataProcessor entry 0xb47130..0xb47320'
+            "$TRACK_A_P2_OBJDUMP" -d -Mintel --no-show-raw-insn --start-address=0xb47130 --stop-address=0xb47320 "$TRACK_A_P2_CLIENT"
+          } >> "$out/evidence.txt"
+          echo TRACK_A_P2_DOWNSTREAM_EXACT_ARGUMENT_FLOW_PRESERVED=true
           echo TRACK_A_P2_DOWNSTREAM_TARGETED_VALIDATED=true
 
       - name: Upload sanitized static evidence only

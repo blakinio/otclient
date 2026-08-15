@@ -2,8 +2,7 @@ name: Track A runtime restart/relogin reacquisition
 
 on:
   push:
-    branches:
-      - research/OTC-20260815-track-a-runtime-reacquisition
+    branches: [research/OTC-20260815-track-a-runtime-reacquisition]
     paths:
       - .github/workflows/tibia-official-client-re-runtime-reacquisition.yml
       - .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
@@ -46,7 +45,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 60
 
-      - name: Validate exact request baseline and proven runtime dependencies
+      - name: Setup isolated runtime and arm generation 1
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -61,199 +60,139 @@ jobs:
           python3 - "$RUN_REQUEST" "$EXPECTED_CLIENT_SHA256" "$EXPECTED_CLIENT_SIZE" "$EXPECTED_CODE_BEARING_HEAD" <<'PY'
           import json, sys
           path, expected_sha, expected_size, expected_code_head = sys.argv[1:]
-          data = json.load(open(path, encoding='utf-8'))
-          assert data['schema_version'] == 1
-          assert data['task_id'] == 'OTC-20260815-track-a-runtime-reacquisition'
-          assert data['track_id'] == 'official-client-re'
-          assert data['reason'] == 'resume_after_p0_runtime_lane_release'
-          assert data['base_main'] == '8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45'
-          assert data['runtime_code_bearing_head'] == expected_code_head
-          client = data['expected_client']
-          assert client['sha256'] == expected_sha
-          assert client['size'] == int(expected_size)
-          assert client['version_mapping'] == '15.32.df7b29'
-          assert client['platform'] == 'official_native_linux_only'
-          released = data['released_prerequisite']
-          assert released['p0_pr'] == 302
-          assert released['stale_run'] == 31880617510
-          assert released['runner_proof_run'] == 31883178675
-          assert released['runner_name'] == 'synology-otclient-01'
-          assert released['live_process_discriminator_run'] == 31883422477
-          assert released['live_process_discriminator_job'] == 95009054487
-          assert released['live_exact_track_clients'] == 0
+          data=json.load(open(path, encoding='utf-8'))
+          assert data['schema_version']==1
+          assert data['task_id']=='OTC-20260815-track-a-runtime-reacquisition'
+          assert data['track_id']=='official-client-re'
+          assert data['reason']=='resume_after_p0_runtime_lane_release'
+          assert data['base_main']=='8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45'
+          assert data['runtime_code_bearing_head']==expected_code_head
+          c=data['expected_client']
+          assert c['sha256']==expected_sha and c['size']==int(expected_size)
+          assert c['version_mapping']=='15.32.df7b29' and c['platform']=='official_native_linux_only'
+          r=data['released_prerequisite']
+          assert r['p0_pr']==302 and r['stale_run']==31880617510
+          assert r['runner_proof_run']==31883178675 and r['runner_name']=='synology-otclient-01'
+          assert r['live_process_discriminator_run']==31883422477
+          assert r['live_process_discriminator_job']==95009054487 and r['live_exact_track_clients']==0
           print('TRACK_A_RUNTIME_RESUME_REQUEST_VERIFIED=true')
           PY
-          bash -n .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
-          echo TRACK_A_RUNTIME_DEPENDENCY_FENCES_VERIFIED=true
 
-      - name: Rehydrate proven materializer with known-good Xvfb profile and bounded launcher HOME
-        shell: bash
-        run: |
-          set -Eeuo pipefail
           baseline="$RUNNER_TEMP/track-a-runtime-baseline.yml"
-          extractor="$RUNNER_TEMP/extract-track-a-runtime-step.py"
           git show "$BASELINE_WORKFLOW_COMMIT:.github/workflows/tibia-official-client-re-runtime-reacquisition.yml" > "$baseline"
-          cat > "$extractor" <<'PY'
+          materialize="$RUNNER_TEMP/materialize-track-a-runtime.sh"
+          python3 - "$baseline" "$materialize" <<'PY'
           from pathlib import Path
           import sys
-          source, name, output = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3])
-          lines = source.read_text(encoding='utf-8').splitlines()
-          marker = f'      - name: {name}'
-          try:
-              start = lines.index(marker)
-          except ValueError:
-              raise SystemExit(f'missing pinned step: {name}')
-          run = None
-          for i in range(start + 1, len(lines)):
-              if lines[i].startswith('      - name: '):
-                  break
-              if lines[i] == '        run: |':
-                  run = i + 1
-                  break
-          if run is None:
-              raise SystemExit(f'missing run block: {name}')
-          body = []
+          source, output=map(Path, sys.argv[1:])
+          lines=source.read_text(encoding='utf-8').splitlines()
+          marker='      - name: Materialize exact runner-layout and current-run ownership helper'
+          start=lines.index(marker)
+          run=None
+          for i in range(start+1,len(lines)):
+              if lines[i].startswith('      - name: '): break
+              if lines[i]=='        run: |': run=i+1; break
+          assert run is not None
+          body=[]
           for line in lines[run:]:
-              if line.startswith('      - name: '):
-                  break
-              if line and not line.startswith('          '):
-                  raise SystemExit(f'unexpected indentation in {name}: {line!r}')
+              if line.startswith('      - name: '): break
+              if line and not line.startswith('          '): raise SystemExit('unexpected materializer indentation')
               body.append(line[10:] if line else '')
-          output.write_text('\n'.join(body) + '\n', encoding='utf-8')
+          output.write_text('\n'.join(body)+'\n', encoding='utf-8')
           PY
-          chmod 700 "$extractor"
-          materialize="$RUNNER_TEMP/materialize-track-a-runtime.sh"
-          python3 "$extractor" "$baseline" 'Materialize exact runner-layout and current-run ownership helper' "$materialize"
           bash "$materialize"
           effective="$RUNNER_TEMP/tibia-official-client-re-runtime-reacquisition-effective.sh"
           python3 - "$effective" "$PX_BACKEND_DIR" <<'PY'
           from pathlib import Path
           import sys
-          path, backend = Path(sys.argv[1]), sys.argv[2]
-          text = path.read_text(encoding='utf-8')
-          def once(old, new, label):
+          path, backend=Path(sys.argv[1]),sys.argv[2]
+          text=path.read_text(encoding='utf-8')
+          def once(old,new,label):
               global text
-              count=text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{label} anchor count={count}, expected 1')
+              n=text.count(old)
+              if n!=1: raise SystemExit(f'{label} anchor count={n}, expected 1')
               text=text.replace(old,new,1)
-          once(
-              '  tool_lib="$td/usr/lib/x86_64-linux-gnu:$td/lib/x86_64-linux-gnu"',
-              f'  tool_lib="$td/usr/lib/x86_64-linux-gnu:{backend}:$td/lib/x86_64-linux-gnu"',
-              'client-support-loader',
-          )
-          once(
-              '    PATH="$tool_path" LD_LIBRARY_PATH="$package/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\',
-              '    PATH="$tool_path" LD_LIBRARY_PATH="$package/bin/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\',
-              'client-bundled-Qt',
-          )
-          once(
-              '    LIBGL_DRIVERS_PATH="$dri" QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" VK_DRIVER_FILES="$vk_icd" \\',
-              '    LIBGL_DRIVERS_PATH="$dri" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \\',
-              'client-software-backend',
-          )
-          once(
-              '    nohup "$xvfb" "$TRACK_DISPLAY" -screen 0 1280x800x24 \\\n    -xkbdir "$td/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset \\',
-              '    nohup "$xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \\\n    -xkbdir "$td/usr/share/X11/xkb" -nolisten tcp -noreset \\',
-              'known-good-xvfb-profile',
-          )
-          path.write_text(text, encoding='utf-8')
+          once('  tool_lib="$td/usr/lib/x86_64-linux-gnu:$td/lib/x86_64-linux-gnu"',
+               f'  tool_lib="$td/usr/lib/x86_64-linux-gnu:{backend}:$td/lib/x86_64-linux-gnu"','support-loader')
+          once('LD_LIBRARY_PATH="$package/lib:$tool_lib"','LD_LIBRARY_PATH="$package/bin/lib:$tool_lib"','bundled-Qt')
+          once('QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" VK_DRIVER_FILES="$vk_icd"',
+               'QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none','software-backend')
+          once('1280x800x24','1920x1080x24','xvfb-screen')
+          once(' +extension GLX +iglx +render -nolisten tcp -noreset',' -nolisten tcp -noreset','xvfb-flags')
+          path.write_text(text,encoding='utf-8')
           PY
           bash -n "$effective"
           grep -Fq "$PX_BACKEND_DIR" "$effective"
           grep -Fq 'LD_LIBRARY_PATH="$package/bin/lib:$tool_lib"' "$effective"
           grep -Fq 'QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none' "$effective"
-          grep -Fq -- '-screen 0 1920x1080x24' "$effective"
-          ! grep -Fq -- '-screen 0 1280x800x24' "$effective"
+          grep -Fq '1920x1080x24' "$effective"
+          ! grep -Fq '1280x800x24' "$effective"
           ! grep -Fq '+extension GLX +iglx +render' "$effective"
+          echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$effective" >> "$GITHUB_ENV"
 
           scaffold="$RUNNER_TEMP/prepare-track-a-minimal-home.sh"
           cat > "$scaffold" <<'SH'
           #!/usr/bin/env bash
           set -Eeuo pipefail
-          gen="${1:?generation}"
-          [[ "$gen" == 1 || "$gen" == 2 ]]
+          gen="${1:?generation}"; [[ "$gen" == 1 || "$gen" == 2 ]]
           root="/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID"
-          package="$root/package"
-          home="$root/home-gen-$gen"
-          tibia="$home/.local/share/CipSoft GmbH/Tibia"
+          package="$root/package"; home="$root/home-gen-$gen"; tibia="$home/.local/share/CipSoft GmbH/Tibia"
           source_meta="/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/launchermetadata.json"
-          [[ -d "$package" && -x "$package/bin/client" ]]
-          [[ -f "$source_meta" && ! -L "$source_meta" ]]
+          [[ -d "$package" && -x "$package/bin/client" && -f "$source_meta" && ! -L "$source_meta" ]]
           [[ "$(stat -c '%s' "$source_meta")" == 2485 ]]
           python3 - "$source_meta" <<'PY'
-          import json, re, sys
-          data=json.load(open(sys.argv[1], encoding='utf-8'))
-          assert set(data) == {'launcher','packages','hardwaresurvey','hints'}
-          forbidden=re.compile(r'(?i)(password|credential|access[_-]?token|refresh[_-]?token|email|cookie|session)')
-          def walk(obj):
-              if isinstance(obj, dict):
-                  for key, value in obj.items():
-                      assert not forbidden.search(str(key)), f'forbidden metadata key: {key}'
-                      walk(value)
-              elif isinstance(obj, list):
-                  for value in obj: walk(value)
-          walk(data)
-          assert isinstance(data['packages'], list) and data['packages']
-          assert isinstance(data['launcher'], dict)
-          print('TRACK_A_RUNTIME_LAUNCHER_METADATA_STRUCTURE_VERIFIED=true')
+          import json,re,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert set(d)=={'launcher','packages','hardwaresurvey','hints'}
+          bad=re.compile(r'(?i)(password|credential|access[_-]?token|refresh[_-]?token|email|cookie|session)')
+          def walk(x):
+              if isinstance(x,dict):
+                  for k,v in x.items(): assert not bad.search(str(k)); walk(v)
+              elif isinstance(x,list):
+                  for v in x: walk(v)
+          walk(d); assert isinstance(d['packages'],list) and d['packages']; assert isinstance(d['launcher'],dict)
           PY
           mkdir -p "$tibia/packages"
           [[ ! -e "$tibia/launchermetadata.json" && ! -e "$tibia/.running" && ! -e "$tibia/packages/Tibia" ]]
-          install -m 600 "$source_meta" "$tibia/launchermetadata.json"
-          : > "$tibia/.running"
-          chmod 600 "$tibia/.running"
+          install -m 600 "$source_meta" "$tibia/launchermetadata.json"; : > "$tibia/.running"; chmod 600 "$tibia/.running"
           ln -s "$package" "$tibia/packages/Tibia"
-          [[ "$(stat -c '%s' "$tibia/launchermetadata.json")" == 2485 ]]
-          [[ ! -s "$tibia/.running" ]]
           [[ "$(readlink -f "$tibia/packages/Tibia")" == "$(readlink -f "$package")" ]]
-          echo "TRACK_A_RUNTIME_MINIMAL_HOME_READY generation=$gen metadata_sha256=$(sha256sum "$tibia/launchermetadata.json" | awk '{print $1}')"
+          echo "TRACK_A_RUNTIME_MINIMAL_HOME_READY generation=$gen"
           SH
-          chmod 700 "$scaffold"
-          bash -n "$scaffold"
-          echo "TRACK_A_RUNTIME_BASELINE_WORKFLOW=$baseline" >> "$GITHUB_ENV"
-          echo "TRACK_A_RUNTIME_STEP_EXTRACTOR=$extractor" >> "$GITHUB_ENV"
-          echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$effective" >> "$GITHUB_ENV"
-          echo "TRACK_A_RUNTIME_HOME_SCAFFOLD=$scaffold" >> "$GITHUB_ENV"
-          echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER_SHA256=$(sha256sum "$effective" | awk '{print $1}')"
-          echo TRACK_A_RUNTIME_KNOWN_GOOD_XVFB_PROFILE_MATERIALIZED=true
+          chmod 700 "$scaffold"; bash -n "$scaffold"; echo "TRACK_A_RUNTIME_HOME_SCAFFOLD=$scaffold" >> "$GITHUB_ENV"
 
-      - name: Recover only exact task-owned residue from run 22
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          step="$RUNNER_TEMP/recover-track-a-runtime-residue.sh"
-          python3 "$TRACK_A_RUNTIME_STEP_EXTRACTOR" "$TRACK_A_RUNTIME_BASELINE_WORKFLOW" 'Recover only exact task-owned residue from failed client launch' "$step"
-          python3 - "$step" "$BASELINE_RESIDUE_RUN_ID" "$FAILED_RUN_TO_RECOVER" <<'PY'
+          # Recover only the previously fenced task-owned run-22 residue using the pinned baseline recovery code.
+          recover="$RUNNER_TEMP/recover-track-a-runtime-residue.sh"
+          python3 - "$baseline" "$recover" "$BASELINE_RESIDUE_RUN_ID" "$FAILED_RUN_TO_RECOVER" <<'PY'
           from pathlib import Path
           import sys
-          path, old, new = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
-          text = path.read_text(encoding='utf-8')
-          if text.count(old) != 1:
-              raise SystemExit(f'residue exact-run anchor count={text.count(old)}, expected 1')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          source,output,old,new=Path(sys.argv[1]),Path(sys.argv[2]),sys.argv[3],sys.argv[4]
+          lines=source.read_text(encoding='utf-8').splitlines(); marker='      - name: Recover only exact task-owned residue from failed client launch'; start=lines.index(marker); run=None
+          for i in range(start+1,len(lines)):
+              if lines[i].startswith('      - name: '): break
+              if lines[i]=='        run: |': run=i+1; break
+          body=[]
+          for line in lines[run:]:
+              if line.startswith('      - name: '): break
+              body.append(line[10:] if line else '')
+          text='\n'.join(body)+'\n'; n=text.count(old)
+          if n!=1: raise SystemExit(f'residue anchor count={n}')
+          output.write_text(text.replace(old,new,1),encoding='utf-8')
           PY
-          bash "$step"
+          bash "$recover"
 
-      - name: Bootstrap isolated no-secret runtime namespace
-        shell: bash
-        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" bootstrap
-
-      - name: Verify persistent bootstrap children survived step boundary
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          step="$RUNNER_TEMP/verify-track-a-runtime-persistence.sh"
-          python3 "$TRACK_A_RUNTIME_STEP_EXTRACTOR" "$TRACK_A_RUNTIME_BASELINE_WORKFLOW" 'Verify persistent bootstrap children survived step boundary' "$step"
-          bash "$step"
-
-      - name: Build minimal non-secret launcher HOME for generation 1
-        shell: bash
-        run: bash "$TRACK_A_RUNTIME_HOME_SCAFFOLD" 1
-
-      - name: Prepare generation 1 and arm logged-out structural observer
-        shell: bash
-        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" prepare 1
+          bash "$effective" bootstrap
+          runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/runtime"
+          run_marker="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"
+          for role in socks-relay xvfb; do
+            pid="$(tr -cd '0-9' <"$runtime/$role.pid")"; kill -0 "$pid"
+            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ"; grep -azFxq "$TASK_MARKER" "/proc/$pid/environ"
+            grep -azFxq "$run_marker" "/proc/$pid/environ"; grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ"
+            ! grep -azEq '^(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD)=' "/proc/$pid/environ"
+          done
+          bash "$scaffold" 1
+          bash "$effective" prepare 1
+          echo TRACK_A_RUNTIME_GEN1_PREPARED=true
 
       - name: Login generation 1 with protected inputs only
         shell: bash
@@ -264,25 +203,18 @@ jobs:
           set +x
           bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" login 1
 
-      - name: Verify generation 1 structural world state and confinement
-        shell: bash
-        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" verify 1
-
-      - name: Cleanly stop generation 1 task-owned client and observer
+      - name: Verify generation 1 stop it and arm fresh generation 2
         shell: bash
         run: |
           set -Eeuo pipefail
-          step="$RUNNER_TEMP/stop-track-a-runtime-generation1.sh"
-          python3 "$TRACK_A_RUNTIME_STEP_EXTRACTOR" "$TRACK_A_RUNTIME_BASELINE_WORKFLOW" 'Cleanly stop generation 1 task-owned client and observer' "$step"
-          bash "$step"
-
-      - name: Build minimal non-secret launcher HOME for generation 2
-        shell: bash
-        run: bash "$TRACK_A_RUNTIME_HOME_SCAFFOLD" 2
-
-      - name: Prepare generation 2 with fresh PID PIE and observer
-        shell: bash
-        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" prepare 2
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" verify 1
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" stop 1
+          runtime="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/runtime"
+          pidfile="$runtime/observer-gen-1.pid"
+          if [[ -r "$pidfile" ]]; then pid="$(tr -cd '0-9' <"$pidfile")"; [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; fi
+          bash "$TRACK_A_RUNTIME_HOME_SCAFFOLD" 2
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" prepare 2
+          echo TRACK_A_RUNTIME_GEN2_PREPARED=true
 
       - name: Login generation 2 with protected inputs only
         shell: bash
@@ -293,103 +225,49 @@ jobs:
           set +x
           bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" login 2
 
-      - name: Verify generation 2 structural world state and confinement
+      - name: Verify generation 2 and require restart stable reacquisition
         shell: bash
-        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" verify 2
-
-      - name: Compare generations and require restart stable reacquisition
-        shell: bash
-        run: bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" compare
+        run: |
+          set -Eeuo pipefail
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" verify 2
+          bash "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" compare
 
       - name: Snapshot sanitized runtime evidence before cleanup
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
-          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"
-          out=artifacts/runtime-reacquisition
-          td=/work/_otclient_tibia_re_state/toolroot
-          source_home=/work/_otclient_tibia_re_state/home
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"; out=artifacts/runtime-reacquisition; td=/work/_otclient_tibia_re_state/toolroot
           mkdir -p "$out"
           python3 - "$root" "$out" <<'PY'
-          import re, shutil, sys
+          import re,shutil,sys
           from pathlib import Path
-          root, out = map(Path, sys.argv[1:])
-          email = re.compile(r'(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}')
-          for gen in (1, 2):
-              g = root / f'generation-{gen}'
-              if not g.is_dir():
-                  continue
+          root,out=map(Path,sys.argv[1:]); email=re.compile(r'(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}')
+          for gen in (1,2):
+              g=root/f'generation-{gen}'
+              if not g.is_dir(): continue
               for name in ('map-records.tsv','baseline-count.txt','pie-base.txt','window.id'):
-                  src = g / name
-                  if src.is_file():
-                      shutil.copyfile(src, out / f'gen{gen}-{name}')
+                  src=g/name
+                  if src.is_file(): shutil.copyfile(src,out/f'gen{gen}-{name}')
               for name in ('client.log','gdb.log'):
-                  src = g / name
-                  if not src.is_file():
-                      continue
+                  src=g/name
+                  if not src.is_file(): continue
                   lines=[]
                   for line in src.read_text(errors='replace').splitlines()[-160:]:
-                      if 'TIBIA_TEST_EMAIL' in line or 'TIBIA_TEST_PASSWORD' in line:
-                          line='[REDACTED_SECRET_VARIABLE_LINE]'
-                      line=email.sub('[REDACTED_EMAIL]', line)
-                      lines.append(line)
-                  (out / f'gen{gen}-{name}').write_text('\n'.join(lines)+'\n', encoding='utf-8')
-          comparison = root / 'comparison.txt'
-          if comparison.is_file():
-              shutil.copyfile(comparison, out / 'comparison.txt')
+                      if 'TIBIA_TEST_EMAIL' in line or 'TIBIA_TEST_PASSWORD' in line: line='[REDACTED_SECRET_VARIABLE_LINE]'
+                      lines.append(email.sub('[REDACTED_EMAIL]',line))
+                  (out/f'gen{gen}-{name}').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+          c=root/'comparison.txt'
+          if c.is_file(): shutil.copyfile(c,out/'comparison.txt')
           PY
           export DISPLAY=":$DISPLAY_NUM"
           if [[ -x "$td/usr/bin/xdotool" ]]; then
-            {
-              client_pid="$(tr -cd '0-9' <"$root/runtime/client-gen-1.pid" 2>/dev/null || true)"
-              echo "client_gen_1_pid=${client_pid:-none}"
-              count=0
-              for w in $("$td/usr/bin/xdotool" search --onlyvisible --name '.*' 2>/dev/null || true); do
-                count=$((count+1))
-                wp="$("$td/usr/bin/xdotool" getwindowpid "$w" 2>/dev/null || true)"
-                wn="$("$td/usr/bin/xdotool" getwindowname "$w" 2>/dev/null | tr '\n\r\t' ' ' || true)"
-                geom="$("$td/usr/bin/xdotool" getwindowgeometry --shell "$w" 2>/dev/null | tr '\n' ' ' || true)"
-                printf 'window=%s pid=%s name=%q geometry=%q\n' "$w" "${wp:-none}" "$wn" "$geom"
-              done
-              echo "visible_window_count=$count"
-            } > "$out/x11-visible-windows.txt"
+            { count=0; for w in $("$td/usr/bin/xdotool" search --onlyvisible --name '.*' 2>/dev/null || true); do count=$((count+1)); wp="$("$td/usr/bin/xdotool" getwindowpid "$w" 2>/dev/null || true)"; wn="$("$td/usr/bin/xdotool" getwindowname "$w" 2>/dev/null | tr '\n\r\t' ' ' || true)"; printf 'window=%s pid=%s name=%q\n' "$w" "${wp:-none}" "$wn"; done; echo "visible_window_count=$count"; } > "$out/x11-visible-windows.txt"
           fi
-          for gen in 1 2; do
-            home="$root/home-gen-$gen"
-            if [[ -d "$home" ]]; then
-              find "$home" -xdev -maxdepth 5 -printf '%y %P\n' 2>/dev/null | LC_ALL=C sort > "$out/gen${gen}-home-tree.txt"
-            fi
-          done
           {
-            tibia_root="$source_home/.local/share/CipSoft GmbH/Tibia"
-            config_root="$source_home/.config/CipSoft GmbH"
-            echo "source_tibia_root_exists=$([[ -d "$tibia_root" ]] && echo true || echo false)"
-            echo "source_config_root_exists=$([[ -d "$config_root" ]] && echo true || echo false)"
-            if [[ -d "$tibia_root" ]]; then
-              echo "source_tibia_nonpackage_files=$(find "$tibia_root" -xdev -maxdepth 2 -type f ! -path '*/packages/*' 2>/dev/null | wc -l)"
-              echo "source_tibia_nonpackage_dirs=$(find "$tibia_root" -xdev -maxdepth 2 -type d ! -path '*/packages/*' 2>/dev/null | wc -l)"
-            fi
-            if [[ -d "$config_root" ]]; then
-              echo "source_config_files=$(find "$config_root" -xdev -maxdepth 3 -type f 2>/dev/null | wc -l)"
-              echo "source_config_dirs=$(find "$config_root" -xdev -maxdepth 3 -type d 2>/dev/null | wc -l)"
-            fi
-          } > "$out/home-shape-summary.txt"
-          {
-            echo "workflow_status=${{ job.status }}"
-            echo "workflow_run_id=$GITHUB_RUN_ID"
-            echo "workflow_head=$GITHUB_SHA"
-            echo "runner=$RUNNER_NAME"
-            echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"
-            echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
-            echo "current_run_ownership=true"
-            echo "bundled_qt_precedence=true"
-            echo "software_backend=true"
-            echo "minimal_launcher_home=true"
-            echo "known_good_xvfb_profile=true"
-            if [[ -n "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" && -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
-              echo "effective_helper_sha256=$(sha256sum "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" | awk '{print $1}')"
-            fi
+            echo "workflow_status=${{ job.status }}"; echo "workflow_run_id=$GITHUB_RUN_ID"; echo "workflow_head=$GITHUB_SHA"; echo "runner=$RUNNER_NAME"
+            echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"; echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
+            echo "current_run_ownership=true"; echo "bundled_qt_precedence=true"; echo "software_backend=true"; echo "minimal_launcher_home=true"; echo "known_good_xvfb_profile=true"
           } > "$out/workflow-terminal.txt"
 
       - name: Clean exact current-run runtime processes and ephemeral state
@@ -397,67 +275,25 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"
-          runtime="$root/runtime"
-          run_marker="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"
-          owned_current() {
-            local pid="$1" role="$2"
-            [[ -r "/proc/$pid/environ" ]] || return 1
-            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || return 1
-            grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" || return 1
-            grep -azFxq "$run_marker" "/proc/$pid/environ" || return 1
-            grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ" || return 1
-          }
-          stop_current() {
-            local role="$1" file="$runtime/$role.pid" pid=''
-            [[ -r "$file" ]] && pid="$(tr -cd '0-9' <"$file" 2>/dev/null || true)"
-            [[ -n "$pid" ]] || return 0
-            if kill -0 "$pid" 2>/dev/null; then
-              owned_current "$pid" "$role" || { echo "TRACK_A_RUNTIME_ERROR=foreign_current_$role" >&2; exit 1; }
-              kill -CONT "$pid" 2>/dev/null || true
-              kill -TERM "$pid" 2>/dev/null || true
-              for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
-              if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; fi
-              for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done
-              ! kill -0 "$pid" 2>/dev/null || { echo "TRACK_A_RUNTIME_ERROR=current_stop_timeout_$role" >&2; exit 1; }
-              echo "TRACK_A_RUNTIME_CURRENT_PROCESS_STOPPED role=$role pid=$pid"
-            fi
-          }
+          root="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID"; runtime="$root/runtime"; run_marker="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"
+          owned(){ local pid="$1" role="$2"; [[ -r "/proc/$pid/environ" ]] && grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" && grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" && grep -azFxq "$run_marker" "/proc/$pid/environ" && grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ"; }
+          stop(){ local role="$1" file="$runtime/$role.pid" pid=''; [[ -r "$file" ]] && pid="$(tr -cd '0-9' <"$file" 2>/dev/null || true)"; [[ -n "$pid" ]] || return 0; if kill -0 "$pid" 2>/dev/null; then owned "$pid" "$role" || exit 1; kill -CONT "$pid" 2>/dev/null || true; kill -TERM "$pid" 2>/dev/null || true; for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done; kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true; for _ in $(seq 1 20); do kill -0 "$pid" 2>/dev/null || break; sleep .1; done; ! kill -0 "$pid" 2>/dev/null || exit 1; fi; }
           xvfb_pid="$(tr -cd '0-9' <"$runtime/xvfb.pid" 2>/dev/null || true)"
-          for role in observer-gen-1 observer-gen-2 client-gen-1 client-gen-2 xvfb socks-relay; do
-            stop_current "$role"
-          done
+          for role in observer-gen-1 observer-gen-2 client-gen-1 client-gen-2 xvfb socks-relay; do stop "$role"; done
           python3 - "$TASK_SOCKS_PORT" <<'PY'
-          import pathlib, sys
+          import pathlib,sys
           needle=f"{int(sys.argv[1]):04X}"
           for name in ('tcp','tcp6'):
               p=pathlib.Path('/proc/net')/name
-              if not p.exists():
-                  continue
+              if not p.exists(): continue
               for row in p.read_text().splitlines()[1:]:
                   f=row.split()
-                  if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==needle and f[3]=='0A':
-                      raise SystemExit('TRACK_A_RUNTIME_ERROR=current_socks_port_still_listening')
+                  if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==needle and f[3]=='0A': raise SystemExit(1)
           PY
-          lock="/tmp/.X${DISPLAY_NUM}-lock"
-          sock="/tmp/.X11-unix/X${DISPLAY_NUM}"
-          if [[ -e "$lock" ]]; then
-            lock_pid="$(tr -cd '0-9' <"$lock" 2>/dev/null || true)"
-            [[ -n "$xvfb_pid" && "$lock_pid" == "$xvfb_pid" ]] || { echo TRACK_A_RUNTIME_ERROR=foreign_current_display_lock >&2; exit 1; }
-            ! kill -0 "$lock_pid" 2>/dev/null || { echo TRACK_A_RUNTIME_ERROR=current_display_lock_pid_alive >&2; exit 1; }
-            rm -f "$lock"
-          fi
-          if [[ -e "$sock" ]]; then
-            [[ -n "$xvfb_pid" ]] || { echo TRACK_A_RUNTIME_ERROR=current_x11_socket_without_xvfb >&2; exit 1; }
-            ! kill -0 "$xvfb_pid" 2>/dev/null || { echo TRACK_A_RUNTIME_ERROR=current_x11_socket_xvfb_alive >&2; exit 1; }
-            grep -Fq "$sock" /proc/net/unix 2>/dev/null && { echo TRACK_A_RUNTIME_ERROR=current_x11_socket_still_active >&2; exit 1; }
-            rm -f "$sock"
-          fi
-          if [[ -r "$root/task-id" ]]; then
-            [[ "$(cat "$root/task-id")" == "$TASK_ID" ]] || { echo TRACK_A_RUNTIME_ERROR=foreign_current_root >&2; exit 1; }
-            [[ "$root" == "/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/$GITHUB_RUN_ID" ]] || { echo TRACK_A_RUNTIME_ERROR=current_root_outside_namespace >&2; exit 1; }
-            rm -rf -- "$root"
-          fi
+          lock="/tmp/.X${DISPLAY_NUM}-lock"; sock="/tmp/.X11-unix/X${DISPLAY_NUM}"
+          if [[ -e "$lock" ]]; then lp="$(tr -cd '0-9' <"$lock" 2>/dev/null || true)"; [[ -n "$xvfb_pid" && "$lp" == "$xvfb_pid" ]] || exit 1; ! kill -0 "$lp" 2>/dev/null || exit 1; rm -f "$lock"; fi
+          if [[ -e "$sock" ]]; then [[ -n "$xvfb_pid" ]] || exit 1; ! kill -0 "$xvfb_pid" 2>/dev/null || exit 1; grep -Fq "$sock" /proc/net/unix 2>/dev/null && exit 1; rm -f "$sock"; fi
+          if [[ -r "$root/task-id" ]]; then [[ "$(cat "$root/task-id")" == "$TASK_ID" ]] || exit 1; rm -rf -- "$root"; fi
           echo TRACK_A_RUNTIME_CURRENT_RUN_CLEANUP_COMPLETE=true
 
       - name: Upload sanitized runtime reacquisition evidence

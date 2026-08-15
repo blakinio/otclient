@@ -2,23 +2,23 @@
 task_id: OTC-20260815-track-a-live-runtime-lease-manager
 status: validating
 agent: ChatGPT
-session_id: null
+session_id: chatgpt-lease-normal-exit-20260815-2350
 session_role: postmerge-remediation
-session_rotation_count: 3
+session_rotation_count: 4
 project_lane: otclient
 lane: track-a-runtime-governance
 track_id: official-client-re
 task_kind: implementation
-phase: final-ci
-branch: fix/OTC-20260815-track-a-live-runtime-lease-postmerge-p1
+phase: normal-launcher-exit-final-review
+branch: fix/OTC-20260815-track-a-live-runtime-lease-normal-exit
 base_branch: main
-base_main: 3575cc0c0a0b4efbcd9fc860d3226002fe40e70f
-worktree: github-only://blakinio/otclient/refs/heads/fix/OTC-20260815-track-a-live-runtime-lease-postmerge-p1
+base_main: f6fa2264904c6ffb3734d4a63e1edbb29260fcc1
+worktree: github-only://blakinio/otclient/refs/heads/fix/OTC-20260815-track-a-live-runtime-lease-normal-exit
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
-related_pr: 313
+related_pr: 317
 created: 2026-08-15T22:04:00+02:00
-updated: 2026-08-15T23:16:07+02:00
+updated: 2026-08-15T23:55:00+02:00
 lease_released_at: null
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-live-runtime-lease-manager.md
@@ -34,12 +34,11 @@ owned_paths:
 modules_touched:
   - track-a-runtime-governance
 reuses:
-  - PR #311 canonical-live governance decision as pending policy input only
-  - repository 45-minute stale-lease convention
+  - PR #312 initial manager promotion
+  - PR #313 post-lock-time and killed-parent child-lock remediation
 depends_on:
   - PR #311 must remain fail-closed until this remediation is merged and governance is revalidated
   - PR #309 noVNC/display evidence is read-only input only
-  - coordinator PR #300 disposition ACCEPT_WITH_EDITS and explicit delegation of MODULE_CATALOG.md / CHANGELOG.md
 blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
@@ -49,109 +48,80 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: low_noise
 implementation_authorized: true
-last_progress_at: 2026-08-15T23:16:07+02:00
-ci_check_generation: postmerge-p1-final
-last_verified_code_head: ad30ae9500384aa45bec5307c17c2028cf28c868
-semantic_run: 31908930698
-semantic_unit_job: 95070957976
-semantic_selfhosted_job: 95070958055
+last_progress_at: 2026-08-15T23:55:00+02:00
+ci_check_generation: normal-launcher-exit-final
+last_verified_code_head: 7bf0d0f1238dc16a590087445a4a4c58c574f05f
+semantic_run: 31910656040
+semantic_unit_job: 95075082947
+semantic_selfhosted_job: 95075082997
 semantic_state: success
 repository_ci_run: null
 repository_ci_required_job: null
 repository_ci_state: pending
-coordinator_disposition: ACCEPT_WITH_EDITS
-coordinator_evidence: docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/canonical-live-lease-manager/20260815-pr312-disposition.md
-remediation_evidence: docs/agents/evidence/OTC-20260815-track-a-live-runtime-lease-manager/20260815-postmerge-p1-remediation.md
 review_threads: 0
 stop_reason: null
-next_action: run PR #313 required CI and review on the exact final head; if green with zero material findings, merge under protection, resolve the two post-merge P1 threads on PR #312, then archive this task and release ownership before returning to PR #311
+next_action: run exact-final-head repository CI and review on PR #317; if green with zero material findings, protected-merge it, resolve PR #311's normal-exit finding, revalidate/merge #311, then archive this manager task
 ---
 
 # Objective
 
-Keep the authoritative Track A canonical-live controller lease manager safe after two material post-merge concurrency findings, without claiming or mutating a canonical Tibia runtime.
+Close the remaining canonical-live lease serialization defect: a `guard-run` launcher that exits normally after forking/backgrounding a mutation child must not release the coordination flock while that child remains alive.
 
-# Promoted implementation — FACT
+# Promoted baseline — FACT
 
-PR #312 merged to `main` as commit `3575cc0c0a0b4efbcd9fc860d3226002fe40e70f` after coordinator disposition `ACCEPT_WITH_EDITS` and protected CI. Production entrypoint:
+PR #312 merged the canonical-live lease manager. PR #313 merged two concurrency corrections: time-sensitive operations sample time after acquiring the flock, and a guarded child inherits the flock descriptor when the guard parent is killed.
 
-`./.github/scripts/tibia-official-client-re-canonical-live-lease`
+# New post-merge P1 finding — FACT
 
-Authoritative state:
+Final review on PR #311 reproduced a distinct normal-return path:
 
-`/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime`
+```text
+guard-run -- bash -c 'sleep 8 &'
+```
 
-The manager provides serialized `acquire`, `renew`, `validate`, `release`, redacted `status`, and `guard-run`; fixed production state path; task-local token confinement; atomic mode-0600 state; SHA-256 token digest only in shared state; explicit stale takeover reason; generation fencing; and rejection of renew/validate/release by expired holders.
+The immediate launcher exits normally. Although the descendant inherited the same open file description, `LeaseManager.locked()` explicitly called `LOCK_UN` in its `finally` block. On Linux `flock` is associated with the open file description, so that explicit unlock released the shared flock even while the background descendant remained alive. A second nonblocking flock could then succeed, allowing stale takeover to overlap the surviving mutation after expiry.
 
-# Post-merge P1 findings — FACT
-
-Two material review findings were posted on merged PR #312 after merge:
-
-1. `guard-run` could release the coordination flock when the guard parent terminated while its child command continued running.
-2. time-sensitive operations sampled current time before potentially blocking on the flock, so a lease that expired during the wait could still be accepted.
-
-PR #311 remains fail-closed until the corrected manager is on `main` and governance is revalidated.
+This is separate from the PR #313 killed-parent regression and keeps PR #311 fail-closed until PR #317 reaches `main`.
 
 # Remediation — FACT
 
-PR #313 is the narrow remediation. The code change:
+The narrow fix removes explicit `LOCK_UN` from the generic `locked()` context manager and closes only the manager's descriptor copy. Ordinary operations still release the lock when their final descriptor closes. For `guard-run`, descendants inherit the open file description; therefore the lock remains held until the last surviving mutation descendant closes its inherited descriptor.
 
-- makes `LeaseManager.locked()` yield the live flock descriptor;
-- passes that descriptor into the guarded child with `pass_fds=(lock_fd,)`, preserving serialization when the guard parent dies before its child;
-- samples current time only after lock acquisition in `acquire`, `renew`, `release`, `validate`, `status`, and `guard_run`;
-- adds regression tests for post-lock expiry and parent-killed/child-survives lock inheritance.
-
-Final implementation scope is limited to the manager implementation, its tests, this task, and its evidence. Temporary GitHub-only validation workflows were removed from the branch before final CI.
+The deterministic regression test forks a background child, lets the immediate launcher exit normally, proves a second nonblocking flock is denied while the child remains alive, and proves the flock becomes acquirable after the child exits.
 
 # Validation — FACT
 
-Focused patch/test run:
+Branch-only semantic run on code/test head `c11921267a1f7306d61046c4922b30d35c258703`:
 
 ```text
-run=31908781559
-job=95070594733 SUCCESS
+run=31910656040
+unit_job=95075082947 SUCCESS
+isolated_selfhosted_job=95075082997 SUCCESS
 ```
 
-Independent branch validation after the remediation:
+The unit job ran 14 tests and explicitly passed `test_guard_normal_launcher_exit_keeps_lock_in_background_child`. The isolated Synology job completed the lease self-test with `TRACK_A_CANONICAL_LEASE_CONCURRENT_SERIALIZATION_PROVEN=true`, `TRACK_A_CANONICAL_LEASE_SELFTEST_COMPLETE=true`, and `TRACK_A_CANONICAL_LEASE_CANONICAL_STATE_UNTOUCHED=true`.
 
-```text
-run=31908930698 SUCCESS
-head=2d548c67c0b0d9e39c5d8a51cd72fd1bba878d9a
-unit_job=95070957976 SUCCESS
-isolated_selfhosted_job=95070958055 SUCCESS
-```
-
-The self-hosted validation used only the task-owned self-test root and preserved the existing `CANONICAL_STATE_UNTOUCHED` contract. It did not create or mutate production canonical-live state.
-
-Durable evidence:
-
-`docs/agents/evidence/OTC-20260815-track-a-live-runtime-lease-manager/20260815-postmerge-p1-remediation.md`
+The temporary branch-only semantic trigger was removed before the final PR scope. Final changed paths are only the manager implementation, deterministic tests and this durable task record.
 
 # Safety / non-claims
 
-- No canonical live state directory is created or modified by this remediation.
-- No Tibia client process, display `:98`, display `:115`, login/account/session, input, attach, signal, VNC/noVNC, or gameplay state is mutated.
-- `:98` is NOT canonicalized.
-- PR #303/#309 owned paths and Track B remain untouched.
-- No owner-funded Codex/OpenAI API or paid AI quota was invoked by this remediation.
+- No production canonical-live state is used by tests.
+- No Tibia process, login/session, display, VNC/noVNC, input or instrumentation is mutated.
+- `:98` remains NOT_PROVEN/NOT_REGISTERED as canonical.
+- PR #303 runtime paths/processes and Track B remain untouched.
+- No owner-funded Codex/OpenAI API or paid AI quota is authorized or used.
 
 # Acceptance inventory
 
-- [x] coordinator disposition `ACCEPT_WITH_EDITS` recorded;
-- [x] PR #312 protected merge to `main` verified as `3575cc0c0a0b4efbcd9fc860d3226002fe40e70f`;
-- [x] P1 guard-parent/child-lock finding repaired in PR #313;
-- [x] P1 pre-lock-time finding repaired for all affected operations in PR #313;
-- [x] focused unit/compile validation SUCCESS (`31908781559` / `95070594733`);
-- [x] independent branch unit validation SUCCESS (`31908930698` / `95070957976`);
-- [x] isolated Synology validation SUCCESS (`31908930698` / `95070958055`);
-- [x] PR #313 currently has zero review threads before readiness transition;
-- [ ] PR #313 exact-final-head `CI / Required` SUCCESS;
-- [ ] PR #313 final review has zero unresolved material findings;
-- [ ] PR #313 protected merge to `main`;
-- [ ] two post-merge P1 review threads on PR #312 resolved after fix reaches `main`;
-- [ ] task archived/terminally closed and ownership released;
-- [ ] PR #311 governance revalidated against corrected manager on `main`.
-
-# Closeout boundary
-
-The task is not complete merely because PR #312 merged. The two post-merge P1 findings reopened implementation. Completion requires PR #313 green/reviewed/merged, the two PR #312 threads resolved, task archival and ownership release. Runtime E2E is `NOT_APPLICABLE_WITH_REASON`: this manager does not mutate a Tibia runtime; its complete applicable path is deterministic CLI/unit behavior plus isolated Synology validation and protected repository CI.
+- [x] normal-launcher-return unlock root cause identified;
+- [x] explicit `LOCK_UN` removed from production lock context;
+- [x] normal-return surviving-child regression added;
+- [x] deterministic unit suite SUCCESS (`31910656040` / `95075082947`);
+- [x] isolated Synology validation SUCCESS (`31910656040` / `95075082997`);
+- [x] production canonical state untouched by validation;
+- [x] temporary semantic workflow trigger absent from final diff;
+- [ ] repository `CI / Required` SUCCESS on exact final head;
+- [ ] zero unresolved material review findings;
+- [ ] protected merge PR #317 to `main`;
+- [ ] PR #311 normal-exit review finding resolved only after this fix reaches `main`;
+- [ ] manager task archived/terminally closed after all post-merge findings are resolved.

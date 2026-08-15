@@ -155,7 +155,10 @@ class LeaseManager:
             fcntl.flock(fd, fcntl.LOCK_EX)
             yield fd
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            # Do not issue LOCK_UN here. guard-run deliberately passes this open
+            # file description to mutation descendants. Closing only our copy
+            # keeps the flock held until the last surviving inherited copy is
+            # closed, including when the immediate launcher exits normally.
             os.close(fd)
 
     def _load_state_unlocked(self) -> dict[str, Any] | None:

@@ -1,8 +1,8 @@
 ---
 task_id: OTC-20260815-track-a-p2-post-serialization-buffer-boundary
-status: active
-agent: ChatGPT
-session_id: chatgpt-p2-buffer-researcher-20260815-2107
+status: waiting
+agent: unassigned
+session_id: null
 session_role: researcher
 session_rotation_count: 1
 project_lane: otclient
@@ -18,7 +18,7 @@ worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 308
 created: 2026-08-15T17:49:00+02:00
-updated: 2026-08-15T21:07:00+02:00
+updated: 2026-08-15T21:11:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-p2-post-serialization-buffer-boundary.md
   - docs/agents/evidence/OTC-20260815-track-a-p2-post-serialization-buffer-boundary/**
@@ -27,7 +27,8 @@ owned_paths:
 depends_on:
   - main@8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
   - coordinator PR #300 promoted #306 serialization evidence as pinned unmerged dependency only
-blocks: []
+blocks:
+  - semantic static run 31903141897 on code-bearing head 5d7f4bb1aadc782f9bc69b1e292577d88fe0c4a2 remains in_progress after the two ordinary state observations allowed by anti-stall policy
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
@@ -39,17 +40,21 @@ task_completion_policy: draft_pr_only
 user_communication: terminal_only
 implementation_authorized: true
 invocation_started_at: 2026-08-15T21:07:00+02:00
-last_progress_at: 2026-08-15T21:07:00+02:00
-ci_checks_for_current_head: 0
+last_progress_at: 2026-08-15T21:10:00+02:00
+lease_released_at: 2026-08-15T21:11:00+02:00
+code_bearing_head: 5d7f4bb1aadc782f9bc69b1e292577d88fe0c4a2
+semantic_run: 31903141897
+semantic_run_state_at_release: in_progress
+ci_checks_for_current_head: 2
 ci_check_generation: buffer-dataflow-discovery
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 1
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-next_action: implement and execute one exact-client static reproducer that independently revalidates the promoted QDataStream serializer facts and proves or boundedly rejects shared QDataStream/QBuffer/byte-container state through concrete data provenance
+next_action: in a fresh researcher rotation, inspect run 31903141897 exactly once after it is terminal; on success download the sanitized artifact and classify QDataStream/QBuffer common-or-split state from helper 0x1960340 and c20c70 data flow, then make at most one evidence-based script repair if required; on failure inspect the first actionable error before any rerun
 ---
 
 # Objective
@@ -64,6 +69,12 @@ TProtocolClientMessageProcessor
 ```
 
 Research output remains Draft-only. Promotion authority is coordinator PR #300.
+
+# Current implementation checkpoint
+
+The task now contains an exact-build static reproducer and a self-hosted workflow on owned paths only. The reproducer independently revalidates writer/intermediate RTTI/address points, retention bytes and serializer slots, then disassembles `0xc20c70` plus helper `0x1960340` to distinguish concrete QBuffer/QDataStream shared state from vtable adjacency. It emits only sanitized text/JSON evidence and preserves protocol framing, sequence, compression, encryption and final egress as UNKNOWN unless directly proven.
+
+Push run `31903141897` started on exact code-bearing head `5d7f4bb1aadc782f9bc69b1e292577d88fe0c4a2`. First observation: queued. Second observation: in_progress. No third ordinary state check is permitted in this invocation. No duplicate run is dispatched.
 
 # Exact client fence
 
@@ -116,9 +127,9 @@ Do not use vtable adjacency, generic QIODevice/QBuffer/QByteArray census, generi
 - [ ] temporal order claimed only if direct control/data-flow evidence supports it;
 - [ ] framing distinguished from container management;
 - [ ] sequence/compression/encryption/final egress remain UNKNOWN unless directly proven;
-- [ ] negative controls enforced;
-- [ ] execution success and semantic outcome separate;
-- [ ] no proprietary client bytes, credentials, account state or secret payloads committed/uploaded;
+- [x] negative controls encoded in reproducer;
+- [x] execution success and semantic outcome are separate outputs;
+- [x] no proprietary client bytes, credentials, account state or secret payloads are committed/uploaded;
 - [ ] exact-head repository CI terminal before Draft handoff;
 - [ ] task released as `ready` for coordinator review rather than merged.
 

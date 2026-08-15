@@ -14,9 +14,9 @@ branch: docs/OTC-20260815-track-a-live-runtime-lease-manager-final-closeout
 base_branch: main
 base_main: e9df81f50dbb231bc4ac6cc3fc21f260fc358d34
 risk: medium
-related_pr: PENDING_CLOSEOUT_PR
+related_pr: 319
 created: 2026-08-15T22:04:00+02:00
-updated: 2026-08-16T01:18:00+02:00
+updated: 2026-08-16T01:19:00+02:00
 lease_expires_at: null
 lease_released_at: 2026-08-16T01:18:00+02:00
 stale_takeover_count: 1
@@ -31,7 +31,7 @@ continuation_policy: completed
 task_completion_policy: completed
 user_communication: terminal_only
 implementation_authorized: false
-last_progress_at: 2026-08-16T01:18:00+02:00
+last_progress_at: 2026-08-16T01:19:00+02:00
 final_implementation_head: d61d362c12125e3c70167f09729a0caa8b891e78
 final_main_merge: e9df81f50dbb231bc4ac6cc3fc21f260fc358d34
 semantic_run: 31914257951
@@ -47,65 +47,57 @@ repository_ci_state: success
 review_threads: 0
 e2e_result: NOT_APPLICABLE
 stop_reason: completed
-next_action: reconcile and promote the separate canonical-live bootstrap contract, then final canonical-live governance; runtime creation/login remains unauthorized by this closeout
+next_action: reconcile and promote PR #318 bootstrap contract, then final PR #311 governance; runtime creation/login remains unauthorized
 ---
 
 # Objective
 
-Provide a fail-closed canonical-live controller lease manager whose production `guard-run` serializes the entire lifetime of a mutation tree without placing the coordination flock under guarded-command control.
+Provide a fail-closed canonical-live controller lease manager whose production `guard-run` serializes the complete lifetime of a mutation tree without giving the guarded command control of the coordination flock.
 
 # Terminal implementation — FACT
 
-The final implementation was clean-restacked as PR #316 exact head `d61d362c12125e3c70167f09729a0caa8b891e78` on `main@b433290f48e18270279895ff4abb1a54b4475051`, preserving PR #317's lower-level last-close semantics while adding the dedicated out-of-band Linux subreaper supervisor.
+PR #316 was clean-restacked on PR #317's merged last-close base, producing exact head `d61d362c12125e3c70167f09729a0caa8b891e78`. The final tree preserves PR #317's no-explicit-`LOCK_UN` last-close behavior and adds the out-of-band Linux child-subreaper supervisor. The caller acquires and validates before forking; the supervisor alone retains the flock after dispatch; the guarded command uses `close_fds=True`; the supervisor waits for the primary command and all adopted/orphaned descendants before releasing serialization.
 
-The production wrapper routes `guard-run` through `.github/scripts/tibia-official-client-re-canonical-live-guard.py`. The caller acquires the canonical flock and validates the current lease before forking. The dedicated supervisor retains the flock, the guarded command receives no flock descriptor (`close_fds=True`), and the supervisor waits for the primary command plus orphaned/daemonized descendants before releasing serialization.
-
-The stale workflow lint defect from old run `31910752406` was repaired on the restacked head by replacing the two shellcheck-SC2016 single-quoted grep expressions with intentionally escaped double-quoted literals. Durable pull-request workflow coverage now executes the manager unit suite, isolated Synology suite and fresh acceptance audit on relevant exact PR heads.
-
-PR #316 merged under repository protection as `e9df81f50dbb231bc4ac6cc3fc21f260fc358d34`.
+The old `31910752406` SC2016 failure was fixed on the restacked head by making the two literal grep expressions shellcheck-safe. PR #316 then merged under repository protection as `e9df81f50dbb231bc4ac6cc3fc21f260fc358d34`.
 
 # Final validation — FACT
 
-Exact implementation head `d61d362c12125e3c70167f09729a0caa8b891e78`:
+Exact head `d61d362c12125e3c70167f09729a0caa8b891e78`:
 
 ```text
-Track A canonical live controller lease run 31914257951
-unit job 95083728186 = SUCCESS
-isolated Synology job 95083728146 = SUCCESS
-fresh independent acceptance audit 95083728148 = SUCCESS
-
-repository CI run 31914258080
-CI / Required job 95083836065 = SUCCESS
-Fast Checks / Syntax and workflow validation = SUCCESS
+semantic run 31914257951
+unit 95083728186 SUCCESS
+isolated Synology 95083728146 SUCCESS
+fresh independent acceptance audit 95083728148 SUCCESS
+repository CI 31914258080
+CI / Required 95083836065 SUCCESS
 ```
 
-The final semantic run therefore revalidated the deterministic lease tests, daemonization/caller-death supervisor regression, isolated Synology invariants and a fresh independent falsification pass on the combined #317 + #316 tree. Repository actionlint/shellcheck passed on the same exact head.
+Repository syntax/workflow validation, including actionlint/shellcheck, passed on that same head. PR #316 has zero unresolved material review threads. PR #313's two surviving post-merge P1 threads were resolved only after the final supervisor reached `main` and the task used the defined `NOT_APPLICABLE` E2E result token.
 
-# Review and related-PR hygiene — FACT
+# Related manager PRs — FACT
 
-Manager-related implementation lifecycle:
-
-- PR #312 — merged initial manager as `3575cc0c0a0b4efbcd9fc860d3226002fe40e70f`;
-- PR #313 — merged concurrency remediation as `f6fa2264904c6ffb3734d4a63e1edbb29260fcc1`; its two surviving post-merge P1 threads are now resolved against the final corrected manager;
-- PR #314 — closed superseded and not merged; its stale closeout evidence was not reused;
-- PR #317 — merged normal-launcher last-close remediation as `b433290f48e18270279895ff4abb1a54b4475051`;
-- PR #316 — clean-restacked on #317, exact-head validated and merged as `e9df81f50dbb231bc4ac6cc3fc21f260fc358d34`.
-
-PR #316 has zero unresolved material review threads. The prior test-cleanup P1 remains resolved, and the final restack did not reintroduce the unsafe saved-PID signal path.
+- #312 merged initial manager as `3575cc0c0a0b4efbcd9fc860d3226002fe40e70f`.
+- #313 merged concurrency remediation as `f6fa2264904c6ffb3734d4a63e1edbb29260fcc1`.
+- #314 is closed superseded and was not merged; its stale closeout evidence is not reused.
+- #317 merged normal-launcher last-close remediation as `b433290f48e18270279895ff4abb1a54b4475051`.
+- #316 merged the final supervisor stack as `e9df81f50dbb231bc4ac6cc3fc21f260fc358d34`.
+- #319 is this fresh archive/closeout and is terminal only when this archive reaches `main`.
 
 # E2E
 
 Result: `NOT_APPLICABLE`.
 
-Reason: this manager is runtime-governance infrastructure and its acceptance boundary is the public lease/guard entrypoint through serialized isolated state and descendant lifetime to observable command/lock outcomes. A live Tibia launch/login would be outside this task's authorization and would weaken, not strengthen, this closeout.
+Reason: the manager's real acceptance boundary is the public lease/guard entrypoint through OS process/flock behavior and isolated state. Launching or logging into Tibia is outside this task's authorization.
 
 # Safety / non-claims
 
-- No Tibia client was launched, logged in, signalled, attached, given input or mutated for this closeout.
-- No production canonical-live registration was created.
-- `:98`, `6082`, PID and session canonical status remain `UNKNOWN` / `NOT_REGISTERED` absent direct evidence.
+- No Tibia client launch/login/input/attach/signal/runtime mutation was performed.
+- No credentials were used and no production canonical registration was created.
+- `:98`, `6082`, PID and session remain `UNKNOWN` / `NOT_REGISTERED` without direct evidence.
 - Exact client fence remains `15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
-- PR #303 runtime-owned paths/processes and Track B were not touched.
+- PR #303 runtime-owned paths/processes and Track B were untouched.
+- No branch protection, lease/identity gate or host-security boundary was weakened.
 - No owner-funded Codex/OpenAI API or paid AI quota was used.
 
 # Closeout
@@ -128,14 +120,10 @@ closeout:
       - CI / Required job 95083836065
   pull_requests:
     unresolved_review_threads: 0
-    terminal_manager_prs:
-      - blakinio/otclient#312 merged
-      - blakinio/otclient#313 merged
-      - blakinio/otclient#314 closed_superseded
-      - blakinio/otclient#316 merged
-      - blakinio/otclient#317 merged
+    implementation_prs_terminal: true
+    closeout_pr: blakinio/otclient#319
   task_status: completed
-  task_archived: true
-  ownership_released: true
+  task_archived_on_merge_of: blakinio/otclient#319
+  ownership_released_on_merge_of: blakinio/otclient#319
   stale_closeout_reused: false
 ```

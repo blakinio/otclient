@@ -47,14 +47,14 @@ def main() -> int:
     )
     require(
         "TProtocolWriter" in canonical
-        and "RTTI: `0x3080728`" in canonical
-        and "vtable address point: `0x2f69dd0`" in canonical,
+        and "RTTI: 0x3080728" in canonical
+        and "vtable address point: 0x2f69dd0" in canonical,
         "canonical_tprotocolwriter_identity",
     )
     require(
         "TIODeviceWriter" in canonical
-        and "RTTI: `0x3080718`" in canonical
-        and "vtable address point: `0x2f69d48`" in canonical,
+        and "RTTI: 0x3080718" in canonical
+        and "vtable address point: 0x2f69d48" in canonical,
         "canonical_tiodevicewriter_identity",
     )
     require(

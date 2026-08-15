@@ -29,7 +29,7 @@ jobs:
       EXPECTED_CODE_BEARING_HEAD: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
       BASELINE_WORKFLOW_COMMIT: 527369447672a355b6fc0a3f8a4f9c2b39f33b67
       BASELINE_WORKFLOW_BLOB: c382eab394cfbbed9a6fce93331d16fa2b0ecbbc
-      FAILED_RUN_TO_RECOVER: '31888421091'
+      FAILED_RUN_TO_RECOVER: '31888683076'
       BASELINE_RESIDUE_RUN_ID: '31885192604'
       PX_BACKEND_DIR: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy
       PX_BACKEND_FILE: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libproxy/libpxbackend-1.0.so
@@ -86,7 +86,7 @@ jobs:
           bash -n .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
           echo TRACK_A_RUNTIME_DEPENDENCY_FENCES_VERIFIED=true
 
-      - name: Rehydrate proven runtime materializer with bounded launcher HOME scaffold
+      - name: Rehydrate proven materializer with known-good Xvfb profile and bounded launcher HOME
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -131,28 +131,41 @@ jobs:
           import sys
           path, backend = Path(sys.argv[1]), sys.argv[2]
           text = path.read_text(encoding='utf-8')
-          old_tool_lib = '  tool_lib="$td/usr/lib/x86_64-linux-gnu:$td/lib/x86_64-linux-gnu"'
-          new_tool_lib = f'  tool_lib="$td/usr/lib/x86_64-linux-gnu:{backend}:$td/lib/x86_64-linux-gnu"'
-          if text.count(old_tool_lib) != 1:
-              raise SystemExit(f'client support-loader anchor count={text.count(old_tool_lib)}, expected 1')
-          text = text.replace(old_tool_lib, new_tool_lib, 1)
-          old_client_ld = '    PATH="$tool_path" LD_LIBRARY_PATH="$package/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\'
-          new_client_ld = '    PATH="$tool_path" LD_LIBRARY_PATH="$package/bin/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\'
-          if text.count(old_client_ld) != 1:
-              raise SystemExit(f'client bundled-Qt anchor count={text.count(old_client_ld)}, expected 1')
-          text = text.replace(old_client_ld, new_client_ld, 1)
-          old_render = '    LIBGL_DRIVERS_PATH="$dri" QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" VK_DRIVER_FILES="$vk_icd" \\'
-          new_render = '    LIBGL_DRIVERS_PATH="$dri" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \\'
-          if text.count(old_render) != 1:
-              raise SystemExit(f'client render-backend anchor count={text.count(old_render)}, expected 1')
-          text = text.replace(old_render, new_render, 1)
+          def once(old, new, label):
+              global text
+              count=text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label} anchor count={count}, expected 1')
+              text=text.replace(old,new,1)
+          once(
+              '  tool_lib="$td/usr/lib/x86_64-linux-gnu:$td/lib/x86_64-linux-gnu"',
+              f'  tool_lib="$td/usr/lib/x86_64-linux-gnu:{backend}:$td/lib/x86_64-linux-gnu"',
+              'client-support-loader',
+          )
+          once(
+              '    PATH="$tool_path" LD_LIBRARY_PATH="$package/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\',
+              '    PATH="$tool_path" LD_LIBRARY_PATH="$package/bin/lib:$tool_lib" LIBGL_ALWAYS_SOFTWARE=1 \\',
+              'client-bundled-Qt',
+          )
+          once(
+              '    LIBGL_DRIVERS_PATH="$dri" QSG_RHI_BACKEND=vulkan VK_ICD_FILENAMES="$vk_icd" VK_DRIVER_FILES="$vk_icd" \\',
+              '    LIBGL_DRIVERS_PATH="$dri" QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \\',
+              'client-software-backend',
+          )
+          once(
+              '    nohup "$xvfb" "$TRACK_DISPLAY" -screen 0 1280x800x24 \\\n    -xkbdir "$td/usr/share/X11/xkb" +extension GLX +iglx +render -nolisten tcp -noreset \\',
+              '    nohup "$xvfb" "$TRACK_DISPLAY" -screen 0 1920x1080x24 \\\n    -xkbdir "$td/usr/share/X11/xkb" -nolisten tcp -noreset \\',
+              'known-good-xvfb-profile',
+          )
           path.write_text(text, encoding='utf-8')
           PY
           bash -n "$effective"
           grep -Fq "$PX_BACKEND_DIR" "$effective"
           grep -Fq 'LD_LIBRARY_PATH="$package/bin/lib:$tool_lib"' "$effective"
           grep -Fq 'QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none' "$effective"
-          ! grep -Fq 'QSG_RHI_BACKEND=vulkan' "$effective"
+          grep -Fq -- '-screen 0 1920x1080x24' "$effective"
+          ! grep -Fq -- '-screen 0 1280x800x24' "$effective"
+          ! grep -Fq '+extension GLX +iglx +render' "$effective"
 
           scaffold="$RUNNER_TEMP/prepare-track-a-minimal-home.sh"
           cat > "$scaffold" <<'SH'
@@ -170,8 +183,7 @@ jobs:
           [[ "$(stat -c '%s' "$source_meta")" == 2485 ]]
           python3 - "$source_meta" <<'PY'
           import json, re, sys
-          path=sys.argv[1]
-          data=json.load(open(path, encoding='utf-8'))
+          data=json.load(open(sys.argv[1], encoding='utf-8'))
           assert set(data) == {'launcher','packages','hardwaresurvey','hints'}
           forbidden=re.compile(r'(?i)(password|credential|access[_-]?token|refresh[_-]?token|email|cookie|session)')
           def walk(obj):
@@ -204,9 +216,9 @@ jobs:
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER=$effective" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_HOME_SCAFFOLD=$scaffold" >> "$GITHUB_ENV"
           echo "TRACK_A_RUNTIME_EFFECTIVE_HELPER_SHA256=$(sha256sum "$effective" | awk '{print $1}')"
-          echo TRACK_A_RUNTIME_MINIMAL_HOME_SCAFFOLD_MATERIALIZED=true
+          echo TRACK_A_RUNTIME_KNOWN_GOOD_XVFB_PROFILE_MATERIALIZED=true
 
-      - name: Recover only exact task-owned residue from run 21
+      - name: Recover only exact task-owned residue from run 22
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -374,6 +386,7 @@ jobs:
             echo "bundled_qt_precedence=true"
             echo "software_backend=true"
             echo "minimal_launcher_home=true"
+            echo "known_good_xvfb_profile=true"
             if [[ -n "${TRACK_A_RUNTIME_EFFECTIVE_HELPER:-}" && -r "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" ]]; then
               echo "effective_helper_sha256=$(sha256sum "$TRACK_A_RUNTIME_EFFECTIVE_HELPER" | awk '{print $1}')"
             fi

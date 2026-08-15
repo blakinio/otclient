@@ -1,6 +1,6 @@
 # OTClient Module and System Catalogue
 
-Last reviewed: 2026-08-04
+Last reviewed: 2026-08-15
 
 This catalogue makes reusable work visible across the greenfield Rust client and existing OTClient. Verify source, manifests, tasks, tests and open PR state before use.
 
@@ -60,6 +60,12 @@ Detailed maintenance boundaries are in `docs/architecture/LEGACY_OTCLIENT_ARCHIT
 | TestEnvironment/fakes | maintained legacy | Deterministic lifecycle and substitutes for global resources/game state | `tests/support/test_environment/**`, `tests/support/mocks/**` | Prefer over another legacy global mocking layer. Rust gets independent typed fakes. |
 | Lua runner/stubs | maintained legacy | Named assertions, deterministic failure and minimal globals | `tests/lua/helpers/**` | Add focused legacy tests to the existing runner/contracts. |
 | Protocol loopback | maintained legacy | Bounded local socket integration for framed packets | `tests/integration/protocol/loopback_packet_test.cpp` | Extend for legacy regressions. Does not prove Rust adapter compatibility. |
+
+## Official-client Track A research tooling
+
+| Tool/system | Status | Responsibility/public surface | Source/docs | Reuse/safety notes |
+|---|---|---|---|---|
+| Canonical live controller lease manager | PR #312; coordinator `ACCEPT_WITH_EDITS` promotion | Cooperative same-UID authority fence for sequential control of a future canonical Track A live runtime: serialized acquire/renew/validate/release/status, explicit stale takeover with generation fencing, and lock-held `guard-run` | `.github/scripts/tibia-official-client-re-canonical-live-lease*`, `.github/workflows/tibia-official-client-re-canonical-live-lease.yml`, `docs/agents/evidence/OTC-20260815-track-a-live-runtime-lease-manager/**` | Production authority is fixed at `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime`; task tokens are confined under task state. It does **not** discover/register the Tibia PID/session/display, does not make `:98` canonical, and is not a hostile-local-user security boundary. PR #311 must separately govern/enable canonical-live reuse after this tool reaches `main`. |
 
 ## Current governance work
 

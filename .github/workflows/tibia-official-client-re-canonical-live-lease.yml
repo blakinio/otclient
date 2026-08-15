@@ -1,0 +1,34 @@
+name: Track A canonical live controller lease
+
+on:
+  push:
+    branches: [feat/OTC-20260815-track-a-live-runtime-lease-manager]
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-lease
+      - .github/scripts/tibia-official-client-re-canonical-live-lease.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_lease_selfhosted.sh
+      - .github/workflows/tibia-official-client-re-canonical-live-lease.yml
+      - docs/agents/tasks/active/OTC-20260815-track-a-live-runtime-lease-manager.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run deterministic lease tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+
+  isolated-selfhosted:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise lease transitions in task-owned state only
+        shell: bash
+        run: bash .github/scripts/test_tibia_official_client_re_canonical_live_lease_selfhosted.sh

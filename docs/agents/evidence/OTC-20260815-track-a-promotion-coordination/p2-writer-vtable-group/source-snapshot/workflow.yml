@@ -1,0 +1,93 @@
+name: Track A P2 writer vtable-group identity
+
+on:
+  push:
+    branches:
+      - research/OTC-20260815-track-a-p2-writer-vtable-group
+    paths:
+      - .github/workflows/tibia-official-client-re-p2-writer-vtable-group.yml
+      - .github/scripts/tibia-official-client-re-p2-writer-vtable-group.py
+      - docs/agents/evidence/OTC-20260815-track-a-p2-writer-vtable-group/**
+      - docs/agents/tasks/active/OTC-20260815-track-a-p2-writer-vtable-group.md
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  classify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      RTTI_ARTIFACT_ID: '9231716774'
+      RTTI_ARTIFACT_SHA256: d99919403c001fbcc2a959346443c405f8a2234fb81438fbc6a626a1833edb82
+      PROV_ARTIFACT_ID: '9229609330'
+      PROV_ARTIFACT_SHA256: bc5604ffbcf7e75a6b00dad227aefaa0036ea4792efb61ce85de488b6877782c
+      FAMILY_ARTIFACT_ID: '9229251044'
+      FAMILY_ARTIFACT_SHA256: 4b914f65d4a4eb3c91a39ce9918e8e4f865fadcf4853ab4af25ffa5d5f519520
+    steps:
+      - name: Checkout exact Draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Validate task context and parser
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$GITHUB_REF_NAME" == research/OTC-20260815-track-a-p2-writer-vtable-group ]]
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-writer-vtable-group.py
+          echo "TRACK_A_P2_VTABLE_EXACT_HEAD=$GITHUB_SHA"
+
+      - name: Fetch exact reviewed text artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p artifacts/source/rtti artifacts/source/prov artifacts/source/family
+          fetch_artifact() {
+            local id="$1" sha="$2" out="$3"
+            curl --fail-with-body --location --silent --show-error \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" \
+              -o "$out"
+            echo "$sha  $out" | sha256sum -c -
+          }
+          fetch_artifact "$RTTI_ARTIFACT_ID" "$RTTI_ARTIFACT_SHA256" artifacts/source/rtti.zip
+          fetch_artifact "$PROV_ARTIFACT_ID" "$PROV_ARTIFACT_SHA256" artifacts/source/prov.zip
+          fetch_artifact "$FAMILY_ARTIFACT_ID" "$FAMILY_ARTIFACT_SHA256" artifacts/source/family.zip
+          unzip -q artifacts/source/rtti.zip -d artifacts/source/rtti
+          unzip -q artifacts/source/prov.zip -d artifacts/source/prov
+          unzip -q artifacts/source/family.zip -d artifacts/source/family
+          test -s artifacts/source/rtti/track-a-tcp-member-rtti.txt
+          test -s artifacts/source/prov/track-a-gameserver-tcp-writer-provenance.txt
+          test -s artifacts/source/family/track-a-network-writer-vtable-census.txt
+          echo TRACK_A_P2_VTABLE_SOURCE_ARTIFACTS_VERIFIED=true
+
+      - name: Classify intermediate vtable identity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p artifacts/p2-vtable-group
+          python3 .github/scripts/tibia-official-client-re-p2-writer-vtable-group.py \
+            --rtti-artifact artifacts/source/rtti/track-a-tcp-member-rtti.txt \
+            --provenance-artifact artifacts/source/prov/track-a-gameserver-tcp-writer-provenance.txt \
+            --writer-family-artifact artifacts/source/family/track-a-network-writer-vtable-census.txt \
+            --output artifacts/p2-vtable-group/result.json \
+            | tee artifacts/p2-vtable-group/validation.log
+          grep -Fxq 'P2_VTABLE_GROUP_COMPLETE=true' artifacts/p2-vtable-group/validation.log
+          grep -Fxq 'P2_VTABLE_GROUP_RESULT=PROVEN_DISTINCT_ADJACENT_ITANIUM_VTABLE_IDENTITY_NAME_UNKNOWN' artifacts/p2-vtable-group/validation.log
+          grep -Fxq 'P2_FIRST_WRITER_TRANSFORM_BOUNDARY=UNKNOWN' artifacts/p2-vtable-group/validation.log
+
+      - name: Upload sanitized result only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-writer-vtable-group-${{ github.run_id }}
+          path: artifacts/p2-vtable-group/**
+          retention-days: 7
+          if-no-files-found: error

@@ -1,0 +1,41 @@
+{
+  "classification": {
+    "0x3084c70_relation_to_canonical_writer_branch": "UNKNOWN_SEPARATE_LEAD",
+    "0x7de7f0_0x7dfd60_role": "INFERENCE_TEARDOWN_LIKE",
+    "final_binary_egress": "UNKNOWN",
+    "first_writer_transform_boundary": "UNKNOWN",
+    "framing_order": "UNKNOWN",
+    "pr301_intermediate_object_identity": "DISTINCT_TYPED_OBJECT_NAME_UNKNOWN",
+    "rtti_0x3080748_base_relationship": "UNKNOWN",
+    "rtti_0x3080748_name": "UNKNOWN",
+    "simple_secondary_vtable_of_tprotocolwriter": "DISPROVEN_BY_DISTINCT_TYPEINFO_AND_SEPARATE_OBJECT"
+  },
+  "exact_client_sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+  "facts": {
+    "first_functions": [
+      "0x7de7f0",
+      "0x7dfd60"
+    ],
+    "historical_0x3084c70_family_separate": true,
+    "intermediate_object_vptr": "0x2f69e30",
+    "intermediate_offset_to_top": 0,
+    "intermediate_typeinfo": "0x3080748",
+    "intermediate_typeinfo_differs_from_tiodevicewriter": true,
+    "intermediate_typeinfo_differs_from_tprotocolwriter": true,
+    "separate_allocated_object_receives_vptr": true
+  },
+  "semantic_result": "PROVEN_DISTINCT_ADJACENT_ITANIUM_VTABLE_IDENTITY_NAME_UNKNOWN",
+  "source": {
+    "executed_head": "c479f58a1b45d6a4a2d4063d07ea83057532b8f7",
+    "provenance_artifact_id": 9229609330,
+    "provenance_artifact_zip_sha256": "bc5604ffbcf7e75a6b00dad227aefaa0036ea4792efb61ce85de488b6877782c",
+    "rtti_artifact_id": 9231716774,
+    "rtti_artifact_zip_sha256": "d99919403c001fbcc2a959346443c405f8a2234fb81438fbc6a626a1833edb82",
+    "sanitized_result_artifact_id": 9246799418,
+    "sanitized_result_artifact_zip_sha256": "d0bf06e8c973f351fe96037445de0586f30e5044f5d1a097bfc866b85c0df48f",
+    "successful_job": 95010894063,
+    "successful_run": 31884166982,
+    "writer_family_artifact_id": 9229251044,
+    "writer_family_artifact_zip_sha256": "4b914f65d4a4eb3c91a39ce9918e8e4f865fadcf4853ab4af25ffa5d5f519520"
+  }
+}

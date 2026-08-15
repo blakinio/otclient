@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: waiting
-agent: unassigned
-session_id: null
+status: active
+agent: ChatGPT
+session_id: chatgpt-track-a-coordinator-20260815-2106
 session_role: coordinator
-session_rotation_count: 8
+session_rotation_count: 9
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -16,8 +16,8 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T17:53:00+02:00
-lease_released_at: 2026-08-15T17:53:00+02:00
+updated: 2026-08-15T21:12:00+02:00
+lease_expires_at: 2026-08-15T21:57:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,49 +47,33 @@ user_communication: low_noise
 context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
-last_progress_at: 2026-08-15T17:53:00+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: p2-serialization-promotion-and-dispatch
-terminal_ci_wait_started_at: 2026-08-15T17:51:00+02:00
-terminal_ci_checks_for_current_generation: 2
+invocation_started_at: 2026-08-15T21:06:00+02:00
+last_progress_at: 2026-08-15T21:12:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: coordinator-rotation-9
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-stop_reason: coordinator exact-head CI run 31893876568 remains in flight after the two bounded checks allowed for this head; source promotion and next-lane dispatch are durable, so ownership is released rather than polling or colliding with independent researchers
-last_verified_integration_head: da96c97b91c236be6f97e4edf80214f77b4b2492
-last_verified_integration_ci_run: 31893397505
+stop_reason: null
+last_verified_integration_head: ce933e8fe28ea61669da28ffcc10cf21675a62b0
+last_verified_integration_ci_run: 31893876568
 last_verified_integration_ci_state: success
-pending_integration_head: ce933e8fe28ea61669da28ffcc10cf21675a62b0
-pending_integration_ci_run: 31893876568
-pending_integration_ci_observed:
-  detect_build_scope: success
-  lua_syntax: success
-  yamllint: success
-  actionlint: in_progress
-  informational_static_analysis: in_progress
-  ci_required: not_yet_terminal
-last_promotion:
-  source_pr: 306
-  disposition: ACCEPT_WITH_EDITS
-  source_head: c13e6d8946d1407c880a07d76fcfd5f4bf07c80b
-  source_final_static_run: 31893391887
-  source_final_ci_run: 31893395016
-  source_final_artifact: 9249137864
-  source_final_artifact_digest: sha256:c80014c2cc9b3db5b3406540e7d6d4efeef0301f63fd5858379614179b59398d
-  semantic_result: SERIALIZATION_ONLY_PROVEN
-next_research_dispatch:
-  task_id: OTC-20260815-track-a-p2-post-serialization-buffer-boundary
-  pr: 308
-  branch: research/OTC-20260815-track-a-p2-post-serialization-buffer-boundary
-  state: ready_unassigned
-  base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
+pending_integration_head: faf7787d1b2aa93aa350a4954634c133f120e285
+pending_integration_ci_run: unknown
+active_operation:
+  - review PR 307 exact-head loader/support-state evidence
+  - review PR 308 when its released semantic run becomes terminal
+  - classify PR 303 run 31893122418 as bounded negative Xvfb-cwd evidence without mutating its stale worker branch
+next_action: finish reviewable PR 307 and PR 308 evidence on their exact heads, promote only bounded accepted facts into coordinator-owned evidence, and keep PR 303 read-only unless stale-takeover preflight proves no active writer or run
 ---
 
 # Objective
 
-Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Research branches remain Draft-only; coordinator promotion is bounded by independently reviewed evidence. Track B remains outside mutation authority.
+Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Researchers remain Draft-only. This coordinator is the promotion/integration authority subject to repository governance. Track B remains outside mutation authority.
 
 # Exact client fence
 
@@ -100,7 +84,7 @@ sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 platform: official_native_linux_only
 ```
 
-# Promotion ledger
+# Promoted bounded state
 
 ## ACCEPT
 - #283 bounded read-only runtime bridge; live authority/session epoch remains UNKNOWN.
@@ -108,20 +92,21 @@ platform: official_native_linux_only
 
 ## ACCEPT_WITH_EDITS
 - #279 fail-closed worldmap reconstruction tooling; real capture/mappings/complete OTBM remain UNKNOWN.
-- #290 bounded historical login/recovery procedure retained only as revalidation input.
-- #304 bounded quantitative coverage baseline; source Draft closed unmerged.
-- #301 bounded P2 writer-retention evidence; source Draft closed unmerged.
-- #305 bounded P2 intermediate-vtable/type correction; source Draft closed unmerged.
-- #302 bounded static P0 slice; direct authoritative XYZ remains UNKNOWN.
-- #306 bounded first concrete retained-writer serialization evidence. Source Draft closed unmerged after promotion. Final source static run `31893391887` SUCCESS, final source CI `31893395016` SUCCESS, review threads 0, final artifact `9249137864` digest `sha256:c80014c2cc9b3db5b3406540e7d6d4efeef0301f63fd5858379614179b59398d`. Promoted FACT: processor retains intermediate AP `0x2f69e30` / RTTI `0x3080748`; intermediate retains TProtocolWriter AP `0x2f69dd0` / RTTI `0x3080728`; `+0x10 -> 0xc10960` performs retained-writer QDataStream signed-byte serialization of a message-derived value; `+0x18 -> 0xc20290` serializes structured fields `+0x30/+0x34` as signed-short values; adjacent `+0x20 -> 0xc20c70` constructs QBuffer. Coordinator edit: "first" is local to the first concrete non-lifecycle slot demonstrated in this vtable, not global temporal order. Canonical evidence: `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/p2-first-serialization-boundary/`.
+- #290 historical login/recovery procedure retained only as revalidation input.
+- #304 quantitative coverage baseline; source Draft closed unmerged.
+- #301 retained TProtocolWriter branch; source Draft closed unmerged.
+- #305 intermediate-vtable/type correction; source Draft closed unmerged.
+- #302 bounded static P0 facts only; direct authoritative XYZ remains UNKNOWN.
+- #306 retained intermediate -> TProtocolWriter QDataStream serialization evidence; source Draft closed unmerged. `0xc10960` and `0xc20290` prove serialization on the retained writer branch; adjacent `0xc20c70` constructs QBuffer, but relation/order remains UNKNOWN.
 
-## ACTIVE / READY / WAITING RESEARCH
-- #303 RUNTIME remains independently active under `chatgpt-runtime-researcher-20260815-1730`; coordinator must not mutate it. Current lane is bounded to Xvfb cwd provenance on task display `:115`. Restart/relogin remains UNKNOWN.
-- #302 P0 remains waiting on a bounded exact-client in-game process window from RUNTIME; direct authoritative XYZ remains UNKNOWN.
-- #308 P2 post-serialization buffer boundary is open Draft, mergeable, `ready/unassigned`, exact main base. It must trace real QDataStream-to-QBuffer/byte-container state/data flow and may not infer temporal order from vtable adjacency.
+# Rotation 9 live reconciliation
 
-## RETURN_FOR_EVIDENCE
-- #295 remains blocked by four material review threads plus overlapping/stale Track B ownership lifecycle and is outside safe Track A mutation authority.
+- `main` remains `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
+- Prior coordinator CI run `31893876568` on `ce933e8fe28ea61669da28ffcc10cf21675a62b0` is now terminal `SUCCESS`; that head is promoted to the last verified integration generation. PR #300 has since advanced to `faf7787d1b2aa93aa350a4954634c133f120e285`, so the prior run is not final-head CI for the current PR.
+- #307 is a released/ready Draft with exact-head CI `31894342104` SUCCESS. Its bounded negative facts are reviewable: current bundled-Qt loader resolves; reverting blindly to historical literal loader is disproven; qxcb/GLX plugin dependency bytes/chains are present/resolvable. Metadata-only canonical HOME support-state found `.cache/CipSoft GmbH` with four files/6937 aggregate bytes but did not read payloads; causality/sensitivity remain UNKNOWN.
+- #308 released its worker lease as `waiting` after two ordinary observations of semantic run `31903141897`; coordinator may inspect that run once terminal and review the resulting artifact without taking the researcher branch.
+- #303 run `31893122418` terminally reproduced historical patched-Xvfb cwd on task-owned `:115` but still failed before login with `client_gen_1_window_missing`; cleanup passed. This disproves Xvfb cwd as the missing isolated cause. The #303 task record still carries an old active lease and must not be mutated until stale-takeover rules are satisfied.
+- #302 remains waiting on a bounded live exact-client in-game observation window; direct player XYZ remains `UNKNOWN/INCONCLUSIVE`.
 
 # Canonical non-completion boundary
 
@@ -133,10 +118,6 @@ RUNTIME: PARTIAL_historical_single_generation_world_evidence_restart_relogin_unk
 ACTION: A3_A4_NOT_PROVEN
 COMPLETE: false
 ```
-
-# Explicit P2 UNKNOWN boundary
-
-Still UNKNOWN: temporal first operation in complete outbound pipeline; QBuffer temporal/data-flow relation; framing; sequence; compression; encryption; final binary egress/socket ownership; causal local harness. Direct DualConnection writer ownership remains NOT_PROVEN.
 
 # Quantitative baseline
 
@@ -156,27 +137,12 @@ p1_overall_field_evidence_coverage: UNKNOWN/UNKNOWN
 restart_relogin_stability: UNKNOWN/1
 ```
 
-# Rotation-8 completed work
-
-- [x] independently reviewed final #306 source/result/report/reproducer/final artifact;
-- [x] classified #306 `ACCEPT_WITH_EDITS` and promoted bounded evidence;
-- [x] closed #306 unmerged after promotion;
-- [x] updated #300 PR body to the true current capability boundary;
-- [x] dispatched independent Draft #308 from exact main and left it `ready/unassigned`;
-- [x] #300 review threads rechecked: zero;
-- [ ] exact-head CI `31893876568` on `ce933e8fe28ea61669da28ffcc10cf21675a62b0` remains in flight at lease release.
-
 # Remaining programme gates
 
-- [ ] finish coordinator exact-head CI classification when run `31893876568` becomes terminal;
-- [ ] independently execute/review #308 and continue P2 toward buffer/framing/pipeline order/final egress/harness;
-- [ ] reconcile #303 when its researcher releases a reviewable RUNTIME handoff;
-- [ ] direct P0 authoritative reads and P1 live authority/restart stability;
-- [ ] A3/A4 action parity;
-- [ ] semantic protocol/QMeta coverage and finite P0/P1 denominators;
-- [ ] #295/#291 ownership lifecycle terminal reconciliation;
-- [ ] final programme audit/E2E/exact-head CI/PR hygiene/archive/ownership release.
-
-# Next action
-
-On a fresh coordinator rotation, first read run `31893876568` exactly. If green, mark `ce933e8fe28ea61669da28ffcc10cf21675a62b0` as the verified integration generation. Do not duplicate #308 or #303 work. Reacquire coordinator later when #303 or #308 publishes a reviewable handoff. If CI fails, repair only the exact defect without altering accepted semantic claims.
+- finish P2 QDataStream -> buffer/framing/pipeline-order/final-egress/harness evidence;
+- recover live RUNTIME restart/relogin and provide a bounded P0/P1 observation window;
+- prove direct P0 reads and live P1 authority/restart stability;
+- prove A3/A4 action parity where required;
+- close semantic protocol/QMeta coverage and finite P0/P1 denominators;
+- reconcile #295/#291 ownership lifecycle without Track B contamination;
+- perform final programme audit/E2E/exact-head CI/PR hygiene/archive/ownership release.

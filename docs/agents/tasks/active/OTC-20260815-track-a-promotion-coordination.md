@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: waiting
-agent: unassigned
-session_id: null
+status: active
+agent: ChatGPT
+session_id: chatgpt-track-a-coordinator-20260815-2122
 session_role: coordinator
-session_rotation_count: 9
+session_rotation_count: 10
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -16,8 +16,8 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T21:20:00+02:00
-lease_released_at: 2026-08-15T21:20:00+02:00
+updated: 2026-08-15T21:22:00+02:00
+lease_expires_at: 2026-08-15T22:07:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -40,20 +40,19 @@ run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
-last_progress_at: 2026-08-15T21:20:00+02:00
+invocation_started_at: 2026-08-15T21:06:00+02:00
+last_progress_at: 2026-08-15T21:22:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: coordinator-rotation-9-loader-promotion
+ci_check_generation: coordinator-rotation-10-ownership-audit
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-stop_reason: serial programme rotation into released P2 task #308; coordinator ownership deliberately released before researcher mutation
+stop_reason: null
 last_verified_integration_head: ce933e8fe28ea61669da28ffcc10cf21675a62b0
 last_verified_integration_ci_run: 31893876568
 last_verified_integration_ci_state: success
-pending_integration_head: a0b79c17d802bf4a26be0e178e4f08bb5aefff4f
-pending_integration_ci_run: not_checked_yet
 last_promotion:
   source_pr: 307
   disposition: ACCEPT_WITH_EDITS
@@ -62,21 +61,31 @@ last_promotion:
   source_exact_head_ci_state: success
   source_pr_state: closed_unmerged
   canonical_evidence: docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/runtime-loader-diagnostic/20260815-pr307-disposition.md
-next_action: after P2 #308 completes its released worker handoff, reacquire coordinator, review/promote only the bounded QBuffer/QDataStream facts, then reconcile stale RUNTIME #303 using the promoted #307 next discriminator
+active_operation:
+  - persist PR 295 / PR 291 ownership-lifecycle blocker without mutating either overlapping contract task
+  - inspect released results from active PR 308 and PR 303 only after material progress, without polling loops
+next_action: record #295/#291 lifecycle defect under coordinator-owned evidence; then re-evaluate active P2/RUNTIME lanes once after other progress and promote only released evidence
 ---
 
 # Objective
 
 Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Research branches remain Draft-only; coordinator owns promotion. Track B remains outside mutation authority.
 
-# Rotation-9 durable progress
+# Durable programme state
 
-- `main` preflight remained `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
-- Prior coordinator CI `31893876568` on `ce933e8fe28ea61669da28ffcc10cf21675a62b0` is terminal `SUCCESS` and is the last verified coordinator integration generation.
-- PR #307 was independently reviewed from workflow source and raw logs, classified `ACCEPT_WITH_EDITS`, promoted into coordinator-owned evidence, and closed unmerged. Promoted facts: current exact-client bundled-Qt/libproxy/toolroot dependency graph resolves; literal historical loader replay is not a current positive oracle; qxcb and xcb-GLX plugin files/chains resolve. Persistent HOME `.cache/CipSoft GmbH` remains metadata-only `UNKNOWN`, with no payload read/copy authorization.
-- PR #303 run `31893122418` reproduced the historical patched-Xvfb cwd on isolated task-owned `:115` but still failed before login with `client_gen_1_window_missing`; cleanup succeeded. Xvfb cwd is therefore rejected as an isolated cause. #303 remains read-only until stale takeover is revalidated.
-- PR #308 semantic run `31903141897` on code-bearing head `5d7f4bb1aadc782f9bc69b1e292577d88fe0c4a2` and code-bearing CI `31903144036` are `SUCCESS`. Artifact `9251635451`, digest `sha256:118810016d53f5bc234f6216b1d2f45876422041d7539b32a942a285317c6c32`, independently shows a QBuffer allocation and direct QBuffer-as-QIODevice binding into a local QDataStream before local serialization. Source task is still waiting/unassigned and requires its own artifact classification/final handoff before coordinator promotion.
-- PR #302 still has no bounded live exact-client in-game observation window; direct player XYZ remains `UNKNOWN/INCONCLUSIVE`.
+- `main` invocation preflight: `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
+- Last verified coordinator integration generation: `ce933e8fe28ea61669da28ffcc10cf21675a62b0`, CI `31893876568` SUCCESS.
+- #307: `ACCEPT_WITH_EDITS`, promoted, source Draft closed unmerged. Current loader/plugin dependency resolution is not the demonstrated RUNTIME blocker; canonical HOME cache remains metadata-only `UNKNOWN` and must not be copied/read as a shortcut.
+- #308: independently active researcher rotation 2 is strengthening the successful `BUFFER_DATAFLOW_PROVEN` artifact with persistent retained-writer provenance; coordinator does not mutate it while owned.
+- #303: independently active researcher rotation 6. Run #30 adds sanitized `QT_DEBUG_PLUGINS=1`; coordinator does not mutate it while owned.
+- #302: waiting on a bounded live exact-client in-game process; direct player XYZ remains `UNKNOWN/INCONCLUSIVE`.
+
+# #295 / #291 lifecycle audit
+
+- #295 remains open, non-Draft and has four unresolved material review threads: duplicate contract ownership, missing separate-authorization qualification for Atlas consumption, weakened raw-packet prohibition, and dropped non-negative integer constraint for `producer.protocol_version`.
+- #291 is already merged as `005158b5b9bf25fe77bd5fc10813a6388a072836`, but `docs/agents/tasks/active/OTC-20260813-map-observation-export.md` remains on `main` with `status: blocked` and still declares ownership of `docs/agents/contracts/MAP_OBSERVATION_V1.md`.
+- #295's correction task also declares that contract. Therefore the overlap is real even though #291 is merged. Coordinator must not edit the contract through #295 until the stale merged-task lifecycle is formally archived/superseded under a correctly owned task.
+- Current disposition stays `RETURN_FOR_EVIDENCE / OWNERSHIP_LIFECYCLE_BLOCKED`; no Track B mutation or external Oteryn dependency is authorized.
 
 # Canonical non-completion boundary
 
@@ -96,5 +105,5 @@ COMPLETE: false
 - prove direct P0 reads and live P1 authority/restart stability;
 - prove A3/A4 action parity where required;
 - close semantic protocol/QMeta coverage and finite P0/P1 denominators;
-- reconcile #295/#291 ownership lifecycle without Track B contamination;
+- repair #295/#291 ownership lifecycle before contract mutation;
 - final audit/E2E/exact-head CI/PR hygiene/archive/ownership release.

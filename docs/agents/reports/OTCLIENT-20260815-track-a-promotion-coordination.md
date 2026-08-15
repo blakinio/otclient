@@ -29,7 +29,28 @@ Merged PR #299 establishes for the exact build:
 - `TGameserverTCPConnection` QMeta/type/RTTI ownership;
 - concrete `QTcpSocket*` member construction at receiver `+0x10`;
 - `TProtocolWriter : TIODeviceWriter` RTTI relationship;
-- corrected outbound chain reaches `TGameserverDualConnection`.
+- corrected processing graph `TProtocolClientMessageProcessor -> TGameserverNetworkPacketRawDataProcessor -> TGameserverDualConnection`;
+- outer retained fields `+0xa00/+0xa08` -> `TProtocolClientMessageProcessor`, `+0xa10/+0xa18` -> raw-data processor, `+0xc18/+0xc20` -> `TGameserverDualConnection`.
+
+Accepted PR #301 adds one bounded retention fact for the same exact build:
+
+```text
+TProtocolClientMessageProcessor
+ -> retained intermediate object (exact class UNKNOWN)
+ -> retained shared TProtocolWriter
+```
+
+The same setup FDE constructs/retains `TGameserverDualConnection` separately at outer `+0xc18/+0xc20`.
+
+### INFERENCE
+
+Combining the accepted retention fact with the independently accepted processing graph supports:
+
+```text
+writer_location_relative_to_dualconnection = UPSTREAM_ON_TPROTOCOLCLIENTMESSAGEPROCESSOR_BRANCH
+```
+
+This is graph-relative inference, not proof of a direct `TGameserverDualConnection -> TProtocolWriter` member.
 
 ### DISPROVEN / SUPERSEDED
 
@@ -40,13 +61,15 @@ Do not revive without direct contradictory proof:
 - `0xc33259` as network/gameplay binary sink;
 - stale `TProtocolWriter` RTTI `0x3080700`.
 
-### UNKNOWN
+### NOT_PROVEN / UNKNOWN
 
-- concrete `TGameserverDualConnection -> actual writer` ownership/reference/dispatch edge;
-- gameplay serialization/framing order;
-- compression/encryption/sequence transformation boundary;
-- final binary socket/QIODevice egress;
-- causal controlled/local harness proof.
+- direct `TGameserverDualConnection -> TProtocolWriter` member/reference: NOT_PROVEN;
+- exact class identity of intermediate vptr `0x2f69e30`: UNKNOWN;
+- gameplay serialization/framing order: UNKNOWN;
+- compression/encryption/sequence transformation boundary: UNKNOWN;
+- final binary socket/QIODevice egress: UNKNOWN;
+- causal controlled/local harness proof: UNKNOWN;
+- relationship of historical `0x3084c70 -> +0xd0 -> 0xb40630` writer-family lead to canonical `TProtocolWriter`: UNKNOWN.
 
 ## Promotion dispositions
 
@@ -81,32 +104,16 @@ Source PR was closed unmerged at `04356aa9c042ce19d9d8431b91f18567e410a5e5`. The
 
 **PR #290 — historical login/session recovery procedure.**
 
-Only the corrected historical native-Linux procedure is retained as `REVALIDATION_REQUIRED` at `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/accepted-historical-login-procedure.md`. OCR is limited to historical character-selection bootstrap; it is not world-semantic evidence. Current login/restart stability requires fresh runtime proof.
+Only the corrected historical native-Linux procedure is retained as `REVALIDATION_REQUIRED` at `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/accepted-historical-login-procedure.md`. Coordinator evidence `20260815-login-update-revalidation.md` further corrects the stale assumption that a newer child binary is currently required: exact fenced client reconstruction and later live-world evidence used the same SHA. Current login/restart stability still requires fresh runtime proof.
 
 **PR #304 — item-level quantitative coverage baseline.**
 
-Reviewed exact Draft head: `43a60bd96cc644b656b200c9edbfb75578b330b6`. Exact-head CI run `31882010038` completed `SUCCESS`, changed paths are task-owned, and there are no unresolved inline review threads.
-
-Coordinator independently checked the load-bearing exact-build source evidence:
-
-- protocol-surface run `31787489302` / job `94726575137` on `synology-otclient-01` rechecked the exact client SHA and emitted the full `189` inbound + `160` outbound identifier inventory plus the independent `47` handler literal census;
-- QMeta census run `31790619327` / job `94736463933` recovered all `47` protocol-handler QMeta records under the relocation-backed structural gate;
-- Qt callsite census run `31799755489` / job `94764705414` counted `2078` direct `connectImpl`, `41` legacy connect and `65` disconnectImpl callsites = `2184`, while explicitly leaving semantic ownership UNKNOWN.
-
-The reviewed registry validator enforces record-ID uniqueness, allowed classifications, registered provenance references, message-list decode/hash/count/uniqueness, selected-set denominators, percentage arithmetic and retained `DISPROVEN/SUPERSEDED` evidence. Its boundary is internal registry integrity; it does not cryptographically regenerate every compressed record from every historical source log.
-
-The exact accepted source blobs are copied unchanged under:
-
-`docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/coverage-audit/source-snapshot/`
-
-with the coordinator promotion boundary at:
-
-`docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/coverage-audit/PROMOTION_BOUNDARY.md`
+Reviewed exact Draft head `43a60bd96cc644b656b200c9edbfb75578b330b6`; exact-head CI `31882010038` completed `SUCCESS`. Exact accepted source blobs are copied under coordinator evidence at `coverage-audit/source-snapshot/`, with a separate promotion boundary. Inventory completeness is not semantic completion.
 
 Accepted quantitative baseline:
 
 ```yaml
-protocol_identifier_inventory: 349/349          # 189 inbound + 160 outbound; inventory only
+protocol_identifier_inventory: 349/349          # inventory only
 protocol_direct_qmeta_links: 27/349
 generated_message_semantic_support: UNKNOWN/349
 protocol_handler_qmeta_records: 47/47
@@ -122,7 +129,40 @@ p2_chain_closure: UNKNOWN/5
 restart_relogin_stability: UNKNOWN/1
 ```
 
-None of the 100% inventory rows is programme-semantic completion.
+**PR #301 — P2 writer retention provenance.**
+
+Reviewed exact final Draft head: `50e2d95c7dc8b0759eb6233a3751f73434958e88`.
+
+Validation:
+
+- source semantic run `31883231486` / job `95008610322` = SUCCESS;
+- final source provenance run `31883456870` = SUCCESS;
+- final required PR CI `31883459362` = SUCCESS;
+- changed paths confined to declared research roots;
+- unresolved review threads: `0`;
+- reviewed historical source artifact `9229609330` is verified by ZIP SHA-256 `bc5604ffbcf7e75a6b00dad227aefaa0036ea4792efb61ce85de488b6877782c` before the discriminator runs.
+
+Promoted boundary:
+
+```yaml
+TProtocolClientMessageProcessor_retains_writer_branch: FACT
+writer_intermediate_class: UNKNOWN
+writer_relative_to_DualConnection: INFERENCE_UPSTREAM_ON_CLIENT_PROCESSOR_BRANCH
+direct_DualConnection_writer_member: NOT_PROVEN
+framing_order: UNKNOWN
+transform_boundary: UNKNOWN
+final_binary_egress: UNKNOWN
+causal_local_harness: UNKNOWN
+P2_complete: false
+```
+
+Exact reviewed evidence/result/reproducer/workflow blobs are copied unchanged under:
+
+`docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/p2-writer-ownership/source-snapshot/`
+
+with the coordinator boundary at:
+
+`docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/p2-writer-ownership/PROMOTION_BOUNDARY.md`.
 
 ### RETURN_FOR_EVIDENCE
 
@@ -130,17 +170,15 @@ None of the 100% inventory rows is programme-semantic completion.
 
 Still not promotable: material unresolved review findings and Track B ownership collision remain.
 
-**PR #301 — P2 writer ownership.**
-
-Current reviewed head `29ca506501efc716330a80ab2b96eaf9bbe3d4d5` contains only the approved dispatch/task contract. No evidence report, reproducer or executed hypothesis exists yet. Required next evidence is the exact-client `TGameserverDualConnection -> TProtocolWriter/TIODeviceWriter` ownership/dispatch discriminator without reviving superseded sink models.
+### LIVE REVALIDATION REQUIRED
 
 **PR #302 — direct player position.**
 
-Current reviewed head `e45b126923495b209c08a77e9a3db96b44ad71a4` contains a bounded read-only typed `TPlayerData` probe, but material runtime run `31880617510` / job `95002559098` remains queued on the serialized self-hosted lane. No direct-position semantic result exists.
+The previous statement that run `31880617510` remained queued is stale: that run is now cancelled and #302 advanced to at least `ab22e9c495daea050f45e90b3e38b78062539d59`. Coordinator must refetch the current exact task/head/runs before assigning a new disposition. No newer P0 semantic result is promoted by this report yet.
 
 **PR #303 — restart/relogin reacquisition.**
 
-Runtime semantic execution remains blocked behind #302. During the current campaign rotation, #303 was additionally hardened fail-closed so a surviving task-owned GDB observer prevents task-root deletion. Code-bearing safety-repair head: `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`; task checkpoint head after durable evidence update: `2b6350abeb4de37180247c585b90bd1e4c0a9d0f`. This is cleanup safety evidence only, not restart/relogin semantic proof.
+Earlier live semantic execution had not run. #303 includes fail-closed observer-cleanup hardening (`4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`) and durable evidence, but that is safety evidence only. Because the P0 serialized-lane state changed, current #303 runtime state must be re-fetched before retaining the old blocker classification.
 
 ### REJECT / SUPERSEDE
 
@@ -153,27 +191,25 @@ Runtime semantic execution remains blocked behind #302. During the current campa
 
 ```yaml
 P2_NETWORK:
-  pr: 301
-  disposition: RETURN_FOR_EVIDENCE / DISPATCH_READY
-  semantic_result: none
+  source_pr: 301
+  disposition: ACCEPT_WITH_EDITS
+  retention_fact: accepted
+  completion: partial
+  remaining: framing_transform_order_final_binary_egress_causal_harness
 P0_STATE:
   pr: 302
-  disposition: RETURN_FOR_EVIDENCE
-  blocker: run 31880617510 / job 95002559098 queued
+  disposition: REVALIDATION_REQUIRED
+  old_queued_blocker: stale
 P1_BRIDGE:
   source_pr: 283 closed unmerged after ACCEPT
   integration: present on PR 300
   completion: partial
 RUNTIME:
   pr: 303
-  disposition: RETURN_FOR_EVIDENCE
-  blocker: serialized behind P0; no self-hosted reacquire semantic job executed
-  cleanup_safety_repair: integrated only on Draft #303, not a semantic capability
+  disposition: REVALIDATION_REQUIRED
+  cleanup_safety_repair: evidence_only
 COVERAGE_AUDIT:
-  source_pr: 304
-  disposition: ACCEPT_WITH_EDITS
-  exact_source_head: 43a60bd96cc644b656b200c9edbfb75578b330b6
-  source_ci: 31882010038 SUCCESS
+  source_pr: 304 closed unmerged after ACCEPT_WITH_EDITS
   coordinator_snapshot: present
 ```
 
@@ -183,12 +219,12 @@ Track A is **not COMPLETE/100%**.
 
 Material open programme gates are:
 
-1. P2 writer ownership, transform/framing order, final egress and causal harness;
+1. P2 transformation/framing order, final binary egress and causal harness;
 2. authoritative P0 direct player/state reads with semantic discrimination;
 3. live bridge authority/session epoch and restart/relogin read reacquisition;
 4. A3/A4 action parity with authoritative before/after state;
-5. full message/QMeta semantic classification beyond the now-canonical bounded inventories;
+5. full message/QMeta semantic classification beyond bounded inventories;
 6. finite item-level P0/P1 read-field denominator where currently `UNKNOWN/UNKNOWN`;
 7. final exact-head integration validation, PR hygiene and programme closeout.
 
-The coordinator must preserve these UNKNOWNs rather than converting inventory completeness into a false completion claim.
+The coordinator must preserve these UNKNOWNs rather than converting inventory completeness or partial ownership provenance into a false completion claim.

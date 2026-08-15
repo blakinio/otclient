@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T14:05:00+02:00
+updated: 2026-08-15T14:09:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -37,8 +37,9 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
 code_bearing_head: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
+resume_dispatch_head: 950ce8f5f7cf22b457e82cdb20e9eec285438d9c
 invocation_started_at: 2026-08-15T14:05:00+02:00
-last_progress_at: 2026-08-15T14:05:00+02:00
+last_progress_at: 2026-08-15T14:09:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: runtime
 terminal_ci_wait_started_at: null
@@ -48,6 +49,15 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
+active_operation:
+  type: exact_build_runtime_reacquisition
+  run_id: 31883846172
+  job_id: 95010096196
+  workflow: .github/workflows/tibia-official-client-re-runtime-reacquisition.yml
+  execution_head: 950ce8f5f7cf22b457e82cdb20e9eec285438d9c
+  first_observed_status: queued
+  source_code_blob: c1b88d4cc17edf2684b93d7e516f9c694e37966a
+  run_request: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/runtime-run-request.json
 ---
 
 # Objective
@@ -64,7 +74,7 @@ platform: official_native_linux_only
 runner: synology-otclient-01
 ```
 
-# Runtime ownership
+# Runtime ownership and safety
 
 ```yaml
 state_directory: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition
@@ -76,53 +86,28 @@ track_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
 concurrency_group: official-client-re-runtime
 ```
 
-The task never owns the shared upstream Track A wireproxy process and must not touch Track B state/processes, pre-existing X11 locks/sockets or a process whose task role/executable markers cannot be verified.
+Credentials may exist only in protected login-step inputs. Persistent client/X/observer/relay environments must remain free of credential variables. The task must not touch Track B, shared upstream wireproxy ownership, foreign display locks/sockets, or irreversible gameplay/economic effects.
 
-# Credential and effect boundary
-
-Credentials may exist only in protected secret inputs to the minimal login step. Persistent client/X/observer/relay processes are launched without `TIBIA_TEST_EMAIL` or `TIBIA_TEST_PASSWORD` and their environments are checked before semantic use. Secret values must never be printed, persisted, OCRed, inspected or artifacted.
-
-Allowed side effects are login/session recovery and clean task-owned process restart only. No market, trade, forge, currency or irreversible gameplay effect is authorized. Movement is not part of this hypothesis.
-
-# Planned discriminator
-
-For each generation:
-
-1. verify exact client SHA/size and task-local WARP/SOCKS confinement;
-2. launch a fresh client with task-local HOME/display/relay and no credential variables in its environment;
-3. arm the exact-build structural Worldmap breakpoint at static offset `0x19a8ea3` before login;
-4. require a logged-out zero-record negative baseline;
-5. use protected credentials only in the login step;
-6. require multiple valid `(x,y,z,order)` Worldmap records and sustained task-local SOCKS with zero direct TCP/UDP escape;
-7. cleanly stop task-owned observer/client;
-8. repeat with a fresh PID and PIE base;
-9. accept only if both generations independently satisfy the structural gate and PID/PIE are fresh.
-
-# Safety repair retained
-
-Code-bearing head `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4` fails closed on observer cleanup before starting generation 2 or deleting task-local state. Compare to current PR head proves the only later files are this task record and `20260815-observer-cleanup-hardening.md`; runtime implementation is unchanged.
-
-# Resume preflight — 2026-08-15 14:05 +02
+# Changed prerequisite and dispatch
 
 ### FACT
 
-- `main` remains `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
-- P0 stale queued run `31880617510` was fenced and cancelled by its owning task; it is no longer a concurrency blocker.
-- P0 run `31883178675` executed on `synology-otclient-01`, proving the selector can currently reach the dedicated runner.
-- P0 run `31883422477` / job `95009054487` found zero currently live exact Track A client processes and left P0 `waiting` on RUNTIME ownership for a bounded live process window.
-- The latest RUNTIME code-bearing workflow run `31882125124` at `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4` was cancelled while the old serialized dependency existed; it produced no semantic reacquisition result.
+- P0 owner fenced and cancelled stale run `31880617510`; it no longer holds the serialized runtime lane.
+- P0 run `31883178675` executed on `synology-otclient-01`.
+- P0 run `31883422477` / job `95009054487` proved zero currently live exact Track A client processes and left P0 waiting on RUNTIME to create a bounded live process window.
+- Latest RUNTIME implementation before resume is helper blob `c1b88d4cc17edf2684b93d7e516f9c694e37966a` from code-bearing head `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`; later pre-resume changes were task/evidence only.
+- GitHub API refused direct retry of cancelled run `31882125124` (`403 This workflow run cannot be retried`).
+- A durable request `runtime-run-request.json` now fences the changed prerequisite, exact client, code-bearing head and authorized/forbidden effects.
+- Workflow head `950ce8f5f7cf22b457e82cdb20e9eec285438d9c` validates that request and exact helper Git blob before runtime work; push created run `31883846172`, job `95010096196`.
+- First job observation: `queued`.
 
-### INFERENCE
+### UNKNOWN pending exact run
 
-The original RUNTIME waiting prerequisite is materially changed: the serialized P0 blocker is released and the matching runner is proven reachable. Re-running the existing exact code-bearing RUNTIME workflow is now a distinct authorized retry under changed external state, not an identical blind retry.
-
-### UNKNOWN
-
-- whether protected Tibia login secrets are populated/accepted;
+- protected-secret availability/acceptance;
 - generation-1 structural `IN_GAME`;
 - generation-2 fresh PID/PIE and read reacquisition;
-- live credential-environment assertions;
-- cleanup outcome;
+- transport confinement/credential-environment assertions;
+- cleanup result;
 - bridge `session_epoch` / R4 semantics;
 - A3/A4.
 
@@ -140,4 +125,4 @@ The original RUNTIME waiting prerequisite is materially changed: the serialized 
 
 # Next action
 
-Re-run cancelled workflow run `31882125124` on exact code-bearing head `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4` now that the serialized P0 dependency is released. Inspect exact job logs/artifacts and classify the first material runtime result; do not weaken gates or create a conceptual duplicate.
+Inspect run `31883846172` only after material state change or within the bounded external-operation policy. Consume the first material runtime result and artifacts, classify FACT/UNKNOWN without weakening gates, then checkpoint and release the RUNTIME task if an external blocker remains.

@@ -118,6 +118,45 @@ class CanonicalLiveLeaseTests(unittest.TestCase):
             now=241,
         )
 
+    def test_expired_release_is_rejected_and_preserves_stale_takeover_path(self) -> None:
+        self.manager.acquire(self.a, self.token_a, 60, now=100)
+        self.assertLeaseError(
+            "lease_expired",
+            self.manager.release,
+            self.a,
+            self.token_a,
+            now=161,
+        )
+        self.assertTrue(self.token_a.exists())
+        status = self.manager.status(now=161)
+        self.assertEqual(status["status"], "active")
+        self.assertEqual(status["generation"], 1)
+        self.assertTrue(status["expired"])
+        self.assertLeaseError(
+            "stale_takeover_reason_required",
+            self.manager.acquire,
+            self.b,
+            self.token_b,
+            60,
+            now=161,
+        )
+        takeover = self.manager.acquire(
+            self.b,
+            self.token_b,
+            60,
+            stale_reason="expired holder cannot release; explicit takeover required",
+            now=161,
+        )
+        self.assertEqual(takeover.generation, 2)
+        self.assertTrue(takeover.stale_takeover)
+        self.assertLeaseError(
+            "lease_identity_mismatch",
+            self.manager.release,
+            self.a,
+            self.token_a,
+            now=162,
+        )
+
     def test_release_is_fenced_and_preserves_generation(self) -> None:
         self.manager.acquire(self.a, self.token_a, 300, now=100)
         released = self.manager.release(self.a, self.token_a, now=110)

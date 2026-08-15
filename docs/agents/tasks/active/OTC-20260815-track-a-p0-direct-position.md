@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-p0-direct-position
-status: waiting
+status: active
 agent: ChatGPT
-session_id: chatgpt-p0-static-re-20260815-1405
+session_id: chatgpt-p0-static-re-20260815-1707
 session_role: researcher
-session_rotation_count: 1
+session_rotation_count: 2
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
@@ -31,26 +31,29 @@ policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
 execution_mode: github-only
+execution_reason: side-effect-free exact-ELF accessor isolation while separately owned RUNTIME reacquisition proceeds
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
 code_bearing_head: eec9f6fcb065dd7762fa098ad78d1661b0060bd3
-invocation_started_at: 2026-08-15T14:05:00+02:00
-last_progress_at: 2026-08-15T14:13:00+02:00
+invocation_started_at: 2026-08-15T17:07:00+02:00
+last_progress_at: 2026-08-15T17:07:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: static-re
+ci_check_generation: static-accessor-re
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-lease_released_at: 2026-08-15T14:13:00+02:00
-claim_check: passed against open Draft PR #302, exact main@8fca1c3 and non-overlapping P0 owned paths; RUNTIME PR #303 was separately active and was not mutated during this P0 lease
+context_pressure: medium
+context_growth: stable
+decomposition_decision: phased
+claim_check: open Draft PR #302, exact main@8fca1c3, waiting task lease released, owned paths non-overlapping; independently active RUNTIME #303 will not be mutated
 last_checkpoint: docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/20260815-exact-elf-static-tplayerdata.md
-next_action: resume the separately released RUNTIME task and repair its verified runner-selector mismatch; after RUNTIME creates a bounded live exact-client window, return to P0 for passive typed-owner/provider validation before any movement stimulus
+next_action: extend the existing side-effect-free exact-ELF probe only enough to resolve bounded disassembly/xrefs around TPlayerData and the playerPosition/IPlayerDataProvider strings, then preserve concrete accessor/member candidates for live validation after RUNTIME releases a process window
 ---
 
 # Objective
@@ -135,7 +138,7 @@ Full evidence: `docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/202
 
 # RUNTIME coordination observation — FACT
 
-RUNTIME run `31883846172` / job `95010096196` requested `[self-hosted, otclient, synology]` and remained queued with `runner_id=0`. During that same interval, P0 static job `95010405800` requested `[otclient, synology]`, was assigned to `synology-otclient-01` and completed successfully. This proves runner reachability and makes the extra `self-hosted` label a concrete RUNTIME selector-mismatch candidate.
+RUNTIME is now independently active on Draft PR #303 under a fresh rotation. P0 does not own or mutate its branch, workflow, login procedure, X11 namespace, SOCKS relay or task-owned processes.
 
 # Classification
 
@@ -143,7 +146,7 @@ RUNTIME run `31883846172` / job `95010096196` requested `[self-hosted, otclient,
 
 - exact client and `TPlayerData` structural provenance are reproducible;
 - static analysis recovered `playerPosition` / `IPlayerDataProvider` / worldmap context without runtime or gameplay side effects;
-- runner reachability is proven independently of the queued RUNTIME selector.
+- runner reachability is proven independently of RUNTIME.
 
 ### INFERENCE
 
@@ -153,9 +156,9 @@ The next live P0 discriminator should prioritize the `IPlayerDataProvider` / `pl
 
 Direct authoritative player XYZ remains **UNKNOWN / INCONCLUSIVE**. The owner/accessor behind `playerPosition`, its backing storage, lifetime and discrimination from render/viewport/cache state require live exact-client observation.
 
-# Real stop condition
+# Rotation 2 scope
 
-P0 has exhausted useful side-effect-free work for this invocation without taking over RUNTIME. A live exact in-game process is required for the next semantic gate. The separate RUNTIME task has released its lease after a queued external run and can now be resumed safely by a new session after live-state revalidation.
+This rotation is side-effect-free static RE only. It may improve exact-ELF structural provenance and bounded accessor candidates while #303 owns runtime. It must not perform login/restart, attach to or interfere with #303 processes, or spend the one-step movement budget.
 
 # Resume condition
 

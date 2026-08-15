@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: waiting
-agent: unassigned
-session_id: null
+status: active
+agent: ChatGPT
+session_id: chatgpt-track-a-coordinator-20260815-2133
 session_role: coordinator
-session_rotation_count: 10
+session_rotation_count: 11
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -16,8 +16,8 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T21:27:00+02:00
-lease_released_at: 2026-08-15T21:27:00+02:00
+updated: 2026-08-15T21:33:00+02:00
+lease_expires_at: 2026-08-15T22:18:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -40,57 +40,58 @@ run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
-last_progress_at: 2026-08-15T21:27:00+02:00
+invocation_started_at: 2026-08-15T21:33:00+02:00
+last_progress_at: 2026-08-15T21:33:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: coordinator-rotation-10-runtime-boundary
+ci_check_generation: coordinator-rotation-11-p2-promotion
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-stop_reason: serial programme rotation into released P2 #308 completion; coordinator ownership released before researcher mutation
+stop_reason: null
 last_verified_integration_head: ce933e8fe28ea61669da28ffcc10cf21675a62b0
 last_verified_integration_ci_run: 31893876568
 last_verified_integration_ci_state: success
-last_promotion:
-  source_pr: 307
-  disposition: ACCEPT_WITH_EDITS
-  source_pr_state: closed_unmerged
-  canonical_evidence: docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/runtime-loader-diagnostic/20260815-pr307-disposition.md
-next_action: complete released #308 researcher handoff from terminal hardened run 31903490468 and CI 31903493799; then reacquire coordinator and review/promote bounded P2 facts
+active_operation:
+  - independently promote released PR 308 bounded persistent QBuffer-backed QDataStream facts
+  - close PR 308 unmerged after canonical evidence is durable
+  - reconcile current RUNTIME/P0/P1/ACTION/COVERAGE next safe lane without Track B mutation
+next_action: persist PR 308 ACCEPT_WITH_EDITS disposition under coordinator-owned evidence, update canonical P2 non-completion boundary, close source Draft unmerged, then select next safe READY programme lane
 ---
 
 # Objective
 
-Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Research branches remain Draft-only; coordinator owns promotion. Track B remains outside mutation authority.
+Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete. Researchers remain Draft-only. This coordinator is the promotion/integration authority subject to repository governance. Track B remains outside mutation authority.
 
-# Durable programme state
-
-- `main` invocation preflight remained `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
-- Last verified coordinator integration generation: `ce933e8fe28ea61669da28ffcc10cf21675a62b0`, CI `31893876568` SUCCESS.
-- #307: independently reviewed `ACCEPT_WITH_EDITS`, promoted, source Draft closed unmerged.
-- #303 cache metadata classifier `31903484499` proves only 3 `.qsb` shader-class files plus one 80-byte gpu/cache-class file, 6937 B total, payload unread in that classifier. Later seed run `31903627907` reached `CACHE_SEEDED` and `CLIENT_RUNNING` but exited `127` before mapped/visible window counts; coordinator classifies it `INCONCLUSIVE_HARNESS_FAILURE`, not cache causality. Further canonical-cache payload reads/copies are returned for evidence; PR comment `5303842133` directs no-payload mapped/unmapped X11 + Qt diagnostics. Canonical evidence: `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/runtime-cache-boundary/20260815-pr303-cache-classification-and-harness.md`.
-- #308 hardened semantic run `31903490468` on code-bearing head `34f73b0c48198ba452caa505b4c0f3ae7e5b61d7` is terminal SUCCESS; code-bearing CI `31903493799` is terminal SUCCESS. Task is `waiting/unassigned` and explicitly requests a fresh researcher rotation to classify artifact, persist final evidence, then release Draft ready for coordinator.
-- #295 remains ownership-lifecycle blocked by merged #291's stale active task record still owning `MAP_OBSERVATION_V1.md`; four material review threads remain unresolved. Canonical audit: `docs/agents/evidence/OTC-20260815-track-a-promotion-coordination/map-observation-ownership/20260815-pr295-pr291-lifecycle-blocker.md`.
-- #302 remains waiting for a bounded live exact-client in-game observation window; direct player XYZ stays `UNKNOWN/INCONCLUSIVE`.
-
-# Canonical non-completion boundary
+# Exact client fence
 
 ```yaml
-P2: PARTIAL_hardened_buffer_writer_provenance_success_awaiting_research_handoff_and_promotion
+version_mapping: 15.32.df7b29
+size: 51965216
+sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+platform: official_native_linux_only
+```
+
+# Rotation 11 pre-promotion state
+
+- `main` rechecked at `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
+- PR #308 source release head `7153ba4f0799a2c6b81eeeb62e4b1320e386c924` is Draft/open/mergeable, all six changed files remain within declared task-owned paths, review submissions/threads are zero.
+- Hardened semantic run `31903490468` on code-bearing head `34f73b0c48198ba452caa505b4c0f3ae7e5b61d7` is `SUCCESS`; artifact `9251725866` digest `sha256:f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e` was independently rechecked; semantic verdict is `BUFFER_DATAFLOW_PROVEN` with `PERSISTENT_TPROTOCOLWRITER_QBUFFER_BINDING=PROVEN`.
+- Code-bearing CI `31903493799` is `SUCCESS`; exact release-head CI `31903882606` on `7153ba4f...` is also `SUCCESS`.
+- Post-code-bearing changes are docs-only: final task record and final sanitized evidence.
+- Proven local object lifecycle: QBuffer/QDataStream binding constructed before serializer use. Overall protocol-stage order, framing, sequence, compression, encryption, final binary egress and causal local harness remain UNKNOWN.
+- #303 RUNTIME remains independently owned; coordinator has returned its cache-seed harness for evidence and must not mutate while active.
+- #302 P0 still waits on bounded live exact-client in-game observation; direct player XYZ remains `UNKNOWN/INCONCLUSIVE`.
+- #295 remains ownership-lifecycle blocked by merged #291's stale active task owning the same map-observation contract.
+
+# Canonical non-completion boundary before this promotion
+
+```yaml
+P2: PARTIAL_hardened_buffer_writer_provenance_success_ready_for_promotion
 P1: PARTIAL_read_only_bridge_integrated_live_authority_unknown
 P0: PARTIAL_static_playerPosition_anchor_plus_structural_world_transition_direct_authoritative_player_state_unknown
 RUNTIME: PARTIAL_historical_single_generation_world_evidence_restart_relogin_unknown
 ACTION: A3_A4_NOT_PROVEN
 COMPLETE: false
 ```
-
-# Remaining programme gates
-
-- complete/promote #308 then continue P2 toward framing/pipeline-order/final-egress/harness;
-- recover live RUNTIME restart/relogin and provide bounded P0/P1 observation;
-- prove direct P0 reads and live P1 authority/restart stability;
-- prove A3/A4 action parity where required;
-- close semantic protocol/QMeta coverage and finite P0/P1 denominators;
-- repair #295/#291 ownership lifecycle before contract mutation;
-- final audit/E2E/exact-head CI/PR hygiene/archive/ownership release.

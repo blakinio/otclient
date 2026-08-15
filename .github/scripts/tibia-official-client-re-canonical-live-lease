@@ -61,8 +61,14 @@ case "$operation" in
       echo 'TRACK_A_CANONICAL_LEASE_ERROR=controller_identity_or_token_path_missing' >&2
       exit 64
     }
-    case "$token_file" in
-      "$TASK_STATE_ROOT/$task_id/"*) ;;
+    [[ "$task_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$ ]] || {
+      echo 'TRACK_A_CANONICAL_LEASE_ERROR=task_id_invalid_for_state_path' >&2
+      exit 64
+    }
+    canonical_task_root="$(realpath -m -- "$TASK_STATE_ROOT/$task_id")"
+    canonical_token_file="$(realpath -m -- "$token_file")"
+    case "$canonical_token_file" in
+      "$canonical_task_root/"*) ;;
       *)
         echo 'TRACK_A_CANONICAL_LEASE_ERROR=token_path_outside_task_state' >&2
         exit 64

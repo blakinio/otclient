@@ -88,170 +88,178 @@ jobs:
           out="$RUNNER_TEMP/tibia-official-client-re-runtime-reacquisition-effective.sh"
           python3 - "$src" "$out" <<'PY'
           from pathlib import Path
-          from textwrap import dedent
           import sys
 
           src, out = map(Path, sys.argv[1:])
           text = src.read_text(encoding='utf-8')
-          replacements = []
-          replacements.append((
-              "TASK_MARKER=\"OTCLIENT_TIBIA_RE_TASK=$TASK_ID\"\nROLE_VAR='OTCLIENT_TIBIA_RE_ROLE'",
-              "TASK_MARKER=\"OTCLIENT_TIBIA_RE_TASK=$TASK_ID\"\nRUN_MARKER=\"OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID\"\nROLE_VAR='OTCLIENT_TIBIA_RE_ROLE'",
-          ))
-          replacements.append((
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label} match count {count}, expected 1')
+              text = text.replace(old, new, 1)
+
+          def replace_function(name: str, next_name: str, lines: list[str]) -> None:
+              global text
+              start_marker = f'{name}() {{\n'
+              end_marker = f'\n}}\n\n{next_name}() {{\n'
+              if text.count(start_marker) != 1 or text.count(end_marker) != 1:
+                  raise SystemExit(f'function anchors not unique: {name}->{next_name}')
+              start = text.index(start_marker)
+              end = text.index(end_marker, start) + 2
+              text = text[:start] + '\n'.join(lines) + text[end:]
+
+          replace_once(
+              'TASK_MARKER="OTCLIENT_TIBIA_RE_TASK=$TASK_ID"\nROLE_VAR=\'OTCLIENT_TIBIA_RE_ROLE\'',
+              'TASK_MARKER="OTCLIENT_TIBIA_RE_TASK=$TASK_ID"\nRUN_MARKER="OTCLIENT_TIBIA_RE_RUN_ID=$GITHUB_RUN_ID"\nROLE_VAR=\'OTCLIENT_TIBIA_RE_ROLE\'',
+              'run-marker-header',
+          )
+          replace_once(
               "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\nTASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
               "BASE_STATE='/home/runner/_work/_otclient_tibia_re_state'\nLEGACY_STATE='/work/_otclient_tibia_re_state'\nTASK_ROOT=\"$BASE_STATE/tasks/$TASK_ID\"",
-          ))
-          replacements.append((
+              'legacy-source-header',
+          )
+          replace_once(
               "toolroot() { printf '%s/toolroot\\n' \"$BASE_STATE\"; }",
-              dedent('''\
-          source_state() {
-            local state client size sha
-            for state in "$LEGACY_STATE" "$BASE_STATE"; do
-              client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
-              [[ -x "$client" ]] || continue
-              size="$(stat -c '%s' "$client" 2>/dev/null || true)"
-              sha="$(sha256sum "$client" 2>/dev/null | awk '{print $1}')"
-              if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
-                printf '%s\n' "$state"
-                return 0
-              fi
-            done
-            die exact_source_state_unavailable
-          }
-          toolroot() { printf '%s/toolroot\n' "$(source_state)"; }
-          '''),
-          ))
-          replacements.append((
-              dedent('''\
-          role_owned() {
-            local pid="$1" role="$2" expected="${3:-}"
-            [[ -r "/proc/$pid/environ" ]] || return 1
-            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || return 1
-            grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" || return 1
-            grep -azFxq "$ROLE_VAR=$role" "/proc/$pid/environ" || return 1
-            [[ -z "$expected" || "$(readlink -f "/proc/$pid/exe")" == "$(readlink -f "$expected")" ]]
-          }
-          '''),
-              dedent('''\
-          role_owned() {
-            local pid="$1" role="$2" expected="${3:-}"
-            [[ -r "/proc/$pid/environ" ]] || return 1
-            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || return 1
-            grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" || return 1
-            grep -azFxq "$RUN_MARKER" "/proc/$pid/environ" || return 1
-            grep -azFxq "$ROLE_VAR=$role" "/proc/$pid/environ" || return 1
-            [[ -z "$expected" || "$(readlink -f "/proc/$pid/exe")" == "$(readlink -f "$expected")" ]]
-          }
+              '\n'.join([
+                  'source_state() {',
+                  '  local state client size sha',
+                  '  for state in "$LEGACY_STATE" "$BASE_STATE"; do',
+                  '    client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"',
+                  '    [[ -x "$client" ]] || continue',
+                  '    size="$(stat -c \'%s\' "$client" 2>/dev/null || true)"',
+                  '    sha="$(sha256sum "$client" 2>/dev/null | awk \'{print $1}\')"',
+                  '    if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then',
+                  '      printf \'%s\\n\' "$state"',
+                  '      return 0',
+                  '    fi',
+                  '  done',
+                  '  die exact_source_state_unavailable',
+                  '}',
+                  'toolroot() { printf \'%s/toolroot\\n\' "$(source_state)"; }',
+              ]),
+              'source-state-toolroot',
+          )
 
-          discover_role_pid() {
-            local role="$1" expected="$2" tries="${3:-100}" candidate found count
-            for _ in $(seq 1 "$tries"); do
-              found=''; count=0
-              for proc in /proc/[0-9]*; do
-                candidate="${proc##*/}"
-                if role_owned "$candidate" "$role" "$expected"; then
-                  found="$candidate"
-                  count=$((count+1))
-                fi
-              done
-              (( count <= 1 )) || die "ambiguous_${role}_processes"
-              if (( count == 1 )); then
-                printf '%s\n' "$found"
-                return 0
-              fi
-              sleep .2
-            done
-            return 1
-          }
-          '''),
-          ))
-          replacements.append((
-              dedent('''\
-          verify_upstream_warp() {
-            local pid
-            pid="$(tr -cd '0-9' <"$BASE_STATE/runtime/wireproxy.pid" 2>/dev/null || true)"
-            [[ -n "$pid" && -r "/proc/$pid/environ" ]] || die upstream_wireproxy_unavailable
-            grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || die upstream_wireproxy_wrong_owner
-            kill -0 "$pid" || die upstream_wireproxy_dead
-            curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
-              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \
-              || die upstream_warp_not_verified
-            printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s\n' "$pid"
-          }
-          '''),
-              dedent('''\
-          verify_upstream_warp() {
-            local source state pid selected_pid='' selected_state='' count=0
-            declare -A seen=()
-            source="$(source_state)"
-            for state in "$source" "$BASE_STATE" "$LEGACY_STATE"; do
-              [[ -r "$state/runtime/wireproxy.pid" ]] || continue
-              pid="$(tr -cd '0-9' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"
-              [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue
-              grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || continue
-              kill -0 "$pid" 2>/dev/null || continue
-              [[ -z "${seen[$pid]:-}" ]] || continue
-              seen[$pid]=1
-              selected_pid="$pid"
-              selected_state="$state"
-              count=$((count+1))
-            done
-            (( count == 1 )) || {
-              (( count == 0 )) && die upstream_wireproxy_unavailable
-              die upstream_wireproxy_ambiguous
-            }
-            port_listening "$UPSTREAM_SOCKS_PORT" || die upstream_socks_not_listening
-            curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \
-              https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' \
-              || die upstream_warp_not_verified
-            printf 'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s source_state=%s\n' "$selected_pid" "$selected_state"
-          }
-          '''),
-          ))
-          replacements.append((
+          replace_function('role_owned', 'assert_no_secret_env', [
+              'role_owned() {',
+              '  local pid="$1" role="$2" expected="${3:-}"',
+              '  [[ -r "/proc/$pid/environ" ]] || return 1',
+              '  grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || return 1',
+              '  grep -azFxq "$TASK_MARKER" "/proc/$pid/environ" || return 1',
+              '  grep -azFxq "$RUN_MARKER" "/proc/$pid/environ" || return 1',
+              '  grep -azFxq "$ROLE_VAR=$role" "/proc/$pid/environ" || return 1',
+              '  [[ -z "$expected" || "$(readlink -f "/proc/$pid/exe")" == "$(readlink -f "$expected")" ]]',
+              '}',
+              '',
+              'discover_role_pid() {',
+              '  local role="$1" expected="$2" tries="${3:-100}" candidate found count',
+              '  for _ in $(seq 1 "$tries"); do',
+              '    found=\'\'; count=0',
+              '    for proc in /proc/[0-9]*; do',
+              '      candidate="${proc##*/}"',
+              '      if role_owned "$candidate" "$role" "$expected"; then',
+              '        found="$candidate"',
+              '        count=$((count+1))',
+              '      fi',
+              '    done',
+              '    (( count <= 1 )) || die "ambiguous_${role}_processes"',
+              '    if (( count == 1 )); then',
+              '      printf \'%s\\n\' "$found"',
+              '      return 0',
+              '    fi',
+              '    sleep .2',
+              '  done',
+              '  return 1',
+              '}',
+          ])
+
+          replace_function('verify_upstream_warp', 'start_relay', [
+              'verify_upstream_warp() {',
+              '  local source state pid selected_pid=\'\' selected_state=\'\' count=0',
+              '  declare -A seen=()',
+              '  source="$(source_state)"',
+              '  for state in "$source" "$BASE_STATE" "$LEGACY_STATE"; do',
+              '    [[ -r "$state/runtime/wireproxy.pid" ]] || continue',
+              '    pid="$(tr -cd \'0-9\' <"$state/runtime/wireproxy.pid" 2>/dev/null || true)"',
+              '    [[ -n "$pid" && -r "/proc/$pid/environ" ]] || continue',
+              '    grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ" || continue',
+              '    kill -0 "$pid" 2>/dev/null || continue',
+              '    [[ -z "${seen[$pid]:-}" ]] || continue',
+              '    seen[$pid]=1',
+              '    selected_pid="$pid"',
+              '    selected_state="$state"',
+              '    count=$((count+1))',
+              '  done',
+              '  (( count == 1 )) || {',
+              '    (( count == 0 )) && die upstream_wireproxy_unavailable',
+              '    die upstream_wireproxy_ambiguous',
+              '  }',
+              '  port_listening "$UPSTREAM_SOCKS_PORT" || die upstream_socks_not_listening',
+              '  curl --socks5-hostname "127.0.0.1:$UPSTREAM_SOCKS_PORT" -fsS --max-time 15 \\',
+              '    https://www.cloudflare.com/cdn-cgi/trace | grep -Eq \'^warp=(on|plus)$\' \\',
+              '    || die upstream_warp_not_verified',
+              '  printf \'TRACK_A_UPSTREAM_WARP_VERIFIED=true pid=%s source_state=%s\\n\' "$selected_pid" "$selected_state"',
+              '}',
+          ])
+
+          replace_once(
               '  local td="$(toolroot)" xvfb="$BASE_STATE/runtime/Xvfb-track-a" pid',
               '  local source td xvfb pid\n  source="$(source_state)"; td="$(toolroot)"; xvfb="$source/runtime/Xvfb-track-a"',
-          ))
-          replacements.append((
+              'xvfb-source-state',
+          )
+          replace_once(
               '  local root="$(run_root)" src="$BASE_STATE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia" dst',
               '  local root source src dst\n  root="$(run_root)"; source="$(source_state)"\n  src="$source/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"\n  printf \'TRACK_A_RUNTIME_SOURCE_STATE=%s\\n\' "$source"',
-          ))
-          replacements.append((
+              'bootstrap-source-state',
+          )
+          replace_once(
               '  local td="$(toolroot)" xvfb="$BASE_STATE/runtime/Xvfb-track-a" root="$(run_root)"',
               '  local source td xvfb root\n  source="$(source_state 2>/dev/null || printf \'%s\\n\' "$BASE_STATE")"\n  td="$source/toolroot"; xvfb="$source/runtime/Xvfb-track-a"; root="$(run_root)"',
-          ))
-          replacements.extend([
+              'cleanup-source-state',
+          )
+
+          for old, new, label in [
               (
                   '    OTCLIENT_TIBIA_RE_ROLE=socks-relay \\\n    nohup python3 "$relay"',
                   '    OTCLIENT_TIBIA_RE_ROLE=socks-relay OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" \\\n    nohup setsid python3 "$relay"',
+                  'relay-run-marker',
               ),
               (
                   '    OTCLIENT_TIBIA_RE_ROLE=xvfb HOME="$(run_root)/home" \\\n    PATH="$td/usr/bin:$td/usr/sbin:/usr/bin:/bin"',
                   '    OTCLIENT_TIBIA_RE_ROLE=xvfb OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" HOME="$(run_root)/home" \\\n    PATH="$td/usr/bin:$td/usr/sbin:/usr/bin:/bin"',
+                  'xvfb-run-marker',
               ),
               (
                   '    nohup "$xvfb" "$TRACK_DISPLAY"',
                   '    sh -c \'cd "$1" && shift && exec "$@"\' sh "$td/usr/bin" nohup setsid "$xvfb" "$TRACK_DISPLAY"',
+                  'xvfb-cwd-setsid',
               ),
               (
                   '    OTCLIENT_TIBIA_RE_ROLE="client-gen-$gen" HOME="$root/home-gen-$gen" DISPLAY="$TRACK_DISPLAY" \\',
                   '    OTCLIENT_TIBIA_RE_ROLE="client-gen-$gen" OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" HOME="$root/home-gen-$gen" DISPLAY="$TRACK_DISPLAY" \\',
+                  'client-run-marker',
               ),
               (
                   '    nohup "$client" >"$gdir/client.log" 2>&1 </dev/null &',
                   '    nohup setsid "$client" >"$gdir/client.log" 2>&1 </dev/null &',
+                  'client-setsid',
               ),
               (
                   '    OTCLIENT_TIBIA_RE_ROLE="observer-gen-$gen" HOME="$root/home" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \\',
                   '    OTCLIENT_TIBIA_RE_ROLE="observer-gen-$gen" OTCLIENT_TIBIA_RE_RUN_ID="$GITHUB_RUN_ID" HOME="$root/home" PATH="$tool_path" LD_LIBRARY_PATH="$tool_lib" \\',
+                  'observer-run-marker',
               ),
               (
                   '    nohup "$gdb" -q -nx -batch -x "$gdir/world.gdb" >"$gdir/gdb.log" 2>&1 </dev/null &',
                   '    nohup setsid "$gdb" -q -nx -batch -x "$gdir/world.gdb" >"$gdir/gdb.log" 2>&1 </dev/null &',
+                  'observer-setsid',
               ),
-          ])
-          replacements.append((
+          ]:
+              replace_once(old, new, label)
+
+          replace_once(
               '  pid=$!; printf \'%s\\n\' "$pid" >"$(pidfile "client-gen-$gen")"\n'
               '  for _ in $(seq 1 80); do kill -0 "$pid" 2>/dev/null || die "client_gen_${gen}_exited"; [[ -r "/proc/$pid/maps" ]] && break; sleep .25; done\n'
               '  role_owned "$pid" "client-gen-$gen" "$client" || die "client_gen_${gen}_ownership_failed"\n'
@@ -261,8 +269,9 @@ jobs:
               '  printf \'%s\\n\' "$pid" >"$(pidfile "client-gen-$gen")"\n'
               '  assert_no_secret_env "$pid" "client-gen-$gen"\n'
               '  printf \'TRACK_A_RUNTIME_ROLE_DISCOVERED role=client-gen-%s pid=%s launcher_pid=%s\\n\' "$gen" "$pid" "$launcher_pid"',
-          ))
-          replacements.append((
+              'client-pid-discovery',
+          )
+          replace_once(
               '  gp=$!; printf \'%s\\n\' "$gp" >"$(pidfile "observer-gen-$gen")"\n'
               '  for _ in $(seq 1 50); do [[ "$(awk \'/^TracerPid:/{print $2}\' "/proc/$pid/status")" == "$gp" ]] && break; kill -0 "$gp" 2>/dev/null || die observer_exited; sleep .15; done\n'
               '  role_owned "$gp" "observer-gen-$gen" "$gdb" || die observer_ownership_failed\n'
@@ -274,13 +283,8 @@ jobs:
               '  role_owned "$gp" "observer-gen-$gen" "$gdb" || die observer_ownership_failed\n'
               '  assert_no_secret_env "$gp" "observer-gen-$gen"\n'
               '  printf \'TRACK_A_RUNTIME_ROLE_DISCOVERED role=observer-gen-%s pid=%s launcher_pid=%s\\n\' "$gen" "$gp" "$observer_launcher_pid"',
-          ))
-
-          for old, new in replacements:
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'compatibility transform match count {count}, expected 1: {old[:120]!r}')
-              text = text.replace(old, new, 1)
+              'observer-pid-discovery',
+          )
 
           out.write_text(text, encoding='utf-8')
           PY

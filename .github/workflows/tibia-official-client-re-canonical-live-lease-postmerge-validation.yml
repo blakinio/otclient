@@ -1,0 +1,37 @@
+name: Track A canonical lease post-merge validation
+
+on:
+  push:
+    branches:
+      - fix/OTC-20260815-track-a-live-runtime-lease-postmerge-p1
+    paths:
+      - .github/workflows/tibia-official-client-re-canonical-live-lease-postmerge-validation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout remediation branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: fix/OTC-20260815-track-a-live-runtime-lease-postmerge-p1
+          persist-credentials: false
+      - name: Run deterministic lease tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+
+  isolated-selfhosted:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout remediation branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: fix/OTC-20260815-track-a-live-runtime-lease-postmerge-p1
+          persist-credentials: false
+      - name: Exercise lease transitions in task-owned state only
+        shell: bash
+        run: bash .github/scripts/test_tibia_official_client_re_canonical_live_lease_selfhosted.sh

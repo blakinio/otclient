@@ -179,7 +179,6 @@ jobs:
           SH
           chmod 700 "$scaffold"; bash -n "$scaffold"; echo "TRACK_A_RUNTIME_HOME_SCAFFOLD=$scaffold" >> "$GITHUB_ENV"
 
-          # Recover only the previously fenced task-owned run-22 residue using the pinned baseline recovery code.
           recover="$RUNNER_TEMP/recover-track-a-runtime-residue.sh"
           python3 - "$baseline" "$recover" "$BASELINE_RESIDUE_RUN_ID" "$FAILED_RUN_TO_RECOVER" <<'PY'
           from pathlib import Path
@@ -199,7 +198,13 @@ jobs:
           PY
           bash "$recover"
 
-          bash "$effective" bootstrap
+          historical_xvfb_cwd=/work/_otclient_tibia_re_state/toolroot/usr/bin
+          [[ -d "$historical_xvfb_cwd" ]]
+          (
+            cd "$historical_xvfb_cwd"
+            echo "TRACK_A_RUNTIME_XVFB_BOOTSTRAP_CWD=$PWD"
+            bash "$effective" bootstrap
+          )
           task_package="/home/runner/_work/_otclient_tibia_re_state/tasks/$TASK_ID/runs/$GITHUB_RUN_ID/package"
           task_crash="$task_package/crashdump"
           [[ -d "$task_crash" ]] || { echo TRACK_A_RUNTIME_ERROR=task_crashdump_missing >&2; exit 1; }
@@ -313,7 +318,7 @@ jobs:
           {
             echo "workflow_status=${{ job.status }}"; echo "workflow_run_id=$GITHUB_RUN_ID"; echo "workflow_head=$GITHUB_SHA"; echo "runner=$RUNNER_NAME"
             echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"; echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
-            echo "current_run_ownership=true"; echo "bundled_qt_precedence=true"; echo "software_backend=true"; echo "minimal_launcher_home=true"; echo "known_good_xvfb_profile=true"; echo "physical_canonical_home_package=true"; echo "task_local_crashdump_cleared=true"
+            echo "current_run_ownership=true"; echo "bundled_qt_precedence=true"; echo "software_backend=true"; echo "minimal_launcher_home=true"; echo "known_good_xvfb_profile=true"; echo "physical_canonical_home_package=true"; echo "historical_xvfb_cwd=true"; echo "task_local_crashdump_cleared=true"
           } > "$out/workflow-terminal.txt"
 
       - name: Clean exact current-run runtime processes and ephemeral state

@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+CANONICAL_STATE_DIR='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+TASK_STATE_ROOT='/home/runner/_work/_otclient_tibia_re_state/tasks'
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+IMPL="$SCRIPT_DIR/tibia-official-client-re-canonical-live-lease.py"
+
+operation=''
+task_id=''
+token_file=''
+expect=''
+
+for arg in "$@"; do
+  if [[ -n "$expect" ]]; then
+    case "$expect" in
+      task_id) task_id="$arg" ;;
+      token_file) token_file="$arg" ;;
+    esac
+    expect=''
+    continue
+  fi
+
+  case "$arg" in
+    --state-dir|--state-dir=*)
+      echo 'TRACK_A_CANONICAL_LEASE_ERROR=noncanonical_state_override_forbidden' >&2
+      exit 64
+      ;;
+    --task-id) expect='task_id' ;;
+    --task-id=*) task_id="${arg#--task-id=}" ;;
+    --token-file) expect='token_file' ;;
+    --token-file=*) token_file="${arg#--token-file=}" ;;
+    acquire|renew|release|validate|status|guard-run)
+      [[ -z "$operation" ]] && operation="$arg"
+      ;;
+  esac
+done
+
+[[ -z "$expect" ]] || {
+  echo 'TRACK_A_CANONICAL_LEASE_ERROR=missing_option_value' >&2
+  exit 64
+}
+
+case "$operation" in
+  acquire|renew|release|validate|guard-run)
+    [[ -n "$task_id" && -n "$token_file" ]] || {
+      echo 'TRACK_A_CANONICAL_LEASE_ERROR=controller_identity_or_token_path_missing' >&2
+      exit 64
+    }
+    case "$token_file" in
+      "$TASK_STATE_ROOT/$task_id/"*) ;;
+      *)
+        echo 'TRACK_A_CANONICAL_LEASE_ERROR=token_path_outside_task_state' >&2
+        exit 64
+        ;;
+    esac
+    ;;
+  status) ;;
+  *)
+    echo 'TRACK_A_CANONICAL_LEASE_ERROR=operation_missing_or_invalid' >&2
+    exit 64
+    ;;
+esac
+
+exec python3 "$IMPL" --state-dir "$CANONICAL_STATE_DIR" "$@"

@@ -1,0 +1,82 @@
+name: Track A P2 writer ownership provenance
+
+on:
+  push:
+    branches:
+      - research/OTC-20260815-track-a-p2-writer-ownership
+    paths:
+      - .github/workflows/tibia-official-client-re-p2-writer-ownership.yml
+      - .github/scripts/tibia-official-client-re-p2-writer-ownership.py
+      - docs/agents/evidence/OTC-20260815-track-a-p2-writer-ownership/**
+      - docs/agents/tasks/active/OTC-20260815-track-a-p2-writer-ownership.md
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      SOURCE_ARTIFACT_ID: '9229609330'
+      SOURCE_ARTIFACT_SHA256: bc5604ffbcf7e75a6b00dad227aefaa0036ea4792efb61ce85de488b6877782c
+      SOURCE_ARTIFACT_FILE: track-a-gameserver-tcp-writer-provenance.txt
+      CANONICAL_REPORT: docs/agents/evidence/OTC-20260813-official-client-re/20260814-final-write-reconciliation-generation-5.md
+    steps:
+      - name: Checkout exact Draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Validate exact task context and parser syntax
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$GITHUB_REF_NAME" == research/OTC-20260815-track-a-p2-writer-ownership ]]
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-writer-ownership.py
+          test -s "$CANONICAL_REPORT"
+          echo "TRACK_A_P2_EXACT_HEAD=$GITHUB_SHA"
+
+      - name: Fetch and verify reviewed exact-build provenance artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p artifacts/source
+          curl --fail-with-body --location --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip" \
+            -o artifacts/source/provenance.zip
+          echo "$SOURCE_ARTIFACT_SHA256  artifacts/source/provenance.zip" | sha256sum -c -
+          unzip -q artifacts/source/provenance.zip -d artifacts/source/extracted
+          test -s "artifacts/source/extracted/$SOURCE_ARTIFACT_FILE"
+          [[ "$(find artifacts/source/extracted -type f | wc -l)" == '1' ]]
+          echo TRACK_A_P2_SOURCE_ARTIFACT_VERIFIED=true
+
+      - name: Prove bounded writer ownership relation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p artifacts/p2-writer-ownership
+          python3 .github/scripts/tibia-official-client-re-p2-writer-ownership.py \
+            --artifact "artifacts/source/extracted/$SOURCE_ARTIFACT_FILE" \
+            --canonical "$CANONICAL_REPORT" \
+            --output-json artifacts/p2-writer-ownership/result.json \
+            --output-text artifacts/p2-writer-ownership/result.txt \
+            | tee artifacts/p2-writer-ownership/validation.log
+          grep -Fxq 'P2_WRITER_OWNERSHIP_COMPLETE=true' artifacts/p2-writer-ownership/validation.log
+          grep -Fxq 'P2_WRITER_OWNERSHIP_RESULT=PROVEN_WRITER_RETAINED_UPSTREAM_BY_TPROTOCOLCLIENTMESSAGEPROCESSOR' artifacts/p2-writer-ownership/validation.log
+
+      - name: Upload sanitized P2 evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-writer-ownership-${{ github.run_id }}
+          path: artifacts/p2-writer-ownership/**
+          retention-days: 7
+          if-no-files-found: error

@@ -16,9 +16,9 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track-a-p2-post-serialization-buffer-boundary
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
-related_pr: null
+related_pr: 308
 created: 2026-08-15T17:49:00+02:00
-updated: 2026-08-15T17:49:00+02:00
+updated: 2026-08-15T17:50:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-p2-post-serialization-buffer-boundary.md
   - docs/agents/evidence/OTC-20260815-track-a-p2-post-serialization-buffer-boundary/**

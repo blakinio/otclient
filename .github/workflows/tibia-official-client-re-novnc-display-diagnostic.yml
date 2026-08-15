@@ -26,40 +26,76 @@ jobs:
 
           python3 - <<'PY'
           import base64
-          import hashlib
           import os
           import re
           import socket
           import struct
           import subprocess
-          import sys
-          import urllib.request
 
-          HOST = "synology"
           PORT = 6082
           TIMEOUT = 4.0
+          BROWSER_HOST = "synology"
 
           def marker(name, value):
               print(f"{name}={value}", flush=True)
 
-          # Do not print private addresses. Only record whether the LAN hostname resolves.
-          try:
-              socket.getaddrinfo(HOST, PORT, type=socket.SOCK_STREAM)
-              marker("SYNLOGY_HOSTNAME_RESOLVED", "true")
-          except Exception as exc:
-              marker("SYNLOGY_HOSTNAME_RESOLVED", "false")
-              marker("SYNLOGY_RESOLVE_ERROR_CLASS", type(exc).__name__)
+          def default_ipv4_gateway():
+              try:
+                  rows = open("/proc/net/route", encoding="ascii").read().splitlines()[1:]
+              except OSError:
+                  return None
+              for row in rows:
+                  fields = row.split()
+                  if len(fields) < 4 or fields[1] != "00000000":
+                      continue
+                  try:
+                      flags = int(fields[3], 16)
+                      raw = int(fields[2], 16)
+                  except ValueError:
+                      continue
+                  if not (flags & 0x2) or raw == 0:
+                      continue
+                  return socket.inet_ntoa(struct.pack("<I", raw))
+              return None
 
-          try:
-              req = urllib.request.Request(f"http://{HOST}:{PORT}/vnc.html", method="HEAD")
-              with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
-                  marker("NOVNC_HTTP_REACHABLE", "true")
-                  marker("NOVNC_HTTP_STATUS", response.status)
-                  ctype = (response.headers.get("Content-Type") or "unknown").split(";", 1)[0]
-                  marker("NOVNC_HTTP_CONTENT_TYPE", re.sub(r"[^A-Za-z0-9._/+\-]", "_", ctype)[:80])
-          except Exception as exc:
-              marker("NOVNC_HTTP_REACHABLE", "false")
-              marker("NOVNC_HTTP_ERROR_CLASS", type(exc).__name__)
+          def tcp_connect(host, port=PORT, timeout=TIMEOUT):
+              sock = socket.create_connection((host, port), timeout=timeout)
+              sock.settimeout(timeout)
+              return sock
+
+          def http_probe(connect_host, label):
+              try:
+                  sock = tcp_connect(connect_host)
+              except Exception as exc:
+                  marker(f"{label}_TCP_6082_REACHABLE", "false")
+                  marker(f"{label}_TCP_ERROR_CLASS", type(exc).__name__)
+                  return False
+              marker(f"{label}_TCP_6082_REACHABLE", "true")
+              try:
+                  request = (
+                      "HEAD /vnc.html HTTP/1.1\r\n"
+                      f"Host: {BROWSER_HOST}:{PORT}\r\n"
+                      "Connection: close\r\n\r\n"
+                  ).encode("ascii")
+                  sock.sendall(request)
+                  data = bytearray()
+                  while b"\r\n\r\n" not in data and len(data) < 16384:
+                      chunk = sock.recv(4096)
+                      if not chunk:
+                          break
+                      data.extend(chunk)
+                  status_line = bytes(data).split(b"\r\n", 1)[0].decode("ascii", "replace")
+                  match = re.search(r"\s(\d{3})(?:\s|$)", status_line)
+                  status = int(match.group(1)) if match else 0
+                  marker(f"{label}_NOVNC_HTTP_RESPONSE", str(status != 0).lower())
+                  marker(f"{label}_NOVNC_HTTP_STATUS", status)
+                  return status != 0
+              except Exception as exc:
+                  marker(f"{label}_NOVNC_HTTP_RESPONSE", "false")
+                  marker(f"{label}_NOVNC_HTTP_ERROR_CLASS", type(exc).__name__)
+                  return False
+              finally:
+                  sock.close()
 
           def recv_exact(sock, count):
               out = bytearray()
@@ -70,29 +106,8 @@ jobs:
                   out.extend(chunk)
               return bytes(out)
 
-          def ws_recv(sock):
-              first = recv_exact(sock, 2)
-              opcode = first[0] & 0x0F
-              masked = bool(first[1] & 0x80)
-              length = first[1] & 0x7F
-              if length == 126:
-                  length = struct.unpack("!H", recv_exact(sock, 2))[0]
-              elif length == 127:
-                  length = struct.unpack("!Q", recv_exact(sock, 8))[0]
-              mask = recv_exact(sock, 4) if masked else None
-              payload = bytearray(recv_exact(sock, length))
-              if mask:
-                  for i in range(length):
-                      payload[i] ^= mask[i % 4]
-              if opcode == 8:
-                  raise EOFError("websocket close")
-              if opcode == 9:
-                  ws_send(sock, bytes(payload), opcode=10)
-                  return ws_recv(sock)
-              return opcode, bytes(payload)
-
           def ws_send(sock, payload, opcode=2):
-              key = os.urandom(4)
+              mask_key = os.urandom(4)
               length = len(payload)
               head = bytearray([0x80 | opcode])
               if length < 126:
@@ -103,19 +118,40 @@ jobs:
               else:
                   head.append(0x80 | 127)
                   head.extend(struct.pack("!Q", length))
-              head.extend(key)
-              masked = bytes(b ^ key[i % 4] for i, b in enumerate(payload))
+              head.extend(mask_key)
+              masked = bytes(b ^ mask_key[i % 4] for i, b in enumerate(payload))
               sock.sendall(bytes(head) + masked)
+
+          def ws_recv(sock):
+              first = recv_exact(sock, 2)
+              opcode = first[0] & 0x0F
+              masked = bool(first[1] & 0x80)
+              length = first[1] & 0x7F
+              if length == 126:
+                  length = struct.unpack("!H", recv_exact(sock, 2))[0]
+              elif length == 127:
+                  length = struct.unpack("!Q", recv_exact(sock, 8))[0]
+              mask_key = recv_exact(sock, 4) if masked else None
+              payload = bytearray(recv_exact(sock, length))
+              if mask_key:
+                  for i in range(length):
+                      payload[i] ^= mask_key[i % 4]
+              if opcode == 8:
+                  raise EOFError("websocket close")
+              if opcode == 9:
+                  ws_send(sock, bytes(payload), opcode=10)
+                  return ws_recv(sock)
+              return opcode, bytes(payload)
 
           class WSBytes:
               def __init__(self, sock):
                   self.sock = sock
                   self.buf = bytearray()
+
               def read(self, count):
                   while len(self.buf) < count:
                       opcode, payload = ws_recv(self.sock)
                       if opcode == 1:
-                          # Legacy websockify base64 mode, accepted only if it decodes cleanly.
                           payload = base64.b64decode(payload, validate=True)
                       elif opcode != 2:
                           continue
@@ -124,87 +160,114 @@ jobs:
                   del self.buf[:count]
                   return out
 
-          try:
-              sock = socket.create_connection((HOST, PORT), timeout=TIMEOUT)
-              sock.settimeout(TIMEOUT)
-              ws_key = base64.b64encode(os.urandom(16)).decode("ascii")
-              request = (
-                  "GET /websockify HTTP/1.1\r\n"
-                  f"Host: {HOST}:{PORT}\r\n"
-                  "Upgrade: websocket\r\n"
-                  "Connection: Upgrade\r\n"
-                  f"Sec-WebSocket-Key: {ws_key}\r\n"
-                  "Sec-WebSocket-Version: 13\r\n"
-                  "Sec-WebSocket-Protocol: binary\r\n"
-                  f"Origin: http://{HOST}:{PORT}\r\n\r\n"
-              ).encode("ascii")
-              sock.sendall(request)
-              header = bytearray()
-              while b"\r\n\r\n" not in header and len(header) < 16384:
-                  chunk = sock.recv(4096)
-                  if not chunk:
-                      break
-                  header.extend(chunk)
-              status_line = bytes(header).split(b"\r\n", 1)[0].decode("ascii", "replace")
-              status_match = re.search(r"\s(\d{3})\s", status_line)
-              status = int(status_match.group(1)) if status_match else 0
-              marker("WEBSOCKIFY_UPGRADE_STATUS", status)
-              if status != 101:
-                  raise RuntimeError("websocket upgrade rejected")
-              marker("WEBSOCKIFY_REACHABLE", "true")
-              stream = WSBytes(sock)
-              banner = stream.read(12)
-              if not re.fullmatch(rb"RFB \d{3}\.\d{3}\n", banner):
-                  raise RuntimeError("invalid RFB banner")
-              version = banner.decode("ascii").strip().split(" ", 1)[1]
-              marker("RFB_PROTOCOL_VERSION", version)
-              ws_send(sock, banner)
-              count = stream.read(1)[0]
-              if count == 0:
-                  reason_len = struct.unpack("!I", stream.read(4))[0]
-                  _ = stream.read(min(reason_len, 1024))
-                  marker("RFB_SECURITY_TYPES_AVAILABLE", "none")
-                  raise RuntimeError("RFB security negotiation failed")
-              security_types = list(stream.read(count))
-              marker("RFB_SECURITY_NONE_AVAILABLE", str(1 in security_types).lower())
-              marker("RFB_SECURITY_VNC_AUTH_AVAILABLE", str(2 in security_types).lower())
-              if 1 not in security_types:
-                  marker("RFB_AUTH_REQUIRED", "true")
-                  marker("RFB_DISPLAY_HINT", "unknown")
-              else:
-                  marker("RFB_AUTH_REQUIRED", "false")
+          def rfb_probe(connect_host, label):
+              try:
+                  sock = tcp_connect(connect_host)
+                  ws_key = base64.b64encode(os.urandom(16)).decode("ascii")
+                  request = (
+                      "GET /websockify HTTP/1.1\r\n"
+                      f"Host: {BROWSER_HOST}:{PORT}\r\n"
+                      "Upgrade: websocket\r\n"
+                      "Connection: Upgrade\r\n"
+                      f"Sec-WebSocket-Key: {ws_key}\r\n"
+                      "Sec-WebSocket-Version: 13\r\n"
+                      "Sec-WebSocket-Protocol: binary\r\n"
+                      f"Origin: http://{BROWSER_HOST}:{PORT}\r\n\r\n"
+                  ).encode("ascii")
+                  sock.sendall(request)
+                  header = bytearray()
+                  while b"\r\n\r\n" not in header and len(header) < 16384:
+                      chunk = sock.recv(4096)
+                      if not chunk:
+                          break
+                      header.extend(chunk)
+                  status_line = bytes(header).split(b"\r\n", 1)[0].decode("ascii", "replace")
+                  match = re.search(r"\s(\d{3})(?:\s|$)", status_line)
+                  status = int(match.group(1)) if match else 0
+                  marker(f"{label}_WEBSOCKIFY_UPGRADE_STATUS", status)
+                  if status != 101:
+                      raise RuntimeError("websocket upgrade rejected")
+                  marker(f"{label}_WEBSOCKIFY_REACHABLE", "true")
+                  stream = WSBytes(sock)
+                  banner = stream.read(12)
+                  if not re.fullmatch(rb"RFB \d{3}\.\d{3}\n", banner):
+                      raise RuntimeError("invalid RFB banner")
+                  version = banner.decode("ascii").strip().split(" ", 1)[1]
+                  marker(f"{label}_RFB_PROTOCOL_VERSION", version)
+                  ws_send(sock, banner)
+                  count = stream.read(1)[0]
+                  if count == 0:
+                      reason_len = struct.unpack("!I", stream.read(4))[0]
+                      _ = stream.read(min(reason_len, 1024))
+                      marker(f"{label}_RFB_SECURITY_TYPES_AVAILABLE", "none")
+                      raise RuntimeError("RFB security negotiation failed")
+                  security_types = list(stream.read(count))
+                  marker(f"{label}_RFB_SECURITY_NONE_AVAILABLE", str(1 in security_types).lower())
+                  marker(f"{label}_RFB_SECURITY_VNC_AUTH_AVAILABLE", str(2 in security_types).lower())
+                  if 1 not in security_types:
+                      marker(f"{label}_RFB_AUTH_REQUIRED", "true")
+                      marker(f"{label}_RFB_DISPLAY_HINT", "unknown")
+                      return
+                  marker(f"{label}_RFB_AUTH_REQUIRED", "false")
                   ws_send(sock, b"\x01")
                   security_result = struct.unpack("!I", stream.read(4))[0]
-                  marker("RFB_SECURITY_RESULT", security_result)
+                  marker(f"{label}_RFB_SECURITY_RESULT", security_result)
                   if security_result != 0:
                       raise RuntimeError("RFB no-auth rejected")
-                  ws_send(sock, b"\x01")  # shared ClientInit
+                  ws_send(sock, b"\x01")
                   server_init = stream.read(24)
                   width, height = struct.unpack("!HH", server_init[:4])
                   name_len = struct.unpack("!I", server_init[20:24])[0]
                   if name_len > 4096:
                       raise RuntimeError("RFB desktop name too long")
                   name = stream.read(name_len).decode("utf-8", "replace")
-                  marker("RFB_FRAMEBUFFER_WIDTH", width)
-                  marker("RFB_FRAMEBUFFER_HEIGHT", height)
-                  # Never print the full desktop name. Extract only a numeric X-display hint.
+                  marker(f"{label}_RFB_FRAMEBUFFER_WIDTH", width)
+                  marker(f"{label}_RFB_FRAMEBUFFER_HEIGHT", height)
                   hint = re.search(r"(?<!\d):(\d{1,4})(?:\.\d+)?(?:\b|$)", name)
-                  marker("RFB_DISPLAY_HINT", f":{hint.group(1)}" if hint else "unknown")
-                  marker("RFB_DESKTOP_NAME_HAS_X11_TOKEN", str("X11" in name or "x11" in name).lower())
-              sock.close()
-          except Exception as exc:
-              marker("WEBSOCKIFY_RFB_PROBE_COMPLETE", "false")
-              marker("WEBSOCKIFY_RFB_ERROR_CLASS", type(exc).__name__)
-          else:
-              marker("WEBSOCKIFY_RFB_PROBE_COMPLETE", "true")
+                  marker(f"{label}_RFB_DISPLAY_HINT", f":{hint.group(1)}" if hint else "unknown")
+                  marker(f"{label}_RFB_DESKTOP_NAME_HAS_X11_TOKEN", str("X11" in name or "x11" in name).lower())
+              except Exception as exc:
+                  marker(f"{label}_WEBSOCKIFY_RFB_PROBE_COMPLETE", "false")
+                  marker(f"{label}_WEBSOCKIFY_RFB_ERROR_CLASS", type(exc).__name__)
+              else:
+                  marker(f"{label}_WEBSOCKIFY_RFB_PROBE_COMPLETE", "true")
+              finally:
+                  try:
+                      sock.close()
+                  except Exception:
+                      pass
 
-          # Read-only X11 socket inventory from this runner namespace. No PIDs, envs or process control.
+          try:
+              socket.getaddrinfo(BROWSER_HOST, PORT, type=socket.SOCK_STREAM)
+              marker("SYNLOGY_HOSTNAME_RESOLVED", "true")
+              hostname_reachable = True
+          except Exception as exc:
+              marker("SYNLOGY_HOSTNAME_RESOLVED", "false")
+              marker("SYNLOGY_RESOLVE_ERROR_CLASS", type(exc).__name__)
+              hostname_reachable = False
+
+          if hostname_reachable:
+              http_probe(BROWSER_HOST, "HOSTNAME")
+              rfb_probe(BROWSER_HOST, "HOSTNAME")
+          else:
+              marker("HOSTNAME_TCP_6082_REACHABLE", "false")
+              marker("HOSTNAME_WEBSOCKIFY_RFB_PROBE_COMPLETE", "false")
+
+          gateway = default_ipv4_gateway()
+          marker("DOCKER_DEFAULT_GATEWAY_FOUND", str(bool(gateway)).lower())
+          if gateway:
+              http_probe(gateway, "DOCKER_GATEWAY")
+              rfb_probe(gateway, "DOCKER_GATEWAY")
+          else:
+              marker("DOCKER_GATEWAY_TCP_6082_REACHABLE", "false")
+              marker("DOCKER_GATEWAY_WEBSOCKIFY_RFB_PROBE_COMPLETE", "false")
+
           displays = []
           try:
               for entry in os.listdir("/tmp/.X11-unix"):
-                  m = re.fullmatch(r"X(\d+)", entry)
-                  if m:
-                      displays.append(int(m.group(1)))
+                  match = re.fullmatch(r"X(\d+)", entry)
+                  if match:
+                      displays.append(int(match.group(1)))
           except FileNotFoundError:
               pass
           displays = sorted(set(displays))
@@ -239,20 +302,6 @@ jobs:
                       marker(f"X11_DISPLAY_{display}_HAS_RENDER", str("RENDER" in proc.stdout).lower())
                   except Exception as exc:
                       marker(f"X11_DISPLAY_{display}_QUERY", f"error_{type(exc).__name__}")
-
-          # Test only conventional direct VNC ports corresponding to relevant display numbers.
-          probe_displays = sorted(set(displays + [88, 98, 115]))
-          for display in probe_displays:
-              vnc_port = 5900 + display
-              try:
-                  s = socket.create_connection((HOST, vnc_port), timeout=1.0)
-                  s.settimeout(1.0)
-                  banner = s.recv(12)
-                  s.close()
-                  ok = bool(re.fullmatch(rb"RFB \d{3}\.\d{3}\n", banner))
-              except Exception:
-                  ok = False
-              marker(f"DIRECT_RFB_DISPLAY_{display}_REACHABLE", str(ok).lower())
 
           marker("TRACK_A_NOVNC_READONLY_PROBE_COMPLETE", "true")
           PY

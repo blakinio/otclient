@@ -1,0 +1,214 @@
+name: Track A gameserver TCP writer provenance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [otclient, synology]
+    timeout-minutes: 14
+    env:
+      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
+      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      METAOBJECT: '0x30b7d00'
+      STATIC_METACALL: '0xdd1cc0'
+      DIRECT_WRITER: '0xb46bd0'
+      QTCPSOCKET_CTOR_PLT: '0x4ddbc0'
+    steps:
+      - name: Resolve QMeta class and QTcpSocket member provenance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          if [[ -d /work && -w /work ]]; then state="$LEGACY_IMAGE_STATE"; else state="$CANONICAL_STATE"; fi
+          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
+          toolroot="$state/toolroot"
+          gdb="$toolroot/usr/bin/gdb"
+          [[ -x "$client" && -x "$gdb" ]]
+          [[ "$(stat -c %s "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
+          export PATH="$toolroot/usr/bin:$toolroot/usr/sbin:/usr/bin:/bin"
+          export LD_LIBRARY_PATH="$toolroot/usr/lib/x86_64-linux-gnu:$toolroot/lib/x86_64-linux-gnu"
+          report="$RUNNER_TEMP/track-a-gameserver-tcp-writer-provenance.txt"
+          frames="$RUNNER_TEMP/track-a-gameserver-tcp-writer-frames.txt"
+          relocs="$RUNNER_TEMP/track-a-gameserver-tcp-writer-relocs.txt"
+          plan="$RUNNER_TEMP/track-a-gameserver-tcp-disasm-plan.txt"
+          : >"$report"; : >"$plan"
+          exec > >(tee -a "$report") 2>&1
+          echo TRACK_A_GAMESERVER_TCP_WRITER_PROVENANCE_BEGIN=true
+          echo "CLIENT_SIZE=$EXPECTED_CLIENT_SIZE"
+          echo "CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo CLIENT_FENCE_SHA_SIZE_VERIFIED=true
+          readelf --debug-dump=frames "$client" >"$frames"
+          readelf -WrC "$client" >"$relocs"
+
+          python3 -u - "$client" "$frames" "$relocs" "$plan" <<'PY'
+          import re,struct,sys
+          client,frames_path,reloc_path,plan_path=sys.argv[1:]
+          data=open(client,'rb').read()
+          meta=0x30b7d00
+          metacall=0xdd1cc0
+          writer=0xb46bd0
+          qtctor=0x4ddbc0
+
+          phoff=struct.unpack_from('<Q',data,0x20)[0]; phentsz=struct.unpack_from('<H',data,0x36)[0]; phnum=struct.unpack_from('<H',data,0x38)[0]
+          loads=[]
+          for i in range(phnum):
+              o=phoff+i*phentsz
+              typ,flags,fo,va,_,fsz,msz,_=struct.unpack_from('<IIQQQQQQ',data,o)
+              if typ==1 and fsz:loads.append((fo,fo+fsz,va,va+fsz,flags))
+          execs=[x for x in loads if x[4]&1]
+          def va_to_off(va):
+              for fs,fe,base,end,flags in loads:
+                  if base<=va<end:return fs+va-base
+          frames=[]
+          for line in open(frames_path,errors='replace'):
+              m=re.search(r'pc=([0-9a-fA-F]+)\.\.([0-9a-fA-F]+)',line)
+              if m:frames.append((int(m.group(1),16),int(m.group(2),16)))
+          def containing(addr):return [(a,b) for a,b in frames if a<=addr<b]
+          def direct_calls(target):
+              out=[]
+              for fs,fe,base,end,flags in execs:
+                  blob=data[fs:fe]; p=0
+                  while True:
+                      p=blob.find(b'\xe8',p)
+                      if p<0:break
+                      if p+5<=len(blob):
+                          site=base+p
+                          got=(site+5+struct.unpack_from('<i',blob,p+1)[0])&0xffffffffffffffff
+                          if got==target:out.append(site)
+                      p+=1
+              return out
+          def rip_refs(target):
+              out=[]
+              for fs,fe,base,end,flags in execs:
+                  blob=data[fs:fe]
+                  for p in range(0,len(blob)-7):
+                      if 0x40<=blob[p]<=0x4f and blob[p+1] in (0x8d,0x8b) and (blob[p+2]&0xc7)==0x05:
+                          site=base+p
+                          got=(site+7+struct.unpack_from('<i',blob,p+3)[0])&0xffffffffffffffff
+                          if got==target:out.append(site)
+              return out
+
+          shoff=struct.unpack_from('<Q',data,0x28)[0]; shentsz=struct.unpack_from('<H',data,0x3a)[0]; shnum=struct.unpack_from('<H',data,0x3c)[0]
+          rel={}
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              if struct.unpack_from('<I',data,o+4)[0]!=4:continue
+              roff=struct.unpack_from('<Q',data,o+0x18)[0]; rsize=struct.unpack_from('<Q',data,o+0x20)[0]; rentsz=struct.unpack_from('<Q',data,o+0x38)[0] or 24
+              for p in range(roff,roff+rsize,rentsz):
+                  r_offset,r_info,r_addend=struct.unpack_from('<QQq',data,p)
+                  if (r_info&0xffffffff)==8:rel[r_offset]=r_addend&0xffffffffffffffff
+          def qword(va):
+              if va in rel:return rel[va]
+              off=va_to_off(va)
+              if off is None or off+8>len(data):return None
+              return struct.unpack_from('<Q',data,off)[0]
+          def cstring(va,limit=512):
+              off=va_to_off(va)
+              if off is None:return None
+              end=data.find(b'\0',off,min(len(data),off+limit))
+              if end<0:return None
+              raw=data[off:end]
+              if not raw:return ''
+              return raw.decode('utf-8','replace')
+          def require(condition,message):
+              if not condition:
+                  print(f'REQUIRED_FACT_FAIL={message}')
+                  raise SystemExit(2)
+              print(f'REQUIRED_FACT_OK={message}')
+
+          print('QMETA_STRUCT_BEGIN=true')
+          for r in range(0,0x38,8):
+              v=qword(meta+r)
+              print(f'QMETA_FIELD rel=0x{r:x} value={hex(v) if v is not None else "UNMAPPED"}')
+          print('QMETA_STRUCT_END=true')
+          qmeta_strings=qword(meta+8)
+          qmeta_data=qword(meta+0x10)
+          qmeta_metacall=qword(meta+0x18)
+          print(f'QMETA_STRINGDATA=0x{qmeta_strings:x}')
+          print(f'QMETA_DATA=0x{qmeta_data:x}')
+          print(f'QMETA_STATIC_METACALL=0x{qmeta_metacall:x}')
+          require(qmeta_strings==0x1d4d2b0,'QMETA_STRINGDATA_EXPECTED')
+          require(qmeta_data==0x1d4d1a0,'QMETA_DATA_EXPECTED')
+          require(qmeta_metacall==metacall,'QMETA_STATIC_METACALL_EXPECTED')
+
+          sbase=qmeta_strings
+          soff=va_to_off(sbase) if sbase else None
+          recovered_strings=[]
+          if soff is not None:
+              blob=data[soff:soff+0x500]
+              print('QMETA_STRING_REGION_BEGIN=true')
+              for m in re.finditer(rb'[A-Za-z_][A-Za-z0-9_:<> ,*&.()/-]{2,}\x00',blob):
+                  text=m.group()[:-1].decode('utf-8','replace')
+                  recovered_strings.append(text)
+                  print(f'QMETA_STRING va=0x{sbase+m.start():x} text={text!r}')
+              print('QMETA_STRING_REGION_END=true')
+          require('tibia::network::TGameserverTCPConnection' in recovered_strings,'QMETA_CLASS_STRING')
+
+          print('QMETA_EXACT_RELOCS_BEGIN=true')
+          for line in open(reloc_path,errors='replace'):
+              m=re.match(r'^\s*([0-9a-fA-F]+)\s+',line)
+              if m and meta<=int(m.group(1),16)<meta+0x38:print('QMETA_RELOC '+line.strip())
+          print('QMETA_EXACT_RELOCS_END=true')
+
+          qrefs=rip_refs(meta)
+          print(f'QMETA_RIP_REF_COUNT={len(qrefs)}')
+          print('QMETA_RIP_REF_SITES='+(','.join(hex(x) for x in qrefs) if qrefs else 'none'))
+          ctorcalls=direct_calls(qtctor)
+          print(f'QTCPSOCKET_CTOR_DIRECT_CALL_COUNT={len(ctorcalls)}')
+          print('QTCPSOCKET_CTOR_DIRECT_CALL_SITES='+(','.join(hex(x) for x in ctorcalls) if ctorcalls else 'none'))
+          require(ctorcalls==[0x196ff2a,0x19702c7],'QTCPSOCKET_TWO_EXPECTED_DIRECT_CTORS')
+          wcalls=direct_calls(writer)
+          print(f'WRITER_DIRECT_CALL_COUNT={len(wcalls)}')
+
+          selected=[]
+          for site in qrefs+ctorcalls+[metacall,writer]:
+              for f in containing(site):
+                  if f not in selected and f[1]-f[0]<=0x6000:selected.append(f)
+          print(f'SELECTED_FDE_COUNT={len(selected)}')
+          for a,b in selected:
+              print(f'SELECTED_FDE start=0x{a:x} end=0x{b:x} size=0x{b-a:x}')
+          require(bool(containing(writer)),'DIRECT_WRITER_HAS_FDE')
+          require(all(containing(site) for site in ctorcalls),'QTCPSOCKET_CTORS_HAVE_FDE')
+          with open(plan_path,'w') as f:
+              for a,b in selected[:24]:f.write(f'0x{a:x} 0x{b:x}\n')
+
+          for site in ctorcalls:
+              for a,b in containing(site):
+                  off=va_to_off(a); endoff=va_to_off(b-1)
+                  if off is None or endoff is None:continue
+                  blob=data[off:endoff+1]
+                  for p in range(len(blob)-4):
+                      if 0x48<=blob[p]<=0x4f and blob[p+1]==0x89 and (blob[p+2]&0xc0)==0x40 and blob[p+3]==0x10:
+                          print(f'PLUS10_STORE_CANDIDATE ctor_call=0x{site:x} site=0x{a+p:x} bytes={blob[p:p+8].hex()}')
+          print('PROVENANCE_REQUIRED_STATIC_FACTS_VERIFIED=true')
+          print('TRACK_A_GAMESERVER_TCP_STATIC_PROVENANCE_COMPLETE=true')
+          PY
+
+          while read -r lo hi; do
+            [[ "$lo" =~ ^0x[0-9a-f]+$ && "$hi" =~ ^0x[0-9a-f]+$ ]] || continue
+            echo "FDE_DISASSEMBLY_BEGIN lo=$lo hi=$hi"
+            "$gdb" -q -nx -batch "$client" -ex 'set pagination off' -ex 'set disassembly-flavor intel' -ex "disassemble /r $lo,$hi" || true
+            echo "FDE_DISASSEMBLY_END lo=$lo hi=$hi"
+          done <"$plan"
+
+          grep -q '^CLIENT_FENCE_SHA_SIZE_VERIFIED=true$' "$report"
+          grep -q '^PROVENANCE_REQUIRED_STATIC_FACTS_VERIFIED=true$' "$report"
+          grep -q '^TRACK_A_GAMESERVER_TCP_STATIC_PROVENANCE_COMPLETE=true$' "$report"
+          echo TRACK_A_GAMESERVER_TCP_WRITER_PROVENANCE_COMPLETE=true
+
+      - name: Upload exact-version gameserver TCP provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-gameserver-tcp-writer-provenance-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-gameserver-tcp-writer-provenance.txt
+          if-no-files-found: error
+          retention-days: 30

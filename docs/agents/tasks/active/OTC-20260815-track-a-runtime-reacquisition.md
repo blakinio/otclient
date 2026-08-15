@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-runtime-reacquisition
-status: active
+status: waiting
 agent: ChatGPT
 session_id: chatgpt-runtime-researcher-20260815-1405
 session_role: researcher
@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T14:09:00+02:00
+updated: 2026-08-15T14:12:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -27,7 +27,8 @@ depends_on:
   - coordinator-retained exact-build structural world evidence
   - historical login procedure in PR #290 as revalidation-required input only
   - PR #283 bridge evidence as read-only reference only
-blocks: []
+blocks:
+  - exact self-hosted run 31883846172 / job 95010096196 exists but remained queued across the two allowed unchanged-state observations; semantic execution has not started
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
@@ -39,25 +40,17 @@ user_communication: terminal_only
 code_bearing_head: 4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4
 resume_dispatch_head: 950ce8f5f7cf22b457e82cdb20e9eec285438d9c
 invocation_started_at: 2026-08-15T14:05:00+02:00
-last_progress_at: 2026-08-15T14:09:00+02:00
+last_progress_at: 2026-08-15T14:12:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: runtime
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 2
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-active_operation:
-  type: exact_build_runtime_reacquisition
-  run_id: 31883846172
-  job_id: 95010096196
-  workflow: .github/workflows/tibia-official-client-re-runtime-reacquisition.yml
-  execution_head: 950ce8f5f7cf22b457e82cdb20e9eec285438d9c
-  first_observed_status: queued
-  source_code_blob: c1b88d4cc17edf2684b93d7e516f9c694e37966a
-  run_request: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/runtime-run-request.json
+last_checkpoint: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-resume-dispatch-queued.md
 ---
 
 # Objective
@@ -74,40 +67,28 @@ platform: official_native_linux_only
 runner: synology-otclient-01
 ```
 
-# Runtime ownership and safety
-
-```yaml
-state_directory: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition
-display: ':115'
-task_socks_port: 25415
-upstream_track_a_socks_port: 25354
-process_marker: OTCLIENT_TIBIA_RE_TASK=OTC-20260815-track-a-runtime-reacquisition
-track_marker: OTCLIENT_TIBIA_RE_TRACK=official-client-re
-concurrency_group: official-client-re-runtime
-```
-
-Credentials may exist only in protected login-step inputs. Persistent client/X/observer/relay environments must remain free of credential variables. The task must not touch Track B, shared upstream wireproxy ownership, foreign display locks/sockets, or irreversible gameplay/economic effects.
-
-# Changed prerequisite and dispatch
+# Durable resume state
 
 ### FACT
 
-- P0 owner fenced and cancelled stale run `31880617510`; it no longer holds the serialized runtime lane.
+- P0 owner fenced and cancelled stale run `31880617510`; it is no longer the serialized runtime blocker.
 - P0 run `31883178675` executed on `synology-otclient-01`.
-- P0 run `31883422477` / job `95009054487` proved zero currently live exact Track A client processes and left P0 waiting on RUNTIME to create a bounded live process window.
-- Latest RUNTIME implementation before resume is helper blob `c1b88d4cc17edf2684b93d7e516f9c694e37966a` from code-bearing head `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`; later pre-resume changes were task/evidence only.
-- GitHub API refused direct retry of cancelled run `31882125124` (`403 This workflow run cannot be retried`).
-- A durable request `runtime-run-request.json` now fences the changed prerequisite, exact client, code-bearing head and authorized/forbidden effects.
-- Workflow head `950ce8f5f7cf22b457e82cdb20e9eec285438d9c` validates that request and exact helper Git blob before runtime work; push created run `31883846172`, job `95010096196`.
-- First job observation: `queued`.
+- P0 run `31883422477` / job `95009054487` proved zero currently live exact Track A client processes; P0 remains UNKNOWN and waits for a RUNTIME-created live observation window.
+- The latest pre-resume runtime helper is exact Git blob `c1b88d4cc17edf2684b93d7e516f9c694e37966a` from code-bearing head `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`.
+- GitHub refused direct retry of cancelled run `31882125124`, so an explicit task-owned `runtime-run-request.json` was persisted and fenced.
+- Workflow head `950ce8f5f7cf22b457e82cdb20e9eec285438d9c` validates the run request, exact helper blob, branch/repository/runner identity and exact client fence before runtime work.
+- This created run `31883846172`, job `95010096196` (`reacquire`).
+- Observation 1: queued. Observation 2: queued. No semantic step has started.
+- Full resume/queue evidence is in `20260815-resume-dispatch-queued.md`.
 
-### UNKNOWN pending exact run
+### UNKNOWN
 
-- protected-secret availability/acceptance;
+- runner assignment/busy state; runner inventory remains unavailable to the current GitHub integration;
+- protected login-secret availability/acceptance;
 - generation-1 structural `IN_GAME`;
-- generation-2 fresh PID/PIE and read reacquisition;
-- transport confinement/credential-environment assertions;
-- cleanup result;
+- generation-2 fresh PID/PIE and structural read reacquisition;
+- transport confinement and credential-environment results;
+- cleanup outcome;
 - bridge `session_epoch` / R4 semantics;
 - A3/A4.
 
@@ -123,6 +104,10 @@ Credentials may exist only in protected login-step inputs. Persistent client/X/o
 - [ ] no unauthorized gameplay effect occurred;
 - [ ] exact final-head repository CI terminal before Draft handoff.
 
+# Real stop condition
+
+The task has no further safe local mutation while the exact self-hosted job is queued. `EXECUTION_PROTOCOL.md` forbids keeping an active worker alive only to wait/poll, and `ANTI_STALL_AND_EXECUTION_BUDGET.md` forbids a third unchanged check. The lease is therefore released with `status: waiting` rather than fabricating progress or dispatching a duplicate.
+
 # Next action
 
-Inspect run `31883846172` only after material state change or within the bounded external-operation policy. Consume the first material runtime result and artifacts, classify FACT/UNKNOWN without weakening gates, then checkpoint and release the RUNTIME task if an external blocker remains.
+Resume only after run `31883846172` materially changes state. Inspect job `95010096196` logs/artifacts first. If it executes, classify generation 1/2 from structural records, PID/PIE, transport and environment evidence; if it remains unassigned at the next authorized barrier, retain the exact external blocker without another conceptual duplicate.

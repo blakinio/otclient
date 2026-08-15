@@ -1,10 +1,10 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: waiting
-agent: unassigned
-session_id: null
+status: active
+agent: ChatGPT
+session_id: chatgpt-coordinator-20260815-1718
 session_role: coordinator
-session_rotation_count: 5
+session_rotation_count: 6
 project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T17:17:00+02:00
+updated: 2026-08-15T17:18:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,9 +47,9 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T17:07:00+02:00
-last_progress_at: 2026-08-15T17:17:00+02:00
+last_progress_at: 2026-08-15T17:18:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: coordinator-rotation-5
+ci_check_generation: coordinator-rotation-6
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -57,8 +57,6 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 1
 stall_warnings: 0
-waiting_reason: independent_research_in_progress_or_ready_and_coordinator_has_no_nonoverlapping_promotion_work
-lease_released_at: 2026-08-15T17:17:00+02:00
 ---
 
 # Objective
@@ -87,31 +85,16 @@ platform: official_native_linux_only
 - #301 bounded P2 writer retention; exact source snapshot promoted; source Draft closed unmerged; coordinator CI `31883767739` SUCCESS.
 - #305 bounded P2 intermediate-vtable/type correction. Exact source final head `9329e338235b7f9997d74d4db5313f329662378b`; final task-specific run `31884379539` SUCCESS; final PR CI `31884381191` including `CI / Required` SUCCESS; review threads 0. Exact source blobs copied under coordinator ownership; integration checkpoint `0ade6404c5b43f5fe468b8dd748846406d4c856e` passed CI run `31884644268`.
 
-Accepted #305 boundary:
-```yaml
-intermediate_vptr_0x2f69e30: FACT
-intermediate_typeinfo_0x3080748: FACT
-separate_allocated_object_receives_vptr: FACT
-simple_secondary_TProtocolWriter_interpretation: DISPROVEN
-0x7de7f0_0x7dfd60_role: INFERENCE_TEARDOWN_LIKE
-rtti_0x3080748_semantic_name: UNKNOWN
-rtti_0x3080748_base_relation: UNKNOWN
-first_writer_transform_boundary: UNKNOWN
-framing_order: UNKNOWN
-final_binary_egress: UNKNOWN
-P2_complete: false
-```
-
 ## ACTIVE / READY RESEARCH
-- #302 P0: independently active Draft, live head observed `9060e83036c6a50a59f055c5248b4071aa47b946`. Exact-ELF static work recovered `TPlayerData`, `playerPosition`, and `IPlayerDataProvider` structural leads. Direct authoritative XYZ remains UNKNOWN. #302 owns its P0 task/evidence/workflow/script paths and must not be mutated by the coordinator while active.
-- #303 RUNTIME: independently active Draft, live head observed `5b7a9707e5b1594f5cc62fb0a1ad67f7556226eb`. Exact-client runner/WARP/relay/Xvfb/loader/bundled-Qt/software-renderer prerequisites are progressively bounded; current rotation first repairs deterministic actionlint/shellcheck findings, then may test one canonical-HOME-package-path/cwd discriminator. Restart/relogin stability remains UNKNOWN. #303 owns its runtime paths and must not be mutated by the coordinator while active.
-- #306 P2: Draft-only `OTC-20260815-track-a-p2-first-transform-boundary`, exact main base `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`, current observed head `d87a646500832989c57e89f7e1bbf33e5b495bab`, status READY/unassigned. It owns only its task/evidence plus uniquely named P2 workflow/script. Objective is the first concrete serialization/data-transform edge on the accepted writer branch; it explicitly excludes final-socket run `31825417040`, generic QIODevice enumeration, vtable adjacency and superseded sink models.
+- #302 P0: researcher rotation released to `waiting` at live head `6f838d1089968d216e506cd272e7b98680da9fc8` after side-effect-free static RE. New bounded evidence fixes `playerPosition` literal at `0x1cdde3f`, unique bounded code site `0x8367c1`, and exact relocation-backed provider/worldmap/TPlayerData type anchors. Direct authoritative XYZ remains UNKNOWN. This released slice is under coordinator review now.
+- #303 RUNTIME: independently active Draft; coordinator does not mutate its owned paths.
+- #306 P2: Draft-only first-transform-boundary task, READY/unassigned for an independent researcher; coordinator does not convert itself into that researcher.
 
 ## RETURN_FOR_EVIDENCE
-- #295 map-observation ownership correction remains not promotable. Live review has four unresolved material threads: overlapping ownership of `MAP_OBSERVATION_V1.md` with the older active export task, missing separate-authorization gate for external Atlas consumption, weakened blanket raw-packet prohibition, and dropped non-negative integer constraint for `producer.protocol_version`. Its source base `42226155ee3afdcef380f6400a2fefc52061ada3` is also obsolete relative to current main. Do not integrate it until ownership and all findings are resolved.
+- #295 map-observation ownership correction remains not promotable due four unresolved material review threads and stale/overlapping ownership.
 
 ## RELATED NON-TRACK-A IMPLEMENTATION
-- #292 is still an open Draft implementing an OTClient `Map`/`Tile` observation recorder under `src/**`. It is not the official-client Track A producer and is not mutated by this coordinator. Its existence is a conflict/input to #295 ownership reconciliation, not Track A runtime authority.
+- #292 remains open Draft OTClient `Map`/`Tile` observation recorder and is not the official-client Track A producer.
 
 ## REJECT/SUPERSEDE
 - #289 broad stale continuation and superseded P2 model;
@@ -148,13 +131,13 @@ restart_relogin_stability: UNKNOWN/1
 ```
 
 # Acceptance inventory
-- [x] #304 independently reviewed, accepted with edits, promoted as a bounded source snapshot and source Draft closed unmerged.
-- [x] #301 independently reviewed, accepted with edits, promoted as a bounded source snapshot and source Draft closed unmerged.
-- [x] #305 independently reviewed, promoted as a bounded source snapshot and source Draft closed unmerged.
-- [x] coordinator integration head `0ade6404c5b43f5fe468b8dd748846406d4c856e` passed CI run `31884644268` for the accepted #305 generation.
-- [x] next disjoint P2 serialization/transform hypothesis dispatched as Draft #306 with a concrete task/branch/worktree/owned-path contract and no duplicate final-socket experiment.
-- [x] current #295 overlap/review findings and related #292 implementation rechecked before coordinator release.
-- [ ] active #302/#303 and ready #306 results reconciled after independent researcher handoff.
+- [x] #304 independently reviewed, promoted boundedly and source Draft closed unmerged.
+- [x] #301 independently reviewed, promoted boundedly and source Draft closed unmerged.
+- [x] #305 independently reviewed, promoted boundedly and source Draft closed unmerged.
+- [x] next disjoint P2 serialization/transform hypothesis dispatched as Draft #306.
+- [x] current #295 overlap/review findings and related #292 implementation rechecked.
+- [ ] released #302 static slice reviewed and assigned a bounded disposition.
+- [ ] active #303 and ready #306 results reconciled after independent researcher handoff.
 - [ ] P2 actual transform/framing order, final binary egress and causal harness closed.
 - [ ] P0 direct authoritative reads and P1 live authority/restart stability closed.
 - [ ] A3/A4 action parity closed where required.
@@ -162,10 +145,6 @@ restart_relogin_stability: UNKNOWN/1
 - [ ] #295 ownership/review conflict either remediated by its owner or terminally superseded with bounded unique content preserved.
 - [ ] final programme audit/CI/PR hygiene/archive/ownership release complete.
 
-# Stop / release rationale
-
-No additional coordinator-owned promotion or integration slice is currently reviewable without violating independent worker ownership. #302 and #303 have fresh active researcher leases; #306 is a concrete independent READY Draft task but requires a fresh researcher session rather than converting the coordinator into a serial researcher. #295 has unresolved ownership/review findings outside current coordinator owned paths. Repeated polling is forbidden by the anti-stall contract.
-
 # Next action
 
-Reacquire this coordinator task after the first of #302, #303, or #306 publishes a reviewable handoff/release; refetch exact `main`, that Draft head, its task/checks/artifacts and assign one promotion disposition before any canonical integration.
+Review exact #302 head `6f838d1089968d216e506cd272e7b98680da9fc8`: verify changed paths, evidence, exact-client provenance, current-head CI and review threads; then assign `ACCEPT`, `ACCEPT_WITH_EDITS`, `RETURN_FOR_EVIDENCE`, or `REJECT/SUPERSEDE` to the bounded static slice without promoting direct player XYZ.

@@ -1,0 +1,78 @@
+name: Track A runtime cache-window probe replay
+
+on:
+  push:
+    branches: [research/OTC-20260815-track-a-runtime-reacquisition]
+    paths:
+      - .github/workflows/tibia-official-client-re-runtime-cache-window-replay.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    concurrency:
+      group: official-client-re-runtime
+      cancel-in-progress: false
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      TASK_ID: OTC-20260815-track-a-runtime-reacquisition
+      TRACK_DISPLAY: ':115'
+      DISPLAY_NUM: '115'
+      TASK_SOCKS_PORT: '25415'
+      UPSTREAM_SOCKS_PORT: '25354'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      BASE_STATE: /work/_otclient_tibia_re_state
+      QT_DEBUG_PLUGINS: '1'
+      SOURCE_WORKFLOW: .github/workflows/tibia-official-client-re-runtime-cache-window.yml
+      EXPECTED_SOURCE_BLOB: d829a95c809515f7792570f242e6cb3f748005c9
+    steps:
+      - name: Checkout exact draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Replay identical cache probe with only xdotool loader repaired
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$(git hash-object "$SOURCE_WORKFLOW")" == "$EXPECTED_SOURCE_BLOB" ]]
+          out="$RUNNER_TEMP/cache-window-replay.sh"
+          python3 - "$SOURCE_WORKFLOW" "$out" <<'PY'
+          from pathlib import Path
+          import sys
+          source,out=map(Path,sys.argv[1:])
+          lines=source.read_text(encoding='utf-8').splitlines()
+          marker='      - name: Probe visible window with only classified task-local cache seeded'
+          start=lines.index(marker)
+          run=None
+          for i in range(start+1,len(lines)):
+              if lines[i].startswith('      - name: '): break
+              if lines[i]=='        run: |':
+                  run=i+1
+                  break
+          if run is None: raise SystemExit('source run block missing')
+          body=[]
+          for line in lines[run:]:
+              if lines[i].startswith('      - name: '):
+                  break
+              if line and not line.startswith('          '):
+                  raise SystemExit(f'unexpected source indentation: {line!r}')
+              body.append(line[10:] if line else '')
+          text='\n'.join(body)+'\n'
+          anchor='export DISPLAY="$TRACK_DISPLAY"'
+          if text.count(anchor)!=1:
+              raise SystemExit(f'DISPLAY anchor count={text.count(anchor)}')
+          text=text.replace(anchor,anchor+'\nexport LD_LIBRARY_PATH="$tool_lib"',1)
+          out.write_text(text,encoding='utf-8')
+          PY
+          bash -n "$out"
+          grep -Fq 'export LD_LIBRARY_PATH="$tool_lib"' "$out"
+          echo TRACK_A_CACHE_WINDOW_REPLAY_XDOTOOL_LOADER_REPAIRED=true
+          bash "$out"

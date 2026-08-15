@@ -176,7 +176,8 @@ def main() -> int:
     serial2 = disassemble(ns.objdump, ns.client, SERIALIZE_2, SERIALIZE_2 + 0x180)
     require("QDataStream" in serial2 and "lsEs" in serial2, "slot_0x18_qdatastream_signed_short")
     require("[rsi+0x30]" in serial2, "slot_0x18_reads_argument_field_30")
-    require("[rsi+0x34]" in serial2, "slot_0x18_reads_argument_field_34")
+    require("rbx,rsi" in serial2, "slot_0x18_preserves_argument_in_rbx")
+    require("[rbx+0x34]" in serial2, "slot_0x18_reads_argument_field_34")
     require("[rdi+0x18]" in serial2, "slot_0x18_uses_retained_writer_member")
 
     # Adjacent concrete byte-buffer construction exists, but ordering relative to the serializer calls

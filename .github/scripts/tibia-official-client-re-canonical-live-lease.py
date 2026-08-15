@@ -320,6 +320,8 @@ class LeaseManager:
                 raise LeaseError("lease_identity_mismatch", "controller identity mismatch")
             if not self._token_matches(state, token):
                 raise LeaseError("lease_token_mismatch", "lease token mismatch")
+            if int(state.get("expires_at", 0)) <= now_epoch:
+                raise LeaseError("lease_expired", "controller lease has expired")
             generation = int(state["generation"])
             state.update(
                 {

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: active
+status: ready
 agent: ChatGPT
 session_id: chatgpt-coordinator-20260815-1330
 session_role: coordinator
@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T13:38:00+02:00
+updated: 2026-08-15T13:41:30+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,16 +47,17 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T13:38:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: current
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+last_progress_at: 2026-08-15T13:41:30+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: terminal
+tterminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 1
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 2
 stall_warnings: 0
+stop_reason: coverage promotion is integrated and validated; no independent worker-spawn capability exists, so the prompt permits serial execution of the highest-information READY researcher lane only after coordinator ownership is released
 ---
 
 # Objective
@@ -74,7 +75,7 @@ BRANCH: docs/OTC-20260815-track-a-promotion-coordination
 WORKTREE: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 ```
 
-This is coordinator session rotation 2 on the same task after the previous session released ownership with `status: ready`. No researcher branch/worktree is shared.
+Coordinator session rotation 2 is now released (`status: ready`) before claiming any researcher branch.
 
 # Exact client fence
 
@@ -96,14 +97,14 @@ platform: official_native_linux_only
 
 - #279: fail-closed worldmap reconstruction tooling; exact accepted blobs rebuilt on #300. Real capture/mappings/complete OTBM remain UNKNOWN.
 - #290: bounded historical login/recovery procedure retained as `REVALIDATION_REQUIRED`.
-- #304: bounded exact-build quantitative coverage baseline reviewed at source head `43a60bd96cc644b656b200c9edbfb75578b330b6`; source CI `31882010038` SUCCESS. Exact accepted evidence blobs copied under coordinator evidence in commit `7b2f824e1038ea3d90200186fdb257ba25c95bc1`; campaign report updated in `ad6c99ac0f2729e7c233efc96e235a9b8c409411`. Inventory completeness is not semantic completeness; source-registry self-validation is internal-integrity evidence, not cryptographic regeneration from every historical log.
+- #304: bounded exact-build quantitative coverage baseline reviewed at source head `43a60bd96cc644b656b200c9edbfb75578b330b6`; source CI `31882010038` SUCCESS; exact accepted evidence copied under coordinator ownership in `7b2f824e1038ea3d90200186fdb257ba25c95bc1`; coordinator integration head `0f5f835426ae9cd633c41e0cd0898d0a7dab87a4` passed CI `31882563937`; source Draft #304 closed unmerged after promotion.
 
 ## RETURN_FOR_EVIDENCE
 
 - #295: material review findings plus Track B ownership collision.
-- #301 P2-NETWORK: contract-only head `29ca506501efc716330a80ab2b96eaf9bbe3d4d5`; no experiment delivered.
+- #301 P2-NETWORK: contract-only head `29ca506501efc716330a80ab2b96eaf9bbe3d4d5`; no experiment delivered; highest-information READY lane.
 - #302 P0-STATE: typed read-only probe exists, but self-hosted run `31880617510` / job `95002559098` remains queued; no semantic direct-position result.
-- #303 RUNTIME: semantic run remains blocked behind #302. Cleanup was additionally hardened fail-closed on code head `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`; durable waiting checkpoint is `2b6350abeb4de37180247c585b90bd1e4c0a9d0f`. Safety repair only, not semantic evidence.
+- #303 RUNTIME: semantic run remains blocked behind #302. Cleanup hardening at `4bd5cbc47fbfd816a6ab5dd66b57c88b3ff981f4`; durable waiting checkpoint `2b6350abeb4de37180247c585b90bd1e4c0a9d0f`; safety only, not semantic evidence.
 
 ## REJECT/SUPERSEDE
 
@@ -142,32 +143,14 @@ ACTION: A3_A4_NOT_PROVEN
 COMPLETE: false
 ```
 
-# Acceptance inventory
+# Validation checkpoint
 
-- [x] current main and governance refetched;
-- [x] coordinator ownership rotated safely;
-- [x] #279/#283/#290 accepted bounded slices integrated/preserved;
-- [x] #304 new evidence reviewed, assigned `ACCEPT_WITH_EDITS`, exact accepted blobs promoted under coordinator ownership;
-- [x] quantitative coverage state reconciled without overstating inventory percentages;
-- [x] #301/#302/#303 current dispositions evidence-backed;
-- [ ] exact-head coordinator CI terminal for the coverage-integration generation;
-- [ ] source #304 lifecycle/PR hygiene finalized after integration validation;
-- [ ] highest-information unresolved lane #301 executed or an exact blocker persisted;
-- [ ] P0/RUNTIME live gates satisfied when the serialized self-hosted lane releases;
-- [ ] final programme audit/E2E/CI/PR hygiene/task archive/ownership release complete.
-
-# Execution budget
-
-```yaml
-session_rotation_count: 2
-last_progress_at: 2026-08-15T13:38:00+02:00
-ordinary_ci_checks_for_current_head: 0
-terminal_ci_checks: 0
-repair_cycles: 0
-context_reconstruction_attempts: 2
-stall_warnings: 0
-```
+- source #304 exact-head CI: `31882010038` = SUCCESS;
+- exact source blobs promoted by SHA under coordinator evidence;
+- coordinator integration head `0f5f835426ae9cd633c41e0cd0898d0a7dab87a4` = CI `31882563937` SUCCESS;
+- source #304 closed Draft/unmerged after promotion;
+- no programme-completion claim is made.
 
 # Next action
 
-Run exact-head repository validation for this coordinator integration generation. If green, close the now-promoted #304 Draft source without merging it. Then, because no separate worker-spawn capability exists and #301 remains READY/unassigned, release coordinator ownership to `ready` and claim #301 as a separate Draft-only researcher session (allowed only because no safe parallel worker path exists). Do not share the coordinator branch while researching #301.
+Claim #301 as an isolated Draft-only P2 researcher session. Revalidate its exact head/task/owned paths, use current canonical #299 facts plus bounded historical exact-build evidence, and execute the `TGameserverDualConnection -> TProtocolWriter/TIODeviceWriter` ownership/provenance discriminator. Do not write #300 while #301 is active. After #301 reaches a reviewable Draft handoff, release it and rotate back to #300 for independent promotion review.

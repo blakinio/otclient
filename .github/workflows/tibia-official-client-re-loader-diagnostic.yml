@@ -54,22 +54,15 @@ jobs:
               off=phoff+i*phentsize
               p_type,p_flags,p_offset,p_vaddr,p_paddr,p_filesz,p_memsz,p_align=struct.unpack_from('<IIQQQQQQ',data,off)
               ph.append((p_type,p_offset,p_vaddr,p_filesz,p_memsz))
-          interp=''
-          dynamic=None
-          loads=[]
+          interp=''; dynamic=None; loads=[]
           for p_type,p_offset,p_vaddr,p_filesz,p_memsz in ph:
-              if p_type==3:
-                  interp=data[p_offset:p_offset+p_filesz].split(b'\0',1)[0].decode()
-              elif p_type==2:
-                  dynamic=(p_offset,p_filesz)
-              elif p_type==1:
-                  loads.append((p_vaddr,p_vaddr+p_memsz,p_offset,p_filesz))
-          if not interp or dynamic is None:
-              raise SystemExit('missing ELF interpreter/dynamic segment')
+              if p_type==3: interp=data[p_offset:p_offset+p_filesz].split(b'\0',1)[0].decode()
+              elif p_type==2: dynamic=(p_offset,p_filesz)
+              elif p_type==1: loads.append((p_vaddr,p_vaddr+p_memsz,p_offset,p_filesz))
+          if not interp or dynamic is None: raise SystemExit('missing ELF interpreter/dynamic segment')
           def va_to_off(va):
               for lo,hi,fo,fs in loads:
-                  if lo <= va < hi and va-lo < fs:
-                      return fo+(va-lo)
+                  if lo <= va < hi and va-lo < fs: return fo+(va-lo)
               raise SystemExit(f'unmapped VA 0x{va:x}')
           entries=[]; strtab_va=None; strsz=None
           doff,dsize=dynamic
@@ -79,8 +72,7 @@ jobs:
               entries.append((tag,val))
               if tag==5: strtab_va=val
               elif tag==10: strsz=val
-          if strtab_va is None or strsz is None:
-              raise SystemExit('missing dynamic string table')
+          if strtab_va is None or strsz is None: raise SystemExit('missing dynamic string table')
           so=va_to_off(strtab_va); strings=data[so:so+strsz]
           def dynstr(idx):
               end=strings.find(b'\0',idx)
@@ -114,17 +106,22 @@ jobs:
           echo TRACK_A_LOADER_LAYOUT_END=true
 
           list_case() {
-            local label="$1" libs="$2" output
+            local label="$1" libs="$2" output rc
             output="$RUNNER_TEMP/loader-$label.txt"
+            set +e
             env -u LD_PRELOAD LD_LIBRARY_PATH="$libs" "$interpreter" --list "$client" >"$output" 2>&1
+            rc=$?
+            set -e
+            printf '%s\n' "$rc" >"$RUNNER_TEMP/loader-$label.rc"
             echo "TRACK_A_LOADER_CASE_BEGIN=$label"
+            echo "TRACK_A_LOADER_CASE_RC=$label:$rc"
             sed -E 's/[[:space:]]+/ /g' "$output" | sed 's/^ //'
             echo "TRACK_A_LOADER_CASE_END=$label"
           }
           list_case positive "$positive_lib"
           list_case current "$current_lib"
 
-          python3 - "$RUNNER_TEMP/loader-positive.txt" "$RUNNER_TEMP/loader-current.txt" <<'PY'
+          python3 - "$RUNNER_TEMP/loader-positive.txt" "$RUNNER_TEMP/loader-current.txt" "$RUNNER_TEMP/loader-positive.rc" "$RUNNER_TEMP/loader-current.rc" <<'PY'
           import re,sys
           def parse(path):
               out={}
@@ -133,11 +130,13 @@ jobs:
                   if m: out[m.group(1)]=m.group(2)
               return out
           a=parse(sys.argv[1]); b=parse(sys.argv[2])
-          keys=sorted(set(a)|set(b))
-          diffs=[]
+          arc=int(open(sys.argv[3]).read()); brc=int(open(sys.argv[4]).read())
+          keys=sorted(set(a)|set(b)); diffs=[]
           for k in keys:
               av=a.get(k,'MISSING'); bv=b.get(k,'MISSING')
               if av!=bv: diffs.append((k,av,bv))
+          print(f'TRACK_A_LOADER_POSITIVE_STYLE_RC={arc}')
+          print(f'TRACK_A_LOADER_CURRENT_STYLE_RC={brc}')
           print(f'TRACK_A_LOADER_RESOLUTION_DIFF_COUNT={len(diffs)}')
           for k,av,bv in diffs: print(f'LOADER_DIFF name={k} positive={av} current={bv}')
           qt=[d for d in diffs if d[0].startswith('libQt6')]
@@ -147,4 +146,5 @@ jobs:
           print(f'TRACK_A_LOADER_GL_DIFF_COUNT={len(gl)}')
           print(f'TRACK_A_LOADER_PROXY_DIFF_COUNT={len(proxy)}')
           print('TRACK_A_LOADER_DIFFERENTIAL_COMPLETE=true')
+          if brc != 0: raise SystemExit('current-style loader resolution failed')
           PY

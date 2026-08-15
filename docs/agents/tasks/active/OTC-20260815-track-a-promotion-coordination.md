@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-promotion-coordination
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-coordinator-20260815-125938
 session_role: coordinator
@@ -9,14 +9,14 @@ project_lane: otclient
 lane: track-a-coordination
 track_id: official-client-re
 task_kind: integration
-phase: exact-head-validation-and-handover
+phase: promotion-review-integration
 branch: docs/OTC-20260815-track-a-promotion-coordination
 base_branch: main
 base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T13:25:01+02:00
+updated: 2026-08-15T13:27:26+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,7 +47,7 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T13:25:01+02:00
+last_progress_at: 2026-08-15T13:27:26+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: other
 terminal_ci_wait_started_at: null
@@ -63,7 +63,7 @@ stall_warnings: 0
 
 Keep canonical Track A (`official-client-re`) true, reproducible and progressively complete while researchers remain Draft-only and the coordinator alone promotes accepted evidence. Track B is outside mutation authority.
 
-# Coordinator live-state contract
+# Live-state contract
 
 ```yaml
 TASK_ID: OTC-20260815-track-a-promotion-coordination
@@ -74,8 +74,6 @@ BRANCH: docs/OTC-20260815-track-a-promotion-coordination
 WORKTREE: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 ```
 
-This session safely took over the same coordinator task after the prior coordinator exceeded the mandatory no-progress budget. No researcher branch/worktree has been shared.
-
 # Exact client fence
 
 ```yaml
@@ -85,111 +83,69 @@ sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 platform: official_native_linux_only
 ```
 
-# Coordinator dispositions
+# Durable campaign checkpoint
 
-## ACCEPT
+## Integrated accepted evidence
 
-- PR #283: bounded read-only runtime bridge implementation only. Source PR closed unmerged; accepted exact source blobs rebuilt on #300. P1 remains incomplete because live `session-status`, authoritative player position, restart/relogin stability and write/action APIs are not proven.
-- Exact-build reversible structural world transition from run `31806312967` / job `94785974126` as bounded runtime/world-state evidence only; A3/A4 remain unproven.
+- PR #279 `ACCEPT_WITH_EDITS`: source closed unmerged at `04356aa9c042ce19d9d8431b91f18567e410a5e5`; exact accepted worldmap tool/test blobs rebuilt on #300; source exact-head CI `31681889560` SUCCESS; 23/23 focused tests, syntax and synthetic reconstruct/compare/plan evidence retained. Real capture/mappings/complete OTBM remain UNKNOWN.
+- PR #283 `ACCEPT`: source closed unmerged at `d93ccb34f66af7d3198a50a46e706b4f902ae637`; exact accepted read-only bridge/test blobs rebuilt on #300; source exact-head CI `31680615776` SUCCESS; exact runtime validation `31654823776` / `94306874981` retained. `session-status` remains DERIVED until live structural correlation; authoritative position/restart/write API remain UNKNOWN.
+- PR #290 `ACCEPT_WITH_EDITS`: bounded historical login/recovery procedure preserved as `REVALIDATION_REQUIRED`; source closed.
+- bounded exact-build reversible structural world transition from run `31806312967` / job `94785974126` retained as FACT world-state evidence only; A3/A4 remain unproven.
 
-## ACCEPT_WITH_EDITS
+## Rejected/superseded
 
-- PR #279: fail-closed worldmap reconstruction tooling. Source PR closed unmerged; accepted tool/test/report blobs rebuilt on #300 with module catalogue and changelog registration. Real capture coverage, appearance mappings and complete OTBM remain unproven.
-- PR #290: bounded historical login/recovery procedure preserved as `REVALIDATION_REQUIRED`; stale source PR closed unmerged.
+- #289 stale broad continuation / superseded P2 model;
+- #296 stale lifecycle draft after accepted correction integration;
+- #277 stale Oteryn-dependent handover; unique negative history preserved;
+- #280 superseded only as an active Track A dependency; broader infrastructure PR remains separately owned/open.
 
-## RETURN_FOR_EVIDENCE
+## Return for evidence
 
-- PR #295: four unresolved material review threads plus Track B ownership collision.
-- PR #301: dispatch-only P2 writer-ownership Draft; no researcher evidence or executed hypothesis yet; remains READY/unassigned.
-- PR #302: typed read-only direct-position probe exists, but self-hosted run `31880617510` job `95002559098` remains queued; no semantic result.
-- PR #303: isolated restart/relogin design exists, but no self-hosted `reacquire` semantic job has executed; serialized behind #302.
-- PR #304: dispatch-only item-level coverage Draft; no registries/validator/summary yet; remains READY/unassigned.
+- #295: material review findings plus Track B ownership collision.
+- #301 P2-NETWORK: current head `29ca506501efc716330a80ab2b96eaf9bbe3d4d5`; dispatch contract only; READY/unassigned, no experiment result.
+- #302 P0-STATE: current head `e45b126923495b209c08a77e9a3db96b44ad71a4`; typed read-only probe exists but run `31880617510` job `95002559098` remains queued; no semantic result.
+- #303 RUNTIME: current head `0270b1f3b6e75c995649b405758f058bae026c88`; no self-hosted reacquire semantic job executed; serialized behind #302.
+- #304 COVERAGE-AUDIT: current head `7eec15079e54bc163785013025cdea47d30e57c7`; dispatch contract only; READY/unassigned, no registries/validator.
 
-## REJECT/SUPERSEDE
-
-- PR #289: stale broad continuation with superseded P2 model and unresolved safety failures.
-- PR #296: stale lifecycle draft after accepted correction was integrated.
-- PR #277: stale Oteryn-dependent handover; unique negative history preserved before closure.
-- PR #280 only as an active Track A dependency; broader infrastructure PR remains intentionally open under separate ownership.
-
-# Canonical P2 boundary
+# Canonical non-completion boundary
 
 ```yaml
-proven:
-  - TGameserverTCPConnection exact-build ownership/QMeta/RTTI
-  - concrete QTcpSocket member construction at receiver +0x10
-  - TProtocolWriter : TIODeviceWriter RTTI
-disproven_or_superseded:
-  - owner+0x88 -> 0xb5b880 gameplay endpoint
-  - 0xb46bd0 binary gameplay sink
-  - 0xc33259 network/gameplay sink
-unknown:
-  - TGameserverDualConnection -> actual writer edge
-  - serialization/framing order
-  - compression/encryption/sequence boundary
-  - final binary socket/QIODevice egress
-  - causal local/custom harness proof
+P2: OPEN_writer_ownership_transform_order_final_egress_harness
+P1: PARTIAL_read_only_bridge_integrated_live_authority_unknown
+P0: PARTIAL_structural_world_transition_fact_direct_player_state_unknown
+RUNTIME: PARTIAL_one_generation_world_evidence_restart_relogin_unknown
+ACTION: A3_A4_NOT_PROVEN
+PROTOCOL_COVERAGE: 349/349 scoped identifier inventory; semantic classification UNKNOWN/349
+QMETA_COVERAGE: 47/47 scoped handler inventory; semantic direct-Qt classification UNKNOWN/2184
+P0_COVERAGE: UNKNOWN/UNKNOWN
+COMPLETE: false
 ```
 
-# Integration state
+# Validation checkpoint
 
-```yaml
-worldmap:
-  source_pr: 279 closed unmerged
-  source_head: 04356aa9c042ce19d9d8431b91f18567e410a5e5
-  source_exact_head_ci: 31681889560 success
-  current_main_rebuild: present_on_pr_300
-  module_catalog: registered
-  changelog: registered
-bridge:
-  source_pr: 283 closed unmerged
-  source_head: d93ccb34f66af7d3198a50a46e706b4f902ae637
-  validated_code_head: 89e13819e6f53026b831b7e8e4c8fab228d1626c
-  source_exact_head_ci: 31680615776 success
-  current_main_rebuild: present_on_pr_300
-  module_catalog: registered
-  changelog: registered
-```
+Coordinator integration checkpoint `941921ae6c481d2ad6d94c0b182fba8c1bd40f68` was audited for changed paths and exact source-blob identity:
 
-# Quantitative checkpoint
+- all 23 changed files are within declared Track A coordinator/integration scope;
+- current worldmap tool/test blob SHAs exactly equal the accepted #279 source blobs;
+- current runtime-bridge tool/test/profile blob SHAs exactly equal the accepted #283 source blobs;
+- `main` was still `8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45` immediately before exact-head validation;
+- exact-head CI run `31882005845` progressed from `pending` to `in_progress` across the two ordinary checks allowed for that SHA; no third poll is permitted by the anti-stall contract.
 
-```yaml
-protocol_identifier_inventory: 349/349 scoped inventory only
-protocol_handler_qmeta_records: 47/47 scoped inventory only
-legacy_qobject_connect_edges: 40/41
-high_information_gameaction_sender_metaobjects: 29/31
-direct_qt_connection_semantic_classification: UNKNOWN/2184
-generated_message_semantic_classification: UNKNOWN/349
-p0_live_read_coverage: UNKNOWN/UNKNOWN
-```
+This task is not marked completed and #300 remains Draft because independent researcher evidence and programme gates are outstanding. The current checkpoint commit is documentation-only after the audited integration head; no product/tool/test blob changed after `941921ae...`.
 
-No scoped 100% inventory value is global semantic coverage.
-
-# Acceptance inventory
-
-- [x] Current main/governance/ownership preflight completed before mutation.
-- [x] Stale broad #289 ownership released with positive and negative evidence preserved.
-- [x] #277/#290 terminally reconciled; #280 removed as a Track A dependency without overstepping infrastructure ownership.
-- [x] #279 accepted source closed and bounded worldmap implementation rebuilt on current main.
-- [x] #283 accepted source closed and bounded read-only bridge implementation rebuilt on current main.
-- [x] Active Draft #301-#304 exact heads reviewed and assigned coordinator dispositions.
-- [x] P2/P1/P0/RUNTIME/ACTION non-completion boundaries explicitly preserved.
-- [ ] Combined coordinator exact-head CI passes on the final checkpoint head.
-- [ ] Item-level protocol/QMeta/P0 registries produced and promoted.
-- [ ] P2 writer/final-egress, authoritative P0 reads and restart/relogin evidence close their required gates.
-- [ ] A3/A4 safe action parity gates close.
-- [ ] Final programme audit/E2E/terminal PR/task/archive/ownership release gates close.
-
-# Execution budget checkpoint
+# Execution budget state
 
 ```yaml
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T13:25:01+02:00
-context_reconstruction_attempts: 1
+checkpoint_at: 2026-08-15T13:27:26+02:00
+elapsed_minutes_approx: 39
+ordinary_ci_checks_for_941921ae: 2
 repair_cycles: 0
+context_reconstruction_attempts: 1
 stall_warnings: 0
+stop_reason: current coordinator-safe work exhausted; runtime lanes are waiting and READY P2/coverage tasks require separate Draft-only researcher sessions, but the available toolset cannot spawn an independent worker and coordinator role must not impersonate them
 ```
 
 # Next action
 
-Run exact-head CI on this combined coordinator checkpoint. If it passes and no new researcher evidence becomes reviewable, checkpoint the coordinator `ready` and rotate: an independent researcher must next claim the already-created P2 task #301 (highest information gain) or coverage task #304; the current coordinator session cannot impersonate those Draft-only researcher roles or spawn a separate worker with the available toolset.
+A separate Draft-only researcher session must claim `OTC-20260815-track-a-p2-writer-ownership` / PR #301 first (highest information gain) and execute its exact-client writer-ownership hypothesis without reviving the superseded models. In parallel, #302/#303 may resume only when the serialized self-hosted runtime lane assigns their jobs, and another independent static researcher may claim #304. The next coordinator session must refetch main/PR heads, review only newly produced evidence, and continue promotion from this checkpoint.

@@ -1,0 +1,118 @@
+name: Track A runtime restart/relogin reacquisition
+
+on:
+  push:
+    branches:
+      - research/OTC-20260815-track-a-runtime-reacquisition
+    paths:
+      - .github/workflows/tibia-official-client-re-runtime-reacquisition.yml
+      - .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-client-re-runtime
+  cancel-in-progress: false
+
+jobs:
+  reacquire:
+    runs-on: [self-hosted, otclient, synology]
+    timeout-minutes: 18
+    env:
+      EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-runtime-reacquisition
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+    steps:
+      - name: Checkout exact draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Validate task helper and exact execution context
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
+          bash -n .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+          test -x /bin/bash
+          echo TRACK_A_RUNTIME_HELPER_SYNTAX_PASS=true
+          echo "TRACK_A_RUNTIME_EXACT_HEAD=$GITHUB_SHA"
+
+      - name: Bootstrap isolated no-secret runtime namespace
+        shell: bash
+        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh bootstrap
+
+      - name: Prepare generation 1 and arm logged-out structural observer
+        shell: bash
+        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh prepare 1
+
+      - name: Login generation 1 with protected inputs only
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh login 1
+
+      - name: Verify generation 1 structural world state and confinement
+        shell: bash
+        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh verify 1
+
+      - name: Cleanly stop generation 1 task-owned client and observer
+        shell: bash
+        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh stop 1
+
+      - name: Prepare generation 2 with fresh PID PIE and observer
+        shell: bash
+        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh prepare 2
+
+      - name: Login generation 2 with protected inputs only
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh login 2
+
+      - name: Verify generation 2 structural world state and confinement
+        shell: bash
+        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh verify 2
+
+      - name: Compare generations and require restart stable reacquisition
+        shell: bash
+        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh compare
+
+      - name: Clean task-owned runtime processes and ephemeral state
+        if: always()
+        shell: bash
+        run: bash .github/scripts/tibia-official-client-re-runtime-reacquisition.sh cleanup
+
+      - name: Record sanitized workflow terminal marker
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p artifacts/runtime-reacquisition
+          {
+            echo "workflow_status=${{ job.status }}"
+            echo "workflow_run_id=$GITHUB_RUN_ID"
+            echo "workflow_head=$GITHUB_SHA"
+            echo "runner=$RUNNER_NAME"
+            echo "expected_client_sha256=$EXPECTED_CLIENT_SHA256"
+            echo "expected_client_size=$EXPECTED_CLIENT_SIZE"
+          } > artifacts/runtime-reacquisition/workflow-terminal.txt
+
+      - name: Upload sanitized runtime reacquisition evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-runtime-reacquisition-${{ github.run_id }}
+          path: artifacts/runtime-reacquisition/**
+          if-no-files-found: ignore
+          retention-days: 7

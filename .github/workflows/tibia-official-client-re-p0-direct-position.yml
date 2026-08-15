@@ -125,14 +125,39 @@ jobs:
           [[ "$(stat -c '%s' "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
 
+          target_exe="$(readlink -f "$client")"
           pid="$(tr -cd '0-9' <"$runtime/client.pid" 2>/dev/null || true)"
-          [[ -n "$pid" ]]
+          pid_source=pidfile
+          if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null \
+             || [[ ! -r "/proc/$pid/environ" ]] \
+             || [[ "$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)" != "$target_exe" ]] \
+             || ! grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ"; then
+            echo "TRACK_A_P0_PIDFILE_STALE=true"
+            matches=()
+            for proc in /proc/[0-9]*; do
+              candidate="${proc##*/}"
+              [[ -r "$proc/environ" ]] || continue
+              [[ "$(readlink -f "$proc/exe" 2>/dev/null || true)" == "$target_exe" ]] || continue
+              grep -azFxq "$TRACK_MARKER" "$proc/environ" || continue
+              matches+=("$candidate")
+            done
+            echo "TRACK_A_P0_DISCOVERED_EXACT_TRACK_CLIENTS=${#matches[@]}"
+            if [[ "${#matches[@]}" -ne 1 ]]; then
+              echo "TRACK_A_P0_ERROR=expected_one_live_exact_track_client" >&2
+              exit 3
+            fi
+            pid="${matches[0]}"
+            pid_source=proc_discovery
+          fi
+
           kill -0 "$pid"
           [[ -r "/proc/$pid/environ" ]]
           grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ"
-          [[ "$(readlink -f "/proc/$pid/exe")" == "$(readlink -f "$client")" ]]
+          [[ "$(readlink -f "/proc/$pid/exe")" == "$target_exe" ]]
 
           echo TRACK_A_P0_RUNTIME_OWNERSHIP_FENCE=true
+          echo "TRACK_A_P0_PID_SOURCE=$pid_source"
+          echo "TRACK_A_P0_PID=$pid"
           echo "TRACK_A_P0_TRACER_PID=$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")"
           python3 .github/scripts/tibia-official-client-re-p0-direct-position.py \
             --pid "$pid" \

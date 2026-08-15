@@ -5,6 +5,7 @@ CANONICAL_STATE_DIR='/home/runner/_work/_otclient_tibia_re_state/canonical-live-
 TASK_STATE_ROOT='/home/runner/_work/_otclient_tibia_re_state/tasks'
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 IMPL="$SCRIPT_DIR/tibia-official-client-re-canonical-live-lease.py"
+GUARD_IMPL="$SCRIPT_DIR/tibia-official-client-re-canonical-live-guard.py"
 
 operation=''
 task_id=''
@@ -81,5 +82,9 @@ case "$operation" in
     exit 64
     ;;
 esac
+
+if [[ "$operation" == guard-run ]]; then
+  exec python3 "$GUARD_IMPL" --state-dir "$CANONICAL_STATE_DIR" "$@"
+fi
 
 exec python3 "$IMPL" --state-dir "$CANONICAL_STATE_DIR" "$@"

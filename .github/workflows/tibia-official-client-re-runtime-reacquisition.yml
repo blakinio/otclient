@@ -37,6 +37,7 @@ jobs:
       TASK_MARKER: OTCLIENT_TIBIA_RE_TASK=OTC-20260815-track-a-runtime-reacquisition
       DISPLAY_NUM: '115'
       TASK_SOCKS_PORT: '25415'
+      QT_DEBUG_PLUGINS: '1'
 
     steps:
       - name: Checkout exact draft head with bounded history

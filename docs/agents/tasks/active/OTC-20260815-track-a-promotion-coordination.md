@@ -16,7 +16,7 @@ base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
 worktree: github-only://blakinio/otclient/refs/heads/docs/OTC-20260815-track-a-promotion-coordination
 worktree_mode: isolated_branch_checkout_equivalent
 created: 2026-08-15T12:23:00+02:00
-updated: 2026-08-15T13:41:30+02:00
+updated: 2026-08-15T13:42:00+02:00
 risk: medium
 related_pr: 300
 owned_paths:
@@ -47,10 +47,10 @@ context_pressure: high
 context_growth: controlled
 decomposition_decision: phased
 invocation_started_at: 2026-08-15T12:48:00+02:00
-last_progress_at: 2026-08-15T13:41:30+02:00
+last_progress_at: 2026-08-15T13:42:00+02:00
 ci_checks_for_current_head: 2
 ci_check_generation: terminal
-tterminal_ci_wait_started_at: null
+terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 1
 unchanged_state_checks: 0
 identical_failure_retries: 0

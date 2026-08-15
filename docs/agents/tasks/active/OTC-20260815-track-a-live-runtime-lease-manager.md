@@ -1,25 +1,25 @@
 ---
 task_id: OTC-20260815-track-a-live-runtime-lease-manager
-status: ready
-agent: unassigned
+status: implementing
+agent: ChatGPT
 session_id: null
-session_role: promotion-worker
-session_rotation_count: 2
+session_role: postmerge-remediation
+session_rotation_count: 3
 project_lane: otclient
 lane: track-a-runtime-governance
 track_id: official-client-re
 task_kind: implementation
-phase: promotion-ready
-branch: feat/OTC-20260815-track-a-live-runtime-lease-manager
+phase: postmerge-review-remediation
+branch: fix/OTC-20260815-track-a-live-runtime-lease-postmerge-p1
 base_branch: main
-base_main: 8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45
+base_main: 3575cc0c0a0b4efbcd9fc860d3226002fe40e70f
 worktree: github-only://blakinio/otclient/refs/heads/feat/OTC-20260815-track-a-live-runtime-lease-manager
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 312
 created: 2026-08-15T22:04:00+02:00
 updated: 2026-08-15T23:03:00+02:00
-lease_released_at: 2026-08-15T23:03:00+02:00
+lease_released_at: null
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-live-runtime-lease-manager.md
   - docs/agents/evidence/OTC-20260815-track-a-live-runtime-lease-manager/**
@@ -68,7 +68,7 @@ delegated_paths:
   - docs/agents/MODULE_CATALOG.md
   - docs/agents/CHANGELOG.md
 review_threads: 0
-stop_reason: promotion-ready handoff; final task-only release head checks are the protected merge gate
+stop_reason: null
 ---
 
 # Objective
@@ -141,3 +141,7 @@ Final task-only release commit is intentionally the remaining protected merge ga
 # Next action
 
 Do not edit the source again. Observe only the final task-release head custom validation and repository `CI / Required`; if both are SUCCESS and the PR remains mergeable with no new material review findings, perform the protected merge. Then return to PR #311 governance reconciliation without declaring `:98` canonical.
+
+# Post-merge P1 review remediation
+
+A post-merge review on PR #312 identified two material P1 concurrency defects on merged commit `3575cc0c0a0b4efbcd9fc860d3226002fe40e70f`: guard children could outlive the lock holder, and time-sensitive operations sampled time before blocking on the flock. This continuation repairs both without touching Tibia runtime state, PR #303/#309 paths, Track B, or the production canonical state. PR #311 must remain fail-closed until this remediation is merged and revalidated.

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-runtime-reacquisition
-status: validating
+status: waiting
 agent: chatgpt-runtime-researcher
 project_lane: otclient
 lane: RUNTIME
@@ -14,7 +14,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T12:55:16+02:00
+updated: 2026-08-15T13:12:53+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -24,7 +24,9 @@ depends_on:
   - coordinator-retained exact-build structural world evidence
   - historical login procedure in PR #290 as untrusted/revalidation-required input only
   - PR #283 bridge evidence as reference only; no ownership of its paths
-blocks: []
+blocks:
+  - separately owned P0 run 31880617510 / job 95002559098 is queued with runner_id=0 in the same official-client-re-runtime concurrency group
+  - runtime run 31881287155 has not materialized/assigned its self-hosted reacquire job; direct runner inventory is unavailable through the current GitHub integration (HTTP 403)
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
@@ -33,6 +35,8 @@ run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
+last_checkpoint: docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-runtime-reacquisition-waiting.md
+code_bearing_head: 9d5734ced2155cf01ab6cbdfabfb2eb2707b7152
 ---
 
 # Objective
@@ -150,17 +154,44 @@ Login/session recovery and clean process restart only. No market/trade/forge/cur
 
 For each generation, arm the exact-build structural Worldmap breakpoint at static offset `0x19a8ea3` before credentials are supplied. Require a bounded logged-out `NO_STIMULUS` baseline with zero valid Worldmap records, then use the protected login helper and require multiple validated `(x,y,z,order)` Worldmap records after character activation. This tests the existing structural read path without repeating movement. Repeat the same resolver procedure after a clean task-owned client/observer restart and require a fresh PID/PIE.
 
+# Current checkpoint
+
+### FACT
+
+- Draft PR #303 remains open and Draft-only on `research/OTC-20260815-track-a-runtime-reacquisition` against `main@8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45`.
+- The task-owned helper/workflow are implemented at code-bearing head `9d5734ced2155cf01ab6cbdfabfb2eb2707b7152` with the credential, namespace, transport, negative-control and fresh-PID/PIE fences described above.
+- Standard PR CI for that code-bearing head completed `success` in run `31881289268`.
+- Earlier runtime workflow runs `31880945751` and `31881193523` were cancelled before a task self-hosted runtime job appeared in the GitHub jobs inventory; they provide no runtime semantic evidence.
+- Current runtime run `31881287155` targets the code-bearing head and is `in_progress`, but its jobs inventory contains only auxiliary `luacheck`/`cppcheck` check-runs; no `reacquire` self-hosted job has yet materialized/been assigned.
+- Separately owned P0 run `31880617510` / job `95002559098` remains `queued` with `runner_id=0` and uses the same `official-client-re-runtime` concurrency group. Its own task record is `waiting` on that job.
+- Direct self-hosted runner inventory returned HTTP `403 Resource not accessible by integration`; current `online/busy` runner state cannot be verified through this connector.
+- Durable waiting evidence is recorded at `docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/20260815-runtime-reacquisition-waiting.md`.
+
+### UNKNOWN
+
+- Current online/busy state of a matching self-hosted runner.
+- Whether protected login secrets are currently populated and accepted; the protected login step has not executed.
+- Generation 1 structural `IN_GAME`, generation 2 fresh PID/PIE, restart/relogin reacquisition, runtime credential-environment assertions and runtime cleanup outcome.
+- Bridge `session_epoch` / R4 semantics.
+- Action gates A3 and A4; historical reversible GUI movement is not sufficient to promote them.
+
+# Resume condition
+
+Resume when the serialized Track A runtime lane can assign this task's `reacquire` job on `synology-otclient-01` without cancelling/bypassing separately owned P0 work. Re-fetch current `main`, PR/task ownership and the exact Draft head before execution. Inspect exact runtime logs/artifacts before classifying any semantic claim.
+
 # Execution-budget checkpoint
 
 ```yaml
 invocation_started_at: 2026-08-15T12:49:00+02:00
-checkpoint_at: 2026-08-15T12:55:16+02:00
-ordinary_exact_head_checks: 0
-repair_cycles: 0
+checkpoint_at: 2026-08-15T13:12:53+02:00
+code_bearing_head: 9d5734ced2155cf01ab6cbdfabfb2eb2707b7152
+ordinary_exact_head_checks: 1
+repair_cycles: 2
 identical_failure_retries: 0
+runtime_semantic_runs_completed: 0
 no_progress_state: false
 context_pressure: medium
-next_action: implement the task-owned no-secret prepare/login/verify/restart workflow and run it on the exact draft head
+next_action: resume exact runtime run only after the separately owned queued P0/self-hosted lane releases; do not poll indefinitely or bypass ownership
 ```
 
 # Deliverable

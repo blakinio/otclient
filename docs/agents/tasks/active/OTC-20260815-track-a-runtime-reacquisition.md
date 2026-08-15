@@ -17,7 +17,7 @@ worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
 related_pr: 303
-updated: 2026-08-15T21:31:00+02:00
+updated: 2026-08-15T21:36:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-runtime-reacquisition.md
   - docs/agents/evidence/OTC-20260815-track-a-runtime-reacquisition/**
@@ -27,6 +27,7 @@ owned_paths:
   - .github/workflows/tibia-official-client-re-runtime-cache-window-replay.yml
   - .github/workflows/tibia-official-client-re-runtime-xdotool-reacquisition.yml
   - .github/scripts/tibia-official-client-re-runtime-reacquisition.sh
+  - .github/scripts/tibia-official-client-re-parent-gdb-patch.py
 depends_on:
   - coordinator-retained exact-build structural world evidence
   - PR #290 historical login procedure as revalidation-required input only
@@ -41,19 +42,19 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: terminal_only
 runtime_code_bearing_head: 1147062b1f91298055f8623043457298c5797600
-workflow_quality_head: 20229fc50efc57116dfb72be36744f053fa1c704
+workflow_quality_head: 8177ec91311c1b6d526f5ecf1d02a2dc5c90aef3
 invocation_started_at: 2026-08-15T21:05:00+02:00
-last_progress_at: 2026-08-15T21:31:00+02:00
+last_progress_at: 2026-08-15T21:36:00+02:00
 ci_checks_for_current_head: 1
-ci_check_generation: xdotool_repaired_full_reacquisition
+ci_check_generation: yama_parent_tracer_reacquisition
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 2
+repair_cycles_for_current_gate: 0
 stop_reason: null
 active_operation:
-  type: full_gen1_gen2_reacquisition_with_xdotool_loader_repaired
-  no_cache_control_run: 31903986899
-  no_cache_control_job: 95058901925
-next_action: execute the established #303 gen1-login-verify-stop-gen2-login-verify-compare contract with no cache seed and no client behavior change, but rewrite only effective-helper xdotool invocations to use toolroot loader libraries; preserve protected secrets, exact SHA, WARP/SOCKS, GDB observer, restart and cleanup semantics
+  type: replace_attach_observer_with_task_owned_parent_gdb
+  prior_run: 31904207608
+  prior_job: 95059419997
+next_action: patch only the materialized effective helper so task-owned GDB launches the exact official client as its child with ASLR left enabled, preserves the same exact-SHA/proxy/software-render/login/structural breakpoint contract and repaired xdotool loader, and stops child-before-observer; do not change kernel.yama.ptrace_scope or any host security setting
 ---
 
 # Objective
@@ -70,32 +71,17 @@ Prove restart/relogin/reacquisition stability for official native Linux Tibia an
 - structural run `31806312967` / `94785974126`: real `(x,y,z,order)` records, strip counts `0,33,88`, reversible `Up` then `Down`; `(32546,32510,7) -> (32546,32509,7) -> (32546,32510,7)` is DERIVED only;
 - direct authoritative P0 XYZ remains UNKNOWN.
 
-# Corrected root cause — FACT
+# Corrected visible-window root cause — FACT
 
-Runs #26-#30 reported `client_gen_1_window_missing`, but the helper's `resolve_window()` and login path invoke private toolroot `xdotool` without toolroot `LD_LIBRARY_PATH`, while errors are redirected and converted to empty search results. Independent cache-window run `31903627907` exposed the same tool failure as shell exit `127`.
+Runs #26-#30 reported `client_gen_1_window_missing`, but the helper's `resolve_window()` and login path invoke private toolroot `xdotool` without toolroot `LD_LIBRARY_PATH`, while errors are redirected and converted to empty search results. Run `31903986899` / job `95058901925` is the required no-cache control: after only repairing the xdotool loader it proved 4 process windows / 2 visible windows and Tibia window `2097162` at `1020x650`. Canonical shader/GPU cache is therefore not required and must not be seeded into the full path.
 
-Run `31903793288` / job `95058443760` added xdotool loader support and showed 4 PID windows / 2 visible windows with a cache-seeded HOME. That result was initially confounded by the cache seed.
+# Yama transition — FACT
 
-The required no-cache control run `31903986899` / job `95058901925` removed the cache seed while retaining the xdotool loader repair and completed SUCCESS:
+The first full xdotool-repaired reacquisition run `31904207608` / job `95059419997` reached the exact client/Xvfb/WARP/window setup but stopped before protected login with `TRACK_A_RUNTIME_ERROR=ptrace_scope_not_zero`. Cleanup succeeded and no login secret was used. The current host security posture is therefore incompatible with the old `launch client -> gdb attach` observer model.
 
-```text
-TRACK_A_NO_CACHE_CONTROL=true
-TRACK_A_CACHE_WINDOW_EXACT_CLIENT_VERIFIED=true
-TRACK_A_CACHE_WINDOW_UPSTREAM_WARP_VERIFIED=true
-TRACK_A_CACHE_WINDOW_TASK_RELAY_VERIFIED=true
-TRACK_A_CACHE_WINDOW_XVFB_VERIFIED=true
-TRACK_A_CACHE_WINDOW_CLIENT_RUNNING=true pid=15240
-TRACK_A_CACHE_WINDOW_ALL_PID_WINDOWS=4
-TRACK_A_CACHE_WINDOW_VISIBLE_PID_WINDOWS=2
-TRACK_A_CACHE_WINDOW_ID=2097162
-X=0 Y=0 WIDTH=1020 HEIGHT=650
-```
+The task will **not** write `/proc/sys/kernel/yama/ptrace_scope`, invoke `sysctl`, request privileged host mutation, or weaken Yama. The bounded replacement uses normal Yama parent-child semantics: a task-owned GDB process launches `/bin/bash <task-local-launcher>`, the launcher exports the exact existing client runtime/proxy/software-render environment and `exec`s the exact SHA-fenced client, and GDB catches that exec, computes the PIE from `/proc/<child>/maps`, installs the same exact-build Worldmap breakpoint at `PIE + 0x19a8ea3`, and continues. `set disable-randomization off` preserves ASLR so restart-stability still requires a fresh PIE. The client process receives the `client-gen-N` task role while GDB retains `observer-gen-N`; both remain credential-variable-free.
 
-Therefore the canonical shader/GPU cache is **not required for the visible-window gate**. The actual proven blocker was the X11 observer/control tool loader. The cache must not be added to the full reacquisition path.
-
-# Remaining action
-
-Run full two-generation reacquisition with only effective-helper `xdotool` invocations wrapped in the toolroot loader environment. If gen1/gen2 succeed structurally, proceed to a final live-session run rather than stopping at GUI proof.
+Stop ordering changes only as required by parent tracing: terminate the exact task-owned client first while GDB passes `SIGTERM` through, then allow batch GDB to exit naturally; terminate the exact task-owned observer only if it remains after a bounded child-exit wait. No broad process kill is permitted.
 
 # Acceptance
 
@@ -107,4 +93,5 @@ Run full two-generation reacquisition with only effective-helper `xdotool` invoc
 - [ ] privacy-safe screenshot;
 - [ ] final accepted session intentionally left logged in after observer detach;
 - [x] no-cache visible-window gate proven;
+- [x] host Yama security posture preserved; no global ptrace weakening authorized;
 - [ ] final exact-head CI green.

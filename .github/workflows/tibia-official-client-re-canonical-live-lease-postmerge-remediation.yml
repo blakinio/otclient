@@ -32,158 +32,102 @@ jobs:
           task_path = Path('docs/agents/tasks/active/OTC-20260815-track-a-live-runtime-lease-manager.md')
 
           source = source_path.read_text(encoding='utf-8')
-
           replacements = [
-              (
-                  '''    @contextmanager\n    def locked(self) -> Iterator[None]:\n        self._prepare()\n        fd = os.open(self.lock_path, os.O_RDWR)\n        try:\n            fcntl.flock(fd, fcntl.LOCK_EX)\n            yield\n        finally:\n            fcntl.flock(fd, fcntl.LOCK_UN)\n            os.close(fd)\n''',
-                  '''    @contextmanager\n    def locked(self) -> Iterator[int]:\n        self._prepare()\n        fd = os.open(self.lock_path, os.O_RDWR)\n        try:\n            fcntl.flock(fd, fcntl.LOCK_EX)\n            yield fd\n        finally:\n            fcntl.flock(fd, fcntl.LOCK_UN)\n            os.close(fd)\n''',
-              ),
-              (
-                  '''    ) -> LeaseResult:\n        now_epoch = _now_epoch(now)\n        stale_reason = _validate_reason(stale_reason)\n        with self.locked():\n            previous = self._load_state_unlocked()\n''',
-                  '''    ) -> LeaseResult:\n        stale_reason = _validate_reason(stale_reason)\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            previous = self._load_state_unlocked()\n''',
-              ),
-              (
-                  '''    ) -> LeaseResult:\n        now_epoch = _now_epoch(now)\n        token = _read_private_token(token_file)\n        with self.locked():\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            state["renewed_at"] = now_epoch\n''',
-                  '''    ) -> LeaseResult:\n        token = _read_private_token(token_file)\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            state["renewed_at"] = now_epoch\n''',
-              ),
-              (
-                  '''    ) -> LeaseResult:\n        now_epoch = _now_epoch(now)\n        token = _read_private_token(token_file)\n        with self.locked():\n            state = self._load_state_unlocked()\n            if state is None or state.get("status") != "active":\n''',
-                  '''    ) -> LeaseResult:\n        token = _read_private_token(token_file)\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n            if state is None or state.get("status") != "active":\n''',
-              ),
-              (
-                  '''    ) -> LeaseResult:\n        now_epoch = _now_epoch(now)\n        token = _read_private_token(token_file)\n        with self.locked():\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            return LeaseResult(int(state["generation"]), int(state["expires_at"]))\n''',
-                  '''    ) -> LeaseResult:\n        token = _read_private_token(token_file)\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            return LeaseResult(int(state["generation"]), int(state["expires_at"]))\n''',
-              ),
-              (
-                  '''    def status(self, *, now: float | None = None) -> dict[str, Any]:\n        now_epoch = _now_epoch(now)\n        with self.locked():\n            state = self._load_state_unlocked()\n''',
-                  '''    def status(self, *, now: float | None = None) -> dict[str, Any]:\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n''',
-              ),
-              (
-                  '''        if not command:\n            raise LeaseError("guard_command_missing", "guard-run requires a command")\n        now_epoch = _now_epoch(now)\n        token = _read_private_token(token_file)\n        with self.locked():\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            result = LeaseResult(int(state["generation"]), int(state["expires_at"]))\n            completed = subprocess.run(list(command), check=False)\n            return result, int(completed.returncode)\n''',
-                  '''        if not command:\n            raise LeaseError("guard_command_missing", "guard-run requires a command")\n        token = _read_private_token(token_file)\n        with self.locked() as lock_fd:\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            result = LeaseResult(int(state["generation"]), int(state["expires_at"]))\n            completed = subprocess.run(\n                list(command),\n                check=False,\n                pass_fds=(lock_fd,),\n            )\n            return result, int(completed.returncode)\n''',
-              ),
+              ("    @contextmanager\n    def locked(self) -> Iterator[None]:\n        self._prepare()\n        fd = os.open(self.lock_path, os.O_RDWR)\n        try:\n            fcntl.flock(fd, fcntl.LOCK_EX)\n            yield\n        finally:\n            fcntl.flock(fd, fcntl.LOCK_UN)\n            os.close(fd)\n", "    @contextmanager\n    def locked(self) -> Iterator[int]:\n        self._prepare()\n        fd = os.open(self.lock_path, os.O_RDWR)\n        try:\n            fcntl.flock(fd, fcntl.LOCK_EX)\n            yield fd\n        finally:\n            fcntl.flock(fd, fcntl.LOCK_UN)\n            os.close(fd)\n"),
+              ("    ) -> LeaseResult:\n        now_epoch = _now_epoch(now)\n        stale_reason = _validate_reason(stale_reason)\n        with self.locked():\n            previous = self._load_state_unlocked()\n", "    ) -> LeaseResult:\n        stale_reason = _validate_reason(stale_reason)\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            previous = self._load_state_unlocked()\n"),
+              ("    ) -> LeaseResult:\n        now_epoch = _now_epoch(now)\n        token = _read_private_token(token_file)\n        with self.locked():\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            state[\"renewed_at\"] = now_epoch\n", "    ) -> LeaseResult:\n        token = _read_private_token(token_file)\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            state[\"renewed_at\"] = now_epoch\n"),
+              ("    ) -> LeaseResult:\n        now_epoch = _now_epoch(now)\n        token = _read_private_token(token_file)\n        with self.locked():\n            state = self._load_state_unlocked()\n            if state is None or state.get(\"status\") != \"active\":\n", "    ) -> LeaseResult:\n        token = _read_private_token(token_file)\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n            if state is None or state.get(\"status\") != \"active\":\n"),
+              ("    ) -> LeaseResult:\n        now_epoch = _now_epoch(now)\n        token = _read_private_token(token_file)\n        with self.locked():\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            return LeaseResult(int(state[\"generation\"]), int(state[\"expires_at\"]))\n", "    ) -> LeaseResult:\n        token = _read_private_token(token_file)\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            return LeaseResult(int(state[\"generation\"]), int(state[\"expires_at\"]))\n"),
+              ("    def status(self, *, now: float | None = None) -> dict[str, Any]:\n        now_epoch = _now_epoch(now)\n        with self.locked():\n            state = self._load_state_unlocked()\n", "    def status(self, *, now: float | None = None) -> dict[str, Any]:\n        with self.locked():\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n"),
+              ("        if not command:\n            raise LeaseError(\"guard_command_missing\", \"guard-run requires a command\")\n        now_epoch = _now_epoch(now)\n        token = _read_private_token(token_file)\n        with self.locked():\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            result = LeaseResult(int(state[\"generation\"]), int(state[\"expires_at\"]))\n            completed = subprocess.run(list(command), check=False)\n            return result, int(completed.returncode)\n", "        if not command:\n            raise LeaseError(\"guard_command_missing\", \"guard-run requires a command\")\n        token = _read_private_token(token_file)\n        with self.locked() as lock_fd:\n            now_epoch = _now_epoch(now)\n            state = self._load_state_unlocked()\n            self._require_current_unlocked(state, identity, token, now_epoch)\n            assert state is not None\n            result = LeaseResult(int(state[\"generation\"]), int(state[\"expires_at\"]))\n            completed = subprocess.run(\n                list(command),\n                check=False,\n                pass_fds=(lock_fd,),\n            )\n            return result, int(completed.returncode)\n"),
           ]
-
           for old, new in replacements:
               count = source.count(old)
               if count != 1:
-                  raise SystemExit(f'expected exactly one source replacement, found {count}: {old[:80]!r}')
+                  raise SystemExit(f'expected one source replacement, found {count}: {old[:80]!r}')
               source = source.replace(old, new, 1)
           source_path.write_text(source, encoding='utf-8')
 
           tests = test_path.read_text(encoding='utf-8')
-          old_imports = '''import importlib.util\nimport json\nimport os\nfrom pathlib import Path\nimport stat\nimport subprocess\nimport sys\nimport tempfile\nimport unittest\n'''
-          new_imports = '''import fcntl\nimport importlib.util\nimport json\nimport os\nfrom pathlib import Path\nimport stat\nimport subprocess\nimport sys\nimport tempfile\nimport time\nimport unittest\nfrom contextlib import contextmanager\nfrom unittest import mock\n'''
+          old_imports = "import importlib.util\nimport json\nimport os\nfrom pathlib import Path\nimport stat\nimport subprocess\nimport sys\nimport tempfile\nimport unittest\n"
+          new_imports = "import fcntl\nimport importlib.util\nimport json\nimport os\nfrom pathlib import Path\nimport stat\nimport subprocess\nimport sys\nimport tempfile\nimport time\nimport unittest\nfrom contextlib import contextmanager\nfrom unittest import mock\n"
           if tests.count(old_imports) != 1:
               raise SystemExit('test import block drifted')
           tests = tests.replace(old_imports, new_imports, 1)
 
-          anchor = '''    def test_corrupt_state_fails_closed(self) -> None:\n'''
-          added_tests = r'''    def test_all_time_sensitive_operations_recheck_time_after_lock_acquisition(self) -> None:
-        self.manager.acquire(self.a, self.token_a, 60, now=100)
-        fake_now = [100.0]
-
-        @contextmanager
-        def delayed_lock():
-            self.manager._prepare()
-            fd = os.open(self.manager.lock_path, os.O_RDWR)
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX)
-                fake_now[0] = 161.0
-                yield fd
-            finally:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-                os.close(fd)
-
-        with (
-            mock.patch.object(self.manager, "locked", delayed_lock),
-            mock.patch.object(lease.time, "time", side_effect=lambda: fake_now[0]),
-        ):
-            for operation, call in (
-                ("renew", lambda: self.manager.renew(self.a, self.token_a, 60)),
-                ("release", lambda: self.manager.release(self.a, self.token_a)),
-                ("validate", lambda: self.manager.validate(self.a, self.token_a)),
-                (
-                    "guard-run",
-                    lambda: self.manager.guard_run(
-                        self.a,
-                        self.token_a,
-                        [sys.executable, "-c", "raise SystemExit(99)"],
-                    ),
-                ),
-            ):
-                with self.subTest(operation=operation):
-                    fake_now[0] = 100.0
-                    self.assertLeaseError("lease_expired", call)
-
-            fake_now[0] = 100.0
-            status = self.manager.status()
-            self.assertTrue(status["expired"])
-
-            fake_now[0] = 100.0
-            self.assertLeaseError(
-                "stale_takeover_reason_required",
-                self.manager.acquire,
-                self.b,
-                self.token_b,
-                60,
-            )
-
-    def test_guard_child_inherits_lock_if_guard_parent_is_killed(self) -> None:
-        self.manager.acquire(self.a, self.token_a, 60)
-        guard = subprocess.Popen(
-            [
-                sys.executable,
-                str(SCRIPT),
-                "--state-dir",
-                str(self.root),
-                "guard-run",
-                "--task-id",
-                self.a.task_id,
-                "--session-id",
-                self.a.session_id,
-                "--token-file",
-                str(self.token_a),
-                "--",
-                sys.executable,
-                "-c",
-                "import os,time; print(os.getpid(), flush=True); time.sleep(2.0)",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        assert guard.stdout is not None
-        child_pid = int(guard.stdout.readline().strip())
-        guard.kill()
-        guard.wait(timeout=5)
-
-        lock_fd = os.open(self.manager.lock_path, os.O_RDWR)
-        try:
-            with self.assertRaises(BlockingIOError):
-                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-
-            deadline = time.monotonic() + 5.0
-            while True:
-                try:
-                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    break
-                except BlockingIOError:
-                    if time.monotonic() >= deadline:
-                        self.fail("guard child outlived parent without eventually releasing inherited lock")
-                    time.sleep(0.05)
-        finally:
-            try:
-                fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            except OSError:
-                pass
-            os.close(lock_fd)
-            try:
-                os.kill(child_pid, 9)
-            except ProcessLookupError:
-                pass
-
-'''
+          lines = [
+              "    def test_all_time_sensitive_operations_recheck_time_after_lock_acquisition(self) -> None:",
+              "        self.manager.acquire(self.a, self.token_a, 60, now=100)",
+              "        fake_now = [100.0]",
+              "",
+              "        @contextmanager",
+              "        def delayed_lock():",
+              "            self.manager._prepare()",
+              "            fd = os.open(self.manager.lock_path, os.O_RDWR)",
+              "            try:",
+              "                fcntl.flock(fd, fcntl.LOCK_EX)",
+              "                fake_now[0] = 161.0",
+              "                yield fd",
+              "            finally:",
+              "                fcntl.flock(fd, fcntl.LOCK_UN)",
+              "                os.close(fd)",
+              "",
+              "        with (",
+              "            mock.patch.object(self.manager, 'locked', delayed_lock),",
+              "            mock.patch.object(lease.time, 'time', side_effect=lambda: fake_now[0]),",
+              "        ):",
+              "            for operation, call in (",
+              "                ('renew', lambda: self.manager.renew(self.a, self.token_a, 60)),",
+              "                ('release', lambda: self.manager.release(self.a, self.token_a)),",
+              "                ('validate', lambda: self.manager.validate(self.a, self.token_a)),",
+              "                ('guard-run', lambda: self.manager.guard_run(self.a, self.token_a, [sys.executable, '-c', 'raise SystemExit(99)'])),",
+              "            ):",
+              "                with self.subTest(operation=operation):",
+              "                    fake_now[0] = 100.0",
+              "                    self.assertLeaseError('lease_expired', call)",
+              "",
+              "            fake_now[0] = 100.0",
+              "            self.assertTrue(self.manager.status()['expired'])",
+              "            fake_now[0] = 100.0",
+              "            self.assertLeaseError('stale_takeover_reason_required', self.manager.acquire, self.b, self.token_b, 60)",
+              "",
+              "    def test_guard_child_inherits_lock_if_guard_parent_is_killed(self) -> None:",
+              "        self.manager.acquire(self.a, self.token_a, 60)",
+              "        guard = subprocess.Popen(",
+              "            [sys.executable, str(SCRIPT), '--state-dir', str(self.root), 'guard-run', '--task-id', self.a.task_id, '--session-id', self.a.session_id, '--token-file', str(self.token_a), '--', sys.executable, '-c', \"import os,time; print(os.getpid(), flush=True); time.sleep(2.0)\"],",
+              "            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,",
+              "        )",
+              "        assert guard.stdout is not None",
+              "        child_pid = int(guard.stdout.readline().strip())",
+              "        guard.kill()",
+              "        guard.wait(timeout=5)",
+              "        lock_fd = os.open(self.manager.lock_path, os.O_RDWR)",
+              "        try:",
+              "            with self.assertRaises(BlockingIOError):",
+              "                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)",
+              "            deadline = time.monotonic() + 5.0",
+              "            while True:",
+              "                try:",
+              "                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)",
+              "                    break",
+              "                except BlockingIOError:",
+              "                    if time.monotonic() >= deadline:",
+              "                        self.fail('guard child did not eventually release inherited lock')",
+              "                    time.sleep(0.05)",
+              "        finally:",
+              "            try:",
+              "                fcntl.flock(lock_fd, fcntl.LOCK_UN)",
+              "            except OSError:",
+              "                pass",
+              "            os.close(lock_fd)",
+              "            try:",
+              "                os.kill(child_pid, 9)",
+              "            except ProcessLookupError:",
+              "                pass",
+              "",
+          ]
+          added_tests = "\n".join(lines) + "\n"
+          anchor = "    def test_corrupt_state_fails_closed(self) -> None:\n"
           if tests.count(anchor) != 1:
               raise SystemExit('test insertion anchor drifted')
           tests = tests.replace(anchor, added_tests + anchor, 1)
@@ -205,7 +149,7 @@ jobs:
               if task.count(old) != 1:
                   raise SystemExit(f'task state drifted: {old}')
               task = task.replace(old, new, 1)
-          task += '''\n# Post-merge P1 review remediation\n\nA post-merge review on PR #312 identified two material P1 concurrency defects on merged commit `3575cc0c0a0b4efbcd9fc860d3226002fe40e70f`:\n\n1. `guard-run` could release the coordination flock when its parent was killed while the guarded child kept mutating.\n2. time-sensitive operations sampled `now` before blocking on the flock, so a lease that expired while waiting could still be accepted.\n\nThis continuation owns the same manager implementation/test paths and repairs both findings without touching any Tibia runtime, PR #303/#309 paths, Track B, or the production canonical state. Canonical live reuse remains fail-closed in PR #311 until this remediation is merged and revalidated.\n'''
+          task += "\n# Post-merge P1 review remediation\n\nA post-merge review on PR #312 identified two material P1 concurrency defects on merged commit `3575cc0c0a0b4efbcd9fc860d3226002fe40e70f`: guard children could outlive the lock holder, and time-sensitive operations sampled time before blocking on the flock. This continuation repairs both without touching Tibia runtime state, PR #303/#309 paths, Track B, or the production canonical state. PR #311 must remain fail-closed until this remediation is merged and revalidated.\n"
           task_path.write_text(task, encoding='utf-8')
           PY
 

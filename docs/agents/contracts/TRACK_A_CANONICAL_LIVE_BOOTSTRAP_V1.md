@@ -32,28 +32,60 @@ For ordinary guarded mutation, the caller acquires and validates the authoritati
 
 That final `guard-run` behavior is a required foundation, but it is deliberately **not sufficient by itself for bootstrap**: ordinary `guard-run` completes only after the guarded process tree is gone, while successful bootstrap must leave one exact registered official-client process alive after an explicit verified detach transition. Bootstrap therefore requires a distinct reviewed primitive/state machine that preserves the same authority and anti-escape guarantees through registration and detachment.
 
-## Preconditions
+## Authoritative namespace
 
-Bootstrap MUST fail closed unless all are true at transaction start:
+Bootstrap and all later Gate B readers/writers MUST use the manager-owned canonical namespace exactly as promoted by the production wrapper:
+
+```yaml
+state_root: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+coordination_lock: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/coordination.lock
+lease_record: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/lease.json
+runtime_registration: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
+```
+
+`runtime-registration.json` is the one authoritative current registration path. Bootstrap candidates MUST be written as mode-restricted temporary files in the same directory and atomically renamed to that exact path only at commit. Controllers MUST NOT select, override, infer or create an alternative state root or registration path. Absence means that this exact registration is absent or explicitly invalidated under the current authoritative lease; absence in any other directory is irrelevant.
+
+## Preconditions and transaction-start ordering
+
+Static prerequisites may be checked before coordination, but **runtime absence is authoritative only while the coordination flock is already held**. A pre-lease inventory may be used for diagnostics but MUST NOT authorize launch.
+
+Before any bootstrap child is created, the controller MUST:
+
+1. acquire the current authoritative controller lease through the promoted manager, thereby holding the canonical coordination lock;
+2. while that same lease/lock remains held, perform a fresh fail-closed inventory immediately before launch;
+3. prove the exact authoritative registration is absent and prove there is no existing official-client candidate/session that could conflict with a second live session;
+4. only then enter the creation state.
+
+The under-lease inventory MUST satisfy all of the following:
 
 ```yaml
 track: official-client-re
 platform: official_native_linux_only
-current_live_registration: absent
-current_exact_live_client_count: 0
-current_exact_live_client_count_evidence: fresh_direct_preflight
 controller_lease: current_and_valid
 lease_generation: known
 lease_manager: final_promoted_current_main_version
 bootstrap_supervisor: reviewed_current_main_bootstrap_version
 canonical_namespace:
-  state_root: declared
-  display: declared_after_preflight
-  remote_view_endpoint: declared_or_null_after_preflight
+  state_root: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+  runtime_registration: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
+current_live_registration: absent
+current_live_registration_evidence: fresh_under_authoritative_lock
+current_exact_live_client_count: 0
+current_exact_live_client_count_evidence: fresh_under_authoritative_lock
+all_official_client_candidate_count: 0
+unverifiable_or_mismatched_official_client_candidate_count: 0
+existing_official_client_session_count: 0
+inventory_completeness: proven_for_permitted_local_process_window_session_evidence
+canonical_display: declared_after_under_lock_preflight
+remote_view_endpoint: declared_or_null_after_under_lock_preflight
 second_live_session_authorized: false
 ```
 
-If an exact live client already exists, this contract MUST NOT create another session. The caller must enter the ordinary registration/reuse/recovery path instead. Historical display/process observations are not sufficient to satisfy these preconditions.
+The inventory is fail-closed across **all** official native Linux client candidates, not only the exact fenced build. A running official client with a different version/hash, a process/window/session that plausibly belongs to the official client but cannot be verified, or local evidence of an existing official-client account/session is a blocker rather than evidence of absence. If the permitted local evidence cannot establish inventory completeness, bootstrap MUST stop for recovery/reconciliation instead of launching another client.
+
+If a registered client, an exact live client, any mismatched/unverifiable official-client candidate, or any existing official-client session is found, this contract MUST NOT create another session. The caller must enter the ordinary registration/reuse/recovery path or explicit reconciliation path instead. Historical display/process observations are not sufficient to satisfy these preconditions.
+
+The lease MUST remain continuously held from before the authoritative absence inventory through creation, registration commit and safe detach. Therefore two concurrent bootstrap callers cannot both act on the same stale absence observation: after waiting for the coordination lock, a later caller must repeat the full under-lock inventory and must refuse creation if the first caller has already registered or left any conflicting official-client candidate/session.
 
 ## Exact client fence
 
@@ -71,12 +103,16 @@ A different official client build requires an explicitly revalidated fence befor
 ## State machine
 
 ```text
-ABSENT
+UNCLAIMED
   |
-  | fresh preflight proves no registered/exact live client
-  | acquire current controller lease
+  | acquire current authoritative controller lease / canonical coordination flock
   v
-BOOTSTRAP_LEASED
+LEASED_UNPROVEN
+  |
+  | while lock remains held: fresh authoritative registration + all-official-client
+  | process/window/session inventory proves zero registered/exact/mismatched/unverifiable clients
+  v
+BOOTSTRAP_LEASED_ABSENT
   |
   | bootstrap supervisor creates task/track-owned launch descendants
   v
@@ -87,7 +123,7 @@ PROCESS_CREATED_UNREGISTERED
   v
 PROCESS_VERIFIED
   |
-  | atomically publish generation-bound registration candidate
+  | atomically publish generation-bound registration candidate to the authoritative registration path
   v
 REGISTRATION_PENDING_COMMIT
   |
@@ -105,16 +141,19 @@ Any failure before `REGISTERED_IDLE_RUNTIME` goes to `ABORT_CLEANUP`, which term
 
 ## Authority invariant
 
-The bootstrap transaction MUST begin with a current authoritative controller lease and MUST remain under one reviewed external supervisor for the entire mutation phase, including process creation, any separately authorized login mutation, identity proof, registration commit and safe-detach checks.
+The bootstrap transaction MUST begin by acquiring a current authoritative controller lease and MUST perform the decisive runtime-absence inventory only after that acquisition. It MUST remain under one reviewed external supervisor for the entire mutation phase, including process creation, any separately authorized login mutation, identity proof, registration commit and safe-detach checks.
 
 The persistent client MUST NOT receive the coordination flock or lease capability. Only the external supervisor may hold the coordination flock during bootstrap mutation.
 
 Forbidden patterns:
 
 - standalone `validate` then detached launch;
+- checking absence before lease acquisition and later launching from that stale observation;
 - launcher forks a persistent descendant and exits before supervisor tracks it;
 - passing the coordination flock or lease capability into the client or helper;
 - writing registration before the exact process identity is proven;
+- using a registration path outside `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json`;
+- treating a mismatched or unverifiable official-client candidate as equivalent to absence;
 - releasing bootstrap mutation authority before registration is durably committed and revalidated;
 - claiming a process from another task/display/track;
 - treating PR/task metadata as lease authority.
@@ -131,7 +170,8 @@ or an equivalent reviewed primitive whose success condition is not child exit, b
 
 It MUST preserve the final PR #316 anti-escape model during the mutation phase:
 
-- authoritative lease acquired and validated before dispatch;
+- authoritative lease acquired and validated before any decisive absence check or dispatch;
+- under that held lease, authoritative registration plus all-official-client candidate/session absence is freshly re-proven immediately before launch;
 - only the external supervisor holds the coordination flock after dispatch;
 - launched command/client/helpers receive no flock descriptor and no lease capability;
 - caller/launcher exit cannot release serialization while bootstrap-owned mutation descendants remain;
@@ -142,7 +182,13 @@ A bootstrap implementation is **not authorized by this documentation PR**. It re
 
 ## Runtime registration record
 
-Registration MUST be atomic and mode-restricted. Required non-secret fields:
+The authoritative current record is exactly:
+
+```text
+/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
+```
+
+Registration MUST be atomic and mode-restricted. All readers, candidate writers, committers, recovery logic and Gate B preflight MUST use this namespace/path. Required non-secret fields:
 
 ```yaml
 schema_version: 1
@@ -192,7 +238,7 @@ current_exact_client_pid: NOT_REGISTERED
 current_exact_client_session: NOT_REGISTERED
 ```
 
-A bootstrap implementation may select `:98` only after a fresh transaction-start preflight proves that it is available, appropriate and bound to the exact process being registered. This contract does not pre-register `:98` or `6082`.
+A bootstrap implementation may select `:98` only after the under-lease transaction-start inventory proves that it is available, appropriate and bound to the exact process being registered. This contract does not pre-register `:98` or `6082`.
 
 ## Login / credentials boundary
 
@@ -213,12 +259,12 @@ Network liveness alone is never `IN_GAME` authority.
 
 ## Registration commit
 
-Registration commit is a two-phase operation:
+Registration commit is a two-phase operation inside the authoritative state directory:
 
-1. write a candidate record atomically under the bootstrap supervisor;
+1. write a mode-restricted candidate as a uniquely named temporary file in `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/` while the bootstrap supervisor still owns the authoritative lease/coordination flock;
 2. re-read/revalidate the exact live process, current lease generation, display/window and required state;
-3. promote candidate to current registration atomically;
-4. re-read the committed registration and revalidate exact process identity and lease generation;
+3. atomically rename the candidate to `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json`;
+4. re-read that exact committed registration and revalidate exact process identity and lease generation;
 5. only then allow the explicit safe-detach transition.
 
 If the current controller lease changes during the transaction, bootstrap aborts. A registration created under an older generation cannot be committed under a replacement lease.
@@ -229,7 +275,7 @@ The persistent exact client must not inherit the controller coordination flock o
 
 After successful registration commit, supervisor detachment must prove:
 
-- client exact identity still matches the committed registration;
+- client exact identity still matches the committed authoritative registration;
 - committed registration still names the current boot/PID/start/exact fence/display/window identity;
 - no bootstrap/login/helper process capable of mutation remains untracked;
 - any remaining process is either the exact registered persistent client or explicitly classified non-mutating and owned;
@@ -245,7 +291,7 @@ A detached client does not itself hold controller authority. Later external muta
 
 Before registration commit, any error must:
 
-- mark candidate registration absent/invalid;
+- remove/mark invalid only the bootstrap candidate; it MUST NOT fabricate or preserve a current registration claiming success;
 - terminate only descendants whose bootstrap ownership/provenance is proven;
 - wait/reap boundedly where safe;
 - never use broad `pkill`/display cleanup;
@@ -254,17 +300,17 @@ Before registration commit, any error must:
 
 If safe cleanup cannot be proven, retain/fail closed rather than releasing authority around an untracked descendant.
 
-After registration commit but before safe detach, any failure must fail closed and treat the committed registration as requiring recovery/revalidation; it must not silently release authority while a mutation-capable bootstrap descendant remains.
+After registration commit but before safe detach, any failure must fail closed and treat the authoritative committed registration as requiring recovery/revalidation; it must not silently release authority while a mutation-capable bootstrap descendant remains.
 
 ## Post-bootstrap reuse
 
 Ordinary later mutation/reuse requires:
 
 1. acquire current authoritative lease;
-2. load current registration;
-3. revalidate boot/PID/start/exact fence/display/window and required mutation-relevant state;
+2. load `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json` only;
+3. revalidate boot/PID/start/exact fence/display/window and required mutation-relevant state, and fail closed if any competing or unverifiable official-client candidate/session is present;
 4. perform mutation through the final reviewed supervisor for the complete mutation/process-tree lifetime;
-5. update/invalidate registration if process or identity-bearing state changes materially;
+5. update/invalidate the authoritative registration if process or identity-bearing state changes materially;
 6. release lease only when no guarded mutation descendants remain.
 
 After stale lease takeover, the registration must be revalidated before any mutation.
@@ -274,6 +320,9 @@ After stale lease takeover, the registration must be revalidated before any muta
 Implementation cannot be promoted without deterministic non-live tests proving at least:
 
 - no-registration -> exact-child -> atomic registration -> safe detach;
+- authoritative absence check occurs only after lease acquisition and immediately before launch;
+- two concurrent bootstraps cannot both act on one stale absence observation: the second waits, repeats under-lock inventory, then refuses once the first registers or leaves a conflicting client;
+- all registration readers/writers use `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json` and alternative roots/paths fail closed;
 - wrong SHA abort;
 - PID reuse/start mismatch abort;
 - lease-generation change during bootstrap abort;
@@ -285,7 +334,8 @@ Implementation cannot be promoted without deterministic non-live tests proving a
 - committed registration changes identity before detach -> detach fails/recovery required;
 - registration commit then controller release leaves client but no mutation helper;
 - persistent client receives neither flock descriptor nor lease capability;
-- second bootstrap refused if a registered/exact live client already exists;
+- second bootstrap refused if a registration, exact client, mismatched/unverifiable official-client candidate, or existing official-client session already exists;
+- incomplete inventory fails closed instead of being treated as absence;
 - cleanup affects only owned descendants;
 - no secret fields in state/log/artifacts.
 

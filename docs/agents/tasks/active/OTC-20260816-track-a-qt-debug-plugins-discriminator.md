@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-qt-debug-plugins-discriminator
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-qt-debug-plugins-20260816
 session_role: runtime_researcher
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: isolated-qt-plugin-discovery
+phase: coordinator-promotion-ready
 branch: diag/OTC-20260816-track-a-qt-debug-plugins
 base_branch: main
 base_main: a1bab5e7197aba484ac72a4dbcb2d8fddeaeacc2
 risk: high
-updated: 2026-08-16T19:43:00+02:00
+updated: 2026-08-16T19:48:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-qt-debug-plugins-discriminator.md
   - docs/agents/evidence/OTC-20260816-track-a-qt-debug-plugins-discriminator/**
-  - .github/workflows/tibia-official-client-re-qt-debug-plugins-discriminator.yml
 modules_touched: []
 reuses:
   - docs/agents/tasks/archive/OTC-20260816-track-a-qsg-glx-egl-rhi-discriminator.md
@@ -28,7 +27,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: terminal inventory proved package/toolroot XCB GL plugins exist and have zero missing dependencies under canonical LD_LIBRARY_PATH; one isolated runtime capture with QT_DEBUG_PLUGINS=1 is required to classify discovery/load/initialization without forcing a backend or touching canonical state
+execution_reason: one governance-compliant ephemeral-isolated QT_DEBUG_PLUGINS run proved the bundled Qt platform plugin path and libqxcb metadata are discovered while the exact client remains alive with no visible windows; xcbglintegrations-specific loader lines remain unknown because the 426-line sanitized log was connector-truncated, so further mutation is disabled and a narrower filtered discriminator is selected
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -48,7 +47,7 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
-mutation_authorized: true
+mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
@@ -65,26 +64,53 @@ exact_client_fence:
   version: 15.32.df7b29
   size: 51965216
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-source_harness:
-  commit: cb557da12ebb41c597340909b2db717ee59cdfe1
-  blob: 1616edcc982be50ef2c95b8077160ec8fe9291fe
-  required_patches: 3
-  patch_1: nounset-safe snapshot local declaration
-  patch_2: replace source task id with current task id
-  patch_3: replace QT_XCB_GL_INTEGRATION=none with QSG_INFO=1 plus QT_DEBUG_PLUGINS=1 while preserving QT_QUICK_BACKEND=software
+semantic_run:
+  run: 31962559445
+  job: 95202662909
+  governance_run: 31962559402
+  governance_result: SUCCESS
+  result: SUCCESS
+  source_blob: 1616edcc982be50ef2c95b8077160ec8fe9291fe
+  patch_count: 3
+  canonical_state_access: NONE
+  display: ':231'
+  vnc_port: 6200
+  client_pid: 25426
+  client_pgid: 25426
+  client_alive_t05: true
+  client_alive_t15: true
+  client_alive_t35: true
+  visible_windows_t05: 0
+  visible_windows_t15: 0
+  visible_windows_t35: 0
+  cleanup: COMPLETE
+result:
+  classification: PROVEN_BUNDLED_QXCB_PLATFORM_PLUGIN_DISCOVERED_METADATA_VALID_XCBGLINTEGRATION_DISCOVERY_LOAD_INIT_UNKNOWN
+  bundled_platform_plugin_dir_scanned: true
+  bundled_libqxcb_metadata_found: true
+  bundled_libqxcb_key_xcb_found: true
+  general_bundled_plugin_loader_operational: true
+  xcbglintegration_specific_discovery: UNKNOWN_CONNECTOR_LOG_TRUNCATION
+  xcbglintegration_specific_load: UNKNOWN
+  xcbglintegration_specific_initialization: UNKNOWN
+  visible_window: NONE_THROUGH_35S
+one_shot_workflow_removed: true
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-qt-debug-plugins-discriminator/20260816-qt-plugin-discovery.md
+audit:
+  result: PASS
+  material_findings_open: 0
 acceptance:
-  - immutable source blob and exact patch sites fenced before execution
-  - task-owned isolated display/WARP/VNC/client namespace only
-  - exact live client executable fence passes
-  - bounded snapshots at 5/15/35 seconds collected
-  - sanitized client log captures QT_DEBUG_PLUGINS discovery/load/init output and QSG/GLX/EGL/RHI messages
-  - no backend forced and no canonical state access
-  - cleanup completes
-  - exactly one semantic physical run; no retry on a new discriminator
-last_completed_step: XCB GL plugin inventory #408/#409 proved plugin files exist with zero missing dependencies under canonical LD_LIBRARY_PATH
-next_action: execute exactly one governance-compliant isolated QT_DEBUG_PLUGINS discriminator and persist sanitized discovery/load/initialization evidence
+  - immutable source blob and exact patch sites fenced: PASS
+  - task-owned isolated startup and exact client fence: PASS
+  - QT_DEBUG_PLUGINS enabled without forcing backend: PASS
+  - bundled platform plugin discovery and libqxcb metadata captured: PASS
+  - cleanup complete and canonical state untouched: PASS
+  - xcbglintegrations-specific load/init remains explicitly UNKNOWN rather than inferred
+last_completed_step: run 31962559445/job 95202662909 proved bundled platforms/libqxcb discovery and metadata validity while the exact client stayed alive and windowless through 35 seconds; one-shot workflow removed
+next_action: coordinator-promote/archive this discriminator; then run one separately admitted narrow filtered ephemeral-isolated discriminator emitting only xcbglintegrations/libqxcb-glx/libqxcb-egl/load-error/QXcbIntegration/GLX/EGL lines, without backend forcing or canonical bootstrap
 ---
 
-# Track A Qt plugin discovery discriminator
+# Track A Qt plugin discovery discriminator — terminal candidate
 
-Diagnostic only. It must not create, reuse or mutate the canonical runtime and must not force GLX, EGL, Vulkan, OpenGL or another renderer/backend.
+The general bundled Qt plugin loader and xcb platform plugin discovery are proven. The remaining load-bearing gap is the exact xcbglintegrations discovery/load/initialization sequence.

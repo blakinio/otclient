@@ -77,8 +77,10 @@ jobs:
 
       - name: Assert GitHub-hosted no-runtime boundary
         shell: bash
+        env:
+          RUNNER_ENVIRONMENT_CONTEXT: ${{ runner.environment }}
         run: |
           set -euo pipefail
-          test "${RUNNER_ENVIRONMENT}" = "github-hosted"
+          test "${RUNNER_ENVIRONMENT_CONTEXT}" = "github-hosted"
           ! grep -R --line-number --fixed-strings "runs-on: self-hosted" .github/workflows/tibia-official-client-re-p1-bridge-health.yml
           ! grep -R --line-number --fixed-strings "synology-otclient-01" .github/workflows/tibia-official-client-re-p1-bridge-health.yml tools/tibia_runtime_bridge tests/tools/tibia_runtime_bridge

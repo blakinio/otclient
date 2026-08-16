@@ -48,7 +48,7 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 runner_filesystem_mutation_authorized: true
 owner_funded_ai_api_authorized: false

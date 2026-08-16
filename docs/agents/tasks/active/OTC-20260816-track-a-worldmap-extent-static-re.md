@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-worldmap-extent-static-re
-status: investigating
+status: blocked
 agent: ChatGPT
 session_id: chatgpt-viewport-static-20260816-1426
 session_role: static_re_researcher
@@ -12,14 +12,13 @@ phase: investigate
 implementation_authorized: false
 branch: research/OTC-20260816-track-a-worldmap-extent-static-re
 base_branch: main
-base_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f
+base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
 pr: 367
 risk: medium
-updated: 2026-08-16T14:33:00+02:00
+updated: 2026-08-16T14:40:30+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md
   - .github/scripts/tibia-official-client-re-worldmap-extent-static.py
-  - .github/workflows/tibia-official-client-re-worldmap-extent-static.yml
   - docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/**
   - docs/agents/reports/OTCLIENT-20260816-worldmap-extent-static-re.md
 modules_touched: []
@@ -29,7 +28,8 @@ reuses:
   - PR #365 merged feasibility checkpoint
   - PR #366 merged feasibility-task archive/ownership release
   - PR #310 GitHub-hosted exact-client staging failure evidence
-  - run 31892019505 artifact 9248797952 static exact-binary evidence
+  - run 31892019505 artifact 9248797952 historical exact-binary static evidence
+  - run 31947502633 artifact 9263704543 independent hosted input-blocker corroboration
 depends_on: []
 blocks: []
 policy_version: 2
@@ -45,7 +45,7 @@ context_growth: rising
 context_score: 10
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: one cohesive patch/dependency graph spans extent ownership, storage/protocol consumers and render/camera/picker consumers; rotate the same task before any split
+decomposition_reason: one cohesive patch/dependency graph spans extent ownership, storage/protocol consumers and render/camera/picker consumers; the task is blocked on exact hosted input before a useful split exists
 validation_level: focused
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
@@ -70,9 +70,9 @@ client_size: 51965216
 client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
 invocation_started_at: 2026-08-16T14:20:00+02:00
-last_progress_at: 2026-08-16T14:33:00+02:00
+last_progress_at: 2026-08-16T14:40:30+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: hosted-static-dispatch-1
+ci_check_generation: blocked-static-frontier-checkpoint-pending
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -80,17 +80,39 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-heavy_validation_runs: 0
-hosted_staging_attempts_this_task: 0
+heavy_validation_runs: 1
+hosted_staging_attempts_this_task: 1
+hosted_staging_run: 31947523640
+hosted_staging_job: 95165795953
+hosted_staging_artifact: 9263709952
+hosted_staging_artifact_digest: sha256:87315733a626bd0d2f8540bc05b0aa5bcd1fcd33d78764be6dc0243a30ae837f
+hosted_staging_result: INPUT_BLOCKED
+independent_hosted_corroboration_run: 31947502633
+independent_hosted_corroboration_job: 95165743019
+independent_hosted_corroboration_artifact: 9263704543
+historical_exact_binary_run: 31892019505
+historical_exact_binary_job: 95029600292
+historical_exact_binary_artifact: 9248797952
+historical_exact_binary_runner: synology-otclient-01
+historical_exact_binary_evidence_reused: true
+current_exact_binary_reexecution: NOT_PERFORMED
+current_exact_binary_provenance_upgraded: false
+blocker_class: INPUT_BLOCKED
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
-static_classification: MORE_STATIC_RE_NEEDED
+static_classification: BLOCKED
 new_gui_session_created: false
 runtime_used: false
-next_action: run exactly one materially different GitHub-hosted exact-fence materialization attempt and, only if the fence passes, extract the bounded worldmap type/xref/call/field graph; otherwise persist INPUT_BLOCKED without Synology fallback
+client_bytes_modified: false
+synology_static_re_this_task: false
+temporary_hosted_workflow_retained: false
+analyzer_validation:
+  python_syntax_on_hosted_boundary: PASS
+  exact_binary_execution: NOT_RUN_INPUT_BLOCKED
+next_action: provide a compliant GitHub-hosted-readable exact 15.32.df7b29 native-Linux client source, verify size/SHA, then resume static typeinfo/vtable/xref/field/allocation/parser/render dependency recovery; do not use Synology static fallback and do not escalate to GUI/runtime for this input blocker
 ---
 
 # Track A worldmap extent static RE
@@ -108,52 +130,59 @@ Recover a durable static patch/dependency graph for the exact official native-Li
 - `TWorldMapCamera`;
 - `TWorldMapPicker`.
 
-No client bytes are modified in this task. No live official-client runtime is observed or mutated.
+No client bytes were modified. No live official-client runtime was observed or mutated.
+
+## Final classification for this invocation
+
+```yaml
+static_classification: BLOCKED
+blocker_class: INPUT_BLOCKED
+runtime_discriminator_required: false
+```
+
+The unresolved questions remain static questions, but the exact `15.32.df7b29` binary cannot currently be staged on the required GitHub-hosted analysis surface. Synology is explicitly not used as a static fallback.
+
+## Durable outputs
+
+- `docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-static-frontier.md`
+- `docs/agents/reports/OTCLIENT-20260816-worldmap-extent-static-re.md`
+- `.github/scripts/tibia-official-client-re-worldmap-extent-static.py` — retained as an unvalidated-on-exact-input analyzer scaffold; syntax passed the hosted boundary step but exact analysis never ran because input staging failed.
+
+The one-shot staging workflow is removed at this checkpoint so subsequent task/report pushes cannot silently repeat the failed source request.
 
 ## Trusted starting point and ownership
 
-PR #365 merged the accepted PR #325 feasibility report/evidence onto `main`; PR #366 then archived that completed feasibility task and released its ownership. The retained report/evidence remain on `main` and are read-only dependencies for this continuation.
+PR #365 merged the accepted PR #325 feasibility report/evidence; PR #366 archived that completed task and released its ownership. PR #363's continuation-prompt paths and PR #310's P2 staging paths remain read-only.
 
-The prior evidence proves exact-client semantic/type-name surfaces and preserves historical `18 x 14` only as `DERIVED_FROM_OBSERVED_JOB_LOG`. It does not prove object layouts, dimension fields, allocations, parser limits, maximum dimensions or patch points.
-
-PR #363 owns only the continuation prompt/task paths and remains read-only to this task. PR #310 owns its P2 script/workflow/task and remains read-only. This task owns only the new paths declared above.
-
-## Execution boundary
-
-```yaml
-static_execution: github_hosted_first
-runtime_access: none
-synology_static_fallback: forbidden
-gui_runtime_initial_phase: forbidden
-new_x11_display: forbidden
-new_vnc_or_novnc_desktop: forbidden
-new_logged_in_tibia_session: forbidden
-client_byte_mutation: forbidden
-owner_codex_openai_api_paid_ai: forbidden
-```
-
-If static evidence later proves a runtime discriminator is necessary, this task records the smallest discriminator and stops/rotates. It does not silently reclassify into live observation.
+Current coordinator state also classifies P2 hosted staging as blocked on a compliant exact-client source with no Synology fallback.
 
 ## Static acceptance inventory
 
-- [ ] revalidate exact client size/SHA and source provenance for every new exact-binary claim;
-- [ ] recover or explicitly bound typeinfo/vtable/xref/constructor/destructor evidence for extent/subfield/viewport;
-- [ ] identify or explicitly bound candidate dimension/edge fields and default/material writers;
-- [ ] enumerate material readers through storage/protocol;
-- [ ] enumerate material readers through render provider/camera/picker;
-- [ ] correlate literal/derived dimension constants with call/data flow, never blind numeric search alone;
-- [ ] audit fixed arrays, allocation/capacity, loops/masks, row/column/floor parser assumptions, clipping/culling, coordinate packing, cache and picking limits;
-- [ ] persist a patch/dependency graph with exact locations, evidence, writers/readers, allocation/protocol/render dependencies, isolated-change consequence and confidence;
-- [ ] classify exactly one of `STATIC_PATCH_GRAPH_READY`, `MORE_STATIC_RE_NEEDED`, `RUNTIME_DISCRIMINATOR_REQUIRED`, `BLOCKED`;
-- [ ] no client byte mutation or live runtime action occurred;
-- [ ] focused validation, fresh static/docs audit, exact-head required CI and lifecycle gates pass before completion.
+- [x] exact historical client size/SHA fence revalidated from retained artifact `9248797952`; current exact-binary reexecution is explicitly `NOT_PERFORMED`;
+- [x] all eight requested semantic/type surfaces inventoried with exact retained addresses;
+- [x] retained `.data.rel.ro` relocation leads for `TWorldMapRenderProvider` and `TWorldMapViewport` recorded without overclaiming them as vtables;
+- [ ] typeinfo/vtable/constructor/destructor evidence recovered for extent/subfield/viewport — BLOCKED on exact hosted binary;
+- [ ] candidate dimension/edge fields and default writers identified — BLOCKED on exact hosted binary;
+- [ ] material readers/writers through storage/protocol recovered — BLOCKED on exact hosted binary;
+- [ ] material readers/writers through render/camera/picker recovered — BLOCKED on exact hosted binary;
+- [x] literal `18`/`14` are not treated as patch constants; historical `18 x 14` remains `DERIVED_FROM_OBSERVED_JOB_LOG` only;
+- [ ] fixed arrays, allocation/capacity, loops/masks, parser row/column/floor assumptions, clipping/culling, coordinate packing, cache and picking limits audited — BLOCKED on exact hosted binary;
+- [ ] complete patch/dependency graph with isolated-change consequences produced — BLOCKED;
+- [x] final classification chosen from the required set: `BLOCKED`;
+- [x] no client byte mutation or live runtime action occurred;
+- [x] one materially different GitHub-hosted staging experiment executed; failure persisted as sanitized evidence;
+- [x] independent same-repo P0 GitHub-hosted attempt corroborates the same input blocker;
+- [x] one-shot workflow removed to prevent blind retries;
+- [ ] exact-head normal repository CI for the final blocked checkpoint — pending after this commit.
 
-## Input staging evidence and bounded experiment
+## Input-staging result
 
-PR #310 already exhausted two hosted source attempts: `download.tibia.com` failed DNS resolution and a plain automated request to `static.tibia.com` returned HTTP 403. Those requests are not repeated blindly.
+This task's run `31947523640` / job `95165795953` failed at the materialization step. Analyzer installation and static graph extraction were skipped; cleanup and sanitized artifact upload succeeded. Artifact `9263709952` records `INPUT_BLOCKED` for the same-URL Referer/compressed strategy.
 
-PR #97's public GitHub-release source was also inspected as a potential compliant source, but the published original-Linux inventory inspected for this task does not expose the required `15.32.df7b29` build and is therefore not accepted as an exact-client source.
+Independent P0 run `31947502633` / job `95165743019` on `ubuntu-latest` records the same class of failure in artifact `9263704543`.
 
-The single new hosted staging experiment uses the same official static archive URL but a materially different request behavior: compressed transfer plus a same-URL `Referer`, matching a historical package-manager workaround for automated downloads from this endpoint. Exact size/SHA fencing remains decisive. A download that succeeds but does not match the exact fence is still `INPUT_BLOCKED`.
+No additional HTTP variant, no Synology fallback and no runtime escalation are authorized by this result.
 
-The workflow never executes the client. The archive/client remain only in `$RUNNER_TEMP`, are removed in an `always()` cleanup step, and are excluded from uploaded artifacts. Only sanitized structural JSON/text evidence may be uploaded.
+## Resume condition
+
+Resume only when the exact fenced client is available to GitHub-hosted Actions through a compliant source. The first resumed action is exact size/SHA validation followed by static recovery of typeinfo/vtables, field writers/readers, allocation limits, protocol parser assumptions and render/camera/picker dependencies.

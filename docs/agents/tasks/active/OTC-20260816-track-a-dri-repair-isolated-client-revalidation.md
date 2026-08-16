@@ -8,13 +8,13 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: runtime-admitted-before-dispatch
+phase: pre-runtime-transformer-repair
 branch: diag/OTC-20260816-track-a-dri-repair-isolated-client-revalidation
 base_branch: main
 base_main: fa5b66b697d42c60515c5de48ea5e30135eadd0e
 current_main: fa5b66b697d42c60515c5de48ea5e30135eadd0e
 created: 2026-08-16T22:19:00+02:00
-updated: 2026-08-16T22:19:00+02:00
+updated: 2026-08-16T22:29:00+02:00
 risk: high
 researcher_delivery: draft_only
 implementation_authorized: true
@@ -88,6 +88,22 @@ experiment:
   client_backend_forcing: false
   snapshots_seconds: [5, 15, 35]
   max_semantic_physical_runs: 1
+  semantic_physical_runs_completed: 0
+preflight_attempt:
+  workflow_head: 1836f4109d21f4eb7448b6eaba2c170353357476
+  governance_run: 31970617994
+  governance_result: SUCCESS
+  workflow_run: 31970618113
+  workflow_job: 95222415652
+  result: PRE_RUNTIME_TRANSFORMER_REFUSAL
+  discriminator: DRI_REVALIDATION_REFUSED=XVFB_ENV_PATCH_SITE_COUNT:0
+  runtime_mutation_started: false
+  namespace_created: false
+  xvfb_started: false
+  client_started: false
+  semantic_physical_run_consumed: false
+  repair_cycle: 1
+  repair_hypothesis: replace fragile two-line Xvfb environment anchor with the unique XKB_CONFIG_ROOT token already present exactly once in the immutable source script
 acceptance:
   - task-owned ephemeral namespace and dynamically free display/ports are proven before mutation
   - exact source/client/support fences pass
@@ -103,10 +119,10 @@ acceptance:
 audit:
   result: PENDING_PHYSICAL_DISCRIMINATOR
   material_findings_open: 0
-last_completed_step: current-main DRI repair was promoted and archived; anti-duplication found no open equivalent physical revalidation task; admission is persisted before the one-shot workflow is added
-next_action: add one immutable-source-derived one-shot ephemeral_isolated workflow, obtain Track A governance admission, execute exactly one semantic physical run, then remove the workflow and persist sanitized terminal evidence
+last_completed_step: governance admitted the task, but workflow run 31970618113/job 95222415652 refused inside the immutable-source transformer before generated-script execution because the two-line Xvfb environment anchor matched zero sites; no namespace or runtime process was created
+next_action: repair exactly the evidenced transformer anchor without changing runtime semantics; after fresh governance admission, allow one generated-script execution and stop on its first valid discriminator
 ---
 
 # Track A isolated DRI-repair client revalidation
 
-This task is intentionally non-canonical. It may mutate only its task-owned ephemeral namespace. It does not acquire the canonical lease, publish registration, use credentials, log in, perform gameplay, or authorize a canonical bootstrap retry.
+The first workflow attempt never crossed the runtime boundary. It failed before the generated isolated harness was written/executed, so the single semantic physical run remains unused. The repair is limited to a deterministic transformer anchor change.

@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runner_infrastructure_repair
-phase: bounded-system-helper-repair
+phase: repair-dispatched
 branch: ci/OTC-20260816-track-a-runner-system-xkbcomp-repair
 base_branch: main
 base_main: 22089c5ca65228379c409dd33561a096eea00b16
 risk: medium
-updated: 2026-08-16T17:22:00+02:00
+updated: 2026-08-16T17:23:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-runner-system-xkbcomp-repair.md
   - docs/agents/evidence/OTC-20260816-track-a-runner-system-xkbcomp-repair/**
@@ -89,8 +89,8 @@ acceptance:
   - any post-publication failure removes the newly created target before exit
   - one-shot workflow is removed immediately after terminal result
   - successful system helper publication is classified as immediate container repair, not durable declarative runner-image provisioning
-last_completed_step: read-only xkbcomp inventory proved the contained root already has root-owned executable xkbcomp SHA 0967e7e7..., while /usr/bin/xkbcomp and system xkbcomp packages are absent; Xvfb requires the absolute system path
-next_action: run one bounded repair+isolated-Xvfb validation; if UID/path authority fails, persist external runner-image deployment blocker instead of retrying canonical bootstrap
+last_completed_step: task-owned one-shot repair workflow is now present on the PR branch with exact source/target fences, fail-closed rollback and isolated-Xvfb validation; task checkpoint updated to dispatch it through normal pull-request synchronization
+next_action: consume the single bounded repair+isolated-Xvfb result; on PASS remove the one-shot workflow and persist evidence, on privilege/path failure persist explicit runner-image deployment blocker without canonical bootstrap retry
 ---
 
 # Dedicated runner system xkbcomp repair

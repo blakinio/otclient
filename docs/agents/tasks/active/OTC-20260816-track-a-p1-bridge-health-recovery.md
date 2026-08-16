@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-p1-bridge-health-recovery
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-coord-p1-replay-20260816-2019
 session_role: promotion_integration_coordinator
@@ -8,13 +8,13 @@ project_lane: otclient
 lane: P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: coordinator-current-main-promotion
+phase: coordinator-promotion-ready
 branch: feat/OTC-20260816-track-a-p1-bridge-health-recovery-v3
 base_branch: main
 base_main: d3f186414256151c9d5e03f34c5a9026b1fba500
 current_main: d3f186414256151c9d5e03f34c5a9026b1fba500
 created: 2026-08-16T15:37:00+02:00
-updated: 2026-08-16T20:19:00+02:00
+updated: 2026-08-16T20:30:00+02:00
 risk: medium
 researcher_delivery: draft_only
 implementation_authorized: true
@@ -101,11 +101,17 @@ prior_replay:
 current_replay:
   pr: 414
   initial_head: 4a127a422da058853f95aa88a0001326d8ad30b0
+  validated_parent_head: be345d57c8a7b23c52d6a7e752086c093fd6bd0a
+  final_checkpoint_head: PENDING_AFTER_THIS_TASK_ONLY_UPDATE
   base_main: d3f186414256151c9d5e03f34c5a9026b1fba500
   method: exact accepted blobs replayed onto current main; no source branch merge/rebase
   implementation_blob_policy: all tools/tests/profile blobs are exact matches to PR #372 accepted head
   shared_index_policy: MODULE_CATALOG.md and CHANGELOG.md blobs are exact PR #372 versions; compare dbd9520e..d3f18641 proves current main did not modify either path after the prior replay base
   physical_runtime_used: false
+coordinator_disposition:
+  decision: ACCEPT
+  material_findings_open: 0
+  review_threads_open: 0
 acceptance:
   - preserve exact coordinator-accepted P1 bridge semantics and tests byte-for-byte
   - bind lifecycle IPC to Linux SO_PEERCRED plus boot/PID/start/executable identity and matching PING envelope
@@ -118,25 +124,35 @@ acceptance:
 validation:
   source_semantic_audit: PASS_MATERIAL_FINDINGS_0
   prior_replay_exact_head_checks: PASS
-  current_replay_final_head: PENDING_AFTER_THIS_CHECKPOINT
-  current_replay_track_a_governance: PENDING
-  current_replay_repository_ci: PENDING
-  review_threads_open: PENDING
+  validated_parent_head: be345d57c8a7b23c52d6a7e752086c093fd6bd0a
+  validated_parent_track_a_governance_run: 31964279603
+  validated_parent_track_a_governance_result: SUCCESS
+  validated_parent_canonical_live_governance_run: 31964279608
+  validated_parent_canonical_live_governance_result: SUCCESS
+  validated_parent_repository_ci_run: 31964279913
+  validated_parent_repository_ci_result: SUCCESS
+  final_exact_head_track_a_governance: PENDING
+  final_exact_head_canonical_live_governance: PENDING
+  final_exact_head_repository_ci: PENDING
+  review_threads_open: 0
   physical_e2e: NOT_APPLICABLE
   physical_e2e_reason: P1 is a hosted producer; physical attach/restart/relogin evidence belongs to serialized RUNTIME ownership
 audit:
-  prior_result: PASS
-  prior_material_findings_open: 0
-  current_replay_result: PENDING_EXACT_DIFF_REVIEW
+  result: PASS
+  material_findings_open: 0
+  notes:
+    - current-main replay preserves accepted implementation/test/profile blobs exactly
+    - 30 later main commits from the prior replay base do not overlap P1 implementation or shared-index paths
+    - no physical runtime operation occurred
 closeout:
   implementation_complete: true
   vertical_slice_complete: true
-  final_ci: PENDING
+  final_ci: PENDING_ON_FINAL_TASK_ONLY_CHECKPOINT_HEAD
   old_pr_372_terminal: false
   current_pr_414_terminal: false
   ownership_released: false
-last_completed_step: created clean current-main promotion PR #414 by replaying the accepted P1 implementation/test/profile/shared-index blobs exactly onto main d3f186414256151c9d5e03f34c5a9026b1fba500; no physical runtime operation occurred
-next_action: inspect PR #414 exact final diff and review threads, obtain exact-head Track A governance plus repository CI, then if all gates pass close #372 superseded and promote #414
+last_completed_step: independently reviewed the current-main replay, verified exact accepted implementation/test blobs, zero review threads, and successful governance/canonical-governance/repository CI on parent head be345d57c8a7b23c52d6a7e752086c093fd6bd0a
+next_action: obtain exact-head governance/canonical-governance/repository CI for this task-only checkpoint; if all pass and main remains compatible, close PR #372 superseded, mark PR #414 ready, and squash-merge #414
 ---
 
 # Track A P1 bridge health/recovery current-main promotion

@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: track-a-runner-system-xkbcomp-repair
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair-and-validate-xvfb:

@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: discovery
-phase: validate-source-correlation
+phase: final-no-temp-workflow-validation
 branch: docs/OTC-20260816-track-a-qlibrary-linux-resolution-hosted-v2
 base_branch: main
 base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
 risk: low
-updated: 2026-08-16T15:44:00+02:00
+updated: 2026-08-16T15:50:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-qlibrary-linux-resolution-hosted.md
   - docs/agents/reports/OTCLIENT-20260816-qlibrary-linux-resolution-source-correlated.md
-  - .github/workflows/tibia-official-client-re-qlibrary-linux-resolution-hosted-v2.yml
 modules_touched: []
 reuses:
   - docs/agents/reports/OTCLIENT-20260816-filesystem-helper-resolver-static.md
@@ -36,12 +35,6 @@ physical_e2e_required: false
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
-context_pressure: low
-context_growth: stable
-context_score: 5
-estimate_confidence: high
-decomposition_decision: single
-decomposition_reason: bounded official-source correlation for one QLibrary absolute extensionless input
 validation_level: focused
 track_a_runtime_agent_admission_version: 1
 runtime_owner_task: NOT_APPLICABLE
@@ -73,7 +66,7 @@ source_pr_failure:
   run: 31943243252
   job: 95155325324
   classification: VALIDATOR_DEFECT
-  failed_expectation: searched for append-style .so construction not used by Qt 6.9.3
+  failed_expectation: append-style .so spelling not used by Qt 6.9.3
 primary_source:
   qt_tag: v6.9.3
   qlibrary_unix_git_blob: afa96679a0db38f8f08ee9244175368e78c8d349
@@ -82,44 +75,29 @@ primary_source:
   qlibrary_p_sha256: 32d89e6dee9cbaab5777f98b0bc4dea8da45fffcb058604fdf35daa55efdc24e
 result:
   classification: OFFICIAL_QT_6_9_3_SOURCE_CORRELATED
-  haswell_false_potential_candidates:
-    - <APPDIR>/BattlEye/BEClient
-    - <APPDIR>/BattlEye/BEClient.so
-    - <APPDIR>/BattlEye/libBEClient
-    - <APPDIR>/BattlEye/libBEClient.so
-  haswell_true_glibc_potential_candidates:
-    - <APPDIR>/BattlEye/glibc-hwcaps/x86-64-v3/BEClient
-    - <APPDIR>/BattlEye/glibc-hwcaps/x86-64-v3/BEClient.so
-    - <APPDIR>/BattlEye/BEClient
-    - <APPDIR>/BattlEye/BEClient.so
-    - <APPDIR>/BattlEye/glibc-hwcaps/x86-64-v3/libBEClient
-    - <APPDIR>/BattlEye/glibc-hwcaps/x86-64-v3/libBEClient.so
-    - <APPDIR>/BattlEye/libBEClient
-    - <APPDIR>/BattlEye/libBEClient.so
-  actual_attempt_rule: runtime dlopen attempts are a prefix of the applicable potential list and stop at first success or, for absolute input, after a failed attempt whose path exists
+  haswell_false_potential_candidates: [<APPDIR>/BattlEye/BEClient, <APPDIR>/BattlEye/BEClient.so, <APPDIR>/BattlEye/libBEClient, <APPDIR>/BattlEye/libBEClient.so]
+  haswell_true_BEClient_so_index: 3
+  actual_attempt_rule: actual dlopen attempts are a prefix of the applicable potential list and stop at first success or after a failed existing absolute candidate
   BEClient_so_generated: true
   BEClient_so_actually_attempted: UNKNOWN_RUNTIME_CONDITIONAL
   successful_mapping: UNKNOWN
-acceptance:
-  - use only official public qt/qtbase v6.9.3 for new semantic work
-  - validate exact source file content hashes before parsing
-  - validate .so suffix, lib prefix, absolute exact-first ordering, haswell/glibc prefix transform, loop order, dlopen construction and retry stop condition
-  - distinguish potential generated candidates from actual conditional dlopen attempts
-  - preserve actual successful mapping as UNKNOWN without runtime evidence
-  - no Synology/proprietary semantic execution or BattlEye internal analysis
-  - remove temporary hosted validator workflow before merge
 validation:
-  hosted_source_validator: PENDING
-  track_a_governance: PENDING
-  repository_ci: PENDING
+  validated_head: 74f1f95d1547fdd10acba207b52132d4757b0633
+  hosted_source_validator_run: 31950672119
+  hosted_source_validator_result: SUCCESS
+  track_a_governance_run: 31950672049
+  track_a_governance_result: SUCCESS
+  repository_ci_run: 31950672278
+  repository_ci_result: SUCCESS
+  temporary_validator_workflow: REMOVE_BEFORE_FINAL_HEAD
+  final_no_temp_workflow_governance: PENDING
+  final_no_temp_workflow_repository_ci: PENDING
   e2e: NOT_APPLICABLE_WITH_REASON
   e2e_reason: public-source static semantic correlation only
-last_completed_step: corrected PR 356 validator defect against official Qt 6.9.3 source and persisted candidate-versus-attempt semantics
-next_action: run hosted exact-source validator; if green, record evidence, remove temporary workflow, rerun final exact-head governance/CI and promote through coordinator
+last_completed_step: exact official Qt 6.9.3 source validator, Track A governance and repository CI all passed on 74f1f95d
+next_action: remove temporary validator workflow, obtain final exact-head governance/CI, then coordinator-review/promote if main remains fresh
 ---
 
 # Qt 6.9.3 QLibrary source-correlation task
 
-The prior Draft #356 is replaced because its load-bearing validator encoded the wrong source spelling for the generic `.so` suffix. The replacement derives behavior from the exact official Qt 6.9.3 source and explicitly models the absolute-path retry stop condition, so generated candidate order is not confused with the runtime `dlopen` sequence.
-
-No physical runtime, proprietary semantic probe, login/session state or anti-cheat internals are part of this task.
+The replacement corrects the old #356 validator defect and preserves the distinction between potential generated names and runtime-conditional `dlopen` attempts. No physical runtime, proprietary semantic probe, login/session state or anti-cheat internals are part of this task.

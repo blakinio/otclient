@@ -2,23 +2,25 @@
 task_id: OTC-20260816-track-a-xcbgl-runtime-trace
 status: ready
 agent: ChatGPT
-session_id: chatgpt-xcbgl-runtime-trace-20260816
-session_role: runtime_researcher
+session_id: chatgpt-coord-xcbgl-promote-20260816-2111
+session_role: promotion_integration_coordinator
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
 phase: coordinator-promotion-ready
-branch: diag/OTC-20260816-track-a-xcbgl-runtime-trace
+branch: docs/OTC-20260816-track-a-xcbgl-runtime-trace-promote
 base_branch: main
-base_main: d3f186414256151c9d5e03f34c5a9026b1fba500
+base_main: 7629e6579610fd8069e7cac4bce8503c0b0a191e
+current_main: 7629e6579610fd8069e7cac4bce8503c0b0a191e
 risk: high
-updated: 2026-08-16T20:24:00+02:00
+updated: 2026-08-16T21:11:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xcbgl-runtime-trace.md
   - docs/agents/evidence/OTC-20260816-track-a-xcbgl-runtime-trace/**
 modules_touched: []
 reuses:
+  - source Draft PR #415
   - docs/agents/tasks/archive/OTC-20260816-track-a-xcbgl-log-extract.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-qt-debug-plugins-discriminator.md
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
@@ -27,18 +29,17 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: one separately admitted ephemeral-isolated runtime discriminator was required because #412/#413 proved the retained #410 Actions log could not classify XCB GL integration discovery/load/init or same-display GLX extension state
+execution_reason: coordinator promotion replays accepted durable physical evidence by exact blob SHA from current main; no additional client/runtime execution is required or authorized
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
-validation_level: heavy
+validation_level: focused
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
-execution_class: synology_physical_runtime
-runner: synology-otclient-01
-runtime_access: ephemeral_isolated
-runtime_owner_task: OTC-20260816-track-a-xcbgl-runtime-trace
-runtime_namespace: track-a-xcbgl-runtime-trace-v1
+execution_class: github_hosted
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -46,72 +47,61 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-persistent_session_role: none
-physical_e2e_required: true
+persistent_session_role: consumer_of_runtime_evidence
+physical_e2e_required: false
 owner_funded_ai_api_authorized: false
-canonical_boundary:
-  read_or_write_canonical_lease: false
-  read_or_write_canonical_registration: false
-  publish_registration: false
-  canonical_namespace_access: false
-  credentials_allowed: false
-  login_allowed: false
-  gameplay_allowed: false
-  track_b_access: false
-exact_client_fence:
-  version: 15.32.df7b29
-  size: 51965216
-  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-source_harness:
-  commit: cb557da12ebb41c597340909b2db717ee59cdfe1
-  blob: 1616edcc982be50ef2c95b8077160ec8fe9291fe
-  fenced_patch_count: 6
-execution:
+runtime_nonclaims:
+  display_98_current_canonical_status: UNKNOWN
+  rfb_6082_current_backend_mapping: UNKNOWN
+  current_exact_client_pid: NOT_REGISTERED
+  current_exact_client_session: NOT_REGISTERED
+source_research:
   pr: 415
+  final_head: 3d8cdb3c9e1f025edcca2770a7c4ae46aa438393
   dispatch_head: 8ffc60146573e5fb9ac1b900ff45843af10301dd
+  task_blob: 63fbaff120f1e5b5198197d22100af0c6676808b
+  evidence_blob: 005458510d069f23a4e0a1fba95f028f78b162a4
+  coordinator_decision: ACCEPT
+  material_findings_open: 0
+  review_threads_open: 0
+physical_evidence:
+  runtime_access_during_source_run: ephemeral_isolated
+  runtime_namespace: track-a-xcbgl-runtime-trace-v1
+  runner: synology-otclient-01
   governance_run: 31964397501
   governance_result: SUCCESS
   semantic_run: 31964397523
   semantic_job: 95207211173
   semantic_result: SUCCESS
-  runner: synology-otclient-01
-  one_shot_workflow_removed: true
   cleanup: COMPLETE
   canonical_state_access: NONE
-runtime_observation:
-  ephemeral_display: ':231'
-  ephemeral_vnc_port: 6200
-  ephemeral_client_pid: 26073
-  ephemeral_client_pgid: 26073
-  client_alive_t05: true
-  client_alive_t15: true
-  client_alive_t35: true
-  visible_windows_t05: 0
-  visible_windows_t15: 0
-  visible_windows_t35: 0
-  window_classification: CLIENT_ALIVE_NO_VISIBLE_WINDOWS_ON_ISOLATED_DISPLAY
-  historical_ephemeral_values_only: true
-x11_extension_observation:
-  extension_count: 22
-  glx_present: false
-  glx_major_opcode: 0
-  render_present: true
-  render_major_opcode: 139
-qt_xcb_gl_trace:
-  client_log_total_lines: 424
-  allowlist_filter_matches: 41
-  xcb_platform_library_loaded: true
-  xcbglintegrations_directory_scanned: true
-  xcb_glx_metadata_found: true
-  xcb_glx_key_found: true
-  xcb_glx_library_loaded: true
-  xcb_egl_specific_log_line_present: false
-  qxcb_reports_neither_glx_nor_egl_enabled: true
-  qrhi_gles2_context_failed: true
-  vulkan_library_loaded: true
-  qrhi_vulkan_initialized: true
+  exact_client:
+    version: 15.32.df7b29
+    size: 51965216
+    sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  observed_ephemeral_only:
+    display: ':231'
+    vnc_port: 6200
+    client_pid: 26073
+    client_pgid: 26073
+  x11_extensions:
+    count: 22
+    glx_present: false
+    render_present: true
+  qt_trace:
+    client_log_total_lines: 424
+    allowlist_filter_matches: 41
+    xcb_platform_library_loaded: true
+    xcbglintegrations_directory_scanned: true
+    xcb_glx_metadata_found: true
+    xcb_glx_key_found: true
+    xcb_glx_library_loaded: true
+    qxcb_reports_neither_glx_nor_egl_enabled: true
+    qrhi_gles2_context_failed: true
+    vulkan_library_loaded: true
+    qrhi_vulkan_initialized: true
 result:
   classification: PROVEN_TASK_OWNED_XVFB_GLX_ABSENT_QT_XCB_GLX_PLUGIN_DISCOVERED_AND_LOADED_CONTEXT_CREATION_FAILS_NO_GLX_OR_EGL
   glx_absence_is_direct_prerequisite_gap: true
@@ -126,27 +116,48 @@ negative_evidence_boundary:
     - GLX absence alone explains the final no-window state
 evidence:
   - docs/agents/evidence/OTC-20260816-track-a-xcbgl-runtime-trace/20260816-xcbgl-runtime-trace.md
+promotion:
+  pr: 425
+  source_pr: 415
+  replay_method: exact task/evidence blobs onto current main; no source branch merge or rebase
+  initial_replay_head: 608566a4368213d6de1b220fdc18a2aa7a9c60e5
+  final_checkpoint_head: PENDING_AFTER_THIS_UPDATE
+  source_head_behind_current_main_by: 2
+  source_head_only_changed_paths:
+    - docs/agents/tasks/active/OTC-20260816-track-a-xcbgl-runtime-trace.md
+    - docs/agents/evidence/OTC-20260816-track-a-xcbgl-runtime-trace/20260816-xcbgl-runtime-trace.md
+  intervening_main_commits:
+    - 070a066488d22126483e13fc8a08b17df5090918
+    - 7629e6579610fd8069e7cac4bce8503c0b0a191e
+  intervening_main_overlap: false
+validation:
+  source_final_track_a_governance_run: 31964566084
+  source_final_track_a_governance_result: SUCCESS
+  source_final_repository_ci_run: 31964566087
+  source_final_repository_ci_result: SUCCESS
+  promotion_exact_head_track_a_governance: PENDING
+  promotion_exact_head_repository_ci: PENDING
+  review_threads_open: 0
+  e2e: PASS_SOURCE_PHYSICAL_DISCRIMINATOR
+  e2e_evidence: run 31964397523 / job 95207211173
+  no_second_physical_run: true
 audit:
-  result: PASS_PENDING_EXACT_FINAL_HEAD_CHECKS
+  result: PASS
   material_findings_open: 0
-  notes:
-    - exact semantic run and cleanup succeeded under governance-compliant ephemeral_isolated admission
-    - the temporary workflow was removed before any subsequent task/evidence commit, preventing a second physical run
-    - an initial repository CI generation on the temporary-workflow head found only a missing final newline in that temporary file; the file is now removed and final exact-head normal checks must supersede that generation
 acceptance:
-  - immutable source blob and six patch sites fenced: PASS
-  - task-owned isolated namespace only: PASS
-  - exact live client executable fence: PASS
-  - same-display read-only X11 extension inventory: PASS
-  - complete local client-log scan with compact sanitized allowlist emission: PASS
-  - no client backend forcing: PASS
+  - exact source task/evidence blobs replayed from current main: PASS
+  - one governance-compliant ephemeral-isolated physical discriminator: PASS
+  - exact live client fence: PASS
+  - same-display GLX extension inventory: PASS
+  - Qt XCB GL plugin discovery/load evidence: PASS
   - no canonical state access: PASS
   - cleanup: PASS
-  - exactly one semantic physical run: PASS
-last_completed_step: run 31964397523/job 95207211173 proved the task-owned Xvfb advertises no GLX extension while Qt discovers and loads libqxcb-glx-integration.so before reporting neither GLX nor EGL enabled; the client remains alive with zero visible windows through 35 seconds and cleanup completes
-next_action: coordinator-promote/archive this Draft after exact-final-head checks; separately admit a support-only Xvfb capability discriminator to determine whether the exact contained Xvfb can expose GLX at all, without launching the official client or retrying canonical bootstrap
+  - no second physical run: PASS
+  - GLX absence not overstated as sole no-window cause: PASS
+last_completed_step: coordinator replayed the accepted two-file #415 package exactly onto main@7629e6579610fd8069e7cac4bce8503c0b0a191e as PR #425 with no overlap from merged P1 implementation/archive commits
+next_action: obtain exact-head Track A governance and repository CI on this checkpoint, close source Draft #415 superseded, mark #425 ready, merge after branch-protection gates, then archive this task and release ownership
 ---
 
-# Track A XCB GL runtime trace — terminal candidate
+# Track A XCB GL runtime trace — coordinator promotion
 
-The missing XCB GL loader evidence is closed for this isolated surface. The next unresolved question is the contained Xvfb server's GLX capability, not another official-client retry.
+The accepted physical discriminator is being promoted from a clean current-main replay. No new runtime execution is permitted by this promotion session. The source ephemeral display, VNC port and PID are historical evidence only and must never be treated as current canonical identity.

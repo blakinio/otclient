@@ -1,0 +1,139 @@
+name: Track A isolated Xvfb startup discriminator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/agents/tasks/active/OTC-20260816-track-a-isolated-xvfb-startup-discriminator.md
+      - .github/workflows/tibia-official-client-re-isolated-xvfb-startup-discriminator.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-isolated-xvfb-startup-discriminator
+  cancel-in-progress: false
+
+jobs:
+  diagnose-xvfb:
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Reproduce exact Xvfb invocation on isolated display
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: 917b8ab943fd9aa1fded50c9a0b8b4e1dfeb5cbb
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          [[ "$GITHUB_REPOSITORY" == 'blakinio/otclient' ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]]
+
+          root='/work/_otclient_tibia_re_state/toolroot'
+          xvfb="$root/usr/bin/Xvfb"
+          tmp="$(mktemp -d "$RUNNER_TEMP/track-a-xvfb-diag.XXXXXX")"
+          log="$tmp/xvfb.log"
+          pid=''
+          display_number=''
+          socket_preexisting=false
+
+          cleanup() {
+            rc=$?
+            if [[ "$pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$pid" 2>/dev/null; then
+              kill "$pid" 2>/dev/null || true
+              for _ in $(seq 1 20); do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep .1
+              done
+              kill -KILL "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+            fi
+            if [[ -n "$display_number" ]]; then
+              lock="/tmp/.X${display_number}-lock"
+              sock="/tmp/.X11-unix/X${display_number}"
+              owner=''
+              [[ ! -f "$lock" ]] || owner="$(tr -cd '0-9' <"$lock" 2>/dev/null || true)"
+              if [[ -n "$pid" && "$owner" == "$pid" ]]; then
+                rm -f -- "$lock" "$sock"
+              elif [[ "$socket_preexisting" == false && ! -e "$lock" && -S "$sock" ]]; then
+                rm -f -- "$sock"
+              fi
+            fi
+            rm -rf -- "$tmp"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          [[ -f "$xvfb" && -x "$xvfb" && ! -L "$xvfb" ]]
+          xvfb_real="$(realpath -e -- "$xvfb")"
+          [[ "$xvfb_real" == "$root"/* ]]
+          printf 'XVFB_BINARY_REALPATH=%s\n' "$xvfb_real"
+          printf 'XVFB_BINARY_SHA256=%s\n' "$(sha256sum "$xvfb" | awk '{print $1}')"
+
+          ldd_out="$(LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" ldd "$xvfb" 2>&1 || true)"
+          missing="$(printf '%s\n' "$ldd_out" | grep -c 'not found' || true)"
+          printf 'XVFB_LDD_MISSING_COUNT=%s\n' "$missing"
+          if [[ "$missing" != 0 ]]; then
+            printf '%s\n' "$ldd_out" | grep 'not found' | sed 's/^/XVFB_LDD_MISSING=/'
+          fi
+
+          for n in $(seq 199 220); do
+            if [[ ! -e "/tmp/.X${n}-lock" && ! -e "/tmp/.X11-unix/X${n}" ]]; then
+              display_number="$n"
+              break
+            fi
+          done
+          [[ -n "$display_number" ]]
+          display=":$display_number"
+          sock="/tmp/.X11-unix/X${display_number}"
+          [[ -e "$sock" ]] && socket_preexisting=true
+          printf 'XVFB_DIAGNOSTIC_DISPLAY=%s\n' "$display"
+
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            OTCLIENT_TIBIA_RE_ROLE=xvfb-diagnostic \
+            HOME="$tmp" PATH="$root/usr/bin:$root/usr/sbin:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu:$root/lib/x86_64-linux-gnu" \
+            XKB_CONFIG_ROOT="$root/usr/share/X11/xkb" \
+            "$xvfb" "$display" -screen 0 1920x1080x24 -xkbdir "$root/usr/share/X11/xkb" \
+            -nolisten tcp -noreset >"$log" 2>&1 &
+          pid=$!
+          printf 'XVFB_DIAGNOSTIC_PID=%s\n' "$pid"
+
+          outcome='TIMEOUT_NO_SOCKET'
+          process_rc='STILL_RUNNING'
+          for _ in $(seq 1 80); do
+            if [[ -S "$sock" ]]; then
+              outcome='SOCKET_CREATED'
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              set +e
+              wait "$pid"
+              process_rc=$?
+              set -e
+              outcome='PROCESS_EXITED_BEFORE_SOCKET'
+              break
+            fi
+            sleep .1
+          done
+
+          printf 'XVFB_DIAGNOSTIC_OUTCOME=%s\n' "$outcome"
+          printf 'XVFB_DIAGNOSTIC_PROCESS_RC=%s\n' "$process_rc"
+          echo 'XVFB_DIAGNOSTIC_STDERR_BEGIN'
+          sed -n '1,80p' "$log"
+          echo 'XVFB_DIAGNOSTIC_STDERR_END'
+
+          if [[ "$outcome" == 'SOCKET_CREATED' ]]; then
+            echo 'XVFB_ISOLATED_RESULT=PASS_EXACT_INVOCATION'
+            exit 0
+          fi
+          echo 'XVFB_ISOLATED_RESULT=FAIL_EXACT_INVOCATION'
+          exit 2

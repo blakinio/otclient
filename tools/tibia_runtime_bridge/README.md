@@ -6,14 +6,14 @@ This tool is the durable read-only bridge/API boundary for `OTCLIENT-TIBIA-RE` P
 
 P1 runs as `github_hosted` with `runtime_access: none`. Repository tests and bridge compilation are allowed; real attach, launch, login/relogin, restart, kill, X11/VNC control, live `/proc` inspection and physical recovery belong to separately admitted RUNTIME work.
 
-The bridge must never infer a canonical target from historical `:98`, RFB `6082`, a PID or a reachable socket. Current canonical identity is usable only when the authoritative runtime registration, current controller generation, fresh Gate B identity and bridge PING agree. Missing or contradictory evidence fails closed.
+The bridge must never infer a canonical target from historical `:98`, RFB `6082`, a PID or a reachable socket. Current canonical identity is usable only when the authoritative runtime registration, current controller generation, fresh Gate B identity and an identity-bound bridge PING agree. Missing or contradictory evidence fails closed.
 
 ## Read-only bridge v1
 
 1. `launcher.py` loads a versioned profile and verifies the exact official-client SHA-256 before launch.
 2. The launcher injects `otclient-tibia-runtime-bridge.so` with `LD_PRELOAD`; it does not modify installed client files.
 3. `bridge.cpp` discovers the executable PIE base at runtime, binds a mode-`0600` Unix-domain socket and accepts bounded local commands.
-4. `PING` reports helper/base readiness.
+4. `PING` reports helper/base readiness plus the helper process PID, process start ticks and exact profile version/SHA so health consumers can bind the socket response to the registered process rather than trusting socket reachability alone.
 5. `DISCOVER <target>` runs on the client's Qt event-loop thread, scans only readable/writable mappings of the current process for the profile's exact primary-vptr value, applies an object-layout plausibility gate and validates candidate QObject-compatible instances by Qt class name.
 6. `session-status` combines three structural discoveries into a deliberately non-terminal `in_game_candidate` result.
 7. `ipc_client.py` provides a bounded JSON client.
@@ -34,19 +34,19 @@ The committed profile is fenced to official native-Linux client `15.32.df7b29`, 
 
 `health.py` is a pure evaluator. It performs no filesystem, process, socket, X11, VNC or network discovery. A separately authorized runtime producer supplies three non-secret evidence objects:
 
-- the authoritative `runtime-registration.json` record from the canonical namespace;
+- the complete authoritative `runtime-registration.json` record from the canonical namespace;
 - a fresh Gate B observation whose boot identity, PID, process start ticks, exact client fence, display/window evidence, registration generation and lease generation exactly match that record;
-- a current bridge `PING` response proving `main_base_resolved=true`.
+- a current bridge `PING` response whose PID, process start ticks, client version and binary SHA exactly match the registered process.
 
 The caller must also provide the current expected controller lease generation. A positive `READY` result requires all of the following:
 
-- registration schema v1 and `runtime_id=track-a-canonical-live`;
+- complete registration schema v1 and `runtime_id=track-a-canonical-live` with its required non-secret provenance/state fields;
 - exact client `15.32.df7b29 / 51965216 / e6c244...ff7fe`;
 - current expected lease generation equals both registration and fresh observation;
 - canonical namespace `canonical-live-runtime`;
 - fresh `gate_b=PASS` and `target_uniqueness=PROVEN` observation inside the configured age/skew window;
 - exact equality of registration generation, boot hash, PID, process start ticks, version/size/SHA, display and window identity;
-- healthy `PING` with a resolved main PIE base.
+- healthy `PING` with a resolved main PIE base whose PID/start ticks/version/SHA bind that bridge response to the same registered exact runtime.
 
 Failure tokens are explicit: `NOT_REGISTERED`, `REGISTRATION_INVALID`, `EXPECTED_AUTHORITY_UNAVAILABLE`, `LEASE_GENERATION_MISMATCH`, `GATE_B_NOT_PROVEN`, `NAMESPACE_MISMATCH`, `OBSERVATION_STALE`, `OBSERVATION_FROM_FUTURE`, `IDENTITY_MISMATCH` and `BRIDGE_UNHEALTHY`.
 
@@ -67,14 +67,20 @@ Example shape (synthetic values only):
     "runtime_id": "track-a-canonical-live",
     "registration_generation": 7,
     "lease_generation": 9,
-    "boot_id_sha256": "<64 lowercase hex>",
+    "registered_at": "2026-08-16T13:00:00+02:00",
+    "boot_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "pid": 1234,
     "process_start_ticks": 5678,
     "client_version": "15.32.df7b29",
     "client_size": 51965216,
     "client_sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
     "display": ":synthetic",
-    "window_identity": {"synthetic": true}
+    "window_identity": {"synthetic": true},
+    "remote_view_endpoint": null,
+    "remote_view_mapping": "UNKNOWN",
+    "state": "LOGIN",
+    "source_task": "synthetic-runtime-producer",
+    "source_run": "synthetic-run"
   },
   "observation": {
     "schema": "otclient.tibia-runtime-bridge.runtime-observation.v1",
@@ -84,7 +90,7 @@ Example shape (synthetic values only):
     "target_uniqueness": "PROVEN",
     "registration_generation": 7,
     "lease_generation": 9,
-    "boot_id_sha256": "<same 64 lowercase hex>",
+    "boot_id_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "pid": 1234,
     "process_start_ticks": 5678,
     "client_version": "15.32.df7b29",
@@ -93,7 +99,15 @@ Example shape (synthetic values only):
     "display": ":synthetic",
     "window_identity": {"synthetic": true}
   },
-  "bridge_ping": {"ok": true, "command": "PING", "main_base_resolved": true}
+  "bridge_ping": {
+    "ok": true,
+    "command": "PING",
+    "main_base_resolved": true,
+    "pid": 1234,
+    "process_start_ticks": 5678,
+    "client_version": "15.32.df7b29",
+    "binary_sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  }
 }
 ```
 

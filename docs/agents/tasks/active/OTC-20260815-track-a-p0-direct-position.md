@@ -17,7 +17,7 @@ current_main: ce9997304e4b771b6243395bf0c3a6084f32a7dc
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track-a-p0-direct-position
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
-updated: 2026-08-16T14:25:00+02:00
+updated: 2026-08-16T14:30:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-p0-direct-position.md
   - docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/**
@@ -39,6 +39,16 @@ prompt_contract_version: 1.0.0
 execution_mode: github-only
 execution_class: github_hosted
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 persistent_session_role: consumer_of_runtime_evidence
 physical_e2e_required: false
 mutation_authorized: false
@@ -49,15 +59,15 @@ task_completion_policy: draft_pr_only
 user_communication: low_noise
 code_bearing_head: a3068a6a9460525cb1946186cf439caf7832e176
 invocation_started_at: 2026-08-16T14:25:00+02:00
-last_progress_at: 2026-08-16T14:25:00+02:00
-lease_released_at: 2026-08-16T14:25:00+02:00
+last_progress_at: 2026-08-16T14:30:00+02:00
+lease_released_at: 2026-08-16T14:30:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: github-hosted-replay
+ci_check_generation: admission-fields-repair
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
 legacy_runtime_pr_303: CLOSED_SUPERSEDED

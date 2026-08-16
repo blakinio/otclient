@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-p1-bridge-health-recovery
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: agent-20260816-p1-bridge-001
 session_role: researcher
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: bridge-health-recovery
+phase: handoff
 branch: feat/OTC-20260816-track-a-p1-bridge-health-recovery
 base_branch: main
 base_main: 0d7b2607912552599ae501891491aab439cfde7b
 created: 2026-08-16T13:14:00+02:00
-updated: 2026-08-16T13:18:00+02:00
+updated: 2026-08-16T13:25:38+02:00
 risk: medium
 researcher_delivery: draft_only
 implementation_authorized: true
@@ -29,7 +29,6 @@ reuses:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_P1_BRIDGE_ALIAS.md
   - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 depends_on:
-  - "PR #283 historical accepted source; blobs are reused only after exact comparison"
   - "PR #303 / RUNTIME only for later physical attach/restart/relogin evidence; not mutated by this task"
 blocks: []
 cross_repository_tasks: []
@@ -43,9 +42,9 @@ decomposition_decision: single
 context_pressure: medium
 context_growth: stable
 context_score: 8
-estimate_confidence: medium
-validation_level: focused
-heavy_validation_runs: 0
+estimate_confidence: high
+validation_level: component
+heavy_validation_runs: 1
 session_rotation_count: 0
 stale_takeover_count: 0
 human_interruptions: 0
@@ -77,14 +76,14 @@ track_a_runtime_admission:
   mutation_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-16T13:10:00+02:00
-last_progress_at: 2026-08-16T13:18:00+02:00
+last_progress_at: 2026-08-16T13:25:38+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: final-draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -97,38 +96,62 @@ The P1 layer must never bootstrap, launch, login, restart, kill, attach to, reco
 
 # Current factual basis
 
-- Current dispatch base is `main@0d7b2607912552599ae501891491aab439cfde7b`.
-- PR #283 is closed unmerged, but its bounded read-only bridge implementation was explicitly accepted by the coordinator; its source/test blobs were absent on current `main` and have now been reconstructed from the accepted blob SHAs before P1 extensions.
-- Untouched restored bridge blobs preserve accepted #283 `bridge.cpp`, launcher, resolver, profile, CMake and original focused-test content.
-- No open PR currently owns `tools/tibia_runtime_bridge/**` or `tests/tools/tibia_runtime_bridge/**`.
-- PR #303 owns separate runtime surfaces; this task consumes only durable evidence and performs no live observation or mutation.
-- Current canonical runtime identity remains unclaimed here: `:98 = UNKNOWN`, `6082 = UNKNOWN`, PID/session = `NOT_REGISTERED`.
-- Existing repository `CI` does not execute `tests/tools/tibia_runtime_bridge/*.py`; a unique task-owned temporary GitHub-hosted validation workflow is therefore permitted for focused/component proof and will be removed before final handoff head.
+- Dispatch base and current `main` are both `0d7b2607912552599ae501891491aab439cfde7b` at handoff preparation.
+- PR #283 is closed unmerged, but its bounded read-only bridge implementation was explicitly accepted by the coordinator. The accepted source/test baseline was reconstructed on this branch from its exact blob SHAs before any P1 extension.
+- Untouched restored blobs for CMake, `bridge.cpp`, launcher, resolver, profile, `__init__.py` and original focused tests remain byte-identical to the accepted #283 blobs; the temporary hosted workflow asserted these SHAs before tests.
+- `ipc_client.py` extends the accepted API compatibly with typed transport/protocol failure subclasses while retaining `BridgeClientError` as their base.
+- `health.py` consumes only an explicit exact-fence `BridgeBinding`; it owns no canonical-state discovery and no process-control/launch/login/restart/attach capability.
+- PR #303 owns separate physical runtime surfaces; this task neither observed nor mutated that runtime.
+- Canonical live identity is deliberately not claimed here: `:98 = UNKNOWN`, `6082 = UNKNOWN`, PID/session = `NOT_REGISTERED`.
+- The task-owned temporary workflow `.github/workflows/track-a-p1-bridge-validation.yml` was used only for hosted validation and was removed before this handoff head.
 
 # Acceptance inventory
 
 - [x] Rebuild the exact accepted PR #283 bridge/tool/test baseline on this current-main branch from accepted blob SHAs before extension.
 - [x] Preserve exact profile/hash fencing, owner-only local IPC, bounded request framing, read-only discovery and derived `session-status` semantics.
 - [x] Add an explicit runtime identity model suitable for RUNTIME-produced registrations/evidence without reading or mutating the canonical runtime from P1.
-- [x] Add fail-closed bridge health classification that distinguishes readiness, unreachable, malformed response and stale/changed identity without promoting `session-status` to authoritative `IN_GAME`.
-- [x] Add deterministic reacquisition that binds only to a fresh explicit identity/endpoint, rejects absent identity, exact-fence mismatch, generation regression/change during probe and process identity change, and drops stale cached channels.
-- [x] Add bounded recovery semantics that may retry/reacquire a newly supplied identity but never starts/restarts/logs in a client or invents PID/display/socket data.
-- [x] Add deterministic tests for healthy/unavailable/malformed/identity-change/stale-generation/replacement-endpoint/retry-exhaustion/recovery-success paths.
-- [ ] Keep all prior #283 focused tests passing on the implementation head.
-- [ ] Run proportional GitHub-hosted focused/component validation and exact-head repository CI required for the final Draft head.
-- [ ] Perform a fresh post-implementation audit with zero open material findings before handoff.
-- [ ] Remove the temporary validation workflow before the final Draft handoff head.
-- [ ] Leave the result as `DRAFT_NOT_PROMOTED`; do not merge or promote P1 conclusions.
+- [x] Add fail-closed bridge health classification for healthy/degraded, unreachable, malformed, absent/invalid identity and stale/changed identity without promoting `session-status` to authoritative `IN_GAME`.
+- [x] Add deterministic reacquisition that binds only to a fresh explicit identity/endpoint, rejects absent identity, exact-fence mismatch, registration/lease generation regression, same-generation process/endpoint change and identity changes during probe, and drops stale cached channels.
+- [x] Add bounded recovery that retries/reacquires only newly supplied explicit bindings and never starts/restarts/logs in a client or invents PID/display/socket data.
+- [x] Cover healthy/unavailable/malformed/identity-change/stale-generation/stale-lease/replacement-endpoint/retry-exhaustion/recovery-success and real Unix-socket transport/protocol classification paths with deterministic tests.
+- [x] Keep all prior #283 focused tests passing on the latest implementation code (`31944224720`, job `95157714206`: baseline fence, dependencies, `py_compile`, focused suite all SUCCESS before C++ build step).
+- [x] Run proportional GitHub-hosted focused/component validation. Full validation run `31944059279`, job `95157324527`, completed SUCCESS including accepted-blob fence, dependencies, `py_compile`, focused suite and standalone Qt bridge build. Later Python-only audit fixes did not change accepted CMake/`bridge.cpp`; run `31944224720` re-proved their exact blob fence and the complete Python suite on head `7c86acf779a4677715161001ab9315d41afed65d`.
+- [x] Diagnose the sole failed validation generation from evidence: run `31944025412`, job `95157249963` failed only because hosted validation lacked `pyelftools`; dependency installation was added and the next full run succeeded. No identical blind retry was used.
+- [x] Perform a fresh post-implementation exact-source audit. Two robustness findings were found and fixed (string-based stale classification; non-object `PING` handling), followed by additional regression/real-IPC tests. Final re-read at `e78fea2e19ad93e1c828cd8f00cd47a23b7a6402` found zero open material code findings. This was a same-invocation validator pass, not an independent external reviewer; coordinator review remains required for promotion.
+- [x] Remove the temporary validation workflow before the final Draft handoff head (`e78fea2e19ad93e1c828cd8f00cd47a23b7a6402`).
+- [x] Leave the result `DRAFT_NOT_PROMOTED`; PR #357 remains Draft and the researcher does not merge/promote it.
+- [ ] Final exact-head repository CI/checks are intentionally read from PR #357 after this immutable handoff commit; any failure reopens the task before coordinator promotion.
 
 # Evidence boundary
 
-`session-status` remains a structural candidate with evidence level `DERIVED_UNTIL_LIVE_CORRELATION`. This task may prove API/lifecycle behavior under deterministic hosted simulation; it cannot prove physical attach, real restart/relogin stability, canonical session readiness, authoritative player position or gameplay actions.
+`session-status` remains a structural candidate with evidence level `DERIVED_UNTIL_LIVE_CORRELATION`. This task proves only hosted bridge/API/lifecycle behavior and standalone helper buildability. It does not prove physical attach, canonical runtime existence, persistent-session reacquisition, restart/relogin stability, current `IN_GAME`, authoritative player position or gameplay actions.
+
+# Validation evidence
+
+- Accepted baseline reconstruction commit: `a96ba77e4cdbb51dd5257ff45e32c057a04c5772`.
+- Full hosted component run: `31944059279`, job `95157324527` = `SUCCESS`.
+- Latest implementation hosted run: `31944224720`, job `95157714206`; accepted baseline fence, dependencies, `py_compile` and complete focused suite = `SUCCESS` before branch cleanup advanced the Draft head.
+- Temporary validation workflow removed: `e78fea2e19ad93e1c828cd8f00cd47a23b7a6402`.
+- Main freshness recheck at handoff preparation: `main@0d7b2607912552599ae501891491aab439cfde7b`.
+
+# Audit result
+
+```yaml
+auditor_mode: fresh_exact_source_same_invocation
+material_findings_fixed: 2
+material_findings_open: 0
+independent_external_audit: coordinator_required_for_promotion
+runtime_nonclaims_preserved: true
+gameplay_mutation_added: false
+owner_funded_ai_used: false
+```
 
 # Checkpoint
 
 ```yaml
-status: implementing
-last_completed_step: restored accepted bridge baseline and implemented explicit-identity health/reacquisition/recovery API plus deterministic tests
+status: ready
+result: DRAFT_NOT_PROMOTED
+last_completed_step: froze P1 code, removed temporary hosted validation workflow, and prepared Draft handoff after zero-open-finding source audit
 blockers: []
-next_action: run the task-owned GitHub-hosted focused/component validation, repair only evidence-backed failures, then audit and freeze the Draft handoff head
+next_action: verify PR #357 final exact-head repository checks, then coordinator reviews/promotes or rejects the Draft P1 package; physical runtime proof remains RUNTIME-owned
 ```

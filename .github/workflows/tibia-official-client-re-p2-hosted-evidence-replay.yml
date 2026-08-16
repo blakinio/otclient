@@ -1,0 +1,69 @@
+name: Track A P2 hosted evidence replay
+
+on:
+  push:
+    branches: [research/OTC-20260816-track-a-p2-hosted-evidence-replay]
+    paths:
+      - .github/workflows/tibia-official-client-re-p2-hosted-evidence-replay.yml
+      - .github/scripts/tibia-official-client-re-p2-hosted-evidence-replay.py
+      - docs/agents/evidence/OTC-20260816-track-a-p2-hosted-evidence-replay/**
+      - docs/agents/tasks/active/OTC-20260816-track-a-p2-hosted-evidence-replay.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p2-hosted-evidence-replay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay-sanitized-exact-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact Draft head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify hosted no-runtime boundary and pinned fixture blob
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          fixture='docs/agents/evidence/OTC-20260816-track-a-p2-hosted-evidence-replay/historical-exact-chain.json'
+          blob="$(git ls-files -s -- "$fixture" | awk '{print $2}')"
+          [[ "$blob" == eb856a17f01ab37fce94c09646918e7b01fbed6c ]]
+          echo 'P2_REPLAY_RUNTIME_ACCESS=none'
+          echo 'P2_REPLAY_SYNOLOGY_EXECUTION=false'
+          echo 'P2_REPLAY_CLIENT_EXECUTION=false'
+          echo 'P2_REPLAY_EXACT_BINARY_REEXECUTION=false'
+
+      - name: Replay provenance and processor-chain evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          fixture='docs/agents/evidence/OTC-20260816-track-a-p2-hosted-evidence-replay/historical-exact-chain.json'
+          out='artifacts/p2-hosted-evidence-replay'
+          mkdir -p "$out"
+          fixture_sha="$(sha256sum "$fixture" | awk '{print $1}')"
+          python3 .github/scripts/tibia-official-client-re-p2-hosted-evidence-replay.py \
+            --fixture "$fixture" \
+            --fixture-sha256 "$fixture_sha" \
+            --output "$out/result.json" \
+            | tee "$out/validation.log"
+          grep -Fxq 'P2_REPLAY_COMPLETE=true' "$out/validation.log"
+          grep -Fxq 'P2_REPLAY_HOSTED_CONSISTENCY=PROVEN' "$out/validation.log"
+          grep -Fxq 'P2_REPLAY_CURRENT_EXACT_BINARY_REEXECUTION=NOT_PERFORMED' "$out/validation.log"
+          grep -Fxq 'P2_REPLAY_NEXT_DISCRIMINATOR=0xb40370/0xb4066b' "$out/validation.log"
+
+      - name: Upload hosted replay result only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-hosted-evidence-replay-${{ github.run_id }}
+          path: artifacts/p2-hosted-evidence-replay/**
+          if-no-files-found: error
+          retention-days: 14

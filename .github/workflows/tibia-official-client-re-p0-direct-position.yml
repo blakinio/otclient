@@ -44,6 +44,7 @@ jobs:
           [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
           python3 -m py_compile .github/scripts/tibia-official-client-re-p0-direct-position.py
           command -v objdump
+          command -v getent
           echo TRACK_A_P0_EXECUTION_CLASS=github_hosted
           echo TRACK_A_P0_RUNTIME_ACCESS=none
           echo TRACK_A_P0_SYNOLOGY_EXECUTION=false
@@ -60,26 +61,53 @@ jobs:
           packed="$RUNNER_TEMP/client.lzma"
           client="$RUNNER_TEMP/tibia-static-client"
           selected="$RUNNER_TEMP/selected-client-entry.json"
+          resolve_ip=''
 
-          fetch() {
+          qnam_fetch() {
             local url="$1" output="$2"
-            curl --fail --silent --show-error --location \
-              --retry 1 --retry-all-errors --connect-timeout 20 --max-time 180 \
-              --user-agent 'Tibia Linux Launcher static research' \
-              "$url" --output "$output"
+            local -a args=(
+              --fail --silent --show-error --location
+              --connect-timeout 20 --max-time 180
+              --compressed
+              --user-agent ''
+            )
+            if [[ -n "$resolve_ip" ]]; then
+              args+=(--resolve "static.tibia.com:443:$resolve_ip")
+            fi
+            curl "${args[@]}" "$url" --output "$output"
           }
 
-          if ! fetch "$PACKAGE_BASE_URL/package.json.version" "$version_file"; then
-            {
-              echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
-              echo P0_HOSTED_INPUT_REASON=package_version_download_failed
-              echo "P0_HOSTED_INPUT_URL=$PACKAGE_BASE_URL/package.json.version"
-            } | tee "$out/input-status.txt"
-            exit 3
+          version_url="$PACKAGE_BASE_URL/package.json.version"
+          if ! qnam_fetch "$version_url" "$version_file"; then
+            echo P0_HOSTED_QNAM_DOMAIN_FETCH=FAILED | tee "$out/input-status.txt"
+            mapfile -t ips < <(getent ahostsv4 static.tibia.com | awk '{print $1}' | sort -u | head -n 2)
+            printf 'P0_HOSTED_STATIC_TIBIA_IPV4_COUNT=%s\n' "${#ips[@]}" | tee -a "$out/input-status.txt"
+            recovered=false
+            for ip in "${ips[@]}"; do
+              [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+              rm -f "$version_file"
+              resolve_ip="$ip"
+              if qnam_fetch "$version_url" "$version_file"; then
+                echo P0_HOSTED_QNAM_RESOLVED_FETCH=SUCCESS | tee -a "$out/input-status.txt"
+                recovered=true
+                break
+              fi
+              echo P0_HOSTED_QNAM_RESOLVED_FETCH=FAILED | tee -a "$out/input-status.txt"
+            done
+            if [[ "$recovered" != true ]]; then
+              {
+                echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+                echo P0_HOSTED_INPUT_REASON=launcher_equivalent_package_version_fetch_failed
+                echo "P0_HOSTED_INPUT_URL=$version_url"
+              } | tee -a "$out/input-status.txt"
+              exit 3
+            fi
+          else
+            echo P0_HOSTED_QNAM_DOMAIN_FETCH=SUCCESS | tee "$out/input-status.txt"
           fi
 
           version="$(tr -d '\r\n' < "$version_file")"
-          echo "P0_HOSTED_PACKAGE_VERSION=$version" | tee "$out/input-status.txt"
+          echo "P0_HOSTED_PACKAGE_VERSION=$version" | tee -a "$out/input-status.txt"
           if [[ "$version" != "$EXPECTED_CLIENT_VERSION" ]]; then
             {
               echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
@@ -89,11 +117,10 @@ jobs:
             exit 3
           fi
 
-          if ! fetch "$PACKAGE_BASE_URL/package.json" "$manifest"; then
+          if ! qnam_fetch "$PACKAGE_BASE_URL/package.json" "$manifest"; then
             {
               echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
-              echo P0_HOSTED_INPUT_REASON=package_manifest_download_failed
-              echo "P0_HOSTED_INPUT_URL=$PACKAGE_BASE_URL/package.json"
+              echo P0_HOSTED_INPUT_REASON=package_manifest_download_failed_after_version_success
             } | tee -a "$out/input-status.txt"
             exit 3
           fi
@@ -138,7 +165,7 @@ jobs:
             *) client_url="$PACKAGE_BASE_URL/$rel_url" ;;
           esac
 
-          if ! fetch "$client_url" "$packed"; then
+          if ! qnam_fetch "$client_url" "$packed"; then
             {
               echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
               echo P0_HOSTED_INPUT_REASON=packed_client_download_failed

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-path-service-rtti-static
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-path-service-rtti-static-20260816
 session_role: validator
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: discovery
-phase: validate
+phase: close
 branch: research/OTC-20260816-track-a-path-service-rtti-static
 base_branch: main
 base_main: 8f81392f65ee53b2f7034771ba507e3ea422ccd7
 risk: low
-updated: 2026-08-16T11:34:00+02:00
+updated: 2026-08-16T11:35:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-path-service-rtti-static.md
   - docs/agents/reports/OTCLIENT-20260816-path-service-rtti-static.md
-  - .github/workflows/tibia-official-client-re-path-service-rtti-static.yml
 modules_touched: []
 reuses:
   - docs/agents/reports/OTCLIENT-20260816-beclient-static-integration.md
@@ -88,8 +87,9 @@ audit:
   material_findings_open: 0
 e2e: NOT_APPLICABLE
 e2e_reason: static evidence reconstruction only; no executable or runtime behavior changed
-last_completed_step: final deterministic validator passed and durable report written
-next_action: remove temporary workflow, review retained documentation diff, then complete exact-head required CI/merge and archive task
+temporary_workflow_removed: true
+last_completed_step: final deterministic validator passed; report persisted; temporary workflow removed; retained diff is documentation only
+next_action: complete exact-head required repository CI, merge PR #337, then archive this task and release ownership
 ---
 
 # Objective
@@ -143,6 +143,10 @@ Combined with the predecessor's proven loader flow (`owner service -> virtual +0
 Other similarly named FileSystemHelper candidates from the first RTTI sweep crossed new RTTI/vtable boundaries before the mechanically calculated `+0xd8`; those candidate mappings are rejected. Only the uninterrupted `TTibiaFileSystemHelper` group is retained for the `+0xd8` mapping.
 
 The earlier `BEClient` string observation remains historically correct as insufficient on its own; the new RTTI/vtable + predecessor data-flow evidence now turns that exact xref into causally connected loader-side evidence.
+
+# Audit
+
+PASS. The final retained documentation preserves exact RTTI/vtable and deterministic validator facts, keeps the loader-owner field's direct dynamic type as not directly proven, keeps source-level method names and concrete runtime path UNKNOWN, and records rejected first-pass candidate mappings explicitly.
 
 # Safety
 

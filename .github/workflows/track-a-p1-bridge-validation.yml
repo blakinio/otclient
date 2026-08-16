@@ -6,7 +6,7 @@ on:
     paths:
       - "tools/tibia_runtime_bridge/**"
       - "tests/tools/tibia_runtime_bridge/**"
-      - ".github/workflows/track-a-p1-bridge-validation.yml
+      - ".github/workflows/track-a-p1-bridge-validation.yml"
 
 permissions: {}
 

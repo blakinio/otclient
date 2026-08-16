@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Inventory exact linked QtCore statically
+    name: Trace exact Qt version and QLibrary load internals
     runs-on: [otclient, synology]
     timeout-minutes: 6
     steps:
-      - name: Identify client dynamic linkage and retained QtCore files
+      - name: Re-fence QtCore and follow qVersion / QLibrary load
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -24,95 +24,118 @@ jobs:
           [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || exit 2
           root='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package'
           client="$root/bin/client"
+          qtcore="$root/bin/libQt6Core.so.6"
           [[ -f "$client" ]] || exit 3
           [[ "$(stat -c '%s' "$client")" == '51965216' ]] || exit 4
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
+          [[ -f "$qtcore" ]] || { echo "QLIB_FAIL_QTCORE_NOT_FOUND=$qtcore"; find "$root" -maxdepth 3 -name '*Qt6Core*' -print; exit 6; }
+          [[ "$(stat -c '%s' "$qtcore")" == '8789520' ]] || exit 7
+          [[ "$(sha256sum "$qtcore" | awk '{print $1}')" == '8a3b0ce62670c3f195898f152d3ddb5b37e78ec647ef9ebae00a917ce1ac5875' ]] || exit 8
           echo 'QLIB_CLIENT_FENCE=PASS'
-          python3 - "$root" "$client" <<'PY'
-          import hashlib,os,pathlib,re,struct,sys
-          root=pathlib.Path(sys.argv[1]); client=pathlib.Path(sys.argv[2])
-          def parse_elf(path):
-              d=path.read_bytes()
-              if d[:4]!=b'\x7fELF' or d[4]!=2 or d[5]!=1: raise ValueError(f'unsupported ELF: {path}')
-              h=struct.unpack_from('<HHIQQQIHHHHHH',d,16)
-              _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-              sf='<IIQQQQIIQQ'; raw=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
-              st=raw[shstrndx]; shnames=d[st[4]:st[4]+st[5]]
-              def cs(blob,o):
-                  if not (0<=o<len(blob)):return ''
-                  e=blob.find(b'\0',o);e=len(blob) if e<0 else e
-                  return blob[o:e].decode('utf8','replace')
-              secs=[]
-              for i,x in enumerate(raw):
-                  secs.append({'idx':i,'name':cs(shnames,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
-              by={s['name']:s for s in secs}
-              dyninfo={'needed':[],'soname':None,'rpath':None,'runpath':None}
-              dyn=by.get('.dynamic')
-              if dyn and 0<=dyn['link']<len(secs):
-                  ds=secs[dyn['link']]; strings=d[ds['off']:ds['off']+ds['size']]
-                  tags=[]
-                  for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 16):
-                      tag,val=struct.unpack_from('<qQ',d,o)
-                      if tag==0:break
-                      tags.append((tag,val))
-                  for tag,val in tags:
-                      if tag==1:dyninfo['needed'].append(cs(strings,val))
-                      elif tag==14:dyninfo['soname']=cs(strings,val)
-                      elif tag==15:dyninfo['rpath']=cs(strings,val)
-                      elif tag==29:dyninfo['runpath']=cs(strings,val)
-              syms=[]
-              sym=by.get('.dynsym')
-              if sym and 0<=sym['link']<len(secs):
-                  ss=secs[sym['link']]; strings=d[ss['off']:ss['off']+ss['size']]
-                  for o in range(sym['off'],sym['off']+sym['size'],sym['entsize'] or 24):
-                      no,info,other,si,val,sz=struct.unpack_from('<IBBHQQ',d,o)
-                      name=cs(strings,no)
-                      if name:syms.append((name,val,sz,si,info))
-              return d,dyninfo,syms,secs
-          cd,ci,csyms,csecs=parse_elf(client)
-          print('QLIB_CLIENT_DYNAMIC_NEEDED='+','.join(ci['needed']))
-          print(f'QLIB_CLIENT_RPATH={ci["rpath"] or ""}')
-          print(f'QLIB_CLIENT_RUNPATH={ci["runpath"] or ""}')
-          print(f'QLIB_CLIENT_SONAME={ci["soname"] or ""}')
-          qtcore_needed=[n for n in ci['needed'] if 'Qt6Core' in n or 'QtCore' in n]
-          print('QLIB_CLIENT_QTCORE_NEEDED='+','.join(qtcore_needed))
-          # Retained files/symlinks with QtCore in name.
-          candidates=[]
-          for dirpath,dirnames,filenames in os.walk(root):
-              for n in filenames:
-                  if 'Qt6Core' in n or 'QtCore' in n:
-                      p=pathlib.Path(dirpath)/n;candidates.append(p)
-              for n in list(dirnames):
-                  p=pathlib.Path(dirpath)/n
-                  if p.is_symlink() and ('Qt6Core' in n or 'QtCore' in n):candidates.append(p)
-          uniq=[];seen=set()
-          for p in candidates:
-              s=str(p)
-              if s not in seen:seen.add(s);uniq.append(p)
-          print('QLIB_QTCORE_CANDIDATES_BEGIN')
-          for p in sorted(uniq,key=lambda x:str(x)):
-              try:
-                  resolved=p.resolve(strict=True); data=resolved.read_bytes(); rel=p.relative_to(root)
-                  print(f'path={rel} symlink={str(p.is_symlink()).lower()} link={os.readlink(p) if p.is_symlink() else ""} resolved={resolved} size={len(data)} sha256={hashlib.sha256(data).hexdigest()}')
-              except Exception as e: print(f'path={p} error={type(e).__name__}:{e}')
-          print('QLIB_QTCORE_CANDIDATES_END')
-          # Inspect regular unique resolved ELF candidates.
-          resolved_seen=set()
-          for p in sorted(uniq,key=lambda x:str(x)):
-              try:r=p.resolve(strict=True)
-              except:continue
-              if str(r) in resolved_seen or not r.is_file():continue
-              resolved_seen.add(str(r))
-              try:qd,qi,qsyms,qsecs=parse_elf(r)
-              except Exception as e:
-                  print(f'QLIB_QTCORE_PARSE_SKIP={r}:{e}');continue
-              print(f'QLIB_QTCORE_ELF path={r} soname={qi["soname"] or ""} needed={";".join(qi["needed"])} rpath={qi["rpath"] or ""} runpath={qi["runpath"] or ""}')
-              wanted=[(n,v,z) for n,v,z,si,info in qsyms if ('QLibrary' in n or n in ('qVersion','qt_version_tag') or 'versionString' in n)]
-              print('QLIB_QTCORE_DYNSYMS_BEGIN')
-              for n,v,z in wanted[:300]:print(f'name={n} value=0x{v:x} size=0x{z:x}')
-              print('QLIB_QTCORE_DYNSYMS_END')
-              vers=sorted(set(m.group(0).decode('ascii') for m in re.finditer(rb'(?<![0-9])6\.[0-9]{1,2}\.[0-9]{1,2}(?![0-9])',qd)))
-              print('QLIB_QTCORE_VERSION_STRINGS='+','.join(vers[:100]))
+          echo 'QLIB_QTCORE_FENCE=PASS'
+          python3 - "$qtcore" <<'PY'
+          import hashlib,pathlib,struct,sys
+          p=pathlib.Path(sys.argv[1]); d=p.read_bytes(); E='<'
+          h=struct.unpack_from('<HHIQQQIHHHHHH',d,16)
+          _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
+          sf='<IIQQQQIIQQ'; raw=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
+          st=raw[shstrndx]; shnames=d[st[4]:st[4]+st[5]]
+          def cs(blob,o):
+              if not (0<=o<len(blob)):return ''
+              e=blob.find(b'\0',o); e=len(blob) if e<0 else e
+              return blob[o:e].decode('utf8','replace')
+          secs=[]
+          for i,x in enumerate(raw):
+              secs.append({'idx':i,'name':cs(shnames,x[0]),'type':x[1],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+          by={s['name']:s for s in secs}; text=by['.text']
+          def voff(va):
+              for s in secs:
+                  if s['type']!=8 and s['addr']<=va<s['addr']+s['size']:
+                      return s['off']+(va-s['addr'])
+              return None
+          def b_at(va,n):
+              o=voff(va); return b'' if o is None else d[o:o+n]
+          def ascii_at(va,limit=260):
+              o=voff(va)
+              if o is None:return None
+              e=d.find(b'\0',o,min(len(d),o+limit))
+              if e<=o:return None
+              z=d[o:e]
+              if not z or not all(32<=x<127 for x in z):return None
+              return z.decode('ascii','replace')
+          # Dynamic symbols.
+          dyn=by['.dynsym']; ss=secs[dyn['link']]; sb=d[ss['off']:ss['off']+ss['size']]; syms=[]
+          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
+              no,info,other,si,val,sz=struct.unpack_from('<IBBHQQ',d,o); syms.append((cs(sb,no),val,sz,si,info))
+          symmap={n:(v,z,si,info) for n,v,z,si,info in syms}
+          print('QLIB_QT_VERSION_SYMBOLS_BEGIN')
+          for n,v,z,si,info in syms:
+              if n=='qVersion' or 'qt_version_tag' in n or 'versionString' in n:
+                  print(f'name={n} value=0x{v:x} size=0x{z:x} shndx={si}')
+          print('QLIB_QT_VERSION_SYMBOLS_END')
+          qv=symmap.get('qVersion')
+          if qv:
+              va,size=qv[0],qv[1]
+              blob=b_at(va,max(64,size or 0))
+              print(f'QLIB_QVERSION_VA=0x{va:x}')
+              print(f'QLIB_QVERSION_SIZE=0x{size:x}')
+              print(f'QLIB_QVERSION_BYTES={blob.hex()}')
+              print('QLIB_QVERSION_RIP_REFS_BEGIN')
+              for i in range(min(len(blob)-7,96)):
+                  if blob[i] not in range(0x48,0x50) or blob[i+1] not in (0x8d,0x8b):continue
+                  m=blob[i+2]
+                  if (m>>6)!=0 or (m&7)!=5:continue
+                  ins=va+i; dst=ins+7+struct.unpack_from('<i',blob,i+3)[0]
+                  print(f'ref=0x{ins:x} target=0x{dst:x} text={ascii_at(dst) or ""}')
+              print('QLIB_QVERSION_RIP_REFS_END')
+          # GOT/PLT names for later direct-call interpretation.
+          gotnames={}
+          for rn in ('.rela.plt','.rela.dyn'):
+              r=by.get(rn)
+              if not r:continue
+              for o in range(r['off'],r['off']+r['size'],r['entsize'] or 24):
+                  ro,ri,ad=struct.unpack_from('<QQq',d,o); sym=ri>>32
+                  if sym and sym<len(syms):gotnames[ro]=syms[sym][0]
+          def plt_name(va):
+              x=b_at(va,24)
+              for p in range(min(10,max(0,len(x)-6))):
+                  if x[p:p+2]==b'\xff\x25':
+                      got=va+p+6+struct.unpack_from('<i',x,p+2)[0]
+                      return gotnames.get(got,''),got
+              return '',None
+          # Exact public QLibrary symbols and nearby private/exported names.
+          print('QLIB_PRIVATE_SYMBOLS_BEGIN')
+          for n,v,z,si,info in syms:
+              if 'QLibraryPrivate' in n or 'QLibraryStore' in n or 'load_sys' in n or 'unload_sys' in n:
+                  print(f'name={n} value=0x{v:x} size=0x{z:x}')
+          print('QLIB_PRIVATE_SYMBOLS_END')
+          for name in ('_ZN8QLibrary4loadEv','_ZN8QLibrary7setFileNameERK7QString','_ZN8QLibrary6unloadEv'):
+              q=symmap.get(name)
+              if not q:continue
+              va,size=q[0],q[1]; blob=b_at(va,max(size,96))
+              print(f'QLIB_PUBLIC name={name} va=0x{va:x} size=0x{size:x} bytes={blob.hex()}')
+              print(f'QLIB_PUBLIC_CALLS_BEGIN name={name}')
+              for i in range(min(len(blob)-5,max(size,96))):
+                  if blob[i]!=0xe8:continue
+                  ins=va+i; dst=ins+5+struct.unpack_from('<i',blob,i+1)[0]; pn,got=plt_name(dst)
+                  local='yes' if text['addr']<=dst<text['addr']+text['size'] else 'no'
+                  print(f'call=0x{ins:x} target=0x{dst:x} local_text={local} plt={pn}')
+              print(f'QLIB_PUBLIC_CALLS_END name={name}')
+          # Exact .so/lib strings and common Unix loader diagnostic strings, discovery only.
+          print('QLIB_RELEVANT_STRINGS_BEGIN')
+          for needle in (b'.so\0',b'lib\0',b'Cannot load library\0',b'QLibrary::load\0'):
+              poss=[];p0=0
+              while True:
+                  j=d.find(needle,p0)
+                  if j<0:break
+                  va=None
+                  for s in secs:
+                      if s['type']!=8 and s['off']<=j<s['off']+s['size']:
+                          va=s['addr']+(j-s['off']);break
+                  if va is not None:poss.append(va)
+                  p0=j+1
+              print(f'needle={needle[:-1].decode("ascii","replace")} count={len(poss)} vas='+','.join(hex(x) for x in poss[:80]))
+          print('QLIB_RELEVANT_STRINGS_END')
           print('QLIB_EXECUTED_TARGET=false')
           print('QLIB_LIVE_RUNTIME_OBSERVED=false')
           print('QLIB_MUTATION_PERFORMED=false')

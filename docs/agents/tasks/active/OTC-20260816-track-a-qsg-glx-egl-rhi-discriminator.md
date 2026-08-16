@@ -13,7 +13,7 @@ branch: diag/OTC-20260816-track-a-qsg-glx-egl-rhi
 base_branch: main
 base_main: d7a2d4168816cb42267fc7b20aacb88ae1b13b8e
 risk: high
-updated: 2026-08-16T19:22:00+02:00
+updated: 2026-08-16T19:23:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-qsg-glx-egl-rhi-discriminator.md
   - docs/agents/evidence/OTC-20260816-track-a-qsg-glx-egl-rhi-discriminator/**
@@ -68,11 +68,12 @@ exact_client_fence:
 source_harness:
   commit: cb557da12ebb41c597340909b2db717ee59cdfe1
   blob: 1616edcc982be50ef2c95b8077160ec8fe9291fe
-  required_patches: 2
+  required_patches: 3
   patch_1: nounset-safe snapshot local declaration
-  patch_2: replace QT_XCB_GL_INTEGRATION=none with QSG_INFO=1 while preserving QT_QUICK_BACKEND=software
+  patch_2: replace source task id with this task id so namespace/marker ownership is current-task scoped
+  patch_3: replace QT_XCB_GL_INTEGRATION=none with QSG_INFO=1 while preserving QT_QUICK_BACKEND=software
 acceptance:
-  - immutable source blob and exactly two patch sites are fenced before execution
+  - immutable source blob and exactly three patch sites are fenced before execution
   - task-owned isolated display/WARP/VNC/client namespace only
   - exact live client executable fence passes
   - bounded snapshots at 5/15/35 seconds are collected

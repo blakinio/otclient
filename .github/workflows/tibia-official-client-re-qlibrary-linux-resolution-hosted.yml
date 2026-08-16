@@ -1,0 +1,119 @@
+name: Track A Qt 6.9.3 QLibrary Linux source validator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-qlibrary-linux-resolution-hosted.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-qlibrary-linux-resolution-hosted.md
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate official Qt 6.9.3 Unix candidate expansion
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch official source and derive candidates
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import hashlib,re,urllib.request
+          base='https://raw.githubusercontent.com/qt/qtbase/v6.9.3/src/corelib/plugin/'
+          files={}
+          for name in ('qlibrary_unix.cpp','qlibrary_p.h'):
+              url=base+name
+              with urllib.request.urlopen(url, timeout=30) as r:
+                  data=r.read()
+              text=data.decode('utf-8')
+              files[name]=text
+              print(f'QT_SOURCE_FILE={name} sha256={hashlib.sha256(data).hexdigest()} bytes={len(data)} url={url}')
+          unix=files['qlibrary_unix.cpp']; priv=files['qlibrary_p.h']
+
+          # Exact Qt 6.9.3 source invariants relevant to non-plugin QLibrary on Linux.
+          required={
+              'unix_so_suffix':'suffixes.append(u".so"_s);',
+              'absolute_prepend_empty_suffix':'suffixes.prepend(QString());',
+              'absolute_prepend_empty_prefix':'prefixes.prepend(QString());',
+              'haswell_runtime_gate':'if (qCpuHasFeature(ArchHaswell))',
+              'glibc_hwcaps_prefix':'s->prepend("glibc-hwcaps/x86-64-v3/"_L1)',
+              'attempt_formula':'QString attempt = path + prefixes.at(prefix) + name + suffixes.at(suffix);',
+              'dlopen_attempt':'dlopen(QFile::encodeName(attempt), dlFlags)',
+              'generic_lib_prefix':'return u"lib";',
+          }
+          for label,needle in required.items():
+              hay=priv if label=='generic_lib_prefix' else unix
+              if needle not in hay:
+                  raise SystemExit(f'VALIDATOR_FAIL={label}')
+              print(f'VALIDATOR_PASS={label}')
+
+          # Validate transform order: modified candidate first, original second.
+          transform_pattern=re.compile(r'QString modifiedPath = s;\s*f\(&modifiedPath\);\s*list\.append\(modifiedPath\);\s*list\.append\(s\);',re.S)
+          if not transform_pattern.search(unix):
+              raise SystemExit('VALIDATOR_FAIL=haswell_transform_order')
+          print('VALIDATOR_PASS=haswell_transform_order_modified_then_original')
+
+          # Validate nested order: prefix outer, suffix inner.
+          loop_pattern=re.compile(r'for \(int prefix = 0; prefix < prefixes\.size\(\); prefix\+\+\) \{\s*for \(int suffix = 0; suffix < suffixes\.size\(\); suffix\+\+\)',re.S)
+          if not loop_pattern.search(unix):
+              raise SystemExit('VALIDATOR_FAIL=candidate_loop_order')
+          print('VALIDATOR_PASS=candidate_loop_order_prefix_outer_suffix_inner')
+
+          # Non-plugin, empty fullVersion on generic Linux.
+          base_prefixes=['lib']
+          base_suffixes=['.so']
+          # Absolute path inserts exact-name cases at the head before x86 feature transform.
+          abs_prefixes=['']+base_prefixes
+          abs_suffixes=['']+base_suffixes
+
+          def candidates(prefixes,suffixes):
+              path='<APPDIR>/BattlEye/'
+              name='BEClient'
+              return [path+p+name+s for p in prefixes for s in suffixes]
+
+          no_haswell=candidates(abs_prefixes,abs_suffixes)
+          print('QLIB_CANDIDATES_ARCH_HASWELL_FALSE='+','.join(no_haswell))
+          expected_no=[
+              '<APPDIR>/BattlEye/BEClient',
+              '<APPDIR>/BattlEye/BEClient.so',
+              '<APPDIR>/BattlEye/libBEClient',
+              '<APPDIR>/BattlEye/libBEClient.so',
+          ]
+          if no_haswell!=expected_no:
+              raise SystemExit('VALIDATOR_FAIL=no_haswell_candidates')
+          print('VALIDATOR_PASS=no_haswell_candidate_order')
+
+          # x86 Linux + glibc + ArchHaswell true: transform each prefix to hwcaps first, original second.
+          haswell_prefixes=[]
+          for p in abs_prefixes:
+              haswell_prefixes += ['glibc-hwcaps/x86-64-v3/'+p,p]
+          haswell=candidates(haswell_prefixes,abs_suffixes)
+          print('QLIB_CANDIDATES_ARCH_HASWELL_TRUE='+','.join(haswell))
+          expected_haswell=[
+              '<APPDIR>/BattlEye/glibc-hwcaps/x86-64-v3/BEClient',
+              '<APPDIR>/BattlEye/glibc-hwcaps/x86-64-v3/BEClient.so',
+              '<APPDIR>/BattlEye/BEClient',
+              '<APPDIR>/BattlEye/BEClient.so',
+              '<APPDIR>/BattlEye/glibc-hwcaps/x86-64-v3/libBEClient',
+              '<APPDIR>/BattlEye/glibc-hwcaps/x86-64-v3/libBEClient.so',
+              '<APPDIR>/BattlEye/libBEClient',
+              '<APPDIR>/BattlEye/libBEClient.so',
+          ]
+          if haswell!=expected_haswell:
+              raise SystemExit('VALIDATOR_FAIL=haswell_candidates')
+          print('VALIDATOR_PASS=haswell_candidate_order')
+
+          # Load-bearing conclusion: the no-prefix .so candidate is generated in both branches.
+          target='<APPDIR>/BattlEye/BEClient.so'
+          if target not in no_haswell or target not in haswell:
+              raise SystemExit('VALIDATOR_FAIL=BEClient_so_candidate_missing')
+          print(f'VALIDATOR_PASS=BEClient_so_candidate index_no_haswell={no_haswell.index(target)} index_haswell={haswell.index(target)}')
+          print('VALIDATOR_CLASSIFICATION=OFFICIAL_QT_6_9_3_SOURCE_CORRELATED')
+          print('VALIDATOR_PROPRIETARY_ARTIFACT_ACCESS=false')
+          print('VALIDATOR_RUNTIME_ACCESS=none')
+          print('VALIDATOR_PERSISTENT_SESSION=none')
+          print('VALIDATOR_PHYSICAL_E2E=false')
+          PY

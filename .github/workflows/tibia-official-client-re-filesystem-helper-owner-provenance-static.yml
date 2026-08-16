@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace loader callback registration statically
+    name: Deterministically validate filesystem-helper ownership provenance
     runs-on: [otclient, synology]
-    timeout-minutes: 7
+    timeout-minutes: 5
     steps:
-      - name: Find instruction-boundary references to loader entry
+      - name: Re-derive exact bootstrap application and TGameClient chain
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -26,58 +26,135 @@ jobs:
           [[ -f "$client" ]] || exit 3
           [[ "$(stat -c '%s' "$client")" == '51965216' ]] || exit 4
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
-          echo 'OWNER_PROV_CLIENT_FENCE=PASS'
+          echo 'OWNER_PROV_VALIDATOR_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
           import hashlib,pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-          sf=E+'IIQQQQIIQQ';sh=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
-          st=sh[shstrndx];sn=d[st[4]:st[4]+st[5]]
+          sf=E+'IIQQQQIIQQ';raw=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
+          st=raw[shstrndx];sn=d[st[4]:st[4]+st[5]]
           def cs(b,o):
+              if not (0<=o<len(b)):return ''
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
-          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]} for x in sh]
-          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
-          def b_at(va,n):return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
-          target=0x6fc034
-          refs=[]
-          # RIP-relative LEA/MOV address materialization at actual instruction starts for common encodings.
-          for i in range(len(tb)-7):
-              if tb[i] not in range(0x48,0x50):continue
-              if tb[i+1] not in (0x8d,0x8b):continue
-              m=tb[i+2]
-              if (m>>6)!=0 or (m&7)!=5:continue
-              va=text['addr']+i;dst=va+7+struct.unpack_from('<i',tb,i+3)[0]
-              if dst==target:refs.append((va,'lea' if tb[i+1]==0x8d else 'mov_rip'))
-          # Direct branch refs for completeness.
-          for i in range(len(tb)-5):
-              va=text['addr']+i
-              if tb[i] in (0xe8,0xe9):
-                  dst=va+5+struct.unpack_from('<i',tb,i+1)[0]
-                  if dst==target:refs.append((va,'call' if tb[i]==0xe8 else 'jmp'))
-          print('OWNER_PROV_LOADER_CODE_REFS='+','.join(f'0x{va:x}:{kind}' for va,kind in refs))
-          for va,kind in refs:
-              lo=max(text['addr'],va-0x160);hi=min(text['addr']+text['size'],va+0x180);w=b_at(lo,hi-lo)
-              print(f'OWNER_PROV_LOADER_REF_WINDOW ref=0x{va:x} kind={kind} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
-          # Relocation/data references to exact function address.
-          rel=by.get('.rela.dyn');rrefs=[]
-          if rel:
-              for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
-                  ro,ri,ad=struct.unpack_from('<QQq',d,o)
-                  if ad==target:rrefs.append(ro)
-          print('OWNER_PROV_LOADER_RELOCATION_REFS='+','.join(hex(v) for v in rrefs))
-          # Search exact qword function value in allocated non-text sections; record only locations, no semantic claim yet.
-          q=struct.pack('<Q',target);datarefs=[]
-          for s in secs:
-              if s['name']=='.text' or not s['size']:continue
-              blob=d[s['off']:s['off']+s['size']];p=0
-              while True:
-                  j=blob.find(q,p)
-                  if j<0:break
-                  datarefs.append((s['name'],s['addr']+j));p=j+1
-          print('OWNER_PROV_LOADER_QWORD_REFS='+','.join(f'{n}@0x{va:x}' for n,va in datarefs[:100]))
-          print('OWNER_PROV_EXECUTED_TARGET=false')
-          print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
-          print('OWNER_PROV_MUTATION_PERFORMED=false')
+          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]} for x in raw]
+          by={s['name']:s for s in secs};text=by['.text']
+          def vaoff(va):
+              for s in secs:
+                  if s['size'] and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
+              return None
+          def b_at(va,n):
+              o=vaoff(va)
+              return b'' if o is None else d[o:o+n]
+          def expect(va,hx,label):
+              want=bytes.fromhex(hx);got=b_at(va,len(want))
+              if got!=want:raise SystemExit(f'VALIDATOR_FAIL={label}@0x{va:x}:got={got.hex()}')
+              print(f'VALIDATOR_PASS={label}@0x{va:x}')
+          def rel32(va):
+              x=b_at(va,5)
+              if len(x)!=5 or x[0]!=0xe8:raise SystemExit(f'VALIDATOR_FAIL=not_call@0x{va:x}')
+              return va+5+struct.unpack_from('<i',x,1)[0]
+          def rip7(va):
+              x=b_at(va,7)
+              if len(x)!=7:raise SystemExit(f'VALIDATOR_FAIL=short_rip@0x{va:x}')
+              return va+7+struct.unpack_from('<i',x,3)[0]
+          def string_at(va):
+              o=vaoff(va)
+              if o is None:return None
+              e=d.find(b'\0',o,min(len(d),o+220))
+              if e<=o:return None
+              z=d[o:e]
+              if not z or len(z)>200:return None
+              return z.decode('ascii','replace')
+
+          rel=by['.rela.dyn'];bo={}
+          for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
+              ro,ri,ad=struct.unpack_from('<QQq',d,o);bo[ro]=(ri&0xffffffff,ri>>32,ad)
+          def relocation_target(va):
+              r=bo.get(va)
+              return None if r is None else r[2]
+          def assert_primary_vtable(vptr,typeinfo,typename,slots,label):
+              if struct.unpack('<q',b_at(vptr-16,8))[0]!=0:raise SystemExit(f'VALIDATOR_FAIL={label}_offset_to_top')
+              if relocation_target(vptr-8)!=typeinfo:raise SystemExit(f'VALIDATOR_FAIL={label}_typeinfo_slot')
+              nr=relocation_target(typeinfo+8)
+              if nr is None or string_at(nr)!=typename:raise SystemExit(f'VALIDATOR_FAIL={label}_typename:{nr}:{string_at(nr) if nr else None}')
+              for off,target in slots.items():
+                  if relocation_target(vptr+off)!=target:raise SystemExit(f'VALIDATOR_FAIL={label}_slot_{off:x}')
+              print(f'VALIDATOR_PASS={label}_rtti_vtable')
+
+          # 1) Exact TTibiaFileSystemHelper object construction and embedded base filesystem helper.
+          expect(0x5ef510,'488d0d692b9702','ttibia_vptr_lea')
+          if rip7(0x5ef510)!=0x2f62080:raise SystemExit('VALIDATOR_FAIL=ttibia_vptr_target')
+          expect(0x5ef517,'488948f8','ttibia_vptr_store')
+          expect(0x5ef540,'4c897530','ttibia_plus20_control_block')
+          expect(0x5ef544,'48894528','ttibia_plus18_object_ptr')
+          assert_primary_vtable(0x2f62080,0x3070940,'N5tibia6shared22TTibiaFileSystemHelperE',{0xd8:0xc95cb0},'ttibia')
+          print('VALIDATOR_PASS=ttibia_plus18_plus20_shared_base_filesystem_pair')
+
+          # 2) The fresh TTibia shared_ptr pair is written directly into TGameApplication stack object +0x18/+0x20.
+          expect(0x5ef458,'4c8d642470','application_stack_base_r12_rsp_plus70')
+          expect(0x5ef570,'4889ac2490000000','application_plus20_ttibia_control')
+          expect(0x5ef578,'4c89bc2488000000','application_plus18_ttibia_object')
+          expect(0x5ef6ba,'488d050f75a802','tgameapplication_vptr_lea')
+          if rip7(0x5ef6ba)!=0x3076bd0:raise SystemExit('VALIDATOR_FAIL=tgameapplication_vptr_target')
+          expect(0x5ef6cd,'4889442470','tgameapplication_vptr_store')
+          assert_primary_vtable(0x3076bd0,0x3073958,'N5tibia6client16TGameApplicationE',{0x78:0x6c9760},'tgameapplication')
+          expect(0x5ef82b,'4c89e7','bootstrap_pass_application_this')
+          if rel32(0x5ef82e)!=0x6c9760:raise SystemExit('VALIDATOR_FAIL=bootstrap_call_tgameapplication_slot78')
+          print('VALIDATOR_PASS=ttibia_shared_ptr_to_tgameapplication_plus18_plus20')
+
+          # 3) TGameApplication::slot+0x78 carries the same this into the TGameClient factory.
+          expect(0x6c9760,'55baf6000000be4b0000004889e541574156415541544c8d65b0534889fb','tgameapplication_slot78_entry_and_this')
+          expect(0x6ca12e,'4889df','factory_receives_same_application_this')
+          if rel32(0x6ca131)!=0x6c8020:raise SystemExit('VALIDATOR_FAIL=tgameclient_factory_target')
+          print('VALIDATOR_PASS=tgameapplication_this_to_tgameclient_factory')
+
+          # 4) TGameClient factory copies source +0x18/+0x20 pair directly into new client +0x20/+0x28.
+          expect(0x6c8020,'554889e5415741564989fe','tgameclient_factory_entry_r14_from_rdi')
+          expect(0x6c80c6,'498b7618','factory_read_application_plus18')
+          expect(0x6c80ca,'4d8b6e20','factory_read_application_plus20')
+          expect(0x6c80d2,'4889b508ffffff','factory_save_object_ptr')
+          expect(0x6c814f,'4d896c2428','factory_store_client_plus28_control')
+          expect(0x6c8172,'488b8508ffffff','factory_reload_object_ptr')
+          expect(0x6c8182,'4989442420','factory_store_client_plus20_object')
+          expect(0x6c844c,'488d05b5e49a02','tgameclient_vptr_lea')
+          if rip7(0x6c844c)!=0x3076908:raise SystemExit('VALIDATOR_FAIL=tgameclient_vptr_target')
+          expect(0x6c8463,'49890424','tgameclient_vptr_store')
+          assert_primary_vtable(0x3076908,0x3070398,'N5tibia6client11TGameClientE',{0x60:0x6ba100},'tgameclient')
+          print('VALIDATOR_PASS=ttibia_shared_ptr_to_tgameclient_plus20_plus28_DIRECT')
+
+          # 5) +0x748 is part of the same concrete TGameClient construction layout and is later consumed there.
+          expect(0x6c8507,'498dbc2448070000','tgameclient_plus748_address')
+          expect(0x6c8a96,'498b9c2448070000','tgameclient_plus748_read')
+          print('VALIDATOR_PASS=tgameclient_plus748_layout_member')
+
+          # 6) Loader-side bounded facts: this is RBX; getter receives that same this and reads +0x20/+0x28; loader also reads +0x748.
+          expect(0x6fc034,'554889e54157415641554154534889fb','loader_entry_this_to_rbx')
+          expect(0x6fc4d7,'4c8bb348070000','loader_this_plus748')
+          expect(0x6fc4de,'4889de','loader_pass_this_as_getter_rsi')
+          if rel32(0x6fc4f2)!=0x6ba0b0:raise SystemExit('VALIDATOR_FAIL=loader_getter_target')
+          expect(0x6ba0b0,'488b5620','getter_read_plus20')
+          expect(0x6ba0bd,'488b4e28','getter_read_plus28')
+          print('VALIDATOR_PASS=loader_receiver_plus20_plus28_plus748_shape')
+
+          # Immutable windows from independent earlier probes.
+          for label,start,end,want in [
+              ('bootstrap_ttibia',0x5ef480,0x5ef590,'a611ddea5178c1cb286340e51e635d544c27438962aacf32ba9c8b8b24110ae1'),
+              ('factory_pair',0x6c80b0,0x6c8190,'4865cefae5a364922a3d4dc0de7100865ac6df9ff79134e64291978beb5e1a8f'),
+              ('tgameclient_derived',0x6c83c0,0x6c84c0,'cbb42f1e5b9aa36cd60a20d88ea9a6b03cf9eca39758aa82090b3828d94a1b19'),
+              ('plus748_init',0x6c84d0,0x6c8560,'ebf87700d3ae62ec8bf69625f3742849eac93bbe02d61bb547329d7e9441733e'),
+              ('plus748_read',0x6c8a70,0x6c8ae0,'2b17d8b56ac504acb9dd79a98474f45918eec10a40073225722fcc4555ae4b86'),
+              ('loader_pair',0x6fc4c0,0x6fc530,'8ebe482d09736fb934f3bda7526eb34e270a838c50a62720348d99f6a0ce993f'),
+          ]:
+              got=hashlib.sha256(b_at(start,end-start)).hexdigest()
+              if got!=want:raise SystemExit(f'VALIDATOR_FAIL={label}_sha256:{got}')
+              print(f'VALIDATOR_PASS={label}_sha256:{got}')
+
+          print('VALIDATOR_PROVENANCE=TGameApplication_plus18_plus20_and_TGameClient_plus20_plus28_DIRECT_TTibiaFileSystemHelper_SHARED_PTR')
+          print('VALIDATOR_LOADER_RECEIVER_EXACT_DYNAMIC_TYPE=NOT_DIRECTLY_PROVEN')
+          print('VALIDATOR_LOADER_RECEIVER_TGAMECLIENT_LAYOUT_CORRELATION=HIGH_CONFIDENCE_DERIVED')
+          print('VALIDATOR_EXECUTED_TARGET=false')
+          print('VALIDATOR_LIVE_RUNTIME_OBSERVED=false')
+          print('VALIDATOR_MUTATION_PERFORMED=false')
           PY

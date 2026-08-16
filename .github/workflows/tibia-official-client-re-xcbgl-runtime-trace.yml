@@ -1,0 +1,159 @@
+name: Track A isolated XCB GL runtime trace
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-xcbgl-runtime-trace.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-xcbgl-runtime-trace
+  cancel-in-progress: false
+
+jobs:
+  xcbgl-runtime-trace:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    steps:
+      - name: Fetch immutable isolated harness, add XCB GL trace and execute
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: d3f186414256151c9d5e03f34c5a9026b1fba500
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]] || { echo "XCBGL_DIAG_REFUSED=BASE_MOVED:$EVENT_BASE_SHA"; exit 44; }
+
+          source_url='https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml'
+          source_blob='1616edcc982be50ef2c95b8077160ec8fe9291fe'
+          source_file="$(mktemp)"
+          generated="$(mktemp)"
+          trap 'rm -f -- "$source_file" "$generated"' EXIT
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$source_file" "$source_url"
+
+          python3 - "$source_file" "$generated" "$source_blob" <<'PY'
+          import hashlib, pathlib, sys
+          source = pathlib.Path(sys.argv[1]); output = pathlib.Path(sys.argv[2]); expected_blob = sys.argv[3]
+          data = source.read_bytes()
+          actual_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+          if actual_blob != expected_blob:
+              raise SystemExit(f'XCBGL_DIAG_REFUSED=SOURCE_BLOB_MISMATCH:{actual_blob}')
+          lines = data.decode().splitlines()
+          marker = '      - name: Reproduce isolated startup and inventory task-owned windows'
+          try: step = lines.index(marker)
+          except ValueError: raise SystemExit('XCBGL_DIAG_REFUSED=SOURCE_STEP_MISSING')
+          run_index = None
+          for idx in range(step + 1, len(lines)):
+              if lines[idx].strip() == 'run: |': run_index = idx; break
+              if lines[idx].startswith('      - name:'): break
+          if run_index is None: raise SystemExit('XCBGL_DIAG_REFUSED=SOURCE_RUN_BLOCK_MISSING')
+          run_indent = len(lines[run_index]) - len(lines[run_index].lstrip(' ')); content_indent = None; block=[]
+          for line in lines[run_index+1:]:
+              if not line.strip(): block.append(''); continue
+              indent = len(line) - len(line.lstrip(' '))
+              if indent <= run_indent: break
+              if content_indent is None: content_indent = indent
+              if indent < content_indent: raise SystemExit('XCBGL_DIAG_REFUSED=INCONSISTENT_BLOCK_INDENT')
+              block.append(line[content_indent:])
+          script='\n'.join(block)+'\n'
+
+          patches=[
+            ('local label="$1" out="$root/windows-$label.tsv" pids="$root/pids-$label.txt"', 'local label="$1"\n  local out="$root/windows-$label.tsv"\n  local pids="$root/pids-$label.txt"', 'SNAPSHOT_LOCAL'),
+            ("task='OTC-20260816-track-a-client-window-ownership-discriminator'", "task='OTC-20260816-track-a-xcbgl-runtime-trace'", 'TASK_ID'),
+            ("'QT_XCB_GL_INTEGRATION': 'none',", "'QSG_INFO': '1',\n              'QT_DEBUG_PLUGINS': '1',", 'GRAPHICS_ENV'),
+          ]
+          for old,new,label in patches:
+              count=script.count(old)
+              if count != 1: raise SystemExit(f'XCBGL_DIAG_REFUSED={label}_PATCH_SITE_COUNT:{count}')
+              script=script.replace(old,new)
+
+          xvfb_anchor="echo 'WINDOW_DIAG_XVFB=PASS'\n"
+          x11_probe=r'''echo 'WINDOW_DIAG_XVFB=PASS'
+          python3 - "$display_number" <<'PYX11'
+          import socket, struct, sys
+          display_number = int(sys.argv[1])
+          sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+          sock.settimeout(3.0)
+          sock.connect(f'/tmp/.X11-unix/X{display_number}')
+          def read_exact(n):
+              chunks=[]; total=0
+              while total < n:
+                  chunk=sock.recv(n-total)
+                  if not chunk: raise SystemExit('XCBGL_DIAG_X11_ERROR=unexpected_eof')
+                  chunks.append(chunk); total += len(chunk)
+              return b''.join(chunks)
+          sock.sendall(struct.pack('<BBHHHHH', ord('l'), 0, 11, 0, 0, 0, 0))
+          setup=read_exact(8)
+          setup_len=struct.unpack_from('<H', setup, 6)[0]
+          setup_body=read_exact(setup_len*4)
+          if setup[0] != 1:
+              reason=setup_body[:setup[1]].decode('ascii','replace')
+              raise SystemExit('XCBGL_DIAG_X11_ERROR=setup_failed:'+reason)
+          sock.sendall(struct.pack('<BBH', 99, 0, 1))
+          reply=read_exact(32)
+          if reply[0] != 1: raise SystemExit('XCBGL_DIAG_X11_ERROR=list_extensions_reply')
+          payload=read_exact(struct.unpack_from('<I', reply, 4)[0]*4)
+          names=[]; off=0
+          for _ in range(reply[1]):
+              if off >= len(payload): raise SystemExit('XCBGL_DIAG_X11_ERROR=extensions_truncated')
+              n=payload[off]; off += 1
+              if off+n > len(payload): raise SystemExit('XCBGL_DIAG_X11_ERROR=extension_name_truncated')
+              names.append(payload[off:off+n].decode('ascii','replace')); off += n
+          def query_extension(name):
+              raw=name.encode('ascii'); pad=(-len(raw)) % 4
+              length=(8+len(raw)+pad)//4
+              sock.sendall(struct.pack('<BBHHH', 98, 0, length, len(raw), 0)+raw+(b'\0'*pad))
+              rep=read_exact(32)
+              if rep[0] != 1: raise SystemExit('XCBGL_DIAG_X11_ERROR=query_extension_reply:'+name)
+              return bool(rep[8]), int(rep[9])
+          glx_present, glx_opcode=query_extension('GLX')
+          render_present, render_opcode=query_extension('RENDER')
+          safe_names=[n for n in names if n and all(32 <= ord(ch) < 127 for ch in n)]
+          print('XCBGL_DIAG_X11_EXTENSION_COUNT='+str(len(names)))
+          print('XCBGL_DIAG_X11_EXTENSIONS='+','.join(sorted(safe_names)))
+          print('XCBGL_DIAG_X11_GLX_PRESENT='+str(glx_present).lower())
+          print('XCBGL_DIAG_X11_GLX_MAJOR_OPCODE='+str(glx_opcode if glx_present else 0))
+          print('XCBGL_DIAG_X11_RENDER_PRESENT='+str(render_present).lower())
+          print('XCBGL_DIAG_X11_RENDER_MAJOR_OPCODE='+str(render_opcode if render_present else 0))
+          sock.close()
+          PYX11
+          '''
+          if script.count(xvfb_anchor) != 1:
+              raise SystemExit(f'XCBGL_DIAG_REFUSED=X11_PROBE_ANCHOR_COUNT:{script.count(xvfb_anchor)}')
+          script=script.replace(xvfb_anchor,x11_probe,1)
+
+          old_filter="chosen=lines[:40] + (['...<middle omitted>...'] if len(lines)>120 else []) + (lines[-80:] if len(lines)>40 else [])"
+          new_filter="chosen=[line for line in lines if re.search(r'(?i)(xcbglintegrations|libqxcb-(?:glx|egl)-integration|QXcbIntegration|GLX|EGL|QRhi|Cannot load library|loaded library)', line)]"
+          if script.count(old_filter) != 1:
+              raise SystemExit(f'XCBGL_DIAG_REFUSED=LOG_FILTER_PATCH_SITE_COUNT:{script.count(old_filter)}')
+          script=script.replace(old_filter,new_filter,1)
+          old_count="print(f'WINDOW_DIAG_CLIENT_LOG_TOTAL_LINES={len(lines)}')"
+          new_count="print(f'WINDOW_DIAG_CLIENT_LOG_FILTER_MATCHES={seen}')\nprint(f'WINDOW_DIAG_CLIENT_LOG_TOTAL_LINES={len(lines)}')"
+          if script.count(old_count) != 1:
+              raise SystemExit(f'XCBGL_DIAG_REFUSED=LOG_COUNT_PATCH_SITE_COUNT:{script.count(old_count)}')
+          script=script.replace(old_count,new_count,1)
+
+          required=["task='OTC-20260816-track-a-xcbgl-runtime-trace'", "'QT_QUICK_BACKEND': 'software'", "'QSG_INFO': '1'", "'QT_DEBUG_PLUGINS': '1'", 'XCBGL_DIAG_X11_GLX_PRESENT=', 'xcbglintegrations|libqxcb-', 'WINDOW_DIAG_CLIENT_LOG_FILTER_MATCHES=', 'start_new_session=True', 'descendant_pids()', 'sha256sum "/proc/$client_pid/exe"', 'WINDOW_DIAG_RESULT=PASS_DISCRIMINATOR_CAPTURED', 'WINDOW_DIAG_CLEANUP=COMPLETE', 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe']
+          for needle in required:
+              if needle not in script: raise SystemExit(f'XCBGL_DIAG_REFUSED=MISSING_FENCE:{needle}')
+          forbidden=["'QT_XCB_GL_INTEGRATION': 'none'", '/proc/*/environ', "glob('/proc/*')", 'runtime-registration.json', 'canonical-live-runtime', 'TIBIA_TEST_EMAIL=', 'TIBIA_TEST_PASSWORD=', 'QSG_RHI_BACKEND']
+          for needle in forbidden:
+              if needle in script: raise SystemExit(f'XCBGL_DIAG_REFUSED=FORBIDDEN_SOURCE_SHAPE:{needle}')
+          output.write_text(script)
+          print(f'XCBGL_DIAG_SOURCE_BLOB=PASS:{actual_blob}')
+          print('XCBGL_DIAG_PATCH_COUNT=6')
+          print('XCBGL_DIAG_CANONICAL_STATE_ACCESS=NONE')
+          print('XCBGL_DIAG_ENV=QT_QUICK_BACKEND_software,QSG_INFO_1,QT_DEBUG_PLUGINS_1')
+          print('XCBGL_DIAG_X11_SCOPE=TASK_OWNED_DISPLAY_CORE_READ_ONLY')
+          print('XCBGL_DIAG_LOG_SCOPE=ALLOWLIST_FILTERED_COMPLETE_CLIENT_LOG')
+          PY
+          bash -n "$generated"
+          echo 'XCBGL_DIAG_BASH_N=PASS'
+          bash "$generated"

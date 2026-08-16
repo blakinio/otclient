@@ -113,7 +113,7 @@ jobs:
       - name: Execute one isolated XRes identity discriminator
         shell: bash
         env:
-          EXPECTED_BASE_SHA: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
+          EXPECTED_BASE_SHA: c4fd10384d988d3eedeb64535239dc24c184e299
           EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set +x

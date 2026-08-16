@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace caller of Init-resolving QLibrary path
+    name: Prove Init invocation and filename-state flow statically
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Correlate callers with BattlEye path construction
+      - name: Inspect only the QLibrary function state flow
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -25,7 +25,7 @@ jobs:
           client='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/client'
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 3
           python3 - "$client" <<'PY'
-          import hashlib,pathlib,re,struct,sys
+          import hashlib,pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16); _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
           shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
@@ -35,97 +35,58 @@ jobs:
               e=blob.find(b'\0',o);e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[]
-          for i,x in enumerate(sh):
-              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
+          for x in sh:secs.append({'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
           text=next(s for s in secs if s['name']=='.text'); tb=d[text['off']:text['off']+text['size']]
+          qstart=0x6fc034; qend=0x6fda00
+          off=text['off']+(qstart-text['addr']); qb=d[off:off+(qend-qstart)]
 
-          target_func=0x6fc034
-          direct=[]
-          for i in range(len(tb)-5):
-              if tb[i]!=0xe8:continue
-              va=text['addr']+i; dest=va+5+struct.unpack_from('<i',tb,i+1)[0]
-              if dest==target_func:direct.append(va)
-          print('BE_INIT_FUNC_DIRECT_CALLERS_BEGIN')
-          for va in direct:print(f'call=0x{va:x}')
-          print('BE_INIT_FUNC_DIRECT_CALLERS_END')
+          # resolve() return was stored in r12 at 0x6fc596 (49 89 c4). Find all direct CALL/JMP r12 uses later.
+          patterns={b'\x41\xff\xd4':'call_r12',b'\x41\xff\xe4':'jmp_r12',b'\x41\xff\x14\x24':'call_ptr_r12'}
+          print('BE_INIT_RESULT_USES_BEGIN')
+          for pat,name in patterns.items():
+              pos=0
+              while True:
+                  i=qb.find(pat,pos)
+                  if i<0:break
+                  va=qstart+i
+                  if va>=0x6fc596:print(f'{name}=0x{va:x}')
+                  pos=i+1
+          print('BE_INIT_RESULT_USES_END')
 
-          # Exact known BattlEye-related printable strings plus all exact .so/BattlEye path strings.
-          candidates={}
-          keyrx=re.compile(r'BattlEye|BEClient|battleye|BECLIENT|GetVer|^Init$|\.so(?:\.|$)',re.I)
-          for m in re.finditer(rb'[\x20-\x7e]{2,240}\x00',d):
-              try:s=m.group()[:-1].decode('ascii')
-              except:continue
-              if keyrx.search(s):candidates[m.start()]=s
-          print('BE_RELEVANT_CSTRINGS_BEGIN')
-          for va,s in sorted(candidates.items()):print(f'va=0x{va:x} text={s[:220]}')
-          print('BE_RELEVANT_CSTRINGS_END')
-
-          prefixes={bytes.fromhex(x) for x in [
-            '488d05','488d0d','488d15','488d1d','488d25','488d2d','488d35','488d3d',
-            '4c8d05','4c8d0d','4c8d15','4c8d1d','4c8d25','4c8d2d','4c8d35','4c8d3d',
-            '488b05','488b0d','488b15','488b1d','488b25','488b2d','488b35','488b3d']}
+          # Locate references to stack slot [rbp-0x138], which feeds QLibrary::setFileName at 0x6fcab0.
+          disp=(0xfffffffffffffec8).to_bytes(8,'little')[:4]
+          print('BE_FILENAME_SLOT_RAW_REFERENCES_BEGIN')
+          pos=0
           refs=[]
-          for i in range(len(tb)-7):
-              p=tb[i:i+3]
-              if p not in prefixes:continue
-              iva=text['addr']+i; target=iva+7+struct.unpack_from('<i',tb,i+3)[0]
-              if target in candidates:refs.append((iva,target,candidates[target],p.hex()))
-          print('BE_RELEVANT_XREFS_BEGIN')
-          for iva,target,s,op in refs:print(f'ref=0x{iva:x} target=0x{target:x} op={op} text={s[:200]}')
-          print('BE_RELEVANT_XREFS_END')
+          while True:
+              i=qb.find(disp,pos)
+              if i<0:break
+              va=qstart+i
+              refs.append(va)
+              print(f'disp_ref=0x{va:x}')
+              pos=i+1
+          print('BE_FILENAME_SLOT_RAW_REFERENCES_END')
 
-          # Identify normal-frame starts heuristically and correlate each direct caller with relevant refs nearby.
-          pat=b'\x55\x48\x89\xe5'
-          def func_start(va,back=0x3000):
-              rel=va-text['addr'];lo=max(0,rel-back);pos=tb.rfind(pat,lo,rel+1)
-              return text['addr']+pos if pos>=0 else max(text['addr'],va-0x400)
-          print('BE_CALLER_CORRELATION_BEGIN')
-          caller_funcs=[]
-          for call in direct:
-              fs=func_start(call)
-              caller_funcs.append(fs)
-              nearby=[r for r in refs if fs-0x1000<=r[0]<=call+0x2000]
-              print(f'caller_call=0x{call:x} heuristic_start=0x{fs:x} relevant_refs={len(nearby)}')
-              for iva,target,s,op in nearby:print(f'  ref=0x{iva:x} target=0x{target:x} text={s[:200]}')
-          print('BE_CALLER_CORRELATION_END')
+          # Emit only small windows around relevant state-flow instructions for offline decoding.
+          def emit(label,va,before,after):
+              start=max(text['addr'],va-before); end=min(text['addr']+text['size'],va+after)
+              fo=text['off']+(start-text['addr']); blob=d[fo:fo+(end-start)]
+              print(f'{label}_VA=0x{start:x}');print(f'{label}_SIZE=0x{len(blob):x}');print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}');print(f'{label}_HEX={blob.hex()}')
+          emit('BE_RESOLVE_AND_AFTER',0x6fc591,0x20,0x220)
+          emit('BE_SET_FILENAME_LOAD',0x6fcaba,0x40,0x60)
+          for idx,va in enumerate(refs[:20]):emit(f'BE_FILENAME_SLOT_{idx}',va,0x40,0x60)
 
-          # Trace direct callers one level further up for the small discovered set.
-          print('BE_CALLER_PARENT_CALLS_BEGIN')
-          unique=sorted(set(caller_funcs))
-          for f in unique:
-              parents=[]
-              for i in range(len(tb)-5):
-                  if tb[i]!=0xe8:continue
-                  va=text['addr']+i;dest=va+5+struct.unpack_from('<i',tb,i+1)[0]
-                  if dest==f:parents.append(va)
-              print(f'function=0x{f:x} parents={len(parents)} values={",".join("0x%x"%x for x in parents[:50])}')
-          print('BE_CALLER_PARENT_CALLS_END')
-
-          # Emit tiny bounded windows around the QLibrary sequence and its direct callers for offline disassembly.
-          def emit(label,va,size):
-              if not (text['addr']<=va<text['addr']+text['size']):return
-              off=text['off']+(va-text['addr']);blob=d[off:min(len(d),off+size)]
-              print(f'{label}_VA=0x{va:x}');print(f'{label}_SIZE=0x{len(blob):x}');print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}');print(f'{label}_HEX={blob.hex()}')
-          emit('BE_RESOLVE_INIT_WINDOW',0x6fc550,0x70)
-          emit('BE_SETNAME_LOAD_WINDOW',0x6fca50,0xa0)
-          for idx,call in enumerate(direct[:12]):emit(f'BE_DIRECT_CALLER_{idx}',max(text['addr'],call-0x100),0x260)
-
-          # Entire QLibrary function: list direct call targets and RIP references to printable strings only, no raw dump.
-          qstart=0x6fc034;qend=0x6fcb30
-          print('BE_QLIBRARY_FUNCTION_REFERENCES_BEGIN')
-          for i in range(qstart-text['addr'],min(qend-text['addr'],len(tb)-7)):
-              p=tb[i:i+3]
-              if p in prefixes:
-                  va=text['addr']+i;t=va+7+struct.unpack_from('<i',tb,i+3)[0]
-                  if 0<=t<len(d):
-                      e=d.find(b'\0',t,min(len(d),t+220))
-                      if e>t:
-                          raw=d[t:e]
-                          if raw and all(32<=b<127 for b in raw):
-                              try:s=raw.decode('ascii')
-                              except:continue
-                              print(f'ref=0x{va:x} target=0x{t:x} text={s[:200]}')
-          print('BE_QLIBRARY_FUNCTION_REFERENCES_END')
-          print('BE_FINAL_STATIC_EXECUTED=false')
-          print('BE_FINAL_STATIC_MUTATION_PERFORMED=false')
+          # Search relocations/data pointers that contain this function address; no process/runtime inspection.
+          needle=struct.pack('<Q',qstart)
+          print('BE_QFUNCTION_RAW_POINTERS_BEGIN')
+          pos=0;count=0
+          while True:
+              i=d.find(needle,pos)
+              if i<0:break
+              print(f'fileoff=0x{i:x}')
+              count+=1;pos=i+1
+              if count>=50:break
+          print('BE_QFUNCTION_RAW_POINTERS_END')
+          print('BE_STATEFLOW_EXECUTED=false')
+          print('BE_STATEFLOW_MUTATION_PERFORMED=false')
           PY

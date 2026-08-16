@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Isolate exact BattlEye state ownership interval
+    name: Search client-wide BE state owner consumers
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - name: Emit bounded branch and failure paths for offline decoding
+      - name: Scan exact +0x748 owner loads and candidate output-slot uses
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -37,69 +37,62 @@ jobs:
               e=blob.find(b'\0',o);e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[]
-          for i,x in enumerate(sh):secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
-          by={s['name']:s for s in secs}; text=by['.text']; tb=d[text['off']:text['off']+text['size']]
+          for i,x in enumerate(sh):secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
+          text=next(s for s in secs if s['name']=='.text'); tb=d[text['off']:text['off']+text['size']]
+          regs=['rax','rcx','rdx','rbx','rsp','rbp','rsi','rdi','r8','r9','r10','r11','r12','r13','r14','r15']
+          loads=[]
+          disp_target=0x748
+          for i in range(len(tb)-7):
+              rex=tb[i]
+              if rex not in range(0x48,0x50) or tb[i+1]!=0x8b: continue
+              modrm=tb[i+2]
+              if (modrm>>6)!=2 or (modrm&7)==4: continue  # no SIB in this bounded decoder
+              disp=struct.unpack_from('<i',tb,i+3)[0]
+              if disp!=disp_target:continue
+              dst=((modrm>>3)&7)|(((rex>>2)&1)<<3)
+              src=(modrm&7)|((rex&1)<<3)
+              loads.append((text['addr']+i,dst,src))
+          print(f'BE_CB4_OWNER_748_LOAD_COUNT={len(loads)}')
+          print('BE_CB4_OWNER_748_LOADS_BEGIN')
+          for idx,(va,dst,src) in enumerate(loads):print(f'index={idx} va=0x{va:x} dst={regs[dst]} owner={regs[src]}')
+          print('BE_CB4_OWNER_748_LOADS_END')
 
-          dyn=by.get('.dynsym'); syms=[]
-          if dyn and 0<=dyn['link']<len(secs):
-              ss=secs[dyn['link']]; sb=d[ss['off']:ss['off']+ss['size']]
-              for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
-                  if o+24>len(d):break
-                  sn,info,other,si,val,sz=struct.unpack_from(E+'IBBHQQ',d,o); syms.append(cs(sb,sn).split('@',1)[0])
-          relsec=by.get('.rela.plt') or by.get('.rela.plt.sec'); pltsec=by.get('.plt.sec') or by.get('.plt'); plt={}
-          if relsec and pltsec:
-              ent=pltsec['entsize'] or 16; reserved=0 if pltsec['name']=='.plt.sec' else 1
-              for idx,o in enumerate(range(relsec['off'],relsec['off']+relsec['size'],relsec['entsize'] or 24)):
-                  if o+24>len(d):break
-                  _,ri,_=struct.unpack_from(E+'QQq',d,o); si=ri>>32; nm=syms[si] if si<len(syms) else '?'
-                  plt[pltsec['addr']+(idx+reserved)*ent]=nm
+          slots={0x28,0x30,0x38,0x40,0x48,0x49,0x4a,0x4b}
+          candidates=[]
+          for idx,(loadva,dst,src) in enumerate(loads):
+              start=loadva-text['addr']; end=min(len(tb),start+0x120)
+              for j in range(start+7,end-4):
+                  rex=tb[j]
+                  if rex not in range(0x40,0x50): continue
+                  op=tb[j+1]
+                  if op not in (0x8b,0x8d,0x89,0x83,0x80,0x0f,0xc6): continue
+                  # Common non-SIB modrm location. 0f xx forms are intentionally omitted from semantic claims.
+                  mpos=j+2
+                  if op==0x0f: mpos=j+3
+                  if mpos>=len(tb):continue
+                  modrm=tb[mpos]
+                  if (modrm>>6)!=1 or (modrm&7)==4:continue
+                  base=(modrm&7)|((rex&1)<<3)
+                  if base!=dst:continue
+                  disp8=tb[mpos+1]
+                  if disp8>=128:disp8-=256
+                  if disp8 in slots:
+                      candidates.append((idx,loadva,text['addr']+j,regs[dst],disp8,op))
+          print(f'BE_CB4_OWNER_SLOT_CANDIDATE_COUNT={len(candidates)}')
+          print('BE_CB4_OWNER_SLOT_CANDIDATES_BEGIN')
+          for idx,loadva,va,reg,slot,op in candidates:
+              print(f'owner_load_index={idx} owner_load=0x{loadva:x} ref=0x{va:x} base={reg} slot=0x{slot:x} opcode=0x{op:x}')
+          print('BE_CB4_OWNER_SLOT_CANDIDATES_END')
 
-          def emit(label,start,end):
+          # Emit windows only for owner loads that have a candidate slot reference, plus the known BattlEye load at 0x6fc4d7.
+          keep=sorted(set([idx for idx,_,_,_,_,_ in candidates] + [idx for idx,(va,_,_) in enumerate(loads) if va==0x6fc4d7]))
+          print('BE_CB4_OWNER_WINDOWS_BEGIN')
+          for idx in keep[:30]:
+              va,dst,src=loads[idx]; start=max(text['addr'],va-0x30); end=min(text['addr']+text['size'],va+0x160)
               fo=text['off']+(start-text['addr']); blob=d[fo:fo+(end-start)]
-              print(f'{label}_VA=0x{start:x}')
-              print(f'{label}_END=0x{end:x}')
-              print(f'{label}_SIZE=0x{len(blob):x}')
-              print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}')
-              print(f'{label}_HEX={blob.hex()}')
-
-          # Proven ownership interval for state local: store [rbp-0x148]=r14 at 0x6fc4eb,
-          # next overwrite of that local occurs at 0x6fc82d.
-          start=0x6fc4eb; end=0x6fc82d
-          emit('BE_CB3_EXACT_STATE_INTERVAL',start,end)
-          for label,s,e in [
-              ('BE_CB3_BRANCH_4B_NONZERO',0x6fd790,0x6fd810),
-              ('BE_CB3_INIT_FALSE',0x6fd7c0,0x6fd860),
-              ('BE_CB3_RESOLVE_NULL',0x6fd890,0x6fd900),
-              ('BE_CB3_SETNAME_LOAD',0x6fca80,0x6fcae0),
-          ]: emit(label,s,e)
-
-          print('BE_CB3_INTERVAL_DIRECT_CALLS_BEGIN')
-          for i in range(start-text['addr'],end-text['addr']-5):
-              if tb[i]!=0xe8:continue
-              va=text['addr']+i; dest=va+5+struct.unpack_from('<i',tb,i+1)[0]
-              print(f'call=0x{va:x} target=0x{dest:x} kind={plt.get(dest,"INTERNAL")}')
-          print('BE_CB3_INTERVAL_DIRECT_CALLS_END')
-
-          # RIP-relative printable strings referenced in the same exact interval only.
-          prefixes={bytes.fromhex(x) for x in ['488d05','488d0d','488d15','488d1d','488d25','488d2d','488d35','488d3d','4c8d05','4c8d0d','4c8d15','4c8d1d','4c8d25','4c8d2d','4c8d35','4c8d3d']}
-          print('BE_CB3_INTERVAL_STRINGS_BEGIN')
-          seen=set()
-          for i in range(start-text['addr'],min(end-text['addr'],len(tb)-7)):
-              p=tb[i:i+3]
-              if p not in prefixes:continue
-              va=text['addr']+i; target=va+7+struct.unpack_from('<i',tb,i+3)[0]
-              if not (0<=target<len(d)):continue
-              ee=d.find(b'\0',target,min(len(d),target+200))
-              if ee<=target:continue
-              raw=d[target:ee]
-              if not raw or not all(32<=b<127 for b in raw):continue
-              try:s=raw.decode('ascii')
-              except:continue
-              key=(target,s)
-              if key in seen:continue
-              seen.add(key); print(f'ref=0x{va:x} target=0x{target:x} text={s[:180]}')
-          print('BE_CB3_INTERVAL_STRINGS_END')
-          print('BE_CB3_EXECUTED_TARGET=false')
-          print('BE_CB3_LIVE_RUNTIME_OBSERVED=false')
-          print('BE_CB3_MUTATION_PERFORMED=false')
+              print(f'index={idx} va=0x{start:x} owner_load=0x{va:x} size=0x{len(blob):x} sha256={hashlib.sha256(blob).hexdigest()} hex={blob.hex()}')
+          print('BE_CB4_OWNER_WINDOWS_END')
+          print('BE_CB4_EXECUTED_TARGET=false')
+          print('BE_CB4_LIVE_RUNTIME_OBSERVED=false')
+          print('BE_CB4_MUTATION_PERFORMED=false')
           PY

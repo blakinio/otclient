@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace TTibiaFileSystemHelper construction and BEClient resolver
+    name: Bound TTibiaFileSystemHelper constructor and resolver trace
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Validate vtable chain and emit bounded constructor/resolver windows
+      - name: Validate concrete vtable and emit exact bounded windows
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -41,7 +41,7 @@ jobs:
               return blob[o:e].decode('utf8','replace')
           secs=[]
           for i,x in enumerate(sh):
-              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+              secs.append({'idx':i,'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
           by={s['name']:s for s in secs}; text=by['.text']; tb=d[text['off']:text['off']+text['size']]
           def va_to_off(va):
               for s in secs:
@@ -49,94 +49,44 @@ jobs:
                       return s['off']+(va-s['addr'])
               return None
           def b_at(va,n):
-              o=va_to_off(va)
-              if o is None:return b''
-              return d[o:o+n]
-          def rawq(va):
-              x=b_at(va,8); return None if len(x)!=8 else struct.unpack('<Q',x)[0]
-          def in_text(va):return text['addr'] <= va < text['addr']+text['size']
+              o=va_to_off(va); return b'' if o is None else d[o:o+n]
           def emit(label,start,end):
               blob=b_at(start,end-start)
               print(f'{label}_VA=0x{start:x}')
               print(f'{label}_END=0x{end:x}')
               print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}')
               print(f'{label}_HEX={blob.hex()}')
-          def rel32_target(va):
-              x=b_at(va,5)
-              return None if len(x)!=5 or x[0]!=0xe8 else va+5+struct.unpack_from('<i',x,1)[0]
 
-          dyn=by.get('.dynsym'); syms=[]
-          if dyn and 0<=dyn['link']<len(secs):
-              ss=secs[dyn['link']]; sb=d[ss['off']:ss['off']+ss['size']]
-              for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
-                  if o+24>len(d):break
-                  sn,info,other,si,val,sz=struct.unpack_from(E+'IBBHQQ',d,o)
-                  syms.append((cs(sb,sn),val,sz,info))
           rel=by.get('.rela.dyn'); relocs=[]
           if rel:
               for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
                   if o+24>len(d):break
                   ro,ri,add=struct.unpack_from(E+'QQq',d,o); relocs.append((ro,ri&0xffffffff,ri>>32,add))
           byoff={ro:(typ,sym,add) for ro,typ,sym,add in relocs}
-
           ti=0x3070940; typeinfo_slot=0x2f62078; vptr=0x2f62080
-          print('PATH_SVC_VTABLE_VALIDATION_BEGIN')
-          r0=byoff.get(ti); rname=syms[r0[1]][0] if r0 and r0[1] and r0[1]<len(syms) else ''
-          print(f'typeinfo_vptr_reloc={r0} symbol={rname}')
-          print(f'type_name_ptr_reloc={byoff.get(ti+8)}')
-          print(f'offset_to_top_raw={rawq(typeinfo_slot-8)}')
-          print(f'typeinfo_slot_reloc={byoff.get(typeinfo_slot)}')
-          contiguous=True
+          print('PATH_SVC_VTABLE_BEGIN')
+          print(f'offset_to_top={struct.unpack("<q",b_at(typeinfo_slot-8,8))[0]}')
+          print(f'typeinfo_reloc={byoff.get(typeinfo_slot)}')
+          all_text=True
           for off in range(0,0x100,8):
-              rr=byoff.get(vptr+off)
-              target=None if rr is None else rr[2]
-              ok=(rr is not None and in_text(target))
-              contiguous &= ok
-              print(f'slot=+0x{off:x} reloc=0x{vptr+off:x} target={"NONE" if target is None else hex(target)} text={str(ok).lower()}')
-          print(f'VTABLE_0_TO_F8_ALL_TEXT={str(contiguous).lower()}')
-          print(f'VTABLE_SLOT_30_TARGET={hex(byoff[vptr+0x30][2]) if vptr+0x30 in byoff else "NONE"}')
-          print(f'VTABLE_SLOT_D8_TARGET={hex(byoff[vptr+0xd8][2]) if vptr+0xd8 in byoff else "NONE"}')
-          print('PATH_SVC_VTABLE_VALIDATION_END')
+              rr=byoff.get(vptr+off); target=None if rr is None else rr[2]
+              ok=(target is not None and text['addr'] <= target < text['addr']+text['size'])
+              all_text &= ok
+              print(f'slot=+0x{off:x} target={"NONE" if target is None else hex(target)} text={str(ok).lower()}')
+          print(f'VTABLE_0_TO_F8_ALL_TEXT={str(all_text).lower()}')
+          print(f'SLOT30_TARGET={hex(byoff[vptr+0x30][2])}')
+          print(f'SLOTD8_TARGET={hex(byoff[vptr+0xd8][2])}')
+          print('PATH_SVC_VTABLE_END')
 
-          # Exact c95cb0 wrapper facts: builds QString("BEClient") then dispatches same object's +0x30 method.
-          beclient_va=0x1d69bb2
-          lea=0xc95cb2
-          lea_bytes=b_at(lea,7)
-          lea_target=lea+7+struct.unpack_from('<i',lea_bytes,3)[0] if len(lea_bytes)==7 and lea_bytes[:3]==bytes.fromhex('488d15') else None
-          print('PATH_SVC_C95CB0_FACTS_BEGIN')
-          print(f'c95cb0_first_bytes={b_at(0xc95cb0,0x40).hex()}')
-          print(f'beclient_lea_target={"NONE" if lea_target is None else hex(lea_target)} expected=0x{beclient_va:x}')
-          print(f'fromUtf8_call_target={hex(rel32_target(0xc95cd9)) if rel32_target(0xc95cd9) is not None else "NONE"}')
-          print(f'load_virtual_slot30_bytes={b_at(0xc95cd2,7).hex()}')
-          print(f'key_length_bytes={b_at(0xc95cca,5).hex()}')
-          print(f'category9_bytes={b_at(0xc95ce1,5).hex()}')
-          print(f'indirect_call_bytes={b_at(0xc95cec,3).hex()}')
-          print('PATH_SVC_C95CB0_FACTS_END')
+          # One linear pass: direct rel32 calls into the concrete constructor-like region.
+          calls=[]
+          for i in range(len(tb)-5):
+              if tb[i]!=0xe8:continue
+              va=text['addr']+i; dest=va+5+struct.unpack_from('<i',tb,i+1)[0]
+              if 0x6b4f40 <= dest < 0x6b5050:calls.append((va,dest))
+          print('PATH_SVC_CTOR_REGION_CALLS='+','.join(f'0x{va:x}->0x{dest:x}' for va,dest in calls))
 
-          # Emit bounded target for the +0x30 generic resolver used by the BEClient wrapper.
-          emit('PATH_SVC_GENERIC_SLOT30',0xc9b820,0xc9bd20)
-
-          # Emit all high-value vptr-reference contexts for the concrete helper.
-          for label,start,end in [
-              ('PATH_SVC_VPTR_REF_5EF510',0x5ef480,0x5ef590),
-              ('PATH_SVC_VPTR_REF_6B4FC0',0x6b4f50,0x6b5050),
-              ('PATH_SVC_VPTR_REF_19A6A9E',0x19a6a20,0x19a6b30),
-          ]:
-              emit(label,start,end)
-
-          # Direct rel32 callsites into the bounded 0x6b4f50..0x6b5050 constructor-like region.
-          print('PATH_SVC_CONSTRUCTOR_CALL_CANDIDATES_BEGIN')
-          for target in range(0x6b4f50,0x6b5051,0x10):
-              calls=[]
-              for i in range(len(tb)-5):
-                  if tb[i]!=0xe8:continue
-                  va=text['addr']+i
-                  if va+5+struct.unpack_from('<i',tb,i+1)[0]==target:calls.append(va)
-              if calls:print(f'target=0x{target:x} calls='+','.join(hex(x) for x in calls[:40]))
-          print('PATH_SVC_CONSTRUCTOR_CALL_CANDIDATES_END')
-
-          # Search RIP-relative LEA references to exact concrete vptr; candidates only, bounded contexts emitted above.
-          print('PATH_SVC_CONCRETE_VPTR_REFS_BEGIN')
+          # One linear pass: exact RIP-relative LEAs to the concrete vptr.
           refs=[]
           for i in range(len(tb)-7):
               if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
@@ -144,8 +94,25 @@ jobs:
               if (m>>6)!=0 or (m&7)!=5:continue
               va=text['addr']+i; dest=va+7+struct.unpack_from('<i',tb,i+3)[0]
               if dest==vptr:refs.append(va)
-          print('refs='+','.join(hex(x) for x in refs))
-          print('PATH_SVC_CONCRETE_VPTR_REFS_END')
+          print('PATH_SVC_CONCRETE_VPTR_REFS='+','.join(hex(x) for x in refs))
+
+          # Loader method exact facts; c95cb0 builds BEClient key and dispatches same object's +0x30 resolver.
+          lea=b_at(0xc95cb2,7); lea_target=0xc95cb9+struct.unpack_from('<i',lea,3)[0]
+          print(f'PATH_SVC_BECLIENT_LEA_TARGET=0x{lea_target:x}')
+          call=b_at(0xc95cd9,5); fromutf8=0xc95cde+struct.unpack_from('<i',call,1)[0]
+          print(f'PATH_SVC_FROMUTF8_TARGET=0x{fromutf8:x}')
+          print(f'PATH_SVC_LOAD_SLOT30_BYTES={b_at(0xc95cd2,7).hex()}')
+          print(f'PATH_SVC_LENGTH8_BYTES={b_at(0xc95cca,5).hex()}')
+          print(f'PATH_SVC_CATEGORY9_BYTES={b_at(0xc95ce1,5).hex()}')
+          print(f'PATH_SVC_CALL_SLOT30_BYTES={b_at(0xc95cec,3).hex()}')
+
+          for label,start,end in [
+              ('PATH_SVC_TIBIA_D8',0xc95cb0,0xc95d40),
+              ('PATH_SVC_GENERIC_SLOT30',0xc9b820,0xc9bd20),
+              ('PATH_SVC_VPTR_5EF510',0x5ef480,0x5ef590),
+              ('PATH_SVC_VPTR_6B4FC0',0x6b4f40,0x6b5050),
+              ('PATH_SVC_VPTR_19A6A9E',0x19a6a20,0x19a6b30),
+          ]:emit(label,start,end)
 
           print('PATH_SVC_EXECUTED_TARGET=false')
           print('PATH_SVC_LIVE_RUNTIME_OBSERVED=false')

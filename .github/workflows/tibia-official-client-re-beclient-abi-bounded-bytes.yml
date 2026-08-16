@@ -1,0 +1,95 @@
+name: Track A BEClient ABI bounded bytes
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-beclient-abi-bounded-bytes.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-beclient-abi-static.md
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Extract bounded static loader and export windows
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Emit minimal static byte windows only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || exit 2
+          base='/home/runner/_work/_otclient_tibia_re_state'
+          package="$base/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package"
+          client="$package/bin/client"
+          be="$package/bin/BattlEye/BEClient.so"
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 3
+          [[ "$(sha256sum "$be" | awk '{print $1}')" == '5d1c90ab244155d393296b2e575425aee3252d4d09110007a6d6c3a0bfe05a98' ]] || exit 4
+
+          python3 - "$client" "$be" <<'PY'
+          import hashlib, pathlib, struct, sys
+          client=pathlib.Path(sys.argv[1]); be=pathlib.Path(sys.argv[2])
+          cd=client.read_bytes(); bd=be.read_bytes()
+
+          def printable_cstring_context(data, pos):
+              left=data.rfind(b'\0', max(0,pos-512), pos)
+              left=0 if left<0 else left+1
+              right=data.find(b'\0',pos,min(len(data),pos+512))
+              right=len(data) if right<0 else right
+              raw=data[left:right]
+              text=''.join(chr(b) if 32<=b<127 else '?' for b in raw)
+              return left,right,text[:900]
+
+          print('BE_BOUNDED_CLIENT_STRING_CONTEXT_BEGIN')
+          for pos in [0x1d69bb2,0x1c9c202,0x1d3ed27,0x1d3ed43,0x1d7b160]:
+              l,r,t=printable_cstring_context(cd,pos)
+              print(f'pos=0x{pos:x} cstr_start=0x{l:x} cstr_end=0x{r:x} text={t}')
+          print('BE_BOUNDED_CLIENT_STRING_CONTEXT_END')
+
+          def emit(label,data,start,size):
+              end=min(len(data),start+size)
+              blob=data[start:end]
+              print(f'{label}_START=0x{start:x}')
+              print(f'{label}_SIZE=0x{len(blob):x}')
+              print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}')
+              print(f'{label}_HEX={blob.hex()}')
+
+          # One concrete client-side xref to the BEClient literal; bounded to 384 bytes.
+          emit('BE_BOUNDED_CLIENT_LOADER',cd,0xc95c20,0x180)
+
+          # Parse BE section headers and dynsym, then map each exported value by actual section address range.
+          E='<'; h=struct.unpack_from(E+'HHIQQQIHHHHHH',bd,16)
+          _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
+          shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,bd,shoff+i*shentsz) for i in range(shnum)]
+          st=sh[shstrndx]; names=bd[st[4]:st[4]+st[5]]
+          def cs(blob,o):
+              if o<0 or o>=len(blob): return ''
+              e=blob.find(b'\0',o); e=len(blob) if e<0 else e
+              return blob[o:e].decode('utf8','replace')
+          secs=[]
+          for i,x in enumerate(sh):
+              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+          by={s['name']:s for s in secs}; dyn=by['.dynsym']; strsec=secs[dyn['link']]; sb=bd[strsec['off']:strsec['off']+strsec['size']]
+          wanted={'Init','GetVer','_0','_1','_2','_3','_4','_5','_6','_7'}
+          syms=[]
+          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
+              if o+24>len(bd): break
+              sn,info,other,shndx,val,sz=struct.unpack_from(E+'IBBHQQ',bd,o); nm=cs(sb,sn)
+              if nm in wanted: syms.append((nm,val,sz,shndx))
+          print('BE_BOUNDED_EXPORT_MAP_BEGIN')
+          for nm,val,sz,shndx in sorted(syms,key=lambda x:x[1]):
+              owner=next((s for s in secs if s['type']!=8 and s['addr']<=val<s['addr']+s['size'] and s['off']+(val-s['addr'])<len(bd)),None)
+              if owner:
+                  foff=owner['off']+(val-owner['addr'])
+                  print(f'name={nm} value=0x{val:x} dyn_shndx={shndx} dyn_section={secs[shndx]["name"] if 0<=shndx<len(secs) else "?"} actual_section={owner["name"]} fileoff=0x{foff:x} symbol_size=0x{sz:x}')
+                  want=0xc0 if nm=='Init' else (0x40 if nm in {'GetVer','_5','_7'} else 0x80)
+                  emit('BE_BOUNDED_'+nm.replace('_','N'),bd,foff,want)
+              else:
+                  print(f'name={nm} value=0x{val:x} owner=UNMAPPED')
+          print('BE_BOUNDED_EXPORT_MAP_END')
+          print('BE_BOUNDED_EXECUTED=false')
+          print('BE_BOUNDED_MUTATION_PERFORMED=false')
+          PY

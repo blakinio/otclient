@@ -2,18 +2,18 @@
 task_id: OTC-20260816-track-a-xres-window-identity
 status: implementing
 agent: ChatGPT
-session_id: chatgpt-xres-window-identity-20260816
+session_id: chatgpt-xres-window-identity-v2-20260816
 session_role: runtime_identity_researcher
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: hosted-preflight-before-xres-identity-current-main
-branch: diag/OTC-20260816-track-a-xres-window-identity
+phase: hosted-preflight-before-xres-identity-current-main-replay
+branch: diag/OTC-20260816-track-a-xres-window-identity-v2
 base_branch: main
 base_main: 845adabba5f6d2bfecb6d54bc13834c47cc61c94
 risk: high
-updated: 2026-08-16T23:21:00+02:00
+updated: 2026-08-16T23:24:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xres-window-identity.md
   - docs/agents/evidence/OTC-20260816-track-a-xres-window-identity/**
@@ -26,13 +26,14 @@ reuses:
   - semantic source head 8e9cc81011383922cf6bad75ca7207deb749fffb
   - immutable harness blob 1616edcc982be50ef2c95b8077160ec8fe9291fe
   - immutable post-RHI transformer blobs d663a40c446983c7359265bf834113ba49e6a5d1 and b9d15f8d1131339b06bfa9cb1e81940c2163a283
+  - source XRes Draft #440 hosted-preflight work only; no physical run occurred there
   - X-Resource protocol v1.2 / XCB RES QueryClientIds primary specification
 blocks:
   - OTC-20260816-track-a-canonical-runtime-e2e
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: PR #438 directly proved a raw VIEWABLE 1920x1080 XID exists from t15 while available WM PID/name/class queries cannot bind it to the exact client PID. X-Resource v1.2 QueryClientIds is specifically designed to identify the local-client PID from any resource XID. One separately admitted isolated launch can therefore resolve the exact ownership question without changing graphics behavior, credentials, login or canonical state. Since branch creation, trusted main advanced only through unrelated World Observation/Atlas documentation and lifecycle PRs #439/#441; XRes task authority and the physical exact-base fence are refreshed to current main 845adabba5f6d2bfecb6d54bc13834c47cc61c94 before enablement.
+execution_reason: PR #438 directly proved a raw VIEWABLE 1920x1080 XID exists from t15 while available WM PID/name/class queries cannot bind it to the exact client PID. X-Resource v1.2 QueryClientIds is specifically designed to identify the local-client PID from any resource XID. Source XRes Draft #440 remained physical-off while main advanced through unrelated World Observation/Atlas documentation and lifecycle. GitHub computed its conflict-free merge tree against current main 845adabba5f6d2bfecb6d54bc13834c47cc61c94; that exact tree was replayed as a linear commit and this task is now rebound to the v2 branch, preserving the tested XRes observer without stale PR-base payload ambiguity.
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -65,14 +66,22 @@ source_evidence:
   source_final_ci: 31972667199_SUCCESS
   source_final_required_ci: 95227425189_SUCCESS
   classification: PROVEN_RAW_X11_TREE_HAS_VIEWABLE_1920X1080_NAMELESS_PIDLESS_WINDOW_FROM_T15_WHILE_XDOTOOL_NAMED_VISIBLE_SEARCH_RETURNS_ZERO_AND_EXACT_CLIENT_REMAINS_ALIVE_POST_GLX
+source_xres_draft:
+  pr: 440
+  source_head: cf2b5ffd42b9a10fb078009a1111e2cd287c510c
+  source_pr_base_payload: c4fd10384d988d3eedeb64535239dc24c184e299
+  github_merge_ref: 1003ae6054e430d50d3d58c62bc02f570c3c9a21
+  github_merge_tree: a4a19b42b85a9697ae8043f27f062d20c012c6ab
+  merge_ref_current_main_parent: 845adabba5f6d2bfecb6d54bc13834c47cc61c94
+  replay_seed_commit: 3e35186cb68815223329adedfba99cefa3c2acb3
+  physical_run_occurred: false
 main_reconciliation:
-  original_branch_parent: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
   current_pr_base: 845adabba5f6d2bfecb6d54bc13834c47cc61c94
   intervening_prs:
     - 439_world_observation_atlas_boundary_docs
     - 441_world_observation_atlas_archive
   overlap_with_owned_paths: false
-  physical_execution_during_reconciliation: false
+  replay_method: exact conflict-free GitHub merge tree replayed as linear commit on current main
 primary_protocol_basis:
   extension: X-Resource
   required_version: 1.2
@@ -98,7 +107,7 @@ experiment:
 hosted_preflight_history:
   initial_anchor_failure: XRES_PATCH_REFUSED_SNAPSHOT_XRES_INSERT_COUNT_0
   initial_physical_job: SKIPPED
-  corrected_patcher_head: 268ca58a6ee5d7e7ed9bd531deba1d83493176b0
+  corrected_source_head: 268ca58a6ee5d7e7ed9bd531deba1d83493176b0
   corrected_hosted_preflight: SUCCESS
   corrected_track_a_governance: SUCCESS
   corrected_actionlint: SUCCESS
@@ -126,10 +135,10 @@ acceptance:
   - returned PID is compared to exact client PID without inference
   - cleanup complete
   - one-shot workflow/patchers removed after valid result
-last_completed_step: hosted preflight with corrected XRes observer is proven SUCCESS and Track A governance is green; main advanced only through unrelated #441 lifecycle closeout, so task authority is refreshed to exact current main before final pre-runtime CI generation
-next_action: refence the workflow to current main 845adabba5f6d2bfecb6d54bc13834c47cc61c94, obtain exact-head hosted preflight/Track A governance/CI with physical job skipped, reread main, then create one explicit authorization checkpoint if and only if all gates remain green
+last_completed_step: source #440 conflict-free merge tree was replayed linearly onto current trusted main 845adabba5f6d2bfecb6d54bc13834c47cc61c94 as seed 3e35186cb68815223329adedfba99cefa3c2acb3; task metadata is now bound to the v2 branch while physical execution remains gated OFF
+next_action: open current-main replacement PR, close #440 superseded without merge, obtain hosted XRes preflight + Track A governance + required CI with physical job skipped, reread main, then create exactly one semantic authorization checkpoint if all gates are green and replacement PR base payload remains exact current main
 ---
 
-# Track A XRes window identity discriminator
+# Track A XRes window identity discriminator — current-main replay
 
 This task does not assume that the viewable X11 window belongs to Tibia. It exists to obtain direct X-Resource local PID identity before any canonical worker change.

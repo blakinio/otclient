@@ -1,0 +1,191 @@
+name: Track A worldmap extent static RE
+
+on:
+  push:
+    branches: [research/OTC-20260816-track-a-worldmap-extent-static-re]
+    paths:
+      - .github/workflows/tibia-official-client-re-worldmap-extent-static.yml
+      - .github/scripts/tibia-official-client-re-worldmap-extent-static.py
+      - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-worldmap-extent-static-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-client-static-graph:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_HEAD_BRANCH: research/OTC-20260816-track-a-worldmap-extent-static-re
+      OFFICIAL_LINUX_ARCHIVE_URL: https://static.tibia.com/download/tibia.x64.tar.gz
+    steps:
+      - name: Checkout exact research head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Verify GitHub-hosted no-runtime boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          [[ "$RUNNER_ARCH" == X64 ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          python3 -m py_compile .github/scripts/tibia-official-client-re-worldmap-extent-static.py
+          echo 'WORLDMAP_STATIC_EXECUTION_CLASS=github_hosted'
+          echo 'WORLDMAP_STATIC_RUNTIME_ACCESS=none'
+          echo 'WORLDMAP_STATIC_SYNOLOGY_EXECUTION=false'
+          echo 'WORLDMAP_STATIC_CLIENT_EXECUTION=false'
+          echo 'WORLDMAP_STATIC_CLIENT_MUTATION=false'
+
+      - name: Materialize exact official Linux client with referer-aware request
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/worldmap-extent-static
+          mkdir -p "$out"
+          archive="$RUNNER_TEMP/tibia.x64.tar.gz"
+          client="$RUNNER_TEMP/tibia-static-client"
+
+          # PR #310 already proved the plain automated static.tibia.com request returns HTTP 403.
+          # This is one materially different request strategy: compressed transfer plus a same-URL
+          # Referer, matching the historical package-manager workaround recorded for this endpoint.
+          if ! curl --compressed --fail --silent --show-error --location \
+              --referer "$OFFICIAL_LINUX_ARCHIVE_URL" \
+              --connect-timeout 20 --max-time 900 \
+              "$OFFICIAL_LINUX_ARCHIVE_URL" --output "$archive"; then
+            {
+              echo 'WORLDMAP_STATIC_INPUT_STATUS=INPUT_BLOCKED'
+              echo 'WORLDMAP_STATIC_INPUT_REASON=referer_aware_official_archive_download_failed'
+              echo "WORLDMAP_STATIC_INPUT_URL=$OFFICIAL_LINUX_ARCHIVE_URL"
+              echo 'WORLDMAP_STATIC_INPUT_STRATEGY=official_static_tibia_same_url_referer_compressed'
+            } | tee "$out/input-status.txt"
+            exit 3
+          fi
+
+          python3 - "$archive" "$client" <<'PY'
+          import shutil
+          import sys
+          import tarfile
+          from pathlib import PurePosixPath
+
+          archive, target = sys.argv[1:]
+          with tarfile.open(archive, mode='r:*') as tf:
+              candidates = []
+              for member in tf.getmembers():
+                  if not member.isfile():
+                      continue
+                  path = PurePosixPath(member.name)
+                  if path.is_absolute() or '..' in path.parts:
+                      continue
+                  if len(path.parts) >= 2 and path.parts[-2:] == ('bin', 'client'):
+                      candidates.append(member)
+              if len(candidates) != 1:
+                  names = ','.join(m.name for m in candidates[:10]) or '<none>'
+                  raise SystemExit(f'WORLDMAP_STATIC_INPUT_BLOCKED=client_member_count:{len(candidates)}:{names}')
+              source = tf.extractfile(candidates[0])
+              if source is None:
+                  raise SystemExit('WORLDMAP_STATIC_INPUT_BLOCKED=client_member_unreadable')
+              with source, open(target, 'wb') as output:
+                  shutil.copyfileobj(source, output, length=1024 * 1024)
+              print(f'WORLDMAP_STATIC_CLIENT_MEMBER={candidates[0].name}')
+          PY
+
+          size="$(stat -c '%s' "$client")"
+          sha="$(sha256sum "$client" | awk '{print $1}')"
+          {
+            echo "WORLDMAP_STATIC_INPUT_SIZE=$size"
+            echo "WORLDMAP_STATIC_INPUT_SHA256=$sha"
+            echo "WORLDMAP_STATIC_EXPECTED_SIZE=$EXPECTED_CLIENT_SIZE"
+            echo "WORLDMAP_STATIC_EXPECTED_SHA256=$EXPECTED_CLIENT_SHA256"
+            echo 'WORLDMAP_STATIC_INPUT_STRATEGY=official_static_tibia_same_url_referer_compressed'
+          } | tee "$out/input-status.txt"
+
+          if [[ "$size" != "$EXPECTED_CLIENT_SIZE" || "$sha" != "$EXPECTED_CLIENT_SHA256" ]]; then
+            echo 'WORLDMAP_STATIC_INPUT_STATUS=INPUT_BLOCKED' | tee -a "$out/input-status.txt"
+            echo 'WORLDMAP_STATIC_INPUT_REASON=exact_client_fence_mismatch' | tee -a "$out/input-status.txt"
+            exit 3
+          fi
+
+          echo 'WORLDMAP_STATIC_INPUT_STATUS=EXACT_FENCE_VERIFIED' | tee -a "$out/input-status.txt"
+          echo "WORLDMAP_STATIC_CLIENT=$client" >> "$GITHUB_ENV"
+
+      - name: Install static analyzer dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m pip install --disable-pip-version-check --no-input \
+            pyelftools==0.32 capstone==5.0.6
+
+      - name: Recover worldmap extent dependency graph
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/worldmap-extent-static
+          python3 .github/scripts/tibia-official-client-re-worldmap-extent-static.py \
+            --client "$WORLDMAP_STATIC_CLIENT" \
+            --input-source official_static_tibia_same_url_referer_compressed \
+            --output-json "$out/result.json" \
+            --output-text "$out/result.txt" \
+            | tee "$out/validation.log"
+
+          grep -Fxq 'WORLDMAP_STATIC_COMPLETE=true' "$out/validation.log"
+          grep -Fxq 'WORLDMAP_STATIC_RESULT=EXACT_CLIENT_GRAPH_EXTRACTED' "$out/validation.log"
+          python3 - "$out/result.json" <<'PY'
+          import json
+          import sys
+
+          data = json.load(open(sys.argv[1], encoding='utf-8'))
+          exact = data['exact_client']
+          assert exact['version'] == '15.32.df7b29'
+          assert exact['size'] == 51965216
+          assert exact['sha256'] == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          assert exact['platform'] == 'official_native_linux_only'
+          expected = {
+              'TWorldMapExtent',
+              'TWorldMapSubfieldExtent',
+              'TWorldMapViewport',
+              'TWorldMapStorage',
+              'TWorldmapProtocolMessageHandler',
+              'TWorldMapRenderProvider',
+              'TWorldMapCamera',
+              'TWorldMapPicker',
+          }
+          assert set(data['types']) == expected
+          assert all(data['types'][name]['name_occurrences'] for name in expected)
+          assert data['analysis']['function_range_count'] > 0
+          assert data['analysis']['seed_function_count'] > 0
+          assert data['analysis']['relevant_function_count'] > 0
+          PY
+          echo 'WORLDMAP_STATIC_HOSTED_VALIDATED=true'
+
+      - name: Remove proprietary input before evidence upload
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -f "$RUNNER_TEMP/tibia-static-client" "$RUNNER_TEMP/tibia.x64.tar.gz"
+          test ! -e "$RUNNER_TEMP/tibia-static-client"
+          test ! -e "$RUNNER_TEMP/tibia.x64.tar.gz"
+
+      - name: Upload sanitized static evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: track-a-worldmap-extent-static-${{ github.run_id }}
+          path: |
+            artifacts/worldmap-extent-static/input-status.txt
+            artifacts/worldmap-extent-static/result.json
+            artifacts/worldmap-extent-static/result.txt
+            artifacts/worldmap-extent-static/validation.log
+          if-no-files-found: error
+          retention-days: 7

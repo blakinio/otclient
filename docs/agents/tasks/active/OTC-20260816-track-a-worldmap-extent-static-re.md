@@ -5,16 +5,17 @@ agent: ChatGPT
 session_id: chatgpt-viewport-static-20260816-1426
 session_role: static_re_researcher
 project_lane: otclient
-lane: P0-STATE
+lane: STATIC-RE
 track_id: official-client-re
 task_kind: discovery
 phase: investigate
 implementation_authorized: false
 branch: research/OTC-20260816-track-a-worldmap-extent-static-re
 base_branch: main
-base_main: ce9997304e4b771b6243395bf0c3a6084f32a7dc
+base_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f
+pr: 367
 risk: medium
-updated: 2026-08-16T14:26:35+02:00
+updated: 2026-08-16T14:33:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md
   - .github/scripts/tibia-official-client-re-worldmap-extent-static.py
@@ -26,14 +27,15 @@ reuses:
   - docs/agents/reports/OTCLIENT-20260816-official-client-map-viewport-feasibility.md
   - docs/agents/evidence/OTC-20260816-official-client-map-viewport-feasibility/20260816-evidence.md
   - PR #365 merged feasibility checkpoint
-  - PR #310 hosted exact-client staging failure evidence
+  - PR #366 merged feasibility-task archive/ownership release
+  - PR #310 GitHub-hosted exact-client staging failure evidence
   - run 31892019505 artifact 9248797952 static exact-binary evidence
 depends_on: []
 blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: exact-client static ELF/RTTI/xref/disassembly work is deterministic/disposable and Track A routing requires GitHub-hosted execution rather than Synology
+execution_reason: exact-client ELF/RTTI/xref/disassembly work is deterministic/disposable and Track A hybrid routing requires GitHub-hosted execution rather than Synology
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: finalize_archive_and_continue
@@ -43,7 +45,7 @@ context_growth: rising
 context_score: 10
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: one cohesive patch/dependency graph spans dimension ownership, storage/protocol consumers and render/camera/picker consumers; rotate on the same task before any split
+decomposition_reason: one cohesive patch/dependency graph spans extent ownership, storage/protocol consumers and render/camera/picker consumers; rotate the same task before any split
 validation_level: focused
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
@@ -68,9 +70,9 @@ client_size: 51965216
 client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
 invocation_started_at: 2026-08-16T14:20:00+02:00
-last_progress_at: 2026-08-16T14:26:35+02:00
+last_progress_at: 2026-08-16T14:33:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: task-claim
+ci_check_generation: hosted-static-dispatch-1
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -79,6 +81,7 @@ repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 heavy_validation_runs: 0
+hosted_staging_attempts_this_task: 0
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
@@ -87,20 +90,33 @@ runtime_nonclaims:
 static_classification: MORE_STATIC_RE_NEEDED
 new_gui_session_created: false
 runtime_used: false
-next_action: publish the Draft PR, then run one GitHub-hosted exact-fence materialization/static-analysis attempt using a materially new staging strategy or stop INPUT_BLOCKED without Synology fallback
+next_action: run exactly one materially different GitHub-hosted exact-fence materialization attempt and, only if the fence passes, extract the bounded worldmap type/xref/call/field graph; otherwise persist INPUT_BLOCKED without Synology fallback
 ---
 
 # Track A worldmap extent static RE
 
 ## Objective
 
-Recover a durable static patch/dependency graph for the exact official native-Linux client covering `TWorldMapExtent`, `TWorldMapSubfieldExtent`, `TWorldMapViewport`, `TWorldMapStorage`, `TWorldmapProtocolMessageHandler`, `TWorldMapRenderProvider`, `TWorldMapCamera` and `TWorldMapPicker`.
+Recover a durable static patch/dependency graph for the exact official native-Linux client covering:
+
+- `TWorldMapExtent`;
+- `TWorldMapSubfieldExtent`;
+- `TWorldMapViewport`;
+- `TWorldMapStorage`;
+- `TWorldmapProtocolMessageHandler`;
+- `TWorldMapRenderProvider`;
+- `TWorldMapCamera`;
+- `TWorldMapPicker`.
 
 No client bytes are modified in this task. No live official-client runtime is observed or mutated.
 
-## Trusted starting point
+## Trusted starting point and ownership
 
-PR #365 merged the accepted PR #325 feasibility report/evidence onto current `main`. The retained evidence proves semantic worldmap surfaces exist on the exact fenced client and preserves historical `18 x 14` only as `DERIVED_FROM_OBSERVED_JOB_LOG`; exact field layouts, allocation limits, parser assumptions and patch points remain unresolved.
+PR #365 merged the accepted PR #325 feasibility report/evidence onto `main`; PR #366 then archived that completed feasibility task and released its ownership. The retained report/evidence remain on `main` and are read-only dependencies for this continuation.
+
+The prior evidence proves exact-client semantic/type-name surfaces and preserves historical `18 x 14` only as `DERIVED_FROM_OBSERVED_JOB_LOG`. It does not prove object layouts, dimension fields, allocations, parser limits, maximum dimensions or patch points.
+
+PR #363 owns only the continuation prompt/task paths and remains read-only to this task. PR #310 owns its P2 script/workflow/task and remains read-only. This task owns only the new paths declared above.
 
 ## Execution boundary
 
@@ -127,13 +143,17 @@ If static evidence later proves a runtime discriminator is necessary, this task 
 - [ ] enumerate material readers through render provider/camera/picker;
 - [ ] correlate literal/derived dimension constants with call/data flow, never blind numeric search alone;
 - [ ] audit fixed arrays, allocation/capacity, loops/masks, row/column/floor parser assumptions, clipping/culling, coordinate packing, cache and picking limits;
-- [ ] persist the patch/dependency graph with exact locations, evidence, writers/readers, allocation/protocol/render dependencies, isolated-change consequence and confidence;
+- [ ] persist a patch/dependency graph with exact locations, evidence, writers/readers, allocation/protocol/render dependencies, isolated-change consequence and confidence;
 - [ ] classify exactly one of `STATIC_PATCH_GRAPH_READY`, `MORE_STATIC_RE_NEEDED`, `RUNTIME_DISCRIMINATOR_REQUIRED`, `BLOCKED`;
 - [ ] no client byte mutation or live runtime action occurred;
 - [ ] focused validation, fresh static/docs audit, exact-head required CI and lifecycle gates pass before completion.
 
-## Input staging evidence
+## Input staging evidence and bounded experiment
 
-PR #310 already exhausted two same-task hosted attempts: `download.tibia.com` DNS failure and `static.tibia.com` HTTP 403. Do not repeat those requests blindly. A public GitHub release source already used by PR #97 was inspected as a possible staging source, but its published original-Linux release inventory does not expose the required `15.32.df7b29` build, so it is not accepted as an exact-client source for this task.
+PR #310 already exhausted two hosted source attempts: `download.tibia.com` failed DNS resolution and a plain automated request to `static.tibia.com` returned HTTP 403. Those requests are not repeated blindly.
 
-One materially different hosted attempt is allowed if supported by new evidence. Failure to obtain the exact fenced input becomes `INPUT_BLOCKED`; Synology is not a static fallback.
+PR #97's public GitHub-release source was also inspected as a potential compliant source, but the published original-Linux inventory inspected for this task does not expose the required `15.32.df7b29` build and is therefore not accepted as an exact-client source.
+
+The single new hosted staging experiment uses the same official static archive URL but a materially different request behavior: compressed transfer plus a same-URL `Referer`, matching a historical package-manager workaround for automated downloads from this endpoint. Exact size/SHA fencing remains decisive. A download that succeeds but does not match the exact fence is still `INPUT_BLOCKED`.
+
+The workflow never executes the client. The archive/client remain only in `$RUNNER_TEMP`, are removed in an `always()` cleanup step, and are excluded from uploaded artifacts. Only sanitized structural JSON/text evidence may be uploaded.

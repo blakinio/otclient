@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-canonical-bootstrap-implementation
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-runtime-bootstrap-v2-20260816-1503
 session_role: implementation_worker
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: remediate-bootstrap-rebind
+phase: exact-head-validate
 branch: ci/OTC-20260816-track-a-canonical-bootstrap-implementation-v2
 base_branch: main
 base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
 risk: high
-updated: 2026-08-16T15:03:00+02:00
+updated: 2026-08-16T15:33:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-bootstrap-implementation.md
   - .github/scripts/tibia-official-client-re-canonical-live-transition.py
@@ -40,13 +40,13 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
 context_pressure: medium
 context_growth: stable
-context_score: 8
+context_score: 9
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: repair four independent audit findings, validate, independently audit, then promote before physical runtime reuse
+decomposition_reason: repair four coordinator findings plus two fail-closed audit hardenings, validate, independently review, then promote before physical runtime reuse
 validation_level: heavy
 session_rotation_count: 1
-heavy_validation_runs: 0
+heavy_validation_runs: 1
 stale_takeover_count: 1
 human_interruptions: 1
 track_a_runtime_agent_admission_version: 1
@@ -76,23 +76,40 @@ source_findings:
   - id: TACOORD-360-001
     severity: HIGH
     source_pr: 360
+    implementation_status: REMEDIATED
     remediation: restore and revalidate the exact previous authoritative registration on every post-write rebind failure
   - id: TACOORD-360-002
     severity: HIGH
     source_pr: 360
+    implementation_status: REMEDIATED
     remediation: align transition and real shell-worker argv contract and regression-test the actual parser
   - id: TACOORD-360-003
     severity: HIGH
     source_pr: 360
+    implementation_status: REMEDIATED
     remediation: remove credential/login typing from this infrastructure worker entirely; physical login remains separately RUNTIME-owned
   - id: TACOORD-360-004
     severity: MEDIUM
     source_pr: 360
+    implementation_status: REMEDIATED
     remediation: remove historical shared wireproxy PID/25354 dependency and create a canonical-owned pinned userspace-WARP helper inside the bootstrap process group
+audit_hardenings:
+  - id: TACBOOT-V2-AUD-001
+    severity: HIGH
+    implementation_status: REMEDIATED
+    finding: bootstrap absence inventory must fail closed when a same-runner-UID live process cannot be inspected well enough to exclude an official-client candidate
+    remediation: process inventory now raises process_inventory_incomplete instead of silently skipping an unreadable same-UID process
+  - id: TACBOOT-V2-AUD-002
+    severity: HIGH
+    implementation_status: REMEDIATED
+    finding: safe detach must prove that the bootstrap process group contains no untracked helper descendants
+    remediation: worker reports exactly client/xvfb/vnc/wireproxy PIDs and PGID; controller compares the complete live PGID membership to that exact set before registration/detach and during Gate B
 acceptance:
   - canonical flock is held continuously across under-lock registration/candidate preflight, bootstrap launch, registration publication, post-probe and detach decision
   - bootstrap refuses an existing authoritative registration and any detectable official-client candidate before launch
+  - inability to complete same-runner-UID process inventory is a fail-closed bootstrap blocker rather than an implicit absence proof
   - created client is revalidated by boot identity, PID, process start ticks, exact executable size/SHA, display and window before registration success
+  - bootstrap worker reports exactly client/Xvfb/VNC/wireproxy process ownership and safe detach refuses any additional live process in the bootstrap PGID
   - registration is atomic, mode 0600, generation-bound and revalidated after publication
   - persistent descendants receive neither lease capability material nor canonical flock file descriptors
   - bootstrap failure terminates only the bootstrap-owned process group, invokes bounded owned-state rollback and leaves no success registration
@@ -106,15 +123,25 @@ validation:
   local_preflight:
     python_compile: PASS
     shell_syntax: PASS
-    deterministic_tests: PASS_7_OF_7
-  github_hosted: PENDING
-  independent_audit: PENDING
-  final_exact_head_ci: PENDING
+    initial_deterministic_tests: PASS_7_OF_7
+  github_hosted:
+    exact_head_before_checkpoint_update: 6ceadd2cf92e9874321ed710899fe9e00740b6c0
+    transition_validator_run: 31949999637
+    transition_validator_job: 95171900739
+    transition_validator_result: SUCCESS
+    track_a_governance_run: 31949999631
+    track_a_governance_result: SUCCESS
+    repository_ci_run: 31949999741
+    repository_ci_result: PENDING
+  implementation_self_audit:
+    result: PASS_AFTER_TWO_ADDITIONAL_HARDENINGS
+    material_findings_open: 0
+  independent_coordinator_audit: PENDING
 e2e:
   result: NOT_APPLICABLE_WITH_REASON
   reason: this is a no-runtime infrastructure producer; physical bootstrap/login E2E belongs to RUNTIME only after trusted-main promotion
-last_completed_step: created fresh-current-main replacement branch and locally reproduced all four coordinator findings with deterministic remediations
-next_action: persist replacement implementation plus hosted validator, open a superseding Draft PR, close stale PR 360, then validate and independently audit the exact head
+last_completed_step: exact-head GitHub-hosted transition validator and Track A governance passed after remediation of all four PR 360 findings plus fail-closed process-inventory and process-group-detach hardening
+next_action: let ordinary repository CI finish; if green, record evidence, remove the temporary validator workflow, obtain final exact-head governance/repository CI without the temporary workflow, perform coordinator promotion review and only then merge/promote
 ---
 
 # Canonical live bootstrap/rebind implementation v2
@@ -123,6 +150,6 @@ This fresh-current-main continuation replaces stale PR #360 without inheriting i
 
 ## Safety boundary
 
-The physical runtime remains unregistered and unclaimed. No historical display, VNC port, PID, session, wireproxy PID or SOCKS port is promoted as current truth. The replacement specifically removes the historical shared-wireproxy dependency: any future authorized bootstrap must create and own its own pinned userspace-WARP helper under the canonical namespace/process group.
+The physical runtime remains unregistered and unclaimed. No historical display, VNC port, PID, session, wireproxy PID or SOCKS port is promoted as current truth. The replacement removes the historical shared-wireproxy dependency: any future authorized bootstrap must create and own its own pinned userspace-WARP helper under the canonical namespace/process group.
 
 Account login is deliberately absent from this infrastructure worker. A later RUNTIME task may perform a separately reviewed protected login only after this implementation is promoted to trusted `main` and fresh Gate A/bootstrap/Gate B admission permits mutation.

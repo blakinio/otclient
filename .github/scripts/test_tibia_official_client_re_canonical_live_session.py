@@ -100,5 +100,54 @@ class ToolrootResolverTests(unittest.TestCase):
         self.assertNotIn('command -v "$1"', source)
 
 
+class BoundedClientWindowWaitTests(unittest.TestCase):
+    @staticmethod
+    def source() -> str:
+        return WORKER.read_text(encoding='utf-8')
+
+    @classmethod
+    def function_body(cls, name: str, following: str) -> str:
+        source = cls.source()
+        start = source.index(f'{name}() {{')
+        end = source.index(f'\n{following}() {{', start)
+        return source[start:end]
+
+    def test_window_helper_has_single_thirty_second_bound_and_dead_pid_exit(self):
+        body = self.function_body('window', 'contract_test')
+        self.assertEqual(body.count('for _ in $(seq 1 120); do'), 1)
+        self.assertIn('kill -0 "$pid" 2>/dev/null || return 2', body)
+        self.assertIn('sleep .25', body)
+        self.assertIn('return 1', body)
+
+    def test_bootstrap_does_not_multiply_window_wait(self):
+        body = self.function_body('bootstrap', 'probe')
+        self.assertNotIn('for _ in $(seq 1 100); do', body)
+        self.assertEqual(body.count('window "$pid" "$display" "$xdotool"'), 1)
+        self.assertIn('window_rc=$?', body)
+        self.assertIn('if [[ "$window_rc" == 2 ]]; then', body)
+        self.assertIn('die client_exited', body)
+        self.assertIn('die client_window_missing', body)
+
+    def test_probe_preserves_dead_client_vs_missing_window_classification(self):
+        body = self.function_body('probe', 'rollback')
+        self.assertEqual(body.count('window "$pid" "$display" "$xdotool"'), 1)
+        self.assertIn('window_rc=$?', body)
+        self.assertIn('die client_exited', body)
+        self.assertIn('die client_window_missing', body)
+
+    def test_bootstrap_emits_non_secret_stage_markers(self):
+        body = self.function_body('bootstrap', 'probe')
+        expected = (
+            'TRACK_A_CANONICAL_STAGE=warp_ready',
+            'TRACK_A_CANONICAL_STAGE=xvfb_ready',
+            'TRACK_A_CANONICAL_STAGE=vnc_ready',
+            'TRACK_A_CANONICAL_STAGE=client_started',
+            'TRACK_A_CANONICAL_STAGE=client_window_wait_begin',
+            'TRACK_A_CANONICAL_STAGE=client_window_ready',
+        )
+        for marker in expected:
+            self.assertIn(marker, body)
+
+
 if __name__ == '__main__':
     unittest.main()

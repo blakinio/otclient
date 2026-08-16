@@ -10,6 +10,8 @@ Before treating the absence of Codex or a local terminal as a blocker, read and 
 
 For any official-Tibia research, login, runtime-analysis, protocol-analysis, worldmap/OTBM extraction, or OTClient-to-Tibia-Global compatibility task, read and obey `TIBIA_RESEARCH_TRACKS.md` before claiming work or touching a runtime. Its repository-only rule, two-track scope separation, runtime namespace isolation and cross-track ownership restrictions are mandatory and override stale task/PR wording that conflates the tracks.
 
+For every Track A (`official-client-re`) worker, `contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md` is additionally mandatory before claiming, resuming, observing, creating, reusing, controlling, or mutating an official-client runtime. The worker must classify `runtime_access` and persist/emit the admission record before the first runtime-related operation and after any authority/identity-changing fact. `UNKNOWN`, `REQUIRED_NOT_PROVEN`, `REQUIRED_UNAVAILABLE`, or `REQUIRED_UNIMPLEMENTED` on a required gate means refuse the mutation. Historical `:98`, `6082`, PID/session evidence is never current authority; missing registration means bootstrap, generation mismatch means reviewed rebind, and ordinary canonical mutation requires current Gate A + any required rebind + Gate B under the final cancellation-safe whole-lifetime supervisor. Stale task/PR wording cannot relax this admission gate.
+
 ## Authority and state model
 
 Authority for the current task is frozen from system and owner instructions plus governance on the trusted base ref at task start. Edits made by the current unmerged task cannot expand that task's permissions or safety boundaries.

@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace control-flow predecessors of TGameClient creation block
+    name: Map exact TGameClient creation function entry
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
-      - name: Find exact relative branches into 0x6c976e
+      - name: Resolve 0x6c9760 callers relocations and vtable identity
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -32,39 +32,71 @@ jobs:
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-          sf=E+'IIQQQQIIQQ';sh=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
-          st=sh[shstrndx];sn=d[st[4]:st[4]+st[5]]
+          sf=E+'IIQQQQIIQQ';raw=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
+          st=raw[shstrndx];sn=d[st[4]:st[4]+st[5]]
           def cs(b,o):
+              if not (0<=o<len(b)):return ''
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
-          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in sh]
-          text=next(s for s in secs if s['name']=='.text');tb=d[text['off']:text['off']+text['size']]
+          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]} for x in raw]
+          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
+          def vaoff(va):
+              for s in secs:
+                  if s['size'] and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
           def b_at(va,n):return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
-          target=0x6c976e;refs=[]
-          for i in range(len(tb)-6):
+          def q(va):
+              o=vaoff(va);return None if o is None else struct.unpack_from('<Q',d,o)[0]
+          def s_at(va):
+              o=vaoff(va)
+              if o is None:return None
+              e=d.find(b'\0',o,min(len(d),o+200))
+              if e<=o:return None
+              z=d[o:e]
+              if not z or len(z)>180 or not all(32<=x<127 for x in z):return None
+              return z.decode('ascii','replace')
+          target=0x6c9760
+          calls=[]
+          for i in range(len(tb)-5):
+              if tb[i]!=0xe8:continue
               va=text['addr']+i
-              if tb[i] in (0xe8,0xe9):
-                  dst=va+5+struct.unpack_from('<i',tb,i+1)[0]
-                  if dst==target:refs.append((va,'call' if tb[i]==0xe8 else 'jmp'))
-              if tb[i]==0x0f and 0x80<=tb[i+1]<=0x8f:
-                  dst=va+6+struct.unpack_from('<i',tb,i+2)[0]
-                  if dst==target:refs.append((va,f'jcc_{tb[i+1]:02x}'))
-              if 0x70<=tb[i]<=0x7f:
-                  dst=va+2+struct.unpack_from('<b',tb,i+1)[0]
-                  if dst==target:refs.append((va,f'jcc8_{tb[i]:02x}'))
-              if tb[i]==0xeb:
-                  dst=va+2+struct.unpack_from('<b',tb,i+1)[0]
-                  if dst==target:refs.append((va,'jmp8'))
-          print('OWNER_PROV_BLOCK_XREFS='+','.join(f'0x{va:x}:{kind}' for va,kind in refs))
-          for va,kind in refs:
-              lo=max(text['addr'],va-0x180);hi=min(text['addr']+text['size'],va+0x120);w=b_at(lo,hi-lo)
-              print(f'OWNER_PROV_BLOCK_XREF_WINDOW source=0x{va:x} kind={kind} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
-          # Also emit immediately preceding bytes to distinguish fall-through from branch-entry.
-          for start,end,label in [(0x6c95e0,0x6c9790,'PRE_BLOCK'),(0x6c9200,0x6c97a0,'WIDE_PRE_BLOCK')]:
-              w=b_at(start,end-start)
-              print(f'OWNER_PROV_{label}_START=0x{start:x}')
-              print(f'OWNER_PROV_{label}_SHA256={hashlib.sha256(w).hexdigest()}')
-              print(f'OWNER_PROV_{label}_HEX={w.hex()}')
+              if va+5+struct.unpack_from('<i',tb,i+1)[0]==target:calls.append(va)
+          print('OWNER_PROV_ENTRY_CALLS='+','.join(hex(v) for v in calls))
+          for va in calls:
+              lo=max(text['addr'],va-0x140);hi=min(text['addr']+text['size'],va+0x100);w=b_at(lo,hi-lo)
+              print(f'OWNER_PROV_ENTRY_CALL_WINDOW call=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          rel=by['.rela.dyn'];rels=[]
+          for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
+              ro,ri,add=struct.unpack_from('<QQq',d,o);rels.append((ro,ri&0xffffffff,ri>>32,add))
+          bo={ro:(ty,sy,ad) for ro,ty,sy,ad in rels};ba={}
+          for ro,ty,sy,ad in rels:ba.setdefault(ad,[]).append((ro,ty,sy))
+          print('OWNER_PROV_ENTRY_RELOCS='+','.join(hex(x[0]) for x in ba.get(target,[])))
+          def tiname(ti):
+              r=bo.get(ti+8);return None if not r else s_at(r[2])
+          groups=[]
+          for entry,ty,sy in ba.get(target,[]):
+              for delta in range(8,0x808,8):
+                  tis=entry-delta;r=bo.get(tis)
+                  if not r:continue
+                  nm=tiname(r[2]);oq=q(tis-8)
+                  if not nm or oq is None:continue
+                  top=struct.unpack('<q',struct.pack('<Q',oq))[0];ap=tis+8;slot=entry-ap
+                  if slot>=0 and slot%8==0 and -0x100000<=top<=0x100000:groups.append((slot,ap,r[2],nm,top,entry))
+          groups.sort(key=lambda x:x[0])
+          for slot,ap,ti,nm,top,entry in groups[:12]:
+              print(f'OWNER_PROV_ENTRY_VTABLE entry=0x{entry:x} slot=0x{slot:x} vptr=0x{ap:x} typeinfo=0x{ti:x} top={top} name={nm}')
+          for slot,ap,ti,nm,top,entry in groups[:3]:
+              refs=[]
+              for i in range(len(tb)-7):
+                  if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
+                  m=tb[i+2]
+                  if (m>>6)!=0 or (m&7)!=5:continue
+                  va=text['addr']+i;dst=va+7+struct.unpack_from('<i',tb,i+3)[0]
+                  if dst==ap:refs.append(va)
+              print(f'OWNER_PROV_ENTRY_VPTR_REFS vptr=0x{ap:x} name={nm} refs='+','.join(hex(v) for v in refs))
+              for va in refs[:20]:
+                  lo=max(text['addr'],va-0xa0);hi=min(text['addr']+text['size'],va+0x120);w=b_at(lo,hi-lo)
+                  print(f'OWNER_PROV_ENTRY_CTOR_WINDOW lea=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          print('OWNER_PROV_ENTRY_ANCHOR='+b_at(0x6c9760,0x20).hex())
           print('OWNER_PROV_EXECUTED_TARGET=false')
           print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
           print('OWNER_PROV_MUTATION_PERFORMED=false')

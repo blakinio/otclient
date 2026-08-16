@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-canonical-client-window-wait-fix
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-window-wait-fix-20260816-1742
 session_role: runtime_infrastructure_maintainer
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_infrastructure_fix
-phase: validate
+phase: coordinator-promotion-ready
 branch: fix/OTC-20260816-track-a-canonical-client-window-wait
 base_branch: main
 base_main: b69084067de24528b1f763ab9630f638e8bcf092
 risk: medium
-updated: 2026-08-16T17:47:00+02:00
+updated: 2026-08-16T17:51:00+02:00
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
-  - .github/workflows/tibia-official-client-re-canonical-window-wait-fix.yml
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-client-window-wait-fix.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-client-window-wait-fix/**
 modules_touched: []
@@ -32,7 +31,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: deterministic trusted-worker bounded-wait defect is repaired and validated without physical runtime access
+execution_reason: deterministic trusted-worker bounded-wait defect was repaired and validated without physical runtime access
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -63,6 +62,7 @@ source_failure:
   acquired_lease_generation: 4
   result: worker_timeout
   registration_published: false
+  gate_b_reached: false
   credentials_used: false
 root_cause:
   window_helper_attempts: 120
@@ -78,6 +78,29 @@ implementation:
   nested_outer_wait_removed: true
   non_secret_stage_markers_added: true
   probe_failure_classification_aligned: true
+validation:
+  source_validated_head: 7cc7c64aa40b6662973dbc2f059a099a89a184c6
+  hosted_validator_run: 31956703737
+  hosted_validator_job: 95188323165
+  hosted_validator_result: SUCCESS
+  session_tests: 9_PASS
+  transition_tests: 9_PASS
+  guard_tests: 3_PASS
+  lease_tests: 14_PASS
+  bounded_window_validator: PASS
+  validation_merge_base_main: ffe954be315ee29825c726b996a30fea8475a0f3
+  temporary_validator_workflow: REMOVED
+  final_head_governance: PENDING
+  final_head_repository_ci: PENDING
+  review_threads_open: 0
+evidence_path: docs/agents/evidence/OTC-20260816-track-a-canonical-client-window-wait-fix/20260816-hosted-validation.md
+audit:
+  result: PASS
+  material_findings_open: 0
+  notes:
+    - source branch was created from parent b6908406 while v5 terminal checkpoint #393 landed concurrently as ffe954be
+    - hosted validator checked the pull-request merge ref combining current main ffe954be with the fix source head
+    - changed executable paths do not overlap the terminal v5 task/evidence paths added by ffe954be
 acceptance:
   - bootstrap invokes the already-bounded client-window helper exactly once
   - dead client during the bounded wait is classified as client_exited
@@ -85,9 +108,10 @@ acceptance:
   - no production test-only knobs can reduce runtime identity or authority checks
   - deterministic tests prove the nested 100x wait is absent and the two failure classes are preserved
   - existing toolroot/session/transition/guard/lease tests pass on GitHub-hosted execution
-  - no Synology, client, X11/VNC, WARP, credentials, login or canonical registration is accessed
-last_completed_step: replaced the compounded 100x client-window polling with one bounded wait, added dead-PID classification plus non-secret stage markers, and added deterministic regression tests
-next_action: run the task-owned GitHub-hosted validator; on PASS remove the temporary workflow, persist exact evidence and complete coordinator promotion before any new physical RUNTIME attempt
+  - temporary validator is removed before promotion
+  - no Synology, client, X11/VNC, WARP, credentials, login or canonical registration was accessed
+last_completed_step: hosted validator 31956703737/job 95188323165 passed all session/transition/guard/lease and bounded-wait checks against a merge ref containing current main ffe954be; one-shot validator removed and independent diff audit found zero material findings
+next_action: obtain final exact-head Track A governance/repository CI, coordinator-promote this fix, archive ownership, then redispatch the blocked canonical RUNTIME task from the resulting trusted main
 ---
 
 # Canonical client-window bounded-wait fix

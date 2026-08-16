@@ -14,20 +14,19 @@ jobs:
   inspect:
     name: Trace QLibrary filename construction statically
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Emit bounded exact-client loader/helper bytes
+      - name: Emit exact filename-dataflow windows
         shell: bash
         run: |
           set -Eeuo pipefail
           set +x
-          [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || { echo 'BE_PATH_ERROR=wrong_runner'; exit 2; }
+          [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || exit 2
           client='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/client'
-          [[ -f "$client" ]] || { echo 'BE_PATH_ERROR=client_missing'; exit 3; }
-          [[ "$(stat -c '%s' "$client")" == '51965216' ]] || { echo 'BE_PATH_ERROR=client_size'; exit 4; }
-          [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || { echo 'BE_PATH_ERROR=client_sha'; exit 5; }
+          [[ -f "$client" ]] || exit 3
+          [[ "$(stat -c '%s' "$client")" == '51965216' ]] || exit 4
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'BE_PATH_CLIENT_FENCE=PASS'
-
           python3 - "$client" <<'PY'
           import hashlib,pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
@@ -36,24 +35,24 @@ jobs:
           shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
           st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
           def cs(blob,o):
-              if o<0 or o>=len(blob): return ''
               e=blob.find(b'\0',o); e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
-          secs=[]
-          for i,x in enumerate(sh):
-              secs.append({'idx':i,'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]})
+          secs=[{'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in sh]
           text=next(s for s in secs if s['name']=='.text')
           def emit(label,start,end):
-              assert text['addr'] <= start < end <= text['addr']+text['size']
               fo=text['off']+(start-text['addr']); blob=d[fo:fo+(end-start)]
               print(f'{label}_VA=0x{start:x}')
               print(f'{label}_END=0x{end:x}')
-              print(f'{label}_SIZE=0x{len(blob):x}')
               print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}')
               print(f'{label}_HEX={blob.hex()}')
-          emit('BE_PATH_LOADER',0x6fc034,0x6fcb10)
-          emit('BE_PATH_HELPERS',0x6b9f20,0x6ba1a0)
-          emit('BE_PATH_PRE_HELPERS',0x6b22f0,0x6b3b80)
+          emit('BE_PATH_LOCAL_INIT',0x6fc170,0x6fc250)
+          emit('BE_PATH_OWNER_PRODUCER',0x6fc450,0x6fc540)
+          emit('BE_PATH_LATE_BUILD',0x6fc760,0x6fc820)
+          emit('BE_PATH_SET_FILENAME',0x6fca70,0x6fcae0)
+          emit('BE_PATH_HELPER_A',0x6b9f70,0x6ba060)
+          emit('BE_PATH_HELPER_B',0x6ba060,0x6ba150)
+          emit('BE_PATH_QSTRING_HELPERS',0x6b2300,0x6b2460)
+          emit('BE_PATH_STRING_HELPERS',0x6b2dc0,0x6b3b40)
           print('BE_PATH_EXECUTED_TARGET=false')
           print('BE_PATH_LIVE_RUNTIME_OBSERVED=false')
           print('BE_PATH_MUTATION_PERFORMED=false')

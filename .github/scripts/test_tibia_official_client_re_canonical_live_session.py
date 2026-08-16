@@ -38,6 +38,12 @@ class ToolrootResolverTests(unittest.TestCase):
         lib = root / 'usr/lib/x86_64-linux-gnu/libproxychains.so.4'
         lib.parent.mkdir(parents=True)
         lib.write_bytes(b'fixture')
+        if complete:
+            dri = root / 'usr/lib/x86_64-linux-gnu/dri'
+            dri.mkdir(parents=True)
+            provider = dri / 'libdril_dri.so'
+            provider.write_bytes(b'provider')
+            (dri / 'swrast_dri.so').symlink_to(provider.name)
         return root
 
     def run_resolver(self, candidates: list[Path]) -> subprocess.CompletedProcess[str]:
@@ -83,6 +89,26 @@ class ToolrootResolverTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), str(fallback))
 
+    def test_rejects_missing_swrast_provider(self):
+        missing = self.make_root('missing-swrast', complete=True)
+        (missing / 'usr/lib/x86_64-linux-gnu/dri/swrast_dri.so').unlink()
+        fallback = self.make_root('fallback-swrast', complete=True)
+        result = self.run_resolver([missing, fallback])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(fallback))
+
+    def test_rejects_swrast_symlink_escape(self):
+        escaped = self.make_root('escaped-swrast', complete=True)
+        swrast = escaped / 'usr/lib/x86_64-linux-gnu/dri/swrast_dri.so'
+        swrast.unlink()
+        outside = self.root / 'outside-swrast.so'
+        outside.write_bytes(b'outside-provider')
+        swrast.symlink_to(outside)
+        fallback = self.make_root('fallback-contained-swrast', complete=True)
+        result = self.run_resolver([escaped, fallback])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(fallback))
+
     def test_fails_closed_when_no_complete_root_exists(self):
         partial = self.make_root('partial', complete=False)
         result = self.run_resolver([partial])
@@ -98,6 +124,7 @@ class ToolrootResolverTests(unittest.TestCase):
         self.assertIn('toolroot_complete "$persisted_toolroot" || die toolroot_unavailable', source)
         self.assertIn('printf \'%s\\n\' "$TOOL" >"$SESSION/toolroot"', source)
         self.assertIn('within_toolroot "$root_real" "$path"', source)
+        self.assertIn('contained_dri_root "$root" >/dev/null || return 1', source)
         self.assertNotIn('command -v "$1"', source)
 
 
@@ -193,6 +220,18 @@ esac
         ):
             self.assertIn(marker, source)
 
+    def test_xvfb_uses_contained_dri_provider_path_without_cli_glx_override(self):
+        source = WORKER.read_text(encoding='utf-8')
+        start = source.index("printf 'TRACK_A_CANONICAL_STAGE=xvfb_start")
+        end = source.index('echo $! >"$SESSION/xvfb.pid"', start)
+        launch = source[start:end]
+        self.assertIn('dri="$(contained_dri_root "$TOOL")" || die dri_provider_unavailable', source)
+        self.assertIn('LIBGL_DRIVERS_PATH="$dri"', launch)
+        self.assertNotIn('+extension GLX', launch)
+        self.assertNotIn('LIBGL_ALWAYS_SOFTWARE', launch)
+        self.assertNotIn('GALLIUM_DRIVER', launch)
+        self.assertNotIn('MESA_LOADER_DRIVER_OVERRIDE', launch)
+
     def test_client_graphics_environment_restores_qt_xcb_integration_selection(self):
         source = WORKER.read_text(encoding='utf-8')
         start = source.index("printf 'TRACK_A_CANONICAL_STAGE=client_start")
@@ -200,6 +239,7 @@ esac
         launch = source[start:end]
         self.assertIn('QT_QUICK_BACKEND=software', launch)
         self.assertIn('QSG_INFO=1', launch)
+        self.assertNotIn('LIBGL_DRIVERS_PATH=', launch)
         self.assertNotIn('QT_XCB_GL_INTEGRATION=none', source)
         self.assertNotIn('QSG_RHI_BACKEND=', launch)
 

@@ -8,365 +8,155 @@ on:
       - .github/workflows/tibia-official-client-re-p0-direct-position.yml
       - .github/scripts/tibia-official-client-re-p0-direct-position.py
   workflow_dispatch:
-    inputs:
-      mode:
-        description: P0 probe mode
-        required: true
-        type: choice
-        default: static
-        options:
-          - static
-          - live
 
 permissions:
   contents: read
-  actions: write
+
+concurrency:
+  group: track-a-p0-direct-position-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  static-elf-re:
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'static')
-    runs-on: [otclient, synology]
-    timeout-minutes: 8
+  hosted-static-position-re:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
-      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
-      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
+      EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-p0-direct-position
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET: '0x308ca70'
+      OFFICIAL_LINUX_ARCHIVE_URL: https://static.tibia.com/download/tibia.x64.tar.gz
     steps:
-      - name: Checkout exact draft head
+      - name: Checkout exact Draft head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
 
-      - name: Analyze exact TPlayerData ELF neighborhood read-only
+      - name: Verify hosted no-runtime boundary
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          [[ "$GITHUB_REF_NAME" == research/OTC-20260815-track-a-p0-direct-position ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          [[ "$RUNNER_ARCH" == X64 ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p0-direct-position.py
+          command -v objdump
+          echo TRACK_A_P0_EXECUTION_CLASS=github_hosted
+          echo TRACK_A_P0_RUNTIME_ACCESS=none
+          echo TRACK_A_P0_SYNOLOGY_EXECUTION=false
+          echo TRACK_A_P0_PHYSICAL_E2E=false
 
-          if [[ -d /work && -w /work ]]; then
-            state="$LEGACY_IMAGE_STATE"
-          else
-            state="$CANONICAL_STATE"
+      - name: Materialize exact official client read-only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/p0-hosted-static
+          mkdir -p "$out"
+          archive="$RUNNER_TEMP/tibia.x64.tar.gz"
+          client="$RUNNER_TEMP/tibia-static-client"
+
+          # Historical AUR packaging required a same-URL Referer for this official
+          # endpoint. This is a new bounded retrieval hypothesis after the prior
+          # User-Agent-only hosted attempt returned HTTP 403.
+          if ! curl --fail --silent --show-error --location \
+              --retry 1 --retry-all-errors --connect-timeout 20 --max-time 900 \
+              --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36' \
+              --referer "$OFFICIAL_LINUX_ARCHIVE_URL" \
+              "$OFFICIAL_LINUX_ARCHIVE_URL" --output "$archive"; then
+            {
+              echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+              echo P0_HOSTED_INPUT_REASON=official_archive_download_failed_with_same_url_referer
+              echo "P0_HOSTED_INPUT_URL=$OFFICIAL_LINUX_ARCHIVE_URL"
+            } | tee "$out/input-status.txt"
+            exit 3
           fi
-          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
-          [[ -x "$client" ]]
-          [[ "$(stat -c '%s' "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
-          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
 
-          mkdir -p artifacts/p0-static-elf
+          python3 - "$archive" "$client" "$out/archive-members.txt" <<'PY'
+          import shutil
+          import sys
+          import tarfile
+          from pathlib import PurePosixPath
+
+          archive, target, listing = sys.argv[1:]
+          with tarfile.open(archive, mode='r:*') as tf:
+              safe = []
+              candidates = []
+              for member in tf.getmembers():
+                  path = PurePosixPath(member.name)
+                  if path.is_absolute() or '..' in path.parts:
+                      continue
+                  safe.append(f"{member.size}\t{member.name}")
+                  if member.isfile() and len(path.parts) >= 2 and path.parts[-2:] == ('bin', 'client'):
+                      candidates.append(member)
+              open(listing, 'w', encoding='utf-8').write('\n'.join(safe[:400]) + '\n')
+              if len(candidates) != 1:
+                  raise SystemExit(f'P0_HOSTED_INPUT_BLOCKED=client_member_count:{len(candidates)}')
+              src = tf.extractfile(candidates[0])
+              if src is None:
+                  raise SystemExit('P0_HOSTED_INPUT_BLOCKED=client_member_unreadable')
+              with src, open(target, 'wb') as dst:
+                  shutil.copyfileobj(src, dst, length=1024 * 1024)
+              print(f'P0_HOSTED_CLIENT_MEMBER={candidates[0].name}')
+          PY
+
+          size="$(stat -c '%s' "$client")"
+          sha="$(sha256sum "$client" | awk '{print $1}')"
+          {
+            echo "P0_HOSTED_INPUT_SIZE=$size"
+            echo "P0_HOSTED_INPUT_SHA256=$sha"
+            echo "P0_HOSTED_EXPECTED_SIZE=$EXPECTED_CLIENT_SIZE"
+            echo "P0_HOSTED_EXPECTED_SHA256=$EXPECTED_CLIENT_SHA256"
+          } | tee "$out/input-status.txt"
+          if [[ "$size" != "$EXPECTED_CLIENT_SIZE" || "$sha" != "$EXPECTED_CLIENT_SHA256" ]]; then
+            echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED | tee -a "$out/input-status.txt"
+            echo P0_HOSTED_INPUT_REASON=exact_client_fence_mismatch | tee -a "$out/input-status.txt"
+            exit 3
+          fi
+          echo P0_HOSTED_INPUT_STATUS=EXACT_FENCE_VERIFIED | tee -a "$out/input-status.txt"
+          echo "TRACK_A_P0_CLIENT=$client" >> "$GITHUB_ENV"
+
+      - name: Analyze TPlayerData and playerPosition code site
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/p0-hosted-static
           python3 .github/scripts/tibia-official-client-re-p0-direct-position.py \
             --static-only \
-            --client "$client" \
+            --client "$TRACK_A_P0_CLIENT" \
             --expected-sha256 "$EXPECTED_CLIENT_SHA256" \
             --expected-size "$EXPECTED_CLIENT_SIZE" \
             --vptr-offset "$EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET" \
             --static-vtable-slots 32 \
-            --static-xref-limit 24 \
-            --static-disasm-limit 12 \
-            | tee artifacts/p0-static-elf/static-elf-re.txt
+            --static-xref-limit 64 \
+            --static-disasm-limit 24 \
+            | tee "$out/static-elf-re.txt"
 
-          python3 - "$client" artifacts/p0-static-elf <<'PY' \
-            | tee artifacts/p0-static-elf/player-position-graph.txt
-          import importlib.util
-          import sys
-          from pathlib import Path
+          objdump -d -Mintel --no-show-raw-insn \
+            --start-address=0x836500 --stop-address=0x836a00 \
+            "$TRACK_A_P0_CLIENT" > "$out/player-position-disasm.txt"
 
-          client = Path(sys.argv[1])
-          out = Path(sys.argv[2])
-          script = Path('.github/scripts/tibia-official-client-re-p0-direct-position.py')
-          spec = importlib.util.spec_from_file_location('track_a_p0_probe', script)
-          if spec is None or spec.loader is None:
-              raise SystemExit('TRACK_A_P0_GRAPH_ERROR=module_load_failed')
-          module = importlib.util.module_from_spec(spec)
-          sys.modules[spec.name] = module
-          spec.loader.exec_module(module)
-          elf = module.Elf64(client)
+          grep -Fxq 'TRACK_A_P0_EXACT_CLIENT_FENCE=true' "$out/static-elf-re.txt"
+          grep -Fxq 'TRACK_A_P0_STATIC_PROBE_COMPLETE=true' "$out/static-elf-re.txt"
+          grep -Eq '^ *8367c1:' "$out/player-position-disasm.txt"
+          grep -Eiq '1cdde3f' "$out/player-position-disasm.txt"
+          echo TRACK_A_P0_HOSTED_STATIC_RE_COMPLETE=true | tee "$out/result.txt"
 
-          needles = {
-              'playerPosition': b'playerPosition',
-              'worldmap_render_provider_rtti': b'N5tibia8worldmap23TWorldMapRenderProviderE',
-              'worldmap_viewport_rtti': b'N5tibia8worldmap17TWorldMapViewportE',
-              'iplayer_data_provider_rtti': b'N5tibia4game19IPlayerDataProviderE',
-              'tplayer_data_rtti': b'N5tibia4game11TPlayerDataE',
-          }
-          anchors = {}
-          for label, needle in needles.items():
-              hits = elf.find_bytes(needle)
-              print(f'TRACK_A_P0_GRAPH_ANCHOR_COUNT label={label} count={len(hits)}')
-              for index, file_offset in enumerate(hits[:8]):
-                  va = elf.offset_to_vaddr(file_offset)
-                  if va is None:
-                      continue
-                  key = f'{label}[{index}]'
-                  anchors[key] = va
-                  print(
-                      f'TRACK_A_P0_GRAPH_ANCHOR label={key} '
-                      f'file_offset=0x{file_offset:x} vaddr=0x{va:x}'
-                  )
+      - name: Remove proprietary input before upload
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -f "$RUNNER_TEMP/tibia-static-client" "$RUNNER_TEMP/tibia.x64.tar.gz"
+          test ! -e "$RUNNER_TEMP/tibia-static-client"
+          test ! -e "$RUNNER_TEMP/tibia.x64.tar.gz"
 
-          targets = set(anchors.values())
-          xrefs = elf.find_rip_xrefs(targets, limit=256)
-          print(f'TRACK_A_P0_GRAPH_RIP_XREF_COUNT={len(xrefs)}')
-          for address, target, kind in xrefs:
-              labels = ','.join(sorted(key for key, value in anchors.items() if value == target))
-              print(
-                  f'TRACK_A_P0_GRAPH_RIP_XREF address=0x{address:x} '
-                  f'target=0x{target:x} kind={kind} labels={labels}'
-              )
-
-          mask = (1 << 64) - 1
-          data_refs = []
-          for location, relas in elf.relocations.items():
-              for rela in relas:
-                  resolved = rela.addend & mask
-                  if rela.r_type == module.R_X86_64_RELATIVE and resolved in targets:
-                      data_refs.append((location, resolved, rela.section))
-          data_refs = sorted(set(data_refs))
-          print(f'TRACK_A_P0_GRAPH_RELOCATION_REF_COUNT={len(data_refs)}')
-          for location, target, section in data_refs[:128]:
-              labels = ','.join(sorted(key for key, value in anchors.items() if value == target))
-              owner_section = elf.section_for_vaddr(location)
-              print(
-                  f'TRACK_A_P0_GRAPH_RELOCATION_REF location=0x{location:x} '
-                  f'target=0x{target:x} rela_section={section} '
-                  f'owner_section={owner_section.name if owner_section else "unknown"} '
-                  f'labels={labels}'
-              )
-
-          for key, va in anchors.items():
-              if not key.startswith('playerPosition['):
-                  continue
-              file_offset = elf.vaddr_to_offset(va)
-              lo = max(0, file_offset - 0x600)
-              hi = min(len(elf.data), file_offset + 0x1000)
-              local_strings = module.extract_ascii_strings(elf.data[lo:hi], min_len=3)
-              print(f'TRACK_A_P0_GRAPH_LOCAL_STRING_WINDOW anchor={key} lo=0x{lo:x} hi=0x{hi:x}')
-              for relative, text in local_strings[:220]:
-                  compact = text if len(text) <= 180 else text[:177] + '...'
-                  print(
-                      f'TRACK_A_P0_GRAPH_LOCAL_STRING file_offset=0x{lo + relative:x} '
-                      f'text={compact}'
-                  )
-
-          disasm = []
-          for address, _target, _kind in xrefs:
-              if address not in disasm:
-                  disasm.append(address)
-          for slot in (0, 1, 2, 3, 4, 12, 13, 14, 15):
-              try:
-                  target, _relas = elf.resolved_qword(0x308CA70 + slot * 8)
-              except RuntimeError:
-                  continue
-              if elf.is_exec_vaddr(target) and target not in disasm:
-                  disasm.append(target)
-          disasm = disasm[:24]
-          (out / 'player-position-disasm-addresses.txt').write_text(
-              ''.join(f'0x{address:x}\n' for address in disasm),
-              encoding='utf-8',
-          )
-          print(f'TRACK_A_P0_GRAPH_DISASM_ADDRESS_COUNT={len(disasm)}')
-          print('TRACK_A_P0_GRAPH_COMPLETE=true')
-          PY
-
-          gdb_bin="$(command -v gdb 2>/dev/null || true)"
-          if [[ -z "$gdb_bin" && -x "$state/toolroot/usr/bin/gdb" ]]; then
-            gdb_bin="$state/toolroot/usr/bin/gdb"
-          fi
-          if [[ -n "$gdb_bin" ]]; then
-            echo "TRACK_A_P0_GRAPH_GDB=$gdb_bin" \
-              | tee artifacts/p0-static-elf/player-position-disasm.txt
-            while IFS= read -r address; do
-              [[ "$address" =~ ^0x[0-9a-f]+$ ]]
-              start="$(printf '0x%x' "$((address - 64))")"
-              stop="$(printf '0x%x' "$((address + 192))")"
-              {
-                echo "TRACK_A_P0_GRAPH_DISASM_BEGIN=$address"
-                if ! "$gdb_bin" --batch -nx \
-                  -ex 'set disassembly-flavor intel' \
-                  -ex "file $client" \
-                  -ex "disassemble /r $start,$stop"; then
-                  echo "TRACK_A_P0_GRAPH_DISASM_COMMAND_FAILED=$address"
-                fi
-                echo "TRACK_A_P0_GRAPH_DISASM_END=$address"
-              } >> artifacts/p0-static-elf/player-position-disasm.txt
-            done < artifacts/p0-static-elf/player-position-disasm-addresses.txt
-          else
-            echo TRACK_A_P0_GRAPH_GDB=unavailable \
-              | tee artifacts/p0-static-elf/player-position-disasm.txt
-          fi
-
-          grep -Fxq 'TRACK_A_P0_EXACT_CLIENT_FENCE=true' artifacts/p0-static-elf/static-elf-re.txt
-          grep -Fxq 'TRACK_A_P0_STATIC_PROBE_COMPLETE=true' artifacts/p0-static-elf/static-elf-re.txt
-          grep -Fxq 'TRACK_A_P0_GRAPH_COMPLETE=true' artifacts/p0-static-elf/player-position-graph.txt
-          echo TRACK_A_P0_STATIC_JOB_COMPLETE=true
-
-      - name: Upload sanitized exact ELF static evidence
+      - name: Upload sanitized derived evidence only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: track-a-p0-static-elf-${{ github.run_id }}
-          path: artifacts/p0-static-elf/**
-          if-no-files-found: ignore
+          name: track-a-p0-hosted-static-${{ github.run_id }}
+          path: artifacts/p0-hosted-static/**
+          if-no-files-found: error
           retention-days: 7
-
-  cancel-stale-p0-run:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live'
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    env:
-      GH_TOKEN: ${{ github.token }}
-      STALE_RUN_ID: '31880617510'
-      STALE_HEAD_SHA: '7493983ca230c789f2d423cb073e036f4e29570e'
-    steps:
-      - name: Cancel only the verified stale P0 run
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-          import urllib.error
-          import urllib.request
-
-          repo = os.environ['GITHUB_REPOSITORY']
-          run_id = os.environ['STALE_RUN_ID']
-          expected_sha = os.environ['STALE_HEAD_SHA']
-          token = os.environ['GH_TOKEN']
-          base = f'https://api.github.com/repos/{repo}/actions/runs/{run_id}'
-          headers = {
-              'Accept': 'application/vnd.github+json',
-              'Authorization': f'Bearer {token}',
-              'X-GitHub-Api-Version': '2022-11-28',
-          }
-
-          def request(url: str, method: str = 'GET'):
-              req = urllib.request.Request(url, headers=headers, method=method)
-              with urllib.request.urlopen(req, timeout=20) as response:
-                  return response.status, response.read()
-
-          _, raw = request(base)
-          run = json.loads(raw)
-          expected = {
-              'id': int(run_id),
-              'name': 'Track A P0 direct player position',
-              'head_branch': 'research/OTC-20260815-track-a-p0-direct-position',
-              'head_sha': expected_sha,
-              'path': '.github/workflows/tibia-official-client-re-p0-direct-position.yml',
-          }
-          for key, value in expected.items():
-              if run.get(key) != value:
-                  raise SystemExit(f'stale-run fence mismatch for {key}: {run.get(key)!r}')
-
-          status = run.get('status')
-          if status == 'completed':
-              print('TRACK_A_P0_STALE_RUN_ALREADY_TERMINAL=true')
-              raise SystemExit(0)
-          if status != 'queued':
-              print(f'TRACK_A_P0_STALE_RUN_NOT_CANCELLED_STATUS={status}')
-              raise SystemExit(0)
-
-          try:
-              code, _ = request(base + '/cancel', method='POST')
-          except urllib.error.HTTPError as exc:
-              if exc.code == 409:
-                  _, raw = request(base)
-                  current = json.loads(raw)
-                  print(f'TRACK_A_P0_STALE_CANCEL_RACE_STATUS={current.get("status")}')
-                  raise SystemExit(0)
-              raise
-          if code != 202:
-              raise SystemExit(f'unexpected cancel response: {code}')
-          print('TRACK_A_P0_STALE_RUN_CANCEL_REQUESTED=true')
-          PY
-
-  passive-probe:
-    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'live'
-    needs: cancel-stale-p0-run
-    concurrency:
-      group: official-client-re-runtime
-      cancel-in-progress: false
-    runs-on: [otclient, synology]
-    timeout-minutes: 6
-    env:
-      CANONICAL_STATE: /home/runner/_work/_otclient_tibia_re_state
-      LEGACY_IMAGE_STATE: /work/_otclient_tibia_re_state
-      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-      EXPECTED_CLIENT_SIZE: '51965216'
-      EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET: '0x308ca70'
-      TRACK_MARKER: OTCLIENT_TIBIA_RE_TRACK=official-client-re
-
-    steps:
-      - name: Checkout exact draft head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-
-      - name: Validate owned exact-build runtime and probe TPlayerData read-only
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          [[ "$GITHUB_REF_NAME" == research/OTC-20260815-track-a-p0-direct-position ]]
-
-          if [[ -d /work && -w /work ]]; then
-            state="$LEGACY_IMAGE_STATE"
-          else
-            state="$CANONICAL_STATE"
-          fi
-          runtime="$state/runtime"
-          client="$state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
-          strips="$runtime/map-provenance-persistent-strips.tsv"
-
-          [[ -x "$client" ]]
-          [[ "$(stat -c '%s' "$client")" == "$EXPECTED_CLIENT_SIZE" ]]
-          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]
-
-          target_exe="$(readlink -f "$client")"
-          pid="$(tr -cd '0-9' <"$runtime/client.pid" 2>/dev/null || true)"
-          pid_source=pidfile
-          if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null \
-             || [[ ! -r "/proc/$pid/environ" ]] \
-             || [[ "$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)" != "$target_exe" ]] \
-             || ! grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ"; then
-            echo "TRACK_A_P0_PIDFILE_STALE=true"
-            matches=()
-            for proc in /proc/[0-9]*; do
-              candidate="${proc##*/}"
-              [[ -r "$proc/environ" ]] || continue
-              [[ "$(readlink -f "$proc/exe" 2>/dev/null || true)" == "$target_exe" ]] || continue
-              grep -azFxq "$TRACK_MARKER" "$proc/environ" || continue
-              matches+=("$candidate")
-            done
-            echo "TRACK_A_P0_DISCOVERED_EXACT_TRACK_CLIENTS=${#matches[@]}"
-            if [[ "${#matches[@]}" -ne 1 ]]; then
-              echo "TRACK_A_P0_ERROR=expected_one_live_exact_track_client" >&2
-              exit 3
-            fi
-            pid="${matches[0]}"
-            pid_source=proc_discovery
-          fi
-
-          kill -0 "$pid"
-          [[ -r "/proc/$pid/environ" ]]
-          grep -azFxq "$TRACK_MARKER" "/proc/$pid/environ"
-          [[ "$(readlink -f "/proc/$pid/exe")" == "$target_exe" ]]
-
-          echo TRACK_A_P0_RUNTIME_OWNERSHIP_FENCE=true
-          echo "TRACK_A_P0_PID_SOURCE=$pid_source"
-          echo "TRACK_A_P0_PID=$pid"
-          echo "TRACK_A_P0_TRACER_PID=$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")"
-          python3 .github/scripts/tibia-official-client-re-p0-direct-position.py \
-            --pid "$pid" \
-            --client "$client" \
-            --expected-sha256 "$EXPECTED_CLIENT_SHA256" \
-            --expected-size "$EXPECTED_CLIENT_SIZE" \
-            --vptr-offset "$EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET" \
-            --strips "$strips"
-
-          kill -0 "$pid"
-          echo TRACK_A_P0_PROCESS_SURVIVED=true

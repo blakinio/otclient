@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Resolve category 9 path components exactly
+    name: Decode category 9 base directory and static component
     runs-on: [otclient, synology]
     timeout-minutes: 6
     steps:
-      - name: Decode category 9 jump tables and QString constants
+      - name: Resolve Qt base-dir call and static QString backing
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -38,81 +38,83 @@ jobs:
               if not (0<=o<len(b)):return ''
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
-          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in raw]
-          text=next(s for s in secs if s['name']=='.text')
+          secs=[]
+          for i,x in enumerate(raw):secs.append({'idx':i,'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+          by={s['name']:s for s in secs}
           def voff(va):
               for s in secs:
                   if s['size'] and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
               return None
           def b_at(va,n):
               o=voff(va);return b'' if o is None else d[o:o+n]
-          def q(va):
-              o=voff(va);return None if o is None or o+8>len(d) else struct.unpack_from('<Q',d,o)[0]
-          def utf16_from_qstring_obj(obj):
-              vals=[q(obj+i) for i in (0,8,16)]
-              out=[]
-              for ptr in vals:
-                  if ptr is None:continue
-                  o=voff(ptr)
-                  if o is None:continue
-                  raw=d[o:o+128]
-                  chars=[]
-                  for j in range(0,len(raw)-1,2):
-                      c=raw[j]|(raw[j+1]<<8)
-                      if c==0:break
-                      if c<32 or c>126:break
-                      chars.append(chr(c))
-                  if chars:out.append(('ptr',hex(ptr),''.join(chars)))
-              # Qt6 QArrayDataPointer often has data pointer at +8 and size at +16.
-              p=q(obj+8);sz=q(obj+16)
-              if p is not None and sz is not None and 0<sz<100 and voff(p) is not None:
-                  try:
-                      txt=d[voff(p):voff(p)+2*sz].decode('utf-16le')
-                      out.append(('qarray',hex(p),txt))
-                  except:pass
-              return vals,out
-          def table_target(table,index):
-              off=struct.unpack('<i',b_at(table+index*4,4))[0]
-              return table+off
-          for label,table in [('slot10',0x1d689f8),('slot18',0x1d68a4c)]:
-              targets=[table_target(table,i) for i in range(16)]
-              print(f'FS_RESOLVER_{label.upper()}_TABLE='+','.join(f'{i}:0x{t:x}' for i,t in enumerate(targets)))
-              t=targets[9]
-              code=b_at(t,96)
-              print(f'FS_RESOLVER_{label.upper()}_CATEGORY9_TARGET=0x{t:x}')
-              print(f'FS_RESOLVER_{label.upper()}_CATEGORY9_BYTES={code.hex()}')
-              # Collect RIP-relative memory/lea targets from first 64 bytes of case.
-              print(f'FS_RESOLVER_{label.upper()}_CATEGORY9_RIP_BEGIN')
-              seen=[]
-              for i in range(min(64,len(code)-7)):
-                  if code[i] not in range(0x48,0x50) and not (code[i]==0x66):continue
-                  # common 48/4x 8b/8d disp32 forms
-                  if code[i] in range(0x48,0x50) and code[i+1] in (0x8b,0x8d):
-                      m=code[i+2]
-                      if (m>>6)==0 and (m&7)==5:
-                          va=t+i;dst=va+7+struct.unpack_from('<i',code,i+3)[0];seen.append(dst);print(f'va=0x{va:x} target=0x{dst:x}')
-                  # 66 0f 6f /r RIP-relative movdqa
-                  if code[i:i+3]==b'\x66\x0f\x6f':
-                      m=code[i+3]
-                      if (m>>6)==0 and (m&7)==5:
-                          va=t+i;dst=va+8+struct.unpack_from('<i',code,i+4)[0];seen.append(dst);print(f'va=0x{va:x} target=0x{dst:x}')
-              print(f'FS_RESOLVER_{label.upper()}_CATEGORY9_RIP_END')
-              for obj in sorted(set(seen)):
-                  vals,decoded=utf16_from_qstring_obj(obj)
-                  if decoded:
-                      print(f'FS_RESOLVER_QSTRING_CANDIDATE owner={label} category=9 obj=0x{obj:x} qwords='+','.join('NONE' if v is None else hex(v) for v in vals)+' decoded='+repr(decoded))
-          # Exact UTF-16 occurrences for candidate path labels.
-          for textval in ('BattlEye','bin','BEClient'):
-              needle=textval.encode('utf-16le');poss=[];p=0
-              while True:
-                  j=d.find(needle,p)
-                  if j<0:break
-                  va=None
-                  for s in secs:
-                      if s['off']<=j<s['off']+s['size']:va=s['addr']+(j-s['off']);break
-                  if va is not None:poss.append(va)
-                  p=j+1
-              print(f'FS_RESOLVER_UTF16 literal={textval} vas='+','.join(hex(v) for v in poss[:40]))
+          def ascii_at(va,limit=200):
+              o=voff(va)
+              if o is None:return None
+              e=d.find(b'\0',o,min(len(d),o+limit))
+              if e<=o:return None
+              z=d[o:e]
+              if z and all(32<=x<127 for x in z):return z.decode('ascii')
+              return None
+          def utf16_at(va,nchars=None,limit=100):
+              o=voff(va)
+              if o is None:return None
+              rawb=d[o:o+(2*nchars if nchars is not None else 2*limit)]
+              if nchars is None:
+                  end=None
+                  for j in range(0,len(rawb)-1,2):
+                      if rawb[j:j+2]==b'\0\0':end=j;break
+                  if end is not None:rawb=rawb[:end]
+              try:
+                  t=rawb.decode('utf-16le')
+                  return t if t and all(32<=ord(c)<127 for c in t) else None
+              except:return None
+          # dynamic symbols + relocation map
+          dyn=by['.dynsym'];ss=secs[dyn['link']];sb=d[ss['off']:ss['off']+ss['size']];syms=[]
+          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
+              no,info,other,si,val,sz=struct.unpack_from('<IBBHQQ',d,o);syms.append((cs(sb,no),val,sz,si,info))
+          got_names={};rel_by_off={}
+          for rn in ('.rela.plt','.rela.dyn'):
+              r=by.get(rn)
+              if not r:continue
+              for o in range(r['off'],r['off']+r['size'],r['entsize'] or 24):
+                  ro,ri,ad=struct.unpack_from('<QQq',d,o);sym=ri>>32;typ=ri&0xffffffff
+                  name=syms[sym][0] if sym and sym<len(syms) else ''
+                  if name:got_names[ro]=name
+                  rel_by_off[ro]=(typ,sym,ad,name)
+          def plt_symbol(va):
+              x=b_at(va,24)
+              for p in range(0,min(10,len(x)-6)):
+                  if x[p:p+2]==b'\xff\x25':
+                      got=va+p+6+struct.unpack_from('<i',x,p+2)[0]
+                      return got,got_names.get(got,''),x.hex()
+              return None,'',x.hex()
+          got,name,hx=plt_symbol(0x4e0050)
+          print(f'FS_RESOLVER_SLOT18_CATEGORY9_CALL target=0x4e0050 got={"NONE" if got is None else hex(got)} symbol={name} bytes={hx}')
+          # category9 slot10 object exact 24 bytes and relocations for each qword.
+          obj=0x31964a0
+          print(f'FS_RESOLVER_SLOT10_CATEGORY9_OBJECT=0x{obj:x} raw={b_at(obj,24).hex()}')
+          for off in (0,8,16):
+              va=obj+off;rawq=struct.unpack('<Q',b_at(va,8))[0]
+              r=rel_by_off.get(va)
+              print(f'FS_RESOLVER_SLOT10_QWORD va=0x{va:x} raw=0x{rawq:x} reloc={r}')
+              candidates=[rawq]
+              if r:candidates.append(r[2])
+              for ptr in candidates:
+                  if not ptr:continue
+                  for n in (None,3,4,8,9,16):
+                      t=utf16_at(ptr,n)
+                      if t:print(f'FS_RESOLVER_SLOT10_BACKING source=0x{va:x} ptr=0x{ptr:x} nchars={n} text={t}')
+                  a=ascii_at(ptr)
+                  if a:print(f'FS_RESOLVER_SLOT10_BACKING_ASCII source=0x{va:x} ptr=0x{ptr:x} text={a}')
+          # inspect nearby static objects / relocation addends for category9 and category10 to distinguish boundaries.
+          print('FS_RESOLVER_SLOT10_STATIC_REGION_BEGIN')
+          for va in range(0x3196460,0x31964e0,8):
+              rawq=struct.unpack('<Q',b_at(va,8))[0];r=rel_by_off.get(va)
+              if rawq or r:print(f'va=0x{va:x} raw=0x{rawq:x} reloc={r}')
+          print('FS_RESOLVER_SLOT10_STATIC_REGION_END')
+          # category9 case exact direct call must be QCoreApplication-like symbol identified above.
+          call=b_at(0xc91230,5);dst=0xc91235+struct.unpack_from('<i',call,1)[0]
+          print(f'FS_RESOLVER_SLOT18_CATEGORY9_CASE_CALL=0x{dst:x}')
           print('FS_RESOLVER_EXECUTED_TARGET=false')
           print('FS_RESOLVER_LIVE_RUNTIME_OBSERVED=false')
           print('FS_RESOLVER_MUTATION_PERFORMED=false')

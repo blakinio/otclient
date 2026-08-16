@@ -1,8 +1,8 @@
 ---
 task_id: OTC-20260816-track-a-agent-runtime-governance
-status: validating
-agent: ChatGPT
-session_id: chatgpt-20260816-0805-track-a-agent-governance
+status: waiting
+agent: unassigned
+session_id: null
 session_role: governance-implementer
 session_rotation_count: 0
 project_lane: otclient
@@ -16,9 +16,9 @@ base_main: 3a5568f36ebc326afd246d0d2da45b5d8eecabfa
 risk: medium
 related_pr: 324
 created: 2026-08-16T08:05:00+02:00
-updated: 2026-08-16T08:32:00+02:00
-lease_expires_at: 2026-08-16T09:17:00+02:00
-lease_released_at: null
+updated: 2026-08-16T08:34:00+02:00
+lease_expires_at: null
+lease_released_at: 2026-08-16T08:34:00+02:00
 owned_paths:
   - docs/agents/README.md
   - docs/agents/AGENTS.md
@@ -78,22 +78,34 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-last_progress_at: 2026-08-16T08:32:00+02:00
+last_progress_at: 2026-08-16T08:34:00+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: draft-final-candidate
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 1
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 0
+context_reconstruction_attempts: 0
+stall_warnings: 0
 material_review_findings:
   - PRRT_kwDOTVmdjs6ZlHWz: remediated and verified; authorized canonical mutation requires positive equal lease generations after any rebind, with fresh negative regressions
   - PRRT_kwDOTVmdjs6ZlHW1: remediated and verified; every canonical access class is bound to runtime_owner_task == current task_id and the canonical namespace
   - PRRT_kwDOTVmdjs6ZlHW2: remediated and verified; ephemeral_isolated rejects the reserved canonical-live-runtime namespace and aliases, with fresh negative regressions
   - PRRT_kwDOTVmdjs6ZlIVI: remediated and verified; universally mandatory docs/agents/README.md now points every Track A worker to the admission contract and is covered by workflow triggering plus static audit
 validation_evidence:
-  - parent_head: 90f31bfe42bbc2e8c178e90b7e04a6d69f64c01e
+  - implementation_parent_head: 90f31bfe42bbc2e8c178e90b7e04a6d69f64c01e
   - track_a_governance_run: 31931442198 SUCCESS
   - policy_audit_job: 95126785784 SUCCESS
   - fresh_behavior_audit_job: 95126785680 SUCCESS
   - repository_ci_run: 31931442374 SUCCESS
   - required_ci_job: 95127228818 SUCCESS
   - unresolved_review_threads_after_verification: 0
-last_completed_step: all four material P1 findings are remediated and resolved; the universal Track A entrypoint, policy validator and behavior regressions passed on parent head 90f31bfe42bbc2e8c178e90b7e04a6d69f64c01e; this checkpoint adds the newly owned universal README path and durable evidence only
-next_action: require fresh exact-head Track A governance audit and repository CI for this checkpoint head, then update PR #324 evidence, mark Ready, require the new protected Ready-state CI generation, merge, archive and release ownership
+  - pre_wait_checkpoint_head: 2ba5a77ec0678527f311c13c76360f4ec2fe2756
+  - pre_wait_track_a_governance_run: 31931711113 QUEUED
+  - pre_wait_repository_ci_run: 31931711186 QUEUED
+last_completed_step: final seven-file PR diff and ownership were reviewed with no unrelated paths; all four material P1 findings are resolved; exact-head draft checks remained queued after the maximum two ordinary checks, so the active worker released ownership instead of polling
+next_action: claim this waiting task only after verifying no active owner, then inspect the exact current PR #324 head and its newest governance/CI runs; if both pass with zero material review threads, mark Ready without changing the head and require the resulting protected Ready-state CI generation before merge
 ---
 
 # Track A agent runtime-governance enforcement

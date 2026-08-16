@@ -13,7 +13,7 @@ branch: feat/OTC-20260816-track-a-p1-bridge-health-recovery
 base_branch: main
 base_main: 0d7b2607912552599ae501891491aab439cfde7b
 created: 2026-08-16T13:14:00+02:00
-updated: 2026-08-16T13:14:00+02:00
+updated: 2026-08-16T13:18:00+02:00
 risk: medium
 researcher_delivery: draft_only
 implementation_authorized: true
@@ -21,6 +21,7 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-p1-bridge-health-recovery.md
   - tools/tibia_runtime_bridge/**
   - tests/tools/tibia_runtime_bridge/**
+  - .github/workflows/track-a-p1-bridge-validation.yml
 modules_touched:
   - Track A official-client runtime bridge tooling
 reuses:
@@ -76,7 +77,7 @@ track_a_runtime_admission:
   mutation_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-16T13:10:00+02:00
-last_progress_at: 2026-08-16T13:14:00+02:00
+last_progress_at: 2026-08-16T13:18:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -97,23 +98,26 @@ The P1 layer must never bootstrap, launch, login, restart, kill, attach to, reco
 # Current factual basis
 
 - Current dispatch base is `main@0d7b2607912552599ae501891491aab439cfde7b`.
-- PR #283 is closed unmerged, but its bounded read-only bridge implementation was explicitly accepted by the coordinator; its source/test blobs are not present on current `main`.
+- PR #283 is closed unmerged, but its bounded read-only bridge implementation was explicitly accepted by the coordinator; its source/test blobs were absent on current `main` and have now been reconstructed from the accepted blob SHAs before P1 extensions.
+- Untouched restored bridge blobs preserve accepted #283 `bridge.cpp`, launcher, resolver, profile, CMake and original focused-test content.
 - No open PR currently owns `tools/tibia_runtime_bridge/**` or `tests/tools/tibia_runtime_bridge/**`.
 - PR #303 owns separate runtime surfaces; this task consumes only durable evidence and performs no live observation or mutation.
 - Current canonical runtime identity remains unclaimed here: `:98 = UNKNOWN`, `6082 = UNKNOWN`, PID/session = `NOT_REGISTERED`.
+- Existing repository `CI` does not execute `tests/tools/tibia_runtime_bridge/*.py`; a unique task-owned temporary GitHub-hosted validation workflow is therefore permitted for focused/component proof and will be removed before final handoff head.
 
 # Acceptance inventory
 
-- [ ] Rebuild the exact accepted PR #283 bridge/tool/test baseline on this current-main branch and prove the reused blobs match the accepted source.
-- [ ] Preserve exact profile/hash fencing, owner-only local IPC, bounded request framing, read-only discovery and derived `session-status` semantics.
-- [ ] Add an explicit runtime identity model suitable for RUNTIME-produced registrations/evidence without reading or mutating the canonical runtime from P1.
-- [ ] Add fail-closed bridge health classification that distinguishes ready/not-ready, unreachable, malformed response and stale/changed identity without promoting `session-status` to authoritative `IN_GAME`.
-- [ ] Add deterministic reacquisition that binds only to a fresh explicit identity/endpoint, rejects absent identity, exact-fence mismatch, generation regression/change during probe and process identity change, and drops stale cached channels.
-- [ ] Add bounded recovery semantics that may retry/reacquire a newly supplied identity but never starts/restarts/logs in a client or invents PID/display/socket data.
-- [ ] Cover healthy, unavailable, malformed, identity-change race, stale generation, replacement endpoint, retry exhaustion and recovery-success paths with deterministic tests.
-- [ ] Keep all prior #283 focused tests passing.
-- [ ] Run proportional GitHub-hosted focused/component validation and exact-head repository CI required for this Draft head.
+- [x] Rebuild the exact accepted PR #283 bridge/tool/test baseline on this current-main branch from accepted blob SHAs before extension.
+- [x] Preserve exact profile/hash fencing, owner-only local IPC, bounded request framing, read-only discovery and derived `session-status` semantics.
+- [x] Add an explicit runtime identity model suitable for RUNTIME-produced registrations/evidence without reading or mutating the canonical runtime from P1.
+- [x] Add fail-closed bridge health classification that distinguishes readiness, unreachable, malformed response and stale/changed identity without promoting `session-status` to authoritative `IN_GAME`.
+- [x] Add deterministic reacquisition that binds only to a fresh explicit identity/endpoint, rejects absent identity, exact-fence mismatch, generation regression/change during probe and process identity change, and drops stale cached channels.
+- [x] Add bounded recovery semantics that may retry/reacquire a newly supplied identity but never starts/restarts/logs in a client or invents PID/display/socket data.
+- [x] Add deterministic tests for healthy/unavailable/malformed/identity-change/stale-generation/replacement-endpoint/retry-exhaustion/recovery-success paths.
+- [ ] Keep all prior #283 focused tests passing on the implementation head.
+- [ ] Run proportional GitHub-hosted focused/component validation and exact-head repository CI required for the final Draft head.
 - [ ] Perform a fresh post-implementation audit with zero open material findings before handoff.
+- [ ] Remove the temporary validation workflow before the final Draft handoff head.
 - [ ] Leave the result as `DRAFT_NOT_PROMOTED`; do not merge or promote P1 conclusions.
 
 # Evidence boundary
@@ -124,7 +128,7 @@ The P1 layer must never bootstrap, launch, login, restart, kill, attach to, reco
 
 ```yaml
 status: implementing
-last_completed_step: claimed current-main P1 lane with runtime_access none and non-overlapping bridge paths
+last_completed_step: restored accepted bridge baseline and implemented explicit-identity health/reacquisition/recovery API plus deterministic tests
 blockers: []
-next_action: reconstruct the accepted PR #283 bridge baseline exactly, inspect its public Python API, then implement the smallest fail-closed health/reacquisition/recovery layer with deterministic tests
+next_action: run the task-owned GitHub-hosted focused/component validation, repair only evidence-backed failures, then audit and freeze the Draft handoff head
 ```

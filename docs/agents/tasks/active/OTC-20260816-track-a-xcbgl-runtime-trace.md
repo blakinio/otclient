@@ -2,34 +2,29 @@
 task_id: OTC-20260816-track-a-xcbgl-runtime-trace
 status: ready
 agent: ChatGPT
-session_id: chatgpt-coord-xcbgl-promote-20260816-2111
+session_id: chatgpt-coord-xcbgl-promote-20260816-2112
 session_role: promotion_integration_coordinator
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: coordinator-promotion-ready
+phase: coordinator-merge-ready
 branch: docs/OTC-20260816-track-a-xcbgl-runtime-trace-promote
 base_branch: main
 base_main: 7629e6579610fd8069e7cac4bce8503c0b0a191e
 current_main: 7629e6579610fd8069e7cac4bce8503c0b0a191e
 risk: high
-updated: 2026-08-16T21:11:00+02:00
+updated: 2026-08-16T21:12:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xcbgl-runtime-trace.md
   - docs/agents/evidence/OTC-20260816-track-a-xcbgl-runtime-trace/**
 modules_touched: []
-reuses:
-  - source Draft PR #415
-  - docs/agents/tasks/archive/OTC-20260816-track-a-xcbgl-log-extract.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-qt-debug-plugins-discriminator.md
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 blocks:
   - OTC-20260816-track-a-canonical-runtime-e2e
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: coordinator promotion replays accepted durable physical evidence by exact blob SHA from current main; no additional client/runtime execution is required or authorized
+execution_reason: coordinator promotion of already-produced durable physical evidence; this session performs no client/runtime operation
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -60,7 +55,7 @@ runtime_nonclaims:
 source_research:
   pr: 415
   final_head: 3d8cdb3c9e1f025edcca2770a7c4ae46aa438393
-  dispatch_head: 8ffc60146573e5fb9ac1b900ff45843af10301dd
+  disposition: CLOSED_SUPERSEDED_BY_425
   task_blob: 63fbaff120f1e5b5198197d22100af0c6676808b
   evidence_blob: 005458510d069f23a4e0a1fba95f028f78b162a4
   coordinator_decision: ACCEPT
@@ -119,45 +114,46 @@ evidence:
 promotion:
   pr: 425
   source_pr: 415
-  replay_method: exact task/evidence blobs onto current main; no source branch merge or rebase
+  replay_method: exact accepted source blobs onto main@7629e6579610fd8069e7cac4bce8503c0b0a191e
   initial_replay_head: 608566a4368213d6de1b220fdc18a2aa7a9c60e5
+  validated_parent_head: e9562ec7b625dd9357cc0b1c13f9d840fbb7aeef
   final_checkpoint_head: PENDING_AFTER_THIS_UPDATE
-  source_head_behind_current_main_by: 2
-  source_head_only_changed_paths:
-    - docs/agents/tasks/active/OTC-20260816-track-a-xcbgl-runtime-trace.md
-    - docs/agents/evidence/OTC-20260816-track-a-xcbgl-runtime-trace/20260816-xcbgl-runtime-trace.md
-  intervening_main_commits:
-    - 070a066488d22126483e13fc8a08b17df5090918
-    - 7629e6579610fd8069e7cac4bce8503c0b0a191e
   intervening_main_overlap: false
 validation:
   source_final_track_a_governance_run: 31964566084
   source_final_track_a_governance_result: SUCCESS
   source_final_repository_ci_run: 31964566087
   source_final_repository_ci_result: SUCCESS
-  promotion_exact_head_track_a_governance: PENDING
-  promotion_exact_head_repository_ci: PENDING
+  validated_parent_track_a_governance_run: 31966856108
+  validated_parent_track_a_governance_result: SUCCESS
+  validated_parent_repository_ci_run: 31966856245
+  validated_parent_repository_ci_result: SUCCESS
+  validated_parent_required_ci_job: 95213265464
+  validated_parent_required_ci_result: SUCCESS
+  final_exact_head_track_a_governance: PENDING
+  final_exact_head_repository_ci: PENDING
   review_threads_open: 0
-  e2e: PASS_SOURCE_PHYSICAL_DISCRIMINATOR
-  e2e_evidence: run 31964397523 / job 95207211173
+  physical_e2e: PASS
+  physical_e2e_evidence: run 31964397523 / job 95207211173
   no_second_physical_run: true
 audit:
   result: PASS
   material_findings_open: 0
 acceptance:
-  - exact source task/evidence blobs replayed from current main: PASS
-  - one governance-compliant ephemeral-isolated physical discriminator: PASS
+  - exact source evidence replayed from current main: PASS
+  - governance-compliant ephemeral-isolated physical discriminator: PASS
   - exact live client fence: PASS
-  - same-display GLX extension inventory: PASS
-  - Qt XCB GL plugin discovery/load evidence: PASS
+  - same-display X11 GLX inventory: PASS
+  - Qt xcb_glx discovery and load: PASS
+  - bounded no-window result through 35 seconds: PASS
   - no canonical state access: PASS
   - cleanup: PASS
   - no second physical run: PASS
-  - GLX absence not overstated as sole no-window cause: PASS
-last_completed_step: coordinator replayed the accepted two-file #415 package exactly onto main@7629e6579610fd8069e7cac4bce8503c0b0a191e as PR #425 with no overlap from merged P1 implementation/archive commits
-next_action: obtain exact-head Track A governance and repository CI on this checkpoint, close source Draft #415 superseded, mark #425 ready, merge after branch-protection gates, then archive this task and release ownership
+  - GLX absence not overstated as sole root cause: PASS
+last_completed_step: coordinator accepted source #415, closed it superseded, and verified clean replay #425 parent head e9562ec7b625dd9357cc0b1c13f9d840fbb7aeef with green Track A governance and CI / Required
+next_action: obtain final exact-head governance and repository CI after this task-only checkpoint update, mark #425 ready, merge if branch-protection gates pass, then archive the task and release ownership before admitting any support-only Xvfb follow-up
 ---
 
-# Track A XCB GL runtime trace — coordinator promotion
+# Track A XCB GL runtime trace — promotion terminal candidate
 
-The accepted physical discriminator is being promoted from a clean current-main replay. No new runtime execution is permitted by this promotion session. The source ephemeral display, VNC port and PID are historical evidence only and must never be treated as current canonical identity.
+This promotion consumes only durable evidence. The source ephemeral display, VNC port and process identifiers are historical values of a destroyed task-owned namespace and are not current canonical authority.

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-coverage-audit-refresh
-status: investigating
+status: validating
 agent: ChatGPT
 session_id: chatgpt-coverage-audit-20260816-1427
 session_role: researcher_auditor
@@ -8,13 +8,14 @@ project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: audit
-phase: investigate
+phase: validate
 branch: research/OTC-20260816-track-a-coverage-audit-refresh
 base_branch: main
 base_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f
 current_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f
+pull_request: 369
 created: 2026-08-16T14:27:00+02:00
-updated: 2026-08-16T14:35:00+02:00
+updated: 2026-08-16T14:41:00+02:00
 risk: low
 researcher_delivery: draft_only
 implementation_authorized: false
@@ -76,23 +77,43 @@ feature_scope:
   e2e_required: false
   completion_claim: internal_only
 invocation_started_at: 2026-08-16T14:27:00+02:00
-last_progress_at: 2026-08-16T14:35:00+02:00
+last_progress_at: 2026-08-16T14:41:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft-audit
-terminal_ci_wait_started_at: null
+ci_check_generation: final-audit-head
+terminal_ci_wait_started_at: 2026-08-16T14:41:00+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
+snapshot_heads:
+  P0_PR302: d0b56ce562eb3ef6e59c1635687204917553dd32
+  P1_PR357: fe37b80423d7cc8b269cd58edc19a2795e01e381
+  P2_PR310: a01281648c35dc04bf20437acc584b55b11ea727
+  RUNTIME_PR358: d78e42b955c27ee07fba783f5496588f34d29461
+  RUNTIME_INFRA_PR360: 1d64fab66650b1fcd58388ff5cf6f9a77a392dc4
+  QLIBRARY_PR356: f8e3733aa90bde0cd93c3bc6c3a364ac02b625dd
+  VIEWPORT_PROMPT_PR363: b09e49cc950c091416c640dfd27f0fdfb7dd97fc
+historical_coverage_baseline:
+  pr: 304
+  final_head: 43a60bd96cc644b656b200c9edbfb75578b330b6
+  disposition: ACCEPT_WITH_EDITS_BOUNDED_INVENTORY_ONLY
+  merged: false
+audit_result: FAIL_MATERIAL_GAPS_OPEN
+material_findings_open: 9
+high_findings: 4
+medium_findings: 5
+programme_complete: false
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
-last_completed_step: resolved live main, current Track A Draft ownership, historical accepted coverage baseline and current no-runtime routing boundary
-next_action: audit exact current Draft heads plus canonical programme denominators, persist contradictions/missing-proof inventory, and validate the task-owned report before Draft handoff
+last_checkpoint:
+  - docs/agents/reports/OTCLIENT-20260816-track-a-coverage-audit-refresh.md
+last_completed_step: persisted a denominator-preserving current-state coverage ledger, nine stable material findings, supersession/negative-evidence table and information-gain-ordered missing-proof queue
+next_action: validate this exact Draft head with Track A governance and repository CI, then publish a no-head-change handoff to coordinator; do not merge or promote global coverage state
 ---
 
 # Track A coverage / contradiction / missing-proof audit refresh
@@ -103,19 +124,25 @@ Falsify campaign completeness from current repository evidence. Reconcile quanti
 
 ## Scope boundary
 
-This task is GitHub-hosted and `runtime_access: none`. It may consume durable runtime evidence and current Draft branches read-only, but it must not use Synology, inspect a live client/display/VNC surface, log in, mutate gameplay/session state, touch PR #303-owned runtime surfaces, or use owner-funded Codex/OpenAI API/paid AI quota.
+This task is GitHub-hosted and `runtime_access: none`. It consumed durable runtime evidence and exact live Draft heads read-only. It did not use Synology, inspect a live client/display/VNC surface, log in, mutate gameplay/session state, touch PR #303-owned runtime surfaces, or use owner-funded Codex/OpenAI API/paid AI quota.
 
 ## Acceptance
 
-- [ ] exact current `main` and relevant Track A Draft heads are recorded;
-- [ ] every percentage has an explicit denominator and evidence class;
-- [ ] inventory completeness is separated from semantic/read/action completion;
-- [ ] accepted #304 bounded baseline is reconciled without promoting its closed Draft as canonical runtime truth;
-- [ ] protocol/QMeta/P0/P1/P2/runtime/restart coverage gaps are explicitly classified;
-- [ ] current contradictions, stale dependencies and supersessions are recorded with exact PR/path/head evidence;
-- [ ] no green CI result is treated as capability proof;
-- [ ] every material missing proof maps to the smallest falsifiable next discriminator and owning lane;
-- [ ] E2E is `NOT_APPLICABLE` with reason because this is a no-runtime documentation/evidence audit;
-- [ ] task-owned report receives a fresh documentation audit and exact-head repository/governance validation before Draft handoff.
+- [x] exact current `main` and relevant Track A Draft heads are recorded;
+- [x] every percentage has an explicit denominator and evidence class;
+- [x] inventory completeness is separated from semantic/read/action completion;
+- [x] accepted #304 bounded baseline is reconciled without promoting its closed Draft as canonical runtime truth;
+- [x] protocol/QMeta/P0/P1/P2/runtime/restart coverage gaps are explicitly classified;
+- [x] current contradictions, stale dependencies and supersessions are recorded with exact PR/path/head evidence;
+- [x] no green CI result is treated as capability proof;
+- [x] every material missing proof maps to the smallest falsifiable next discriminator and owning lane;
+- [x] E2E is `NOT_APPLICABLE_WITH_REASON` because this is a no-runtime documentation/evidence audit;
+- [ ] exact final-head Track A governance and repository CI complete successfully before Draft handoff.
 
-Research output is `DRAFT_NOT_PROMOTED`. Coordinator review is required before any global coverage/programme state change or merge.
+## Result
+
+`FAIL_MATERIAL_GAPS_OPEN` / `DRAFT_NOT_PROMOTED`.
+
+The report records nine open material findings: four HIGH and five MEDIUM. No evidence supports a Track A completion claim. The dominant remaining gaps are canonical machine-readable coverage durability, semantic denominators, promotion-safe canonical runtime bootstrap, and reusable compliant GitHub-hosted exact-client staging.
+
+Coordinator review is required before any global coverage/programme state change or merge.

@@ -1,0 +1,94 @@
+name: Track A XCB GL completed-log extraction
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-xcbgl-log-extract.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  extract-xcbgl-lines:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Filter completed QT_DEBUG_PLUGINS job log
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_JOB: '95202662909'
+          SOURCE_RUN: '31962559445'
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          meta="$(mktemp)"
+          log="$(mktemp)"
+          trap 'rm -f -- "$meta" "$log"' EXIT
+
+          curl -fsSL \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            -o "$meta" "$api/actions/jobs/$SOURCE_JOB"
+
+          python3 - "$meta" "$SOURCE_JOB" "$SOURCE_RUN" <<'PY'
+          import json, pathlib, sys
+          data=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert str(data.get('id')) == sys.argv[2], data.get('id')
+          assert str(data.get('run_id')) == sys.argv[3], data.get('run_id')
+          assert data.get('status') == 'completed', data.get('status')
+          assert data.get('conclusion') == 'success', data.get('conclusion')
+          print('XCBGL_LOG_SOURCE_JOB_FENCE=PASS')
+          print(f"XCBGL_LOG_SOURCE_JOB={data['id']}")
+          print(f"XCBGL_LOG_SOURCE_RUN={data['run_id']}")
+          PY
+
+          curl -fsSL -L \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            -o "$log" "$api/actions/jobs/$SOURCE_JOB/logs"
+
+          python3 - "$log" <<'PY'
+          import pathlib, re, sys
+          raw=pathlib.Path(sys.argv[1]).read_text(errors='replace')
+          ansi=re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+          patterns=(
+              'xcbglintegrations', 'libqxcb-glx-integration', 'libqxcb-egl-integration',
+              'xcb_glx', 'xcb_egl', 'xcb glx gl-integration', 'failed to initialize glx',
+              'qx cbintegration', 'qxcbintegration', 'cannot load library', 'loaded library',
+              'qrhi', 'glx', 'egl',
+          )
+          secretish=re.compile(r'(?i)(authorization:|bearer\s|password|cookie|session[_ -]?token|@[a-z0-9.-]+\.[a-z]{2,})')
+          selected=[]
+          for line in raw.splitlines():
+              line=ansi.sub('',line)
+              low=line.lower()
+              if not any(p in low for p in patterns):
+                  continue
+              # Keep only runtime/client-log/plugin-loader lines, not workflow source text or env dumps.
+              if not any(mark in line for mark in ('WINDOW_DIAG_CLIENT_LOG=', 'qt.core.plugin.', 'QXcb', 'QRhi', 'Xcb GLX', 'xcbglintegrations', 'libqxcb-', 'Failed to initialize GLX')):
+                  continue
+              if secretish.search(line):
+                  continue
+              # Strip timestamp prefix emitted by Actions, retain bounded content.
+              if 'Z ' in line[:40]:
+                  line=line.split('Z ',1)[1]
+              selected.append(line[:500])
+          # Deduplicate exact repeated tail lines while preserving order.
+          out=[]; seen=set()
+          for line in selected:
+              if line in seen: continue
+              seen.add(line); out.append(line)
+          if not out:
+              raise SystemExit('XCBGL_LOG_FILTER_RESULT=NO_MATCHES')
+          print(f'XCBGL_LOG_FILTER_MATCH_COUNT={len(out)}')
+          for line in out[:200]:
+              print('XCBGL_LOG_FILTERED='+line)
+          print('XCBGL_LOG_FILTER_RESULT=PASS')
+          PY

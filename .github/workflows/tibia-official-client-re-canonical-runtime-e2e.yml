@@ -14,26 +14,30 @@ permissions:
 
 concurrency:
   group: track-a-canonical-runtime-e2e
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   reconcile:
     name: Read-only canonical state reconciliation
-    runs-on: [self-hosted, Linux, X64, otclient, tibia-re, synology]
+    runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify trusted-base runtime policy is fail-closed
+      - name: Verify exact physical runner and trusted-base policy
         shell: bash
         run: |
           set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$GITHUB_REF_NAME" == ci/OTC-20260816-track-a-canonical-runtime-e2e ]]
           grep -Fq 'Status: DRAFT CONTRACT / FINAL MANAGER + REBIND RECONCILED / NOT IMPLEMENTED' \
             docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
           grep -Fq 'generation_rebind: REQUIRED_UNAVAILABLE' \
             docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
           grep -Fq 'bootstrap: REQUIRED_UNIMPLEMENTED' \
             docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+          echo TRACK_A_RECON_RUNNER=synology-otclient-01
           echo TRACK_A_RECON_TRUSTED_BASE_FAIL_CLOSED=true
 
       - name: Inspect only canonical authority metadata
@@ -131,11 +135,8 @@ jobs:
           if lease_status == "active" and not lease.get("expired", False):
               print("TRACK_A_RECON_CLASSIFICATION=gate_a_existing_controller_must_reconcile")
           elif isinstance(lease_generation, int) and registered_generation == lease_generation + 1:
-              # This is only a descriptive anomaly check. No authority is inferred.
               print("TRACK_A_RECON_CLASSIFICATION=registration_generation_ahead_fail_closed")
           else:
-              # Any new acquire after released/expired authority advances the lease generation,
-              # so an existing registration requires the reviewed rebind transition before Gate B.
               print("TRACK_A_RECON_CLASSIFICATION=canonical_rebind_required_after_gate_a")
           PY
 

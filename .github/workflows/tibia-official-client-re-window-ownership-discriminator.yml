@@ -1,0 +1,402 @@
+name: Track A isolated client window ownership discriminator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/agents/tasks/active/OTC-20260816-track-a-client-window-ownership-discriminator.md
+      - .github/workflows/tibia-official-client-re-window-ownership-discriminator.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-client-window-ownership-discriminator
+  cancel-in-progress: false
+
+jobs:
+  discriminate-window-ownership:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Reproduce isolated startup and inventory task-owned windows
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: 05d4a7136e234b874f7f112ad8c92f01b0aabd51
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]] || {
+            echo "WINDOW_DIAG_REFUSED=BASE_MOVED:$EVENT_BASE_SHA" >&2
+            exit 44
+          }
+
+          task='OTC-20260816-track-a-client-window-ownership-discriminator'
+          marker="OTCLIENT_TIBIA_RE_DIAG_TASK=$task"
+          base='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260816-track-a-client-window-ownership-discriminator'
+          root="$base/ephemeral-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          tool='/work/_otclient_tibia_re_state/toolroot'
+          size=51965216
+          sha='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          xkb_sha='0967e7e7b03b077327cea74567726b265bd304b4fdf59f87bf7fdfe1074e7591'
+          wgcf_ver=2.2.32
+          wgcf_sha='2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c'
+          wp_ver=1.1.3
+          wp_tar_sha='e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c'
+          display_number=''
+          display=''
+          warp_port=''
+          vnc_port=''
+          wireproxy_pid=''
+          xvfb_pid=''
+          vnc_pid=''
+          client_pid=''
+          client_pgid=''
+
+          listen() {
+            python3 - "$1" <<'PY'
+          import pathlib, sys
+          port = f'{int(sys.argv[1]):04X}'
+          for name in ('tcp', 'tcp6'):
+              path = pathlib.Path('/proc/net') / name
+              if not path.exists():
+                  continue
+              for row in path.read_text().splitlines()[1:]:
+                  f = row.split()
+                  if len(f) > 3 and f[1].rsplit(':',1)[-1].upper() == port and f[3] == '0A':
+                      raise SystemExit(0)
+          raise SystemExit(1)
+          PY
+          }
+
+          task_owned_pid() {
+            local pid="$1" role="$2"
+            [[ "$pid" =~ ^[1-9][0-9]*$ && -r "/proc/$pid/environ" ]] || return 1
+            grep -azFxq "$marker" "/proc/$pid/environ" || return 1
+            grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ"
+          }
+
+          kill_owned() {
+            local pid="$1" role="$2"
+            [[ -n "$pid" ]] || return 0
+            if task_owned_pid "$pid" "$role"; then
+              kill "$pid" 2>/dev/null || true
+              for _ in $(seq 1 20); do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep .1
+              done
+              kill -9 "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+            fi
+          }
+
+          cleanup_client_group() {
+            [[ -n "$client_pgid" ]] || return 0
+            mapfile -t members < <(ps -o pid= -g "$client_pgid" 2>/dev/null | tr -d ' ' | grep -E '^[0-9]+$' || true)
+            for pid in "${members[@]}"; do
+              [[ -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$marker" "/proc/$pid/environ" || {
+                echo "WINDOW_DIAG_CLEANUP_REFUSED=FOREIGN_PID_IN_CLIENT_GROUP:$pid" >&2
+                continue
+              }
+              kill "$pid" 2>/dev/null || true
+            done
+            sleep .3
+            for pid in "${members[@]}"; do
+              [[ -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$marker" "/proc/$pid/environ" || continue
+              kill -9 "$pid" 2>/dev/null || true
+            done
+          }
+
+          cleanup() {
+            rc=$?
+            cleanup_client_group || true
+            kill_owned "$vnc_pid" vnc || true
+            kill_owned "$xvfb_pid" xvfb || true
+            kill_owned "$wireproxy_pid" wireproxy || true
+            if [[ -n "$display_number" && -f "/tmp/.X${display_number}-lock" ]]; then
+              owner="$(tr -cd '0-9' <"/tmp/.X${display_number}-lock" 2>/dev/null || true)"
+              if [[ -n "$xvfb_pid" && "$owner" == "$xvfb_pid" && ! -e "/proc/$xvfb_pid" ]]; then
+                rm -f -- "/tmp/.X${display_number}-lock" "/tmp/.X11-unix/X${display_number}"
+              fi
+            fi
+            rm -rf --one-file-system "$root" 2>/dev/null || true
+            echo 'WINDOW_DIAG_CLEANUP=COMPLETE'
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          [[ ! -e "$root" ]] || { echo 'WINDOW_DIAG_REFUSED=NAMESPACE_EXISTS'; exit 45; }
+          mkdir -p "$root"
+          chmod 700 "$base" "$root" 2>/dev/null || true
+          echo "WINDOW_DIAG_NAMESPACE=$root"
+          echo 'WINDOW_DIAG_ADMISSION=EPHEMERAL_ISOLATED_MUTATION_AUTHORIZED'
+
+          [[ -d "$tool" && ! -L "$tool" && "$(realpath -e "$tool")" == "$tool" ]] || { echo 'WINDOW_DIAG_REFUSED=TOOLROOT'; exit 46; }
+          for bin in Xvfb x11vnc xdotool; do
+            [[ -x "$tool/usr/bin/$bin" && ! -L "$tool/usr/bin/$bin" ]] || { echo "WINDOW_DIAG_REFUSED=TOOL_$bin"; exit 46; }
+          done
+          [[ -d "$tool/usr/share/X11/xkb" && ! -L "$tool/usr/share/X11/xkb" ]] || { echo 'WINDOW_DIAG_REFUSED=XKBROOT'; exit 46; }
+          [[ -f /usr/bin/xkbcomp && ! -L /usr/bin/xkbcomp && -x /usr/bin/xkbcomp ]] || { echo 'WINDOW_DIAG_REFUSED=SYSTEM_XKBCOMP'; exit 47; }
+          [[ "$(sha256sum /usr/bin/xkbcomp | awk '{print $1}')" == "$xkb_sha" ]] || { echo 'WINDOW_DIAG_REFUSED=XKBCOMP_SHA'; exit 48; }
+          preload="$(find "$tool" -xdev -type f -name libproxychains.so.4 -print -quit 2>/dev/null || true)"
+          [[ -n "$preload" ]] || { echo 'WINDOW_DIAG_REFUSED=PROXYCHAINS'; exit 49; }
+
+          source_pkg=''
+          for candidate in \
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia' \
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia'; do
+            client="$candidate/bin/client"
+            if [[ -x "$client" && ! -L "$client" \
+              && "$(stat -c %s "$client" 2>/dev/null || true)" == "$size" \
+              && "$(sha256sum "$client" 2>/dev/null | awk '{print $1}')" == "$sha" ]]; then
+              source_pkg="$candidate"
+              break
+            fi
+          done
+          [[ -n "$source_pkg" ]] || { echo 'WINDOW_DIAG_REFUSED=EXACT_SOURCE_MISSING'; exit 50; }
+          echo 'WINDOW_DIAG_EXACT_SOURCE_FENCE=PASS'
+
+          for n in $(seq 231 250); do
+            if [[ ! -e "/tmp/.X${n}-lock" && ! -e "/tmp/.X11-unix/X${n}" ]]; then
+              display_number="$n"
+              display=":$n"
+              break
+            fi
+          done
+          [[ -n "$display_number" ]] || { echo 'WINDOW_DIAG_REFUSED=NO_FREE_DISPLAY'; exit 51; }
+
+          free_port() {
+            local p
+            for p in $(seq "$1" "$2"); do
+              if ! listen "$p"; then echo "$p"; return 0; fi
+            done
+            return 1
+          }
+          warp_port="$(free_port 25450 25480)" || { echo 'WINDOW_DIAG_REFUSED=NO_WARP_PORT'; exit 52; }
+          vnc_port="$(free_port 6200 6230)" || { echo 'WINDOW_DIAG_REFUSED=NO_VNC_PORT'; exit 53; }
+          echo "WINDOW_DIAG_DISPLAY=$display"
+          echo "WINDOW_DIAG_VNC_PORT=$vnc_port"
+
+          warp="$root/warp"
+          mkdir -p "$warp/bin" "$warp/state"
+          curl -fL --retry 3 --connect-timeout 10 -o "$warp/bin/wgcf" \
+            "https://github.com/ViRb3/wgcf/releases/download/v$wgcf_ver/wgcf_${wgcf_ver}_linux_amd64"
+          [[ "$(sha256sum "$warp/bin/wgcf" | awk '{print $1}')" == "$wgcf_sha" ]] || { echo 'WINDOW_DIAG_REFUSED=WGCF_SHA'; exit 54; }
+          chmod 755 "$warp/bin/wgcf"
+          curl -fL --retry 3 --connect-timeout 10 -o "$warp/bin/wireproxy.tar.gz" \
+            "https://github.com/windtf/wireproxy/releases/download/v$wp_ver/wireproxy_linux_amd64.tar.gz"
+          [[ "$(sha256sum "$warp/bin/wireproxy.tar.gz" | awk '{print $1}')" == "$wp_tar_sha" ]] || { echo 'WINDOW_DIAG_REFUSED=WIREPROXY_SHA'; exit 55; }
+          mkdir "$warp/unpack"
+          tar -xzf "$warp/bin/wireproxy.tar.gz" -C "$warp/unpack"
+          wp_source="$(find "$warp/unpack" -type f -name wireproxy -print -quit)"
+          [[ -n "$wp_source" ]] || { echo 'WINDOW_DIAG_REFUSED=WIREPROXY_BINARY'; exit 56; }
+          install -m755 "$wp_source" "$warp/bin/wireproxy"
+          rm -rf "$warp/unpack"
+          (
+            cd "$warp/state"
+            "$warp/bin/wgcf" register --accept-tos >/dev/null
+            chmod 600 wgcf-account.toml
+            "$warp/bin/wgcf" generate >/dev/null
+            chmod 600 wgcf-profile.conf
+          )
+          cat >"$root/wireproxy.conf" <<EOF
+          WGConfig = $warp/state/wgcf-profile.conf
+          [Socks5]
+          BindAddress = 127.0.0.1:$warp_port
+          EOF
+          "$warp/bin/wireproxy" -n -c "$root/wireproxy.conf" >/dev/null
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_DIAG_TASK="$task" OTCLIENT_TIBIA_RE_ROLE=wireproxy \
+            nohup "$warp/bin/wireproxy" -c "$root/wireproxy.conf" >"$root/wireproxy.log" 2>&1 </dev/null &
+          wireproxy_pid=$!
+          for _ in $(seq 1 40); do
+            kill -0 "$wireproxy_pid" 2>/dev/null || { echo 'WINDOW_DIAG_WARP=EXITED'; exit 57; }
+            listen "$warp_port" && break
+            sleep .25
+          done
+          listen "$warp_port" || { echo 'WINDOW_DIAG_WARP=NOT_LISTENING'; exit 58; }
+          curl --socks5-hostname "127.0.0.1:$warp_port" -fsS --max-time 15 \
+            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' || { echo 'WINDOW_DIAG_WARP=EGRESS_FAIL'; exit 59; }
+          echo 'WINDOW_DIAG_WARP=PASS'
+
+          home="$root/home"
+          package="$home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          mkdir -p "$(dirname "$package")"
+          cp -a --reflink=auto "$source_pkg" "$package"
+          client="$package/bin/client"
+          [[ -x "$client" && ! -L "$client" ]] || { echo 'WINDOW_DIAG_REFUSED=COPIED_CLIENT'; exit 60; }
+          [[ "$(stat -c %s "$client")" == "$size" && "$(sha256sum "$client" | awk '{print $1}')" == "$sha" ]] || { echo 'WINDOW_DIAG_REFUSED=COPIED_CLIENT_FENCE'; exit 61; }
+          cat >"$root/proxychains.conf" <<EOF
+          strict_chain
+          proxy_dns
+          remote_dns_subnet 224
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 $warp_port
+          EOF
+          chmod 600 "$root/proxychains.conf"
+
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_DIAG_TASK="$task" OTCLIENT_TIBIA_RE_ROLE=xvfb \
+            HOME="$home" PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+            XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \
+            nohup "$tool/usr/bin/Xvfb" "$display" -screen 0 1920x1080x24 \
+            -xkbdir "$tool/usr/share/X11/xkb" -nolisten tcp -noreset \
+            >"$root/xvfb.log" 2>&1 </dev/null &
+          xvfb_pid=$!
+          for _ in $(seq 1 60); do
+            [[ -e "/tmp/.X11-unix/X${display_number}" ]] && break
+            kill -0 "$xvfb_pid" 2>/dev/null || { echo 'WINDOW_DIAG_XVFB=EXITED'; exit 62; }
+            sleep .2
+          done
+          [[ -e "/tmp/.X11-unix/X${display_number}" ]] || { echo 'WINDOW_DIAG_XVFB=NO_SOCKET'; exit 63; }
+          echo 'WINDOW_DIAG_XVFB=PASS'
+
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_DIAG_TASK="$task" OTCLIENT_TIBIA_RE_ROLE=vnc \
+            HOME="$home" DISPLAY="$display" \
+            nohup "$tool/usr/bin/x11vnc" -display "$display" -rfbport "$vnc_port" \
+            -forever -shared -viewonly -localhost -nopw -noxdamage \
+            >"$root/vnc.log" 2>&1 </dev/null &
+          vnc_pid=$!
+          for _ in $(seq 1 60); do
+            listen "$vnc_port" && break
+            kill -0 "$vnc_pid" 2>/dev/null || { echo 'WINDOW_DIAG_VNC=EXITED'; exit 64; }
+            sleep .2
+          done
+          listen "$vnc_port" || { echo 'WINDOW_DIAG_VNC=NOT_LISTENING'; exit 65; }
+          echo 'WINDOW_DIAG_VNC=PASS'
+
+          (
+            cd "$package"
+            exec setsid env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+              OTCLIENT_TIBIA_RE_DIAG_TASK="$task" OTCLIENT_TIBIA_RE_ROLE=client \
+              HOME="$home" DISPLAY="$display" \
+              PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+              LD_LIBRARY_PATH="$package/bin/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/usr/lib/x86_64-linux-gnu/libproxy:$tool/lib/x86_64-linux-gnu" \
+              QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+              XDG_DATA_DIRS="$tool/usr/share:/usr/share" FONTCONFIG_PATH="$tool/etc/fonts" \
+              FONTCONFIG_FILE="$tool/etc/fonts/fonts.conf" LD_PRELOAD="$preload" \
+              PROXYCHAINS_CONF_FILE="$root/proxychains.conf" \
+              "$client"
+          ) >"$root/client.log" 2>&1 &
+          client_pid=$!
+          sleep .2
+          client_pgid="$(ps -o pgid= -p "$client_pid" 2>/dev/null | tr -d ' ' || true)"
+          [[ "$client_pgid" == "$client_pid" ]] || {
+            echo "WINDOW_DIAG_REFUSED=CLIENT_NOT_ISOLATED_GROUP:pid=$client_pid:pgid=$client_pgid"
+            exit 66
+          }
+          echo "WINDOW_DIAG_CLIENT_PID=$client_pid"
+          echo 'WINDOW_DIAG_CLIENT_START=PASS'
+
+          sanitize_text() {
+            python3 -c 'import re,sys; s=sys.stdin.read(); s=re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}","<redacted-email>",s); s=re.sub(r"(?i)((?:password|token|authorization|cookie|session)[^=:\\s]{0,20}[=:]\\s*)\\S+",r"\\1<redacted>",s); s="".join(ch if ch.isprintable() or ch in "\\n\\t" else "?" for ch in s); print(s[:300],end="")'
+          }
+
+          descendant_pids() {
+            local frontier="$client_pid" next='' pid child depth
+            printf '%s\n' "$client_pid"
+            for depth in 1 2 3; do
+              next=''
+              for pid in $frontier; do
+                while read -r child; do
+                  [[ "$child" =~ ^[0-9]+$ ]] || continue
+                  [[ -r "/proc/$child/environ" ]] || continue
+                  grep -azFxq "$marker" "/proc/$child/environ" || continue
+                  printf '%s\n' "$child"
+                  next+=" $child"
+                done < <(pgrep -P "$pid" 2>/dev/null || true)
+              done
+              frontier="$next"
+              [[ -n "$frontier" ]] || break
+            done
+          }
+
+          snapshot() {
+            local label="$1" out="$root/windows-$label.tsv" pids="$root/pids-$label.txt" win wpid title class geom owned relation
+            echo "WINDOW_DIAG_SNAPSHOT=$label"
+            if kill -0 "$client_pid" 2>/dev/null; then echo 'WINDOW_DIAG_CLIENT_ALIVE=true'; else echo 'WINDOW_DIAG_CLIENT_ALIVE=false'; fi
+            descendant_pids | sort -nu >"$pids"
+            while read -r pid; do
+              [[ "$pid" =~ ^[0-9]+$ ]] || continue
+              ppid="$(awk '{print $4}' "/proc/$pid/stat" 2>/dev/null || true)"
+              comm="$(cat "/proc/$pid/comm" 2>/dev/null || true)"
+              exe="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+              echo "WINDOW_DIAG_TASK_PROCESS=pid=$pid:ppid=${ppid:-unknown}:comm=${comm:-unknown}:exe=$(basename "${exe:-unknown}")"
+            done <"$pids"
+            : >"$out"
+            mapfile -t windows < <(DISPLAY="$display" "$tool/usr/bin/xdotool" search --onlyvisible --name '.*' 2>/dev/null | sort -nu | head -n 30 || true)
+            echo "WINDOW_DIAG_VISIBLE_WINDOW_COUNT=${#windows[@]}"
+            for win in "${windows[@]}"; do
+              wpid="$(DISPLAY="$display" "$tool/usr/bin/xdotool" getwindowpid "$win" 2>/dev/null || true)"
+              title="$(DISPLAY="$display" "$tool/usr/bin/xdotool" getwindowname "$win" 2>/dev/null || true)"
+              class="$(DISPLAY="$display" "$tool/usr/bin/xdotool" getwindowclassname "$win" 2>/dev/null || true)"
+              geom="$(DISPLAY="$display" "$tool/usr/bin/xdotool" getwindowgeometry --shell "$win" 2>/dev/null | tr '\n' ',' || true)"
+              owned=false
+              relation=other
+              if [[ "$wpid" =~ ^[0-9]+$ ]] && grep -Fxq "$wpid" "$pids"; then
+                owned=true
+                if [[ "$wpid" == "$client_pid" ]]; then relation=launched_pid; else relation=owned_descendant; fi
+              fi
+              safe_title="$(printf '%s' "$title" | sanitize_text)"
+              safe_class="$(printf '%s' "$class" | sanitize_text)"
+              echo "WINDOW_DIAG_WINDOW=id=$win:pid=${wpid:-unknown}:owned=$owned:relation=$relation:title=$safe_title:class=$safe_class:geometry=$geom"
+              printf '%s\t%s\t%s\t%s\t%s\n' "$win" "${wpid:-}" "$owned" "$relation" "$title" >>"$out"
+            done
+          }
+
+          sleep 5
+          snapshot t05
+          sleep 10
+          snapshot t15
+          sleep 20
+          snapshot t35
+
+          echo '=== WINDOW_DIAG_CLIENT_LOG_SANITIZED ==='
+          python3 - "$root/client.log" <<'PY'
+          import pathlib,re,sys
+          p=pathlib.Path(sys.argv[1])
+          text=p.read_text(errors='replace') if p.exists() else ''
+          lines=text.splitlines()
+          chosen=lines[:40] + (['...<middle omitted>...'] if len(lines)>120 else []) + (lines[-80:] if len(lines)>40 else [])
+          seen=0
+          for line in chosen:
+              line=re.sub(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}','<redacted-email>',line)
+              line=re.sub(r'(?i)((?:password|token|authorization|cookie|session)[^=:\s]{0,20}[=:]\s*)\S+',r'\1<redacted>',line)
+              line=''.join(ch if ch.isprintable() else '?' for ch in line)[:400]
+              print('WINDOW_DIAG_CLIENT_LOG='+line)
+              seen+=1
+              if seen>=121: break
+          print(f'WINDOW_DIAG_CLIENT_LOG_TOTAL_LINES={len(lines)}')
+          PY
+
+          final="$root/windows-t35.tsv"
+          if ! kill -0 "$client_pid" 2>/dev/null; then
+            classification=CLIENT_EXITED_WITHIN_35S
+          elif awk -F'\t' '$3=="true" && $4=="launched_pid" && $5=="Tibia" {found=1} END{exit !found}' "$final"; then
+            classification=LAUNCHED_PID_TIBIA_WINDOW_FOUND
+          elif awk -F'\t' '$3=="true" && $4=="owned_descendant" {found=1} END{exit !found}' "$final"; then
+            classification=OWNED_DESCENDANT_VISIBLE_WINDOW_FOUND
+          elif awk -F'\t' '$3=="true" {found=1} END{exit !found}' "$final"; then
+            classification=LAUNCHED_RUNTIME_VISIBLE_WINDOW_DIFFERENT_TITLE_OR_CLASS
+          elif [[ -s "$final" ]]; then
+            classification=VISIBLE_WINDOW_FOREIGN_TO_TASK_NAMESPACE
+          else
+            classification=CLIENT_ALIVE_NO_VISIBLE_WINDOWS_ON_ISOLATED_DISPLAY
+          fi
+          echo "WINDOW_DIAG_CLASSIFICATION=$classification"
+          echo 'WINDOW_DIAG_RESULT=PASS_DISCRIMINATOR_CAPTURED'

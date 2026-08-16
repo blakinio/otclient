@@ -2,18 +2,37 @@
 
 ```yaml
 task_id: OTC-20260816-official-client-map-viewport-feasibility
+policy_version: 2
+project_lane: otclient
 track: official-client-re
 repository: blakinio/otclient
-task_kind: research_documentation
-phase: documenting
-status: ACTIVE
+task_kind: discovery
+implementation_authorized: false
+phase: validate
+status: validating
 base_branch: main
 base_head: 3a5568f36ebc326afd246d0d2da45b5d8eecabfa
 branch: docs/OTC-20260816-official-client-map-viewport-feasibility
+pull_request: 325
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: finalize_archive_and_continue
-user_communication: low_noise
+session_id: chat-20260816-viewport-feasibility
+session_role: validator
+execution_mode: chat_github_connector
+execution_reason: narrow repository documentation, primary GitHub evidence review and PR closeout require no owner-funded AI or local checkout
+updated_at: 2026-08-16T08:40:00+02:00
+context_pressure: medium
+context_growth: stable
+context_score: 7
+estimate_confidence: medium
+decomposition_decision: single
+decomposition_reason: one cohesive evidence checkpoint with one report, one evidence index and one task lifecycle
+validation_level: focused
+session_rotation_count: 0
+heavy_validation_runs: 0
+stale_takeover_count: 0
+human_interruptions: 0
 ```
 
 ## Objective
@@ -33,9 +52,11 @@ docs/agents/tasks/archive/OTC-20260816-official-client-map-viewport-feasibility.
 
 It does not own or mutate official-client runtime, client bytes, workflows, Track A controller/registration state, PR #300 coordinator paths, PR #303 runtime surfaces, PR #324 governance paths, Track B, Canary/Otheryn, proprietary assets, credentials, captures with private data, or owner-funded AI/API resources.
 
-## Track A runtime admission
+## Track A runtime boundary
 
-This task intentionally uses the fail-closed static/documentation class described by the pending runtime-admission governance in PR #324 so the record remains safe if that contract lands before this PR closes.
+Authority for this task comes from the trusted-base `AGENTS.md` hierarchy and `docs/agents/TIBIA_RESEARCH_TRACKS.md` on `main`, not from pending PR prose or unmerged governance.
+
+This task is static/documentation-only:
 
 ```yaml
 track_id: official-client-re
@@ -53,7 +74,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 ```
 
-No live runtime operation is authorized by this task.
+No live runtime operation is authorized or performed by this task.
 
 ## Exact researched client fence
 
@@ -78,22 +99,23 @@ Untrusted/stale narrative, historical PIDs/PIE addresses, old display assumption
 
 ## Related live work / overlap boundary
 
-- PR #300 owns Track A promotion/integration coordinator paths. This task must not edit its owned report/task/evidence or shared changelog/catalogue files.
+- PR #300 owns Track A promotion/integration coordinator paths. This task does not edit its owned report/task/evidence or shared changelog/catalogue files.
 - PR #303 owns its declared runtime-reacquisition surfaces. This task performs no runtime observation or mutation.
-- PR #324 owns Track A runtime-agent governance. This task is documentation-only and records `runtime_access: none`.
+- PR #324 owns pending Track A runtime-agent governance. This task does not consume that unmerged PR as authority and does not edit its paths.
 - PR #302 supplied the exact static-ELF artifact used as evidence; this task consumes it read-only.
 
-## Feature scope
+## Delivery classification
 
 ```yaml
 feature_scope:
-  type: internal_only
+  type: documentation
   user_facing: false
   backend_required: false
   frontend_required: false
   integration_required: false
   e2e_required: false
-  completion_claim: internal_only
+implementation_status: documentation_evidence_checkpoint
+user_facing_feature_complete: false
 ```
 
 ## Acceptance inventory
@@ -101,45 +123,80 @@ feature_scope:
 1. A durable report records the exact official-client fence and provenance for every material finding.
 2. Exact-binary evidence for `TWorldMapExtent`, `TWorldMapSubfieldExtent`, `TWorldMapStorage`, `TWorldMapViewport`, `TWorldMapCamera`, `TWorldmapProtocolMessageHandler`, `TWorldMapRenderProvider`, `onCameraViewportChanged` and `TMapScaleFactor` is preserved without committing client bytes.
 3. The current `18 x 14` interpretation is not promoted beyond the strength of its retained evidence; raw-log retention limitations are explicit.
-4. Feasibility is classified as INFERENCE, not implemented/proven patch support.
+4. Feasibility is classified as derived/high-confidence research direction, not implemented/proven patch support.
 5. Unknowns include field offsets, fixed allocations, parser/serializer limits, renderer limits, server-side awareness requirements and maximum safe dimensions.
 6. Quantitative candidate sizes distinguish linear dimension growth from tile-count growth.
-7. The next experiment is bounded and starts with static field/callsite recovery; any future live mutation must independently pass current Track A runtime admission and ownership gates.
+7. The next experiment is bounded and starts with static field/callsite recovery; any future live mutation must independently pass then-current Track A runtime admission and ownership gates.
 8. No proprietary binary/assets, credentials, private captures or personal data are committed.
-9. Documentation/path/diff audit passes; runtime E2E is `NOT_APPLICABLE_WITH_REASON`.
-10. Required exact-head GitHub checks pass and the PR reaches an intentional terminal state.
+9. Documentation/path/diff audit passes; runtime E2E is `NOT_APPLICABLE` with the reason that this PR changes documentation/evidence only and no runtime behavior.
+10. Required exact-head GitHub checks pass and PR #325 reaches an intentional terminal state before task completion.
 
-## Validation plan
-
-```yaml
-focused:
-  - exact path/content review
-  - provenance and claim-strength review
-  - link/identifier consistency review
-component: documentation-only; no product compilation required by BUILD_TEST_MATRIX
-fresh_audit: proportionate final diff/path/contradiction/privacy/PR-hygiene review
-e2e: NOT_APPLICABLE_WITH_REASON: documentation-only evidence checkpoint; no runtime behavior changed
-final_ci: required repository checks on exact final head
-```
-
-## Current state
+## Current evidence state
 
 ```yaml
 PROVEN:
   - exact researched client fence exists on canonical main documentation
-  - exact static artifact/run identifiers verified
-  - selected worldmap/view/camera/storage/protocol/render semantic strings verified in downloaded artifact text
-  - historical reversible-step run/job and workflow logic verified
+  - exact static artifact/run identifiers verified through GitHub Actions metadata
+  - selected worldmap/view/camera/storage/protocol/render semantic strings verified in the downloaded exact artifact text
+  - historical reversible-step run/job/workflow logic verified
 DERIVED:
-  - separate worldmap extent/storage/viewport/camera/protocol/render types make a larger viewport technically plausible
+  - separate worldmap extent/storage/viewport/camera/protocol/render concepts make a larger loaded/rendered area technically plausible
+  - observed historical edge geometry is consistent with an 18_x_14 baseline, but the consumed downloadable artifact does not retain the raw TSV/job-log rows
 UNKNOWN:
   - exact patch points and maximum safe viewport
   - whether all relevant buffers are dynamic
   - whether terrain-only expansion can be separated from live entity awareness in the exact client
-  - current canonical live runtime state for a future mutation experiment
+  - current canonical live runtime state for any future mutation experiment
 CONFLICT: []
+```
+
+## Validation and closeout checkpoint
+
+```yaml
+focused_validation:
+  changed_paths_reviewed: true
+  full_pr_diff_reviewed: true
+  provenance_rechecked_against_primary_github_metadata: true
+  claim_strength_reviewed: true
+  proprietary_or_secret_material_found: false
+  ownership_overlap_found: false
+component_validation:
+  result: NOT_APPLICABLE
+  reason: documentation/evidence-only change; no product/runtime code changed
+e2e:
+  result: NOT_APPLICABLE
+  reason: documentation/evidence-only checkpoint; no executable or user-facing runtime behavior changed
+fresh_audit:
+  state: remediation_in_progress
+  validator_role: chat-20260816-viewport-feasibility / validator role using exact PR diff and primary evidence rather than implementer narrative
+  finding: OTC325-AUD-001
+  finding_severity: medium
+  finding_summary: initial task checkpoint used non-canonical v2 task/delivery fields and referenced pending PR #324 too strongly in its runtime-admission wording
+  disposition: fixed_in_current_checkpoint
+final_ci:
+  state: pending_after_audit_remediation
+pull_requests:
+  related:
+    - blakinio/otclient#325: current_delivery_pr
+  unresolved_threads: pending_final_check
+```
+
+## Anti-stall checkpoint
+
+```yaml
+invocation_started_at: 2026-08-16T08:31:00+02:00
+last_progress_at: 2026-08-16T08:40:00+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: draft
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 1
+context_reconstruction_attempts: 0
+stall_warnings: 0
 ```
 
 ## Next action
 
-Create the durable report and compact non-proprietary evidence extract, review the full branch diff, then complete documentation-only audit/CI/PR closeout.
+Re-audit the remediated exact PR diff as a fresh validator-role pass, then freeze the closeout/archive head and run required exact-head CI before merge.

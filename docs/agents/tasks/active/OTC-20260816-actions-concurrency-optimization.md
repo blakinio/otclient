@@ -1,42 +1,46 @@
-# OTC-20260816-actions-concurrency-optimization
-
+---
+task_id: OTC-20260816-actions-concurrency-optimization
 status: active
+owner: current-agent
 branch: ci/OTC-20260816-actions-concurrency-optimization
-base: main
-pr: 328
+base_branch: main
+related_pr: "328"
 feature_scope: infrastructure
 completion_claim: internal_only
+ownership_released: false
+owned_paths:
+  - .github/workflows/ci.yml
+  - .github/workflows/infrastructure-retry.yml
+  - docs/agents/tasks/active/OTC-20260816-actions-concurrency-optimization.md
+  - docs/agents/tasks/archive/OTC-20260816-actions-concurrency-optimization.md
+---
+
+# OTC-20260816 Actions concurrency optimization
 
 ## Objective
 
 Reduce avoidable GitHub-hosted runner occupancy and queue amplification without weakening repository-required validation: documentation/task-only changes must not fan out into unrelated Lua/static-analysis jobs, compile-relevant changes must retain the existing Windows build gate, and intentionally cancelled superseded CI runs must not be automatically retried.
 
-## Ownership
+## Ownership and coordination
 
-owned_paths:
-- .github/workflows/ci.yml
-- .github/workflows/infrastructure-retry.yml
-- docs/agents/tasks/active/OTC-20260816-actions-concurrency-optimization.md
-- docs/agents/tasks/archive/OTC-20260816-actions-concurrency-optimization.md
+Reuses:
+- existing `dorny/paths-filter` scope classifier in `.github/workflows/ci.yml`;
+- existing `CI / Required` aggregate gate;
+- existing one-shot infrastructure retry classifier.
 
-reuses:
-- existing `dorny/paths-filter` scope classifier in `.github/workflows/ci.yml`
-- existing `CI / Required` aggregate gate
-- existing one-shot infrastructure retry classifier
+Dependencies: none.
 
-depends_on: []
-blocks: []
-cross_repository_tasks:
-- `blakinio/Otheryn`: separate CI-concurrency optimization task in PR #417; no shared branch or file ownership
-- `blakinio/Oteryn-Platform`: audited separately; current Edge Security workflow already ignores `docs/agents/**` and cancels superseded runs
-- `blakinio/freqtrade`: audited separately; live CI load is dominated by active governance PR #1563 and its risk-aware component graph
+Cross-repository coordination:
+- `blakinio/Otheryn`: separate CI-concurrency optimization task in PR #417; no shared branch or file ownership;
+- `blakinio/Oteryn-Platform`: audited separately; current Edge Security workflow already ignores `docs/agents/**` and cancels superseded runs;
+- `blakinio/freqtrade`: audited separately; live CI load is dominated by active governance PR #1563 and its risk-aware component graph.
 
 ## Live evidence at claim
 
 - GitHub Pro concurrency pressure was observed across the owner's repositories; current repository state at 2026-08-16 showed queued CI/retry runs while other repositories occupied many GitHub-hosted runners.
 - `CI` already uses per-PR/ref concurrency with `cancel-in-progress: true`.
 - Every ordinary PR currently starts `Detect Build Scope`, two jobs inside `Fast Checks`, and `Lua Syntax` before `CI / Required`, even for documentation-only changes.
-- `.github/workflows/infrastructure-retry.yml` treats `cancelled` as retryable when it does not find a newer run, despite intentional cancellation being part of the CI concurrency design.
+- `.github/workflows/infrastructure-retry.yml` treated `cancelled` as retryable when it did not find a newer run, despite intentional cancellation being part of the CI concurrency design.
 - Open PR #280 owns only the dedicated Synology runner stack/migration workflow and does not overlap `.github/workflows/ci.yml` or `.github/workflows/infrastructure-retry.yml`.
 
 ## Implemented change
@@ -87,5 +91,6 @@ proven:
   - scoped general CI fanout implemented
   - cancelled conclusions removed from automatic retry eligibility
   - PR #280 path ownership does not overlap this task
-next_action: inspect PR #328 exact diff and exact-head emitted checks; promote from draft only after workflow validation is green
+  - active task now carries required YAML front matter after deterministic governance audit identified the omission
+next_action: inspect PR #328 exact-head emitted checks after the front-matter fix; promote from draft only after workflow validation is green
 ```

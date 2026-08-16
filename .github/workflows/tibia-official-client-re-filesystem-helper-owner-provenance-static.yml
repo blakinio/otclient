@@ -1,0 +1,84 @@
+name: Track A filesystem-helper owner provenance static probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-filesystem-helper-owner-provenance-static.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-filesystem-helper-owner-provenance.md
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Trace TTibiaFileSystemHelper ownership statically
+    runs-on: [otclient, synology]
+    timeout-minutes: 7
+    steps:
+      - name: Disassemble exact bounded owner and constructor regions
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || exit 2
+          client='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/client'
+          [[ -f "$client" ]] || exit 3
+          [[ "$(stat -c '%s' "$client")" == '51965216' ]] || exit 4
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
+          echo 'OWNER_PROV_CLIENT_FENCE=PASS'
+          echo "OWNER_PROV_OBJDUMP=$(command -v objdump || true)"
+          echo "OWNER_PROV_LLVM_OBJDUMP=$(command -v llvm-objdump || true)"
+          if command -v objdump >/dev/null 2>&1; then
+            for spec in \
+              'CTOR1:0x5ef300:0x5ef760' \
+              'OWNER_GETTERS:0x6b9f40:0x6ba130' \
+              'OWNER_NEAR:0x6ba130:0x6ba500' \
+              'LOADER_CALLER:0x6fc430:0x6fc560' \
+              'CTOR2:0x19a6880:0x19a6c80'; do
+              IFS=: read -r label start stop <<<"$spec"
+              echo "OWNER_PROV_${label}_BEGIN"
+              objdump -d -M intel --start-address="$start" --stop-address="$stop" "$client"
+              echo "OWNER_PROV_${label}_END"
+            done
+          fi
+          python3 - "$client" <<'PY'
+          import hashlib,pathlib,struct,sys
+          d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
+          h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
+          _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
+          shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
+          st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
+          def cs(blob,o):
+              e=blob.find(b'\0',o); e=len(blob) if e<0 else e
+              return blob[o:e].decode('utf8','replace')
+          secs=[]
+          for x in sh: secs.append({'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]})
+          text=next(s for s in secs if s['name']=='.text'); tb=d[text['off']:text['off']+text['size']]
+          def b_at(va,n):
+              off=text['off']+(va-text['addr']); return d[off:off+n]
+          # Exact rel32 callsites to getter 0x6ba0b0; emit compact windows around each to identify owner register provenance.
+          getter=0x6ba0b0; calls=[]
+          for i in range(len(tb)-5):
+              if tb[i]!=0xe8: continue
+              va=text['addr']+i
+              if va+5+struct.unpack_from('<i',tb,i+1)[0]==getter: calls.append(va)
+          print(f'OWNER_PROV_GETTER_CALL_COUNT={len(calls)}')
+          print('OWNER_PROV_GETTER_CALLS='+','.join(hex(v) for v in calls))
+          for va in calls:
+              start=max(text['addr'],va-0x28); end=min(text['addr']+text['size'],va+0x28)
+              blob=b_at(start,end-start)
+              print(f'OWNER_PROV_GETTER_WINDOW call=0x{va:x} start=0x{start:x} size=0x{len(blob):x} sha256={hashlib.sha256(blob).hexdigest()} hex={blob.hex()}')
+          # Exact vptr RIP-relative target appears at known proven construction sites. Preserve immutable windows.
+          for label,start,end in [
+              ('ctor1',0x5ef480,0x5ef590),
+              ('getter_cluster',0x6b9f40,0x6ba130),
+              ('loader_owner',0x6fc450,0x6fc530),
+              ('ctor2',0x19a6a20,0x19a6b30),
+          ]:
+              blob=b_at(start,end-start)
+              print(f'OWNER_PROV_WINDOW label={label} start=0x{start:x} end=0x{end:x} sha256={hashlib.sha256(blob).hexdigest()} hex={blob.hex()}')
+          print('OWNER_PROV_EXECUTED_TARGET=false')
+          print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
+          print('OWNER_PROV_MUTATION_PERFORMED=false')
+          PY

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-xvfb-glx-capability
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-xvfb-glx-capability-20260816
 session_role: runtime_infrastructure_observer
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: runtime_infrastructure_inventory
-phase: contained-xvfb-glx-capability-readonly
+phase: coordinator-promotion-ready
 branch: diag/OTC-20260816-track-a-xvfb-glx-capability
 base_branch: main
 base_main: d3f186414256151c9d5e03f34c5a9026b1fba500
 risk: low
-updated: 2026-08-16T20:29:00+02:00
+updated: 2026-08-16T20:34:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xvfb-glx-capability.md
   - docs/agents/evidence/OTC-20260816-track-a-xvfb-glx-capability/**
-  - .github/workflows/tibia-official-client-re-xvfb-glx-capability.yml
 modules_touched: []
 reuses:
   - PR #415 terminal XCB GL runtime-trace evidence as unpromoted research input only
@@ -28,7 +27,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: the isolated runtime discriminator directly observed GLX absent on the task-owned Xvfb display while Qt successfully loaded the xcb_glx integration plugin; this task inspects only the fixed contained Xvfb support filesystem/binary surface to determine whether GLX support is present before any separate Xvfb-only execution
+execution_reason: the isolated runtime discriminator directly observed GLX absent on the task-owned contained-Xvfb display while Qt successfully loaded the xcb_glx integration plugin; this task inspected only the fixed contained Xvfb support filesystem/binary surface to determine whether GLX support exists before any separate Xvfb-only execution
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -55,8 +54,7 @@ owner_funded_ai_api_authorized: false
 observation_allowlist:
   - /work/_otclient_tibia_re_state/toolroot/usr/bin/Xvfb
   - /work/_otclient_tibia_re_state/toolroot/usr/lib/xorg/modules/**
-  - /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/** only as ldd-resolved dependencies of Xvfb or fixed GLX module candidates
-  - ELF metadata, SHA-256, file metadata, bounded printable-string matches for GLX symbols/names
+  - fixed contained dependency roots under /work/_otclient_tibia_re_state/toolroot
 forbidden_observation:
   - official client package/files/processes
   - /proc process inventory
@@ -65,19 +63,62 @@ forbidden_observation:
   - network/game/login state
   - credentials or environment secrets
   - Track B and historical PR #303 runtime surfaces
+attempts:
+  - run: 31964825329
+    job: 95208270559
+    result: HARNESS_FAILURE
+    cause: external file/binutils commands unavailable on runner
+    xserver_started: false
+    client_started: false
+    semantic_conclusion_authorized: false
+  - run: 31964879003
+    job: 95208403843
+    result: SUCCESS
+    parser: python_stdlib_only
+    xserver_started: false
+    client_started: false
+    canonical_state_access: NONE
+result:
+  classification: PROVEN_CONTAINED_XVFB_HAS_GLX_SERVER_CODE_LIBGLX_MODULE_AND_CONTAINED_LIBGL_DEPENDENCY_RUNTIME_GLX_INITIALIZATION_UNPROVEN
+  xvfb_path: /work/_otclient_tibia_re_state/toolroot/usr/bin/Xvfb
+  xvfb_sha256: 2c7f5a9534410fed5092d782a69ca7ffd9fce80e98b81ffe4944d703dd11d3b1
+  xvfb_size: 2064864
+  xvfb_libGL_needed: true
+  xvfb_libGL_resolved_contained: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/libGL.so.1.7.0
+  xvfb_glx_string_count: 11
+  xvfb_has_iglx_options: true
+  xvfb_has_glx_provider_diagnostics: true
+  module_root_present: true
+  libglx_module_present: true
+  libglx_sha256: 373b75559ee9a17449dfb84871bb7e5e306da7bd3aecd3282c7f03831ccf961a
+  libglx_direct_dependencies_resolved_contained: true
+  libglamoregl_present: true
+  libglamoregl_sha256: 431437fee72a299a4c8b38f84eeb36aedf6e78b53a603956843377d536355acd
+  libglamoregl_direct_dependencies_resolved_contained: true
+  runtime_glx_initialization: UNKNOWN
+one_shot_workflow_removed: true
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-xvfb-glx-capability/20260816-contained-xvfb-glx-capability.md
+audit:
+  result: PASS_PENDING_EXACT_FINAL_HEAD_CHECKS
+  material_findings_open: 0
+  notes:
+    - first attempt was harness-only and started no X server/client
+    - successful inventory used Python stdlib only and no external parser utilities
+    - one-shot workflow was removed before terminal task/evidence checkpoint
 acceptance:
-  - exact fixed support root and Xvfb path validated as real non-symlink contained objects
-  - Xvfb SHA-256 and ELF dependency surface recorded
-  - fixed xorg module tree inventoried only for GLX/glamor-related files
-  - any libglx module SHA/dependency metadata recorded
-  - bounded Xvfb printable-string search classifies whether GLX names/symbols are compiled/referenced
-  - no X server or official client is started
-  - no canonical state access
-  - one-shot workflow removed after capture
-last_completed_step: PR #415 run 31964397523/job 95207211173 directly observed GLX absent from a task-owned contained-Xvfb display while Qt loaded libqxcb-glx-integration.so
-next_action: perform exactly one read-only fixed-path contained-Xvfb GLX capability inventory; use its result to decide whether a separately admitted Xvfb-only +extension GLX execution is justified
+  - exact fixed support root and Xvfb path validated: PASS
+  - Xvfb SHA/ELF dependency surface recorded: PASS
+  - contained GLX/glamor module tree inventoried: PASS
+  - libglx direct dependencies resolved in fixed root: PASS
+  - bounded Xvfb GLX strings recorded: PASS
+  - no X server/client started: PASS
+  - no canonical state access: PASS
+  - one-shot workflow removed: PASS
+last_completed_step: run 31964879003/job 95208403843 proved the exact contained Xvfb includes GLX server code/options, depends on contained libGL.so.1, and has contained libglx.so plus libglamoregl.so with direct dependencies resolved; runtime GLX initialization remains unproven
+next_action: coordinator-promote/archive this Draft after exact-final-head checks; separately admit exactly one task-owned Xvfb-only +extension GLX probe with stderr plus core-X11 extension query, without official client/VNC/WARP or canonical state access
 ---
 
-# Track A contained Xvfb GLX capability inventory
+# Track A contained Xvfb GLX capability inventory — terminal candidate
 
-Read-only support-filesystem evidence only. This task must not start Xvfb or the official client and must not inspect canonical runtime state.
+Static/read-only capability is present. The next question is whether the exact contained server can actually expose GLX when explicitly requested.

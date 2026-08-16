@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Validate exact BattlEye initializer anchors
+    name: Map static QString initializer helper
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - name: Re-derive adjacent global and literal instructions
+      - name: Trace helper 0x6b2350 into Qt QString construction
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -37,48 +37,55 @@ jobs:
           def cs(b,o):
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
-          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in raw]
-          text=next(s for s in secs if s['name']=='.text')
-          def vaoff(va):
+          secs=[]
+          for i,x in enumerate(raw):secs.append({'idx':i,'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9],'link':x[6]})
+          by={s['name']:s for s in secs};text=by['.text']
+          def voff(va):
               for s in secs:
                   if s['name']!='.bss' and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
-              return None
           def b_at(va,n):
-              o=vaoff(va);return b'' if o is None else d[o:o+n]
-          def rip7(va):
-              x=b_at(va,7)
-              if len(x)!=7:raise SystemExit(f'FAIL_SHORT_RIP@0x{va:x}')
-              return va+7+struct.unpack_from('<i',x,3)[0]
+              o=voff(va);return b'' if o is None else d[o:o+n]
           def rel32(va):
               x=b_at(va,5)
               if len(x)!=5 or x[0]!=0xe8:raise SystemExit(f'FAIL_NOT_CALL@0x{va:x}:{x.hex()}')
               return va+5+struct.unpack_from('<i',x,1)[0]
-          # Exact tiny candidate window only.
-          w=b_at(0x613450,0x70)
-          print('FS_RESOLVER_INIT_TINY_SHA256='+hashlib.sha256(w).hexdigest())
-          print('FS_RESOLVER_INIT_TINY_HEX='+w.hex())
-          # These two instructions came from the exploratory candidate; now validate exact boundaries/opcodes/targets.
-          g=b_at(0x613463,7);lit=b_at(0x61346a,7)
-          print(f'FS_RESOLVER_INIT_GLOBAL_INSN={g.hex()} target=0x{rip7(0x613463):x}')
-          print(f'FS_RESOLVER_INIT_LITERAL_INSN={lit.hex()} target=0x{rip7(0x61346a):x}')
-          if g[:3] != bytes.fromhex('4c8d25') or rip7(0x613463)!=0x31964a0:raise SystemExit('FS_RESOLVER_FAIL=global_instruction')
-          if lit[:3] != bytes.fromhex('488d35') or rip7(0x61346a)!=0x1d7b160:raise SystemExit('FS_RESOLVER_FAIL=BattlEye_literal_instruction')
-          if b_at(0x613471,3)!=bytes.fromhex('4c89e7'):raise SystemExit('FS_RESOLVER_FAIL=global_to_rdi')
-          print('FS_RESOLVER_PASS=adjacent_global_BattlEye_initializer_inputs')
-          # Next call(s) from these exact sequential boundaries.
-          if b_at(0x613474,1)==b'\xe8':
-              print(f'FS_RESOLVER_INIT_CONSTRUCT_CALL=0x{rel32(0x613474):x} bytes={b_at(0x613474,5).hex()}')
-          else:
-              print(f'FS_RESOLVER_INIT_AFTER_ARGS_BYTES={b_at(0x613474,24).hex()}')
-          # print exact direct calls in only this 0x70-byte window for subsequent mapping, no global census claim.
-          print('FS_RESOLVER_INIT_TINY_CALLS_BEGIN')
-          for i in range(len(w)-5):
-              if w[i]==0xe8:
-                  va=0x613450+i
-                  try:dst=rel32(va)
-                  except:continue
-                  print(f'call=0x{va:x} target=0x{dst:x} bytes={b_at(va,5).hex()}')
-          print('FS_RESOLVER_INIT_TINY_CALLS_END')
+          # dynsym/GOT map for PLT target names.
+          dyn=by['.dynsym'];ss=secs[dyn['link']];sb=d[ss['off']:ss['off']+ss['size']];syms=[]
+          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
+              no,info,other,si,val,sz=struct.unpack_from('<IBBHQQ',d,o);syms.append((cs(sb,no),val,sz,si,info))
+          gotnames={}
+          for rn in ('.rela.plt','.rela.dyn'):
+              r=by.get(rn)
+              if not r:continue
+              for o in range(r['off'],r['off']+r['size'],r['entsize'] or 24):
+                  ro,ri,ad=struct.unpack_from('<QQq',d,o);sym=ri>>32
+                  if sym and sym<len(syms):gotnames[ro]=syms[sym][0]
+          def plt_name(va):
+              x=b_at(va,24)
+              for p in range(min(10,max(0,len(x)-6))):
+                  if x[p:p+2]==b'\xff\x25':
+                      got=va+p+6+struct.unpack_from('<i',x,p+2)[0];return gotnames.get(got,''),got,x.hex()
+              return '',None,x.hex()
+          # Revalidate initializer arguments and target first.
+          if b_at(0x613463,3)!=bytes.fromhex('4c8d25') or b_at(0x61346a,3)!=bytes.fromhex('488d35') or b_at(0x613471,3)!=bytes.fromhex('4c89e7'):
+              raise SystemExit('FS_RESOLVER_FAIL=initializer_boundaries')
+          if rel32(0x613474)!=0x6b2350:raise SystemExit('FS_RESOLVER_FAIL=initializer_helper_target')
+          print('FS_RESOLVER_PASS=BattlEye_global_initializer_call_0x6b2350')
+          start,end=0x6b2350,0x6b24c0;blob=b_at(start,end-start)
+          print('FS_RESOLVER_HELPER_SHA256='+hashlib.sha256(blob).hexdigest())
+          print('FS_RESOLVER_HELPER_HEX='+blob.hex())
+          print('FS_RESOLVER_HELPER_CALLS_BEGIN')
+          for i in range(len(blob)-5):
+              if blob[i]!=0xe8:continue
+              va=start+i
+              try:dst=rel32(va)
+              except:continue
+              name,got,hx=plt_name(dst)
+              print(f'call=0x{va:x} target=0x{dst:x} symbol={name} bytes={b_at(va,5).hex()}')
+          print('FS_RESOLVER_HELPER_CALLS_END')
+          # Also resolve 0x4da740 from static initializer sequence.
+          name,got,hx=plt_name(0x4da740)
+          print(f'FS_RESOLVER_ATEEXIT_LIKE target=0x4da740 symbol={name} got={"NONE" if got is None else hex(got)} bytes={hx}')
           print('FS_RESOLVER_EXECUTED_TARGET=false')
           print('FS_RESOLVER_LIVE_RUNTIME_OBSERVED=false')
           print('FS_RESOLVER_MUTATION_PERFORMED=false')

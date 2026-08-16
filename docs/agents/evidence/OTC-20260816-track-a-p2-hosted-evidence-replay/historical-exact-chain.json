@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "provenance": {
     "source_run": 31944051248,
     "source_job": 95157306712,
@@ -7,7 +7,13 @@
     "source_artifact_zip_sha256": "30bd87d94088019b42fcf8504dfb6082af53b447547c544fec816e35b86407f3",
     "source_execution": "historical_exact_binary_synology_quarantined_for_routing",
     "current_hosted_replay_can_upgrade_exact_binary_provenance": false,
-    "contains_client_binary_bytes": false
+    "contains_client_binary_bytes": false,
+    "correlation_artifacts": [
+      {"id":9229609330,"sha256":"bc5604ffbcf7e75a6b00dad227aefaa0036ea4792efb61ce85de488b6877782c","role":"exact_setup_fde_and_construction_provenance"},
+      {"id":9228087310,"sha256":"a8755bf378f494ec8f895d563d12f61cf43bf59f12fa5fb6b6dc3d6ad68705e1","role":"transport_vtable_rtti"},
+      {"id":9228207514,"sha256":"b74d5d011d374a2ab735f8a75df54cbd774d7ee7d3903ab3430ea37072ca5b5d","role":"stream_owner_pairs"},
+      {"id":9228275973,"sha256":"beb0fc79cb9eb75922e46c33d02cc096cb0c56706d8f7f7ac7efa46d8a12d998","role":"outbound_owner_vtables_and_disassembly"}
+    ]
   },
   "exact_client": {
     "version_mapping": "15.32.df7b29",
@@ -22,7 +28,7 @@
     "first_downstream_transform": "PROVEN:TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
     "same_message_handoff_to_dualconnection": "PROVEN",
     "protocol_stage_order": "PROVEN_PARTIAL",
-    "framing": "UNKNOWN",
+    "framing": "PROVEN_PARTIAL",
     "sequence": "UNKNOWN",
     "compression": "UNKNOWN",
     "encryption": "UNKNOWN",
@@ -30,16 +36,54 @@
   },
   "stage_order": [
     {"stage":"TProtocolClientMessageProcessor virtual +0x10","entry":"0xc2df80","input":"signal argument","effect":"invoke retained intermediate; QIODevice::readAll on persistent QBuffer this+0x18; assign bytes to message+0x8"},
-    {"stage":"TGameserverNetworkPacketRawDataProcessor virtual +0x10","entry":"0xb47130","input":"same message object","effect":"QByteArray insert/append/reallocation and in-place assignment to message+0x8"},
+    {"stage":"TGameserverNetworkPacketRawDataProcessor virtual +0x10","entry":"0xb47130","input":"same message object","effect":"prepend one-byte field; append bytes until modulo-8 condition clears; write post-loop size-state delta into first byte; optional further stream transform; assign result back to message+0x8"},
     {"stage":"TGameserverDualConnection virtual +0x80","entry":"0xb56d60","input":"same post-raw message object","effect":"consumer call proven; transport semantics unclassified"},
-    {"stage":"TGameserverDualConnection virtual +0x78","entry":"0xb56970","input":"same post-raw message object","effect":"consumer call proven; transport semantics unclassified"}
+    {"stage":"TGameserverDualConnection virtual +0x78","entry":"0xb56970","input":"same post-raw message object","effect":"consumer call proven; connection-selection/health behavior observed; not classified as final write"}
   ],
   "provenance_members": {
     "persistent_qbuffer_saved_at_setup_scratch": "rbp-0x218",
     "persistent_qbuffer_stored_in_client_processor_member": "this+0x18",
     "client_processor_outer_member": "outer+0xa00",
     "raw_processor_outer_member": "outer+0xa10",
-    "dualconnection_outer_member": "outer+0xc18"
+    "dualconnection_outer_member": "outer+0xc18",
+    "sequence_flow_processor_outer_members": "outer+0xc28/+0xc30"
+  },
+  "typed_dependencies": {
+    "raw_processor_this_plus_8_10": {
+      "type":"tibia::network::TUnencryptedRawMessageStream",
+      "address_point":"0x3084c58",
+      "rtti":"0x3080660",
+      "base":"QBuffer",
+      "classification":"PROVEN"
+    },
+    "raw_processor_this_plus_18_20": {
+      "primary_type":"shared::TCompressionHelper",
+      "primary_address_point":"0x2f69430",
+      "primary_rtti":"0x30806c8",
+      "contained_or_secondary_vptr_type":"shared::TZlibInflateWrapper",
+      "secondary_address_point":"0x2f69410",
+      "secondary_rtti":"0x30806b0",
+      "classification":"PROVEN_CONSTRUCTION_AND_RETENTION"
+    },
+    "sequence_flow_processor": {
+      "type":"tibia::network::TGameserverNetworkPacketSequenceFlowProcessor",
+      "address_point":"0x3084d68",
+      "rtti":"0x3080678",
+      "outer_members":"0xc28/+0xc30",
+      "temporal_position_relative_to_raw_and_dual":"UNKNOWN"
+    }
+  },
+  "framing_evidence": {
+    "processor":"TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "prepend_header_call":"0xb47189 QByteArray::insert(position=0,length=1)",
+    "alignment_test":"0xb47210 test sil,0x7",
+    "padding_append_call":"0xb47206 QByteArray::append(char)",
+    "header_value_store":"0xb47285 store low byte of post-loop size-state delta into first byte",
+    "alignment_modulus":8,
+    "classification":"PROVEN_PARTIAL",
+    "pad_byte_generator":"0x1832b90",
+    "pad_byte_semantics":"UNKNOWN",
+    "exact_header_semantic_name":"UNKNOWN"
   },
   "instruction_markers": [
     "197108f: mov QWORD PTR [rax+0x28],rsi",
@@ -51,21 +95,32 @@
     "c2dfd5: call QIODevice::readAll",
     "b47189: call QByteArray::insert",
     "b47206: call QByteArray::append",
+    "b47210: test sil,0x7",
+    "b47285: write framing delta byte",
     "b47300: call QByteArray::operator="
   ],
-  "next_discriminator_observation": {
-    "source_run": 31904696996,
-    "source_artifact_id": 9252025461,
-    "address": "0xb4066b",
-    "function_window": "dual_precondition@0xb40370",
-    "observed_call": "QIODevice::write(QByteArray)",
-    "direction": "UNKNOWN",
-    "outbound_egress_claim": "FORBIDDEN_UNTIL_DIRECTION_AND_OWNERSHIP_PROVEN"
+  "egress_discriminators": {
+    "dual_precondition_qiodevice_write": {
+      "address":"0xb4066b",
+      "function_window":"TGameserverDualConnection+0x90@0xb40370",
+      "direction":"UNKNOWN",
+      "classification":"NOT_FINAL_EGRESS_PROOF"
+    },
+    "tcp_text_write": {
+      "address":"0xb46c75",
+      "function_window":"0xb46bd0",
+      "owner":"TGameserverTCPConnection::QTcpSocket* at this+0x10",
+      "payload":"QString local-8-bit plus newline",
+      "classification":"DISPROVEN_AS_BINARY_GAMEPLAY_SINK"
+    }
   },
   "negative_controls": {
     "direct_dualconnection_writer_ownership_assumed": false,
     "dual_plus80_or_plus78_labeled_final_egress": false,
     "historical_final_socket_run_used_as_current_proof": false,
-    "raw_transform_labeled_framing_without_semantics": false
+    "raw_transform_labeled_encryption_without_type_proof": false,
+    "compression_helper_presence_labeled_compression_order": false,
+    "sequence_type_presence_labeled_sequence_order": false,
+    "b46c75_labeled_binary_gameplay_sink": false
   }
 }

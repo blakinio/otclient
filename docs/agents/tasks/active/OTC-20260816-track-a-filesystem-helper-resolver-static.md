@@ -13,7 +13,7 @@ branch: docs/OTC-20260816-track-a-filesystem-helper-resolver-static
 base_branch: main
 base_main: 2c56f7f2c7c01d8dbc1b66febeea22b1d4aff6e8
 risk: low
-updated: 2026-08-16T12:45:00+02:00
+updated: 2026-08-16T12:46:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-filesystem-helper-resolver-static.md
   - docs/agents/reports/OTCLIENT-20260816-filesystem-helper-resolver-static.md
@@ -99,16 +99,14 @@ audit:
   material_findings_open: 0
 e2e: NOT_APPLICABLE
 e2e_reason: static evidence reconstruction only; no executable/runtime behavior changed
-temporary_workflow_removed: false
-last_completed_step: final deterministic path-formula validator passed and durable report written
-next_action: remove temporary workflow, audit retained diff, exact-head CI/merge/archive, then continue with QLibrary native-Linux extension/platform resolution
+temporary_workflow_removed: true
+last_completed_step: report audited; temporary workflow removed; retained diff is documentation only
+next_action: exact-head CI/merge/archive, then continue with QLibrary native-Linux extension/platform resolution
 ---
 
 # Final result
 
 ## PROVEN
-
-The exact client-side `shared::TFileSystemHelper::vtable+0x78 -> 0xcfa5e0` resolver implements:
 
 ```text
 J(components):
@@ -118,50 +116,29 @@ J(components):
   return QDir::toNativeSeparators(accumulator)
 ```
 
-For the BattlEye loader wrapper:
-
-```text
-TTibiaFileSystemHelper +0xd8
-  -> key "BEClient"
-  -> category 9
-  -> +0x30
-  -> +0x28(category 9)
-       -> +0x18(9) = QCoreApplication::applicationDirPath()
-       -> +0x10(9) = QString("BattlEye")
-       -> J([applicationDirPath(), "BattlEye"])
-  -> J([previous result, "BEClient"])
-  -> previously proven QLibrary::setFileName input
-```
-
-Authoritative symbolic formula:
+For the exact BattlEye loader key:
 
 ```text
 J([J([QCoreApplication::applicationDirPath(), "BattlEye"]), "BEClient"])
 ```
 
-Stable path-equivalent relative suffix:
-
-```text
-BattlEye/BEClient
-```
-
-The client-side formula contains no `.so` extension.
+The stable path-equivalent suffix is `BattlEye/BEClient`; the client-side resolver does not append `.so`.
 
 Final deterministic validator: `31942437204 / 95153445603`, success.
 
 ## DYNAMIC / UNKNOWN downstream boundary
 
-The actual application-directory prefix is runtime-derived. Exact platform-specific QLibrary candidate expansion/mapped file remains a separate downstream layer; this task does not silently promote `BEClient.so` as the exact client-generated string.
+The application-directory prefix is runtime-derived. Exact QLibrary native-Linux candidate expansion and exact filesystem object ultimately mapped remain a separate downstream layer.
 
 ## Corrections
 
-- raw global xref census for the `BattlEye` initializer is rejected as semantic evidence; only exact adjacent initializer instructions are retained;
-- raw file reads of runtime-initialized QString global `0x31964a0` are invalid; the value is instead proved through its static initializer;
-- one diagnostic `objdump` attempt failed because the runner lacks `objdump`; no evidence depends on that run.
+- raw global xref counts are rejected as semantic evidence;
+- runtime-initialized global QString raw file bytes are not used;
+- failed `objdump` diagnostic is not load-bearing.
 
 # Audit
 
-PASS. The report promotes the QLibrary input from wholly UNKNOWN to a PROVEN symbolic/dynamic formula while preserving runtime prefix and downstream QLibrary file-resolution boundaries.
+PASS. QLibrary client input is promoted from wholly UNKNOWN to a PROVEN symbolic/dynamic formula while downstream platform resolution remains bounded.
 
 # Safety
 

@@ -7,7 +7,6 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-p0-direct-position.yml
       - .github/scripts/tibia-official-client-re-p0-direct-position.py
-      - docs/agents/tasks/active/OTC-20260815-track-a-p0-direct-position.md
   workflow_dispatch:
 
 permissions:
@@ -154,10 +153,24 @@ jobs:
           [[ "$actual_packed_hash" == "$packed_hash" ]] || { echo P0_HOSTED_INPUT_BLOCKED=packed_hash_mismatch; exit 3; }
 
           python3 - "$packed" "$client" <<'PY'
-          import lzma,shutil,sys
+          import lzma,sys
           src,dst=sys.argv[1:]
-          with lzma.open(src,'rb') as r, open(dst,'wb') as w:
-              shutil.copyfileobj(r,w,1024*1024)
+          data=open(src,'rb').read()
+          attempts=[('raw',data)]
+          if len(data) > 32:
+              attempts.append(('skip32',data[32:]))
+          errors=[]
+          for label,payload in attempts:
+              try:
+                  decoded=lzma.decompress(payload)
+              except lzma.LZMAError as exc:
+                  errors.append(f'{label}:{exc}')
+                  continue
+              open(dst,'wb').write(decoded)
+              print(f'P0_HOSTED_LZMA_MODE={label}')
+              break
+          else:
+              raise SystemExit('P0_HOSTED_INPUT_BLOCKED=lzma_decode_failed:' + '|'.join(errors))
           PY
 
           size="$(stat -c '%s' "$client")"

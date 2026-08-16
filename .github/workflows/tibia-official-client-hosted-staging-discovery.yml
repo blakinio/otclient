@@ -15,89 +15,158 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Derive current official Linux download and fence client
+      - name: Derive official Linux download and fence exact client
         shell: bash
         run: |
           set -Eeuo pipefail
           root="$(mktemp -d)"
-          trap 'rm -rf -- "$root"' EXIT
-          cookie="$root/cookies.txt"
+          wireproxy_pid=''
+          cleanup() {
+            if [[ -n "$wireproxy_pid" ]]; then
+              kill "$wireproxy_pid" 2>/dev/null || true
+              wait "$wireproxy_pid" 2>/dev/null || true
+            fi
+            rm -rf -- "$root"
+          }
+          trap cleanup EXIT
+
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
           page="$root/download.html"
+          cookie="$root/cookies.txt"
           archive="$root/tibia.x64.tar.gz"
           extract="$root/extract"
+          touch "$cookie"
           mkdir -p "$extract"
 
-          python3 - "$page" "$cookie" <<'PY'
+          pages=(
+            'https://www.tibia.com/mmorpg/free-multiplayer-online-role-playing-game.php?lpv=10&step=playnow'
+            'https://www.tibia.com/account/?subtopic=downloadclient'
+          )
+          proxy_args=()
+
+          fetch_page() {
+            local mode="$1" url code rc
+            for url in "${pages[@]}"; do
+              set +e
+              code="$(curl --location --silent --show-error --compressed --connect-timeout 20 --max-time 45 \
+                --user-agent "$ua" --referer 'https://www.tibia.com/' \
+                --cookie "$cookie" --cookie-jar "$cookie" \
+                "${proxy_args[@]}" --output "$page" --write-out '%{http_code}' "$url")"
+              rc=$?
+              set -e
+              echo "OFFICIAL_DOWNLOAD_PAGE_FETCH=$mode:$url:curl_rc=$rc:http_status=$code"
+              if [[ "$rc" == 0 && "$code" == 200 ]]; then
+                printf '%s\n' "$url" >"$root/referer"
+                printf '%s\n' "$mode" >"$root/egress-mode"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          if ! fetch_page direct; then
+            echo 'DIRECT_OFFICIAL_PAGE_RESULT=BLOCKED'
+            warp="$root/warp"
+            mkdir -p "$warp"
+            wgcf="$warp/wgcf"
+            wireproxy="$warp/wireproxy"
+            wgcf_sha='2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c'
+            wireproxy_tar_sha='e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c'
+
+            curl --fail --location --silent --show-error --retry 2 --connect-timeout 20 \
+              --output "$wgcf" \
+              'https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64'
+            test "$(sha256sum "$wgcf" | cut -d' ' -f1)" = "$wgcf_sha"
+            chmod 755 "$wgcf"
+
+            curl --fail --location --silent --show-error --retry 2 --connect-timeout 20 \
+              --output "$warp/wireproxy.tar.gz" \
+              'https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz'
+            test "$(sha256sum "$warp/wireproxy.tar.gz" | cut -d' ' -f1)" = "$wireproxy_tar_sha"
+            mkdir "$warp/unpack"
+            tar -xzf "$warp/wireproxy.tar.gz" -C "$warp/unpack"
+            wireproxy_source="$(find "$warp/unpack" -type f -name wireproxy -print -quit)"
+            test -n "$wireproxy_source"
+            install -m755 "$wireproxy_source" "$wireproxy"
+
+            (
+              cd "$warp"
+              "$wgcf" register --accept-tos >/dev/null
+              chmod 600 wgcf-account.toml
+              "$wgcf" generate >/dev/null
+              chmod 600 wgcf-profile.conf
+            )
+            cat >"$warp/wireproxy.conf" <<EOF
+          WGConfig = $warp/wgcf-profile.conf
+          [Socks5]
+          BindAddress = 127.0.0.1:25354
+          EOF
+            "$wireproxy" -n -c "$warp/wireproxy.conf" >/dev/null
+            "$wireproxy" -c "$warp/wireproxy.conf" >"$warp/wireproxy.log" 2>&1 &
+            wireproxy_pid=$!
+            ready=0
+            for _ in $(seq 1 40); do
+              if python3 - <<'PY'
+          import socket
+          with socket.create_connection(('127.0.0.1', 25354), timeout=0.2):
+              pass
+          PY
+              then
+                ready=1
+                break
+              fi
+              kill -0 "$wireproxy_pid" 2>/dev/null || break
+              sleep .25
+            done
+            test "$ready" = 1
+            warp_state="$(curl --fail --silent --show-error --max-time 20 \
+              --socks5-hostname 127.0.0.1:25354 https://www.cloudflare.com/cdn-cgi/trace \
+              | sed -n 's/^warp=//p')"
+            case "$warp_state" in
+              on|plus) ;;
+              *) echo "HOSTED_WARP_VALIDATION=FAIL:$warp_state"; exit 1 ;;
+            esac
+            echo "HOSTED_WARP_VALIDATION=PASS:$warp_state"
+            proxy_args=(--socks5-hostname 127.0.0.1:25354)
+            if ! fetch_page hosted-warp; then
+              echo 'STAGING_DISCOVERY=INPUT_BLOCKED_OFFICIAL_PAGE_EVEN_VIA_HOSTED_WARP'
+              exit 1
+            fi
+          fi
+
+          python3 - "$page" "$root/referer" <<'PY'
           import html
-          import http.cookiejar
           import pathlib
           import re
           import sys
           import urllib.parse
-          import urllib.request
 
-          output = pathlib.Path(sys.argv[1])
-          cookie_path = pathlib.Path(sys.argv[2])
-          jar = http.cookiejar.MozillaCookieJar(str(cookie_path))
-          opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-          headers = {
-              'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.8',
-              'Referer': 'https://www.tibia.com/',
-          }
-          pages = [
-              'https://www.tibia.com/mmorpg/free-multiplayer-online-role-playing-game.php?lpv=10&step=playnow',
-              'https://www.tibia.com/account/?subtopic=downloadclient',
-          ]
-          selected = None
-          body = None
-          for url in pages:
-              request = urllib.request.Request(url, headers=headers)
-              try:
-                  with opener.open(request, timeout=30) as response:
-                      payload = response.read()
-                      status = response.status
-                      final = response.geturl()
-              except Exception as exc:
-                  print(f'OFFICIAL_DOWNLOAD_PAGE_FETCH_FAIL={url}:{type(exc).__name__}')
-                  continue
-              print(f'OFFICIAL_DOWNLOAD_PAGE_FETCH={url}:status={status}:final={final}:bytes={len(payload)}')
-              if status == 200:
-                  selected = final
-                  body = payload.decode('utf-8', errors='replace')
-                  break
-          if selected is None or body is None:
-              raise SystemExit('STAGING_DISCOVERY=INPUT_BLOCKED_OFFICIAL_PAGE')
-
-          output.write_text(body)
-          jar.save(ignore_discard=True, ignore_expires=True)
-          decoded = html.unescape(body).replace('\\/', '/')
+          page = pathlib.Path(sys.argv[1])
+          referer_file = pathlib.Path(sys.argv[2])
+          selected = referer_file.read_text().strip()
+          decoded = html.unescape(page.read_text(errors='replace')).replace('\\/', '/')
           hrefs = re.findall(r'''(?:href|data-href)\s*=\s*["']([^"']+)["']''', decoded, flags=re.I)
-          direct = [href for href in hrefs if 'tibia.x64.tar.gz' in href.lower()]
-          if not direct:
-              direct = [href for href in hrefs if href.lower().endswith('.tar.gz') and 'tibia' in href.lower()]
-          if not direct:
-              marker = re.findall(r'''https?://[^\s"'<>]+tibia\.x64\.tar\.gz[^\s"'<>]*''', decoded, flags=re.I)
-              direct = marker
-          if not direct:
+          candidates = [href for href in hrefs if 'tibia.x64.tar.gz' in href.lower()]
+          if not candidates:
+              candidates = [href for href in hrefs if href.lower().endswith('.tar.gz') and 'tibia' in href.lower()]
+          if not candidates:
+              candidates = re.findall(r'''https?://[^\s"'<>]+tibia\.x64\.tar\.gz[^\s"'<>]*''', decoded, flags=re.I)
+          if not candidates:
               raise SystemExit('STAGING_DISCOVERY=INPUT_BLOCKED_LINUX_LINK_NOT_DERIVED')
-          resolved = urllib.parse.urljoin(selected, direct[0])
-          parsed = urllib.parse.urlparse(resolved)
-          host = (parsed.hostname or '').lower()
+          resolved = urllib.parse.urljoin(selected, candidates[0])
+          host = (urllib.parse.urlparse(resolved).hostname or '').lower()
           if not (host == 'tibia.com' or host.endswith('.tibia.com')):
               raise SystemExit(f'STAGING_DISCOVERY=INPUT_BLOCKED_NON_OFFICIAL_HOST:{host}')
+          pathlib.Path('/tmp/track-a-official-linux-url').write_text(resolved)
           print(f'OFFICIAL_LINUX_DOWNLOAD_URL={resolved}')
           print(f'OFFICIAL_DOWNLOAD_REFERER={selected}')
-          pathlib.Path('/tmp/track-a-official-linux-url').write_text(resolved)
-          pathlib.Path('/tmp/track-a-official-linux-referer').write_text(selected)
           PY
 
           url="$(cat /tmp/track-a-official-linux-url)"
-          referer="$(cat /tmp/track-a-official-linux-referer)"
-          curl --fail --location --silent --show-error --retry 2 --connect-timeout 20 \
-            --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
-            --referer "$referer" --cookie "$cookie" --output "$archive" "$url"
+          referer="$(cat "$root/referer")"
+          curl --fail --location --silent --show-error --retry 2 --connect-timeout 20 --max-time 600 \
+            --user-agent "$ua" --referer "$referer" --cookie "$cookie" \
+            "${proxy_args[@]}" --output "$archive" "$url"
           echo "OFFICIAL_LINUX_ARCHIVE_SIZE=$(stat -c %s "$archive")"
           echo "OFFICIAL_LINUX_ARCHIVE_SHA256=$(sha256sum "$archive" | cut -d' ' -f1)"
           tar -tzf "$archive" >/dev/null
@@ -115,13 +184,17 @@ jobs:
           for path in root.rglob('client'):
               if not path.is_file():
                   continue
+              digest = hashlib.sha256()
+              with path.open('rb') as handle:
+                  for block in iter(lambda: handle.read(1024 * 1024), b''):
+                      digest.update(block)
               size = path.stat().st_size
-              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              value = digest.hexdigest()
               rel = path.relative_to(root)
-              candidates.append((str(rel), size, digest))
-              print(f'OFFICIAL_CLIENT_CANDIDATE={rel}:size={size}:sha256={digest}')
-          for rel, size, digest in candidates:
-              if size == target_size and digest == target_sha:
+              candidates.append((str(rel), size, value))
+              print(f'OFFICIAL_CLIENT_CANDIDATE={rel}:size={size}:sha256={value}')
+          for rel, size, value in candidates:
+              if size == target_size and value == target_sha:
                   print(f'EXACT_CLIENT_MATCH={rel}')
                   print('STAGING_DISCOVERY=EXACT_STAGING_AVAILABLE')
                   raise SystemExit(0)

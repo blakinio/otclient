@@ -11,8 +11,8 @@ implementation_head: 4c50f1d5843bfe067cca19519e25e4fa9dc7ccfe
 implementation_merge_commit: c4b1919e16fb2931c74f32cb310229703dbf893c
 implementation_tree: 6a51b91962c61b72a97a308d07292779ac7c3407
 closeout_branch: docs/OTC-20260816-linux-ci-hybrid-closeout
-closeout_pr: pending
-updated: 2026-08-16T11:48:00+02:00
+closeout_pr: 341
+updated: 2026-08-16T11:55:00+02:00
 owned_paths: []
 policy_version: 2
 prompting_standard_version: 2.1
@@ -197,6 +197,11 @@ related_prs:
     purpose: superseded_attempt
     final_head: b082c62fdd13896e27321a86e2bccf2d46c41abc
     terminal_state: closed_superseded
+  - repository: blakinio/otclient
+    number: 341
+    purpose: archive
+    terminal_state: merged
+    unresolved_threads: 0
 ```
 
 PR #280 is not a related implementation/closeout PR for this task. It remains the separate specialized Synology/runtime lane and is intentionally untouched.
@@ -224,6 +229,7 @@ pull_requests:
   terminal_prs:
     - blakinio/otclient#331 merged
     - blakinio/otclient#328 closed_superseded
+    - blakinio/otclient#341 merged
 task_archived_or_terminal: true
 ownership_released: true
 stale_branches_reconciled: true

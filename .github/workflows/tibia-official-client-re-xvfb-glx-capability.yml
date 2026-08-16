@@ -44,6 +44,7 @@ jobs:
           echo 'XVFB_GLX_INV_CANONICAL_STATE_ACCESS=NONE'
           echo 'XVFB_GLX_INV_XSERVER_STARTED=false'
           echo 'XVFB_GLX_INV_CLIENT_STARTED=false'
+          echo 'XVFB_GLX_INV_PARSER=PYTHON_STDLIB_ONLY'
 
           [[ -d "$tool" && ! -L "$tool" && "$(realpath -e "$tool")" == "$tool" ]] || {
             echo 'XVFB_GLX_INV_REFUSED=TOOLROOT'
@@ -59,68 +60,162 @@ jobs:
             exit 47
           }
 
-          printf 'XVFB_GLX_INV_XVFB_REALPATH=%s\n' "$xvfb_real"
-          printf 'XVFB_GLX_INV_XVFB_SHA256=%s\n' "$(sha256sum "$xvfb" | awk '{print $1}')"
-          printf 'XVFB_GLX_INV_XVFB_SIZE=%s\n' "$(stat -c %s "$xvfb")"
-          printf 'XVFB_GLX_INV_XVFB_MODE=%s\n' "$(stat -c %a "$xvfb")"
-          printf 'XVFB_GLX_INV_XVFB_UID=%s\n' "$(stat -c %u "$xvfb")"
-          printf 'XVFB_GLX_INV_XVFB_GID=%s\n' "$(stat -c %g "$xvfb")"
-          printf 'XVFB_GLX_INV_XVFB_FILE=%s\n' "$(file -b "$xvfb" | tr '\n' ' ' | head -c 300)"
+          python3 - "$tool" "$xvfb" "$modules" <<'PY'
+          import hashlib
+          import os
+          import pathlib
+          import re
+          import stat
+          import struct
+          import sys
 
-          echo 'XVFB_GLX_INV_XVFB_NEEDED_BEGIN'
-          readelf -d "$xvfb" 2>/dev/null | sed -n 's/.*Shared library: \[\([^]]*\)\].*/XVFB_GLX_INV_XVFB_NEEDED=\1/p' | sort -u
-          echo 'XVFB_GLX_INV_XVFB_NEEDED_END'
+          tool = pathlib.Path(sys.argv[1]).resolve()
+          xvfb = pathlib.Path(sys.argv[2]).resolve()
+          modules = pathlib.Path(sys.argv[3])
 
-          echo 'XVFB_GLX_INV_XVFB_LDD_BEGIN'
-          env LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
-            ldd "$xvfb" 2>&1 | sed 's/^/XVFB_GLX_INV_XVFB_LDD=/' | head -n 120
-          echo 'XVFB_GLX_INV_XVFB_LDD_END'
+          if tool not in xvfb.parents:
+              raise SystemExit('XVFB_GLX_INV_REFUSED=XVFB_CONTAINMENT_PY')
 
-          echo 'XVFB_GLX_INV_XVFB_GLX_SYMBOLS_BEGIN'
-          readelf -Ws "$xvfb" 2>/dev/null | grep -Ei 'GLX|glx' | sed 's/^/XVFB_GLX_INV_XVFB_GLX_SYMBOL=/' | head -n 80 || true
-          echo 'XVFB_GLX_INV_XVFB_GLX_SYMBOLS_END'
+          def sha256(path):
+              h = hashlib.sha256()
+              with open(path, 'rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
 
-          echo 'XVFB_GLX_INV_XVFB_GLX_STRINGS_BEGIN'
-          strings -a "$xvfb" | grep -Ei '(^|[^[:alnum:]_])(GLX|glx|Glx)([^[:alnum:]_]|$)' \
-            | sort -u | sed 's/^/XVFB_GLX_INV_XVFB_GLX_STRING=/' | head -n 80 || true
-          echo 'XVFB_GLX_INV_XVFB_GLX_STRINGS_END'
+          def elf_info(path):
+              data = pathlib.Path(path).read_bytes()
+              if len(data) < 64 or data[:4] != b'\x7fELF' or data[4] != 2 or data[5] != 1:
+                  return {'elf64le': False, 'needed': [], 'glx_strings': []}
+              hdr = struct.unpack_from('<16sHHIQQQIHHHHHH', data, 0)
+              e_machine = hdr[2]
+              e_shoff, e_shentsize, e_shnum, e_shstrndx = hdr[6], hdr[11], hdr[12], hdr[13]
+              raw = []
+              for i in range(e_shnum):
+                  at = e_shoff + i * e_shentsize
+                  if at + 64 > len(data):
+                      break
+                  raw.append(struct.unpack_from('<IIQQQQIIQQ', data, at))
+              names = b''
+              if 0 <= e_shstrndx < len(raw):
+                  sh = raw[e_shstrndx]
+                  names = data[sh[4]:sh[4] + sh[5]]
+              def sec_name(off):
+                  if off >= len(names):
+                      return ''
+                  end = names.find(b'\0', off)
+                  if end < 0:
+                      end = len(names)
+                  return names[off:end].decode('ascii', 'replace')
+              needed = []
+              dyn = None
+              for i, sh in enumerate(raw):
+                  if sh[1] == 6:
+                      dyn = (i, sh)
+                      break
+              if dyn:
+                  _, sh = dyn
+                  link = sh[6]
+                  if 0 <= link < len(raw):
+                      strsh = raw[link]
+                      dynstr = data[strsh[4]:strsh[4] + strsh[5]]
+                      entsize = sh[9] or 16
+                      for at in range(sh[4], sh[4] + sh[5], entsize):
+                          if at + 16 > len(data):
+                              break
+                          tag, val = struct.unpack_from('<QQ', data, at)
+                          if tag == 0:
+                              break
+                          if tag == 1 and val < len(dynstr):
+                              end = dynstr.find(b'\0', val)
+                              if end < 0:
+                                  end = len(dynstr)
+                              needed.append(dynstr[val:end].decode('ascii', 'replace'))
+              strings = []
+              for m in re.finditer(rb'[\x20-\x7e]{4,}', data):
+                  s = m.group().decode('ascii', 'replace')
+                  if re.search(r'(?i)(^|[^A-Za-z0-9_])glx([^A-Za-z0-9_]|$)', s):
+                      strings.append(s[:240])
+                      if len(strings) >= 80:
+                          break
+              return {
+                  'elf64le': True,
+                  'machine': e_machine,
+                  'needed': sorted(set(needed)),
+                  'glx_strings': sorted(set(strings)),
+              }
 
-          if [[ -d "$modules" && ! -L "$modules" && "$(realpath -e "$modules")" == "$tool"/* ]]; then
-            echo 'XVFB_GLX_INV_MODULE_ROOT_PRESENT=true'
-          else
-            echo 'XVFB_GLX_INV_MODULE_ROOT_PRESENT=false'
-          fi
+          search_dirs = [
+              tool / 'usr/lib/x86_64-linux-gnu',
+              tool / 'lib/x86_64-linux-gnu',
+              tool / 'usr/lib',
+              tool / 'lib',
+          ]
+          def resolve_needed(name):
+              for root in search_dirs:
+                  p = root / name
+                  if p.exists():
+                      return str(p.resolve())
+              return None
 
-          mapfile -t candidates < <(
-            if [[ -d "$modules" ]]; then
-              find "$modules" -xdev -maxdepth 4 -type f \
-                \( -iname '*glx*.so*' -o -iname '*glamor*egl*.so*' -o -iname 'libglamoregl.so*' \) \
-                -print 2>/dev/null | sort -u | head -n 40
-            fi
-          )
-          echo "XVFB_GLX_INV_MODULE_CANDIDATE_COUNT=${#candidates[@]}"
-          for candidate in "${candidates[@]}"; do
-            real="$(realpath -e "$candidate")"
-            [[ "$real" == "$tool"/* ]] || {
-              echo "XVFB_GLX_INV_REFUSED=MODULE_ESCAPES_ROOT:$(basename "$candidate")"
-              exit 48
-            }
-            printf 'XVFB_GLX_INV_MODULE_PATH=%s\n' "$real"
-            printf 'XVFB_GLX_INV_MODULE_SHA256=%s:%s\n' "$(basename "$candidate")" "$(sha256sum "$candidate" | awk '{print $1}')"
-            printf 'XVFB_GLX_INV_MODULE_SIZE=%s:%s\n' "$(basename "$candidate")" "$(stat -c %s "$candidate")"
-            printf 'XVFB_GLX_INV_MODULE_FILE=%s:%s\n' "$(basename "$candidate")" "$(file -b "$candidate" | tr '\n' ' ' | head -c 260)"
-            readelf -d "$candidate" 2>/dev/null \
-              | sed -n "s/.*Shared library: \[\([^]]*\)\].*/XVFB_GLX_INV_MODULE_NEEDED=$(basename "$candidate"):\1/p" \
-              | sort -u | head -n 80 || true
-            env LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
-              ldd "$candidate" 2>&1 | grep -E 'not found|libGL|libEGL|libGLX|libOpenGL|libdrm|libgbm' \
-              | sed "s/^/XVFB_GLX_INV_MODULE_LDD=$(basename "$candidate"):/" | head -n 80 || true
-          done
+          st = xvfb.stat()
+          info = elf_info(xvfb)
+          print(f'XVFB_GLX_INV_XVFB_REALPATH={xvfb}')
+          print(f'XVFB_GLX_INV_XVFB_SHA256={sha256(xvfb)}')
+          print(f'XVFB_GLX_INV_XVFB_SIZE={st.st_size}')
+          print(f'XVFB_GLX_INV_XVFB_MODE={stat.S_IMODE(st.st_mode):o}')
+          print(f'XVFB_GLX_INV_XVFB_UID={st.st_uid}')
+          print(f'XVFB_GLX_INV_XVFB_GID={st.st_gid}')
+          print(f'XVFB_GLX_INV_XVFB_ELF64LE={str(info.get("elf64le", False)).lower()}')
+          print(f'XVFB_GLX_INV_XVFB_MACHINE={info.get("machine", "unknown")}')
+          for name in info.get('needed', []):
+              resolved = resolve_needed(name)
+              print(f'XVFB_GLX_INV_XVFB_NEEDED={name}:{resolved or "NOT_CONTAINED_FIXED_SEARCH"}')
+          print(f'XVFB_GLX_INV_XVFB_GLX_STRING_COUNT={len(info.get("glx_strings", []))}')
+          for line in info.get('glx_strings', []):
+              print('XVFB_GLX_INV_XVFB_GLX_STRING=' + line)
 
-          if printf '%s\n' "${candidates[@]}" | grep -Eq '/libglx\.so([.]|$)'; then
-            echo 'XVFB_GLX_INV_LIBGLX_MODULE_PRESENT=true'
-          else
-            echo 'XVFB_GLX_INV_LIBGLX_MODULE_PRESENT=false'
-          fi
+          module_candidates = []
+          if modules.is_dir() and not modules.is_symlink() and tool in modules.resolve().parents:
+              print('XVFB_GLX_INV_MODULE_ROOT_PRESENT=true')
+              for root, dirs, files in os.walk(modules):
+                  rel_depth = len(pathlib.Path(root).relative_to(modules).parts)
+                  if rel_depth >= 4:
+                      dirs[:] = []
+                  for name in files:
+                      lower = name.lower()
+                      if (('glx' in lower and '.so' in lower) or
+                          ('glamor' in lower and 'egl' in lower and '.so' in lower) or
+                          lower.startswith('libglamoregl.so')):
+                          module_candidates.append(pathlib.Path(root) / name)
+                          if len(module_candidates) >= 40:
+                              break
+                  if len(module_candidates) >= 40:
+                      break
+          else:
+              print('XVFB_GLX_INV_MODULE_ROOT_PRESENT=false')
 
-          echo 'XVFB_GLX_INV_RESULT=PASS_READ_ONLY_INVENTORY'
+          module_candidates = sorted(set(p.resolve() for p in module_candidates))
+          print(f'XVFB_GLX_INV_MODULE_CANDIDATE_COUNT={len(module_candidates)}')
+          libglx_present = False
+          for p in module_candidates:
+              if tool not in p.parents:
+                  raise SystemExit('XVFB_GLX_INV_REFUSED=MODULE_ESCAPES_ROOT:' + p.name)
+              if re.fullmatch(r'libglx\.so(?:\..*)?', p.name, re.I):
+                  libglx_present = True
+              st = p.stat()
+              mi = elf_info(p)
+              print(f'XVFB_GLX_INV_MODULE_PATH={p}')
+              print(f'XVFB_GLX_INV_MODULE_SHA256={p.name}:{sha256(p)}')
+              print(f'XVFB_GLX_INV_MODULE_SIZE={p.name}:{st.st_size}')
+              print(f'XVFB_GLX_INV_MODULE_ELF64LE={p.name}:{str(mi.get("elf64le", False)).lower()}')
+              for name in mi.get('needed', []):
+                  resolved = resolve_needed(name)
+                  print(f'XVFB_GLX_INV_MODULE_NEEDED={p.name}:{name}:{resolved or "NOT_CONTAINED_FIXED_SEARCH"}')
+              glx_strings = mi.get('glx_strings', [])
+              print(f'XVFB_GLX_INV_MODULE_GLX_STRING_COUNT={p.name}:{len(glx_strings)}')
+              for line in glx_strings[:30]:
+                  print(f'XVFB_GLX_INV_MODULE_GLX_STRING={p.name}:{line}')
+          print(f'XVFB_GLX_INV_LIBGLX_MODULE_PRESENT={str(libglx_present).lower()}')
+          print('XVFB_GLX_INV_RESULT=PASS_READ_ONLY_INVENTORY')
+          PY

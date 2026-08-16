@@ -16,6 +16,18 @@ run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: finalize_archive_and_continue
 implementation_authorized: false
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
 owned_paths:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_VIEWPORT_CONTINUATION.md
   - docs/agents/tasks/active/OTC-20260816-track-a-viewport-continuation-prompt.md
@@ -152,10 +164,15 @@ focused_review:
   runtime_mutation_authorized: false
   owner_funded_ai_used: false
 fresh_audit: PASS
-exact_head_ci: pending
+runtime_governance_first_failure:
+  run: 31946601744
+  job: 95163487148
+  cause: active Track A task lacked mandatory runtime admission fields
+  disposition: fixed by explicit runtime_access none admission record
+exact_head_ci: pending_after_fix
 pr_terminal: pending
 ```
 
 # Next action
 
-Mark PR #363 ready for review, run required exact-head CI, then merge/archive through normal repository protection if all checks remain green.
+Re-run/observe required exact-head Track A runtime-governance and repository CI on the repaired head, then merge/archive through normal repository protection if all checks remain green.

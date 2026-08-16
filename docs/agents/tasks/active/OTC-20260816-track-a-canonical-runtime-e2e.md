@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
-status: implementing
+status: blocked
 agent: ChatGPT
 session_id: chatgpt-runtime-v3-20260816-1644
 session_role: runtime_owner
@@ -8,33 +8,30 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: canonical-bootstrap
+phase: waiting-runner-support-layout-inventory
 branch: ci/OTC-20260816-track-a-canonical-runtime-e2e-v3
 base_branch: main
 base_main: 67e5dc88ff4d6c241d90a046527dac4aa9f831d8
 risk: high
-updated: 2026-08-16T16:44:00+02:00
+updated: 2026-08-16T16:48:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
-  - .github/workflows/tibia-official-client-re-canonical-runtime-e2e-v3.yml
 modules_touched: []
 reuses:
   - .github/scripts/tibia-official-client-re-canonical-live-lease
   - .github/scripts/tibia-official-client-re-canonical-live-transition.py
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-  - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-toolroot-layout-fix.md
 supersedes_pr: 376
-depends_on: []
+depends_on:
+  - OTC-20260816-track-a-runner-support-layout-inventory
 blocks:
   - OTC-20260815-track-a-p0-direct-position
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: physical Synology operation is dispatched only through repository-controlled GitHub Actions using trusted-main transition/worker code
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -48,51 +45,66 @@ physical_e2e_required: true
 runtime_access: canonical_bootstrap
 runtime_owner_task: OTC-20260816-track-a-canonical-runtime-e2e
 runtime_namespace: canonical-live-runtime
-canonical_registration: RECHECK_IN_WORKFLOW
-canonical_lease_generation: RECHECK_IN_WORKFLOW
-registration_lease_generation: NOT_APPLICABLE_IF_REGISTRATION_ABSENT
-gate_a: REQUIRED_FRESH_IN_WORKFLOW
-generation_rebind: NOT_APPLICABLE_IF_REGISTRATION_ABSENT
-gate_b: REQUIRED_AFTER_BOOTSTRAP
-bootstrap: TRUSTED_MAIN_IMPLEMENTED_AND_TOOLROOT_FIXED
-target_uniqueness: REPROVE_UNDER_LOCK
+canonical_registration: ABSENT_AT_RUN_31953635875_PRECHECK
+canonical_lease_generation: 2_RELEASE_EXPECTED_AFTER_FAILED_WORKFLOW
+registration_lease_generation: NOT_APPLICABLE
+gate_a: ACQUIRED_GENERATION_2_THEN_RELEASE_PATH_EXECUTED
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_REACHED
+bootstrap: FAIL_CLOSED_BEFORE_WARP_X11_CLIENT
+target_uniqueness: NOT_REACHED_THIS_ATTEMPT
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
-live_runtime_authorization_source: owner instruction 2026-08-16 to finish existing Track A tasks, subject to current admission gates; this phase performs bootstrap only and does not use account credentials
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
-excluded_runtime_surfaces:
-  - Track B PR #284 namespace
-  - historical closed PR #303 runtime surfaces
-prior_attempt:
-  pr: 376
-  run: 31952484701
-  job: 95177998199
-  runner: synology-otclient-01
-  acquired_lease_generation: 1
-  result: FAIL_CLOSED_XVFB_UNAVAILABLE
-  registration_published: false
-  rollback_semantics: transition kills bootstrap process group and invokes worker rollback on any unsuccessful bootstrap; absence of bootstrap_rollback_failed means rollback completed
-  remediation_pr: 379
-  remediation_archive_pr: 380
+physical_attempts:
+  - pr: 376
+    run: 31952484701
+    job: 95177998199
+    acquired_lease_generation: 1
+    result: FAIL_CLOSED_XVFB_UNAVAILABLE
+    registration_published: false
+    remediation: PR 379/380
+  - pr: 381
+    run: 31953635875
+    job: 95180815033
+    runner: synology-otclient-01
+    pre_admission_lease_status: released
+    pre_admission_lease_generation: 1
+    acquired_lease_generation: 2
+    result: FAIL_CLOSED_TOOLROOT_UNAVAILABLE
+    stage: support-root-resolution-before-WARP-X11-client
+    registration_published: false
+    session_root_precheck: ABSENT
+    credentials_used: false
+    login_attempted: false
+    workflow_status: REMOVED_TO_PREVENT_RETRY
+root_cause_frontier:
+  trusted_worker_fixed_candidates:
+    - /home/runner/_work/_otclient_tibia_re_state/toolroot
+    - /work/_otclient_tibia_re_state/toolroot
+  result: neither candidate satisfied the hardened same-root completeness/containment contract on the current physical runner
+  static_runner_stack_finding: PR 280 proposed image installs xvfb, xdotool and proxychains4 as system packages but does not list x11vnc; that branch is not trusted-current deployment proof
+  unknowns:
+    - actual current system paths and versions for Xvfb/x11vnc/xdotool/XKB/libproxychains on synology-otclient-01
+    - which fixed support components, if any, are missing from each historical toolroot
+    - whether current runner image already has x11vnc outside the historical roots
+safety:
+  one_shot_bootstrap_workflow_removed: true
+  blind_physical_retry_forbidden: true
+  next_physical_work_must_be_read_only_support_inventory: true
 acceptance:
-  - fresh authoritative lease and registration state are observed before mutation
-  - if registration already exists, workflow refuses bootstrap and returns for reclassification rather than creating a second runtime
-  - canonical lease is acquired for this exact task/session before transition bootstrap
-  - trusted-main bootstrap re-proves registration absence and all-official-client candidate absence under canonical coordination lock
-  - exact client fence 15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe is proven
-  - one persistent localhost-only X11/VNC/exact-client runtime is created using the trusted selected toolroot
-  - authoritative registration is committed and immediate same-generation Gate B passes
-  - controller lease is released while canonical desktop/VNC/client remain alive idle
-  - no credentials are read or typed and no login is attempted in this phase
-  - no second Track A official-client runtime and no Track B/old PR #303 surface is touched
-last_completed_step: toolroot layout repair #379 and lifecycle archive #380 were promoted to trusted main after hardened hosted validation
-next_action: run exactly one bootstrap-only Synology workflow from this fresh-main branch; persist sanitized registration evidence if Gate B passes, otherwise stop at the new fail-closed discriminator without blind retry
+  - bounded read-only runner support-layout inventory proves exact realpaths/existence/version metadata for only required support tools/data
+  - inventory does not inspect official-client processes, registration, X11/VNC sessions, network/game state or credentials
+  - any resolver/image repair is implemented and promoted on GitHub-hosted before another bootstrap attempt
+  - next bootstrap is a fresh-current-main redispatch with fresh admission and one bounded attempt
+last_completed_step: fresh trusted-main physical run 31953635875 acquired generation 2 but failed closed at toolroot_unavailable before WARP/X11/client; one-shot workflow was removed and static PR280 inspection exposed a likely system-package/x11vnc mismatch requiring exact runner inventory
+next_action: execute OTC-20260816-track-a-runner-support-layout-inventory as a separate bounded read-only Synology infrastructure observation; use its sanitized result to choose a hosted resolver/image fix or declare an external deployment blocker
 ---
 
-# Track A canonical physical runtime E2E v3
+# Track A canonical physical runtime E2E v3 — blocked support-layout checkpoint
 
-This is the fresh trusted-main continuation after the fail-closed #376 toolroot defect was repaired and archived. The physical phase remains intentionally limited to creating and registering one persistent exact-client X11/VNC runtime without account login or credential use.
+The runner is reachable and canonical admission is functioning, but the current physical support filesystem does not satisfy the hardened trusted-worker root contract. No registered runtime exists and no client/login was started. Further bootstrap attempts are disabled until a minimal support-layout inventory identifies the actual runner tool placement without observing the official client/runtime surface.

@@ -1,5 +1,9 @@
 # Tibia research track isolation
 
+```yaml
+tibia_research_tracks_policy_version: 5
+```
+
 This contract is mandatory for all current and future official-Tibia research in `blakinio/otclient`.
 
 ## Repository boundary
@@ -58,6 +62,181 @@ Track A owns research whose subject is the official Linux Tibia client itself, i
 
 Track A must not modify or take over Track B's OTClient-to-Global lab, workflow, branch, PR, containers or mutable state.
 
+## Track A canonical live-runtime model
+
+Track A distinguishes **one canonical persistent live official-client runtime** from **task-isolated ephemeral sandboxes**. The architecture decision is `docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md`.
+
+A unique X11 `DISPLAY` isolates a virtual X server, windows, focus, screenshots, GUI automation and process-control namespace. It does **not** create a separate Tibia Global account/session, character/world session or controller authority.
+
+By default there is at most **one canonical persistent official-client Tibia Global runtime/session** for Track A at a time. It is a programme resource that may be reused sequentially; mutation control remains exclusive.
+
+### Four distinct transitions
+
+Do not collapse controller authority, registration-generation recovery, existing-runtime identity and first creation.
+
+#### Gate A — authoritative lease and final cancellation-safe whole-lifetime supervisor
+
+The current task must first hold a current lease from:
+
+```text
+.github/scripts/tibia-official-client-re-canonical-live-lease
+```
+
+using the fixed canonical authority namespace:
+
+```text
+/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+```
+
+Repository task files, PR bodies/comments, manually written timestamps, a visible display/PID/socket/noVNC endpoint, or an agent statement are discovery metadata only. They never substitute for the authoritative lease.
+
+A successful lease `acquire` call does not mean the coordination flock remains continuously held after that call returns. Every ordinary canonical state-changing or invasive command must execute through the final reviewed supervisor path (`guard-run`, or a later reviewed equivalent preserving the same semantics):
+
+1. acquire `coordination.lock`;
+2. validate the current task/session token and lease generation while that flock is held;
+3. dispatch so only the dedicated Linux child-subreaper supervisor retains the coordination flock;
+4. start the guarded command with `close_fds=True`, so the command receives no flock descriptor;
+5. block normal cancellation signals across the supervisor fork setup window and install non-terminating handlers in the lock-owning supervisor before restoring its signal mask;
+6. keep serialization even when a foreground process-group cancellation kills the caller but a guarded descendant ignores that cancellation;
+7. retain the flock through the entire primary command plus all adopted/orphaned mutation descendants;
+8. release only after the complete guarded mutation tree is gone.
+
+These are the final PR #321 cancellation-safe semantics, built on PR #316 child-subreaper supervision and PR #317 descriptor-last-close hardening and freshly archived by PR #322. Standalone `validate` is preflight evidence only and never authorizes detached or otherwise unguarded mutation.
+
+If the manager is unavailable, lease validation fails, or the final supervisor whole-lifetime guarantee cannot be used, canonical mutation is disabled.
+
+#### Registration generation rebind — fail closed before Gate B
+
+The authoritative registration is bound to the lease generation that created or last revalidated it. A later legitimate controller acquisition advances the manager generation. Therefore a registration whose exact runtime still exists can require a **dedicated generation-rebind transition** before ordinary reuse.
+
+When the registration exists but `lease_generation` differs from the current validated controller generation, ordinary mutation is disabled until a reviewed rebind primitive completes while the canonical coordination flock remains held under Gate A. The rebind must freshly prove the same exact live runtime and target uniqueness, then atomically change only the authority binding while preserving the proven runtime identity.
+
+A rebind must prove at least:
+
+```yaml
+registration_path: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
+schema_version: 1
+runtime_id: track-a-canonical-live
+previous_lease_generation: <older registered generation>
+current_lease_generation: <current validated generation>
+boot_id_sha256: <current boot identity hash equal to registration>
+pid: <current pid equal to registration>
+process_start_ticks: <current start ticks equal to registration>
+client_version: 15.32.df7b29
+client_size: 51965216
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+display_window_state: freshly_revalidated
+target_uniqueness: proven
+competing_or_unverifiable_official_client_candidates: 0
+```
+
+Under the same continuously held flock, the rebind writes a mode-restricted candidate, increments `registration_generation`, sets `lease_generation` to the current validated generation, atomically replaces the authoritative registration, then re-reads and revalidates it plus the exact live runtime before success.
+
+Rebind is not client mutation and must not launch, log in, stop, signal, attach to or inject into the client. It cannot create a missing registration, bless a new/reused PID, accept a changed fence, repair contradictory display/window/state evidence or reconcile an ambiguous second official client. Any such condition fails closed into explicit recovery/bootstrap as applicable. Ad-hoc manual editing of `runtime-registration.json` is never a substitute.
+
+The policy defines this transition but does not implement it. Until a reviewed implementation exists, a generation mismatch keeps ordinary canonical mutation disabled.
+
+#### Gate B — authoritative exact-runtime registration and fresh preflight
+
+A current lease proves who may control; it does not prove what live process is canonical. After any required generation rebind, ordinary reuse/mutation requires the one authoritative current registration:
+
+```text
+/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
+```
+
+All Gate B readers/writers/rebind/recovery logic use that exact path. Alternative roots or registration files are not canonical.
+
+Immediately before ordinary reuse/mutation, the controller must freshly prove the registered process at least by:
+
+```yaml
+runtime_id: track-a-canonical-live
+registration_generation: <current registration generation>
+lease_generation: <current validated controller generation>
+boot_id_sha256: <current boot identity hash>
+pid: <current pid>
+process_start_ticks: <current /proc starttime>
+client_version: 15.32.df7b29
+client_size: 51965216
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+display: <current proven canonical X11 display>
+window_identity: <current official-client window evidence>
+remote_view_endpoint: <endpoint or null>
+remote_view_mapping: PROVEN | UNKNOWN
+state: LOGIN | CHARACTER_SELECT | IN_GAME | DISCONNECTED | UNKNOWN
+```
+
+PID alone is insufficient; boot identity + PID + process start ticks + exact executable fence are the minimum process identity boundary. Required display/window/state/mapping facts must be proven for the mutation being attempted.
+
+Registration is evidence, not authority. Gate B fails closed when the record is missing, malformed, stale, contradictory, still tied to a different lease generation after the rebind point, or does not match fresh process/fence/display/window/state evidence. It also fails closed when a competing or unverifiable official native Linux client candidate/session exists and unique safe targeting cannot be proven.
+
+After stale lease takeover or any normal new controller generation, the prior registration must be freshly falsified under replacement authority. If all exact-runtime facts remain unchanged, only the dedicated rebind transition may bind it to the current generation. The previous controller's registration is never self-authenticating authority.
+
+#### Initial creation/bootstrap — separate fail-closed transition
+
+When no authoritative registration exists, **do not weaken Gate B**, do not use generation rebind, and do not treat an earlier absence probe as launch authority. Initial creation is governed only by:
+
+```text
+docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+```
+
+The bootstrap contract requires a current lease, then a reviewed bootstrap supervisor that acquires the canonical coordination flock and validates the lease under that flock. While continuously holding the flock it re-proves absence of the authoritative registration and performs a fresh fail-closed inventory of **all** official-client candidates/sessions immediately before launch. It then owns creation descendants, proves exact process/fence/display/window identity, atomically commits the authoritative registration, revalidates it, and performs explicit safe detach.
+
+Ordinary `guard-run` is not a bootstrap safe-detach primitive: ordinary `guard-run` holds serialization until its process tree is gone, while successful bootstrap must leave one exact registered client alive after the explicit safe-detach boundary.
+
+Bootstrap binds the first registration to its creation lease generation. A later controller generation must perform the dedicated under-lock rebind before Gate B current-generation equality can pass for sequential reuse.
+
+The bootstrap contract does not itself implement or authorize client launch/login. A live creation/login execution requires its own implementation, deterministic validation and separately authorized runtime execution.
+
+### Exact fence and current non-claims
+
+Track A's current exact official-client fence is:
+
+```yaml
+version: 15.32.df7b29
+size: 51965216
+sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+platform: official_native_linux_only
+```
+
+Historical runtime evidence does not establish current canonical identity. Until direct Gate B/bootstrap evidence proves otherwise:
+
+```yaml
+display_98_current_canonical_status: UNKNOWN
+rfb_6082_current_backend_mapping: UNKNOWN
+current_exact_client_pid: NOT_REGISTERED
+current_exact_client_session: NOT_REGISTERED
+```
+
+No mutation may treat `:98`, `6082`, a PID or a session as canonical merely because it existed or worked historically.
+
+### Ephemeral isolated runtime
+
+A Track A task may create a task-owned ephemeral native-Linux runtime for startup, loader, rendering, GUI, recovery-harness, instrumentation-harness or similar experiments when that task authorizes it.
+
+Ephemeral runtimes use task-unique namespaces:
+
+```yaml
+runtime_class: ephemeral_isolated
+container_names: unique per track/task when used
+named_volumes: unique per track/task when used
+state_directory: unique per task
+display: unique per task when X11 is used
+loopback_ports: unique per task
+process_ownership_marker: task-specific where technically available
+remote_view_endpoint: task-specific when provided
+runtime_platform: native_linux_only
+```
+
+An ephemeral runtime is not the canonical registered live session. World login is not implied and should not be performed merely to mirror canonical state. Its owner may clean up only its own sandbox.
+
+### Parallel Track A research
+
+Static reverse engineering, binary analysis, protocol reconstruction, artifact/replay analysis, evidence normalization, tooling and documentation may proceed concurrently without canonical live control.
+
+Read-only live observation without Gate A is allowed only when it is demonstrably non-invasive, cannot alter process/session state and does not overlap another task's owned runtime surface. If those conditions cannot be proven, acquire current authority or do not observe.
+
+A second logged-in Track A Global session is not created merely because another task has a unique display. A genuinely independent additional live-session experiment requires explicit owner authorization and a separately declared safety/ownership boundary.
+
 ## Track B — OTClient to Tibia Global compatibility
 
 ```yaml
@@ -90,11 +269,11 @@ Track B must not claim the `OTCLIENT-TIBIA-RE` alias, must not become the canoni
 
 Both tracks may use `synology-otclient-01`, but shared runner hardware does not imply shared runtime ownership. The runner/runtime used for these experiments must remain native Linux.
 
-Every live task must declare and verify its own unique namespace before mutation or process control:
+For task-owned ephemeral runtimes, every live task must declare and verify its own unique namespace before mutation or process control:
 
 ```yaml
-container_names: unique per track/task
-named_volumes: unique per track/task
+container_names: unique per track/task when used
+named_volumes: unique per track/task when used
 state_directory: unique per track/task
 display: unique per track/task when X11 is used
 loopback_ports: unique per track/task
@@ -102,9 +281,15 @@ process_ownership_marker: task-specific where technically available
 runtime_platform: native_linux_only
 ```
 
-An agent may stop, restart, remove, clean, attach to, inject into, signal or reconfigure only processes/containers/displays/ports/state that its own task explicitly owns. Never use broad `pkill`, Docker cleanup, shared display cleanup or state deletion that can affect the other track.
+The Track A canonical live runtime is the deliberate exception to per-task state/display uniqueness: it is a persistent programme resource governed by Gate A + any required generation rebind + Gate B for reuse and by the separate bootstrap transaction for first creation. Its runtime identifiers may remain stable across sequential controller tasks; **control ownership never does**.
 
-Before any destructive or invasive runtime action, verify the target belongs to the current task. If ownership is ambiguous, stop that action and choose a non-destructive discovery method.
+Track B never shares Track A's canonical live runtime, lease/token, `coordination.lock`, runtime registration, rebind transition, bootstrap supervisor or mutable state.
+
+An agent may stop, restart, remove, clean, attach to, inject into, signal or reconfigure only processes/containers/displays/ports/state that its own task explicitly owns. For the Track A canonical live runtime, ordinary action additionally requires Gate A, any required rebind and Gate B to pass now, and mutation to stay under the final cancellation-safe supervisor for its whole process-tree lifetime. Initial creation requires the bootstrap contract instead.
+
+Never use broad `pkill`, Docker cleanup, shared display cleanup or state deletion that can affect another task/track. If ownership, identity, authority or target uniqueness is ambiguous, stop the action and choose non-destructive discovery.
+
+PR #303 runtime-owned paths/processes remain separately owned. Track A canonical-live governance may consume its durable evidence only within the recorded factual boundary and must not mutate its runtime surface.
 
 ## Path and PR isolation
 
@@ -127,12 +312,14 @@ Allowed examples:
 
 Before consuming cross-track evidence, verify its exact version/claim boundary and that it was established on the Linux runtime required by this contract. Do not treat another track's live container, active session, transient PID, heap address, socket, display or secret-bearing handoff as shared state.
 
+Within Track A, the canonical runtime's mutable process/session state is not generic concurrently owned evidence merely because several workers can observe repository metadata about it.
+
 ## Coordination rule
 
 If both tracks are active simultaneously:
 
 1. preserve both as independent tasks/PRs;
-2. verify disjoint `owned_paths` and runtime namespaces;
+2. verify disjoint `owned_paths` and runtime namespaces; Track A's canonical programme resource is governed only by its authority/rebind/identity/bootstrap gates and is never Track B state;
 3. verify both are using only native Linux client/runtime targets;
 4. do not reassign one track's task to the other;
 5. do not merge their objectives into a single worker context;
@@ -152,6 +339,9 @@ Track A / official-client-re:
   client/runtime: official native Linux Tibia client only
   canonical prompt: docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
   imported state: docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-state.md
+  canonical authority root: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+  canonical registration: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
+  bootstrap contract: docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
   supporting lanes include official-client runtime/bridge/worldmap work as live state determines
 
 Track B / otclient-global-login:
@@ -163,4 +353,4 @@ Track B / otclient-global-login:
   owned implementation: tools/tibia-global-login-lab/** and .github/workflows/tibia-global-login-lab.yml
 ```
 
-Revalidate exact live PR/task state on every continuation, but preserve the track boundary and Linux-only rule above unless the owner explicitly changes them.
+Revalidate exact live PR/task state on every continuation, but preserve the repository boundary, Linux-only rule, Track A Gate A/rebind/Gate B/bootstrap separation and Track B isolation unless the owner explicitly changes them.

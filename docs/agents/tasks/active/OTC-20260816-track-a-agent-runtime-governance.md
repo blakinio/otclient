@@ -16,10 +16,11 @@ base_main: 3a5568f36ebc326afd246d0d2da45b5d8eecabfa
 risk: medium
 related_pr: 324
 created: 2026-08-16T08:05:00+02:00
-updated: 2026-08-16T08:23:00+02:00
-lease_expires_at: 2026-08-16T09:08:00+02:00
+updated: 2026-08-16T08:32:00+02:00
+lease_expires_at: 2026-08-16T09:17:00+02:00
 lease_released_at: null
 owned_paths:
+  - docs/agents/README.md
   - docs/agents/AGENTS.md
   - docs/agents/TIBIA_RESEARCH_TRACKS.md
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
@@ -77,13 +78,22 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-last_progress_at: 2026-08-16T08:23:00+02:00
+last_progress_at: 2026-08-16T08:32:00+02:00
 material_review_findings:
-  - PRRT_kwDOTVmdjs6ZlHWz: remediated in branch; authorized canonical mutation now requires positive equal lease generations after any rebind, with fresh negative regressions
-  - PRRT_kwDOTVmdjs6ZlHW1: remediated in branch; every canonical access class is bound to runtime_owner_task == current task_id and the canonical namespace
-  - PRRT_kwDOTVmdjs6ZlHW2: remediated in branch; ephemeral_isolated rejects the reserved canonical-live-runtime namespace and aliases, with fresh negative regressions
-last_completed_step: fresh review P1s were repaired fail-closed in the admission validator and fresh behavior audit; no runtime access was used
-next_action: require fresh exact-head admission-policy audit, behavior audit and repository CI after the three P1 repairs; then resolve only verified review threads, protected-merge PR #324 and archive/release the task
+  - PRRT_kwDOTVmdjs6ZlHWz: remediated and verified; authorized canonical mutation requires positive equal lease generations after any rebind, with fresh negative regressions
+  - PRRT_kwDOTVmdjs6ZlHW1: remediated and verified; every canonical access class is bound to runtime_owner_task == current task_id and the canonical namespace
+  - PRRT_kwDOTVmdjs6ZlHW2: remediated and verified; ephemeral_isolated rejects the reserved canonical-live-runtime namespace and aliases, with fresh negative regressions
+  - PRRT_kwDOTVmdjs6ZlIVI: remediated and verified; universally mandatory docs/agents/README.md now points every Track A worker to the admission contract and is covered by workflow triggering plus static audit
+validation_evidence:
+  - parent_head: 90f31bfe42bbc2e8c178e90b7e04a6d69f64c01e
+  - track_a_governance_run: 31931442198 SUCCESS
+  - policy_audit_job: 95126785784 SUCCESS
+  - fresh_behavior_audit_job: 95126785680 SUCCESS
+  - repository_ci_run: 31931442374 SUCCESS
+  - required_ci_job: 95127228818 SUCCESS
+  - unresolved_review_threads_after_verification: 0
+last_completed_step: all four material P1 findings are remediated and resolved; the universal Track A entrypoint, policy validator and behavior regressions passed on parent head 90f31bfe42bbc2e8c178e90b7e04a6d69f64c01e; this checkpoint adds the newly owned universal README path and durable evidence only
+next_action: require fresh exact-head Track A governance audit and repository CI for this checkpoint head, then update PR #324 evidence, mark Ready, require the new protected Ready-state CI generation, merge, archive and release ownership
 ---
 
 # Track A agent runtime-governance enforcement
@@ -94,7 +104,8 @@ Make the final Track A canonical-live runtime rules unavoidable at the normal ag
 
 ## Acceptance criteria
 
-- Track A agent instructions require workers to read the admission contract and classify runtime access before any runtime operation.
+- The universally mandatory `docs/agents/README.md` routes every Track A worker to the runtime-admission contract before runtime work.
+- Track A nested agent instructions require workers to read the admission contract and classify runtime access before any runtime operation.
 - The canonical Track A wrapper requires the same admission before claim/resume/observation/control/mutation.
 - The Track A contract defines a mandatory admission record for `none`, `read_only`, `ephemeral_isolated`, `canonical_reuse_or_mutation`, `canonical_bootstrap`, and `canonical_rebind` work.
 - Canonical mutation requires current Gate A plus any required rebind plus Gate B, target ownership/uniqueness, equal current lease-generation binding and the final whole-lifetime supervisor.
@@ -103,7 +114,7 @@ Make the final Track A canonical-live runtime rules unavoidable at the normal ag
 - Ephemeral runtimes cannot use or alias the reserved canonical namespace.
 - Historical `:98`, `6082`, PID or session evidence never satisfies current canonical identity.
 - Track A workers may not mutate PR #303-owned runtime or Track B state through these rules.
-- A deterministic repository test prevents removal/regression of the mandatory policy invariants.
+- A deterministic repository test prevents removal/regression of the mandatory policy invariants and the universal entrypoint pointer.
 - Future added/modified Track A active tasks must declare the complete runtime admission record; runtime-sensitive Track A implementation changes without such a task record fail the policy audit.
 - No live Tibia client is launched, logged in, signalled, attached to or mutated by this task.
 - Exact-head CI/review are green before merge; task is archived and ownership released afterward.
@@ -131,6 +142,8 @@ A canonical admission names another task as runtime owner. CI rejects it.
 An ephemeral admission uses `canonical-live-runtime` or an alias containing that reserved namespace. CI rejects it.
 
 A runtime-sensitive Track A PR updates code/workflow paths without an added/modified active Track A task containing an admission record. CI rejects it.
+
+Removing the Track A admission pointer from the universally mandatory `docs/agents/README.md` fails the policy audit.
 
 ### Boundary
 

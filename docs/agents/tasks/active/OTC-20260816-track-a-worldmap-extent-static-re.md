@@ -16,7 +16,7 @@ base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
 live_main_observed: ffe954be315ee29825c726b996a30fea8475a0f3
 pr: 367
 risk: medium
-updated: 2026-08-16T18:02:00+02:00
+updated: 2026-08-16T18:19:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md
   - .github/scripts/tibia-official-client-re-worldmap-extent-static.py
@@ -74,9 +74,9 @@ client_size: 51965216
 client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
 invocation_started_at: 2026-08-16T14:20:00+02:00
-last_progress_at: 2026-08-16T18:02:00+02:00
+last_progress_at: 2026-08-16T18:19:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: retained-owner-geometry-object
+ci_check_generation: owner-vptr-storage-scale-coupling
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -113,6 +113,12 @@ retained_geometry:
   owner_plus_0x10_static_vptr: 0x0308ce70
   owner_plus_0x10_exact_class_identity: UNKNOWN
   viewport_18x14_interpretation: INFERENCE
+handler_owner:
+  historical_runtime_address: 0x55868276a460
+  static_vptr: 0x030871d8
+  exact_class_identity: UNKNOWN
+  protocol_handler_identity: INFERENCE
+  discriminator_window: 0x030871c8..0x030871d7
 observer_source_provenance:
   status: RECOVERED
   create_on_map: 0x00cecc70
@@ -127,6 +133,14 @@ exact_handler_disassembly:
   full_map_subfield_scale_x32: PROVEN
   map_description_grid_fields_0x38_0x3c_0x40_0x48: PROVEN_ACCESSES
   hash_table_rebuild_0xced1b0: PROVEN_STRUCTURE_INFERENCE_STORAGE
+  hash_rebuild_self_0x30_float_0xd0_coupling: PROVEN
+  hash_rebuild_self_0x30_exact_class_identity: UNKNOWN
+exact_static_identity_frontier:
+  handler_owner_vptr_header: 0x030871c8..0x030871d7
+  geometry_object_vptr_header: 0x0308ce60..0x0308ce6f
+  geometry_control_vptr_header: 0x02f683c0..0x02f683cf
+  counted_viewport_type_string_start: 0x1cabb60
+  counted_protocol_handler_type_string_start: 0x1cdba40
 user_supplied_launcher:
   archive_size: 29477141
   archive_sha256: 04a87c801d3855f4da1b07e201dff1f79acc8528c57c984131c3a2a88cb60ea7
@@ -137,7 +151,7 @@ hosted_official_metadata_probe:
   run: 31949948886
   result: CLOUDFLARE_HTTP_403
   identical_retry_allowed: false
-next_action: identify static vptr 0x0308ce70 via retained vtable header/typeinfo evidence; recover writers/xrefs for object +0x48/+0x4c and candidate bounds; continue 0xceca50 and 0xced1b0 storage correlation; then trace render/camera/picker constraints before any mutation design
+next_action: recover any retained vtable-header/typeinfo window for 0x030871d8, 0x0308ce70 or 0x02f683d0; recover geometry writers/xrefs; correlate 0xced1b0 self+0x30/+0xd0 with storage/render/camera identity; then audit render/camera/picker bounds before mutation design
 ---
 
 # Track A worldmap extent static RE
@@ -154,46 +168,48 @@ retained_evidence_research_path: active
 runtime_discriminator_required: false
 ```
 
-Fresh GitHub-hosted materialization of the exact installed game-client ELF remains unavailable, but retained same-repository evidence continues to advance the graph. The owner-supplied Linux package has been preserved as exact GitHub artifact `9264329820`; static inspection proves it is the launcher/updater distribution and not the fenced 51,965,216-byte installed client.
+Fresh GitHub-hosted materialization of the exact installed game-client ELF remains unavailable, but retained same-repository evidence has advanced the graph further. No new runtime, GUI/session, client-byte mutation, Synology static RE, credentials, Codex/OpenAI API or owner-funded token use occurred.
 
-## New durable evidence
+## Durable evidence
 
 - `20260816-retained-provenance-recovery.md` — raw geometry, exact prefixes and type/container census.
 - `20260816-user-supplied-linux-launcher-artifact.md` / `20260816-owner-upload-launcher-package.md` — exact user upload fence and GitHub artifact provenance.
-- `20260816-exact-handler-disassembly-recovery.md` — recovered producer-source labels plus exact fenced FullMap/Create/Change/Delete/MapDescription disassembly graph.
+- `20260816-exact-handler-disassembly-recovery.md` — producer-source labels plus exact fenced FullMap/Create/Change/Delete/MapDescription disassembly graph.
 - `20260816-retained-owner-geometry-object.md` — direct `owner+0x10` object fields, exact stored `18/14`, candidate bound deltas and static vptr `0x0308ce70`.
+- `20260816-owner-vptr-storage-scale-coupling.md` — common handler-owner static vptr `0x030871d8`, exact identity windows, and `0xced1b0 -> self+0x30/+0xd0` float coupling.
 
-Major current static facts:
+## Major current facts
 
-- observer-source provenance for `CreateOnMap`, `ChangeOnMap`, `DeleteOnMap`, `FullMap` and the `MapDescription` capture is recovered from historical workflow source;
-- `FullMap@0xcec8d0` copies a three-DWORD map-state tuple and multiplies two payload integers by exactly 32 before an owner virtual call;
-- `MapDescription@0x19a8a80` uses descriptor fields `+0x38/+0x3c/+0x40/+0x48` as multiplicative/divisor geometry parameters and `+0x08/+0x0c/+0x10` as coordinate-transform inputs;
-- the concrete object at the proven handler `owner+0x10` path stores `DWORD +0x48=18` and `DWORD +0x4c=14`, while two candidate bound pairs in that same object differ by exactly `18` and `14`;
-- the object's exact historical static vptr is `0x0308ce70`, while its exact class identity remains `UNKNOWN` because the decisive vtable-header/typeinfo relocation window is not retained in the inspected artifacts;
-- neighboring `0xced1b0` rebuilds a bucketed 0x20-byte-node hash structure and is a strong storage/unordered-map correlation candidate;
-- Create/Change/Delete share the owner `+0x10 -> vslot +0xa0` family and repeated owner `+0xd8` map-state comparison paths.
-
-No new runtime, GUI/session, client-byte mutation, Synology static RE, credentials, Codex/OpenAI API or owner-funded token use occurred.
+- A concrete object on the proven `owner+0x10` path stores exact DWORDs `18/14` at `+0x48/+0x4c`; two candidate bound pairs in the same object differ independently by `18/14`.
+- Its exact historical static vptr is `0x0308ce70`; exact class identity remains `UNKNOWN`.
+- The common historical map-handler owner has exact static vptr `0x030871d8`; `TWorldmapProtocolMessageHandler` is a strong but unproven semantic correlation.
+- `FullMap@0xcec8d0` multiplies two payload integers by exactly 32 before a worldmap-owner virtual call.
+- `MapDescription@0x19a8a80` uses descriptor grid/divisor fields `+0x38/+0x3c/+0x40/+0x48` and coordinate transform inputs `+0x08/+0x0c/+0x10`.
+- `0xced1b0` rebuilds a bucketed 0x20-byte-node hash structure and later consumes a float at dependency `self+0x30/+0xd0`; exact class and semantic meaning remain `UNKNOWN`.
+- The exact-static census includes all target type names, shared-control-block surfaces, full counted viewport string start `0x1cabb60`, full counted protocol-handler string start `0x1cdba40`, and literal `tibia::worldmap::TWorldMapExtentX` at `0x1cd9ad7`.
 
 ## Acceptance progress
 
 - [x] exact historical installed-client fence retained;
 - [x] all eight target type surfaces present;
-- [x] richer shared-lifetime/control-block surfaces recovered;
-- [x] raw 18-sample horizontal groups and Y delta 14 directly preserved;
-- [x] concrete worldmap-handler dependency object stores exact `18/14` pair;
-- [x] same object's candidate bound-pair differences independently equal `18/14`;
+- [x] shared-lifetime/control-block surfaces recovered;
+- [x] raw 18-sample horizontal groups and Y delta 14 preserved;
+- [x] concrete worldmap dependency object stores exact `18/14`;
+- [x] candidate bound-pair differences independently equal `18/14`;
+- [x] common handler owner vptr recovered;
 - [x] observer label-source provenance recovered;
-- [x] full retained disassembly recovered for the five bounded map-handler/description ranges;
-- [x] protocol-side x32 subfield/tile conversion surface proven;
-- [x] descriptor grid/divisor field accesses proven in MapDescription;
-- [ ] exact class identity for static vptr `0x0308ce70` recovered;
-- [ ] exact semantic names/units for descriptor/object geometry fields recovered;
-- [ ] extent/subfield/viewport dimension fields semantically identified;
+- [x] retained disassembly recovered for bounded map-handler/description ranges;
+- [x] protocol-side ×32 conversion proven;
+- [x] descriptor grid/divisor accesses proven;
+- [x] candidate hash rebuild and post-rebuild float coupling proven;
+- [ ] exact class identity for static vptr `0x0308ce70`;
+- [ ] exact class identity for static vptr `0x030871d8`;
+- [ ] semantic names/units for geometry fields;
+- [ ] extent/subfield/viewport fields semantically identified;
 - [ ] constructors/default writers and complete readers/writers recovered;
 - [ ] storage direct-member relation and capacity/eviction rules proven;
 - [ ] render/camera/picker clipping/culling/transform dependencies traced;
 - [ ] fixed allocations/loop bounds/masks/packing audited completely;
 - [ ] coherent patch/dependency graph ready for mutation design.
 
-The task remains active while retained evidence continues producing new facts.
+The task remains active while retained evidence can still produce non-duplicative facts.

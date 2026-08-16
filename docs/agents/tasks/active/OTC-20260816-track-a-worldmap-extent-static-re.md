@@ -13,10 +13,10 @@ implementation_authorized: false
 branch: research/OTC-20260816-track-a-worldmap-extent-static-re
 base_branch: main
 base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
-live_main_observed: ffe954be315ee29825c726b996a30fea8475a0f3
+live_main_observed: 05d4a7136e234b874f7f112ad8c92f01b0aabd51
 pr: 367
 risk: medium
-updated: 2026-08-16T18:23:00+02:00
+updated: 2026-08-16T18:25:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md
   - .github/scripts/tibia-official-client-re-worldmap-extent-static.py
@@ -34,12 +34,13 @@ reuses:
   - run 31804083206 job 94778661881 exact fenced handler disassembly log
   - commits caa938463356ce9a8ece92e9ae908ba507f501a9 and 734f845deace5a26efa09b96a168bea0c05272f0 observer producer source
   - user-supplied tibia.x64.tar.gz artifact 9264329820 exact archive fence
+  - main PR #397 runtime-v6 discriminator read-only cross-check
 depends_on: []
 blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: static/artifact reverse engineering remains deterministic and GitHub-hosted; retained same-repo evidence was exhausted to a bounded missing-static-window blocker
+execution_reason: retained same-repository exact-client evidence is exhausted to a bounded missing-static-window blocker; physical runtime remains a separate lane
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: finalize_archive_and_continue
@@ -74,9 +75,9 @@ client_size: 51965216
 client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
 invocation_started_at: 2026-08-16T14:20:00+02:00
-last_progress_at: 2026-08-16T18:23:00+02:00
+last_progress_at: 2026-08-16T18:25:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: exact-static-evidence-blocker
+ci_check_generation: live-main-static-blocker-refresh
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -152,9 +153,17 @@ static_blocker:
   kind: NEW_EXACT_STATIC_EVIDENCE_REQUIRED
   effect: class identities and safe field patch sites cannot be proven from the current retained set
   acceptable_unblockers:
-    - previously uninspected same-repository retained artifact containing the exact windows/relocations
+    - previously uninspected same-repository retained artifact containing exact windows/relocations
     - governance-compliant staging of the fenced exact client sufficient to extract only bounded missing static evidence
   forbidden_duplicate_action: repeat identical official CDN staging attempt
+runtime_v6_crosscheck:
+  main_pr: 397
+  result: FAIL_CLOSED_CLIENT_WINDOW_MISSING
+  official_exact_client_launch_stage_reached: true
+  authoritative_registration_published: false
+  gate_b_reached: false
+  static_evidence_staged_for_this_task: false
+  static_unblock: false
 user_supplied_launcher:
   archive_size: 29477141
   archive_sha256: 04a87c801d3855f4da1b07e201dff1f79acc8528c57c984131c3a2a88cb60ea7
@@ -165,7 +174,7 @@ hosted_official_metadata_probe:
   run: 31949948886
   result: CLOUDFLARE_HTTP_403
   identical_retry_allowed: false
-next_action: obtain NEW exact static evidence for at least one identity window or geometry writer/xref; do not rescan the current retained set or repeat identical CDN fetches; after unblocking, resume the same PR/task with storage/render/camera/picker dependency recovery
+next_action: obtain NEW exact static evidence for at least one identity window or geometry writer/xref; do not rescan the current retained set, do not repeat identical CDN fetches, and do not use physical Synology runtime as an unauthorized static fallback; after unblocking, resume this same PR/task
 ---
 
 # Track A worldmap extent static RE
@@ -182,9 +191,9 @@ retained_evidence_research_path: BLOCKED_NEW_EXACT_STATIC_EVIDENCE_REQUIRED
 runtime_discriminator_required: false
 ```
 
-The current downloaded retained evidence set has been exhausted for the exact identity/writer questions that now gate safe patch design. This is a static-input blocker, not a reason to create a new task or PR.
+The current retained evidence set is exhausted for the identity/writer questions that now gate safe patch design. Live `main@05d4a7136e234b874f7f112ad8c92f01b0aabd51` adds RUNTIME v6 evidence but does not stage new exact static bytes for this lane; v6 failed closed at `client_window_missing` without authoritative registration or Gate B.
 
-No new runtime, GUI/session, client-byte mutation, Synology static RE, credentials, Codex/OpenAI API or owner-funded token use occurred.
+No new runtime, GUI/session, client-byte mutation, Synology static RE, credentials, Codex/OpenAI API or owner-funded token use occurred in this STATIC-RE continuation.
 
 ## Durable evidence
 
@@ -233,9 +242,6 @@ No new runtime, GUI/session, client-byte mutation, Synology static RE, credentia
 
 ## Exact blocker
 
-Further progress now requires **new exact static evidence**, not another pass over the same retained files. Any future continuation must resume this same task/PR and first obtain one of:
-
-1. a previously uninspected same-repository artifact containing one of the exact identity windows/relocations; or
-2. a governance-compliant staging of the fenced exact client sufficient to extract only the bounded missing bytes/relocations/writer xrefs.
+Further progress now requires **new exact static evidence**, not another pass over the same retained files. Resume this same task/PR only after a previously uninspected same-repository artifact provides the missing windows/relocations, or after governance-compliant staging of the fenced exact client provides the bounded missing bytes/relocations/writer xrefs.
 
 Do not repeat the already-failed identical official CDN staging attempt. Do not use Synology as an unauthorized static fallback.

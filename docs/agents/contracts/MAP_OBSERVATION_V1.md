@@ -2,10 +2,11 @@
 
 Coordination ID: `OTS-20260813-world-reconstruction-navigation`.
 
-This is the versioned contract for a local, read-only observation artifact
-produced from OTClient's already-decoded `Map`/`Tile` state. It does not define
-OTBM IDs, packet parsing, authentication, a network transport, or an action
-controller.
+This is the versioned contract for a local, read-only semantic world-observation artifact. The record encoding, field semantics, completeness rules, ordering, identity rules, transition evidence and forbidden-data rules below remain producer-neutral and frozen for version `1`.
+
+For the current reconstruction programme, the authoritative live producer is **Track A `official-client-re`**, whose subject is the official native Linux Tibia client. Track B (`otclient-global-login`) is not the producer for this programme and must not be used as a shortcut to obtain Track A observation evidence. A future OTClient-side producer may adopt this same normalized format only through a separately owned task and evidence boundary.
+
+The current Track A producer must consume structurally decoded/verified exact-client state and reuse coordinator-promoted Track A worldmap/runtime-bridge evidence rather than duplicating discovery. Historical or still-Draft PR state is evidence only and is not runtime authority. This contract does not define OTBM IDs, packet parsing, authentication, a network transport, or an action controller.
 
 ## P0 fixture authority
 
@@ -76,9 +77,9 @@ uses this form:
 ```
 
 `stack_position` is a non-negative integer and array order is ascending stack
-order. `category` is the factual OTClient category (`item`, `creature`,
+order. `category` is the factual producer category (`item`, `creature`,
 `effect`, `missile`, or `unknown`). `identity` preserves only raw client-side
-identity already decoded by OTClient:
+identity already structurally established by the producer:
 
 - `client_appearance_id` is an integer appearance/item identifier when known;
 - `client_creature_id` is an integer client-local creature identifier when
@@ -125,9 +126,18 @@ authorization header, bearer token, login request/response, raw packet payload,
 or proprietary client asset. Persistence failures are local diagnostics only;
 they do not create a synthetic observation.
 
-## P1 boundaries
+## P1 boundaries — current Track A producer
 
-P1 instruments decoded map state around `ProtocolGame::setTileDescription`,
-map updates, and `Map`/`Tile` changes. It is disabled by default, failure-safe,
-bounded, and local-only. It must not reparse protocol packets, mutate map state,
-or directly contact an Atlas service.
+P1 produces normalized observations from structurally verified state of the exact official native Linux Tibia client. It is disabled by default, failure-safe, bounded, local-only, and must preserve `UNKNOWN` for fields that are not structurally proven.
+
+P1 must:
+
+- exact-version fence all build-specific structural claims;
+- consume coordinator-promoted Track A worldmap/runtime-bridge evidence rather than duplicate it;
+- keep observation production read-only and separate from login/input/action authority;
+- avoid reparsing raw protocol packets merely to populate this normalized artifact;
+- avoid mutating client/world state in order to manufacture an observation;
+- keep Track B PR/runtime namespaces completely independent;
+- defer any live observation, bridge activation/instrumentation or action proof to the then-current Track A runtime-admission and ownership gates.
+
+This contract does not grant runtime authority. Historical displays, VNC ports, PIDs, sessions or prior bridge/runtime observations remain evidence only.

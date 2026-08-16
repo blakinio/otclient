@@ -14,7 +14,7 @@ material_findings_open: 7
 high_findings_open: 4
 medium_findings_open: 3
 previous_material_findings: 9
-previous_findings_resolved_or_superseded: 2
+previous_findings_materially_reclassified_or_resolved: 3
 runtime_access: none
 physical_e2e: NOT_APPLICABLE_WITH_REASON
 ```
@@ -342,7 +342,7 @@ audit:
   open_findings:
     high: 4
     medium: 3
-  resolved_or_superseded_since_previous_package: 2
+  materially_reclassified_or_resolved_since_previous_package: 3
   false_completion_claim_found: false
   inventory_vs_semantic_boundary_preserved: true
   historical_runtime_promoted_to_current: false

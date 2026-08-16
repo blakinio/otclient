@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-world-observation-atlas-boundary
-status: investigating
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: COVERAGE-AUDIT
@@ -11,8 +11,9 @@ branch: docs/OTC-20260816-world-observation-atlas-boundary
 base_branch: main
 start_sha: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
 created: 2026-08-16T23:09:00+02:00
-updated: 2026-08-16T23:09:00+02:00
+updated: 2026-08-16T23:16:00+02:00
 risk: medium
+related_pr: 439
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-world-observation-atlas-boundary.md
@@ -37,6 +38,16 @@ execution_class: github_hosted
 runtime_access: none
 persistent_session_role: none
 physical_e2e_required: false
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
 ---
@@ -122,28 +133,39 @@ Autonomous exploration is a later milestone.
 - [x] producer-side index/export responsibilities are documented;
 - [x] physical RUNTIME authority is not broadened;
 - [x] cross-repository Atlas consumption remains a separately authorized/promoted boundary;
-- [ ] stale original map-observation P0 task is archived/released;
-- [ ] programme document is committed and validated;
+- [x] stale original map-observation P0 task is archived/released;
+- [x] programme document is committed;
+- [ ] exact-head Track A governance and repository CI pass;
+- [ ] review/merge hygiene is clean.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-16T23:09:00+02:00
-status: investigating
+updated_at: 2026-08-16T23:16:00+02:00
+status: validating
 branch: docs/OTC-20260816-world-observation-atlas-boundary
+pr: 439
 base_main: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
 shared_coordination_id: OTS-20260813-world-reconstruction-navigation
 proven:
   - MAP_OBSERVATION_V1 on current main already declares Track A as current authoritative producer.
   - current Track A routing separates hosted P0/P1/P2 work from physical RUNTIME evidence.
-  - old PR #292 implements an open-source OTClient Map/Tile recorder and is therefore the wrong producer for this programme.
+  - old PR #292 implemented an open-source OTClient Map/Tile recorder and is closed unmerged as the wrong producer.
+  - stale P0 task ownership has been moved from active to archive on this branch.
 owner_decisions:
   - Track A agent should index discovered Global Tibia tile facts and deliver changed indexed data to Atlas.
   - Atlas must visualize verified/unverified coverage and accessibility, including tiles unavailable to an ordinary character.
   - Atlas should provide humans and agents with remaining verification targets.
 unknown:
   - exact producer index engine and bundle encoding beyond frozen semantic requirements.
+validation:
+  - run: 31972849429
+    check: repository CI
+    result: PASS on predecessor head 22ee93e1910d188c4eb07e8c4e0e42b88dc08afd
+  - run: 31972849305
+    check: Track A agent runtime governance
+    result: FAIL on predecessor head because this task omitted required admission fields; fixed in the current commit
 blockers: []
-next_action: Finish producer boundary programme doc and archive the stale original P0 task, then open the documentation reconciliation PR for review/CI.
+next_action: Re-run/observe exact-head governance and CI after the admission-field repair; if clean, review diff/threads and merge PR #439.
 ```

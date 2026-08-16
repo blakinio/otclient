@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-canonical-live-runtime
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: automation-20260816-0733-canonical-final
 session_role: governance-integrator
@@ -9,14 +9,14 @@ project_lane: otclient
 lane: track-a-governance
 track_id: official-client-re
 task_kind: implementation
-phase: integrate
+phase: validate
 branch: docs/OTC-20260815-track-a-canonical-live-runtime
 base_branch: main
 base_main: b0fd474e34c0252220b773b2304d889821080727
 risk: high
 related_pr: 311
-updated: 2026-08-16T07:37:00+02:00
-lease_expires_at: 2026-08-16T08:22:00+02:00
+updated: 2026-08-16T07:39:00+02:00
+lease_expires_at: 2026-08-16T08:24:00+02:00
 lease_released_at: null
 owned_paths:
   - .github/workflows/track-a-canonical-live-governance.yml
@@ -42,19 +42,19 @@ task_completion_policy: protected_merge_then_archive
 user_communication: terminal_only
 implementation_authorized: true
 invocation_started_at: 2026-08-16T07:16:27+02:00
-last_progress_at: 2026-08-16T07:37:00+02:00
+last_progress_at: 2026-08-16T07:39:00+02:00
 context_pressure: medium
 context_growth: stable
 context_score: 8
 estimate_confidence: high
 decomposition_decision: single
-validation_level: focused
-heavy_validation_runs: 0
+validation_level: full
+heavy_validation_runs: 1
 stale_takeover_count: 0
 human_interruptions: 0
 ci_checks_for_current_head: 0
-ci_check_generation: draft
-terminal_ci_wait_started_at: null
+ci_check_generation: ready
+terminal_ci_wait_started_at: 2026-08-16T07:39:00+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
@@ -63,10 +63,14 @@ context_reconstruction_attempts: 0
 stall_warnings: 0
 claim_reason: previous task checkpoint was explicitly released with session_id null and lease_expires_at null; no active owner existed, so this is a normal replacement integration session rather than stale takeover
 material_review_findings:
-  - PRRT_kwDOTVmdjs6ZkaMN: final manager needed cancellation-safe lock ownership; repaired and promoted by PR #321/#322
-  - PRRT_kwDOTVmdjs6ZkaMO: sequential reuse needs a dedicated under-lock fail-closed registration generation-rebind transition before Gate B current-generation equality
-last_completed_step: PR #311 was clean-restacked on main@b0fd474e34c0252220b773b2304d889821080727; policy/ADR/bootstrap now target PR #321/#322 and define the fail-closed registration-generation rebind
-next_action: add and run a deterministic fresh governance acceptance audit, resolve material review threads, then require exact-head repository CI and protected merge
+  - PRRT_kwDOTVmdjs6ZkaMN: RESOLVED after PR #321/#322 cancellation-safe manager promotion and policy-v5 restack
+  - PRRT_kwDOTVmdjs6ZkaMO: RESOLVED by dedicated under-lock fail-closed registration-generation rebind boundary
+pre_final_governance_audit_head: ce4f3e76578a07ea89c609a23e234663e8c2fd18
+pre_final_governance_audit_run: 31929433087
+pre_final_governance_audit_result: success
+review_threads_open_material: 0
+last_completed_step: clean restack on final main is complete; PR #318 bootstrap contract is reconciled to PR #321/#322; cancellation and generation-rebind P1 threads are resolved; a fresh GitHub-hosted deterministic governance audit passed before final freeze
+next_action: require fresh audit and repository CI / Required PASS on this frozen exact head, protected-merge PR #311, then archive task and release ownership
 ---
 
 # Objective

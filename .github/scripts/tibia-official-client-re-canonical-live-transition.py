@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import hashlib
 import importlib.util
 import json
@@ -82,17 +81,12 @@ def _exe_path(pid: int) -> Path:
 def _identity(pid: int) -> dict[str, Any]:
     exe = _exe_path(pid)
     st = exe.stat()
-    size = st.st_size
-    sha = _sha256(exe)
     return {
         "boot_id_sha256": _boot_id_sha256(),
         "pid": pid,
         "process_start_ticks": _proc_start_ticks(pid),
-        "exe_path": str(exe),
-        "exe_dev": st.st_dev,
-        "exe_ino": st.st_ino,
-        "client_size": size,
-        "client_sha256": sha,
+        "client_size": st.st_size,
+        "client_sha256": _sha256(exe),
     }
 
 
@@ -114,17 +108,16 @@ def _candidate_pids() -> list[int]:
             st = exe.stat()
         except (OSError, TransitionError):
             continue
-        path_text = str(exe)
-        plausible_path = "CipSoft GmbH/Tibia/packages/Tibia" in path_text
-        if not plausible_path and st.st_size != EXPECTED_SIZE:
+        plausible = "CipSoft GmbH/Tibia/packages/Tibia" in str(exe)
+        if not plausible and st.st_size != EXPECTED_SIZE:
             continue
         try:
             sha = _sha256(exe)
         except OSError:
-            if plausible_path:
+            if plausible:
                 result.append(pid)
             continue
-        if plausible_path or (st.st_size == EXPECTED_SIZE and sha == EXPECTED_SHA256):
+        if plausible or (st.st_size == EXPECTED_SIZE and sha == EXPECTED_SHA256):
             result.append(pid)
     return sorted(set(result))
 
@@ -133,7 +126,8 @@ def _read_registration() -> dict[str, Any] | None:
     if not REGISTRATION.exists():
         return None
     st = REGISTRATION.lstat()
-    if not REGISTRATION.is_file() or REGISTRATION.is_symlink() or (st.st_mode & 0o777) != 0o600:
+    owner_ok = not hasattr(os, "getuid") or st.st_uid == os.getuid()
+    if not REGISTRATION.is_file() or REGISTRATION.is_symlink() or (st.st_mode & 0o777) != 0o600 or not owner_ok:
         raise TransitionError("registration_file_unsafe")
     try:
         data = json.loads(REGISTRATION.read_text(encoding="utf-8"))
@@ -147,6 +141,10 @@ def _read_registration() -> dict[str, Any] | None:
         raise TransitionError("registration_client_fence_invalid")
     if data.get("state") not in ALLOWED_STATES or data.get("remote_view_mapping") not in {"PROVEN", "UNKNOWN"}:
         raise TransitionError("registration_state_invalid")
+    if not isinstance(data.get("registration_generation"), int) or int(data["registration_generation"]) < 1:
+        raise TransitionError("registration_generation_invalid")
+    if not isinstance(data.get("lease_generation"), int) or int(data["lease_generation"]) < 1:
+        raise TransitionError("registration_lease_generation_invalid")
     return data
 
 
@@ -217,12 +215,12 @@ def _sanitized_env() -> dict[str, str]:
     return env
 
 
-def _run_probe(command: Sequence[str], manifest: Path) -> dict[str, Any]:
+def _run_probe(worker: Path, manifest: Path) -> dict[str, Any]:
     try:
         manifest.unlink()
     except FileNotFoundError:
         pass
-    completed = subprocess.run([*command, str(manifest)], check=False, env=_sanitized_env(), close_fds=True)
+    completed = subprocess.run([str(worker), "probe", str(manifest)], check=False, env=_sanitized_env(), close_fds=True)
     if completed.returncode != 0:
         raise TransitionError("probe_failed")
     return _load_manifest(manifest)
@@ -271,96 +269,80 @@ def bootstrap(args: argparse.Namespace) -> None:
     lease = _load_lease_module()
     manager = lease.LeaseManager(STATE_DIR)
     manifest_path = STATE_DIR / ".bootstrap-manifest.json"
+    post_path = STATE_DIR / ".bootstrap-post-manifest.json"
     child: subprocess.Popen[bytes] | None = None
-    committed = False
+    registration_written = False
+    success = False
+    generation = 0
     with manager.locked():
         identity, generation = _validate_lease_locked(manager, lease, args.task_id, args.session_id, args.token_file)
         if _read_registration() is not None:
             raise TransitionError("registration_already_present")
-        candidates = _candidate_pids()
-        if candidates:
-            raise TransitionError("official_client_candidate_present", repr(candidates))
+        if _candidate_pids():
+            raise TransitionError("official_client_candidate_present")
         STATE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
-        try:
-            manifest_path.unlink()
-        except FileNotFoundError:
-            pass
+        for path in (manifest_path, post_path):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
         try:
             child = subprocess.Popen(
-                [*args.worker, str(manifest_path)],
-                env=_sanitized_env(),
-                close_fds=True,
-                start_new_session=True,
+                [str(args.worker), "bootstrap", str(manifest_path)],
+                env=_sanitized_env(), close_fds=True, start_new_session=True,
             )
             rc = child.wait(timeout=args.worker_timeout)
             if rc != 0:
                 raise TransitionError("bootstrap_worker_failed", f"rc={rc}")
             manifest = _load_manifest(manifest_path)
-            pgid = child.pid
-            if int(manifest.get("process_group_id", pgid)) != pgid:
+            if not isinstance(manifest.get("process_group_id"), int) or int(manifest["process_group_id"]) != child.pid:
                 raise TransitionError("bootstrap_process_group_invalid")
             current = _identity(int(manifest["pid"]))
             _exact_identity(current)
-            candidates = _candidate_pids()
-            if candidates != [int(manifest["pid"])]:
-                raise TransitionError("bootstrap_target_not_unique", repr(candidates))
+            if _candidate_pids() != [int(manifest["pid"])]:
+                raise TransitionError("bootstrap_target_not_unique")
             _lease_recheck_locked(manager, lease, identity, args.token_file, generation)
-            now = int(time.time())
             record: dict[str, Any] = {
-                "schema_version": 1,
-                "runtime_id": RUNTIME_ID,
-                "registration_generation": 1,
-                "lease_generation": generation,
-                "registered_at": now,
-                "boot_id_sha256": current["boot_id_sha256"],
-                "pid": current["pid"],
-                "process_start_ticks": current["process_start_ticks"],
-                "client_version": EXPECTED_VERSION,
-                "client_size": EXPECTED_SIZE,
-                "client_sha256": EXPECTED_SHA256,
-                "display": manifest["display"],
+                "schema_version": 1, "runtime_id": RUNTIME_ID,
+                "registration_generation": 1, "lease_generation": generation,
+                "registered_at": int(time.time()), "boot_id_sha256": current["boot_id_sha256"],
+                "pid": current["pid"], "process_start_ticks": current["process_start_ticks"],
+                "client_version": EXPECTED_VERSION, "client_size": EXPECTED_SIZE,
+                "client_sha256": EXPECTED_SHA256, "display": manifest["display"],
                 "window_identity": manifest["window_identity"],
                 "remote_view_endpoint": manifest["remote_view_endpoint"],
-                "remote_view_mapping": manifest["remote_view_mapping"],
-                "state": manifest["state"],
-                "source_task": args.task_id,
-                "source_run": _source_run(),
+                "remote_view_mapping": manifest["remote_view_mapping"], "state": manifest["state"],
+                "source_task": args.task_id, "source_run": _source_run(),
             }
             _atomic_registration(record)
-            committed = True
-            reread = _read_registration()
-            if reread != record:
+            registration_written = True
+            if _read_registration() != record:
                 raise TransitionError("registration_revalidation_failed")
-            final = _identity(int(record["pid"]))
-            _exact_identity(final)
-            for key in ("boot_id_sha256", "pid", "process_start_ticks"):
-                if final[key] != record[key]:
-                    raise TransitionError("bootstrap_identity_changed_before_detach")
+            post = _run_probe(args.worker, post_path)
+            _manifest_matches_registration(post, record)
             if _candidate_pids() != [int(record["pid"])]:
                 raise TransitionError("bootstrap_uniqueness_changed_before_detach")
             _lease_recheck_locked(manager, lease, identity, args.token_file, generation)
-        except BaseException:
-            if not committed and child is not None:
-                _terminate_group(child.pid)
-            if not committed:
+            success = True
+        finally:
+            if not success:
+                if child is not None:
+                    _terminate_group(child.pid)
+                if registration_written:
+                    try:
+                        REGISTRATION.unlink()
+                    except FileNotFoundError:
+                        pass
+            for path in (manifest_path, post_path):
                 try:
-                    REGISTRATION.unlink()
+                    path.unlink()
                 except FileNotFoundError:
                     pass
-            raise
-        finally:
-            try:
-                manifest_path.unlink()
-            except FileNotFoundError:
-                pass
     print("TRACK_A_CANONICAL_BOOTSTRAP=PASS")
     print(f"TRACK_A_CANONICAL_LEASE_GENERATION={generation}")
 
 
-def _probe_registered(args: argparse.Namespace, *, permit_rebind: bool) -> tuple[dict[str, Any], dict[str, Any], int, Any, Any, Any]:
-    lease = _load_lease_module()
-    manager = lease.LeaseManager(STATE_DIR)
-    identity, generation = _validate_lease_locked(manager, lease, args.task_id, args.session_id, args.token_file)
+def _probe_registered_locked(args: argparse.Namespace, lease: Any, manager: Any, identity: Any, generation: int, *, permit_rebind: bool) -> tuple[dict[str, Any], dict[str, Any]]:
     registration = _read_registration()
     if registration is None:
         raise TransitionError("registration_absent")
@@ -370,37 +352,40 @@ def _probe_registered(args: argparse.Namespace, *, permit_rebind: bool) -> tuple
             raise TransitionError("rebind_generation_not_older")
     elif reg_generation != generation:
         raise TransitionError("registration_generation_mismatch")
-    manifest = _run_probe(args.probe, STATE_DIR / ".gate-b-manifest.json")
-    _manifest_matches_registration(manifest, registration)
-    candidates = _candidate_pids()
-    if candidates != [int(registration["pid"])]:
-        raise TransitionError("registered_target_not_unique", repr(candidates))
-    return registration, manifest, generation, identity, lease, manager
+    manifest_path = STATE_DIR / ".gate-b-manifest.json"
+    try:
+        manifest = _run_probe(args.probe, manifest_path)
+        _manifest_matches_registration(manifest, registration)
+        if _candidate_pids() != [int(registration["pid"])]:
+            raise TransitionError("registered_target_not_unique")
+        _lease_recheck_locked(manager, lease, identity, args.token_file, generation)
+        return registration, manifest
+    finally:
+        try:
+            manifest_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def rebind(args: argparse.Namespace) -> None:
     lease = _load_lease_module()
     manager = lease.LeaseManager(STATE_DIR)
     with manager.locked():
-        registration, manifest, generation, identity, _, _ = _probe_registered(args, permit_rebind=True)
-        _lease_recheck_locked(manager, lease, identity, args.token_file, generation)
+        identity, generation = _validate_lease_locked(manager, lease, args.task_id, args.session_id, args.token_file)
+        registration, manifest = _probe_registered_locked(args, lease, manager, identity, generation, permit_rebind=True)
         updated = dict(registration)
         updated["registration_generation"] = int(registration["registration_generation"]) + 1
         updated["lease_generation"] = generation
         updated["source_task"] = args.task_id
         updated["source_run"] = _source_run()
-        updated["display"] = manifest["display"]
-        updated["window_identity"] = manifest["window_identity"]
-        updated["remote_view_endpoint"] = manifest["remote_view_endpoint"]
-        updated["remote_view_mapping"] = manifest["remote_view_mapping"]
-        updated["state"] = manifest["state"]
+        for key in ("display", "window_identity", "remote_view_endpoint", "remote_view_mapping", "state"):
+            updated[key] = manifest[key]
         _atomic_registration(updated)
         if _read_registration() != updated:
             raise TransitionError("rebind_revalidation_failed")
-        _manifest_matches_registration(_run_probe(args.probe, STATE_DIR / ".gate-b-manifest.json"), updated)
-        if _candidate_pids() != [int(updated["pid"])]:
-            raise TransitionError("rebind_uniqueness_changed")
-        _lease_recheck_locked(manager, lease, identity, args.token_file, generation)
+        final, _ = _probe_registered_locked(args, lease, manager, identity, generation, permit_rebind=False)
+        if final != updated:
+            raise TransitionError("rebind_final_registration_changed")
     print("TRACK_A_CANONICAL_REBIND=PASS")
     print(f"TRACK_A_CANONICAL_LEASE_GENERATION={generation}")
 
@@ -409,10 +394,8 @@ def gate_b(args: argparse.Namespace) -> None:
     lease = _load_lease_module()
     manager = lease.LeaseManager(STATE_DIR)
     with manager.locked():
-        registration, _, generation, identity, _, _ = _probe_registered(args, permit_rebind=False)
-        _lease_recheck_locked(manager, lease, identity, args.token_file, generation)
-        if _candidate_pids() != [int(registration["pid"])]:
-            raise TransitionError("gate_b_uniqueness_changed")
+        identity, generation = _validate_lease_locked(manager, lease, args.task_id, args.session_id, args.token_file)
+        registration, _ = _probe_registered_locked(args, lease, manager, identity, generation, permit_rebind=False)
     print("TRACK_A_CANONICAL_GATE_B=PASS")
     print(f"TRACK_A_CANONICAL_LEASE_GENERATION={generation}")
     print(f"TRACK_A_CANONICAL_RUNTIME_STATE={registration['state']}")
@@ -430,25 +413,18 @@ def parser() -> argparse.ArgumentParser:
     b = subs.add_parser("bootstrap")
     _common(b)
     b.add_argument("--worker-timeout", type=int, default=180)
-    b.add_argument("worker", nargs=argparse.REMAINDER)
+    b.add_argument("--worker", required=True, type=Path)
     r = subs.add_parser("rebind")
     _common(r)
-    r.add_argument("probe", nargs=argparse.REMAINDER)
+    r.add_argument("--probe", required=True, type=Path)
     g = subs.add_parser("gate-b")
     _common(g)
-    g.add_argument("probe", nargs=argparse.REMAINDER)
+    g.add_argument("--probe", required=True, type=Path)
     return p
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parser().parse_args(argv)
-    for field in ("worker", "probe"):
-        command = getattr(args, field, None)
-        if command is not None and command[:1] == ["--"]:
-            setattr(args, field, command[1:])
-        if command is not None and not getattr(args, field):
-            print("TRACK_A_CANONICAL_TRANSITION_ERROR=command_missing", file=sys.stderr)
-            return 2
     try:
         {"bootstrap": bootstrap, "rebind": rebind, "gate-b": gate_b}[args.operation](args)
         return 0

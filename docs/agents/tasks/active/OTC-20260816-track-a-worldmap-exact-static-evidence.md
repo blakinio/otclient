@@ -16,15 +16,17 @@ current_main: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260816-track-a-worldmap-exact-static-evidence
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
-updated: 2026-08-16T23:08:30+02:00
+updated: 2026-08-16T23:13:30+02:00
 producer_pr: 437
-producer_head: e79e306f3e4a5a66593afce7a6a9e243ba76f295
+producer_head: d8d0ae7016636b2addb130b8a744584b83b5f7a2
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-exact-static-evidence.md
   - docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/**
   - .github/workflows/tibia-official-client-re-worldmap-exact-static-evidence.yml
+  - .github/workflows/tibia-official-client-re-worldmap-exact-static-hosted-recovery.yml
   - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py
   - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
+  - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py
 modules_touched: []
 reuses:
   - PR #367 / OTC-20260816-track-a-worldmap-extent-static-re as consumer only; its branch is not owned by this producer
@@ -121,39 +123,54 @@ researcher_delivery: draft_only
 WORLD_MAP_STATIC_EVIDENCE_READY: false
 programme_complete: false
 validation_state:
-  current_head_runtime_governance_run: 31972398445
-  current_head_runtime_governance_conclusion: success
-  prior_head_ci_run: 31972398548
-  prior_head_ci_conclusion: success
+  prior_runtime_governance_run: 31972398445
+  prior_runtime_governance_conclusion: success
+  prior_ci_run: 31972398548
+  prior_ci_conclusion: success
+  source_v2_run: 31972743782
+  source_v2_job: 95227595548
+  source_v2_conclusion: success
+  source_v2_artifact_id: 9270235755
+  source_v2_artifact_name: track-a-worldmap-exact-static-source-31972743782
+  source_v2_artifact_sha256: 039d22fe5f88a07784c4ddc32cf6b1d9c2d07a34e90ed5902ffd21d3acd5735b
+  hosted_v2_job: 95227676658
+  hosted_v2_conclusion: failure
 recovery_checkpoint:
-  status: EXACT_SOURCE_PROVEN_DISASSEMBLER_MISSING
+  status: HOSTED_REPORT_ORDERING_FAILURE_SOURCE_EVIDENCE_PRESERVED
   trusted_base: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
   first_source_run_id: 31972285354
   first_source_job_id: 95226438379
   first_source_failure: silent precondition exit before selector; analyzer not executed
   discriminator_run_id: 31972499618
   discriminator_job_id: 95226977563
-  discriminator_head: e79e306f3e4a5a66593afce7a6a9e243ba76f295
   discriminator_result: candidate_1_exact_source_present_and_fenced_but_source_disassembler_missing
   exact_source_candidate_index: 1
   exact_source_regular: true
   exact_source_symlink: false
   exact_source_size: 51965216
   exact_source_sha_match: true
-  objdump_available: false
-  llvm_objdump_available: false
+  objdump_available_on_source: false
+  llvm_objdump_available_on_source: false
+  source_v2_identity_windows_recovered: 3
+  source_v2_direct_vptr_xrefs:
+    0x02f683d0: 2
+    0x030871d8: 4
+    0x0308ce70: 3
+  source_v2_bounded_code_windows: 49
+  source_v2_bounded_raw_bytes: 52992
+  hosted_failure: WORLD_MAP_STATIC_V2_REFUSED=SOURCE_REPORT_NONDETERMINISTIC
+  hosted_failure_scope: derived Markdown ordering only; exact JSON fence/identity/code-window checks completed before this guard and the raw client was not present on the hosted runner
   canonical_runtime_touched: false
   client_process_started: false
   client_bytes_mutated: false
-  first_hypothesis: select only the two exact-source candidates proven by #431's successful immutable harness, then verify size and SHA before any bounded read
-  prohibited_repeat: do not rerun source with a mandatory Synology objdump/llvm-objdump check; use bounded source extraction and hosted disassembly instead
-next_action: add repo-contained v2 staging that parses ELF and scans RIP-relative vptr references on Synology without a disassembler, emits only bounded relevant code windows, then disassembles/validates those windows on ubuntu-latest and persists exact evidence for PR #367
+  prohibited_repeat: do not repeat the same source-disassembler failure or redo GUI/window v7; recover hosted validation from the already sanitized source artifact when possible
+next_action: use a bounded hosted-only recovery job against source artifact 9270235755, relaxing only the derived Markdown ordering guard while preserving all preceding exact JSON/policy/window checks, then persist enriched evidence for PR #367
 ---
 
 # Track A world-map exact static evidence producer
 
 This task is a read-only exact-client evidence producer for consumer PR #367. It does not own or modify the consumer branch, does not acquire canonical runtime authority, and does not start the official client.
 
-Post-v7 GUI evidence (#431/#432/#434) is deliberately not repeated. The static path is now independently proven viable at the file boundary: discriminator run `31972499618`, job `95226977563`, found candidate `1` as a regular non-symlink exact file with size `51965216` and SHA match `true`. The same run proved both `objdump` and `llvm-objdump` absent on the source runner.
+Post-v7 GUI evidence (#431/#432/#434) is deliberately not repeated. Run `31972499618`, job `95226977563`, proved candidate `1` is the exact regular non-symlink file and also proved no source-side objdump/llvm-objdump exists.
 
-The next discriminator therefore changes the extraction architecture rather than retrying: source-side pure Python performs ELF/relocation parsing plus bounded RIP-relative vptr reference discovery and code-window staging; disassembly is moved to the GitHub-hosted validation job where the raw client is never present.
+V2 source run `31972743782`, job `95227595548`, then succeeded without any source disassembler: exact fence passed, all three identity windows were recovered, nine direct vptr xrefs were decoded, 49 bounded code windows totaling 52,992 raw bytes were sanitized, and source artifact `9270235755` was uploaded. Hosted job `95227676658` downloaded that artifact with the raw client absent and failed only at the derived Markdown deterministic-order guard (`SOURCE_REPORT_NONDETERMINISTIC`) before bounded disassembly. The preserved source artifact is therefore the preferred recovery input; no identical physical failure is being retried.

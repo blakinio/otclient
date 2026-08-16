@@ -13,7 +13,7 @@ branch: ci/OTC-20260816-track-a-runner-support-layout-inventory
 base_branch: main
 base_main: 67e5dc88ff4d6c241d90a046527dac4aa9f831d8
 risk: low
-updated: 2026-08-16T16:53:00+02:00
+updated: 2026-08-16T16:54:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-runner-support-layout-inventory.md
   - docs/agents/evidence/OTC-20260816-track-a-runner-support-layout-inventory/**
@@ -39,16 +39,16 @@ runner: synology-otclient-01
 runtime_access: read_only
 persistent_session_role: none
 physical_e2e_required: false
-runtime_owner_task: NOT_APPLICABLE_SUPPORT_FILESYSTEM_ONLY
+runtime_owner_task: OTC-20260816-track-a-runner-support-layout-inventory
 runtime_namespace: runner-support-layout
-canonical_registration: NOT_OBSERVED
-canonical_lease_generation: NOT_OBSERVED
-registration_lease_generation: NOT_OBSERVED
-gate_a: NOT_APPLICABLE_NO_CANONICAL_RUNTIME_SURFACE_ACCESS
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+target_uniqueness: PROVEN
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
 observation_allowlist:
@@ -100,8 +100,8 @@ root_cause:
 evidence_path: docs/agents/evidence/OTC-20260816-track-a-runner-support-layout-inventory/20260816-support-layout.md
 validation:
   physical_inventory_result: SUCCESS
-  governance_after_workflow_removal: PENDING
-  repository_ci_after_workflow_removal: PENDING
+  governance_after_workflow_removal: RECHECK_AFTER_ADMISSION_NORMALIZATION
+  repository_ci_after_workflow_removal: SUCCESS_RUN_31953921816
   review_threads_open: 0
   physical_e2e: NOT_APPLICABLE_WITH_REASON
   physical_e2e_reason: support-filesystem metadata observation only; no client/runtime behavior exercised
@@ -112,7 +112,8 @@ audit:
     - current running runner layout is directly proven and supersedes historical assumptions about a complete toolroot
     - PR #280 Dockerfile remains design input only and is not used as proof of current deployment
     - no canonical runtime/client/process/display/VNC/network/credential state was observed
-last_completed_step: completed one read-only physical support-layout inventory, removed the one-shot workflow and persisted the exact split-layout root cause
+    - initial deterministic governance failure was task-metadata-only: read_only admission now uses the contract's exact NOT_APPLICABLE gates and target_uniqueness PROVEN
+last_completed_step: completed one read-only physical support-layout inventory, removed the one-shot workflow, persisted the exact split-layout root cause and normalized the durable read-only admission record
 next_action: obtain exact-head governance/CI and merge this sanitized evidence; then implement/promote a hosted-only explicit split-layout worker repair before any further bootstrap attempt
 ---
 

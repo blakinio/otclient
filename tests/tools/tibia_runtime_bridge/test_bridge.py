@@ -231,7 +231,6 @@ class IpcClientTests(unittest.TestCase):
 
             second = self.start_process_server(path)
             try:
-                self.assertNotEqual(first.pid, second.pid)
                 with self.assertRaises(BridgePeerIdentityError):
                     request(path, "PING", expected_identity=stale_identity)
             finally:

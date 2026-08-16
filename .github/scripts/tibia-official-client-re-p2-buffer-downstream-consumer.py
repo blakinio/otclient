@@ -157,10 +157,11 @@ def main() -> int:
     require(at(setup_i, 0x1970CC6, "call", "QBuffer4open"), "persistent_qbuffer_open")
     require(at(setup_i, 0x1970CA6, "[rbp-0x218]", "r15"), "persistent_qbuffer_saved_rbpm218")
 
-    # TProtocolClientMessageProcessor actual object begins at allocation+0x10.  Its this+0x18
-    # receives the SAME saved persistent QBuffer object from rbp-0x218.
+    # TProtocolClientMessageProcessor actual object begins at allocation+0x10. Its this+0x18
+    # receives the SAME saved persistent QBuffer object from rbp-0x218. GNU objdump renders
+    # RIP-relative comment targets without guaranteeing an optional "0x" prefix.
     require(at(setup_i, 0x197104F, "lea", "rdx,[rax+0x10]"), "client_processor_actual_object_pointer")
-    require(at(setup_i, 0x1971056, "0x2f6a208"), "client_processor_ap_loaded")
+    require(at(setup_i, 0x1971056, "2f6a208"), "client_processor_ap_loaded")
     require(at(setup_i, 0x197105D, "[rax+0x10]", "rcx"), "client_processor_vptr_store")
     require(at(setup_i, 0x1971084, "rsi", "[rbp-0x218]"), "client_processor_reloads_same_qbuffer")
     require(at(setup_i, 0x197108F, "[rax+0x28]", "rsi"), "client_processor_this_plus18_qbuffer_store")

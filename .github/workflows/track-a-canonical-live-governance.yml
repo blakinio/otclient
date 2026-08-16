@@ -1,0 +1,100 @@
+name: Track A canonical live governance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-canonical-live-governance.yml
+      - docs/agents/CHANGELOG.md
+      - docs/agents/TIBIA_RESEARCH_TRACKS.md
+      - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+      - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
+      - docs/agents/tasks/active/OTC-20260815-track-a-canonical-live-runtime.md
+      - docs/agents/tasks/archive/OTC-20260815-track-a-canonical-live-runtime.md
+      - docs/agents/evidence/OTC-20260815-track-a-canonical-live-runtime/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-governance-audit:
+    name: Fresh independent acceptance audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Falsify canonical authority, rebind, identity and bootstrap invariants
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          tracks = Path('docs/agents/TIBIA_RESEARCH_TRACKS.md').read_text()
+          adr = Path('docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md').read_text()
+          bootstrap = Path('docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md').read_text()
+          changelog = Path('docs/agents/CHANGELOG.md').read_text()
+
+          required_all = {
+              'tracks': (tracks, [
+                  'tibia_research_tracks_policy_version: 5',
+                  'final PR #321 cancellation-safe semantics',
+                  'Registration generation rebind — fail closed before Gate B',
+                  'Ad-hoc manual editing of `runtime-registration.json` is never a substitute.',
+                  'Initial creation/bootstrap — separate fail-closed transition',
+                  'display_98_current_canonical_status: UNKNOWN',
+                  'rfb_6082_current_backend_mapping: UNKNOWN',
+                  'current_exact_client_pid: NOT_REGISTERED',
+                  'current_exact_client_session: NOT_REGISTERED',
+              ]),
+              'adr': (adr, [
+                  'Gate A — authoritative lease plus final cancellation-safe whole-lifetime supervisor',
+                  'PR #321 is the final cancellation-safe implementation',
+                  'Registration-generation rebind — fail closed before Gate B equality',
+                  'the only registration defect being repaired by this transition is the older lease generation',
+                  'This ADR defines the required transition but does **not** implement it.',
+                  'Gate B — authoritative current-runtime registration and fresh preflight',
+                  'Initial creation/bootstrap is a separate transition',
+                  'display_98_current_canonical_status: UNKNOWN',
+                  'current_exact_client_pid: NOT_REGISTERED',
+              ]),
+              'bootstrap': (bootstrap, [
+                  'PR #321 supplies cancellation-safe lock ownership',
+                  'fresh final manager closeout/archive: PR #322',
+                  'Post-bootstrap controller-generation rebind',
+                  'It cannot create a missing registration',
+                  'This contract defines the required boundary only. It does **not** implement or authorize generation rebinding.',
+                  'foreground process-group cancellation with a signal-ignoring descendant cannot release the canonical flock early',
+              ]),
+              'changelog': (changelog, [
+                  'Track A canonical-live policy v5 separates four fail-closed transitions',
+                  'The rebind/bootstrap transitions are governance contracts only and are not implemented or live-authorized by this PR.',
+              ]),
+          }
+
+          for label, (text, needles) in required_all.items():
+              missing = [needle for needle in needles if needle not in text]
+              if missing:
+                  raise SystemExit(f'{label}: missing required invariants: {missing}')
+
+          fence = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          for label, text in [('tracks', tracks), ('adr', adr), ('bootstrap', bootstrap), ('changelog', changelog)]:
+              if fence not in text:
+                  raise SystemExit(f'{label}: exact client fence missing')
+
+          forbidden = {
+              'tracks': ['These are the final PR #316 semantics'],
+              'adr': ['The final authority implementation is the manager/supervisor stack promoted through PRs #312, #313, #317 and #316, with fresh closeout in #319.'],
+              'bootstrap': [
+                  'fresh manager closeout/archive: PR #319',
+                  'Later external mutation requires a fresh/current lease plus current exact-runtime registration/preflight.\n',
+              ],
+          }
+          for label, needles in forbidden.items():
+              text = {'tracks': tracks, 'adr': adr, 'bootstrap': bootstrap}[label]
+              present = [needle for needle in needles if needle in text]
+              if present:
+                  raise SystemExit(f'{label}: stale governance text survived restack: {present}')
+
+          print('TRACK_A_CANONICAL_GOVERNANCE_FRESH_AUDIT_PASS=true')
+          PY

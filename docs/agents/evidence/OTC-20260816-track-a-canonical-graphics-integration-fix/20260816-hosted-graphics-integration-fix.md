@@ -57,17 +57,42 @@ Properties:
 
 ## Hosted contract test
 
-`.github/scripts/test_tibia_official_client_re_canonical_live_session.py` now requires the canonical client launch block to contain:
+`.github/scripts/test_tibia_official_client_re_canonical_live_session.py` requires the canonical client launch block to contain:
 
 - `QT_QUICK_BACKEND=software`;
 - `QSG_INFO=1`;
 - no `QT_XCB_GL_INTEGRATION=none` anywhere in the worker;
 - no forced `QSG_RHI_BACKEND=` in the launch block.
 
-Existing bounded-window, toolroot and canonical transition/guard/lease suites remain required by repository CI.
+## Exact hosted validation
+
+Temporary GitHub-hosted validator:
+
+- workflow run: `31959453898`
+- job: `95195086514`
+- runner: `ubuntu-24.04`
+- result: `SUCCESS`
+- runtime access: `none`
+- physical E2E: `false`
+
+Exact suite results:
+
+```text
+canonical session tests: 11 PASS
+canonical transition tests: 9 PASS
+canonical guard tests: 3 PASS
+canonical lease tests: 14 PASS
+TRACK_A_CANONICAL_GRAPHICS_INTEGRATION_CONTRACT=PASS
+TRACK_A_RUNTIME_ACCESS=none
+TRACK_A_PHYSICAL_E2E=false
+```
+
+The validator also ran `bash -n` against the worker. The session suite includes the new graphics-environment contract and retained bounded-window/toolroot tests; transition, guard and lease suites remained green without physical runtime access.
+
+The temporary validator workflow is task-owned and is removed before promotion.
 
 ## Classification
 
-`HOSTED_SOURCE_FIX / PHYSICAL_RESULT_UNKNOWN`
+`PASS / HOSTED_GRAPHICS_INTEGRATION_SOURCE_FIX_PROVEN / PHYSICAL_RESULT_UNKNOWN`
 
 This task does not claim that GLX/EGL libraries/plugins are present and functional on `synology-otclient-01`, nor that a visible Tibia window will map after the change. A fresh physical canonical bootstrap is allowed only after this fix reaches trusted `main` and must independently re-prove all admission/support/identity gates.

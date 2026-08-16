@@ -12,97 +12,70 @@ permissions:
 
 jobs:
   inspect:
-    name: Map QLibrary function relocation ownership
+    name: Inventory exact Init exporters in retained package
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
-      - name: Inspect static relocation/vtable references only
+      - name: Parse dynamic symbols without executing libraries
         shell: bash
         run: |
           set -Eeuo pipefail
           set +x
           [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || exit 2
-          client='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/client'
+          package='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package'
+          client="$package/bin/client"
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 3
-          python3 - "$client" <<'PY'
-          import pathlib,re,struct,sys
-          d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
-          h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16); _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-          shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
-          st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
-          def cs(blob,o):
-              if o<0 or o>=len(blob): return ''
-              e=blob.find(b'\0',o); e=len(blob) if e<0 else e
-              return blob[o:e].decode('utf8','replace')
-          secs=[]
-          for i,x in enumerate(sh):
-              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'info':x[7],'entsize':x[9]})
-          by={s['name']:s for s in secs}
-          dyn=by.get('.dynsym'); syms=[]
-          if dyn and 0<=dyn['link']<len(secs):
-              ss=secs[dyn['link']]; sb=d[ss['off']:ss['off']+ss['size']]
-              for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
-                  if o+24>len(d):break
-                  sn,info,other,si,val,sz=struct.unpack_from(E+'IBBHQQ',d,o)
-                  syms.append(cs(sb,sn).split('@',1)[0])
-
-          target=0x6fc034
-          matches=[]
-          allrel=[]
-          for s in secs:
-              if s['type'] not in (4,9): continue
-              ent=s['entsize'] or (24 if s['type']==4 else 16)
-              for o in range(s['off'],s['off']+s['size'],ent):
-                  if s['type']==4:
+          python3 - "$package" <<'PY'
+          import hashlib,pathlib,struct,sys
+          root=pathlib.Path(sys.argv[1]); E='<'
+          def exports(path):
+              try:d=path.read_bytes()
+              except OSError:return None
+              if len(d)<64 or d[:4]!=b'\x7fELF' or d[4]!=2 or d[5]!=1:return None
+              try:
+                  h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16);_,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
+                  shfmt=E+'IIQQQQIIQQ';sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
+                  st=sh[shstrndx];names=d[st[4]:st[4]+st[5]]
+                  def cs(blob,o):
+                      if o<0 or o>=len(blob):return ''
+                      e=blob.find(b'\0',o);e=len(blob) if e<0 else e
+                      return blob[o:e].decode('utf8','replace')
+                  secs=[]
+                  for i,x in enumerate(sh):secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+                  dyn=next((s for s in secs if s['name']=='.dynsym'),None)
+                  if not dyn or not (0<=dyn['link']<len(secs)):return set()
+                  ss=secs[dyn['link']];sb=d[ss['off']:ss['off']+ss['size']];out=set()
+                  for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
                       if o+24>len(d):break
-                      roff,rinfo,addend=struct.unpack_from(E+'QQq',d,o)
-                  else:
-                      if o+16>len(d):break
-                      roff,rinfo=struct.unpack_from(E+'QQ',d,o); addend=0
-                  symidx=rinfo>>32; typ=rinfo&0xffffffff
-                  sym=syms[symidx] if symidx<len(syms) else ''
-                  rec=(s['name'],roff,typ,symidx,sym,addend)
-                  allrel.append(rec)
-                  if addend==target: matches.append(rec)
-          print('BE_QFUNC_RELOC_MATCHES_BEGIN')
-          for sec,roff,typ,si,sym,add in matches:
-              print(f'section={sec} r_offset=0x{roff:x} type={typ} sym={sym or "<none>"} addend=0x{add:x}')
-          print('BE_QFUNC_RELOC_MATCHES_END')
-
-          # For each vtable-like relocation target, print neighboring relocations and printable addend targets.
-          print('BE_QFUNC_RELOC_NEIGHBORS_BEGIN')
-          for _,roff,_,_,_,_ in matches:
-              print(f'CENTER r_offset=0x{roff:x}')
-              neigh=[r for r in allrel if abs(r[1]-roff)<=0x100]
-              for sec,noff,typ,si,sym,add in sorted(neigh,key=lambda x:x[1]):
-                  text=''
-                  if 0<=add<len(d):
-                      e=d.find(b'\0',add,min(len(d),add+220))
-                      if e>add:
-                          raw=d[add:e]
-                          if raw and all(32<=b<127 for b in raw):
-                              try:text=raw.decode('ascii')
-                              except:text=''
-                  print(f'  off=0x{noff:x} delta={noff-roff:+#x} type={typ} sym={sym or "<none>"} addend=0x{(add & ((1<<64)-1)):x} text={text[:180]}')
-          print('BE_QFUNC_RELOC_NEIGHBORS_END')
-
-          # Locate RTTI-ish printable names around relocation addends in those same neighborhoods.
-          print('BE_QFUNC_RTTI_CANDIDATES_BEGIN')
-          seen=set()
-          for _,roff,_,_,_,_ in matches:
-              for sec,noff,typ,si,sym,add in allrel:
-                  if abs(noff-roff)>0x200: continue
-                  for pos in range(max(0,add-0x100),min(len(d),add+0x100)) if 0<=add<len(d) else []:
-                      if pos in seen: continue
-                      e=d.find(b'\0',pos,min(len(d),pos+160))
-                      if e<=pos: continue
-                      raw=d[pos:e]
-                      if 3<=len(raw)<=120 and all(32<=b<127 for b in raw):
-                          try:t=raw.decode('ascii')
-                          except:continue
-                          if re.search(r'(BattlEye|Battle|Client|Library|Application|Manager|Loader|Plugin|^\d+[A-Z])',t):
-                              seen.add(pos); print(f'pos=0x{pos:x} text={t}')
-          print('BE_QFUNC_RTTI_CANDIDATES_END')
-          print('BE_RELOC_EXECUTED=false')
-          print('BE_RELOC_MUTATION_PERFORMED=false')
+                      sn,info,other,si,val,sz=struct.unpack_from(E+'IBBHQQ',d,o);nm=cs(sb,sn).split('@',1)[0]
+                      bind=info>>4;vis=other&3
+                      if nm and si!=0 and bind in (1,2) and vis==0:out.add(nm)
+                  return out
+              except Exception:return None
+          files=[]
+          for p in root.rglob('*'):
+              if not p.is_file():continue
+              # Parse ELF files regardless of suffix; report only exact matching export sets.
+              try:
+                  with p.open('rb') as f:magic=f.read(4)
+              except OSError:continue
+              if magic!=b'\x7fELF':continue
+              ex=exports(p)
+              if ex is None:continue
+              hits=sorted({'Init','GetVer','_0','_1','_2','_3','_4','_5','_6','_7'} & ex)
+              if hits:
+                  files.append((p,hits,p.stat().st_size,hashlib.sha256(p.read_bytes()).hexdigest()))
+          print(f'BE_EXPORT_INVENTORY_MATCH_COUNT={len(files)}')
+          print('BE_EXPORT_INVENTORY_BEGIN')
+          for p,hits,size,sha in sorted(files,key=lambda x:str(x[0])):
+              rel=p.relative_to(root)
+              print(f'path={rel} size={size} sha256={sha} exports={",".join(hits)}')
+          print('BE_EXPORT_INVENTORY_END')
+          print(f'BE_INIT_EXPORTER_COUNT={sum(1 for _,hits,_,_ in files if "Init" in hits)}')
+          print('BE_INIT_EXPORTERS_BEGIN')
+          for p,hits,size,sha in sorted(files,key=lambda x:str(x[0])):
+              if 'Init' in hits:print(f'path={p.relative_to(root)} sha256={sha}')
+          print('BE_INIT_EXPORTERS_END')
+          print('BE_EXPORT_INVENTORY_EXECUTED=false')
+          print('BE_EXPORT_INVENTORY_MUTATION_PERFORMED=false')
           PY

@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Identify TGameClient factory caller class via RTTI
+    name: Trace callers of TGameClient creation method
     runs-on: [otclient, synology]
-    timeout-minutes: 7
+    timeout-minutes: 6
     steps:
-      - name: Map 0x6c976e function and class construction
+      - name: Map direct callers and receiver provenance of 0x6c976e
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,75 +28,39 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'OWNER_PROV_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
-          import pathlib,struct,sys,hashlib
+          import hashlib,pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-          shfmt=E+'IIQQQQIIQQ';raw=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
-          st=raw[shstrndx];names=d[st[4]:st[4]+st[5]]
-          def cs(blob,o):
-              if not (0<=o<len(blob)):return ''
-              e=blob.find(b'\0',o);e=len(blob) if e<0 else e
-              return blob[o:e].decode('utf8','replace')
-          secs=[]
-          for x in raw:secs.append({'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]})
-          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
-          def voff(va):
-              for s in secs:
-                  if s['size'] and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
+          sf=E+'IIQQQQIIQQ';sh=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
+          st=sh[shstrndx];sn=d[st[4]:st[4]+st[5]]
+          def cs(b,o):
+              e=b.find(b'\0',o);e=len(b) if e<0 else e
+              return b[o:e].decode('utf8','replace')
+          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in sh]
+          text=next(s for s in secs if s['name']=='.text');tb=d[text['off']:text['off']+text['size']]
           def b_at(va,n):return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
-          def q(va):
-              o=voff(va);return None if o is None else struct.unpack_from('<Q',d,o)[0]
-          def s_at(va):
-              o=voff(va)
-              if o is None:return None
-              e=d.find(b'\0',o,min(len(d),o+200))
-              if e<=o:return None
-              z=d[o:e]
-              if not z or len(z)>180 or not all(32<=x<127 for x in z):return None
-              return z.decode('ascii','replace')
-          rel=by['.rela.dyn'];rels=[]
-          for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
-              ro,ri,add=struct.unpack_from('<QQq',d,o);rels.append((ro,ri&0xffffffff,ri>>32,add))
-          bo={ro:(ty,sy,ad) for ro,ty,sy,ad in rels};ba={}
-          for ro,ty,sy,ad in rels:ba.setdefault(ad,[]).append((ro,ty,sy))
-          def tiname(ti):
-              r=bo.get(ti+8)
-              return None if not r else s_at(r[2])
-          target=0x6c976e;refs=ba.get(target,[])
-          print('OWNER_PROV_CALLER_FUNC_RELOCS='+','.join(hex(x[0]) for x in refs))
-          groups=[]
-          for entry,ty,sy in refs:
-              for delta in range(8,0x608,8):
-                  tis=entry-delta;r=bo.get(tis)
-                  if not r:continue
-                  nm=tiname(r[2])
-                  if not nm:continue
-                  oq=q(tis-8)
-                  if oq is None:continue
-                  top=struct.unpack('<q',struct.pack('<Q',oq))[0]
-                  ap=tis+8;slot=entry-ap
-                  if slot>=0 and slot%8==0 and -0x100000<=top<=0x100000:
-                      groups.append((slot,ap,r[2],nm,top,entry))
-          groups.sort(key=lambda x:x[0])
-          for slot,ap,ti,nm,top,entry in groups[:12]:
-              print(f'OWNER_PROV_CALLER_VTABLE entry=0x{entry:x} slot=0x{slot:x} vptr=0x{ap:x} typeinfo=0x{ti:x} offset_to_top={top} name={nm}')
-          # For nearest groups, locate all exact RIP LEA refs to vptr address points.
-          for slot,ap,ti,nm,top,entry in groups[:4]:
-              rs=[]
-              for i in range(len(tb)-7):
-                  if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
-                  m=tb[i+2]
-                  if (m>>6)!=0 or (m&7)!=5:continue
-                  va=text['addr']+i;dst=va+7+struct.unpack_from('<i',tb,i+3)[0]
-                  if dst==ap:rs.append(va)
-              print(f'OWNER_PROV_CALLER_VPTR_REFS vptr=0x{ap:x} name={nm} refs='+','.join(hex(v) for v in rs))
-              for va in rs[:16]:
-                  lo=max(text['addr'],va-0xa0);hi=min(text['addr']+text['size'],va+0x120);w=b_at(lo,hi-lo)
-                  print(f'OWNER_PROV_CALLER_CTOR_WINDOW lea=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
-          # Prologue proves RBX=this when applicable.
-          w=b_at(0x6c976e,0x60)
-          print('OWNER_PROV_CALLER_PROLOGUE_HEX='+w.hex())
+          target=0x6c976e;calls=[]
+          for i in range(len(tb)-5):
+              if tb[i]!=0xe8:continue
+              va=text['addr']+i
+              if va+5+struct.unpack_from('<i',tb,i+1)[0]==target:calls.append(va)
+          print('OWNER_PROV_CREATE_METHOD_CALLS='+','.join(hex(v) for v in calls))
+          for va in calls:
+              lo=max(text['addr'],va-0x180);hi=min(text['addr']+text['size'],va+0x100);w=b_at(lo,hi-lo)
+              print(f'OWNER_PROV_CREATE_METHOD_CALL_WINDOW call=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          # Also map exact RIP-relative LEAs to the method itself (function-pointer use).
+          lrefs=[]
+          for i in range(len(tb)-7):
+              if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
+              m=tb[i+2]
+              if (m>>6)!=0 or (m&7)!=5:continue
+              va=text['addr']+i;dst=va+7+struct.unpack_from('<i',tb,i+3)[0]
+              if dst==target:lrefs.append(va)
+          print('OWNER_PROV_CREATE_METHOD_LEA_REFS='+','.join(hex(v) for v in lrefs))
+          for va in lrefs:
+              lo=max(text['addr'],va-0x100);hi=min(text['addr']+text['size'],va+0x100);w=b_at(lo,hi-lo)
+              print(f'OWNER_PROV_CREATE_METHOD_LEA_WINDOW lea=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
           print('OWNER_PROV_EXECUTED_TARGET=false')
           print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
           print('OWNER_PROV_MUTATION_PERFORMED=false')

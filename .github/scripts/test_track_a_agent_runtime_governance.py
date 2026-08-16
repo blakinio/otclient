@@ -8,6 +8,13 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 TRACK_A = "official-client-re"
+CANONICAL_NAMESPACE = "canonical-live-runtime"
+CANONICAL_STATE_ROOT = "/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime"
+CANONICAL_RUNTIME_ACCESS = {
+    "canonical_reuse_or_mutation",
+    "canonical_bootstrap",
+    "canonical_rebind",
+}
 
 ADMISSION_FIELDS = (
     "runtime_access",
@@ -28,9 +35,7 @@ RUNTIME_ACCESS_VALUES = {
     "none",
     "read_only",
     "ephemeral_isolated",
-    "canonical_reuse_or_mutation",
-    "canonical_bootstrap",
-    "canonical_rebind",
+    *CANONICAL_RUNTIME_ACCESS,
 }
 
 TRACK_A_SENSITIVE_PREFIXES = (
@@ -80,6 +85,18 @@ def fail_task(path: Path, message: str) -> None:
     raise SystemExit(f"{path}: Track A runtime admission invalid: {message}")
 
 
+def positive_generation(path: Path, values: dict[str, str], field: str) -> int:
+    value = values[field]
+    if not re.fullmatch(r"[1-9][0-9]*", value):
+        fail_task(path, f"{field} must be a positive integer, got {value!r}")
+    return int(value)
+
+
+def is_canonical_namespace(value: str) -> bool:
+    normalized = value.rstrip("/")
+    return normalized in {CANONICAL_NAMESPACE, CANONICAL_STATE_ROOT}
+
+
 def validate_track_a_task(path: Path) -> bool:
     values = parse_frontmatter(path)
     if values.get("track_id") != TRACK_A:
@@ -120,6 +137,13 @@ def validate_track_a_task(path: Path) -> bool:
     if values["target_uniqueness"] not in {"PROVEN", "UNKNOWN", "NOT_APPLICABLE"}:
         fail_task(path, f"invalid target_uniqueness={values['target_uniqueness']!r}")
 
+    task_id = values.get("task_id")
+    if runtime_access in CANONICAL_RUNTIME_ACCESS:
+        if not task_id or values["runtime_owner_task"] != task_id:
+            fail_task(path, "canonical runtime_owner_task must equal the current task_id")
+        if not is_canonical_namespace(values["runtime_namespace"]):
+            fail_task(path, "canonical runtime access must use the authoritative canonical namespace")
+
     canonical_gates = ("gate_a", "generation_rebind", "gate_b", "bootstrap")
 
     if runtime_access == "none":
@@ -146,10 +170,13 @@ def validate_track_a_task(path: Path) -> bool:
                 fail_task(path, f"ephemeral_isolated requires canonical {field}=NOT_APPLICABLE")
         if values["canonical_registration"] != "NOT_APPLICABLE":
             fail_task(path, "ephemeral_isolated cannot use canonical registration")
-        if values["runtime_owner_task"] != values.get("task_id"):
+        if values["runtime_owner_task"] != task_id:
             fail_task(path, "ephemeral_isolated runtime_owner_task must equal task_id")
-        if values["runtime_namespace"] in {"UNKNOWN", "NOT_APPLICABLE"}:
+        namespace = values["runtime_namespace"]
+        if namespace in {"UNKNOWN", "NOT_APPLICABLE"}:
             fail_task(path, "ephemeral_isolated requires a proven task-owned runtime_namespace")
+        if "canonical-live-runtime" in namespace:
+            fail_task(path, "ephemeral_isolated cannot use or alias the reserved canonical namespace")
         if mutation == "true" and values["target_uniqueness"] != "PROVEN":
             fail_task(path, "ephemeral mutation requires target_uniqueness=PROVEN")
 
@@ -168,6 +195,14 @@ def validate_track_a_task(path: Path) -> bool:
                     fail_task(path, f"authorized canonical mutation requires {field}={expected}")
             if values["generation_rebind"] not in {"PASS", "NOT_APPLICABLE"}:
                 fail_task(path, "authorized canonical mutation requires rebind PASS or NOT_APPLICABLE")
+            lease_generation = positive_generation(path, values, "canonical_lease_generation")
+            registration_generation = positive_generation(path, values, "registration_lease_generation")
+            if lease_generation != registration_generation:
+                fail_task(
+                    path,
+                    "authorized canonical mutation requires registration_lease_generation "
+                    "to equal canonical_lease_generation after any required rebind",
+                )
 
     elif runtime_access == "canonical_bootstrap":
         if mutation != "false":
@@ -190,6 +225,10 @@ def validate_track_a_task(path: Path) -> bool:
             fail_task(path, "current rebind implementation is unavailable and must fail closed")
         if values["bootstrap"] != "NOT_APPLICABLE":
             fail_task(path, "rebind cannot use bootstrap")
+        lease_generation = positive_generation(path, values, "canonical_lease_generation")
+        registration_generation = positive_generation(path, values, "registration_lease_generation")
+        if lease_generation == registration_generation:
+            fail_task(path, "canonical_rebind requires a real older registration generation mismatch")
 
     return True
 

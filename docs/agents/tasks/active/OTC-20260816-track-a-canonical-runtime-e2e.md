@@ -1,163 +1,158 @@
 ---
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
-status: blocked
+status: implementing
 agent: ChatGPT
-session_id: chatgpt-runtime-v7-20260816
-session_role: runtime_owner
+session_id: chatgpt-runtime-admission-reconcile-20260816
+session_role: governance_reconciliation_engineer
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: governance-blocked-after-v7-fail-closed
-branch: ci/OTC-20260816-track-a-canonical-runtime-e2e-v7
+phase: hosted-bootstrap-admission-reconciliation
+branch: fix/OTC-20260816-track-a-bootstrap-admission-reconcile
 base_branch: main
-base_main: 778e13306d93297025abf8e4e970e91ac9830a36
+base_main: fa5b66b697d42c60515c5de48ea5e30135eadd0e
 risk: high
-updated: 2026-08-16T19:16:00+02:00
+updated: 2026-08-16T22:31:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
-modules_touched: []
+  - .github/scripts/test_track_a_agent_runtime_governance.py
+modules_touched:
+  - Track A runtime admission validator
 reuses:
-  - .github/scripts/tibia-official-client-re-canonical-live-lease
-  - .github/scripts/tibia-official-client-re-canonical-live-transition.py
-  - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
   - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-client-window-ownership-discriminator.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-graphics-integration-fix.md
-depends_on: []
+  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md
+  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-xvfb-dri-path-fix.md
+  - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+  - .github/scripts/tibia-official-client-re-canonical-live-session.sh
 blocks:
   - OTC-20260815-track-a-p0-direct-position
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: v7 physically executed one bootstrap after graphics fix #402 but the deterministic Track A admission policy rejected the task because canonical_bootstrap is not currently implemented/authorized for mutation; the physical run also failed closed at client_window_missing with no registration or Gate B; the task is therefore returned to fail-closed governance state and no further canonical mutation is authorized
-run_scope: single_task
+execution_reason: trusted main already contains the reviewed bootstrap/rebind/Gate-B implementation promoted by PR #371 and archived by #375, and the minimal Xvfb DRI-provider repair promoted by #429 and archived by #430; the remaining blocker is the deterministic admission validator's stale unconditional rejection of canonical_bootstrap mutation. This hosted phase reconciles that validator only. The current unmerged governance change cannot authorize its own physical runtime use; physical mutation remains forbidden until the reconciliation is merged to trusted main and this task is freshly re-admitted from that new main.
+run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
-task_completion_policy: full_closeout
+task_completion_policy: finalize_archive_and_continue
 validation_level: heavy
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
-execution_class: synology_physical_runtime
-runner: synology-otclient-01
-persistent_session_role: canonical_runtime_owner
-physical_e2e_required: true
-runtime_access: canonical_bootstrap
-runtime_owner_task: OTC-20260816-track-a-canonical-runtime-e2e
-runtime_namespace: canonical-live-runtime
-canonical_registration: ABSENT
-canonical_lease_generation: 6
+execution_class: github_hosted
+runner: github-hosted
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
-gate_a: REQUIRED_NOT_PROVEN
+gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
-bootstrap: REQUIRED_NOT_PROVEN
-target_uniqueness: UNKNOWN
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
+persistent_session_role: none
+physical_e2e_required: true
 owner_funded_ai_api_authorized: false
-live_runtime_authorization_source: no current mutation authorization; v7 execution occurred while deterministic governance was red and must not be treated as policy-compliant authority
+invocation_started_at: 2026-08-16T22:27:00+02:00
+last_progress_at: 2026-08-16T22:31:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: draft
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 0
+context_reconstruction_attempts: 1
+stall_warnings: 0
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
-excluded_runtime_surfaces:
-  - Track B PR #284 namespace
-  - historical closed PR #303 runtime surfaces
-prior_fail_closed_attempts:
-  - pr: 376
-    acquired_lease_generation: 1
-    result: XVFB_UNAVAILABLE_BEFORE_REGISTRATION
-  - pr: 381
-    acquired_lease_generation: 2
-    result: TOOLROOT_UNAVAILABLE_BEFORE_WARP_X11_CLIENT
-  - pr: 386
-    acquired_lease_generation: 3
-    result: XVFB_SOCKET_MISSING_BEFORE_CLIENT_REGISTRATION
-  - pr: 393
-    acquired_lease_generation: 4
-    result: FAIL_CLOSED_WORKER_TIMEOUT
-  - pr: 397
-    run: 31957502867
-    job: 95190252936
-    acquired_lease_generation: 5
-    result: FAIL_CLOSED_CLIENT_WINDOW_MISSING
-    registration_published: false
-    gate_b_reached: false
-  - pr: 405
-    run: 31960965493
-    job: 95198777325
-    workflow_head: 8f560e0d3a87e9f6a6b599bb276b7b25d9588e53
-    governance_run: 31960965481
-    governance_result: FAILURE
-    governance_discriminator: bootstrap is not currently implemented/authorized
-    pre_admission_lease_generation: 5
-    acquired_lease_generation: 6
-    trusted_worker_wait_contract: PASS
-    trusted_worker_graphics_contract: PASS
-    support_root_preflight: PASS
-    system_xkbcomp_preflight: PASS
-    warp: PASS
-    xvfb: PASS
-    vnc: PASS
-    client_start: REACHED
-    result: FAIL_CLOSED_CLIENT_WINDOW_MISSING
-    registration_published: false
-    gate_b_reached: false
-    credentials_used: false
-    login_attempted: false
-    governance_compliant_execution: false
-    one_shot_workflow_removed: true
-resolved_discriminator:
-  pr: 398
-  run: 31958546334
-  job: 95192878995
-  classification: PROVEN_CLIENT_ALIVE_ZERO_VISIBLE_WINDOWS_WITH_QT_GL_CONTEXT_FAILURES
-resolved_graphics_fix:
-  implementation_pr: 402
-  implementation_merge_commit: 8b04ffd0c2a9c25b3a8fba942b55ccb6ca450044
-  archive_merge_commit: 778e13306d93297025abf8e4e970e91ac9830a36
-  removed_environment_assignment: QT_XCB_GL_INTEGRATION=none
-  preserved_environment_assignment: QT_QUICK_BACKEND=software
-  added_nonsecret_diagnostic_assignment: QSG_INFO=1
-  graphics_contract: PASS
-current_classification:
-  physical_result: CLIENT_WINDOW_MISSING_AFTER_GRAPHICS_SOURCE_FIX
-  policy_result: CANONICAL_BOOTSTRAP_MUTATION_NOT_CURRENTLY_AUTHORIZED
-  proven:
-    - v7 source graphics contract passed
-    - support root/xkbcomp/WARP/Xvfb/VNC passed
-    - client start stage was reached
-    - bounded window wait still ended in client_window_missing
-    - no authoritative registration was published and Gate B was not reached
-    - deterministic Track A governance rejected mutation authorization
-  unknown:
-    - actual GLX/EGL/RHI backend selected at runtime after #402
-    - bounded QSG_INFO client-log contents for the failed v7 bootstrap
-    - whether a non-canonical graphics diagnostic can identify a further environment/toolroot correction
-safety:
-  blind_bootstrap_retry_forbidden: true
-  one_shot_bootstrap_workflow_removed: true
-  registration_exists: false
-  current_pid_session_claimed: false
-  credentials_allowed: false
-  login_allowed: false
-  gameplay_allowed: false
-  track_b_access: false
-evidence:
-  - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260816-v6-client-window-missing.md
-  - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260816-v7-governance-invalid-client-window-missing.md
+trusted_bootstrap_implementation:
+  implementation_pr: 371
+  implementation_merge_commit: d16091ca29ff7c9330115e9ce0fdbfb41646e0dc
+  archive_pr: 375
+  archive_merge_commit: 259e418b2c526f93bd697f07c42b73b1fd40a914
+  implementation_path: .github/scripts/tibia-official-client-re-canonical-live-transition.py
+  worker_path: .github/scripts/tibia-official-client-re-canonical-live-session.sh
+  status: PROMOTED_AND_ARCHIVED
+  physical_authority_from_implementation_pr: false
+trusted_xvfb_dri_repair:
+  proof_pr: 427
+  proof_archive_pr: 428
+  implementation_pr: 429
+  implementation_merge_commit: feb5c087eba70bd649602737742e4f2fe3e72bc3
+  archive_pr: 430
+  archive_merge_commit: fa5b66b697d42c60515c5de48ea5e30135eadd0e
+  classification: PROVEN_LIBGL_DRIVERS_PATH_ALONE_ENABLES_GLX_UNDER_CURRENT_CANONICAL_XVFB_ARGUMENTS
+historical_runtime_checkpoint:
+  last_physical_pr: 405
+  last_physical_run: 31960965493
+  last_physical_job: 95198777325
+  last_lease_generation: 6
+  authoritative_registration_published: false
+  gate_b_reached: false
+  last_physical_result: FAIL_CLOSED_CLIENT_WINDOW_MISSING
+  last_governance_result: FAILURE
+  last_governance_discriminator: bootstrap is not currently implemented/authorized
+  credentials_used: false
+  login_attempted: false
+  gameplay_attempted: false
+resolved_noncanonical_diagnostics:
+  xcb_gl_trace_pr: 425
+  xcb_gl_trace_archive_pr: 426
+  dri_path_minimality_pr: 427
+  dri_path_minimality_archive_pr: 428
+  proven_before_repair: task-owned Xvfb did not advertise GLX and Qt loaded xcb_glx then failed context creation
+  proven_after_dri_path: exact canonical-shaped Xvfb arguments advertise GLX with only contained LIBGL_DRIVERS_PATH; no +extension GLX required
+admission_reconciliation_contract:
+  purpose: authorize invocation of the already-reviewed bootstrap transaction only when explicit attempt metadata is present; the transaction itself must still acquire current lease authority and prove under-lock absence/uniqueness before child creation
+  bootstrap_mutation_true_requires:
+    - canonical_registration ABSENT
+    - canonical_lease_generation UNKNOWN at pre-run task checkpoint
+    - registration_lease_generation NOT_APPLICABLE
+    - gate_a REQUIRED_NOT_PROVEN at pre-run task checkpoint
+    - generation_rebind NOT_APPLICABLE
+    - gate_b NOT_APPLICABLE
+    - bootstrap PASS
+    - target_uniqueness UNKNOWN at pre-run task checkpoint
+    - bootstrap_attempt_limit 1
+    - non-empty live_runtime_authorization_source
+    - credentials_allowed false
+    - login_allowed false
+    - gameplay_allowed false
+  runtime_transaction_invariants:
+    - reviewed transition acquires canonical coordination flock and validates the freshly acquired lease before decisive absence checks
+    - registration absence and complete official-client candidate/session inventory are re-proven under the held flock immediately before launch
+    - any failure before registration commit cleans only bootstrap-owned descendants and leaves no success registration
+    - same-generation Gate B must pass before controller release
+    - task-level mutation_authorized true authorizes only one invocation of the reviewed fail-closed transaction, not child creation outside its internal gates
+forbidden:
+  - physical Synology execution from this reconciliation branch
+  - canonical lease/registration/session observation or mutation from this reconciliation branch
+  - weakening exact client fence, canonical namespace, under-lock absence inventory, Gate B or cleanup invariants
+  - credentials, login or gameplay authorization
+  - Track B or historical PR #303 runtime access
+  - owner-funded Codex/OpenAI API quota
 acceptance:
-  - v7 physical result and governance failure are durably recorded without a success claim
-  - one-shot workflow is removed
-  - mutation_authorized is false and canonical bootstrap remains fail-closed
-  - no further canonical bootstrap retry is permitted from this task checkpoint
-  - next investigation must be governance-compliant and non-canonical unless bootstrap governance is explicitly implemented/changed
-last_completed_step: v7 run 31960965493/job 95198777325 acquired lease generation 6 and again failed at client_window_missing after the trusted graphics source fix, while deterministic governance run 31960965481 rejected canonical bootstrap mutation authorization; workflow removed and task returned fail-closed
-next_action: perform governance-compliant non-canonical graphics/backend diagnostic that captures bounded QSG_INFO/GLX/EGL/RHI evidence, or separately implement/review the governance contract required to authorize canonical bootstrap; do not retry canonical bootstrap from this checkpoint
+  - deterministic validator still accepts existing none/read_only/ephemeral/canonical-reuse fail-closed cases
+  - fail-closed bootstrap state with mutation_authorized false remains valid
+  - canonical_bootstrap mutation_authorized true is accepted only for one explicitly authorized no-credential transaction with bootstrap PASS and pre-run transactional gate values
+  - registration UNKNOWN cannot authorize bootstrap mutation
+  - stale Gate A PASS/target uniqueness PROVEN preclaims cannot substitute for transaction-owned under-lock proof
+  - missing owner authorization source, attempt limit other than 1, or credentials/login/gameplay permission rejects the bootstrap mutation claim
+  - canonical rebind behavior remains unchanged in this phase
+  - fresh independent positive/negative validator passes
+  - standard Track A governance and repository CI pass on exact final head
+  - reconciliation merges before any physical task re-admission
+last_completed_step: trusted-main inspection proved #371/#375 already promoted and archived the bootstrap/rebind/Gate-B implementation, while current admission code still unconditionally rejects canonical_bootstrap mutation; #429/#430 have already promoted and archived the DRI provider repair
+next_action: reconcile the deterministic bootstrap admission validator on this hosted-only branch, run independent positive/negative validation, obtain exact-head governance/CI and merge; only then re-admit this same task from the new trusted main for exactly one physical bootstrap/Gate-B attempt
 ---
 
-# Track A canonical physical runtime E2E v7 — blocked checkpoint
+# Track A canonical runtime E2E — hosted admission reconciliation
 
-v7 did not establish a canonical runtime. It again reached a live client start path after support stages but failed closed at `client_window_missing`, and the deterministic admission policy independently rejected canonical bootstrap mutation authorization. Registration and Gate B remain absent/unproven. No further canonical retry is authorized.
+This checkpoint intentionally has `runtime_access: none`. It cannot authorize or execute the official client. It exists solely to reconcile the deterministic admission validator with the already-promoted bootstrap implementation before a fresh physical re-admission.

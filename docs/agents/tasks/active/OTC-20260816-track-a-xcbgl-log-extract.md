@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-xcbgl-log-extract
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-xcbgl-log-extract-20260816
 session_role: runtime_evidence_researcher
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: evidence_extraction
-phase: hosted-log-filter
+phase: coordinator-promotion-ready
 branch: diag/OTC-20260816-track-a-xcbgl-log-extract
 base_branch: main
 base_main: cf3dce624efe58d2cc75192831030470ef9a338b
 risk: low
-updated: 2026-08-16T19:58:00+02:00
+updated: 2026-08-16T20:00:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xcbgl-log-extract.md
   - docs/agents/evidence/OTC-20260816-track-a-xcbgl-log-extract/**
-  - .github/workflows/track-a-xcbgl-log-extract.yml
 modules_touched: []
 reuses:
   - docs/agents/tasks/archive/OTC-20260816-track-a-qt-debug-plugins-discriminator.md
@@ -27,7 +26,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: completed physical job 95202662909 already contains QT_DEBUG_PLUGINS evidence, but connector rendering elided its middle section; GitHub-hosted Actions log extraction can recover the load-bearing xcbglintegrations/GLX/EGL lines without another physical client run
+execution_reason: hosted extraction of the completed governance-compliant #410 Actions log is complete; it proves the retained log contains no xcbglintegration-specific observation, but this is not negative runtime proof because #410 persisted only bounded sanitized portions of its 426-line task-owned client log
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -57,29 +56,47 @@ source_job:
   source_task: OTC-20260816-track-a-qt-debug-plugins-discriminator
   source_governance: SUCCESS
   source_cleanup: COMPLETE
-filter_scope:
-  - xcbglintegrations
-  - libqxcb-glx-integration
-  - libqxcb-egl-integration
-  - xcb_glx
-  - xcb_egl
-  - Xcb GLX gl-integration
-  - Failed to initialize GLX
-  - QXcbIntegration
-  - Cannot load library
-  - loaded library
-  - QRhi
+extractor:
+  run: 31963247184
+  job: 95204331959
+  result: SUCCESS
+  source_job_fence: PASS
+  filter_match_count: 11
+  physical_runner_used: false
+  client_launch: false
+result:
+  classification: PROVEN_RETAINED_ACTIONS_LOG_HAS_NO_XCBGLINTEGRATION_SPECIFIC_OBSERVATION_RUNTIME_DISCOVERY_LOAD_INIT_STILL_UNKNOWN
+  retained_xcbglintegrations_line: ABSENT
+  retained_libqxcb_glx_line: ABSENT
+  retained_libqxcb_egl_line: ABSENT
+  retained_xcb_glx_key_line: ABSENT
+  retained_xcb_egl_key_line: ABSENT
+  retained_glx_initialize_line: ABSENT
+  negative_runtime_claim_authorized: false
+one_shot_workflow_removed: true
+primary_source:
+  qt_version: v6.9.3
+  factory_path: src/plugins/platforms/xcb/gl_integrations/qxcbglintegrationfactory.cpp
+  factory_subdirectory: /xcbglintegrations
+  factory_load_method: qLoadPlugin
+  glx_initialize_path: src/plugins/platforms/xcb/gl_integrations/xcb_glx/qxcbglxintegration.cpp
+  glx_no_extension_behavior: initialize_returns_false
+  glx_minimum_version: 1.3
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-xcbgl-log-extract/20260816-filtered-log-result.md
+audit:
+  result: PASS
+  material_findings_open: 0
 acceptance:
-  - fetch only completed job 95202662909 logs via GitHub Actions API
-  - emit only allowlisted load-bearing plugin/GLX/EGL/RHI lines
-  - no physical runner or client execution
-  - no canonical runtime state access
-  - no credentials/secrets printed or persisted
-  - classify xcbglintegration discovery/load/init from the same already-completed physical run where evidence permits
-last_completed_step: #410/#411 proved bundled platforms/libqxcb discovery but connector rendering omitted xcbglintegrations-specific middle lines
-next_action: execute one GitHub-hosted filtered extraction of completed job 95202662909 and persist exact evidence; no physical retry
+  - completed source job fenced: PASS
+  - Actions log downloaded and allowlist-filtered on GitHub-hosted: PASS
+  - no new physical execution: PASS
+  - canonical state untouched: PASS
+  - retained-log evidence boundary classified without false negative inference: PASS
+last_completed_step: hosted run 31963247184/job 95204331959 recovered all retained allowlisted lines from completed job 95202662909 and proved no xcbglintegration-specific observation survives in the Actions log; temporary extractor removed
+next_action: coordinator-promote/archive this task; in the next owner invocation, one separately admitted ephemeral-isolated task should emit a compact xcbglintegration loader trace plus read-only Xvfb extension inventory from the same task-owned display, without backend forcing or canonical bootstrap
 ---
 
-# Track A XCB GL log extraction
+# Track A XCB GL log extraction — terminal candidate
 
-Hosted-only evidence recovery from one already-completed, governance-compliant physical job. No runtime execution occurs in this task.
+The existing retained Actions log is exhausted for the missing XCB GL integration evidence. A new physical observation is required, but it can be narrowly filtered and should include the task-owned Xvfb GLX extension state.

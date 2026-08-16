@@ -1,17 +1,17 @@
 ---
 task_id: OTC-20260816-track-a-hybrid-routing-refresh
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: otclient
 track: official-client-re
 task_kind: documentation
-phase: routing-refresh
+phase: exact-head-validation
 branch: docs/OTC-20260816-track-a-hybrid-routing-refresh
 base_branch: main
 base_head: 9008bb7933db9e96119a61280941e695744e8408
 created: 2026-08-16T11:49:00+02:00
-updated: 2026-08-16T11:49:00+02:00
+updated: 2026-08-16T11:56:00+02:00
 risk: medium
 execution_mode: github-only
 owned_paths:
@@ -21,7 +21,7 @@ owned_paths:
   - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING_EVAL.md
   - docs/agents/tasks/active/OTC-20260816-track-a-hybrid-routing-refresh.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-hybrid-routing-refresh.md
-related_pr: pending
+related_pr: "342"
 reuses:
   - PR #331
   - docs/agents/tasks/active/OTC-20260816-linux-ci-hybrid.md
@@ -96,8 +96,8 @@ PR #315 is historical evidence that persistent `:98` existed while no exact live
 - [x] Missing registration routes to canonical bootstrap rather than ordinary launch/reuse.
 - [x] Generation mismatch routes to rebind rather than manual registration editing.
 - [x] P2/P0/P1/COVERAGE default to GitHub-hosted; RUNTIME owns physical Synology evidence.
-- [ ] `docs/agents/AGENTS.md` mandates the routing contract.
-- [ ] `docs/agents/README.md` includes the routing contract in Track A read order.
+- [x] `docs/agents/AGENTS.md` mandates the routing contract.
+- [x] `docs/agents/README.md` includes the routing contract in Track A read order.
 - [x] Manual routing regression matrix passes.
 - [ ] Exact-head repository CI passes.
 - [ ] Review has zero unresolved material findings.
@@ -108,21 +108,23 @@ PR #315 is historical evidence that persistent `:98` existed while no exact live
 
 - Documentation/prompt-routing change only; live runtime E2E is `NOT_APPLICABLE` because this task neither launches nor observes nor mutates a client.
 - Manual scenario matrix: `docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING_EVAL.md`.
-- Required exact-head repository CI and review remain mandatory before merge.
+- PR #342 is the integration PR; exact-head repository CI and review remain mandatory before merge.
 
 # Handover
 
 ```yaml
-STATUS: implementing
+STATUS: validating
 BASE_MAIN: 9008bb7933db9e96119a61280941e695744e8408
 BRANCH: docs/OTC-20260816-track-a-hybrid-routing-refresh
+PR: 342
 RUNTIME_ACCESS: none
 FACTS:
   - PR #331 merged the hosted Linux build/Xvfb smoke versus Synology physical-runtime boundary.
   - canonical-live governance targets one registered idle persistent runtime.
   - current canonical runtime identity remains UNKNOWN/NOT_REGISTERED without fresh evidence.
+  - universal Track A entrypoints now require the hybrid routing contract on this branch.
 UNKNOWN:
   - exact live session/display/port identity at current time
   - future bootstrap implementation/live authorization state unless separately proven
-NEXT_ACTION: update universal agent entrypoints, audit diff, open PR, run exact-head CI/review, merge, then archive task
+NEXT_ACTION: complete exact-head CI/review for PR #342, merge if protected gates pass, then archive this task and release ownership
 ```

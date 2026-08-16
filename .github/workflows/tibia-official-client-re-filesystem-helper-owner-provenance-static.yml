@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace callers of TGameClient creation method
+    name: Trace control-flow predecessors of TGameClient creation block
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Map direct callers and receiver provenance of 0x6c976e
+      - name: Find exact relative branches into 0x6c976e
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -40,27 +40,31 @@ jobs:
           secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in sh]
           text=next(s for s in secs if s['name']=='.text');tb=d[text['off']:text['off']+text['size']]
           def b_at(va,n):return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
-          target=0x6c976e;calls=[]
-          for i in range(len(tb)-5):
-              if tb[i]!=0xe8:continue
+          target=0x6c976e;refs=[]
+          for i in range(len(tb)-6):
               va=text['addr']+i
-              if va+5+struct.unpack_from('<i',tb,i+1)[0]==target:calls.append(va)
-          print('OWNER_PROV_CREATE_METHOD_CALLS='+','.join(hex(v) for v in calls))
-          for va in calls:
-              lo=max(text['addr'],va-0x180);hi=min(text['addr']+text['size'],va+0x100);w=b_at(lo,hi-lo)
-              print(f'OWNER_PROV_CREATE_METHOD_CALL_WINDOW call=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
-          # Also map exact RIP-relative LEAs to the method itself (function-pointer use).
-          lrefs=[]
-          for i in range(len(tb)-7):
-              if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
-              m=tb[i+2]
-              if (m>>6)!=0 or (m&7)!=5:continue
-              va=text['addr']+i;dst=va+7+struct.unpack_from('<i',tb,i+3)[0]
-              if dst==target:lrefs.append(va)
-          print('OWNER_PROV_CREATE_METHOD_LEA_REFS='+','.join(hex(v) for v in lrefs))
-          for va in lrefs:
-              lo=max(text['addr'],va-0x100);hi=min(text['addr']+text['size'],va+0x100);w=b_at(lo,hi-lo)
-              print(f'OWNER_PROV_CREATE_METHOD_LEA_WINDOW lea=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+              if tb[i] in (0xe8,0xe9):
+                  dst=va+5+struct.unpack_from('<i',tb,i+1)[0]
+                  if dst==target:refs.append((va,'call' if tb[i]==0xe8 else 'jmp'))
+              if tb[i]==0x0f and 0x80<=tb[i+1]<=0x8f:
+                  dst=va+6+struct.unpack_from('<i',tb,i+2)[0]
+                  if dst==target:refs.append((va,f'jcc_{tb[i+1]:02x}'))
+              if 0x70<=tb[i]<=0x7f:
+                  dst=va+2+struct.unpack_from('<b',tb,i+1)[0]
+                  if dst==target:refs.append((va,f'jcc8_{tb[i]:02x}'))
+              if tb[i]==0xeb:
+                  dst=va+2+struct.unpack_from('<b',tb,i+1)[0]
+                  if dst==target:refs.append((va,'jmp8'))
+          print('OWNER_PROV_BLOCK_XREFS='+','.join(f'0x{va:x}:{kind}' for va,kind in refs))
+          for va,kind in refs:
+              lo=max(text['addr'],va-0x180);hi=min(text['addr']+text['size'],va+0x120);w=b_at(lo,hi-lo)
+              print(f'OWNER_PROV_BLOCK_XREF_WINDOW source=0x{va:x} kind={kind} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          # Also emit immediately preceding bytes to distinguish fall-through from branch-entry.
+          for start,end,label in [(0x6c95e0,0x6c9790,'PRE_BLOCK'),(0x6c9200,0x6c97a0,'WIDE_PRE_BLOCK')]:
+              w=b_at(start,end-start)
+              print(f'OWNER_PROV_{label}_START=0x{start:x}')
+              print(f'OWNER_PROV_{label}_SHA256={hashlib.sha256(w).hexdigest()}')
+              print(f'OWNER_PROV_{label}_HEX={w.hex()}')
           print('OWNER_PROV_EXECUTED_TARGET=false')
           print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
           print('OWNER_PROV_MUTATION_PERFORMED=false')

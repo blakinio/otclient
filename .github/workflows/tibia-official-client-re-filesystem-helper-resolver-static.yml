@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Decode shared filesystem helper resolver statically
+    name: Map shared filesystem resolver Qt calls
     runs-on: [otclient, synology]
     timeout-minutes: 6
     steps:
-      - name: Emit exact resolver bytes and RIP references
+      - name: Resolve exact PLT targets and entry anchors
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,7 +28,7 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'FS_RESOLVER_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
-          import hashlib,pathlib,struct,sys
+          import pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
@@ -38,52 +38,41 @@ jobs:
               if not (0<=o<len(b)):return ''
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
-          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]} for x in raw]
-          by={s['name']:s for s in secs};text=by['.text']
+          secs=[]
+          for i,x in enumerate(raw):secs.append({'idx':i,'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+          by={s['name']:s for s in secs}
           def voff(va):
               for s in secs:
                   if s['size'] and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
           def b_at(va,n):
               o=voff(va);return b'' if o is None else d[o:o+n]
-          def s_at(va):
-              o=voff(va)
-              if o is None:return None
-              e=d.find(b'\0',o,min(len(d),o+220))
-              if e<=o:return None
-              z=d[o:e]
-              if not z or len(z)>200 or not all(32<=x<127 for x in z):return None
-              return z.decode('ascii','replace')
-          rel=by['.rela.dyn'];bo={}
-          for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
-              ro,ri,ad=struct.unpack_from('<QQq',d,o);bo[ro]=(ri&0xffffffff,ri>>32,ad)
-          rt=lambda va: None if va not in bo else bo[va][2]
-          vptr=0x2f61f90;ti=0x3070918
-          if struct.unpack('<q',b_at(vptr-16,8))[0]!=0 or rt(vptr-8)!=ti or rt(vptr+0x78)!=0xcfa5e0:raise SystemExit('FS_RESOLVER_FAIL=vtable')
-          nameva=rt(ti+8)
-          if not nameva or s_at(nameva)!='N6shared17TFileSystemHelperE':raise SystemExit('FS_RESOLVER_FAIL=type')
-          print('FS_RESOLVER_PASS=base_RTTI_slot78')
-          for label,a,b in [('ENTRY',0xcfa5e0,0xcfa760),('NEXT',0xcfa760,0xcfa900),('CALLER',0xc9b890,0xc9ba20)]:
-              w=b_at(a,b-a)
-              print(f'FS_RESOLVER_{label}_START=0x{a:x}')
-              print(f'FS_RESOLVER_{label}_END=0x{b:x}')
-              print(f'FS_RESOLVER_{label}_SHA256={hashlib.sha256(w).hexdigest()}')
-              print(f'FS_RESOLVER_{label}_HEX={w.hex()}')
-          # Known slash reference must be exact RIP-relative LEA.
-          x=b_at(0xcfa615,7)
-          dst=0xcfa61c+struct.unpack_from('<i',x,3)[0]
-          print(f'FS_RESOLVER_SLASH_REF_BYTES={x.hex()}')
-          print(f'FS_RESOLVER_SLASH_REF_TARGET=0x{dst:x}')
-          print(f'FS_RESOLVER_SLASH_TEXT={s_at(dst)}')
-          # Print all likely RIP refs from entry window, including non-printable target addresses.
-          blob=b_at(0xcfa5e0,0x180)
-          print('FS_RESOLVER_ENTRY_RIP_REFS_BEGIN')
-          for i in range(len(blob)-7):
-              if blob[i] not in range(0x48,0x50) or blob[i+1] not in (0x8d,0x8b):continue
-              m=blob[i+2]
-              if (m>>6)!=0 or (m&7)!=5:continue
-              va=0xcfa5e0+i;dst=va+7+struct.unpack_from('<i',blob,i+3)[0]
-              print(f'ref=0x{va:x} op=0x{blob[i+1]:02x} target=0x{dst:x} text={s_at(dst) or ""}')
-          print('FS_RESOLVER_ENTRY_RIP_REFS_END')
+          # dynamic symbols
+          dyn=by['.dynsym'];strs=secs[dyn['link']];sb=d[strs['off']:strs['off']+strs['size']];syms=[]
+          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
+              no,info,other,si,val,sz=struct.unpack_from('<IBBHQQ',d,o);syms.append((cs(sb,no),val,sz,si,info))
+          got_to_name={}
+          for rname in ('.rela.plt','.rela.dyn'):
+              r=by.get(rname)
+              if not r:continue
+              for o in range(r['off'],r['off']+r['size'],r['entsize'] or 24):
+                  ro,ri,ad=struct.unpack_from('<QQq',d,o);sym=ri>>32
+                  if sym and sym<len(syms):got_to_name[ro]=syms[sym][0]
+          print('FS_RESOLVER_PLT_TARGETS_BEGIN')
+          for va in (0x4ddaf0,0x4de970,0x4db340,0x4ded60,0x4dc0c0):
+              x=b_at(va,24);got=None
+              # common jmp [rip+disp32] at byte 0 or after CET/endbr prefix
+              for p in range(0,min(10,len(x)-6)):
+                  if x[p:p+2]==b'\xff\x25':
+                      got=va+p+6+struct.unpack_from('<i',x,p+2)[0];break
+              print(f'target=0x{va:x} bytes={x.hex()} got={"NONE" if got is None else hex(got)} symbol={"" if got is None else got_to_name.get(got,"")}')
+          print('FS_RESOLVER_PLT_TARGETS_END')
+          # exact resolver instructions around slash handling and final conversion.
+          for va,n,label in [
+              (0xcfa615,7,'slash_lea'),(0xcfa646,11,'slash_call_setup'),(0xcfa651,5,'first_qt_call'),
+              (0xcfa656,11,'second_qt_call_setup'),(0xcfa65c,5,'second_qt_call'),
+              (0xcfa708,14,'final_conversion_setup_call'),(0xcfa749,15,'multi_element_growth_call'),
+          ]:
+              print(f'FS_RESOLVER_ANCHOR {label} va=0x{va:x} bytes={b_at(va,n).hex()}')
           print('FS_RESOLVER_EXECUTED_TARGET=false')
           print('FS_RESOLVER_LIVE_RUNTIME_OBSERVED=false')
           print('FS_RESOLVER_MUTATION_PERFORMED=false')

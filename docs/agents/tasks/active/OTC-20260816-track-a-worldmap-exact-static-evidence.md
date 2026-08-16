@@ -16,14 +16,15 @@ current_main: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260816-track-a-worldmap-exact-static-evidence
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
-updated: 2026-08-16T23:04:00+02:00
+updated: 2026-08-16T23:08:30+02:00
 producer_pr: 437
-producer_head: bfbd81dc6cf3ad54e383484161ce5624634f7409
+producer_head: e79e306f3e4a5a66593afce7a6a9e243ba76f295
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-exact-static-evidence.md
   - docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/**
   - .github/workflows/tibia-official-client-re-worldmap-exact-static-evidence.yml
   - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py
+  - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
 modules_touched: []
 reuses:
   - PR #367 / OTC-20260816-track-a-worldmap-extent-static-re as consumer only; its branch is not owned by this producer
@@ -120,30 +121,39 @@ researcher_delivery: draft_only
 WORLD_MAP_STATIC_EVIDENCE_READY: false
 programme_complete: false
 validation_state:
-  current_head_runtime_governance_run: 31972287815
+  current_head_runtime_governance_run: 31972398445
   current_head_runtime_governance_conclusion: success
-  current_head_ci_run: 31972287917
-  current_head_ci_state: in_progress
+  prior_head_ci_run: 31972398548
+  prior_head_ci_conclusion: success
 recovery_checkpoint:
-  status: QUEUED_FIRST_SOURCE_JOB
+  status: EXACT_SOURCE_PROVEN_DISASSEMBLER_MISSING
   trusted_base: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
-  runner_job_started: false
-  source_run_id: 31972285354
-  source_job_id: 95226438379
-  source_run_head: bfbd81dc6cf3ad54e383484161ce5624634f7409
-  source_job_state: queued
-  queue_discriminator: synology-otclient-01 is occupied by admitted physical run 31972261899 job 95226396914; no source failure has occurred and this producer has not touched that runtime lease or namespace
+  first_source_run_id: 31972285354
+  first_source_job_id: 95226438379
+  first_source_failure: silent precondition exit before selector; analyzer not executed
+  discriminator_run_id: 31972499618
+  discriminator_job_id: 95226977563
+  discriminator_head: e79e306f3e4a5a66593afce7a6a9e243ba76f295
+  discriminator_result: candidate_1_exact_source_present_and_fenced_but_source_disassembler_missing
+  exact_source_candidate_index: 1
+  exact_source_regular: true
+  exact_source_symlink: false
+  exact_source_size: 51965216
+  exact_source_sha_match: true
+  objdump_available: false
+  llvm_objdump_available: false
+  canonical_runtime_touched: false
+  client_process_started: false
+  client_bytes_mutated: false
   first_hypothesis: select only the two exact-source candidates proven by #431's successful immutable harness, then verify size and SHA before any bounded read
-  prohibited_repeat: do not retry PR #435 retained-run SOURCE_CLIENT path without a new discriminator
-next_action: let the admitted self-hosted queue serialize naturally; when source job 95226438379 starts, consume exact-fenced sanitized output, refine once only if fresh evidence exposes a new analyzer discriminator, and persist final evidence for PR #367
+  prohibited_repeat: do not rerun source with a mandatory Synology objdump/llvm-objdump check; use bounded source extraction and hosted disassembly instead
+next_action: add repo-contained v2 staging that parses ELF and scans RIP-relative vptr references on Synology without a disassembler, emits only bounded relevant code windows, then disassembles/validates those windows on ubuntu-latest and persists exact evidence for PR #367
 ---
 
 # Track A world-map exact static evidence producer
 
 This task is a read-only exact-client evidence producer for consumer PR #367. It does not own or modify the consumer branch, does not acquire canonical runtime authority, and does not start the official client.
 
-The post-v7 discriminator is already established: #431 restored GLX and exact-client startup but still observed zero visible windows. Because the requested product is static ELF evidence, the approved path is to avoid the GUI gate entirely and read only a size/SHA-fenced retained exact file.
+Post-v7 GUI evidence (#431/#432/#434) is deliberately not repeated. The static path is now independently proven viable at the file boundary: discriminator run `31972499618`, job `95226977563`, found candidate `1` as a regular non-symlink exact file with size `51965216` and SHA match `true`. The same run proved both `objdump` and `llvm-objdump` absent on the source runner.
 
-The first source hypothesis deliberately differs from failed PR #435 run 31971704065: that run bound one stale retained-run path and failed before ELF access. This producer instead uses only the two install candidates already exercised successfully by the immutable #431 harness, then performs bounded relocation-aware extraction.
-
-The first producer run is `31972285354`; source job `95226438379` is queued behind an already-admitted live runtime job on `synology-otclient-01`. Queueing is not treated as evidence failure and no competing runtime lease is modified.
+The next discriminator therefore changes the extraction architecture rather than retrying: source-side pure Python performs ELF/relocation parsing plus bounded RIP-relative vptr reference discovery and code-window staging; disassembly is moved to the GitHub-hosted validation job where the raw client is never present.

@@ -7,11 +7,16 @@ on:
       - docs/agents/AGENTS.md
       - docs/agents/TIBIA_RESEARCH_TRACKS.md
       - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+      - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+      - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
       - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
+      - docs/agents/tasks/active/**
       - .github/scripts/test_track_a_agent_runtime_governance.py
+      - .github/scripts/tibia-official-client-re-*
       - .github/workflows/track-a-agent-runtime-governance.yml
-      - docs/agents/tasks/active/OTC-20260816-track-a-agent-runtime-governance.md
-      - docs/agents/tasks/archive/OTC-20260816-track-a-agent-runtime-governance.md
+      - .github/workflows/tibia-official-client-re-*
+      - tools/tibia_runtime_bridge/**
+      - tools/tibia_worldmap_reconstruction/**
   workflow_dispatch:
 
 permissions:
@@ -22,15 +27,22 @@ jobs:
     name: Deterministic admission-policy audit
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
     steps:
-      - name: Checkout exact head
+      - name: Checkout exact head with base history
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Verify Track A research-agent runtime gates
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 -m py_compile .github/scripts/test_track_a_agent_runtime_governance.py
-          python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          if [[ -n "${BASE_SHA:-}" ]]; then
+            python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$BASE_SHA"
+          else
+            python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          fi

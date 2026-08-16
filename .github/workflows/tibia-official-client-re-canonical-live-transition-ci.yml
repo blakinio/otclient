@@ -6,7 +6,6 @@ on:
       - ci/OTC-20260816-track-a-canonical-bootstrap-implementation
     paths:
       - .github/scripts/tibia-official-client-re-canonical-live-transition.py
-      - .github/scripts/test_tibia_official_client_re-canonical-live-transition.py
       - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
       - .github/scripts/tibia-official-client-re-canonical-live-lease.py
       - .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
@@ -48,5 +47,5 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
-            --base "${{ github.event.repository.default_branch }}" \
+            --changed-from origin/main \
             --expected-branch "$EXPECTED_BRANCH"

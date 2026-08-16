@@ -34,18 +34,45 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Verify source boundary and select exact client
+      - name: Diagnose source boundary and select exact client
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]]
-          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]]
-          [[ "$RUNNER_OS" == Linux ]]
-          [[ "$RUNNER_ARCH" == X64 ]]
-          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]]
-          command -v python3 >/dev/null
-          command -v objdump >/dev/null
-          command -v sha256sum >/dev/null
+
+          repo_ok=false
+          ref_ok=false
+          os_ok=false
+          arch_ok=false
+          runner_ok=false
+          python_ok=false
+          objdump_ok=false
+          llvm_objdump_ok=false
+
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] && repo_ok=true
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] && ref_ok=true
+          [[ "$RUNNER_OS" == Linux ]] && os_ok=true
+          [[ "$RUNNER_ARCH" == X64 ]] && arch_ok=true
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] && runner_ok=true
+          command -v python3 >/dev/null 2>&1 && python_ok=true
+          command -v objdump >/dev/null 2>&1 && objdump_ok=true
+          command -v llvm-objdump >/dev/null 2>&1 && llvm_objdump_ok=true
+
+          echo "WORLD_MAP_STATIC_PREFLIGHT_REPOSITORY_OK=$repo_ok"
+          echo "WORLD_MAP_STATIC_PREFLIGHT_REF_OK=$ref_ok"
+          echo "WORLD_MAP_STATIC_PREFLIGHT_OS_OK=$os_ok"
+          echo "WORLD_MAP_STATIC_PREFLIGHT_ARCH_OK=$arch_ok"
+          echo "WORLD_MAP_STATIC_PREFLIGHT_RUNNER_OK=$runner_ok"
+          echo "WORLD_MAP_STATIC_PREFLIGHT_PYTHON3_OK=$python_ok"
+          echo "WORLD_MAP_STATIC_PREFLIGHT_OBJDUMP_OK=$objdump_ok"
+          echo "WORLD_MAP_STATIC_PREFLIGHT_LLVM_OBJDUMP_OK=$llvm_objdump_ok"
+
+          [[ "$repo_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=REPOSITORY_BOUNDARY'; exit 61; }
+          [[ "$ref_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=REF_BOUNDARY'; exit 62; }
+          [[ "$os_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=OS_BOUNDARY'; exit 63; }
+          [[ "$arch_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=ARCH_BOUNDARY'; exit 64; }
+          [[ "$runner_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=RUNNER_BOUNDARY'; exit 65; }
+          [[ "$python_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=PYTHON3_MISSING'; exit 66; }
+
           python3 -m py_compile .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py
 
           candidates=(
@@ -56,15 +83,59 @@ jobs:
           source_index=''
           for index in 0 1; do
             candidate="${candidates[$index]}"
-            if [[ -f "$candidate" && ! -L "$candidate" \
-              && "$(stat -c %s "$candidate" 2>/dev/null || true)" == "$EXPECTED_CLIENT_SIZE" \
-              && "$(sha256sum "$candidate" 2>/dev/null | awk '{print $1}')" == "$EXPECTED_CLIENT_SHA256" ]]; then
+            candidate_regular=false
+            candidate_symlink=false
+            candidate_size='ABSENT'
+            candidate_sha_match=false
+
+            [[ -f "$candidate" ]] && candidate_regular=true
+            [[ -L "$candidate" ]] && candidate_symlink=true
+            if [[ "$candidate_regular" == true && "$candidate_symlink" == false ]]; then
+              candidate_size="$(stat -c %s "$candidate" 2>/dev/null || echo STAT_FAILED)"
+              if [[ "$candidate_size" == "$EXPECTED_CLIENT_SIZE" ]]; then
+                if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
+          import hashlib
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          expected = sys.argv[2]
+          digest = hashlib.sha256()
+          with path.open('rb') as handle:
+              for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                  digest.update(chunk)
+          raise SystemExit(0 if digest.hexdigest() == expected else 1)
+          PY
+                then
+                  candidate_sha_match=true
+                fi
+              fi
+            fi
+
+            echo "WORLD_MAP_STATIC_CANDIDATE_${index}_REGULAR=$candidate_regular"
+            echo "WORLD_MAP_STATIC_CANDIDATE_${index}_SYMLINK=$candidate_symlink"
+            echo "WORLD_MAP_STATIC_CANDIDATE_${index}_SIZE=$candidate_size"
+            echo "WORLD_MAP_STATIC_CANDIDATE_${index}_SHA_MATCH=$candidate_sha_match"
+
+            if [[ "$candidate_regular" == true && "$candidate_symlink" == false \
+              && "$candidate_size" == "$EXPECTED_CLIENT_SIZE" \
+              && "$candidate_sha_match" == true ]]; then
               source_client="$candidate"
               source_index="$index"
               break
             fi
           done
+
           [[ -n "$source_client" ]] || { echo 'WORLD_MAP_STATIC_REFUSED=EXACT_SOURCE_MISSING'; exit 50; }
+          [[ "$objdump_ok" == true || "$llvm_objdump_ok" == true ]] || {
+            echo 'WORLD_MAP_STATIC_REFUSED=DISASSEMBLER_MISSING'
+            exit 67
+          }
+          if [[ "$objdump_ok" != true ]]; then
+            echo 'WORLD_MAP_STATIC_REFUSED=ONLY_LLVM_OBJDUMP_AVAILABLE_REQUIRES_ANALYZER_ADAPTATION'
+            exit 68
+          fi
+
           {
             echo "SOURCE_CLIENT=$source_client"
             echo "SOURCE_CANDIDATE_INDEX=$source_index"

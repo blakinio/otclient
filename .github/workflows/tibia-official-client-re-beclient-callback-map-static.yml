@@ -1,0 +1,115 @@
+name: Track A BEClient callback map static probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-beclient-callback-map-static.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-beclient-callback-map.md
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Map client-side Init state slots statically
+    runs-on: [otclient, synology]
+    timeout-minutes: 6
+    steps:
+      - name: Extract bounded exact-client state-slot windows
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || { echo 'BE_CB_ERROR=wrong_runner'; exit 2; }
+          package='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package'
+          client="$package/bin/client"
+          [[ -f "$client" ]] || { echo 'BE_CB_ERROR=client_missing'; exit 3; }
+          [[ "$(stat -c '%s' "$client")" == '51965216' ]] || { echo 'BE_CB_ERROR=client_size'; exit 4; }
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || { echo 'BE_CB_ERROR=client_sha'; exit 5; }
+          echo 'BE_CB_CLIENT_FENCE=PASS'
+          for tool in objdump llvm-objdump eu-objdump ndisasm readelf llvm-readobj rizin radare2; do
+            p="$(command -v "$tool" 2>/dev/null || true)"
+            echo "BE_CB_TOOL_${tool//-/_}=${p:-UNAVAILABLE}"
+          done
+
+          python3 - "$client" <<'PY'
+          import hashlib,pathlib,struct,sys
+          p=pathlib.Path(sys.argv[1]); d=p.read_bytes(); E='<'
+          h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
+          _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
+          shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
+          st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
+          def cs(blob,o):
+              if o<0 or o>=len(blob): return ''
+              e=blob.find(b'\0',o); e=len(blob) if e<0 else e
+              return blob[o:e].decode('utf8','replace')
+          secs=[]
+          for i,x in enumerate(sh):
+              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
+          text=next(s for s in secs if s['name']=='.text')
+          tb=d[text['off']:text['off']+text['size']]
+          qstart=0x6fc034; qend=0x6fda00
+          assert text['addr'] <= qstart < qend <= text['addr']+text['size']
+          qb=tb[qstart-text['addr']:qend-text['addr']]
+          state_disp=-0x148
+
+          def reg_name(n):
+              return ['rax','rcx','rdx','rbx','rsp','rbp','rsi','rdi','r8','r9','r10','r11','r12','r13','r14','r15'][n]
+
+          loads=[]
+          # mov/lea r64,[rbp-0x148] with disp32; exact instruction boundary candidates only.
+          for i in range(len(qb)-7):
+              rex=qb[i]
+              if rex not in range(0x48,0x50): continue
+              if qb[i+1] not in (0x8b,0x8d): continue
+              modrm=qb[i+2]
+              if (modrm>>6)!=2 or (modrm&7)!=5: continue
+              disp=struct.unpack_from('<i',qb,i+3)[0]
+              if disp!=state_disp: continue
+              reg=((modrm>>3)&7) | (((rex>>2)&1)<<3)
+              va=qstart+i
+              loads.append((va,qb[i+1],reg))
+          print(f'BE_CB_STATE_LOCAL_DISP={state_disp}')
+          print(f'BE_CB_STATE_LOCAL_LOAD_COUNT={len(loads)}')
+          print('BE_CB_STATE_LOCAL_LOADS_BEGIN')
+          for idx,(va,op,reg) in enumerate(loads):
+              print(f'index={idx} va=0x{va:x} op={"mov" if op==0x8b else "lea"} reg={reg_name(reg)}')
+          print('BE_CB_STATE_LOCAL_LOADS_END')
+
+          # Emit bounded windows beginning at each exact state-local load for offline disassembly.
+          print('BE_CB_STATE_WINDOWS_BEGIN')
+          for idx,(va,op,reg) in enumerate(loads):
+              start=va; size=0x90
+              fo=text['off']+(start-text['addr']); blob=d[fo:fo+size]
+              print(f'WINDOW index={idx} va=0x{start:x} reg={reg_name(reg)} size=0x{len(blob):x} sha256={hashlib.sha256(blob).hexdigest()} hex={blob.hex()}')
+          print('BE_CB_STATE_WINDOWS_END')
+
+          # Exact lifecycle anchor windows around block clear, Init call and immediate success handling.
+          anchors=[
+              ('pre_block_clear',0x6fc610,0x90),
+              ('init_call',0x6fc670,0x90),
+              ('post_init',0x6fc6b0,0xc0),
+              ('set_filename_load',0x6fca80,0x70),
+          ]
+          print('BE_CB_ANCHOR_WINDOWS_BEGIN')
+          for name,va,size in anchors:
+              fo=text['off']+(va-text['addr']); blob=d[fo:fo+size]
+              print(f'ANCHOR name={name} va=0x{va:x} size=0x{len(blob):x} sha256={hashlib.sha256(blob).hexdigest()} hex={blob.hex()}')
+          print('BE_CB_ANCHOR_WINDOWS_END')
+
+          # Conservative raw census of direct memory operands using likely state offsets after a state-local load.
+          # This is a candidate index only; semantics require disassembly/control-flow confirmation.
+          candidate_offsets=set()
+          for va,op,reg in loads:
+              fo=text['off']+(va-text['addr'])
+              w=d[fo:min(len(d),fo+0x90)]
+              # Search disp8/disp32 values aligned to the expected small interface region.
+              for offv in range(0x00,0x81):
+                  b=bytes([offv])
+                  if b in w: candidate_offsets.add(offv)
+          print('BE_CB_CANDIDATE_SMALL_OFFSETS='+','.join(f'0x{x:x}' for x in sorted(candidate_offsets)))
+          print('BE_CB_EXECUTED_TARGET=false')
+          print('BE_CB_LIVE_RUNTIME_OBSERVED=false')
+          print('BE_CB_MUTATION_PERFORMED=false')
+          PY

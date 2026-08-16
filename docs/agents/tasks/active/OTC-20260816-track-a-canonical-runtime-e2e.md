@@ -2,18 +2,18 @@
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
 status: blocked
 agent: ChatGPT
-session_id: chatgpt-runtime-v5-20260816-1734
+session_id: chatgpt-runtime-v6-20260816
 session_role: runtime_owner
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: waiting-bounded-client-window-wait-fix
-branch: ci/OTC-20260816-track-a-canonical-runtime-e2e-v5
+phase: waiting-client-window-ownership-discriminator
+branch: ci/OTC-20260816-track-a-canonical-runtime-e2e-v6
 base_branch: main
-base_main: b69084067de24528b1f763ab9630f638e8bcf092
+base_main: 9e3634c1d822ffc6e74d8e42da63a4e8c60ea3e1
 risk: high
-updated: 2026-08-16T17:41:00+02:00
+updated: 2026-08-16T18:07:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
@@ -28,15 +28,15 @@ reuses:
   - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-toolroot-layout-fix.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-runner-support-x11vnc-repair.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-runner-system-xkbcomp-repair.md
-supersedes_pr: 386
+  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-client-window-wait-fix.md
 depends_on:
-  - OTC-20260816-track-a-canonical-client-window-wait-fix
+  - OTC-20260816-track-a-client-window-ownership-discriminator
 blocks:
   - OTC-20260815-track-a-p0-direct-position
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: v5 physical bootstrap passed trusted support preflight and acquired canonical lease generation 4 but hit the transition worker timeout; deterministic source review found the client-window wait can exceed the supervisor budget and must be repaired/promoted before another physical attempt
+execution_reason: v6 physical bootstrap reached a live exact client after WARP/Xvfb/VNC success but failed closed at the bounded visible-window discriminator; a separate non-registering ephemeral-isolated diagnostic must resolve window/process ownership or startup state before another canonical bootstrap attempt
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -51,7 +51,7 @@ runtime_access: canonical_bootstrap
 runtime_owner_task: OTC-20260816-track-a-canonical-runtime-e2e
 runtime_namespace: canonical-live-runtime
 canonical_registration: ABSENT
-canonical_lease_generation: 4
+canonical_lease_generation: 5
 registration_lease_generation: NOT_APPLICABLE
 gate_a: REQUIRED_NOT_PROVEN
 generation_rebind: NOT_APPLICABLE
@@ -60,7 +60,7 @@ bootstrap: REQUIRED_NOT_PROVEN
 target_uniqueness: UNKNOWN
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
-live_runtime_authorization_source: owner instruction 2026-08-16 to finish the existing Track A tasks; v5 bootstrap used no account credentials or login input
+live_runtime_authorization_source: owner instruction 2026-08-16 to finish existing Track A tasks; no further canonical mutation is authorized from this branch after the v6 discriminator
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
@@ -88,42 +88,64 @@ prior_fail_closed_attempts:
   - pr: 393
     run: 31956030015
     job: 95186692121
-    head: fc329b23fa8e30fb6110fb162e9c57ed2d3d4e5d
-    pre_admission_lease_status: released
-    pre_admission_lease_generation: 3
     acquired_lease_generation: 4
+    result: FAIL_CLOSED_WORKER_TIMEOUT
+    registration_published: false
+    gate_b_reached: false
+  - pr: 397
+    run: 31957502867
+    job: 95190252936
+    head: 29c750adfbfbf0ea4db64005698b456a5b9c92b0
+    governance_run: 31957502830
+    governance_result: SUCCESS
+    pre_admission_lease_status: released
+    pre_admission_lease_generation: 4
+    acquired_lease_generation: 5
+    trusted_worker_wait_contract: PASS
     support_root_preflight: PASS
     system_xkbcomp_preflight: PASS
-    warp_profile_generated: true
-    result: FAIL_CLOSED_WORKER_TIMEOUT
+    warp: PASS
+    xvfb: PASS
+    vnc: PASS
+    client_start: REACHED
+    client_liveness_during_window_wait: ALIVE
+    bounded_window_wait_seconds_approx: 30
+    result: FAIL_CLOSED_CLIENT_WINDOW_MISSING
     registration_published: false
     gate_b_reached: false
     credentials_used: false
     login_attempted: false
     one_shot_workflow_removed: true
-deterministic_root_cause:
-  classification: BOUNDED_CLIENT_WINDOW_WAIT_DEFECT
-  window_helper_max_seconds_approx: 30
-  bootstrap_outer_attempts: 100
-  bootstrap_nominal_missing_window_seconds_approx: 3025
-  transition_worker_timeout_seconds: 300
-  consequence: missing/slow client window path can be masked by supervisor worker_timeout before client_window_missing is emitted
-  evidence: docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260816-v5-worker-timeout.md
+current_discriminator:
+  classification: CLIENT_ALIVE_NO_MATCHING_PID_OWNED_VISIBLE_TIBIA_WINDOW
+  proven:
+    - exact trusted base and bounded-window worker contract passed
+    - support root and xkbcomp passed
+    - canonical WARP egress passed
+    - Xvfb socket/startup passed
+    - localhost-only VNC listener startup passed
+    - exact client launch stage was reached
+    - launched exact client PID remained alive throughout the bounded 30-second window wait
+    - no visible window matching ^Tibia$ owned by the launched PID was found within that budget
+  unknown:
+    - whether any visible client-related X11 window existed under another title
+    - whether a relevant window was owned by an owned child/related process instead of the launched PID
+    - whether the client remained blocked before window mapping and why
+  evidence: docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260816-v6-client-window-missing.md
 safety:
   blind_bootstrap_retry_forbidden: true
   one_shot_bootstrap_workflow_removed: true
   registration_exists: false
   current_pid_session_claimed: false
 acceptance:
-  - hosted-only worker fix is independently tested/promoted to trusted main before any new physical bootstrap
-  - client-window wait is bounded below transition worker timeout and preserves client_exited/client_window_missing failure classification
-  - next RUNTIME attempt starts from the new current main with fresh admission and one bounded attempt
-  - bootstrap still creates only one exact-fenced persistent X11/VNC/client runtime and immediate Gate B must pass before controller release
-  - no credentials are used until a later separately admitted protected-login phase
-last_completed_step: v5 physical run 31956030015/job 95186692121 passed support/xkbcomp preflight, acquired lease generation 4 and generated canonical WARP profile, then failed closed at worker_timeout; one-shot workflow removed and deterministic nested client-window wait defect persisted
-next_action: implement/test/promote OTC-20260816-track-a-canonical-client-window-wait-fix on GitHub-hosted current main, then close this stale v5 PR and create one fresh-current-main RUNTIME redispatch
+  - bounded ephemeral-isolated diagnostic determines visible X11 window title/class/PID ownership versus no mapped window
+  - diagnostic may inspect only task-owned startup process tree/window metadata and bounded sanitized startup log with no credentials/login/canonical registration mutation
+  - all diagnostic processes/display/WARP state are cleaned before exit
+  - only after the discriminator is resolved may a hosted fix be promoted or a fresh canonical bootstrap be redispatched
+last_completed_step: v6 run 31957502867/job 95190252936 acquired lease generation 5 and passed WARP/Xvfb/VNC/client-start stages, then failed closed after the correct 30-second wait at client_window_missing; one-shot workflow removed and sanitized evidence persisted
+next_action: execute one separately admitted ephemeral-isolated client-window ownership/startup discriminator; do not retry canonical bootstrap until that evidence identifies the required fix or proves a safe window-owner matching rule
 ---
 
-# Track A canonical physical runtime E2E v5 — blocked checkpoint
+# Track A canonical physical runtime E2E v6 — blocked checkpoint
 
-The runner support blockers are cleared, but the trusted worker's nested client-window polling can exceed the transition supervisor budget. No authoritative runtime registration exists from v5. Further physical bootstrap is disabled until the bounded-wait fix reaches trusted main.
+v6 eliminated the generic timeout and reached a live exact client process after all support stages passed. The remaining blocker is now precisely the lack of a visible `^Tibia$` window owned by the launched PID during the bounded 30-second wait. Canonical registration/Gate B remain unproven and no login occurred.

@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - docs/agents/README.md
       - docs/agents/AGENTS.md
       - docs/agents/TIBIA_RESEARCH_TRACKS.md
       - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
@@ -41,6 +42,29 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 -m py_compile .github/scripts/test_track_a_agent_runtime_governance.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path('docs/agents/README.md').read_text(encoding='utf-8')
+          required = [
+              'Track A official-client runtime admission — mandatory',
+              'contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md',
+              'the active Track A task must persist the complete admission record',
+              'current-task ownership/target uniqueness',
+              'equal current lease-generation binding after any rebind',
+              'an ephemeral sandbox may never use or alias the canonical namespace',
+              'display_98_current_canonical_status: UNKNOWN',
+              'rfb_6082_current_backend_mapping: UNKNOWN',
+              'current_exact_client_pid: NOT_REGISTERED',
+              'current_exact_client_session: NOT_REGISTERED',
+              'PR #303-owned state',
+              'Track B never shares Track A canonical authority',
+          ]
+          missing = [needle for needle in required if needle not in text]
+          if missing:
+              raise SystemExit(f'docs/agents/README.md: missing universal Track A admission markers: {missing}')
+          print('TRACK_A_AGENT_RUNTIME_UNIVERSAL_ENTRYPOINT_PASS=true')
+          PY
           if [[ -n "${BASE_SHA:-}" ]]; then
             python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$BASE_SHA"
           else

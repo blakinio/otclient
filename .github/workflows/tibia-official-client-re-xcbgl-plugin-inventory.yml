@@ -1,0 +1,116 @@
+name: Track A read-only XCB GL plugin inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-xcbgl-plugin-inventory.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-xcbgl-plugin-inventory
+  cancel-in-progress: false
+
+jobs:
+  inventory-xcbgl-plugins:
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    steps:
+      - name: Read-only exact-package and Qt plugin inventory
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: a3363557ad02e1421e78e02ea4b09864bd01b84d
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]] || { echo "XCBGL_INV_REFUSED=BASE_MOVED:$EVENT_BASE_SHA"; exit 44; }
+
+          size=51965216
+          sha='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          tool='/work/_otclient_tibia_re_state/toolroot'
+          source=''
+          for package in \
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia' \
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia'; do
+            client="$package/bin/client"
+            if [[ -x "$client" && ! -L "$client" \
+              && "$(stat -c %s "$client" 2>/dev/null || true)" == "$size" \
+              && "$(sha256sum "$client" 2>/dev/null | awk '{print $1}')" == "$sha" ]]; then
+              source="$package"
+              break
+            fi
+          done
+          [[ -n "$source" ]] || { echo 'XCBGL_INV_REFUSED=EXACT_SOURCE_MISSING'; exit 45; }
+          [[ -d "$tool" && ! -L "$tool" ]] || { echo 'XCBGL_INV_REFUSED=TOOLROOT_MISSING_OR_SYMLINK'; exit 46; }
+          echo 'XCBGL_INV_EXACT_SOURCE_FENCE=PASS'
+          echo 'XCBGL_INV_CLIENT_LAUNCH=false'
+          echo 'XCBGL_INV_CANONICAL_STATE_ACCESS=NONE'
+          echo "XCBGL_INV_SOURCE_ROOT=$source"
+          echo "XCBGL_INV_TOOLROOT=$tool"
+
+          python3 - "$source" "$tool" <<'PY'
+          import hashlib
+          import os
+          import pathlib
+          import subprocess
+          import sys
+
+          roots = [('package', pathlib.Path(sys.argv[1])), ('toolroot', pathlib.Path(sys.argv[2]))]
+          needles = ('xcbglintegrations', 'xcb_glx', 'xcb_egl', 'libqxcb', 'libqegl', 'libqglx')
+          files = []
+          dirs = []
+          for label, root in roots:
+              for base, dirnames, filenames in os.walk(root):
+                  pbase = pathlib.Path(base)
+                  rel_depth = len(pbase.relative_to(root).parts)
+                  if rel_depth > 8:
+                      dirnames[:] = []
+                      continue
+                  for d in list(dirnames):
+                      if 'xcbglintegrations' in d.lower():
+                          dirs.append((label, pbase / d, root))
+                  for name in filenames:
+                      low = name.lower()
+                      if any(n in low for n in needles) and name.endswith('.so'):
+                          path = pbase / name
+                          if path.is_symlink() or not path.is_file():
+                              continue
+                          files.append((label, path, root))
+          print(f'XCBGL_INV_MATCHING_DIR_COUNT={len(dirs)}')
+          for label, path, root in sorted(dirs):
+              print(f'XCBGL_INV_DIR={label}:{path.relative_to(root)}')
+          print(f'XCBGL_INV_PLUGIN_FILE_COUNT={len(files)}')
+          for label, path, root in sorted(files):
+              data = path.read_bytes()
+              digest = hashlib.sha256(data).hexdigest()
+              print(f'XCBGL_INV_PLUGIN={label}:{path.relative_to(root)}:size={len(data)}:sha256={digest}')
+              ldd = subprocess.run(['ldd', str(path)], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False).stdout.splitlines()
+              missing = [line.strip() for line in ldd if 'not found' in line]
+              print(f'XCBGL_INV_LDD_MISSING_COUNT={label}:{path.relative_to(root)}:{len(missing)}')
+              for line in missing[:20]:
+                  print(f'XCBGL_INV_LDD_MISSING={label}:{path.relative_to(root)}:{line}')
+              dyn = subprocess.run(['readelf','-d',str(path)], text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False).stdout.splitlines()
+              needed = [line.strip() for line in dyn if '(NEEDED)' in line]
+              for line in needed[:30]:
+                  print(f'XCBGL_INV_NEEDED={label}:{path.relative_to(root)}:{line}')
+          # Inventory common Qt plugin roots, without reading arbitrary file contents.
+          for label, root in roots:
+              candidates = []
+              for p in root.rglob('platforms'):
+                  if p.is_dir() and len(p.relative_to(root).parts) <= 8:
+                      candidates.append(p.relative_to(root))
+              for p in root.rglob('xcbglintegrations'):
+                  if p.is_dir() and len(p.relative_to(root).parts) <= 8:
+                      candidates.append(p.relative_to(root))
+              unique = sorted({str(x) for x in candidates})
+              print(f'XCBGL_INV_QT_PLUGIN_DIR_CANDIDATE_COUNT={label}:{len(unique)}')
+              for item in unique[:40]:
+                  print(f'XCBGL_INV_QT_PLUGIN_DIR={label}:{item}')
+          print('XCBGL_INV_RESULT=PASS_READ_ONLY_INVENTORY')
+          PY

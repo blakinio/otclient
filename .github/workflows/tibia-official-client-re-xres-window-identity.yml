@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-xres-window-identity.yml
       - .github/scripts/tibia-official-client-re-xres-window-identity-patch.py
+      - .github/scripts/tibia-official-client-re-xres-window-identity-patch-v2.py
       - docs/agents/tasks/active/OTC-20260816-track-a-xres-window-identity.md
 
 permissions:
@@ -46,9 +47,12 @@ jobs:
           [[ "$(git hash-object "$harness")" == 1616edcc982be50ef2c95b8077160ec8fe9291fe ]]
           [[ "$(git hash-object "$t1")" == d663a40c446983c7359265bf834113ba49e6a5d1 ]]
           [[ "$(git hash-object "$t2")" == b9d15f8d1131339b06bfa9cb1e81940c2163a283 ]]
-          python3 -m py_compile .github/scripts/tibia-official-client-re-xres-window-identity-patch.py "$t1" "$t2"
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-xres-window-identity-patch.py \
+            .github/scripts/tibia-official-client-re-xres-window-identity-patch-v2.py \
+            "$t1" "$t2"
           python3 "$t2" "$harness" "$base_script"
-          python3 .github/scripts/tibia-official-client-re-xres-window-identity-patch.py "$base_script" "$final_script"
+          python3 .github/scripts/tibia-official-client-re-xres-window-identity-patch-v2.py "$base_script" "$final_script"
           bash -n "$final_script"
           python3 - "$final_script" <<'PY'
           import pathlib, sys
@@ -141,7 +145,7 @@ jobs:
           [[ "$(git hash-object "$t1")" == d663a40c446983c7359265bf834113ba49e6a5d1 ]]
           [[ "$(git hash-object "$t2")" == b9d15f8d1131339b06bfa9cb1e81940c2163a283 ]]
           python3 "$t2" "$harness" "$base_script"
-          python3 .github/scripts/tibia-official-client-re-xres-window-identity-patch.py "$base_script" "$final_script"
+          python3 .github/scripts/tibia-official-client-re-xres-window-identity-patch-v2.py "$base_script" "$final_script"
           bash -n "$final_script"
           echo 'XRES_GENERATED_SCRIPT=PASS'
           bash "$final_script"

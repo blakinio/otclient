@@ -45,6 +45,10 @@ TRACK_A_SENSITIVE_PREFIXES = (
     "tools/tibia_worldmap_reconstruction/",
 )
 
+BOOTSTRAP_TRANSITION = ".github/scripts/tibia-official-client-re-canonical-live-transition.py"
+BOOTSTRAP_ARCHIVE = "docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md"
+BOOTSTRAP_MERGE = "d16091ca29ff7c9330115e9ce0fdbfb41646e0dc"
+
 
 def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
@@ -99,6 +103,36 @@ def is_canonical_namespace(value: str) -> bool:
 
 def task_matches_expected_branch(values: dict[str, str], expected_branch: str | None) -> bool:
     return bool(expected_branch and values.get("branch") == expected_branch)
+
+
+def bootstrap_implementation_promoted() -> bool:
+    transition_path = ROOT / BOOTSTRAP_TRANSITION
+    archive_path = ROOT / BOOTSTRAP_ARCHIVE
+    if not transition_path.is_file() or not archive_path.is_file():
+        return False
+    transition = transition_path.read_text(encoding="utf-8")
+    archive = archive_path.read_text(encoding="utf-8")
+    transition_markers = (
+        '"""Cancellation-safe Track A canonical bootstrap, rebind and Gate B."""',
+        "def _bootstrap(",
+        "def _rebind(",
+        "def _gateb(",
+        "fcntl.flock(lock_fd, fcntl.LOCK_EX)",
+        "[str(args.worker), 'bootstrap', str(manifest_path)]",
+        "_commit(staged)",
+        "_candidates()",
+    )
+    archive_markers = (
+        "task_id: OTC-20260816-track-a-canonical-bootstrap-implementation",
+        "status: completed",
+        "implementation_pr: 371",
+        f"implementation_merge_commit: {BOOTSTRAP_MERGE}",
+        "ownership_released: true",
+        "consumer_next_action: refresh OTC-20260816-track-a-canonical-runtime-e2e from trusted main and perform fresh RUNTIME admission before any physical bootstrap or login",
+    )
+    return all(marker in transition for marker in transition_markers) and all(
+        marker in archive for marker in archive_markers
+    )
 
 
 def validate_track_a_task(path: Path) -> bool:
@@ -217,16 +251,43 @@ def validate_track_a_task(path: Path) -> bool:
                 )
 
     elif runtime_access == "canonical_bootstrap":
-        if mutation != "false":
-            fail_task(path, "bootstrap is not currently implemented/authorized")
         if values["canonical_registration"] not in {"ABSENT", "UNKNOWN"}:
             fail_task(path, "bootstrap admission requires registration ABSENT or UNKNOWN")
         if values["generation_rebind"] != "NOT_APPLICABLE":
             fail_task(path, "bootstrap cannot use generation rebind")
         if values["gate_b"] != "NOT_APPLICABLE":
             fail_task(path, "bootstrap cannot use ordinary Gate B")
-        if values["bootstrap"] not in {"REQUIRED_UNIMPLEMENTED", "REQUIRED_NOT_PROVEN"}:
-            fail_task(path, "current bootstrap admission must remain fail-closed")
+
+        if mutation == "false":
+            if values["bootstrap"] not in {
+                "REQUIRED_UNIMPLEMENTED",
+                "REQUIRED_NOT_PROVEN",
+                "PASS",
+            }:
+                fail_task(path, "fail-closed bootstrap checkpoint has invalid bootstrap state")
+        else:
+            if not bootstrap_implementation_promoted():
+                fail_task(path, "reviewed canonical bootstrap implementation is not present on trusted base")
+            required = {
+                "canonical_registration": "ABSENT",
+                "canonical_lease_generation": "UNKNOWN",
+                "registration_lease_generation": "NOT_APPLICABLE",
+                "gate_a": "REQUIRED_NOT_PROVEN",
+                "generation_rebind": "NOT_APPLICABLE",
+                "gate_b": "NOT_APPLICABLE",
+                "bootstrap": "PASS",
+                "target_uniqueness": "UNKNOWN",
+                "bootstrap_attempt_limit": "1",
+                "credentials_allowed": "false",
+                "login_allowed": "false",
+                "gameplay_allowed": "false",
+            }
+            for field, expected in required.items():
+                if values.get(field) != expected:
+                    fail_task(path, f"authorized bootstrap transaction requires {field}={expected}")
+            source = values.get("live_runtime_authorization_source", "").strip()
+            if not source or source.upper() in {"NONE", "NOT_APPLICABLE", "UNKNOWN"}:
+                fail_task(path, "authorized bootstrap transaction requires explicit live_runtime_authorization_source")
 
     elif runtime_access == "canonical_rebind":
         if mutation != "false":
@@ -234,7 +295,7 @@ def validate_track_a_task(path: Path) -> bool:
         if values["canonical_registration"] != "PRESENT":
             fail_task(path, "rebind requires an existing authoritative registration")
         if values["generation_rebind"] not in {"REQUIRED_UNAVAILABLE", "REQUIRED_NOT_PROVEN"}:
-            fail_task(path, "current rebind implementation is unavailable and must fail closed")
+            fail_task(path, "current task-level rebind admission remains fail-closed")
         if values["bootstrap"] != "NOT_APPLICABLE":
             fail_task(path, "rebind cannot use bootstrap")
         lease_generation = positive_generation(path, values, "canonical_lease_generation")
@@ -317,7 +378,6 @@ def static_policy_audit() -> None:
             "PR #303-owned state",
         ),
     )
-
     require(
         "docs/agents/AGENTS.md",
         agents,
@@ -331,7 +391,6 @@ def static_policy_audit() -> None:
             "Stale task/PR wording cannot relax this admission gate",
         ),
     )
-
     require(
         "docs/agents/TIBIA_RESEARCH_TRACKS.md",
         tracks,
@@ -348,7 +407,6 @@ def static_policy_audit() -> None:
             exact_fence,
         ),
     )
-
     require(
         "TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md",
         admission,
@@ -385,7 +443,6 @@ def static_policy_audit() -> None:
             "### REFUSE — ambiguous read-only target",
         ),
     )
-
     require(
         "OTCLIENT_TIBIA_RE_CANONICAL.md",
         canonical,
@@ -407,6 +464,29 @@ def static_policy_audit() -> None:
             "Do not mutate or live-observe PR #303-owned runtime surfaces",
         ),
     )
+    require(
+        "promoted bootstrap implementation",
+        read(BOOTSTRAP_TRANSITION),
+        (
+            '"""Cancellation-safe Track A canonical bootstrap, rebind and Gate B."""',
+            "def _bootstrap(",
+            "def _rebind(",
+            "def _gateb(",
+            "fcntl.flock(lock_fd, fcntl.LOCK_EX)",
+        ),
+    )
+    require(
+        "bootstrap implementation archive",
+        read(BOOTSTRAP_ARCHIVE),
+        (
+            "status: completed",
+            "implementation_pr: 371",
+            f"implementation_merge_commit: {BOOTSTRAP_MERGE}",
+            "ownership_released: true",
+        ),
+    )
+    if not bootstrap_implementation_promoted():
+        raise SystemExit("trusted bootstrap implementation/archive proof is incomplete")
 
     forbid(
         "OTCLIENT_TIBIA_RE_CANONICAL.md",

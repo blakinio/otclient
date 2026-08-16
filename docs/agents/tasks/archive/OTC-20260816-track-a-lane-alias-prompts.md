@@ -14,10 +14,10 @@ branch: docs/OTC-20260816-track-a-lane-alias-prompts-closeout
 base_branch: main
 base_main: fc7ed58b5845a10871fd0bd4b638bd4f96af425c
 risk: medium
-related_pr: 349
+related_pr: 350
 implementation_pr: 349
 implementation_merge: fc7ed58b5845a10871fd0bd4b638bd4f96af425c
-closeout_pr: PENDING
+closeout_pr: 350
 updated: 2026-08-16T12:38:00+02:00
 lease_expires_at: null
 lease_released_at: 2026-08-16T12:38:00+02:00
@@ -93,5 +93,7 @@ Exact implementation head `14fb19029a3f92ac8c0ee3e121a6689a184c75f1`:
 - Ready-state CI `31942094404`: SUCCESS; `CI / Required` `95152669808`: SUCCESS;
 - review threads: 0;
 - protected squash merge: `fc7ed58b5845a10871fd0bd4b638bd4f96af425c`.
+
+Closeout PR: #350.
 
 No live runtime, PR #303 runtime surface, Track B state, credentials, owner-funded Codex/OpenAI API or paid AI quota was accessed or mutated by this task.

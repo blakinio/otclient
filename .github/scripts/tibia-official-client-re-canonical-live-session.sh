@@ -165,6 +165,7 @@ source_pkg() {
 window() {
   local pid="$1" display="$2" xdotool="$3" win geometry candidate_area best='' best_area=0 width height
   for _ in $(seq 1 120); do
+    kill -0 "$pid" 2>/dev/null || return 2
     best=''
     best_area=0
     for win in $(DISPLAY="$display" "$xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
@@ -180,7 +181,7 @@ window() {
     done
     if [[ -n "$best" ]]; then
       echo "$best"
-      return
+      return 0
     fi
     sleep .25
   done
@@ -335,7 +336,7 @@ verify_tracked_group() {
 }
 
 bootstrap() {
-  local manifest="$1" source home package display display_number vnc_port xvfb vnc xdotool preload client pid win pgid metadata warp_port
+  local manifest="$1" source home package display display_number vnc_port xvfb vnc xdotool preload client pid win pgid metadata warp_port window_rc
   [[ "${RUNNER_NAME:-}" == synology-otclient-01 ]] || die wrong_runner
   [[ "${GITHUB_REPOSITORY:-}" == blakinio/otclient ]] || die wrong_repository
   [[ ! -e "$SESSION" ]] || die session_root_exists
@@ -350,6 +351,7 @@ bootstrap() {
   printf 'TRACK_A_CANONICAL_TOOLROOT=%s\n' "$TOOL"
 
   start_warp
+  printf 'TRACK_A_CANONICAL_STAGE=warp_ready\n'
   warp_port="$(cat "$SESSION/warp-port")"
   xvfb="$(tool Xvfb)" || die xvfb_unavailable
   vnc="$(tool x11vnc)" || die vnc_unavailable
@@ -392,6 +394,7 @@ EOF
     sleep .2
   done
   [[ -e /tmp/.X11-unix/X$display_number ]] || die xvfb_socket_missing
+  printf 'TRACK_A_CANONICAL_STAGE=xvfb_ready\n'
 
   env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
     OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1 \
@@ -404,6 +407,7 @@ EOF
     sleep .2
   done
   listen "$vnc_port" || die vnc_not_listening
+  printf 'TRACK_A_CANONICAL_STAGE=vnc_ready\n'
 
   (
     cd "$package"
@@ -421,13 +425,19 @@ EOF
   )
 
   pid="$(rpid client)"
-  for _ in $(seq 1 100); do
-    kill -0 "$pid" 2>/dev/null || die client_exited
-    win="$(window "$pid" "$display" "$xdotool" || true)"
-    [[ -n "$win" ]] && break
-    sleep .25
-  done
-  [[ -n "${win:-}" ]] || die client_window_missing
+  kill -0 "$pid" 2>/dev/null || die client_exited
+  printf 'TRACK_A_CANONICAL_STAGE=client_started\n'
+  printf 'TRACK_A_CANONICAL_STAGE=client_window_wait_begin\n'
+  if win="$(window "$pid" "$display" "$xdotool")"; then
+    :
+  else
+    window_rc=$?
+    if [[ "$window_rc" == 2 ]]; then
+      die client_exited
+    fi
+    die client_window_missing
+  fi
+  printf 'TRACK_A_CANONICAL_STAGE=client_window_ready\n'
   verify_client "$client"
   echo "$display" >"$SESSION/display"
   echo "$win" >"$SESSION/window"
@@ -437,7 +447,7 @@ EOF
 }
 
 probe() {
-  local manifest="$1" pid display win vnc_port client xdotool pgid persisted_toolroot
+  local manifest="$1" pid display win vnc_port client xdotool pgid persisted_toolroot window_rc
   [[ -d "$SESSION" ]] || die session_missing
   persisted_toolroot="$(cat "$SESSION/toolroot" 2>/dev/null || true)"
   toolroot_complete "$persisted_toolroot" || die toolroot_unavailable
@@ -452,7 +462,15 @@ probe() {
   listen "$vnc_port" || die vnc_not_listening
   listen "$(cat "$SESSION/warp-port")" || die wireproxy_not_listening
   xdotool="$(tool xdotool)" || die xdotool_unavailable
-  win="$(window "$pid" "$display" "$xdotool")" || die client_window_missing
+  if win="$(window "$pid" "$display" "$xdotool")"; then
+    :
+  else
+    window_rc=$?
+    if [[ "$window_rc" == 2 ]]; then
+      die client_exited
+    fi
+    die client_window_missing
+  fi
   echo "$win" >"$SESSION/window"
   write_manifest "$manifest" "$pid" "$pgid" "$display" "$win" "$vnc_port"
 }

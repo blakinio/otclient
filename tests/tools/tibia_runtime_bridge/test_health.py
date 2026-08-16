@@ -17,8 +17,10 @@ from tools.tibia_runtime_bridge.health import (
     RecoveryPolicy,
 )
 from tools.tibia_runtime_bridge.ipc_client import (
+    BridgePeerIdentityError,
     BridgeProtocolError,
     BridgeTransportError,
+    PeerIdentityExpectation,
     request,
 )
 
@@ -51,16 +53,39 @@ class BridgeHealthTests(unittest.TestCase):
         )
 
     @staticmethod
-    def ping_ok(path: Path, command: str, *, timeout: float) -> dict[str, object]:
+    def ping_ok(
+        path: Path,
+        command: str,
+        *,
+        timeout: float,
+        expected_identity: PeerIdentityExpectation | None = None,
+    ) -> dict[str, object]:
         assert path.is_absolute()
         assert command == "PING"
         assert timeout > 0
-        return {"ok": True, "command": "PING", "main_base_resolved": True}
+        assert expected_identity is not None
+        return {
+            "ok": True,
+            "command": "PING",
+            "main_base_resolved": True,
+            "boot_id_sha256": expected_identity.boot_id_sha256,
+            "pid": expected_identity.pid,
+            "process_start_ticks": expected_identity.process_start_ticks,
+            "client_version": expected_identity.client_version,
+            "client_size": expected_identity.client_size,
+            "client_sha256": expected_identity.client_sha256,
+        }
 
     @staticmethod
-    def status_ok(path: Path, *, timeout: float) -> dict[str, object]:
+    def status_ok(
+        path: Path,
+        *,
+        timeout: float,
+        expected_identity: PeerIdentityExpectation | None = None,
+    ) -> dict[str, object]:
         assert path.is_absolute()
         assert timeout > 0
+        assert expected_identity is not None
         return {
             "ok": True,
             "in_game_candidate": False,
@@ -144,17 +169,51 @@ class BridgeHealthTests(unittest.TestCase):
     def test_transport_failure_is_unreachable(self):
         current = self.binding()
 
-        def unreachable(path: Path, command: str, *, timeout: float) -> dict[str, object]:
+        def unreachable(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            assert expected_identity is not None
             raise BridgeTransportError("synthetic socket unavailable")
 
         session = BridgeSession(lambda: current, request_fn=unreachable, status_fn=self.status_ok)
         session.reacquire()
         self.assertEqual(HealthState.UNREACHABLE, session.probe().state)
 
+    def test_peer_identity_failure_is_stale_and_discards_binding(self):
+        current = self.binding()
+
+        def wrong_peer(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            assert expected_identity is not None
+            raise BridgePeerIdentityError("synthetic same-path replacement")
+
+        session = BridgeSession(lambda: current, request_fn=wrong_peer, status_fn=self.status_ok)
+        session.reacquire()
+        health = session.probe()
+        self.assertEqual(HealthState.STALE_IDENTITY, health.state)
+        self.assertFalse(health.bridge_ready)
+        self.assertIsNone(session.binding)
+
     def test_protocol_failure_is_malformed(self):
         current = self.binding()
 
-        def malformed(path: Path, command: str, *, timeout: float) -> dict[str, object]:
+        def malformed(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            assert expected_identity is not None
             raise BridgeProtocolError("synthetic malformed response")
 
         session = BridgeSession(lambda: current, request_fn=malformed, status_fn=self.status_ok)
@@ -164,7 +223,14 @@ class BridgeHealthTests(unittest.TestCase):
     def test_non_object_ping_is_malformed(self):
         current = self.binding()
 
-        def non_object(path: Path, command: str, *, timeout: float) -> Any:
+        def non_object(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> Any:
+            assert expected_identity is not None
             return ["not", "an", "object"]
 
         session = BridgeSession(lambda: current, request_fn=non_object, status_fn=self.status_ok)
@@ -174,18 +240,61 @@ class BridgeHealthTests(unittest.TestCase):
     def test_incomplete_ping_is_malformed(self):
         current = self.binding()
 
-        def incomplete(path: Path, command: str, *, timeout: float) -> dict[str, object]:
-            return {"ok": True, "command": "PING"}
+        def incomplete(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            assert expected_identity is not None
+            return {"ok": True, "command": "PING", "main_base_resolved": True}
 
         session = BridgeSession(lambda: current, request_fn=incomplete, status_fn=self.status_ok)
         session.reacquire()
         self.assertEqual(HealthState.MALFORMED, session.probe().state)
 
+    def test_ping_identity_envelope_mismatch_is_stale(self):
+        current = self.binding()
+
+        def mismatched_ping(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            response = self.ping_ok(
+                path,
+                command,
+                timeout=timeout,
+                expected_identity=expected_identity,
+            )
+            response["process_start_ticks"] = int(response["process_start_ticks"]) + 1
+            return response
+
+        session = BridgeSession(lambda: current, request_fn=mismatched_ping, status_fn=self.status_ok)
+        session.reacquire()
+        health = session.probe()
+        self.assertEqual(HealthState.STALE_IDENTITY, health.state)
+        self.assertIsNone(session.binding)
+
     def test_bridge_side_discovery_failure_is_degraded(self):
         current = self.binding()
 
-        def failed_status(path: Path, *, timeout: float) -> dict[str, object]:
-            return {"ok": False, "in_game_candidate": False, "evidence_level": "UNKNOWN"}
+        def failed_status(
+            path: Path,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            assert expected_identity is not None
+            return {
+                "ok": False,
+                "in_game_candidate": False,
+                "evidence_level": "UNKNOWN",
+                "response": {"ok": False, "error": "PROC_MEM_OPEN_FAILED"},
+            }
 
         session = BridgeSession(lambda: current, request_fn=self.ping_ok, status_fn=failed_status)
         session.reacquire()
@@ -196,7 +305,13 @@ class BridgeHealthTests(unittest.TestCase):
     def test_wrong_session_evidence_level_is_malformed(self):
         current = self.binding()
 
-        def promoted_status(path: Path, *, timeout: float) -> dict[str, object]:
+        def promoted_status(
+            path: Path,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            assert expected_identity is not None
             return {
                 "ok": True,
                 "in_game_candidate": True,
@@ -213,9 +328,21 @@ class BridgeHealthTests(unittest.TestCase):
             "bridge-b.sock", registration_generation=2, lease_generation=2, pid=101, process_start_ticks=1001
         )
 
-        def ping_and_replace(path: Path, command: str, *, timeout: float) -> dict[str, object]:
+        def ping_and_replace(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            response = self.ping_ok(
+                path,
+                command,
+                timeout=timeout,
+                expected_identity=expected_identity,
+            )
             holder["binding"] = replacement
-            return {"ok": True, "command": "PING", "main_base_resolved": True}
+            return response
 
         session = BridgeSession(
             lambda: holder["binding"], request_fn=ping_and_replace, status_fn=self.status_ok
@@ -275,12 +402,23 @@ class BridgeHealthTests(unittest.TestCase):
         )
         calls = {"ping": 0}
 
-        def flaky_ping(path: Path, command: str, *, timeout: float) -> dict[str, object]:
+        def flaky_ping(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
             calls["ping"] += 1
             if calls["ping"] == 1:
                 holder["binding"] = replacement
                 raise BridgeTransportError("synthetic first endpoint loss")
-            return {"ok": True, "command": "PING", "main_base_resolved": True}
+            return self.ping_ok(
+                path,
+                command,
+                timeout=timeout,
+                expected_identity=expected_identity,
+            )
 
         session = BridgeSession(lambda: holder["binding"], request_fn=flaky_ping, status_fn=self.status_ok)
         result = session.recover(RecoveryPolicy(max_attempts=3))
@@ -294,7 +432,14 @@ class BridgeHealthTests(unittest.TestCase):
         current = self.binding()
         retries: list[tuple[int, BridgeHealth]] = []
 
-        def unavailable(path: Path, command: str, *, timeout: float) -> dict[str, object]:
+        def unavailable(
+            path: Path,
+            command: str,
+            *,
+            timeout: float,
+            expected_identity: PeerIdentityExpectation | None = None,
+        ) -> dict[str, object]:
+            assert expected_identity is not None
             raise BridgeTransportError("synthetic persistent endpoint loss")
 
         session = BridgeSession(lambda: current, request_fn=unavailable, status_fn=self.status_ok)

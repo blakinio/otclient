@@ -4,7 +4,7 @@ status: completed
 agent: ChatGPT
 session_id: null
 session_role: terminal-closeout
-session_rotation_count: 5
+session_rotation_count: 6
 project_lane: otclient
 lane: track-a-runtime-governance
 track_id: official-client-re
@@ -16,10 +16,10 @@ base_main: e9df81f50dbb231bc4ac6cc3fc21f260fc358d34
 risk: medium
 related_pr: 319
 created: 2026-08-15T22:04:00+02:00
-updated: 2026-08-16T01:19:00+02:00
+updated: 2026-08-16T02:14:00+02:00
 lease_expires_at: null
-lease_released_at: 2026-08-16T01:18:00+02:00
-stale_takeover_count: 1
+lease_released_at: 2026-08-16T02:14:00+02:00
+stale_takeover_count: 2
 owned_paths: []
 modules_touched:
   - track-a-runtime-governance
@@ -31,7 +31,7 @@ continuation_policy: completed
 task_completion_policy: completed
 user_communication: terminal_only
 implementation_authorized: false
-last_progress_at: 2026-08-16T01:19:00+02:00
+last_progress_at: 2026-08-16T02:14:00+02:00
 final_implementation_head: d61d362c12125e3c70167f09729a0caa8b891e78
 final_main_merge: e9df81f50dbb231bc4ac6cc3fc21f260fc358d34
 semantic_run: 31914257951
@@ -83,6 +83,10 @@ Repository syntax/workflow validation, including actionlint/shellcheck, passed o
 - #317 merged normal-launcher last-close remediation as `b433290f48e18270279895ff4abb1a54b4475051`.
 - #316 merged the final supervisor stack as `e9df81f50dbb231bc4ac6cc3fc21f260fc358d34`.
 - #319 is this fresh archive/closeout and is terminal only when this archive reaches `main`.
+
+# Final replacement-session closeout — FACT
+
+Before the final PR #319 merge, the durable active task on `main` was re-read. Its prior checkpoint had exceeded the repository 45-minute stale threshold and its lease had expired. Live Git/PR state showed the previous worker was no longer active and PR #319 remained on a coherent branch head. A replacement closeout session renewed ownership on the same task before mutation, incremented `session_rotation_count` to `6` and `stale_takeover_count` to `2`, then released ownership again in this terminal archive.
 
 # E2E
 

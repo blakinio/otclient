@@ -1,20 +1,20 @@
 ---
 task_id: OTC-20260816-track-a-p1-bridge-health-recovery
-status: ready
+status: validating
 agent: ChatGPT
-session_id: chatgpt-p1-fresh-main-20260816-1537
-session_role: implementer
+session_id: chatgpt-p1-current-base-closeout-20260816-2015
+session_role: validator_integrator
 project_lane: otclient
 lane: P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: coordinator-promotion-ready
+phase: current-base-final-validation
 branch: feat/OTC-20260816-track-a-p1-bridge-health-recovery-v2
 base_branch: main
 base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
-current_main: 259e418b2c526f93bd697f07c42b73b1fd40a914
+current_main: d3f186414256151c9d5e03f34c5a9026b1fba500
 created: 2026-08-16T15:37:00+02:00
-updated: 2026-08-16T16:07:00+02:00
+updated: 2026-08-16T20:15:00+02:00
 risk: medium
 researcher_delivery: draft_only
 implementation_authorized: true
@@ -38,13 +38,13 @@ blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: fresh-main replay and deterministic validation require no physical runtime or owner-funded AI
+execution_reason: fresh-current-main validation and deterministic bridge checks require no physical runtime or owner-funded AI
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
-user_communication: low_noise
+user_communication: terminal_only
 decomposition_decision: single
-decomposition_reason: exact accepted P1 content replayed onto current main to remove stale/diverged branch history before promotion
+decomposition_reason: exact accepted P1 content is preserved while final promotion is revalidated against the live current main
 context_pressure: medium
 context_growth: stable
 context_score: 8
@@ -89,25 +89,22 @@ fresh_main_replay:
     source_head: 9ddab031da32c69c55dd2f6940583c2523f00c06
     changelog_delta: +1/-0
     module_catalog_delta: +1/-0
-    method: exact source blobs reused only after compare proved they equal current-main content plus one P1 record each
-  later_main_advance:
+    method: exact source blobs reused only after compare proved they equal then-current-main content plus one P1 record each
+  current_main_advance:
     from: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
-    to: 259e418b2c526f93bd697f07c42b73b1fd40a914
-    compare_status: NON_OVERLAPPING
-    files:
-      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
-      - .github/scripts/tibia-official-client-re-canonical-live-session.sh
-      - .github/scripts/tibia-official-client-re-canonical-live-transition.py
-      - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md
+    to: d3f186414256151c9d5e03f34c5a9026b1fba500
+    compare_status: NON_OVERLAPPING_WITH_P1_OWNED_PATHS
+    ahead_commits: 30
+    note: live compare shows the advance is confined to canonical-runtime scripts/evidence/reports/tasks and does not touch the 14-file P1 diff
 acceptance:
-  - preserve exact coordinator-accepted P1 bridge semantics and tests byte-for-byte
+  - preserve exact coordinator-accepted P1 bridge semantics and tests byte-for-byte except task-only closeout checkpoints
   - bind lifecycle IPC to Linux SO_PEERCRED plus boot/PID/start/executable identity and matching PING envelope
   - fail closed for stale registration, stale process identity, same-path endpoint replacement, protocol and transport failures
   - distinguish completed zero-hit discovery from incomplete/error process-memory scans
   - recovery remains bounded/read-only and never launches/logs-in/restarts/signals/attaches to the client
   - launcher LD_PRELOAD activation remains RUNTIME-owned and is not exercised by this P1 task
-  - shared indexes preserve all current-main content and add only one P1 record each
-  - coordinator performs final promotion review before merge
+  - shared indexes preserve current-main content and add only one P1 record each
+  - coordinator/validator performs final current-base promotion review before merge
 validation:
   source_semantic_audit: PASS_MATERIAL_FINDINGS_0
   accepted_replay_head: 7865507fd583a32d5065e1926e51bc80c5af09f6
@@ -117,17 +114,51 @@ validation:
   accepted_replay_canonical_live_governance_result: SUCCESS
   accepted_replay_repository_ci_run: 31950483984
   accepted_replay_repository_ci_result: SUCCESS
+  prior_final_head: fae521fdb3b84acfd2d13baaedc676142aabb10e
+  prior_final_track_a_governance_run: 31951842202
+  prior_final_track_a_governance_result: SUCCESS_OLD_BASE
+  prior_final_canonical_live_governance_run: 31951842194
+  prior_final_canonical_live_governance_result: SUCCESS_OLD_BASE
+  prior_final_repository_ci_run: 31951945089
+  prior_final_repository_ci_result: SUCCESS_OLD_BASE
   final_checkpoint_head: PENDING_AFTER_THIS_TASK_ONLY_UPDATE
-  final_checkpoint_track_a_governance: PENDING
-  final_checkpoint_repository_ci: PENDING
+  final_current_base_track_a_governance: PENDING
+  final_current_base_canonical_live_governance: PENDING
+  final_current_base_repository_ci: PENDING
   review_threads_open: 0
   physical_e2e: NOT_APPLICABLE_WITH_REASON
-  physical_e2e_reason: P1 is a hosted producer; physical attach/restart/relogin evidence belongs to serialized RUNTIME ownership
+  physical_e2e_reason: P1 is a GitHub-hosted producer with runtime_access none; physical attach/restart/relogin evidence belongs exclusively to serialized RUNTIME ownership
 audit:
-  result: PASS
+  result: PASS_CURRENT_BASE_FRESH_REVIEW
+  validator_session: chatgpt-p1-current-base-closeout-20260816-2015
   material_findings_open: 0
-last_completed_step: verified accepted replay exact-head governance/canonical-live governance/repository CI, closed source PR #357 superseded, and proved trusted-main advance through #371/#375 changes only non-overlapping RUNTIME-INFRA/archive paths
-next_action: obtain final exact-head governance and repository CI after this task-only checkpoint update, then coordinator mark ready and squash-merge PR #372; archive and release ownership after merge
+  basis:
+    - exact 14-file PR diff inspected
+    - bridge lifecycle identity binding and bounded recovery implementation inspected
+    - regression tests cover stale peer/same-path replacement, identity drift, scanner failure and bounded recovery
+    - current main advance compared and found non-overlapping with P1 owned paths
+recovery:
+  policy_version: 1
+  generation: 1
+  session_id: chatgpt-p1-current-base-closeout-20260816-2015
+  session_started_at: 2026-08-16T20:15:00+02:00
+  checkpointed_at: 2026-08-16T20:15:00+02:00
+  last_progress_at: 2026-08-16T20:15:00+02:00
+  phase: current-base-final-validation
+  exact_head: PENDING_AFTER_THIS_TASK_ONLY_UPDATE
+  pull_request: 372
+  active_operation: final exact-head GitHub-hosted required CI after task-only checkpoint commit
+  external_run_ids: []
+  operation_started_at: null
+  wait_deadline_at: null
+  check_generation: current-base-final
+  checks_used: 0
+  status: ready
+  safe_to_resume: true
+  resume_condition: pull-request synchronize checks exist for the resulting exact head against current main
+  next_action: inspect one aggregate workflow snapshot for the resulting exact head and squash-merge PR #372 only if every required gate passes
+last_completed_step: performed a fresh current-base semantic/diff review, verified zero review threads, and proved main dbd9520..d3f1864 advances only non-overlapping Track A runtime/evidence paths
+next_action: inspect the synchronize-triggered exact-head Track A governance/canonical-live governance/repository CI against current main and, if all gates pass, squash-merge PR #372 then archive/release the task
 ---
 
 # Track A P1 bridge health/recovery fresh-main promotion

@@ -24,6 +24,7 @@ TIBIA_RESEARCH_TRACKS.md
 contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 decisions/ADR-0001-track-a-canonical-live-runtime.md
 contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
 ```
 
@@ -32,6 +33,8 @@ At claim/resume/checkpoint, the active Track A task must persist the complete ad
 For `read_only`, live observation is legal only when non-invasiveness, a declared non-conflicting target/namespace/ownership boundary, and `target_uniqueness: PROVEN` are fresh; otherwise use `none` for static/artifact work or refuse the live observation.
 
 Canonical reuse/mutation requires current Gate A, any required reviewed generation rebind, Gate B on the authoritative exact-runtime registration, current-task ownership/target uniqueness, equal current lease-generation binding after any rebind, and the final cancellation-safe whole-lifetime supervisor. Missing registration routes only to bootstrap; a generation mismatch routes only to reviewed rebind; an ephemeral sandbox may never use or alias the canonical namespace.
+
+After merged PR #331, `programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md` additionally routes Track A execution by evidence class. Deterministic/disposable work (static analysis, workflow/Lua validation, unit/integration tests, Linux build, `ldd`, hosted real-artifact `Xvfb` startup smoke, registries and evidence processing) defaults to GitHub-hosted runners. Synology/self-hosted is reserved for the serialized physical runtime: one canonical persistent session, real display/input, login/relogin, walking/clicking, LAN/runtime integration, long-lived observation and direct physical gameplay E2E. Hosted startup liveness is not physical gameplay E2E. Parallel workers must not create one logged-in persistent session each; physical mutation is serialized through the one canonical runtime authority when it exists and passes current admission gates.
 
 Historical runtime evidence is discovery input only. Until fresh authoritative evidence proves otherwise, preserve exactly:
 

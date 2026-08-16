@@ -12,8 +12,10 @@ phase: integrate
 branch: docs/OTC-20260816-track-a-filesystem-helper-resolver-static-promote
 base_branch: main
 base_main: 3a3d0fd00d25fa4ea65ea7e6b3ef189a21d753d8
+related_pr: 351
+supersedes_pr: 348
 risk: low
-updated: 2026-08-16T12:48:50+02:00
+updated: 2026-08-16T12:49:23+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-filesystem-helper-resolver-static.md
   - docs/agents/reports/OTCLIENT-20260816-filesystem-helper-resolver-static.md
@@ -78,8 +80,8 @@ audit:
 e2e:
   result: NOT_APPLICABLE
   reason: documentation/static evidence promotion only; no executable or runtime behavior changed
-last_completed_step: replayed the identical audited report blob on current main and refreshed runtime/hybrid-routing checkpoint fields
-next_action: open the fresh-main promotion PR, verify exact-head governance/CI and review hygiene, then merge/archive if all gates pass
+last_completed_step: opened fresh-main promotion PR 351 with identical audited report blob and current routing checkpoint
+next_action: verify PR 351 exact-head governance/CI and review hygiene, then merge/archive if all gates pass
 ---
 
 # Coordinator promotion checkpoint

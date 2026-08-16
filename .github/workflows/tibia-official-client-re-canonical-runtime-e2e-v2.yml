@@ -1,0 +1,117 @@
+name: Track A canonical runtime E2E v2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
+      - .github/workflows/tibia-official-client-re-canonical-runtime-e2e-v2.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-runtime-e2e
+  cancel-in-progress: false
+
+jobs:
+  bootstrap-canonical-runtime:
+    runs-on: [self-hosted, Linux, X64, otclient, tibia-re, synology]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fresh admission, canonical bootstrap and immediate Gate B
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+
+          task='OTC-20260816-track-a-canonical-runtime-e2e'
+          session="runtime-v2-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          state='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+          token_root="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime"
+          token="$token_root/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          worker='.github/scripts/tibia-official-client-re-canonical-live-session.sh'
+          acquired=0
+
+          mkdir -p "$token_root"
+          chmod 700 "/home/runner/_work/_otclient_tibia_re_state/tasks/$task" "$token_root" 2>/dev/null || true
+          rm -f "$token"
+
+          cleanup() {
+            rc=$?
+            if [[ "$acquired" == 1 ]]; then
+              "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+            fi
+            rm -f "$token"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          echo '=== PRE_ADMISSION ==='
+          "$lease" status --json
+          if [[ -e "$state/runtime-registration.json" ]]; then
+            echo 'RUNTIME_BOOTSTRAP_PRECHECK=REGISTRATION_ALREADY_PRESENT'
+            exit 42
+          fi
+
+          "$lease" acquire \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --ttl-seconds 1200
+          acquired=1
+
+          echo '=== BOOTSTRAP ==='
+          python3 "$transition" bootstrap \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --worker "$worker" \
+            --worker-timeout 300
+
+          echo '=== GATE_B_SAME_GENERATION ==='
+          python3 "$transition" gate-b \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --probe "$worker"
+
+          echo '=== SANITIZED_REGISTRATION ==='
+          python3 - "$state/runtime-registration.json" <<'PY'
+          import json, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          data = json.loads(path.read_text())
+          allowed = [
+              'schema_version','runtime_id','registration_generation','lease_generation',
+              'boot_id_sha256','pid','process_start_ticks','client_version','client_size',
+              'client_sha256','display','window_identity','remote_view_endpoint',
+              'remote_view_mapping','state','source_task','source_run'
+          ]
+          if data.get('runtime_id') != 'track-a-canonical-live':
+              raise SystemExit('RUNTIME_REGISTRATION_INVALID=runtime_id')
+          if data.get('client_version') != '15.32.df7b29':
+              raise SystemExit('RUNTIME_REGISTRATION_INVALID=client_version')
+          if data.get('client_size') != 51965216:
+              raise SystemExit('RUNTIME_REGISTRATION_INVALID=client_size')
+          if data.get('client_sha256') != 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe':
+              raise SystemExit('RUNTIME_REGISTRATION_INVALID=client_sha256')
+          if data.get('remote_view_mapping') != 'PROVEN':
+              raise SystemExit('RUNTIME_REGISTRATION_INVALID=remote_view_mapping')
+          print(json.dumps({k:data.get(k) for k in allowed}, sort_keys=True))
+          print('RUNTIME_BOOTSTRAP_RESULT=REGISTERED_GATE_B_PASS')
+          PY
+
+          "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          acquired=0
+          rm -f "$token"
+
+          echo '=== POST_RELEASE ==='
+          "$lease" status --json
+          test -f "$state/runtime-registration.json"
+          echo 'RUNTIME_CONTROLLER_RELEASED=true'
+          echo 'RUNTIME_EXPECTED_PERSISTENT_DESKTOP_CLIENT=true'

@@ -11,7 +11,7 @@ branch: docs/OTC-20260816-track-a-hybrid-routing-refresh-v2
 base_branch: main
 base_head: 6c06d4daf83c03f2f9d22b4e2631caef0bb489c2
 created: 2026-08-16T11:49:00+02:00
-updated: 2026-08-16T11:59:00+02:00
+updated: 2026-08-16T12:01:00+02:00
 risk: medium
 execution_mode: github-only
 owned_paths:
@@ -21,7 +21,7 @@ owned_paths:
   - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING_EVAL.md
   - docs/agents/tasks/active/OTC-20260816-track-a-hybrid-routing-refresh.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-hybrid-routing-refresh.md
-related_pr: pending
+related_pr: "343"
 supersedes_pr: "342"
 reuses:
   - PR #331
@@ -105,7 +105,7 @@ PR #315 is historical evidence that persistent `:98` existed while no exact live
 - [x] Prior exact-head PR #342 validation passed both `CI / Required` and both Track A runtime-governance audits before restack.
 - [ ] Current restacked exact-head repository CI passes.
 - [ ] Current restacked review has zero unresolved material findings.
-- [ ] Restacked PR merges through protected main rules.
+- [ ] PR #343 merges through protected main rules.
 - [ ] Task is archived and ownership released after merge.
 
 # Validation
@@ -113,7 +113,7 @@ PR #315 is historical evidence that persistent `:98` existed while no exact live
 - Documentation/prompt-routing change only; live runtime E2E is `NOT_APPLICABLE` because this task neither launches nor observes nor mutates a client.
 - Manual scenario matrix: `docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING_EVAL.md`.
 - Prior PR #342 head `a99b166428a7f4ebe81d0d430a9f2758d6e49609` passed `CI / Required`, deterministic admission-policy audit and fresh admission behavior audit, but `main` advanced through PR #341 before merge. Strict-up-to-date policy therefore required this clean restack on `main@6c06d4daf83c03f2f9d22b4e2631caef0bb489c2`.
-- Current exact-head CI/review remain mandatory before merge.
+- Current PR #343 exact-head CI/review remain mandatory before merge.
 
 # Handover
 
@@ -121,7 +121,7 @@ PR #315 is historical evidence that persistent `:98` existed while no exact live
 STATUS: validating
 BASE_MAIN: 6c06d4daf83c03f2f9d22b4e2631caef0bb489c2
 BRANCH: docs/OTC-20260816-track-a-hybrid-routing-refresh-v2
-PR: pending
+PR: 343
 SUPERSEDES_PR: 342
 RUNTIME_ACCESS: none
 FACTS:
@@ -133,5 +133,5 @@ FACTS:
 UNKNOWN:
   - exact live session/display/port identity at current time
   - future bootstrap implementation/live authorization state unless separately proven
-NEXT_ACTION: open the restacked integration PR, close #342 as superseded, run exact-head CI/review, merge if protected gates pass, then archive this task and release ownership
+NEXT_ACTION: complete exact-head CI/review on PR #343, merge if protected gates pass, then archive this task and release ownership
 ```

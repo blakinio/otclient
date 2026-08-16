@@ -1,0 +1,109 @@
+name: Track A BattlEye read-only inspection
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-battleye-readonly.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-battleye-readonly.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Inspect installed Linux client for BattlEye
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Read-only BattlEye inventory
+        shell: bash
+        env:
+          EXPECTED_CLIENT_SIZE: '51965216'
+          EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+        run: |
+          set -Eeuo pipefail
+          set +x
+          umask 077
+
+          if [[ "${RUNNER_NAME:-}" != 'synology-otclient-01' ]]; then
+            echo "BATTLEYE_AUDIT_ERROR=wrong_runner"
+            exit 2
+          fi
+
+          base='/home/runner/_work/_otclient_tibia_re_state'
+          tibia_home="$base/home/.local/share/CipSoft GmbH/Tibia"
+          package="$tibia_home/packages/Tibia"
+          client="$package/bin/client"
+
+          echo "BATTLEYE_AUDIT_RUNNER=synology-otclient-01"
+          echo "BATTLEYE_AUDIT_TARGET=$package"
+
+          if [[ ! -f "$client" ]]; then
+            echo "BATTLEYE_AUDIT_ERROR=exact_client_missing"
+            exit 3
+          fi
+
+          actual_size="$(stat -c '%s' "$client")"
+          actual_sha="$(sha256sum "$client" | awk '{print $1}')"
+          echo "BATTLEYE_AUDIT_CLIENT_SIZE=$actual_size"
+          echo "BATTLEYE_AUDIT_CLIENT_SHA256=$actual_sha"
+          if [[ "$actual_size" != "$EXPECTED_CLIENT_SIZE" || "$actual_sha" != "$EXPECTED_CLIENT_SHA256" ]]; then
+            echo "BATTLEYE_AUDIT_ERROR=exact_client_fence_mismatch"
+            exit 4
+          fi
+          echo "BATTLEYE_AUDIT_EXACT_CLIENT_FENCE=PASS"
+
+          path_hits="$RUNNER_TEMP/battleye-path-hits.txt"
+          : >"$path_hits"
+          for root in "$tibia_home" "$base/home/.local/share" /opt /usr/local; do
+            [[ -e "$root" ]] || continue
+            find "$root" -xdev -maxdepth 10 \
+              \( -type f -o -type d -o -type l \) \
+              \( -iname '*battleye*' -o -iname 'beclient*' -o -iname 'beservice*' \) \
+              -print 2>/dev/null || true
+          done | sort -u >"$path_hits"
+
+          path_count="$(grep -c . "$path_hits" || true)"
+          echo "BATTLEYE_AUDIT_PATH_HIT_COUNT=$path_count"
+          if (( path_count > 0 )); then
+            while IFS= read -r hit; do
+              printf 'BATTLEYE_AUDIT_PATH_HIT=%s\n' "$hit"
+            done <"$path_hits"
+          fi
+
+          for token in BattlEye BEClient BEService; do
+            if LC_ALL=C grep -aFq -- "$token" "$client"; then
+              echo "BATTLEYE_AUDIT_CLIENT_TOKEN_${token^^}=PRESENT"
+            else
+              echo "BATTLEYE_AUDIT_CLIENT_TOKEN_${token^^}=ABSENT"
+            fi
+          done
+
+          process_hits=0
+          for procdir in /proc/[0-9]*; do
+            [[ -r "$procdir/comm" ]] || continue
+            comm="$(cat "$procdir/comm" 2>/dev/null || true)"
+            lower="${comm,,}"
+            case "$lower" in
+              *battleye*|*beclient*|*beservice*)
+                process_hits=$((process_hits + 1))
+                printf 'BATTLEYE_AUDIT_PROCESS_NAME=%s\n' "$comm"
+                ;;
+            esac
+          done
+          echo "BATTLEYE_AUDIT_PROCESS_NAME_HIT_COUNT=$process_hits"
+
+          exact_client_candidates=0
+          for procdir in /proc/[0-9]*; do
+            exe="$(readlink -f "$procdir/exe" 2>/dev/null || true)"
+            [[ -n "$exe" && -f "$exe" ]] || continue
+            size="$(stat -c '%s' "$exe" 2>/dev/null || true)"
+            [[ "$size" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            sha="$(sha256sum "$exe" 2>/dev/null | awk '{print $1}')"
+            [[ "$sha" == "$EXPECTED_CLIENT_SHA256" ]] || continue
+            exact_client_candidates=$((exact_client_candidates + 1))
+          done
+          echo "BATTLEYE_AUDIT_EXACT_CLIENT_PROCESS_COUNT=$exact_client_candidates"
+          echo "BATTLEYE_AUDIT_MUTATION_PERFORMED=false"

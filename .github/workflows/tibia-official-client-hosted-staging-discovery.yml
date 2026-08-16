@@ -1,0 +1,133 @@
+name: Track A official client hosted staging discovery
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/agents/tasks/active/OTC-20260816-track-a-hosted-client-staging-discovery.md
+      - .github/workflows/tibia-official-client-hosted-staging-discovery.yml
+
+permissions:
+  contents: read
+
+jobs:
+  discover-official-linux-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Derive current official Linux download and fence client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          root="$(mktemp -d)"
+          trap 'rm -rf -- "$root"' EXIT
+          cookie="$root/cookies.txt"
+          page="$root/download.html"
+          archive="$root/tibia.x64.tar.gz"
+          extract="$root/extract"
+          mkdir -p "$extract"
+
+          python3 - "$page" "$cookie" <<'PY'
+          import html
+          import http.cookiejar
+          import pathlib
+          import re
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          output = pathlib.Path(sys.argv[1])
+          cookie_path = pathlib.Path(sys.argv[2])
+          jar = http.cookiejar.MozillaCookieJar(str(cookie_path))
+          opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.8',
+              'Referer': 'https://www.tibia.com/',
+          }
+          pages = [
+              'https://www.tibia.com/mmorpg/free-multiplayer-online-role-playing-game.php?lpv=10&step=playnow',
+              'https://www.tibia.com/account/?subtopic=downloadclient',
+          ]
+          selected = None
+          body = None
+          for url in pages:
+              request = urllib.request.Request(url, headers=headers)
+              try:
+                  with opener.open(request, timeout=30) as response:
+                      payload = response.read()
+                      status = response.status
+                      final = response.geturl()
+              except Exception as exc:
+                  print(f'OFFICIAL_DOWNLOAD_PAGE_FETCH_FAIL={url}:{type(exc).__name__}')
+                  continue
+              print(f'OFFICIAL_DOWNLOAD_PAGE_FETCH={url}:status={status}:final={final}:bytes={len(payload)}')
+              if status == 200:
+                  selected = final
+                  body = payload.decode('utf-8', errors='replace')
+                  break
+          if selected is None or body is None:
+              raise SystemExit('STAGING_DISCOVERY=INPUT_BLOCKED_OFFICIAL_PAGE')
+
+          output.write_text(body)
+          jar.save(ignore_discard=True, ignore_expires=True)
+          decoded = html.unescape(body).replace('\\/', '/')
+          hrefs = re.findall(r'''(?:href|data-href)\s*=\s*["']([^"']+)["']''', decoded, flags=re.I)
+          direct = [href for href in hrefs if 'tibia.x64.tar.gz' in href.lower()]
+          if not direct:
+              direct = [href for href in hrefs if href.lower().endswith('.tar.gz') and 'tibia' in href.lower()]
+          if not direct:
+              marker = re.findall(r'''https?://[^\s"'<>]+tibia\.x64\.tar\.gz[^\s"'<>]*''', decoded, flags=re.I)
+              direct = marker
+          if not direct:
+              raise SystemExit('STAGING_DISCOVERY=INPUT_BLOCKED_LINUX_LINK_NOT_DERIVED')
+          resolved = urllib.parse.urljoin(selected, direct[0])
+          parsed = urllib.parse.urlparse(resolved)
+          host = (parsed.hostname or '').lower()
+          if not (host == 'tibia.com' or host.endswith('.tibia.com')):
+              raise SystemExit(f'STAGING_DISCOVERY=INPUT_BLOCKED_NON_OFFICIAL_HOST:{host}')
+          print(f'OFFICIAL_LINUX_DOWNLOAD_URL={resolved}')
+          print(f'OFFICIAL_DOWNLOAD_REFERER={selected}')
+          pathlib.Path('/tmp/track-a-official-linux-url').write_text(resolved)
+          pathlib.Path('/tmp/track-a-official-linux-referer').write_text(selected)
+          PY
+
+          url="$(cat /tmp/track-a-official-linux-url)"
+          referer="$(cat /tmp/track-a-official-linux-referer)"
+          curl --fail --location --silent --show-error --retry 2 --connect-timeout 20 \
+            --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
+            --referer "$referer" --cookie "$cookie" --output "$archive" "$url"
+          echo "OFFICIAL_LINUX_ARCHIVE_SIZE=$(stat -c %s "$archive")"
+          echo "OFFICIAL_LINUX_ARCHIVE_SHA256=$(sha256sum "$archive" | cut -d' ' -f1)"
+          tar -tzf "$archive" >/dev/null
+          tar -xzf "$archive" -C "$extract"
+
+          python3 - "$extract" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          target_size = 51965216
+          target_sha = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          candidates = []
+          for path in root.rglob('client'):
+              if not path.is_file():
+                  continue
+              size = path.stat().st_size
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              rel = path.relative_to(root)
+              candidates.append((str(rel), size, digest))
+              print(f'OFFICIAL_CLIENT_CANDIDATE={rel}:size={size}:sha256={digest}')
+          for rel, size, digest in candidates:
+              if size == target_size and digest == target_sha:
+                  print(f'EXACT_CLIENT_MATCH={rel}')
+                  print('STAGING_DISCOVERY=EXACT_STAGING_AVAILABLE')
+                  raise SystemExit(0)
+          if candidates:
+              print('STAGING_DISCOVERY=CURRENT_OFFICIAL_BUILD_DIFFERS')
+              raise SystemExit(3)
+          print('STAGING_DISCOVERY=CURRENT_TARBALL_NO_CLIENT_CANDIDATE')
+          raise SystemExit(4)
+          PY

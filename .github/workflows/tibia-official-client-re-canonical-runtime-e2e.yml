@@ -57,7 +57,7 @@ jobs:
           echo TRACK_A_RECON_NETWORK_OBSERVATION=false
           echo TRACK_A_RECON_PR303_SURFACE_ACCESS=false
 
-          "$lease_wrapper" status --json > "$RUNNER_TEMP/track-a-canonical-lease-public.json"
+          bash "$lease_wrapper" status --json > "$RUNNER_TEMP/track-a-canonical-lease-public.json"
 
           python3 - "$RUNNER_TEMP/track-a-canonical-lease-public.json" "$registration" <<'PY'
           import json

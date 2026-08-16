@@ -34,7 +34,7 @@ jobs:
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
-          python3 .github/scripts/test_tibia_official_client_re-canonical_live_lease.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
 
       - name: Verify minimal Xvfb-only graphics change and preserved wireproxy version
         shell: bash

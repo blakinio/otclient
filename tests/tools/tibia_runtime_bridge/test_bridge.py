@@ -15,6 +15,7 @@ import unittest
 from tools.tibia_runtime_bridge.ipc_client import (
     BridgeClientError,
     BridgePeerIdentityError,
+    BridgeProtocolError,
     PeerIdentityExpectation,
     request,
     session_status,
@@ -216,6 +217,15 @@ class IpcClientTests(unittest.TestCase):
                 self.assertEqual("UNKNOWN", result["evidence_level"])
                 self.assertEqual("player_protocol_handler", result["failed_target"])
                 self.assertEqual("PROC_MEM_OPEN_FAILED", result["response"]["error"])
+            finally: thread.join(2)
+
+    def test_session_status_rejects_unproven_successful_scan(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "bridge.sock"
+            thread = self.run_server(path, b'{"ok":true,"target":"player_protocol_handler","vptr_hits":0,"validated_hits":0}\n')
+            try:
+                with self.assertRaises(BridgeProtocolError):
+                    session_status(path)
             finally: thread.join(2)
 
     @unittest.skipUnless(hasattr(socket, "SO_PEERCRED") and Path("/proc").is_dir(), "Linux peer credentials required")

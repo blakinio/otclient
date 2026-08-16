@@ -13,9 +13,10 @@ implementation_authorized: false
 branch: research/OTC-20260816-track-a-worldmap-extent-static-re
 base_branch: main
 base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
+live_main_observed: ffe954be315ee29825c726b996a30fea8475a0f3
 pr: 367
 risk: medium
-updated: 2026-08-16T15:39:00+02:00
+updated: 2026-08-16T18:02:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md
   - .github/scripts/tibia-official-client-re-worldmap-extent-static.py
@@ -73,9 +74,9 @@ client_size: 51965216
 client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
 invocation_started_at: 2026-08-16T14:20:00+02:00
-last_progress_at: 2026-08-16T15:39:00+02:00
+last_progress_at: 2026-08-16T18:02:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: exact-handler-disassembly-recovery
+ci_check_generation: retained-owner-geometry-object
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -106,6 +107,11 @@ retained_geometry:
   raw_strip_artifact: 9227370490
   two_z7_horizontal_groups_of_18: PROVEN
   y_difference_14: PROVEN
+  direct_owner_plus_0x10_pair_18_14: PROVEN
+  direct_owner_plus_0x10_pair_offsets: 0x48/0x4c
+  candidate_bound_differences_18_14: PROVEN_ARITHMETIC
+  owner_plus_0x10_static_vptr: 0x0308ce70
+  owner_plus_0x10_exact_class_identity: UNKNOWN
   viewport_18x14_interpretation: INFERENCE
 observer_source_provenance:
   status: RECOVERED
@@ -131,7 +137,7 @@ hosted_official_metadata_probe:
   run: 31949948886
   result: CLOUDFLARE_HTTP_403
   identical_retry_allowed: false
-next_action: recover remaining 0xceca50 body and retained typeinfo/vtable/xrefs; correlate 0xced1b0 with TWorldMapStorage/unordered_map; trace owner+0x70/+0x10/+0x80/+0xd8 into protocol/storage/render; then recover viewport/render/camera/picker bounds before any mutation design
+next_action: identify static vptr 0x0308ce70 via retained vtable header/typeinfo evidence; recover writers/xrefs for object +0x48/+0x4c and candidate bounds; continue 0xceca50 and 0xced1b0 storage correlation; then trace render/camera/picker constraints before any mutation design
 ---
 
 # Track A worldmap extent static RE
@@ -155,12 +161,15 @@ Fresh GitHub-hosted materialization of the exact installed game-client ELF remai
 - `20260816-retained-provenance-recovery.md` — raw geometry, exact prefixes and type/container census.
 - `20260816-user-supplied-linux-launcher-artifact.md` / `20260816-owner-upload-launcher-package.md` — exact user upload fence and GitHub artifact provenance.
 - `20260816-exact-handler-disassembly-recovery.md` — recovered producer-source labels plus exact fenced FullMap/Create/Change/Delete/MapDescription disassembly graph.
+- `20260816-retained-owner-geometry-object.md` — direct `owner+0x10` object fields, exact stored `18/14`, candidate bound deltas and static vptr `0x0308ce70`.
 
-Major new static facts:
+Major current static facts:
 
 - observer-source provenance for `CreateOnMap`, `ChangeOnMap`, `DeleteOnMap`, `FullMap` and the `MapDescription` capture is recovered from historical workflow source;
 - `FullMap@0xcec8d0` copies a three-DWORD map-state tuple and multiplies two payload integers by exactly 32 before an owner virtual call;
 - `MapDescription@0x19a8a80` uses descriptor fields `+0x38/+0x3c/+0x40/+0x48` as multiplicative/divisor geometry parameters and `+0x08/+0x0c/+0x10` as coordinate-transform inputs;
+- the concrete object at the proven handler `owner+0x10` path stores `DWORD +0x48=18` and `DWORD +0x4c=14`, while two candidate bound pairs in that same object differ by exactly `18` and `14`;
+- the object's exact historical static vptr is `0x0308ce70`, while its exact class identity remains `UNKNOWN` because the decisive vtable-header/typeinfo relocation window is not retained in the inspected artifacts;
 - neighboring `0xced1b0` rebuilds a bucketed 0x20-byte-node hash structure and is a strong storage/unordered-map correlation candidate;
 - Create/Change/Delete share the owner `+0x10 -> vslot +0xa0` family and repeated owner `+0xd8` map-state comparison paths.
 
@@ -172,12 +181,15 @@ No new runtime, GUI/session, client-byte mutation, Synology static RE, credentia
 - [x] all eight target type surfaces present;
 - [x] richer shared-lifetime/control-block surfaces recovered;
 - [x] raw 18-sample horizontal groups and Y delta 14 directly preserved;
+- [x] concrete worldmap-handler dependency object stores exact `18/14` pair;
+- [x] same object's candidate bound-pair differences independently equal `18/14`;
 - [x] observer label-source provenance recovered;
 - [x] full retained disassembly recovered for the five bounded map-handler/description ranges;
 - [x] protocol-side x32 subfield/tile conversion surface proven;
 - [x] descriptor grid/divisor field accesses proven in MapDescription;
-- [ ] exact semantic names/units for descriptor geometry fields recovered;
-- [ ] extent/subfield/viewport dimension fields recovered;
+- [ ] exact class identity for static vptr `0x0308ce70` recovered;
+- [ ] exact semantic names/units for descriptor/object geometry fields recovered;
+- [ ] extent/subfield/viewport dimension fields semantically identified;
 - [ ] constructors/default writers and complete readers/writers recovered;
 - [ ] storage direct-member relation and capacity/eviction rules proven;
 - [ ] render/camera/picker clipping/culling/transform dependencies traced;

@@ -16,8 +16,8 @@ base_main: 3a5568f36ebc326afd246d0d2da45b5d8eecabfa
 risk: medium
 related_pr: 324
 created: 2026-08-16T08:05:00+02:00
-updated: 2026-08-16T08:13:00+02:00
-lease_expires_at: 2026-08-16T08:58:00+02:00
+updated: 2026-08-16T08:23:00+02:00
+lease_expires_at: 2026-08-16T09:08:00+02:00
 lease_released_at: null
 owned_paths:
   - docs/agents/AGENTS.md
@@ -77,9 +77,13 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-last_progress_at: 2026-08-16T08:13:00+02:00
-last_completed_step: admission contract, Track A agent entrypoint requirement, canonical prompt reconciliation and changed-task CI enforcement are implemented on PR #324; no runtime access was used
-next_action: require deterministic admission-policy audit plus repository CI and fresh review on the exact final PR #324 head, repair any material finding, then protected-merge and archive the task
+last_progress_at: 2026-08-16T08:23:00+02:00
+material_review_findings:
+  - PRRT_kwDOTVmdjs6ZlHWz: remediated in branch; authorized canonical mutation now requires positive equal lease generations after any rebind, with fresh negative regressions
+  - PRRT_kwDOTVmdjs6ZlHW1: remediated in branch; every canonical access class is bound to runtime_owner_task == current task_id and the canonical namespace
+  - PRRT_kwDOTVmdjs6ZlHW2: remediated in branch; ephemeral_isolated rejects the reserved canonical-live-runtime namespace and aliases, with fresh negative regressions
+last_completed_step: fresh review P1s were repaired fail-closed in the admission validator and fresh behavior audit; no runtime access was used
+next_action: require fresh exact-head admission-policy audit, behavior audit and repository CI after the three P1 repairs; then resolve only verified review threads, protected-merge PR #324 and archive/release the task
 ---
 
 # Track A agent runtime-governance enforcement
@@ -93,9 +97,10 @@ Make the final Track A canonical-live runtime rules unavoidable at the normal ag
 - Track A agent instructions require workers to read the admission contract and classify runtime access before any runtime operation.
 - The canonical Track A wrapper requires the same admission before claim/resume/observation/control/mutation.
 - The Track A contract defines a mandatory admission record for `none`, `read_only`, `ephemeral_isolated`, `canonical_reuse_or_mutation`, `canonical_bootstrap`, and `canonical_rebind` work.
-- Canonical mutation requires current Gate A plus any required rebind plus Gate B, with the final whole-lifetime supervisor.
+- Canonical mutation requires current Gate A plus any required rebind plus Gate B, target ownership/uniqueness, equal current lease-generation binding and the final whole-lifetime supervisor.
 - Missing registration never falls through to ordinary reuse; it requires the separately implemented/authorized bootstrap transition.
-- Lease-generation mismatch never falls through to ordinary reuse; it requires the reviewed rebind primitive.
+- Lease-generation mismatch never falls through to ordinary reuse; it requires the reviewed rebind primitive and post-rebind equality before mutation.
+- Ephemeral runtimes cannot use or alias the reserved canonical namespace.
 - Historical `:98`, `6082`, PID or session evidence never satisfies current canonical identity.
 - Track A workers may not mutate PR #303-owned runtime or Track B state through these rules.
 - A deterministic repository test prevents removal/regression of the mandatory policy invariants.
@@ -111,19 +116,23 @@ A static P2 researcher records `runtime_access: none`, performs no runtime opera
 
 A read-only researcher records `runtime_access: read_only` and may inspect only demonstrably non-invasive evidence outside another task's owned runtime surface.
 
+A task-owned ephemeral sandbox may mutate only its proven unique non-canonical namespace.
+
 ### Negative
 
 A researcher sees historical `:98` or reachable `6082` and attempts to send input, attach, restart, login or otherwise mutate without Gate A + current identity. The policy requires refusal.
 
 A researcher finds no `runtime-registration.json` and tries to launch through ordinary `guard-run`. The policy requires bootstrap instead.
 
-A researcher finds an older registration generation and edits the JSON or proceeds anyway. The policy requires the dedicated rebind transition or refusal.
+A researcher finds an older registration generation and edits the JSON or proceeds anyway. The policy requires the dedicated rebind transition or refusal; even a claimed rebind cannot authorize mutation until the registration generation binding equals the current lease generation.
+
+A canonical admission names another task as runtime owner. CI rejects it.
+
+An ephemeral admission uses `canonical-live-runtime` or an alias containing that reserved namespace. CI rejects it.
 
 A runtime-sensitive Track A PR updates code/workflow paths without an added/modified active Track A task containing an admission record. CI rejects it.
 
 ### Boundary
-
-A task-owned ephemeral X11 sandbox may use a unique display and mutate only that sandbox, but it does not become the canonical live session and does not authorize a second logged-in Global session.
 
 An existing Track A task is not mass-migrated merely because this policy merges. The admission fields become mandatory when that active task is next added/modified/claimed, matching the repository's migrate-on-next-checkpoint execution policy.
 

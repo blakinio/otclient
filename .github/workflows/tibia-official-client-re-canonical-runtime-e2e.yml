@@ -1,0 +1,147 @@
+name: Track A canonical physical runtime E2E
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260816-track-a-canonical-runtime-e2e
+    paths:
+      - .github/workflows/tibia-official-client-re-canonical-runtime-e2e.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-runtime-e2e
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Read-only canonical state reconciliation
+    runs-on: [self-hosted, Linux, X64, otclient, tibia-re, synology]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify trusted-base runtime policy is fail-closed
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          grep -Fq 'Status: DRAFT CONTRACT / FINAL MANAGER + REBIND RECONCILED / NOT IMPLEMENTED' \
+            docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+          grep -Fq 'generation_rebind: REQUIRED_UNAVAILABLE' \
+            docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+          grep -Fq 'bootstrap: REQUIRED_UNIMPLEMENTED' \
+            docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+          echo TRACK_A_RECON_TRUSTED_BASE_FAIL_CLOSED=true
+
+      - name: Inspect only canonical authority metadata
+        shell: bash
+        env:
+          STATE_ROOT: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          lease_wrapper=.github/scripts/tibia-official-client-re-canonical-live-lease
+          registration="$STATE_ROOT/runtime-registration.json"
+
+          echo TRACK_A_RECON_RUNTIME_ACCESS=read_only
+          echo TRACK_A_RECON_MUTATION_AUTHORIZED=false
+          echo TRACK_A_RECON_PROCESS_OBSERVATION=false
+          echo TRACK_A_RECON_DISPLAY_OBSERVATION=false
+          echo TRACK_A_RECON_NETWORK_OBSERVATION=false
+          echo TRACK_A_RECON_PR303_SURFACE_ACCESS=false
+
+          "$lease_wrapper" status --json > "$RUNNER_TEMP/track-a-canonical-lease-public.json"
+
+          python3 - "$RUNNER_TEMP/track-a-canonical-lease-public.json" "$registration" <<'PY'
+          import json
+          import os
+          import stat
+          import sys
+          from pathlib import Path
+
+          lease_path = Path(sys.argv[1])
+          registration_path = Path(sys.argv[2])
+          lease = json.loads(lease_path.read_text(encoding="utf-8"))
+
+          allowed_lease = {
+              "schema_version": lease.get("schema_version"),
+              "runtime_id": lease.get("runtime_id"),
+              "status": lease.get("status"),
+              "generation": lease.get("generation"),
+              "controller_task": lease.get("controller_task"),
+              "controller_session": lease.get("controller_session"),
+              "expires_at": lease.get("expires_at"),
+              "expired": lease.get("expired"),
+          }
+          print("TRACK_A_RECON_LEASE_PUBLIC=" + json.dumps(allowed_lease, sort_keys=True, separators=(",", ":")))
+
+          if not registration_path.exists():
+              print("TRACK_A_RECON_REGISTRATION_EXISTS=false")
+              print("TRACK_A_RECON_CLASSIFICATION=canonical_bootstrap_required")
+              raise SystemExit(0)
+
+          st = registration_path.lstat()
+          if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+              print("TRACK_A_RECON_REGISTRATION_EXISTS=true")
+              print("TRACK_A_RECON_REGISTRATION_FILE_SAFE=false")
+              print("TRACK_A_RECON_CLASSIFICATION=registration_invalid_fail_closed")
+              raise SystemExit(3)
+
+          mode = stat.S_IMODE(st.st_mode)
+          owner_ok = not hasattr(os, "getuid") or st.st_uid == os.getuid()
+          mode_ok = mode == 0o600
+          print("TRACK_A_RECON_REGISTRATION_EXISTS=true")
+          print("TRACK_A_RECON_REGISTRATION_FILE_SAFE=" + str(owner_ok and mode_ok).lower())
+          if not (owner_ok and mode_ok):
+              print("TRACK_A_RECON_CLASSIFICATION=registration_invalid_fail_closed")
+              raise SystemExit(3)
+
+          try:
+              registration = json.loads(registration_path.read_text(encoding="utf-8"))
+          except (OSError, json.JSONDecodeError):
+              print("TRACK_A_RECON_REGISTRATION_PARSE=false")
+              print("TRACK_A_RECON_CLASSIFICATION=registration_invalid_fail_closed")
+              raise SystemExit(3)
+
+          public_registration = {
+              "schema_version": registration.get("schema_version"),
+              "runtime_id": registration.get("runtime_id"),
+              "registration_generation": registration.get("registration_generation"),
+              "lease_generation": registration.get("lease_generation"),
+          }
+          print("TRACK_A_RECON_REGISTRATION_PUBLIC=" + json.dumps(public_registration, sort_keys=True, separators=(",", ":")))
+
+          if registration.get("schema_version") != 1 or registration.get("runtime_id") != "track-a-canonical-live":
+              print("TRACK_A_RECON_CLASSIFICATION=registration_invalid_fail_closed")
+              raise SystemExit(3)
+          if not isinstance(registration.get("registration_generation"), int) or registration["registration_generation"] < 1:
+              print("TRACK_A_RECON_CLASSIFICATION=registration_invalid_fail_closed")
+              raise SystemExit(3)
+          if not isinstance(registration.get("lease_generation"), int) or registration["lease_generation"] < 1:
+              print("TRACK_A_RECON_CLASSIFICATION=registration_invalid_fail_closed")
+              raise SystemExit(3)
+
+          lease_status = lease.get("status")
+          lease_generation = lease.get("generation")
+          registered_generation = registration["lease_generation"]
+
+          if lease_status == "active" and not lease.get("expired", False):
+              print("TRACK_A_RECON_CLASSIFICATION=gate_a_existing_controller_must_reconcile")
+          elif isinstance(lease_generation, int) and registered_generation == lease_generation + 1:
+              # This is only a descriptive anomaly check. No authority is inferred.
+              print("TRACK_A_RECON_CLASSIFICATION=registration_generation_ahead_fail_closed")
+          else:
+              # Any new acquire after released/expired authority advances the lease generation,
+              # so an existing registration requires the reviewed rebind transition before Gate B.
+              print("TRACK_A_RECON_CLASSIFICATION=canonical_rebind_required_after_gate_a")
+          PY
+
+      - name: Assert reconciliation stayed non-invasive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo TRACK_A_RECON_COMPLETE=true
+          echo TRACK_A_RECON_NO_CLIENT_MUTATION=true

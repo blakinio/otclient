@@ -14,9 +14,9 @@ jobs:
   inspect:
     name: Trace QLibrary filename construction statically
     runs-on: [otclient, synology]
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
-      - name: Static exact-client disassembly and string/xref inventory
+      - name: Emit bounded exact-client loader/helper bytes
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,24 +27,9 @@ jobs:
           [[ "$(stat -c '%s' "$client")" == '51965216' ]] || { echo 'BE_PATH_ERROR=client_size'; exit 4; }
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || { echo 'BE_PATH_ERROR=client_sha'; exit 5; }
           echo 'BE_PATH_CLIENT_FENCE=PASS'
-          echo "BE_PATH_GDB=$(command -v gdb 2>/dev/null || true)"
-
-          if command -v gdb >/dev/null 2>&1; then
-            echo 'BE_PATH_GDB_MAIN_BEGIN'
-            gdb -q -nx -batch \
-              -ex 'set pagination off' \
-              -ex 'set confirm off' \
-              -ex 'set disassembly-flavor intel' \
-              -ex "file $client" \
-              -ex 'disassemble /r 0x6fc120,0x6fcb10' \
-              -ex 'disassemble /r 0x6b9f20,0x6ba1a0'
-            echo 'BE_PATH_GDB_MAIN_END'
-          else
-            echo 'BE_PATH_GDB_UNAVAILABLE=true'
-          fi
 
           python3 - "$client" <<'PY'
-          import pathlib,struct,sys
+          import hashlib,pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
@@ -56,50 +41,19 @@ jobs:
               return blob[o:e].decode('utf8','replace')
           secs=[]
           for i,x in enumerate(sh):
-              secs.append({'idx':i,'name':cs(names,x[0]),'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
+              secs.append({'idx':i,'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]})
           text=next(s for s in secs if s['name']=='.text')
-          tb=d[text['off']:text['off']+text['size']]
-          def fileoff_to_va(off):
-              for s in secs:
-                  if s['off'] <= off < s['off']+s['size']:
-                      return s['addr'] + (off-s['off'])
-              return None
-          hits=[]
-          needles=(b'BattlEye',b'BEClient',b'BEClient.so',b'BattlEye/',b'/BattlEye',b'.so')
-          for needle in needles:
-              start=0
-              while True:
-                  o=d.find(needle,start)
-                  if o<0: break
-                  e=d.find(b'\0',o,min(len(d),o+180)); e=len(d) if e<0 else e
-                  raw=d[o:e]
-                  if raw and len(raw)<=180 and all((32<=b<127) for b in raw):
-                      va=fileoff_to_va(o)
-                      hits.append((needle.decode('ascii'),o,va,raw.decode('ascii','replace')))
-                  start=o+1
-          uniq=[]; seen=set()
-          for h in hits:
-              key=(h[1],h[3])
-              if key not in seen:
-                  seen.add(key); uniq.append(h)
-          print('BE_PATH_STRINGS_BEGIN')
-          for needle,off,va,s in uniq[:160]:
-              if 'BattlEye' in s or 'BEClient' in s:
-                  print(f'needle={needle} fileoff=0x{off:x} va={"UNKNOWN" if va is None else hex(va)} text={s}')
-          print('BE_PATH_STRINGS_END')
-
-          targets={va for _,_,va,s in uniq if va is not None and ('BattlEye' in s or 'BEClient' in s)}
-          print('BE_PATH_RIP_XREFS_BEGIN')
-          # Exact common RIP-relative LEA forms only; candidate evidence, not semantic proof by itself.
-          for i in range(len(tb)-7):
-              if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d: continue
-              modrm=tb[i+2]
-              if (modrm>>6)!=0 or (modrm&7)!=5: continue
-              va=text['addr']+i
-              target=va+7+struct.unpack_from('<i',tb,i+3)[0]
-              if target in targets:
-                  print(f'ref=0x{va:x} target=0x{target:x}')
-          print('BE_PATH_RIP_XREFS_END')
+          def emit(label,start,end):
+              assert text['addr'] <= start < end <= text['addr']+text['size']
+              fo=text['off']+(start-text['addr']); blob=d[fo:fo+(end-start)]
+              print(f'{label}_VA=0x{start:x}')
+              print(f'{label}_END=0x{end:x}')
+              print(f'{label}_SIZE=0x{len(blob):x}')
+              print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}')
+              print(f'{label}_HEX={blob.hex()}')
+          emit('BE_PATH_LOADER',0x6fc034,0x6fcb10)
+          emit('BE_PATH_HELPERS',0x6b9f20,0x6ba1a0)
+          emit('BE_PATH_PRE_HELPERS',0x6b22f0,0x6b3b80)
           print('BE_PATH_EXECUTED_TARGET=false')
           print('BE_PATH_LIVE_RUNTIME_OBSERVED=false')
           print('BE_PATH_MUTATION_PERFORMED=false')

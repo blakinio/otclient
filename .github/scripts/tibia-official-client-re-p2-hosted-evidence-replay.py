@@ -37,7 +37,7 @@ def main() -> int:
     digest = sha256(args.fixture)
     require(digest == args.fixture_sha256, "fixture_exact_head_digest")
     data = json.loads(args.fixture.read_text(encoding="utf-8"))
-    require(data["schema_version"] == 3, "schema_v3")
+    require(data["schema_version"] == 4, "schema_v4")
 
     p = data["provenance"]
     require(p["source_run"] == EXPECTED_SOURCE_RUN, "source_run")
@@ -48,7 +48,7 @@ def main() -> int:
     require(p["current_hosted_replay_can_upgrade_exact_binary_provenance"] is False, "no_provenance_upgrade")
     require(p["contains_client_binary_bytes"] is False, "no_client_bytes")
     correlations = {x["id"]: x for x in p["correlation_artifacts"]}
-    for artifact_id in (9229609330, 9228087310, 9228207514, 9228275973):
+    for artifact_id in (9229609330, 9228087310, 9228207514, 9228275973, 9226966960, 9229441999):
         require(artifact_id in correlations, f"correlation_artifact_{artifact_id}")
 
     client = data["exact_client"]
@@ -64,6 +64,7 @@ def main() -> int:
     require(h["same_message_handoff_to_dualconnection"] == "PROVEN", "same_message_handoff")
     require(h["protocol_stage_order"] == "PROVEN_PARTIAL", "stage_order_partial")
     require(h["framing"] == "PROVEN_PARTIAL", "framing_partial")
+    require(h["direct_qiodevice_qbytearray_final_egress"] == "DISPROVEN", "direct_qbytearray_egress_disproven")
     for key in ("sequence", "compression", "encryption", "final_binary_egress"):
         require(h[key] == "UNKNOWN", f"unknown_preserved_{key}")
 
@@ -113,40 +114,30 @@ def main() -> int:
     require(framing["exact_header_semantic_name"] == "UNKNOWN", "header_semantic_name_unknown")
     require(framing["optional_transform_condition"] == "message+0x28 == 2", "optional_transform_condition")
     require(framing["optional_transform_dynamic_type"] == "UNKNOWN", "optional_transform_type_unknown")
+    require(framing["forward_inverse_pair_inference"] == "HIGH_CONFIDENCE_INFERENCE_ONLY", "forward_inverse_kept_inference")
 
-    markers = set(data["instruction_markers"])
-    for marker in (
-        "19711d7: load source owner from outer+0xa20",
-        "19711ee: load source shared pair from source owner+0xc0",
-        "19711f6: overwrite setup scratch rbp-0x40/-0x38 with source shared pair",
-        "1971250: retain source pair first pointer at RawDataProcessor control+0x18 / actual this+0x8",
-        "1971272: retain TCompressionHelper actual object at RawDataProcessor control+0x28 / actual this+0x18",
-        "7dd67f: call QWORD PTR [rax+0x10]",
-        "7dd693: call QWORD PTR [rax+0x10]",
-        "7dd6a7: call QWORD PTR [rax+0x80]",
-        "7dd6be: call QWORD PTR [rax+0x78]",
-        "c2dfa5: mov rdi,QWORD PTR [rbp+0x18]",
-        "c2dfd5: call QIODevice::readAll",
-        "b47189: call QByteArray::insert",
-        "b47206: call QByteArray::append",
-        "b47210: test sil,0x7",
-        "b47285: write framing delta byte",
-        "b47287: compare message+0x28 with 2",
-        "b472a7: load retained RawDataProcessor this+0x8 object",
-        "b472b4: call retained-object virtual +0x28",
-        "b47300: call QByteArray::operator=",
-    ):
-        require(marker in markers, f"marker_{marker.split(':',1)[0]}_{abs(hash(marker)) % 10000}")
+    stream_api = data["raw_stream_methods"]
+    require(stream_api["classification"] == "PROVEN_INTERNAL_STREAM_BUFFER_API", "raw_stream_internal_api")
+    require("self" in stream_api["method_0xb40630"], "b40630_self_write")
+    require("readAll" in stream_api["method_0xb40710"], "b40710_readall")
 
-    egress = data["egress_discriminators"]
-    require(egress["dual_precondition_qiodevice_write"]["classification"] == "NOT_FINAL_EGRESS_PROOF", "b4066b_not_egress")
-    require(egress["dual_precondition_qiodevice_write"]["direction"] == "UNKNOWN", "b4066b_direction_unknown")
-    require(egress["tcp_text_write"]["classification"] == "DISPROVEN_AS_BINARY_GAMEPLAY_SINK", "b46c75_disproven_binary_sink")
+    census = data["direct_qiodevice_qbytearray_write_census"]
+    require(census["symbol"] == "QIODevice::write(QByteArray const&)", "direct_write_symbol")
+    require(census["direct_callsite_count"] == 5, "direct_write_count")
+    require(census["classification"] == "ALL_DIRECT_CALLSITES_DISPROVEN_AS_FINAL_BINARY_GAMEPLAY_EGRESS", "all_direct_writes_disproven")
+    callsites = {x["address"]: x for x in census["callsites"]}
+    require(set(callsites) == {"0x7dd563", "0xb4066b", "0xb46c75", "0xc4a848", "0xd08642"}, "direct_write_exact_set")
+    require(callsites["0x7dd563"]["classification"] == "DISPROVEN_AS_FINAL_NETWORK_EGRESS", "7dd563_disproven")
+    require(callsites["0xb4066b"]["classification"] == "DISPROVEN_AS_FINAL_NETWORK_EGRESS", "b4066b_disproven")
+    require(callsites["0xb46c75"]["classification"] == "DISPROVEN_AS_BINARY_GAMEPLAY_SINK", "b46c75_disproven")
+    require(callsites["0xc4a848"]["classification"] == "DISPROVEN_AS_GAMEPLAY_EGRESS", "c4a848_disproven")
+    require(callsites["0xd08642"]["classification"] == "DISPROVEN_AS_GAMEPLAY_EGRESS", "d08642_disproven")
+    require("indirect/virtual" in census["next_search_space"], "next_search_space_indirect")
 
     require(not any(data["negative_controls"].values()), "negative_controls")
 
     result = {
-        "schema_version": 3,
+        "schema_version": 4,
         "execution_class": "github_hosted",
         "runtime_access": "none",
         "hosted_replay_consistency": "PROVEN",
@@ -154,17 +145,12 @@ def main() -> int:
         "current_exact_binary_reexecution": "NOT_PERFORMED",
         "current_exact_binary_provenance_upgraded": False,
         "accepted_chain_for_hypothesis_selection": ["0xc2df80", "0xb47130", "0xb56d60", "0xb56970"],
-        "typed_facts": {
-            "setup_unencrypted_raw_stream": "TUnencryptedRawMessageStream@0x3084c58; not proven as RawDataProcessor member",
-            "raw_this_plus_8_source": "[outer+0xa20]+0xc0 shared pair; dynamic type UNKNOWN",
-            "raw_this_plus_18": "TCompressionHelper@0x2f69430 with TZlibInflateWrapper@0x2f69410",
-            "sequence_processor": "TGameserverNetworkPacketSequenceFlowProcessor@0x3084d68; temporal position UNKNOWN"
-        },
         "classification": {
             "framing": "PROVEN_PARTIAL",
             "sequence": "UNKNOWN",
             "compression": "UNKNOWN",
             "encryption": "UNKNOWN",
+            "direct_qiodevice_qbytearray_final_egress": "DISPROVEN",
             "final_binary_egress": "UNKNOWN"
         },
         "remaining_discriminators": [
@@ -172,7 +158,7 @@ def main() -> int:
             "resolve 0x1832b90 pad-byte generator semantics",
             "prove temporal position of sequence-flow processor relative to raw and dual stages",
             "prove whether/where TCompressionHelper participates in outbound transform",
-            "prove final binary QTcpSocket/QIODevice ownership and write edge"
+            "find final binary egress through non-QByteArray-direct mechanism: other overload, indirect/virtual writeData, QAbstractSocket/QTcpSocket virtual path, or lower-level socket API"
         ],
         "fixture_sha256": digest,
     }
@@ -182,6 +168,7 @@ def main() -> int:
     print("P2_REPLAY_HOSTED_CONSISTENCY=PROVEN")
     print("P2_REPLAY_CURRENT_EXACT_BINARY_REEXECUTION=NOT_PERFORMED")
     print("P2_REPLAY_FRAMING=PROVEN_PARTIAL")
+    print("P2_REPLAY_DIRECT_QIODEVICE_QBYTEARRAY_EGRESS=DISPROVEN")
     print("P2_REPLAY_SEQUENCE=UNKNOWN")
     print("P2_REPLAY_COMPRESSION=UNKNOWN")
     print("P2_REPLAY_ENCRYPTION=UNKNOWN")

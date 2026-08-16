@@ -51,25 +51,18 @@ jobs:
           echo 'XCBGL_INV_EXACT_SOURCE_FENCE=PASS'
           echo 'XCBGL_INV_CLIENT_LAUNCH=false'
           echo 'XCBGL_INV_CANONICAL_STATE_ACCESS=NONE'
-          echo "XCBGL_INV_SOURCE_ROOT=$source"
-          echo "XCBGL_INV_TOOLROOT=$tool"
 
           python3 - "$source" "$tool" <<'PY'
-          import hashlib
-          import os
-          import pathlib
-          import subprocess
-          import sys
-
-          roots = [('package', pathlib.Path(sys.argv[1])), ('toolroot', pathlib.Path(sys.argv[2]))]
+          import hashlib, os, pathlib, subprocess, sys
+          source = pathlib.Path(sys.argv[1])
+          tool = pathlib.Path(sys.argv[2])
+          roots = [('package', source), ('toolroot', tool)]
           needles = ('xcbglintegrations', 'xcb_glx', 'xcb_egl', 'libqxcb', 'libqegl', 'libqglx')
-          files = []
-          dirs = []
+          files, dirs = [], []
           for label, root in roots:
               for base, dirnames, filenames in os.walk(root):
                   pbase = pathlib.Path(base)
-                  rel_depth = len(pbase.relative_to(root).parts)
-                  if rel_depth > 8:
+                  if len(pbase.relative_to(root).parts) > 8:
                       dirnames[:] = []
                       continue
                   for d in list(dirnames):
@@ -79,38 +72,44 @@ jobs:
                       low = name.lower()
                       if any(n in low for n in needles) and name.endswith('.so'):
                           path = pbase / name
-                          if path.is_symlink() or not path.is_file():
-                              continue
-                          files.append((label, path, root))
+                          if path.is_file() and not path.is_symlink():
+                              files.append((label, path, root))
           print(f'XCBGL_INV_MATCHING_DIR_COUNT={len(dirs)}')
           for label, path, root in sorted(dirs):
               print(f'XCBGL_INV_DIR={label}:{path.relative_to(root)}')
           print(f'XCBGL_INV_PLUGIN_FILE_COUNT={len(files)}')
+          ld_path = ':'.join([
+              str(source / 'bin/lib'),
+              str(tool / 'usr/lib/x86_64-linux-gnu'),
+              str(tool / 'usr/lib/x86_64-linux-gnu/libproxy'),
+              str(tool / 'lib/x86_64-linux-gnu'),
+          ])
+          print('XCBGL_INV_LDD_ENV=CANONICAL_LD_LIBRARY_PATH')
+          env = dict(os.environ, LD_LIBRARY_PATH=ld_path)
+          total_missing = 0
           for label, path, root in sorted(files):
               data = path.read_bytes()
               digest = hashlib.sha256(data).hexdigest()
-              print(f'XCBGL_INV_PLUGIN={label}:{path.relative_to(root)}:size={len(data)}:sha256={digest}')
-              ldd = subprocess.run(['ldd', str(path)], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False).stdout.splitlines()
-              missing = [line.strip() for line in ldd if 'not found' in line]
-              print(f'XCBGL_INV_LDD_MISSING_COUNT={label}:{path.relative_to(root)}:{len(missing)}')
-              for line in missing[:20]:
-                  print(f'XCBGL_INV_LDD_MISSING={label}:{path.relative_to(root)}:{line}')
-              dyn = subprocess.run(['readelf','-d',str(path)], text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False).stdout.splitlines()
-              needed = [line.strip() for line in dyn if '(NEEDED)' in line]
-              for line in needed[:30]:
-                  print(f'XCBGL_INV_NEEDED={label}:{path.relative_to(root)}:{line}')
-          # Inventory common Qt plugin roots, without reading arbitrary file contents.
+              rel = path.relative_to(root)
+              print(f'XCBGL_INV_PLUGIN={label}:{rel}:size={len(data)}:sha256={digest}')
+              proc = subprocess.run(['ldd', str(path)], env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+              lines = proc.stdout.splitlines()
+              missing = [line.strip() for line in lines if 'not found' in line]
+              total_missing += len(missing)
+              print(f'XCBGL_INV_LDD_RC={label}:{rel}:{proc.returncode}')
+              print(f'XCBGL_INV_LDD_MISSING_COUNT={label}:{rel}:{len(missing)}')
+              for line in missing[:30]:
+                  print(f'XCBGL_INV_LDD_MISSING={label}:{rel}:{line}')
           for label, root in roots:
               candidates = []
-              for p in root.rglob('platforms'):
-                  if p.is_dir() and len(p.relative_to(root).parts) <= 8:
-                      candidates.append(p.relative_to(root))
-              for p in root.rglob('xcbglintegrations'):
-                  if p.is_dir() and len(p.relative_to(root).parts) <= 8:
-                      candidates.append(p.relative_to(root))
-              unique = sorted({str(x) for x in candidates})
+              for target in ('platforms', 'xcbglintegrations'):
+                  for p in root.rglob(target):
+                      if p.is_dir() and len(p.relative_to(root).parts) <= 8:
+                          candidates.append(str(p.relative_to(root)))
+              unique = sorted(set(candidates))
               print(f'XCBGL_INV_QT_PLUGIN_DIR_CANDIDATE_COUNT={label}:{len(unique)}')
               for item in unique[:40]:
                   print(f'XCBGL_INV_QT_PLUGIN_DIR={label}:{item}')
+          print(f'XCBGL_INV_TOTAL_MISSING_DEPS={total_missing}')
           print('XCBGL_INV_RESULT=PASS_READ_ONLY_INVENTORY')
           PY

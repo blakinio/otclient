@@ -52,6 +52,19 @@ mutation_authorized: true | false
 
 A task may store this compact record in its active checkpoint. It MUST NOT fabricate PASS from historical evidence merely to continue.
 
+## Exact client fence
+
+Every positive canonical identity, bootstrap identity, rebind identity, or current-runtime claim under this contract is fenced to the official native Linux client exactly as follows:
+
+```yaml
+client_version: 15.32.df7b29
+client_size: 51965216
+client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+runtime_platform: official_native_linux_only
+```
+
+A different version, size, SHA-256, platform, unverifiable executable, or contradictory process evidence fails closed. A future build may replace this fence only through a separately reviewed trusted-base governance change with fresh exact-build evidence; a worker must not weaken or reinterpret the fence inside its own task merely to continue runtime work.
+
 ## Runtime-access classes
 
 ### 1. `none`

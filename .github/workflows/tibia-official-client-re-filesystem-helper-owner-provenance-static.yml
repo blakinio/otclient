@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace TGameClient factory input object statically
+    name: Trace factory caller RBX service-field writers
     runs-on: [otclient, synology]
     timeout-minutes: 6
     steps:
-      - name: Map callers and field writers for TGameClient input
+      - name: Scan exact caller for RBX plus 0x18/0x20 initialization
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -38,42 +38,52 @@ jobs:
               e=blob.find(b'\0',o);e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[]
-          for x in sh:secs.append({'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]})
-          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
+          for x in sh:secs.append({'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]})
+          text=next(s for s in secs if s['name']=='.text')
           def b_at(va,n):return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
-          def calls(target):
-              out=[]
-              for i in range(len(tb)-5):
-                  if tb[i]!=0xe8:continue
-                  va=text['addr']+i
-                  if va+5+struct.unpack_from('<i',tb,i+1)[0]==target:out.append(va)
-              return out
-          target=0x6c8020
-          csx=calls(target)
-          print('OWNER_PROV_TGAMECLIENT_FACTORY_CALLS='+','.join(hex(v) for v in csx))
-          for va in csx:
-              lo=max(text['addr'],va-0x180);hi=min(text['addr']+text['size'],va+0x100);w=b_at(lo,hi-lo)
-              print(f'OWNER_PROV_FACTORY_CALL_WINDOW call=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
-          rel=by.get('.rela.dyn')
-          if rel:
-              refs=[]
-              for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
-                  ro,ri,add=struct.unpack_from('<QQq',d,o)
-                  if add==target:refs.append(ro)
-              print('OWNER_PROV_TGAMECLIENT_FACTORY_RELOCS='+','.join(hex(v) for v in refs))
-          # Locate common writes to +0x18/+0x20 pairs in a broad initializer region around known bootstrap construction.
-          for label,start,end in [('BOOTSTRAP',0x5ee000,0x5f1000),('GAMECLIENT_NEAR',0x6c7000,0x6c8020)]:
-              blob=b_at(start,end-start)
-              hits=[]
-              for i in range(len(blob)-8):
-                  rex=blob[i]
-                  if not (0x48<=rex<=0x4f) or blob[i+1]!=0x89:continue
-                  m=blob[i+2];mod=m>>6;rm=m&7
-                  if rm==4 or mod not in (1,2):continue
-                  disp=struct.unpack_from('<b' if mod==1 else '<i',blob,i+3)[0]
-                  if disp not in (0x18,0x20):continue
-                  va=start+i;hits.append(va)
-              print(f'OWNER_PROV_PAIR_WRITES region={label} count={len(hits)} hits='+','.join(hex(v) for v in hits[:200]))
+          start,end=0x6c9000,0x6ca140;blob=b_at(start,end-start)
+          regs=['rax','rcx','rdx','rbx','rsp','rbp','rsi','rdi','r8','r9','r10','r11','r12','r13','r14','r15']
+          hits=[]
+          print('OWNER_PROV_RBX_PAIR_WRITES_BEGIN')
+          for i in range(len(blob)-10):
+              rex=blob[i]
+              if not (0x48<=rex<=0x4f) or blob[i+1]!=0x89:continue
+              m=blob[i+2];mod=m>>6;rm=m&7
+              base=rm|((rex&1)<<3);src=((m>>3)&7)|(((rex>>2)&1)<<3)
+              if base!=3 or mod not in (1,2):continue
+              disp=struct.unpack_from('<b' if mod==1 else '<i',blob,i+3)[0]
+              if disp not in (0x18,0x20):continue
+              va=start+i;hits.append(va)
+              size=4 if mod==1 else 7
+              print(f'va=0x{va:x} src={regs[src]} disp=0x{disp:x} bytes={blob[i:i+size].hex()}')
+          # MOVUPS 16-byte stores to RBX+0x18/+0x20.
+          for i in range(len(blob)-10):
+              p=i;rex=None
+              if 0x40<=blob[p]<=0x4f:rex=blob[p];p+=1
+              if blob[p:p+2]!=b'\x0f\x11':continue
+              m=blob[p+2];mod=m>>6;rm=m&7;base=rm|(((rex or 0)&1)<<3)
+              if base!=3 or mod not in (1,2):continue
+              disp=struct.unpack_from('<b' if mod==1 else '<i',blob,p+3)[0]
+              if disp not in (0x18,0x20):continue
+              va=start+i;hits.append(va)
+              print(f'va=0x{va:x} xmm_store disp=0x{disp:x} bytes={blob[i:i+8].hex()}')
+          print('OWNER_PROV_RBX_PAIR_WRITES_END')
+          for va in sorted(set(hits)):
+              lo=max(start,va-0x90);hi=min(end,va+0xb0);w=b_at(lo,hi-lo)
+              print(f'OWNER_PROV_RBX_PAIR_WINDOW center=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          # Candidate function prologues nearest below the TGameClient factory call.
+          patterns=[bytes.fromhex(x) for x in ('554889e5','4157415641554154','415741564155','41564155415455','41574156415455')]
+          pros=[]
+          for pat in patterns:
+              p=0
+              while True:
+                  j=blob.find(pat,p)
+                  if j<0:break
+                  pros.append(start+j);p=j+1
+          print('OWNER_PROV_NEAR_PROLOGUES='+','.join(hex(v) for v in sorted(set(pros))[-40:]))
+          # Exact factory call argument setup anchor.
+          anchor=b_at(0x6ca128,14)
+          print('OWNER_PROV_FACTORY_ARG_ANCHOR='+anchor.hex())
           print('OWNER_PROV_EXECUTED_TARGET=false')
           print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
           print('OWNER_PROV_MUTATION_PERFORMED=false')

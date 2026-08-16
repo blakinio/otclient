@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Map QLibrary BattlEye integration statically
+    name: Trace caller of Init-resolving QLibrary path
     runs-on: [otclient, synology]
     timeout-minutes: 6
     steps:
-      - name: Correlate QLibrary callsites with BattlEye literals
+      - name: Correlate callers with BattlEye path construction
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -36,96 +36,96 @@ jobs:
               return blob[o:e].decode('utf8','replace')
           secs=[]
           for i,x in enumerate(sh):
-              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
-          by={s['name']:s for s in secs}; text=by['.text']; tb=d[text['off']:text['off']+text['size']]
-          dyn=by['.dynsym']; stsec=secs[dyn['link']]; sb=d[stsec['off']:stsec['off']+stsec['size']]
-          syms=[]
-          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
-              if o+24>len(d):break
-              sn,info,other,si,val,sz=struct.unpack_from(E+'IBBHQQ',d,o); syms.append(cs(sb,sn).split('@',1)[0])
-          relsec=by.get('.rela.plt') or by.get('.rela.plt.sec'); pltsec=by.get('.plt.sec') or by.get('.plt')
-          if not relsec or not pltsec: raise SystemExit('missing plt metadata')
-          rels=[]; ent=relsec['entsize'] or 24
-          for i,o in enumerate(range(relsec['off'],relsec['off']+relsec['size'],ent)):
-              if o+24>len(d):break
-              _,ri,_=struct.unpack_from(E+'QQq',d,o); si=ri>>32; rels.append((i,syms[si] if si<len(syms) else '?'))
-          plt_ent=pltsec['entsize'] or 16; reserved=0 if pltsec['name']=='.plt.sec' else 1
-          wanted={
-            '_ZN8QLibrary11setFileNameERK7QString':'setFileName',
-            '_ZN8QLibrary4loadEv':'load',
-            '_ZN8QLibrary6unloadEv':'unload',
-            '_ZN8QLibrary7resolveEPKc':'resolve',
-            '_ZNK8QLibrary8isLoadedEv':'isLoaded',
-            '_ZN8QLibraryC1EP7QObject':'ctor',
-            '_ZN8QLibraryD1Ev':'dtor',
-          }
-          plt={wanted[n]:pltsec['addr']+(i+reserved)*plt_ent for i,n in rels if n in wanted}
-          print('BE_QT_PLT_BEGIN')
-          for n,a in sorted(plt.items()):print(f'{n}=0x{a:x}')
-          print('BE_QT_PLT_END')
+              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
+          text=next(s for s in secs if s['name']=='.text'); tb=d[text['off']:text['off']+text['size']]
 
-          calls=[]
+          target_func=0x6fc034
+          direct=[]
           for i in range(len(tb)-5):
               if tb[i]!=0xe8:continue
-              va=text['addr']+i; target=va+5+struct.unpack_from('<i',tb,i+1)[0]
-              for n,a in plt.items():
-                  if target==a:calls.append((n,va))
-          print('BE_QT_CALLS_BEGIN')
-          for n,va in calls:print(f'name={n} call=0x{va:x}')
-          print('BE_QT_CALLS_END')
+              va=text['addr']+i; dest=va+5+struct.unpack_from('<i',tb,i+1)[0]
+              if dest==target_func:direct.append(va)
+          print('BE_INIT_FUNC_DIRECT_CALLERS_BEGIN')
+          for va in direct:print(f'call=0x{va:x}')
+          print('BE_INIT_FUNC_DIRECT_CALLERS_END')
 
-          special={0x1c96c8f:'Init',0x1d69bb2:'BEClient',0x1d7b160:'BattlEye',0x1c6a9bb:'battleye'}
+          # Exact known BattlEye-related printable strings plus all exact .so/BattlEye path strings.
+          candidates={}
+          keyrx=re.compile(r'BattlEye|BEClient|battleye|BECLIENT|GetVer|^Init$|\.so(?:\.|$)',re.I)
+          for m in re.finditer(rb'[\x20-\x7e]{2,240}\x00',d):
+              try:s=m.group()[:-1].decode('ascii')
+              except:continue
+              if keyrx.search(s):candidates[m.start()]=s
+          print('BE_RELEVANT_CSTRINGS_BEGIN')
+          for va,s in sorted(candidates.items()):print(f'va=0x{va:x} text={s[:220]}')
+          print('BE_RELEVANT_CSTRINGS_END')
+
           prefixes={bytes.fromhex(x) for x in [
             '488d05','488d0d','488d15','488d1d','488d25','488d2d','488d35','488d3d',
-            '4c8d05','4c8d0d','4c8d15','4c8d1d','4c8d25','4c8d2d','4c8d35','4c8d3d']}
+            '4c8d05','4c8d0d','4c8d15','4c8d1d','4c8d25','4c8d2d','4c8d35','4c8d3d',
+            '488b05','488b0d','488b15','488b1d','488b25','488b2d','488b35','488b3d']}
           refs=[]
           for i in range(len(tb)-7):
               p=tb[i:i+3]
               if p not in prefixes:continue
-              va=text['addr']+i; target=va+7+struct.unpack_from('<i',tb,i+3)[0]
-              if target in special:refs.append((special[target],va,target))
+              iva=text['addr']+i; target=iva+7+struct.unpack_from('<i',tb,i+3)[0]
+              if target in candidates:refs.append((iva,target,candidates[target],p.hex()))
+          print('BE_RELEVANT_XREFS_BEGIN')
+          for iva,target,s,op in refs:print(f'ref=0x{iva:x} target=0x{target:x} op={op} text={s[:200]}')
+          print('BE_RELEVANT_XREFS_END')
 
-          # Group QLibrary calls into nearby call clusters, then correlate special refs within +/- 0x2000.
-          print('BE_QT_CLUSTERS_BEGIN')
-          clusters=[]
-          for item in calls:
-              if not clusters or item[1]-clusters[-1][-1][1]>0x1000:clusters.append([item])
-              else:clusters[-1].append(item)
-          for ci,c in enumerate(clusters):
-              lo=c[0][1]-0x2000; hi=c[-1][1]+0x2000
-              rel=[r for r in refs if lo<=r[1]<=hi]
-              print(f'CLUSTER idx={ci} start=0x{c[0][1]:x} end=0x{c[-1][1]:x} calls={len(c)} refs={len(rel)}')
-              for n,va in c:print(f'  CALL {n} 0x{va:x}')
-              for n,va,t in rel:print(f'  REF {n} 0x{va:x}->0x{t:x}')
-          print('BE_QT_CLUSTERS_END')
+          # Identify normal-frame starts heuristically and correlate each direct caller with relevant refs nearby.
+          pat=b'\x55\x48\x89\xe5'
+          def func_start(va,back=0x3000):
+              rel=va-text['addr'];lo=max(0,rel-back);pos=tb.rfind(pat,lo,rel+1)
+              return text['addr']+pos if pos>=0 else max(text['addr'],va-0x400)
+          print('BE_CALLER_CORRELATION_BEGIN')
+          caller_funcs=[]
+          for call in direct:
+              fs=func_start(call)
+              caller_funcs.append(fs)
+              nearby=[r for r in refs if fs-0x1000<=r[0]<=call+0x2000]
+              print(f'caller_call=0x{call:x} heuristic_start=0x{fs:x} relevant_refs={len(nearby)}')
+              for iva,target,s,op in nearby:print(f'  ref=0x{iva:x} target=0x{target:x} text={s[:200]}')
+          print('BE_CALLER_CORRELATION_END')
 
-          # Bounded string-reference scan around the unique Init xref and all QLibrary calls close to it.
-          init_ref=0x6fc587
-          near=[(n,va) for n,va in calls if abs(va-init_ref)<0x8000]
-          print('BE_QT_NEAR_INIT_BEGIN')
-          for n,va in near:print(f'{n}=0x{va:x} delta={va-init_ref:+#x}')
-          print('BE_QT_NEAR_INIT_END')
+          # Trace direct callers one level further up for the small discovered set.
+          print('BE_CALLER_PARENT_CALLS_BEGIN')
+          unique=sorted(set(caller_funcs))
+          for f in unique:
+              parents=[]
+              for i in range(len(tb)-5):
+                  if tb[i]!=0xe8:continue
+                  va=text['addr']+i;dest=va+5+struct.unpack_from('<i',tb,i+1)[0]
+                  if dest==f:parents.append(va)
+              print(f'function=0x{f:x} parents={len(parents)} values={",".join("0x%x"%x for x in parents[:50])}')
+          print('BE_CALLER_PARENT_CALLS_END')
 
-          # Find exact printable strings in the likely enclosing region around Init xref.
-          lo=max(0,init_ref-0x10000);hi=min(len(d),init_ref+0x10000)
-          print('BE_INIT_REGION_STRINGS_BEGIN')
-          vals=[]
-          for m in re.finditer(rb'[\x20-\x7e]{2,160}\x00',d[lo:hi]):
-              try:s=m.group()[:-1].decode('ascii')
-              except:continue
-              if any(k.lower() in s.lower() for k in ('battle','beclient','init','library','client','anti','error','load','fail')):
-                  vals.append((lo+m.start(),s))
-          for va,s in vals[:250]:print(f'va=0x{va:x} text={s[:160]}')
-          print('BE_INIT_REGION_STRINGS_END')
+          # Emit tiny bounded windows around the QLibrary sequence and its direct callers for offline disassembly.
+          def emit(label,va,size):
+              if not (text['addr']<=va<text['addr']+text['size']):return
+              off=text['off']+(va-text['addr']);blob=d[off:min(len(d),off+size)]
+              print(f'{label}_VA=0x{va:x}');print(f'{label}_SIZE=0x{len(blob):x}');print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}');print(f'{label}_HEX={blob.hex()}')
+          emit('BE_RESOLVE_INIT_WINDOW',0x6fc550,0x70)
+          emit('BE_SETNAME_LOAD_WINDOW',0x6fca50,0xa0)
+          for idx,call in enumerate(direct[:12]):emit(f'BE_DIRECT_CALLER_{idx}',max(text['addr'],call-0x100),0x260)
 
-          def func_start(va):
-              rel=va-text['addr'];lo=max(0,rel-0x2000);pat=b'\x55\x48\x89\xe5';pos=tb.rfind(pat,lo,rel+1)
-              return text['addr']+pos if pos>=0 else max(text['addr'],va-0x300)
-          def emit(label,va,size=0x900):
-              start=func_start(va);off=text['off']+(start-text['addr']);blob=d[off:min(len(d),off+size)]
-              print(f'{label}_VA=0x{start:x}');print(f'{label}_SIZE=0x{len(blob):x}');print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}');print(f'{label}_HEX={blob.hex()}')
-          emit('BE_INIT_XREF_FUNCTION',init_ref)
-          for idx,(n,va) in enumerate(near[:12]):emit(f'BE_QT_NEAR_INIT_{idx}_{n}',va,0x500)
-          print('BE_QT_EXECUTED=false')
-          print('BE_QT_MUTATION_PERFORMED=false')
+          # Entire QLibrary function: list direct call targets and RIP references to printable strings only, no raw dump.
+          qstart=0x6fc034;qend=0x6fcb30
+          print('BE_QLIBRARY_FUNCTION_REFERENCES_BEGIN')
+          for i in range(qstart-text['addr'],min(qend-text['addr'],len(tb)-7)):
+              p=tb[i:i+3]
+              if p in prefixes:
+                  va=text['addr']+i;t=va+7+struct.unpack_from('<i',tb,i+3)[0]
+                  if 0<=t<len(d):
+                      e=d.find(b'\0',t,min(len(d),t+220))
+                      if e>t:
+                          raw=d[t:e]
+                          if raw and all(32<=b<127 for b in raw):
+                              try:s=raw.decode('ascii')
+                              except:continue
+                              print(f'ref=0x{va:x} target=0x{t:x} text={s[:200]}')
+          print('BE_QLIBRARY_FUNCTION_REFERENCES_END')
+          print('BE_FINAL_STATIC_EXECUTED=false')
+          print('BE_FINAL_STATIC_MUTATION_PERFORMED=false')
           PY

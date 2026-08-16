@@ -1,0 +1,126 @@
+name: Track A contained Xvfb GLX capability inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-xvfb-glx-capability.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-xvfb-glx-capability
+  cancel-in-progress: false
+
+jobs:
+  xvfb-glx-capability:
+    runs-on: [otclient, synology]
+    timeout-minutes: 6
+    steps:
+      - name: Inventory exact contained Xvfb and GLX support files read-only
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: d3f186414256151c9d5e03f34c5a9026b1fba500
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]] || {
+            echo "XVFB_GLX_INV_REFUSED=BASE_MOVED:$EVENT_BASE_SHA"
+            exit 44
+          }
+
+          task='OTC-20260816-track-a-xvfb-glx-capability'
+          tool='/work/_otclient_tibia_re_state/toolroot'
+          xvfb="$tool/usr/bin/Xvfb"
+          modules="$tool/usr/lib/xorg/modules"
+
+          echo "XVFB_GLX_INV_TASK=$task"
+          echo 'XVFB_GLX_INV_RUNTIME_ACCESS=read_only'
+          echo 'XVFB_GLX_INV_CANONICAL_STATE_ACCESS=NONE'
+          echo 'XVFB_GLX_INV_XSERVER_STARTED=false'
+          echo 'XVFB_GLX_INV_CLIENT_STARTED=false'
+
+          [[ -d "$tool" && ! -L "$tool" && "$(realpath -e "$tool")" == "$tool" ]] || {
+            echo 'XVFB_GLX_INV_REFUSED=TOOLROOT'
+            exit 45
+          }
+          [[ -f "$xvfb" && -x "$xvfb" && ! -L "$xvfb" ]] || {
+            echo 'XVFB_GLX_INV_REFUSED=XVFB'
+            exit 46
+          }
+          xvfb_real="$(realpath -e "$xvfb")"
+          [[ "$xvfb_real" == "$tool"/* ]] || {
+            echo 'XVFB_GLX_INV_REFUSED=XVFB_CONTAINMENT'
+            exit 47
+          }
+
+          printf 'XVFB_GLX_INV_XVFB_REALPATH=%s\n' "$xvfb_real"
+          printf 'XVFB_GLX_INV_XVFB_SHA256=%s\n' "$(sha256sum "$xvfb" | awk '{print $1}')"
+          printf 'XVFB_GLX_INV_XVFB_SIZE=%s\n' "$(stat -c %s "$xvfb")"
+          printf 'XVFB_GLX_INV_XVFB_MODE=%s\n' "$(stat -c %a "$xvfb")"
+          printf 'XVFB_GLX_INV_XVFB_UID=%s\n' "$(stat -c %u "$xvfb")"
+          printf 'XVFB_GLX_INV_XVFB_GID=%s\n' "$(stat -c %g "$xvfb")"
+          printf 'XVFB_GLX_INV_XVFB_FILE=%s\n' "$(file -b "$xvfb" | tr '\n' ' ' | head -c 300)"
+
+          echo 'XVFB_GLX_INV_XVFB_NEEDED_BEGIN'
+          readelf -d "$xvfb" 2>/dev/null | sed -n 's/.*Shared library: \[\([^]]*\)\].*/XVFB_GLX_INV_XVFB_NEEDED=\1/p' | sort -u
+          echo 'XVFB_GLX_INV_XVFB_NEEDED_END'
+
+          echo 'XVFB_GLX_INV_XVFB_LDD_BEGIN'
+          env LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+            ldd "$xvfb" 2>&1 | sed 's/^/XVFB_GLX_INV_XVFB_LDD=/' | head -n 120
+          echo 'XVFB_GLX_INV_XVFB_LDD_END'
+
+          echo 'XVFB_GLX_INV_XVFB_GLX_SYMBOLS_BEGIN'
+          readelf -Ws "$xvfb" 2>/dev/null | grep -Ei 'GLX|glx' | sed 's/^/XVFB_GLX_INV_XVFB_GLX_SYMBOL=/' | head -n 80 || true
+          echo 'XVFB_GLX_INV_XVFB_GLX_SYMBOLS_END'
+
+          echo 'XVFB_GLX_INV_XVFB_GLX_STRINGS_BEGIN'
+          strings -a "$xvfb" | grep -Ei '(^|[^[:alnum:]_])(GLX|glx|Glx)([^[:alnum:]_]|$)' \
+            | sort -u | sed 's/^/XVFB_GLX_INV_XVFB_GLX_STRING=/' | head -n 80 || true
+          echo 'XVFB_GLX_INV_XVFB_GLX_STRINGS_END'
+
+          if [[ -d "$modules" && ! -L "$modules" && "$(realpath -e "$modules")" == "$tool"/* ]]; then
+            echo 'XVFB_GLX_INV_MODULE_ROOT_PRESENT=true'
+          else
+            echo 'XVFB_GLX_INV_MODULE_ROOT_PRESENT=false'
+          fi
+
+          mapfile -t candidates < <(
+            if [[ -d "$modules" ]]; then
+              find "$modules" -xdev -maxdepth 4 -type f \
+                \( -iname '*glx*.so*' -o -iname '*glamor*egl*.so*' -o -iname 'libglamoregl.so*' \) \
+                -print 2>/dev/null | sort -u | head -n 40
+            fi
+          )
+          echo "XVFB_GLX_INV_MODULE_CANDIDATE_COUNT=${#candidates[@]}"
+          for candidate in "${candidates[@]}"; do
+            real="$(realpath -e "$candidate")"
+            [[ "$real" == "$tool"/* ]] || {
+              echo "XVFB_GLX_INV_REFUSED=MODULE_ESCAPES_ROOT:$(basename "$candidate")"
+              exit 48
+            }
+            printf 'XVFB_GLX_INV_MODULE_PATH=%s\n' "$real"
+            printf 'XVFB_GLX_INV_MODULE_SHA256=%s:%s\n' "$(basename "$candidate")" "$(sha256sum "$candidate" | awk '{print $1}')"
+            printf 'XVFB_GLX_INV_MODULE_SIZE=%s:%s\n' "$(basename "$candidate")" "$(stat -c %s "$candidate")"
+            printf 'XVFB_GLX_INV_MODULE_FILE=%s:%s\n' "$(basename "$candidate")" "$(file -b "$candidate" | tr '\n' ' ' | head -c 260)"
+            readelf -d "$candidate" 2>/dev/null \
+              | sed -n "s/.*Shared library: \[\([^]]*\)\].*/XVFB_GLX_INV_MODULE_NEEDED=$(basename "$candidate"):\1/p" \
+              | sort -u | head -n 80 || true
+            env LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+              ldd "$candidate" 2>&1 | grep -E 'not found|libGL|libEGL|libGLX|libOpenGL|libdrm|libgbm' \
+              | sed "s/^/XVFB_GLX_INV_MODULE_LDD=$(basename "$candidate"):/" | head -n 80 || true
+          done
+
+          if printf '%s\n' "${candidates[@]}" | grep -Eq '/libglx\.so([.]|$)'; then
+            echo 'XVFB_GLX_INV_LIBGLX_MODULE_PRESENT=true'
+          else
+            echo 'XVFB_GLX_INV_LIBGLX_MODULE_PRESENT=false'
+          fi
+
+          echo 'XVFB_GLX_INV_RESULT=PASS_READ_ONLY_INVENTORY'

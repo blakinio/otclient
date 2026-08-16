@@ -6,8 +6,6 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-p2-buffer-downstream-consumer.yml
       - .github/scripts/tibia-official-client-re-p2-buffer-downstream-consumer.py
-      - docs/agents/evidence/OTC-20260815-track-a-p2-buffer-downstream-consumer/**
-      - docs/agents/tasks/active/OTC-20260815-track-a-p2-buffer-downstream-consumer.md
   workflow_dispatch:
 
 permissions:
@@ -25,7 +23,7 @@ jobs:
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-p2-buffer-downstream-consumer
-      OFFICIAL_LINUX_ARCHIVE_URL: https://download.tibia.com/tibia.x64.tar.gz
+      OFFICIAL_LINUX_ARCHIVE_URL: https://static.tibia.com/download/tibia.x64.tar.gz
     steps:
       - name: Checkout exact Draft head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
@@ -49,7 +47,7 @@ jobs:
           echo "TRACK_A_P2_RUNTIME_ACCESS=none"
           echo "TRACK_A_P2_PERSISTENT_SESSION=none"
           echo "TRACK_A_P2_PHYSICAL_E2E=false"
-          echo "TRACK_A_P2_SYNLOGY_EXECUTION=false"
+          echo "TRACK_A_P2_SYNOLOGY_EXECUTION=false"
 
       - name: Materialize exact official Linux client without executing it
         shell: bash

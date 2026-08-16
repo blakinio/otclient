@@ -11,12 +11,12 @@ permissions: {}
 jobs:
   retry-once:
     name: Retry infrastructure failure once
-    # GitHub aggregates an exact job-level startup_failure as workflow failure;
-    # the script below proves that classification before issuing a retry.
+    # Superseded runs are intentionally cancelled by CI concurrency and must not
+    # create more runner demand. Only a real timeout or a proven startup failure
+    # is eligible for one automatic retry.
     if: >-
       github.event.workflow_run.run_attempt == 1 &&
-      (github.event.workflow_run.conclusion == 'cancelled' ||
-      github.event.workflow_run.conclusion == 'timed_out' ||
+      (github.event.workflow_run.conclusion == 'timed_out' ||
       github.event.workflow_run.conclusion == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -28,37 +28,19 @@ jobs:
         env:
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           GH_TOKEN: ${{ github.token }}
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.event.workflow_run.id }}
-          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
-          WORKFLOW_EVENT: ${{ github.event.workflow_run.event }}
-          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ ! "${RUN_ID}" =~ ^[0-9]+$ || ! "${RUN_NUMBER}" =~ ^[0-9]+$ || ! "${WORKFLOW_ID}" =~ ^[0-9]+$ ]]; then
+          if [[ ! "${RUN_ID}" =~ ^[0-9]+$ ]]; then
             echo "::error title=Invalid workflow run metadata::Refusing to issue a retry request."
             exit 1
           fi
 
           retry_reason=""
-          if [[ "${CONCLUSION}" == "cancelled" ]]; then
-            newer_runs="$(
-              gh api --method GET \
-                "repos/${REPOSITORY}/actions/workflows/${WORKFLOW_ID}/runs" \
-                -f branch="${HEAD_BRANCH}" \
-                -f event="${WORKFLOW_EVENT}" \
-                -F per_page=100 \
-                --jq ".workflow_runs | map(select(.run_number > ${RUN_NUMBER})) | length"
-            )"
-            if (( newer_runs > 0 )); then
-              echo "::notice title=Stale cancellation is not retried::A newer CI run already exists for this branch and event."
-              exit 0
-            fi
-            retry_reason="workflow was cancelled and has not been superseded"
-          elif [[ "${CONCLUSION}" == "timed_out" ]]; then
+          if [[ "${CONCLUSION}" == "timed_out" ]]; then
             # Repository policy intentionally permits one retry for the exact timed_out conclusion.
             retry_reason="workflow timed out"
           elif [[ "${CONCLUSION}" == "failure" ]]; then

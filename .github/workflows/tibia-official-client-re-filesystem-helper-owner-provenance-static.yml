@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Map TTibiaFileSystemHelper factory and owner initializer callers
+    name: Resolve owner methods through RTTI vtables
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 7
     steps:
-      - name: Locate function entrypoints and direct callsites
+      - name: Map function targets to vtable typeinfo and construction refs
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,45 +28,91 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'OWNER_PROV_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
-          import hashlib,pathlib,struct,sys
+          import pathlib,struct,sys,hashlib
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-          shfmt=E+'IIQQQQIIQQ';sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
-          st=sh[shstrndx];names=d[st[4]:st[4]+st[5]]
+          shfmt=E+'IIQQQQIIQQ';rawsh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
+          st=rawsh[shstrndx];shnames=d[st[4]:st[4]+st[5]]
           def cs(blob,o):
+              if not (0 <= o < len(blob)):return ''
               e=blob.find(b'\0',o);e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[]
-          for x in sh:secs.append({'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]})
-          text=next(s for s in secs if s['name']=='.text');tb=d[text['off']:text['off']+text['size']]
-          def b_at(va,n):
-              return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
-          def direct_calls(target):
+          for x in rawsh:secs.append({'name':cs(shnames,x[0]),'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
+          def vaoff(va):
+              for s in secs:
+                  if s['size'] and s['addr'] <= va < s['addr']+s['size']:return s['off']+(va-s['addr'])
+          def qword(va):
+              o=vaoff(va)
+              return None if o is None or o+8>len(d) else struct.unpack_from('<Q',d,o)[0]
+          def strva(va):
+              o=vaoff(va)
+              if o is None:return None
+              e=d.find(b'\0',o,min(len(d),o+220))
+              if e<=o:return None
+              raw=d[o:e]
+              if len(raw)>200 or not raw or not all(32<=c<127 for c in raw):return None
+              return raw.decode('ascii','replace')
+          rel=by['.rela.dyn'];rels=[]
+          for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
+              ro,ri,add=struct.unpack_from('<QQq',d,o);rels.append((ro,ri&0xffffffff,ri>>32,add))
+          byoff={ro:(typ,sym,add) for ro,typ,sym,add in rels};byadd={}
+          for ro,typ,sym,add in rels:byadd.setdefault(add,[]).append((ro,typ,sym))
+          def typeinfo_at(ti):
+              nr=byoff.get(ti+8)
+              if not nr:return None
+              name=strva(nr[2])
+              if not name:return None
+              if not (name.startswith('N') or name.startswith('St') or name.startswith('_Z') or name[0].isdigit()):return None
+              return name
+          def enclosing_vtable(entry):
               out=[]
-              for i in range(len(tb)-5):
-                  if tb[i]!=0xe8:continue
-                  va=text['addr']+i
-                  if va+5+struct.unpack_from('<i',tb,i+1)[0]==target:out.append(va)
+              for delta in range(8,0x608,8):
+                  tislot=entry-delta
+                  r=byoff.get(tislot)
+                  if not r:continue
+                  ti=r[2];name=typeinfo_at(ti)
+                  if not name:continue
+                  oq=qword(tislot-8)
+                  if oq is None:continue
+                  soff=struct.unpack('<q',struct.pack('<Q',oq))[0]
+                  if not (-0x100000 <= soff <= 0x100000):continue
+                  address_point=tislot+8;slot=entry-address_point
+                  if slot<0 or slot%8:continue
+                  out.append((slot,tislot,address_point,ti,soff,name))
+              out.sort(key=lambda x:x[0])
               return out
-          prologue=bytes.fromhex('415741564155415455534889f34881ec38010000897c241c4c8d642470')
-          region_start=0x5ef300;region=b_at(region_start,0xa00)
-          hits=[];p=0
-          while True:
-              j=region.find(prologue,p)
-              if j<0:break
-              hits.append(region_start+j);p=j+1
-          print('OWNER_PROV_FACTORY_PROLOGUE_HITS='+','.join(hex(x) for x in hits))
-          for target in hits+[0x6ba100]:
-              calls=direct_calls(target)
-              print(f'OWNER_PROV_DIRECT_CALLS target=0x{target:x} count={len(calls)} calls='+','.join(hex(x) for x in calls))
-              for va in calls[:40]:
-                  lo=max(text['addr'],va-0x90);hi=min(text['addr']+text['size'],va+0xb0);w=b_at(lo,hi-lo)
-                  print(f'OWNER_PROV_CALL_WINDOW target=0x{target:x} call=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
-          # Also map exact direct calls to the known shared_ptr helper used by the factory.
-          for target in (0x6b2e20,0x6ba0b0):
-              calls=[x for x in direct_calls(target) if 0x5ef300 <= x < 0x5efd00 or target==0x6ba0b0]
-              print(f'OWNER_PROV_LOCAL_CALLS target=0x{target:x} count={len(calls)} calls='+','.join(hex(x) for x in calls))
+          targets=[0x5ef440,0x6ba100,0x6fc034]
+          discovered=[]
+          for target in targets:
+              refs=byadd.get(target,[])
+              print(f'OWNER_PROV_FUNC_REFS target=0x{target:x} count={len(refs)} refs='+','.join(hex(x[0]) for x in refs))
+              for ro,typ,sym in refs:
+                  groups=enclosing_vtable(ro)
+                  if not groups:
+                      print(f'OWNER_PROV_FUNC_VTABLE target=0x{target:x} entry=0x{ro:x} group=NONE')
+                  for slot,tislot,vptr,ti,soff,name in groups[:4]:
+                      print(f'OWNER_PROV_FUNC_VTABLE target=0x{target:x} entry=0x{ro:x} slot=0x{slot:x} tislot=0x{tislot:x} vptr=0x{vptr:x} typeinfo=0x{ti:x} offset_to_top={soff} name={name}')
+                      if slot < 0x400:discovered.append((vptr,name))
+          # Instruction-boundary candidates that materialize discovered address points via RIP-relative LEA.
+          seen=set(discovered)
+          print('OWNER_PROV_VPTR_LEA_REFS_BEGIN')
+          for vptr,name in sorted(seen):
+              refs=[]
+              for i in range(len(tb)-7):
+                  if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
+                  m=tb[i+2]
+                  if (m>>6)!=0 or (m&7)!=5:continue
+                  va=text['addr']+i;dest=va+7+struct.unpack_from('<i',tb,i+3)[0]
+                  if dest==vptr:refs.append(va)
+              print(f'vptr=0x{vptr:x} name={name} lea_refs='+','.join(hex(x) for x in refs))
+              for va in refs[:20]:
+                  lo=max(text['addr'],va-0x70);hi=min(text['addr']+text['size'],va+0xa0)
+                  w=d[text['off']+(lo-text['addr']):text['off']+(hi-text['addr'])]
+                  print(f'OWNER_PROV_VPTR_WINDOW vptr=0x{vptr:x} lea=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          print('OWNER_PROV_VPTR_LEA_REFS_END')
           print('OWNER_PROV_EXECUTED_TARGET=false')
           print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
           print('OWNER_PROV_MUTATION_PERFORMED=false')

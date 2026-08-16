@@ -1,0 +1,52 @@
+name: Track A canonical live transition CI
+
+on:
+  push:
+    branches:
+      - ci/OTC-20260816-track-a-canonical-bootstrap-implementation
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+      - .github/scripts/test_tibia_official_client_re-canonical-live-transition.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - .github/scripts/tibia-official-client-re-canonical-live-lease.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+      - .github/scripts/tibia-official-client-re-canonical-live-guard.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
+      - .github/scripts/test_track_a_agent_runtime_governance.py
+      - .github/workflows/tibia-official-client-re-canonical-live-transition-ci.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-bootstrap-implementation.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Syntax
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-canonical-live-transition.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - name: Canonical transition tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
+      - name: Existing lease and guard regression tests
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py -v
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py -v
+      - name: Track A admission audit
+        env:
+          EXPECTED_BRANCH: ci/OTC-20260816-track-a-canonical-bootstrap-implementation
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --base "${{ github.event.repository.default_branch }}" \
+            --expected-branch "$EXPECTED_BRANCH"

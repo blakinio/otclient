@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-xvfb-libgl-drivers-path
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-xvfb-libgl-drivers-path-20260816
 session_role: runtime_infrastructure_researcher
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: isolated-xvfb-libgl-drivers-path
+phase: coordinator-promotion-ready
 branch: diag/OTC-20260816-track-a-xvfb-libgl-drivers-path
 base_branch: main
 base_main: d3f186414256151c9d5e03f34c5a9026b1fba500
 risk: medium
-updated: 2026-08-16T20:49:00+02:00
+updated: 2026-08-16T20:52:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xvfb-libgl-drivers-path.md
   - docs/agents/evidence/OTC-20260816-track-a-xvfb-libgl-drivers-path/**
-  - .github/workflows/tibia-official-client-re-xvfb-libgl-drivers-path.yml
 modules_touched: []
 reuses:
   - PR #417 explicit-GLX differential as unpromoted research input only
@@ -29,7 +28,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: the contained GLX provider stack is present with zero missing direct dependencies and Xorg libglx explicitly supports LIBGL_DRIVERS_PATH; default and explicit-GLX Xvfb launches still advertise GLX absent, so the next single-variable test binds the proven contained DRI provider directory
+execution_reason: the contained GLX provider stack is present and Xorg libglx supports LIBGL_DRIVERS_PATH; this single-variable Xvfb-only experiment directly proved binding the contained DRI directory changes GLX from absent to present
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -49,7 +48,7 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
-mutation_authorized: true
+mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
@@ -65,44 +64,56 @@ canonical_boundary:
   login_allowed: false
   gameplay_allowed: false
   track_b_access: false
-exact_support_fence:
-  toolroot: /work/_otclient_tibia_re_state/toolroot
-  xvfb: /work/_otclient_tibia_re_state/toolroot/usr/bin/Xvfb
-  xvfb_sha256: 2c7f5a9534410fed5092d782a69ca7ffd9fce80e98b81ffe4944d703dd11d3b1
-  dri_root: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/dri
+execution:
+  pr: 420
+  dispatch_head: 74650474e73f4418681a52c46bf524ba878a3080
+  governance_run: 31965565693
+  governance_result: SUCCESS
+  semantic_run: 31965565953
+  semantic_job: 95210097816
+  semantic_result: SUCCESS
+  canonical_state_access: NONE
+  client_started: false
+  vnc_started: false
+  warp_started: false
+  cleanup: COMPLETE
+result:
+  classification: PROVEN_CONTAINED_LIBGL_DRIVERS_PATH_CAUSALLY_ENABLES_GLX_ON_EXACT_XVFB
+  baseline_pr417_glx_present: false
+  baseline_pr417_extension_count: 22
+  libgl_drivers_path: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/dri
   swrast_resolved: /work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/dri/libdril_dri.so
-  swrast_sha256: c28638b02783ebc96a78bb982fe59ad0d54230bc1faf53305af33edab29cd388
-  xkb_root: /work/_otclient_tibia_re_state/toolroot/usr/share/X11/xkb
-  xkbcomp: /usr/bin/xkbcomp
-  xkbcomp_sha256: 0967e7e7b03b077327cea74567726b265bd304b4fdf59f87bf7fdfe1074e7591
-experiment:
-  baseline_reference: PR #417 explicit +extension GLX case
-  only_new_variable: LIBGL_DRIVERS_PATH=/work/_otclient_tibia_re_state/toolroot/usr/lib/x86_64-linux-gnu/dri
-  server_args: identical to #417 explicit-GLX Xvfb case including +extension GLX
-  observation:
-    - core-X11 GLX and RENDER extension state
-    - bounded Xvfb stderr for GLX/AIGLX/swrast/renderer/dlopen/driver/provider lines
-forbidden:
-  - LIBGL_ALWAYS_SOFTWARE
-  - GALLIUM_DRIVER
-  - MESA_LOADER_DRIVER_OVERRIDE
-  - official client/package access
-  - VNC/WARP/proxy
-  - canonical state access
-  - credentials/login/gameplay
-  - Track B and historical PR #303 surfaces
+  server_started: true
+  extension_count: 23
+  glx_present: true
+  glx_major_opcode: 150
+  render_present: true
+  render_major_opcode: 139
+  causal_variable: LIBGL_DRIVERS_PATH
+  canonical_bootstrap_retry_authorized: false
+one_shot_workflow_removed: true
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-xvfb-libgl-drivers-path/20260816-libgl-drivers-path-enables-glx.md
+audit:
+  result: PASS_PENDING_EXACT_FINAL_HEAD_CHECKS
+  material_findings_open: 0
+  notes:
+    - dispatch-head governance passed both admission audits
+    - the experiment changed one provider variable relative to the #417 explicit-GLX case
+    - no official client/VNC/WARP/canonical state was touched
+    - one-shot workflow removed before terminal evidence/task commits
 acceptance:
-  - exact Xvfb/swrast/xkbcomp fences pass
-  - task-owned isolated display only
-  - LIBGL_DRIVERS_PATH is the only new provider variable relative to #417 explicit-GLX case
-  - GLX/RENDER query and bounded provider stderr captured
-  - no client/VNC/WARP/canonical state
-  - cleanup complete
-  - exactly one semantic physical workflow run; no retry after valid discriminator
-last_completed_step: PR #419 run 31965397353/job 95209684373 proved the contained Mesa/GLVND/swrast stack is present and direct-dependency complete, and Xorg libglx contains the LIBGL_DRIVERS_PATH provider-search override
-next_action: execute exactly one Xvfb-only explicit-GLX run with the proven contained LIBGL_DRIVERS_PATH, persist result, remove the one-shot workflow, return mutation_authorized=false, and hand the Draft to coordinator
+  - exact Xvfb/swrast/xkbcomp fences: PASS
+  - task-owned isolated display: PASS
+  - single provider variable: PASS
+  - core-X11 GLX/RENDER capture: PASS
+  - no client/VNC/WARP/canonical state: PASS
+  - cleanup: PASS
+  - exactly one semantic physical workflow run: PASS
+last_completed_step: run 31965565953/job 95210097816 directly proved the contained LIBGL_DRIVERS_PATH increases Xvfb extension count 22 to 23 and enables GLX with opcode 150 while preserving RENDER
+next_action: coordinator-promote/archive this Draft after exact-final-head checks; separately implement/test a minimal GitHub-hosted canonical-worker repair that derives and validates the contained DRI root from the selected toolroot and exports it as LIBGL_DRIVERS_PATH to Xvfb, with no physical runtime execution in the implementation PR
 ---
 
-# Track A Xvfb LIBGL_DRIVERS_PATH discriminator
+# Track A Xvfb LIBGL_DRIVERS_PATH proof — terminal candidate
 
-One-variable support-process experiment only. No official client or canonical runtime access.
+The missing GLX prerequisite now has a direct causal repair. The next step is a hosted-only worker change, not another physical runtime experiment.

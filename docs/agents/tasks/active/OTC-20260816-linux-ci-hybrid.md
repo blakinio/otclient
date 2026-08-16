@@ -2,7 +2,7 @@
 task_id: OTC-20260816-linux-ci-hybrid
 status: active
 owner: current-agent
-branch: ci/OTC-20260816-linux-ci-hybrid
+branch: ci/OTC-20260816-linux-postmerge-resilience
 base_branch: main
 related_pr: "331"
 feature_scope: infrastructure
@@ -11,9 +11,13 @@ ownership_released: false
 owned_paths:
   - .github/workflows/ci.yml
   - .github/workflows/infrastructure-retry.yml
+  - .github/workflows/reusable-build-linux.yml
   - .github/workflows/reusable-build-windows.yml
   - docs/agents/tasks/active/OTC-20260816-linux-ci-hybrid.md
   - docs/agents/tasks/archive/OTC-20260816-linux-ci-hybrid.md
+  - docs/agents/tasks/active/OTC-20260712-client-test-foundation.md
+  - docs/agents/tasks/archive/OTC-20260712-client-test-foundation.md
+updated: 2026-08-16
 ---
 
 # OTC-20260816 Linux CI hybrid
@@ -22,104 +26,115 @@ owned_paths:
 
 Make the ordinary OTClient build/test path Linux-only on GitHub-hosted runners, including a bounded headless startup smoke of the built Linux client, while preserving Synology/self-hosted capacity exclusively for work that genuinely needs controlled runtime, LAN, real display/input, persistent sessions, or physical gameplay evidence.
 
+## Current state
+
+The primary implementation is already merged through PR #331 (`4c50f1d5843bfe067cca19519e25e4fa9dc7ccfe` -> merge commit `c4b1919e16fb2931c74f32cb310229703dbf893c`). Exact-head CI run `31935503532` passed both hosted Linux builds, unit/Lua/integration tests, the real release-artifact startup smoke and `CI / Required`.
+
+The first post-merge `main` run `31937211914` did not expose an OTClient regression. Its Linux configure failed while vcpkg cold-built dependencies because the pinned freetype 2.14.3 source download from `gitlab.freedesktop.org` returned HTTP 504 through all three vcpkg attempts. A retry on the same merge SHA entered both hosted `Run CMake` jobs successfully but was later cancelled by the repository's intended `main` concurrency policy when newer documentation-only commits superseded that old `main` run.
+
+This closeout slice therefore hardens only the reusable Linux build against that demonstrated transient external-source failure, then requires a fresh full Linux build/smoke on the exact repair head and on `main` after merge before this task may be archived.
+
 ## Coordination
 
-- Owner explicitly authorized disabling Windows builds because this OTClient deployment uses Linux only.
-- Owner explicitly accepted the runner boundary: deterministic/static/build/startup validation on GitHub-hosted runners; physical gameplay control and persistent runtime evidence on Synology.
-- PR #328 is closed as superseded; its safe hosted-runner queue reductions are carried forward where applicable without its Windows gate.
-- Live validation exposed that PR #328's already-started Windows matrix kept consuming hosted runners after the PR was closed. General CI now listens for `pull_request.closed`; the new no-work run shares the PR concurrency group, so closing a PR cancels its older in-progress CI instead of leaving orphaned build demand.
-- PR #280 remains a separate specialized Synology/runtime lane and its owned files are not modified by this task.
-- Historical task `OTC-20260712-client-test-foundation` still lists `.github/workflows/reusable-build-linux.yml` as owned although its implementation PR #3 is already merged. This task does not modify that file; the startup smoke is deliberately implemented in `.github/workflows/ci.yml` after the existing Linux build artifact is produced.
+- Windows general CI remains intentionally disabled; it must not be reintroduced.
+- Dedicated Synology/Track A runtime workflows remain outside the changed runtime scope.
+- PR #328 is closed as superseded.
+- PR #280 remains a separate specialized Synology/runtime lane.
+- Historical task `OTC-20260712-client-test-foundation` was discovered to retain stale ownership of `.github/workflows/reusable-build-linux.yml` even though PR #3 is merged. This slice archives that terminal historical task and releases its ownership before modifying the reusable Linux workflow.
+- No open PR currently claims `reusable-build-linux.yml` or `OTC-20260816-linux-ci-hybrid`.
 
-## Implemented scope
+## Implemented primary scope
 
-- Replace the required Windows compile job in `.github/workflows/ci.yml` with the existing GitHub-hosted Linux reusable build.
-- Keep ordinary scope detection, fast checks, Lua checks, required aggregation, and Linux builds on GitHub-hosted Ubuntu runners.
-- Add a required GitHub-hosted Linux startup-smoke job for compile-relevant non-draft changes:
-  - download the `linux-linux-release` artifact from the same Actions run;
-  - check dynamic-library resolution with `ldd`;
-  - run the real `otclient` binary under `Xvfb` with software GL and null OpenAL output;
-  - isolate persisted state with `--user-dir` under `RUNNER_TEMP`;
-  - require the client to remain alive for a bounded 20-second startup window;
-  - upload startup and dependency logs as evidence.
-- On PR close, create only a no-work CI run in the same concurrency group so any older build for that PR is cancelled without allocating new build/test runners.
-- Avoid retrying intentionally cancelled superseded CI runs.
-- Remove the reusable Windows build workflow after verifying that the ordinary CI caller is replaced and no active workflow file in the current workflow inventory names another Windows build entry point.
-- Do not change the dedicated Synology/Track A runtime workflows.
+- Required Windows compile job replaced by the GitHub-hosted Linux reusable build.
+- Ordinary scope detection, fast checks, Lua checks, required aggregation and Linux builds remain on GitHub-hosted Ubuntu runners.
+- Required hosted Linux startup smoke:
+  - downloads `linux-linux-release` from the same run;
+  - verifies shared-library resolution with `ldd`;
+  - runs the real `otclient` under `Xvfb`, software GL and null OpenAL;
+  - isolates state with `--user-dir` under `RUNNER_TEMP`;
+  - requires a bounded 20-second liveness window;
+  - uploads startup/dependency logs.
+- PR-close cancellation emits no normal build/test work and cancels obsolete CI in the same PR concurrency group.
+- Superseded cancellations are not automatically treated as infrastructure failures.
+- Reusable Windows build workflow is removed; current workflow inventory and code search contain no `build-windows`, `windows-2025` or `reusable-build-windows.yml` general-CI dependency.
+
+## Post-merge resilience slice
+
+- Release the stale merged test-foundation ownership record.
+- Cache vcpkg source downloads on hosted Linux runners to reduce repeated external fetches.
+- Give the CMake configure/build action one bounded retry after a failed first attempt. A deterministic code/configuration failure will still fail the second attempt; a transient source/network failure gets one additional chance without weakening the required gate.
+- Require exact-head Linux release/tests + startup smoke + `CI / Required` before merge.
+- Require a fresh compile-scope `main` run after merge before task archival.
 
 ## Runner boundary
 
 ### GitHub-hosted runners
 
-Responsible for deterministic and disposable validation that does not require a durable game session:
-
-- static analysis, workflow validation and Lua syntax;
-- C++/Lua unit and bounded integration tests;
-- Linux release/test compilation;
-- Linux client artifact dependency validation;
-- bounded headless client startup smoke under a virtual X display.
+Responsible for deterministic/disposable validation that does not require a durable game session: static/workflow/Lua checks, C++/Lua/integration tests, Linux release/test compilation, artifact dependency validation and bounded headless startup smoke.
 
 ### Synology/self-hosted runtime
 
-Responsible for evidence that depends on the real controlled environment:
-
-- persistent OTClient session and canonical runtime registration;
-- real display/input ownership;
-- login and physical gameplay control such as walking/clicking;
-- LAN/runtime integration requiring the Synology environment;
-- long-lived observations and direct runtime evidence.
+Responsible for persistent OTClient sessions, canonical runtime registration, real display/input ownership, login/walking/clicking, LAN/runtime integration and direct physical gameplay evidence.
 
 A GitHub headless startup smoke is not evidence of successful physical gameplay and must never replace Synology runtime E2E where that evidence is required.
 
 ## Acceptance inventory
 
-- [x] `CI` has no `windows-2025`, `build-windows`, or `reusable-build-windows.yml` dependency on the implementation branch.
+- [x] General `CI` has no Windows build dependency.
 - [x] Compile-relevant PRs require `Build - Linux` via `.github/workflows/reusable-build-linux.yml`.
-- [x] Documentation/task-only changes are scoped so unrelated fast/Lua/build/smoke jobs can be skipped.
-- [x] Closed PRs have a concurrency-cancellation path that emits no normal build/test work.
-- [ ] Generic CI jobs are observed on GitHub-hosted Ubuntu runners on the exact implementation head.
-- [ ] Exact-head Actions proves the real Linux release artifact starts under `Xvfb` and survives the bounded 20-second smoke window.
-- [ ] Startup smoke evidence artifact contains dependency/startup logs.
-- [x] Dedicated Synology/runtime workflow files are outside this task's changed-file set.
-- [x] Runner responsibility boundary is durably recorded and explicitly prevents hosted startup smoke from being treated as physical gameplay E2E.
-- [x] Superseded `cancelled` CI runs are not automatically retried.
-- [ ] Workflow validation/actionlint and exact-head required CI pass.
-- [ ] Related PRs are terminal: #328 closed superseded; PR #331 merged when green; #280 intentionally remains separate if still active.
+- [x] Documentation/task-only changes skip unrelated fast/Lua/build/smoke jobs.
+- [x] Closed PRs share the PR concurrency key and emit no normal build/test work.
+- [x] Generic CI jobs were observed on GitHub-hosted Ubuntu runners on exact implementation head `4c50f1d...`.
+- [x] Exact-head run `31935503532` proves the real Linux release artifact starts under `Xvfb` and survives the bounded 20-second smoke window.
+- [x] Smoke artifact `9260979303` contains dependency/startup logs; smoke job `95140721575` completed successfully.
+- [x] Exact-head Linux tests job `95137457639` and release job `95137457721` passed.
+- [x] Exact-head `CI / Required` job `95140827090` passed.
+- [x] Dedicated Synology/runtime workflow files remain outside this task's implementation changes.
+- [x] Runner responsibility boundary is durably recorded.
+- [x] PR #331 is merged; #328 is closed superseded; #280 remains separate.
+- [x] Initial post-merge failure classified from direct job logs as external freetype HTTP 504, not an OTClient compile regression.
+- [x] Historical merged task #3 stale ownership identified and released in this closeout slice.
+- [ ] Resilience PR exact head passes actionlint/workflow validation, both Linux builds, tests, startup smoke and `CI / Required`.
+- [ ] Resilience PR merged.
+- [ ] Fresh compile-scope `main` CI after resilience merge passes both Linux builds, startup smoke and `CI / Required`.
+- [ ] Task archived and ownership released.
 
-## Validation
+## Validation contract
 
-1. Inspect the exact branch diff and workflow references.
-2. Verify no Windows build dependency remains in general CI.
-3. Inspect PR #331 exact-head Actions jobs/runner labels.
-4. Require workflow syntax/actionlint, both Linux builds, hosted client startup smoke and `CI / Required` success.
-5. Verify the smoke job uses the real release artifact, a virtual display, isolated user directory, bounded liveness and no Synology runner labels.
-6. Verify closed-PR events skip normal jobs while sharing the same concurrency key used by the PR's active run.
-7. Merge only on the exact validated head.
-8. Verify post-merge `main` and its Actions outcome.
-9. Archive this task and release ownership after post-merge verification.
+1. Keep Windows disabled and preserve the hosted/Synology responsibility split.
+2. Validate the resilience diff through exact-head Actions.
+3. Require both Linux matrix builds and the same real-artifact 20-second startup smoke.
+4. Merge only the validated exact head.
+5. Verify the resulting compile-scope `main` run, not a docs-only run.
+6. Archive this task only after post-merge `main` success.
 
 ## Runtime E2E
 
 `SPLIT_BY_ENVIRONMENT`:
 
-- GitHub-hosted environment outcome required here: real release artifact headless startup smoke.
-- Physical gameplay/runtime E2E remains intentionally outside this infrastructure task and belongs to the dedicated Synology/Track A runtime lane. That lane must provide its own direct display/PID/session/gameplay evidence when a task requires it.
+- GitHub-hosted outcome required here: Linux release/tests plus real release-artifact headless startup smoke.
+- Physical gameplay/runtime E2E remains intentionally outside this infrastructure task and belongs to the dedicated Synology/Track A runtime lane.
 
 ## Context checkpoint
 
 ```yaml
-state: PROVEN
-phase: validation
-base_head: a27b9f3383b0555142b31216672e9f0143d2cd3d
-implementation_pr: 331
-superseded_pr: 328
-specialized_runtime_pr: 280
-historical_merged_pr_with_stale_task_claim: 3
-observed_orphaned_run: 31934213173
-changed_paths:
-  - .github/workflows/ci.yml
-  - .github/workflows/infrastructure-retry.yml
-  - .github/workflows/reusable-build-windows.yml (removed)
-  - docs/agents/tasks/active/OTC-20260816-linux-ci-hybrid.md
-next_action: validate the new exact PR head through hosted Linux builds plus real client startup smoke, audit the final diff, then merge and archive if green
+state: PROVEN_WITH_POSTMERGE_INFRASTRUCTURE_FOLLOWUP
+phase: closeout_resilience
+primary_implementation_pr: 331
+primary_implementation_head: 4c50f1d5843bfe067cca19519e25e4fa9dc7ccfe
+primary_merge_commit: c4b1919e16fb2931c74f32cb310229703dbf893c
+exact_head_ci_run: 31935503532
+exact_head_linux_tests_job: 95137457639
+exact_head_linux_release_job: 95137457721
+exact_head_smoke_job: 95140721575
+exact_head_required_job: 95140827090
+exact_head_smoke_artifact: 9260979303
+initial_postmerge_run: 31937211914
+initial_postmerge_failure: EXTERNAL_FREETYPE_HTTP_504
+initial_postmerge_attempt: 1
+postmerge_retry_attempt: 2
+postmerge_retry_result: SUPERSEDED_BY_NEWER_MAIN_CONCURRENCY
+resilience_branch: ci/OTC-20260816-linux-postmerge-resilience
+stale_ownership_task_archived: OTC-20260712-client-test-foundation
+next_action: harden reusable Linux dependency fetch resilience, validate exact head, merge, require fresh compile-scope main CI, then archive
 ```

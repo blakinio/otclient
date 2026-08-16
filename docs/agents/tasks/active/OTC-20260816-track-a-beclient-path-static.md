@@ -1,19 +1,19 @@
 ---
 task_id: OTC-20260816-track-a-beclient-path-static
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-beclient-path-static-20260816
-session_role: researcher
+session_role: validator
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: discovery
-phase: validate
+phase: close
 branch: research/OTC-20260816-track-a-beclient-path-static
 base_branch: main
 base_main: 0fd3c743508901b62fd1e3f355cf8964ca7da5db
 risk: low
-updated: 2026-08-16T11:16:00+02:00
+updated: 2026-08-16T11:17:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-beclient-path-static.md
   - docs/agents/reports/OTCLIENT-20260816-beclient-path-static.md
@@ -87,7 +87,7 @@ validation_runs:
   - run: 31938348199
     job: 95143716438
     conclusion: success
-    purpose: exploratory raw +0xd8 sweep; numerical census later rejected as not instruction-boundary-safe
+    purpose: exploratory raw +0xd8 sweep; numerical census rejected as not instruction-boundary-safe
   - run: 31938451474
     job: 95143965655
     conclusion: failure
@@ -97,9 +97,15 @@ validation_runs:
     conclusion: success
     purpose: final deterministic loader-specific filename data-flow validator
 report: docs/agents/reports/OTCLIENT-20260816-beclient-path-static.md
+audit:
+  result: PASS
+  basis: deterministic final exact-client validator plus fresh final diff/provenance review
+  material_findings_open: 0
 e2e: NOT_APPLICABLE
-last_completed_step: final deterministic filename data-flow validator passed; material findings persisted; temporary workflow is being removed before final exact-head CI
-next_action: audit the final two-file documentation diff against exact run evidence, then complete exact-head repository CI and merge
+e2e_reason: static evidence reconstruction only; no executable or runtime behavior changed
+temporary_workflow_removed: true
+last_completed_step: final report audited; temporary workflow removed; retained diff is report plus task only
+next_action: complete exact-head required repository CI, merge PR #335, then archive this task and release ownership
 ---
 
 # Objective
@@ -151,7 +157,11 @@ Static retained-file analysis only (`runtime_access: none`). No client/BattlEye 
 5. Concrete runtime filename/path — remains UNKNOWN with exact missing link recorded.
 6. Prior raw audio-loader and post-`0x6fc82d` state corrections preserved — PASS.
 7. BattlEye internals/bypass/evasion not analyzed — PASS.
-8. Temporary workflow removal before final merge — in progress as closeout operation.
+8. Temporary workflow removal before final merge — PASS.
+
+# Audit
+
+PASS. The final two-file retained diff was reviewed against the exact run/job provenance. The report preserves the concrete filename as UNKNOWN, retains the client-to-BEClient conclusion as DERIVED, and explicitly rejects the unsafe raw `+0xd8` census instead of laundering it into a fact.
 
 # E2E
 

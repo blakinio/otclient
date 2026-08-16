@@ -26,6 +26,8 @@ jobs:
       pull-requests: read
     outputs:
       compile: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.compile }}
+      fast: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.fast }}
+      lua: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group') && 'true' || steps.filter.outputs.lua }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
@@ -50,9 +52,41 @@ jobs:
               - "CMakePresets.json"
               - ".github/workflows/ci.yml"
               - ".github/workflows/reusable-build-windows.yml"
+            fast:
+              - "src/**"
+              - "tests/**"
+              - "modules/**"
+              - "mods/**"
+              - "data/**"
+              - "cmake/**"
+              - "vc18/**"
+              - "vcpkg.json"
+              - "vcpkg-configuration.json"
+              - "CMakeLists.txt"
+              - "CMakePresets.json"
+              - ".github/**"
+              - ".yamllint.yaml"
+              - "**/*.xml"
+            lua:
+              - "src/**"
+              - "tests/**"
+              - "modules/**"
+              - "mods/**"
+              - "data/**"
+              - "cmake/**"
+              - "vc18/**"
+              - "vcpkg.json"
+              - "vcpkg-configuration.json"
+              - "CMakeLists.txt"
+              - "CMakePresets.json"
+              - ".github/workflows/ci.yml"
+              - ".github/workflows/reusable-build-windows.yml"
+              - ".github/workflows/reusable-tests-lua.yml"
 
   checks:
     name: Fast Checks
+    needs: changes
+    if: needs.changes.outputs.fast == 'true'
     permissions:
       contents: read
       checks: write
@@ -61,6 +95,8 @@ jobs:
 
   tests-lua:
     name: Lua Syntax
+    needs: changes
+    if: needs.changes.outputs.lua == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/reusable-tests-lua.yml
@@ -100,16 +136,41 @@ jobs:
           jobs = json.loads(os.environ["NEEDS_JSON"])
           rejected = {}
 
-          for name in ("changes", "checks", "tests-lua"):
-              result = jobs[name].get("result")
-              if result != "success":
-                  rejected[name] = f"expected success, got {result}"
+          changes_result = jobs["changes"].get("result")
+          if changes_result != "success":
+              rejected["changes"] = f"expected success, got {changes_result}"
 
-          compile_scope = jobs["changes"].get("outputs", {}).get("compile")
-          if compile_scope not in {"true", "false"}:
-              rejected["scope:compile"] = (
-                  f"expected true or false, got {compile_scope!r}"
-              )
+          outputs = jobs["changes"].get("outputs", {})
+          scopes = {
+              "compile": outputs.get("compile"),
+              "fast": outputs.get("fast"),
+              "lua": outputs.get("lua"),
+          }
+          for scope, value in scopes.items():
+              if value not in {"true", "false"}:
+                  rejected[f"scope:{scope}"] = (
+                      f"expected true or false, got {value!r}"
+                  )
+
+          for job_name, scope_name in (("checks", "fast"), ("tests-lua", "lua")):
+              result = jobs[job_name].get("result")
+              scope_value = scopes[scope_name]
+              if scope_value == "true" and result != "success":
+                  rejected[job_name] = (
+                      f"scope {scope_name}=true requires success, got {result}"
+                  )
+              elif scope_value == "false" and result != "skipped":
+                  rejected[job_name] = (
+                      f"scope {scope_name}=false requires skipped, got {result}"
+                  )
+
+          compile_scope = scopes["compile"]
+          if compile_scope == "true":
+              for required_scope in ("fast", "lua"):
+                  if scopes[required_scope] != "true":
+                      rejected[f"scope:{required_scope}"] = (
+                          f"compile=true requires {required_scope}=true, got {scopes[required_scope]!r}"
+                      )
 
           is_draft = os.environ["IS_DRAFT"] == "true"
           windows_result = jobs["build-windows"].get("result")
@@ -121,10 +182,17 @@ jobs:
               rejected["build-windows"] = (
                   f"scope compile=true requires success, got {windows_result}"
               )
+          elif (is_draft or compile_scope == "false") and windows_result != "skipped":
+              rejected["build-windows"] = (
+                  f"draft or compile=false requires skipped, got {windows_result}"
+              )
 
           print("Required job results:")
           for name in sorted(jobs):
               print(f"- {name}: {jobs[name].get('result')}")
+          print("Detected scopes:")
+          for name in sorted(scopes):
+              print(f"- {name}: {scopes[name]}")
 
           if rejected:
               for name, reason in sorted(rejected.items()):

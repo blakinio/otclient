@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-xcbgl-runtime-trace
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-xcbgl-runtime-trace-20260816
 session_role: runtime_researcher
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: isolated-xcbgl-loader-trace
+phase: coordinator-promotion-ready
 branch: diag/OTC-20260816-track-a-xcbgl-runtime-trace
 base_branch: main
 base_main: d3f186414256151c9d5e03f34c5a9026b1fba500
 risk: high
-updated: 2026-08-16T20:14:00+02:00
+updated: 2026-08-16T20:24:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xcbgl-runtime-trace.md
   - docs/agents/evidence/OTC-20260816-track-a-xcbgl-runtime-trace/**
-  - .github/workflows/tibia-official-client-re-xcbgl-runtime-trace.yml
 modules_touched: []
 reuses:
   - docs/agents/tasks/archive/OTC-20260816-track-a-xcbgl-log-extract.md
@@ -28,7 +27,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: the completed hosted extraction of #410 proved the retained Actions log cannot classify xcbglintegrations discovery/load/init; the next accepted discriminator is one narrow ephemeral-isolated runtime trace plus read-only extension inventory on the same task-owned Xvfb display
+execution_reason: one separately admitted ephemeral-isolated runtime discriminator was required because #412/#413 proved the retained #410 Actions log could not classify XCB GL integration discovery/load/init or same-display GLX extension state
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -48,7 +47,7 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
-mutation_authorized: true
+mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
@@ -68,37 +67,86 @@ exact_client_fence:
 source_harness:
   commit: cb557da12ebb41c597340909b2db717ee59cdfe1
   blob: 1616edcc982be50ef2c95b8077160ec8fe9291fe
-  required_patches: 6
-  patch_1: nounset-safe snapshot local declaration
-  patch_2: replace source task id with current task id
-  patch_3: replace QT_XCB_GL_INTEGRATION=none with QSG_INFO=1 plus QT_DEBUG_PLUGINS=1 while preserving QT_QUICK_BACKEND=software
-  patch_4: add read-only core-X11 extension inventory after task-owned Xvfb socket proof
-  patch_5: filter the complete task-owned client log to xcbglintegrations/QXcbIntegration/GLX/EGL/QRhi/load lines before emission
-  patch_6: emit exact filtered-match count alongside total client-log line count
-observation_scope:
-  - same task-owned isolated Xvfb display created by the accepted immutable harness
-  - X11 core ListExtensions plus QueryExtension for GLX and RENDER only
-  - complete client.log scanned locally but only allowlisted sanitized graphics/plugin lines emitted
-  - bounded 5/15/35 second client/window snapshots retained from the accepted harness
-forbidden:
-  - canonical bootstrap or canonical lease/registration/session access
-  - backend forcing including QSG_RHI_BACKEND or QT_XCB_GL_INTEGRATION override
-  - account credentials, login or gameplay
-  - Track B or historical PR #303 runtime surfaces
-  - arbitrary process inventory or proprietary binary upload
+  fenced_patch_count: 6
+execution:
+  pr: 415
+  dispatch_head: 8ffc60146573e5fb9ac1b900ff45843af10301dd
+  governance_run: 31964397501
+  governance_result: SUCCESS
+  semantic_run: 31964397523
+  semantic_job: 95207211173
+  semantic_result: SUCCESS
+  runner: synology-otclient-01
+  one_shot_workflow_removed: true
+  cleanup: COMPLETE
+  canonical_state_access: NONE
+runtime_observation:
+  ephemeral_display: ':231'
+  ephemeral_vnc_port: 6200
+  ephemeral_client_pid: 26073
+  ephemeral_client_pgid: 26073
+  client_alive_t05: true
+  client_alive_t15: true
+  client_alive_t35: true
+  visible_windows_t05: 0
+  visible_windows_t15: 0
+  visible_windows_t35: 0
+  window_classification: CLIENT_ALIVE_NO_VISIBLE_WINDOWS_ON_ISOLATED_DISPLAY
+  historical_ephemeral_values_only: true
+x11_extension_observation:
+  extension_count: 22
+  glx_present: false
+  glx_major_opcode: 0
+  render_present: true
+  render_major_opcode: 139
+qt_xcb_gl_trace:
+  client_log_total_lines: 424
+  allowlist_filter_matches: 41
+  xcb_platform_library_loaded: true
+  xcbglintegrations_directory_scanned: true
+  xcb_glx_metadata_found: true
+  xcb_glx_key_found: true
+  xcb_glx_library_loaded: true
+  xcb_egl_specific_log_line_present: false
+  qxcb_reports_neither_glx_nor_egl_enabled: true
+  qrhi_gles2_context_failed: true
+  vulkan_library_loaded: true
+  qrhi_vulkan_initialized: true
+result:
+  classification: PROVEN_TASK_OWNED_XVFB_GLX_ABSENT_QT_XCB_GLX_PLUGIN_DISCOVERED_AND_LOADED_CONTEXT_CREATION_FAILS_NO_GLX_OR_EGL
+  glx_absence_is_direct_prerequisite_gap: true
+  glx_absence_proven_sole_no_window_root_cause: false
+  canonical_bootstrap_retry_authorized: false
+  client_backend_forcing_authorized: false
+negative_evidence_boundary:
+  statement: the complete 424-line task-owned client log was scanned locally with EGL/libqxcb-egl-integration included in the allowlist and emitted no libqxcb-egl-integration-specific line
+  does_not_prove:
+    - EGL plugin file is absent from the package
+    - every EGL code path is impossible
+    - GLX absence alone explains the final no-window state
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-xcbgl-runtime-trace/20260816-xcbgl-runtime-trace.md
+audit:
+  result: PASS_PENDING_EXACT_FINAL_HEAD_CHECKS
+  material_findings_open: 0
+  notes:
+    - exact semantic run and cleanup succeeded under governance-compliant ephemeral_isolated admission
+    - the temporary workflow was removed before any subsequent task/evidence commit, preventing a second physical run
+    - an initial repository CI generation on the temporary-workflow head found only a missing final newline in that temporary file; the file is now removed and final exact-head normal checks must supersede that generation
 acceptance:
-  - immutable source blob and every patch site fenced before execution
-  - task-owned isolated display/WARP/VNC/client namespace only
-  - exact live client executable fence passes
-  - read-only X11 extension inventory proves whether GLX is advertised on the exact task-owned display
-  - complete client log is scanned and only compact sanitized xcbglintegration/GLX/EGL/QRhi/load lines are emitted
-  - no graphics backend is forced and canonical state is untouched
-  - cleanup completes
-  - exactly one semantic physical run; no retry on a new discriminator
-last_completed_step: #412/#413 exhausted the retained #410 Actions log and proved xcbglintegration discovery/load/init remains unknown without a new physical observation
-next_action: execute exactly one governance-compliant isolated XCB GL loader trace plus same-display X11 extension inventory, persist the sanitized result, remove the one-shot workflow, return mutation_authorized=false, and hand the Draft to the coordinator
+  - immutable source blob and six patch sites fenced: PASS
+  - task-owned isolated namespace only: PASS
+  - exact live client executable fence: PASS
+  - same-display read-only X11 extension inventory: PASS
+  - complete local client-log scan with compact sanitized allowlist emission: PASS
+  - no client backend forcing: PASS
+  - no canonical state access: PASS
+  - cleanup: PASS
+  - exactly one semantic physical run: PASS
+last_completed_step: run 31964397523/job 95207211173 proved the task-owned Xvfb advertises no GLX extension while Qt discovers and loads libqxcb-glx-integration.so before reporting neither GLX nor EGL enabled; the client remains alive with zero visible windows through 35 seconds and cleanup completes
+next_action: coordinator-promote/archive this Draft after exact-final-head checks; separately admit a support-only Xvfb capability discriminator to determine whether the exact contained Xvfb can expose GLX at all, without launching the official client or retrying canonical bootstrap
 ---
 
-# Track A XCB GL runtime trace discriminator
+# Track A XCB GL runtime trace — terminal candidate
 
-This is a narrow non-canonical physical diagnostic. It must not create, inspect or mutate the canonical runtime and must not force GLX, EGL, Vulkan, OpenGL or another renderer/backend.
+The missing XCB GL loader evidence is closed for this isolated surface. The next unresolved question is the contained Xvfb server's GLX capability, not another official-client retry.

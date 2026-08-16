@@ -1,0 +1,40 @@
+name: Track A canonical toolroot layout fix
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-session.sh
+      - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-toolroot-layout-fix.md
+      - .github/workflows/tibia-official-client-re-canonical-toolroot-layout-fix.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate fail-closed toolroot resolver and transition contracts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
+          python3 -m py_compile \
+            .github/scripts/test_tibia_official_client_re_canonical_live_session.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          grep -Fq 'TOOLROOT_HOME="$BASE/toolroot"' .github/scripts/tibia-official-client-re-canonical-live-session.sh
+          grep -Fq 'TOOLROOT_WORK=/work/_otclient_tibia_re_state/toolroot' .github/scripts/tibia-official-client-re-canonical-live-session.sh
+          grep -Fq 'toolroot_complete "$persisted_toolroot" || die toolroot_unavailable' .github/scripts/tibia-official-client-re-canonical-live-session.sh
+          if grep -Fq 'login_e2e' .github/scripts/tibia-official-client-re-canonical-live-session.sh; then
+            echo 'TOOLROOT_FIX_FAIL=login_surface_added' >&2
+            exit 1
+          fi
+          echo 'TOOLROOT_FIX_VALIDATION=PASS'

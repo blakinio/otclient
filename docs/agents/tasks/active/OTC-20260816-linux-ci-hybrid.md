@@ -4,7 +4,7 @@ status: active
 owner: current-agent
 branch: ci/OTC-20260816-linux-ci-hybrid
 base_branch: main
-related_pr: null
+related_pr: "331"
 feature_scope: infrastructure
 completion_claim: internal_only
 ownership_released: false
@@ -38,20 +38,20 @@ Make the ordinary OTClient build/test path Linux-only on GitHub-hosted runners w
 
 ## Acceptance inventory
 
-- [ ] `CI` has no `windows-2025`, `build-windows`, or `reusable-build-windows.yml` dependency.
-- [ ] Compile-relevant PRs require `Build - Linux` via `.github/workflows/reusable-build-linux.yml`.
-- [ ] Documentation/task-only changes do not allocate unrelated fast/Lua/build runners.
-- [ ] Generic CI jobs use GitHub-hosted Ubuntu runners.
-- [ ] Dedicated Synology/runtime workflow files remain unchanged.
-- [ ] Superseded `cancelled` CI runs are not automatically retried.
+- [x] `CI` has no `windows-2025`, `build-windows`, or `reusable-build-windows.yml` dependency on the implementation branch.
+- [x] Compile-relevant PRs require `Build - Linux` via `.github/workflows/reusable-build-linux.yml`.
+- [x] Documentation/task-only changes are scoped so unrelated fast/Lua/build jobs can be skipped.
+- [ ] Generic CI jobs are observed on GitHub-hosted Ubuntu runners on the exact implementation head.
+- [x] Dedicated Synology/runtime workflow files are outside this task's changed-file set.
+- [x] Superseded `cancelled` CI runs are not automatically retried.
 - [ ] Workflow validation/actionlint and exact-head required CI pass.
-- [ ] Related PRs are terminal: #328 closed superseded; implementation PR merged when green; #280 intentionally remains separate if still active.
+- [ ] Related PRs are terminal: #328 closed superseded; PR #331 merged when green; #280 intentionally remains separate if still active.
 
 ## Validation
 
 1. Inspect the exact branch diff and workflow references.
 2. Verify no Windows build dependency remains in general CI.
-3. Open a PR and inspect exact-head Actions jobs/runner labels.
+3. Inspect PR #331 exact-head Actions jobs/runner labels.
 4. Require workflow syntax/actionlint and `CI / Required` success.
 5. Merge only on the exact validated head.
 6. Archive this task and release ownership after post-merge verification.
@@ -64,9 +64,15 @@ Make the ordinary OTClient build/test path Linux-only on GitHub-hosted runners w
 
 ```yaml
 state: PROVEN
-phase: implementation
+phase: validation
 base_head: a27b9f3383b0555142b31216672e9f0143d2cd3d
+implementation_pr: 331
 superseded_pr: 328
 specialized_runtime_pr: 280
-next_action: remove the Windows reusable build, inspect the exact diff, open the implementation PR, and validate exact-head Actions
+changed_paths:
+  - .github/workflows/ci.yml
+  - .github/workflows/infrastructure-retry.yml
+  - .github/workflows/reusable-build-windows.yml (removed)
+  - docs/agents/tasks/active/OTC-20260816-linux-ci-hybrid.md
+next_action: validate PR 331 on its exact head, audit the final diff, then merge and archive if green
 ```

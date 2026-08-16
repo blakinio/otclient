@@ -3,7 +3,7 @@
 status: active
 branch: ci/OTC-20260816-actions-concurrency-optimization
 base: main
-pr: pending
+pr: 328
 feature_scope: infrastructure
 completion_claim: internal_only
 
@@ -27,9 +27,9 @@ reuses:
 depends_on: []
 blocks: []
 cross_repository_tasks:
-- `blakinio/Otheryn`: separate CI-concurrency optimization task; no shared branch or file ownership
-- `blakinio/Oteryn-Platform`: separate CI-concurrency optimization task if live evidence warrants it
-- `blakinio/freqtrade`: separate CI-concurrency optimization task if live evidence warrants it
+- `blakinio/Otheryn`: separate CI-concurrency optimization task in PR #417; no shared branch or file ownership
+- `blakinio/Oteryn-Platform`: audited separately; current Edge Security workflow already ignores `docs/agents/**` and cancels superseded runs
+- `blakinio/freqtrade`: audited separately; live CI load is dominated by active governance PR #1563 and its risk-aware component graph
 
 ## Live evidence at claim
 
@@ -39,18 +39,27 @@ cross_repository_tasks:
 - `.github/workflows/infrastructure-retry.yml` treats `cancelled` as retryable when it does not find a newer run, despite intentional cancellation being part of the CI concurrency design.
 - Open PR #280 owns only the dedicated Synology runner stack/migration workflow and does not overlap `.github/workflows/ci.yml` or `.github/workflows/infrastructure-retry.yml`.
 
+## Implemented change
+
+- `CI` now emits explicit `compile`, `fast`, and `lua` path-scope outputs.
+- Documentation/task-only changes leave both `fast` and `lua` false, so reusable Fast Checks and Lua Syntax are skipped rather than allocating hosted runners.
+- Compile paths are deliberately duplicated into both `fast` and `lua` filters; `CI / Required` fails closed if `compile=true` is ever inconsistent with those scopes.
+- Manual dispatch and merge-queue validation force all scopes true.
+- The aggregate required job validates each scope against the actual job conclusion and continues to require Windows success for a non-draft compile-scope run.
+- Infrastructure retry no longer treats `cancelled` as retryable; timeout and proven startup-failure handling remain.
+
 ## Acceptance inventory
 
 - [ ] Documentation/task-only PRs run only the scope detector plus the aggregate required gate from the general `CI` workflow; unrelated Fast Checks, Lua Syntax and Windows build are skipped.
-- [ ] Code/config/workflow changes still run the relevant Fast Checks and Lua gate according to explicit path scope.
-- [ ] Every compile-relevant path remains a subset of both fast-check and Lua-validation scope so the existing Windows build dependency cannot silently bypass those gates.
-- [ ] `workflow_dispatch` and merge-queue validation force the full validation scope.
-- [ ] `CI / Required` validates scope/result consistency and fails closed if a required scoped job is skipped or a non-required scoped job unexpectedly runs.
-- [ ] Windows compilation remains required for non-draft compile-scope changes.
-- [ ] Automatic retry remains available for `timed_out` and proven `startup_failure` infrastructure failures, but not for intentional `cancelled` conclusions.
+- [x] Code/config/workflow changes still run the relevant Fast Checks and Lua gate according to explicit path scope.
+- [x] Every compile-relevant path remains a subset of both fast-check and Lua-validation scope so the existing Windows build dependency cannot silently bypass those gates.
+- [x] `workflow_dispatch` and merge-queue validation force the full validation scope.
+- [x] `CI / Required` validates scope/result consistency and fails closed if a required scoped job is skipped or a non-required scoped job unexpectedly runs.
+- [x] Windows compilation remains required for non-draft compile-scope changes.
+- [x] Automatic retry remains available for `timed_out` and proven `startup_failure` infrastructure failures, but not for intentional `cancelled` conclusions.
 - [ ] Workflow syntax/actionlint and exact-head required CI pass on the implementation head.
 - [ ] A post-merge docs-only closeout PR proves the reduced emitted job graph on the optimized `main` before archival is merged.
-- [ ] No owner-funded AI/Codex/OpenAI quota is used.
+- [x] No owner-funded AI/Codex/OpenAI quota is used.
 
 ## Validation plan
 
@@ -65,13 +74,18 @@ cross_repository_tasks:
 
 ```yaml
 state: PROVEN
-phase: implementation
+phase: validation
 owner: current-agent
 branch: ci/OTC-20260816-actions-concurrency-optimization
-pr: pending
+pr: 328
+head: pending-live-refresh
 owned_paths:
   - .github/workflows/ci.yml
   - .github/workflows/infrastructure-retry.yml
   - docs/agents/tasks/active/OTC-20260816-actions-concurrency-optimization.md
-next_action: open an early draft PR, then implement scoped CI fanout and cancellation-retry suppression
+proven:
+  - scoped general CI fanout implemented
+  - cancelled conclusions removed from automatic retry eligibility
+  - PR #280 path ownership does not overlap this task
+next_action: inspect PR #328 exact diff and exact-head emitted checks; promote from draft only after workflow validation is green
 ```

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-xvfb-glx-enable-probe
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-xvfb-glx-enable-20260816
 session_role: runtime_infrastructure_researcher
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: isolated-xvfb-glx-enable
+phase: coordinator-promotion-ready
 branch: diag/OTC-20260816-track-a-xvfb-glx-enable-probe
 base_branch: main
 base_main: d3f186414256151c9d5e03f34c5a9026b1fba500
 risk: medium
-updated: 2026-08-16T20:35:00+02:00
+updated: 2026-08-16T20:39:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xvfb-glx-enable-probe.md
   - docs/agents/evidence/OTC-20260816-track-a-xvfb-glx-enable-probe/**
-  - .github/workflows/tibia-official-client-re-xvfb-glx-enable-probe.yml
 modules_touched: []
 reuses:
   - PR #416 contained-Xvfb capability evidence as unpromoted research input only
@@ -28,7 +27,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: read-only capability inventory proved the exact contained Xvfb has GLX server code, contained libGL dependency and libglx.so module while the prior isolated display advertised no GLX; one isolated Xvfb-only differential is required to test whether explicit +extension GLX changes the server extension state
+execution_reason: read-only capability inventory proved the exact contained Xvfb has GLX server code, contained libGL dependency and libglx.so module while the prior isolated display advertised no GLX; one isolated Xvfb-only differential tested whether explicit +extension GLX changes the server extension state
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -48,7 +47,7 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
-mutation_authorized: true
+mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
@@ -71,33 +70,55 @@ exact_support_fence:
   xkb_root: /work/_otclient_tibia_re_state/toolroot/usr/share/X11/xkb
   system_xkbcomp: /usr/bin/xkbcomp
   system_xkbcomp_sha256: 0967e7e7b03b077327cea74567726b265bd304b4fdf59f87bf7fdfe1074e7591
-experiment:
-  - start one task-owned default Xvfb with the accepted support environment and capture stderr plus core-X11 extension state
-  - tear it down with ownership verification
-  - start one task-owned Xvfb with the same environment plus exactly `+extension GLX`
-  - capture stderr plus core-X11 extension state
-  - tear it down completely
-  - compare GLX and RENDER presence between the two subruns
-forbidden:
-  - official client launch or package access
-  - VNC/WARP/proxy setup
-  - canonical lease/registration/session access
-  - arbitrary process inventory
-  - credentials/login/gameplay
-  - Track B and historical PR #303 surfaces
+execution:
+  pr: 417
+  dispatch_head: 6ade6bf38131a325935686c9766f1545afd196d9
+  governance_run: 31965041248
+  governance_result: SUCCESS
+  semantic_run: 31965041300
+  semantic_job: 95208804449
+  semantic_result: SUCCESS
+  canonical_state_access: NONE
+  client_started: false
+  vnc_started: false
+  warp_started: false
+  cleanup: COMPLETE
+result:
+  classification: PROVEN_EXPLICIT_GLX_FLAG_DOES_NOT_ENABLE_GLX_ON_CURRENT_CONTAINED_XVFB_ENVIRONMENT
+  default_server_started: true
+  default_extension_count: 22
+  default_glx_present: false
+  default_render_present: true
+  explicit_glx_server_started: true
+  explicit_glx_extension_count: 22
+  explicit_glx_present: false
+  explicit_glx_render_present: true
+  extension_lists_identical: true
+  explicit_glx_provider_log_present: false
+  explicit_glx_hypothesis_disproven: true
+one_shot_workflow_removed: true
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-xvfb-glx-enable-probe/20260816-default-vs-explicit-glx.md
+audit:
+  result: PASS_PENDING_EXACT_FINAL_HEAD_CHECKS
+  material_findings_open: 0
+  notes:
+    - dispatch-head fresh admission behavior and deterministic policy audits both passed
+    - exactly one semantic physical workflow run executed
+    - official client/VNC/WARP/canonical state were excluded
+    - one-shot workflow removed before terminal evidence/task commits
 acceptance:
-  - exact Xvfb and xkbcomp fences pass before launch
-  - both displays are freshly selected and task-owned
-  - default and explicit-GLX server use identical environment/args except `+extension GLX`
-  - core-X11 ListExtensions/QueryExtension records GLX and RENDER for each subrun
-  - bounded sanitized Xvfb stderr records GLX provider/init diagnostics
-  - no official client/VNC/WARP/canonical state access
-  - cleanup completes for both subruns
-  - exactly one semantic physical workflow run; no retry after a valid discriminator
-last_completed_step: PR #416 run 31964879003/job 95208403843 proved the contained Xvfb binary includes GLX code/options, contained libGL.so.1 and contained libglx.so/libglamoregl.so with direct dependencies resolved
-next_action: execute exactly one isolated Xvfb-only default-vs-+extension-GLX differential, persist the sanitized result, remove the one-shot workflow, return mutation_authorized=false and hand the Draft to the coordinator
+  - exact Xvfb and xkbcomp fences: PASS
+  - default and explicit GLX Xvfb subruns captured: PASS
+  - core-X11 GLX/RENDER comparison: PASS
+  - bounded server stderr: PASS
+  - no client/VNC/WARP/canonical state: PASS
+  - cleanup: PASS
+  - exactly one semantic workflow run: PASS
+last_completed_step: run 31965041300/job 95208804449 proved explicit +extension GLX does not change the contained Xvfb extension list: both default and explicit cases advertise 22 extensions with GLX absent and RENDER present
+next_action: coordinator-promote/archive this Draft after exact-final-head checks; separately admit one Xvfb-only contained-modulepath discriminator using `-modulepath /work/_otclient_tibia_re_state/toolroot/usr/lib/xorg/modules +extension GLX`, without official client/VNC/WARP or canonical state access
 ---
 
-# Track A Xvfb GLX enable probe
+# Track A Xvfb GLX enable probe — terminal candidate
 
-Support-process discriminator only. No official Tibia client or canonical runtime surface may be touched.
+The command-line extension flag is not sufficient. The next variable is explicit binding of Xvfb to the contained Xorg module tree that contains `libglx.so`.

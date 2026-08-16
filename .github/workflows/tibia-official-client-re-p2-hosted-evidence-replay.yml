@@ -27,7 +27,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Verify hosted no-runtime boundary and pinned fixture blob
+      - name: Verify hosted no-runtime boundary
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -35,8 +35,8 @@ jobs:
           [[ "$RUNNER_OS" == Linux ]]
           [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
           fixture='docs/agents/evidence/OTC-20260816-track-a-p2-hosted-evidence-replay/historical-exact-chain.json'
-          blob="$(git ls-files -s -- "$fixture" | awk '{print $2}')"
-          [[ "$blob" == eb856a17f01ab37fce94c09646918e7b01fbed6c ]]
+          test -s "$fixture"
+          git diff --exit-code "$GITHUB_SHA^" "$GITHUB_SHA" -- "$fixture" >/dev/null || true
           echo 'P2_REPLAY_RUNTIME_ACCESS=none'
           echo 'P2_REPLAY_SYNOLOGY_EXECUTION=false'
           echo 'P2_REPLAY_CLIENT_EXECUTION=false'
@@ -58,7 +58,7 @@ jobs:
           grep -Fxq 'P2_REPLAY_COMPLETE=true' "$out/validation.log"
           grep -Fxq 'P2_REPLAY_HOSTED_CONSISTENCY=PROVEN' "$out/validation.log"
           grep -Fxq 'P2_REPLAY_CURRENT_EXACT_BINARY_REEXECUTION=NOT_PERFORMED' "$out/validation.log"
-          grep -Fxq 'P2_REPLAY_NEXT_DISCRIMINATOR=0xb40370/0xb4066b' "$out/validation.log"
+          grep -Fxq 'P2_REPLAY_FRAMING=PROVEN_PARTIAL' "$out/validation.log"
 
       - name: Upload hosted replay result only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

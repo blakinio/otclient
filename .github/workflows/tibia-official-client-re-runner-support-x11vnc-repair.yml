@@ -65,10 +65,20 @@ jobs:
           [[ "$(dpkg-query -W -f='${Version}' x11vnc 2>/dev/null)" == '0.9.16-10' ]]
           dpkg-query -S "$src" | grep -Eq '^x11vnc(:[^:]+)?: /usr/bin/x11vnc$'
           verify_output="$(dpkg -V x11vnc 2>&1 || true)"
-          [[ -z "$verify_output" ]] || {
-            printf 'RUNNER_SUPPORT_REPAIR_REFUSED=DPKG_VERIFY:%s\n' "$verify_output" >&2
-            exit 42
-          }
+          if [[ -n "$verify_output" ]]; then
+            unexpected="$(printf '%s\n' "$verify_output" | grep -Ev \
+              -e '^missing +/usr/share/doc/x11vnc/NEWS\.gz$' \
+              -e '^missing +/usr/share/doc/x11vnc/README\.gz$' \
+              -e '^missing +/usr/share/man/man1/x11vnc\.1\.gz$' \
+              -e '^missing +/usr/share/man/man8/Xdummy\.8\.gz$' || true)"
+            [[ -z "$unexpected" ]] || {
+              printf 'RUNNER_SUPPORT_REPAIR_REFUSED=DPKG_PAYLOAD_VERIFY:%s\n' "$unexpected" >&2
+              exit 42
+            }
+            echo 'RUNNER_SUPPORT_DPKG_VERIFY=ONLY_KNOWN_DOCS_MISSING'
+          else
+            echo 'RUNNER_SUPPORT_DPKG_VERIFY=FULL_PACKAGE_OK'
+          fi
 
           [[ -d "$root" && ! -L "$root" ]]
           root_real="$(realpath -e -- "$root")"

@@ -14,8 +14,8 @@ branch: docs/OTC-20260815-track-a-canonical-live-bootstrap-closeout
 base_branch: main
 base_main: 9d3b94d4f06a1eba1dacca91a9dd288e1a8af56a
 risk: medium
-related_pr: pending
-updated: 2026-08-16T05:21:00+02:00
+related_pr: 320
+updated: 2026-08-16T05:22:00+02:00
 lease_expires_at: null
 lease_released_at: 2026-08-16T05:21:00+02:00
 stale_takeover_count: 1
@@ -28,7 +28,7 @@ continuation_policy: completed
 task_completion_policy: completed
 user_communication: terminal_only
 implementation_authorized: false
-last_progress_at: 2026-08-16T05:21:00+02:00
+last_progress_at: 2026-08-16T05:22:00+02:00
 final_contract_head: 3daa6d1f4d966729a30699843f698ee98852611b
 final_main_merge: 9d3b94d4f06a1eba1dacca91a9dd288e1a8af56a
 repository_ci_run: 31923908397
@@ -40,7 +40,7 @@ audit_material_findings_open: 0
 e2e_result: NOT_APPLICABLE
 review_threads: 0
 stop_reason: completed
-next_action: clean-restack and validate PR #311 against final manager plus bootstrap contract; do not launch/login a client
+next_action: after PR #320 protected-merges, clean-restack and validate PR #311 against final manager plus bootstrap contract; do not launch/login a client
 ---
 
 # Terminal result
@@ -86,8 +86,10 @@ closeout:
       - CI / Required job 95108437445
   pull_requests:
     implementation_pr: blakinio/otclient#318 merged
+    closeout_pr: blakinio/otclient#320
     unresolved_review_threads: 0
   task_status: completed
-  ownership_released: true
+  task_archived_on_merge_of: blakinio/otclient#320
+  ownership_released_on_merge_of: blakinio/otclient#320
   stale_closeout_reused: false
 ```

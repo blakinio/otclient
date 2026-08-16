@@ -16,7 +16,9 @@ current_main: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260816-track-a-worldmap-exact-static-evidence
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
-updated: 2026-08-16T22:58:00+02:00
+updated: 2026-08-16T23:04:00+02:00
+producer_pr: 437
+producer_head: bfbd81dc6cf3ad54e383484161ce5624634f7409
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-exact-static-evidence.md
   - docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/**
@@ -117,15 +119,23 @@ consumer_contract:
 researcher_delivery: draft_only
 WORLD_MAP_STATIC_EVIDENCE_READY: false
 programme_complete: false
+validation_state:
+  current_head_runtime_governance_run: 31972287815
+  current_head_runtime_governance_conclusion: success
+  current_head_ci_run: 31972287917
+  current_head_ci_state: in_progress
 recovery_checkpoint:
-  status: PREPARED_BEFORE_FIRST_RUNNER_JOB
+  status: QUEUED_FIRST_SOURCE_JOB
   trusted_base: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
   runner_job_started: false
-  source_run_id: NOT_STARTED
-  source_job_id: NOT_STARTED
+  source_run_id: 31972285354
+  source_job_id: 95226438379
+  source_run_head: bfbd81dc6cf3ad54e383484161ce5624634f7409
+  source_job_state: queued
+  queue_discriminator: synology-otclient-01 is occupied by admitted physical run 31972261899 job 95226396914; no source failure has occurred and this producer has not touched that runtime lease or namespace
   first_hypothesis: select only the two exact-source candidates proven by #431's successful immutable harness, then verify size and SHA before any bounded read
   prohibited_repeat: do not retry PR #435 retained-run SOURCE_CLIENT path without a new discriminator
-next_action: open Draft producer PR, add bounded ELF/RTTI/xref sanitizer plus hosted validator, execute one source-staging attempt, then persist exact sanitized evidence and coordinates for PR #367
+next_action: let the admitted self-hosted queue serialize naturally; when source job 95226438379 starts, consume exact-fenced sanitized output, refine once only if fresh evidence exposes a new analyzer discriminator, and persist final evidence for PR #367
 ---
 
 # Track A world-map exact static evidence producer
@@ -135,3 +145,5 @@ This task is a read-only exact-client evidence producer for consumer PR #367. It
 The post-v7 discriminator is already established: #431 restored GLX and exact-client startup but still observed zero visible windows. Because the requested product is static ELF evidence, the approved path is to avoid the GUI gate entirely and read only a size/SHA-fenced retained exact file.
 
 The first source hypothesis deliberately differs from failed PR #435 run 31971704065: that run bound one stale retained-run path and failed before ELF access. This producer instead uses only the two install candidates already exercised successfully by the immutable #431 harness, then performs bounded relocation-aware extraction.
+
+The first producer run is `31972285354`; source job `95226438379` is queued behind an already-admitted live runtime job on `synology-otclient-01`. Queueing is not treated as evidence failure and no competing runtime lease is modified.

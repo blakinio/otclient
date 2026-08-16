@@ -91,11 +91,11 @@ jobs:
               raise SystemExit(f'DRI_REVALIDATION_REFUSED=SUPPORT_ANCHOR_COUNT:{script.count(support_anchor)}')
           script=script.replace(support_anchor,support_patch,1)
 
-          xvfb_env_anchor='LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \\\n    XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \\'
-          xvfb_env_patch='LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \\\n    LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \\'
-          if script.count(xvfb_env_anchor) != 1:
-              raise SystemExit(f'DRI_REVALIDATION_REFUSED=XVFB_ENV_PATCH_SITE_COUNT:{script.count(xvfb_env_anchor)}')
-          script=script.replace(xvfb_env_anchor,xvfb_env_patch,1)
+          xkb_env_token='XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb"'
+          xkb_env_patch='LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb"'
+          if script.count(xkb_env_token) != 1:
+              raise SystemExit(f'DRI_REVALIDATION_REFUSED=XVFB_ENV_PATCH_SITE_COUNT:{script.count(xkb_env_token)}')
+          script=script.replace(xkb_env_token,xkb_env_patch,1)
 
           xvfb_anchor="echo 'WINDOW_DIAG_XVFB=PASS'\n"
           x11_probe=r'''echo 'WINDOW_DIAG_XVFB=PASS'

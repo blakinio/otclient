@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "provenance": {
+    "source_run": 31944051248,
+    "source_job": 95157306712,
+    "source_artifact_id": 9262800114,
+    "source_artifact_zip_sha256": "30bd87d94088019b42fcf8504dfb6082af53b447547c544fec816e35b86407f3",
+    "source_execution": "historical_exact_binary_synology_quarantined_for_routing",
+    "current_hosted_replay_can_upgrade_exact_binary_provenance": false,
+    "contains_client_binary_bytes": false
+  },
+  "exact_client": {
+    "version_mapping": "15.32.df7b29",
+    "platform": "official_native_linux_only",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "historical_exact_binary_result": {
+    "semantic_result": "POST_SERIALIZATION_PROCESSOR_CHAIN_PROVEN",
+    "persistent_qbuffer_direct_readall": "PROVEN",
+    "first_downstream_consumer": "PROVEN:TProtocolClientMessageProcessor+0x10@0xc2df80",
+    "first_downstream_transform": "PROVEN:TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "same_message_handoff_to_dualconnection": "PROVEN",
+    "protocol_stage_order": "PROVEN_PARTIAL",
+    "framing": "UNKNOWN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN",
+    "final_binary_egress": "UNKNOWN"
+  },
+  "stage_order": [
+    {"stage":"TProtocolClientMessageProcessor virtual +0x10","entry":"0xc2df80","input":"signal argument","effect":"invoke retained intermediate; QIODevice::readAll on persistent QBuffer this+0x18; assign bytes to message+0x8"},
+    {"stage":"TGameserverNetworkPacketRawDataProcessor virtual +0x10","entry":"0xb47130","input":"same message object","effect":"QByteArray insert/append/reallocation and in-place assignment to message+0x8"},
+    {"stage":"TGameserverDualConnection virtual +0x80","entry":"0xb56d60","input":"same post-raw message object","effect":"consumer call proven; transport semantics unclassified"},
+    {"stage":"TGameserverDualConnection virtual +0x78","entry":"0xb56970","input":"same post-raw message object","effect":"consumer call proven; transport semantics unclassified"}
+  ],
+  "provenance_members": {
+    "persistent_qbuffer_saved_at_setup_scratch": "rbp-0x218",
+    "persistent_qbuffer_stored_in_client_processor_member": "this+0x18",
+    "client_processor_outer_member": "outer+0xa00",
+    "raw_processor_outer_member": "outer+0xa10",
+    "dualconnection_outer_member": "outer+0xc18"
+  },
+  "instruction_markers": [
+    "197108f: mov QWORD PTR [rax+0x28],rsi",
+    "7dd67f: call QWORD PTR [rax+0x10]",
+    "7dd693: call QWORD PTR [rax+0x10]",
+    "7dd6a7: call QWORD PTR [rax+0x80]",
+    "7dd6be: call QWORD PTR [rax+0x78]",
+    "c2dfa5: mov rdi,QWORD PTR [rbp+0x18]",
+    "c2dfd5: call QIODevice::readAll",
+    "b47189: call QByteArray::insert",
+    "b47206: call QByteArray::append",
+    "b47300: call QByteArray::operator="
+  ],
+  "next_discriminator_observation": {
+    "source_run": 31904696996,
+    "source_artifact_id": 9252025461,
+    "address": "0xb4066b",
+    "function_window": "dual_precondition@0xb40370",
+    "observed_call": "QIODevice::write(QByteArray)",
+    "direction": "UNKNOWN",
+    "outbound_egress_claim": "FORBIDDEN_UNTIL_DIRECTION_AND_OWNERSHIP_PROVEN"
+  },
+  "negative_controls": {
+    "direct_dualconnection_writer_ownership_assumed": false,
+    "dual_plus80_or_plus78_labeled_final_egress": false,
+    "historical_final_socket_run_used_as_current_proof": false,
+    "raw_transform_labeled_framing_without_semantics": false
+  }
+}

@@ -13,7 +13,7 @@ branch: feat/OTC-20260816-track-a-p1-bridge-health-recovery
 base_branch: main
 base_main: 0d7b2607912552599ae501891491aab439cfde7b
 created: 2026-08-16T13:14:00+02:00
-updated: 2026-08-16T13:25:38+02:00
+updated: 2026-08-16T13:26:57+02:00
 risk: medium
 researcher_delivery: draft_only
 implementation_authorized: true
@@ -58,32 +58,29 @@ feature_scope:
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 execution_class: github_hosted
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
 persistent_session_role: consumer_of_runtime_evidence
 physical_e2e_required: false
-track_a_runtime_admission:
-  track_id: official-client-re
-  runtime_access: none
-  runtime_owner_task: NOT_APPLICABLE
-  runtime_namespace: NOT_APPLICABLE
-  canonical_registration: NOT_APPLICABLE
-  canonical_lease_generation: NOT_APPLICABLE
-  registration_lease_generation: NOT_APPLICABLE
-  gate_a: NOT_APPLICABLE
-  generation_rebind: NOT_APPLICABLE
-  gate_b: NOT_APPLICABLE
-  bootstrap: NOT_APPLICABLE
-  target_uniqueness: NOT_APPLICABLE
-  mutation_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-16T13:10:00+02:00
-last_progress_at: 2026-08-16T13:25:38+02:00
+last_progress_at: 2026-08-16T13:26:57+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: final-draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -104,6 +101,7 @@ The P1 layer must never bootstrap, launch, login, restart, kill, attach to, reco
 - PR #303 owns separate physical runtime surfaces; this task neither observed nor mutated that runtime.
 - Canonical live identity is deliberately not claimed here: `:98 = UNKNOWN`, `6082 = UNKNOWN`, PID/session = `NOT_REGISTERED`.
 - The task-owned temporary workflow `.github/workflows/track-a-p1-bridge-validation.yml` was used only for hosted validation and was removed before this handoff head.
+- Final Track A admission fields are persisted at top-level front matter exactly as the deterministic governance parser requires for `runtime_access: none`.
 
 # Acceptance inventory
 
@@ -116,11 +114,12 @@ The P1 layer must never bootstrap, launch, login, restart, kill, attach to, reco
 - [x] Cover healthy/unavailable/malformed/identity-change/stale-generation/stale-lease/replacement-endpoint/retry-exhaustion/recovery-success and real Unix-socket transport/protocol classification paths with deterministic tests.
 - [x] Keep all prior #283 focused tests passing on the latest implementation code (`31944224720`, job `95157714206`: baseline fence, dependencies, `py_compile`, focused suite all SUCCESS before C++ build step).
 - [x] Run proportional GitHub-hosted focused/component validation. Full validation run `31944059279`, job `95157324527`, completed SUCCESS including accepted-blob fence, dependencies, `py_compile`, focused suite and standalone Qt bridge build. Later Python-only audit fixes did not change accepted CMake/`bridge.cpp`; run `31944224720` re-proved their exact blob fence and the complete Python suite on head `7c86acf779a4677715161001ab9315d41afed65d`.
-- [x] Diagnose the sole failed validation generation from evidence: run `31944025412`, job `95157249963` failed only because hosted validation lacked `pyelftools`; dependency installation was added and the next full run succeeded. No identical blind retry was used.
+- [x] Diagnose the sole focused-validation failure from evidence: run `31944025412`, job `95157249963` failed only because hosted validation lacked `pyelftools`; dependency installation was added and the next full run succeeded. No identical blind retry was used.
 - [x] Perform a fresh post-implementation exact-source audit. Two robustness findings were found and fixed (string-based stale classification; non-object `PING` handling), followed by additional regression/real-IPC tests. Final re-read at `e78fea2e19ad93e1c828cd8f00cd47a23b7a6402` found zero open material code findings. This was a same-invocation validator pass, not an independent external reviewer; coordinator review remains required for promotion.
 - [x] Remove the temporary validation workflow before the final Draft handoff head (`e78fea2e19ad93e1c828cd8f00cd47a23b7a6402`).
+- [x] Correct the deterministic Track A admission record after exact-head governance exposed nested-vs-top-level parser incompatibility (`31944317814`, job `95157928824`).
 - [x] Leave the result `DRAFT_NOT_PROMOTED`; PR #357 remains Draft and the researcher does not merge/promote it.
-- [ ] Final exact-head repository CI/checks are intentionally read from PR #357 after this immutable handoff commit; any failure reopens the task before coordinator promotion.
+- [ ] Final exact-head repository CI/checks are intentionally read from PR #357 after this handoff commit; any failure reopens the task before coordinator promotion.
 
 # Evidence boundary
 
@@ -133,6 +132,7 @@ The P1 layer must never bootstrap, launch, login, restart, kill, attach to, reco
 - Latest implementation hosted run: `31944224720`, job `95157714206`; accepted baseline fence, dependencies, `py_compile` and complete focused suite = `SUCCESS` before branch cleanup advanced the Draft head.
 - Temporary validation workflow removed: `e78fea2e19ad93e1c828cd8f00cd47a23b7a6402`.
 - Main freshness recheck at handoff preparation: `main@0d7b2607912552599ae501891491aab439cfde7b`.
+- Exact-head governance diagnostic: `31944317814`, job `95157928824` identified only missing top-level admission fields; fresh behavior audit in the same run passed, and the record was flattened without touching bridge code.
 
 # Audit result
 
@@ -151,7 +151,7 @@ owner_funded_ai_used: false
 ```yaml
 status: ready
 result: DRAFT_NOT_PROMOTED
-last_completed_step: froze P1 code, removed temporary hosted validation workflow, and prepared Draft handoff after zero-open-finding source audit
+last_completed_step: fixed deterministic admission-record shape after exact-head governance while preserving the frozen P1 bridge implementation
 blockers: []
 next_action: verify PR #357 final exact-head repository checks, then coordinator reviews/promotes or rejects the Draft P1 package; physical runtime proof remains RUNTIME-owned
 ```

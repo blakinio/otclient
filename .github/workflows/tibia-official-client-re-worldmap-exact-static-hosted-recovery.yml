@@ -1,0 +1,128 @@
+name: Track A worldmap exact static hosted recovery
+
+on:
+  push:
+    branches:
+      - research/OTC-20260816-track-a-worldmap-exact-static-evidence
+    paths:
+      - .github/workflows/tibia-official-client-re-worldmap-exact-static-hosted-recovery.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: track-a-worldmap-exact-static-hosted-recovery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  hosted-recover:
+    name: Recover hosted worldmap evidence from preserved source artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260816-track-a-worldmap-exact-static-evidence
+      SOURCE_RUN_ID: '31972743782'
+      SOURCE_ARTIFACT_ID: '9270235755'
+      SOURCE_ARTIFACT_NAME: track-a-worldmap-exact-static-source-31972743782
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Checkout producer branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify hosted recovery boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          [[ "$RUNNER_ARCH" == X64 ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          command -v objdump >/dev/null
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py
+          echo WORLD_MAP_STATIC_RECOVERY_EXECUTION_CLASS=github_hosted
+          echo WORLD_MAP_STATIC_RECOVERY_SOURCE_RUN_ID="$SOURCE_RUN_ID"
+          echo WORLD_MAP_STATIC_RECOVERY_SOURCE_ARTIFACT_ID="$SOURCE_ARTIFACT_ID"
+          echo WORLD_MAP_STATIC_RUNTIME_ACCESS=none
+          echo WORLD_MAP_STATIC_RAW_CLIENT_PRESENT=false
+          echo WORLD_MAP_STATIC_PHYSICAL_E2E=false
+
+      - name: Download preserved sanitized source artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: artifacts/source
+          github-token: ${{ github.token }}
+          repository: blakinio/otclient
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Disassemble bounded windows and recover enriched evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf artifacts/hosted-validation artifacts/final
+          mkdir -p artifacts/hosted-validation artifacts/final
+
+          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py \
+            validate \
+            --bundle-dir artifacts/source \
+            --outdir artifacts/hosted-validation
+
+          grep -Fxq 'WORLD_MAP_STATIC_HOSTED_VALIDATION=PASS' artifacts/hosted-validation/hosted-validation.txt
+          grep -Fxq "WORLD_MAP_STATIC_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/hosted-validation/hosted-validation.txt
+          grep -Fxq "WORLD_MAP_STATIC_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/hosted-validation/hosted-validation.txt
+          grep -Fxq "WORLD_MAP_STATIC_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/hosted-validation/hosted-validation.txt
+
+          cp artifacts/hosted-validation/worldmap-static-evidence.json artifacts/final/
+          cp artifacts/hosted-validation/worldmap-static-evidence.md artifacts/final/
+          cp artifacts/source/source-fence.txt artifacts/final/
+          cp artifacts/hosted-validation/hosted-validation.json artifacts/final/
+          cp artifacts/hosted-validation/hosted-validation.txt artifacts/final/
+
+      - name: Enforce final consumer artifact boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('artifacts/final')
+          allowed = {
+              'worldmap-static-evidence.json',
+              'worldmap-static-evidence.md',
+              'source-fence.txt',
+              'hosted-validation.json',
+              'hosted-validation.txt',
+          }
+          actual = {p.name for p in root.iterdir() if p.is_file()}
+          if actual != allowed:
+              raise SystemExit(f'unsafe final artifact file set: {sorted(actual)}')
+          for path in sorted(root.iterdir()):
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              if len(data) > 2 * 1024 * 1024:
+                  raise SystemExit(f'oversized final output: {path}:{len(data)}')
+              if data.startswith(b'\x7fELF') or data[:2] == b'MZ':
+                  raise SystemExit(f'raw executable payload refused: {path}')
+              data.decode('utf-8')
+          print('WORLD_MAP_STATIC_RECOVERY_FINAL_SANITIZED_BOUNDARY=PASS')
+          PY
+
+      - name: Upload recovered consumer-facing sanitized evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-worldmap-exact-static-final-recovery-${{ github.run_id }}
+          path: artifacts/final/**
+          if-no-files-found: error
+          retention-days: 30

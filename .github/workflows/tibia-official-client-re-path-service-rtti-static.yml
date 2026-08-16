@@ -1,0 +1,133 @@
+name: Track A path-service RTTI static probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-path-service-rtti-static.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-path-service-rtti-static.md
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Identify QLibrary filename service type statically
+    runs-on: [otclient, synology]
+    timeout-minutes: 7
+    steps:
+      - name: Parse exact-client RTTI relocations and decoder availability
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || exit 2
+          client='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/client'
+          [[ -f "$client" ]] || exit 3
+          [[ "$(stat -c '%s' "$client")" == '51965216' ]] || exit 4
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
+          echo 'PATH_RTTI_CLIENT_FENCE=PASS'
+
+          python3 - "$client" <<'PY'
+          import importlib.util,pathlib,struct,sys,re
+          for mod in ('capstone','iced_x86','elftools'):
+              print(f'PATH_RTTI_MODULE_{mod.upper()}={"AVAILABLE" if importlib.util.find_spec(mod) else "UNAVAILABLE"}')
+
+          d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
+          h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
+          _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
+          shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
+          st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
+          def cs(blob,o):
+              if not (0 <= o < len(blob)): return ''
+              e=blob.find(b'\0',o); e=len(blob) if e<0 else e
+              return blob[o:e].decode('utf8','replace')
+          secs=[]
+          for i,x in enumerate(sh):
+              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+          by={s['name']:s for s in secs}; text=by['.text']
+          def va_to_off(va):
+              for s in secs:
+                  if s['size'] and s['addr'] <= va < s['addr']+s['size']:
+                      return s['off']+(va-s['addr'])
+              return None
+          def string_at_va(va,limit=180):
+              o=va_to_off(va)
+              if o is None:return None
+              e=d.find(b'\0',o,min(len(d),o+limit))
+              if e<=o:return None
+              raw=d[o:e]
+              if not raw or len(raw)>160 or not all(32<=b<127 for b in raw):return None
+              return raw.decode('ascii','replace')
+
+          rel=by.get('.rela.dyn')
+          relocs=[]
+          if rel:
+              for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
+                  if o+24>len(d):break
+                  ro,ri,add=struct.unpack_from(E+'QQq',d,o)
+                  relocs.append((ro,ri&0xffffffff,ri>>32,add))
+          print(f'PATH_RTTI_RELA_DYN_COUNT={len(relocs)}')
+          byoff={ro:(typ,sym,add) for ro,typ,sym,add in relocs}
+          byadd={}
+          for ro,typ,sym,add in relocs:byadd.setdefault(add,[]).append((ro,typ,sym))
+
+          helpers={0x6b9fa0,0x6ba000,0x6ba060,0x6ba0b0}
+          print('PATH_RTTI_HELPER_RELOCS_BEGIN')
+          for target in sorted(helpers):
+              refs=byadd.get(target,[])
+              print(f'target=0x{target:x} refs={len(refs)} '+','.join(f'0x{ro:x}/t{typ}' for ro,typ,sym in refs[:30]))
+          print('PATH_RTTI_HELPER_RELOCS_END')
+
+          # Collect printable strings with type/path/resource terminology, then use relocation
+          # relationships to identify possible Itanium typeinfo objects and vtable typeinfo slots.
+          terms=re.compile(r'(FileSystem|Filesystem|FileService|Resource|Path|Directory|Install|Storage|Archive|Asset|DataProvider|ResourceProvider)',re.I)
+          candidates=[]
+          seen=set()
+          for s in secs:
+              if not (s['flags'] & 0x2) or s['size']==0: continue
+              blob=d[s['off']:s['off']+s['size']]
+              for m in re.finditer(rb'[ -~]{4,160}\x00',blob):
+                  raw=m.group()[:-1]
+                  try:txt=raw.decode('ascii')
+                  except:continue
+                  if not terms.search(txt):continue
+                  va=s['addr']+m.start()
+                  key=(va,txt)
+                  if key in seen:continue
+                  seen.add(key); candidates.append((va,txt))
+          print(f'PATH_RTTI_TERM_STRING_COUNT={len(candidates)}')
+          print('PATH_RTTI_TYPE_CANDIDATES_BEGIN')
+          emitted=0
+          for sva,txt in candidates:
+              name_refs=byadd.get(sva,[])
+              # A common Itanium typeinfo object has name pointer at object+8.
+              for nro,ntyp,nsym in name_refs:
+                  ti=nro-8
+                  vrefs=byadd.get(ti,[])
+                  if not vrefs:continue
+                  for tro,ttyp,tsym in vrefs[:8]:
+                      # If tro is the typeinfo slot (vptr-8), slot +0xd8 from vptr is at tro+8+0xd8.
+                      slot_off=tro+8+0xd8
+                      slot=byoff.get(slot_off)
+                      slotadd='NONE' if slot is None else hex(slot[2])
+                      print(f'name_va=0x{sva:x} text={txt[:120]} typeinfo=0x{ti:x} typeinfo_ref=0x{tro:x} slot_d8_reloc=0x{slot_off:x} slot_d8_addend={slotadd}')
+                      emitted+=1
+                      if emitted>=120:break
+                  if emitted>=120:break
+              if emitted>=120:break
+          print('PATH_RTTI_TYPE_CANDIDATES_END')
+
+          # Search exact relative calls to getter 0x6ba0b0, retained as a safe callsite census.
+          tb=d[text['off']:text['off']+text['size']]
+          getter=0x6ba0b0; calls=[]
+          for i in range(len(tb)-5):
+              if tb[i]!=0xe8:continue
+              va=text['addr']+i
+              if va+5+struct.unpack_from('<i',tb,i+1)[0]==getter:calls.append(va)
+          print(f'PATH_RTTI_GETTER_CALL_COUNT={len(calls)}')
+          print('PATH_RTTI_GETTER_CALLS='+','.join(hex(x) for x in calls))
+          print('PATH_RTTI_EXECUTED_TARGET=false')
+          print('PATH_RTTI_LIVE_RUNTIME_OBSERVED=false')
+          print('PATH_RTTI_MUTATION_PERFORMED=false')
+          PY

@@ -65,13 +65,22 @@ class HealthFixture(unittest.TestCase):
             "window_identity": copy.deepcopy(reg["window_identity"]),
         }
 
-    def ping(self) -> dict:
-        return {"ok": True, "command": "PING", "main_base_resolved": True}
+    def ping(self, registration: dict | None = None) -> dict:
+        reg = self.registration() if registration is None else registration
+        return {
+            "ok": True,
+            "command": "PING",
+            "main_base_resolved": True,
+            "pid": reg["pid"],
+            "process_start_ticks": reg["process_start_ticks"],
+            "client_version": reg["client_version"],
+            "binary_sha256": reg["client_sha256"],
+        }
 
     def health(self, registration: dict | None = None, observation: dict | None = None, ping: dict | None = None, **kwargs):
         reg = self.registration() if registration is None else registration
         obs = self.observation(reg) if observation is None else observation
-        bridge_ping = self.ping() if ping is None else ping
+        bridge_ping = self.ping(reg) if ping is None else ping
         return evaluate_health(
             reg,
             obs,
@@ -83,7 +92,7 @@ class HealthFixture(unittest.TestCase):
 
 
 class HealthEvaluationTests(HealthFixture):
-    def test_ready_requires_registration_gate_b_and_ping(self):
+    def test_ready_requires_registration_gate_b_and_identity_bound_ping(self):
         report = self.health()
         self.assertTrue(report.ready)
         self.assertEqual(Readiness.READY, report.readiness)
@@ -127,6 +136,19 @@ class HealthEvaluationTests(HealthFixture):
         report = self.health(registration, observation)
         self.assertEqual(Readiness.REGISTRATION_INVALID, report.readiness)
 
+    def test_incomplete_canonical_registration_rejected(self):
+        registration = self.registration()
+        del registration["source_run"]
+        report = self.health(registration, self.observation(registration))
+        self.assertEqual(Readiness.REGISTRATION_INVALID, report.readiness)
+
+    def test_non_json_window_identity_rejected(self):
+        registration = self.registration()
+        registration["window_identity"] = {"bad": {1, 2}}
+        observation = self.observation(registration)
+        report = self.health(registration, observation)
+        self.assertEqual(Readiness.REGISTRATION_INVALID, report.readiness)
+
     def test_observation_namespace_mismatch_rejected(self):
         observation = self.observation()
         observation["runtime_namespace"] = "historical-display-98"
@@ -156,7 +178,21 @@ class HealthEvaluationTests(HealthFixture):
         self.assertEqual(Readiness.IDENTITY_MISMATCH, report.readiness)
 
     def test_bridge_ping_must_prove_main_base(self):
-        report = self.health(ping={"ok": True, "command": "PING", "main_base_resolved": False})
+        ping = self.ping()
+        ping["main_base_resolved"] = False
+        report = self.health(ping=ping)
+        self.assertEqual(Readiness.BRIDGE_UNHEALTHY, report.readiness)
+
+    def test_bridge_ping_must_match_registered_pid_and_start_ticks(self):
+        ping = self.ping()
+        ping["pid"] += 1
+        report = self.health(ping=ping)
+        self.assertEqual(Readiness.BRIDGE_UNHEALTHY, report.readiness)
+
+    def test_bridge_ping_must_match_exact_profile_identity(self):
+        ping = self.ping()
+        ping["binary_sha256"] = "a" * 64
+        report = self.health(ping=ping)
         self.assertEqual(Readiness.BRIDGE_UNHEALTHY, report.readiness)
 
     def test_game_state_does_not_change_runtime_readiness_claim(self):
@@ -200,7 +236,9 @@ class ReacquisitionTests(HealthFixture):
 class RecoveryTests(HealthFixture):
     def test_ready_to_degraded_to_reacquiring_and_back_to_ready(self):
         ready = self.health()
-        unhealthy = self.health(ping={"ok": False, "command": "PING", "main_base_resolved": False})
+        unhealthy_ping = self.ping()
+        unhealthy_ping["ok"] = False
+        unhealthy = self.health(ping=unhealthy_ping)
         state, action = recovery_transition(RecoveryState.READY, unhealthy)
         self.assertEqual(RecoveryState.DEGRADED, state)
         self.assertEqual(RecoveryAction.REACQUIRE, action)
@@ -213,7 +251,9 @@ class RecoveryTests(HealthFixture):
 
     def test_recovery_report_never_exposes_old_identity_on_failure(self):
         current = self.health().identity
-        unhealthy = self.health(ping={"ok": False, "command": "PING", "main_base_resolved": False})
+        unhealthy_ping = self.ping()
+        unhealthy_ping["ok"] = False
+        unhealthy = self.health(ping=unhealthy_ping)
         report = build_recovery_report(current, RecoveryState.READY, unhealthy)
         self.assertEqual("DROP_CURRENT_AND_WAIT", report["reacquisition_action"])
         self.assertIsNone(report["accepted_identity"])

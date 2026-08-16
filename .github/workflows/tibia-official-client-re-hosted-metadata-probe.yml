@@ -1,0 +1,64 @@
+name: Track A hosted official Linux package metadata probe
+
+on:
+  push:
+    branches:
+      - research/OTC-20260816-track-a-worldmap-extent-static-re
+    paths:
+      - .github/workflows/tibia-official-client-re-hosted-metadata-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch official launcher metadata and extract Linux client entry
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == 'blakinio/otclient' ]]
+          out="$RUNNER_TEMP/tibia-metadata-probe"
+          mkdir -p "$out"
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          ref='https://www.tibia.com/account/?subtopic=downloadclient'
+          fetch() {
+            local name="$1" url="$2"
+            local code
+            code="$(curl -sS -L --retry 0 --compressed -A "$ua" -e "$ref" -o "$out/$name" -w '%{http_code}' "$url" || true)"
+            echo "FETCH name=$name http=$code bytes=$(stat -c '%s' "$out/$name" 2>/dev/null || echo 0) url=$url"
+          }
+          fetch tibiametadata.json 'https://static.tibia.com/launcher/tibiametadata.json'
+          fetch package.json 'https://static.tibia.com/launcher/tibiaclient-linux-current/package.json'
+          fetch package.json.version 'https://static.tibia.com/launcher/tibiaclient-linux-current/package.json.version'
+          python3 - "$out" <<'PY'
+          import json, pathlib, sys
+          root=pathlib.Path(sys.argv[1])
+          for name in ('tibiametadata.json','package.json'):
+              p=root/name
+              if not p.exists() or not p.stat().st_size:
+                  continue
+              try:
+                  obj=json.loads(p.read_text(errors='replace'))
+              except Exception as e:
+                  print(f'JSON_PARSE_FAIL name={name} error={type(e).__name__}:{e}')
+                  continue
+              if isinstance(obj,dict): print(f'JSON_TOP_KEYS name={name} keys={sorted(obj)[:80]}')
+              def walk(v,path=()):
+                  if isinstance(v,dict):
+                      # print any dictionary that appears to describe the installed client file
+                      text=' '.join(str(x) for x in v.values() if isinstance(x,(str,int,float,bool)))
+                      keys=' '.join(map(str,v.keys()))
+                      if 'bin/client' in text or any(str(x).endswith('/client') for x in v.values() if isinstance(x,str)) or ('client' in text.lower() and any(k.lower() in ('path','file','filename','name') for k in v)):
+                          print('CLIENT_ENTRY path='+'/'.join(map(str,path))+' json='+json.dumps(v,sort_keys=True,separators=(',',':'))[:12000])
+                      for k,x in v.items(): walk(x,path+(k,))
+                  elif isinstance(v,list):
+                      for i,x in enumerate(v): walk(x,path+(i,))
+              walk(obj)
+          pv=root/'package.json.version'
+          if pv.exists() and pv.stat().st_size:
+              print('PACKAGE_VERSION_RAW='+pv.read_text(errors='replace').strip()[:500])
+          PY

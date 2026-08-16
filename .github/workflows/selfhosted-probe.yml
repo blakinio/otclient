@@ -1,38 +1,63 @@
-name: Self-hosted OTClient Probe
+name: P0 exact-client disassembly staging
 
-# Fresh infrastructure discovery probe: 2026-08-13T11:40+02:00.
+# Owner-authorized, one-shot, read-only evidence staging for PR #302.
+# This does not launch/login/attach to Tibia and does not mutate the exact package.
 on:
   push:
     branches:
       - ai/selfhosted-otclient-probe
-  pull_request:
-    branches:
-      - main
+    paths:
+      - .github/workflows/selfhosted-probe.yml
 
 permissions:
   contents: read
 
 jobs:
-  probe:
-    runs-on: self-hosted
-    timeout-minutes: 5
+  stage-p0-disasm:
+    runs-on: [self-hosted, synology, otclient]
+    timeout-minutes: 10
     steps:
-      - name: Host and runtime inventory
+      - name: Verify exact client and extract bounded disassembly
         shell: bash
         run: |
-          set -u
-          echo "runner_name=${RUNNER_NAME:-unknown}"
-          echo "hostname=$(hostname)"
-          echo "user=$(id -un)"
-          echo "kernel=$(uname -a)"
-          echo "pwd=$(pwd)"
-          echo "--- processes ---"
-          ps -eo pid,comm,args | grep -Ei 'tibia|otclient|xvfb|x11vnc|vnc' | grep -v grep || true
-          echo "--- docker containers ---"
-          if command -v docker >/dev/null 2>&1; then
-            docker ps -a --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}' | grep -Ei 'tibia|otclient|ots|warp' || true
-          else
-            echo 'docker=unavailable'
+          set -euo pipefail
+          EXPECTED_SHA='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          CONTAINER='oteryn-tibia-client-analysis'
+          CLIENT='/data/client-15.32.df7b29/bin/client'
+
+          actual_sha="$(docker exec "$CONTAINER" bash -lc "sha256sum '$CLIENT' | awk '{print \$1}'")"
+          actual_size="$(docker exec "$CONTAINER" bash -lc "stat -c '%s' '$CLIENT'")"
+          printf 'client=%s\nsize=%s\nsha256=%s\n' "$CLIENT" "$actual_size" "$actual_sha"
+
+          if [[ "$actual_sha" != "$EXPECTED_SHA" ]]; then
+            echo "FATAL: exact-client SHA mismatch" >&2
+            exit 42
           fi
-          echo "--- likely paths ---"
-          find /volume1 /opt /srv /home /tmp -maxdepth 4 \( -iname '*tibia*' -o -iname '*otclient*' -o -iname '*warp*' \) -print 2>/dev/null | head -n 200 || true
+
+          docker exec "$CONTAINER" bash -lc '
+            set -euo pipefail
+            CLIENT="/data/client-15.32.df7b29/bin/client"
+            sha256sum "$CLIENT"
+            stat -c "size=%s" "$CLIENT"
+            echo "===== 0x836700 ====="
+            objdump -d -C -M intel --start-address=0x836600 --stop-address=0x836900 "$CLIENT"
+            echo "===== TPlayerData vtable targets ====="
+            for A in 0xd1cbd0 0xd2ac70 0xd2ef30 0x843e20 0x843f60 0xeda3c0 0xee0010 0xeda3e0 0xee0100; do
+              echo "===== $A ====="
+              START=$((A-128))
+              END=$((A+384))
+              objdump -d -C -M intel --start-address=$START --stop-address=$END "$CLIENT"
+            done
+          ' > p0-disasm.txt
+
+          test -s p0-disasm.txt
+          echo "artifact_sha256=$(sha256sum p0-disasm.txt | awk '{print $1}')"
+          echo "artifact_bytes=$(stat -c '%s' p0-disasm.txt)"
+
+      - name: Upload P0 disassembly evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-disasm
+          path: p0-disasm.txt
+          if-no-files-found: error
+          retention-days: 30

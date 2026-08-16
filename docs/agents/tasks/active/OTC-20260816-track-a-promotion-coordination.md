@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-promotion-coordination
-status: investigating
+status: waiting
 agent: ChatGPT
 session_id: chatgpt-coord-20260816-1338
 session_role: promotion_integration_coordinator
@@ -13,7 +13,7 @@ branch: docs/OTC-20260816-track-a-promotion-coordination-live-2
 base_branch: main
 base_main: 0d7b2607912552599ae501891491aab439cfde7b
 risk: medium
-updated: 2026-08-16T13:46:26+02:00
+updated: 2026-08-16T13:51:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-promotion-coordination.md
 modules_touched: []
@@ -61,9 +61,9 @@ mutation_authorized: false
 owner_funded_ai_api_authorized: false
 programme_complete: false
 invocation_started_at: 2026-08-16T13:38:00+02:00
-last_progress_at: 2026-08-16T13:46:26+02:00
+last_progress_at: 2026-08-16T13:51:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: coordinator-checkpoint
+ci_check_generation: coordinator-checkpoint-after-pr303-close
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -79,7 +79,7 @@ runtime_nonclaims:
   current_exact_client_session: NOT_REGISTERED
 current_main:
   sha: 0d7b2607912552599ae501891491aab439cfde7b
-  verified_at: 2026-08-16T13:45:00+02:00
+  verified_at: 2026-08-16T13:50:00+02:00
 current_relevant_open_prs:
   - 360
   - 358
@@ -87,7 +87,6 @@ current_relevant_open_prs:
   - 356
   - 325
   - 310
-  - 303
   - 302
   - 295
   - 280
@@ -96,6 +95,10 @@ closed_or_integrated_this_invocation:
     disposition: closed_unmerged_concurrent_duplicate_of_357
     final_observed_head: 76079a7d5c19a6b72ea72644f25d5cfdfd325e80
     coordinator_comment: 5307250855
+  - pr: 303
+    disposition: closed_unmerged_superseded_runtime_attempt_historical_evidence_only
+    final_observed_head: 37772abae2637ac9a3229a1d8fcaa2b0b95894a2
+    coordinator_comment: 5307286024
 lane_barrier:
   P1-BRIDGE:
     canonical_pr: 357
@@ -131,6 +134,8 @@ lane_barrier:
       target_uniqueness: UNKNOWN
       mutation_authorized: false
     next_dependency: reviewed canonical bootstrap/rebind/Gate-B implementation promoted to trusted main
+    superseded_legacy_runtime_prs:
+      - 303
   RUNTIME-INFRA:
     pr: 360
     last_reviewed_head: 1d64fab66650b1fcd58388ff5cf6f9a77a392dc4
@@ -192,7 +197,7 @@ lane_barrier:
     disposition: WAITING_ON_RUNTIME_PREREQUISITE
     next_dependency: one bounded live exact Track A in-game process under RUNTIME ownership after canonical runtime gates permit it
   COVERAGE-AUDIT:
-    disposition: coordinator_barrier_audit_active
+    disposition: coordinator_barrier_waiting
     open_material_gaps:
       - canonical bootstrap/rebind implementation is not promotion-safe
       - physical canonical runtime remains unregistered and unclaimed
@@ -213,14 +218,15 @@ audit:
   material_findings_open: 6
   notes:
     - duplicate P1 writer PR 359 was closed unmerged before any promotion
+    - stale physical-runtime PR 303 was closed unmerged and retained only as non-authoritative historical evidence
     - green CI on PR 360 does not override the three HIGH fail-closed/credential/argv findings
     - PR 358 read-only physical reconciliation is accepted as evidence only; it is not physical E2E success
     - no historical display, VNC port, PID or session is promoted to current fact
 e2e:
   result: NOT_APPLICABLE
   reason: this coordinator checkpoint performs GitHub-only integration review; physical E2E is exclusively the serialized RUNTIME lane and remains blocked by unpromoted bootstrap/rebind code
-last_completed_step: independently audited current P1, QLibrary and canonical-runtime Drafts; closed duplicate PR 359; returned PR 356 and PR 360 for evidence/repair; preserved PR 358 as blocked read-only reconciliation evidence
-next_action: wait for materially changed heads on PR 360 or PR 356, or for a safe shared-index ownership release enabling PR 357 integration docs; meanwhile do not poll unchanged CI and do not authorize physical runtime mutation
+last_completed_step: independently audited current P1, QLibrary and canonical-runtime Drafts; closed duplicate PR 359 and stale runtime PR 303; returned PR 356 and PR 360 for evidence/repair; preserved PR 358 as blocked read-only reconciliation evidence
+next_action: on the first material head/ownership change affecting PR 360, PR 356, or the shared integration indexes, refetch exact main and resume coordinator review; do not poll unchanged state or authorize physical runtime mutation
 ---
 
 # OTCLIENT-TIBIA-RE coordinator checkpoint
@@ -231,13 +237,13 @@ next_action: wait for materially changed heads on PR 360 or PR 356, or for a saf
 
 P1 implementation PR #357 is the canonical bridge Draft; concurrent duplicate #359 was closed unmerged. The P1 code is accepted subject to repository integration documentation and explicit authority wording. Shared `MODULE_CATALOG.md` and `CHANGELOG.md` edits are not currently safe because open PR #23 still owns those paths.
 
-The RUNTIME lane performed one fresh read-only Synology reconciliation in #358. It directly proved canonical lease absence at generation 0 and absence of authoritative registration without observing a client/display/network session. Therefore the only legal future path is reviewed canonical bootstrap from trusted `main`; current display `:98`, VNC `6082`, exact PID and exact session remain unclaimed.
+The RUNTIME lane performed one fresh read-only Synology reconciliation in #358. It directly proved canonical lease absence at generation 0 and absence of authoritative registration without observing a client/display/network session. Therefore the only legal future path is reviewed canonical bootstrap from trusted `main`; current display `:98`, VNC `6082`, exact PID and exact session remain unclaimed. Stale runtime-reacquisition PR #303 is closed unmerged so it cannot remain a competing physical-runtime owner; its branch is historical evidence only.
 
 RUNTIME-INFRA PR #360 is not promotion-safe despite green hosted CI. Independent coordinator audit found open HIGH findings in rebind rollback, worker argv compatibility and credential handling, plus an unresolved shared wireproxy ownership dependency. #358 must remain blocked until those findings are repaired, independently re-audited and the resulting implementation is deliberately promoted.
 
 Hosted QLibrary PR #356 remains a source-correlation task only. Its load-bearing validator failed and must be repaired against official Qt 6.9.3 source without a Synology/proprietary fallback. Actual successful runtime mapping remains `UNKNOWN`.
 
-P2 #310 remains input-blocked on compliant hosted staging of the exact native-Linux client. P0 #302 remains blocked on a future admitted canonical live in-game process. No lane may substitute historical runtime state or PR #303-owned surfaces.
+P2 #310 remains input-blocked on compliant hosted staging of the exact native-Linux client. P0 #302 remains blocked on a future admitted canonical live in-game process. No lane may substitute historical runtime state or closed PR #303 surfaces.
 
 ## Safety/nonclaims
 

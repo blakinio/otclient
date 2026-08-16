@@ -78,6 +78,14 @@ jobs:
           vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
           vcpkgGitCommitId: ${{ env.VCPKG_GIT_COMMIT_ID }}
 
+      - name: Cache vcpkg source downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: vcpkg/downloads
+          key: vcpkg-downloads-${{ runner.os }}-${{ env.VCPKG_GIT_COMMIT_ID }}
+          restore-keys: |
+            vcpkg-downloads-${{ runner.os }}-
+
       - name: Setup NuGet for vcpkg
         env:
           NUGET_AUTH_TOKEN: ${{ env.VCPKG_NUGET_API_KEY }}
@@ -101,6 +109,16 @@ jobs:
             -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
 
       - name: Run CMake
+        id: cmake_primary
+        continue-on-error: true
+        uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956  # v10.9
+        with:
+          configurePreset: ${{ matrix.buildtype }}
+          buildPreset: ${{ matrix.buildtype }}
+          configurePresetAdditionalArgs: "['-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF']"
+
+      - name: Retry CMake once after failure
+        if: steps.cmake_primary.outcome == 'failure'
         uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956  # v10.9
         with:
           configurePreset: ${{ matrix.buildtype }}

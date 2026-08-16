@@ -22,49 +22,53 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate worker contracts and official Qt 6.9.3 correlation
+      - name: Worker shell syntax
+        run: bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
+
+      - name: XCB GL regression tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_xcb_gl_integration.py
+
+      - name: Canonical session tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+
+      - name: Canonical transition tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+
+      - name: Canonical guard tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
+
+      - name: Canonical lease tests
+        run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+
+      - name: Official Qt 6.9.3 source correlation
         shell: bash
         run: |
           set -Eeuo pipefail
-          bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
-          python3 .github/scripts/test_tibia_official_client_re_canonical_xcb_gl_integration.py
-          python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py
-          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
-          python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
-          python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
-
           tmp="$(mktemp -d)"
           trap 'rm -rf -- "$tmp"' EXIT
           connection="$tmp/qxcbconnection.cpp"
           integration="$tmp/qxcbintegration.cpp"
-          curl -fsSL --retry 3 --connect-timeout 10 \
-            -o "$connection" \
-            https://raw.githubusercontent.com/qt/qtbase/v6.9.3/src/plugins/platforms/xcb/qxcbconnection.cpp
-          curl -fsSL --retry 3 --connect-timeout 10 \
-            -o "$integration" \
-            https://raw.githubusercontent.com/qt/qtbase/v6.9.3/src/plugins/platforms/xcb/qxcbintegration.cpp
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$connection" https://raw.githubusercontent.com/qt/qtbase/v6.9.3/src/plugins/platforms/xcb/qxcbconnection.cpp
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$integration" https://raw.githubusercontent.com/qt/qtbase/v6.9.3/src/plugins/platforms/xcb/qxcbintegration.cpp
           test "$(git hash-object "$connection")" = e6d232d0ef95023e8b1586b706743fc7f01c3711
           test "$(git hash-object "$integration")" = 5066a079614efd00730ced3bdd206b7c1f815464
-
           python3 - "$connection" "$integration" <<'PY'
           import pathlib, sys
           connection = pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
           integration = pathlib.Path(sys.argv[2]).read_text(encoding='utf-8')
-          required_connection = (
+          for needle in (
               'QStringList glIntegrationNames;',
               'glIntegrationNames << QStringLiteral("xcb_glx");',
               'glIntegrationNames << QStringLiteral("xcb_egl");',
               'QByteArray glIntegrationName = qgetenv("QT_XCB_GL_INTEGRATION");',
               'if (glIntegrationName == "none")',
               'glIntegrationNames.clear();',
-          )
-          for needle in required_connection:
+          ):
               assert needle in connection, needle
-          required_integration = (
+          for needle in (
               'Cannot create platform OpenGL context, neither GLX nor EGL are enabled',
               'Cannot create platform offscreen surface, neither GLX nor EGL are enabled',
-          )
-          for needle in required_integration:
+          ):
               assert needle in integration, needle
           worker = pathlib.Path('.github/scripts/tibia-official-client-re-canonical-live-session.sh').read_text()
           assert 'QT_XCB_GL_INTEGRATION=none' not in worker
@@ -73,6 +77,8 @@ jobs:
           print('TRACK_A_QT_XCB_GL_SOURCE_CORRELATION=PASS')
           PY
 
+      - name: Routing boundary
+        run: |
           echo 'TRACK_A_XCB_GL_FIX=PASS'
           echo 'TRACK_A_RUNTIME_ACCESS=none'
           echo 'TRACK_A_PHYSICAL_E2E=false'

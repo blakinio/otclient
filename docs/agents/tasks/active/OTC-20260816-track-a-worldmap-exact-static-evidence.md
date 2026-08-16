@@ -8,17 +8,17 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: evidence_staging
-phase: worldmap-exact-static-evidence
+phase: consumer-ready-exact-static-evidence
 branch: research/OTC-20260816-track-a-worldmap-exact-static-evidence
 base_branch: main
 base_main: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
-current_main: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
+current_main_at_admission: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260816-track-a-worldmap-exact-static-evidence
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
-updated: 2026-08-16T23:13:30+02:00
+updated: 2026-08-16T23:22:42+02:00
 producer_pr: 437
-producer_head: d8d0ae7016636b2addb130b8a744584b83b5f7a2
+producer_evidence_head: d605640d5d949067e4e178e5086bf5b8873e9989
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-exact-static-evidence.md
   - docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/**
@@ -29,18 +29,13 @@ owned_paths:
   - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py
 modules_touched: []
 reuses:
-  - PR #367 / OTC-20260816-track-a-worldmap-extent-static-re as consumer only; its branch is not owned by this producer
+  - PR #367 / OTC-20260816-track-a-worldmap-extent-static-re as consumer only; its branch is not owned or modified by this producer
   - PR #405 / runtime v7 as historical client_window_missing evidence only
-  - PR #431/#432/#434 isolated DRI revalidation as fresh post-v7 discriminator and exact-source fence proof
+  - PR #431/#432/#434 as the fresh post-v7 GUI discriminator and exact-source selector precedent
   - immutable exact-source selector in commit cb557da12ebb41c597340909b2db717ee59cdfe1
-  - PR #435 source-staging contract as current read-only sanitizer precedent; its failed retained-run SOURCE_CLIENT path is not reused
+  - PR #435 as read-only source-staging precedent only; its stale retained-run path was not reused
   - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-depends_on:
-  - exact retained native-Linux client file matching 15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-  - no live/canonical runtime dependency
-blocks:
-  - PR #367 static continuation until fresh exact identity-window and geometry xref evidence is produced or a genuine INPUT_BLOCKED condition is proven
 policy_version: 2
 prompting_standard_version: 2.1
 track_a_runtime_agent_admission_version: 1
@@ -69,13 +64,11 @@ runtime_nonclaims:
   current_exact_client_session: NOT_REGISTERED
 source_staging_exception:
   coordinator_approved: true
-  reason: user-directed RUNTIME continuation requires physical exact-file evidence for PR #367; retained corpus lacks the requested bytes/xrefs, repeated direct hosted client retrieval is already forbidden by the consumer task, and the accepted Track A routing permits bounded read-only evidence staging when host-local exact material is the only admissible source
+  reason: user-directed RUNTIME continuation required physical exact-file evidence for PR #367; current routing permits bounded read-only host-local exact-file staging when retained GitHub evidence is insufficient
   source_executor: synology-otclient-01
   source_access: read_only_file_only
   source_runtime_access: none
-  source_candidates:
-    - /home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client
-    - /work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client
+  source_candidate_index: 1
   canonical_state_access: forbidden
   client_process_access: forbidden
   process_memory_access: forbidden
@@ -87,10 +80,15 @@ source_staging_exception:
   client_byte_mutation: forbidden
   allowed_output: bounded sanitized text/json evidence only
   hosted_validation_executor: ubuntu-latest
+exact_client:
+  version: 15.32.df7b29
+  size: 51965216
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 consumer_contract:
   pr: 367
   task: OTC-20260816-track-a-worldmap-extent-static-re
   consumer_branch: research/OTC-20260816-track-a-worldmap-extent-static-re
+  consumer_branch_modified: false
   requested_identity_windows:
     - 0x030871c8..0x030871d7 for vptr 0x030871d8
     - 0x0308ce60..0x0308ce6f for vptr 0x0308ce70
@@ -105,72 +103,112 @@ consumer_contract:
   priority_values:
     - +0x48 = 18
     - +0x4c = 14
-  follow_on_types:
-    - TWorldMapViewport
-    - TWorldMapStorage
-    - TWorldMapRenderProvider
-    - TWorldMapCamera
-    - TWorldMapPicker
-  required_output:
-    - exact client version/size/SHA fence proof
-    - exact bytes and qwords for all recoverable identity windows
-    - relocation-aware vtable/typeinfo relationship and RTTI name when directly recoverable
-    - bounded direct writer/read/xref evidence for requested geometry fields when directly recoverable
-    - explicit UNKNOWN for any semantic identity or xref not directly proven
-    - no raw executable/package or unbounded proprietary disassembly
   physical_confirmation_owner: RUNTIME
 researcher_delivery: draft_only
-WORLD_MAP_STATIC_EVIDENCE_READY: false
+WORLD_MAP_STATIC_EVIDENCE_READY: true
 programme_complete: false
-validation_state:
-  prior_runtime_governance_run: 31972398445
-  prior_runtime_governance_conclusion: success
-  prior_ci_run: 31972398548
-  prior_ci_conclusion: success
-  source_v2_run: 31972743782
-  source_v2_job: 95227595548
-  source_v2_conclusion: success
-  source_v2_artifact_id: 9270235755
-  source_v2_artifact_name: track-a-worldmap-exact-static-source-31972743782
-  source_v2_artifact_sha256: 039d22fe5f88a07784c4ddc32cf6b1d9c2d07a34e90ed5902ffd21d3acd5735b
-  hosted_v2_job: 95227676658
-  hosted_v2_conclusion: failure
-recovery_checkpoint:
-  status: HOSTED_REPORT_ORDERING_FAILURE_SOURCE_EVIDENCE_PRESERVED
-  trusted_base: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
-  first_source_run_id: 31972285354
-  first_source_job_id: 95226438379
-  first_source_failure: silent precondition exit before selector; analyzer not executed
-  discriminator_run_id: 31972499618
-  discriminator_job_id: 95226977563
-  discriminator_result: candidate_1_exact_source_present_and_fenced_but_source_disassembler_missing
-  exact_source_candidate_index: 1
-  exact_source_regular: true
-  exact_source_symlink: false
-  exact_source_size: 51965216
-  exact_source_sha_match: true
-  objdump_available_on_source: false
-  llvm_objdump_available_on_source: false
-  source_v2_identity_windows_recovered: 3
-  source_v2_direct_vptr_xrefs:
-    0x02f683d0: 2
-    0x030871d8: 4
-    0x0308ce70: 3
-  source_v2_bounded_code_windows: 49
-  source_v2_bounded_raw_bytes: 52992
-  hosted_failure: WORLD_MAP_STATIC_V2_REFUSED=SOURCE_REPORT_NONDETERMINISTIC
-  hosted_failure_scope: derived Markdown ordering only; exact JSON fence/identity/code-window checks completed before this guard and the raw client was not present on the hosted runner
-  canonical_runtime_touched: false
-  client_process_started: false
-  client_bytes_mutated: false
-  prohibited_repeat: do not repeat the same source-disassembler failure or redo GUI/window v7; recover hosted validation from the already sanitized source artifact when possible
-next_action: use a bounded hosted-only recovery job against source artifact 9270235755, relaxing only the derived Markdown ordering guard while preserving all preceding exact JSON/policy/window checks, then persist enriched evidence for PR #367
+delivery_state: CONSUMER_READY_DRAFT
+identity_results:
+  recovered: 3
+  total: 3
+  protocol_handler:
+    vptr: 0x030871d8
+    typeinfo: 0x03085fb8
+    rtti: tibia::worldmap::TWorldmapProtocolMessageHandler
+  storage:
+    vptr: 0x0308ce70
+    typeinfo: 0x0308b5f0
+    rtti: tibia::worldmap::TWorldMapStorage
+  control_block:
+    vptr: 0x02f683d0
+    typeinfo: 0x0307fb20
+    rtti: std::_Sp_counted_ptr_inplace<tibia::worldmap::TWorldMapStorage,...>
+geometry_results:
+  constructor: 0x00cbf37a
+  storage_writer_vtable_slot_12: 0x00cc6cd0
+  storage_bounds_reader_vtable_slot_14: 0x00cb01d0
+  storage_paired_reader_vtable_slot_13: 0x00cb0180
+  embedded_extent_vptr: 0x02f61578
+  embedded_extent_typeinfo: 0x0306fc60
+  embedded_extent_rtti: tibia::worldmap::TWorldMapExtent
+  requested_offsets_initialized: [+0x18, +0x1c, +0x30, +0x34, +0x48, +0x4c]
+  requested_offsets_mutated: [+0x18, +0x1c, +0x30, +0x34, +0x48, +0x4c]
+  requested_offsets_direct_bounds_read: [+0x18, +0x1c, +0x30, +0x34]
+  requested_extent_pair_read: [+0x48, +0x4c]
+  extent_pair_read_abi_role: INFERENCE_HIDDEN_SRET
+  priority_pair_writer: 0x00cc6d2c
+  priority_pair_writer_semantics: copies one QWORD from argument rsi+0x38 into TWorldMapStorage+0x48, covering +0x48/+0x4c
+  direct_immediate_18_writer_found: false
+  direct_immediate_14_writer_found: false
+  exact_dynamic_upstream_origin_of_18_14: UNKNOWN
+  configured_vs_computed_vs_parser_derived: UNKNOWN
+  classification: MUTABLE_COPY_DRIVEN_AT_TWORLDMAPSTORAGE_LAYER
+follow_on_rtti:
+  TWorldMapViewport: {typeinfo: 0x0308b590, vptr: 0x0308c9a8, first_slot: 0x00dee920}
+  TWorldMapStorage: {typeinfo: 0x0308b5f0, vptr: 0x0308ce70, first_slot: 0x00dee8e0}
+  TWorldMapRenderProvider: {typeinfo: 0x03089b70, vptr: 0x02f6c258, first_slot: 0x00820970}
+  TWorldMapCamera: {typeinfo: 0x03080500, vptr: 0x03083968, first_slot: 0x00dedda0}
+  TWorldMapPicker: {typeinfo: 0x03086888, vptr: 0x02f6b7c8, first_slot: 0x008205c0}
+source_validation:
+  source_run: 31972743782
+  source_job: 95227595548
+  source_result: success
+  source_artifact_id: 9270235755
+  source_artifact_sha256: 039d22fe5f88a07784c4ddc32cf6b1d9c2d07a34e90ed5902ffd21d3acd5735b
+  identity_windows_recovered: 3
+  direct_vptr_xrefs: 9
+  bounded_code_windows: 49
+  bounded_code_raw_bytes: 52992
+hosted_validation:
+  recovery_run: 31972915689
+  recovery_job: 95228024727
+  recovery_result: success
+  final_artifact_id: 9270276361
+  final_artifact_sha256: 0dc8d0a44e5a2550ef79c219bda14787796ef7accc0ab1627fecd7c6d55330bc
+  raw_client_present: false
+  exact_fence_validated: true
+  sanitized_boundary: pass
+prior_failures_and_discriminators:
+  - run: 31972285354
+    job: 95226438379
+    result: failed_precondition_before_selector
+    repeated_identically: false
+  - run: 31972499618
+    job: 95226977563
+    result: exact_source_candidate_1_proven_but_objdump_and_llvm_objdump_absent
+    repeated_identically: false
+  - run: 31972743782
+    job: 95227676658
+    result: hosted_derived_markdown_ordering_guard_only
+    recovery: hosted_only_run_31972915689_from_preserved_source_artifact
+    repeated_physical_read_for_recovery: false
+durable_evidence:
+  json:
+    path: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260816-worldmap-exact-static-evidence.json
+    commit: 400fe33cf66a3385a91063a74e8fba646b3369e0
+  handoff:
+    path: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260816-worldmap-exact-static-evidence.md
+    commit: d605640d5d949067e4e178e5086bf5b8873e9989
+curation:
+  raw_generic_displacement_classifier_promoted_as_direct_field_proof: false
+  stack_only_plus_0x4c_hit_promoted: false
+  adjacent_TWorldMapViewport_plus_0x48_immediate_8_promoted_as_storage: false
+  direct_storage_plus_0x4c_coverage: QWORD writes/reads at Storage+0x48 span both DWORD +0x48 and +0x4c
+remaining_unknowns:
+  - exact RTTI identity of embedded vptr 0x02f615a0 at Storage+0x10 and Storage+0x28
+  - exact member names and units for the six requested DWORD fields
+  - upstream producer of slot-12 input QWORD rsi+0x38 and exact dynamic origin of retained values 18/14
+  - storage capacity/eviction and fixed allocation constraints
+  - render clipping/culling and iteration bounds
+  - camera projection/scale limits
+  - picker screen/world limits
+  - parser packing/masks beyond the recovered geometry writer path
+  - any safe mutation or client patch design
+next_action: PR #367 may consume the durable evidence above without Synology access; producer PR #437 remains Draft per researcher_delivery=draft_only and must not modify the consumer branch
 ---
 
-# Track A world-map exact static evidence producer
+# Track A world-map exact static evidence producer — consumer-ready Draft
 
-This task is a read-only exact-client evidence producer for consumer PR #367. It does not own or modify the consumer branch, does not acquire canonical runtime authority, and does not start the official client.
+The requested exact static evidence is now durable in GitHub and sufficient to unblock PR #367's next static-reasoning step. The three identity windows are exact; the historical geometry object is proven to be `TWorldMapStorage`; all six requested geometry DWORDs have exact initialization and mutation coverage through three QWORD pairs; `+0x48/+0x4c` are fields of an embedded exact `TWorldMapExtent`; and the Storage vtable exposes the direct pair writer and half-open bound reader.
 
-Post-v7 GUI evidence (#431/#432/#434) is deliberately not repeated. Run `31972499618`, job `95226977563`, proved candidate `1` is the exact regular non-symlink file and also proved no source-side objdump/llvm-objdump exists.
-
-V2 source run `31972743782`, job `95227595548`, then succeeded without any source disassembler: exact fence passed, all three identity windows were recovered, nine direct vptr xrefs were decoded, 49 bounded code windows totaling 52,992 raw bytes were sanitized, and source artifact `9270235755` was uploaded. Hosted job `95227676658` downloaded that artifact with the raw client absent and failed only at the derived Markdown deterministic-order guard (`SOURCE_REPORT_NONDETERMINISTIC`) before bounded disassembly. The preserved source artifact is therefore the preferred recovery input; no identical physical failure is being retried.
+The exact upstream producer of the observed runtime `18/14` pair remains unknown. This producer does not convert that unknown into a patch hypothesis and does not claim current live-runtime authority.

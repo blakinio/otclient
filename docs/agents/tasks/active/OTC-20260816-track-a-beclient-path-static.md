@@ -13,11 +13,10 @@ branch: research/OTC-20260816-track-a-beclient-path-static
 base_branch: main
 base_main: 0fd3c743508901b62fd1e3f355cf8964ca7da5db
 risk: low
-updated: 2026-08-16T11:15:00+02:00
+updated: 2026-08-16T11:16:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-beclient-path-static.md
   - docs/agents/reports/OTCLIENT-20260816-beclient-path-static.md
-  - .github/workflows/tibia-official-client-re-beclient-path-static.yml
 modules_touched: []
 reuses:
   - docs/agents/reports/OTCLIENT-20260816-beclient-static-integration.md
@@ -99,7 +98,8 @@ validation_runs:
     purpose: final deterministic loader-specific filename data-flow validator
 report: docs/agents/reports/OTCLIENT-20260816-beclient-path-static.md
 e2e: NOT_APPLICABLE
-next_action: remove the temporary workflow, audit the final report/task diff against exact run evidence, and complete exact-head repository validation/merge without promoting the concrete dynamic filename beyond UNKNOWN
+last_completed_step: final deterministic filename data-flow validator passed; material findings persisted; temporary workflow is being removed before final exact-head CI
+next_action: audit the final two-file documentation diff against exact run evidence, then complete exact-head repository CI and merge
 ---
 
 # Objective
@@ -151,7 +151,7 @@ Static retained-file analysis only (`runtime_access: none`). No client/BattlEye 
 5. Concrete runtime filename/path — remains UNKNOWN with exact missing link recorded.
 6. Prior raw audio-loader and post-`0x6fc82d` state corrections preserved — PASS.
 7. BattlEye internals/bypass/evasion not analyzed — PASS.
-8. Temporary workflow removal before final merge — pending closeout step.
+8. Temporary workflow removal before final merge — in progress as closeout operation.
 
 # E2E
 

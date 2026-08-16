@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-canonical-client-window-wait-fix
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-coord-window-wait-fix-20260816-1746
 session_role: runtime_infrastructure_maintainer
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: runtime_worker_repair
-phase: remove-temporary-validator-and-finalize
+phase: coordinator-promotion-ready
 branch: fix/OTC-20260816-track-a-canonical-client-window-wait-fix
 base_branch: main
 base_main: ffe954be315ee29825c726b996a30fea8475a0f3
 risk: medium
-updated: 2026-08-16T17:55:00+02:00
+updated: 2026-08-16T17:57:00+02:00
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
-  - .github/workflows/tibia-official-client-re-canonical-window-wait-fix-v2.yml
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-client-window-wait-fix.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-client-window-wait-fix/**
 modules_touched: []
@@ -30,7 +29,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: deterministic worker wait-budget defect is fully testable without physical runtime; no Synology execution is required or authorized for this repair
+execution_reason: deterministic worker wait-budget defect was fully repaired and semantically validated without physical runtime access
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -88,8 +87,17 @@ validation:
   behavioral_cases: [found_window, exited_client, live_client_missing_window, wait_budget_invariant]
   runtime_access: none
   physical_e2e: false
+  temporary_validator_workflow: REMOVED
   final_governance: PENDING
   final_repository_ci: PENDING
+  review_threads_open: PENDING
+evidence_path: docs/agents/evidence/OTC-20260816-track-a-canonical-client-window-wait-fix/20260816-hosted-validation.md
+audit:
+  result: PASS
+  material_findings_open: 0
+  notes:
+    - superseded source PR #394 closed unmerged after fresh-main #395 added stronger behavioral coverage
+    - exact-client fence, lease, registration, Gate B, rollback and credential contracts are unchanged
 acceptance:
   - production client-window discovery uses one bounded wait budget comfortably below the transition worker timeout of 300 seconds
   - no nested outer loop multiplies the window helper wait budget
@@ -99,10 +107,10 @@ acceptance:
   - no physical runtime, login, credentials, VNC, Synology or client execution is used by validation
   - temporary validator workflow is removed before promotion
   - exact-head Track A governance and repository CI pass before promotion
-last_completed_step: dedicated GitHub-hosted validator 31956997604/job 95189035137 passed 10 session, 9 transition, 3 guard and 14 lease tests on fresh-main PR #395 with runtime_access:none
-next_action: persist sanitized validator evidence, remove the temporary workflow, then obtain final exact-head governance/CI and coordinator promotion
+last_completed_step: fresh-main semantic validator 31956997604/job 95189035137 passed all behavioral and dependent canonical contracts; evidence persisted and temporary validator removed
+next_action: obtain final exact-head Track A governance/repository CI and review hygiene, then coordinator-promote and archive this fix before fresh RUNTIME redispatch
 ---
 
 # Track A canonical client window wait fix
 
-The fresh-main worker repair replaces the compounded window wait with one 30-second production budget, preserves explicit liveness classifications and adds sanitized stage markers. Hosted semantic validation is green; no physical runtime was touched.
+The fresh-main worker repair replaces the compounded window wait with one 30-second production budget, preserves explicit liveness classifications and adds sanitized stage markers. The semantic validator passed and was removed; no physical runtime was touched.

@@ -1,0 +1,109 @@
+name: Track A BEClient static analysis
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-beclient-static-analysis.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-beclient-static-analysis.md
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Static ELF analysis of BEClient.so
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Analyze BEClient.so without executing it
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          export LC_ALL=C
+
+          target='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/BattlEye/BEClient.so'
+          package='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package'
+          exact_client="$package/bin/client"
+          expected_client_size='51965216'
+          expected_client_sha='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+
+          [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || { echo 'BE_STATIC_ERROR=wrong_runner'; exit 2; }
+          [[ -f "$target" ]] || { echo 'BE_STATIC_ERROR=target_missing'; exit 3; }
+          [[ -f "$exact_client" ]] || { echo 'BE_STATIC_ERROR=exact_client_missing'; exit 4; }
+
+          client_size="$(stat -c '%s' "$exact_client")"
+          client_sha="$(sha256sum "$exact_client" | awk '{print $1}')"
+          [[ "$client_size" == "$expected_client_size" && "$client_sha" == "$expected_client_sha" ]] || {
+            echo "BE_STATIC_ERROR=client_fence_mismatch size=$client_size sha=$client_sha"
+            exit 5
+          }
+          echo 'BE_STATIC_CLIENT_FENCE=PASS'
+
+          echo "BE_STATIC_SIZE=$(stat -c '%s' "$target")"
+          echo "BE_STATIC_SHA256=$(sha256sum "$target" | awk '{print $1}')"
+          echo "BE_STATIC_MD5=$(md5sum "$target" | awk '{print $1}')"
+          echo "BE_STATIC_FILE=$(file -b "$target")"
+
+          echo 'BE_STATIC_ELF_HEADER_BEGIN'
+          readelf -hW "$target" | grep -E '^[[:space:]]*(Class:|Data:|OS/ABI:|ABI Version:|Type:|Machine:|Entry point address:|Number of program headers:|Number of section headers:)' || true
+          echo 'BE_STATIC_ELF_HEADER_END'
+
+          build_id="$(readelf -nW "$target" 2>/dev/null | sed -n 's/.*Build ID: //p' | head -n1)"
+          echo "BE_STATIC_BUILD_ID=${build_id:-NONE}"
+
+          if readelf -SW "$target" | grep -q '[.]symtab'; then echo 'BE_STATIC_SYMTAB=PRESENT'; else echo 'BE_STATIC_SYMTAB=ABSENT'; fi
+          if readelf -SW "$target" | grep -q '[.]debug_'; then echo 'BE_STATIC_DEBUG_SECTIONS=PRESENT'; else echo 'BE_STATIC_DEBUG_SECTIONS=ABSENT'; fi
+
+          echo 'BE_STATIC_HARDENING_BEGIN'
+          readelf -lW "$target" | grep -E 'GNU_STACK|GNU_RELRO' || true
+          if readelf -dW "$target" | grep -Eq 'BIND_NOW|FLAGS.*NOW'; then echo 'BIND_NOW=PRESENT'; else echo 'BIND_NOW=ABSENT'; fi
+          if readelf -dW "$target" | grep -q '(TEXTREL)'; then echo 'TEXTREL=PRESENT'; else echo 'TEXTREL=ABSENT'; fi
+          echo 'BE_STATIC_HARDENING_END'
+
+          echo 'BE_STATIC_DYNAMIC_BEGIN'
+          readelf -dW "$target" | grep -E '\(NEEDED\)|\(SONAME\)|\(RPATH\)|\(RUNPATH\)' || true
+          echo 'BE_STATIC_DYNAMIC_END'
+
+          exports="$RUNNER_TEMP/be-exports.txt"
+          imports="$RUNNER_TEMP/be-imports.txt"
+          nm -D --defined-only "$target" 2>/dev/null | awk '{print $3}' | sed '/^$/d' | sort -u >"$exports" || true
+          nm -D --undefined-only "$target" 2>/dev/null | awk '{print $NF}' | sed 's/@.*//' | sed '/^$/d' | sort -u >"$imports" || true
+          echo "BE_STATIC_EXPORT_COUNT=$(wc -l <"$exports" | tr -d ' ')"
+          echo 'BE_STATIC_EXPORTS_BEGIN'
+          head -n 100 "$exports"
+          echo 'BE_STATIC_EXPORTS_END'
+          echo "BE_STATIC_IMPORT_COUNT=$(wc -l <"$imports" | tr -d ' ')"
+
+          echo 'BE_STATIC_IMPORT_FAMILIES_BEGIN'
+          for pattern in \
+            'ptrace|process_vm_|prctl|syscall|kill|tgkill' \
+            'mmap|mprotect|munmap|madvise|mlock' \
+            'dlopen|dlsym|dladdr|dl_iterate_phdr' \
+            'socket|connect|send|recv|getaddrinfo|gethostby|poll|select|epoll' \
+            'open|openat|fopen|readlink|stat|lstat|fstat|readdir|opendir|access' \
+            'pthread_|clone|fork|exec|waitpid' \
+            'SHA|MD5|AES|EVP_|RAND_|HMAC|CRYPTO|SSL_|TLS_' \
+            'getenv|setenv|unsetenv' \
+            'clock_gettime|gettimeofday|nanosleep'; do
+            matches="$(grep -Ei "$pattern" "$imports" | paste -sd, - || true)"
+            printf 'FAMILY[%s]=%s\n' "$pattern" "${matches:-NONE}"
+          done
+          echo 'BE_STATIC_IMPORT_FAMILIES_END'
+
+          strings_all="$RUNNER_TEMP/be-strings.txt"
+          strings -a -n 5 "$target" >"$strings_all"
+          echo "BE_STATIC_STRING_COUNT=$(wc -l <"$strings_all" | tr -d ' ')"
+
+          echo 'BE_STATIC_SELECTED_STRINGS_BEGIN'
+          grep -Eai 'BattlEye|BEClient|/proc/|/sys/|/dev/|ptrace|debug|hook|inject|virtual|vmware|wine|proton|docker|container|steam|kernel|module|driver|lib[A-Za-z0-9_.+-]*[.]so|https?://|wss?://|[A-Za-z0-9.-]+[.](com|net|org|gg|io)([:/]|$)' "$strings_all" \
+            | sed -E 's/[[:cntrl:]]//g' | sort -u | head -n 200 || true
+          echo 'BE_STATIC_SELECTED_STRINGS_END'
+
+          echo 'BE_STATIC_SECTION_SUMMARY_BEGIN'
+          readelf -SW "$target" | awk '/\[[[:space:]]*[0-9]+\]/{print $2, $3, $6}' | head -n 80 || true
+          echo 'BE_STATIC_SECTION_SUMMARY_END'
+
+          echo 'BE_STATIC_EXECUTED=false'
+          echo 'BE_STATIC_MUTATION_PERFORMED=false'

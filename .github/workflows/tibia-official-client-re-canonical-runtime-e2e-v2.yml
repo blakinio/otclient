@@ -12,14 +12,16 @@ permissions:
 
 concurrency:
   group: track-a-canonical-runtime-e2e
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   bootstrap-canonical-runtime:
-    runs-on: [self-hosted, Linux, X64, otclient, tibia-re, synology]
+    runs-on: [otclient, synology]
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
 
       - name: Fresh admission, canonical bootstrap and immediate Gate B
         shell: bash
@@ -27,6 +29,9 @@ jobs:
           set +x
           set -Eeuo pipefail
           umask 077
+
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          [[ "$GITHUB_REPOSITORY" == 'blakinio/otclient' ]]
 
           task='OTC-20260816-track-a-canonical-runtime-e2e'
           session="runtime-v2-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -45,7 +50,7 @@ jobs:
           cleanup() {
             rc=$?
             if [[ "$acquired" == 1 ]]; then
-              "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
+              bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token" >/dev/null 2>&1 || true
             fi
             rm -f "$token"
             exit "$rc"
@@ -53,13 +58,13 @@ jobs:
           trap cleanup EXIT
 
           echo '=== PRE_ADMISSION ==='
-          "$lease" status --json
+          bash "$lease" status --json
           if [[ -e "$state/runtime-registration.json" ]]; then
             echo 'RUNTIME_BOOTSTRAP_PRECHECK=REGISTRATION_ALREADY_PRESENT'
             exit 42
           fi
 
-          "$lease" acquire \
+          bash "$lease" acquire \
             --task-id "$task" \
             --session-id "$session" \
             --token-file "$token" \
@@ -106,12 +111,12 @@ jobs:
           print('RUNTIME_BOOTSTRAP_RESULT=REGISTERED_GATE_B_PASS')
           PY
 
-          "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
           acquired=0
           rm -f "$token"
 
           echo '=== POST_RELEASE ==='
-          "$lease" status --json
+          bash "$lease" status --json
           test -f "$state/runtime-registration.json"
           echo 'RUNTIME_CONTROLLER_RELEASED=true'
           echo 'RUNTIME_EXPECTED_PERSISTENT_DESKTOP_CLIENT=true'

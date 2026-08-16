@@ -14,8 +14,8 @@ branch: docs/OTC-20260815-track-a-canonical-live-runtime-closeout
 base_branch: main
 base_main: f1803780e77e4747a7a878fc87b2943af73b2873
 risk: high
-related_pr: null
-updated: 2026-08-16T07:47:00+02:00
+related_pr: 323
+updated: 2026-08-16T07:48:00+02:00
 lease_expires_at: null
 lease_released_at: 2026-08-16T07:47:00+02:00
 owned_paths: []
@@ -32,7 +32,7 @@ continuation_policy: completed
 task_completion_policy: completed
 user_communication: terminal_only
 implementation_authorized: true
-last_progress_at: 2026-08-16T07:47:00+02:00
+last_progress_at: 2026-08-16T07:48:00+02:00
 context_pressure: medium
 context_growth: stable
 context_score: 8
@@ -128,11 +128,12 @@ closeout:
     bootstrap_contract_pr: blakinio/otclient#318 merged
     bootstrap_closeout_pr: blakinio/otclient#320 merged
     stale_closeout_pr: blakinio/otclient#314 closed superseded
+    closeout_pr: blakinio/otclient#323
     unresolved_review_threads: 0
     open_related_prs: 0
   task_status: completed
-  task_archived_on_merge_of: pending_closeout_pr
-  ownership_released_on_merge_of: pending_closeout_pr
+  task_archived_on_merge_of: blakinio/otclient#323
+  ownership_released_on_merge_of: blakinio/otclient#323
   stale_manager_closeout_reused: false
   canonical_runtime_status_claimed: false
 ```

@@ -1,0 +1,13 @@
+name: Track A isolated client window ownership discriminator retired
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  retired:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'retired one-shot discriminator; use v3 workflow on this PR'

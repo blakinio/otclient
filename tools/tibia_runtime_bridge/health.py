@@ -17,6 +17,7 @@ REGISTRATION_SCHEMA_VERSION = 1
 EXACT_CLIENT_VERSION = "15.32.df7b29"
 EXACT_CLIENT_SIZE = 51965216
 EXACT_CLIENT_SHA256 = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+REGISTRATION_STATES = {"LOGIN", "CHARACTER_SELECT", "IN_GAME", "DISCONNECTED", "UNKNOWN"}
 
 
 class Readiness(str, Enum):
@@ -145,6 +146,7 @@ def _registration_identity(registration: Mapping[str, Any]) -> tuple[RuntimeIden
 
     registration_generation = _strict_positive_int(registration.get("registration_generation"))
     lease_generation = _strict_positive_int(registration.get("lease_generation"))
+    registered_at = _nonempty_text(registration.get("registered_at"))
     boot_id_sha256 = _sha256_text(registration.get("boot_id_sha256"))
     pid = _strict_positive_int(registration.get("pid"))
     process_start_ticks = _strict_positive_int(registration.get("process_start_ticks"))
@@ -153,11 +155,18 @@ def _registration_identity(registration: Mapping[str, Any]) -> tuple[RuntimeIden
     client_sha256 = _sha256_text(registration.get("client_sha256"))
     display = _nonempty_text(registration.get("display"))
     window_identity = registration.get("window_identity")
+    remote_view_endpoint = registration.get("remote_view_endpoint")
+    remote_view_mapping = registration.get("remote_view_mapping")
+    state = registration.get("state")
+    source_task = _nonempty_text(registration.get("source_task"))
+    source_run = _nonempty_text(registration.get("source_run"))
 
     if registration_generation is None:
         return None, "registration_generation must be a positive integer"
     if lease_generation is None:
         return None, "lease_generation must be a positive integer"
+    if registered_at is None:
+        return None, "registered_at must be present; its age is not used as liveness"
     if boot_id_sha256 is None:
         return None, "boot_id_sha256 must be a lowercase SHA-256 digest"
     if pid is None:
@@ -174,6 +183,18 @@ def _registration_identity(registration: Mapping[str, Any]) -> tuple[RuntimeIden
         return None, "display must be a non-empty declared value"
     if window_identity is None or window_identity == "" or window_identity == {} or window_identity == []:
         return None, "window_identity must contain current non-secret window evidence"
+    try:
+        _stable_json(window_identity)
+    except (TypeError, ValueError):
+        return None, "window_identity must be JSON-compatible registration evidence"
+    if remote_view_endpoint is not None and _nonempty_text(remote_view_endpoint) is None:
+        return None, "remote_view_endpoint must be null or non-empty text"
+    if remote_view_mapping not in {"PROVEN", "UNKNOWN"}:
+        return None, "remote_view_mapping must be PROVEN or UNKNOWN"
+    if state not in REGISTRATION_STATES:
+        return None, "state is not a valid canonical registration state"
+    if source_task is None or source_run is None:
+        return None, "source_task and source_run must be present"
 
     return RuntimeIdentity(
         registration_generation=registration_generation,
@@ -192,6 +213,15 @@ def _registration_identity(registration: Mapping[str, Any]) -> tuple[RuntimeIden
 def _observation_matches_identity(observation: Mapping[str, Any], identity: RuntimeIdentity) -> bool:
     expected = identity.as_dict()
     return all(observation.get(field) == value for field, value in expected.items())
+
+
+def _bridge_matches_identity(bridge_ping: Mapping[str, Any], identity: RuntimeIdentity) -> bool:
+    return (
+        _strict_positive_int(bridge_ping.get("pid")) == identity.pid
+        and _strict_positive_int(bridge_ping.get("process_start_ticks")) == identity.process_start_ticks
+        and bridge_ping.get("client_version") == identity.client_version
+        and bridge_ping.get("binary_sha256") == identity.client_sha256
+    )
 
 
 def evaluate_health(
@@ -263,8 +293,10 @@ def evaluate_health(
         return HealthReport(Readiness.BRIDGE_UNHEALTHY, "bridge PING evidence is absent")
     if bridge_ping.get("ok") is not True or bridge_ping.get("command") != "PING" or bridge_ping.get("main_base_resolved") is not True:
         return HealthReport(Readiness.BRIDGE_UNHEALTHY, "bridge PING did not prove a healthy exact-runtime helper")
+    if not _bridge_matches_identity(bridge_ping, identity):
+        return HealthReport(Readiness.BRIDGE_UNHEALTHY, "bridge PING identity does not match the registered PID/start/exact profile")
 
-    return HealthReport(Readiness.READY, "registration, current lease, fresh Gate B identity and bridge PING agree", identity)
+    return HealthReport(Readiness.READY, "registration, current lease, fresh Gate B identity and identity-bound bridge PING agree", identity)
 
 
 def decide_reacquisition(current: RuntimeIdentity | None, latest: HealthReport) -> ReacquisitionAction:

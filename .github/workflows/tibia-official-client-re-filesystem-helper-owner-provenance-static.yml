@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace TTibiaFileSystemHelper shared_ptr transfer statically
+    name: Map TTibiaFileSystemHelper factory and owner initializer callers
     runs-on: [otclient, synology]
     timeout-minutes: 6
     steps:
-      - name: Find exact stack-pair reads and candidate field stores
+      - name: Locate function entrypoints and direct callsites
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -29,84 +29,44 @@ jobs:
           echo 'OWNER_PROV_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
           import hashlib,pathlib,struct,sys
-          d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
+          d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-          shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
-          st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
+          shfmt=E+'IIQQQQIIQQ';sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
+          st=sh[shstrndx];names=d[st[4]:st[4]+st[5]]
           def cs(blob,o):
-              e=blob.find(b'\0',o); e=len(blob) if e<0 else e
+              e=blob.find(b'\0',o);e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[]
           for x in sh:secs.append({'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]})
-          text=next(s for s in secs if s['name']=='.text'); tb=d[text['off']:text['off']+text['size']]
+          text=next(s for s in secs if s['name']=='.text');tb=d[text['off']:text['off']+text['size']]
           def b_at(va,n):
-              off=text['off']+(va-text['addr']);return d[off:off+n]
-          start,end=0x5ef300,0x5efd00
-          blob=b_at(start,end-start)
-          regs=['rax','rcx','rdx','rbx','rsp','rbp','rsi','rdi','r8','r9','r10','r11','r12','r13','r14','r15']
-          print('OWNER_PROV_STACK_PAIR_ACCESSES_BEGIN')
-          accesses=[]
-          for i in range(len(blob)-8):
-              rex=blob[i]
-              if not (0x48 <= rex <= 0x4f): continue
-              op=blob[i+1]
-              if op not in (0x8b,0x89): continue
-              m=blob[i+2]; mod=m>>6; rm=m&7; reg=((m>>3)&7) | (((rex>>2)&1)<<3)
-              if mod!=2 or rm!=4 or blob[i+3]!=0x24: continue
-              disp=struct.unpack_from('<i',blob,i+4)[0]
-              if disp not in (0x88,0x90): continue
-              va=start+i; direction='load_from_stack' if op==0x8b else 'store_to_stack'
-              print(f'va=0x{va:x} dir={direction} reg={regs[reg]} disp=0x{disp:x} bytes={blob[i:i+8].hex()}')
-              accesses.append(va)
-          print('OWNER_PROV_STACK_PAIR_ACCESSES_END')
-
-          print('OWNER_PROV_FIELD_STORE_CANDIDATES_BEGIN')
-          stores=[]
-          for i in range(len(blob)-8):
-              rex=blob[i]
-              if not (0x48 <= rex <= 0x4f) or blob[i+1]!=0x89: continue
-              m=blob[i+2]; mod=m>>6; rm=m&7; src=((m>>3)&7) | (((rex>>2)&1)<<3)
-              base=(rm | ((rex&1)<<3))
-              if rm==4: continue
-              if mod==1:
-                  disp=struct.unpack_from('<b',blob,i+3)[0]; size=4
-              elif mod==2:
-                  disp=struct.unpack_from('<i',blob,i+3)[0]; size=7
-              else: continue
-              if disp not in (0x20,0x28): continue
-              va=start+i
-              print(f'va=0x{va:x} base={regs[base]} src={regs[src]} disp=0x{disp:x} bytes={blob[i:i+size].hex()}')
-              stores.append(va)
-          print('OWNER_PROV_FIELD_STORE_CANDIDATES_END')
-
-          # 16-byte stores can assign an entire shared_ptr pair at once.
-          print('OWNER_PROV_XMM_FIELD_STORES_BEGIN')
-          xmm=[]
-          for i in range(len(blob)-8):
-              # MOVUPS m128,xmm: 0F 11 /r, optional REX
-              p=i
-              rex=None
-              if 0x40 <= blob[p] <= 0x4f:
-                  rex=blob[p];p+=1
-              if blob[p:p+2] != b'\x0f\x11': continue
-              m=blob[p+2];mod=m>>6;rm=m&7
-              if rm==4 or mod not in (1,2): continue
-              base=rm | (((rex or 0)&1)<<3)
-              if mod==1:
-                  disp=struct.unpack_from('<b',blob,p+3)[0];size=p-i+4
-              else:
-                  disp=struct.unpack_from('<i',blob,p+3)[0];size=p-i+7
-              if disp not in (0x20,0x28): continue
-              va=start+i
-              print(f'va=0x{va:x} base={regs[base]} disp=0x{disp:x} bytes={blob[i:i+size].hex()}')
-              xmm.append(va)
-          print('OWNER_PROV_XMM_FIELD_STORES_END')
-
-          # Emit compact exact windows around all reads and candidate stores for offline boundary-safe decoding.
-          for va in sorted(set(accesses+stores+xmm)):
-              lo=max(start,va-0x30);hi=min(end,va+0x50);w=b_at(lo,hi-lo)
-              print(f'OWNER_PROV_CANDIDATE_WINDOW center=0x{va:x} start=0x{lo:x} size=0x{len(w):x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+              return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
+          def direct_calls(target):
+              out=[]
+              for i in range(len(tb)-5):
+                  if tb[i]!=0xe8:continue
+                  va=text['addr']+i
+                  if va+5+struct.unpack_from('<i',tb,i+1)[0]==target:out.append(va)
+              return out
+          prologue=bytes.fromhex('415741564155415455534889f34881ec38010000897c241c4c8d642470')
+          region_start=0x5ef300;region=b_at(region_start,0xa00)
+          hits=[];p=0
+          while True:
+              j=region.find(prologue,p)
+              if j<0:break
+              hits.append(region_start+j);p=j+1
+          print('OWNER_PROV_FACTORY_PROLOGUE_HITS='+','.join(hex(x) for x in hits))
+          for target in hits+[0x6ba100]:
+              calls=direct_calls(target)
+              print(f'OWNER_PROV_DIRECT_CALLS target=0x{target:x} count={len(calls)} calls='+','.join(hex(x) for x in calls))
+              for va in calls[:40]:
+                  lo=max(text['addr'],va-0x90);hi=min(text['addr']+text['size'],va+0xb0);w=b_at(lo,hi-lo)
+                  print(f'OWNER_PROV_CALL_WINDOW target=0x{target:x} call=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          # Also map exact direct calls to the known shared_ptr helper used by the factory.
+          for target in (0x6b2e20,0x6ba0b0):
+              calls=[x for x in direct_calls(target) if 0x5ef300 <= x < 0x5efd00 or target==0x6ba0b0]
+              print(f'OWNER_PROV_LOCAL_CALLS target=0x{target:x} count={len(calls)} calls='+','.join(hex(x) for x in calls))
           print('OWNER_PROV_EXECUTED_TARGET=false')
           print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
           print('OWNER_PROV_MUTATION_PERFORMED=false')

@@ -1,24 +1,24 @@
 ---
 task_id: OTC-20260816-track-a-agent-runtime-governance
-status: waiting
-agent: unassigned
-session_id: null
-session_role: governance-implementer
-session_rotation_count: 0
+status: active
+agent: ChatGPT
+session_id: chatgpt-coordinator-20260816-0836
+session_role: coordinator
+session_rotation_count: 1
 project_lane: otclient
 lane: track-a-governance
 track_id: official-client-re
 task_kind: implementation
-phase: validate
+phase: final-independent-remediation
 branch: docs/OTC-20260816-track-a-agent-runtime-governance
 base_branch: main
 base_main: 3a5568f36ebc326afd246d0d2da45b5d8eecabfa
 risk: medium
 related_pr: 324
 created: 2026-08-16T08:05:00+02:00
-updated: 2026-08-16T08:34:00+02:00
-lease_expires_at: null
-lease_released_at: 2026-08-16T08:34:00+02:00
+updated: 2026-08-16T08:36:00+02:00
+lease_expires_at: 2026-08-16T09:21:00+02:00
+lease_released_at: null
 owned_paths:
   - docs/agents/README.md
   - docs/agents/AGENTS.md
@@ -39,7 +39,7 @@ reuses:
   - current Track A research isolation contract policy v5
 depends_on:
   - main@3a5568f36ebc326afd246d0d2da45b5d8eecabfa
-  - active coordinator PR #300 remains separately owned; this task does not edit its owned paths
+  - coordinator PR #300 remains separately owned/released; this task does not edit its changed CHANGELOG/MODULE_CATALOG paths
   - runtime research PR #303 remains separately owned; this task does not access or mutate its runtime surface
 policy_version: 2
 prompting_standard_version: 2.1
@@ -78,21 +78,24 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-last_progress_at: 2026-08-16T08:34:00+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: draft-final-candidate
+last_progress_at: 2026-08-16T08:36:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: coordinator-final-admission-remediation
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 1
+unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
 material_review_findings:
-  - PRRT_kwDOTVmdjs6ZlHWz: remediated and verified; authorized canonical mutation requires positive equal lease generations after any rebind, with fresh negative regressions
-  - PRRT_kwDOTVmdjs6ZlHW1: remediated and verified; every canonical access class is bound to runtime_owner_task == current task_id and the canonical namespace
-  - PRRT_kwDOTVmdjs6ZlHW2: remediated and verified; ephemeral_isolated rejects the reserved canonical-live-runtime namespace and aliases, with fresh negative regressions
-  - PRRT_kwDOTVmdjs6ZlIVI: remediated and verified; universally mandatory docs/agents/README.md now points every Track A worker to the admission contract and is covered by workflow triggering plus static audit
+  - PRRT_kwDOTVmdjs6ZlHWz: remediated and verified; authorized canonical mutation requires positive equal lease generations after any rebind
+  - PRRT_kwDOTVmdjs6ZlHW1: remediated and verified; canonical access is bound to runtime_owner_task == task_id and canonical namespace
+  - PRRT_kwDOTVmdjs6ZlHW2: remediated and verified; ephemeral_isolated rejects canonical namespace and aliases
+  - PRRT_kwDOTVmdjs6ZlIVI: remediated and verified; universal mandatory docs/agents/README.md entrypoint is workflow-triggered and statically audited
+  - PRRT_kwDOTVmdjs6ZlJ8D: active; read_only must require proven uniqueness/non-conflicting target ownership before live observation
+  - PRRT_kwDOTVmdjs6ZlKa_: active; runtime-sensitive diff must bind changed Track A admission task to current PR head branch rather than accept any changed Track A task
+  - claim_resume_admission: active; admission record must be persisted at Track A claim/resume/checkpoint (`none` for static), not delayed until first live operation
 validation_evidence:
   - implementation_parent_head: 90f31bfe42bbc2e8c178e90b7e04a6d69f64c01e
   - track_a_governance_run: 31931442198 SUCCESS
@@ -100,12 +103,9 @@ validation_evidence:
   - fresh_behavior_audit_job: 95126785680 SUCCESS
   - repository_ci_run: 31931442374 SUCCESS
   - required_ci_job: 95127228818 SUCCESS
-  - unresolved_review_threads_after_verification: 0
-  - pre_wait_checkpoint_head: 2ba5a77ec0678527f311c13c76360f4ec2fe2756
-  - pre_wait_track_a_governance_run: 31931711113 QUEUED
-  - pre_wait_repository_ci_run: 31931711186 QUEUED
-last_completed_step: final seven-file PR diff and ownership were reviewed with no unrelated paths; all four material P1 findings are resolved; exact-head draft checks remained queued after the maximum two ordinary checks, so the active worker released ownership instead of polling
-next_action: claim this waiting task only after verifying no active owner, then inspect the exact current PR #324 head and its newest governance/CI runs; if both pass with zero material review threads, mark Ready without changing the head and require the resulting protected Ready-state CI generation before merge
+  - released_checkpoint_head: 11300cae0a2d5cc284c08fef2eb48fc3fbaaf71b
+last_completed_step: previous implementer released ownership; coordinator independently claimed after verifying waiting/unassigned state and preserved runtime_access=none
+next_action: repair read_only target proof, claim/resume persistence, and branch-bound sensitive-path admission; add deterministic negative cases; rerun exact-head governance + repository CI; resolve only verified findings; release for protected merge and archive
 ---
 
 # Track A agent runtime-governance enforcement
@@ -116,57 +116,24 @@ Make the final Track A canonical-live runtime rules unavoidable at the normal ag
 
 ## Acceptance criteria
 
-- The universally mandatory `docs/agents/README.md` routes every Track A worker to the runtime-admission contract before runtime work.
-- Track A nested agent instructions require workers to read the admission contract and classify runtime access before any runtime operation.
-- The canonical Track A wrapper requires the same admission before claim/resume/observation/control/mutation.
-- The Track A contract defines a mandatory admission record for `none`, `read_only`, `ephemeral_isolated`, `canonical_reuse_or_mutation`, `canonical_bootstrap`, and `canonical_rebind` work.
-- Canonical mutation requires current Gate A plus any required rebind plus Gate B, target ownership/uniqueness, equal current lease-generation binding and the final whole-lifetime supervisor.
-- Missing registration never falls through to ordinary reuse; it requires the separately implemented/authorized bootstrap transition.
-- Lease-generation mismatch never falls through to ordinary reuse; it requires the reviewed rebind primitive and post-rebind equality before mutation.
-- Ephemeral runtimes cannot use or alias the reserved canonical namespace.
-- Historical `:98`, `6082`, PID or session evidence never satisfies current canonical identity.
-- Track A workers may not mutate PR #303-owned runtime or Track B state through these rules.
-- A deterministic repository test prevents removal/regression of the mandatory policy invariants and the universal entrypoint pointer.
-- Future added/modified Track A active tasks must declare the complete runtime admission record; runtime-sensitive Track A implementation changes without such a task record fail the policy audit.
-- No live Tibia client is launched, logged in, signalled, attached to or mutated by this task.
+- The universally mandatory `docs/agents/README.md` routes every Track A worker to the admission contract at claim/resume; static workers persist `runtime_access: none` before substantial Track A work.
+- Track A nested instructions and canonical wrapper require the same admission and re-admission before live work or after material authority/identity change.
+- The contract defines a mandatory admission record for `none`, `read_only`, `ephemeral_isolated`, `canonical_reuse_or_mutation`, `canonical_bootstrap`, and `canonical_rebind`.
+- `read_only` requires demonstrably non-invasive observation, a declared non-conflicting target boundary, and `target_uniqueness: PROVEN`; otherwise refuse observation.
+- Canonical mutation requires current Gate A + any required rebind + Gate B + current-task ownership + authoritative canonical namespace + target uniqueness + positive equal current/registration lease generations + final whole-lifetime supervisor.
+- Missing registration routes only to bootstrap; generation mismatch routes only to reviewed rebind.
+- Ephemeral runtimes cannot use/alias canonical namespace.
+- Historical `:98`, `6082`, PID/session evidence never satisfies current identity.
+- Runtime-sensitive PRs cannot satisfy CI using an unrelated changed Track A task record; admission must be bound to the current PR head branch.
+- Track A workers may not mutate PR #303-owned runtime or Track B state.
+- Deterministic repository tests prevent regression/bypass of these invariants.
+- No live Tibia runtime operation is performed by this task.
 - Exact-head CI/review are green before merge; task is archived and ownership released afterward.
 
-## Evaluation cases
+## Current safety boundary
 
-### Positive
+This task itself is `runtime_access: none`. No X11/RFB/Tibia process/login/session/credentials/canonical state/PR #303 runtime/Track B runtime is inspected or mutated.
 
-A static P2 researcher records `runtime_access: none`, performs no runtime operation and proceeds without a lease.
+## Promotion boundary
 
-A read-only researcher records `runtime_access: read_only` and may inspect only demonstrably non-invasive evidence outside another task's owned runtime surface.
-
-A task-owned ephemeral sandbox may mutate only its proven unique non-canonical namespace.
-
-### Negative
-
-A researcher sees historical `:98` or reachable `6082` and attempts to send input, attach, restart, login or otherwise mutate without Gate A + current identity. The policy requires refusal.
-
-A researcher finds no `runtime-registration.json` and tries to launch through ordinary `guard-run`. The policy requires bootstrap instead.
-
-A researcher finds an older registration generation and edits the JSON or proceeds anyway. The policy requires the dedicated rebind transition or refusal; even a claimed rebind cannot authorize mutation until the registration generation binding equals the current lease generation.
-
-A canonical admission names another task as runtime owner. CI rejects it.
-
-An ephemeral admission uses `canonical-live-runtime` or an alias containing that reserved namespace. CI rejects it.
-
-A runtime-sensitive Track A PR updates code/workflow paths without an added/modified active Track A task containing an admission record. CI rejects it.
-
-Removing the Track A admission pointer from the universally mandatory `docs/agents/README.md` fails the policy audit.
-
-### Boundary
-
-An existing Track A task is not mass-migrated merely because this policy merges. The admission fields become mandatory when that active task is next added/modified/claimed, matching the repository's migrate-on-next-checkpoint execution policy.
-
-## Current overlap check
-
-- PR #300 task is `waiting`, `session_id: null`, and its declared `owned_paths` do not include this task's changed governance entrypoints.
-- PR #303 changed paths are limited to its runtime scripts/workflows/evidence/task record; none overlap this task.
-- `docs/agents/CHANGELOG.md` is intentionally excluded because PR #300 currently changes it.
-
-## Safety
-
-This task itself has `runtime_access: none`. It does not inspect or mutate current X11, RFB/noVNC, Tibia process, login/session, credentials, canonical state directory, PR #303 runtime, or Track B runtime.
+This PR is governance-only. Runtime E2E is `NOT_APPLICABLE_WITH_REASON`: no live runtime is exercised because the deliverable is admission policy and deterministic repository enforcement. The relevant component E2E is policy validator + fresh negative/positive behavior cases + repository CI.

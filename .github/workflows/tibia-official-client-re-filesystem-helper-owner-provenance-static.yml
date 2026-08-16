@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Bind loader owner to TGameClient statically
+    name: Validate exact TGameClient plus 0x748 member windows
     runs-on: [otclient, synology]
-    timeout-minutes: 7
+    timeout-minutes: 5
     steps:
-      - name: Correlate loader function TGameClient vtable and plus 0x748 field
+      - name: Emit and anchor constructor member initialization
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,69 +28,44 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'OWNER_PROV_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
-          import pathlib,struct,sys,hashlib
+          import hashlib,pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-          sf=E+'IIQQQQIIQQ';raw=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
-          st=raw[shstrndx];sn=d[st[4]:st[4]+st[5]]
+          sf=E+'IIQQQQIIQQ';sh=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
+          st=sh[shstrndx];sn=d[st[4]:st[4]+st[5]]
           def cs(b,o):
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
-          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]} for x in raw]
-          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
+          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in sh]
+          text=next(s for s in secs if s['name']=='.text')
           def b_at(va,n):return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
-          rel=by['.rela.dyn'];bo={};ba={}
-          for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
-              ro,ri,ad=struct.unpack_from('<QQq',d,o);r=(ri&0xffffffff,ri>>32,ad);bo[ro]=r;ba.setdefault(ad,[]).append((ro,r[0],r[1]))
-          vptr=0x3076908
-          print('OWNER_PROV_TGAMECLIENT_VTABLE_BEGIN')
-          vtargets=[]
-          for off in range(0,0x300,8):
-              r=bo.get(vptr+off)
-              if r:
-                  vtargets.append((off,r[2]));print(f'slot=0x{off:x} target=0x{r[2]:x}')
-          print('OWNER_PROV_TGAMECLIENT_VTABLE_END')
-          loader=0x6fc034
-          calls=[]
-          for i in range(len(tb)-5):
-              if tb[i]!=0xe8:continue
-              va=text['addr']+i;dst=va+5+struct.unpack_from('<i',tb,i+1)[0]
-              if dst==loader:calls.append(va)
-          print('OWNER_PROV_LOADER_CALLS='+','.join(hex(v) for v in calls))
-          print('OWNER_PROV_LOADER_RELOCS='+','.join(hex(x[0]) for x in ba.get(loader,[])))
-          print('OWNER_PROV_LOADER_ENTRY_HEX='+b_at(loader,0x80).hex())
-          # Which TGameClient virtual functions directly call the loader?
-          for off,target in vtargets:
-              # bounded scan of first 0x500 bytes at each vtable target, only when inside .text
-              if not (text['addr']<=target<text['addr']+text['size']):continue
-              w=b_at(target,min(0x500,text['addr']+text['size']-target))
-              refs=[]
-              for i in range(len(w)-5):
-                  if w[i]==0xe8 and target+i+5+struct.unpack_from('<i',w,i+1)[0]==loader:refs.append(target+i)
-              if refs:print(f'OWNER_PROV_TGAMECLIENT_VIRTUAL_CALLS_LOADER slot=0x{off:x} function=0x{target:x} calls='+','.join(hex(v) for v in refs))
-          # Instruction-boundary-like memory operands with disp32 0x748 and base r12 in constructor/factory body.
-          blob=b_at(0x6c8020,0x1600);base=0x6c8020
-          print('OWNER_PROV_TGAMECLIENT_PLUS748_ACCESSES_BEGIN')
-          for i in range(len(blob)-9):
-              p=i;rex=None
-              if 0x40<=blob[p]<=0x4f:rex=blob[p];p+=1
-              if blob[p] not in (0x8b,0x89,0x8d,0xc7):continue
-              m=blob[p+1];mod=m>>6;rm=m&7
-              if mod!=2:continue
-              disp_at=p+2
-              base_reg=rm|(((rex or 0)&1)<<3)
-              if rm==4:
-                  sib=blob[p+2];base_reg=(sib&7)|(((rex or 0)&1)<<3);disp_at=p+3
-              if base_reg!=12:continue
-              disp=struct.unpack_from('<i',blob,disp_at)[0]
-              if disp!=0x748:continue
-              va=base+i
-              print(f'va=0x{va:x} bytes={blob[i:i+12].hex()}')
-          print('OWNER_PROV_TGAMECLIENT_PLUS748_ACCESSES_END')
-          # Known loader owner load and getter call windows.
-          for label,start,end in [('LOADER_OWNER',0x6fc4c0,0x6fc530),('GETTER',0x6ba0a0,0x6ba0f0)]:
-              w=b_at(start,end-start);print(f'OWNER_PROV_{label}_SHA256={hashlib.sha256(w).hexdigest()}');print(f'OWNER_PROV_{label}_HEX={w.hex()}')
+          for label,start,end in [
+              ('PLUS748_INIT',0x6c84d0,0x6c8560),
+              ('PLUS748_READ',0x6c8a70,0x6c8ae0),
+              ('FACTORY_PAIR',0x6c80b0,0x6c8190),
+              ('LOADER_PAIR',0x6fc4c0,0x6fc530),
+          ]:
+              w=b_at(start,end-start)
+              print(f'OWNER_PROV_{label}_START=0x{start:x}')
+              print(f'OWNER_PROV_{label}_SHA256={hashlib.sha256(w).hexdigest()}')
+              print(f'OWNER_PROV_{label}_HEX={w.hex()}')
+          checks={
+              0x6c8507:'498dbc2448070000',
+              0x6c8a96:'498b9c2448070000',
+              0x6c80c6:'498b7618',
+              0x6c80ca:'4d8b6e20',
+              0x6c80d2:'4889b508ffffff',
+              0x6c814f:'4d896c2428',
+              0x6c8172:'488b8508ffffff',
+              0x6c8182:'4989442420',
+              0x6fc4d7:'4c8bb348070000',
+              0x6fc4f2:'e8b9dbfbff',
+          }
+          for va,hx in checks.items():
+              want=bytes.fromhex(hx);got=b_at(va,len(want))
+              if got!=want:raise SystemExit(f'OWNER_PROV_ANCHOR_FAIL=0x{va:x}:{got.hex()}')
+              print(f'OWNER_PROV_ANCHOR_PASS=0x{va:x}')
           print('OWNER_PROV_EXECUTED_TARGET=false')
           print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
           print('OWNER_PROV_MUTATION_PERFORMED=false')

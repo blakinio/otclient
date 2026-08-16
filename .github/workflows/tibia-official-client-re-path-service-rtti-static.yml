@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Identify QLibrary filename service type statically
+    name: Validate filesystem-helper RTTI and vtables statically
     runs-on: [otclient, synology]
-    timeout-minutes: 7
+    timeout-minutes: 6
     steps:
-      - name: Parse exact-client RTTI relocations and decoder availability
+      - name: Validate candidate typeinfo/vtables and emit bounded method bytes
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -29,10 +29,7 @@ jobs:
           echo 'PATH_RTTI_CLIENT_FENCE=PASS'
 
           python3 - "$client" <<'PY'
-          import importlib.util,pathlib,struct,sys,re
-          for mod in ('capstone','iced_x86','elftools'):
-              print(f'PATH_RTTI_MODULE_{mod.upper()}={"AVAILABLE" if importlib.util.find_spec(mod) else "UNAVAILABLE"}')
-
+          import hashlib,pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
@@ -45,88 +42,132 @@ jobs:
           secs=[]
           for i,x in enumerate(sh):
               secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
-          by={s['name']:s for s in secs}; text=by['.text']
+          by={s['name']:s for s in secs}; text=by['.text']; tb=d[text['off']:text['off']+text['size']]
           def va_to_off(va):
               for s in secs:
                   if s['size'] and s['addr'] <= va < s['addr']+s['size']:
                       return s['off']+(va-s['addr'])
               return None
-          def string_at_va(va,limit=180):
+          def rawq(va):
               o=va_to_off(va)
-              if o is None:return None
-              e=d.find(b'\0',o,min(len(d),o+limit))
-              if e<=o:return None
-              raw=d[o:e]
-              if not raw or len(raw)>160 or not all(32<=b<127 for b in raw):return None
-              return raw.decode('ascii','replace')
+              return None if o is None or o+8>len(d) else struct.unpack_from('<Q',d,o)[0]
+          def in_text(va): return text['addr'] <= va < text['addr']+text['size']
+          def emit(label,start,end):
+              o=va_to_off(start)
+              if o is None: print(f'{label}=NO_FILE_MAPPING'); return
+              blob=d[o:o+(end-start)]
+              print(f'{label}_VA=0x{start:x}')
+              print(f'{label}_END=0x{end:x}')
+              print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}')
+              print(f'{label}_HEX={blob.hex()}')
 
-          rel=by.get('.rela.dyn')
-          relocs=[]
+          # Dynamic symbols are useful for external RTTI vtable relocation names.
+          dyn=by.get('.dynsym'); syms=[]
+          if dyn and 0 <= dyn['link'] < len(secs):
+              ss=secs[dyn['link']]; sb=d[ss['off']:ss['off']+ss['size']]
+              for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
+                  if o+24>len(d): break
+                  sn,info,other,si,val,sz=struct.unpack_from(E+'IBBHQQ',d,o)
+                  syms.append((cs(sb,sn),val,sz,si,info))
+
+          rel=by.get('.rela.dyn'); relocs=[]
           if rel:
               for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
-                  if o+24>len(d):break
+                  if o+24>len(d): break
                   ro,ri,add=struct.unpack_from(E+'QQq',d,o)
-                  relocs.append((ro,ri&0xffffffff,ri>>32,add))
-          print(f'PATH_RTTI_RELA_DYN_COUNT={len(relocs)}')
+                  typ=ri&0xffffffff; sym=ri>>32
+                  relocs.append((ro,typ,sym,add))
           byoff={ro:(typ,sym,add) for ro,typ,sym,add in relocs}
           byadd={}
-          for ro,typ,sym,add in relocs:byadd.setdefault(add,[]).append((ro,typ,sym))
+          for ro,typ,sym,add in relocs: byadd.setdefault(add,[]).append((ro,typ,sym))
+          def rdesc(va):
+              r=byoff.get(va)
+              if not r:return 'NONE'
+              typ,sym,add=r
+              name=syms[sym][0] if sym and sym < len(syms) else ''
+              return f'type={typ},sym={sym},name={name},add={hex(add)}'
 
-          helpers={0x6b9fa0,0x6ba000,0x6ba060,0x6ba0b0}
-          print('PATH_RTTI_HELPER_RELOCS_BEGIN')
-          for target in sorted(helpers):
-              refs=byadd.get(target,[])
-              print(f'target=0x{target:x} refs={len(refs)} '+','.join(f'0x{ro:x}/t{typ}' for ro,typ,sym in refs[:30]))
-          print('PATH_RTTI_HELPER_RELOCS_END')
+          candidates={
+              'shared_TFileSystemHelper': {'name_va':0x1c95800,'ti':0x3070918},
+              'tibia_shared_TTibiaFileSystemHelper': {'name_va':0x1c95880,'ti':0x3070940},
+              'tibia_assets_TAssetFileSystemHelper': {'name_va':0x1c914e0,'ti':0x306ffb0},
+          }
+          print('PATH_RTTI_CANDIDATE_LAYOUT_BEGIN')
+          valid=[]
+          for label,c in candidates.items():
+              ti=c['ti']
+              print(f'CANDIDATE={label} name_va=0x{c["name_va"]:x} typeinfo=0x{ti:x}')
+              for va in range(ti,ti+0x28,8):
+                  print(f'  TYPEINFO_QWORD va=0x{va:x} raw={"NONE" if rawq(va) is None else hex(rawq(va))} reloc={rdesc(va)}')
+              refs=byadd.get(ti,[])
+              print('  TYPEINFO_REFS='+','.join(f'0x{ro:x}/t{typ}' for ro,typ,sym in refs))
+              for tro,typ,sym in refs:
+                  offraw=rawq(tro-8)
+                  # A likely Itanium vtable typeinfo slot has a small signed offset-to-top immediately before it.
+                  soff=None if offraw is None else struct.unpack('<q',struct.pack('<Q',offraw))[0]
+                  entries=[]
+                  text_entries=0
+                  for n in range(0,0x110,8):
+                      va=tro+8+n
+                      rr=byoff.get(va)
+                      if rr:
+                          target=rr[2]
+                          entries.append((n,va,target,rr[0],rr[1]))
+                          if in_text(target): text_entries+=1
+                  likely=(soff is not None and -0x10000 <= soff <= 0x10000 and text_entries>=4)
+                  print(f'  REF=0x{tro:x} offset_to_top={soff} text_entries_next_0x110={text_entries} LIKELY_VTABLE={str(likely).lower()}')
+                  if likely:
+                      valid.append((label,tro,soff))
+                      print(f'  VTABLE_ADDRESS_POINT=0x{tro+8:x}')
+                      for n,va,target,rtyp,rsym in entries:
+                          if n <= 0xf8:
+                              print(f'    SLOT=+0x{n:x} reloc_va=0x{va:x} target=0x{target:x} in_text={str(in_text(target)).lower()}')
+                      slot=byoff.get(tro+8+0xd8)
+                      print(f'  SLOT_D8={"NONE" if slot is None else hex(slot[2])}')
+          print('PATH_RTTI_CANDIDATE_LAYOUT_END')
 
-          # Collect printable strings with type/path/resource terminology, then use relocation
-          # relationships to identify possible Itanium typeinfo objects and vtable typeinfo slots.
-          terms=re.compile(r'(FileSystem|Filesystem|FileService|Resource|Path|Directory|Install|Storage|Archive|Asset|DataProvider|ResourceProvider)',re.I)
-          candidates=[]
-          seen=set()
-          for s in secs:
-              if not (s['flags'] & 0x2) or s['size']==0: continue
-              blob=d[s['off']:s['off']+s['size']]
-              for m in re.finditer(rb'[ -~]{4,160}\x00',blob):
-                  raw=m.group()[:-1]
-                  try:txt=raw.decode('ascii')
-                  except:continue
-                  if not terms.search(txt):continue
-                  va=s['addr']+m.start()
-                  key=(va,txt)
-                  if key in seen:continue
-                  seen.add(key); candidates.append((va,txt))
-          print(f'PATH_RTTI_TERM_STRING_COUNT={len(candidates)}')
-          print('PATH_RTTI_TYPE_CANDIDATES_BEGIN')
-          emitted=0
-          for sva,txt in candidates:
-              name_refs=byadd.get(sva,[])
-              # A common Itanium typeinfo object has name pointer at object+8.
-              for nro,ntyp,nsym in name_refs:
-                  ti=nro-8
-                  vrefs=byadd.get(ti,[])
-                  if not vrefs:continue
-                  for tro,ttyp,tsym in vrefs[:8]:
-                      # If tro is the typeinfo slot (vptr-8), slot +0xd8 from vptr is at tro+8+0xd8.
-                      slot_off=tro+8+0xd8
-                      slot=byoff.get(slot_off)
-                      slotadd='NONE' if slot is None else hex(slot[2])
-                      print(f'name_va=0x{sva:x} text={txt[:120]} typeinfo=0x{ti:x} typeinfo_ref=0x{tro:x} slot_d8_reloc=0x{slot_off:x} slot_d8_addend={slotadd}')
-                      emitted+=1
-                      if emitted>=120:break
-                  if emitted>=120:break
-              if emitted>=120:break
-          print('PATH_RTTI_TYPE_CANDIDATES_END')
+          # Candidate concrete helper inheritance relationship: TTibiaFileSystemHelper -> base typeinfo.
+          print('PATH_RTTI_INHERITANCE_CHECK_BEGIN')
+          for va in range(0x3070940,0x3070970,8):
+              print(f'va=0x{va:x} raw={"NONE" if rawq(va) is None else hex(rawq(va))} reloc={rdesc(va)}')
+          print('PATH_RTTI_INHERITANCE_CHECK_END')
 
-          # Search exact relative calls to getter 0x6ba0b0, retained as a safe callsite census.
-          tb=d[text['off']:text['off']+text['size']]
-          getter=0x6ba0b0; calls=[]
-          for i in range(len(tb)-5):
-              if tb[i]!=0xe8:continue
-              va=text['addr']+i
-              if va+5+struct.unpack_from('<i',tb,i+1)[0]==getter:calls.append(va)
-          print(f'PATH_RTTI_GETTER_CALL_COUNT={len(calls)}')
-          print('PATH_RTTI_GETTER_CALLS='+','.join(hex(x) for x in calls))
+          # Emit bounded code around candidate +0xd8 targets from the first-pass findings.
+          for label,target in [
+              ('PATH_RTTI_BASE_D8',0x6b15c0),
+              ('PATH_RTTI_TIBIA_D8',0xc95cb0),
+              ('PATH_RTTI_ASSET_D8',0x6b03c0),
+          ]:
+              emit(label,max(text['addr'],target-0x30),min(text['addr']+text['size'],target+0x1d0))
+
+          # Verify whether c95cb0 begins with a bounded instruction sequence referencing the known BEClient string.
+          # This is loader-side filename construction evidence only, not BattlEye internal analysis.
+          known_beclient=0x1d69bb2
+          print('PATH_RTTI_C95CB0_RIP_REFS_BEGIN')
+          lo=0xc95c80-text['addr']; hi=0xc95e80-text['addr']
+          for i in range(max(0,lo),min(len(tb)-7,hi)):
+              if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
+              m=tb[i+2]
+              if (m>>6)!=0 or (m&7)!=5:continue
+              va=text['addr']+i; dest=va+7+struct.unpack_from('<i',tb,i+3)[0]
+              if dest==known_beclient:
+                  print(f'BECLIENT_REF_CANDIDATE=0x{va:x}->0x{dest:x}')
+          print('PATH_RTTI_C95CB0_RIP_REFS_END')
+
+          # Candidate constructor/vptr assignment references to validated vtable address points.
+          print('PATH_RTTI_VPTR_LEA_CANDIDATES_BEGIN')
+          targets={}
+          for label,tro,soff in valid:
+              targets[tro+8]=label
+          for i in range(len(tb)-7):
+              if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
+              m=tb[i+2]
+              if (m>>6)!=0 or (m&7)!=5:continue
+              va=text['addr']+i; dest=va+7+struct.unpack_from('<i',tb,i+3)[0]
+              if dest in targets:
+                  print(f'type={targets[dest]} lea=0x{va:x} vptr=0x{dest:x}')
+          print('PATH_RTTI_VPTR_LEA_CANDIDATES_END')
+
           print('PATH_RTTI_EXECUTED_TARGET=false')
           print('PATH_RTTI_LIVE_RUNTIME_OBSERVED=false')
           print('PATH_RTTI_MUTATION_PERFORMED=false')

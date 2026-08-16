@@ -11,15 +11,15 @@ runtime_platform: official_native_linux_only
 
 This contract is the mandatory operational admission gate for every current and future Track A researcher before claiming, resuming, observing, creating, reusing, controlling, or mutating any official-client runtime.
 
-It does not replace `docs/agents/TIBIA_RESEARCH_TRACKS.md`, `docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md`, or `docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md`. It converts those final governance rules into a small per-worker decision that must be made before runtime work.
+It does not replace `docs/agents/TIBIA_RESEARCH_TRACKS.md`, `docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md`, or `docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md`. It converts those final governance rules into a small per-worker decision that must be made at claim/resume and re-evaluated before live runtime work.
 
-Static repository research may proceed without a live runtime only after declaring `runtime_access: none`. Runtime work must use one of the other explicit classes below. There is no implicit or legacy runtime class.
+Static repository research may proceed without a live runtime only after declaring and persisting `runtime_access: none`. Runtime work must use one of the other explicit classes below. There is no implicit or legacy runtime class.
 
-## Mandatory reads before Track A runtime work
+## Mandatory reads before Track A work
 
 A Track A worker MUST read the current trusted-base versions of:
 
-1. `AGENTS.md` and `docs/agents/AGENTS.md`;
+1. `AGENTS.md`, `docs/agents/README.md` and `docs/agents/AGENTS.md`;
 2. `docs/agents/TIBIA_RESEARCH_TRACKS.md`;
 3. `docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md`;
 4. `docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md`;
@@ -30,7 +30,7 @@ Stale task text, historical PR prose, a prior agent statement, or a previously w
 
 ## Required admission record
 
-Before the first runtime-related operation in a session, and again after any fact that can change target identity or authority, persist or emit a compact admission record with these fields:
+At Track A task claim/resume/checkpoint, before substantial work in that worker session, persist or emit the compact admission record below. Static/no-runtime work records `runtime_access: none`. Before the first runtime-related operation, and again after any fact that can change target identity or authority, re-evaluate and re-persist the record before proceeding.
 
 ```yaml
 track_id: official-client-re
@@ -50,7 +50,7 @@ mutation_authorized: true | false
 
 `mutation_authorized: true` is legal only for the exact cases defined below. An `UNKNOWN`, `REQUIRED_NOT_PROVEN`, `REQUIRED_UNAVAILABLE`, or `REQUIRED_UNIMPLEMENTED` value on a required gate means **REFUSE the mutation**.
 
-A task may store this compact record in its active checkpoint. It MUST NOT fabricate PASS from historical evidence merely to continue.
+The active task checkpoint is the durable admission record. It MUST NOT fabricate PASS from historical evidence merely to continue.
 
 ## Exact client fence
 
@@ -81,19 +81,22 @@ bootstrap: NOT_APPLICABLE
 mutation_authorized: false
 ```
 
-A `none` worker MUST NOT silently expand into live observation or mutation. Reclassify and re-run admission first.
+A `none` worker MUST NOT silently expand into live observation or mutation. Reclassify, re-persist and re-run admission first.
 
 ### 2. `read_only`
 
-Use only for demonstrably non-invasive observation that cannot alter process, window, input, login/session, network, instrumentation, or gameplay state and does not cross another task's owned runtime surface.
+Use only for demonstrably non-invasive live observation that cannot alter process, window, input, login/session, network, instrumentation, or gameplay state and does not cross another task's owned runtime surface. Static repository/artifact evidence uses `none`, not `read_only`.
 
-Required result:
+Required result before any live observation:
 
 ```yaml
+runtime_owner_task: <current task id, or NOT_APPLICABLE only when the target is proven unowned>
+runtime_namespace: <explicit non-conflicting observed namespace/target>
+target_uniqueness: PROVEN
 mutation_authorized: false
 ```
 
-Read-only evidence may discover candidates; it never creates controller authority or canonical identity. If non-invasiveness, ownership, or target uniqueness cannot be proven, do not observe that surface.
+`runtime_owner_task` MUST NOT name another task, and `runtime_namespace` MUST NOT be `UNKNOWN` or `NOT_APPLICABLE`. Canonical control gates remain `NOT_APPLICABLE`; read-only observation never creates controller authority or canonical identity. If non-invasiveness, ownership, namespace, or target uniqueness cannot be proven, do not observe that surface.
 
 ### 3. `ephemeral_isolated`
 
@@ -185,7 +188,7 @@ Track A workers MUST preserve current task ownership before any live operation.
 - Track B never shares Track A's canonical lease, registration, coordination lock, bootstrap/rebind transition, process/session, display ownership, or mutable state.
 - Broad `pkill`, Docker cleanup, display cleanup, state deletion, or any target selection that can affect an unproven owner is forbidden.
 
-If ownership or target uniqueness is ambiguous, use non-destructive discovery or stop that live action.
+If ownership or target uniqueness is ambiguous, use non-destructive repository/artifact discovery or stop that live observation/action.
 
 ## Re-admission triggers
 
@@ -213,7 +216,7 @@ runtime_access: none
 mutation_authorized: false
 ```
 
-The worker analyzes the exact binary and repository artifacts only.
+The worker analyzes the exact binary and repository artifacts only after persisting the `none` admission at claim/resume.
 
 ### PASS — isolated startup experiment
 
@@ -221,10 +224,23 @@ The worker analyzes the exact binary and repository artifacts only.
 runtime_access: ephemeral_isolated
 runtime_owner_task: OTC-example
 runtime_namespace: task-unique
+target_uniqueness: PROVEN
 mutation_authorized: true
 ```
 
 The worker has proven its own unique sandbox and touches only that sandbox. It does not login merely to mirror canonical state and does not publish canonical registration.
+
+### PASS — bounded read-only live observation
+
+```yaml
+runtime_access: read_only
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: canonical-live-runtime
+target_uniqueness: PROVEN
+mutation_authorized: false
+```
+
+This is legal only when the target is freshly proven unowned/non-conflicting and the observation is technically non-invasive. It still creates no canonical authority.
 
 ### REFUSE — historical display shortcut
 
@@ -238,10 +254,10 @@ A worker sees no authoritative `runtime-registration.json` and tries ordinary `g
 
 A worker sees the exact old runtime but registration `lease_generation` differs, then manually edits JSON or proceeds with Gate B. Refuse; the dedicated rebind must exist and pass first.
 
-### Boundary — read-only evidence
+### REFUSE — ambiguous read-only target
 
-A worker may use a bounded non-invasive discriminator outside another task's owned surface to establish a current FACT/UNKNOWN boundary. That observation still does not authorize later mutation; mutation requires a new admission decision.
+A worker cannot prove target uniqueness/ownership or the observed namespace, but tries to proceed because it intends no mutation. Refuse; use `none` for static evidence or obtain a proven non-conflicting live target first.
 
 ## Failure mode
 
-When a required gate is unavailable or unproven, preserve the evidence, set the current runtime fact to `UNKNOWN`/the appropriate fail-closed token, persist exactly one next action, and continue only unrelated safe repository/static work. Do not weaken the gate, invent authority, or launch/login merely to make the task progress.
+When a required gate or target proof is unavailable/unproven, preserve the evidence, set the current runtime fact to `UNKNOWN`/the appropriate fail-closed token, persist exactly one next action, and continue only unrelated safe repository/static work. Do not weaken the gate, invent authority, or launch/login merely to make the task progress.

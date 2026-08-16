@@ -13,70 +13,119 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: track-a-p2-buffer-downstream-consumer-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   hardened-post-serialization-chain:
-    runs-on: [otclient, synology]
-    timeout-minutes: 8
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-p2-buffer-downstream-consumer
+      OFFICIAL_LINUX_ARCHIVE_URL: https://download.tibia.com/tibia.x64.tar.gz
     steps:
       - name: Checkout exact Draft head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           persist-credentials: false
 
-      - name: Verify exact client and static tool context
+      - name: Verify hosted no-runtime execution boundary
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_HEAD_BRANCH" ]]
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$RUNNER_OS" == Linux ]]
+          [[ "$RUNNER_ARCH" == X64 ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
           python3 -m py_compile .github/scripts/tibia-official-client-re-p2-buffer-downstream-consumer.py
+          objdump="$(command -v objdump)"
+          [[ -x "$objdump" ]]
+          "$objdump" --version | head -n 1
+          echo "TRACK_A_P2_OBJDUMP=$objdump" >> "$GITHUB_ENV"
+          echo "TRACK_A_P2_RUNTIME_ACCESS=none"
+          echo "TRACK_A_P2_PERSISTENT_SESSION=none"
+          echo "TRACK_A_P2_PHYSICAL_E2E=false"
+          echo "TRACK_A_P2_SYNLOGY_EXECUTION=false"
 
-          client=''
-          state=''
-          for candidate in /work/_otclient_tibia_re_state /home/runner/_work/_otclient_tibia_re_state; do
-            probe="$candidate/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client"
-            [[ -x "$probe" ]] || continue
-            size="$(stat -c '%s' "$probe")"
-            sha="$(sha256sum "$probe" | awk '{print $1}')"
-            if [[ "$size" == "$EXPECTED_CLIENT_SIZE" && "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
-              client="$probe"; state="$candidate"; break
-            fi
-          done
-          [[ -n "$client" && -n "$state" ]]
+      - name: Materialize exact official Linux client without executing it
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out=artifacts/p2-buffer-downstream-consumer
+          mkdir -p "$out"
+          archive="$RUNNER_TEMP/tibia.x64.tar.gz"
+          client="$RUNNER_TEMP/tibia-static-client"
 
-          objdump="$(command -v objdump || true)"
-          if [[ -z "$objdump" ]]; then
-            pinned="$state/toolroot/usr/bin/objdump"
-            [[ -x "$pinned" ]]
-            wrapper="$RUNNER_TEMP/track-a-p2-downstream-objdump"
-            cat > "$wrapper" <<SH
-          #!/usr/bin/env bash
-          exec env LD_LIBRARY_PATH="$state/toolroot/usr/lib/x86_64-linux-gnu:$state/toolroot/lib/x86_64-linux-gnu" "$pinned" "\$@"
-          SH
-            chmod 700 "$wrapper"
-            objdump="$wrapper"
+          if ! curl --fail --silent --show-error --location \
+              --retry 2 --retry-all-errors --connect-timeout 20 --max-time 900 \
+              --user-agent 'blakinio-otclient-static-research/1.0' \
+              "$OFFICIAL_LINUX_ARCHIVE_URL" --output "$archive"; then
+            {
+              echo 'P2_HOSTED_INPUT_STATUS=INPUT_BLOCKED'
+              echo 'P2_HOSTED_INPUT_REASON=official_linux_archive_download_failed'
+              echo "P2_HOSTED_INPUT_URL=$OFFICIAL_LINUX_ARCHIVE_URL"
+            } | tee "$out/input-status.txt"
+            exit 3
           fi
-          [[ -n "$objdump" && -x "$objdump" ]]
-          "$objdump" --version >/dev/null
+
+          python3 - "$archive" "$client" <<'PY'
+          import shutil
+          import sys
+          import tarfile
+          from pathlib import PurePosixPath
+
+          archive, target = sys.argv[1:]
+          with tarfile.open(archive, mode='r:*') as tf:
+              candidates = []
+              for member in tf.getmembers():
+                  if not member.isfile():
+                      continue
+                  path = PurePosixPath(member.name)
+                  if path.is_absolute() or '..' in path.parts:
+                      continue
+                  parts = path.parts
+                  if len(parts) >= 2 and parts[-2:] == ('bin', 'client'):
+                      candidates.append(member)
+              if len(candidates) != 1:
+                  names = ','.join(m.name for m in candidates[:10]) or '<none>'
+                  raise SystemExit(f'P2_HOSTED_INPUT_BLOCKED=client_member_count:{len(candidates)}:{names}')
+              src = tf.extractfile(candidates[0])
+              if src is None:
+                  raise SystemExit('P2_HOSTED_INPUT_BLOCKED=client_member_unreadable')
+              with src, open(target, 'wb') as dst:
+                  shutil.copyfileobj(src, dst, length=1024 * 1024)
+              print(f'P2_HOSTED_CLIENT_MEMBER={candidates[0].name}')
+          PY
+
+          size="$(stat -c '%s' "$client")"
+          sha="$(sha256sum "$client" | awk '{print $1}')"
           {
-            echo "TRACK_A_P2_CLIENT=$client"
-            echo "TRACK_A_P2_OBJDUMP=$objdump"
-          } >> "$GITHUB_ENV"
+            echo "P2_HOSTED_INPUT_SIZE=$size"
+            echo "P2_HOSTED_INPUT_SHA256=$sha"
+            echo "P2_HOSTED_EXPECTED_SIZE=$EXPECTED_CLIENT_SIZE"
+            echo "P2_HOSTED_EXPECTED_SHA256=$EXPECTED_CLIENT_SHA256"
+          } | tee "$out/input-status.txt"
+
+          if [[ "$size" != "$EXPECTED_CLIENT_SIZE" || "$sha" != "$EXPECTED_CLIENT_SHA256" ]]; then
+            echo 'P2_HOSTED_INPUT_STATUS=INPUT_BLOCKED' | tee -a "$out/input-status.txt"
+            echo 'P2_HOSTED_INPUT_REASON=exact_client_fence_mismatch' | tee -a "$out/input-status.txt"
+            exit 3
+          fi
+
+          echo 'P2_HOSTED_INPUT_STATUS=EXACT_FENCE_VERIFIED' | tee -a "$out/input-status.txt"
+          echo "TRACK_A_P2_CLIENT=$client" >> "$GITHUB_ENV"
           echo "TRACK_A_P2_DOWNSTREAM_EXACT_HEAD=$GITHUB_SHA"
-          echo TRACK_A_P2_DOWNSTREAM_EXACT_CLIENT_VERIFIED=true
+          echo 'TRACK_A_P2_DOWNSTREAM_EXACT_CLIENT_VERIFIED=true'
 
       - name: Prove persistent QBuffer downstream processor chain
         shell: bash
         run: |
           set -Eeuo pipefail
           out=artifacts/p2-buffer-downstream-consumer
-          mkdir -p "$out"
           python3 .github/scripts/tibia-official-client-re-p2-buffer-downstream-consumer.py \
             --client "$TRACK_A_P2_CLIENT" \
             --objdump "$TRACK_A_P2_OBJDUMP" \
@@ -113,10 +162,20 @@ jobs:
           n=d['negative_controls']
           assert not any(n.values())
           PY
-          echo TRACK_A_P2_DOWNSTREAM_HARDENED_VALIDATED=true
+          echo 'TRACK_A_P2_DOWNSTREAM_HARDENED_VALIDATED=true'
+
+      - name: Remove proprietary input before evidence upload
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -f "$RUNNER_TEMP/tibia-static-client" "$RUNNER_TEMP/tibia.x64.tar.gz"
+          test ! -e "$RUNNER_TEMP/tibia-static-client"
+          test ! -e "$RUNNER_TEMP/tibia.x64.tar.gz"
 
       - name: Upload sanitized static evidence only
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: track-a-p2-buffer-downstream-consumer-${{ github.run_id }}
           path: artifacts/p2-buffer-downstream-consumer/**

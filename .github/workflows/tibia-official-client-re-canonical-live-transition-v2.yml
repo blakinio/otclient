@@ -30,7 +30,7 @@ jobs:
           test "$RUNNER_OS" = Linux
           python3 -m py_compile \
             .github/scripts/tibia-official-client-re-canonical-live-transition.py \
-            .github/scripts/test_tibia_official_client_re-canonical-live-transition.py
+            .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
           bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py

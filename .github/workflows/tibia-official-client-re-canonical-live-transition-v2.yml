@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout exact PR head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -30,15 +30,21 @@ jobs:
           test "$RUNNER_OS" = Linux
           python3 -m py_compile \
             .github/scripts/tibia-official-client-re-canonical-live-transition.py \
-            .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+            .github/scripts/test_tibia_official_client_re-canonical-live-transition.py
           bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
-          test "$(git ls-files -s .github/scripts/tibia-official-client-re-canonical-live-transition.py | awk '{print $1}')" = 100755
-          test "$(git ls-files -s .github/scripts/tibia-official-client-re-canonical-live-session.sh | awk '{print $1}')" = 100755
-          ! grep -Fq 'login_e2e' .github/scripts/tibia-official-client-re-canonical-live-session.sh
-          ! grep -Fq '$BASE/runtime/wireproxy.pid' .github/scripts/tibia-official-client-re-canonical-live-session.sh
+          test "$(git ls-files -s .github/scripts/tibia-official-client-re-canonical-live-transition.py | cut -d' ' -f1)" = 100755
+          test "$(git ls-files -s .github/scripts/tibia-official-client-re-canonical-live-session.sh | cut -d' ' -f1)" = 100755
+          if grep -Fq 'login_e2e' .github/scripts/tibia-official-client-re-canonical-live-session.sh; then
+            echo "forbidden login path found in infrastructure worker" >&2
+            exit 1
+          fi
+          if grep -Fq "\$BASE/runtime/wireproxy.pid" .github/scripts/tibia-official-client-re-canonical-live-session.sh; then
+            echo "forbidden historical wireproxy dependency found" >&2
+            exit 1
+          fi
           grep -Fq '_install_supervisor_signal_handlers' .github/scripts/tibia-official-client-re-canonical-live-transition.py
           grep -Fq '_become_child_subreaper' .github/scripts/tibia-official-client-re-canonical-live-transition.py
           grep -Fq 'WGCF_VER=2.2.32' .github/scripts/tibia-official-client-re-canonical-live-session.sh

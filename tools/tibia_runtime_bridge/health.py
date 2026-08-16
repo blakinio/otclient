@@ -24,6 +24,10 @@ class BridgeIdentityError(ValueError):
     """An explicit runtime identity/binding is absent from the accepted fence."""
 
 
+class BridgeStaleIdentityError(BridgeIdentityError):
+    """A previously observed runtime identity or binding moved backwards/changed unsafely."""
+
+
 def _positive_int(value: object, field: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
         raise BridgeIdentityError(f"{field} must be a positive integer")
@@ -204,25 +208,25 @@ class BridgeSession:
             old = previous.identity
             new = candidate.identity
             if new.registration_generation < old.registration_generation:
-                raise BridgeIdentityError("registration_generation regressed")
+                raise BridgeStaleIdentityError("registration_generation regressed")
             if new.lease_generation < old.lease_generation:
-                raise BridgeIdentityError("lease_generation regressed")
+                raise BridgeStaleIdentityError("lease_generation regressed")
             if new.registration_generation == old.registration_generation and candidate != previous:
-                raise BridgeIdentityError("runtime binding changed without registration_generation advance")
+                raise BridgeStaleIdentityError(
+                    "runtime binding changed without registration_generation advance"
+                )
         self._latest_observed = candidate
         return candidate
 
     def reacquire(self) -> ReacquireResult:
         try:
             candidate = self._observe()
+        except BridgeStaleIdentityError as exc:
+            self._binding = None
+            return ReacquireResult(ReacquireState.STALE_IDENTITY, None, str(exc))
         except BridgeIdentityError as exc:
             self._binding = None
-            state = (
-                ReacquireState.STALE_IDENTITY
-                if "regressed" in str(exc) or "without registration_generation" in str(exc)
-                else ReacquireState.INVALID_IDENTITY
-            )
-            return ReacquireResult(state, None, str(exc))
+            return ReacquireResult(ReacquireState.INVALID_IDENTITY, None, str(exc))
 
         if candidate is None:
             self._binding = None
@@ -243,7 +247,13 @@ class BridgeSession:
             current = self._observe()
         except BridgeIdentityError as exc:
             self._binding = None
-            return self._health(HealthState.STALE_IDENTITY, False, None, f"{stage}: {exc}", identity=binding.identity)
+            return self._health(
+                HealthState.STALE_IDENTITY,
+                False,
+                None,
+                f"{stage}: {exc}",
+                identity=binding.identity,
+            )
         if current is None:
             self._binding = None
             return self._health(
@@ -301,8 +311,15 @@ class BridgeSession:
         except BridgeClientError as exc:
             return self._health(HealthState.MALFORMED, False, None, str(exc))
 
+        if not isinstance(ping, dict):
+            return self._health(HealthState.MALFORMED, False, None, "PING response must be an object")
         if ping.get("command") != "PING" or not isinstance(ping.get("main_base_resolved"), bool):
-            return self._health(HealthState.MALFORMED, False, None, "PING response is structurally incomplete")
+            return self._health(
+                HealthState.MALFORMED,
+                False,
+                None,
+                "PING response is structurally incomplete",
+            )
         if not ping.get("ok") or not ping["main_base_resolved"]:
             return self._health(HealthState.DEGRADED, False, None, "PING did not establish a ready bridge")
 

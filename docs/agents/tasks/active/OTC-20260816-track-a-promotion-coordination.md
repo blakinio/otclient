@@ -1,19 +1,19 @@
 ---
 task_id: OTC-20260816-track-a-promotion-coordination
-status: waiting
+status: implementing
 agent: ChatGPT
-session_id: chatgpt-coord-20260816-1338
+session_id: chatgpt-coord-p1-serialize-20260816-1436
 session_role: promotion_integration_coordinator
 project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: programme_coordination
 phase: integrate
-branch: docs/OTC-20260816-track-a-promotion-coordination-live-2
+branch: docs/OTC-20260816-track-a-promotion-coordination-p1-serialize
 base_branch: main
-base_main: 0d7b2607912552599ae501891491aab439cfde7b
+base_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f
 risk: medium
-updated: 2026-08-16T13:51:00+02:00
+updated: 2026-08-16T14:36:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-promotion-coordination.md
 modules_touched: []
@@ -29,7 +29,7 @@ blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: live GitHub coordination, independent diff/evidence review and durable barrier checkpoint require no checkout, physical runtime or owner-funded AI
+execution_reason: live GitHub coordination and shared-index ownership serialization require no checkout, physical runtime or owner-funded AI
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -39,7 +39,7 @@ context_growth: stable
 context_score: 11
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: one coordinator task serializes review and promotion decisions across five independent worker lanes while preserving lane-owned branches
+decomposition_reason: coordinator serializes shared integration paths across otherwise independent worker lanes
 validation_level: focused
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
@@ -61,9 +61,9 @@ mutation_authorized: false
 owner_funded_ai_api_authorized: false
 programme_complete: false
 invocation_started_at: 2026-08-16T13:38:00+02:00
-last_progress_at: 2026-08-16T13:51:00+02:00
+last_progress_at: 2026-08-16T14:36:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: coordinator-checkpoint-after-pr303-close
+ci_check_generation: coordinator-p1-shared-index-serialization
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -78,8 +78,8 @@ runtime_nonclaims:
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
 current_main:
-  sha: 0d7b2607912552599ae501891491aab439cfde7b
-  verified_at: 2026-08-16T13:50:00+02:00
+  sha: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f
+  verified_at: 2026-08-16T14:36:00+02:00
 current_relevant_open_prs:
   - 360
   - 358
@@ -90,6 +90,7 @@ current_relevant_open_prs:
   - 302
   - 295
   - 280
+  - 23
 closed_or_integrated_this_invocation:
   - pr: 359
     disposition: closed_unmerged_concurrent_duplicate_of_357
@@ -99,17 +100,57 @@ closed_or_integrated_this_invocation:
     disposition: closed_unmerged_superseded_runtime_attempt_historical_evidence_only
     final_observed_head: 37772abae2637ac9a3229a1d8fcaa2b0b95894a2
     coordinator_comment: 5307286024
+  - pr: 361
+    disposition: merged_prior_coordinator_checkpoint
+    merge_commit: 19556a5bca362dede3f9c2608902eda6e358b2bc
+shared_index_serialization:
+  status: GRANTED_TO_P1
+  granted_at: 2026-08-16T14:36:00+02:00
+  beneficiary_task: OTC-20260816-track-a-p1-bridge-health-recovery
+  beneficiary_pr: 357
+  paths:
+    - docs/agents/MODULE_CATALOG.md
+    - docs/agents/CHANGELOG.md
+  reason: PR 23 task is stale and blocked exclusively on separate runtime visual approval; no active writer exists, while P1 requires same-PR reusable-integration records for closeout
+  pr23_task_state:
+    task_id: OTC-20260724-oteryn-login-shell
+    status: awaiting_visual_review
+    task_updated: 2026-07-24T21:58:34Z
+    pr_head: 65e101fb9f693e7bf4331ce17b9305289dd15931
+    pr_updated: 2026-08-05T07:52:28Z
+    retained_ownership:
+      - modules/client_entergame/entergame.otui
+      - modules/client_entergame/entergame.otmod
+      - modules/client_entergame/oteryn_login_theme.lua
+      - modules/client_entergame/oteryn_characterlist.otui
+      - docs/agents/ACTIVE_WORK.md
+      - docs/agents/tasks/active/OTC-20260724-oteryn-login-shell.md
+    temporarily_serialized_away:
+      - docs/agents/MODULE_CATALOG.md
+      - docs/agents/CHANGELOG.md
+  rules:
+    - P1 may add only its own reusable bridge integration records to the two shared index paths.
+    - P1 must start from current main versions and preserve all unrelated entries.
+    - P1 must not edit PR 23 UI/task/ACTIVE_WORK paths.
+    - PR 23 must reconcile/rebase its stale copies of the two indexes before any future promotion; its visual-review blocker is unchanged.
+    - This grant ends when PR 357 is merged/closed or when the P1 shared-index edits are otherwise abandoned.
 lane_barrier:
   P1-BRIDGE:
     canonical_pr: 357
-    head: edcc3f85bbe084667cb89024b54cd3ab79185809
-    disposition: ACCEPT_WITH_EDITS
-    exact_head_governance_run: 31944372661
-    exact_head_ci_run: 31944372746
+    head: fe37b80423d7cc8b269cd58edc19a2795e01e381
+    disposition: IMPLEMENTATION_ACCEPTED_SHARED_INDEX_CLOSEOUT_AUTHORIZED
+    semantic_implementation_head: bf0fe057c5f320508dc7c9f0e5f2a55c2c3e1448
+    repair_validation_runs:
+      - 31947189849
+      - 31947285170
+      - 31947365151
+    repair_validation_result: SUCCESS
+    semantic_findings_open: 0
+    authority_wording_status: COMPLETE
+    temporary_validation_workflow_status: REMOVED
     blockers:
-      - reusable bridge integration requires same-PR MODULE_CATALOG and CHANGELOG entries
-      - those shared index paths remain explicitly owned by open PR 23 and must be serialized before editing
-      - wording must keep read-only IPC/discovery separate from LD_PRELOAD activation, which remains RUNTIME-owned
+      - add same-PR MODULE_CATALOG and CHANGELOG records under the serialized grant
+      - refresh/integrate current main and obtain fresh exact-head normal governance/repository CI
     physical_runtime_evidence_required_for_this_hosted_producer: false
   RUNTIME:
     pr: 358
@@ -134,8 +175,6 @@ lane_barrier:
       target_uniqueness: UNKNOWN
       mutation_authorized: false
     next_dependency: reviewed canonical bootstrap/rebind/Gate-B implementation promoted to trusted main
-    superseded_legacy_runtime_prs:
-      - 303
   RUNTIME-INFRA:
     pr: 360
     last_reviewed_head: 1d64fab66650b1fcd58388ff5cf6f9a77a392dc4
@@ -171,26 +210,11 @@ lane_barrier:
     source_validator_job: 95155325324
     source_validator_result: FAILURE
     coordinator_comment: 5307264783
-    findings:
-      - id: QLIB-COORD-001
-        severity: MEDIUM
-        status: open
-        finding: validator literal for Qt 6.9.3 .so suffix does not match official source implementation
-      - id: QLIB-COORD-002
-        severity: MEDIUM
-        status: open
-        finding: generated candidate order must be distinguished from actual dlopen attempts because absolute-path existing-file failure can stop retries
     approved_execution_class: github_hosted
     runtime_access: none
-    synology_static_fallback: forbidden
   P2-NETWORK:
     pr: 310
     disposition: BLOCKED_INPUT_STAGING
-    accepted_hosted_attempts:
-      - run: 31944074222
-        result: download_tibia_com_dns_failure
-      - run: 31944119641
-        result: static_tibia_com_http_403
     next_dependency: legally and technically compliant GitHub-hosted-readable staging source for exact fenced native-Linux client; no Synology fallback
   P0-STATE:
     pr: 302
@@ -201,7 +225,6 @@ lane_barrier:
     open_material_gaps:
       - canonical bootstrap/rebind implementation is not promotion-safe
       - physical canonical runtime remains unregistered and unclaimed
-      - P1 integration documentation is blocked by shared-index ownership serialization
       - QLibrary source validator needs evidence-based repair
       - P2 exact-client hosted staging remains unavailable
       - P0 direct position remains runtime-blocked
@@ -213,38 +236,32 @@ prior_terminal_packages:
     stable_relative_suffix: BattlEye/BEClient
     client_side_so_suffix_append: false
 audit:
-  role: fresh_coordinator_validator
-  result: FAIL_MATERIAL_FINDINGS_OPEN
-  material_findings_open: 6
+  role: promotion_integration_coordinator_stale_checkpoint_takeover
+  result: P1_SHARED_INDEX_SERIALIZATION_GRANTED
+  material_findings_open: 5
+  p1_material_findings_open: 0
   notes:
-    - duplicate P1 writer PR 359 was closed unmerged before any promotion
-    - stale physical-runtime PR 303 was closed unmerged and retained only as non-authoritative historical evidence
-    - green CI on PR 360 does not override the three HIGH fail-closed/credential/argv findings
-    - PR 358 read-only physical reconciliation is accepted as evidence only; it is not physical E2E success
+    - prior coordinator branch was merged as PR 361 and no longer exists; waiting checkpoint on main exceeded the 45-minute stale threshold before takeover
+    - P1 exact owned-path semantic repairs were revalidated on GitHub-hosted runners and did not access physical runtime
+    - stale PR 23 keeps its UI/runtime-visual-review work but no longer blocks P1 from adding narrowly scoped records to the two shared repository indexes
     - no historical display, VNC port, PID or session is promoted to current fact
 e2e:
   result: NOT_APPLICABLE
-  reason: this coordinator checkpoint performs GitHub-only integration review; physical E2E is exclusively the serialized RUNTIME lane and remains blocked by unpromoted bootstrap/rebind code
-last_completed_step: independently audited current P1, QLibrary and canonical-runtime Drafts; closed duplicate PR 359 and stale runtime PR 303; returned PR 356 and PR 360 for evidence/repair; preserved PR 358 as blocked read-only reconciliation evidence
-next_action: on the first material head/ownership change affecting PR 360, PR 356, or the shared integration indexes, refetch exact main and resume coordinator review; do not poll unchanged state or authorize physical runtime mutation
+  reason: this coordinator checkpoint performs GitHub-only ownership serialization; physical E2E is exclusively RUNTIME-owned
+last_completed_step: verified prior coordinator branch merged/deleted, verified PR 23 shared-index owner is stale and visual-review-blocked, and serialized MODULE_CATALOG.md plus CHANGELOG.md writes exclusively to P1 closeout
+next_action: merge this coordinator serialization checkpoint, then let PR 357 add only its two required shared-index records from current main and complete current-main freshness plus exact-head normal checks
 ---
 
 # OTCLIENT-TIBIA-RE coordinator checkpoint
 
-## Current barrier
+## P1 shared-index serialization
 
-`main` remains `0d7b2607912552599ae501891491aab439cfde7b`. The coordinator owns only this checkpoint path and performs no physical runtime work.
+The prior coordinator checkpoint was merged as PR #361 and its branch no longer exists. The remaining `waiting` checkpoint on `main` exceeded the repository stale threshold before this takeover. A fresh read of canonical PR #357 confirms that the two material P1 semantic findings have been repaired and GitHub-hosted component validation is green; the temporary validation workflow has been removed.
 
-P1 implementation PR #357 is the canonical bridge Draft; concurrent duplicate #359 was closed unmerged. The P1 code is accepted subject to repository integration documentation and explicit authority wording. Shared `MODULE_CATALOG.md` and `CHANGELOG.md` edits are not currently safe because open PR #23 still owns those paths.
+Open Draft PR #23 still lists `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md`, but its task has been `awaiting_visual_review` since 2026-07-24 and its only merge blocker is a separate runtime visual approval. There is no active writer on those two index paths. To avoid an indefinite repository-integration deadlock, ownership of exactly those two shared index files is now serialized to P1 for the narrow purpose of adding its reusable bridge records. PR #23 retains its UI/task/ACTIVE_WORK ownership and must reconcile its stale index copies before any later promotion.
 
-The RUNTIME lane performed one fresh read-only Synology reconciliation in #358. It directly proved canonical lease absence at generation 0 and absence of authoritative registration without observing a client/display/network session. Therefore the only legal future path is reviewed canonical bootstrap from trusted `main`; current display `:98`, VNC `6082`, exact PID and exact session remain unclaimed. Stale runtime-reacquisition PR #303 is closed unmerged so it cannot remain a competing physical-runtime owner; its branch is historical evidence only.
-
-RUNTIME-INFRA PR #360 is not promotion-safe despite green hosted CI. Independent coordinator audit found open HIGH findings in rebind rollback, worker argv compatibility and credential handling, plus an unresolved shared wireproxy ownership dependency. #358 must remain blocked until those findings are repaired, independently re-audited and the resulting implementation is deliberately promoted.
-
-Hosted QLibrary PR #356 remains a source-correlation task only. Its load-bearing validator failed and must be repaired against official Qt 6.9.3 source without a Synology/proprietary fallback. Actual successful runtime mapping remains `UNKNOWN`.
-
-P2 #310 remains input-blocked on compliant hosted staging of the exact native-Linux client. P0 #302 remains blocked on a future admitted canonical live in-game process. No lane may substitute historical runtime state or closed PR #303 surfaces.
+This checkpoint grants no physical runtime authority and changes no RUNTIME gates. Current display `:98`, VNC `6082`, exact PID and exact session remain unclaimed.
 
 ## Safety/nonclaims
 
-No login, X11/VNC access, process mutation, bootstrap, rebind, client launch, BattlEye execution/loading, Track B mutation, credentials, owner Codex quota, OpenAI API token or owner-funded paid AI quota was used by this coordinator invocation.
+No login, X11/VNC access, process mutation, bootstrap, rebind, client launch, BattlEye execution/loading, Track B mutation, credentials, owner Codex quota, OpenAI API token or owner-funded paid AI quota was used by this coordinator takeover.

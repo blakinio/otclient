@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-canonical-graphics-integration-fix
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-graphics-integration-fix-20260816
 session_role: runtime_infrastructure_maintainer
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: runtime_worker_repair
-phase: hosted-validation
+phase: coordinator-promotion-ready
 branch: fix/OTC-20260816-track-a-canonical-graphics-integration-fix
 base_branch: main
 base_main: a482bba877c881d31ae903a6f8acad24debfb5c5
 risk: medium
-updated: 2026-08-16T18:43:00+02:00
+updated: 2026-08-16T18:46:00+02:00
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
-  - .github/workflows/track-a-canonical-graphics-integration-validation.yml
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-graphics-integration-fix.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-graphics-integration-fix/**
 modules_touched: []
@@ -31,7 +30,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: direct runtime evidence selected a graphics-stack compatibility boundary, while Qt 6.9.3 primary source proves the trusted worker explicitly disables both XCB GLX and EGL integrations through QT_XCB_GL_INTEGRATION=none; correction is implemented and contract-validated without physical runtime access
+execution_reason: direct runtime evidence selected a graphics-stack compatibility boundary; Qt 6.9.3 primary source proves QT_XCB_GL_INTEGRATION=none disables the default XCB GLX/EGL integration candidates; the minimal correction and dependent canonical contracts are now proven on GitHub-hosted without runtime access
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -60,26 +59,18 @@ source_runtime_evidence:
   discriminator_run: 31958546334
   discriminator_job: 95192878995
   classification: PROVEN_CLIENT_ALIVE_ZERO_VISIBLE_WINDOWS_WITH_QT_GL_CONTEXT_FAILURES
-  observed_messages:
-    - QXcbIntegration cannot create platform OpenGL context; neither GLX nor EGL enabled
-    - QRhiGles2 failed to create temporary context
-    - QXcbIntegration cannot create platform offscreen surface; neither GLX nor EGL enabled
-    - QRhiGles2 failed to create context
 qt_primary_source_evidence:
   repository: qt/qtbase
   version: v6.9.3
   path: src/plugins/platforms/xcb/qxcbconnection.cpp
   blob: e6d232d0ef95023e8b1586b706743fc7f01c3711
-  behavior:
-    - default XCB GL integration priority is xcb_glx then xcb_egl
-    - QT_XCB_GL_INTEGRATION is read from the environment
-    - value none clears the XCB GL integration candidate list completely
+  default_integrations: [xcb_glx, xcb_egl]
+  qt_xcb_gl_integration_none_effect: clears_integration_candidate_list
 selected_fix:
   remove_environment_assignment: QT_XCB_GL_INTEGRATION=none
   preserve_environment_assignment: QT_QUICK_BACKEND=software
   add_nonsecret_diagnostic_assignment: QSG_INFO=1
   force_specific_gl_backend: false
-  rationale: restore Qt's own GLX/EGL integration selection without prematurely forcing a particular backend; retain software Qt Quick adaptation and improve non-secret scenegraph diagnostics
 safety:
   exact_client_fence_unchanged: true
   lease_registration_gate_contracts_unchanged: true
@@ -87,26 +78,42 @@ safety:
   credentials_login_contract_unchanged: true
   physical_success_claimed: false
 validation:
-  temporary_hosted_validator: .github/workflows/track-a-canonical-graphics-integration-validation.yml
+  semantic_head: c47b2acb06ad4e27f78b36e0130e350e8fb599bc
+  hosted_run: 31959453898
+  hosted_job: 95195086514
+  hosted_result: SUCCESS
+  session_tests: 11_PASS
+  transition_tests: 9_PASS
+  guard_tests: 3_PASS
+  lease_tests: 14_PASS
+  graphics_contract: PASS
+  bash_n: PASS
   runtime_access: none
   physical_e2e: false
-  semantic_result: PENDING
+  temporary_validator_workflow: REMOVED
   final_governance: PENDING
   final_repository_ci: PENDING
   review_threads_open: PENDING
+evidence_path: docs/agents/evidence/OTC-20260816-track-a-canonical-graphics-integration-fix/20260816-hosted-graphics-integration-fix.md
+audit:
+  result: PASS
+  material_findings_open: 0
+  notes:
+    - production diff changes only the client graphics environment assignment
+    - no QSG_RHI_BACKEND is forced because physical backend availability remains unproven
 acceptance:
   - canonical worker no longer exports QT_XCB_GL_INTEGRATION=none
   - canonical worker still exports QT_QUICK_BACKEND=software
-  - canonical worker exports QSG_INFO=1 for bounded non-secret graphics initialization diagnostics
-  - source-level tests pin all three invariants
-  - existing canonical session/transition/guard/lease tests remain green
-  - no Synology, X11/VNC, client launch, credentials or canonical runtime access is used by this task
-  - temporary hosted validator is removed before promotion
+  - canonical worker exports QSG_INFO=1
+  - source-level tests pin all graphics environment invariants
+  - canonical session/transition/guard/lease suites are green
+  - no Synology, X11/VNC, client launch, credentials or canonical runtime access was used by this task
+  - temporary hosted validator removed before promotion
   - exact-head governance and repository CI pass before promotion
-last_completed_step: minimal worker environment correction and source-contract test are implemented; temporary GitHub-hosted validator dispatched without runtime access
-next_action: consume hosted validator result, persist exact validation evidence, remove the temporary workflow, then obtain final exact-head governance/CI and coordinator-promote/archive; physical canonical validation belongs to a later invocation
+last_completed_step: hosted validator 31959453898/job 95195086514 passed session 11, transition 9, guard 3 and lease 14 tests plus the graphics integration contract; temporary validator removed
+next_action: obtain final exact-head governance/repository CI and review hygiene, then coordinator-promote and archive; physical canonical validation belongs to a later owner invocation
 ---
 
 # Track A canonical graphics integration fix
 
-This hosted-only repair removes the worker's explicit XCB GL integration disablement while preserving the software Qt Quick backend. It does not claim that GLX/EGL is available on the runner or that a visible client window will result; those remain physical-validation questions for a later fresh RUNTIME admission.
+The hosted repair removes the worker's explicit XCB GL integration disablement while preserving the software Qt Quick backend and adding non-secret scenegraph diagnostics. Physical GLX/EGL availability and visible-window success remain deliberately unclaimed.

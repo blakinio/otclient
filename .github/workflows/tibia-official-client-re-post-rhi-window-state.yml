@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-post-rhi-window-state.yml
       - .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py
+      - .github/scripts/tibia-official-client-re-post-rhi-window-state-transform-v2.py
       - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
 
 permissions:
@@ -36,8 +37,10 @@ jobs:
           curl -fsSL --retry 3 --connect-timeout 10 \
             -o "$source_file" \
             https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
-          python3 -m py_compile .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py
-          python3 .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py \
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py \
+            .github/scripts/tibia-official-client-re-post-rhi-window-state-transform-v2.py
+          python3 .github/scripts/tibia-official-client-re-post-rhi-window-state-transform-v2.py \
             "$source_file" "$generated"
           bash -n "$generated"
           python3 - "$generated" <<'PY'
@@ -124,7 +127,7 @@ jobs:
           curl -fsSL --retry 3 --connect-timeout 10 \
             -o "$source_file" \
             https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
-          python3 .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py \
+          python3 .github/scripts/tibia-official-client-re-post-rhi-window-state-transform-v2.py \
             "$source_file" "$generated"
           bash -n "$generated"
           echo 'POST_RHI_RUNTIME_GENERATED_SCRIPT=PASS'

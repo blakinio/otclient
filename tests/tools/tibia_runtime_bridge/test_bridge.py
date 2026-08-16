@@ -1,13 +1,24 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 from pathlib import Path
 import socket
+import subprocess
+import sys
 import tempfile
 import threading
+import time
 import unittest
 
-from tools.tibia_runtime_bridge.ipc_client import BridgeClientError, request, session_status
+from tools.tibia_runtime_bridge.ipc_client import (
+    BridgeClientError,
+    BridgePeerIdentityError,
+    PeerIdentityExpectation,
+    request,
+    session_status,
+)
 from tools.tibia_runtime_bridge.launcher import BridgeConfigError, build_env, load_profile, sha256_file
 from tools.tibia_runtime_bridge.resolver import ResolverError, itanium_nested_name
 
@@ -87,6 +98,76 @@ class IpcClientTests(unittest.TestCase):
     def run_server(self, path: Path, response: bytes) -> threading.Thread:
         return self.run_server_responses(path, [response])
 
+    @staticmethod
+    def process_start_ticks(pid: int) -> int:
+        raw = Path(f"/proc/{pid}/stat").read_text(encoding="ascii")
+        close = raw.rfind(")")
+        fields = raw[close + 2 :].split()
+        return int(fields[19])
+
+    @staticmethod
+    def sha256_path(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb", buffering=0) as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def expectation_for_pid(self, pid: int) -> PeerIdentityExpectation:
+        boot = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip().encode()
+        exe = Path(os.readlink(f"/proc/{pid}/exe"))
+        return PeerIdentityExpectation(
+            boot_id_sha256=hashlib.sha256(boot).hexdigest(),
+            pid=pid,
+            process_start_ticks=self.process_start_ticks(pid),
+            client_version="test-peer",
+            client_size=exe.stat().st_size,
+            client_sha256=self.sha256_path(exe),
+        )
+
+    @staticmethod
+    def start_process_server(path: Path) -> subprocess.Popen[bytes]:
+        script = (
+            "import socket,sys\n"
+            "path=sys.argv[1]\n"
+            "server=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)\n"
+            "server.bind(path); server.listen(8)\n"
+            "while True:\n"
+            "  conn,_=server.accept()\n"
+            "  try:\n"
+            "    conn.recv(4096)\n"
+            "    conn.sendall(b'{\\\"ok\\\":true,\\\"command\\\":\\\"PING\\\"}\\n')\n"
+            "  finally:\n"
+            "    conn.close()\n"
+        )
+        process = subprocess.Popen(
+            [sys.executable, "-c", script, str(path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            if path.exists():
+                return process
+            if process.poll() is not None:
+                stderr = process.stderr.read().decode("utf-8", errors="replace") if process.stderr else ""
+                raise AssertionError(f"server exited before binding socket: {stderr}")
+            time.sleep(0.01)
+        process.terminate(); process.wait(timeout=2)
+        raise AssertionError("server did not bind Unix socket")
+
+    @staticmethod
+    def stop_process_server(process: subprocess.Popen[bytes], path: Path) -> None:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill(); process.wait(timeout=2)
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
     def test_ping_response(self):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "bridge.sock"; thread = self.run_server(path, b'{"ok":true,"command":"PING"}\n')
@@ -95,7 +176,7 @@ class IpcClientTests(unittest.TestCase):
 
     def test_discover_response(self):
         with tempfile.TemporaryDirectory() as raw:
-            path = Path(raw) / "bridge.sock"; thread = self.run_server(path, b'{"ok":true,"target":"player_protocol_handler","vptr_hits":1,"validated_hits":1}\n')
+            path = Path(raw) / "bridge.sock"; thread = self.run_server(path, b'{"ok":true,"target":"player_protocol_handler","scan_status":"OK","vptr_hits":1,"validated_hits":1}\n')
             try: self.assertEqual(1, request(path, "DISCOVER player_protocol_handler")["validated_hits"])
             finally: thread.join(2)
 
@@ -103,22 +184,58 @@ class IpcClientTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "bridge.sock"
             thread = self.run_server_responses(path, [
-                b'{"ok":true,"target":"player_protocol_handler","vptr_hits":1,"validated_hits":1}\n',
-                b'{"ok":true,"target":"gameserver_game_session","vptr_hits":1,"validated_hits":1}\n',
-                b'{"ok":true,"target":"worldmap_handler","vptr_hits":1,"validated_hits":1}\n'])
+                b'{"ok":true,"target":"player_protocol_handler","scan_status":"OK","vptr_hits":1,"validated_hits":1}\n',
+                b'{"ok":true,"target":"gameserver_game_session","scan_status":"OK","vptr_hits":1,"validated_hits":1}\n',
+                b'{"ok":true,"target":"worldmap_handler","scan_status":"OK","vptr_hits":1,"validated_hits":1}\n'])
             try:
                 result = session_status(path); self.assertTrue(result["in_game_candidate"]); self.assertEqual("DERIVED_UNTIL_LIVE_CORRELATION", result["evidence_level"])
             finally: thread.join(2)
 
-    def test_session_status_false_when_marker_absent(self):
+    def test_session_status_zero_hits_is_successful_not_in_game(self):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "bridge.sock"
             thread = self.run_server_responses(path, [
-                b'{"ok":true,"target":"player_protocol_handler","vptr_hits":0,"validated_hits":0}\n',
-                b'{"ok":true,"target":"gameserver_game_session","vptr_hits":1,"validated_hits":1}\n',
-                b'{"ok":true,"target":"worldmap_handler","vptr_hits":1,"validated_hits":1}\n'])
-            try: self.assertFalse(session_status(path)["in_game_candidate"])
+                b'{"ok":true,"target":"player_protocol_handler","scan_status":"OK","vptr_hits":0,"validated_hits":0}\n',
+                b'{"ok":true,"target":"gameserver_game_session","scan_status":"OK","vptr_hits":1,"validated_hits":1}\n',
+                b'{"ok":true,"target":"worldmap_handler","scan_status":"OK","vptr_hits":1,"validated_hits":1}\n'])
+            try:
+                result = session_status(path)
+                self.assertTrue(result["ok"])
+                self.assertFalse(result["in_game_candidate"])
+                self.assertEqual("DERIVED_UNTIL_LIVE_CORRELATION", result["evidence_level"])
             finally: thread.join(2)
+
+    def test_session_status_scan_failure_fails_closed(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "bridge.sock"
+            thread = self.run_server(path, b'{"ok":false,"error":"PROC_MEM_OPEN_FAILED"}\n')
+            try:
+                result = session_status(path)
+                self.assertFalse(result["ok"])
+                self.assertFalse(result["in_game_candidate"])
+                self.assertEqual("UNKNOWN", result["evidence_level"])
+                self.assertEqual("player_protocol_handler", result["failed_target"])
+                self.assertEqual("PROC_MEM_OPEN_FAILED", result["response"]["error"])
+            finally: thread.join(2)
+
+    @unittest.skipUnless(hasattr(socket, "SO_PEERCRED") and Path("/proc").is_dir(), "Linux peer credentials required")
+    def test_same_path_process_replacement_rejects_stale_peer_identity(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "bridge.sock"
+            first = self.start_process_server(path)
+            try:
+                stale_identity = self.expectation_for_pid(first.pid)
+                self.assertTrue(request(path, "PING", expected_identity=stale_identity)["ok"])
+            finally:
+                self.stop_process_server(first, path)
+
+            second = self.start_process_server(path)
+            try:
+                self.assertNotEqual(first.pid, second.pid)
+                with self.assertRaises(BridgePeerIdentityError):
+                    request(path, "PING", expected_identity=stale_identity)
+            finally:
+                self.stop_process_server(second, path)
 
     def test_invalid_json_fails_closed(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -129,6 +246,14 @@ class IpcClientTests(unittest.TestCase):
 
     def test_multiline_command_rejected(self):
         with self.assertRaises(BridgeClientError): request(Path("/unused"), "PING\nSECOND")
+
+    def test_bridge_source_propagates_scan_failures(self):
+        source = (Path(__file__).parents[3] / "tools/tibia_runtime_bridge/bridge.cpp").read_text(encoding="utf-8")
+        self.assertIn('"PROC_MEM_OPEN_FAILED"', source)
+        self.assertIn('"PROC_MEM_READ_FAILED"', source)
+        self.assertIn("if (!scan.ok)", source)
+        self.assertIn("return errorJson(scan.error);", source)
+        self.assertIn('\\"scan_status\\":\\"OK\\"', source)
 
 
 if __name__ == "__main__":

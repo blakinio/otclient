@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: hosted-preflight-before-xres-identity
+phase: hosted-preflight-before-xres-identity-current-main
 branch: diag/OTC-20260816-track-a-xres-window-identity
 base_branch: main
-base_main: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
+base_main: c4fd10384d988d3eedeb64535239dc24c184e299
 risk: high
-updated: 2026-08-16T23:14:00+02:00
+updated: 2026-08-16T23:17:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xres-window-identity.md
   - docs/agents/evidence/OTC-20260816-track-a-xres-window-identity/**
@@ -31,7 +31,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: PR #438 directly proved a raw VIEWABLE 1920x1080 XID exists from t15 while available WM PID/name/class queries cannot bind it to the exact client PID. X-Resource v1.2 QueryClientIds is specifically designed to identify the local-client PID from any resource XID. One separately admitted isolated launch can therefore resolve the exact ownership question without changing graphics behavior, credentials, login or canonical state. Initial PR head keeps physical execution gated off until hosted transformer/admission/CI validation passes.
+execution_reason: PR #438 directly proved a raw VIEWABLE 1920x1080 XID exists from t15 while available WM PID/name/class queries cannot bind it to the exact client PID. X-Resource v1.2 QueryClientIds is specifically designed to identify the local-client PID from any resource XID. One separately admitted isolated launch can therefore resolve the exact ownership question without changing graphics behavior, credentials, login or canonical state. Main advanced after branch creation only through unrelated documentation PR #439 defining the World Observation/Atlas boundary; the PR base is now c4fd10384d988d3eedeb64535239dc24c184e299 and this task/workflow are re-fenced to that exact trusted main before any physical enablement.
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -64,6 +64,12 @@ source_evidence:
   source_final_ci: 31972667199_SUCCESS
   source_final_required_ci: 95227425189_SUCCESS
   classification: PROVEN_RAW_X11_TREE_HAS_VIEWABLE_1920X1080_NAMELESS_PIDLESS_WINDOW_FROM_T15_WHILE_XDOTOOL_NAMED_VISIBLE_SEARCH_RETURNS_ZERO_AND_EXACT_CLIENT_REMAINS_ALIVE_POST_GLX
+main_reconciliation:
+  original_branch_parent: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
+  current_pr_base: c4fd10384d988d3eedeb64535239dc24c184e299
+  intervening_pr: 439
+  overlap_with_owned_paths: false
+  physical_execution_during_reconciliation: false
 primary_protocol_basis:
   extension: X-Resource
   required_version: 1.2
@@ -110,8 +116,8 @@ acceptance:
   - returned PID is compared to exact client PID without inference
   - cleanup complete
   - one-shot workflow/patcher removed after valid result
-last_completed_step: PR #438 final head 171fbfa679c8c75dc9722fe39c19141962282f01 has green governance/CI, zero review threads, one-shot cleanup, and bounded evidence showing viewable XID 0x00c00011 without PID/name/class identity
-next_action: build and hosted-preflight an XRes-only patch over the immutable PR #438 semantic generator; keep physical job gated until hosted preflight, Track A governance and CI are all green
+last_completed_step: main advanced from b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4 to c4fd10384d988d3eedeb64535239dc24c184e299 only through unrelated documentation PR #439; physical gate remained disabled and task authority is now refreshed to the exact current PR base
+next_action: run hosted XRes transformer preflight, Track A governance and repository CI against current main c4fd10384d988d3eedeb64535239dc24c184e299; keep physical job gated until all are green and main is re-read stable
 ---
 
 # Track A XRes window identity discriminator

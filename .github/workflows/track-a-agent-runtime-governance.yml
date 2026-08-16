@@ -1,0 +1,320 @@
+name: Track A agent runtime governance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/agents/README.md
+      - docs/agents/AGENTS.md
+      - docs/agents/TIBIA_RESEARCH_TRACKS.md
+      - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+      - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+      - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
+      - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
+      - docs/agents/tasks/active/**
+      - .github/scripts/test_track_a_agent_runtime_governance.py
+      - .github/scripts/tibia-official-client-re-*
+      - .github/workflows/track-a-agent-runtime-governance.yml
+      - .github/workflows/tibia-official-client-re-*
+      - tools/tibia_runtime_bridge/**
+      - tools/tibia_worldmap_reconstruction/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy-audit:
+    name: Deterministic admission-policy audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify Track A research-agent runtime gates
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile .github/scripts/test_track_a_agent_runtime_governance.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path('docs/agents/README.md').read_text(encoding='utf-8')
+          required = [
+              'Track A official-client runtime admission — mandatory',
+              'contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md',
+              'at task claim/resume before substantial Track A work',
+              'At claim/resume/checkpoint, the active Track A task must persist',
+              'runtime_access: none',
+              'target_uniqueness: PROVEN',
+              'current-task ownership/target uniqueness',
+              'equal current lease-generation binding after any rebind',
+              'an ephemeral sandbox may never use or alias the canonical namespace',
+              'display_98_current_canonical_status: UNKNOWN',
+              'rfb_6082_current_backend_mapping: UNKNOWN',
+              'current_exact_client_pid: NOT_REGISTERED',
+              'current_exact_client_session: NOT_REGISTERED',
+              'PR #303-owned state',
+              'Track B never shares Track A canonical authority',
+          ]
+          missing = [needle for needle in required if needle not in text]
+          if missing:
+              raise SystemExit(f'docs/agents/README.md: missing universal Track A admission markers: {missing}')
+          print('TRACK_A_AGENT_RUNTIME_UNIVERSAL_ENTRYPOINT_PASS=true')
+          PY
+          if [[ -n "${BASE_SHA:-}" ]]; then
+            python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+              --changed-from "$BASE_SHA" \
+              --expected-branch "$HEAD_BRANCH"
+          else
+            python3 .github/scripts/test_track_a_agent_runtime_governance.py
+          fi
+
+  fresh-audit:
+    name: Fresh admission behavior audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Falsify positive, negative and boundary admission cases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          import tempfile
+
+          script = Path('.github/scripts/test_track_a_agent_runtime_governance.py')
+          spec = importlib.util.spec_from_file_location('track_a_admission_audit', script)
+          assert spec and spec.loader
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          base = {
+              'task_id': 'OTC-audit-case',
+              'branch': 'feature/current-track-a-task',
+              'track_id': 'official-client-re',
+              'runtime_access': 'none',
+              'runtime_owner_task': 'NOT_APPLICABLE',
+              'runtime_namespace': 'NOT_APPLICABLE',
+              'canonical_registration': 'NOT_APPLICABLE',
+              'canonical_lease_generation': 'NOT_APPLICABLE',
+              'registration_lease_generation': 'NOT_APPLICABLE',
+              'gate_a': 'NOT_APPLICABLE',
+              'generation_rebind': 'NOT_APPLICABLE',
+              'gate_b': 'NOT_APPLICABLE',
+              'bootstrap': 'NOT_APPLICABLE',
+              'target_uniqueness': 'NOT_APPLICABLE',
+              'mutation_authorized': 'false',
+          }
+
+          def run_case(name, changes, should_pass):
+              values = dict(base)
+              values.update(changes)
+              with tempfile.TemporaryDirectory() as tmp:
+                  path = Path(tmp) / f'{name}.md'
+                  payload = ['---'] + [f'{key}: {value}' for key, value in values.items()] + ['---', '', '# Case']
+                  path.write_text('\n'.join(payload) + '\n', encoding='utf-8')
+                  passed = True
+                  try:
+                      module.validate_track_a_task(path)
+                  except SystemExit:
+                      passed = False
+              if passed != should_pass:
+                  raise SystemExit(f'{name}: expected pass={should_pass}, got pass={passed}')
+
+          run_case('static_none', {}, True)
+          read_only_ok = {
+              'runtime_access': 'read_only',
+              'runtime_owner_task': 'NOT_APPLICABLE',
+              'runtime_namespace': 'canonical-live-runtime',
+              'canonical_registration': 'UNKNOWN',
+              'canonical_lease_generation': 'UNKNOWN',
+              'registration_lease_generation': 'UNKNOWN',
+              'target_uniqueness': 'PROVEN',
+              'mutation_authorized': 'false',
+          }
+          run_case('read_only_proven_target', read_only_ok, True)
+          run_case(
+              'read_only_unknown_uniqueness',
+              {**read_only_ok, 'target_uniqueness': 'UNKNOWN'},
+              False,
+          )
+          run_case(
+              'read_only_other_task_owner',
+              {**read_only_ok, 'runtime_owner_task': 'OTC-other-task'},
+              False,
+          )
+          run_case(
+              'read_only_unknown_namespace',
+              {**read_only_ok, 'runtime_namespace': 'UNKNOWN'},
+              False,
+          )
+          ephemeral_ok = {
+              'runtime_access': 'ephemeral_isolated',
+              'runtime_owner_task': 'OTC-audit-case',
+              'runtime_namespace': 'task-owned-display-177',
+              'canonical_registration': 'NOT_APPLICABLE',
+              'target_uniqueness': 'PROVEN',
+              'mutation_authorized': 'true',
+          }
+          run_case('ephemeral_owned', ephemeral_ok, True)
+          run_case(
+              'ephemeral_canonical_namespace',
+              {**ephemeral_ok, 'runtime_namespace': 'canonical-live-runtime'},
+              False,
+          )
+          run_case(
+              'ephemeral_canonical_namespace_alias',
+              {**ephemeral_ok, 'runtime_namespace': 'task-canonical-live-runtime-sandbox'},
+              False,
+          )
+          canonical_ok = {
+              'runtime_access': 'canonical_reuse_or_mutation',
+              'runtime_owner_task': 'OTC-audit-case',
+              'runtime_namespace': 'canonical-live-runtime',
+              'canonical_registration': 'PRESENT',
+              'canonical_lease_generation': '7',
+              'registration_lease_generation': '7',
+              'gate_a': 'PASS',
+              'generation_rebind': 'NOT_APPLICABLE',
+              'gate_b': 'PASS',
+              'bootstrap': 'NOT_APPLICABLE',
+              'target_uniqueness': 'PROVEN',
+              'mutation_authorized': 'true',
+          }
+          run_case('canonical_all_gates', canonical_ok, True)
+          run_case('canonical_without_gate_a', {**canonical_ok, 'gate_a': 'REQUIRED_NOT_PROVEN'}, False)
+          run_case('canonical_without_registration', {**canonical_ok, 'canonical_registration': 'ABSENT'}, False)
+          run_case(
+              'canonical_wrong_runtime_owner',
+              {**canonical_ok, 'runtime_owner_task': 'OTC-other-task'},
+              False,
+          )
+          run_case(
+              'canonical_generation_mismatch_without_rebind',
+              {**canonical_ok, 'canonical_lease_generation': '8', 'registration_lease_generation': '7'},
+              False,
+          )
+          run_case(
+              'canonical_generation_mismatch_even_with_rebind_claim',
+              {
+                  **canonical_ok,
+                  'canonical_lease_generation': '8',
+                  'registration_lease_generation': '7',
+                  'generation_rebind': 'PASS',
+              },
+              False,
+          )
+          run_case(
+              'canonical_non_numeric_generation',
+              {**canonical_ok, 'canonical_lease_generation': 'UNKNOWN'},
+              False,
+          )
+          run_case(
+              'bootstrap_fail_closed',
+              {
+                  'runtime_access': 'canonical_bootstrap',
+                  'runtime_owner_task': 'OTC-audit-case',
+                  'runtime_namespace': 'canonical-live-runtime',
+                  'canonical_registration': 'ABSENT',
+                  'canonical_lease_generation': 'UNKNOWN',
+                  'registration_lease_generation': 'NOT_APPLICABLE',
+                  'gate_a': 'REQUIRED_NOT_PROVEN',
+                  'generation_rebind': 'NOT_APPLICABLE',
+                  'gate_b': 'NOT_APPLICABLE',
+                  'bootstrap': 'REQUIRED_UNIMPLEMENTED',
+                  'target_uniqueness': 'UNKNOWN',
+                  'mutation_authorized': 'false',
+              },
+              True,
+          )
+          run_case(
+              'bootstrap_wrong_runtime_owner',
+              {
+                  'runtime_access': 'canonical_bootstrap',
+                  'runtime_owner_task': 'OTC-other-task',
+                  'runtime_namespace': 'canonical-live-runtime',
+                  'canonical_registration': 'ABSENT',
+                  'canonical_lease_generation': 'UNKNOWN',
+                  'registration_lease_generation': 'NOT_APPLICABLE',
+                  'gate_a': 'REQUIRED_NOT_PROVEN',
+                  'generation_rebind': 'NOT_APPLICABLE',
+                  'gate_b': 'NOT_APPLICABLE',
+                  'bootstrap': 'REQUIRED_UNIMPLEMENTED',
+                  'target_uniqueness': 'UNKNOWN',
+                  'mutation_authorized': 'false',
+              },
+              False,
+          )
+          run_case(
+              'bootstrap_cannot_mutate_now',
+              {
+                  'runtime_access': 'canonical_bootstrap',
+                  'runtime_owner_task': 'OTC-audit-case',
+                  'runtime_namespace': 'canonical-live-runtime',
+                  'canonical_registration': 'ABSENT',
+                  'canonical_lease_generation': 'UNKNOWN',
+                  'registration_lease_generation': 'NOT_APPLICABLE',
+                  'gate_a': 'PASS',
+                  'generation_rebind': 'NOT_APPLICABLE',
+                  'gate_b': 'NOT_APPLICABLE',
+                  'bootstrap': 'REQUIRED_UNIMPLEMENTED',
+                  'target_uniqueness': 'PROVEN',
+                  'mutation_authorized': 'true',
+              },
+              False,
+          )
+          rebind_unavailable = {
+              'runtime_access': 'canonical_rebind',
+              'runtime_owner_task': 'OTC-audit-case',
+              'runtime_namespace': 'canonical-live-runtime',
+              'canonical_registration': 'PRESENT',
+              'canonical_lease_generation': '8',
+              'registration_lease_generation': '7',
+              'gate_a': 'PASS',
+              'generation_rebind': 'REQUIRED_UNAVAILABLE',
+              'gate_b': 'NOT_APPLICABLE',
+              'bootstrap': 'NOT_APPLICABLE',
+              'target_uniqueness': 'PROVEN',
+              'mutation_authorized': 'false',
+          }
+          run_case('rebind_unavailable_fail_closed', rebind_unavailable, True)
+          run_case(
+              'rebind_without_generation_mismatch',
+              {**rebind_unavailable, 'registration_lease_generation': '8'},
+              False,
+          )
+          run_case(
+              'rebind_cannot_claim_implemented',
+              {**rebind_unavailable, 'generation_rebind': 'PASS'},
+              False,
+          )
+
+          if not module.task_matches_expected_branch(
+              {'branch': 'feature/current-track-a-task'},
+              'feature/current-track-a-task',
+          ):
+              raise SystemExit('branch_binding_positive: expected current branch match')
+          if module.task_matches_expected_branch(
+              {'branch': 'feature/unrelated-track-a-task'},
+              'feature/current-track-a-task',
+          ):
+              raise SystemExit('branch_binding_negative: unrelated Track A task satisfied current branch')
+          if module.task_matches_expected_branch({'branch': 'feature/current-track-a-task'}, None):
+              raise SystemExit('branch_binding_missing_expected: missing expected branch must fail closed')
+
+          print('TRACK_A_AGENT_RUNTIME_FRESH_AUDIT_PASS=true')
+          PY

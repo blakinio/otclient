@@ -1,7 +1,7 @@
 # OTCLIENT-TIBIA-RE canonical repository/runtime wrapper
 
 ```yaml
-prompt_contract_version: 1.1.1
+prompt_contract_version: 1.2.0
 alias: OTCLIENT-TIBIA-RE
 repository: blakinio/otclient
 base_prompt: docs/agents/prompts/OTCLIENT_TIBIA_RE_PROGRAMME.md
@@ -13,6 +13,7 @@ canonical_runner_selector:
 canonical_state_dir: /home/runner/_work/_otclient_tibia_re_state
 policy_version: 2
 prompting_standard_version: 2.1
+track_a_runtime_agent_admission_version: 1
 ```
 
 ## Resolution contract
@@ -26,6 +27,44 @@ Uruchom OTCLIENT-TIBIA-RE autonomicznie.
 ```
 
 Do not require a task named `docs/agents/tasks/active/OTCLIENT-TIBIA-RE.md`, a branch named `agent/otclient-tibia-re`, or a dedicated `workflow_dispatch` operation merely to resolve the alias.
+
+## Mandatory Track A runtime admission
+
+Before a Track A worker claims, resumes, observes, creates, reuses, controls, or mutates an official-client runtime, it MUST read and apply:
+
+```text
+docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+```
+
+The worker must classify `runtime_access` as exactly one of:
+
+```text
+none
+read_only
+ephemeral_isolated
+canonical_reuse_or_mutation
+canonical_bootstrap
+canonical_rebind
+```
+
+At task claim/resume/checkpoint, persist the complete admission record required by that contract; static/no-runtime work records `runtime_access: none`. Re-evaluate and re-persist admission before the first runtime-related operation and after any material authority/identity change.
+
+`read_only` live observation additionally requires a freshly proven non-conflicting target/namespace/ownership boundary and `target_uniqueness: PROVEN`; otherwise refuse live observation and continue only `none` static/artifact work.
+
+For ordinary canonical reuse/mutation, `mutation_authorized: true` is legal only after current Gate A passes, any required generation rebind passes, Gate B passes on the one authoritative registration, and the mutation remains inside the final PR #321 cancellation-safe whole-lifetime supervisor. Missing registration does not fall through to reuse and requires the separate bootstrap transition. Registration/lease-generation mismatch does not fall through to reuse and requires the dedicated reviewed rebind transition. Manual editing of `runtime-registration.json` is never a substitute.
+
+Until direct current evidence proves otherwise, preserve exactly:
+
+```yaml
+display_98_current_canonical_status: UNKNOWN
+rfb_6082_current_backend_mapping: UNKNOWN
+current_exact_client_pid: NOT_REGISTERED
+current_exact_client_session: NOT_REGISTERED
+```
+
+Historical `:98`, reachable `6082`, an old PID/session, a task/PR statement, or standalone lease validation is discovery evidence only and never current mutation authority. `UNKNOWN`, `REQUIRED_NOT_PROVEN`, `REQUIRED_UNAVAILABLE`, or `REQUIRED_UNIMPLEMENTED` on a required admission gate means refuse that mutation and continue only unrelated safe work.
+
+Task-owned ephemeral runtimes remain allowed only inside a freshly proven unique namespace. A unique X11 display does not create a second Global session or canonical authority. Do not mutate or live-observe PR #303-owned runtime surfaces, or Track B state, through this wrapper.
 
 ## Canonical ownership
 

@@ -11,13 +11,14 @@ task_kind: runtime_discriminator
 phase: hosted-preflight-before-xres-identity-current-main
 branch: diag/OTC-20260816-track-a-xres-window-identity
 base_branch: main
-base_main: c4fd10384d988d3eedeb64535239dc24c184e299
+base_main: 845adabba5f6d2bfecb6d54bc13834c47cc61c94
 risk: high
-updated: 2026-08-16T23:17:00+02:00
+updated: 2026-08-16T23:21:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xres-window-identity.md
   - docs/agents/evidence/OTC-20260816-track-a-xres-window-identity/**
   - .github/scripts/tibia-official-client-re-xres-window-identity-patch.py
+  - .github/scripts/tibia-official-client-re-xres-window-identity-patch-v2.py
   - .github/workflows/tibia-official-client-re-xres-window-identity.yml
 modules_touched: []
 reuses:
@@ -31,7 +32,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: PR #438 directly proved a raw VIEWABLE 1920x1080 XID exists from t15 while available WM PID/name/class queries cannot bind it to the exact client PID. X-Resource v1.2 QueryClientIds is specifically designed to identify the local-client PID from any resource XID. One separately admitted isolated launch can therefore resolve the exact ownership question without changing graphics behavior, credentials, login or canonical state. Main advanced after branch creation only through unrelated documentation PR #439 defining the World Observation/Atlas boundary; the PR base is now c4fd10384d988d3eedeb64535239dc24c184e299 and this task/workflow are re-fenced to that exact trusted main before any physical enablement.
+execution_reason: PR #438 directly proved a raw VIEWABLE 1920x1080 XID exists from t15 while available WM PID/name/class queries cannot bind it to the exact client PID. X-Resource v1.2 QueryClientIds is specifically designed to identify the local-client PID from any resource XID. One separately admitted isolated launch can therefore resolve the exact ownership question without changing graphics behavior, credentials, login or canonical state. Since branch creation, trusted main advanced only through unrelated World Observation/Atlas documentation and lifecycle PRs #439/#441; XRes task authority and the physical exact-base fence are refreshed to current main 845adabba5f6d2bfecb6d54bc13834c47cc61c94 before enablement.
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -66,8 +67,10 @@ source_evidence:
   classification: PROVEN_RAW_X11_TREE_HAS_VIEWABLE_1920X1080_NAMELESS_PIDLESS_WINDOW_FROM_T15_WHILE_XDOTOOL_NAMED_VISIBLE_SEARCH_RETURNS_ZERO_AND_EXACT_CLIENT_REMAINS_ALIVE_POST_GLX
 main_reconciliation:
   original_branch_parent: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
-  current_pr_base: c4fd10384d988d3eedeb64535239dc24c184e299
-  intervening_pr: 439
+  current_pr_base: 845adabba5f6d2bfecb6d54bc13834c47cc61c94
+  intervening_prs:
+    - 439_world_observation_atlas_boundary_docs
+    - 441_world_observation_atlas_archive
   overlap_with_owned_paths: false
   physical_execution_during_reconciliation: false
 primary_protocol_basis:
@@ -92,6 +95,13 @@ experiment:
     - select libraries from a bounded fixed allowlist of contained or standard runner library paths
     - resolve to regular files and emit SHA-256 before use
     - refuse before identity query if XRes version is below 1.2 or helper ABI cannot be loaded
+hosted_preflight_history:
+  initial_anchor_failure: XRES_PATCH_REFUSED_SNAPSHOT_XRES_INSERT_COUNT_0
+  initial_physical_job: SKIPPED
+  corrected_patcher_head: 268ca58a6ee5d7e7ed9bd531deba1d83493176b0
+  corrected_hosted_preflight: SUCCESS
+  corrected_track_a_governance: SUCCESS
+  corrected_actionlint: SUCCESS
 forbidden:
   - canonical lease/registration/session access
   - canonical-live-runtime namespace
@@ -115,9 +125,9 @@ acceptance:
   - viewable raw XID receives a LocalClientPid result or an explicit unsupported/unresolved result
   - returned PID is compared to exact client PID without inference
   - cleanup complete
-  - one-shot workflow/patcher removed after valid result
-last_completed_step: main advanced from b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4 to c4fd10384d988d3eedeb64535239dc24c184e299 only through unrelated documentation PR #439; physical gate remained disabled and task authority is now refreshed to the exact current PR base
-next_action: run hosted XRes transformer preflight, Track A governance and repository CI against current main c4fd10384d988d3eedeb64535239dc24c184e299; keep physical job gated until all are green and main is re-read stable
+  - one-shot workflow/patchers removed after valid result
+last_completed_step: hosted preflight with corrected XRes observer is proven SUCCESS and Track A governance is green; main advanced only through unrelated #441 lifecycle closeout, so task authority is refreshed to exact current main before final pre-runtime CI generation
+next_action: refence the workflow to current main 845adabba5f6d2bfecb6d54bc13834c47cc61c94, obtain exact-head hosted preflight/Track A governance/CI with physical job skipped, reread main, then create one explicit authorization checkpoint if and only if all gates remain green
 ---
 
 # Track A XRes window identity discriminator

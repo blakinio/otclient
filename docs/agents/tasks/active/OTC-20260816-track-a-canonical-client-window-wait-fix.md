@@ -8,15 +8,16 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: runtime_worker_repair
-phase: implement
+phase: validate
 branch: fix/OTC-20260816-track-a-canonical-client-window-wait-fix
 base_branch: main
 base_main: ffe954be315ee29825c726b996a30fea8475a0f3
 risk: medium
-updated: 2026-08-16T17:46:00+02:00
+updated: 2026-08-16T17:53:00+02:00
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+  - .github/workflows/tibia-official-client-re-canonical-window-wait-fix-v2.yml
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-client-window-wait-fix.md
 modules_touched: []
 reuses:
@@ -60,11 +61,13 @@ acceptance:
   - production client-window discovery uses one bounded wait budget comfortably below the transition worker timeout of 300 seconds
   - no nested outer loop multiplies the window helper wait budget
   - client liveness is checked during the window wait and preserves distinct client_exited versus client_window_missing classification
-  - deterministic hosted tests exercise found-window and exited-client behavior and assert the production wait budget/invocation shape
+  - deterministic hosted tests exercise found-window, exited-client and missing-window behavior plus production wait-budget/invocation shape
+  - existing canonical transition/guard/lease tests remain green
   - no physical runtime, login, credentials, VNC, Synology or client execution is used by validation
+  - temporary validator workflow is removed before promotion
   - exact-head Track A governance and repository CI pass before promotion
-last_completed_step: claimed fresh current-main hosted-only worker repair after v5 checkpoint proved the nested window wait can exceed the supervisor budget
-next_action: implement the single-budget window helper and deterministic tests, then run exact-head governance/CI and coordinator promotion
+last_completed_step: selected fresh-main PR #395 as canonical replacement; behavioral tests and finer non-secret stage markers were independently reviewed as stronger than superseded #394
+next_action: run one task-owned GitHub-hosted semantic validator; on PASS remove it, persist evidence, obtain final exact-head governance/CI and coordinator promotion
 ---
 
 # Track A canonical client window wait fix

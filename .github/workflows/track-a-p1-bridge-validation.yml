@@ -1,0 +1,38 @@
+name: Track A P1 bridge validation
+
+on:
+  push:
+    branches:
+      - feat/OTC-20260816-track-a-p1-bridge-health-recovery
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python dependency
+        run: python -m pip install --disable-pip-version-check pyelftools
+      - name: Compile Python modules and focused tests
+        run: |
+          python -m py_compile \
+            tools/tibia_runtime_bridge/*.py \
+            tests/tools/tibia_runtime_bridge/test_bridge.py \
+            tests/tools/tibia_runtime_bridge/test_health.py
+          python -m unittest discover -s tests/tools/tibia_runtime_bridge -p 'test_*.py' -v
+      - name: Install Qt development package
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev
+      - name: Build standalone bridge
+        run: |
+          cmake -S tools/tibia_runtime_bridge -B /tmp/tibia-runtime-bridge-build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/tibia-runtime-bridge-build --parallel 2
+          test -f /tmp/tibia-runtime-bridge-build/otclient-tibia-runtime-bridge.so

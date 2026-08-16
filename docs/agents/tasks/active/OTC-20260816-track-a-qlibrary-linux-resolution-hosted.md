@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-qlibrary-linux-resolution-hosted
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-qlibrary-v2-20260816-1544
 session_role: researcher
@@ -8,12 +8,13 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: discovery
-phase: final-no-temp-workflow-validation
+phase: coordinator-promotion-ready
 branch: docs/OTC-20260816-track-a-qlibrary-linux-resolution-hosted-v2
 base_branch: main
 base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
+current_main: 259e418b2c526f93bd697f07c42b73b1fd40a914
 risk: low
-updated: 2026-08-16T15:50:00+02:00
+updated: 2026-08-16T16:08:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-qlibrary-linux-resolution-hosted.md
   - docs/agents/reports/OTCLIENT-20260816-qlibrary-linux-resolution-source-correlated.md
@@ -63,6 +64,7 @@ historical_exact_qtcore_inventory:
   static_version_string_set: [6.9.3]
 source_pr_failure:
   pr: 356
+  disposition: CLOSED_SUPERSEDED_BY_373
   run: 31943243252
   job: 95155325324
   classification: VALIDATOR_DEFECT
@@ -81,23 +83,45 @@ result:
   BEClient_so_generated: true
   BEClient_so_actually_attempted: UNKNOWN_RUNTIME_CONDITIONAL
   successful_mapping: UNKNOWN
+main_freshness_after_validation:
+  from: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
+  to: 259e418b2c526f93bd697f07c42b73b1fd40a914
+  compare_status: NON_OVERLAPPING
+  files:
+    - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+    - .github/scripts/tibia-official-client-re-canonical-live-session.sh
+    - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+    - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md
 validation:
-  validated_head: 74f1f95d1547fdd10acba207b52132d4757b0633
+  semantic_validator_head: 74f1f95d1547fdd10acba207b52132d4757b0633
   hosted_source_validator_run: 31950672119
   hosted_source_validator_result: SUCCESS
-  track_a_governance_run: 31950672049
-  track_a_governance_result: SUCCESS
-  repository_ci_run: 31950672278
-  repository_ci_result: SUCCESS
-  temporary_validator_workflow: REMOVE_BEFORE_FINAL_HEAD
-  final_no_temp_workflow_governance: PENDING
-  final_no_temp_workflow_repository_ci: PENDING
+  semantic_head_track_a_governance_run: 31950672049
+  semantic_head_track_a_governance_result: SUCCESS
+  semantic_head_repository_ci_run: 31950672278
+  semantic_head_repository_ci_result: SUCCESS
+  temporary_validator_workflow: REMOVED
+  accepted_final_head: 91c493e4346760ccaf1cdd13ed21fc5d85271136
+  accepted_final_track_a_governance_run: 31950786981
+  accepted_final_track_a_governance_result: SUCCESS
+  accepted_final_repository_ci_run: 31950787080
+  accepted_final_repository_ci_result: SUCCESS
+  final_checkpoint_head: PENDING_AFTER_THIS_TASK_ONLY_UPDATE
+  final_checkpoint_track_a_governance: PENDING
+  final_checkpoint_repository_ci: PENDING
+  review_threads_open: 0
   e2e: NOT_APPLICABLE_WITH_REASON
   e2e_reason: public-source static semantic correlation only
-last_completed_step: exact official Qt 6.9.3 source validator, Track A governance and repository CI all passed on 74f1f95d
-next_action: remove temporary validator workflow, obtain final exact-head governance/CI, then coordinator-review/promote if main remains fresh
+audit:
+  result: PASS
+  material_findings_open: 0
+  notes:
+    - old PR #356 failure is classified as a validator defect, not negative semantic evidence
+    - exact-client facts, historical QtCore inventory, official-source correlation and runtime unknowns remain explicitly separated
+last_completed_step: verified corrected source-correlated report, successful semantic validator and exact final-head governance/CI, closed PR #356 superseded, and proved later trusted-main advance is non-overlapping runtime-infrastructure work
+next_action: obtain final exact-head governance/CI after this task-only checkpoint update, then coordinator mark ready and squash-merge PR #373; archive and release ownership after merge
 ---
 
 # Qt 6.9.3 QLibrary source-correlation task
 
-The replacement corrects the old #356 validator defect and preserves the distinction between potential generated names and runtime-conditional `dlopen` attempts. No physical runtime, proprietary semantic probe, login/session state or anti-cheat internals are part of this task.
+This replacement corrects the old #356 validator defect while keeping generated potential QLibrary names separate from runtime-conditional actual `dlopen` attempts. No physical runtime, proprietary semantic probe, login/session state or anti-cheat internals are part of this task.

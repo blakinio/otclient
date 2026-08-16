@@ -16,7 +16,7 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - name: Census owner+0x20 service getter consumers
+      - name: Map virtual slots near owner+0x20 service getter calls
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,52 +28,54 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'BE_PATH_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
-          import hashlib,pathlib,struct,sys
+          import pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
           shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
           st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
           def cs(blob,o):
-              if not (0 <= o < len(blob)): return ''
               e=blob.find(b'\0',o); e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[{'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in sh]
           text=next(s for s in secs if s['name']=='.text'); tb=d[text['off']:text['off']+text['size']]
-          target=0x6ba0b0
-          calls=[]
+          calls=[]; target=0x6ba0b0
           for i in range(len(tb)-5):
               if tb[i]!=0xe8: continue
-              va=text['addr']+i; dest=va+5+struct.unpack_from('<i',tb,i+1)[0]
-              if dest==target: calls.append(va)
-          print(f'BE_PATH_GETTER_6BA0B0_CALL_COUNT={len(calls)}')
-          print('BE_PATH_GETTER_6BA0B0_CALLS='+','.join(f'0x{x:x}' for x in calls))
-          print('BE_PATH_GETTER_CONTEXTS_BEGIN')
-          for idx,va in enumerate(calls[:40]):
-              start=max(text['addr'],va-0x70); end=min(text['addr']+text['size'],va+0xc0)
+              va=text['addr']+i
+              if va+5+struct.unpack_from('<i',tb,i+1)[0]==target: calls.append(va)
+          print('BE_PATH_SLOT_MAP_BEGIN')
+          for callva in calls:
+              lo=callva-text['addr']+5; hi=min(len(tb)-7,lo+0x180)
+              vals=[]
+              i=lo
+              while i<hi:
+                  # CALL r/m64: FF /2, common no-SIB forms only.
+                  if tb[i]==0xff and i+2<hi:
+                      m=tb[i+1]; mod=m>>6; reg=(m>>3)&7; rm=m&7
+                      if reg==2 and rm!=4:
+                          if mod==0:
+                              disp=0; size=2
+                          elif mod==1:
+                              disp=struct.unpack_from('<b',tb,i+2)[0]; size=3
+                          elif mod==2 and i+6<=len(tb):
+                              disp=struct.unpack_from('<i',tb,i+2)[0]; size=6
+                          else:
+                              i+=1; continue
+                          if 0 <= disp <= 0x400:
+                              vals.append((text['addr']+i,disp))
+                  i+=1
+              if vals:
+                  print('getter=0x%x slots=%s' % (callva,','.join('0x%x@0x%x'%(disp,va) for va,disp in vals)))
+          print('BE_PATH_SLOT_MAP_END')
+          # Re-emit the loader's exact getter -> virtual slot -> setFileName anchors for comparison.
+          for label,start,end in [
+              ('LOADER_GETTER_SLOT',0x6fc4d0,0x6fc518),
+              ('LOADER_SET_FILENAME',0x6fcab0,0x6fcac9),
+              ('SESSIONDUMP_GETTER_SLOT',0x6ffb70,0x6ffbc0),
+          ]:
               fo=text['off']+(start-text['addr']); blob=d[fo:fo+(end-start)]
-              print(f'CTX index={idx} call=0x{va:x} va=0x{start:x} size=0x{len(blob):x} sha256={hashlib.sha256(blob).hexdigest()} hex={blob.hex()}')
-          print('BE_PATH_GETTER_CONTEXTS_END')
-          # Nearby printable RIP-relative strings for each getter call context.
-          print('BE_PATH_GETTER_STRINGS_BEGIN')
-          seen=set()
-          for idx,callva in enumerate(calls[:40]):
-              lo=max(0,callva-text['addr']-0x100); hi=min(len(tb)-7,callva-text['addr']+0x180)
-              for i in range(lo,hi):
-                  rex=tb[i]
-                  if rex not in range(0x48,0x50) or tb[i+1]!=0x8d: continue
-                  modrm=tb[i+2]
-                  if (modrm>>6)!=0 or (modrm&7)!=5: continue
-                  va=text['addr']+i; dest=va+7+struct.unpack_from('<i',tb,i+3)[0]
-                  if not (0 <= dest < len(d)): continue
-                  e=d.find(b'\0',dest,min(len(d),dest+180))
-                  if e<=dest: continue
-                  raw=d[dest:e]
-                  if not raw or len(raw)>160 or not all(32<=b<127 for b in raw): continue
-                  s=raw.decode('ascii','replace'); key=(callva,dest,s)
-                  if key in seen: continue
-                  seen.add(key); print(f'call=0x{callva:x} ref=0x{va:x} target=0x{dest:x} text={s}')
-          print('BE_PATH_GETTER_STRINGS_END')
+              print(f'BE_PATH_{label}_VA=0x{start:x} HEX={blob.hex()}')
           print('BE_PATH_EXECUTED_TARGET=false')
           print('BE_PATH_LIVE_RUNTIME_OBSERVED=false')
           print('BE_PATH_MUTATION_PERFORMED=false')

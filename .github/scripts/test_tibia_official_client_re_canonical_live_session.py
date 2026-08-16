@@ -193,6 +193,16 @@ esac
         ):
             self.assertIn(marker, source)
 
+    def test_client_graphics_environment_restores_qt_xcb_integration_selection(self):
+        source = WORKER.read_text(encoding='utf-8')
+        start = source.index("printf 'TRACK_A_CANONICAL_STAGE=client_start")
+        end = source.index('\n  pid="$(rpid client)"', start)
+        launch = source[start:end]
+        self.assertIn('QT_QUICK_BACKEND=software', launch)
+        self.assertIn('QSG_INFO=1', launch)
+        self.assertNotIn('QT_XCB_GL_INTEGRATION=none', source)
+        self.assertNotIn('QSG_RHI_BACKEND=', launch)
+
 
 if __name__ == '__main__':
     unittest.main()

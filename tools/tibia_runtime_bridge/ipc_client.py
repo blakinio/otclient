@@ -212,6 +212,10 @@ def session_status(
                 "response": response,
                 "markers": markers,
             }
+        if response.get("target") != target or response.get("scan_status") != "OK":
+            raise BridgeProtocolError(
+                f"target {target} did not prove a successful matching discovery scan"
+            )
         validated = response.get("validated_hits")
         if not isinstance(validated, int) or isinstance(validated, bool) or validated < 0:
             raise BridgeProtocolError(f"target {target} returned invalid validated_hits")

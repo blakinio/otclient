@@ -26,18 +26,8 @@ jobs:
             run_tests: true
             upload: false
             artifact: windows-cmake-tests
-          - name: Solution Debug
+          - name: Solution Debug + OpenGL + DirectX
             type: Solution
-            configuration: Debug
-            artifact: windows-solution-debug
-          - name: Solution OpenGL
-            type: Solution
-            configuration: OpenGL
-            artifact: windows-solution-opengl
-          - name: Solution DirectX
-            type: Solution
-            configuration: DirectX
-            artifact: windows-solution-directx
     runs-on: windows-2025
     env:
       VCPKG_BINARY_CACHE_ACCESS: read
@@ -183,26 +173,49 @@ jobs:
           name: ${{ matrix.artifact }}
           path: build/${{ matrix.preset }}/bin/
 
-      - name: Build project (MSBuild solution)
+      - name: Build project (MSBuild solution configurations)
         if: matrix.type == 'Solution'
         shell: pwsh
         run: |
           $vcpkgRoot = Join-Path (Get-Location) "vcpkg"
-          $outDir = Join-Path (Get-Location) "artifacts/${{ matrix.configuration }}"
-          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $configurations = @("Debug", "OpenGL", "DirectX")
 
-          msbuild.exe vc18/otclient.sln `
-            /m `
-            /p:Configuration=${{ matrix.configuration }} `
-            /p:Platform=x64 `
-            /p:VcpkgEnableManifest=true `
-            /p:VcpkgRoot="$vcpkgRoot" `
-            /p:OutDir="$outDir\\" `
-            /p:GITHUB_WORKSPACE="${{ github.workspace }}"
+          foreach ($configuration in $configurations) {
+            Write-Host "Building Solution configuration: $configuration"
+            $outDir = Join-Path (Get-Location) "artifacts/$configuration"
+            New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-      - name: Upload artifacts (Solution)
+            msbuild.exe vc18/otclient.sln `
+              /m `
+              /p:Configuration=$configuration `
+              /p:Platform=x64 `
+              /p:VcpkgEnableManifest=true `
+              /p:VcpkgRoot="$vcpkgRoot" `
+              /p:OutDir="$outDir\\" `
+              /p:GITHUB_WORKSPACE="${{ github.workspace }}"
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "MSBuild failed for $configuration with exit code $LASTEXITCODE"
+            }
+          }
+
+      - name: Upload artifacts (Solution Debug)
         if: matrix.type == 'Solution'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: ${{ matrix.artifact }}
-          path: artifacts/${{ matrix.configuration }}/
+          name: windows-solution-debug
+          path: artifacts/Debug/
+
+      - name: Upload artifacts (Solution OpenGL)
+        if: matrix.type == 'Solution'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: windows-solution-opengl
+          path: artifacts/OpenGL/
+
+      - name: Upload artifacts (Solution DirectX)
+        if: matrix.type == 'Solution'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: windows-solution-directx
+          path: artifacts/DirectX/

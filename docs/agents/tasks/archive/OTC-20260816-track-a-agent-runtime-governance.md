@@ -14,8 +14,8 @@ branch: docs/OTC-20260816-track-a-agent-runtime-governance-closeout
 base_branch: main
 base_main: 139ef452214bd212a130f916e87d55c7f8712b93
 risk: medium
-related_pr: null
-updated: 2026-08-16T09:18:00+02:00
+related_pr: 329
+updated: 2026-08-16T09:19:00+02:00
 lease_expires_at: null
 lease_released_at: 2026-08-16T09:15:00+02:00
 owned_paths: []
@@ -46,7 +46,7 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-last_progress_at: 2026-08-16T09:18:00+02:00
+last_progress_at: 2026-08-16T09:19:00+02:00
 final_code_head: 03388d366a91d28fb455ab64bc4bc08d4fd78ca4
 final_release_head: ba88ae0a527058fdc424690e6730d32c7a31488c
 final_main_merge: 139ef452214bd212a130f916e87d55c7f8712b93
@@ -63,9 +63,9 @@ release_head_required_ci_job: 95131816127
 review_threads_open_material: 0
 e2e_result: NOT_APPLICABLE_WITH_REASON
 e2e_reason: repository governance/policy enforcement task; no live Tibia runtime operation was part of implementation or closeout
-closeout_pr: pending
+closeout_pr: 329
 stop_reason: completed
-next_action: bind the closeout PR number, validate the exact closeout head, protected-merge it, and verify this task exists only under tasks/archive on main
+next_action: validate the exact PR #329 closeout head, mark Ready, pass the Ready-state protection generation, protected-merge #329, and verify this task exists only under tasks/archive on main
 ---
 
 # Terminal result
@@ -149,7 +149,7 @@ closeout:
       - CI / Required job 95131816127
   pull_requests:
     implementation_pr: blakinio/otclient#324 merged
-    closeout_pr: pending
+    closeout_pr: blakinio/otclient#329
     unresolved_review_threads: 0
   task_status: completed
   ownership_released: true

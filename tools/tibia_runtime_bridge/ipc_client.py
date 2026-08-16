@@ -18,6 +18,14 @@ class BridgeClientError(RuntimeError):
     pass
 
 
+class BridgeTransportError(BridgeClientError):
+    """The local bridge endpoint could not be reached or completed I/O."""
+
+
+class BridgeProtocolError(BridgeClientError):
+    """The bridge endpoint returned a structurally invalid response."""
+
+
 def request(socket_path: Path, command: str, *, timeout: float = 3.0) -> dict[str, Any]:
     if not command or "\n" in command or "\r" in command:
         raise BridgeClientError("command must be one non-empty line")
@@ -35,11 +43,11 @@ def request(socket_path: Path, command: str, *, timeout: float = 3.0) -> dict[st
             chunks.append(chunk)
             total += len(chunk)
             if total > 1024 * 1024:
-                raise BridgeClientError("bridge response exceeds 1 MiB")
+                raise BridgeProtocolError("bridge response exceeds 1 MiB")
             if b"\n" in chunk:
                 break
     except OSError as exc:
-        raise BridgeClientError(f"IPC request failed: {exc}") from exc
+        raise BridgeTransportError(f"IPC request failed: {exc}") from exc
     finally:
         client.close()
 
@@ -48,9 +56,9 @@ def request(socket_path: Path, command: str, *, timeout: float = 3.0) -> dict[st
     try:
         doc = json.loads(line.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise BridgeClientError("bridge returned invalid JSON") from exc
+        raise BridgeProtocolError("bridge returned invalid JSON") from exc
     if not isinstance(doc, dict) or not isinstance(doc.get("ok"), bool):
-        raise BridgeClientError("bridge response must contain boolean ok")
+        raise BridgeProtocolError("bridge response must contain boolean ok")
     return doc
 
 
@@ -69,7 +77,7 @@ def session_status(socket_path: Path, *, timeout: float = 3.0) -> dict[str, Any]
             }
         validated = response.get("validated_hits")
         if not isinstance(validated, int) or isinstance(validated, bool) or validated < 0:
-            raise BridgeClientError(f"target {target} returned invalid validated_hits")
+            raise BridgeProtocolError(f"target {target} returned invalid validated_hits")
         markers[target] = response
 
     candidate = all(markers[target]["validated_hits"] > 0 for target in SESSION_MARKERS)

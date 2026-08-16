@@ -1,22 +1,23 @@
 ---
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
-status: blocked
+status: implementing
 agent: ChatGPT
-session_id: chatgpt-runtime-v5-20260816-1734
+session_id: chatgpt-runtime-v6-20260816
 session_role: runtime_owner
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: waiting-bounded-client-window-wait-fix
-branch: ci/OTC-20260816-track-a-canonical-runtime-e2e-v5
+phase: canonical-bootstrap
+branch: ci/OTC-20260816-track-a-canonical-runtime-e2e-v6
 base_branch: main
-base_main: b69084067de24528b1f763ab9630f638e8bcf092
+base_main: 9e3634c1d822ffc6e74d8e42da63a4e8c60ea3e1
 risk: high
-updated: 2026-08-16T17:41:00+02:00
+updated: 2026-08-16T18:03:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
+  - .github/workflows/tibia-official-client-re-canonical-runtime-e2e-v6.yml
 modules_touched: []
 reuses:
   - .github/scripts/tibia-official-client-re-canonical-live-lease
@@ -28,15 +29,14 @@ reuses:
   - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-toolroot-layout-fix.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-runner-support-x11vnc-repair.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-runner-system-xkbcomp-repair.md
-supersedes_pr: 386
-depends_on:
-  - OTC-20260816-track-a-canonical-client-window-wait-fix
+  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-client-window-wait-fix.md
+depends_on: []
 blocks:
   - OTC-20260815-track-a-p0-direct-position
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: v5 physical bootstrap passed trusted support preflight and acquired canonical lease generation 4 but hit the transition worker timeout; deterministic source review found the client-window wait can exceed the supervisor budget and must be repaired/promoted before another physical attempt
+execution_reason: one serialized physical bootstrap/Gate-B attempt is routed through repository-controlled GitHub Actions after every previously observed support/wait blocker reached trusted-main terminal state
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -60,7 +60,8 @@ bootstrap: REQUIRED_NOT_PROVEN
 target_uniqueness: UNKNOWN
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
-live_runtime_authorization_source: owner instruction 2026-08-16 to finish the existing Track A tasks; v5 bootstrap used no account credentials or login input
+live_runtime_authorization_source: owner instruction 2026-08-16 to finish existing Track A tasks; authority remains conditional on fresh lease/registration/uniqueness checks and trusted-main transition gates; no account credentials/login are authorized in this phase
+fresh_revalidation_required_before_mutation: true
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
@@ -88,42 +89,54 @@ prior_fail_closed_attempts:
   - pr: 393
     run: 31956030015
     job: 95186692121
-    head: fc329b23fa8e30fb6110fb162e9c57ed2d3d4e5d
-    pre_admission_lease_status: released
-    pre_admission_lease_generation: 3
     acquired_lease_generation: 4
     support_root_preflight: PASS
     system_xkbcomp_preflight: PASS
-    warp_profile_generated: true
     result: FAIL_CLOSED_WORKER_TIMEOUT
     registration_published: false
     gate_b_reached: false
     credentials_used: false
     login_attempted: false
-    one_shot_workflow_removed: true
-deterministic_root_cause:
-  classification: BOUNDED_CLIENT_WINDOW_WAIT_DEFECT
-  window_helper_max_seconds_approx: 30
-  bootstrap_outer_attempts: 100
-  bootstrap_nominal_missing_window_seconds_approx: 3025
-  transition_worker_timeout_seconds: 300
-  consequence: missing/slow client window path can be masked by supervisor worker_timeout before client_window_missing is emitted
-  evidence: docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260816-v5-worker-timeout.md
-safety:
-  blind_bootstrap_retry_forbidden: true
-  one_shot_bootstrap_workflow_removed: true
-  registration_exists: false
-  current_pid_session_claimed: false
+resolved_prerequisites:
+  canonical_bootstrap_transition:
+    implementation_merge: d16091ca29ff7c9330115e9ce0fdbfb41646e0dc
+  support_toolroot:
+    path: /work/_otclient_tibia_re_state/toolroot
+  contained_x11vnc:
+    sha256: 4954921ae9c4e2bf7061603eb6a2d52c2292a0973eb2da5d6f48a9bd49570ffc
+  system_xkbcomp:
+    path: /usr/bin/xkbcomp
+    sha256: 0967e7e7b03b077327cea74567726b265bd304b4fdf59f87bf7fdfe1074e7591
+    isolated_xvfb_socket_validation: PASS
+  bounded_client_window_wait:
+    implementation_merge: c160e6776344429058a0bb97db0b411202e3e82e
+    archive_merge: 9e3634c1d822ffc6e74d8e42da63a4e8c60ea3e1
+    production_wait_budget_seconds: 30
+    transition_worker_timeout_seconds: 300
+    semantic_validation_run: 31956997604
+    semantic_validation_result: SUCCESS
+bootstrap_phase_boundary:
+  credentials_allowed: false
+  login_allowed: false
+  create_second_runtime_if_registration_exists: false
+  exact_client_version: 15.32.df7b29
+  exact_client_size: 51965216
+  exact_client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 acceptance:
-  - hosted-only worker fix is independently tested/promoted to trusted main before any new physical bootstrap
-  - client-window wait is bounded below transition worker timeout and preserves client_exited/client_window_missing failure classification
-  - next RUNTIME attempt starts from the new current main with fresh admission and one bounded attempt
-  - bootstrap still creates only one exact-fenced persistent X11/VNC/client runtime and immediate Gate B must pass before controller release
-  - no credentials are used until a later separately admitted protected-login phase
-last_completed_step: v5 physical run 31956030015/job 95186692121 passed support/xkbcomp preflight, acquired lease generation 4 and generated canonical WARP profile, then failed closed at worker_timeout; one-shot workflow removed and deterministic nested client-window wait defect persisted
-next_action: implement/test/promote OTC-20260816-track-a-canonical-client-window-wait-fix on GitHub-hosted current main, then close this stale v5 PR and create one fresh-current-main RUNTIME redispatch
+  - workflow head/base and trusted-main worker/transition are fenced before physical work
+  - support toolroot and exact current /usr/bin/xkbcomp are re-proven before mutation
+  - fresh authoritative lease and registration state are read before mutation; any existing registration/session forces reclassification rather than duplicate creation
+  - canonical lease is acquired for this exact task/session before transition bootstrap
+  - trusted-main transition re-proves registration absence and candidate uniqueness under the canonical lock
+  - one persistent exact-fenced client + X11 + localhost-only VNC + canonical-owned WARP runtime is created
+  - authoritative registration is atomically committed only after bootstrap proof and immediate same-generation Gate B passes
+  - controller authority is released while the canonical desktop/VNC/client remain alive idle on success
+  - no account credentials/login are consumed in this phase
+  - any new fail-closed discriminator stops this phase; no blind retry is permitted
+last_completed_step: bounded client-window wait defect was promoted and archived on trusted main through PR #395/#396; existing RUNTIME task is re-claimed from current main for one fresh v6 bootstrap/Gate-B attempt
+next_action: dispatch exactly one repository-controlled v6 bootstrap/Gate-B attempt on synology-otclient-01; on PASS persist sanitized authoritative registration and leave runtime idle, on any new discriminator remove the one-shot workflow and persist the exact blocker without retry
 ---
 
-# Track A canonical physical runtime E2E v5 — blocked checkpoint
+# Track A canonical physical runtime E2E v6
 
-The runner support blockers are cleared, but the trusted worker's nested client-window polling can exceed the transition supervisor budget. No authoritative runtime registration exists from v5. Further physical bootstrap is disabled until the bounded-wait fix reaches trusted main.
+All previously observed deterministic support and wait-budget blockers are now terminal on trusted `main`. This phase performs one fresh canonical bootstrap/Gate-B attempt without login credentials. Current PID/session/display/VNC remain unclaimed until the workflow proves and persists them.

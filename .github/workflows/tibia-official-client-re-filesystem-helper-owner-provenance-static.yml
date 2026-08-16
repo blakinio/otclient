@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace factory caller RBX service-field writers
+    name: Identify TGameClient factory caller class via RTTI
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 7
     steps:
-      - name: Scan exact caller for RBX plus 0x18/0x20 initialization
+      - name: Map 0x6c976e function and class construction
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,62 +28,75 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'OWNER_PROV_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
-          import hashlib,pathlib,struct,sys
+          import pathlib,struct,sys,hashlib
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
-          shfmt=E+'IIQQQQIIQQ';sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
-          st=sh[shstrndx];names=d[st[4]:st[4]+st[5]]
+          shfmt=E+'IIQQQQIIQQ';raw=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
+          st=raw[shstrndx];names=d[st[4]:st[4]+st[5]]
           def cs(blob,o):
+              if not (0<=o<len(blob)):return ''
               e=blob.find(b'\0',o);e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[]
-          for x in sh:secs.append({'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5]})
-          text=next(s for s in secs if s['name']=='.text')
+          for x in raw:secs.append({'name':cs(names,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]})
+          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
+          def voff(va):
+              for s in secs:
+                  if s['size'] and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
           def b_at(va,n):return d[text['off']+(va-text['addr']):text['off']+(va-text['addr'])+n]
-          start,end=0x6c9000,0x6ca140;blob=b_at(start,end-start)
-          regs=['rax','rcx','rdx','rbx','rsp','rbp','rsi','rdi','r8','r9','r10','r11','r12','r13','r14','r15']
-          hits=[]
-          print('OWNER_PROV_RBX_PAIR_WRITES_BEGIN')
-          for i in range(len(blob)-10):
-              rex=blob[i]
-              if not (0x48<=rex<=0x4f) or blob[i+1]!=0x89:continue
-              m=blob[i+2];mod=m>>6;rm=m&7
-              base=rm|((rex&1)<<3);src=((m>>3)&7)|(((rex>>2)&1)<<3)
-              if base!=3 or mod not in (1,2):continue
-              disp=struct.unpack_from('<b' if mod==1 else '<i',blob,i+3)[0]
-              if disp not in (0x18,0x20):continue
-              va=start+i;hits.append(va)
-              size=4 if mod==1 else 7
-              print(f'va=0x{va:x} src={regs[src]} disp=0x{disp:x} bytes={blob[i:i+size].hex()}')
-          # MOVUPS 16-byte stores to RBX+0x18/+0x20.
-          for i in range(len(blob)-10):
-              p=i;rex=None
-              if 0x40<=blob[p]<=0x4f:rex=blob[p];p+=1
-              if blob[p:p+2]!=b'\x0f\x11':continue
-              m=blob[p+2];mod=m>>6;rm=m&7;base=rm|(((rex or 0)&1)<<3)
-              if base!=3 or mod not in (1,2):continue
-              disp=struct.unpack_from('<b' if mod==1 else '<i',blob,p+3)[0]
-              if disp not in (0x18,0x20):continue
-              va=start+i;hits.append(va)
-              print(f'va=0x{va:x} xmm_store disp=0x{disp:x} bytes={blob[i:i+8].hex()}')
-          print('OWNER_PROV_RBX_PAIR_WRITES_END')
-          for va in sorted(set(hits)):
-              lo=max(start,va-0x90);hi=min(end,va+0xb0);w=b_at(lo,hi-lo)
-              print(f'OWNER_PROV_RBX_PAIR_WINDOW center=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
-          # Candidate function prologues nearest below the TGameClient factory call.
-          patterns=[bytes.fromhex(x) for x in ('554889e5','4157415641554154','415741564155','41564155415455','41574156415455')]
-          pros=[]
-          for pat in patterns:
-              p=0
-              while True:
-                  j=blob.find(pat,p)
-                  if j<0:break
-                  pros.append(start+j);p=j+1
-          print('OWNER_PROV_NEAR_PROLOGUES='+','.join(hex(v) for v in sorted(set(pros))[-40:]))
-          # Exact factory call argument setup anchor.
-          anchor=b_at(0x6ca128,14)
-          print('OWNER_PROV_FACTORY_ARG_ANCHOR='+anchor.hex())
+          def q(va):
+              o=voff(va);return None if o is None else struct.unpack_from('<Q',d,o)[0]
+          def s_at(va):
+              o=voff(va)
+              if o is None:return None
+              e=d.find(b'\0',o,min(len(d),o+200))
+              if e<=o:return None
+              z=d[o:e]
+              if not z or len(z)>180 or not all(32<=x<127 for x in z):return None
+              return z.decode('ascii','replace')
+          rel=by['.rela.dyn'];rels=[]
+          for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
+              ro,ri,add=struct.unpack_from('<QQq',d,o);rels.append((ro,ri&0xffffffff,ri>>32,add))
+          bo={ro:(ty,sy,ad) for ro,ty,sy,ad in rels};ba={}
+          for ro,ty,sy,ad in rels:ba.setdefault(ad,[]).append((ro,ty,sy))
+          def tiname(ti):
+              r=bo.get(ti+8)
+              return None if not r else s_at(r[2])
+          target=0x6c976e;refs=ba.get(target,[])
+          print('OWNER_PROV_CALLER_FUNC_RELOCS='+','.join(hex(x[0]) for x in refs))
+          groups=[]
+          for entry,ty,sy in refs:
+              for delta in range(8,0x608,8):
+                  tis=entry-delta;r=bo.get(tis)
+                  if not r:continue
+                  nm=tiname(r[2])
+                  if not nm:continue
+                  oq=q(tis-8)
+                  if oq is None:continue
+                  top=struct.unpack('<q',struct.pack('<Q',oq))[0]
+                  ap=tis+8;slot=entry-ap
+                  if slot>=0 and slot%8==0 and -0x100000<=top<=0x100000:
+                      groups.append((slot,ap,r[2],nm,top,entry))
+          groups.sort(key=lambda x:x[0])
+          for slot,ap,ti,nm,top,entry in groups[:12]:
+              print(f'OWNER_PROV_CALLER_VTABLE entry=0x{entry:x} slot=0x{slot:x} vptr=0x{ap:x} typeinfo=0x{ti:x} offset_to_top={top} name={nm}')
+          # For nearest groups, locate all exact RIP LEA refs to vptr address points.
+          for slot,ap,ti,nm,top,entry in groups[:4]:
+              rs=[]
+              for i in range(len(tb)-7):
+                  if tb[i] not in range(0x48,0x50) or tb[i+1]!=0x8d:continue
+                  m=tb[i+2]
+                  if (m>>6)!=0 or (m&7)!=5:continue
+                  va=text['addr']+i;dst=va+7+struct.unpack_from('<i',tb,i+3)[0]
+                  if dst==ap:rs.append(va)
+              print(f'OWNER_PROV_CALLER_VPTR_REFS vptr=0x{ap:x} name={nm} refs='+','.join(hex(v) for v in rs))
+              for va in rs[:16]:
+                  lo=max(text['addr'],va-0xa0);hi=min(text['addr']+text['size'],va+0x120);w=b_at(lo,hi-lo)
+                  print(f'OWNER_PROV_CALLER_CTOR_WINDOW lea=0x{va:x} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          # Prologue proves RBX=this when applicable.
+          w=b_at(0x6c976e,0x60)
+          print('OWNER_PROV_CALLER_PROLOGUE_HEX='+w.hex())
           print('OWNER_PROV_EXECUTED_TARGET=false')
           print('OWNER_PROV_LIVE_RUNTIME_OBSERVED=false')
           print('OWNER_PROV_MUTATION_PERFORMED=false')

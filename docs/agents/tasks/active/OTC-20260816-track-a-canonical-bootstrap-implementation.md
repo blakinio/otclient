@@ -8,18 +8,17 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: exact-head-validate
+phase: final-no-temp-workflow-validation
 branch: ci/OTC-20260816-track-a-canonical-bootstrap-implementation-v2
 base_branch: main
 base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
 risk: high
-updated: 2026-08-16T15:33:00+02:00
+updated: 2026-08-16T15:48:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-bootstrap-implementation.md
   - .github/scripts/tibia-official-client-re-canonical-live-transition.py
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
-  - .github/workflows/tibia-official-client-re-canonical-live-transition-v2.yml
 modules_touched: []
 reuses:
   - .github/scripts/tibia-official-client-re-canonical-live-lease.py
@@ -45,10 +44,6 @@ estimate_confidence: high
 decomposition_decision: phased
 decomposition_reason: repair four coordinator findings plus two fail-closed audit hardenings, validate, independently review, then promote before physical runtime reuse
 validation_level: heavy
-session_rotation_count: 1
-heavy_validation_runs: 1
-stale_takeover_count: 1
-human_interruptions: 1
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 execution_class: github_hosted
@@ -73,83 +68,46 @@ runtime_nonclaims:
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
 source_findings:
-  - id: TACOORD-360-001
-    severity: HIGH
-    source_pr: 360
-    implementation_status: REMEDIATED
-    remediation: restore and revalidate the exact previous authoritative registration on every post-write rebind failure
-  - id: TACOORD-360-002
-    severity: HIGH
-    source_pr: 360
-    implementation_status: REMEDIATED
-    remediation: align transition and real shell-worker argv contract and regression-test the actual parser
-  - id: TACOORD-360-003
-    severity: HIGH
-    source_pr: 360
-    implementation_status: REMEDIATED
-    remediation: remove credential/login typing from this infrastructure worker entirely; physical login remains separately RUNTIME-owned
-  - id: TACOORD-360-004
-    severity: MEDIUM
-    source_pr: 360
-    implementation_status: REMEDIATED
-    remediation: remove historical shared wireproxy PID/25354 dependency and create a canonical-owned pinned userspace-WARP helper inside the bootstrap process group
+  - {id: TACOORD-360-001, severity: HIGH, implementation_status: REMEDIATED, remediation: exact previous registration is restored and revalidated after every post-publication rebind failure}
+  - {id: TACOORD-360-002, severity: HIGH, implementation_status: REMEDIATED, remediation: transition and real shell-worker argv are aligned and regression-tested}
+  - {id: TACOORD-360-003, severity: HIGH, implementation_status: REMEDIATED, remediation: account login and credential typing are absent from this infrastructure worker}
+  - {id: TACOORD-360-004, severity: MEDIUM, implementation_status: REMEDIATED, remediation: historical shared wireproxy PID/port dependency is removed in favor of canonical-owned pinned userspace WARP}
 audit_hardenings:
-  - id: TACBOOT-V2-AUD-001
-    severity: HIGH
-    implementation_status: REMEDIATED
-    finding: bootstrap absence inventory must fail closed when a same-runner-UID live process cannot be inspected well enough to exclude an official-client candidate
-    remediation: process inventory now raises process_inventory_incomplete instead of silently skipping an unreadable same-UID process
-  - id: TACBOOT-V2-AUD-002
-    severity: HIGH
-    implementation_status: REMEDIATED
-    finding: safe detach must prove that the bootstrap process group contains no untracked helper descendants
-    remediation: worker reports exactly client/xvfb/vnc/wireproxy PIDs and PGID; controller compares the complete live PGID membership to that exact set before registration/detach and during Gate B
+  - {id: TACBOOT-V2-AUD-001, severity: HIGH, implementation_status: REMEDIATED, finding: incomplete same-runner-UID process inventory must block bootstrap, remediation: unreadable live same-UID inventory now fails closed}
+  - {id: TACBOOT-V2-AUD-002, severity: HIGH, implementation_status: REMEDIATED, finding: safe detach must exclude untracked bootstrap descendants, remediation: exact client/xvfb/vnc/wireproxy PID set must equal live bootstrap PGID membership}
 acceptance:
-  - canonical flock is held continuously across under-lock registration/candidate preflight, bootstrap launch, registration publication, post-probe and detach decision
-  - bootstrap refuses an existing authoritative registration and any detectable official-client candidate before launch
-  - inability to complete same-runner-UID process inventory is a fail-closed bootstrap blocker rather than an implicit absence proof
-  - created client is revalidated by boot identity, PID, process start ticks, exact executable size/SHA, display and window before registration success
-  - bootstrap worker reports exactly client/Xvfb/VNC/wireproxy process ownership and safe detach refuses any additional live process in the bootstrap PGID
-  - registration is atomic, mode 0600, generation-bound and revalidated after publication
-  - persistent descendants receive neither lease capability material nor canonical flock file descriptors
-  - bootstrap failure terminates only the bootstrap-owned process group, invokes bounded owned-state rollback and leaves no success registration
-  - rebind final-probe or lease/identity failure after publication restores and revalidates the exact previous registration before returning failure
-  - transition bootstrap/probe argv is executable against the real shell worker parser; extra arguments fail closed
-  - this infrastructure worker contains no account-login credential typing path and strips TIBIA_TEST and lease/capability variables from descendants
-  - canonical bootstrap owns its userspace WARP helper and private state; it does not read or reuse historical PR 303 wireproxy PID/port authority
-  - WARP helper downloads are version-pinned and archive/binary inputs are hash-verified before use
-  - physical runtime, login, X11/VNC mutation and real client E2E remain forbidden on this branch until implementation is independently reviewed and promoted to trusted main
+  - canonical flock remains held across absence proof, launch, registration publication, post-probe and detach decision
+  - bootstrap refuses an existing registration, detected official-client candidate, or incomplete same-runner-UID process inventory
+  - client identity is fenced by boot/PID/start/executable size/SHA plus display/window and uniqueness
+  - registration is atomic mode-0600 and lease-generation-bound
+  - persistent descendants receive no lease capability/fd or account credential environment
+  - failed bootstrap terminates only its own process group and leaves no success registration
+  - failed post-publication rebind restores and revalidates the previous authoritative registration
+  - shell worker argv is regression-tested against the real parser
+  - canonical-owned WARP helper uses version/hash-pinned inputs and no PR #303 PID/port authority
+  - safe detach and Gate B reject any extra live member of the bootstrap process group
+  - physical runtime execution remains forbidden until this implementation is promoted to trusted main
 validation:
-  local_preflight:
-    python_compile: PASS
-    shell_syntax: PASS
-    initial_deterministic_tests: PASS_7_OF_7
-  github_hosted:
-    exact_head_before_checkpoint_update: 6ceadd2cf92e9874321ed710899fe9e00740b6c0
-    transition_validator_run: 31949999637
-    transition_validator_job: 95171900739
-    transition_validator_result: SUCCESS
-    track_a_governance_run: 31949999631
-    track_a_governance_result: SUCCESS
-    repository_ci_run: 31949999741
-    repository_ci_result: PENDING
-  implementation_self_audit:
-    result: PASS_AFTER_TWO_ADDITIONAL_HARDENINGS
-    material_findings_open: 0
-  independent_coordinator_audit: PENDING
+  semantic_and_deterministic_validation_head: 8f3874286a925a70ecd381d85204caae21b1e91c
+  transition_validator_run: 31950552377
+  transition_validator_result: SUCCESS
+  track_a_governance_run: 31950552351
+  track_a_governance_result: SUCCESS
+  repository_ci_run: 31950552420
+  repository_ci_result: SUCCESS
+  implementation_audit: PASS_MATERIAL_FINDINGS_0_AFTER_TWO_ADDITIONAL_HARDENINGS
+  temporary_validator_workflow: REMOVE_BEFORE_FINAL_HEAD
+  final_no_temp_workflow_governance: PENDING
+  final_no_temp_workflow_repository_ci: PENDING
 e2e:
   result: NOT_APPLICABLE_WITH_REASON
-  reason: this is a no-runtime infrastructure producer; physical bootstrap/login E2E belongs to RUNTIME only after trusted-main promotion
-last_completed_step: exact-head GitHub-hosted transition validator and Track A governance passed after remediation of all four PR 360 findings plus fail-closed process-inventory and process-group-detach hardening
-next_action: let ordinary repository CI finish; if green, record evidence, remove the temporary validator workflow, obtain final exact-head governance/repository CI without the temporary workflow, perform coordinator promotion review and only then merge/promote
+  reason: no-runtime infrastructure producer; physical bootstrap/login E2E belongs to RUNTIME after trusted-main promotion
+last_completed_step: exact-head transition validator, Track A governance and repository CI all passed on 8f387428 after remediation and workflow-lint repair
+next_action: remove temporary validator workflow, obtain fresh final exact-head governance/repository CI, then coordinator-review and promote if main remains fresh
 ---
 
 # Canonical live bootstrap/rebind implementation v2
 
-This fresh-current-main continuation replaces stale PR #360 without inheriting its base or its unsafe runtime assumptions. It implements only the reviewed authority/identity transition and persistent-session bootstrap plumbing. It does **not** run the official client or access Synology while unmerged.
+Fresh-current-main replacement for stale PR #360. It implements only the reviewed canonical bootstrap/rebind/Gate-B authority and persistent-session plumbing. It does not execute the official client or access Synology while unmerged.
 
-## Safety boundary
-
-The physical runtime remains unregistered and unclaimed. No historical display, VNC port, PID, session, wireproxy PID or SOCKS port is promoted as current truth. The replacement removes the historical shared-wireproxy dependency: any future authorized bootstrap must create and own its own pinned userspace-WARP helper under the canonical namespace/process group.
-
-Account login is deliberately absent from this infrastructure worker. A later RUNTIME task may perform a separately reviewed protected login only after this implementation is promoted to trusted `main` and fresh Gate A/bootstrap/Gate B admission permits mutation.
+Current physical runtime remains unregistered and unclaimed. No historical display, VNC port, PID, session, wireproxy PID or SOCKS port is promoted as current truth. Login is deliberately absent from this infrastructure worker and remains a later serialized RUNTIME operation after trusted-main promotion and fresh admission.

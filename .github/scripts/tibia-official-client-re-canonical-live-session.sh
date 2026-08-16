@@ -283,7 +283,7 @@ warp_tools() {
   archive="$bin/wireproxy.tar.gz"
   if [[ ! -s "$archive" || "$(sha256sum "$archive" 2>/dev/null | awk '{print $1}')" != "$WP_TAR_SHA" ]]; then
     curl -fL --retry 3 --connect-timeout 10 -o "$archive.tmp" \
-      "https://github.com/windtf/wireproxy/releases/download/v$wp_ver/wireproxy_linux_amd64.tar.gz"
+      "https://github.com/windtf/wireproxy/releases/download/v$WP_VER/wireproxy_linux_amd64.tar.gz"
     [[ "$(sha256sum "$archive.tmp" | awk '{print $1}')" == "$WP_TAR_SHA" ]] || die wireproxy_archive_hash_mismatch
     mv -f "$archive.tmp" "$archive"
   fi

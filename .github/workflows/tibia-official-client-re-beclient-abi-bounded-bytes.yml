@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Prove Init invocation and filename-state flow statically
+    name: Map QLibrary function relocation ownership
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - name: Inspect only the QLibrary function state flow
+      - name: Inspect static relocation/vtable references only
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -25,68 +25,84 @@ jobs:
           client='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/client'
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 3
           python3 - "$client" <<'PY'
-          import hashlib,pathlib,struct,sys
+          import pathlib,re,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16); _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
           shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
           st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
           def cs(blob,o):
-              if o<0 or o>=len(blob):return ''
-              e=blob.find(b'\0',o);e=len(blob) if e<0 else e
+              if o<0 or o>=len(blob): return ''
+              e=blob.find(b'\0',o); e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[]
-          for x in sh:secs.append({'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
-          text=next(s for s in secs if s['name']=='.text'); tb=d[text['off']:text['off']+text['size']]
-          qstart=0x6fc034; qend=0x6fda00
-          off=text['off']+(qstart-text['addr']); qb=d[off:off+(qend-qstart)]
+          for i,x in enumerate(sh):
+              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'info':x[7],'entsize':x[9]})
+          by={s['name']:s for s in secs}
+          dyn=by.get('.dynsym'); syms=[]
+          if dyn and 0<=dyn['link']<len(secs):
+              ss=secs[dyn['link']]; sb=d[ss['off']:ss['off']+ss['size']]
+              for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
+                  if o+24>len(d):break
+                  sn,info,other,si,val,sz=struct.unpack_from(E+'IBBHQQ',d,o)
+                  syms.append(cs(sb,sn).split('@',1)[0])
 
-          # resolve() return was stored in r12 at 0x6fc596 (49 89 c4). Find all direct CALL/JMP r12 uses later.
-          patterns={b'\x41\xff\xd4':'call_r12',b'\x41\xff\xe4':'jmp_r12',b'\x41\xff\x14\x24':'call_ptr_r12'}
-          print('BE_INIT_RESULT_USES_BEGIN')
-          for pat,name in patterns.items():
-              pos=0
-              while True:
-                  i=qb.find(pat,pos)
-                  if i<0:break
-                  va=qstart+i
-                  if va>=0x6fc596:print(f'{name}=0x{va:x}')
-                  pos=i+1
-          print('BE_INIT_RESULT_USES_END')
+          target=0x6fc034
+          matches=[]
+          allrel=[]
+          for s in secs:
+              if s['type'] not in (4,9): continue
+              ent=s['entsize'] or (24 if s['type']==4 else 16)
+              for o in range(s['off'],s['off']+s['size'],ent):
+                  if s['type']==4:
+                      if o+24>len(d):break
+                      roff,rinfo,addend=struct.unpack_from(E+'QQq',d,o)
+                  else:
+                      if o+16>len(d):break
+                      roff,rinfo=struct.unpack_from(E+'QQ',d,o); addend=0
+                  symidx=rinfo>>32; typ=rinfo&0xffffffff
+                  sym=syms[symidx] if symidx<len(syms) else ''
+                  rec=(s['name'],roff,typ,symidx,sym,addend)
+                  allrel.append(rec)
+                  if addend==target: matches.append(rec)
+          print('BE_QFUNC_RELOC_MATCHES_BEGIN')
+          for sec,roff,typ,si,sym,add in matches:
+              print(f'section={sec} r_offset=0x{roff:x} type={typ} sym={sym or "<none>"} addend=0x{add:x}')
+          print('BE_QFUNC_RELOC_MATCHES_END')
 
-          # Locate references to stack slot [rbp-0x138], which feeds QLibrary::setFileName at 0x6fcab0.
-          disp=(0xfffffffffffffec8).to_bytes(8,'little')[:4]
-          print('BE_FILENAME_SLOT_RAW_REFERENCES_BEGIN')
-          pos=0
-          refs=[]
-          while True:
-              i=qb.find(disp,pos)
-              if i<0:break
-              va=qstart+i
-              refs.append(va)
-              print(f'disp_ref=0x{va:x}')
-              pos=i+1
-          print('BE_FILENAME_SLOT_RAW_REFERENCES_END')
+          # For each vtable-like relocation target, print neighboring relocations and printable addend targets.
+          print('BE_QFUNC_RELOC_NEIGHBORS_BEGIN')
+          for _,roff,_,_,_,_ in matches:
+              print(f'CENTER r_offset=0x{roff:x}')
+              neigh=[r for r in allrel if abs(r[1]-roff)<=0x100]
+              for sec,noff,typ,si,sym,add in sorted(neigh,key=lambda x:x[1]):
+                  text=''
+                  if 0<=add<len(d):
+                      e=d.find(b'\0',add,min(len(d),add+220))
+                      if e>add:
+                          raw=d[add:e]
+                          if raw and all(32<=b<127 for b in raw):
+                              try:text=raw.decode('ascii')
+                              except:text=''
+                  print(f'  off=0x{noff:x} delta={noff-roff:+#x} type={typ} sym={sym or "<none>"} addend=0x{(add & ((1<<64)-1)):x} text={text[:180]}')
+          print('BE_QFUNC_RELOC_NEIGHBORS_END')
 
-          # Emit only small windows around relevant state-flow instructions for offline decoding.
-          def emit(label,va,before,after):
-              start=max(text['addr'],va-before); end=min(text['addr']+text['size'],va+after)
-              fo=text['off']+(start-text['addr']); blob=d[fo:fo+(end-start)]
-              print(f'{label}_VA=0x{start:x}');print(f'{label}_SIZE=0x{len(blob):x}');print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}');print(f'{label}_HEX={blob.hex()}')
-          emit('BE_RESOLVE_AND_AFTER',0x6fc591,0x20,0x220)
-          emit('BE_SET_FILENAME_LOAD',0x6fcaba,0x40,0x60)
-          for idx,va in enumerate(refs[:20]):emit(f'BE_FILENAME_SLOT_{idx}',va,0x40,0x60)
-
-          # Search relocations/data pointers that contain this function address; no process/runtime inspection.
-          needle=struct.pack('<Q',qstart)
-          print('BE_QFUNCTION_RAW_POINTERS_BEGIN')
-          pos=0;count=0
-          while True:
-              i=d.find(needle,pos)
-              if i<0:break
-              print(f'fileoff=0x{i:x}')
-              count+=1;pos=i+1
-              if count>=50:break
-          print('BE_QFUNCTION_RAW_POINTERS_END')
-          print('BE_STATEFLOW_EXECUTED=false')
-          print('BE_STATEFLOW_MUTATION_PERFORMED=false')
+          # Locate RTTI-ish printable names around relocation addends in those same neighborhoods.
+          print('BE_QFUNC_RTTI_CANDIDATES_BEGIN')
+          seen=set()
+          for _,roff,_,_,_,_ in matches:
+              for sec,noff,typ,si,sym,add in allrel:
+                  if abs(noff-roff)>0x200: continue
+                  for pos in range(max(0,add-0x100),min(len(d),add+0x100)) if 0<=add<len(d) else []:
+                      if pos in seen: continue
+                      e=d.find(b'\0',pos,min(len(d),pos+160))
+                      if e<=pos: continue
+                      raw=d[pos:e]
+                      if 3<=len(raw)<=120 and all(32<=b<127 for b in raw):
+                          try:t=raw.decode('ascii')
+                          except:continue
+                          if re.search(r'(BattlEye|Battle|Client|Library|Application|Manager|Loader|Plugin|^\d+[A-Z])',t):
+                              seen.add(pos); print(f'pos=0x{pos:x} text={t}')
+          print('BE_QFUNC_RTTI_CANDIDATES_END')
+          print('BE_RELOC_EXECUTED=false')
+          print('BE_RELOC_MUTATION_PERFORMED=false')
           PY

@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-p0-direct-position.yml
       - .github/scripts/tibia-official-client-re-p0-direct-position.py
+      - docs/agents/tasks/active/OTC-20260815-track-a-p0-direct-position.md
   workflow_dispatch:
 
 permissions:
@@ -22,10 +23,11 @@ jobs:
     timeout-minutes: 20
     env:
       EXPECTED_HEAD_BRANCH: research/OTC-20260815-track-a-p0-direct-position
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_TPLAYERDATA_PRIMARY_VPTR_OFFSET: '0x308ca70'
-      OFFICIAL_LINUX_ARCHIVE_URL: https://static.tibia.com/download/tibia.x64.tar.gz
+      PACKAGE_BASE_URL: https://static.tibia.com/launcher/tibiaclient-linux-current
     steps:
       - name: Checkout exact Draft head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -48,57 +50,114 @@ jobs:
           echo TRACK_A_P0_SYNOLOGY_EXECUTION=false
           echo TRACK_A_P0_PHYSICAL_E2E=false
 
-      - name: Materialize exact official client read-only
+      - name: Materialize exact bin/client from official package manifest
         shell: bash
         run: |
           set -Eeuo pipefail
           out=artifacts/p0-hosted-static
           mkdir -p "$out"
-          archive="$RUNNER_TEMP/tibia.x64.tar.gz"
+          manifest="$RUNNER_TEMP/package.json"
+          version_file="$RUNNER_TEMP/package.json.version"
+          packed="$RUNNER_TEMP/client.lzma"
           client="$RUNNER_TEMP/tibia-static-client"
+          selected="$RUNNER_TEMP/selected-client-entry.json"
 
-          # Historical AUR packaging required a same-URL Referer for this official
-          # endpoint. This is a new bounded retrieval hypothesis after the prior
-          # User-Agent-only hosted attempt returned HTTP 403.
-          if ! curl --fail --silent --show-error --location \
-              --retry 1 --retry-all-errors --connect-timeout 20 --max-time 900 \
-              --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36' \
-              --referer "$OFFICIAL_LINUX_ARCHIVE_URL" \
-              "$OFFICIAL_LINUX_ARCHIVE_URL" --output "$archive"; then
+          fetch() {
+            local url="$1" output="$2"
+            curl --fail --silent --show-error --location \
+              --retry 1 --retry-all-errors --connect-timeout 20 --max-time 180 \
+              --user-agent 'Tibia Linux Launcher static research' \
+              "$url" --output "$output"
+          }
+
+          if ! fetch "$PACKAGE_BASE_URL/package.json.version" "$version_file"; then
             {
               echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
-              echo P0_HOSTED_INPUT_REASON=official_archive_download_failed_with_same_url_referer
-              echo "P0_HOSTED_INPUT_URL=$OFFICIAL_LINUX_ARCHIVE_URL"
+              echo P0_HOSTED_INPUT_REASON=package_version_download_failed
+              echo "P0_HOSTED_INPUT_URL=$PACKAGE_BASE_URL/package.json.version"
             } | tee "$out/input-status.txt"
             exit 3
           fi
 
-          python3 - "$archive" "$client" "$out/archive-members.txt" <<'PY'
-          import shutil
-          import sys
-          import tarfile
-          from pathlib import PurePosixPath
+          version="$(tr -d '\r\n' < "$version_file")"
+          echo "P0_HOSTED_PACKAGE_VERSION=$version" | tee "$out/input-status.txt"
+          if [[ "$version" != "$EXPECTED_CLIENT_VERSION" ]]; then
+            {
+              echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+              echo P0_HOSTED_INPUT_REASON=package_version_mismatch
+              echo "P0_HOSTED_EXPECTED_VERSION=$EXPECTED_CLIENT_VERSION"
+            } | tee -a "$out/input-status.txt"
+            exit 3
+          fi
 
-          archive, target, listing = sys.argv[1:]
-          with tarfile.open(archive, mode='r:*') as tf:
-              safe = []
-              candidates = []
-              for member in tf.getmembers():
-                  path = PurePosixPath(member.name)
-                  if path.is_absolute() or '..' in path.parts:
-                      continue
-                  safe.append(f"{member.size}\t{member.name}")
-                  if member.isfile() and len(path.parts) >= 2 and path.parts[-2:] == ('bin', 'client'):
-                      candidates.append(member)
-              open(listing, 'w', encoding='utf-8').write('\n'.join(safe[:400]) + '\n')
-              if len(candidates) != 1:
-                  raise SystemExit(f'P0_HOSTED_INPUT_BLOCKED=client_member_count:{len(candidates)}')
-              src = tf.extractfile(candidates[0])
-              if src is None:
-                  raise SystemExit('P0_HOSTED_INPUT_BLOCKED=client_member_unreadable')
-              with src, open(target, 'wb') as dst:
-                  shutil.copyfileobj(src, dst, length=1024 * 1024)
-              print(f'P0_HOSTED_CLIENT_MEMBER={candidates[0].name}')
+          if ! fetch "$PACKAGE_BASE_URL/package.json" "$manifest"; then
+            {
+              echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+              echo P0_HOSTED_INPUT_REASON=package_manifest_download_failed
+              echo "P0_HOSTED_INPUT_URL=$PACKAGE_BASE_URL/package.json"
+            } | tee -a "$out/input-status.txt"
+            exit 3
+          fi
+
+          python3 - "$manifest" "$selected" "$EXPECTED_CLIENT_VERSION" <<'PY'
+          import json,sys
+          manifest_path, selected_path, expected_version = sys.argv[1:]
+          data=json.load(open(manifest_path,encoding='utf-8'))
+          if data.get('version') != expected_version:
+              raise SystemExit(f"P0_HOSTED_INPUT_BLOCKED=manifest_version:{data.get('version')!r}")
+          matches=[x for x in data.get('files',[]) if x.get('localfile') == 'bin/client']
+          if len(matches) != 1:
+              raise SystemExit(f'P0_HOSTED_INPUT_BLOCKED=bin_client_entry_count:{len(matches)}')
+          e=matches[0]
+          required=('url','packedhash','packedsize','unpackedhash','unpackedsize')
+          missing=[k for k in required if not e.get(k)]
+          if missing:
+              raise SystemExit(f'P0_HOSTED_INPUT_BLOCKED=missing_entry_fields:{missing}')
+          json.dump(e,open(selected_path,'w',encoding='utf-8'),sort_keys=True)
+          print('P0_HOSTED_MANIFEST_BIN_CLIENT_FOUND=true')
+          print(f"P0_HOSTED_MANIFEST_CLIENT_URL={e['url']}")
+          print(f"P0_HOSTED_MANIFEST_PACKED_SIZE={e['packedsize']}")
+          print(f"P0_HOSTED_MANIFEST_UNPACKED_SIZE={e['unpackedsize']}")
+          print(f"P0_HOSTED_MANIFEST_UNPACKED_SHA256={e['unpackedhash']}")
+          PY
+
+          readarray -t entry < <(python3 - "$selected" <<'PY'
+          import json,sys
+          e=json.load(open(sys.argv[1],encoding='utf-8'))
+          for k in ('url','packedhash','packedsize','unpackedhash','unpackedsize'):
+              print(e[k])
+          PY
+          )
+          rel_url="${entry[0]}"
+          packed_hash="${entry[1]}"
+          packed_size="${entry[2]}"
+          unpacked_hash="${entry[3]}"
+          unpacked_size="${entry[4]}"
+
+          case "$rel_url" in
+            http://*|https://*) client_url="$rel_url" ;;
+            *) client_url="$PACKAGE_BASE_URL/$rel_url" ;;
+          esac
+
+          if ! fetch "$client_url" "$packed"; then
+            {
+              echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED
+              echo P0_HOSTED_INPUT_REASON=packed_client_download_failed
+              echo "P0_HOSTED_INPUT_RELATIVE_URL=$rel_url"
+            } | tee -a "$out/input-status.txt"
+            exit 3
+          fi
+
+          actual_packed_size="$(stat -c '%s' "$packed")"
+          actual_packed_hash="$(sha256sum "$packed" | awk '{print $1}')"
+          [[ "$actual_packed_size" == "$packed_size" ]] || { echo P0_HOSTED_INPUT_BLOCKED=packed_size_mismatch; exit 3; }
+          [[ "$actual_packed_hash" == "$packed_hash" ]] || { echo P0_HOSTED_INPUT_BLOCKED=packed_hash_mismatch; exit 3; }
+
+          python3 - "$packed" "$client" <<'PY'
+          import lzma,shutil,sys
+          src,dst=sys.argv[1:]
+          with lzma.open(src,'rb') as r, open(dst,'wb') as w:
+              shutil.copyfileobj(r,w,1024*1024)
           PY
 
           size="$(stat -c '%s' "$client")"
@@ -106,14 +165,17 @@ jobs:
           {
             echo "P0_HOSTED_INPUT_SIZE=$size"
             echo "P0_HOSTED_INPUT_SHA256=$sha"
+            echo "P0_HOSTED_MANIFEST_UNPACKED_SIZE=$unpacked_size"
+            echo "P0_HOSTED_MANIFEST_UNPACKED_SHA256=$unpacked_hash"
             echo "P0_HOSTED_EXPECTED_SIZE=$EXPECTED_CLIENT_SIZE"
             echo "P0_HOSTED_EXPECTED_SHA256=$EXPECTED_CLIENT_SHA256"
-          } | tee "$out/input-status.txt"
-          if [[ "$size" != "$EXPECTED_CLIENT_SIZE" || "$sha" != "$EXPECTED_CLIENT_SHA256" ]]; then
-            echo P0_HOSTED_INPUT_STATUS=INPUT_BLOCKED | tee -a "$out/input-status.txt"
-            echo P0_HOSTED_INPUT_REASON=exact_client_fence_mismatch | tee -a "$out/input-status.txt"
-            exit 3
-          fi
+          } | tee -a "$out/input-status.txt"
+
+          [[ "$size" == "$unpacked_size" ]] || { echo P0_HOSTED_INPUT_BLOCKED=manifest_unpacked_size_mismatch; exit 3; }
+          [[ "$sha" == "$unpacked_hash" ]] || { echo P0_HOSTED_INPUT_BLOCKED=manifest_unpacked_hash_mismatch; exit 3; }
+          [[ "$size" == "$EXPECTED_CLIENT_SIZE" ]] || { echo P0_HOSTED_INPUT_BLOCKED=exact_client_size_mismatch; exit 3; }
+          [[ "$sha" == "$EXPECTED_CLIENT_SHA256" ]] || { echo P0_HOSTED_INPUT_BLOCKED=exact_client_sha_mismatch; exit 3; }
+
           echo P0_HOSTED_INPUT_STATUS=EXACT_FENCE_VERIFIED | tee -a "$out/input-status.txt"
           echo "TRACK_A_P0_CLIENT=$client" >> "$GITHUB_ENV"
 
@@ -148,9 +210,15 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          rm -f "$RUNNER_TEMP/tibia-static-client" "$RUNNER_TEMP/tibia.x64.tar.gz"
+          rm -f \
+            "$RUNNER_TEMP/tibia-static-client" \
+            "$RUNNER_TEMP/client.lzma" \
+            "$RUNNER_TEMP/package.json" \
+            "$RUNNER_TEMP/package.json.version" \
+            "$RUNNER_TEMP/selected-client-entry.json"
           test ! -e "$RUNNER_TEMP/tibia-static-client"
-          test ! -e "$RUNNER_TEMP/tibia.x64.tar.gz"
+          test ! -e "$RUNNER_TEMP/client.lzma"
+          test ! -e "$RUNNER_TEMP/package.json"
 
       - name: Upload sanitized derived evidence only
         if: always()

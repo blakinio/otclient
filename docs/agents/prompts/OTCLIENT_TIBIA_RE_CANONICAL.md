@@ -47,7 +47,9 @@ canonical_bootstrap
 canonical_rebind
 ```
 
-and persist or emit the complete admission record required by that contract before the first runtime-related operation and after any material authority/identity change.
+At task claim/resume/checkpoint, persist the complete admission record required by that contract; static/no-runtime work records `runtime_access: none`. Re-evaluate and re-persist admission before the first runtime-related operation and after any material authority/identity change.
+
+`read_only` live observation additionally requires a freshly proven non-conflicting target/namespace/ownership boundary and `target_uniqueness: PROVEN`; otherwise refuse live observation and continue only `none` static/artifact work.
 
 For ordinary canonical reuse/mutation, `mutation_authorized: true` is legal only after current Gate A passes, any required generation rebind passes, Gate B passes on the one authoritative registration, and the mutation remains inside the final PR #321 cancellation-safe whole-lifetime supervisor. Missing registration does not fall through to reuse and requires the separate bootstrap transition. Registration/lease-generation mismatch does not fall through to reuse and requires the dedicated reviewed rebind transition. Manual editing of `runtime-registration.json` is never a substitute.
 
@@ -62,7 +64,7 @@ current_exact_client_session: NOT_REGISTERED
 
 Historical `:98`, reachable `6082`, an old PID/session, a task/PR statement, or standalone lease validation is discovery evidence only and never current mutation authority. `UNKNOWN`, `REQUIRED_NOT_PROVEN`, `REQUIRED_UNAVAILABLE`, or `REQUIRED_UNIMPLEMENTED` on a required admission gate means refuse that mutation and continue only unrelated safe work.
 
-Task-owned ephemeral runtimes remain allowed only inside a freshly proven unique namespace. A unique X11 display does not create a second Global session or canonical authority. Do not mutate PR #303-owned runtime surfaces or Track B state through this wrapper.
+Task-owned ephemeral runtimes remain allowed only inside a freshly proven unique namespace. A unique X11 display does not create a second Global session or canonical authority. Do not mutate or live-observe PR #303-owned runtime surfaces, or Track B state, through this wrapper.
 
 ## Canonical ownership
 

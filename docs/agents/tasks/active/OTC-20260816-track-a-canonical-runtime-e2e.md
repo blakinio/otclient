@@ -1,22 +1,23 @@
 ---
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
-status: blocked
+status: implementing
 agent: ChatGPT
-session_id: chatgpt-runtime-v6-20260816
+session_id: chatgpt-runtime-v7-20260816
 session_role: runtime_owner
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: waiting-client-window-ownership-discriminator
-branch: ci/OTC-20260816-track-a-canonical-runtime-e2e-v6
+phase: fresh-canonical-bootstrap-after-graphics-fix
+branch: ci/OTC-20260816-track-a-canonical-runtime-e2e-v7
 base_branch: main
-base_main: 9e3634c1d822ffc6e74d8e42da63a4e8c60ea3e1
+base_main: 778e13306d93297025abf8e4e970e91ac9830a36
 risk: high
-updated: 2026-08-16T18:07:00+02:00
+updated: 2026-08-16T19:11:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
+  - .github/workflows/tibia-official-client-re-canonical-runtime-e2e-v7.yml
 modules_touched: []
 reuses:
   - .github/scripts/tibia-official-client-re-canonical-live-lease
@@ -24,19 +25,15 @@ reuses:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
   - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-toolroot-layout-fix.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-runner-support-x11vnc-repair.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-runner-system-xkbcomp-repair.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-client-window-wait-fix.md
-depends_on:
-  - OTC-20260816-track-a-client-window-ownership-discriminator
+  - docs/agents/tasks/archive/OTC-20260816-track-a-client-window-ownership-discriminator.md
+  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-graphics-integration-fix.md
+depends_on: []
 blocks:
   - OTC-20260815-track-a-p0-direct-position
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: v6 physical bootstrap reached a live exact client after WARP/Xvfb/VNC success but failed closed at the bounded visible-window discriminator; a separate non-registering ephemeral-isolated diagnostic must resolve window/process ownership or startup state before another canonical bootstrap attempt
+execution_reason: v6 and the isolated discriminator proved the exact client stayed alive with zero visible X11 windows while Qt reported that neither GLX nor EGL was enabled; hosted fix #402 removed the worker's explicit QT_XCB_GL_INTEGRATION=none self-disable, preserved QT_QUICK_BACKEND=software and added QSG_INFO=1, and is now trusted on main; exactly one fresh canonical bootstrap/Gate-B attempt is therefore authorized
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -58,9 +55,9 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: REQUIRED_NOT_PROVEN
 target_uniqueness: UNKNOWN
-mutation_authorized: false
+mutation_authorized: true
 owner_funded_ai_api_authorized: false
-live_runtime_authorization_source: owner instruction 2026-08-16 to finish existing Track A tasks; no further canonical mutation is authorized from this branch after the v6 discriminator
+live_runtime_authorization_source: owner instruction 2026-08-16 to finish the existing Track A task; authorization is limited to exactly one fresh no-login canonical bootstrap/Gate-B attempt from trusted main after graphics fix #402
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
@@ -71,81 +68,69 @@ excluded_runtime_surfaces:
   - historical closed PR #303 runtime surfaces
 prior_fail_closed_attempts:
   - pr: 376
-    run: 31952484701
-    job: 95177998199
     acquired_lease_generation: 1
     result: XVFB_UNAVAILABLE_BEFORE_REGISTRATION
   - pr: 381
-    run: 31953635875
-    job: 95180815033
     acquired_lease_generation: 2
     result: TOOLROOT_UNAVAILABLE_BEFORE_WARP_X11_CLIENT
   - pr: 386
-    run: 31954637565
-    job: 95183271514
     acquired_lease_generation: 3
     result: XVFB_SOCKET_MISSING_BEFORE_CLIENT_REGISTRATION
   - pr: 393
-    run: 31956030015
-    job: 95186692121
     acquired_lease_generation: 4
     result: FAIL_CLOSED_WORKER_TIMEOUT
-    registration_published: false
-    gate_b_reached: false
   - pr: 397
     run: 31957502867
     job: 95190252936
-    head: 29c750adfbfbf0ea4db64005698b456a5b9c92b0
-    governance_run: 31957502830
-    governance_result: SUCCESS
-    pre_admission_lease_status: released
-    pre_admission_lease_generation: 4
     acquired_lease_generation: 5
-    trusted_worker_wait_contract: PASS
-    support_root_preflight: PASS
-    system_xkbcomp_preflight: PASS
-    warp: PASS
-    xvfb: PASS
-    vnc: PASS
-    client_start: REACHED
-    client_liveness_during_window_wait: ALIVE
-    bounded_window_wait_seconds_approx: 30
     result: FAIL_CLOSED_CLIENT_WINDOW_MISSING
     registration_published: false
     gate_b_reached: false
-    credentials_used: false
-    login_attempted: false
-    one_shot_workflow_removed: true
-current_discriminator:
-  classification: CLIENT_ALIVE_NO_MATCHING_PID_OWNED_VISIBLE_TIBIA_WINDOW
-  proven:
-    - exact trusted base and bounded-window worker contract passed
-    - support root and xkbcomp passed
-    - canonical WARP egress passed
-    - Xvfb socket/startup passed
-    - localhost-only VNC listener startup passed
-    - exact client launch stage was reached
-    - launched exact client PID remained alive throughout the bounded 30-second window wait
-    - no visible window matching ^Tibia$ owned by the launched PID was found within that budget
-  unknown:
-    - whether any visible client-related X11 window existed under another title
-    - whether a relevant window was owned by an owned child/related process instead of the launched PID
-    - whether the client remained blocked before window mapping and why
-  evidence: docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260816-v6-client-window-missing.md
+resolved_discriminator:
+  pr: 398
+  run: 31958546334
+  job: 95192878995
+  classification: PROVEN_CLIENT_ALIVE_ZERO_VISIBLE_WINDOWS_WITH_QT_GL_CONTEXT_FAILURES
+  client_alive_through_seconds: 35
+  visible_windows_t05: 0
+  visible_windows_t15: 0
+  visible_windows_t35: 0
+  cleanup: COMPLETE
+resolved_graphics_fix:
+  implementation_pr: 402
+  implementation_merge_commit: 8b04ffd0c2a9c25b3a8fba942b55ccb6ca450044
+  archive_merge_commit: 778e13306d93297025abf8e4e970e91ac9830a36
+  removed_environment_assignment: QT_XCB_GL_INTEGRATION=none
+  preserved_environment_assignment: QT_QUICK_BACKEND=software
+  added_nonsecret_diagnostic_assignment: QSG_INFO=1
+  forced_specific_gl_backend: false
+  hosted_session_tests: 11_PASS
+  hosted_transition_tests: 9_PASS
+  hosted_guard_tests: 3_PASS
+  hosted_lease_tests: 14_PASS
+  graphics_contract: PASS
 safety:
   blind_bootstrap_retry_forbidden: true
-  one_shot_bootstrap_workflow_removed: true
-  registration_exists: false
+  max_physical_attempts_this_phase: 1
+  registration_exists_prestate: false
   current_pid_session_claimed: false
+  credentials_allowed: false
+  login_allowed: false
+  gameplay_allowed: false
+  track_b_access: false
 acceptance:
-  - bounded ephemeral-isolated diagnostic determines visible X11 window title/class/PID ownership versus no mapped window
-  - diagnostic may inspect only task-owned startup process tree/window metadata and bounded sanitized startup log with no credentials/login/canonical registration mutation
-  - all diagnostic processes/display/WARP state are cleaned before exit
-  - only after the discriminator is resolved may a hosted fix be promoted or a fresh canonical bootstrap be redispatched
-last_completed_step: v6 run 31957502867/job 95190252936 acquired lease generation 5 and passed WARP/Xvfb/VNC/client-start stages, then failed closed after the correct 30-second wait at client_window_missing; one-shot workflow removed and sanitized evidence persisted
-next_action: execute one separately admitted ephemeral-isolated client-window ownership/startup discriminator; do not retry canonical bootstrap until that evidence identifies the required fix or proves a safe window-owner matching rule
+  - exact trusted base is 778e13306d93297025abf8e4e970e91ac9830a36
+  - worker graphics contract proves QT_XCB_GL_INTEGRATION=none absent, QT_QUICK_BACKEND=software present and QSG_INFO=1 present before mutation
+  - fresh lease/admission precheck refuses pre-existing registration or unregistered canonical session root
+  - exactly one canonical bootstrap is attempted
+  - immediate same-generation Gate B must pass before controller release and success claim
+  - successful registration must preserve exact client version/size/SHA and loopback VNC mapping
+  - on any new failure, stop fail-closed, publish no registration claim and do not retry
+  - no account credentials, login or gameplay input are used
+last_completed_step: discriminator #398 and hosted graphics fix #402/#404 are terminal on trusted main; no authoritative canonical registration currently exists
+next_action: execute exactly one fresh v7 physical bootstrap and immediate same-generation Gate B; persist sanitized QSG/GLX/EGL/runtime evidence and then remove the one-shot workflow
 ---
 
-# Track A canonical physical runtime E2E v6 — blocked checkpoint
+# Track A canonical physical runtime E2E v7
 
-v6 eliminated the generic timeout and reached a live exact client process after all support stages passed. The remaining blocker is now precisely the lack of a visible `^Tibia$` window owned by the launched PID during the bounded 30-second wait. Canonical registration/Gate B remain unproven and no login occurred.
+Fresh one-shot canonical bootstrap after the trusted Qt XCB graphics integration repair. Success requires authoritative registration plus immediate same-generation Gate B. Any new discriminator terminates this phase without retry.

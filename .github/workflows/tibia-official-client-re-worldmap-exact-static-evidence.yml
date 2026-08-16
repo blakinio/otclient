@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-worldmap-exact-static-evidence.yml
       - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py
+      - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
   workflow_dispatch:
 
 permissions:
@@ -34,46 +35,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Diagnose source boundary and select exact client
+      - name: Verify source boundary and select exact client
         shell: bash
         run: |
           set -Eeuo pipefail
-
-          repo_ok=false
-          ref_ok=false
-          os_ok=false
-          arch_ok=false
-          runner_ok=false
-          python_ok=false
-          objdump_ok=false
-          llvm_objdump_ok=false
-
-          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] && repo_ok=true
-          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] && ref_ok=true
-          [[ "$RUNNER_OS" == Linux ]] && os_ok=true
-          [[ "$RUNNER_ARCH" == X64 ]] && arch_ok=true
-          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] && runner_ok=true
-          command -v python3 >/dev/null 2>&1 && python_ok=true
-          command -v objdump >/dev/null 2>&1 && objdump_ok=true
-          command -v llvm-objdump >/dev/null 2>&1 && llvm_objdump_ok=true
-
-          echo "WORLD_MAP_STATIC_PREFLIGHT_REPOSITORY_OK=$repo_ok"
-          echo "WORLD_MAP_STATIC_PREFLIGHT_REF_OK=$ref_ok"
-          echo "WORLD_MAP_STATIC_PREFLIGHT_OS_OK=$os_ok"
-          echo "WORLD_MAP_STATIC_PREFLIGHT_ARCH_OK=$arch_ok"
-          echo "WORLD_MAP_STATIC_PREFLIGHT_RUNNER_OK=$runner_ok"
-          echo "WORLD_MAP_STATIC_PREFLIGHT_PYTHON3_OK=$python_ok"
-          echo "WORLD_MAP_STATIC_PREFLIGHT_OBJDUMP_OK=$objdump_ok"
-          echo "WORLD_MAP_STATIC_PREFLIGHT_LLVM_OBJDUMP_OK=$llvm_objdump_ok"
-
-          [[ "$repo_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=REPOSITORY_BOUNDARY'; exit 61; }
-          [[ "$ref_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=REF_BOUNDARY'; exit 62; }
-          [[ "$os_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=OS_BOUNDARY'; exit 63; }
-          [[ "$arch_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=ARCH_BOUNDARY'; exit 64; }
-          [[ "$runner_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=RUNNER_BOUNDARY'; exit 65; }
-          [[ "$python_ok" == true ]] || { echo 'WORLD_MAP_STATIC_REFUSED=PYTHON3_MISSING'; exit 66; }
-
-          python3 -m py_compile .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || { echo 'WORLD_MAP_STATIC_REFUSED=REPOSITORY_BOUNDARY'; exit 61; }
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || { echo 'WORLD_MAP_STATIC_REFUSED=REF_BOUNDARY'; exit 62; }
+          [[ "$RUNNER_OS" == Linux ]] || { echo 'WORLD_MAP_STATIC_REFUSED=OS_BOUNDARY'; exit 63; }
+          [[ "$RUNNER_ARCH" == X64 ]] || { echo 'WORLD_MAP_STATIC_REFUSED=ARCH_BOUNDARY'; exit 64; }
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || { echo 'WORLD_MAP_STATIC_REFUSED=RUNNER_BOUNDARY'; exit 65; }
+          command -v python3 >/dev/null 2>&1 || { echo 'WORLD_MAP_STATIC_REFUSED=PYTHON3_MISSING'; exit 66; }
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
 
           candidates=(
             '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
@@ -83,17 +57,10 @@ jobs:
           source_index=''
           for index in 0 1; do
             candidate="${candidates[$index]}"
-            candidate_regular=false
-            candidate_symlink=false
-            candidate_size='ABSENT'
-            candidate_sha_match=false
-
-            [[ -f "$candidate" ]] && candidate_regular=true
-            [[ -L "$candidate" ]] && candidate_symlink=true
-            if [[ "$candidate_regular" == true && "$candidate_symlink" == false ]]; then
-              candidate_size="$(stat -c %s "$candidate" 2>/dev/null || echo STAT_FAILED)"
-              if [[ "$candidate_size" == "$EXPECTED_CLIENT_SIZE" ]]; then
-                if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
+            [[ -f "$candidate" && ! -L "$candidate" ]] || continue
+            candidate_size="$(stat -c %s "$candidate" 2>/dev/null || echo STAT_FAILED)"
+            [[ "$candidate_size" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
           import hashlib
           import sys
           from pathlib import Path
@@ -106,36 +73,13 @@ jobs:
                   digest.update(chunk)
           raise SystemExit(0 if digest.hexdigest() == expected else 1)
           PY
-                then
-                  candidate_sha_match=true
-                fi
-              fi
-            fi
-
-            echo "WORLD_MAP_STATIC_CANDIDATE_${index}_REGULAR=$candidate_regular"
-            echo "WORLD_MAP_STATIC_CANDIDATE_${index}_SYMLINK=$candidate_symlink"
-            echo "WORLD_MAP_STATIC_CANDIDATE_${index}_SIZE=$candidate_size"
-            echo "WORLD_MAP_STATIC_CANDIDATE_${index}_SHA_MATCH=$candidate_sha_match"
-
-            if [[ "$candidate_regular" == true && "$candidate_symlink" == false \
-              && "$candidate_size" == "$EXPECTED_CLIENT_SIZE" \
-              && "$candidate_sha_match" == true ]]; then
+            then
               source_client="$candidate"
               source_index="$index"
               break
             fi
           done
-
           [[ -n "$source_client" ]] || { echo 'WORLD_MAP_STATIC_REFUSED=EXACT_SOURCE_MISSING'; exit 50; }
-          [[ "$objdump_ok" == true || "$llvm_objdump_ok" == true ]] || {
-            echo 'WORLD_MAP_STATIC_REFUSED=DISASSEMBLER_MISSING'
-            exit 67
-          }
-          if [[ "$objdump_ok" != true ]]; then
-            echo 'WORLD_MAP_STATIC_REFUSED=ONLY_LLVM_OBJDUMP_AVAILABLE_REQUIRES_ANALYZER_ADAPTATION'
-            exit 68
-          fi
-
           {
             echo "SOURCE_CLIENT=$source_client"
             echo "SOURCE_CANDIDATE_INDEX=$source_index"
@@ -146,6 +90,8 @@ jobs:
           echo "WORLD_MAP_STATIC_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION"
           echo "WORLD_MAP_STATIC_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE"
           echo "WORLD_MAP_STATIC_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo WORLD_MAP_STATIC_SOURCE_DISASSEMBLY=none
+          echo WORLD_MAP_STATIC_HOSTED_DISASSEMBLY_REQUIRED=true
           echo WORLD_MAP_STATIC_RUNTIME_ACCESS=none
           echo WORLD_MAP_STATIC_CANONICAL_STATE_ACCESS=false
           echo WORLD_MAP_STATIC_CLIENT_PROCESS_ACCESS=false
@@ -156,13 +102,13 @@ jobs:
           echo WORLD_MAP_STATIC_GAMEPLAY_ACCESS=false
           echo WORLD_MAP_STATIC_CLIENT_BYTE_MUTATION=false
 
-      - name: Produce bounded sanitized static evidence
+      - name: Produce bounded sanitized source windows
         shell: bash
         run: |
           set -Eeuo pipefail
           rm -rf artifacts/source
           mkdir -p artifacts/source
-          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
+          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
             source \
             --client "$SOURCE_CLIENT" \
             --candidate-index "$SOURCE_CANDIDATE_INDEX" \
@@ -177,6 +123,8 @@ jobs:
           grep -Fxq 'WORLD_MAP_STATIC_PROCESS_MEMORY_ACCESSED=false' artifacts/source/source-fence.txt
           grep -Fxq 'WORLD_MAP_STATIC_CANONICAL_RUNTIME_ACCESSED=false' artifacts/source/source-fence.txt
           grep -Fxq 'WORLD_MAP_STATIC_RAW_CLIENT_UPLOADED=false' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_STATIC_SOURCE_DISASSEMBLY=none' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_STATIC_HOSTED_DISASSEMBLY_REQUIRED=true' artifacts/source/source-fence.txt
 
       - name: Enforce sanitized source artifact boundary
         shell: bash
@@ -240,9 +188,13 @@ jobs:
           [[ "$RUNNER_OS" == Linux ]]
           [[ "$RUNNER_ARCH" == X64 ]]
           [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
-          python3 -m py_compile .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py
+          command -v objdump >/dev/null
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
           echo WORLD_MAP_STATIC_EXECUTION_CLASS=github_hosted
           echo WORLD_MAP_STATIC_RUNTIME_ACCESS=none
+          echo WORLD_MAP_STATIC_RAW_CLIENT_PRESENT=false
           echo WORLD_MAP_STATIC_PHYSICAL_E2E=false
 
       - name: Download sanitized source evidence
@@ -251,20 +203,20 @@ jobs:
           name: track-a-worldmap-exact-static-source-${{ github.run_id }}
           path: artifacts/source
 
-      - name: Validate exact-fence sanitized evidence
+      - name: Disassemble bounded windows and validate exact evidence
         shell: bash
         run: |
           set -Eeuo pipefail
           rm -rf artifacts/hosted-validation artifacts/final
           mkdir -p artifacts/hosted-validation artifacts/final
-          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
+          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
             validate \
             --bundle-dir artifacts/source \
             --outdir artifacts/hosted-validation
 
           grep -Fxq 'WORLD_MAP_STATIC_HOSTED_VALIDATION=PASS' artifacts/hosted-validation/hosted-validation.txt
-          cp artifacts/source/worldmap-static-evidence.json artifacts/final/
-          cp artifacts/source/worldmap-static-evidence.md artifacts/final/
+          cp artifacts/hosted-validation/worldmap-static-evidence.json artifacts/final/
+          cp artifacts/hosted-validation/worldmap-static-evidence.md artifacts/final/
           cp artifacts/source/source-fence.txt artifacts/final/
           cp artifacts/hosted-validation/hosted-validation.json artifacts/final/
           cp artifacts/hosted-validation/hosted-validation.txt artifacts/final/

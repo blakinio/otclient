@@ -8,16 +8,17 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: repaired-discriminator-v3-in-flight
+phase: final-harness-repair-before-semantic-capture
 branch: ci/OTC-20260816-track-a-client-window-ownership-discriminator
 base_branch: main
 base_main: 05d4a7136e234b874f7f112ad8c92f01b0aabd51
 risk: high
-updated: 2026-08-16T18:17:00+02:00
+updated: 2026-08-16T18:22:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-client-window-ownership-discriminator.md
   - docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/**
   - .github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
+  - .github/workflows/tibia-official-client-re-window-ownership-discriminator-final.yml
 modules_touched: []
 reuses:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
@@ -54,7 +55,7 @@ mutation_authorized: true
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
-live_runtime_authorization_source: owner instruction 2026-08-16 to finish existing Track A tasks; this authorization is limited to one isolated no-login startup discriminator and its evidence-based harness repair, excluding canonical registration/session mutation
+live_runtime_authorization_source: owner instruction 2026-08-16 to finish existing Track A tasks; final repair is limited to the same isolated no-login discriminator and excludes canonical registration/session mutation
 namespace_proof:
   repository_overlap_search: ZERO_MATCHES_BEFORE_CLAIM
   state_root: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260816-track-a-client-window-ownership-discriminator/ephemeral
@@ -85,45 +86,56 @@ first_diagnostic_run:
   run: 31957940075
   job: 95191373266
   result: DIAGNOSTIC_HARNESS_DEFECT_BEFORE_OBSERVATION
+  failed_assertion: CLIENT_NOT_ISOLATED_GROUP
+  cleanup: COMPLETE
+  evidence: docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-first-run-harness-pgid-failure.md
+second_diagnostic_run:
+  run: 31958323922
+  job: 95192357706
+  result: DIAGNOSTIC_SNAPSHOT_HARNESS_DEFECT_BEFORE_WINDOW_CAPTURE
   exact_source_fence: PASS
   warp: PASS
+  launchermetadata_branch: OPTIONAL_SOURCE_ABSENT
   xvfb: PASS
   vnc: PASS
-  failed_assertion: CLIENT_NOT_ISOLATED_GROUP
-  observed_pid: 17676
-  observed_pgid: 64
+  exact_live_client_pid: 20841
+  exact_live_client_pgid: 20841
+  exact_live_client_fence: PASS
+  failed_assertion: SNAPSHOT_LOCAL_LABEL_UNBOUND
+  cleanup: COMPLETE
   window_snapshots_collected: false
   client_log_discriminator_collected: false
-  cleanup: COMPLETE
-  canonical_state_touched: false
-  evidence: docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-first-run-harness-pgid-failure.md
+  evidence: docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-second-run-snapshot-local-failure.md
 repair_cycle:
-  repair_cycles_for_current_gate: 1
-  justification: remove unnecessary wrapper PID/PGID assumption before observation and add exact trusted-worker launchermetadata fidelity; first run never reached semantic discriminator
-  launcher_model: direct Python subprocess with start_new_session true returning the exact client PID
-  process_cleanup_model: launched PID plus marker-verified descendants from known ancestry only; no process-group kill and no broad process scan
-  launchermetadata_fidelity: REQUIRED_AND_IMPLEMENTED
-  corrected_workflow: .github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
-  corrected_workflow_generation: v3
+  repair_cycles_for_current_gate: 2
+  final_harness_repair: split snapshot local declarations before label-dependent expansion under set -u
+  source_generation: v3_at_commit_cb557da12ebb41c597340909b2db717ee59cdfe1
+  source_fetch: immutable raw GitHub URL at exact commit
+  pre_execution_fences:
+    - bash -n on generated shell
+    - exactly one old compound local declaration replaced
+    - old declaration absent after patch
+    - no broad /proc glob marker scan
+    - conditional launchermetadata fidelity present
+    - exact live client size/SHA fence present
+    - no canonical lease or runtime-registration path in generated script
   additional_physical_runs_authorized: 1
+  after_final_run: no further harness retry from this task
 acceptance:
-  - reproduce the trusted client startup environment in a task-owned ephemeral home/display/WARP namespace without canonical state
-  - verify exact client source size/SHA before launch and copy it into task-owned home
-  - mirror the trusted worker conditional launchermetadata.json copy
-  - verify contained toolroot and exact /usr/bin/xkbcomp before Xvfb
-  - verify the launched observation PID resolves to the copied exact client and carries the task marker
-  - collect bounded snapshots at startup and within 35 seconds only
-  - enumerate only visible X11 windows on the task-owned display, recording window id/title/class/geometry and reported PID where available
-  - distinguish exact launched PID, direct/descendant task-owned process window ownership, other title, or no visible window
-  - capture bounded sanitized task-owned client stdout/stderr without credentials/tokens/cookies
+  - reproduce trusted client startup in a task-owned ephemeral home/display/WARP namespace without canonical state
+  - mirror trusted worker conditional launchermetadata behavior
+  - verify exact client source and live launched PID executable size/SHA
+  - collect bounded snapshots at 5/15/35 seconds
+  - enumerate only visible X11 windows on the task-owned display and associate them with launched PID or marker-verified ancestry
+  - capture bounded sanitized task-owned client stdout/stderr
   - do not inspect BattlEye internals or bypass/evasion behavior
   - do not login or send gameplay input
-  - terminate only the launched marker-owned client PID plus marker-verified descendants from its known ancestry, then task-owned Xvfb/VNC/WARP; remove sandbox before exit
-  - remove one-shot workflow after terminal evidence
-last_completed_step: first physical run stopped before semantic observation because PGID==PID was an unnecessary harness assumption; v3 now launches the exact client via start_new_session, mirrors trusted launchermetadata handling and uses ancestry-only cleanup
-next_action: consume exactly one repaired v3 physical discriminator; persist its bounded sanitized evidence and do not perform any further physical retry from this task
+  - cleanup only marker-owned known-ancestry client tree plus task-owned Xvfb/VNC/WARP and sandbox
+  - remove all one-shot workflows after terminal semantic evidence
+last_completed_step: second physical run passed exact startup through live client creation but first snapshot failed on deterministic nounset local-declaration ordering; cleanup completed and evidence was persisted
+next_action: run exactly one final wrapper-generated v3 discriminator with the single local-declaration repair and pre-execution source-shape fences; accept its semantic result or stop permanently on any further harness defect
 ---
 
 # Track A client-window ownership/startup discriminator
 
-The first isolated run proved the namespace/support path but stopped before window observation because of a harness process-group assumption. The repaired v3 generation is the sole remaining physical discriminator and cannot modify canonical state or use login credentials.
+Two physical generations reached progressively further but both stopped on deterministic harness defects before window evidence. The final run is generated from the exact v3 source with one auditable shell-local fix, validated before execution, and is the last harness attempt allowed by this task.

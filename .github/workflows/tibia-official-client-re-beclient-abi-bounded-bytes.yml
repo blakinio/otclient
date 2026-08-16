@@ -12,26 +12,22 @@ permissions:
 
 jobs:
   inspect:
-    name: Correlate dynamic-loader wrappers with callers
+    name: Recover dynamic-loader string arguments statically
     runs-on: [otclient, synology]
     timeout-minutes: 6
     steps:
-      - name: Scan direct wrapper callers and exact symbol strings
+      - name: Decode cstring references around loader-wrapper calls
         shell: bash
         run: |
           set -Eeuo pipefail
           set +x
           [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || exit 2
-          base='/home/runner/_work/_otclient_tibia_re_state'
-          package="$base/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package"
-          client="$package/bin/client"
+          client='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/client'
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 3
-
           python3 - "$client" <<'PY'
-          import hashlib,pathlib,re,struct,sys
-          p=pathlib.Path(sys.argv[1]); d=p.read_bytes(); E='<'
-          h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
-          _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
+          import pathlib,struct,sys
+          d=pathlib.Path(sys.argv[1]).read_bytes(); E='<'
+          h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16); _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
           shfmt=E+'IIQQQQIIQQ'; sh=[struct.unpack_from(shfmt,d,shoff+i*shentsz) for i in range(shnum)]
           st=sh[shstrndx]; names=d[st[4]:st[4]+st[5]]
           def cs(blob,o):
@@ -39,76 +35,63 @@ jobs:
               e=blob.find(b'\0',o);e=len(blob) if e<0 else e
               return blob[o:e].decode('utf8','replace')
           secs=[]
-          for i,x in enumerate(sh):
-              secs.append({'idx':i,'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
-          execsecs=[s for s in secs if s['type']==1 and s['flags']&0x4 and s['off']+s['size']<=len(d)]
-
-          wrappers={'dlopen_wrapper':0x19f3499,'dlclose_wrapper':0x19f3513,'dlsym_wrapper':0x19f3532}
+          for i,x in enumerate(sh):secs.append({'name':cs(names,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5]})
+          text=next(s for s in secs if s['name']=='.text')
+          blob=d[text['off']:text['off']+text['size']]
+          wrappers={'dlopen':0x19f3499,'dlclose':0x19f3513,'dlsym':0x19f3532}
           calls=[]
-          for s in execsecs:
-              blob=d[s['off']:s['off']+s['size']]
-              for i in range(len(blob)-5):
-                  if blob[i]!=0xe8:continue
-                  va=s['addr']+i; disp=struct.unpack_from('<i',blob,i+1)[0]; target=va+5+disp
-                  for name,wva in wrappers.items():
-                      if target==wva:calls.append((name,va,s))
-          print('BE_WRAPPER_CALLS_BEGIN')
-          for name,va,s in calls:print(f'wrapper={name} call=0x{va:x} section={s["name"]}')
-          print('BE_WRAPPER_CALLS_END')
+          for i in range(len(blob)-5):
+              if blob[i]!=0xe8:continue
+              va=text['addr']+i; target=va+5+struct.unpack_from('<i',blob,i+1)[0]
+              for n,w in wrappers.items():
+                  if target==w:calls.append((n,va))
 
-          # Exact printable NUL-terminated strings only; avoids noisy substring matches like "Init".
-          wanted={'BEClient','BEClient.so','BEClient_x64.so','BattlEye','Init','GetVer','_0','_1','_2','_3','_4','_5','_6','_7'}
-          exact=[]
-          for m in re.finditer(rb'[\x20-\x7e]{1,128}\x00',d):
-              raw=m.group()[:-1]
-              try:text=raw.decode('ascii')
-              except:continue
-              if text in wanted or 'BattlEye/' in text or '/BattlEye' in text:
-                  exact.append((m.start(),text))
-          exact_map={pos:text for pos,text in exact}
-          exact_pos=set(exact_map)
-          print('BE_EXACT_CSTRINGS_BEGIN')
-          for pos,text in exact:print(f'va=0x{pos:x} text={text}')
-          print('BE_EXACT_CSTRINGS_END')
-
-          # Common x86-64 RIP-relative LEA/MOV references in a bounded neighborhood around wrapper callers.
-          prefixes={bytes.fromhex(x) for x in ['488d05','488d0d','488d15','488d1d','488d25','488d2d','488d35','488d3d','488b05','488b0d','488b15','488b1d','488b25','488b2d','488b35','488b3d']}
-          print('BE_WRAPPER_CALLER_STRING_REFS_BEGIN')
-          for name,callva,s in calls:
-              start=max(s['addr'],callva-0x180); end=min(s['addr']+s['size'],callva+0x80)
-              boff=s['off']+(start-s['addr']); blob=d[boff:boff+(end-start)]
-              refs=[]
-              for i in range(max(0,len(blob)-7)):
-                  pfx=blob[i:i+3]
+          prefixes={bytes.fromhex(x) for x in ['488d05','488d0d','488d15','488d1d','488d25','488d2d','488d35','488d3d']}
+          def printable_cstr_at(va):
+              if not (0<=va<len(d)): return None
+              e=d.find(b'\0',va,min(len(d),va+256))
+              if e<0 or e==va:return None
+              raw=d[va:e]
+              if not all(32<=b<127 for b in raw):return None
+              try:return raw.decode('ascii')
+              except:return None
+          def refs_near(callva,before=0x180,after=0x10):
+              start=max(text['addr'],callva-before);end=min(text['addr']+text['size'],callva+after)
+              off=text['off']+(start-text['addr']); b=d[off:off+(end-start)]; out=[]
+              for i in range(max(0,len(b)-7)):
+                  pfx=b[i:i+3]
                   if pfx not in prefixes:continue
-                  disp=struct.unpack_from('<i',blob,i+3)[0]; iva=start+i; target=iva+7+disp
-                  if target in exact_pos:refs.append((iva,target,exact_map[target],pfx.hex()))
-              print(f'caller wrapper={name} call=0x{callva:x} refs={len(refs)}')
-              for iva,target,text,op in refs:print(f'  insn=0x{iva:x} target=0x{target:x} text={text} opcode={op}')
-          print('BE_WRAPPER_CALLER_STRING_REFS_END')
+                  iva=start+i; target=iva+7+struct.unpack_from('<i',b,i+3)[0]; s=printable_cstr_at(target)
+                  if s is not None:out.append((iva,target,s,pfx.hex()))
+              return out
 
-          # Heuristic normal-frame function starts to bound the small set of wrapper callers.
-          def func_start(s,va):
-              rel=va-s['addr']; blob=d[s['off']:s['off']+s['size']]
-              lo=max(0,rel-0x1000); pat=b'\x55\x48\x89\xe5'
-              pos=blob.rfind(pat,lo,rel+1)
-              return s['addr']+pos if pos>=0 else max(s['addr'],va-0x200)
-          def emit(label,start,end):
-              start=max(0,start);end=min(len(d),end);blob=d[start:end]
-              print(f'{label}_START=0x{start:x}')
-              print(f'{label}_SIZE=0x{len(blob):x}')
-              print(f'{label}_SHA256={hashlib.sha256(blob).hexdigest()}')
-              print(f'{label}_HEX={blob.hex()}')
-          seen=set()
-          print('BE_WRAPPER_CALLER_WINDOWS_BEGIN')
-          for idx,(name,va,s) in enumerate(calls):
-              fs=func_start(s,va); key=(fs,name)
-              if key in seen:continue
-              seen.add(key)
-              size=min(0x500,max(0x180,va-fs+0x180))
-              print(f'caller_index={idx} wrapper={name} call=0x{va:x} heuristic_function_start=0x{fs:x} window=0x{size:x}')
-              emit(f'BE_CALLER_{idx}_{name}',fs,fs+size)
-          print('BE_WRAPPER_CALLER_WINDOWS_END')
-          print('BE_WRAPPER_EXECUTED=false')
-          print('BE_WRAPPER_MUTATION_PERFORMED=false')
+          print('BE_LOADER_ARGUMENT_REFS_BEGIN')
+          for n,va in calls:
+              refs=refs_near(va,0x180 if n!='dlopen' else 0x260,0x8)
+              # Keep only the closest occurrence of each target/text in this window.
+              uniq=[];seen=set()
+              for r in refs:
+                  key=(r[1],r[2])
+                  if key in seen:continue
+                  seen.add(key);uniq.append(r)
+              print(f'CALL wrapper={n} va=0x{va:x} refs={len(uniq)}')
+              for iva,target,s,op in uniq[-16:]:print(f'  ref=0x{iva:x} target=0x{target:x} op={op} cstr={s[:180]}')
+          print('BE_LOADER_ARGUMENT_REFS_END')
+
+          # Summarize call clusters separated by >0x1000 for easier subsystem discrimination.
+          print('BE_LOADER_CLUSTERS_BEGIN')
+          clusters=[]
+          for item in calls:
+              if not clusters or item[1]-clusters[-1][-1][1]>0x1000:clusters.append([item])
+              else:clusters[-1].append(item)
+          for ci,c in enumerate(clusters):
+              print(f'CLUSTER {ci} start=0x{c[0][1]:x} end=0x{c[-1][1]:x} calls={len(c)} dlopen={sum(1 for n,_ in c if n=="dlopen")} dlsym={sum(1 for n,_ in c if n=="dlsym")} dlclose={sum(1 for n,_ in c if n=="dlclose")}')
+              ss=[]
+              for n,va in c:
+                  for _,target,s,_ in refs_near(va,0x200 if n=='dlopen' else 0x50,0x8):
+                      if s not in ss:ss.append(s)
+              for s in ss[:120]:print(f'  STR {s[:180]}')
+          print('BE_LOADER_CLUSTERS_END')
+          print('BE_LOADER_EXECUTED=false')
+          print('BE_LOADER_MUTATION_PERFORMED=false')
           PY

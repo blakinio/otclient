@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: track-a-xres-window-identity
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   hosted-preflight:
@@ -92,7 +92,7 @@ jobs:
 
   xres-window-identity:
     name: Physical XRes exact-client window identity
-    if: ${{ contains(github.event.pull_request.body, 'XRES_PHYSICAL_EXECUTION_ENABLED=true') }}
+    if: ${{ endsWith(github.event.pull_request.head.ref, '-authorized') }}
     needs: hosted-preflight
     runs-on: [otclient, synology]
     timeout-minutes: 12

@@ -15,11 +15,12 @@ base_main: 139ef452214bd212a130f916e87d55c7f8712b93
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260816-track-a-beclient-abi-static
 worktree_mode: isolated_branch_checkout_equivalent
 risk: low
-related_pr: null
-updated: 2026-08-16T09:20:00+02:00
+related_pr: 330
+updated: 2026-08-16T09:23:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-beclient-abi-static.md
   - .github/workflows/tibia-official-client-re-beclient-abi-static.yml
+  - .github/workflows/tibia-official-client-re-beclient-abi-bounded-bytes.yml
 modules_touched: []
 reuses:
   - closed diagnostic PR #327 static BEClient evidence
@@ -52,12 +53,26 @@ client_version: 15.32.df7b29
 client_size: 51965216
 client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
-next_action: statically map the official client's BattlEye loader strings, dynamic-loader imports, BEClient.cfg, and bounded disassembly around BEClient exported entrypoints and client-side loader callsites without executing either binary
+prior_analysis_run: 31933690981
+prior_analysis_job: 95132257220
+next_action: isolate the concrete client BEClient string at 0x1d69bb2 and xref at 0xc95cb2, then extract only bounded static byte windows for offline disassembly of that legitimate loader path plus Init/GetVer/_0.._7 prologues; do not expand into bypass/evasion analysis
 ---
 
 # Objective
 
 Recover the bounded static integration contract between exact official Linux Tibia client `15.32.df7b29` and its retained `BEClient.so`: library-name discovery, dynamic loading/symbol-resolution path, exported entrypoint shapes (`Init`, `GetVer`, `_0.._7`), and non-secret configuration semantics visible in `BEClient.cfg`.
+
+# Current direct facts
+
+Run `31933690981`, job `95132257220`, succeeded without executing either target.
+
+- exact Tibia client and prior `BEClient.so` SHA fences passed;
+- `BEClient.cfg` is 29 bytes, SHA-256 `4b36d4ab990a3bd9f9b5379f58b65ec6402eb3b3109dc83a02b6827778d29281`, with only `GameID tibia` and `MasterPort 7171`;
+- exact client imports `dlopen`, `dlsym`, `dlclose`;
+- one concrete `BEClient` literal occurs at client VA/file offset `0x1d69bb2`, with a common RIP-relative reference at `0xc95cb2`;
+- numerous broad `BattlEye` and substring `Init` occurrences exist, so they are not yet individually loader-authoritative;
+- remote runner currently lacks `objdump`, `gdb`, and Python capstone;
+- prior BE dynamic symbols remain `Init`, `GetVer`, `_0.._7`; their section-index metadata is structurally inconsistent with the low-address values and will not be trusted as semantic section ownership without independent bounds.
 
 # Safety boundary
 
@@ -68,8 +83,7 @@ Static file inspection only. Do not execute, dlopen, preload, inject, attach, de
 - revalidate exact Tibia client fence and `BEClient.so` hash from prior evidence;
 - hash and inspect `BEClient.cfg` as text only;
 - enumerate client-side BattlEye/library/symbol literals and dynamic-loader imports;
-- locate available static disassembly tooling without installing or executing target code;
-- recover bounded function prologues/call structure for `Init`, `GetVer`, `_0.._7` when statically disassemblable;
-- identify client-side loader/symbol-resolution callsites only to the level needed to describe the legitimate ABI/lifecycle;
+- recover bounded function prologues/call structure for `Init`, `GetVer`, `_0.._7` through offline disassembly of minimal byte windows when direct remote disassembly is unavailable;
+- identify the client-side loader/symbol-resolution callsite only to the level needed to describe legitimate ABI/lifecycle;
 - classify every behavioral statement as FACT or INFERENCE and preserve unknowns;
-- remove temporary workflow and close temporary PR unmerged after evidence collection.
+- remove temporary workflows and close temporary PR unmerged after evidence collection.

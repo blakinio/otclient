@@ -59,6 +59,9 @@ jobs:
           grep -Fq "exec python3 \"\$GUARD_IMPL\" --state-dir \"\$CANONICAL_STATE_DIR\" \"\$@\"" "$wrapper"
           grep -Fq 'PR_SET_CHILD_SUBREAPER' "$helper"
           grep -Fq 'close_fds=True' "$helper"
+          grep -Fq 'SUPERVISOR_CANCELLATION_SIGNALS' "$helper"
+          grep -Fq 'signal.pthread_sigmask' "$helper"
+          grep -Fq '_record_supervisor_cancellation' "$helper"
           if grep -Fq 'pass_fds=' "$helper"; then
             echo '::error::guarded command still controls a passed flock descriptor'
             exit 1

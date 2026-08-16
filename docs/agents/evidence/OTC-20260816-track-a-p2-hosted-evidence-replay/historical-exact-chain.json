@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "provenance": {
     "source_run": 31944051248,
     "source_job": 95157306712,
@@ -12,7 +12,9 @@
       {"id":9229609330,"sha256":"bc5604ffbcf7e75a6b00dad227aefaa0036ea4792efb61ce85de488b6877782c","role":"exact_setup_fde_and_construction_provenance"},
       {"id":9228087310,"sha256":"a8755bf378f494ec8f895d563d12f61cf43bf59f12fa5fb6b6dc3d6ad68705e1","role":"transport_vtable_rtti"},
       {"id":9228207514,"sha256":"b74d5d011d374a2ab735f8a75df54cbd774d7ee7d3903ab3430ea37072ca5b5d","role":"stream_owner_pairs"},
-      {"id":9228275973,"sha256":"beb0fc79cb9eb75922e46c33d02cc096cb0c56706d8f7f7ac7efa46d8a12d998","role":"outbound_owner_vtables_and_disassembly"}
+      {"id":9228275973,"sha256":"beb0fc79cb9eb75922e46c33d02cc096cb0c56706d8f7f7ac7efa46d8a12d998","role":"outbound_owner_vtables_and_disassembly"},
+      {"id":9226966960,"sha256":"7bb148bcaf28443ccac3af5aaad250316ab40d16a5b353653de2953ed16583ae","role":"direct_qiodevice_qbytearray_write_xref_census"},
+      {"id":9229441999,"sha256":"a4ca736215b6c8a8377ffd335cdb2916b526be5d41483e7bb68617ff31a3fe29","role":"remaining_write_sink_classification"}
     ]
   },
   "exact_client": {
@@ -32,6 +34,7 @@
     "sequence": "UNKNOWN",
     "compression": "UNKNOWN",
     "encryption": "UNKNOWN",
+    "direct_qiodevice_qbytearray_final_egress": "DISPROVEN",
     "final_binary_egress": "UNKNOWN"
   },
   "stage_order": [
@@ -94,7 +97,29 @@
     "exact_header_semantic_name":"UNKNOWN",
     "optional_transform_condition":"message+0x28 == 2",
     "optional_transform_dispatch":"retained RawDataProcessor this+0x8 object virtual +0x28",
-    "optional_transform_dynamic_type":"UNKNOWN"
+    "optional_transform_dynamic_type":"UNKNOWN",
+    "reverse_path":"RawDataProcessor+0x18@0xb46cd0 invokes same retained object virtual +0x30 for message+0x28==2, then consumes first byte and slices QByteArray with mid()",
+    "forward_inverse_pair_inference":"HIGH_CONFIDENCE_INFERENCE_ONLY"
+  },
+  "direct_qiodevice_qbytearray_write_census": {
+    "symbol":"QIODevice::write(QByteArray const&)",
+    "direct_callsite_count":5,
+    "classification":"ALL_DIRECT_CALLSITES_DISPROVEN_AS_FINAL_BINARY_GAMEPLAY_EGRESS",
+    "callsites":[
+      {"address":"0x7dd563","classification":"DISPROVEN_AS_FINAL_NETWORK_EGRESS","reason":"reverse RawDataProcessor path writes into TUnencryptedRawMessageStream/QBuffer internal stream"},
+      {"address":"0xb4066b","classification":"DISPROVEN_AS_FINAL_NETWORK_EGRESS","reason":"TUnencryptedRawMessageStream method 0xb40630 writes QByteArray to self (QBuffer-derived), preserving/restoring position"},
+      {"address":"0xb46c75","classification":"DISPROVEN_AS_BINARY_GAMEPLAY_SINK","reason":"TGameserverTCPConnection QTcpSocket write carries QString local-8-bit plus newline text payload"},
+      {"address":"0xc4a848","classification":"DISPROVEN_AS_GAMEPLAY_EGRESS","reason":"QNetworkReply download chunks are written to QFileDevice and flushed"},
+      {"address":"0xd08642","classification":"DISPROVEN_AS_GAMEPLAY_EGRESS","reason":"explicit QFile open/write/close path"}
+    ],
+    "next_search_space":"other QIODevice overload, indirect/virtual writeData, QAbstractSocket/QTcpSocket virtual path, or another lower-level socket API"
+  },
+  "raw_stream_methods": {
+    "type":"tibia::network::TUnencryptedRawMessageStream",
+    "method_0xb40630":"internal self-write preserving/restoring QBuffer position; contains direct QIODevice::write(QByteArray) at 0xb4066b",
+    "method_0xb40690":"remove consumed prefix from same QBuffer backing QByteArray and adjust position",
+    "method_0xb40710":"QIODevice::readAll",
+    "classification":"PROVEN_INTERNAL_STREAM_BUFFER_API"
   },
   "instruction_markers": [
     "197108f: mov QWORD PTR [rax+0x28],rsi",
@@ -116,23 +141,10 @@
     "b47287: compare message+0x28 with 2",
     "b472a7: load retained RawDataProcessor this+0x8 object",
     "b472b4: call retained-object virtual +0x28",
-    "b47300: call QByteArray::operator="
+    "b47300: call QByteArray::operator=",
+    "b46d3b: reverse RawDataProcessor retained-object virtual +0x30",
+    "b4066b: TUnencryptedRawMessageStream internal QIODevice::write(QByteArray) self-write"
   ],
-  "egress_discriminators": {
-    "dual_precondition_qiodevice_write": {
-      "address":"0xb4066b",
-      "function_window":"TGameserverDualConnection+0x90@0xb40370",
-      "direction":"UNKNOWN",
-      "classification":"NOT_FINAL_EGRESS_PROOF"
-    },
-    "tcp_text_write": {
-      "address":"0xb46c75",
-      "function_window":"0xb46bd0",
-      "owner":"TGameserverTCPConnection::QTcpSocket* at this+0x10",
-      "payload":"QString local-8-bit plus newline",
-      "classification":"DISPROVEN_AS_BINARY_GAMEPLAY_SINK"
-    }
-  },
   "negative_controls": {
     "raw_processor_this_plus_8_mislabeled_unencrypted_stream": false,
     "direct_dualconnection_writer_ownership_assumed": false,
@@ -141,6 +153,6 @@
     "raw_transform_labeled_encryption_without_type_proof": false,
     "compression_helper_presence_labeled_compression_order": false,
     "sequence_type_presence_labeled_sequence_order": false,
-    "b46c75_labeled_binary_gameplay_sink": false
+    "any_direct_qiodevice_qbytearray_write_labeled_final_binary_gameplay_egress": false
   }
 }

@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Validate BattlEye QString initializer boundary
+    name: Validate exact BattlEye initializer anchors
     runs-on: [otclient, synology]
     timeout-minutes: 5
     steps:
-      - name: Disassemble exact initializer and resolve its calls
+      - name: Re-derive adjacent global and literal instructions
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,7 +27,6 @@ jobs:
           [[ "$(stat -c '%s' "$client")" == '51965216' ]] || exit 4
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'FS_RESOLVER_CLIENT_FENCE=PASS'
-          objdump -d -M intel --start-address=0x613430 --stop-address=0x6134a8 "$client"
           python3 - "$client" <<'PY'
           import pathlib,struct,sys,hashlib
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
@@ -38,57 +37,48 @@ jobs:
           def cs(b,o):
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
-          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9],'link':x[6]} for x in raw]
-          by={s['name']:s for s in secs};text=by['.text']
-          def voff(va):
+          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5]} for x in raw]
+          text=next(s for s in secs if s['name']=='.text')
+          def vaoff(va):
               for s in secs:
-                  if s['addr']<=va<s['addr']+s['size'] and s['name']!='.bss':return s['off']+(va-s['addr'])
+                  if s['name']!='.bss' and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
+              return None
           def b_at(va,n):
-              o=voff(va);return b'' if o is None else d[o:o+n]
+              o=vaoff(va);return b'' if o is None else d[o:o+n]
           def rip7(va):
-              x=b_at(va,7);return va+7+struct.unpack_from('<i',x,3)[0]
+              x=b_at(va,7)
+              if len(x)!=7:raise SystemExit(f'FAIL_SHORT_RIP@0x{va:x}')
+              return va+7+struct.unpack_from('<i',x,3)[0]
           def rel32(va):
-              x=b_at(va,5);return va+5+struct.unpack_from('<i',x,1)[0]
-          # exact candidate instructions must be real boundaries in objdump and bytes.
-          print('FS_RESOLVER_INIT_WINDOW_SHA256='+hashlib.sha256(b_at(0x613430,0x78)).hexdigest())
-          print('FS_RESOLVER_INIT_WINDOW_HEX='+b_at(0x613430,0x78).hex())
-          # Find all LEA reg,[rip+disp32] and direct calls in this tiny validated window.
-          blob=b_at(0x613430,0x78);base=0x613430
-          print('FS_RESOLVER_INIT_RIP_BEGIN')
-          for i in range(len(blob)-7):
-              if blob[i] in range(0x48,0x50) and blob[i+1]==0x8d:
-                  m=blob[i+2]
-                  if (m>>6)==0 and (m&7)==5:
-                      va=base+i;dst=va+7+struct.unpack_from('<i',blob,i+3)[0]
-                      if dst in (0x31964a0,0x1d7b160):print(f'va=0x{va:x} target=0x{dst:x} bytes={blob[i:i+7].hex()}')
-          print('FS_RESOLVER_INIT_RIP_END')
-          print('FS_RESOLVER_INIT_CALLS_BEGIN')
-          for i in range(len(blob)-5):
-              if blob[i]==0xe8:
-                  va=base+i;dst=va+5+struct.unpack_from('<i',blob,i+1)[0]
-                  print(f'va=0x{va:x} target=0x{dst:x} bytes={blob[i:i+5].hex()}')
-          print('FS_RESOLVER_INIT_CALLS_END')
-          # map dynamic PLT names for any target in this window if applicable.
-          dyn=by['.dynsym'];ss=secs[dyn['link']];sb=d[ss['off']:ss['off']+ss['size']];syms=[]
-          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
-              no,info,other,si,val,sz=struct.unpack_from('<IBBHQQ',d,o);syms.append((cs(sb,no),val,sz,si,info))
-          got_names={}
-          for rn in ('.rela.plt','.rela.dyn'):
-              r=by.get(rn)
-              if not r:continue
-              for o in range(r['off'],r['off']+r['size'],r['entsize'] or 24):
-                  ro,ri,ad=struct.unpack_from('<QQq',d,o);sym=ri>>32
-                  if sym and sym<len(syms):got_names[ro]=syms[sym][0]
-          def plt_name(va):
-              x=b_at(va,24)
-              for p in range(min(10,max(0,len(x)-6))):
-                  if x[p:p+2]==b'\xff\x25':
-                      got=va+p+6+struct.unpack_from('<i',x,p+2)[0];return got_names.get(got,'')
-              return ''
-          for va in range(0x613430,0x6134a8):
-              if b_at(va,1)==b'\xe8':
-                  dst=rel32(va);name=plt_name(dst)
-                  if name:print(f'FS_RESOLVER_INIT_CALL_SYMBOL call=0x{va:x} target=0x{dst:x} symbol={name}')
+              x=b_at(va,5)
+              if len(x)!=5 or x[0]!=0xe8:raise SystemExit(f'FAIL_NOT_CALL@0x{va:x}:{x.hex()}')
+              return va+5+struct.unpack_from('<i',x,1)[0]
+          # Exact tiny candidate window only.
+          w=b_at(0x613450,0x70)
+          print('FS_RESOLVER_INIT_TINY_SHA256='+hashlib.sha256(w).hexdigest())
+          print('FS_RESOLVER_INIT_TINY_HEX='+w.hex())
+          # These two instructions came from the exploratory candidate; now validate exact boundaries/opcodes/targets.
+          g=b_at(0x613463,7);lit=b_at(0x61346a,7)
+          print(f'FS_RESOLVER_INIT_GLOBAL_INSN={g.hex()} target=0x{rip7(0x613463):x}')
+          print(f'FS_RESOLVER_INIT_LITERAL_INSN={lit.hex()} target=0x{rip7(0x61346a):x}')
+          if g[:3] != bytes.fromhex('4c8d25') or rip7(0x613463)!=0x31964a0:raise SystemExit('FS_RESOLVER_FAIL=global_instruction')
+          if lit[:3] != bytes.fromhex('488d35') or rip7(0x61346a)!=0x1d7b160:raise SystemExit('FS_RESOLVER_FAIL=BattlEye_literal_instruction')
+          if b_at(0x613471,3)!=bytes.fromhex('4c89e7'):raise SystemExit('FS_RESOLVER_FAIL=global_to_rdi')
+          print('FS_RESOLVER_PASS=adjacent_global_BattlEye_initializer_inputs')
+          # Next call(s) from these exact sequential boundaries.
+          if b_at(0x613474,1)==b'\xe8':
+              print(f'FS_RESOLVER_INIT_CONSTRUCT_CALL=0x{rel32(0x613474):x} bytes={b_at(0x613474,5).hex()}')
+          else:
+              print(f'FS_RESOLVER_INIT_AFTER_ARGS_BYTES={b_at(0x613474,24).hex()}')
+          # print exact direct calls in only this 0x70-byte window for subsequent mapping, no global census claim.
+          print('FS_RESOLVER_INIT_TINY_CALLS_BEGIN')
+          for i in range(len(w)-5):
+              if w[i]==0xe8:
+                  va=0x613450+i
+                  try:dst=rel32(va)
+                  except:continue
+                  print(f'call=0x{va:x} target=0x{dst:x} bytes={b_at(va,5).hex()}')
+          print('FS_RESOLVER_INIT_TINY_CALLS_END')
           print('FS_RESOLVER_EXECUTED_TARGET=false')
           print('FS_RESOLVER_LIVE_RUNTIME_OBSERVED=false')
           print('FS_RESOLVER_MUTATION_PERFORMED=false')

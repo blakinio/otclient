@@ -442,7 +442,7 @@ EOF
       OTCLIENT_TIBIA_RE_ROLE=client HOME="$home" DISPLAY="$display" \
       PATH="$TOOL/usr/bin:$TOOL/usr/sbin:/usr/bin:/bin" \
       LD_LIBRARY_PATH="$package/bin/lib:$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/usr/lib/x86_64-linux-gnu/libproxy:$TOOL/lib/x86_64-linux-gnu" \
-      QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+      QT_QUICK_BACKEND=software QSG_INFO=1 \
       XDG_DATA_DIRS="$TOOL/usr/share:/usr/share" FONTCONFIG_PATH="$TOOL/etc/fonts" \
       FONTCONFIG_FILE="$TOOL/etc/fonts/fonts.conf" LD_PRELOAD="$preload" \
       PROXYCHAINS_CONF_FILE="$SESSION/proxychains.conf" \

@@ -1,0 +1,84 @@
+name: Track A P1 Bridge Health
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/tibia_runtime_bridge/**"
+      - "tests/tools/tibia_runtime_bridge/**"
+      - ".github/workflows/tibia-official-client-re-p1-bridge-health.yml"
+      - "docs/agents/tasks/active/OTC-20260816-tibia-re-p1-bridge-health.md"
+      - "docs/agents/MODULE_CATALOG.md"
+      - "docs/agents/CHANGELOG.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p1-bridge-health-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-p1:
+    name: Deterministic Bridge / Health
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install deterministic build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            ninja-build \
+            python3-pyelftools \
+            qt6-base-dev
+
+      - name: Compile Python sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            tools/tibia_runtime_bridge/__init__.py \
+            tools/tibia_runtime_bridge/health.py \
+            tools/tibia_runtime_bridge/ipc_client.py \
+            tools/tibia_runtime_bridge/launcher.py \
+            tools/tibia_runtime_bridge/resolver.py \
+            tests/tools/tibia_runtime_bridge/test_bridge.py \
+            tests/tools/tibia_runtime_bridge/test_health.py
+
+      - name: Run focused bridge and lifecycle tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover \
+            -s tests/tools/tibia_runtime_bridge \
+            -p 'test_*.py' \
+            -v
+
+      - name: Build standalone read-only bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake \
+            -S tools/tibia_runtime_bridge \
+            -B "${RUNNER_TEMP}/tibia-runtime-bridge-build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build "${RUNNER_TEMP}/tibia-runtime-bridge-build" --parallel 2
+          test -f "${RUNNER_TEMP}/tibia-runtime-bridge-build/otclient-tibia-runtime-bridge.so"
+
+      - name: Assert GitHub-hosted no-runtime boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${RUNNER_ENVIRONMENT}" = "github-hosted"
+          ! grep -R --line-number --fixed-strings "runs-on: self-hosted" .github/workflows/tibia-official-client-re-p1-bridge-health.yml
+          ! grep -R --line-number --fixed-strings "synology-otclient-01" .github/workflows/tibia-official-client-re-p1-bridge-health.yml tools/tibia_runtime_bridge tests/tools/tibia_runtime_bridge

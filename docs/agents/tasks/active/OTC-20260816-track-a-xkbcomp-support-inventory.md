@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-xkbcomp-support-inventory
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-xkbcomp-inventory-20260816-1717
 session_role: runtime_observer
@@ -8,19 +8,19 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_infrastructure_inventory
-phase: read-only-xkbcomp-support-observation
+phase: coordinator-promotion-ready
 branch: ci/OTC-20260816-track-a-xkbcomp-support-inventory
 base_branch: main
 base_main: 917b8ab943fd9aa1fded50c9a0b8b4e1dfeb5cbb
 risk: low
-updated: 2026-08-16T17:17:00+02:00
+updated: 2026-08-16T17:20:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-xkbcomp-support-inventory.md
   - docs/agents/evidence/OTC-20260816-track-a-xkbcomp-support-inventory/**
-  - .github/workflows/tibia-official-client-re-xkbcomp-support-inventory.yml
 modules_touched: []
 reuses:
-  - docs/agents/evidence/OTC-20260816-track-a-isolated-xvfb-startup-discriminator/20260816-xvfb-startup.md from PR #387
+  - docs/agents/evidence/OTC-20260816-track-a-isolated-xvfb-startup-discriminator/20260816-xvfb-startup.md from merged PR #387
+  - upstream Xorg XkbBinDirectory source correlation
   - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-toolroot-layout-fix.md
 depends_on: []
 blocks:
@@ -28,7 +28,6 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: helper-path existence/package facts are physical runner support metadata; observation is bounded to two fixed xkbcomp paths and package database only
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -52,29 +51,50 @@ bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
-observation_allowlist:
-  - /work/_otclient_tibia_re_state/toolroot/usr/bin/xkbcomp
-  - /usr/bin/xkbcomp
-  - dpkg metadata/ownership for x11-xkb-utils and whichever package owns an observed xkbcomp path
-forbidden_observation:
-  - official client files/processes
-  - /proc process inventory
-  - canonical registration/lease/session directories
-  - X11/VNC display/runtime state
-  - network/game/login state
-  - credentials/environment secrets
-  - Track B PR #284
-acceptance:
-  - exactly one read-only job runs on synology-otclient-01
-  - output reports only existence/type/realpath/mode/uid/SHA for the two fixed xkbcomp paths plus package ownership/version/status
-  - no helper process is executed
-  - no Xvfb/client/VNC/WARP/canonical lease or registration operation occurs
-  - one-shot workflow is removed after result capture
-  - sanitized result selects a bounded repair or explicit external runner-image blocker; canonical bootstrap is not retried directly
-last_completed_step: isolated Xvfb run 31954834760/job 95183766554 proved Xvfb exits rc1 because it attempts missing absolute /usr/bin/xkbcomp, with all shared libraries resolved
-next_action: run one bounded xkbcomp support inventory and persist exact contained/system path/package facts
+execution:
+  run: 31955054478
+  job: 95184310959
+  runner: synology-otclient-01
+  result: SUCCESS
+  workflow_removed_after_capture: true
+result:
+  classification: PROVEN_CONTAINED_XKBCOMP_SYSTEM_ABSOLUTE_PATH_MISSING
+  contained_path: /work/_otclient_tibia_re_state/toolroot/usr/bin/xkbcomp
+  contained_realpath: /work/_otclient_tibia_re_state/toolroot/usr/bin/xkbcomp
+  contained_mode: 755
+  contained_uid: 0
+  contained_executable: true
+  contained_sha256: 0967e7e7b03b077327cea74567726b265bd304b4fdf59f87bf7fdfe1074e7591
+  contained_current_container_dpkg_owner: UNOWNED
+  system_path: /usr/bin/xkbcomp
+  system_state: ABSENT
+  system_package_x11_xkb_utils: NOT_INSTALLED
+  system_package_xkbcomp: NOT_INSTALLED
+root_cause:
+  isolated_xvfb_failure: packaged Xvfb invokes compile-time absolute /usr/bin/xkbcomp while the exact helper already exists only inside the persistent trusted support root
+  xkbdir_argument_limitation: upstream Xorg source shows -xkbdir changes XkbBaseDirectory, not XkbBinDirectory
+  safe_immediate_repair: bounded runner-support operation may materialize a bit-identical /usr/bin/xkbcomp from the proven contained source only if job identity/path preflight permits it; otherwise require runner image provisioning
+  durability_note: /usr/bin is container-local and a successful immediate repair does not replace declarative runner-image provisioning
+evidence_path: docs/agents/evidence/OTC-20260816-track-a-xkbcomp-support-inventory/20260816-xkbcomp-layout.md
+validation:
+  physical_inventory_result: SUCCESS
+  exact_head_governance: PENDING_AFTER_WORKFLOW_REMOVAL
+  exact_head_repository_ci: PENDING_AFTER_WORKFLOW_REMOVAL
+  review_threads_open: 0
+  physical_e2e: NOT_APPLICABLE_WITH_REASON
+  physical_e2e_reason: support-filesystem metadata only; xkbcomp/Xvfb/client/runtime were not executed in this inventory
+audit:
+  result: PASS
+  material_findings_open: 0
+  notes:
+    - contained helper is directly proven regular/root-owned/executable with exact SHA
+    - system absolute helper path is directly proven absent
+    - no package/network operation is needed to test an immediate bounded repair
+    - no official-client/canonical process/registration/display/VNC/network/login/credential state was observed
+last_completed_step: captured one read-only xkbcomp support inventory, removed the one-shot workflow and persisted the exact contained-vs-system helper layout
+next_action: obtain exact-head governance/CI and promote sanitized evidence; then execute one separately reviewed bounded system-helper repair that either atomically materializes exact /usr/bin/xkbcomp and validates isolated Xvfb, or fails closed as an explicit runner-image deployment blocker
 ---
 
 # xkbcomp support inventory
 
-This task observes only the two xkbcomp helper paths relevant to the proven Xvfb failure and their package metadata. It does not start Xvfb or inspect the canonical/client runtime.
+The helper already exists inside the persistent trusted support root with SHA `0967e7e7...`, while this Xvfb build invokes absent absolute `/usr/bin/xkbcomp`. This is now a runner-support path problem, not a missing Xvfb binary/library problem and not a reason to retry the canonical client.

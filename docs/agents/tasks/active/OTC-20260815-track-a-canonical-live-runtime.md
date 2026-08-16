@@ -15,10 +15,11 @@ base_branch: main
 base_main: b0fd474e34c0252220b773b2304d889821080727
 risk: high
 related_pr: 311
-updated: 2026-08-16T07:33:00+02:00
-lease_expires_at: 2026-08-16T08:18:00+02:00
+updated: 2026-08-16T07:37:00+02:00
+lease_expires_at: 2026-08-16T08:22:00+02:00
 lease_released_at: null
 owned_paths:
+  - .github/workflows/track-a-canonical-live-governance.yml
   - docs/agents/tasks/active/OTC-20260815-track-a-canonical-live-runtime.md
   - docs/agents/tasks/archive/OTC-20260815-track-a-canonical-live-runtime.md
   - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
@@ -34,14 +35,14 @@ depends_on:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: final governance restack, contract reconciliation, review repair and exact-head GitHub validation require no owner-funded AI or live runtime mutation
+execution_reason: final governance restack, contract reconciliation, review repair and deterministic GitHub-hosted semantic audit require no owner-funded AI or live runtime mutation
 run_scope: single_task
 continuation_policy: protected_merge_then_archive
 task_completion_policy: protected_merge_then_archive
 user_communication: terminal_only
 implementation_authorized: true
 invocation_started_at: 2026-08-16T07:16:27+02:00
-last_progress_at: 2026-08-16T07:33:00+02:00
+last_progress_at: 2026-08-16T07:37:00+02:00
 context_pressure: medium
 context_growth: stable
 context_score: 8
@@ -64,8 +65,8 @@ claim_reason: previous task checkpoint was explicitly released with session_id n
 material_review_findings:
   - PRRT_kwDOTVmdjs6ZkaMN: final manager needed cancellation-safe lock ownership; repaired and promoted by PR #321/#322
   - PRRT_kwDOTVmdjs6ZkaMO: sequential reuse needs a dedicated under-lock fail-closed registration generation-rebind transition before Gate B current-generation equality
-last_completed_step: manager cancellation P1 is repaired, exact-head validated, protected-merged and freshly archived; current main and both unresolved PR #311 findings were reverified before this claim
-next_action: clean-restack PR #311 on current main, reconcile Gate A/bootstrap to PR #321/#322, define fail-closed generation rebinding, then run fresh audit and exact-head CI
+last_completed_step: PR #311 was clean-restacked on main@b0fd474e34c0252220b773b2304d889821080727; policy/ADR/bootstrap now target PR #321/#322 and define the fail-closed registration-generation rebind
+next_action: add and run a deterministic fresh governance acceptance audit, resolve material review threads, then require exact-head repository CI and protected merge
 ---
 
 # Objective

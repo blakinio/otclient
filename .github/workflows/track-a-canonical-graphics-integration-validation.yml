@@ -1,0 +1,47 @@
+name: Track A canonical graphics integration validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-session.sh
+      - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+      - .github/workflows/track-a-canonical-graphics-integration-validation.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-graphics-integration-fix.md
+      - docs/agents/evidence/OTC-20260816-track-a-canonical-graphics-integration-fix/**
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-contract-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate canonical graphics integration contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          worker='.github/scripts/tibia-official-client-re-canonical-live-session.sh'
+          bash -n "$worker"
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+          python3 - "$worker" <<'PY'
+          import pathlib, sys
+          source = pathlib.Path(sys.argv[1]).read_text()
+          start = source.index("printf 'TRACK_A_CANONICAL_STAGE=client_start")
+          end = source.index('\n  pid="$(rpid client)"', start)
+          launch = source[start:end]
+          assert 'QT_QUICK_BACKEND=software' in launch
+          assert 'QSG_INFO=1' in launch
+          assert 'QT_XCB_GL_INTEGRATION=none' not in source
+          assert 'QSG_RHI_BACKEND=' not in launch
+          print('TRACK_A_CANONICAL_GRAPHICS_INTEGRATION_CONTRACT=PASS')
+          print('TRACK_A_RUNTIME_ACCESS=none')
+          print('TRACK_A_PHYSICAL_E2E=false')
+          PY

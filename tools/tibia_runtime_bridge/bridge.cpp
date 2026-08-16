@@ -1,4 +1,6 @@
+#include <QtCore/QByteArray>
 #include <QtCore/QCoreApplication>
+#include <QtCore/QCryptographicHash>
 #include <QtCore/QMetaObject>
 #include <QtCore/QObject>
 
@@ -39,9 +41,27 @@ struct Region {
     std::uintptr_t end{};
 };
 
+struct RegionReadResult {
+    bool ok{};
+    std::vector<Region> regions;
+    std::string error;
+};
+
+struct ScanResult {
+    bool ok{};
+    std::vector<std::uintptr_t> hits;
+    std::string error;
+};
+
 std::atomic<std::uintptr_t> g_mainBase{0};
 std::vector<TargetProfile> g_targets;
 std::string g_socketPath;
+std::string g_bootIdSha256;
+std::string g_clientVersion;
+std::string g_clientSha256;
+pid_t g_pid{};
+std::uint64_t g_processStartTicks{};
+std::uint64_t g_clientSize{};
 
 std::string jsonEscape(const std::string& input)
 {
@@ -70,6 +90,88 @@ std::string jsonEscape(const std::string& input)
 std::string errorJson(const std::string& code)
 {
     return "{\"ok\":false,\"error\":\"" + jsonEscape(code) + "\"}";
+}
+
+bool isLowerSha256(const std::string& value)
+{
+    return value.size() == 64 && std::all_of(value.begin(), value.end(), [](const unsigned char ch) {
+        return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f');
+    });
+}
+
+std::string sha256Text(const std::string& value)
+{
+    return QCryptographicHash::hash(QByteArray::fromStdString(value), QCryptographicHash::Sha256)
+        .toHex()
+        .toStdString();
+}
+
+bool readProcessStartTicks(std::uint64_t& output)
+{
+    std::ifstream statFile("/proc/self/stat");
+    if (!statFile.is_open()) {
+        return false;
+    }
+    std::string raw;
+    std::getline(statFile, raw);
+    const auto close = raw.rfind(')');
+    if (close == std::string::npos || close + 2 >= raw.size()) {
+        return false;
+    }
+    std::stringstream fields(raw.substr(close + 2));
+    std::string token;
+    for (int index = 0; index <= 19; ++index) {
+        if (!(fields >> token)) {
+            return false;
+        }
+        if (index == 19) {
+            char* end = nullptr;
+            errno = 0;
+            const auto value = std::strtoull(token.c_str(), &end, 10);
+            if (errno != 0 || end == nullptr || *end != '\0' || value == 0) {
+                return false;
+            }
+            output = static_cast<std::uint64_t>(value);
+        }
+    }
+    return output != 0;
+}
+
+bool loadIdentityEnvelope()
+{
+    const char* version = std::getenv("OTCLIENT_TIBIA_RE_CLIENT_VERSION");
+    const char* sha256 = std::getenv("OTCLIENT_TIBIA_RE_BINARY_SHA256");
+    if (version == nullptr || *version == '\0' || sha256 == nullptr || !isLowerSha256(sha256)) {
+        return false;
+    }
+
+    std::ifstream bootFile("/proc/sys/kernel/random/boot_id");
+    if (!bootFile.is_open()) {
+        return false;
+    }
+    std::string bootId;
+    std::getline(bootFile, bootId);
+    if (bootId.empty()) {
+        return false;
+    }
+
+    struct stat executableStat {};
+    if (::stat("/proc/self/exe", &executableStat) != 0 || executableStat.st_size <= 0) {
+        return false;
+    }
+
+    std::uint64_t processStartTicks = 0;
+    if (!readProcessStartTicks(processStartTicks)) {
+        return false;
+    }
+
+    g_bootIdSha256 = sha256Text(bootId);
+    g_clientVersion = version;
+    g_clientSha256 = sha256;
+    g_pid = ::getpid();
+    g_processStartTicks = processStartTicks;
+    g_clientSize = static_cast<std::uint64_t>(executableStat.st_size);
+    return !g_bootIdSha256.empty() && g_pid > 0;
 }
 
 int phdrCallback(dl_phdr_info* info, std::size_t, void*)
@@ -122,9 +224,13 @@ bool loadTargets()
     return !g_targets.empty();
 }
 
-std::vector<Region> readWritableRegions()
+RegionReadResult readWritableRegions()
 {
     std::ifstream maps("/proc/self/maps");
+    if (!maps.is_open()) {
+        return {false, {}, "PROC_MAPS_OPEN_FAILED"};
+    }
+
     std::string line;
     std::vector<Region> regions;
     while (std::getline(maps, line)) {
@@ -142,7 +248,13 @@ std::vector<Region> readWritableRegions()
         }
         regions.push_back({static_cast<std::uintptr_t>(begin), static_cast<std::uintptr_t>(end)});
     }
-    return regions;
+    if (maps.bad()) {
+        return {false, {}, "PROC_MAPS_READ_FAILED"};
+    }
+    if (regions.empty()) {
+        return {false, {}, "PROC_MAPS_NO_WRITABLE_REGIONS"};
+    }
+    return {true, std::move(regions), {}};
 }
 
 bool inRegion(const std::vector<Region>& regions, const std::uintptr_t address)
@@ -152,15 +264,21 @@ bool inRegion(const std::vector<Region>& regions, const std::uintptr_t address)
     });
 }
 
-std::vector<std::uintptr_t> findVptrHits(const std::uintptr_t expectedVptr)
+ScanResult findVptrHits(const std::uintptr_t expectedVptr)
 {
     constexpr std::size_t chunkSize = 1024 * 1024;
     const int fd = ::open("/proc/self/mem", O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        return {};
+        return {false, {}, "PROC_MEM_OPEN_FAILED"};
     }
 
-    const auto regions = readWritableRegions();
+    const auto regionResult = readWritableRegions();
+    if (!regionResult.ok) {
+        ::close(fd);
+        return {false, {}, regionResult.error};
+    }
+
+    const auto& regions = regionResult.regions;
     std::vector<std::uintptr_t> hits;
     std::vector<unsigned char> buffer(chunkSize);
     for (const auto region : regions) {
@@ -168,11 +286,23 @@ std::vector<std::uintptr_t> findVptrHits(const std::uintptr_t expectedVptr)
         while (cursor < region.end) {
             const auto remaining = static_cast<std::size_t>(region.end - cursor);
             const auto wanted = std::min(chunkSize, remaining);
-            const auto count = ::pread(fd, buffer.data(), wanted, static_cast<off_t>(cursor));
-            if (count <= 0) {
-                cursor += wanted;
-                continue;
+            ssize_t count = -1;
+            do {
+                count = ::pread(fd, buffer.data(), wanted, static_cast<off_t>(cursor));
+            } while (count < 0 && errno == EINTR);
+            if (count < 0) {
+                ::close(fd);
+                return {false, {}, "PROC_MEM_READ_FAILED"};
             }
+            if (count == 0) {
+                ::close(fd);
+                return {false, {}, "PROC_MEM_UNEXPECTED_EOF"};
+            }
+            if (static_cast<std::size_t>(count) != wanted) {
+                ::close(fd);
+                return {false, {}, "PROC_MEM_SHORT_READ"};
+            }
+
             const auto usable = static_cast<std::size_t>(count);
             for (std::size_t offset = 0; offset + 2 * sizeof(std::uintptr_t) <= usable; offset += alignof(std::uintptr_t)) {
                 std::uintptr_t value{};
@@ -193,7 +323,7 @@ std::vector<std::uintptr_t> findVptrHits(const std::uintptr_t expectedVptr)
     ::close(fd);
     std::sort(hits.begin(), hits.end());
     hits.erase(std::unique(hits.begin(), hits.end()), hits.end());
-    return hits;
+    return {true, std::move(hits), {}};
 }
 
 const TargetProfile* findTarget(const std::string& name)
@@ -211,10 +341,14 @@ std::string discoverOnQtThread(const TargetProfile& target)
         return errorJson("MAIN_BASE_UNAVAILABLE");
     }
     const auto expectedVptr = mainBase + target.vptrOffset;
-    const auto hits = findVptrHits(expectedVptr);
+    const auto scan = findVptrHits(expectedVptr);
+    if (!scan.ok) {
+        return errorJson(scan.error);
+    }
+
     std::size_t validated = 0;
     std::vector<std::string> classes;
-    for (const auto address : hits) {
+    for (const auto address : scan.hits) {
         auto* object = reinterpret_cast<QObject*>(address);
         const QMetaObject* meta = object->metaObject();
         if (meta == nullptr || meta->className() == nullptr) {
@@ -229,7 +363,8 @@ std::string discoverOnQtThread(const TargetProfile& target)
 
     std::ostringstream output;
     output << "{\"ok\":true,\"target\":\"" << jsonEscape(target.name)
-           << "\",\"vptr_hits\":" << hits.size()
+           << "\",\"scan_status\":\"OK\""
+           << ",\"vptr_hits\":" << scan.hits.size()
            << ",\"validated_hits\":" << validated
            << ",\"expected_qt_class\":\"" << jsonEscape(target.expectedQtClass) << "\",\"classes\":[";
     for (std::size_t index = 0; index < classes.size(); ++index) {
@@ -247,7 +382,13 @@ std::string dispatchCommand(const std::string& command)
     if (command == "PING") {
         std::ostringstream output;
         output << "{\"ok\":true,\"command\":\"PING\",\"main_base_resolved\":"
-               << (g_mainBase.load() != 0 ? "true" : "false") << '}';
+               << (g_mainBase.load() != 0 ? "true" : "false")
+               << ",\"boot_id_sha256\":\"" << jsonEscape(g_bootIdSha256) << '"'
+               << ",\"pid\":" << g_pid
+               << ",\"process_start_ticks\":" << g_processStartTicks
+               << ",\"client_version\":\"" << jsonEscape(g_clientVersion) << '"'
+               << ",\"client_size\":" << g_clientSize
+               << ",\"client_sha256\":\"" << jsonEscape(g_clientSha256) << "\"}";
         return output.str();
     }
 
@@ -277,7 +418,7 @@ void ipcServer()
         std::this_thread::sleep_for(std::chrono::milliseconds(25));
     }
     dl_iterate_phdr(phdrCallback, nullptr);
-    if (g_mainBase.load() == 0 || !loadTargets()) {
+    if (g_mainBase.load() == 0 || !loadIdentityEnvelope() || !loadTargets()) {
         return;
     }
 

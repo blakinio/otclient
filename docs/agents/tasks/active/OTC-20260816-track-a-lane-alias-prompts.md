@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-lane-alias-prompts
-status: active
+status: validating
 agent: ChatGPT
 session_id: chatgpt-20260816-1227-track-a-alias-prompts
 session_role: prompt-implementer
@@ -9,15 +9,15 @@ project_lane: otclient
 lane: track-a-governance
 track_id: official-client-re
 task_kind: documentation
-phase: implementation
+phase: exact-head-validation
 branch: docs/OTC-20260816-track-a-lane-alias-prompts
 base_branch: main
 base_main: 2c56f7f2c7c01d8dbc1b66febeea22b1d4aff6e8
 risk: medium
-related_pr: null
+related_pr: 349
 created: 2026-08-16T12:27:00+02:00
-updated: 2026-08-16T12:27:00+02:00
-lease_expires_at: 2026-08-16T13:12:00+02:00
+updated: 2026-08-16T12:36:00+02:00
+lease_expires_at: 2026-08-16T13:21:00+02:00
 lease_released_at: null
 owned_paths:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_COORDINATOR_ALIAS.md
@@ -41,7 +41,7 @@ depends_on:
   - main@2c56f7f2c7c01d8dbc1b66febeea22b1d4aff6e8
   - PR #343 merged persistent-session/hybrid routing as 54e7aa8ce2994238067d39b37d3d807bc10111d3
   - PR #324/#329 merged and archived Track A runtime-agent admission governance
-  - PR #303 runtime-owned surfaces remain separately owned and must not be touched
+  - PR #303 runtime-owned surfaces remain separately owned and untouched
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -83,56 +83,82 @@ prompt_contract:
     - persistent Synology desktop/VNC/session routing preset
   objective: Provide short repository-resolved aliases for all Track A research roles while making one persistent Synology desktop, owner-visible VNC and one reusable canonical client session the RUNTIME default topology without weakening admission gates.
   baseline_version: OTCLIENT-TIBIA-RE canonical 1.2.0 + hybrid routing 1.0.0 + parallel coordination 1.0.0 on main
-  eval_suite: manual scenario matrix in this task record
+  eval_suite: manual scenario matrix below
   rollback_version: remove the six alias wrappers
-last_progress_at: 2026-08-16T12:27:00+02:00
-last_completed_step: claimed prompt-only paths after verifying current main, active tasks and open PRs; no overlapping owner exists for the six new alias paths
-next_action: add six additive alias wrappers, run deterministic content audit plus documented manual prompt-eval matrix, open Draft PR, validate exact-head CI/review, protected-merge and archive
+last_progress_at: 2026-08-16T12:36:00+02:00
+last_completed_step: six alias wrappers added; exact seven-file diff reviewed; deterministic content audit and manual prompt-eval matrix passed
+next_action: require exact-head Track A governance/repository CI and zero material review findings, then protected-merge PR #349 and archive/release this task
 ---
 
 # Track A lane alias prompts
 
-## Goal
+## Delivered aliases
 
-Add short invocation aliases for the Track A promotion coordinator and all five research lanes. The aliases must resolve through current repository state and the existing canonical/hybrid/admission contracts instead of duplicating a second programme prompt.
+```text
+OTCLIENT-TIBIA-RE-COORD
+OTCLIENT-TIBIA-RE-P2
+OTCLIENT-TIBIA-RE-P0
+OTCLIENT-TIBIA-RE-P1
+OTCLIENT-TIBIA-RE-RUNTIME
+OTCLIENT-TIBIA-RE-AUDIT
+```
 
-The RUNTIME alias must encode the owner's desired operational topology on Synology: one long-lived canonical X11 desktop, one stable owner-observable VNC view bound to that desktop, and one reusable canonical exact-client session whose lifecycle is independent from an individual worker or GitHub Actions job. A new worker must prefer safe re-acquisition/reuse rather than rebuilding the login/session from zero.
+Each file is an additive wrapper: it resolves the current canonical programme, runtime-admission, hybrid-routing and parallel-research contracts, then adds only the concrete lane preset. No second master programme prompt was created.
 
-## Acceptance inventory
+## Persistent Synology desktop/session invariant
 
-- [ ] `OTCLIENT-TIBIA-RE-COORD` resolves to coordinator/promotion authority and does not directly take physical runtime ownership.
-- [ ] `OTCLIENT-TIBIA-RE-P2` resolves to P2-NETWORK, GitHub-hosted by default, Draft-only, consuming RUNTIME evidence when physical proof is required.
-- [ ] `OTCLIENT-TIBIA-RE-P0` resolves to P0-STATE, GitHub-hosted by default, and does not create a second logged-in session for semantic validation.
-- [ ] `OTCLIENT-TIBIA-RE-P1` resolves to P1-BRIDGE, GitHub-hosted by default, and delegates physical reacquisition/restart proof to RUNTIME.
-- [ ] `OTCLIENT-TIBIA-RE-RUNTIME` resolves to Synology physical runtime ownership and requires runtime admission on every claim/resume.
-- [ ] RUNTIME preserves/reuses one persistent desktop + VNC + canonical client/session across worker/job rotations when current authority/identity gates permit it.
-- [ ] RUNTIME never treats historical `:98`, `6082`, PID/session as current authority and never hard-codes them as canonical.
-- [ ] RUNTIME does not routinely logout, kill X11/VNC/client, or rebuild login state at task end; it releases controller authority while preserving the programme runtime unless a reviewed recovery/destructive action explicitly requires otherwise.
-- [ ] VNC availability gives the owner stable visibility but never grants an agent mutation authority; VNC credentials/endpoints are not committed as secrets or guessed from historical values.
-- [ ] `OTCLIENT-TIBIA-RE-AUDIT` resolves to COVERAGE-AUDIT and remains GitHub-hosted/no-runtime.
-- [ ] All researcher aliases remain Draft-only; only coordinator may promote/integrate under the current parallel coordination contract.
-- [ ] All aliases preserve exact native-Linux client fence, admission classes, Gate A/rebind/Gate B/bootstrap separation, PR #303 ownership, Track B isolation and owner-funded AI prohibition.
-- [ ] Documentation E2E is `NOT_APPLICABLE_WITH_REASON`; exact path/content/diff review, manual prompt eval and repository CI are required before merge.
+The coordinator/RUNTIME aliases encode the requested topology as a target/invariant, not an invented current runtime fact:
+
+```text
+one long-lived canonical X11 desktop on synology-otclient-01
++ one long-lived private owner VNC view mapped to that same desktop
++ one reusable canonical exact-client runtime/session
+```
+
+When a healthy authoritative registration exists, RUNTIME must prefer Gate A -> required rebind -> Gate B -> reuse instead of fresh bootstrap/login. Normal worker/job/task completion releases controller authority without routinely logging out, killing the client, stopping X11/VNC or deleting canonical state. If the authenticated session remains safe/idle, preserve it for the next authorized RUNTIME worker. If disconnected while desktop/VNC survives, prefer bounded recovery within the existing desktop and preserve VNC continuity.
+
+Historical `:98`, `6082`, PID/session remain non-authoritative and are never hard-coded as canonical. VNC visibility is not mutation authority. Missing registration still routes only to reviewed bootstrap and a lease-generation mismatch only to reviewed rebind.
+
+## Acceptance / deterministic content audit
+
+- PASS — all six alias files exist on PR #349 and expose unique short owner invocations.
+- PASS — COORD owns promotion/integration and defaults to hosted/no-runtime coordination.
+- PASS — P2/P0/P1/AUDIT default to GitHub-hosted `runtime_access: none` and consume/request RUNTIME evidence instead of starting independent live sessions.
+- PASS — RUNTIME is pinned to `synology-otclient-01`, requires fresh admission at claim/resume and is the serialized physical evidence provider.
+- PASS — RUNTIME explicitly preserves persistent X11 + VNC + client/session across worker/job rotation and forbids routine logout/kill/recreate at task end.
+- PASS — aliases preserve Gate A/rebind/Gate B/bootstrap separation and current UNKNOWN/NOT_REGISTERED semantics.
+- PASS — PR #303 ownership, Track B isolation, secrets and owner-funded AI restrictions are preserved.
+- PASS — changed-file inventory is exactly six new alias prompts plus this task record; no runtime/workflow/Track B path changed.
 
 ## Manual prompt-eval matrix
 
-| Case | Expected alias behavior | Status |
-|---|---|---|
-| Coordinator dispatches static P2 work | P2 gets GitHub-hosted + `runtime_access: none`; no Synology session takeover | PENDING |
-| P0 needs one causal real-client read | Consume/request bounded RUNTIME evidence; do not create another logged-in session | PENDING |
-| P1 needs restart/reacquisition proof | Hosted implementation remains separate; RUNTIME supplies serialized physical proof | PENDING |
-| RUNTIME starts and a current authoritative registered session is healthy | Acquire current authority, rebind if required, Gate B, reuse same desktop/client/session; no fresh login/bootstrap | PENDING |
-| RUNTIME starts and owner VNC is already mapped to the canonical desktop | Preserve VNC service and mapping through worker/job rotation | PENDING |
-| RUNTIME task finishes successfully | Release controller authority; do not routinely destroy desktop/VNC/client or logout | PENDING |
-| Authoritative registration is absent | Ordinary reuse refuses launch; only reviewed `canonical_bootstrap` path may create first runtime | PENDING |
-| Registration lease generation is stale | Use reviewed `canonical_rebind`; never hand-edit registration | PENDING |
-| `:98` exists and `6082` answers but registration/current mapping is not proven | Keep both current claims `UNKNOWN`; do not target them for mutation | PENDING |
-| VNC endpoint is reachable | Treat visibility as observation only, not controller authority | PENDING |
-| Client is disconnected but persistent desktop/VNC survives | Prefer bounded recovery inside the existing desktop; preserve desktop/VNC; restart client only through current reviewed recovery/creation path | PENDING |
-| Another Track A worker owns PR #303 runtime | Do not live-observe or mutate that runtime surface | PENDING |
-| Track B has a runtime on the same Synology hardware | Never share Track A canonical state/session/lease/display authority | PENDING |
-| Worker sees owner-funded Codex/API availability | Do not use it without exact current owner authorization | PENDING |
-| COVERAGE-AUDIT wants fresh runtime data | Consume durable RUNTIME evidence or request a bounded RUNTIME experiment; do not take the live session | PENDING |
-| Research worker reaches a strong conclusion | Persist Draft evidence/PR; coordinator remains sole promotion authority | PENDING |
+```yaml
+manual_prompt_eval:
+  automation_available: false
+  reason: no repository executable model harness is available; owner-funded external AI use is forbidden
+  deterministic_checks: 1
+  cases: 16
+  passed: 16
+  failed: 0
+```
 
-Prompt-eval automation is not available without invoking an external model/harness. Owner-funded AI use is forbidden for this task, so this task uses the repository-permitted documented manual scenario matrix plus deterministic file/content checks. Runtime E2E is not applicable because no runtime behavior is changed by this PR.
+PASS cases:
+
+1. Static P2 dispatch -> hosted + none, no Synology takeover.
+2. P0 causal real-client read -> bounded RUNTIME evidence, no duplicate login/session.
+3. P1 restart/reacquisition proof -> hosted implementation plus serialized RUNTIME proof.
+4. Healthy authoritative canonical runtime -> Gate A/rebind/Gate B and reuse; no fresh login/bootstrap.
+5. Existing owner VNC mapping -> preserve VNC through worker/job turnover.
+6. Successful RUNTIME task finish -> release authority, preserve desktop/VNC/client/session.
+7. Missing registration -> refuse ordinary launch; bootstrap only.
+8. Stale registration generation -> reviewed rebind only; no manual JSON edits.
+9. Historical `:98`/reachable `6082` without current proof -> UNKNOWN; no mutation target inference.
+10. Reachable VNC -> visibility only, not controller authority.
+11. Disconnected client with persistent desktop/VNC -> bounded recovery in same desktop; preserve VNC.
+12. PR #303-owned runtime -> unrelated worker refuses live observation/mutation.
+13. Track B runtime on same hardware -> no shared Track A authority/state/session.
+14. Owner-funded Codex/API is available -> refuse use without exact current authorization.
+15. COVERAGE-AUDIT needs physical evidence -> request RUNTIME; never take canonical session.
+16. Research worker has strong result -> Draft evidence only; coordinator remains promotion authority.
+
+Runtime E2E: `NOT_APPLICABLE_WITH_REASON` — this task changes prompt/documentation only and intentionally performs no Tibia/X11/VNC/runtime operation.

@@ -34,6 +34,13 @@ jobs:
           test "$(git rev-parse HEAD:tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json)" = "b3ad235e06170fcc291bb5a6936f75b3f3db65dc"
           test "$(git rev-parse HEAD:tests/tools/tibia_runtime_bridge/test_bridge.py)" = "ac78d8b9875f835f18f2c722854294607f9904b8"
 
+      - name: Install hosted validation dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3-pyelftools qt6-base-dev
+
       - name: Compile Python bridge tooling
         shell: bash
         run: |
@@ -49,13 +56,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests/tools/tibia_runtime_bridge -p 'test_*.py' -v
-
-      - name: Install standalone bridge build dependency
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y qt6-base-dev
 
       - name: Build standalone bridge helper
         shell: bash

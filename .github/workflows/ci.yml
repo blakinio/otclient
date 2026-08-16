@@ -111,6 +111,93 @@ jobs:
       packages: read
     uses: ./.github/workflows/reusable-build-linux.yml
 
+  smoke-linux:
+    name: Client Startup Smoke - Linux
+    needs: [changes, build-linux]
+    if: needs.changes.outputs.compile == 'true' && needs.build-linux.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout repository resources
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Download Linux release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: linux-linux-release
+          path: build/linux-release/bin
+
+      - name: Install headless runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl1 \
+            libgl1-mesa-dri \
+            libglu1-mesa \
+            libopenal1 \
+            libx11-6 \
+            libxcursor1 \
+            libxi6 \
+            libxinerama1 \
+            libxrandr2 \
+            xauth \
+            xvfb
+
+      - name: Verify client artifact dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          client="build/linux-release/bin/otclient"
+          test -f "${client}"
+          chmod +x "${client}"
+          if ldd "${client}" | tee "${RUNNER_TEMP}/otclient-ldd.log" | grep -q "not found"; then
+            echo "::error title=Missing runtime dependency::Linux client artifact has unresolved shared libraries."
+            exit 1
+          fi
+
+      - name: Launch client under virtual display
+        env:
+          ALSOFT_DRIVERS: "null"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          client="./build/linux-release/bin/otclient"
+          user_dir="${RUNNER_TEMP}/otclient-smoke-user"
+          log="${RUNNER_TEMP}/otclient-smoke.log"
+          mkdir -p "${user_dir}"
+
+          set +e
+          timeout --signal=TERM --kill-after=5s 20s \
+            xvfb-run -a -s "-screen 0 1280x720x24" \
+            "${client}" --user-dir="${user_dir}" >"${log}" 2>&1
+          status=$?
+          set -e
+
+          cat "${log}"
+          if [[ "${status}" -ne 124 ]]; then
+            echo "::error title=Client startup smoke failed::Expected OTClient to stay alive until the 20s smoke timeout; exit status was ${status}."
+            exit 1
+          fi
+
+          echo "OTClient remained alive for the bounded 20s headless startup window."
+
+      - name: Upload startup smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: linux-client-startup-smoke
+          path: |
+            ${{ runner.temp }}/otclient-smoke.log
+            ${{ runner.temp }}/otclient-ldd.log
+          if-no-files-found: warn
+
   required:
     name: CI / Required
     if: always()
@@ -119,6 +206,7 @@ jobs:
       - checks
       - tests-lua
       - build-linux
+      - smoke-linux
     runs-on: ubuntu-latest
     permissions: {}
     steps:
@@ -174,19 +262,18 @@ jobs:
                       )
 
           is_draft = os.environ["IS_DRAFT"] == "true"
-          linux_result = jobs["build-linux"].get("result")
-          if linux_result not in {"success", "skipped"}:
-              rejected["build-linux"] = (
-                  f"unexpected conclusion {linux_result}"
-              )
-          elif not is_draft and compile_scope == "true" and linux_result != "success":
-              rejected["build-linux"] = (
-                  f"scope compile=true requires success, got {linux_result}"
-              )
-          elif (is_draft or compile_scope == "false") and linux_result != "skipped":
-              rejected["build-linux"] = (
-                  f"draft or compile=false requires skipped, got {linux_result}"
-              )
+          for job_name in ("build-linux", "smoke-linux"):
+              result = jobs[job_name].get("result")
+              if result not in {"success", "skipped"}:
+                  rejected[job_name] = f"unexpected conclusion {result}"
+              elif not is_draft and compile_scope == "true" and result != "success":
+                  rejected[job_name] = (
+                      f"scope compile=true requires success, got {result}"
+                  )
+              elif (is_draft or compile_scope == "false") and result != "skipped":
+                  rejected[job_name] = (
+                      f"draft or compile=false requires skipped, got {result}"
+                  )
 
           print("Required job results:")
           for name in sorted(jobs):

@@ -67,6 +67,24 @@ within_toolroot() {
   esac
 }
 
+contained_dri_root() {
+  local root="$1" root_real dri dri_real swrast swrast_real
+  [[ -n "$root" && -d "$root" && ! -L "$root" ]] || return 1
+  root_real="$(realpath -e -- "$root" 2>/dev/null)" || return 1
+  dri="$root/usr/lib/x86_64-linux-gnu/dri"
+  [[ -d "$dri" && ! -L "$dri" ]] || return 1
+  dri_real="$(within_toolroot "$root_real" "$dri")" || return 1
+  swrast="$dri/swrast_dri.so"
+  [[ -e "$swrast" ]] || return 1
+  swrast_real="$(within_toolroot "$root_real" "$swrast")" || return 1
+  case "$swrast_real" in
+    "$dri_real"/*) ;;
+    *) return 1 ;;
+  esac
+  [[ -f "$swrast_real" ]] || return 1
+  printf '%s\n' "$dri_real"
+}
+
 toolroot_complete() {
   local root="$1" root_real name path xkb_real preload preload_real
   [[ -n "$root" && -d "$root" && ! -L "$root" ]] || return 1
@@ -78,6 +96,7 @@ toolroot_complete() {
   done
   xkb_real="$(within_toolroot "$root_real" "$root/usr/share/X11/xkb")" || return 1
   [[ -d "$xkb_real" ]] || return 1
+  contained_dri_root "$root" >/dev/null || return 1
   preload="$(find "$root" -xdev -type f -name libproxychains.so.4 -print -quit 2>/dev/null || true)"
   [[ -n "$preload" ]] || return 1
   preload_real="$(within_toolroot "$root_real" "$preload")" || return 1
@@ -264,7 +283,7 @@ warp_tools() {
   archive="$bin/wireproxy.tar.gz"
   if [[ ! -s "$archive" || "$(sha256sum "$archive" 2>/dev/null | awk '{print $1}')" != "$WP_TAR_SHA" ]]; then
     curl -fL --retry 3 --connect-timeout 10 -o "$archive.tmp" \
-      "https://github.com/windtf/wireproxy/releases/download/v$WP_VER/wireproxy_linux_amd64.tar.gz"
+      "https://github.com/windtf/wireproxy/releases/download/v$wp_ver/wireproxy_linux_amd64.tar.gz"
     [[ "$(sha256sum "$archive.tmp" | awk '{print $1}')" == "$WP_TAR_SHA" ]] || die wireproxy_archive_hash_mismatch
     mv -f "$archive.tmp" "$archive"
   fi
@@ -358,7 +377,7 @@ verify_tracked_group() {
 }
 
 bootstrap() {
-  local manifest="$1" source home package display display_number vnc_port xvfb vnc xdotool preload client pid win pgid metadata warp_port
+  local manifest="$1" source home package display display_number vnc_port xvfb vnc xdotool preload client pid win pgid metadata warp_port dri
   [[ "${RUNNER_NAME:-}" == synology-otclient-01 ]] || die wrong_runner
   [[ "${GITHUB_REPOSITORY:-}" == blakinio/otclient ]] || die wrong_repository
   [[ ! -e "$SESSION" ]] || die session_root_exists
@@ -369,6 +388,7 @@ bootstrap() {
   chmod 700 "$SESSION"
   echo "$pgid" >"$SESSION/bootstrap-pgid"
   TOOL="$(resolve_toolroot)" || die toolroot_unavailable
+  dri="$(contained_dri_root "$TOOL")" || die dri_provider_unavailable
   printf '%s\n' "$TOOL" >"$SESSION/toolroot"
   printf 'TRACK_A_CANONICAL_TOOLROOT=%s\n' "$TOOL"
 
@@ -409,7 +429,7 @@ EOF
     OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1 \
     OTCLIENT_TIBIA_RE_ROLE=xvfb HOME="$home" PATH="$TOOL/usr/bin:$TOOL/usr/sbin:/usr/bin:/bin" \
     LD_LIBRARY_PATH="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu" \
-    XKB_CONFIG_ROOT="$TOOL/usr/share/X11/xkb" \
+    LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$TOOL/usr/share/X11/xkb" \
     nohup "$xvfb" "$display" -screen 0 1920x1080x24 -xkbdir "$TOOL/usr/share/X11/xkb" \
     -nolisten tcp -noreset >"$SESSION/xvfb.log" 2>&1 </dev/null &
   echo $! >"$SESSION/xvfb.pid"

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-qsg-glx-egl-rhi-discriminator
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-qsg-glx-egl-rhi-20260816
 session_role: runtime_researcher
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: isolated-qsg-backend-capture
+phase: coordinator-promotion-ready
 branch: diag/OTC-20260816-track-a-qsg-glx-egl-rhi
 base_branch: main
 base_main: d7a2d4168816cb42267fc7b20aacb88ae1b13b8e
 risk: high
-updated: 2026-08-16T19:23:00+02:00
+updated: 2026-08-16T19:28:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-qsg-glx-egl-rhi-discriminator.md
   - docs/agents/evidence/OTC-20260816-track-a-qsg-glx-egl-rhi-discriminator/**
-  - .github/workflows/tibia-official-client-re-qsg-glx-egl-rhi-discriminator.yml
 modules_touched: []
 reuses:
   - docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-final-no-visible-window-gl-context.md
@@ -28,7 +27,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: canonical bootstrap mutation is governance-blocked; this separate task uses the previously accepted task-owned ephemeral-isolated startup harness only to capture bounded QSG_INFO/GLX/EGL/RHI evidence after the trusted graphics environment fix
+execution_reason: one governance-compliant ephemeral-isolated run captured the missing QSG/GLX/EGL/RHI evidence without canonical state access; the task is now terminal and further mutation is disabled
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -48,7 +47,7 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
-mutation_authorized: true
+mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
@@ -65,26 +64,66 @@ exact_client_fence:
   version: 15.32.df7b29
   size: 51965216
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-source_harness:
-  commit: cb557da12ebb41c597340909b2db717ee59cdfe1
-  blob: 1616edcc982be50ef2c95b8077160ec8fe9291fe
-  required_patches: 3
-  patch_1: nounset-safe snapshot local declaration
-  patch_2: replace source task id with this task id so namespace/marker ownership is current-task scoped
-  patch_3: replace QT_XCB_GL_INTEGRATION=none with QSG_INFO=1 while preserving QT_QUICK_BACKEND=software
+semantic_run:
+  run: 31961555061
+  job: 95200193452
+  governance_run: 31961554989
+  governance_result: SUCCESS
+  result: SUCCESS
+  source_blob: 1616edcc982be50ef2c95b8077160ec8fe9291fe
+  patch_count: 3
+  canonical_state_access: NONE
+  display: ':231'
+  vnc_port: 6200
+  warp: PASS
+  xvfb: PASS
+  vnc: PASS
+  client_pid: 24554
+  client_pgid: 24554
+  client_alive_t05: true
+  client_alive_t15: true
+  client_alive_t35: true
+  visible_windows_t05: 0
+  visible_windows_t15: 0
+  visible_windows_t35: 0
+  cleanup: COMPLETE
+graphics_result:
+  classification: PROVEN_VULKAN_LLVMPIPE_INITIALIZES_WHILE_XCB_GLX_EGL_UNAVAILABLE_AND_NO_VISIBLE_WINDOW
+  qrhi_vulkan_backend: INITIALIZED
+  vulkan_physical_device: llvmpipe LLVM 20.1.2 128 bits
+  mesa_version: 25.2.8
+  vulkan_api: 1.4.318
+  vk_khr_xcb_surface: ENABLED
+  qt_quick_backend: software
+  xcb_glx_egl_platform_context: UNAVAILABLE
+  qrhi_gles2_context: FAILED
+  visible_x11_window: NONE_THROUGH_35S
+  asset_loading: COMPLETE
+  tibia_https_via_task_proxy: PASS
+falsified:
+  - removing QT_XCB_GL_INTEGRATION=none alone is sufficient to map the client window
+  - general Vulkan/GPU unavailability is the blocker
+unknown:
+  - whether xcb_glx/xcb_egl integration plugins are absent, undiscoverable or fail initialization
+  - whether XCB GL integration failure alone causes the missing visible window
+  - exact safe graphics correction
+one_shot_workflow_removed: true
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-qsg-glx-egl-rhi-discriminator/20260816-qsg-glx-egl-rhi-result.md
+audit:
+  result: PASS
+  material_findings_open: 0
 acceptance:
-  - immutable source blob and exactly three patch sites are fenced before execution
-  - task-owned isolated display/WARP/VNC/client namespace only
-  - exact live client executable fence passes
-  - bounded snapshots at 5/15/35 seconds are collected
-  - bounded sanitized client log captures QSG_INFO plus GLX/EGL/RHI/scenegraph messages
-  - no canonical lease/registration/session mutation occurs
-  - cleanup completes for all task-owned state
-  - exactly one semantic physical run; no retry on a new discriminator
-last_completed_step: v7 proved the graphics source contract reached the physical runner but remained client_window_missing; current canonical bootstrap mutation is governance-blocked and did not expose client.log/QSG_INFO
-next_action: run exactly one governance-compliant ephemeral-isolated QSG/GLX/EGL/RHI discriminator and persist its sanitized result
+  - semantic graphics/backend discriminator captured: PASS
+  - exact client remained alive through bounded observation: PASS
+  - task-owned cleanup: PASS
+  - canonical state untouched: PASS
+  - credentials/login/gameplay absent: PASS
+  - no further physical retry from this task
+last_completed_step: run 31961555061/job 95200193452 proved QRhi Vulkan initializes on llvmpipe while XCB still has neither GLX nor EGL and the display remains windowless through 35 seconds; cleanup completed
+next_action: coordinator-promote/archive this discriminator, then inventory exact-client/toolroot xcbglintegrations plugin files, Qt plugin search paths and dynamic dependencies before any backend forcing or canonical bootstrap
 ---
 
-# Track A QSG / GLX / EGL / RHI discriminator
+# Track A QSG / GLX / EGL / RHI discriminator — terminal candidate
 
-This task is diagnostic only. It must not create, reuse or modify the canonical runtime. It reproduces the accepted isolated startup surface after the graphics environment fix and captures only bounded non-secret graphics/backend evidence.
+The isolated diagnostic is complete. Vulkan via llvmpipe initializes successfully, Qt Quick loads the software backend, but XCB still cannot provide GLX/EGL platform contexts and no visible window maps. This selects plugin/discovery/dependency inventory as the next non-canonical boundary.

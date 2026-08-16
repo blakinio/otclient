@@ -8,8 +8,8 @@ track: official-client-re
 repository: blakinio/otclient
 task_kind: discovery
 implementation_authorized: false
-phase: validate
-status: validating
+phase: close
+status: ready
 base_branch: main
 base_head: 3a5568f36ebc326afd246d0d2da45b5d8eecabfa
 branch: docs/OTC-20260816-official-client-map-viewport-feasibility
@@ -21,7 +21,7 @@ session_id: chat-20260816-viewport-feasibility
 session_role: validator
 execution_mode: chat_github_connector
 execution_reason: narrow repository documentation, primary GitHub evidence review and PR closeout require no owner-funded AI or local checkout
-updated_at: 2026-08-16T08:40:00+02:00
+updated_at: 2026-08-16T08:42:00+02:00
 context_pressure: medium
 context_growth: stable
 context_score: 7
@@ -55,8 +55,6 @@ It does not own or mutate official-client runtime, client bytes, workflows, Trac
 ## Track A runtime boundary
 
 Authority for this task comes from the trusted-base `AGENTS.md` hierarchy and `docs/agents/TIBIA_RESEARCH_TRACKS.md` on `main`, not from pending PR prose or unmerged governance.
-
-This task is static/documentation-only:
 
 ```yaml
 track_id: official-client-re
@@ -120,16 +118,16 @@ user_facing_feature_complete: false
 
 ## Acceptance inventory
 
-1. A durable report records the exact official-client fence and provenance for every material finding.
-2. Exact-binary evidence for `TWorldMapExtent`, `TWorldMapSubfieldExtent`, `TWorldMapStorage`, `TWorldMapViewport`, `TWorldMapCamera`, `TWorldmapProtocolMessageHandler`, `TWorldMapRenderProvider`, `onCameraViewportChanged` and `TMapScaleFactor` is preserved without committing client bytes.
-3. The current `18 x 14` interpretation is not promoted beyond the strength of its retained evidence; raw-log retention limitations are explicit.
-4. Feasibility is classified as derived/high-confidence research direction, not implemented/proven patch support.
-5. Unknowns include field offsets, fixed allocations, parser/serializer limits, renderer limits, server-side awareness requirements and maximum safe dimensions.
-6. Quantitative candidate sizes distinguish linear dimension growth from tile-count growth.
-7. The next experiment is bounded and starts with static field/callsite recovery; any future live mutation must independently pass then-current Track A runtime admission and ownership gates.
-8. No proprietary binary/assets, credentials, private captures or personal data are committed.
-9. Documentation/path/diff audit passes; runtime E2E is `NOT_APPLICABLE` with the reason that this PR changes documentation/evidence only and no runtime behavior.
-10. Required exact-head GitHub checks pass and PR #325 reaches an intentional terminal state before task completion.
+1. A durable report records the exact official-client fence and provenance for every material finding. **PASS**
+2. Exact-binary worldmap extent/storage/viewport/camera/protocol/render semantic evidence is preserved without committing client bytes. **PASS**
+3. The current `18 x 14` interpretation is not promoted beyond retained evidence strength; raw-log retention limitations are explicit. **PASS**
+4. Feasibility is classified as derived/high-confidence research direction, not implemented/proven patch support. **PASS**
+5. Field offsets, fixed allocations, parser/serializer limits, renderer limits, server-side awareness requirements and maximum safe dimensions remain explicit UNKNOWNs. **PASS**
+6. Candidate sizes distinguish linear dimension growth from tile-count growth. **PASS**
+7. The next experiment starts with static field/callsite recovery; future live mutation requires then-current Track A authority/ownership gates. **PASS**
+8. No proprietary binary/assets, credentials, private captures or personal data are committed. **PASS**
+9. Documentation/path/diff audit passes; E2E is `NOT_APPLICABLE` for the documented reason. **PASS**
+10. Required exact-head GitHub checks and terminal PR state are required before `completed`. **PENDING FINAL CI/MERGE**
 
 ## Current evidence state
 
@@ -150,7 +148,30 @@ UNKNOWN:
 CONFLICT: []
 ```
 
-## Validation and closeout checkpoint
+## Fresh validator-role audit
+
+```yaml
+audit:
+  result: PASS
+  validator: chat-20260816-viewport-feasibility / validator role
+  method:
+    - reread trusted-base closeout, execution and Track A governance
+    - inspect exact PR changed-path set and full relevant diff
+    - recheck exact client/run/job/artifact provenance against primary GitHub metadata and downloaded artifact text
+    - check claim-strength boundaries, ownership overlap, secrets/proprietary material, duplicate task PRs, reviews and threads
+  findings:
+    - id: OTC325-AUD-001
+      severity: medium
+      confidence: high
+      evidence: initial task checkpoint before commit dbf3e88c3d8fa9fa721dc5cd913ddb287d946ad8
+      impact: non-canonical v2 task/delivery classification and overly strong wording around pending PR #324 could mislead a later worker about authority
+      disposition: fixed
+      verification: remediated task record uses project_lane=otclient, task_kind=discovery, feature_scope.type=documentation and explicitly derives authority only from trusted main governance
+  material_findings_open: 0
+  informational_findings_open: 0
+```
+
+## Validation / PR hygiene
 
 ```yaml
 focused_validation:
@@ -166,27 +187,27 @@ component_validation:
 e2e:
   result: NOT_APPLICABLE
   reason: documentation/evidence-only checkpoint; no executable or user-facing runtime behavior changed
-fresh_audit:
-  state: remediation_in_progress
-  validator_role: chat-20260816-viewport-feasibility / validator role using exact PR diff and primary evidence rather than implementer narrative
-  finding: OTC325-AUD-001
-  finding_severity: medium
-  finding_summary: initial task checkpoint used non-canonical v2 task/delivery fields and referenced pending PR #324 too strongly in its runtime-admission wording
-  disposition: fixed_in_current_checkpoint
-final_ci:
-  state: pending_after_audit_remediation
 pull_requests:
   related:
     - blakinio/otclient#325: current_delivery_pr
-  unresolved_threads: pending_final_check
+  duplicate_related_prs: 0
+  unresolved_review_threads: 0
+  requested_changes: 0
+final_ci:
+  state: PENDING
+  head: to_be_frozen_by_this_closeout_commit
+  required_checks: repository_required_exact_head_checks
+post_merge:
+  required: true
+  action: archive this task and release branch/task ownership as the same entry-task lifecycle
 ```
 
 ## Anti-stall checkpoint
 
 ```yaml
 invocation_started_at: 2026-08-16T08:31:00+02:00
-last_progress_at: 2026-08-16T08:40:00+02:00
-ci_checks_for_current_head: 1
+last_progress_at: 2026-08-16T08:42:00+02:00
+ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
@@ -199,4 +220,4 @@ stall_warnings: 0
 
 ## Next action
 
-Re-audit the remediated exact PR diff as a fresh validator-role pass, then freeze the closeout/archive head and run required exact-head CI before merge.
+Mark PR #325 ready, enable protected auto-merge if repository protection accepts it, and observe required exact-head CI/merge under the bounded terminal-CI contract; after merge, perform repository-mandated archival and ownership release.

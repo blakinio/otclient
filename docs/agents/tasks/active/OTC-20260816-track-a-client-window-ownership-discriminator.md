@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-client-window-ownership-discriminator
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-window-discriminator-20260816
 session_role: runtime_researcher
@@ -8,17 +8,15 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: final-harness-repair-before-semantic-capture
+phase: coordinator-promotion-ready
 branch: ci/OTC-20260816-track-a-client-window-ownership-discriminator
 base_branch: main
 base_main: 05d4a7136e234b874f7f112ad8c92f01b0aabd51
 risk: high
-updated: 2026-08-16T18:22:00+02:00
+updated: 2026-08-16T18:30:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-client-window-ownership-discriminator.md
   - docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/**
-  - .github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
-  - .github/workflows/tibia-official-client-re-window-ownership-discriminator-final.yml
 modules_touched: []
 reuses:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
@@ -31,7 +29,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: physical discriminator must reproduce the exact native-Linux client startup on the dedicated runner; all mutation stays inside one task-owned ephemeral namespace and never writes canonical lease/registration state
+execution_reason: final physical discriminator completed in one task-owned ephemeral namespace, proved the missing-window state and cleaned all task-owned resources; no canonical lease/registration state was touched
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -55,18 +53,9 @@ mutation_authorized: true
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
-live_runtime_authorization_source: owner instruction 2026-08-16 to finish existing Track A tasks; final repair is limited to the same isolated no-login discriminator and excludes canonical registration/session mutation
-namespace_proof:
-  repository_overlap_search: ZERO_MATCHES_BEFORE_CLAIM
-  state_root: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260816-track-a-client-window-ownership-discriminator/ephemeral
-  state_root_rule: every run uses a run-id-specific child and refuses an existing child namespace
-  display_pool: 231-250
-  display_rule: select only lock/socket-free display and clean only recorded task-owned process/socket state
-  network_rule: task-owned pinned wgcf/wireproxy binaries, profile and loopback SOCKS port only
 canonical_boundary:
   read_or_write_canonical_lease: false
   read_or_write_canonical_registration: false
-  canonical_display_or_vnc_reuse: false
   publish_registration: false
   login_allowed: false
   credentials_allowed: false
@@ -76,66 +65,87 @@ exact_client_fence:
   version: 15.32.df7b29
   size: 51965216
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-source_discriminator:
-  canonical_pr: 397
-  run: 31957502867
-  job: 95190252936
-  result: CLIENT_ALIVE_NO_MATCHING_PID_OWNED_VISIBLE_TIBIA_WINDOW
-  evidence: docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260816-v6-client-window-missing.md
-first_diagnostic_run:
-  run: 31957940075
-  job: 95191373266
-  result: DIAGNOSTIC_HARNESS_DEFECT_BEFORE_OBSERVATION
-  failed_assertion: CLIENT_NOT_ISOLATED_GROUP
-  cleanup: COMPLETE
-  evidence: docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-first-run-harness-pgid-failure.md
-second_diagnostic_run:
-  run: 31958323922
-  job: 95192357706
-  result: DIAGNOSTIC_SNAPSHOT_HARNESS_DEFECT_BEFORE_WINDOW_CAPTURE
+prior_harness_failures:
+  - run: 31957940075
+    job: 95191373266
+    result: CLIENT_NOT_ISOLATED_GROUP_BEFORE_OBSERVATION
+    cleanup: COMPLETE
+  - run: 31958323922
+    job: 95192357706
+    result: SNAPSHOT_LOCAL_LABEL_UNBOUND_BEFORE_WINDOW_CAPTURE
+    cleanup: COMPLETE
+final_discriminator:
+  head: d65a883baa75e6de7b356c6f66b555b9aeb93a6c
+  governance_run: 31958546329
+  governance_result: SUCCESS
+  run: 31958546334
+  job: 95192878995
+  result: SUCCESS
+  immutable_source_blob: 1616edcc982be50ef2c95b8077160ec8fe9291fe
+  source_blob_fence: PASS
+  bash_n: PASS
+  ancestry_only: PASS
+  canonical_state_access: NONE
   exact_source_fence: PASS
+  display: ':231'
+  vnc_port: 6200
   warp: PASS
-  launchermetadata_branch: OPTIONAL_SOURCE_ABSENT
+  launchermetadata_branch: SOURCE_ABSENT_OR_UNSAFE
   xvfb: PASS
   vnc: PASS
-  exact_live_client_pid: 20841
-  exact_live_client_pgid: 20841
-  exact_live_client_fence: PASS
-  failed_assertion: SNAPSHOT_LOCAL_LABEL_UNBOUND
+  client_pid: 22224
+  client_pgid: 22224
+  client_start: PASS
+  t05_client_alive: true
+  t05_visible_windows: 0
+  t15_client_alive: true
+  t15_visible_windows: 0
+  t35_client_alive: true
+  t35_visible_windows: 0
+  marker_owned_descendants_observed: 0
+  client_log_total_lines: 86
+  classification: CLIENT_ALIVE_NO_VISIBLE_WINDOWS_ON_ISOLATED_DISPLAY
   cleanup: COMPLETE
-  window_snapshots_collected: false
-  client_log_discriminator_collected: false
-  evidence: docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-second-run-snapshot-local-failure.md
-repair_cycle:
-  repair_cycles_for_current_gate: 2
-  final_harness_repair: split snapshot local declarations before label-dependent expansion under set -u
-  source_generation: v3_at_commit_cb557da12ebb41c597340909b2db717ee59cdfe1
-  source_fetch: immutable raw GitHub URL at exact commit
-  pre_execution_fences:
-    - bash -n on generated shell
-    - exactly one old compound local declaration replaced
-    - old declaration absent after patch
-    - no broad /proc glob marker scan
-    - conditional launchermetadata fidelity present
-    - exact live client size/SHA fence present
-    - no canonical lease or runtime-registration path in generated script
-  additional_physical_runs_authorized: 1
-  after_final_run: no further harness retry from this task
+observed_graphics_errors:
+  - QXcbIntegration cannot create platform OpenGL context; neither GLX nor EGL enabled
+  - QRhiGles2 failed to create temporary context
+  - QXcbIntegration cannot create platform offscreen surface; neither GLX nor EGL enabled
+  - QRhiGles2 failed to create context
+  - failed to acquire GL context to resolve capabilities, using defaults
+other_positive_startup_evidence:
+  - Asset loading complete
+  - HTTPS to static.tibia.com passed through task-owned proxy
+  - HTTPS to www.tibia.com passed through task-owned proxy
+result:
+  classification: PROVEN_CLIENT_ALIVE_ZERO_VISIBLE_WINDOWS_WITH_QT_GL_CONTEXT_FAILURES
+  proven:
+    - exact client remained alive through 35 seconds
+    - zero visible X11 windows existed at 5, 15 and 35 seconds on isolated display
+    - no marker-owned descendant window/process was observed in bounded ancestry
+    - Qt log reports GLX/EGL/QRhiGles2 context creation failures
+    - asset loading and HTTPS startup activity proceeded
+  unknown:
+    - whether GL context failure is sole cause of missing visible window
+    - exact graphics environment correction required for visible window
+    - canonical runtime identity, which remains unregistered
+one_shot_workflows_removed: true
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-first-run-harness-pgid-failure.md
+  - docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-second-run-snapshot-local-failure.md
+  - docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-final-no-visible-window-gl-context.md
+audit:
+  result: PASS
+  material_findings_open: 0
 acceptance:
-  - reproduce trusted client startup in a task-owned ephemeral home/display/WARP namespace without canonical state
-  - mirror trusted worker conditional launchermetadata behavior
-  - verify exact client source and live launched PID executable size/SHA
-  - collect bounded snapshots at 5/15/35 seconds
-  - enumerate only visible X11 windows on the task-owned display and associate them with launched PID or marker-verified ancestry
-  - capture bounded sanitized task-owned client stdout/stderr
-  - do not inspect BattlEye internals or bypass/evasion behavior
-  - do not login or send gameplay input
-  - cleanup only marker-owned known-ancestry client tree plus task-owned Xvfb/VNC/WARP and sandbox
-  - remove all one-shot workflows after terminal semantic evidence
-last_completed_step: second physical run passed exact startup through live client creation but first snapshot failed on deterministic nounset local-declaration ordering; cleanup completed and evidence was persisted
-next_action: run exactly one final wrapper-generated v3 discriminator with the single local-declaration repair and pre-execution source-shape fences; accept its semantic result or stop permanently on any further harness defect
+  - semantic window/startup discriminator captured: PASS
+  - task-owned cleanup: PASS
+  - canonical state untouched: PASS
+  - credentials/login/gameplay absent: PASS
+  - no further physical retry from this task
+last_completed_step: final run 31958546334/job 95192878995 proved exact client alive with zero visible windows through 35 seconds and direct Qt GLX/EGL/QRhiGles2 context failures; cleanup completed and final evidence was persisted
+next_action: promote/archive this discriminator, update canonical RUNTIME blocker, then execute GitHub-hosted RUNTIME-INFRA graphics-stack compatibility research/fix before any new physical canonical bootstrap
 ---
 
-# Track A client-window ownership/startup discriminator
+# Track A client-window ownership/startup discriminator — terminal candidate
 
-Two physical generations reached progressively further but both stopped on deterministic harness defects before window evidence. The final run is generated from the exact v3 source with one auditable shell-local fix, validated before execution, and is the last harness attempt allowed by this task.
+The isolated physical discriminator is complete. It rules out a simple window-title/PID mismatch: the exact client remains alive but the task-owned X11 display has zero visible windows through 35 seconds. The startup log directly reports failure to create Qt OpenGL/offscreen contexts because neither GLX nor EGL is enabled. This evidence selects graphics-stack compatibility as the next hosted-only research/fix boundary; no further physical retry belongs to this task.

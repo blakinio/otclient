@@ -37,7 +37,7 @@ def main() -> int:
     digest = sha256(args.fixture)
     require(digest == args.fixture_sha256, "fixture_exact_head_digest")
     data = json.loads(args.fixture.read_text(encoding="utf-8"))
-    require(data["schema_version"] == 2, "schema_v2")
+    require(data["schema_version"] == 3, "schema_v3")
 
     p = data["provenance"]
     require(p["source_run"] == EXPECTED_SOURCE_RUN, "source_run")
@@ -74,17 +74,26 @@ def main() -> int:
     require(stages[3]["input"] == "same post-raw message object", "dual78_same_post_raw")
 
     typed = data["typed_dependencies"]
-    raw_stream = typed["raw_processor_this_plus_8_10"]
+    raw_stream = typed["unencrypted_raw_message_stream_constructed_in_setup"]
     require(raw_stream["type"] == "tibia::network::TUnencryptedRawMessageStream", "raw_stream_type")
     require(raw_stream["address_point"] == "0x3084c58", "raw_stream_ap")
     require(raw_stream["rtti"] == "0x3080660", "raw_stream_rtti")
     require(raw_stream["base"] == "QBuffer", "raw_stream_qbuffer_base")
+    require(raw_stream["direct_raw_processor_member"] == "NOT_PROVEN", "raw_stream_not_mislabeled_as_raw_member")
+
+    source_pair = typed["raw_processor_this_plus_8_10"]
+    require(source_pair["source"].startswith("shared pair copied from [outer+0xa20]"), "raw_source_pair_outer_a20")
+    require("+0xc0/+0xc8" in source_pair["source"], "raw_source_pair_c0_c8")
+    require(source_pair["source_guard"] == "[outer+0xa20] virtual +0x20 equals 0xe0d890 on fast path", "raw_source_pair_guard")
+    require(source_pair["concrete_dynamic_type"] == "UNKNOWN", "raw_source_pair_type_unknown")
+    require(source_pair["classification"] == "PROVEN_PROVENANCE_TYPE_UNKNOWN", "raw_source_pair_classification")
 
     compression = typed["raw_processor_this_plus_18_20"]
     require(compression["primary_type"] == "shared::TCompressionHelper", "compression_helper_type")
     require(compression["primary_address_point"] == "0x2f69430", "compression_helper_ap")
     require(compression["contained_or_secondary_vptr_type"] == "shared::TZlibInflateWrapper", "zlib_wrapper_type")
     require(compression["secondary_address_point"] == "0x2f69410", "zlib_wrapper_ap")
+    require(compression["classification"] == "PROVEN_CONSTRUCTION_AND_RETENTION", "compression_retention")
 
     sequence = typed["sequence_flow_processor"]
     require(sequence["type"] == "tibia::network::TGameserverNetworkPacketSequenceFlowProcessor", "sequence_processor_type")
@@ -102,10 +111,16 @@ def main() -> int:
     require(framing["classification"] == "PROVEN_PARTIAL", "framing_classification")
     require(framing["pad_byte_semantics"] == "UNKNOWN", "padding_semantics_unknown")
     require(framing["exact_header_semantic_name"] == "UNKNOWN", "header_semantic_name_unknown")
+    require(framing["optional_transform_condition"] == "message+0x28 == 2", "optional_transform_condition")
+    require(framing["optional_transform_dynamic_type"] == "UNKNOWN", "optional_transform_type_unknown")
 
     markers = set(data["instruction_markers"])
     for marker in (
-        "197108f: mov QWORD PTR [rax+0x28],rsi",
+        "19711d7: load source owner from outer+0xa20",
+        "19711ee: load source shared pair from source owner+0xc0",
+        "19711f6: overwrite setup scratch rbp-0x40/-0x38 with source shared pair",
+        "1971250: retain source pair first pointer at RawDataProcessor control+0x18 / actual this+0x8",
+        "1971272: retain TCompressionHelper actual object at RawDataProcessor control+0x28 / actual this+0x18",
         "7dd67f: call QWORD PTR [rax+0x10]",
         "7dd693: call QWORD PTR [rax+0x10]",
         "7dd6a7: call QWORD PTR [rax+0x80]",
@@ -116,9 +131,12 @@ def main() -> int:
         "b47206: call QByteArray::append",
         "b47210: test sil,0x7",
         "b47285: write framing delta byte",
+        "b47287: compare message+0x28 with 2",
+        "b472a7: load retained RawDataProcessor this+0x8 object",
+        "b472b4: call retained-object virtual +0x28",
         "b47300: call QByteArray::operator=",
     ):
-        require(marker in markers, f"marker_{marker.split(':',1)[0]}")
+        require(marker in markers, f"marker_{marker.split(':',1)[0]}_{abs(hash(marker)) % 10000}")
 
     egress = data["egress_discriminators"]
     require(egress["dual_precondition_qiodevice_write"]["classification"] == "NOT_FINAL_EGRESS_PROOF", "b4066b_not_egress")
@@ -128,7 +146,7 @@ def main() -> int:
     require(not any(data["negative_controls"].values()), "negative_controls")
 
     result = {
-        "schema_version": 2,
+        "schema_version": 3,
         "execution_class": "github_hosted",
         "runtime_access": "none",
         "hosted_replay_consistency": "PROVEN",
@@ -136,11 +154,11 @@ def main() -> int:
         "current_exact_binary_reexecution": "NOT_PERFORMED",
         "current_exact_binary_provenance_upgraded": False,
         "accepted_chain_for_hypothesis_selection": ["0xc2df80", "0xb47130", "0xb56d60", "0xb56970"],
-        "typed_dependencies": {
-            "raw_stream": "TUnencryptedRawMessageStream@0x3084c58",
-            "compression_helper": "TCompressionHelper@0x2f69430",
-            "zlib_wrapper": "TZlibInflateWrapper@0x2f69410",
-            "sequence_processor": "TGameserverNetworkPacketSequenceFlowProcessor@0x3084d68"
+        "typed_facts": {
+            "setup_unencrypted_raw_stream": "TUnencryptedRawMessageStream@0x3084c58; not proven as RawDataProcessor member",
+            "raw_this_plus_8_source": "[outer+0xa20]+0xc0 shared pair; dynamic type UNKNOWN",
+            "raw_this_plus_18": "TCompressionHelper@0x2f69430 with TZlibInflateWrapper@0x2f69410",
+            "sequence_processor": "TGameserverNetworkPacketSequenceFlowProcessor@0x3084d68; temporal position UNKNOWN"
         },
         "classification": {
             "framing": "PROVEN_PARTIAL",
@@ -150,9 +168,10 @@ def main() -> int:
             "final_binary_egress": "UNKNOWN"
         },
         "remaining_discriminators": [
+            "identify concrete dynamic type of [outer+0xa20]+0xc0 shared pair retained at RawDataProcessor this+0x8",
             "resolve 0x1832b90 pad-byte generator semantics",
             "prove temporal position of sequence-flow processor relative to raw and dual stages",
-            "prove whether and where TCompressionHelper participates in outbound direction",
+            "prove whether/where TCompressionHelper participates in outbound transform",
             "prove final binary QTcpSocket/QIODevice ownership and write edge"
         ],
         "fixture_sha256": digest,

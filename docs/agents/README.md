@@ -15,6 +15,33 @@ Persistent operating memory for autonomous agents across the legacy client and t
 9. Read `CROSS_REPO_CONTRACTS.md` for protocol, identifiers, login, routing, gameplay channels or assets.
 10. Read relevant tasks, ADRs, audits, source and tests.
 
+## Track A official-client runtime admission — mandatory
+
+For every Track A `official-client-re` worker, and before any worker observes, creates, reuses, controls, attaches to, signals, sends input to, logs in through, or otherwise mutates an official native-Linux Tibia client runtime, read and obey all of:
+
+```text
+TIBIA_RESEARCH_TRACKS.md
+contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+decisions/ADR-0001-track-a-canonical-live-runtime.md
+contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
+```
+
+Before the first runtime-related operation, and again after any authority/identity-changing fact, the active Track A task must persist the complete admission record required by `TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`. `UNKNOWN`, `REQUIRED_NOT_PROVEN`, `REQUIRED_UNAVAILABLE`, or `REQUIRED_UNIMPLEMENTED` on a required gate means refuse that operation.
+
+Canonical reuse/mutation requires current Gate A, any required reviewed generation rebind, Gate B on the authoritative exact-runtime registration, current-task ownership/target uniqueness, equal current lease-generation binding after any rebind, and the final cancellation-safe whole-lifetime supervisor. Missing registration routes only to bootstrap; a generation mismatch routes only to reviewed rebind; an ephemeral sandbox may never use or alias the canonical namespace.
+
+Historical runtime evidence is discovery input only. Until fresh authoritative evidence proves otherwise, preserve exactly:
+
+```yaml
+display_98_current_canonical_status: UNKNOWN
+rfb_6082_current_backend_mapping: UNKNOWN
+current_exact_client_pid: NOT_REGISTERED
+current_exact_client_session: NOT_REGISTERED
+```
+
+Stale task text, PR prose, a visible `:98`, reachable `6082`, numeric PID/session, or standalone lease validation cannot override this admission gate. Track A workers must not mutate another task's runtime surface, including PR #303-owned state, and Track B never shares Track A canonical authority or mutable runtime state.
+
 ## Product tracks
 
 ### Greenfield Oteryn Rust client

@@ -8,22 +8,24 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_infrastructure_fix
-phase: implement
+phase: validate
 branch: fix/OTC-20260816-track-a-canonical-client-window-wait
 base_branch: main
 base_main: b69084067de24528b1f763ab9630f638e8bcf092
 risk: medium
-updated: 2026-08-16T17:42:00+02:00
+updated: 2026-08-16T17:47:00+02:00
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+  - .github/workflows/tibia-official-client-re-canonical-window-wait-fix.yml
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-client-window-wait-fix.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-client-window-wait-fix/**
 modules_touched: []
 reuses:
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260816-v5-worker-timeout.md
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
-  - .github/scripts/test_tibia_official_client_re-canonical-live-transition.py
+  - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+  - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
 depends_on: []
 blocks:
   - OTC-20260816-track-a-canonical-runtime-e2e
@@ -70,18 +72,24 @@ root_cause:
   compounded_max_seconds_approx: 3025
   transition_worker_timeout_seconds: 300
   classification: DETERMINISTIC_BOUNDED_WAIT_DEFECT
+implementation:
+  window_dead_pid_return_code: 2
+  bootstrap_window_calls: 1
+  nested_outer_wait_removed: true
+  non_secret_stage_markers_added: true
+  probe_failure_classification_aligned: true
 acceptance:
   - bootstrap invokes the already-bounded client-window helper exactly once
   - dead client during the bounded wait is classified as client_exited
   - live client with no visible Tibia window after the bounded wait is classified as client_window_missing
   - no production test-only knobs can reduce runtime identity or authority checks
   - deterministic tests prove the nested 100x wait is absent and the two failure classes are preserved
-  - existing toolroot/session/transition tests pass on GitHub-hosted execution
+  - existing toolroot/session/transition/guard/lease tests pass on GitHub-hosted execution
   - no Synology, client, X11/VNC, WARP, credentials, login or canonical registration is accessed
-last_completed_step: claimed fresh-main hosted-only fix after v5 runtime worker_timeout was traced to a deterministic nested client-window wait exceeding the 300-second transition budget
-next_action: implement the single bounded client-window wait plus regression tests, run hosted validation, and promote the fix before any new physical RUNTIME attempt
+last_completed_step: replaced the compounded 100x client-window polling with one bounded wait, added dead-PID classification plus non-secret stage markers, and added deterministic regression tests
+next_action: run the task-owned GitHub-hosted validator; on PASS remove the temporary workflow, persist exact evidence and complete coordinator promotion before any new physical RUNTIME attempt
 ---
 
 # Canonical client-window bounded-wait fix
 
-The trusted worker already has a bounded window search. Bootstrap must call that bounded search once rather than multiplying it inside another 100-iteration loop. This task changes no physical runtime state.
+The trusted worker now uses one bounded window search rather than multiplying it inside another 100-iteration loop. Hosted regression tests preserve `client_exited` versus `client_window_missing`; this task changes no physical runtime state.

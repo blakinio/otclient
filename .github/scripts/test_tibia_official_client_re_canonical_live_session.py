@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -98,6 +99,99 @@ class ToolrootResolverTests(unittest.TestCase):
         self.assertIn('printf \'%s\\n\' "$TOOL" >"$SESSION/toolroot"', source)
         self.assertIn('within_toolroot "$root_real" "$path"', source)
         self.assertNotIn('command -v "$1"', source)
+
+
+class ClientWindowWaitTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def make_xdotool(self, name: str, found: bool) -> Path:
+        path = self.root / name
+        if found:
+            body = '''#!/bin/sh
+case "$1" in
+  search) echo 4242 ;;
+  getwindowgeometry) printf 'WIDTH=800\nHEIGHT=600\n' ;;
+  *) exit 1 ;;
+esac
+'''
+        else:
+            body = '''#!/bin/sh
+case "$1" in
+  search) exit 0 ;;
+  getwindowgeometry) exit 1 ;;
+  *) exit 1 ;;
+esac
+'''
+        path.write_text(body, encoding='utf-8')
+        path.chmod(0o755)
+        return path
+
+    def run_window(
+        self,
+        pid: int,
+        xdotool: Path,
+        attempts: int = 1,
+        delay: str = '0',
+    ) -> subprocess.CompletedProcess[str]:
+        env = dict(os.environ, TRACK_A_CANONICAL_WORKER_CONTRACT_TEST='1')
+        return subprocess.run(
+            [str(WORKER), 'window', str(pid), ':199', str(xdotool), str(attempts), delay],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_found_window_returns_largest_visible_candidate(self):
+        xdotool = self.make_xdotool('xdotool-found', found=True)
+        result = self.run_window(os.getpid(), xdotool)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), '4242')
+
+    def test_exited_client_is_not_relabelled_as_missing_window(self):
+        xdotool = self.make_xdotool('xdotool-unused', found=False)
+        result = self.run_window(999_999_999, xdotool)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('TRACK_A_CANONICAL_SESSION_ERROR=client_exited', result.stderr)
+        self.assertNotIn('client_window_missing', result.stderr)
+
+    def test_live_client_without_window_is_classified_as_window_missing(self):
+        xdotool = self.make_xdotool('xdotool-missing', found=False)
+        result = self.run_window(os.getpid(), xdotool)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('TRACK_A_CANONICAL_SESSION_ERROR=client_window_missing', result.stderr)
+        self.assertNotIn('client_exited', result.stderr)
+
+    def test_production_window_wait_is_single_and_below_supervisor_budget(self):
+        source = WORKER.read_text(encoding='utf-8')
+        waits = re.findall(
+            r'wait_for_window "\$pid" "\$display" "\$xdotool" ([0-9]+) ([0-9.]+)',
+            source,
+        )
+        self.assertEqual(waits, [('120', '.25'), ('120', '.25')])
+        for attempts, delay in waits:
+            self.assertLess(int(attempts) * float(delay), 300.0)
+        self.assertNotIn('for _ in $(seq 1 100); do', source)
+        self.assertIn('kill -0 "$pid" 2>/dev/null || return 2', source)
+        self.assertIn('1) die client_window_missing', source)
+        self.assertIn('2) die client_exited', source)
+
+    def test_stage_markers_cover_warp_and_window_discriminators(self):
+        source = WORKER.read_text(encoding='utf-8')
+        for marker in (
+            'TRACK_A_CANONICAL_STAGE=wireproxy_configtest_start',
+            'TRACK_A_CANONICAL_STAGE=wireproxy_configtest_pass',
+            'TRACK_A_CANONICAL_STAGE=warp_egress_probe_start',
+            'TRACK_A_CANONICAL_STAGE=warp_egress_probe_pass',
+            'TRACK_A_CANONICAL_STAGE=client_window_wait_start',
+            'TRACK_A_CANONICAL_STAGE=client_window_wait_pass',
+        ):
+            self.assertIn(marker, source)
 
 
 if __name__ == '__main__':

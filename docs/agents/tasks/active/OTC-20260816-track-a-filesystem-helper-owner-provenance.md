@@ -13,7 +13,7 @@ branch: docs/OTC-20260816-track-a-filesystem-helper-owner-provenance
 base_branch: main
 base_main: 9008bb7933db9e96119a61280941e695744e8408
 risk: low
-updated: 2026-08-16T12:14:00+02:00
+updated: 2026-08-16T12:15:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-filesystem-helper-owner-provenance.md
   - docs/agents/reports/OTCLIENT-20260816-filesystem-helper-owner-provenance.md
@@ -87,59 +87,51 @@ audit:
   material_findings_open: 0
 e2e: NOT_APPLICABLE
 e2e_reason: static evidence reconstruction only; no executable/runtime behavior changed
-temporary_workflow_removed: false
-last_completed_step: durable report written after deterministic validator success
-next_action: remove temporary workflow, audit retained diff, complete exact-head CI, merge PR #340, archive task, then continue with client-side shared::TFileSystemHelper resolver mapping
+temporary_workflow_removed: true
+last_completed_step: report audited; temporary workflow removed; retained diff is documentation only
+next_action: exact-head CI/merge/archive, then continue with client-side shared::TFileSystemHelper resolver mapping
 ---
 
 # Objective
 
-Trace the exact `TTibiaFileSystemHelper` shared ownership through application bootstrap and game-client construction into the `+0x20/+0x28` fields used by client code, without promoting the exact dynamic type of the separate loader callback receiver beyond direct evidence.
+Trace exact `TTibiaFileSystemHelper` shared ownership through application bootstrap and game-client construction into the `+0x20/+0x28` fields used by client code, without promoting the exact dynamic type of the separate loader callback receiver beyond direct evidence.
 
 # Final result
 
 ## PROVEN
 
-The exact bootstrap constructs `tibia::shared::TTibiaFileSystemHelper` with vptr `0x2f62080` and stores its shared-pointer pair into the stack-resident `tibia::client::TGameApplication`:
-
 ```text
-TGameApplication+0x18 = TTibiaFileSystemHelper object pointer
-TGameApplication+0x20 = TTibiaFileSystemHelper control block
+TTibiaFileSystemHelper shared_ptr
+  -> TGameApplication+0x18/+0x20
+  -> TGameApplication::vtable+0x78
+  -> TGameClient factory 0x6c8020
+  -> TGameClient+0x20/+0x28
 ```
 
-`TGameApplication::vtable+0x78 -> 0x6c9760` passes the same application object to factory `0x6c8020`, which copies those exact source fields into a newly constructed `tibia::client::TGameClient`:
-
-```text
-TGameClient+0x20 = TTibiaFileSystemHelper object pointer
-TGameClient+0x28 = TTibiaFileSystemHelper control block
-```
-
-The same concrete `TGameClient` construction owns/uses member `+0x748` (`0x6c8507`, `0x6c8a96`).
-
-The separate loader entry `0x6fc034` retains its receiver in RBX, reads receiver `+0x748`, and passes that same receiver to helper `0x6ba0b0`, which reads receiver `+0x20/+0x28`.
+The same concrete TGameClient construction owns/uses `+0x748`. The loader entry separately reads receiver `+0x748` and passes the same receiver to helper `0x6ba0b0`, which reads `+0x20/+0x28`.
 
 Final deterministic validator: `31941120670 / 95150360284`, success.
 
 ## DERIVED
 
-The loader receiver is a high-confidence `TGameClient`-layout object because it consumes the same `+0x20/+0x28/+0x748` structure independently established in concrete `TGameClient` construction.
+Loader receiver has a high-confidence `TGameClient` layout correlation.
 
 ## NOT DIRECTLY PROVEN
 
-The exact dynamic/source-level type of the receiver accepted by function entry `0x6fc034` remains not directly proven. Exploratory searches did not recover a direct call/address-registration provenance, and those absence scans are not used as global negative proof.
+Exact dynamic/source-level type and dispatch provenance of receiver at `0x6fc034` remain not directly proven.
 
 ## Correction
 
-A temporary heuristic treated `0x6c976e` as a function start. Exact control-flow/prologue reconstruction corrected the entry to `0x6c9760`; the final validator uses the corrected address only.
+The exact `TGameApplication::slot+0x78` function entry is `0x6c9760`, not temporary heuristic address `0x6c976e`.
+
+# Audit
+
+PASS. Direct TGameClient filesystem-helper ownership is PROVEN; loader callback receiver type remains explicitly bounded.
 
 # Safety
 
 Static exact retained-file analysis only (`runtime_access: none`). No Tibia/BattlEye execution/loading, live process observation, memory/maps, attach/debug/injection, input/network/session mutation, binary patching, unpacking, anti-debug/detection analysis or bypass/evasion work.
 
-# Audit
-
-PASS. The report makes the direct `TTibiaFileSystemHelper -> TGameApplication -> TGameClient+0x20/+0x28` ownership chain PROVEN while keeping loader-receiver source-level type at `NOT_DIRECTLY_PROVEN`.
-
 # E2E
 
-`NOT_APPLICABLE`: no executable or runtime behavior changed.
+`NOT_APPLICABLE`: no executable/runtime behavior changed.

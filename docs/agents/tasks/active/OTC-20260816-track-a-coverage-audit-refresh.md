@@ -13,10 +13,10 @@ branch: research/OTC-20260816-track-a-coverage-audit-refresh-v2
 base_branch: main
 base_main: 22089c5ca65228379c409dd33561a096eea00b16
 current_main: 22089c5ca65228379c409dd33561a096eea00b16
-pull_request: PENDING
+pull_request: 390
 supersedes_pr: 369
 created: 2026-08-16T17:16:00+02:00
-updated: 2026-08-16T17:20:00+02:00
+updated: 2026-08-16T17:25:00+02:00
 risk: low
 researcher_delivery: draft_only
 implementation_authorized: false
@@ -111,11 +111,11 @@ open_findings:
   - AUD-COV-005 reusable GitHub-hosted exact installed-client staging unavailable
   - AUD-COV-006 P1 accepted semantics not yet terminal/promoted from current main generation
   - AUD-COV-007 durable coordinator checkpoint materially stale versus live Git
-ci_check_generation: replacement-final-head-pending
+ci_check_generation: replacement-final-head
 ci_checks_for_current_head: 0
 terminal_ci_checks_for_current_generation: 0
-last_completed_step: rebuilt the closed-unmerged #369 audit package from current main, reconciled live Track A changes and reduced the current material finding set to seven with explicit denominators and supersessions
-next_action: open a replacement Draft PR for this same task, bind this checkpoint to the exact Draft head, run exact-head Track A governance plus repository CI, verify review hygiene, then hand off to coordinator without merge or promotion
+last_completed_step: opened replacement Draft PR #390 for the same task from exact main@22089c5ca65228379c409dd33561a096eea00b16 and bound the refreshed seven-finding audit package to it
+next_action: validate the exact post-checkpoint Draft head with Track A governance and repository CI, verify changed-path/review hygiene, then publish a no-head-change coordinator handoff; do not merge or promote
 ---
 
 # Track A coverage / contradiction / missing-proof audit refresh — fresh-current-main replacement
@@ -135,7 +135,7 @@ Finish the same `OTC-20260816-track-a-coverage-audit-refresh` task after histori
 - [x] current P2 structural progress is separated from framing/egress completion and from canonical promotion;
 - [x] current missing-proof queue is ordered by information gain and owning lane;
 - [x] E2E is `NOT_APPLICABLE_WITH_REASON` because this producer has `runtime_access: none`;
-- [ ] replacement Draft PR is opened and bound to this same task;
+- [x] replacement Draft PR #390 is opened and bound to this same task;
 - [ ] exact final-head Track A governance and repository CI succeed;
 - [ ] review submissions/threads and changed-path scope are checked before coordinator handoff.
 

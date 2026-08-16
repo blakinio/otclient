@@ -1,0 +1,147 @@
+name: Track A XRes exact-client window identity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-xres-window-identity.yml
+      - .github/scripts/tibia-official-client-re-xres-window-identity-patch.py
+      - docs/agents/tasks/active/OTC-20260816-track-a-xres-window-identity.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-xres-window-identity
+  cancel-in-progress: false
+
+jobs:
+  hosted-preflight:
+    name: Hosted XRes transformer preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Rebuild immutable post-RHI script and add XRes observer
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf -- "$tmp"' EXIT
+          harness="$tmp/harness.yml"
+          t1="$tmp/tibia-official-client-re-post-rhi-window-state-transform.py"
+          t2="$tmp/tibia-official-client-re-post-rhi-window-state-transform-v2.py"
+          base_script="$tmp/base.sh"
+          final_script="$tmp/final.sh"
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$harness" \
+            https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$t1" \
+            https://raw.githubusercontent.com/blakinio/otclient/8e9cc81011383922cf6bad75ca7207deb749fffb/.github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$t2" \
+            https://raw.githubusercontent.com/blakinio/otclient/8e9cc81011383922cf6bad75ca7207deb749fffb/.github/scripts/tibia-official-client-re-post-rhi-window-state-transform-v2.py
+          [[ "$(git hash-object "$harness")" == 1616edcc982be50ef2c95b8077160ec8fe9291fe ]]
+          [[ "$(git hash-object "$t1")" == d663a40c446983c7359265bf834113ba49e6a5d1 ]]
+          [[ "$(git hash-object "$t2")" == b9d15f8d1131339b06bfa9cb1e81940c2163a283 ]]
+          python3 -m py_compile .github/scripts/tibia-official-client-re-xres-window-identity-patch.py "$t1" "$t2"
+          python3 "$t2" "$harness" "$base_script"
+          python3 .github/scripts/tibia-official-client-re-xres-window-identity-patch.py "$base_script" "$final_script"
+          bash -n "$final_script"
+          python3 - "$final_script" <<'PY'
+          import pathlib, sys
+          text = pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
+          required = (
+              'xcb_res_query_version',
+              'xcb_res_query_client_ids',
+              'XCB_RES_CLIENT_ID_MASK_LOCAL_CLIENT_PID=2',
+              'XRES_IDENTITY=',
+              'XRES_FINAL_CLASSIFICATION=',
+              'XRES_PROVES_VIEWABLE_WINDOW_OWNED_BY_EXACT_CLIENT',
+              'XRES_PROVES_VIEWABLE_WINDOW_FOREIGN_TO_EXACT_CLIENT',
+              'XRES_VIEWABLE_WINDOW_PID_UNAVAILABLE',
+              'WINDOW_DIAG_CLEANUP=COMPLETE',
+          )
+          missing = [x for x in required if x not in text]
+          if missing:
+              raise SystemExit(f'XRES_PREFLIGHT_MISSING={missing}')
+          forbidden = (
+              'runtime-registration.json',
+              'canonical-live-runtime',
+              '+extension GLX',
+              "'QT_XCB_GL_INTEGRATION': 'none'",
+              'QSG_RHI_BACKEND',
+              '/proc/*/environ',
+              "glob('/proc/*')",
+          )
+          present = [x for x in forbidden if x in text]
+          if present:
+              raise SystemExit(f'XRES_PREFLIGHT_FORBIDDEN={present}')
+          client_start = text.index('python3 - "$root/client.pid"')
+          client_end = text.index('client_pid="$(cat "$root/client.pid")"', client_start)
+          if 'LIBGL_DRIVERS_PATH' in text[client_start:client_end]:
+              raise SystemExit('XRES_PREFLIGHT=DRI_ENV_LEAK_TO_CLIENT')
+          print('XRES_HOSTED_PREFLIGHT=PASS')
+          PY
+
+  xres-window-identity:
+    name: Physical XRes exact-client window identity
+    if: ${{ contains(github.event.pull_request.body, 'XRES_PHYSICAL_EXECUTION_ENABLED=true') }}
+    needs: hosted-preflight
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Revalidate Track A admission
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          echo 'XRES_RUNTIME_ADMISSION=PASS'
+
+      - name: Execute one isolated XRes identity discriminator
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]] || {
+            echo "XRES_REFUSED=BASE_MOVED:$EVENT_BASE_SHA"
+            exit 44
+          }
+          tmp="$(mktemp -d)"
+          trap 'rm -rf -- "$tmp"' EXIT
+          harness="$tmp/harness.yml"
+          t1="$tmp/tibia-official-client-re-post-rhi-window-state-transform.py"
+          t2="$tmp/tibia-official-client-re-post-rhi-window-state-transform-v2.py"
+          base_script="$tmp/base.sh"
+          final_script="$tmp/final.sh"
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$harness" \
+            https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$t1" \
+            https://raw.githubusercontent.com/blakinio/otclient/8e9cc81011383922cf6bad75ca7207deb749fffb/.github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$t2" \
+            https://raw.githubusercontent.com/blakinio/otclient/8e9cc81011383922cf6bad75ca7207deb749fffb/.github/scripts/tibia-official-client-re-post-rhi-window-state-transform-v2.py
+          [[ "$(git hash-object "$harness")" == 1616edcc982be50ef2c95b8077160ec8fe9291fe ]]
+          [[ "$(git hash-object "$t1")" == d663a40c446983c7359265bf834113ba49e6a5d1 ]]
+          [[ "$(git hash-object "$t2")" == b9d15f8d1131339b06bfa9cb1e81940c2163a283 ]]
+          python3 "$t2" "$harness" "$base_script"
+          python3 .github/scripts/tibia-official-client-re-xres-window-identity-patch.py "$base_script" "$final_script"
+          bash -n "$final_script"
+          echo 'XRES_GENERATED_SCRIPT=PASS'
+          bash "$final_script"

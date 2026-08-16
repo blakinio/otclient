@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 5
     env:
       BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
     steps:
       - name: Checkout exact head with base history
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -49,7 +50,10 @@ jobs:
           required = [
               'Track A official-client runtime admission — mandatory',
               'contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md',
-              'the active Track A task must persist the complete admission record',
+              'at task claim/resume before substantial Track A work',
+              'At claim/resume/checkpoint, the active Track A task must persist',
+              'runtime_access: none',
+              'target_uniqueness: PROVEN',
               'current-task ownership/target uniqueness',
               'equal current lease-generation binding after any rebind',
               'an ephemeral sandbox may never use or alias the canonical namespace',
@@ -66,7 +70,9 @@ jobs:
           print('TRACK_A_AGENT_RUNTIME_UNIVERSAL_ENTRYPOINT_PASS=true')
           PY
           if [[ -n "${BASE_SHA:-}" ]]; then
-            python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$BASE_SHA"
+            python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+              --changed-from "$BASE_SHA" \
+              --expected-branch "$HEAD_BRANCH"
           else
             python3 .github/scripts/test_track_a_agent_runtime_governance.py
           fi
@@ -98,6 +104,7 @@ jobs:
 
           base = {
               'task_id': 'OTC-audit-case',
+              'branch': 'feature/current-track-a-task',
               'track_id': 'official-client-re',
               'runtime_access': 'none',
               'runtime_owner_task': 'NOT_APPLICABLE',
@@ -129,16 +136,31 @@ jobs:
                   raise SystemExit(f'{name}: expected pass={should_pass}, got pass={passed}')
 
           run_case('static_none', {}, True)
+          read_only_ok = {
+              'runtime_access': 'read_only',
+              'runtime_owner_task': 'NOT_APPLICABLE',
+              'runtime_namespace': 'canonical-live-runtime',
+              'canonical_registration': 'UNKNOWN',
+              'canonical_lease_generation': 'UNKNOWN',
+              'registration_lease_generation': 'UNKNOWN',
+              'target_uniqueness': 'PROVEN',
+              'mutation_authorized': 'false',
+          }
+          run_case('read_only_proven_target', read_only_ok, True)
           run_case(
-              'read_only',
-              {
-                  'runtime_access': 'read_only',
-                  'canonical_registration': 'UNKNOWN',
-                  'canonical_lease_generation': 'UNKNOWN',
-                  'registration_lease_generation': 'UNKNOWN',
-                  'target_uniqueness': 'UNKNOWN',
-              },
-              True,
+              'read_only_unknown_uniqueness',
+              {**read_only_ok, 'target_uniqueness': 'UNKNOWN'},
+              False,
+          )
+          run_case(
+              'read_only_other_task_owner',
+              {**read_only_ok, 'runtime_owner_task': 'OTC-other-task'},
+              False,
+          )
+          run_case(
+              'read_only_unknown_namespace',
+              {**read_only_ok, 'runtime_namespace': 'UNKNOWN'},
+              False,
           )
           ephemeral_ok = {
               'runtime_access': 'ephemeral_isolated',
@@ -280,5 +302,19 @@ jobs:
               {**rebind_unavailable, 'generation_rebind': 'PASS'},
               False,
           )
+
+          if not module.task_matches_expected_branch(
+              {'branch': 'feature/current-track-a-task'},
+              'feature/current-track-a-task',
+          ):
+              raise SystemExit('branch_binding_positive: expected current branch match')
+          if module.task_matches_expected_branch(
+              {'branch': 'feature/unrelated-track-a-task'},
+              'feature/current-track-a-task',
+          ):
+              raise SystemExit('branch_binding_negative: unrelated Track A task satisfied current branch')
+          if module.task_matches_expected_branch({'branch': 'feature/current-track-a-task'}, None):
+              raise SystemExit('branch_binding_missing_expected: missing expected branch must fail closed')
+
           print('TRACK_A_AGENT_RUNTIME_FRESH_AUDIT_PASS=true')
           PY

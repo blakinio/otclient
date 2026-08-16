@@ -97,6 +97,10 @@ def is_canonical_namespace(value: str) -> bool:
     return normalized in {CANONICAL_NAMESPACE, CANONICAL_STATE_ROOT}
 
 
+def task_matches_expected_branch(values: dict[str, str], expected_branch: str | None) -> bool:
+    return bool(expected_branch and values.get("branch") == expected_branch)
+
+
 def validate_track_a_task(path: Path) -> bool:
     values = parse_frontmatter(path)
     if values.get("track_id") != TRACK_A:
@@ -163,6 +167,14 @@ def validate_track_a_task(path: Path) -> bool:
         for field in canonical_gates:
             if values[field] != "NOT_APPLICABLE":
                 fail_task(path, f"read_only requires {field}=NOT_APPLICABLE")
+        if values["target_uniqueness"] != "PROVEN":
+            fail_task(path, "read_only live observation requires target_uniqueness=PROVEN")
+        namespace = values["runtime_namespace"]
+        if namespace in {"UNKNOWN", "NOT_APPLICABLE"}:
+            fail_task(path, "read_only live observation requires an explicit non-conflicting runtime_namespace")
+        owner = values["runtime_owner_task"]
+        if owner not in {"NOT_APPLICABLE", task_id}:
+            fail_task(path, "read_only cannot observe another task's owned runtime surface")
 
     elif runtime_access == "ephemeral_isolated":
         for field in canonical_gates:
@@ -245,7 +257,7 @@ def changed_paths(base: str) -> list[str]:
     return [line.strip() for line in completed.stdout.splitlines() if line.strip()]
 
 
-def audit_changed_tasks(base: str) -> None:
+def audit_changed_tasks(base: str, expected_branch: str | None = None) -> None:
     paths = changed_paths(base)
     task_paths = [
         path
@@ -254,21 +266,37 @@ def audit_changed_tasks(base: str) -> None:
     ]
 
     track_a_tasks = 0
+    branch_bound_tasks = 0
     for relative in task_paths:
-        if validate_track_a_task(ROOT / relative):
-            track_a_tasks += 1
+        path = ROOT / relative
+        values = parse_frontmatter(path)
+        if values.get("track_id") != TRACK_A:
+            continue
+        validate_track_a_task(path)
+        track_a_tasks += 1
+        if task_matches_expected_branch(values, expected_branch):
+            branch_bound_tasks += 1
 
     sensitive = [path for path in paths if path.startswith(TRACK_A_SENSITIVE_PREFIXES)]
-    if sensitive and track_a_tasks == 0:
-        raise SystemExit(
-            "Track A runtime-sensitive files changed without an added/modified active "
-            f"Track A task admission record: {sensitive}"
-        )
+    if sensitive:
+        if not expected_branch:
+            raise SystemExit(
+                "Track A runtime-sensitive files changed but the current PR head branch "
+                "was not supplied to the admission audit"
+            )
+        if branch_bound_tasks == 0:
+            raise SystemExit(
+                "Track A runtime-sensitive files changed without an added/modified active "
+                "Track A admission task bound to the current PR head branch "
+                f"{expected_branch!r}: {sensitive}"
+            )
 
     print(f"TRACK_A_AGENT_RUNTIME_CHANGED_TASKS={track_a_tasks}")
+    print(f"TRACK_A_AGENT_RUNTIME_BRANCH_BOUND_TASKS={branch_bound_tasks}")
 
 
 def static_policy_audit() -> None:
+    readme = read("docs/agents/README.md")
     agents = read("docs/agents/AGENTS.md")
     tracks = read("docs/agents/TIBIA_RESEARCH_TRACKS.md")
     admission = read("docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md")
@@ -276,6 +304,19 @@ def static_policy_audit() -> None:
 
     exact_fence = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
     registration = "/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json"
+
+    require(
+        "docs/agents/README.md",
+        readme,
+        (
+            "at task claim/resume before substantial Track A work",
+            "At claim/resume/checkpoint, the active Track A task must persist",
+            "runtime_access: none",
+            "target_uniqueness: PROVEN",
+            "read_only",
+            "PR #303-owned state",
+        ),
+    )
 
     require(
         "docs/agents/AGENTS.md",
@@ -313,7 +354,9 @@ def static_policy_audit() -> None:
         admission,
         (
             "track_a_runtime_agent_admission_version: 1",
+            "At Track A task claim/resume/checkpoint",
             "runtime_access: none | read_only | ephemeral_isolated | canonical_reuse_or_mutation | canonical_bootstrap | canonical_rebind",
+            "target_uniqueness: PROVEN",
             "mutation_authorized: true | false",
             "An `UNKNOWN`, `REQUIRED_NOT_PROVEN`, `REQUIRED_UNAVAILABLE`, or `REQUIRED_UNIMPLEMENTED` value on a required gate means **REFUSE the mutation**.",
             "### 1. `none`",
@@ -335,10 +378,11 @@ def static_policy_audit() -> None:
             exact_fence,
             "### PASS — static P2 worker",
             "### PASS — isolated startup experiment",
+            "### PASS — bounded read-only live observation",
             "### REFUSE — historical display shortcut",
             "### REFUSE — missing-registration shortcut",
             "### REFUSE — generation mismatch shortcut",
-            "### Boundary — read-only evidence",
+            "### REFUSE — ambiguous read-only target",
         ),
     )
 
@@ -350,6 +394,8 @@ def static_policy_audit() -> None:
             "track_a_runtime_agent_admission_version: 1",
             "docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md",
             "none\nread_only\nephemeral_isolated\ncanonical_reuse_or_mutation\ncanonical_bootstrap\ncanonical_rebind",
+            "At task claim/resume/checkpoint",
+            "target_uniqueness: PROVEN",
             "Gate A passes, any required generation rebind passes, Gate B passes",
             "Missing registration does not fall through to reuse",
             "Registration/lease-generation mismatch does not fall through to reuse",
@@ -358,7 +404,7 @@ def static_policy_audit() -> None:
             "rfb_6082_current_backend_mapping: UNKNOWN",
             "current_exact_client_pid: NOT_REGISTERED",
             "current_exact_client_session: NOT_REGISTERED",
-            "Do not mutate PR #303-owned runtime surfaces or Track B state",
+            "Do not mutate or live-observe PR #303-owned runtime surfaces",
         ),
     )
 
@@ -377,11 +423,12 @@ def static_policy_audit() -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--changed-from", help="audit added/modified active tasks relative to this git ref")
+    parser.add_argument("--expected-branch", help="require runtime-sensitive admission task to match this PR head branch")
     args = parser.parse_args()
 
     static_policy_audit()
     if args.changed_from:
-        audit_changed_tasks(args.changed_from)
+        audit_changed_tasks(args.changed_from, args.expected_branch)
 
     print("TRACK_A_AGENT_RUNTIME_GOVERNANCE_PASS=true")
     return 0

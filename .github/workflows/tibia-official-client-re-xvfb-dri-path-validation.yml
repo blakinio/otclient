@@ -1,0 +1,70 @@
+name: Track A canonical Xvfb DRI path hosted validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/tibia-official-client-re-canonical-live-session.sh
+      - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+      - .github/workflows/tibia-official-client-re-xvfb-dri-path-validation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate-canonical-xvfb-dri-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Validate worker syntax and canonical runtime suites
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
+          python3 -m py_compile \
+            .github/scripts/test_tibia_official_client_re_canonical_live_session.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_transition.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_guard.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_guard.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
+
+      - name: Verify minimal Xvfb-only graphics change
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('.github/scripts/tibia-official-client-re-canonical-live-session.sh').read_text(encoding='utf-8')
+          start = source.index("printf 'TRACK_A_CANONICAL_STAGE=xvfb_start")
+          end = source.index('echo $! >"$SESSION/xvfb.pid"', start)
+          xvfb = source[start:end]
+          client_start = source.index("printf 'TRACK_A_CANONICAL_STAGE=client_start")
+          client_end = source.index('\n  pid="$(rpid client)"', client_start)
+          client = source[client_start:client_end]
+
+          required = [
+              'contained_dri_root "$root" >/dev/null || return 1',
+              'dri="$(contained_dri_root "$TOOL")" || die dri_provider_unavailable',
+              'LIBGL_DRIVERS_PATH="$dri"',
+          ]
+          missing = [needle for needle in required if needle not in source]
+          if missing:
+              raise SystemExit(f'missing DRI-path repair markers: {missing}')
+          if '+extension GLX' in xvfb:
+              raise SystemExit('unexpected explicit GLX server flag')
+          for forbidden in ('LIBGL_ALWAYS_SOFTWARE', 'GALLIUM_DRIVER', 'MESA_LOADER_DRIVER_OVERRIDE'):
+              if forbidden in xvfb:
+                  raise SystemExit(f'unexpected Xvfb provider override: {forbidden}')
+          if 'LIBGL_DRIVERS_PATH=' in client:
+              raise SystemExit('DRI provider path leaked into client environment')
+          print('TRACK_A_CANONICAL_XVFB_DRI_PATH_SOURCE_CONTRACT=PASS')
+          PY

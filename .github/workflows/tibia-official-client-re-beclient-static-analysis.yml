@@ -21,89 +21,265 @@ jobs:
         run: |
           set -Eeuo pipefail
           set +x
-          export LC_ALL=C
-
-          target='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/BattlEye/BEClient.so'
-          package='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package'
-          exact_client="$package/bin/client"
-          expected_client_size='51965216'
-          expected_client_sha='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
-
           [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || { echo 'BE_STATIC_ERROR=wrong_runner'; exit 2; }
-          [[ -f "$target" ]] || { echo 'BE_STATIC_ERROR=target_missing'; exit 3; }
-          [[ -f "$exact_client" ]] || { echo 'BE_STATIC_ERROR=exact_client_missing'; exit 4; }
+          python3 - <<'PY'
+          from __future__ import annotations
+          import hashlib
+          import math
+          import pathlib
+          import re
+          import struct
+          import sys
 
-          client_size="$(stat -c '%s' "$exact_client")"
-          client_sha="$(sha256sum "$exact_client" | awk '{print $1}')"
-          [[ "$client_size" == "$expected_client_size" && "$client_sha" == "$expected_client_sha" ]] || {
-            echo "BE_STATIC_ERROR=client_fence_mismatch size=$client_size sha=$client_sha"
-            exit 5
-          }
-          echo 'BE_STATIC_CLIENT_FENCE=PASS'
+          target = pathlib.Path('/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/BattlEye/BEClient.so')
+          package = target.parents[2]
+          exact_client = package / 'bin' / 'client'
+          expected_client_size = 51965216
+          expected_client_sha = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
 
-          echo "BE_STATIC_SIZE=$(stat -c '%s' "$target")"
-          echo "BE_STATIC_SHA256=$(sha256sum "$target" | awk '{print $1}')"
-          echo "BE_STATIC_MD5=$(md5sum "$target" | awk '{print $1}')"
-          echo "BE_STATIC_FILE=$(file -b "$target")"
+          def digest(path: pathlib.Path, algo: str) -> str:
+              h = hashlib.new(algo)
+              with path.open('rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
 
-          echo 'BE_STATIC_ELF_HEADER_BEGIN'
-          readelf -hW "$target" | grep -E '^[[:space:]]*(Class:|Data:|OS/ABI:|ABI Version:|Type:|Machine:|Entry point address:|Number of program headers:|Number of section headers:)' || true
-          echo 'BE_STATIC_ELF_HEADER_END'
+          if not target.is_file():
+              print('BE_STATIC_ERROR=target_missing')
+              raise SystemExit(3)
+          if not exact_client.is_file():
+              print('BE_STATIC_ERROR=exact_client_missing')
+              raise SystemExit(4)
+          client_size = exact_client.stat().st_size
+          client_sha = digest(exact_client, 'sha256')
+          if client_size != expected_client_size or client_sha != expected_client_sha:
+              print(f'BE_STATIC_ERROR=client_fence_mismatch size={client_size} sha={client_sha}')
+              raise SystemExit(5)
+          print('BE_STATIC_CLIENT_FENCE=PASS')
 
-          build_id="$(readelf -nW "$target" 2>/dev/null | sed -n 's/.*Build ID: //p' | head -n1)"
-          echo "BE_STATIC_BUILD_ID=${build_id:-NONE}"
+          data = target.read_bytes()
+          print(f'BE_STATIC_SIZE={len(data)}')
+          print(f'BE_STATIC_SHA256={hashlib.sha256(data).hexdigest()}')
+          print(f'BE_STATIC_MD5={hashlib.md5(data).hexdigest()}')
 
-          if readelf -SW "$target" | grep -q '[.]symtab'; then echo 'BE_STATIC_SYMTAB=PRESENT'; else echo 'BE_STATIC_SYMTAB=ABSENT'; fi
-          if readelf -SW "$target" | grep -q '[.]debug_'; then echo 'BE_STATIC_DEBUG_SECTIONS=PRESENT'; else echo 'BE_STATIC_DEBUG_SECTIONS=ABSENT'; fi
+          if len(data) < 64 or data[:4] != b'\x7fELF':
+              print('BE_STATIC_ERROR=not_elf')
+              raise SystemExit(6)
+          elf_class = data[4]
+          elf_data = data[5]
+          if elf_class != 2 or elf_data != 1:
+              print(f'BE_STATIC_ERROR=unsupported_elf class={elf_class} data={elf_data}')
+              raise SystemExit(7)
 
-          echo 'BE_STATIC_HARDENING_BEGIN'
-          readelf -lW "$target" | grep -E 'GNU_STACK|GNU_RELRO' || true
-          if readelf -dW "$target" | grep -Eq 'BIND_NOW|FLAGS.*NOW'; then echo 'BIND_NOW=PRESENT'; else echo 'BIND_NOW=ABSENT'; fi
-          if readelf -dW "$target" | grep -q '(TEXTREL)'; then echo 'TEXTREL=PRESENT'; else echo 'TEXTREL=ABSENT'; fi
-          echo 'BE_STATIC_HARDENING_END'
+          endian = '<'
+          hdr = struct.unpack_from(endian + 'HHIQQQIHHHHHH', data, 16)
+          (e_type, e_machine, e_version, e_entry, e_phoff, e_shoff, e_flags,
+           e_ehsize, e_phentsize, e_phnum, e_shentsize, e_shnum, e_shstrndx) = hdr
+          type_names = {1:'REL', 2:'EXEC', 3:'DYN', 4:'CORE'}
+          machine_names = {3:'Intel 80386', 40:'ARM', 62:'AMD x86-64', 183:'AArch64'}
+          print('BE_STATIC_ELF_HEADER_BEGIN')
+          print('Class=ELF64')
+          print('Data=2s_complement_little_endian')
+          print(f'Type={type_names.get(e_type, str(e_type))}')
+          print(f'Machine={machine_names.get(e_machine, str(e_machine))}')
+          print(f'Entry=0x{e_entry:x}')
+          print(f'ProgramHeaders={e_phnum}')
+          print(f'SectionHeaders={e_shnum}')
+          print('BE_STATIC_ELF_HEADER_END')
 
-          echo 'BE_STATIC_DYNAMIC_BEGIN'
-          readelf -dW "$target" | grep -E '\(NEEDED\)|\(SONAME\)|\(RPATH\)|\(RUNPATH\)' || true
-          echo 'BE_STATIC_DYNAMIC_END'
+          phdrs = []
+          phfmt = endian + 'IIQQQQQQ'
+          phsize = struct.calcsize(phfmt)
+          if e_phentsize < phsize:
+              print('BE_STATIC_ERROR=bad_phentsize')
+              raise SystemExit(8)
+          for i in range(e_phnum):
+              off = e_phoff + i * e_phentsize
+              phdrs.append(struct.unpack_from(phfmt, data, off))
 
-          exports="$RUNNER_TEMP/be-exports.txt"
-          imports="$RUNNER_TEMP/be-imports.txt"
-          nm -D --defined-only "$target" 2>/dev/null | awk '{print $3}' | sed '/^$/d' | sort -u >"$exports" || true
-          nm -D --undefined-only "$target" 2>/dev/null | awk '{print $NF}' | sed 's/@.*//' | sed '/^$/d' | sort -u >"$imports" || true
-          echo "BE_STATIC_EXPORT_COUNT=$(wc -l <"$exports" | tr -d ' ')"
-          echo 'BE_STATIC_EXPORTS_BEGIN'
-          head -n 100 "$exports"
-          echo 'BE_STATIC_EXPORTS_END'
-          echo "BE_STATIC_IMPORT_COUNT=$(wc -l <"$imports" | tr -d ' ')"
+          shfmt = endian + 'IIQQQQIIQQ'
+          shsize = struct.calcsize(shfmt)
+          if e_shentsize < shsize:
+              print('BE_STATIC_ERROR=bad_shentsize')
+              raise SystemExit(9)
+          shdrs = []
+          for i in range(e_shnum):
+              off = e_shoff + i * e_shentsize
+              shdrs.append(struct.unpack_from(shfmt, data, off))
 
-          echo 'BE_STATIC_IMPORT_FAMILIES_BEGIN'
-          for pattern in \
-            'ptrace|process_vm_|prctl|syscall|kill|tgkill' \
-            'mmap|mprotect|munmap|madvise|mlock' \
-            'dlopen|dlsym|dladdr|dl_iterate_phdr' \
-            'socket|connect|send|recv|getaddrinfo|gethostby|poll|select|epoll' \
-            'open|openat|fopen|readlink|stat|lstat|fstat|readdir|opendir|access' \
-            'pthread_|clone|fork|exec|waitpid' \
-            'SHA|MD5|AES|EVP_|RAND_|HMAC|CRYPTO|SSL_|TLS_' \
-            'getenv|setenv|unsetenv' \
-            'clock_gettime|gettimeofday|nanosleep'; do
-            matches="$(grep -Ei "$pattern" "$imports" | paste -sd, - || true)"
-            printf 'FAMILY[%s]=%s\n' "$pattern" "${matches:-NONE}"
-          done
-          echo 'BE_STATIC_IMPORT_FAMILIES_END'
+          def slice_bytes(offset: int, size: int) -> bytes:
+              if offset < 0 or size < 0 or offset + size > len(data):
+                  return b''
+              return data[offset:offset+size]
 
-          strings_all="$RUNNER_TEMP/be-strings.txt"
-          strings -a -n 5 "$target" >"$strings_all"
-          echo "BE_STATIC_STRING_COUNT=$(wc -l <"$strings_all" | tr -d ' ')"
+          if not (0 <= e_shstrndx < len(shdrs)):
+              print('BE_STATIC_ERROR=bad_shstrndx')
+              raise SystemExit(10)
+          shstr_hdr = shdrs[e_shstrndx]
+          shstr = slice_bytes(shstr_hdr[4], shstr_hdr[5])
 
-          echo 'BE_STATIC_SELECTED_STRINGS_BEGIN'
-          grep -Eai 'BattlEye|BEClient|/proc/|/sys/|/dev/|ptrace|debug|hook|inject|virtual|vmware|wine|proton|docker|container|steam|kernel|module|driver|lib[A-Za-z0-9_.+-]*[.]so|https?://|wss?://|[A-Za-z0-9.-]+[.](com|net|org|gg|io)([:/]|$)' "$strings_all" \
-            | sed -E 's/[[:cntrl:]]//g' | sort -u | head -n 200 || true
-          echo 'BE_STATIC_SELECTED_STRINGS_END'
+          def cstr(blob: bytes, off: int) -> str:
+              if off < 0 or off >= len(blob):
+                  return ''
+              end = blob.find(b'\0', off)
+              if end < 0:
+                  end = len(blob)
+              return blob[off:end].decode('utf-8', 'replace')
 
-          echo 'BE_STATIC_SECTION_SUMMARY_BEGIN'
-          readelf -SW "$target" | awk '/\[[[:space:]]*[0-9]+\]/{print $2, $3, $6}' | head -n 80 || true
-          echo 'BE_STATIC_SECTION_SUMMARY_END'
+          sections = []
+          for idx, sh in enumerate(shdrs):
+              name = cstr(shstr, sh[0])
+              sections.append({'idx':idx, 'name':name, 'type':sh[1], 'flags':sh[2], 'addr':sh[3], 'offset':sh[4], 'size':sh[5], 'link':sh[6], 'info':sh[7], 'align':sh[8], 'entsize':sh[9]})
+          by_name = {s['name']: s for s in sections}
 
-          echo 'BE_STATIC_EXECUTED=false'
-          echo 'BE_STATIC_MUTATION_PERFORMED=false'
+          print(f"BE_STATIC_SYMTAB={'PRESENT' if '.symtab' in by_name else 'ABSENT'}")
+          print(f"BE_STATIC_DEBUG_SECTIONS={'PRESENT' if any(s['name'].startswith('.debug') for s in sections) else 'ABSENT'}")
+
+          PT_GNU_STACK = 0x6474E551
+          PT_GNU_RELRO = 0x6474E552
+          stack = next((p for p in phdrs if p[0] == PT_GNU_STACK), None)
+          relro = any(p[0] == PT_GNU_RELRO for p in phdrs)
+          if stack:
+              flags = stack[1]
+              flagtxt = ''.join(ch for bit, ch in ((4,'R'),(2,'W'),(1,'E')) if flags & bit)
+              print(f'BE_STATIC_GNU_STACK={flagtxt or "NONE"}')
+              print(f'BE_STATIC_NX_STACK={"YES" if not (flags & 1) else "NO"}')
+          else:
+              print('BE_STATIC_GNU_STACK=ABSENT')
+              print('BE_STATIC_NX_STACK=UNKNOWN')
+          print(f'BE_STATIC_GNU_RELRO={"PRESENT" if relro else "ABSENT"}')
+
+          dynsec = by_name.get('.dynamic')
+          dynstrsec = by_name.get('.dynstr')
+          dyn_entries = []
+          dynstr = b''
+          if dynstrsec:
+              dynstr = slice_bytes(dynstrsec['offset'], dynstrsec['size'])
+          if dynsec:
+              ent = dynsec['entsize'] or 16
+              blob = slice_bytes(dynsec['offset'], dynsec['size'])
+              for off in range(0, len(blob) - 15, ent):
+                  tag, val = struct.unpack_from(endian + 'qQ', blob, off)
+                  dyn_entries.append((tag, val))
+                  if tag == 0:
+                      break
+          needed = [cstr(dynstr, val) for tag, val in dyn_entries if tag == 1]
+          soname = [cstr(dynstr, val) for tag, val in dyn_entries if tag == 14]
+          rpath = [cstr(dynstr, val) for tag, val in dyn_entries if tag == 15]
+          runpath = [cstr(dynstr, val) for tag, val in dyn_entries if tag == 29]
+          flags_vals = [val for tag, val in dyn_entries if tag == 30]
+          flags1_vals = [val for tag, val in dyn_entries if tag == 0x6ffffffb]
+          bind_now = any(tag == 24 for tag, _ in dyn_entries) or any(v & 0x8 for v in flags_vals) or any(v & 0x1 for v in flags1_vals)
+          textrel = any(tag == 22 for tag, _ in dyn_entries) or any(v & 0x4 for v in flags_vals)
+          print(f'BE_STATIC_BIND_NOW={"PRESENT" if bind_now else "ABSENT"}')
+          print(f'BE_STATIC_TEXTREL={"PRESENT" if textrel else "ABSENT"}')
+          print('BE_STATIC_DYNAMIC_BEGIN')
+          for lib in needed:
+              print(f'NEEDED={lib}')
+          for v in soname:
+              print(f'SONAME={v}')
+          for v in rpath:
+              print(f'RPATH={v}')
+          for v in runpath:
+              print(f'RUNPATH={v}')
+          print('BE_STATIC_DYNAMIC_END')
+
+          build_id = None
+          for sec in sections:
+              if sec['type'] != 7:
+                  continue
+              blob = slice_bytes(sec['offset'], sec['size'])
+              pos = 0
+              while pos + 12 <= len(blob):
+                  namesz, descsz, ntype = struct.unpack_from(endian + 'III', blob, pos)
+                  pos += 12
+                  name = blob[pos:pos+namesz].rstrip(b'\0')
+                  pos += (namesz + 3) & ~3
+                  desc = blob[pos:pos+descsz]
+                  pos += (descsz + 3) & ~3
+                  if name == b'GNU' and ntype == 3:
+                      build_id = desc.hex()
+                      break
+              if build_id:
+                  break
+          print(f'BE_STATIC_BUILD_ID={build_id or "NONE"}')
+
+          imports = []
+          exports = []
+          dynsym = by_name.get('.dynsym')
+          if dynsym and 0 <= dynsym['link'] < len(sections):
+              strsec = sections[dynsym['link']]
+              symstr = slice_bytes(strsec['offset'], strsec['size'])
+              blob = slice_bytes(dynsym['offset'], dynsym['size'])
+              ent = dynsym['entsize'] or 24
+              for off in range(0, len(blob) - 23, ent):
+                  st_name, st_info, st_other, st_shndx, st_value, st_size = struct.unpack_from(endian + 'IBBHQQ', blob, off)
+                  name = cstr(symstr, st_name)
+                  if not name:
+                      continue
+                  bind = st_info >> 4
+                  vis = st_other & 3
+                  if st_shndx == 0:
+                      imports.append(name.split('@', 1)[0])
+                  elif bind in (1,2) and vis == 0:
+                      exports.append(name.split('@', 1)[0])
+          imports = sorted(set(imports))
+          exports = sorted(set(exports))
+          print(f'BE_STATIC_IMPORT_COUNT={len(imports)}')
+          print(f'BE_STATIC_EXPORT_COUNT={len(exports)}')
+          print('BE_STATIC_EXPORTS_BEGIN')
+          for name in exports[:100]:
+              print(name)
+          print('BE_STATIC_EXPORTS_END')
+
+          families = [
+              r'ptrace|process_vm_|prctl|syscall|kill|tgkill',
+              r'mmap|mprotect|munmap|madvise|mlock',
+              r'dlopen|dlsym|dladdr|dl_iterate_phdr',
+              r'socket|connect|send|recv|getaddrinfo|gethostby|poll|select|epoll',
+              r'open|openat|fopen|readlink|stat|lstat|fstat|readdir|opendir|access',
+              r'pthread_|clone|fork|exec|waitpid',
+              r'SHA|MD5|AES|EVP_|RAND_|HMAC|CRYPTO|SSL_|TLS_',
+              r'getenv|setenv|unsetenv',
+              r'clock_gettime|gettimeofday|nanosleep',
+          ]
+          print('BE_STATIC_IMPORT_FAMILIES_BEGIN')
+          for pattern in families:
+              rx = re.compile(pattern, re.I)
+              matches = [x for x in imports if rx.search(x)]
+              print(f'FAMILY[{pattern}]={",".join(matches) if matches else "NONE"}')
+          print('BE_STATIC_IMPORT_FAMILIES_END')
+
+          string_re = re.compile(rb'[\x20-\x7e]{5,}')
+          strings = [m.group().decode('ascii', 'replace') for m in string_re.finditer(data)]
+          print(f'BE_STATIC_STRING_COUNT={len(strings)}')
+          selected_rx = re.compile(
+              r'BattlEye|BEClient|/proc/|/sys/|/dev/|TracerPid|ptrace|debug|hook|inject|virtual|vmware|wine|proton|docker|container|steam|kernel|module|driver|seccomp|lib[A-Za-z0-9_.+\-]*\.so|https?://|wss?://|[A-Za-z0-9.\-]+\.(?:com|net|org|gg|io)(?::|/|$)',
+              re.I,
+          )
+          selected = sorted({s for s in strings if selected_rx.search(s)})
+          print(f'BE_STATIC_SELECTED_STRING_COUNT={len(selected)}')
+          print('BE_STATIC_SELECTED_STRINGS_BEGIN')
+          for s in selected[:250]:
+              print(s[:500])
+          print('BE_STATIC_SELECTED_STRINGS_END')
+
+          def entropy(blob: bytes) -> float:
+              if not blob:
+                  return 0.0
+              counts = [0] * 256
+              for b in blob:
+                  counts[b] += 1
+              n = len(blob)
+              return -sum((c/n) * math.log2(c/n) for c in counts if c)
+
+          print('BE_STATIC_SECTION_SUMMARY_BEGIN')
+          for sec in sections[:100]:
+              blob = slice_bytes(sec['offset'], sec['size']) if sec['type'] != 8 else b''
+              ent = entropy(blob) if blob and sec['size'] <= 20_000_000 else 0.0
+              print(f"SECTION idx={sec['idx']} name={sec['name'] or '<none>'} type={sec['type']} flags=0x{sec['flags']:x} size={sec['size']} entropy={ent:.3f}")
+          print('BE_STATIC_SECTION_SUMMARY_END')
+
+          print('BE_STATIC_EXECUTED=false')
+          print('BE_STATIC_MUTATION_PERFORMED=false')
+          PY

@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Trace BattlEye category string initializer
+    name: Validate BattlEye QString initializer boundary
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 5
     steps:
-      - name: Correlate BattlEye literal with category 9 global QString
+      - name: Disassemble exact initializer and resolve its calls
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -27,84 +27,68 @@ jobs:
           [[ "$(stat -c '%s' "$client")" == '51965216' ]] || exit 4
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'FS_RESOLVER_CLIENT_FENCE=PASS'
+          objdump -d -M intel --start-address=0x613430 --stop-address=0x6134a8 "$client"
           python3 - "$client" <<'PY'
-          import hashlib,pathlib,struct,sys
+          import pathlib,struct,sys,hashlib
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
           sf=E+'IIQQQQIIQQ';raw=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
           st=raw[shstrndx];sn=d[st[4]:st[4]+st[5]]
           def cs(b,o):
-              if not (0<=o<len(b)):return ''
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
-          secs=[]
-          for i,x in enumerate(raw):secs.append({'idx':i,'name':cs(sn,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
-          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
-          def fileoff_to_va(o):
+          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9],'link':x[6]} for x in raw]
+          by={s['name']:s for s in secs};text=by['.text']
+          def voff(va):
               for s in secs:
-                  if s['type']!=8 and s['off']<=o<s['off']+s['size']:return s['addr']+(o-s['off'])
-              return None
-          def va_to_off(va):
-              for s in secs:
-                  if s['type']!=8 and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
-              return None
+                  if s['addr']<=va<s['addr']+s['size'] and s['name']!='.bss':return s['off']+(va-s['addr'])
           def b_at(va,n):
-              o=va_to_off(va);return b'' if o is None else d[o:o+n]
-          # Exact literal VA from file, not assumed equal to offset.
-          needle=b'BattlEye\0';poss=[];p=0
-          while True:
-              j=d.find(needle,p)
-              if j<0:break
-              va=fileoff_to_va(j)
-              if va is not None:poss.append((j,va))
-              p=j+1
-          print('FS_RESOLVER_BATTLEYE_LITERALS='+','.join(f'file=0x{o:x}/va=0x{v:x}' for o,v in poss))
-          battleyes=[v for _,v in poss]
-          global_obj=0x31964a0
-          print(f'FS_RESOLVER_CATEGORY9_GLOBAL=0x{global_obj:x}')
-          # Search common instruction-boundary-looking RIP references to literal and global.
-          wanted=set(battleyes+[global_obj,global_obj+8,global_obj+16])
-          refs=[]
-          for i in range(len(tb)-8):
-              va=text['addr']+i
-              # REX + MOV/LEA rip+disp32
-              if tb[i] in range(0x40,0x50) and tb[i+1] in (0x8b,0x8d,0x89):
-                  m=tb[i+2]
+              o=voff(va);return b'' if o is None else d[o:o+n]
+          def rip7(va):
+              x=b_at(va,7);return va+7+struct.unpack_from('<i',x,3)[0]
+          def rel32(va):
+              x=b_at(va,5);return va+5+struct.unpack_from('<i',x,1)[0]
+          # exact candidate instructions must be real boundaries in objdump and bytes.
+          print('FS_RESOLVER_INIT_WINDOW_SHA256='+hashlib.sha256(b_at(0x613430,0x78)).hexdigest())
+          print('FS_RESOLVER_INIT_WINDOW_HEX='+b_at(0x613430,0x78).hex())
+          # Find all LEA reg,[rip+disp32] and direct calls in this tiny validated window.
+          blob=b_at(0x613430,0x78);base=0x613430
+          print('FS_RESOLVER_INIT_RIP_BEGIN')
+          for i in range(len(blob)-7):
+              if blob[i] in range(0x48,0x50) and blob[i+1]==0x8d:
+                  m=blob[i+2]
                   if (m>>6)==0 and (m&7)==5:
-                      dst=va+7+struct.unpack_from('<i',tb,i+3)[0]
-                      if dst in wanted:refs.append((va,dst,f'rex_{tb[i+1]:02x}'))
-              # MOVDQA xmm,[rip+disp32]
-              if tb[i:i+3]==b'\x66\x0f\x6f':
-                  m=tb[i+3]
-                  if (m>>6)==0 and (m&7)==5:
-                      dst=va+8+struct.unpack_from('<i',tb,i+4)[0]
-                      if dst in wanted:refs.append((va,dst,'movdqa'))
-              # non-REX MOV r32/m32 or MOV m32/r32 rip-relative
-              if tb[i] in (0x8b,0x89):
-                  m=tb[i+1]
-                  if (m>>6)==0 and (m&7)==5:
-                      dst=va+6+struct.unpack_from('<i',tb,i+2)[0]
-                      if dst in wanted:refs.append((va,dst,f'op_{tb[i]:02x}'))
-          # Deduplicate and print bounded windows.
-          uniq=[];seen=set()
-          for r in refs:
-              if r not in seen:seen.add(r);uniq.append(r)
-          print('FS_RESOLVER_BATTLEYE_GLOBAL_REFS='+','.join(f'0x{a:x}->0x{b:x}:{k}' for a,b,k in uniq))
-          for a,b,k in uniq:
-              lo=max(text['addr'],a-0xb0);hi=min(text['addr']+text['size'],a+0x120)
-              w=d[text['off']+(lo-text['addr']):text['off']+(hi-text['addr'])]
-              print(f'FS_RESOLVER_REF_WINDOW ref=0x{a:x} target=0x{b:x} kind={k} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
-          # Revalidate category9 slot10 really reads that global and slot18 really calls applicationDirPath PLT.
-          x=b_at(0xc8f8e0,24)
-          print('FS_RESOLVER_SLOT10_CASE9_HEAD='+x.hex())
-          if not x.startswith(bytes.fromhex('660f6f0d')):raise SystemExit('FS_RESOLVER_FAIL=slot10_case9_head')
-          dst=0xc8f8e8+struct.unpack_from('<i',x,4)[0]
-          if dst!=global_obj:raise SystemExit(f'FS_RESOLVER_FAIL=slot10_case9_global:{hex(dst)}')
-          call=b_at(0xc91230,5)
-          dst2=0xc91235+struct.unpack_from('<i',call,1)[0]
-          if dst2!=0x4e0050:raise SystemExit(f'FS_RESOLVER_FAIL=slot18_case9_call:{hex(dst2)}')
-          print('FS_RESOLVER_PASS=category9_global_and_applicationDirPath_call')
+                      va=base+i;dst=va+7+struct.unpack_from('<i',blob,i+3)[0]
+                      if dst in (0x31964a0,0x1d7b160):print(f'va=0x{va:x} target=0x{dst:x} bytes={blob[i:i+7].hex()}')
+          print('FS_RESOLVER_INIT_RIP_END')
+          print('FS_RESOLVER_INIT_CALLS_BEGIN')
+          for i in range(len(blob)-5):
+              if blob[i]==0xe8:
+                  va=base+i;dst=va+5+struct.unpack_from('<i',blob,i+1)[0]
+                  print(f'va=0x{va:x} target=0x{dst:x} bytes={blob[i:i+5].hex()}')
+          print('FS_RESOLVER_INIT_CALLS_END')
+          # map dynamic PLT names for any target in this window if applicable.
+          dyn=by['.dynsym'];ss=secs[dyn['link']];sb=d[ss['off']:ss['off']+ss['size']];syms=[]
+          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
+              no,info,other,si,val,sz=struct.unpack_from('<IBBHQQ',d,o);syms.append((cs(sb,no),val,sz,si,info))
+          got_names={}
+          for rn in ('.rela.plt','.rela.dyn'):
+              r=by.get(rn)
+              if not r:continue
+              for o in range(r['off'],r['off']+r['size'],r['entsize'] or 24):
+                  ro,ri,ad=struct.unpack_from('<QQq',d,o);sym=ri>>32
+                  if sym and sym<len(syms):got_names[ro]=syms[sym][0]
+          def plt_name(va):
+              x=b_at(va,24)
+              for p in range(min(10,max(0,len(x)-6))):
+                  if x[p:p+2]==b'\xff\x25':
+                      got=va+p+6+struct.unpack_from('<i',x,p+2)[0];return got_names.get(got,'')
+              return ''
+          for va in range(0x613430,0x6134a8):
+              if b_at(va,1)==b'\xe8':
+                  dst=rel32(va);name=plt_name(dst)
+                  if name:print(f'FS_RESOLVER_INIT_CALL_SYMBOL call=0x{va:x} target=0x{dst:x} symbol={name}')
           print('FS_RESOLVER_EXECUTED_TARGET=false')
           print('FS_RESOLVER_LIVE_RUNTIME_OBSERVED=false')
           print('FS_RESOLVER_MUTATION_PERFORMED=false')

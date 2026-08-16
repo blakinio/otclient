@@ -7,7 +7,9 @@ BASE=/home/runner/_work/_otclient_tibia_re_state
 ROOT="$BASE/canonical-live-runtime"
 SESSION="$ROOT/session"
 WARP="$ROOT/warp"
-TOOL="$BASE/toolroot"
+TOOL=''
+TOOLROOT_HOME="$BASE/toolroot"
+TOOLROOT_WORK=/work/_otclient_tibia_re_state/toolroot
 SIZE=51965216
 SHA=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 MARK='OTCLIENT_TIBIA_RE_TRACK=official-client-re'
@@ -18,7 +20,7 @@ WP_VER=1.1.3
 WP_TAR_SHA=e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c
 
 die() { printf 'TRACK_A_CANONICAL_SESSION_ERROR=%s\n' "$1" >&2; exit 1; }
-rpid() { tr -cd '0-9' <"$SESSION/$1.pid" 2>/dev/null || true; }
+rpid() { [[ -r "$SESSION/$1.pid" ]] || return 0; tr -cd '0-9' <"$SESSION/$1.pid" 2>/dev/null || true; }
 pgrp() { ps -o pgid= -p "$1" 2>/dev/null | tr -d ' '; }
 
 listen() {
@@ -54,6 +56,48 @@ verify_client() {
   [[ -x "$1" && ! -L "$1" ]] || die client_not_executable
   [[ "$(stat -c %s "$1")" == "$SIZE" ]] || die client_size_mismatch
   [[ "$(sha256sum "$1" | awk '{print $1}')" == "$SHA" ]] || die client_sha_mismatch
+}
+
+toolroot_complete() {
+  local root="$1" name preload
+  [[ -n "$root" && -d "$root" && ! -L "$root" ]] || return 1
+  for name in Xvfb x11vnc xdotool; do
+    [[ -x "$root/usr/bin/$name" && ! -L "$root/usr/bin/$name" ]] || return 1
+  done
+  [[ -d "$root/usr/share/X11/xkb" ]] || return 1
+  preload="$(find "$root" -xdev -type f -name libproxychains.so.4 -print -quit 2>/dev/null || true)"
+  [[ -n "$preload" ]]
+}
+
+toolroot_candidates() {
+  local raw item
+  if [[ "${TRACK_A_CANONICAL_WORKER_CONTRACT_TEST:-}" == 1 \
+    && -n "${TRACK_A_CANONICAL_TOOLROOT_TEST_CANDIDATES:-}" ]]; then
+    raw="$TRACK_A_CANONICAL_TOOLROOT_TEST_CANDIDATES"
+    while [[ -n "$raw" ]]; do
+      if [[ "$raw" == *';'* ]]; then
+        item="${raw%%;*}"
+        raw="${raw#*;}"
+      else
+        item="$raw"
+        raw=''
+      fi
+      [[ -n "$item" ]] && printf '%s\n' "$item"
+    done
+    return
+  fi
+  printf '%s\n' "$TOOLROOT_HOME" "$TOOLROOT_WORK"
+}
+
+resolve_toolroot() {
+  local candidate
+  while IFS= read -r candidate; do
+    if toolroot_complete "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done < <(toolroot_candidates)
+  return 1
 }
 
 tool() {
@@ -163,6 +207,10 @@ PY
       ;;
     rollback)
       [[ $# == 2 ]] || die usage
+      ;;
+    toolroot)
+      [[ $# == 1 ]] || die usage
+      resolve_toolroot || die toolroot_unavailable
       ;;
     *) die usage ;;
   esac
@@ -284,6 +332,9 @@ bootstrap() {
   mkdir -p "$SESSION"
   chmod 700 "$SESSION"
   echo "$pgid" >"$SESSION/bootstrap-pgid"
+  TOOL="$(resolve_toolroot)" || die toolroot_unavailable
+  printf '%s\n' "$TOOL" >"$SESSION/toolroot"
+  printf 'TRACK_A_CANONICAL_TOOLROOT=%s\n' "$TOOL"
 
   start_warp
   warp_port="$(cat "$SESSION/warp-port")"
@@ -373,8 +424,11 @@ EOF
 }
 
 probe() {
-  local manifest="$1" pid display win vnc_port client xdotool pgid
+  local manifest="$1" pid display win vnc_port client xdotool pgid persisted_toolroot
   [[ -d "$SESSION" ]] || die session_missing
+  persisted_toolroot="$(cat "$SESSION/toolroot" 2>/dev/null || true)"
+  toolroot_complete "$persisted_toolroot" || die toolroot_unavailable
+  TOOL="$persisted_toolroot"
   pgid="$(cat "$SESSION/bootstrap-pgid")"
   pid="$(rpid client)"
   display="$(cat "$SESSION/display")"

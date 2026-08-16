@@ -10,46 +10,18 @@ subject: official native Linux Tibia client only
 implementation_status: NOT_IMPLEMENTED
 client_byte_mutation: NOT_PERFORMED
 live_runtime_access: NOT_PERFORMED
-final_static_classification: BLOCKED
-blocker_class: INPUT_BLOCKED
+static_classification: MORE_STATIC_RE_NEEDED
+fresh_exact_binary_materialization: BLOCKED
+retained_evidence_research_path: ACTIVE
 ```
 
 ## Result
 
-The requested full patch/dependency graph could **not** be completed in this phase because the exact fenced executable cannot currently be staged on the required GitHub-hosted analysis surface.
+Fresh GitHub-hosted staging of the exact `15.32.df7b29` executable remains blocked, but this no longer stops all static progress. Same-repository historical artifacts preserve raw strip rows, GDB event state, exact machine-code prefixes and a richer type census that were not consumed by the earlier feasibility report.
 
-This is an input/infrastructure blocker, not evidence that runtime observation is required.
+The task therefore remains active as `MORE_STATIC_RE_NEEDED`, not `BLOCKED`, while this retained evidence can still advance the dependency graph.
 
-The task did recover and normalize the maximum safe static frontier available from already-retained exact-client evidence, identified two structural RTTI-name relocation leads, preserved every unresolved graph edge explicitly as `UNKNOWN`, and performed one materially different GitHub-hosted staging experiment. That experiment failed before analyzer installation/execution and before any client-byte analysis.
-
-```yaml
-FACT:
-  - the exact historical artifact proves all eight requested semantic/type surfaces exist in client 15.32.df7b29
-  - retained relocation metadata links .data.rel.ro locations 0x3089b78 and 0x308b598 to the TWorldMapRenderProvider and TWorldMapViewport RTTI-name strings respectively
-  - current GitHub-hosted staging remains unavailable after prior DNS/HTTP-403 evidence plus an independent same-URL-Referer failure
-  - no new static analysis ran on Synology
-  - no live client, X11, VNC, login/session or runtime mutation was used
-  - no client bytes were modified
-INFERENCE:
-  - 0x3089b70 and 0x308b590 are ABI-shaped candidate typeinfo-object starts only; they are not proven typeinfo/vtable addresses
-UNKNOWN:
-  - exact extent/subfield/viewport dimension fields
-  - constructor/default writers and all material readers/writers
-  - fixed allocations/capacities and loop bounds
-  - protocol row/column/floor parser assumptions
-  - storage indexing/eviction limits
-  - render clipping/culling/iteration limits
-  - camera projection/scale coupling
-  - picker bounds/coordinate-transform limits
-  - concrete patch sites and isolated-change consequences
-NOT_PROVEN:
-  - that 18/14 are literal static dimension constants
-  - that one constant or one object field controls the map size
-  - that 26x20, 32x24 or 36x28 is safe/supported
-  - that the official server supplies a larger live-awareness area
-```
-
-## Exact evidence boundary
+## Exact fence
 
 ```yaml
 client_version: 15.32.df7b29
@@ -58,126 +30,156 @@ client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
 ```
 
-The accepted feasibility checkpoint is on `main` in:
+No current runtime identity is inferred from historical PID/PIE/display/session data.
 
-- `docs/agents/reports/OTCLIENT-20260816-official-client-map-viewport-feasibility.md`;
-- `docs/agents/evidence/OTC-20260816-official-client-map-viewport-feasibility/20260816-evidence.md`.
+## Geometry evidence upgrade
 
-This continuation's detailed static frontier is in:
+Retained artifact `9227370490` (`track-a-persistent-provenance-dump`, run `31821458677`, head `f23e9df548859d11520bbd2983c0df4e9923c2e7`, digest `sha256:991f5c22a7ffc1d23c6597307a49728b363863a5acd6dd754bff1222404c8e2d`) contains 90 raw strip rows.
 
-`docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-static-frontier.md`.
-
-## Partial target graph
-
-| Target | Proven structural surface | Remaining graph status |
-|---|---|---|
-| `TWorldMapExtent` | exact RTTI-name string `0x1c8fee0`; `TWorldMapExtentX` semantic string `0x1cd9ad7` | fields/writers/readers/vtable UNKNOWN |
-| `TWorldMapSubfieldExtent` | exact RTTI-name string `0x1c9fe20` | fields/writers/readers/vtable UNKNOWN |
-| `TWorldMapViewport` | exact names `0x1cabb60`, `0x1ce1b60`; relocation `0x308b598 -> 0x1ce1b60` | typeinfo candidate only; fields/writers/readers/clipping UNKNOWN |
-| `TWorldMapStorage` | exact names `0x1ca9180`, `0x1ce1c00` | layout/capacity/index/cache/consumers UNKNOWN |
-| `TWorldmapProtocolMessageHandler` | exact/plain/shared ownership names `0x1cd59a0`, `0x1cd67a0`, `0x1cd8bb4`, `0x1cdba40` | parser loops/floor-row-column assumptions/storage writes UNKNOWN |
-| `TWorldMapRenderProvider` | exact names `0x1cdb580`, `0x1cddd20`; relocation `0x3089b78 -> 0x1cddd20` | typeinfo candidate only; render loops/clipping/culling UNKNOWN |
-| `TWorldMapCamera` | exact names `0x1cabce0`, `0x1cabd20` | layout/projection/viewport dependency UNKNOWN |
-| `TWorldMapPicker` | exact names `0x1cdb600`, `0x1cdb640` | bounds/picking transform/extent dependency UNKNOWN |
-
-Additional retained semantic leads include `onCameraViewportChanged`, `onPlayerPositionChanged`, `TWorldMapCoordinate`, `TMapScaleFactor` and `MapScaleFactor`. They remain names, not promoted call edges.
-
-## Why the graph stops here
-
-The historical exact-binary static artifact `9248797952` was deliberately sanitized for a different P0 question. It preserves exact SHA/size, semantic strings and a small relocation/disassembly neighborhood, but it does **not** contain the worldmap constructors, full vtables, function xrefs or arbitrary `.text/.data.rel.ro` bytes needed to recover this task's object-field and consumer graph.
-
-Its generating job `95029600292` ran historically on `synology-otclient-01`. The user explicitly required new static RE to run GitHub-hosted and forbade using Synology merely because it is available. This task therefore reused the retained artifact read-only and did not rerun/extend static analysis there.
-
-## Hosted input attempts
-
-Prior PR `#310` already established two non-working hosted source paths:
-
-- `download.tibia.com`: DNS failure;
-- plain automated `static.tibia.com/download/tibia.x64.tar.gz`: HTTP 403.
-
-This task made exactly one materially different attempt in run `31947523640`, job `95165795953`: compressed transfer with a same-URL Referer. It still classified `INPUT_BLOCKED`; analyzer dependency installation and graph recovery were skipped. Cleanup and sanitized evidence upload succeeded, artifact `9263709952`.
-
-Independent P0 run `31947502633`, job `95165743019`, independently reproduced the same same-URL-Referer input failure on `ubuntu-latest`, artifact `9263704543`.
-
-A public GitHub release source already used by PR `#97` was also inspected, but its published original-Linux inventory did not expose the exact `15.32.df7b29` build. No acceptable exact-version/SHA source was found through the available GitHub repository search.
-
-No further HTTP-variant retry was attempted.
-
-## Current patch/dependency graph status
+Direct facts:
 
 ```text
+Z=7, Y=32502, class=0: X=32537..32554 -> 18 consecutive X
+Z=7, Y=32516, class=0: X=32537..32554 -> 18 consecutive X
+Y delta between those two groups: 14
+```
+
+This upgrades the raw counts/coordinate relationship to PROVEN. It does **not** yet prove that a `TWorldMapViewport` field literally stores width=18 and height=14.
+
+```yaml
+PROVEN:
+  horizontal_sample_count: 18
+  second_horizontal_sample_count: 18
+  y_difference: 14
+INFERENCE:
+  geometry_consistent_with: 18_x_14
+UNKNOWN:
+  stored_dimension_fields: UNKNOWN
+  inclusive_exclusive_semantics: UNKNOWN
+```
+
+## Retained map-event code leads
+
+The same artifact records historical breakpoints under exact historical PIE base `0x5586665f8000`:
+
+```text
+0xcecc70  BP1 observer-assigned CreateOnMap
+0xcecf40  BP2 observer-assigned ChangeOnMap
+0xcd4e20  BP3 worldmap_partial_handler lead
+0xcec8d0  BP4 viewport_shift_candidate_3 lead
+0x19a8ea3 BP5 common_capture
+```
+
+The human-readable BP1/BP2 labels are proven as observer output, not independently recovered debug symbols; original state-local observer-source provenance remains unresolved.
+
+The retained raw log contains 256-byte code prefixes at BP1/BP2. Offline disassembly directly proves:
+
+### `0xcecc70` observer-assigned `CreateOnMap`
+
+- reads event-like `+0x18`, `+0x20`, `+0x28`;
+- loads owner-like `+0x10` and performs virtual dispatch through slot `+0xa0`;
+- dereferences the secondary object from event-like `+0x20` and reads `+0x08`, `+0x28`, `+0x30`;
+- contains direct-call leads `0x1b13c80`, `0x1ab4e50`;
+- contains RIP-relative data leads `0x313a820`, `0x30874a8`, `0x2f615a0`, `0x314b480`.
+
+### `0xcecf40` observer-assigned `ChangeOnMap`
+
+- gates on `byte [event-like+0x10] & 1`;
+- reads event-like `+0x18`, `+0x20`, `+0x28`;
+- loads owner-like `+0x10` and performs the same virtual slot `+0xa0` dispatch;
+- directly calls exact static leads `0x1822ec0` and `0xceca50`;
+- later invokes a virtual function through slot `+0xf0` of a derived object;
+- contains RIP-relative data leads `0x313a820`, `0x2f615a0`, `0x314b480`, `0x312faa8`.
+
+These are exact retained-code facts. None of `+0x10/+0x18/+0x20/+0x28/+0x30` is promoted as a dimension field.
+
+## Richer exact-static census
+
+Retained artifact `9246756211` (`track-a-p0-static-elf-31883967070`, digest `sha256:2d3e423d05eef2e370e10c1dcc6afeab27ad2d3a04fe8ccfb2ba635575dabe74`) provides a broader exact string/type inventory.
+
+It directly proves:
+
+- `TWorldMapExtent`, `TWorldMapSubfieldExtent`, `TWorldMapViewport`, `TWorldMapStorage`;
+- `TWorldmapProtocolMessageHandler`, `TWorldMapRenderProvider`, `TWorldMapCamera`, `TWorldMapPicker`;
+- separate `std::shared_ptr` counted-control-block instantiations for storage, viewport, protocol handler, render provider, camera and picker;
+- an instantiated `std::unordered_map<TWorldMapCoordinate, std::shared_ptr<TWorldMapTile>, ...>` and corresponding hash-node/shared tile/entity types;
+- additional semantic surfaces including `TWorldMapSubfieldCoordinate`, `TWorldMapCalculateTileFunctionService`, `TWorldMapGetByteForStackPosition`, `TWorldMapGetCurrentCoordinate`, `TWorldMapGetItemPropertiesService`, `TCreatureHUDRenderProvider`, `TCreatureHUDOverlayController`, `TWorldMapGameActionProvider` and `TWorldMapGameActionHandler`.
+
+**INFERENCE:** the target subsystems are likely separately allocated/shared-lifetime objects and the coordinate-to-shared-tile hash map is a strong backing-storage candidate. This makes a single global dimension integer controlling protocol/storage/render/camera/picking less plausible.
+
+**UNKNOWN:** exact member ownership, object layout, map capacity/reserve/eviction rules and concrete dependency edges.
+
+## Updated partial dependency graph
+
+```text
+retained event/update path
+  0xcecc70 CreateOnMap label  ----\
+                                  +-- shared owner+0x10 -> virtual slot +0xa0
+  0xcecf40 ChangeOnMap label ----/    event +0x18/+0x20/+0x28
+             |
+             +--> exact common-helper lead 0xceca50
+             +--> further consumers UNKNOWN
+
+TWorldmapProtocolMessageHandler
+             +--> semantic surface PROVEN
+             +--> concrete edge to the retained event/update path UNKNOWN
+
+TWorldMapStorage
+             +--> semantic/shared-lifetime surface PROVEN
+             +--> coordinate -> shared_ptr<TWorldMapTile> unordered_map STRONG_CANDIDATE
+             +--> direct-member/capacity/eviction relationship UNKNOWN
+
 TWorldMapExtent / TWorldMapSubfieldExtent / TWorldMapViewport
-        semantic identity: PROVEN
-        concrete dimension fields: UNKNOWN
-        default writers: UNKNOWN
-        material readers/writers: UNKNOWN
-             |
-             +--> TWorldMapStorage
-             |      object identity: PROVEN
-             |      allocation/capacity/indexing/eviction: UNKNOWN
-             |
-             +--> TWorldmapProtocolMessageHandler
-             |      object identity: PROVEN
-             |      parser row/column/floor loops and strip assumptions: UNKNOWN
-             |
-             +--> TWorldMapRenderProvider
-             |      object identity + RTTI-name relocation lead: PROVEN_PARTIAL
-             |      render loops/clipping/culling/batching: UNKNOWN
-             |
-             +--> TWorldMapCamera
-             |      object identity: PROVEN
-             |      projection/scale/viewport dependency: UNKNOWN
-             |
-             +--> TWorldMapPicker
-                    object identity: PROVEN
-                    picking bounds/coordinate transforms: UNKNOWN
+             +--> semantic identities PROVEN
+             +--> concrete dimension fields/default writers UNKNOWN
+             +--> relation to 0xceca50/0xcecc70/0xcecf40 UNKNOWN
+
+TWorldMapRenderProvider / TWorldMapCamera / TWorldMapPicker
+             +--> semantic/shared-lifetime surfaces PROVEN
+             +--> extent/viewport field readers, clipping/culling/transforms UNKNOWN
 ```
 
-This is deliberately **not** presented as a usable patch graph. A safe mutation cannot be designed from semantic identities alone.
+## Current patch graph matrix
 
-## Classification
+| Graph element | Status |
+|---|---|
+| target subsystem/type presence | PROVEN |
+| separate shared-control-block instantiations | PROVEN for storage/viewport/protocol/render/camera/picker |
+| raw 18-sample geometry and Y delta 14 | PROVEN |
+| literal viewport width/height fields | UNKNOWN |
+| map-event handler code prefixes | PROVEN for retained BP1/BP2 samples |
+| shared owner+0x10 virtual slot +0xa0 path | PROVEN for BP1/BP2 prefixes |
+| helper `0xceca50` involvement | PROVEN for BP2 prefix |
+| protocol handler -> BP1/BP2 edge | UNKNOWN |
+| storage hash map direct ownership | INFERENCE / UNKNOWN direct-member relation |
+| constructor/default dimension writers | UNKNOWN |
+| all material readers/writers | UNKNOWN |
+| fixed arrays/capacities/loop bounds/masks | INCOMPLETE |
+| protocol full-map/strip/floor parser assumptions | UNKNOWN |
+| render iteration/clipping/culling | UNKNOWN |
+| camera projection/scale coupling | UNKNOWN |
+| picker bounds/screen-world transform | UNKNOWN |
+| concrete patch sites | UNKNOWN |
+| safe isolated-change consequence | UNKNOWN |
 
-Final classification for this task invocation:
+## Fresh exact-client input blocker
 
-```text
-BLOCKED
-```
+The existing hosted source failures remain valid:
 
-Specific blocker:
+- PR #310: DNS failure then HTTP 403;
+- this task: run `31947523640`, job `95165795953`, same-URL Referer/compressed strategy -> `INPUT_BLOCKED`, artifact `9263709952`;
+- independent P0 run `31947502633`, job `95165743019` -> same class of blocker, artifact `9263704543`.
 
-```text
-INPUT_BLOCKED: exact 15.32.df7b29 native-Linux executable is not currently available to GitHub-hosted Actions through a compliant source, while Synology static fallback is forbidden.
-```
+No further blind HTTP variant is justified. Synology is not used as a static fallback.
 
-`RUNTIME_DISCRIMINATOR_REQUIRED` is false at this point. The missing facts are still static facts and should be recovered statically once exact input is available.
+## Next research frontier
 
-## Required unblocker
+Retained evidence remains useful. Next actions are:
 
-The smallest correct unblocker is a legally/technically compliant GitHub-hosted-readable source for the exact fenced official client, without committing proprietary bytes and without routing static analysis through Synology.
+1. recover/verify observer-source provenance for the `CreateOnMap`/`ChangeOnMap` labels;
+2. correlate `0xceca50`, `0xcecc70`, `0xcecf40`, `0xcd4e20`, `0xcec8d0` with remaining retained disassembly/static artifacts;
+3. recover typeinfo/vtable/control-block xrefs where prior artifacts contain sufficient relocation data;
+4. inspect retained type/container census for fixed-allocation, coordinate-area and visibility clues;
+5. only when retained evidence is exhausted, the unresolved fresh-executable staging remains the external static input blocker.
 
-Once that exists, the next static run should recover, in order:
-
-1. typeinfo/vtable groups and constructor/destructor candidates for extent/subfield/viewport;
-2. candidate dimension/edge fields and all writes/reads;
-3. storage allocation/index/cache dependencies;
-4. protocol parser row/column/floor/strip dependencies;
-5. render/camera/picker clipping, culling and transform dependencies;
-6. fixed allocations, stack arrays, masks, packing widths and loop bounds;
-7. the final table `field/constant -> writers -> readers -> allocations -> protocol -> render -> isolated-change consequence`.
-
-Only after that table is coherent should a separate client-byte mutation task exist.
-
-## Runtime and safety boundary
-
-No GUI/runtime escalation is justified by the present evidence. This task performed none of the following:
-
-- no Synology static RE;
-- no new or existing X11 session access;
-- no VNC/noVNC access or creation;
-- no Tibia login/relogin/session takeover;
-- no process inspection of a live client;
-- no Gate A/Gate B bypass;
-- no client-byte modification;
-- no owner Codex/OpenAI API/token/paid AI use.
-
-If a future, genuinely runtime-only discriminator appears after static recovery, it must be a separate governance decision against then-current Track A ownership/admission state and the user's persistent-desktop reuse constraints.
+No GUI/runtime discriminator is currently required, and no client-byte mutation is authorized.

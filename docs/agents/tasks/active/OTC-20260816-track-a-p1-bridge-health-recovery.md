@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-p1-bridge-health-recovery
-status: implementing
+status: waiting
 agent: ChatGPT
 session_id: chatgpt-p1-20260816-1421
 session_role: implementer
@@ -8,13 +8,13 @@ project_lane: otclient
 lane: P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: integrate
 branch: feat/OTC-20260816-track-a-p1-bridge-health-recovery
 base_branch: main
 base_main: 0d7b2607912552599ae501891491aab439cfde7b
-current_main: b771cf53f01db02a27c9a2a4d9018e7592900111
+current_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f
 created: 2026-08-16T13:14:00+02:00
-updated: 2026-08-16T14:21:00+02:00
+updated: 2026-08-16T14:34:00+02:00
 risk: medium
 researcher_delivery: draft_only
 implementation_authorized: true
@@ -49,7 +49,7 @@ context_growth: stable
 context_score: 9
 estimate_confidence: high
 validation_level: component
-heavy_validation_runs: 1
+heavy_validation_runs: 4
 session_rotation_count: 1
 stale_takeover_count: 1
 human_interruptions: 1
@@ -79,9 +79,9 @@ persistent_session_role: consumer_of_runtime_evidence
 physical_e2e_required: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-16T13:10:00+02:00
-last_progress_at: 2026-08-16T14:21:00+02:00
+last_progress_at: 2026-08-16T14:34:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: repair-1
+ci_check_generation: closeout-after-temp-workflow-removal
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -100,16 +100,17 @@ P1 must never bootstrap, login, restart, kill, reconfigure, take over, or otherw
 # Current factual basis
 
 - Canonical P1 PR is #357 on branch `feat/OTC-20260816-track-a-p1-bridge-health-recovery`.
-- Previous exact head `edcc3f85bbe084667cb89024b54cd3ab79185809` had Track A governance run `31944372661 = SUCCESS` and repository CI `31944372746 = SUCCESS`.
-- Current `main` advanced to `b771cf53f01db02a27c9a2a4d9018e7592900111`; the P1 branch is behind and must be refreshed only after coherent repairs/integration are ready.
-- Previous worker checkpoint became stale under the repository 45-minute stale threshold; this replacement session resumes the same task/branch/PR and does not create a duplicate writer.
-- Coordinator review on comment `5307270606` returned `ACCEPT_WITH_EDITS`: add same-PR reusable integration records in `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md`, and preserve the read-only IPC/discovery vs invasive `LD_PRELOAD` activation authority distinction.
-- Those two shared documentation paths are currently also changed by still-open PR #23, so they must not be edited concurrently until coordinator serialization/ownership permits it.
-- Fresh P1 semantic audit comment `5307270868` opened two material findings that remain repair requirements for this task:
-  1. the Unix socket endpoint is not cryptographically/process-identity bound to the declared `RuntimeIdentity`; same-path replacement can be accepted as healthy;
-  2. discovery scan failure (`/proc/self/mem` open/read failure) can collapse into a successful zero-hit result and therefore a false `HEALTHY` state.
+- Previous exact head `edcc3f85bbe084667cb89024b54cd3ab79185809` had Track A governance run `31944372661 = SUCCESS` and repository CI `31944372746 = SUCCESS` before the later semantic findings.
+- Current `main` is `ddf7dd9408116fbeaca05bfeb69663f30f7cd34f`; the P1 branch still needs final integration/freshness handling after repository-integration docs are serialized.
+- Previous worker checkpoint became stale under the repository 45-minute stale threshold; this replacement session resumed the same task/branch/PR and created no duplicate writer.
+- Coordinator review comment `5307270606` returned `ACCEPT_WITH_EDITS`: add same-PR reusable integration records in `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md`, and preserve the read-only IPC/discovery vs invasive `LD_PRELOAD` activation authority distinction.
+- `tools/tibia_runtime_bridge/README.md` now makes that authority distinction explicit: raw IPC/discovery is read-only; activation through `launcher.py` uses invasive process instrumentation and remains exclusively RUNTIME-owned.
+- The two shared repository-index paths are still changed by open Draft PR #23 (`65e101fb9f693e7bf4331ce17b9305289dd15931`), so P1 must not race them before coordinator serialization.
+- Semantic audit comment `5307270868` opened two material findings. Both are now repaired in the P1-owned code and covered by deterministic GitHub-hosted regression tests:
+  1. every P1 health/session IPC connection verifies the actual Unix peer with `SO_PEERCRED`, current boot hash, process start ticks and exact executable size/SHA; `PING` additionally carries and is checked against the exact runtime identity envelope, so same-path endpoint replacement fails closed and discards the binding;
+  2. discovery uses explicit scan result/error states; `/proc/self/maps` and `/proc/self/mem` open/read/short-read failures return `ok:false`, while only a successful scan may return `scan_status=OK` with zero hits. `session_status()` now requires the matching target and `scan_status=OK` on every successful marker response.
 - Canonical live state is deliberately not claimed by P1: `:98 = UNKNOWN`, `6082 = UNKNOWN`, PID/session = `NOT_REGISTERED` unless separately proven by the RUNTIME lane.
-- No owner-funded Codex/OpenAI API/paid AI quota or owner credentials are authorized.
+- No owner-funded Codex/OpenAI API/paid AI quota or owner credentials were authorized or used.
 
 # Acceptance inventory
 
@@ -119,51 +120,64 @@ P1 must never bootstrap, login, restart, kill, reconfigure, take over, or otherw
 - [x] Add fail-closed bridge health classification for absent/invalid identity, stale generations, transport/protocol errors and identity changes.
 - [x] Add deterministic reacquisition/recovery that consumes only explicit fresh bindings and never launches/logs in/restarts/signals/kills the official client.
 - [x] Preserve `session-status` evidence level `DERIVED_UNTIL_LIVE_CORRELATION`.
-- [ ] Bind every accepted IPC interaction to the registered exact runtime identity so a same-path endpoint replacement cannot pass health/reacquisition. On Linux, peer PID verification (`SO_PEERCRED`) plus process-start/exact-profile identity proof in the protocol is acceptable; equivalent fail-closed proof is acceptable.
-- [ ] Add deterministic regression coverage for same-path endpoint replacement / peer identity mismatch and prove it fails closed.
-- [ ] Distinguish successful discovery with zero hits from discovery mechanism failure; `/proc/self/mem` open/read failure must propagate as typed/non-healthy state rather than `ok:true` zero hits.
-- [ ] Add deterministic regression coverage for successful zero-hit scan versus scan unavailable/read failure.
-- [ ] Re-run focused Python tests and standalone Qt bridge build after semantic repairs.
-- [ ] Perform a fresh exact-head semantic audit after repairs with zero open material findings.
-- [ ] Reconcile the durable task acceptance/checkpoint with final exact-head CI evidence.
+- [x] Bind every P1 lifecycle IPC interaction to the registered exact runtime identity: Linux peer PID (`SO_PEERCRED`) + boot identity + process-start ticks + exact executable size/SHA, with a matching `PING` identity envelope.
+- [x] Add deterministic regression coverage for same-path endpoint replacement / peer identity mismatch and prove it fails closed; the test does not assume PID non-reuse.
+- [x] Distinguish successful discovery with zero hits from discovery mechanism failure; `/proc/self/mem` and maps failures propagate as explicit `ok:false` scan failures.
+- [x] Add deterministic regression coverage for successful zero-hit scan versus scan unavailable/read failure, plus rejection of an `ok:true` response that lacks explicit matching `scan_status=OK`.
+- [x] Re-run focused Python tests and standalone Qt bridge build after semantic repairs.
+- [x] Perform a fresh exact-source semantic audit after repairs; zero P1 material code findings remain at the validated implementation head.
+- [ ] Reconcile the durable task acceptance/checkpoint with final exact-head normal governance/repository CI after temporary validation workflow removal and integration-doc serialization.
 - [ ] Add required reusable-system integration records to `docs/agents/MODULE_CATALOG.md` and `docs/agents/CHANGELOG.md` only after shared-path ownership is serialized; do not race PR #23.
-- [ ] Ensure README/task wording explicitly distinguishes read-only IPC/discovery from RUNTIME-owned `LD_PRELOAD` activation.
+- [x] Ensure README/task wording explicitly distinguishes read-only IPC/discovery from RUNTIME-owned `LD_PRELOAD` activation.
 - [ ] Refresh/integrate current `main` without overwriting other Track A work and obtain fresh exact-head required governance + repository CI.
-- [ ] Leave physical runtime proof to RUNTIME; P1 E2E remains `NOT_APPLICABLE` because this is a GitHub-hosted internal producer with `runtime_access: none`.
+- [x] Leave physical runtime proof to RUNTIME; P1 E2E is `NOT_APPLICABLE_WITH_REASON` because this is a GitHub-hosted internal producer with `runtime_access: none`.
 - [ ] Coordinator makes the final promotion/merge decision; researcher/implementer does not silently bypass coordinator ownership or shared-index serialization.
 
 # Evidence boundary
 
 `session-status` is a structural candidate only and remains `DERIVED_UNTIL_LIVE_CORRELATION`. This task proves hosted bridge/API/lifecycle behavior and standalone helper buildability. It does not prove physical attach, canonical runtime existence, persistent-session reacquisition, restart/relogin stability, current `IN_GAME`, authoritative player position, VNC/display state, or gameplay actions.
 
-# Prior validation evidence
+# Validation evidence
 
 - Accepted baseline reconstruction commit: `a96ba77e4cdbb51dd5257ff45e32c057a04c5772`.
-- Full hosted component run: `31944059279`, job `95157324527` = `SUCCESS`.
-- Implementation hosted run: `31944224720`, job `95157714206` = focused suite/dependency/blob-fence success on implementation head.
-- Previous exact-head Track A governance: `31944372661 = SUCCESS` on `edcc3f85bbe084667cb89024b54cd3ab79185809`.
-- Previous exact-head repository CI: `31944372746 = SUCCESS` on the same head.
-- These runs predate the two material findings and do not close them.
+- Earlier full hosted component run: `31944059279`, job `95157324527` = `SUCCESS`.
+- Earlier implementation hosted run: `31944224720`, job `95157714206` = focused suite/dependency/blob-fence success.
+- Previous pre-finding exact-head Track A governance: `31944372661 = SUCCESS` on `edcc3f85bbe084667cb89024b54cd3ab79185809`.
+- Previous pre-finding exact-head repository CI: `31944372746 = SUCCESS` on the same head.
+- Repair validation run `31947189849` on `da6d8f5127d5b645e573cb00ba764de72c818fba` = `SUCCESS` (Python compile/tests + standalone Qt bridge build).
+- PID-reuse-safe regression validation run `31947285170` on `1ffc2344feb269442a2b4ce7a4d2adefccef2891` = `SUCCESS`.
+- Final semantic-repair validation run `31947365151` on `bf0fe057c5f320508dc7c9f0e5f2a55c2c3e1448` = `SUCCESS`; it includes explicit scan-status protocol validation and its regression.
 
 # Audit result
 
 ```yaml
-auditor_mode: independent_semantic_review_from_p1_continuation
-material_findings_fixed: 0
-material_findings_open: 2
-coordinator_edits_open: 2
+auditor_mode: fresh_exact_source_semantic_review_after_repairs
+validated_implementation_head: bf0fe057c5f320508dc7c9f0e5f2a55c2c3e1448
+material_findings_fixed: 2
+material_findings_open: 0
+additional_protocol_hardening_fixed: 1
+coordinator_edits_open: 1
+coordinator_edit_completed: authority_wording
+coordinator_edit_blocked: shared_repository_indexes
 runtime_nonclaims_preserved: true
 gameplay_mutation_added: false
 owner_funded_ai_used: false
 ```
 
+# E2E classification
+
+```yaml
+result: NOT_APPLICABLE_WITH_REASON
+reason: P1 is a GitHub-hosted internal bridge/health producer with runtime_access none; physical attach/reacquisition/restart/relogin proof is exclusively RUNTIME-owned
+```
+
 # Checkpoint
 
 ```yaml
-status: implementing
-result: IN_PROGRESS
-last_completed_step: resumed stale canonical P1 task on the existing branch and persisted coordinator plus semantic repair requirements
+status: waiting
+result: IMPLEMENTATION_VALIDATED_WAITING_FOR_SERIALIZED_REPOSITORY_INTEGRATION
+last_completed_step: repaired both material P1 findings, hardened explicit successful-scan protocol semantics, and passed focused tests plus standalone Qt bridge build on exact implementation head bf0fe057c5f320508dc7c9f0e5f2a55c2c3e1448
 blockers:
   - shared MODULE_CATALOG.md and CHANGELOG.md integration edits require coordinator serialization while PR #23 remains an overlapping writer
-next_action: repair the two owned-path semantic findings with deterministic regression tests, then run focused/component validation before shared-index integration
+next_action: remove the temporary P1 validation workflow, notify coordinator of the material head/evidence change, then complete shared integration docs/current-main refresh/final exact-head normal CI as soon as ownership is serialized
 ```

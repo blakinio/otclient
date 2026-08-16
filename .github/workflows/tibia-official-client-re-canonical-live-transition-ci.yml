@@ -6,6 +6,7 @@ on:
       - ci/OTC-20260816-track-a-canonical-bootstrap-implementation
     paths:
       - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+      - .github/scripts/tibia-official-client-re-canonical-live-session.sh
       - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
       - .github/scripts/tibia-official-client-re-canonical-live-lease.py
       - .github/scripts/test_tibia_official_client_re_canonical_live_lease.py
@@ -34,6 +35,7 @@ jobs:
           python3 -m py_compile \
             .github/scripts/tibia-official-client-re-canonical-live-transition.py \
             .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+          bash -n .github/scripts/tibia-official-client-re-canonical-live-session.sh
       - name: Canonical transition tests
         run: python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
       - name: Existing lease and guard regression tests

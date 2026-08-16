@@ -72,6 +72,44 @@ std::string errorJson(const std::string& code)
     return "{\"ok\":false,\"error\":\"" + jsonEscape(code) + "\"}";
 }
 
+std::string envValue(const char* name)
+{
+    const char* value = std::getenv(name);
+    return value == nullptr ? std::string{} : std::string(value);
+}
+
+unsigned long long readSelfProcessStartTicks()
+{
+    std::ifstream stat("/proc/self/stat");
+    std::string line;
+    if (!std::getline(stat, line)) {
+        return 0;
+    }
+    const auto closeParen = line.rfind(')');
+    if (closeParen == std::string::npos || closeParen + 2 >= line.size()) {
+        return 0;
+    }
+
+    std::istringstream fields(line.substr(closeParen + 2));
+    std::string token;
+    for (int field = 3; field <= 22; ++field) {
+        if (!(fields >> token)) {
+            return 0;
+        }
+        if (field != 22) {
+            continue;
+        }
+        char* end = nullptr;
+        errno = 0;
+        const auto value = std::strtoull(token.c_str(), &end, 10);
+        if (errno != 0 || end == nullptr || *end != '\0' || value == 0) {
+            return 0;
+        }
+        return value;
+    }
+    return 0;
+}
+
 int phdrCallback(dl_phdr_info* info, std::size_t, void*)
 {
     if (info != nullptr && (info->dlpi_name == nullptr || info->dlpi_name[0] == '\0')) {
@@ -245,9 +283,16 @@ std::string discoverOnQtThread(const TargetProfile& target)
 std::string dispatchCommand(const std::string& command)
 {
     if (command == "PING") {
+        const auto clientVersion = envValue("OTCLIENT_TIBIA_RE_CLIENT_VERSION");
+        const auto binarySha256 = envValue("OTCLIENT_TIBIA_RE_BINARY_SHA256");
+        const auto processStartTicks = readSelfProcessStartTicks();
         std::ostringstream output;
         output << "{\"ok\":true,\"command\":\"PING\",\"main_base_resolved\":"
-               << (g_mainBase.load() != 0 ? "true" : "false") << '}';
+               << (g_mainBase.load() != 0 ? "true" : "false")
+               << ",\"pid\":" << static_cast<long long>(::getpid())
+               << ",\"process_start_ticks\":" << processStartTicks
+               << ",\"client_version\":\"" << jsonEscape(clientVersion)
+               << "\",\"binary_sha256\":\"" << jsonEscape(binarySha256) << "\"}";
         return output.str();
     }
 

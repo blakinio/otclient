@@ -1,6 +1,6 @@
 # Continuation handover — worldmap extent static RE
 
-Continue the existing task; do not create a replacement research programme.
+Continue the existing task/branch/PR. Do not create a replacement research programme or competing consumer PR.
 
 ```yaml
 repository: blakinio/otclient
@@ -12,87 +12,120 @@ execution_class: github_hosted
 runtime_access: none
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
-run_scope: single_task
-continuation_policy: stop_at_task_boundary
+static_classification: MORE_STATIC_RE_NEEDED
+static_patch_graph_ready: false
+original_blocker: BLOCKED_EXACT_STATIC_BYTES_NOT_DURABLY_STAGED
+original_blocker_status: RESOLVED_BY_PR_437
+remaining_blocker: DOWNSTREAM_EXACT_WORLD_MAP_CONSUMER_WINDOWS_NOT_DURABLY_STAGED
 ```
 
 ## Required startup
 
-Read and obey, in authority order where applicable:
+Read current repository governance, the active task, this handover, the current report, and the newest evidence first. Revalidate live `main`, PR #367 head/reviews/CI, ownership and overlapping tasks before any mutation.
 
-1. repository `AGENTS.md` and live governance;
-2. `docs/agents/PROMPTING_STANDARD.md`;
-3. `docs/agents/PROMPTING_HANDOVER.md`;
-4. `docs/agents/prompts/OTCLIENT_TIBIA_RE_VIEWPORT_CONTINUATION.md` if/when it is canonical on the task's live base, otherwise treat the owner's explicit viewport objective plus this handover as task input without overriding main governance;
-5. active task record `docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md`;
-6. report `docs/agents/reports/OTCLIENT-20260816-worldmap-extent-static-re.md`;
-7. all evidence under `docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/`.
+Mandatory current evidence entry point:
 
-Before any write, refresh `main`, PR #367, reviews, CI, ownership and overlapping PRs/tasks. Preserve one-task/one-PR ownership. Do not use Codex, OpenAI API, or owner-funded tokens/limits.
+`docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-new-exact-static-unblock-and-downstream-recovery.md`
 
-## Objective
+Do not use owner-funded Codex/OpenAI API/tokens. Do not modify client bytes.
 
-Recover the complete static patch/dependency graph required to safely increase official Tibia worldmap viewport/map extent across:
+## New exact-static producer already consumed
 
-- `TWorldMapExtent`;
-- `TWorldMapSubfieldExtent`;
-- `TWorldMapViewport`;
-- `TWorldMapStorage`;
-- `TWorldmapProtocolMessageHandler`;
-- `TWorldMapRenderProvider`;
-- `TWorldMapCamera`;
-- `TWorldMapPicker`.
+Draft PR #437 / task `OTC-20260816-track-a-worldmap-exact-static-evidence` is the bounded sanitized producer for #367 and declares `WORLD_MAP_STATIC_EVIDENCE_READY=true`.
 
-Do not modify client bytes in this phase. Recover dimension fields, constructors/default writers, all material readers/writers, allocations/capacities, loop bounds, parser assumptions, storage indexing/eviction, clipping/culling, camera transforms and picker bounds. Record FACT/INFERENCE/UNKNOWN/CONFLICT separately.
-
-## Current retained evidence
-
-The task has already recovered:
-
-- raw provenance artifact `9227370490` with 90 strip rows;
-- two Z=7 horizontal samples X=`32537..32554` (18 consecutive X) at Y=`32502` and Y=`32516`, with exact delta Y=14;
-- exact retained code leads BP1/static `0xcecc70` and BP2/static `0xcecf40`, observer-assigned `CreateOnMap` and `ChangeOnMap`;
-- shared `owner+0x10 -> virtual slot +0xa0` path and event reads `+0x18/+0x20/+0x28`, plus `ChangeOnMap` gate `event+0x10 & 1` and helper lead `0xceca50`;
-- richer exact-static census artifact `9246756211` with target RTTI/control-block strings and coordinate-to-shared-tile `unordered_map` instantiation;
-- historical exact-build leads `0xcd4e20`, `0xcec8d0`, `0x19a8ea3` and typeinfo/relocation anchors already recorded in evidence.
-
-Do not upgrade observer labels to independent symbols without recovering their source provenance. Do not call event offsets viewport dimensions without a direct field/writer proof.
-
-## Newly supplied official package
-
-The owner supplied `/mnt/data/tibia.x64.tar.gz` in the preceding ChatGPT session and stated it was downloaded on 2026-08-16 from the official Tibia website. The bytes are **not committed to the public repository**. Durable metadata is in `20260816-owner-upload-launcher-package.md`.
-
-Verified archive fence:
+Exact client fence:
 
 ```text
-size    29477141
-sha256  04a87c801d3855f4da1b07e201dff1f79acc8528c57c984131c3a2a88cb60ea7
+version  15.32.df7b29
+size     51965216
+sha256   e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 ```
 
-`Tibia/Tibia` inside it:
+Producer evidence:
 
 ```text
-size    1460808
-sha256  a5fc6e8ee8246868263c438539a54ea045bd048a1bea45f968fc2f498b682ca0
-format  ELF 64-bit PIE x86-64
+source run/job/artifact  31972743782 / 95227595548 / 9270235755
+source artifact sha256   039d22fe5f88a07784c4ddc32cf6b1d9c2d07a34e90ed5902ffd21d3acd5735b
+hosted run/job/artifact  31972915689 / 95228024727 / 9270276361
+hosted artifact sha256   0dc8d0a44e5a2550ef79c219bda14787796ef7accc0ab1627fecd7c6d55330bc
+hosted validation        PASS
 ```
 
-Static strings show launcher/update/package-version logic. It is therefore a launcher/bootstrap candidate, **not** the historical 51,965,216-byte exact game-client ELF. The old exact fence remains historical evidence; do not silently substitute this launcher binary for it.
+Both artifact ZIP digests were independently checked while consuming them. No exhausted historical inventory was rescanned and no failed CDN fetch was repeated.
 
-## Immediate next action
+## Exact corrections now authoritative for this task
 
-First recover, statically and without GUI/login, the launcher's package metadata/update mechanism sufficiently to determine the current official game-package identity/version and whether its game payload can be materialized on GitHub-hosted infrastructure. Prefer extracting URLs/config/package metadata from the supplied archive or official public metadata rather than executing the launcher.
+All three previously missing identity windows are proven:
 
-If a current game payload becomes available, establish a **new explicit immutable fence** (source provenance, version/build, size, SHA-256) before comparing it with historical `15.32.df7b29`. Then determine whether target RTTI/types and worldmap structures persist and continue the graph recovery.
+```text
+0x030871d8 -> tibia::worldmap::TWorldmapProtocolMessageHandler
+0x0308ce70 -> tibia::worldmap::TWorldMapStorage
+0x02f683d0 -> counted TWorldMapStorage control block
+```
 
-In parallel, continue mining same-repository retained artifacts/history for the historical graph. Priority leads: recover provenance/source for BP1/BP2 observer naming; correlate `0xceca50`, `0xcecc70`, `0xcecf40`, `0xcd4e20`, `0xcec8d0`; recover constructor/typeinfo/vtable/storage/render/camera/picker relationships.
+The historical object with retained `+0x48=18`, `+0x4c=14` is **TWorldMapStorage**, not `TWorldMapViewport`. The previous strong Viewport inference for that exact object/control pair is superseded and must not be revived.
 
-## Runtime boundary
+## Storage graph recovered
 
-No runtime is currently required. Do not use Synology for static RE. If a later discriminator genuinely requires GUI/runtime, obey Track A admission/ownership/Gate A/rebind/Gate B/target-uniqueness/supervisor governance and reuse only an admissible existing persistent session. Never create a second desktop/X11/VNC/login session as fallback. If safe reuse is impossible, record WAITING/BLOCKED.
+Exact anchors:
 
-## Acceptance
+```text
+Storage ctor             0x00cbf37a
+Storage slot-12 mutator  0x00cc6cd0
+priority pair copy       0x00cc6d2c: [rsi+0x38] QWORD -> Storage+0x48
+Storage slot-13 export   0x00cb0180
+Storage slot-14 bounds   0x00cb01d0
+TWorldMapExtent vptr     0x02f61578 at Storage+0x40
+```
 
-This phase is ready for patch design only when the evidence graph identifies the relevant extent/dimension storage and proves all material consumers/constraints across protocol, storage, render, camera and picker, with fixed allocations/loop/parser/clipping assumptions enumerated. Until then remain `MORE_STATIC_RE_NEEDED` or an exact blocker; do not claim `STATIC_PATCH_GRAPH_READY`.
+Proven half-open 3D bounds:
 
-Persist every material discovery to the existing task/report/evidence and keep PR #367's description/status synchronized with the live task. Validate the exact final head with repository CI before any closeout claim.
+```text
+Storage+0x18 <= x < Storage+0x30
+Storage+0x1c <= y < Storage+0x34
+Storage+0x20 <= z < Storage+0x38
+```
+
+All requested geometry DWORDs `+0x18/+0x1c/+0x30/+0x34/+0x48/+0x4c` now have exact initialization and mutation coverage.
+
+The Storage geometry mutator traverses its ordered node structure and removes entries outside new bounds; removal decrements `Storage+0x88`. Additional virtuals use `+0x88` while traversing/exporting/filtering the same extent-aware structure. This proves extent-driven out-of-bounds removal and a live collection-count relation, but not a fixed maximum capacity.
+
+The upstream producer of slot-12 input `rsi+0x38` that dynamically supplies the embedded extent pair remains `UNKNOWN`.
+
+## Viewport graph recovered separately
+
+Exact `TWorldMapViewport` constructor:
+
+```text
+constructor 0x00cbf680
+vptr        0x0308c9a8
+typeinfo    0x0308b590
+```
+
+It has its own extent/geometry state, including constructor values `Viewport+0x48=8` and `Viewport+0x60=4`. Adjacent geometry update `0x00cbf700` recomputes Viewport state and includes signed shift-by-5 arithmetic.
+
+Do not infer a direct Storage↔Viewport ownership edge merely from code locality; that exact edge is still `UNKNOWN`.
+
+## Remaining exact frontier
+
+Current producer anchors downstream classes but stages only insufficient first-slot semantics for the final patch graph:
+
+```text
+TWorldMapRenderProvider vptr 0x02f6c258 / first staged slot 0x00820970
+TWorldMapCamera         vptr 0x03083968 / first staged slot 0x00dedda0
+TWorldMapPicker         vptr 0x02f6b7c8 / first staged slot 0x008205c0
+```
+
+The staged RenderProvider/Picker code is destructor/cleanup-heavy; Camera first-slot code is trivial/metaobject-like. Do not invent clipping, culling, projection, scale or picking rules from these windows.
+
+## Exact next action
+
+Obtain a **new bounded exact-client producer bundle** for:
+
+1. the caller/upstream object feeding Storage slot 12, especially the source of `rsi+0x38`;
+2. non-destructor `TWorldMapRenderProvider` virtual/caller windows for iteration/clipping/culling;
+3. non-meta `TWorldMapCamera` windows for projection/scale/viewport coupling;
+4. non-destructor `TWorldMapPicker` windows for screen/world transforms and limits;
+5. fixed-allocation, loop-bound, mask and packing sites tied to those paths.
+
+Then continue this same PR #367. Do not rescan the exhausted retained-artifact set, repeat the identical failed CDN fetch, use Synology as an unauthorized static-analysis fallback, or design a client-byte patch until the downstream graph is complete.

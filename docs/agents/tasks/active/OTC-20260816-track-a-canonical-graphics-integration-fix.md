@@ -8,15 +8,16 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: runtime_worker_repair
-phase: hosted-implementation
+phase: hosted-validation
 branch: fix/OTC-20260816-track-a-canonical-graphics-integration-fix
 base_branch: main
 base_main: a482bba877c881d31ae903a6f8acad24debfb5c5
 risk: medium
-updated: 2026-08-16T18:35:00+02:00
+updated: 2026-08-16T18:43:00+02:00
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+  - .github/workflows/track-a-canonical-graphics-integration-validation.yml
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-graphics-integration-fix.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-graphics-integration-fix/**
 modules_touched: []
@@ -30,7 +31,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: direct runtime evidence selected a graphics-stack compatibility boundary, while Qt 6.9.3 primary source proves the trusted worker explicitly disables both XCB GLX and EGL integrations through QT_XCB_GL_INTEGRATION=none; correction can be implemented and contract-tested without physical runtime access
+execution_reason: direct runtime evidence selected a graphics-stack compatibility boundary, while Qt 6.9.3 primary source proves the trusted worker explicitly disables both XCB GLX and EGL integrations through QT_XCB_GL_INTEGRATION=none; correction is implemented and contract-validated without physical runtime access
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -68,6 +69,7 @@ qt_primary_source_evidence:
   repository: qt/qtbase
   version: v6.9.3
   path: src/plugins/platforms/xcb/qxcbconnection.cpp
+  blob: e6d232d0ef95023e8b1586b706743fc7f01c3711
   behavior:
     - default XCB GL integration priority is xcb_glx then xcb_egl
     - QT_XCB_GL_INTEGRATION is read from the environment
@@ -84,6 +86,14 @@ safety:
   rollback_contract_unchanged: true
   credentials_login_contract_unchanged: true
   physical_success_claimed: false
+validation:
+  temporary_hosted_validator: .github/workflows/track-a-canonical-graphics-integration-validation.yml
+  runtime_access: none
+  physical_e2e: false
+  semantic_result: PENDING
+  final_governance: PENDING
+  final_repository_ci: PENDING
+  review_threads_open: PENDING
 acceptance:
   - canonical worker no longer exports QT_XCB_GL_INTEGRATION=none
   - canonical worker still exports QT_QUICK_BACKEND=software
@@ -91,9 +101,10 @@ acceptance:
   - source-level tests pin all three invariants
   - existing canonical session/transition/guard/lease tests remain green
   - no Synology, X11/VNC, client launch, credentials or canonical runtime access is used by this task
+  - temporary hosted validator is removed before promotion
   - exact-head governance and repository CI pass before promotion
-last_completed_step: terminal window discriminator selected graphics-stack compatibility; Qt 6.9.3 primary source proved QT_XCB_GL_INTEGRATION=none disables both xcb_glx and xcb_egl integration candidates
-next_action: implement the minimal worker environment correction and hosted contract tests, validate exact-head governance/CI, then coordinator-promote/archive; physical canonical validation belongs to a later invocation
+last_completed_step: minimal worker environment correction and source-contract test are implemented; temporary GitHub-hosted validator dispatched without runtime access
+next_action: consume hosted validator result, persist exact validation evidence, remove the temporary workflow, then obtain final exact-head governance/CI and coordinator-promote/archive; physical canonical validation belongs to a later invocation
 ---
 
 # Track A canonical graphics integration fix

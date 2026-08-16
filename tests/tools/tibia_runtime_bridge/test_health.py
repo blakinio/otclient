@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 import unittest
 
 from tools.tibia_runtime_bridge.health import (
@@ -91,6 +92,12 @@ class BridgeHealthTests(unittest.TestCase):
         self.assertEqual(HealthState.NO_IDENTITY, health.state)
         self.assertFalse(health.bridge_ready)
 
+    def test_invalid_binding_source_fails_closed(self):
+        session = BridgeSession(lambda: "not-a-binding", request_fn=self.ping_ok, status_fn=self.status_ok)  # type: ignore[arg-type,return-value]
+        result = session.reacquire()
+        self.assertEqual(ReacquireState.INVALID_IDENTITY, result.state)
+        self.assertIsNone(session.binding)
+
     def test_transport_failure_is_unreachable(self):
         current = self.binding()
 
@@ -108,6 +115,16 @@ class BridgeHealthTests(unittest.TestCase):
             raise BridgeProtocolError("synthetic malformed response")
 
         session = BridgeSession(lambda: current, request_fn=malformed, status_fn=self.status_ok)
+        session.reacquire()
+        self.assertEqual(HealthState.MALFORMED, session.probe().state)
+
+    def test_non_object_ping_is_malformed(self):
+        current = self.binding()
+
+        def non_object(path: Path, command: str, *, timeout: float) -> Any:
+            return ["not", "an", "object"]
+
+        session = BridgeSession(lambda: current, request_fn=non_object, status_fn=self.status_ok)
         session.reacquire()
         self.assertEqual(HealthState.MALFORMED, session.probe().state)
 
@@ -132,6 +149,20 @@ class BridgeHealthTests(unittest.TestCase):
         health = session.probe()
         self.assertEqual(HealthState.DEGRADED, health.state)
         self.assertFalse(health.bridge_ready)
+
+    def test_wrong_session_evidence_level_is_malformed(self):
+        current = self.binding()
+
+        def promoted_status(path: Path, *, timeout: float) -> dict[str, object]:
+            return {
+                "ok": True,
+                "in_game_candidate": True,
+                "evidence_level": "AUTHORITATIVE",
+            }
+
+        session = BridgeSession(lambda: current, request_fn=self.ping_ok, status_fn=promoted_status)
+        session.reacquire()
+        self.assertEqual(HealthState.MALFORMED, session.probe().state)
 
     def test_generation_change_during_probe_discards_cached_channel(self):
         holder = {"binding": self.binding()}
@@ -171,6 +202,23 @@ class BridgeHealthTests(unittest.TestCase):
         session = BridgeSession(lambda: holder["binding"], request_fn=self.ping_ok, status_fn=self.status_ok)
         self.assertEqual(ReacquireState.ACQUIRED, session.reacquire().state)
         holder["binding"] = self.binding()
+
+        reacquired = session.reacquire()
+
+        self.assertEqual(ReacquireState.STALE_IDENTITY, reacquired.state)
+        self.assertIsNone(session.binding)
+
+    def test_lease_generation_regression_is_rejected_with_new_registration(self):
+        holder = {
+            "binding": self.binding(
+                "bridge-b.sock", registration_generation=2, lease_generation=2, pid=101, process_start_ticks=1001
+            )
+        }
+        session = BridgeSession(lambda: holder["binding"], request_fn=self.ping_ok, status_fn=self.status_ok)
+        self.assertEqual(ReacquireState.ACQUIRED, session.reacquire().state)
+        holder["binding"] = self.binding(
+            "bridge-c.sock", registration_generation=3, lease_generation=1, pid=102, process_start_ticks=1002
+        )
 
         reacquired = session.reacquire()
 

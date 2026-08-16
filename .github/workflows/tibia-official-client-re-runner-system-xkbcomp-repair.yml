@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   repair-and-validate-xvfb:
-    runs-on: [self-hosted, Linux, X64, otclient, synology]
+    runs-on: [otclient, synology]
     timeout-minutes: 10
     steps:
       - name: Publish exact helper and validate isolated Xvfb

@@ -8,6 +8,7 @@ phase: validate
 branch: docs/OTC-20260816-track-a-viewport-continuation-prompt
 base_branch: main
 base_head: 19556a5bca362dede3f9c2608902eda6e358b2bc
+pull_request: 363
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: chat_github_connector
@@ -118,7 +119,28 @@ No client-byte mutation or live runtime is authorized by this prompt's initial p
 - It encodes Synology GUI reuse-only behavior and explicitly forbids creation/reconfiguration of a replacement desktop/session.
 - It preserves Track A ownership/admission rules and does not authorize runtime mutation.
 - It does not use owner-funded Codex/OpenAI API quota or owner-owned AI credentials/tokens.
-- Final diff/audit/CI/PR closeout must pass before this task is completed.
+- Final CI/PR closeout must pass before this documentation task is completed.
+
+# Fresh audit
+
+Exact PR #363 two-file diff was re-read against trusted-base Track A governance and the canonical wrapper.
+
+```yaml
+audit:
+  result: PASS
+  material_findings_open: 0
+  prompt_expands_runtime_authority: false
+  static_github_hosted_first: true
+  gui_synology_only: true
+  existing_gui_session_reuse_only: true
+  new_gui_session_forbidden: true
+  desktop_reconfiguration_forbidden: true
+  gate_a_rebind_gate_b_preserved: true
+  owner_funded_ai_used: false
+  proprietary_or_secret_material_added: false
+```
+
+The owner GUI rule is stricter than the general runtime model and therefore narrows this viewport task. It does not grant permission to seize or reuse an active session without current ownership/admission.
 
 # Validation checkpoint
 
@@ -129,11 +151,11 @@ focused_review:
   exact_client_fence_recorded: true
   runtime_mutation_authorized: false
   owner_funded_ai_used: false
-fresh_audit: pending
+fresh_audit: PASS
 exact_head_ci: pending
 pr_terminal: pending
 ```
 
 # Next action
 
-Open the dedicated documentation PR, audit the exact two-file diff against trusted-base Track A governance, then complete required exact-head CI and PR closeout.
+Mark PR #363 ready for review, run required exact-head CI, then merge/archive through normal repository protection if all checks remain green.

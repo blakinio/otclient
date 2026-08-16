@@ -16,7 +16,7 @@ base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
 live_main_observed: ffe954be315ee29825c726b996a30fea8475a0f3
 pr: 367
 risk: medium
-updated: 2026-08-16T18:19:00+02:00
+updated: 2026-08-16T18:23:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md
   - .github/scripts/tibia-official-client-re-worldmap-extent-static.py
@@ -39,7 +39,7 @@ blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: static/artifact reverse engineering remains deterministic and GitHub-hosted; retained same-repo evidence permits continued progress despite unavailable fresh exact-client staging
+execution_reason: static/artifact reverse engineering remains deterministic and GitHub-hosted; retained same-repo evidence was exhausted to a bounded missing-static-window blocker
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: finalize_archive_and_continue
@@ -49,7 +49,7 @@ context_growth: stable
 context_score: 10
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: one cohesive graph spans extent ownership, protocol/storage updates and render/camera/picker consumers; retained evidence is still advancing the same task
+decomposition_reason: one cohesive graph spans extent ownership, protocol/storage updates and render/camera/picker consumers; no replacement task/PR is warranted
 validation_level: focused
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
@@ -74,9 +74,9 @@ client_size: 51965216
 client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
 invocation_started_at: 2026-08-16T14:20:00+02:00
-last_progress_at: 2026-08-16T18:19:00+02:00
+last_progress_at: 2026-08-16T18:23:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: owner-vptr-storage-scale-coupling
+ci_check_generation: exact-static-evidence-blocker
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -88,7 +88,7 @@ heavy_validation_runs: 1
 hosted_staging_attempts_this_task: 2
 hosted_staging_result: INPUT_BLOCKED
 fresh_exact_binary_materialization: BLOCKED
-retained_evidence_research_path: active
+retained_evidence_research_path: BLOCKED_NEW_EXACT_STATIC_EVIDENCE_REQUIRED
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
@@ -141,6 +141,20 @@ exact_static_identity_frontier:
   geometry_control_vptr_header: 0x02f683c0..0x02f683cf
   counted_viewport_type_string_start: 0x1cabb60
   counted_protocol_handler_type_string_start: 0x1cdba40
+retained_identity_search:
+  status: EXHAUSTED_FOR_CURRENT_DOWNLOADED_SET
+  evidence: docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-retained-identity-window-exhaustion.md
+  missing_vptr_header_bytes: true
+  missing_geometry_field_writers_xrefs: true
+  repeated_scan_allowed: false
+static_blocker:
+  status: BLOCKED
+  kind: NEW_EXACT_STATIC_EVIDENCE_REQUIRED
+  effect: class identities and safe field patch sites cannot be proven from the current retained set
+  acceptable_unblockers:
+    - previously uninspected same-repository retained artifact containing the exact windows/relocations
+    - governance-compliant staging of the fenced exact client sufficient to extract only bounded missing static evidence
+  forbidden_duplicate_action: repeat identical official CDN staging attempt
 user_supplied_launcher:
   archive_size: 29477141
   archive_sha256: 04a87c801d3855f4da1b07e201dff1f79acc8528c57c984131c3a2a88cb60ea7
@@ -151,7 +165,7 @@ hosted_official_metadata_probe:
   run: 31949948886
   result: CLOUDFLARE_HTTP_403
   identical_retry_allowed: false
-next_action: recover any retained vtable-header/typeinfo window for 0x030871d8, 0x0308ce70 or 0x02f683d0; recover geometry writers/xrefs; correlate 0xced1b0 self+0x30/+0xd0 with storage/render/camera identity; then audit render/camera/picker bounds before mutation design
+next_action: obtain NEW exact static evidence for at least one identity window or geometry writer/xref; do not rescan the current retained set or repeat identical CDN fetches; after unblocking, resume the same PR/task with storage/render/camera/picker dependency recovery
 ---
 
 # Track A worldmap extent static RE
@@ -164,11 +178,13 @@ Recover the full static patch/dependency graph for `TWorldMapExtent`, `TWorldMap
 ```yaml
 static_classification: MORE_STATIC_RE_NEEDED
 fresh_exact_binary_materialization: BLOCKED
-retained_evidence_research_path: active
+retained_evidence_research_path: BLOCKED_NEW_EXACT_STATIC_EVIDENCE_REQUIRED
 runtime_discriminator_required: false
 ```
 
-Fresh GitHub-hosted materialization of the exact installed game-client ELF remains unavailable, but retained same-repository evidence has advanced the graph further. No new runtime, GUI/session, client-byte mutation, Synology static RE, credentials, Codex/OpenAI API or owner-funded token use occurred.
+The current downloaded retained evidence set has been exhausted for the exact identity/writer questions that now gate safe patch design. This is a static-input blocker, not a reason to create a new task or PR.
+
+No new runtime, GUI/session, client-byte mutation, Synology static RE, credentials, Codex/OpenAI API or owner-funded token use occurred.
 
 ## Durable evidence
 
@@ -177,6 +193,7 @@ Fresh GitHub-hosted materialization of the exact installed game-client ELF remai
 - `20260816-exact-handler-disassembly-recovery.md` — producer-source labels plus exact fenced FullMap/Create/Change/Delete/MapDescription disassembly graph.
 - `20260816-retained-owner-geometry-object.md` — direct `owner+0x10` object fields, exact stored `18/14`, candidate bound deltas and static vptr `0x0308ce70`.
 - `20260816-owner-vptr-storage-scale-coupling.md` — common handler-owner static vptr `0x030871d8`, exact identity windows, and `0xced1b0 -> self+0x30/+0xd0` float coupling.
+- `20260816-retained-identity-window-exhaustion.md` — bounded search proving that the current retained set lacks the required vtable-header/typeinfo windows and geometry-field writer/xrefs.
 
 ## Major current facts
 
@@ -184,9 +201,10 @@ Fresh GitHub-hosted materialization of the exact installed game-client ELF remai
 - Its exact historical static vptr is `0x0308ce70`; exact class identity remains `UNKNOWN`.
 - The common historical map-handler owner has exact static vptr `0x030871d8`; `TWorldmapProtocolMessageHandler` is a strong but unproven semantic correlation.
 - `FullMap@0xcec8d0` multiplies two payload integers by exactly 32 before a worldmap-owner virtual call.
-- `MapDescription@0x19a8a80` uses descriptor grid/divisor fields `+0x38/+0x3c/+0x40/+0x48` and coordinate transform inputs `+0x08/+0x0c/+0x10`.
+- `MapDescription@0x19a8a80` uses descriptor grid/divisor fields `+0x38/+0x3c/+0x40/+0x48` and coordinate-transform inputs `+0x08/+0x0c/+0x10`.
 - `0xced1b0` rebuilds a bucketed 0x20-byte-node hash structure and later consumes a float at dependency `self+0x30/+0xd0`; exact class and semantic meaning remain `UNKNOWN`.
-- The exact-static census includes all target type names, shared-control-block surfaces, full counted viewport string start `0x1cabb60`, full counted protocol-handler string start `0x1cdba40`, and literal `tibia::worldmap::TWorldMapExtentX` at `0x1cd9ad7`.
+- The exact-static census contains all target type names, full counted viewport string start `0x1cabb60`, full counted protocol-handler string start `0x1cdba40`, and literal `tibia::worldmap::TWorldMapExtentX` at `0x1cd9ad7`.
+- Recursive retained-file search found no preserved `vptr-16/vptr-8` header bytes for `0x030871d8`, `0x0308ce70` or `0x02f683d0`, and no direct geometry `+0x48/+0x4c` writer/xrefs.
 
 ## Acceptance progress
 
@@ -202,6 +220,7 @@ Fresh GitHub-hosted materialization of the exact installed game-client ELF remai
 - [x] protocol-side ×32 conversion proven;
 - [x] descriptor grid/divisor accesses proven;
 - [x] candidate hash rebuild and post-rebuild float coupling proven;
+- [x] current retained identity-window search bounded and exhausted;
 - [ ] exact class identity for static vptr `0x0308ce70`;
 - [ ] exact class identity for static vptr `0x030871d8`;
 - [ ] semantic names/units for geometry fields;
@@ -212,4 +231,11 @@ Fresh GitHub-hosted materialization of the exact installed game-client ELF remai
 - [ ] fixed allocations/loop bounds/masks/packing audited completely;
 - [ ] coherent patch/dependency graph ready for mutation design.
 
-The task remains active while retained evidence can still produce non-duplicative facts.
+## Exact blocker
+
+Further progress now requires **new exact static evidence**, not another pass over the same retained files. Any future continuation must resume this same task/PR and first obtain one of:
+
+1. a previously uninspected same-repository artifact containing one of the exact identity windows/relocations; or
+2. a governance-compliant staging of the fenced exact client sufficient to extract only the bounded missing bytes/relocations/writer xrefs.
+
+Do not repeat the already-failed identical official CDN staging attempt. Do not use Synology as an unauthorized static fallback.

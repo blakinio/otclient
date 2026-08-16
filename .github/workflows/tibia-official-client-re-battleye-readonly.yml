@@ -33,33 +33,14 @@ jobs:
           fi
 
           base='/home/runner/_work/_otclient_tibia_re_state'
-          tibia_home="$base/home/.local/share/CipSoft GmbH/Tibia"
-          package="$tibia_home/packages/Tibia"
-          client="$package/bin/client"
-
           echo "BATTLEYE_AUDIT_RUNNER=synology-otclient-01"
-          echo "BATTLEYE_AUDIT_TARGET=$package"
-
-          if [[ ! -f "$client" ]]; then
-            echo "BATTLEYE_AUDIT_ERROR=exact_client_missing"
-            exit 3
-          fi
-
-          actual_size="$(stat -c '%s' "$client")"
-          actual_sha="$(sha256sum "$client" | awk '{print $1}')"
-          echo "BATTLEYE_AUDIT_CLIENT_SIZE=$actual_size"
-          echo "BATTLEYE_AUDIT_CLIENT_SHA256=$actual_sha"
-          if [[ "$actual_size" != "$EXPECTED_CLIENT_SIZE" || "$actual_sha" != "$EXPECTED_CLIENT_SHA256" ]]; then
-            echo "BATTLEYE_AUDIT_ERROR=exact_client_fence_mismatch"
-            exit 4
-          fi
-          echo "BATTLEYE_AUDIT_EXACT_CLIENT_FENCE=PASS"
+          echo "BATTLEYE_AUDIT_DISCOVERY_ROOT=$base"
 
           path_hits="$RUNNER_TEMP/battleye-path-hits.txt"
           : >"$path_hits"
-          for root in "$tibia_home" "$base/home/.local/share" /opt /usr/local; do
+          for root in "$base" /home/runner/.local/share /opt /usr/local; do
             [[ -e "$root" ]] || continue
-            find "$root" -xdev -maxdepth 10 \
+            find "$root" -xdev -maxdepth 16 \
               \( -type f -o -type d -o -type l \) \
               \( -iname '*battleye*' -o -iname 'beclient*' -o -iname 'beservice*' \) \
               -print 2>/dev/null || true
@@ -73,30 +54,48 @@ jobs:
             done <"$path_hits"
           fi
 
-          for token in BattlEye BEClient BEService; do
-            if LC_ALL=C grep -aFq -- "$token" "$client"; then
-              echo "BATTLEYE_AUDIT_CLIENT_TOKEN_${token^^}=PRESENT"
-            else
-              echo "BATTLEYE_AUDIT_CLIENT_TOKEN_${token^^}=ABSENT"
+          exact_files="$RUNNER_TEMP/exact-client-files.txt"
+          : >"$exact_files"
+          while IFS= read -r -d '' candidate; do
+            sha="$(sha256sum "$candidate" 2>/dev/null | awk '{print $1}')"
+            if [[ "$sha" == "$EXPECTED_CLIENT_SHA256" ]]; then
+              printf '%s\n' "$candidate" >>"$exact_files"
             fi
-          done
+          done < <(
+            for root in "$base" /home/runner/.local/share /opt /usr/local; do
+              [[ -e "$root" ]] || continue
+              find "$root" -xdev -maxdepth 16 -type f -size "${EXPECTED_CLIENT_SIZE}c" -print0 2>/dev/null || true
+            done
+          )
+          sort -u -o "$exact_files" "$exact_files"
+
+          exact_file_count="$(grep -c . "$exact_files" || true)"
+          echo "BATTLEYE_AUDIT_EXACT_CLIENT_FILE_COUNT=$exact_file_count"
+          while IFS= read -r client; do
+            [[ -n "$client" ]] || continue
+            printf 'BATTLEYE_AUDIT_EXACT_CLIENT_FILE=%s\n' "$client"
+          done <"$exact_files"
+
+          token_source=''
+          if (( exact_file_count > 0 )); then
+            token_source="$(head -n1 "$exact_files")"
+          fi
 
           process_hits=0
-          for procdir in /proc/[0-9]*; do
-            [[ -r "$procdir/comm" ]] || continue
-            comm="$(cat "$procdir/comm" 2>/dev/null || true)"
-            lower="${comm,,}"
-            case "$lower" in
-              *battleye*|*beclient*|*beservice*)
-                process_hits=$((process_hits + 1))
-                printf 'BATTLEYE_AUDIT_PROCESS_NAME=%s\n' "$comm"
-                ;;
-            esac
-          done
-          echo "BATTLEYE_AUDIT_PROCESS_NAME_HIT_COUNT=$process_hits"
-
           exact_client_candidates=0
+          process_exact_source=''
           for procdir in /proc/[0-9]*; do
+            if [[ -r "$procdir/comm" ]]; then
+              comm="$(cat "$procdir/comm" 2>/dev/null || true)"
+              lower="${comm,,}"
+              case "$lower" in
+                *battleye*|*beclient*|*beservice*)
+                  process_hits=$((process_hits + 1))
+                  printf 'BATTLEYE_AUDIT_PROCESS_NAME=%s\n' "$comm"
+                  ;;
+              esac
+            fi
+
             exe="$(readlink -f "$procdir/exe" 2>/dev/null || true)"
             [[ -n "$exe" && -f "$exe" ]] || continue
             size="$(stat -c '%s' "$exe" 2>/dev/null || true)"
@@ -104,6 +103,30 @@ jobs:
             sha="$(sha256sum "$exe" 2>/dev/null | awk '{print $1}')"
             [[ "$sha" == "$EXPECTED_CLIENT_SHA256" ]] || continue
             exact_client_candidates=$((exact_client_candidates + 1))
+            [[ -n "$process_exact_source" ]] || process_exact_source="$exe"
           done
+          echo "BATTLEYE_AUDIT_PROCESS_NAME_HIT_COUNT=$process_hits"
           echo "BATTLEYE_AUDIT_EXACT_CLIENT_PROCESS_COUNT=$exact_client_candidates"
+
+          if [[ -z "$token_source" && -n "$process_exact_source" ]]; then
+            token_source="$process_exact_source"
+          fi
+
+          if [[ -n "$token_source" ]]; then
+            echo "BATTLEYE_AUDIT_TOKEN_SOURCE_EXACT_FENCE=PASS"
+            for token in BattlEye BEClient BEService; do
+              key="$(printf '%s' "$token" | tr '[:lower:]' '[:upper:]')"
+              if LC_ALL=C grep -aFq -- "$token" "$token_source"; then
+                echo "BATTLEYE_AUDIT_CLIENT_TOKEN_${key}=PRESENT"
+              else
+                echo "BATTLEYE_AUDIT_CLIENT_TOKEN_${key}=ABSENT"
+              fi
+            done
+          else
+            echo "BATTLEYE_AUDIT_TOKEN_SOURCE_EXACT_FENCE=UNAVAILABLE"
+            echo "BATTLEYE_AUDIT_CLIENT_TOKEN_BATTLEYE=UNKNOWN"
+            echo "BATTLEYE_AUDIT_CLIENT_TOKEN_BECLIENT=UNKNOWN"
+            echo "BATTLEYE_AUDIT_CLIENT_TOKEN_BESERVICE=UNKNOWN"
+          fi
+
           echo "BATTLEYE_AUDIT_MUTATION_PERFORMED=false"

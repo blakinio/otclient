@@ -17,7 +17,7 @@ retained_evidence_research_path: ACTIVE
 
 ## Result
 
-The task remains active as `MORE_STATIC_RE_NEEDED`. Fresh GitHub-hosted staging of the exact installed `15.32.df7b29` game-client ELF remains blocked by the official CDN, but same-repository retained exact-client evidence has now yielded a materially stronger protocol/storage-side graph.
+The task remains active as `MORE_STATIC_RE_NEEDED`. Fresh GitHub-hosted staging of the exact installed `15.32.df7b29` game-client ELF remains blocked by the official CDN, but same-repository retained exact-client evidence has now yielded a materially stronger protocol/storage-side graph and, in this continuation, direct object-level `18/14` geometry fields.
 
 The owner-supplied current Linux archive was also preserved as an exact GitHub Actions artifact. Static inspection proves that archive is the Tibia launcher/updater distribution, not the historical 51,965,216-byte installed game-client ELF, so it is not silently substituted for the exact-client fence.
 
@@ -52,7 +52,7 @@ A GitHub-hosted probe using launcher-derived correct official manifest paths ret
 
 Retained artifact `9227370490` (`track-a-persistent-provenance-dump`, run `31821458677`, digest `sha256:991f5c22a7ffc1d23c6597307a49728b363863a5acd6dd754bff1222404c8e2d`) contains 90 raw strip rows.
 
-Direct facts:
+Direct strip facts:
 
 ```text
 Z=7, Y=32502, class=0: X=32537..32554 -> 18 consecutive X
@@ -60,7 +60,45 @@ Z=7, Y=32516, class=0: X=32537..32554 -> 18 consecutive X
 Y delta between those two groups: 14
 ```
 
-This proves the raw 18/14 geometry relationship but does **not** yet prove literal stored `width=18` / `height=14` fields.
+### Direct retained object-level geometry
+
+The same artifact preserves two `ChangeOnMap` hits and one `CreateOnMap` hit with the same historical handler owner `0x55868276a460`. The GDB breakpoints and previously recovered static labels yield one consistent historical PIE base `0x5586665f8000`.
+
+The object reached directly through `owner+0x10` is `0x55867df448c0`; its runtime vptr `0x558669684e70` translates to static vptr `0x0308ce70`.
+
+Across all three retained hits, direct DWORD decoding of that object is stable:
+
+```text
+object+0x18 = 32537
+object+0x1c = 32503
+object+0x30 = 32555
+object+0x34 = 32517
+object+0x38 = 8
+object+0x48 = 18
+object+0x4c = 14
+object+0x50 = 8
+object+0x58 = 7
+object+0x60 = 19
+```
+
+Two independent exact relations occur in the same object:
+
+```text
+32555 - 32537 = 18
+32517 - 32503 = 14
+```
+
+and the object separately stores the exact pair `18,14` at `+0x48/+0x4c`.
+
+**FACT:** a concrete object directly consumed through the worldmap handler's `owner+0x10` path stores an exact `18/14` pair, and the same object stores two coordinate-like pairs whose differences are independently `18/14`. The exact historical static vptr is `0x0308ce70`.
+
+**INFERENCE:** `+0x18/+0x1c` and `+0x30/+0x34` are plausible lower/upper bounds, while `+0x48/+0x4c` are plausible width/height or extent fields. `TWorldMapViewport` is a plausible identity for the object, but this is not proven.
+
+**UNKNOWN:** exact class identity, semantic field names/units, constructor/default writer and complete reader/writer graph. Therefore the pair is not yet a safe patch site and is not called literal `TWorldMapViewport::width/height`.
+
+The horizontal strip span `32537..32554` matches the half-open interpretation `[32537,32555)` exactly. The retained strip Y values (`32502`, `32516`) are one row below the object's candidate Y fields (`32503`, `32517`), so a strip-to-field identity is not promoted without recovering the relevant transform/writer convention.
+
+Durable detail: `docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-retained-owner-geometry-object.md`.
 
 ## Observer producer-source provenance recovered
 
@@ -225,6 +263,8 @@ Existing typeinfo-name relocation leads include:
 
 ABI candidate typeinfo starts `0x3089b70` and `0x308b590` remain hypotheses until their surrounding RTTI/vtable graph is recovered.
 
+The newly recovered `owner+0x10` object has static vptr `0x308ce70`. Current retained artifacts inspected in this continuation do not contain the decisive vtable-header/relocation window around `0x308ce60..0x308ce6f`, so no direct link to the candidate viewport typeinfo is claimed.
+
 ## Updated partial dependency graph
 
 ```text
@@ -236,12 +276,16 @@ FullMap event @0xcec8d0
        -> descriptor grid fields +0x38/+0x3c/+0x40/+0x48
        -> coordinate bases +0x08/+0x0c/+0x10
        -> generated three-DWORD coordinate-like structure
-       -> owner+0x10 virtual slot +0xa0
+       -> owner+0x10 object (static vptr 0x308ce70)
+            -> direct stored pair +0x48/+0x4c = 18/14
+            -> candidate bound differences = 18/14
+            -> exact class identity UNKNOWN
+       -> virtual slot +0xa0
        -> nested record handling
        -> common helper 0xceca50
 
 Create/Change/Delete
-  -> owner+0x10 virtual slot +0xa0 family
+  -> same owner+0x10 object / virtual slot +0xa0 family
   -> repeated owner+0xd8 map-state comparison family
   -> 0xceca50 used by Create/Change
 
@@ -251,7 +295,8 @@ neighbor 0xced1b0
 
 TWorldMapExtent / SubfieldExtent / Viewport
   -> exact semantic identities present
-  -> concrete field ownership still UNKNOWN
+  -> concrete 18/14 geometry object now proven
+  -> exact class/field semantic ownership still UNKNOWN
 
 RenderProvider / Camera / Picker
   -> exact semantic/shared-lifetime identities present
@@ -265,6 +310,10 @@ RenderProvider / Camera / Picker
 | target subsystem/type presence | PROVEN |
 | separate shared-control-block instantiations | PROVEN for storage/viewport/protocol/render/camera/picker |
 | raw 18-sample geometry and Y delta 14 | PROVEN |
+| concrete `owner+0x10` object stores exact `18/14` at `+0x48/+0x4c` | PROVEN |
+| same object's candidate bound-pair differences are `18/14` | PROVEN arithmetic; bound semantics INFERENCE |
+| object static vptr `0x308ce70` | PROVEN |
+| object class identity / viewport RTTI linkage | UNKNOWN |
 | observer label-source mapping | PROVEN as research-source provenance |
 | exact bounded handler disassembly | PROVEN from exact SHA-fenced historical job log |
 | FullMap payload ×32 conversion | PROVEN |
@@ -272,7 +321,7 @@ RenderProvider / Camera / Picker
 | shared owner+0x10 virtual slot +0xa0 path | PROVEN across FullMap/Create/Change/Delete family |
 | helper `0xceca50` involvement | PROVEN for Create/Change and nested description path |
 | hash-table rebuild `0xced1b0` | PROVEN structure; storage identity INFERENCE |
-| literal viewport width/height fields | UNKNOWN |
+| literal `TWorldMapViewport` width/height fields | INFERENCE / UNKNOWN class identity |
 | exact extent/subfield field semantics | UNKNOWN |
 | storage hash map direct ownership | INFERENCE / UNKNOWN direct-member relation |
 | constructor/default dimension writers | UNKNOWN |
@@ -296,11 +345,12 @@ No identical request retry is justified. No Synology static-analysis fallback is
 
 ## Next research frontier
 
-1. recover the remainder and xrefs of common helper `0xceca50`;
-2. correlate `0xced1b0` with `TWorldMapStorage` RTTI/vtable or the coordinate-to-tile unordered-map type;
-3. recover concrete typeinfo/vtables/constructors for `TWorldMapExtent`, `TWorldMapSubfieldExtent`, `TWorldMapViewport`, `TWorldMapStorage`, `TWorldMapRenderProvider`, `TWorldMapCamera` and `TWorldMapPicker`;
-4. follow `owner+0x70`, `owner+0x10`, `owner+0x80`, `owner+0xd8` virtual consumers into protocol/storage/render ownership;
-5. inventory fixed literals, shifts, loop bounds, allocation sizes and clipping tests tied to the recovered geometry;
-6. only after the complete dependency graph is coherent may a mutation design be proposed.
+1. identify static vptr `0x308ce70` by recovering its vtable header/RTTI relocation, with `0x308ce60..0x308ce6f` as the first exact discriminator window;
+2. recover writers/xrefs for the direct object fields `+0x48/+0x4c` and candidate bounds `+0x18/+0x1c/+0x30/+0x34`;
+3. recover the remainder and xrefs of common helper `0xceca50`;
+4. correlate `0xced1b0` with `TWorldMapStorage` RTTI/vtable or the coordinate-to-tile unordered-map type;
+5. recover concrete typeinfo/vtables/constructors for `TWorldMapExtent`, `TWorldMapSubfieldExtent`, `TWorldMapViewport`, `TWorldMapStorage`, `TWorldMapRenderProvider`, `TWorldMapCamera` and `TWorldMapPicker`;
+6. follow `owner+0x70`, `owner+0x10`, `owner+0x80`, `owner+0xd8` virtual consumers into protocol/storage/render ownership and inventory fixed literals, allocations, loops and clipping tests;
+7. only after the complete dependency graph is coherent may a mutation design be proposed.
 
 No GUI/runtime discriminator is currently required, and no client-byte mutation is authorized.

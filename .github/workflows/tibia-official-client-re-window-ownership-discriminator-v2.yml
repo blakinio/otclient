@@ -1,4 +1,4 @@
-name: Track A isolated client window ownership discriminator v2
+name: Track A isolated client window ownership discriminator v3
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: track-a-client-window-ownership-discriminator
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   discriminate-window-ownership:
@@ -55,7 +55,9 @@ jobs:
           display=''
           warp_port=''
           vnc_port=''
+          wireproxy_pid=''
           xvfb_pid=''
+          vnc_pid=''
           client_pid=''
           client_real=''
 
@@ -75,32 +77,70 @@ jobs:
           PY
           }
 
-          task_marker_pids() {
-            local d pid
-            for d in /proc/[0-9]*; do
-              pid="${d##*/}"
-              [[ -r "$d/environ" ]] || continue
-              grep -azFxq "$marker" "$d/environ" || continue
-              printf '%s\n' "$pid"
+          task_owned_pid() {
+            local pid="$1" role="$2"
+            [[ "$pid" =~ ^[1-9][0-9]*$ && -r "/proc/$pid/environ" ]] || return 1
+            grep -azFxq "$marker" "/proc/$pid/environ" || return 1
+            grep -azFxq "OTCLIENT_TIBIA_RE_ROLE=$role" "/proc/$pid/environ"
+          }
+
+          kill_owned() {
+            local pid="$1" role="$2"
+            [[ -n "$pid" ]] || return 0
+            if task_owned_pid "$pid" "$role"; then
+              kill "$pid" 2>/dev/null || true
+              for _ in $(seq 1 20); do
+                kill -0 "$pid" 2>/dev/null || break
+                sleep .1
+              done
+              kill -9 "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+            fi
+          }
+
+          client_tree_pids() {
+            local frontier next pid child depth
+            [[ -n "$client_pid" ]] || return 0
+            task_owned_pid "$client_pid" client || return 0
+            frontier="$client_pid"
+            printf '%s\n' "$client_pid"
+            for depth in 1 2 3 4; do
+              next=''
+              for pid in $frontier; do
+                while read -r child; do
+                  [[ "$child" =~ ^[0-9]+$ && -r "/proc/$child/environ" ]] || continue
+                  grep -azFxq "$marker" "/proc/$child/environ" || continue
+                  printf '%s\n' "$child"
+                  next+=" $child"
+                done < <(pgrep -P "$pid" 2>/dev/null || true)
+              done
+              frontier="$next"
+              [[ -n "$frontier" ]] || break
             done
           }
 
-          cleanup_task_processes() {
+          cleanup_client_tree() {
             local pid
-            mapfile -t pids < <(task_marker_pids | sort -nu)
-            for pid in "${pids[@]}"; do
+            mapfile -t members < <(client_tree_pids | sort -nu)
+            for pid in "${members[@]}"; do
+              [[ -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$marker" "/proc/$pid/environ" || continue
               kill "$pid" 2>/dev/null || true
             done
             sleep .4
-            mapfile -t pids < <(task_marker_pids | sort -nu)
-            for pid in "${pids[@]}"; do
+            for pid in "${members[@]}"; do
+              [[ -r "/proc/$pid/environ" ]] || continue
+              grep -azFxq "$marker" "/proc/$pid/environ" || continue
               kill -9 "$pid" 2>/dev/null || true
             done
           }
 
           cleanup() {
             rc=$?
-            cleanup_task_processes || true
+            cleanup_client_tree || true
+            kill_owned "$vnc_pid" vnc || true
+            kill_owned "$xvfb_pid" xvfb || true
+            kill_owned "$wireproxy_pid" wireproxy || true
             if [[ -n "$display_number" && -f "/tmp/.X${display_number}-lock" ]]; then
               owner="$(tr -cd '0-9' <"/tmp/.X${display_number}-lock" 2>/dev/null || true)"
               if [[ -n "$xvfb_pid" && "$owner" == "$xvfb_pid" && ! -e "/proc/$xvfb_pid" ]]; then
@@ -215,6 +255,14 @@ jobs:
           [[ -x "$client" && ! -L "$client" ]] || { echo 'WINDOW_DIAG_REFUSED=COPIED_CLIENT'; exit 60; }
           [[ "$(stat -c %s "$client")" == "$size" && "$(sha256sum "$client" | awk '{print $1}')" == "$sha" ]] || { echo 'WINDOW_DIAG_REFUSED=COPIED_CLIENT_FENCE'; exit 61; }
           client_real="$(readlink -f "$client")"
+          metadata="$(dirname "$source_pkg")/../../launchermetadata.json"
+          metadata_target="$(dirname "$(dirname "$package")")/launchermetadata.json"
+          if [[ -f "$metadata" && ! -L "$metadata" ]]; then
+            install -m600 "$metadata" "$metadata_target"
+            echo 'WINDOW_DIAG_LAUNCHERMETADATA=COPIED'
+          else
+            echo 'WINDOW_DIAG_LAUNCHERMETADATA=SOURCE_ABSENT_OR_UNSAFE'
+          fi
           cat >"$root/proxychains.conf" <<EOF
           strict_chain
           proxy_dns
@@ -258,62 +306,50 @@ jobs:
           listen "$vnc_port" || { echo 'WINDOW_DIAG_VNC=NOT_LISTENING'; exit 65; }
           echo 'WINDOW_DIAG_VNC=PASS'
 
-          (
-            cd "$package"
-            exec setsid env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-              OTCLIENT_TIBIA_RE_DIAG_TASK="$task" OTCLIENT_TIBIA_RE_ROLE=client \
-              HOME="$home" DISPLAY="$display" \
-              PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
-              LD_LIBRARY_PATH="$package/bin/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/usr/lib/x86_64-linux-gnu/libproxy:$tool/lib/x86_64-linux-gnu" \
-              QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
-              XDG_DATA_DIRS="$tool/usr/share:/usr/share" FONTCONFIG_PATH="$tool/etc/fonts" \
-              FONTCONFIG_FILE="$tool/etc/fonts/fonts.conf" LD_PRELOAD="$preload" \
-              PROXYCHAINS_CONF_FILE="$root/proxychains.conf" \
-              "$client"
-          ) >"$root/client.log" 2>&1 &
-          launcher_pid=$!
-
-          find_exact_client_pids() {
-            local d pid exe
-            for d in /proc/[0-9]*; do
-              pid="${d##*/}"
-              [[ -r "$d/environ" ]] || continue
-              grep -azFxq "$marker" "$d/environ" || continue
-              grep -azFxq 'OTCLIENT_TIBIA_RE_ROLE=client' "$d/environ" || continue
-              exe="$(readlink -f "$d/exe" 2>/dev/null || true)"
-              [[ "$exe" == "$client_real" ]] || continue
-              printf '%s\n' "$pid"
-            done
-          }
-
-          for _ in $(seq 1 50); do
-            mapfile -t candidates < <(find_exact_client_pids | sort -nu)
-            if (( ${#candidates[@]} == 1 )); then
-              client_pid="${candidates[0]}"
-              break
-            fi
-            if (( ${#candidates[@]} > 1 )); then
-              echo "WINDOW_DIAG_REFUSED=MULTIPLE_EXACT_CLIENT_PROCESSES:${candidates[*]}"
-              exit 66
-            fi
-            sleep .1
-          done
-          [[ -n "$client_pid" ]] || {
-            echo "WINDOW_DIAG_REFUSED=EXACT_CLIENT_PROCESS_NOT_IDENTIFIED:launcher_pid=$launcher_pid"
-            exit 66
-          }
+          python3 - "$root/client.pid" "$root/client.log" "$package" "$client" "$home" "$display" "$tool" "$preload" "$root/proxychains.conf" "$task" <<'PY'
+          import os, pathlib, subprocess, sys
+          pidfile, logfile, cwd, client, home, display, tool, preload, proxyconf, task = sys.argv[1:]
+          env = dict(os.environ)
+          for key in ('RUNNER_TRACKING_ID', 'TIBIA_TEST_EMAIL', 'TIBIA_TEST_PASSWORD'):
+              env.pop(key, None)
+          package = pathlib.Path(cwd)
+          env.update({
+              'OTCLIENT_TIBIA_RE_DIAG_TASK': task,
+              'OTCLIENT_TIBIA_RE_ROLE': 'client',
+              'HOME': home,
+              'DISPLAY': display,
+              'PATH': f'{tool}/usr/bin:{tool}/usr/sbin:/usr/bin:/bin',
+              'LD_LIBRARY_PATH': f'{package}/bin/lib:{tool}/usr/lib/x86_64-linux-gnu:{tool}/usr/lib/x86_64-linux-gnu/libproxy:{tool}/lib/x86_64-linux-gnu',
+              'QT_QUICK_BACKEND': 'software',
+              'QT_XCB_GL_INTEGRATION': 'none',
+              'XDG_DATA_DIRS': f'{tool}/usr/share:/usr/share',
+              'FONTCONFIG_PATH': f'{tool}/etc/fonts',
+              'FONTCONFIG_FILE': f'{tool}/etc/fonts/fonts.conf',
+              'LD_PRELOAD': preload,
+              'PROXYCHAINS_CONF_FILE': proxyconf,
+          })
+          with open(logfile, 'ab', buffering=0) as log:
+              proc = subprocess.Popen(
+                  [client], cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                  stdout=log, stderr=subprocess.STDOUT,
+                  start_new_session=True, close_fds=True,
+              )
+          pathlib.Path(pidfile).write_text(str(proc.pid))
+          PY
+          client_pid="$(cat "$root/client.pid")"
+          [[ "$client_pid" =~ ^[1-9][0-9]*$ ]] || { echo 'WINDOW_DIAG_REFUSED=CLIENT_PID_INVALID'; exit 66; }
+          sleep .2
+          task_owned_pid "$client_pid" client || { echo 'WINDOW_DIAG_REFUSED=CLIENT_MARKER_OR_ROLE'; exit 66; }
+          [[ "$(readlink -f "/proc/$client_pid/exe" 2>/dev/null || true)" == "$client_real" ]] || { echo 'WINDOW_DIAG_REFUSED=LIVE_CLIENT_EXE'; exit 66; }
           [[ "$(stat -Lc %s "/proc/$client_pid/exe")" == "$size" ]] || { echo 'WINDOW_DIAG_REFUSED=LIVE_CLIENT_SIZE'; exit 66; }
           [[ "$(sha256sum "/proc/$client_pid/exe" | awk '{print $1}')" == "$sha" ]] || { echo 'WINDOW_DIAG_REFUSED=LIVE_CLIENT_SHA'; exit 66; }
           client_pgid="$(ps -o pgid= -p "$client_pid" 2>/dev/null | tr -d ' ' || true)"
-          echo "WINDOW_DIAG_LAUNCHER_PID=$launcher_pid"
           echo "WINDOW_DIAG_CLIENT_PID=$client_pid"
           echo "WINDOW_DIAG_CLIENT_PGID=${client_pgid:-unknown}"
           echo 'WINDOW_DIAG_CLIENT_START=PASS'
 
           exact_client_alive() {
-            [[ -r "/proc/$client_pid/environ" ]] || return 1
-            grep -azFxq "$marker" "/proc/$client_pid/environ" || return 1
-            grep -azFxq 'OTCLIENT_TIBIA_RE_ROLE=client' "/proc/$client_pid/environ" || return 1
+            task_owned_pid "$client_pid" client || return 1
             [[ "$(readlink -f "/proc/$client_pid/exe" 2>/dev/null || true)" == "$client_real" ]]
           }
 
@@ -324,12 +360,11 @@ jobs:
           descendant_pids() {
             local frontier="$client_pid" next='' pid child depth
             printf '%s\n' "$client_pid"
-            for depth in 1 2 3; do
+            for depth in 1 2 3 4; do
               next=''
               for pid in $frontier; do
                 while read -r child; do
-                  [[ "$child" =~ ^[0-9]+$ ]] || continue
-                  [[ -r "/proc/$child/environ" ]] || continue
+                  [[ "$child" =~ ^[0-9]+$ && -r "/proc/$child/environ" ]] || continue
                   grep -azFxq "$marker" "/proc/$child/environ" || continue
                   printf '%s\n' "$child"
                   next+=" $child"

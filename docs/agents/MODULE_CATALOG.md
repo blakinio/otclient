@@ -1,6 +1,6 @@
 # OTClient Module and System Catalogue
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-08-16
 
 This catalogue makes reusable work visible across the greenfield Rust client and existing OTClient. Verify source, manifests, tasks, tests and open PR state before use.
 
@@ -65,7 +65,7 @@ Detailed maintenance boundaries are in `docs/architecture/LEGACY_OTCLIENT_ARCHIT
 
 | Tool/system | Status | Responsibility/public surface | Source/docs | Reuse/safety notes |
 |---|---|---|---|---|
-| Canonical live controller lease manager | merged PR #312; hardened by merged PR #313; normal-exit descendant retention PR #317 | Cooperative same-UID authority fence for sequential control of a future canonical Track A live runtime: serialized acquire/renew/validate/release/status, explicit stale takeover with generation fencing, and `guard-run` that retains the coordination flock for the complete lifetime of the immediate command and any surviving inherited mutation descendants | `.github/scripts/tibia-official-client-re-canonical-live-lease*`, `.github/workflows/tibia-official-client-re-canonical-live-lease.yml`, `docs/agents/evidence/OTC-20260815-track-a-live-runtime-lease-manager/**` | Production authority is fixed at `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime`; task tokens are confined under task state. Lock release uses last-close semantics so an immediate launcher returning normally does not unlock surviving guarded descendants. It does **not** discover/register the Tibia PID/session/display, does not make `:98` canonical, and is not a hostile-local-user security boundary. PR #311 separately governs canonical-live reuse and requires current runtime identity in addition to this authority. |
+| Canonical live controller lease manager | merged PR #312; hardened by merged PR #313, PR #317 and final supervisor PR #316 | Cooperative same-UID authority fence for sequential control of a future canonical Track A live runtime: serialized acquire/renew/validate/release/status, explicit stale takeover with generation fencing, and production `guard-run` that validates before dispatch then holds the coordination flock in a dedicated Linux child-subreaper supervisor for the entire guarded mutation tree lifetime | `.github/scripts/tibia-official-client-re-canonical-live-lease*`, `.github/scripts/tibia-official-client-re-canonical-live-guard.py`, `.github/workflows/tibia-official-client-re-canonical-live-lease.yml`, `docs/agents/evidence/OTC-20260815-track-a-live-runtime-lease-manager/**` | Production authority is fixed at `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime`; task tokens are confined under task state. The guarded command receives no flock descriptor (`close_fds=True`); the supervisor retains the flock until the primary command and all adopted/orphaned descendants exit. Generic manager lock release uses descriptor last-close semantics. It does **not** discover/register the Tibia PID/session/display, does not make `:98` or `6082` canonical, and is not a hostile-local-user security boundary. PR #311 separately governs canonical-live reuse and requires current exact-runtime identity in addition to this authority. |
 
 ## Current governance work
 

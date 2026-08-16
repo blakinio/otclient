@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-runner-support-layout-inventory
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-runner-support-inventory-20260816-1650
 session_role: runtime_observer
@@ -8,16 +8,15 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_infrastructure_inventory
-phase: read-only-support-layout-observation
+phase: coordinator-promotion-ready
 branch: ci/OTC-20260816-track-a-runner-support-layout-inventory
 base_branch: main
 base_main: 67e5dc88ff4d6c241d90a046527dac4aa9f831d8
 risk: low
-updated: 2026-08-16T16:50:00+02:00
+updated: 2026-08-16T16:53:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-runner-support-layout-inventory.md
   - docs/agents/evidence/OTC-20260816-track-a-runner-support-layout-inventory/**
-  - .github/workflows/tibia-official-client-re-runner-support-layout-inventory.yml
 modules_touched: []
 reuses:
   - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-toolroot-layout-fix.md
@@ -29,7 +28,6 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: exact support paths exist only on the physical dedicated runner; observation is bounded to package/path metadata and does not inspect the official client or canonical runtime surface
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -72,16 +70,52 @@ forbidden_observation:
   - network/game/login state
   - credentials or environment secrets
   - Track B PR #284 surfaces
-acceptance:
-  - exactly one read-only job runs on synology-otclient-01 using [otclient, synology]
-  - output reports existence/type/realpath for only allowlisted roots/components and package installation metadata
-  - output classifies which support-root completeness requirement failed without executing X11 tools or inspecting client/runtime state
-  - workflow is removed immediately after evidence capture before task checkpoint updates
-  - sanitized findings drive a GitHub-hosted repair or an explicit external runner-image deployment blocker; no blind bootstrap retry follows directly
-last_completed_step: RUNTIME #381 proved both hardened candidate support roots fail completeness on the current runner before WARP/X11/client, while static PR #280 design input installs xvfb/xdotool/proxychains4 systemwide but omits x11vnc
-next_action: run one bounded support-layout inventory and persist only its sanitized path/package facts
+execution:
+  run: 31953830754
+  job: 95181286228
+  runner: synology-otclient-01
+  result: SUCCESS
+  one_shot_workflow: REMOVED_AFTER_CAPTURE
+result:
+  classification: PROVEN_SPLIT_SUPPORT_LAYOUT
+  home_work_root: ABSENT
+  work_root: /work/_otclient_tibia_re_state/toolroot
+  work_root_Xvfb: PRESENT_EXECUTABLE_CONTAINED
+  work_root_xdotool: PRESENT_EXECUTABLE_CONTAINED
+  work_root_XKB: PRESENT_CONTAINED
+  work_root_libproxychains: PRESENT_CONTAINED
+  work_root_x11vnc: ABSENT
+  system_x11vnc: /usr/bin/x11vnc
+  system_x11vnc_package: x11vnc_0.9.16-10_INSTALLED
+  system_Xvfb: ABSENT
+  system_xdotool: ABSENT
+  system_XKB: ABSENT
+  system_libproxychains: ABSENT
+  system_xvfb_package: NOT_INSTALLED
+  system_xdotool_package: NOT_INSTALLED
+  system_proxychains4_package: NOT_INSTALLED
+root_cause:
+  finding: trusted one-root completeness gate fails only because the persistent /work toolroot lacks x11vnc, while current runner provides x11vnc at a fixed system path
+  safe_repair_boundary: preserve /work toolroot for Xvfb/xdotool/XKB/libproxychains and permit only literal /usr/bin/x11vnc as an explicit system exception with ownership/mode/package checks; no ambient PATH discovery or generic system fallback
+evidence_path: docs/agents/evidence/OTC-20260816-track-a-runner-support-layout-inventory/20260816-support-layout.md
+validation:
+  physical_inventory_result: SUCCESS
+  governance_after_workflow_removal: PENDING
+  repository_ci_after_workflow_removal: PENDING
+  review_threads_open: 0
+  physical_e2e: NOT_APPLICABLE_WITH_REASON
+  physical_e2e_reason: support-filesystem metadata observation only; no client/runtime behavior exercised
+audit:
+  result: PASS
+  material_findings_open: 0
+  notes:
+    - current running runner layout is directly proven and supersedes historical assumptions about a complete toolroot
+    - PR #280 Dockerfile remains design input only and is not used as proof of current deployment
+    - no canonical runtime/client/process/display/VNC/network/credential state was observed
+last_completed_step: completed one read-only physical support-layout inventory, removed the one-shot workflow and persisted the exact split-layout root cause
+next_action: obtain exact-head governance/CI and merge this sanitized evidence; then implement/promote a hosted-only explicit split-layout worker repair before any further bootstrap attempt
 ---
 
 # Track A dedicated-runner support layout inventory
 
-This task observes only fixed support-tool filesystem/package metadata needed to explain `toolroot_unavailable`. It does not inspect or operate the official client, canonical registration, X11/VNC runtime, network/game state or credentials.
+The current runner has a proven split support layout: Xvfb/xdotool/XKB/libproxychains are contained in `/work/_otclient_tibia_re_state/toolroot`, while `x11vnc` is installed only as `/usr/bin/x11vnc` (`0.9.16-10`). This explains the hardened worker's fail-closed `toolroot_unavailable` without inspecting or operating the official client/runtime surface.

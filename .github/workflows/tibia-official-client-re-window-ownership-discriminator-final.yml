@@ -94,7 +94,7 @@ jobs:
               'WINDOW_DIAG_LAUNCHERMETADATA=',
               'start_new_session=True',
               'descendant_pids()',
-              'WINDOW_DIAG_CLIENT_LIVE_SHA=',
+              'sha256sum "/proc/$client_pid/exe"',
               'WINDOW_DIAG_RESULT=PASS_DISCRIMINATOR_CAPTURED',
               'WINDOW_DIAG_CLEANUP=COMPLETE',
               'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',

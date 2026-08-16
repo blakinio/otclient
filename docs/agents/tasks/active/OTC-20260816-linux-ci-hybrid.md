@@ -27,6 +27,7 @@ Make the ordinary OTClient build/test path Linux-only on GitHub-hosted runners, 
 - Owner explicitly authorized disabling Windows builds because this OTClient deployment uses Linux only.
 - Owner explicitly accepted the runner boundary: deterministic/static/build/startup validation on GitHub-hosted runners; physical gameplay control and persistent runtime evidence on Synology.
 - PR #328 is closed as superseded; its safe hosted-runner queue reductions are carried forward where applicable without its Windows gate.
+- Live validation exposed that PR #328's already-started Windows matrix kept consuming hosted runners after the PR was closed. General CI now listens for `pull_request.closed`; the new no-work run shares the PR concurrency group, so closing a PR cancels its older in-progress CI instead of leaving orphaned build demand.
 - PR #280 remains a separate specialized Synology/runtime lane and its owned files are not modified by this task.
 - Historical task `OTC-20260712-client-test-foundation` still lists `.github/workflows/reusable-build-linux.yml` as owned although its implementation PR #3 is already merged. This task does not modify that file; the startup smoke is deliberately implemented in `.github/workflows/ci.yml` after the existing Linux build artifact is produced.
 
@@ -41,6 +42,7 @@ Make the ordinary OTClient build/test path Linux-only on GitHub-hosted runners, 
   - isolate persisted state with `--user-dir` under `RUNNER_TEMP`;
   - require the client to remain alive for a bounded 20-second startup window;
   - upload startup and dependency logs as evidence.
+- On PR close, create only a no-work CI run in the same concurrency group so any older build for that PR is cancelled without allocating new build/test runners.
 - Avoid retrying intentionally cancelled superseded CI runs.
 - Remove the reusable Windows build workflow after verifying that the ordinary CI caller is replaced and no active workflow file in the current workflow inventory names another Windows build entry point.
 - Do not change the dedicated Synology/Track A runtime workflows.
@@ -74,6 +76,7 @@ A GitHub headless startup smoke is not evidence of successful physical gameplay 
 - [x] `CI` has no `windows-2025`, `build-windows`, or `reusable-build-windows.yml` dependency on the implementation branch.
 - [x] Compile-relevant PRs require `Build - Linux` via `.github/workflows/reusable-build-linux.yml`.
 - [x] Documentation/task-only changes are scoped so unrelated fast/Lua/build/smoke jobs can be skipped.
+- [x] Closed PRs have a concurrency-cancellation path that emits no normal build/test work.
 - [ ] Generic CI jobs are observed on GitHub-hosted Ubuntu runners on the exact implementation head.
 - [ ] Exact-head Actions proves the real Linux release artifact starts under `Xvfb` and survives the bounded 20-second smoke window.
 - [ ] Startup smoke evidence artifact contains dependency/startup logs.
@@ -90,9 +93,10 @@ A GitHub headless startup smoke is not evidence of successful physical gameplay 
 3. Inspect PR #331 exact-head Actions jobs/runner labels.
 4. Require workflow syntax/actionlint, both Linux builds, hosted client startup smoke and `CI / Required` success.
 5. Verify the smoke job uses the real release artifact, a virtual display, isolated user directory, bounded liveness and no Synology runner labels.
-6. Merge only on the exact validated head.
-7. Verify post-merge `main` and its Actions outcome.
-8. Archive this task and release ownership after post-merge verification.
+6. Verify closed-PR events skip normal jobs while sharing the same concurrency key used by the PR's active run.
+7. Merge only on the exact validated head.
+8. Verify post-merge `main` and its Actions outcome.
+9. Archive this task and release ownership after post-merge verification.
 
 ## Runtime E2E
 
@@ -111,6 +115,7 @@ implementation_pr: 331
 superseded_pr: 328
 specialized_runtime_pr: 280
 historical_merged_pr_with_stale_task_claim: 3
+observed_orphaned_run: 31934213173
 changed_paths:
   - .github/workflows/ci.yml
   - .github/workflows/infrastructure-retry.yml

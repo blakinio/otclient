@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import socket
+import tempfile
+import threading
 from typing import Any
 import unittest
 
@@ -13,7 +16,11 @@ from tools.tibia_runtime_bridge.health import (
     ReacquireState,
     RecoveryPolicy,
 )
-from tools.tibia_runtime_bridge.ipc_client import BridgeProtocolError, BridgeTransportError
+from tools.tibia_runtime_bridge.ipc_client import (
+    BridgeProtocolError,
+    BridgeTransportError,
+    request,
+)
 
 
 class BridgeHealthTests(unittest.TestCase):
@@ -72,6 +79,42 @@ class BridgeHealthTests(unittest.TestCase):
             BridgeBinding.from_registration(
                 self.registration(), socket_path=Path("bridge.sock")
             )
+
+    def test_real_missing_socket_is_transport_error(self):
+        with tempfile.TemporaryDirectory() as raw:
+            missing = Path(raw) / "missing.sock"
+            with self.assertRaises(BridgeTransportError):
+                request(missing, "PING", timeout=0.1)
+
+    def test_real_invalid_json_is_protocol_error(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "bridge.sock"
+            ready = threading.Event()
+
+            def serve() -> None:
+                server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                try:
+                    server.bind(str(path))
+                    server.listen(1)
+                    ready.set()
+                    connection, _ = server.accept()
+                    try:
+                        connection.recv(4096)
+                        connection.sendall(b"not-json\n")
+                    finally:
+                        connection.close()
+                finally:
+                    server.close()
+
+            thread = threading.Thread(target=serve)
+            thread.start()
+            self.assertTrue(ready.wait(2))
+            try:
+                with self.assertRaises(BridgeProtocolError):
+                    request(path, "PING", timeout=1.0)
+            finally:
+                thread.join(2)
+            self.assertFalse(thread.is_alive())
 
     def test_healthy_bridge_keeps_session_candidate_derived(self):
         current = self.binding()

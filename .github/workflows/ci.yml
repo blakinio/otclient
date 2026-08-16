@@ -66,6 +66,7 @@ jobs:
               - "CMakePresets.json"
               - ".github/**"
               - ".yamllint.yaml"
+              - "**/*.lua"
               - "**/*.xml"
             lua:
               - "src/**"

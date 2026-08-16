@@ -1,0 +1,116 @@
+name: Track A filesystem-helper resolver static probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-filesystem-helper-resolver-static.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-filesystem-helper-resolver-static.md
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Trace shared filesystem helper resolver statically
+    runs-on: [otclient, synology]
+    timeout-minutes: 7
+    steps:
+      - name: Validate base-helper RTTI and emit resolver evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +x
+          [[ "${RUNNER_NAME:-}" == 'synology-otclient-01' ]] || exit 2
+          client='/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260815-track-a-runtime-reacquisition/runs/31904939696/package/bin/client'
+          [[ -f "$client" ]] || exit 3
+          [[ "$(stat -c '%s' "$client")" == '51965216' ]] || exit 4
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
+          echo 'FS_RESOLVER_CLIENT_FENCE=PASS'
+          echo "FS_RESOLVER_OBJDUMP=$(command -v objdump || true)"
+          if command -v objdump >/dev/null 2>&1; then
+            echo 'FS_RESOLVER_OBJDUMP_CFA5E0_BEGIN'
+            objdump -d -M intel --start-address=0xcfa5e0 --stop-address=0xcfab80 "$client"
+            echo 'FS_RESOLVER_OBJDUMP_CFA5E0_END'
+            echo 'FS_RESOLVER_OBJDUMP_CALLER_BEGIN'
+            objdump -d -M intel --start-address=0xc9b890 --stop-address=0xc9ba20 "$client"
+            echo 'FS_RESOLVER_OBJDUMP_CALLER_END'
+          fi
+          python3 - "$client" <<'PY'
+          import hashlib,pathlib,struct,sys
+          d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
+          h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
+          _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
+          sf=E+'IIQQQQIIQQ';raw=[struct.unpack_from(sf,d,shoff+i*shentsz) for i in range(shnum)]
+          st=raw[shstrndx];sn=d[st[4]:st[4]+st[5]]
+          def cs(b,o):
+              if not (0<=o<len(b)):return ''
+              e=b.find(b'\0',o);e=len(b) if e<0 else e
+              return b[o:e].decode('utf8','replace')
+          secs=[{'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]} for x in raw]
+          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
+          def voff(va):
+              for s in secs:
+                  if s['size'] and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
+              return None
+          def b_at(va,n):
+              o=voff(va);return b'' if o is None else d[o:o+n]
+          def s_at(va):
+              o=voff(va)
+              if o is None:return None
+              e=d.find(b'\0',o,min(len(d),o+240))
+              if e<=o:return None
+              z=d[o:e]
+              if not z or len(z)>220 or not all(32<=x<127 for x in z):return None
+              return z.decode('ascii','replace')
+          rel=by['.rela.dyn'];bo={}
+          for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
+              ro,ri,ad=struct.unpack_from('<QQq',d,o);bo[ro]=(ri&0xffffffff,ri>>32,ad)
+          def rt(va):
+              r=bo.get(va);return None if r is None else r[2]
+          vptr=0x2f61f90;ti=0x3070918
+          if struct.unpack('<q',b_at(vptr-16,8))[0]!=0:raise SystemExit('FS_RESOLVER_FAIL=base_offset_to_top')
+          if rt(vptr-8)!=ti:raise SystemExit('FS_RESOLVER_FAIL=base_typeinfo_slot')
+          nameva=rt(ti+8)
+          if nameva is None or s_at(nameva)!='N6shared17TFileSystemHelperE':raise SystemExit('FS_RESOLVER_FAIL=base_type_name')
+          if rt(vptr+0x78)!=0xcfa5e0:raise SystemExit(f'FS_RESOLVER_FAIL=slot78:{rt(vptr+0x78)}')
+          print('FS_RESOLVER_PASS=shared_TFileSystemHelper_RTTI')
+          print('FS_RESOLVER_PASS=slot78_0xcfa5e0')
+          # Caller anchors already established in TTibia +0x30; revalidate member +0x18 and +0x78 dispatch shape.
+          anchors={
+              0xc9b8b3:'488b5b18',
+              0xc9b8c1:'488b03',
+              0xc9b8ce:'4c8b7078',
+              0xc9b96f:'4889de4889ef4c89fa41ffd6',
+          }
+          for va,hx in anchors.items():
+              want=bytes.fromhex(hx);got=b_at(va,len(want))
+              if got!=want:raise SystemExit(f'FS_RESOLVER_FAIL=anchor_0x{va:x}:{got.hex()}')
+              print(f'FS_RESOLVER_PASS=caller_anchor_0x{va:x}')
+          # RIP-relative printable refs and direct call targets in bounded resolver window.
+          start,end=0xcfa5e0,0xcfab80;blob=b_at(start,end-start)
+          print('FS_RESOLVER_RIP_STRINGS_BEGIN')
+          seen=set()
+          for i in range(len(blob)-7):
+              if blob[i] not in range(0x48,0x50) or blob[i+1] not in (0x8d,0x8b):continue
+              m=blob[i+2]
+              if (m>>6)!=0 or (m&7)!=5:continue
+              va=start+i;dst=va+7+struct.unpack_from('<i',blob,i+3)[0];txt=s_at(dst)
+              if txt and (dst,txt) not in seen:
+                  seen.add((dst,txt));print(f'ref=0x{va:x} target=0x{dst:x} text={txt}')
+          print('FS_RESOLVER_RIP_STRINGS_END')
+          calls=[]
+          for i in range(len(blob)-5):
+              if blob[i]!=0xe8:continue
+              va=start+i;dst=va+5+struct.unpack_from('<i',blob,i+1)[0]
+              if text['addr']<=dst<text['addr']+text['size']:calls.append((va,dst))
+          print('FS_RESOLVER_DIRECT_CALLS='+','.join(f'0x{a:x}->0x{b:x}' for a,b in calls))
+          for label,a,b in [
+              ('slot78',0xcfa5e0,0xcfab80),
+              ('ttibia_slot30_callsite',0xc9b890,0xc9ba20),
+          ]:
+              w=b_at(a,b-a);print(f'FS_RESOLVER_WINDOW label={label} start=0x{a:x} end=0x{b:x} sha256={hashlib.sha256(w).hexdigest()}')
+          print('FS_RESOLVER_EXECUTED_TARGET=false')
+          print('FS_RESOLVER_LIVE_RUNTIME_OBSERVED=false')
+          print('FS_RESOLVER_MUTATION_PERFORMED=false')
+          PY

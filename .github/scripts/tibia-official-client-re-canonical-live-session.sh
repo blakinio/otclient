@@ -163,8 +163,11 @@ source_pkg() {
 }
 
 window() {
-  local pid="$1" display="$2" xdotool="$3" win geometry candidate_area best='' best_area=0 width height
-  for _ in $(seq 1 120); do
+  local pid="$1" display="$2" xdotool="$3" attempts="$4" delay="$5"
+  local win geometry candidate_area best='' best_area=0 width height
+  [[ "$attempts" =~ ^[1-9][0-9]*$ ]] || return 3
+  for _ in $(seq 1 "$attempts"); do
+    kill -0 "$pid" 2>/dev/null || return 2
     best=''
     best_area=0
     for win in $(DISPLAY="$display" "$xdotool" search --onlyvisible --pid "$pid" --name '^Tibia$' 2>/dev/null || true); do
@@ -180,11 +183,23 @@ window() {
     done
     if [[ -n "$best" ]]; then
       echo "$best"
-      return
+      return 0
     fi
-    sleep .25
+    sleep "$delay"
   done
+  kill -0 "$pid" 2>/dev/null || return 2
   return 1
+}
+
+wait_for_window() {
+  local pid="$1" display="$2" xdotool="$3" attempts="$4" delay="$5" win rc=0
+  win="$(window "$pid" "$display" "$xdotool" "$attempts" "$delay")" || rc=$?
+  case "$rc" in
+    0) printf '%s\n' "$win" ;;
+    1) die client_window_missing ;;
+    2) die client_exited ;;
+    *) die client_window_probe_failed ;;
+  esac
 }
 
 contract_test() {
@@ -224,6 +239,10 @@ PY
     toolroot)
       [[ $# == 1 ]] || die usage
       resolve_toolroot || die toolroot_unavailable
+      ;;
+    window)
+      [[ $# == 6 ]] || die usage
+      wait_for_window "$2" "$3" "$4" "$5" "$6"
       ;;
     *) die usage ;;
   esac
@@ -275,7 +294,9 @@ WGConfig = $state/wgcf-profile.conf
 BindAddress = 127.0.0.1:$port
 EOF
   chmod 600 "$SESSION/wireproxy.conf"
+  printf 'TRACK_A_CANONICAL_STAGE=wireproxy_configtest_start\n'
   "$bin/wireproxy" -n -c "$SESSION/wireproxy.conf" >/dev/null
+  printf 'TRACK_A_CANONICAL_STAGE=wireproxy_configtest_pass\n'
   env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
     OTCLIENT_TIBIA_RE_TRACK=official-client-re \
     OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1 OTCLIENT_TIBIA_RE_ROLE=wireproxy \
@@ -293,8 +314,10 @@ EOF
   owned "$pid" wireproxy "$bin/wireproxy" || die wireproxy_ownership_failed
   nosecret "$pid" wireproxy
   listen "$port" || die wireproxy_not_listening
+  printf 'TRACK_A_CANONICAL_STAGE=warp_egress_probe_start\n'
   curl --socks5-hostname "127.0.0.1:$port" -fsS --max-time 15 \
     https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$' || die warp_egress_not_verified
+  printf 'TRACK_A_CANONICAL_STAGE=warp_egress_probe_pass\n'
 }
 
 write_manifest() {
@@ -349,7 +372,9 @@ bootstrap() {
   printf '%s\n' "$TOOL" >"$SESSION/toolroot"
   printf 'TRACK_A_CANONICAL_TOOLROOT=%s\n' "$TOOL"
 
+  printf 'TRACK_A_CANONICAL_STAGE=warp_start\n'
   start_warp
+  printf 'TRACK_A_CANONICAL_STAGE=warp_pass\n'
   warp_port="$(cat "$SESSION/warp-port")"
   xvfb="$(tool Xvfb)" || die xvfb_unavailable
   vnc="$(tool x11vnc)" || die vnc_unavailable
@@ -379,6 +404,7 @@ socks5 127.0.0.1 $warp_port
 EOF
   chmod 600 "$SESSION/proxychains.conf"
 
+  printf 'TRACK_A_CANONICAL_STAGE=xvfb_start\n'
   env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
     OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1 \
     OTCLIENT_TIBIA_RE_ROLE=xvfb HOME="$home" PATH="$TOOL/usr/bin:$TOOL/usr/sbin:/usr/bin:/bin" \
@@ -392,7 +418,9 @@ EOF
     sleep .2
   done
   [[ -e /tmp/.X11-unix/X$display_number ]] || die xvfb_socket_missing
+  printf 'TRACK_A_CANONICAL_STAGE=xvfb_pass\n'
 
+  printf 'TRACK_A_CANONICAL_STAGE=vnc_start\n'
   env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
     OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1 \
     OTCLIENT_TIBIA_RE_ROLE=vnc HOME="$home" DISPLAY="$display" \
@@ -404,7 +432,9 @@ EOF
     sleep .2
   done
   listen "$vnc_port" || die vnc_not_listening
+  printf 'TRACK_A_CANONICAL_STAGE=vnc_pass\n'
 
+  printf 'TRACK_A_CANONICAL_STAGE=client_start\n'
   (
     cd "$package"
     env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
@@ -421,13 +451,9 @@ EOF
   )
 
   pid="$(rpid client)"
-  for _ in $(seq 1 100); do
-    kill -0 "$pid" 2>/dev/null || die client_exited
-    win="$(window "$pid" "$display" "$xdotool" || true)"
-    [[ -n "$win" ]] && break
-    sleep .25
-  done
-  [[ -n "${win:-}" ]] || die client_window_missing
+  printf 'TRACK_A_CANONICAL_STAGE=client_window_wait_start\n'
+  win="$(wait_for_window "$pid" "$display" "$xdotool" 120 .25)"
+  printf 'TRACK_A_CANONICAL_STAGE=client_window_wait_pass\n'
   verify_client "$client"
   echo "$display" >"$SESSION/display"
   echo "$win" >"$SESSION/window"
@@ -452,7 +478,7 @@ probe() {
   listen "$vnc_port" || die vnc_not_listening
   listen "$(cat "$SESSION/warp-port")" || die wireproxy_not_listening
   xdotool="$(tool xdotool)" || die xdotool_unavailable
-  win="$(window "$pid" "$display" "$xdotool")" || die client_window_missing
+  win="$(wait_for_window "$pid" "$display" "$xdotool" 120 .25)"
   echo "$win" >"$SESSION/window"
   write_manifest "$manifest" "$pid" "$pgid" "$display" "$win" "$vnc_port"
 }

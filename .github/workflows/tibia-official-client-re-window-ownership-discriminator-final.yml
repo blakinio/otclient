@@ -1,0 +1,127 @@
+name: Track A final isolated client window discriminator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/agents/tasks/active/OTC-20260816-track-a-client-window-ownership-discriminator.md
+      - .github/workflows/tibia-official-client-re-window-ownership-discriminator-final.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-client-window-ownership-discriminator
+  cancel-in-progress: true
+
+jobs:
+  final-window-discriminator:
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    steps:
+      - name: Fetch immutable v3, apply one harness fix, fence and execute
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: 05d4a7136e234b874f7f112ad8c92f01b0aabd51
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+
+          source_url='https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml'
+          source_blob='1616edcc982be50ef2c95b8077160ec8fe9291fe'
+          source_file="$(mktemp)"
+          generated="$(mktemp)"
+          trap 'rm -f -- "$source_file" "$generated"' EXIT
+
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$source_file" "$source_url"
+
+          python3 - "$source_file" "$generated" "$source_blob" <<'PY'
+          import hashlib
+          import pathlib
+          import sys
+
+          source = pathlib.Path(sys.argv[1])
+          output = pathlib.Path(sys.argv[2])
+          expected_blob = sys.argv[3]
+          data = source.read_bytes()
+          actual_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+          if actual_blob != expected_blob:
+              raise SystemExit(f'WINDOW_DIAG_FINAL_REFUSED=SOURCE_BLOB_MISMATCH:{actual_blob}')
+
+          lines = data.decode('utf-8').splitlines()
+          step_marker = '      - name: Reproduce isolated startup and inventory task-owned windows'
+          try:
+              step = lines.index(step_marker)
+          except ValueError:
+              raise SystemExit('WINDOW_DIAG_FINAL_REFUSED=SOURCE_STEP_MISSING')
+
+          run_index = None
+          for idx in range(step + 1, len(lines)):
+              if lines[idx].strip() == 'run: |':
+                  run_index = idx
+                  break
+              if lines[idx].startswith('      - name:'):
+                  break
+          if run_index is None:
+              raise SystemExit('WINDOW_DIAG_FINAL_REFUSED=SOURCE_RUN_BLOCK_MISSING')
+
+          run_indent = len(lines[run_index]) - len(lines[run_index].lstrip(' '))
+          content_indent = None
+          block = []
+          for line in lines[run_index + 1:]:
+              if not line.strip():
+                  block.append('')
+                  continue
+              indent = len(line) - len(line.lstrip(' '))
+              if indent <= run_indent:
+                  break
+              if content_indent is None:
+                  content_indent = indent
+              if indent < content_indent:
+                  raise SystemExit('WINDOW_DIAG_FINAL_REFUSED=INCONSISTENT_BLOCK_INDENT')
+              block.append(line[content_indent:])
+
+          script = '\n'.join(block) + '\n'
+          old = 'local label="$1" out="$root/windows-$label.tsv" pids="$root/pids-$label.txt"'
+          new = 'local label="$1"\n  local out="$root/windows-$label.tsv"\n  local pids="$root/pids-$label.txt"'
+          if script.count(old) != 1:
+              raise SystemExit(f'WINDOW_DIAG_FINAL_REFUSED=PATCH_SITE_COUNT:{script.count(old)}')
+          script = script.replace(old, new)
+
+          required = [
+              'WINDOW_DIAG_LAUNCHERMETADATA=',
+              'start_new_session=True',
+              'descendant_pids()',
+              'WINDOW_DIAG_CLIENT_LIVE_SHA=',
+              'WINDOW_DIAG_RESULT=PASS_DISCRIMINATOR_CAPTURED',
+              'WINDOW_DIAG_CLEANUP=COMPLETE',
+              'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
+          ]
+          for needle in required:
+              if needle not in script:
+                  raise SystemExit(f'WINDOW_DIAG_FINAL_REFUSED=MISSING_FENCE:{needle}')
+          forbidden = [
+              old,
+              '/proc/*/environ',
+              "glob('/proc/*')",
+              'runtime-registration.json',
+              'canonical-live-runtime',
+              'TIBIA_TEST_EMAIL=',
+              'TIBIA_TEST_PASSWORD=',
+          ]
+          for needle in forbidden:
+              if needle in script:
+                  raise SystemExit(f'WINDOW_DIAG_FINAL_REFUSED=FORBIDDEN_SOURCE_SHAPE:{needle}')
+
+          output.write_text(script, encoding='utf-8')
+          print(f'WINDOW_DIAG_FINAL_SOURCE_BLOB=PASS:{actual_blob}')
+          print('WINDOW_DIAG_FINAL_PATCH_COUNT=1')
+          print('WINDOW_DIAG_FINAL_ANCESTRY_ONLY=PASS')
+          print('WINDOW_DIAG_FINAL_CANONICAL_STATE_ACCESS=NONE')
+          PY
+
+          bash -n "$generated"
+          echo 'WINDOW_DIAG_FINAL_BASH_N=PASS'
+          bash "$generated"

@@ -13,10 +13,10 @@ implementation_authorized: false
 branch: research/OTC-20260816-track-a-worldmap-extent-static-re
 base_branch: main
 base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
-live_main_observed: 05d4a7136e234b874f7f112ad8c92f01b0aabd51
+live_main_observed: d7a2d4168816cb42267fc7b20aacb88ae1b13b8e
 pr: 367
 risk: medium
-updated: 2026-08-16T18:25:00+02:00
+updated: 2026-08-16T19:20:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-extent-static-re.md
   - .github/scripts/tibia-official-client-re-worldmap-extent-static.py
@@ -25,22 +25,20 @@ owned_paths:
 modules_touched: []
 reuses:
   - docs/agents/reports/OTCLIENT-20260816-official-client-map-viewport-feasibility.md
-  - docs/agents/evidence/OTC-20260816-official-client-map-viewport-feasibility/20260816-evidence.md
   - PR #365 merged feasibility checkpoint
   - PR #310 hosted exact-client staging failure evidence
   - run 31892019505 artifact 9248797952 historical exact-binary static evidence
   - run 31883967070 artifact 9246756211 richer historical exact-static census
   - run 31821458677 artifact 9227370490 retained raw provenance/strip/GDB evidence
   - run 31804083206 job 94778661881 exact fenced handler disassembly log
-  - commits caa938463356ce9a8ece92e9ae908ba507f501a9 and 734f845deace5a26efa09b96a168bea0c05272f0 observer producer source
-  - user-supplied tibia.x64.tar.gz artifact 9264329820 exact archive fence
-  - main PR #397 runtime-v6 discriminator read-only cross-check
+  - complete retained artifact inventory evidence 20260816-complete-retained-artifact-inventory.md
+  - main PRs #397 and #405 runtime discriminator read-only cross-checks
 depends_on: []
 blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: retained same-repository exact-client evidence is exhausted to a bounded missing-static-window blocker; physical runtime remains a separate lane
+execution_reason: complete GitHub artifact inventory review and targeted inspection of all admissible static/vtable/RTTI/provenance candidates now proves that the remaining identity/writer bytes were not durably staged; physical runtime remains a separate lane
 run_scope: single_task
 continuation_policy: stop_at_task_boundary
 task_completion_policy: finalize_archive_and_continue
@@ -75,9 +73,9 @@ client_size: 51965216
 client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 runtime_platform: official_native_linux_only
 invocation_started_at: 2026-08-16T14:20:00+02:00
-last_progress_at: 2026-08-16T18:25:00+02:00
+last_progress_at: 2026-08-16T19:20:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: live-main-static-blocker-refresh
+ci_check_generation: complete-retained-artifact-inventory
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -89,7 +87,7 @@ heavy_validation_runs: 1
 hosted_staging_attempts_this_task: 2
 hosted_staging_result: INPUT_BLOCKED
 fresh_exact_binary_materialization: BLOCKED
-retained_evidence_research_path: BLOCKED_NEW_EXACT_STATIC_EVIDENCE_REQUIRED
+retained_evidence_research_path: BLOCKED_EXACT_STATIC_BYTES_NOT_DURABLY_STAGED
 runtime_nonclaims:
   display_98_current_canonical_status: UNKNOWN
   rfb_6082_current_backend_mapping: UNKNOWN
@@ -113,7 +111,16 @@ retained_geometry:
   candidate_bound_differences_18_14: PROVEN_ARITHMETIC
   owner_plus_0x10_static_vptr: 0x0308ce70
   owner_plus_0x10_exact_class_identity: UNKNOWN
-  viewport_18x14_interpretation: INFERENCE
+  viewport_18x14_interpretation: VERY_STRONG_INFERENCE
+geometry_control_block:
+  runtime_address: 0x55867df448b0
+  object_runtime_address: 0x55867df448c0
+  object_offset_from_control: 0x10
+  static_vptr: 0x02f683d0
+  retained_refcount_dwords: [13, 1]
+  inline_object_at_plus_0x10: PROVEN
+  make_shared_sp_counted_ptr_inplace_layout: STRONG_INFERENCE
+  direct_counted_viewport_rtti_link: UNKNOWN
 handler_owner:
   historical_runtime_address: 0x55868276a460
   static_vptr: 0x030871d8
@@ -143,22 +150,25 @@ exact_static_identity_frontier:
   counted_viewport_type_string_start: 0x1cabb60
   counted_protocol_handler_type_string_start: 0x1cdba40
 retained_identity_search:
-  status: EXHAUSTED_FOR_CURRENT_DOWNLOADED_SET
-  evidence: docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-retained-identity-window-exhaustion.md
+  artifact_inventory_total: 493
+  inventory_review: COMPLETE
+  admissible_static_vtable_rtti_provenance_candidates: INSPECTED
+  older_pages_4_5_track_a_artifacts: NONE
+  evidence: docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-complete-retained-artifact-inventory.md
   missing_vptr_header_bytes: true
   missing_geometry_field_writers_xrefs: true
   repeated_scan_allowed: false
 static_blocker:
   status: BLOCKED
-  kind: NEW_EXACT_STATIC_EVIDENCE_REQUIRED
-  effect: class identities and safe field patch sites cannot be proven from the current retained set
+  kind: EXACT_STATIC_BYTES_NOT_DURABLY_STAGED
+  effect: exact class identities, safe field patch sites and complete render/camera/picker constraints cannot be proven from retained GitHub evidence
   acceptable_unblockers:
-    - previously uninspected same-repository retained artifact containing exact windows/relocations
-    - governance-compliant staging of the fenced exact client sufficient to extract only bounded missing static evidence
+    - new admissible exact-client artifact containing one or more missing identity windows/relocations
+    - governance-compliant bounded staging of the fenced exact client sufficient to extract the missing static bytes/writer xrefs
   forbidden_duplicate_action: repeat identical official CDN staging attempt
-runtime_v6_crosscheck:
-  main_pr: 397
-  result: FAIL_CLOSED_CLIENT_WINDOW_MISSING
+runtime_v7_crosscheck:
+  main_pr: 405
+  result: FAIL_CLOSED_CLIENT_WINDOW_MISSING_GOVERNANCE_INVALID
   official_exact_client_launch_stage_reached: true
   authoritative_registration_published: false
   gate_b_reached: false
@@ -174,7 +184,7 @@ hosted_official_metadata_probe:
   run: 31949948886
   result: CLOUDFLARE_HTTP_403
   identical_retry_allowed: false
-next_action: obtain NEW exact static evidence for at least one identity window or geometry writer/xref; do not rescan the current retained set, do not repeat identical CDN fetches, and do not use physical Synology runtime as an unauthorized static fallback; after unblocking, resume this same PR/task
+next_action: obtain NEW admissible exact static bytes for at least one identity window and geometry writer/xref; do not rescan the retained inventory, do not repeat identical CDN fetches, and do not use physical Synology runtime as an unauthorized static fallback; after unblocking, resume this same PR/task and finish storage/render/camera/picker dependency auditing before mutation design
 ---
 
 # Track A worldmap extent static RE
@@ -187,33 +197,32 @@ Recover the full static patch/dependency graph for `TWorldMapExtent`, `TWorldMap
 ```yaml
 static_classification: MORE_STATIC_RE_NEEDED
 fresh_exact_binary_materialization: BLOCKED
-retained_evidence_research_path: BLOCKED_NEW_EXACT_STATIC_EVIDENCE_REQUIRED
-runtime_discriminator_required: false
+retained_evidence_research_path: BLOCKED_EXACT_STATIC_BYTES_NOT_DURABLY_STAGED
+static_patch_graph_ready: false
 ```
 
-The current retained evidence set is exhausted for the identity/writer questions that now gate safe patch design. Live `main@05d4a7136e234b874f7f112ad8c92f01b0aabd51` adds RUNTIME v6 evidence but does not stage new exact static bytes for this lane; v6 failed closed at `client_window_missing` without authoritative registration or Gate B.
+The GitHub-retained evidence path is now genuinely bounded: the complete 493-artifact inventory was reviewed and all admissible Track A static/vtable/RTTI/provenance candidates were directly inspected. They do not retain the three required vtable-header/typeinfo windows or direct writer xrefs for the geometry fields. Further scanning of the same inventory is prohibited as duplicate work.
 
-No new runtime, GUI/session, client-byte mutation, Synology static RE, credentials, Codex/OpenAI API or owner-funded token use occurred in this STATIC-RE continuation.
+## Strongest new structural result
+
+The concrete `owner+0x10` object still stores exact DWORDs `18/14` at `+0x48/+0x4c`, with candidate bound deltas independently equal to `18/14` and static vptr `0x0308ce70`.
+
+Its companion at `owner+0x18` is exactly `0x10` bytes before the object, has static vptr `0x02f683d0`, retained count DWORDs `13/1`, and contains the object inline at companion `+0x10`. The paired structure repeats for adjacent owner dependencies.
+
+**FACT:** inline polymorphic control-like block + counters + object-at-+0x10 layout is directly preserved.
+
+**INFERENCE:** this is strongly consistent with libstdc++ `_Sp_counted_ptr_inplace<T>` / `make_shared<T>`. Combined with the exact counted `TWorldMapViewport` RTTI string, the `18×14` object is now a very strong viewport correlation.
+
+**UNKNOWN:** the direct relocation from control vptr `0x02f683d0` to counted `TWorldMapViewport` typeinfo is not retained, so exact class identity remains unproven.
 
 ## Durable evidence
 
-- `20260816-retained-provenance-recovery.md` — raw geometry, exact prefixes and type/container census.
-- `20260816-user-supplied-linux-launcher-artifact.md` / `20260816-owner-upload-launcher-package.md` — exact user upload fence and GitHub artifact provenance.
-- `20260816-exact-handler-disassembly-recovery.md` — producer-source labels plus exact fenced FullMap/Create/Change/Delete/MapDescription disassembly graph.
-- `20260816-retained-owner-geometry-object.md` — direct `owner+0x10` object fields, exact stored `18/14`, candidate bound deltas and static vptr `0x0308ce70`.
-- `20260816-owner-vptr-storage-scale-coupling.md` — common handler-owner static vptr `0x030871d8`, exact identity windows, and `0xced1b0 -> self+0x30/+0xd0` float coupling.
-- `20260816-retained-identity-window-exhaustion.md` — bounded search proving that the current retained set lacks the required vtable-header/typeinfo windows and geometry-field writer/xrefs.
-
-## Major current facts
-
-- A concrete object on the proven `owner+0x10` path stores exact DWORDs `18/14` at `+0x48/+0x4c`; two candidate bound pairs in the same object differ independently by `18/14`.
-- Its exact historical static vptr is `0x0308ce70`; exact class identity remains `UNKNOWN`.
-- The common historical map-handler owner has exact static vptr `0x030871d8`; `TWorldmapProtocolMessageHandler` is a strong but unproven semantic correlation.
-- `FullMap@0xcec8d0` multiplies two payload integers by exactly 32 before a worldmap-owner virtual call.
-- `MapDescription@0x19a8a80` uses descriptor grid/divisor fields `+0x38/+0x3c/+0x40/+0x48` and coordinate-transform inputs `+0x08/+0x0c/+0x10`.
-- `0xced1b0` rebuilds a bucketed 0x20-byte-node hash structure and later consumes a float at dependency `self+0x30/+0xd0`; exact class and semantic meaning remain `UNKNOWN`.
-- The exact-static census contains all target type names, full counted viewport string start `0x1cabb60`, full counted protocol-handler string start `0x1cdba40`, and literal `tibia::worldmap::TWorldMapExtentX` at `0x1cd9ad7`.
-- Recursive retained-file search found no preserved `vptr-16/vptr-8` header bytes for `0x030871d8`, `0x0308ce70` or `0x02f683d0`, and no direct geometry `+0x48/+0x4c` writer/xrefs.
+- `20260816-retained-provenance-recovery.md`
+- `20260816-exact-handler-disassembly-recovery.md`
+- `20260816-retained-owner-geometry-object.md`
+- `20260816-owner-vptr-storage-scale-coupling.md`
+- `20260816-retained-identity-window-exhaustion.md`
+- `20260816-complete-retained-artifact-inventory.md`
 
 ## Acceptance progress
 
@@ -223,18 +232,19 @@ No new runtime, GUI/session, client-byte mutation, Synology static RE, credentia
 - [x] raw 18-sample horizontal groups and Y delta 14 preserved;
 - [x] concrete worldmap dependency object stores exact `18/14`;
 - [x] candidate bound-pair differences independently equal `18/14`;
+- [x] concrete inline control-block/object layout recovered;
 - [x] common handler owner vptr recovered;
 - [x] observer label-source provenance recovered;
-- [x] retained disassembly recovered for bounded map-handler/description ranges;
+- [x] retained handler/description disassembly recovered;
 - [x] protocol-side ×32 conversion proven;
 - [x] descriptor grid/divisor accesses proven;
 - [x] candidate hash rebuild and post-rebuild float coupling proven;
-- [x] current retained identity-window search bounded and exhausted;
+- [x] complete repository artifact inventory reviewed;
+- [x] all admissible retained static/vtable/RTTI/provenance candidates inspected;
 - [ ] exact class identity for static vptr `0x0308ce70`;
 - [ ] exact class identity for static vptr `0x030871d8`;
-- [ ] semantic names/units for geometry fields;
-- [ ] extent/subfield/viewport fields semantically identified;
-- [ ] constructors/default writers and complete readers/writers recovered;
+- [ ] direct counted-viewport RTTI identity for control vptr `0x02f683d0`;
+- [ ] semantic names/units and complete writers/readers for geometry fields;
 - [ ] storage direct-member relation and capacity/eviction rules proven;
 - [ ] render/camera/picker clipping/culling/transform dependencies traced;
 - [ ] fixed allocations/loop bounds/masks/packing audited completely;
@@ -242,6 +252,8 @@ No new runtime, GUI/session, client-byte mutation, Synology static RE, credentia
 
 ## Exact blocker
 
-Further progress now requires **new exact static evidence**, not another pass over the same retained files. Resume this same task/PR only after a previously uninspected same-repository artifact provides the missing windows/relocations, or after governance-compliant staging of the fenced exact client provides the bounded missing bytes/relocations/writer xrefs.
+Further progress requires new exact static bytes, not another analysis pass over retained GitHub evidence. Minimum useful evidence is one of the vtable-header/typeinfo windows `0x030871c8..0x030871d7`, `0x0308ce60..0x0308ce6f`, `0x02f683c0..0x02f683cf`, plus writer/xref evidence for geometry `+0x48/+0x4c` and enough downstream exact disassembly to finish render/camera/picker constraints.
 
-Do not repeat the already-failed identical official CDN staging attempt. Do not use Synology as an unauthorized static fallback.
+RUNTIME v7 on main reached `client_start` but again failed closed at `client_window_missing`; it published no authoritative registration/Gate B and staged no static bytes for this lane. No current legal physical producer is available to this GitHub-hosted STATIC-RE task.
+
+No client bytes were modified. No GUI/login/gameplay was used by this task. No owner-funded Codex/OpenAI API/token use occurred.

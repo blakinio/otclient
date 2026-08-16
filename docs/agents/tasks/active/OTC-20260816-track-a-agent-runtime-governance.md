@@ -1,24 +1,24 @@
 ---
 task_id: OTC-20260816-track-a-agent-runtime-governance
-status: active
-agent: ChatGPT
-session_id: chatgpt-coordinator-20260816-0836
+status: ready
+agent: unassigned
+session_id: null
 session_role: coordinator
-session_rotation_count: 1
+session_rotation_count: 2
 project_lane: otclient
 lane: track-a-governance
 track_id: official-client-re
 task_kind: implementation
-phase: final-independent-remediation
+phase: merge-ready
 branch: docs/OTC-20260816-track-a-agent-runtime-governance
 base_branch: main
 base_main: 3a5568f36ebc326afd246d0d2da45b5d8eecabfa
 risk: medium
 related_pr: 324
 created: 2026-08-16T08:05:00+02:00
-updated: 2026-08-16T08:36:00+02:00
-lease_expires_at: 2026-08-16T09:21:00+02:00
-lease_released_at: null
+updated: 2026-08-16T09:15:00+02:00
+lease_expires_at: null
+lease_released_at: 2026-08-16T09:15:00+02:00
 owned_paths:
   - docs/agents/README.md
   - docs/agents/AGENTS.md
@@ -78,14 +78,14 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-last_progress_at: 2026-08-16T08:36:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: coordinator-final-admission-remediation
+last_progress_at: 2026-08-16T09:15:00+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: final-code-head-validated-release
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 material_review_findings:
@@ -93,19 +93,22 @@ material_review_findings:
   - PRRT_kwDOTVmdjs6ZlHW1: remediated and verified; canonical access is bound to runtime_owner_task == task_id and canonical namespace
   - PRRT_kwDOTVmdjs6ZlHW2: remediated and verified; ephemeral_isolated rejects canonical namespace and aliases
   - PRRT_kwDOTVmdjs6ZlIVI: remediated and verified; universal mandatory docs/agents/README.md entrypoint is workflow-triggered and statically audited
-  - PRRT_kwDOTVmdjs6ZlJ8D: active; read_only must require proven uniqueness/non-conflicting target ownership before live observation
-  - PRRT_kwDOTVmdjs6ZlKa_: active; runtime-sensitive diff must bind changed Track A admission task to current PR head branch rather than accept any changed Track A task
-  - claim_resume_admission: active; admission record must be persisted at Track A claim/resume/checkpoint (`none` for static), not delayed until first live operation
+  - PRRT_kwDOTVmdjs6ZlI-l: remediated and verified; README is included in durable owned_paths
+  - PRRT_kwDOTVmdjs6ZlJ8D: remediated and verified; read_only requires proven unique/non-conflicting live target, explicit namespace and no other-task owner
+  - PRRT_kwDOTVmdjs6ZlKa_: remediated and verified; runtime-sensitive admission is bound to the current PR head branch
+  - claim_resume_admission: remediated and verified; admission is persisted at Track A claim/resume/checkpoint, with none for static work
 validation_evidence:
-  - implementation_parent_head: 90f31bfe42bbc2e8c178e90b7e04a6d69f64c01e
-  - track_a_governance_run: 31931442198 SUCCESS
-  - policy_audit_job: 95126785784 SUCCESS
-  - fresh_behavior_audit_job: 95126785680 SUCCESS
-  - repository_ci_run: 31931442374 SUCCESS
-  - required_ci_job: 95127228818 SUCCESS
-  - released_checkpoint_head: 11300cae0a2d5cc284c08fef2eb48fc3fbaaf71b
-last_completed_step: previous implementer released ownership; coordinator independently claimed after verifying waiting/unassigned state and preserved runtime_access=none
-next_action: repair read_only target proof, claim/resume persistence, and branch-bound sensitive-path admission; add deterministic negative cases; rerun exact-head governance + repository CI; resolve only verified findings; release for protected merge and archive
+  - validated_code_head: 03388d366a91d28fb455ab64bc4bc08d4fd78ca4
+  - track_a_governance_run: 31932081479 SUCCESS
+  - fresh_behavior_audit_job: 95128348959 SUCCESS
+  - policy_audit_job: 95128348995 SUCCESS
+  - repository_ci_run: 31932081658 SUCCESS
+  - required_ci_job: 95129316186 SUCCESS
+  - unresolved_material_review_threads: 0
+  - e2e_result: NOT_APPLICABLE_WITH_REASON
+  - e2e_reason: governance/policy deliverable; no live Tibia runtime operation is part of this task
+last_completed_step: independent coordinator review remediated all material admission/entrypoint/CI bypasses and validated exact code head with dedicated governance audit plus repository CI
+next_action: mark PR #324 Ready for review; validate the new exact release head through Track A governance and repository CI/protection; protected-merge #324; then archive this task in a separate closeout PR
 ---
 
 # Track A agent runtime-governance enforcement
@@ -125,7 +128,7 @@ Make the final Track A canonical-live runtime rules unavoidable at the normal ag
 - Ephemeral runtimes cannot use/alias canonical namespace.
 - Historical `:98`, `6082`, PID/session evidence never satisfies current identity.
 - Runtime-sensitive PRs cannot satisfy CI using an unrelated changed Track A task record; admission must be bound to the current PR head branch.
-- Track A workers may not mutate PR #303-owned runtime or Track B state.
+- Track A workers may not mutate or live-observe PR #303-owned runtime or Track B state.
 - Deterministic repository tests prevent regression/bypass of these invariants.
 - No live Tibia runtime operation is performed by this task.
 - Exact-head CI/review are green before merge; task is archived and ownership released afterward.

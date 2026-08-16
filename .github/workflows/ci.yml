@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
   merge_group:
     branches: [main]
     types: [checks_requested]
@@ -20,6 +20,7 @@ concurrency:
 jobs:
   changes:
     name: Detect Build Scope
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -200,7 +201,7 @@ jobs:
 
   required:
     name: CI / Required
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || github.event.action != 'closed')
     needs:
       - changes
       - checks

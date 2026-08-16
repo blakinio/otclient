@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Decode category 9 base directory and static component
+    name: Trace BattlEye category string initializer
     runs-on: [otclient, synology]
     timeout-minutes: 6
     steps:
-      - name: Resolve Qt base-dir call and static QString backing
+      - name: Correlate BattlEye literal with category 9 global QString
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -28,7 +28,7 @@ jobs:
           [[ "$(sha256sum "$client" | awk '{print $1}')" == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' ]] || exit 5
           echo 'FS_RESOLVER_CLIENT_FENCE=PASS'
           python3 - "$client" <<'PY'
-          import pathlib,struct,sys
+          import hashlib,pathlib,struct,sys
           d=pathlib.Path(sys.argv[1]).read_bytes();E='<'
           h=struct.unpack_from(E+'HHIQQQIHHHHHH',d,16)
           _,_,_,_,_,shoff,_,_,_,_,shentsz,shnum,shstrndx=h
@@ -39,82 +39,72 @@ jobs:
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
           secs=[]
-          for i,x in enumerate(raw):secs.append({'idx':i,'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
-          by={s['name']:s for s in secs}
-          def voff(va):
+          for i,x in enumerate(raw):secs.append({'idx':i,'name':cs(sn,x[0]),'type':x[1],'flags':x[2],'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+          by={s['name']:s for s in secs};text=by['.text'];tb=d[text['off']:text['off']+text['size']]
+          def fileoff_to_va(o):
               for s in secs:
-                  if s['size'] and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
+                  if s['type']!=8 and s['off']<=o<s['off']+s['size']:return s['addr']+(o-s['off'])
+              return None
+          def va_to_off(va):
+              for s in secs:
+                  if s['type']!=8 and s['addr']<=va<s['addr']+s['size']:return s['off']+(va-s['addr'])
               return None
           def b_at(va,n):
-              o=voff(va);return b'' if o is None else d[o:o+n]
-          def ascii_at(va,limit=200):
-              o=voff(va)
-              if o is None:return None
-              e=d.find(b'\0',o,min(len(d),o+limit))
-              if e<=o:return None
-              z=d[o:e]
-              if z and all(32<=x<127 for x in z):return z.decode('ascii')
-              return None
-          def utf16_at(va,nchars=None,limit=100):
-              o=voff(va)
-              if o is None:return None
-              rawb=d[o:o+(2*nchars if nchars is not None else 2*limit)]
-              if nchars is None:
-                  end=None
-                  for j in range(0,len(rawb)-1,2):
-                      if rawb[j:j+2]==b'\0\0':end=j;break
-                  if end is not None:rawb=rawb[:end]
-              try:
-                  t=rawb.decode('utf-16le')
-                  return t if t and all(32<=ord(c)<127 for c in t) else None
-              except:return None
-          # dynamic symbols + relocation map
-          dyn=by['.dynsym'];ss=secs[dyn['link']];sb=d[ss['off']:ss['off']+ss['size']];syms=[]
-          for o in range(dyn['off'],dyn['off']+dyn['size'],dyn['entsize'] or 24):
-              no,info,other,si,val,sz=struct.unpack_from('<IBBHQQ',d,o);syms.append((cs(sb,no),val,sz,si,info))
-          got_names={};rel_by_off={}
-          for rn in ('.rela.plt','.rela.dyn'):
-              r=by.get(rn)
-              if not r:continue
-              for o in range(r['off'],r['off']+r['size'],r['entsize'] or 24):
-                  ro,ri,ad=struct.unpack_from('<QQq',d,o);sym=ri>>32;typ=ri&0xffffffff
-                  name=syms[sym][0] if sym and sym<len(syms) else ''
-                  if name:got_names[ro]=name
-                  rel_by_off[ro]=(typ,sym,ad,name)
-          def plt_symbol(va):
-              x=b_at(va,24)
-              for p in range(0,min(10,len(x)-6)):
-                  if x[p:p+2]==b'\xff\x25':
-                      got=va+p+6+struct.unpack_from('<i',x,p+2)[0]
-                      return got,got_names.get(got,''),x.hex()
-              return None,'',x.hex()
-          got,name,hx=plt_symbol(0x4e0050)
-          print(f'FS_RESOLVER_SLOT18_CATEGORY9_CALL target=0x4e0050 got={"NONE" if got is None else hex(got)} symbol={name} bytes={hx}')
-          # category9 slot10 object exact 24 bytes and relocations for each qword.
-          obj=0x31964a0
-          print(f'FS_RESOLVER_SLOT10_CATEGORY9_OBJECT=0x{obj:x} raw={b_at(obj,24).hex()}')
-          for off in (0,8,16):
-              va=obj+off;rawq=struct.unpack('<Q',b_at(va,8))[0]
-              r=rel_by_off.get(va)
-              print(f'FS_RESOLVER_SLOT10_QWORD va=0x{va:x} raw=0x{rawq:x} reloc={r}')
-              candidates=[rawq]
-              if r:candidates.append(r[2])
-              for ptr in candidates:
-                  if not ptr:continue
-                  for n in (None,3,4,8,9,16):
-                      t=utf16_at(ptr,n)
-                      if t:print(f'FS_RESOLVER_SLOT10_BACKING source=0x{va:x} ptr=0x{ptr:x} nchars={n} text={t}')
-                  a=ascii_at(ptr)
-                  if a:print(f'FS_RESOLVER_SLOT10_BACKING_ASCII source=0x{va:x} ptr=0x{ptr:x} text={a}')
-          # inspect nearby static objects / relocation addends for category9 and category10 to distinguish boundaries.
-          print('FS_RESOLVER_SLOT10_STATIC_REGION_BEGIN')
-          for va in range(0x3196460,0x31964e0,8):
-              rawq=struct.unpack('<Q',b_at(va,8))[0];r=rel_by_off.get(va)
-              if rawq or r:print(f'va=0x{va:x} raw=0x{rawq:x} reloc={r}')
-          print('FS_RESOLVER_SLOT10_STATIC_REGION_END')
-          # category9 case exact direct call must be QCoreApplication-like symbol identified above.
-          call=b_at(0xc91230,5);dst=0xc91235+struct.unpack_from('<i',call,1)[0]
-          print(f'FS_RESOLVER_SLOT18_CATEGORY9_CASE_CALL=0x{dst:x}')
+              o=va_to_off(va);return b'' if o is None else d[o:o+n]
+          # Exact literal VA from file, not assumed equal to offset.
+          needle=b'BattlEye\0';poss=[];p=0
+          while True:
+              j=d.find(needle,p)
+              if j<0:break
+              va=fileoff_to_va(j)
+              if va is not None:poss.append((j,va))
+              p=j+1
+          print('FS_RESOLVER_BATTLEYE_LITERALS='+','.join(f'file=0x{o:x}/va=0x{v:x}' for o,v in poss))
+          battleyes=[v for _,v in poss]
+          global_obj=0x31964a0
+          print(f'FS_RESOLVER_CATEGORY9_GLOBAL=0x{global_obj:x}')
+          # Search common instruction-boundary-looking RIP references to literal and global.
+          wanted=set(battleyes+[global_obj,global_obj+8,global_obj+16])
+          refs=[]
+          for i in range(len(tb)-8):
+              va=text['addr']+i
+              # REX + MOV/LEA rip+disp32
+              if tb[i] in range(0x40,0x50) and tb[i+1] in (0x8b,0x8d,0x89):
+                  m=tb[i+2]
+                  if (m>>6)==0 and (m&7)==5:
+                      dst=va+7+struct.unpack_from('<i',tb,i+3)[0]
+                      if dst in wanted:refs.append((va,dst,f'rex_{tb[i+1]:02x}'))
+              # MOVDQA xmm,[rip+disp32]
+              if tb[i:i+3]==b'\x66\x0f\x6f':
+                  m=tb[i+3]
+                  if (m>>6)==0 and (m&7)==5:
+                      dst=va+8+struct.unpack_from('<i',tb,i+4)[0]
+                      if dst in wanted:refs.append((va,dst,'movdqa'))
+              # non-REX MOV r32/m32 or MOV m32/r32 rip-relative
+              if tb[i] in (0x8b,0x89):
+                  m=tb[i+1]
+                  if (m>>6)==0 and (m&7)==5:
+                      dst=va+6+struct.unpack_from('<i',tb,i+2)[0]
+                      if dst in wanted:refs.append((va,dst,f'op_{tb[i]:02x}'))
+          # Deduplicate and print bounded windows.
+          uniq=[];seen=set()
+          for r in refs:
+              if r not in seen:seen.add(r);uniq.append(r)
+          print('FS_RESOLVER_BATTLEYE_GLOBAL_REFS='+','.join(f'0x{a:x}->0x{b:x}:{k}' for a,b,k in uniq))
+          for a,b,k in uniq:
+              lo=max(text['addr'],a-0xb0);hi=min(text['addr']+text['size'],a+0x120)
+              w=d[text['off']+(lo-text['addr']):text['off']+(hi-text['addr'])]
+              print(f'FS_RESOLVER_REF_WINDOW ref=0x{a:x} target=0x{b:x} kind={k} start=0x{lo:x} sha256={hashlib.sha256(w).hexdigest()} hex={w.hex()}')
+          # Revalidate category9 slot10 really reads that global and slot18 really calls applicationDirPath PLT.
+          x=b_at(0xc8f8e0,24)
+          print('FS_RESOLVER_SLOT10_CASE9_HEAD='+x.hex())
+          if not x.startswith(bytes.fromhex('660f6f0d')):raise SystemExit('FS_RESOLVER_FAIL=slot10_case9_head')
+          dst=0xc8f8e8+struct.unpack_from('<i',x,4)[0]
+          if dst!=global_obj:raise SystemExit(f'FS_RESOLVER_FAIL=slot10_case9_global:{hex(dst)}')
+          call=b_at(0xc91230,5)
+          dst2=0xc91235+struct.unpack_from('<i',call,1)[0]
+          if dst2!=0x4e0050:raise SystemExit(f'FS_RESOLVER_FAIL=slot18_case9_call:{hex(dst2)}')
+          print('FS_RESOLVER_PASS=category9_global_and_applicationDirPath_call')
           print('FS_RESOLVER_EXECUTED_TARGET=false')
           print('FS_RESOLVER_LIVE_RUNTIME_OBSERVED=false')
           print('FS_RESOLVER_MUTATION_PERFORMED=false')

@@ -8,16 +8,16 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: repair-harness-and-rerun-once
+phase: repaired-discriminator-v3-in-flight
 branch: ci/OTC-20260816-track-a-client-window-ownership-discriminator
 base_branch: main
 base_main: 05d4a7136e234b874f7f112ad8c92f01b0aabd51
 risk: high
-updated: 2026-08-16T18:15:00+02:00
+updated: 2026-08-16T18:17:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-client-window-ownership-discriminator.md
   - docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/**
-  - .github/workflows/tibia-official-client-re-window-ownership-discriminator.yml
+  - .github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
 modules_touched: []
 reuses:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
@@ -99,9 +99,12 @@ first_diagnostic_run:
   evidence: docs/agents/evidence/OTC-20260816-track-a-client-window-ownership-discriminator/20260816-first-run-harness-pgid-failure.md
 repair_cycle:
   repair_cycles_for_current_gate: 1
-  justification: remove unnecessary PGID==PID assumption before observation and add exact trusted-worker launchermetadata fidelity; first run never reached semantic discriminator
+  justification: remove unnecessary wrapper PID/PGID assumption before observation and add exact trusted-worker launchermetadata fidelity; first run never reached semantic discriminator
+  launcher_model: direct Python subprocess with start_new_session true returning the exact client PID
   process_cleanup_model: launched PID plus marker-verified descendants from known ancestry only; no process-group kill and no broad process scan
-  launchermetadata_fidelity: REQUIRED
+  launchermetadata_fidelity: REQUIRED_AND_IMPLEMENTED
+  corrected_workflow: .github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
+  corrected_workflow_generation: v3
   additional_physical_runs_authorized: 1
 acceptance:
   - reproduce the trusted client startup environment in a task-owned ephemeral home/display/WARP namespace without canonical state
@@ -117,10 +120,10 @@ acceptance:
   - do not login or send gameplay input
   - terminate only the launched marker-owned client PID plus marker-verified descendants from its known ancestry, then task-owned Xvfb/VNC/WARP; remove sandbox before exit
   - remove one-shot workflow after terminal evidence
-last_completed_step: first physical run stopped before semantic observation because PGID==PID was an unnecessary harness assumption; cleanup completed and exact evidence was persisted
-next_action: repair the same task-owned workflow by removing process-group dependence and mirroring launchermetadata fidelity, then execute exactly one repaired physical discriminator; no further physical retry is permitted without a new evidence-based finding
+last_completed_step: first physical run stopped before semantic observation because PGID==PID was an unnecessary harness assumption; v3 now launches the exact client via start_new_session, mirrors trusted launchermetadata handling and uses ancestry-only cleanup
+next_action: consume exactly one repaired v3 physical discriminator; persist its bounded sanitized evidence and do not perform any further physical retry from this task
 ---
 
 # Track A client-window ownership/startup discriminator
 
-The first isolated run proved the namespace/support path but stopped before window observation because of a harness process-group assumption. One repaired run is authorized to collect the intended bounded window/process/startup evidence without canonical state or login.
+The first isolated run proved the namespace/support path but stopped before window observation because of a harness process-group assumption. The repaired v3 generation is the sole remaining physical discriminator and cannot modify canonical state or use login credentials.

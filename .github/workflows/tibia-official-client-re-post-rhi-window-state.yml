@@ -1,0 +1,131 @@
+name: Track A post-RHI X11 window-state discriminator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-post-rhi-window-state.yml
+      - .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-post-rhi-window-state
+  cancel-in-progress: false
+
+jobs:
+  preflight-transformer:
+    name: Hosted transformer preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Generate and validate isolated discriminator
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          source_file="$(mktemp)"
+          generated="$(mktemp)"
+          trap 'rm -f -- "$source_file" "$generated"' EXIT
+          curl -fsSL --retry 3 --connect-timeout 10 \
+            -o "$source_file" \
+            https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
+          python3 -m py_compile .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py
+          python3 .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py \
+            "$source_file" "$generated"
+          bash -n "$generated"
+          python3 - "$generated" <<'PY'
+          import pathlib, sys
+          text = pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
+          required = (
+              "task='OTC-20260816-track-a-canonical-runtime-e2e'",
+              'LIBGL_DRIVERS_PATH="$dri"',
+              'POST_RHI_SUPPORT_FENCE=PASS',
+              'POST_RHI_X11_GLX_PRESENT=',
+              'POST_RHI_THREAD_COUNT=',
+              'POST_RHI_X11_TREE_COUNTS=',
+              'POST_RHI_CLIENT_LOG_FILTER_MATCHES=',
+              'NO_NONROOT_X11_WINDOWS_CREATED',
+              'TASK_OWNED_X11_WINDOW_PRESENT_BUT_NOT_VIEWABLE',
+              'TASK_OWNED_X11_WINDOW_VIEWABLE',
+              'WINDOW_DIAG_CLEANUP=COMPLETE',
+              'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
+          )
+          missing = [needle for needle in required if needle not in text]
+          if missing:
+              raise SystemExit(f'POST_RHI_HOSTED_PREFLIGHT_MISSING={missing}')
+          forbidden = (
+              "'QT_XCB_GL_INTEGRATION': 'none'",
+              '+extension GLX',
+              'runtime-registration.json',
+              'canonical-live-runtime',
+              'QSG_RHI_BACKEND',
+              '/proc/*/environ',
+              "glob('/proc/*')",
+          )
+          present = [needle for needle in forbidden if needle in text]
+          if present:
+              raise SystemExit(f'POST_RHI_HOSTED_PREFLIGHT_FORBIDDEN={present}')
+          client_start = text.index('python3 - "$root/client.pid"')
+          client_end = text.index('client_pid="$(cat "$root/client.pid")"', client_start)
+          if 'LIBGL_DRIVERS_PATH' in text[client_start:client_end]:
+              raise SystemExit('POST_RHI_HOSTED_PREFLIGHT=DRI_ENV_LEAK_TO_CLIENT')
+          print('POST_RHI_HOSTED_PREFLIGHT=PASS')
+          PY
+
+  post-rhi-window-state:
+    name: Physical post-RHI X11 window-state discriminator
+    if: ${{ false }}
+    needs: preflight-transformer
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Revalidate Track A admission before runtime boundary
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" \
+            --expected-branch "$HEAD_BRANCH"
+          echo 'POST_RHI_RUNTIME_ADMISSION=PASS'
+
+      - name: Execute exactly one isolated discriminator
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]] || {
+            echo "POST_RHI_REFUSED=BASE_MOVED:$EVENT_BASE_SHA"
+            exit 44
+          }
+          source_file="$(mktemp)"
+          generated="$(mktemp)"
+          trap 'rm -f -- "$source_file" "$generated"' EXIT
+          curl -fsSL --retry 3 --connect-timeout 10 \
+            -o "$source_file" \
+            https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
+          python3 .github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py \
+            "$source_file" "$generated"
+          bash -n "$generated"
+          echo 'POST_RHI_RUNTIME_GENERATED_SCRIPT=PASS'
+          bash "$generated"

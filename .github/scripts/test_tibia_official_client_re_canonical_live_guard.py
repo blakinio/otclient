@@ -5,6 +5,7 @@ import fcntl
 import importlib.util
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import tempfile
@@ -48,6 +49,17 @@ class CanonicalLiveGuardSupervisorTests(unittest.TestCase):
             "--",
             *command,
         ]
+
+    def wait_for_lock_release(self, lock_fd: int, timeout: float = 6.0) -> None:
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    self.fail("supervisor did not retain/release the lock with guarded lifetime")
+                time.sleep(0.05)
 
     def test_guard_supervisor_preserves_exit_contract(self) -> None:
         completed = subprocess.run(
@@ -103,15 +115,53 @@ time.sleep(1.5)
             with self.assertRaises(BlockingIOError):
                 fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-            deadline = time.monotonic() + 6.0
-            while True:
+            self.wait_for_lock_release(lock_fd)
+        finally:
+            if lock_fd is not None:
                 try:
-                    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    break
-                except BlockingIOError:
-                    if time.monotonic() >= deadline:
-                        self.fail("supervisor did not retain/release the lock with daemon lifetime")
-                    time.sleep(0.05)
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+                os.close(lock_fd)
+            if guard.poll() is None:
+                guard.kill()
+                guard.wait(timeout=5)
+            if guard.stdout is not None and not guard.stdout.closed:
+                guard.stdout.close()
+            if guard.stderr is not None and not guard.stderr.closed:
+                guard.stderr.close()
+
+    def test_guard_lock_survives_process_group_sigterm_with_ignoring_descendant(self) -> None:
+        ignoring_program = r'''
+import os
+import signal
+import time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+print(os.getpid(), flush=True)
+time.sleep(1.5)
+'''
+        guard = subprocess.Popen(
+            self.helper_command(sys.executable, "-c", ignoring_program),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        lock_fd: int | None = None
+        try:
+            assert guard.stdout is not None
+            line = guard.stdout.readline().strip()
+            self.assertTrue(line.isdigit(), f"missing guarded pid; got {line!r}")
+
+            os.killpg(guard.pid, signal.SIGTERM)
+            guard.wait(timeout=5)
+            self.assertEqual(guard.returncode, -signal.SIGTERM)
+
+            lock_fd = os.open(self.manager.lock_path, os.O_RDWR)
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            self.wait_for_lock_release(lock_fd)
         finally:
             if lock_fd is not None:
                 try:

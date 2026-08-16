@@ -28,7 +28,7 @@ The final manager/supervisor stack is already promoted on `main`:
 - merged manager main: `e9df81f50dbb231bc4ac6cc3fc21f260fc358d34`;
 - fresh manager closeout/archive: PR #319, merged as `25700f08c3f5729e4ee38bf8c0a3ca04020379be`.
 
-For ordinary guarded mutation, the caller acquires and validates the authoritative lease before dispatch, transfers the coordination flock only to a dedicated child-subreaper supervisor, starts the guarded command with `close_fds=True` so the command receives no flock descriptor, and keeps serialization until the primary command plus all adopted/orphaned descendants have exited.
+For ordinary guarded mutation, the caller first has a current authoritative lease record/capability, then `guard-run` acquires the canonical coordination flock and validates that lease before dispatch. After fork, only a dedicated child-subreaper supervisor retains the flock; it starts the guarded command with `close_fds=True` so the command receives no flock descriptor, and keeps serialization until the primary command plus all adopted/orphaned descendants have exited.
 
 That final `guard-run` behavior is a required foundation, but it is deliberately **not sufficient by itself for bootstrap**: ordinary `guard-run` completes only after the guarded process tree is gone, while successful bootstrap must leave one exact registered official-client process alive after an explicit verified detach transition. Bootstrap therefore requires a distinct reviewed primitive/state machine that preserves the same authority and anti-escape guarantees through registration and detachment.
 
@@ -43,26 +43,30 @@ lease_record: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
 runtime_registration: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
 ```
 
-`runtime-registration.json` is the one authoritative current registration path. Bootstrap candidates MUST be written as mode-restricted temporary files in the same directory and atomically renamed to that exact path only at commit. Controllers MUST NOT select, override, infer or create an alternative state root or registration path. Absence means that this exact registration is absent or explicitly invalidated under the current authoritative lease; absence in any other directory is irrelevant.
+`runtime-registration.json` is the one authoritative current registration path. Bootstrap candidates MUST be written as mode-restricted temporary files in the same directory and atomically renamed to that exact path only at commit. Controllers MUST NOT select, override, infer or create an alternative state root or registration path. Absence means that this exact registration is absent or explicitly invalidated while the bootstrap supervisor holds the canonical coordination flock and has just validated the current authoritative lease; absence in any other directory is irrelevant.
 
 ## Preconditions and transaction-start ordering
 
-Static prerequisites may be checked before coordination, but **runtime absence is authoritative only while the coordination flock is already held**. A pre-lease inventory may be used for diagnostics but MUST NOT authorize launch.
+Static prerequisites may be checked before coordination, but **runtime absence is authoritative only while the canonical coordination flock is already held by the bootstrap supervisor**. A pre-lock inventory may be used for diagnostics but MUST NOT authorize launch.
 
-Before any bootstrap child is created, the controller MUST:
+Before any bootstrap child is created, the controller/bootstrap supervisor MUST perform this exact order:
 
-1. acquire the current authoritative controller lease through the promoted manager, thereby holding the canonical coordination lock;
-2. while that same lease/lock remains held, perform a fresh fail-closed inventory immediately before launch;
-3. prove the exact authoritative registration is absent and prove there is no existing official-client candidate/session that could conflict with a second live session;
-4. only then enter the creation state.
+1. acquire or renew the current authoritative controller lease through the promoted manager and retain its task/session identity plus task-local capability token;
+2. start the reviewed bootstrap supervisor, which acquires the canonical `coordination.lock` flock and, while holding it, validates the current lease identity/token/generation exactly as the final manager requires;
+3. while that same supervisor-owned flock remains held, perform a fresh fail-closed inventory immediately before launch;
+4. prove the exact authoritative registration is absent and prove there is no existing official-client candidate/session that could conflict with a second live session;
+5. only then create bootstrap descendants while the supervisor continuously retains the flock.
 
-The under-lease inventory MUST satisfy all of the following:
+Acquiring the durable lease record does **not** by itself mean the coordination flock remains held after the manager `acquire` call returns. The decisive absence check and launch authorization therefore belong inside the bootstrap supervisor's flock-held critical section.
+
+The under-lock inventory MUST satisfy all of the following:
 
 ```yaml
 track: official-client-re
 platform: official_native_linux_only
 controller_lease: current_and_valid
-lease_generation: known
+lease_generation: known_and_revalidated_under_lock
+coordination_flock: held_by_bootstrap_supervisor
 lease_manager: final_promoted_current_main_version
 bootstrap_supervisor: reviewed_current_main_bootstrap_version
 canonical_namespace:
@@ -85,7 +89,7 @@ The inventory is fail-closed across **all** official native Linux client candida
 
 If a registered client, an exact live client, any mismatched/unverifiable official-client candidate, or any existing official-client session is found, this contract MUST NOT create another session. The caller must enter the ordinary registration/reuse/recovery path or explicit reconciliation path instead. Historical display/process observations are not sufficient to satisfy these preconditions.
 
-The lease MUST remain continuously held from before the authoritative absence inventory through creation, registration commit and safe detach. Therefore two concurrent bootstrap callers cannot both act on the same stale absence observation: after waiting for the coordination lock, a later caller must repeat the full under-lock inventory and must refuse creation if the first caller has already registered or left any conflicting official-client candidate/session.
+The bootstrap supervisor MUST keep the canonical coordination flock continuously from before lease revalidation and the authoritative absence inventory through creation, registration commit and safe detach. Therefore two concurrent bootstrap callers cannot both act on the same stale absence observation: after waiting for the flock, a later supervisor must revalidate its lease, repeat the full under-lock inventory and refuse creation if the first caller has already registered or left any conflicting official-client candidate/session.
 
 ## Exact client fence
 
@@ -105,16 +109,22 @@ A different official client build requires an explicitly revalidated fence befor
 ```text
 UNCLAIMED
   |
-  | acquire current authoritative controller lease / canonical coordination flock
+  | acquire/renew authoritative controller lease record + capability
   v
-LEASED_UNPROVEN
+LEASE_GRANTED
   |
-  | while lock remains held: fresh authoritative registration + all-official-client
-  | process/window/session inventory proves zero registered/exact/mismatched/unverifiable clients
+  | reviewed bootstrap supervisor acquires canonical coordination flock
+  | and validates lease identity/token/generation while holding it
+  v
+SUPERVISOR_LOCKED
+  |
+  | while the same flock remains held: fresh authoritative registration +
+  | all-official-client process/window/session inventory proves zero
+  | registered/exact/mismatched/unverifiable clients
   v
 BOOTSTRAP_LEASED_ABSENT
   |
-  | bootstrap supervisor creates task/track-owned launch descendants
+  | supervisor creates task/track-owned launch descendants
   v
 PROCESS_CREATED_UNREGISTERED
   |
@@ -132,7 +142,7 @@ REGISTRATION_PENDING_COMMIT
 REGISTERED_IDLE_RUNTIME
   |
   | explicit safe-detach proof; no mutation-capable helper remains
-  | supervisor intentionally relinquishes bootstrap mutation ownership
+  | supervisor intentionally relinquishes bootstrap mutation ownership and flock
   v
 IDLE_REUSABLE
 ```
@@ -141,14 +151,15 @@ Any failure before `REGISTERED_IDLE_RUNTIME` goes to `ABORT_CLEANUP`, which term
 
 ## Authority invariant
 
-The bootstrap transaction MUST begin by acquiring a current authoritative controller lease and MUST perform the decisive runtime-absence inventory only after that acquisition. It MUST remain under one reviewed external supervisor for the entire mutation phase, including process creation, any separately authorized login mutation, identity proof, registration commit and safe-detach checks.
+The bootstrap transaction MUST begin with a current authoritative controller lease. Before making any runtime-absence decision, its reviewed external bootstrap supervisor MUST acquire the canonical coordination flock and validate the current lease identity/token/generation under that flock. The decisive runtime-absence inventory, process creation, any separately authorized login mutation, identity proof, registration commit and safe-detach checks all occur while that one supervisor continuously owns the flock.
 
 The persistent client MUST NOT receive the coordination flock or lease capability. Only the external supervisor may hold the coordination flock during bootstrap mutation.
 
 Forbidden patterns:
 
 - standalone `validate` then detached launch;
-- checking absence before lease acquisition and later launching from that stale observation;
+- checking absence before the bootstrap supervisor acquires the coordination flock and later launching from that stale observation;
+- assuming a successful manager `acquire` call itself keeps `coordination.lock` held across subsequent work;
 - launcher forks a persistent descendant and exits before supervisor tracks it;
 - passing the coordination flock or lease capability into the client or helper;
 - writing registration before the exact process identity is proven;
@@ -170,8 +181,9 @@ or an equivalent reviewed primitive whose success condition is not child exit, b
 
 It MUST preserve the final PR #316 anti-escape model during the mutation phase:
 
-- authoritative lease acquired and validated before any decisive absence check or dispatch;
-- under that held lease, authoritative registration plus all-official-client candidate/session absence is freshly re-proven immediately before launch;
+- a current authoritative lease record/capability exists before the supervisor critical section;
+- the supervisor acquires the canonical coordination flock and validates that lease under the flock before any decisive absence check or dispatch;
+- under that continuously held flock, authoritative registration plus all-official-client candidate/session absence is freshly re-proven immediately before launch;
 - only the external supervisor holds the coordination flock after dispatch;
 - launched command/client/helpers receive no flock descriptor and no lease capability;
 - caller/launcher exit cannot release serialization while bootstrap-owned mutation descendants remain;
@@ -238,7 +250,7 @@ current_exact_client_pid: NOT_REGISTERED
 current_exact_client_session: NOT_REGISTERED
 ```
 
-A bootstrap implementation may select `:98` only after the under-lease transaction-start inventory proves that it is available, appropriate and bound to the exact process being registered. This contract does not pre-register `:98` or `6082`.
+A bootstrap implementation may select `:98` only after the supervisor-owned under-lock transaction-start inventory proves that it is available, appropriate and bound to the exact process being registered. This contract does not pre-register `:98` or `6082`.
 
 ## Login / credentials boundary
 
@@ -259,9 +271,9 @@ Network liveness alone is never `IN_GAME` authority.
 
 ## Registration commit
 
-Registration commit is a two-phase operation inside the authoritative state directory:
+Registration commit is a two-phase operation inside the authoritative state directory while the bootstrap supervisor still continuously owns the canonical coordination flock and the validated lease generation remains current:
 
-1. write a mode-restricted candidate as a uniquely named temporary file in `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/` while the bootstrap supervisor still owns the authoritative lease/coordination flock;
+1. write a mode-restricted candidate as a uniquely named temporary file in `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/`;
 2. re-read/revalidate the exact live process, current lease generation, display/window and required state;
 3. atomically rename the candidate to `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json`;
 4. re-read that exact committed registration and revalidate exact process identity and lease generation;
@@ -282,6 +294,7 @@ After successful registration commit, supervisor detachment must prove:
 - the persistent client itself has no controller-lock FD/capability token;
 - registration is current and bound to the lease generation used for creation;
 - supervisor relinquishment is explicit and cannot be triggered merely by launcher/caller exit;
+- canonical coordination flock is closed/released by the supervisor only after all detach checks succeed;
 - canonical controller lease may then be released normally;
 - client remains as the registered idle programme resource.
 
@@ -296,7 +309,7 @@ Before registration commit, any error must:
 - wait/reap boundedly where safe;
 - never use broad `pkill`/display cleanup;
 - not kill Track B or PR #303 task-owned runtime;
-- release controller lease only after bootstrap mutation descendants are gone or demonstrably unable to continue mutation.
+- keep the supervisor-owned coordination flock until bootstrap mutation descendants are gone or demonstrably unable to continue mutation.
 
 If safe cleanup cannot be proven, retain/fail closed rather than releasing authority around an untracked descendant.
 
@@ -306,12 +319,13 @@ After registration commit but before safe detach, any failure must fail closed a
 
 Ordinary later mutation/reuse requires:
 
-1. acquire current authoritative lease;
-2. load `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json` only;
-3. revalidate boot/PID/start/exact fence/display/window and required mutation-relevant state, and fail closed if any competing or unverifiable official-client candidate/session is present;
-4. perform mutation through the final reviewed supervisor for the complete mutation/process-tree lifetime;
-5. update/invalidate the authoritative registration if process or identity-bearing state changes materially;
-6. release lease only when no guarded mutation descendants remain.
+1. acquire or renew the current authoritative lease;
+2. enter the final reviewed supervisor critical section, acquire the canonical coordination flock and validate the lease under that flock;
+3. load `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json` only;
+4. revalidate boot/PID/start/exact fence/display/window and required mutation-relevant state, and fail closed if any competing or unverifiable official-client candidate/session is present;
+5. perform mutation through the final reviewed supervisor for the complete mutation/process-tree lifetime;
+6. update/invalidate the authoritative registration if process or identity-bearing state changes materially;
+7. release the coordination flock only when no guarded mutation descendants remain.
 
 After stale lease takeover, the registration must be revalidated before any mutation.
 
@@ -320,8 +334,10 @@ After stale lease takeover, the registration must be revalidated before any muta
 Implementation cannot be promoted without deterministic non-live tests proving at least:
 
 - no-registration -> exact-child -> atomic registration -> safe detach;
-- authoritative absence check occurs only after lease acquisition and immediately before launch;
-- two concurrent bootstraps cannot both act on one stale absence observation: the second waits, repeats under-lock inventory, then refuses once the first registers or leaves a conflicting client;
+- manager lease acquisition alone is not treated as continuous flock ownership;
+- bootstrap supervisor acquires the canonical coordination flock and validates the lease before the authoritative absence check;
+- authoritative absence check occurs under that flock immediately before launch;
+- two concurrent bootstraps cannot both act on one stale absence observation: the second waits for the flock, revalidates its lease, repeats under-lock inventory, then refuses once the first registers or leaves a conflicting client;
 - all registration readers/writers use `/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json` and alternative roots/paths fail closed;
 - wrong SHA abort;
 - PID reuse/start mismatch abort;

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-canonical-xvfb-dri-path-fix
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-canonical-xvfb-dri-path-fix-20260816
 session_role: implementation_engineer
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME-INFRA
 track_id: official-client-re
 task_kind: implementation
-phase: hosted-worker-repair
+phase: coordinator-promotion-ready
 branch: fix/OTC-20260816-track-a-canonical-xvfb-dri-path
 base_branch: main
 base_main: d3f186414256151c9d5e03f34c5a9026b1fba500
 risk: high
-updated: 2026-08-16T20:58:00+02:00
+updated: 2026-08-16T21:01:00+02:00
 owned_paths:
   - .github/scripts/tibia-official-client-re-canonical-live-session.sh
   - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
@@ -54,40 +54,63 @@ mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: false
 owner_funded_ai_api_authorized: false
-scope:
-  worker_change:
-    - validate `$TOOL/usr/lib/x86_64-linux-gnu/dri` as a real directory contained below the selected toolroot
-    - validate `swrast_dri.so` exists and resolves to a regular file below that contained DRI directory/toolroot
-    - derive the DRI path from the selected trusted toolroot only
-    - export `LIBGL_DRIVERS_PATH` into the Xvfb launch environment
-    - preserve the Xvfb argument list exactly; do not add `+extension GLX`
+implementation:
+  worker:
+    contained_dri_root_helper: added
+    toolroot_requires_contained_dri_provider: true
+    bootstrap_derives_dri_from_selected_toolroot: true
+    xvfb_environment_LIBGL_DRIVERS_PATH: '$dri'
+    xvfb_argument_change: none
+    client_environment_change: none
   tests:
-    - complete toolroot fixtures include a contained DRI/swrast provider
-    - resolver rejects missing DRI provider
-    - resolver rejects swrast symlink escape
-    - source contract proves Xvfb receives the derived LIBGL_DRIVERS_PATH
-    - source contract proves no explicit GLX flag or unrelated renderer override is introduced
-forbidden:
-  - Synology/self-hosted execution
-  - official client/X11/VNC/network/login/gameplay execution
-  - canonical lease/registration/session mutation or observation
-  - client graphics/backend environment changes
-  - `+extension GLX`
-  - LIBGL_ALWAYS_SOFTWARE
-  - GALLIUM_DRIVER
-  - MESA_LOADER_DRIVER_OVERRIDE
-  - changes to lease, transition, Gate B, WARP, credentials or Track B
+    complete_fixture_contains_swrast_provider: true
+    missing_swrast_rejected: true
+    escaping_swrast_rejected: true
+    xvfb_source_contract_added: true
+    client_no_dri_env_leak_contract_added: true
+hosted_validation:
+  implementation_head_with_validator: cf9f361389972dcfe3f8c29db2ecd1c4c147c3ab
+  validator_run: 31966128631
+  validator_job: 95211462614
+  result: SUCCESS
+  shell_syntax: PASS
+  canonical_session_tests: 14_of_14_PASS
+  canonical_transition_tests: 9_of_9_PASS
+  canonical_guard_tests: 3_of_3_PASS
+  canonical_lease_tests: 14_of_14_PASS
+  minimal_xvfb_dri_source_contract: PASS
+  temporary_validator_removed: true
+prior_governance:
+  implementation_head: a57d7671f23335f43fd189991ac138dee9064315
+  run: 31966079573
+  deterministic_policy_audit: SUCCESS
+  fresh_admission_behavior_audit: SUCCESS
+final_validation:
+  governance: PENDING_EXACT_FINAL_HEAD
+  repository_ci: PENDING_EXACT_FINAL_HEAD
+  physical_e2e: NOT_APPLICABLE_WITH_REASON
+  physical_e2e_reason: hosted-only worker implementation; physical runtime may execute only after coordinator promotion to trusted main and fresh RUNTIME admission
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-canonical-xvfb-dri-path-fix/20260816-hosted-validation.md
+audit:
+  result: PASS_PENDING_EXACT_FINAL_HEAD_CHECKS
+  material_findings_open: 0
+  notes:
+    - the dedicated hosted validator exercised session, transition, guard and lease suites
+    - no temporary workflow remains in the delivery diff
+    - no Synology or official-client runtime execution occurred in this implementation PR
 acceptance:
-  - worker syntax passes
-  - canonical session unit/contract tests pass
-  - full relevant canonical transition/guard/lease test suite passes
-  - deterministic source tests prove DRI containment and minimal Xvfb-only env change
-  - repository governance and CI pass on exact final head
-  - no physical runtime job executes
-last_completed_step: PR #421 run 31965779546/job 95210624747 proved LIBGL_DRIVERS_PATH alone enables GLX with the exact current canonical worker Xvfb arguments, so no server flag change is needed
-next_action: implement the minimal worker/test changes on current main, run hosted validation, remove any temporary validation workflow if used, and hand the Draft to coordinator for promotion
+  - worker syntax: PASS
+  - session unit/contract tests: PASS
+  - transition/guard/lease suites: PASS
+  - DRI containment/source contracts: PASS
+  - temporary validation workflow removed: PASS
+  - exact-final-head normal governance and CI: PENDING
+  - physical runtime execution: NOT_APPLICABLE_WITH_REASON
+last_completed_step: implemented the minimal fail-closed contained DRI provider contract and Xvfb-only LIBGL_DRIVERS_PATH assignment; hosted validator run 31966128631/job 95211462614 passed all targeted suites and source contracts, then the temporary workflow was removed
+next_action: obtain exact-final-head normal Track A governance and repository CI, update the terminal handoff without changing code semantics, and leave the Draft for coordinator promotion; only after promotion may RUNTIME redispatch from trusted main
 ---
 
-# Track A canonical Xvfb DRI-path fix
+# Track A canonical Xvfb DRI-path fix — terminal candidate
 
-Hosted-only implementation. It converts the physical causal proof into a fail-closed trusted-worker contract without exercising the physical runtime.
+The repository repair is implemented and hosted-validated. No physical success is claimed; the next physical attempt is gated on coordinator promotion and a fresh trusted-main RUNTIME admission.

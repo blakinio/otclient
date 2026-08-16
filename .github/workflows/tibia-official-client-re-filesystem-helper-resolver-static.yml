@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   inspect:
-    name: Map first BEClient path component statically
+    name: Map TTibia path root and category 9 component
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 7
     steps:
-      - name: Trace TTibiaFileSystemHelper slot plus 0x28
+      - name: Trace TTibiaFileSystemHelper slots plus 0x10 and plus 0x18
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -39,7 +39,7 @@ jobs:
               e=b.find(b'\0',o);e=len(b) if e<0 else e
               return b[o:e].decode('utf8','replace')
           secs=[]
-          for i,x in enumerate(raw):secs.append({'idx':i,'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'link':x[6],'entsize':x[9]})
+          for i,x in enumerate(raw):secs.append({'idx':i,'name':cs(sn,x[0]),'addr':x[3],'off':x[4],'size':x[5],'entsize':x[9]})
           by={s['name']:s for s in secs};text=by['.text']
           def voff(va):
               for s in secs:
@@ -49,40 +49,53 @@ jobs:
           def s_at(va):
               o=voff(va)
               if o is None:return None
-              e=d.find(b'\0',o,min(len(d),o+240))
+              e=d.find(b'\0',o,min(len(d),o+260))
               if e<=o:return None
               z=d[o:e]
-              if not z or len(z)>220 or not all(32<=x<127 for x in z):return None
+              if not z or len(z)>240 or not all(32<=x<127 for x in z):return None
               return z.decode('ascii','replace')
           rel=by['.rela.dyn'];bo={}
           for o in range(rel['off'],rel['off']+rel['size'],rel['entsize'] or 24):
               ro,ri,ad=struct.unpack_from('<QQq',d,o);bo[ro]=(ri&0xffffffff,ri>>32,ad)
           rt=lambda va: None if va not in bo else bo[va][2]
-          tvptr=0x2f62080;tti=0x3070940
-          if rt(tvptr-8)!=tti:raise SystemExit('FS_RESOLVER_FAIL=ttibia_typeinfo')
-          if rt(tvptr+0x28)!=0xc9b620:raise SystemExit(f'FS_RESOLVER_FAIL=ttibia_slot28:{rt(tvptr+0x28)}')
-          print('FS_RESOLVER_PASS=TTibia_slot28_0xc9b620')
-          start,end=0xc9b620,0xc9b890;blob=b_at(start,end-start)
-          print(f'FS_RESOLVER_SLOT28_SHA256={hashlib.sha256(blob).hexdigest()}')
-          print(f'FS_RESOLVER_SLOT28_HEX={blob.hex()}')
-          print('FS_RESOLVER_SLOT28_RIP_STRINGS_BEGIN')
-          for i in range(len(blob)-7):
-              if blob[i] not in range(0x48,0x50) or blob[i+1] not in (0x8d,0x8b):continue
-              m=blob[i+2]
-              if (m>>6)!=0 or (m&7)!=5:continue
-              va=start+i;dst=va+7+struct.unpack_from('<i',blob,i+3)[0];txt=s_at(dst)
-              if txt:print(f'ref=0x{va:x} target=0x{dst:x} text={txt}')
-          print('FS_RESOLVER_SLOT28_RIP_STRINGS_END')
-          # Exact caller builds two QString elements: slot28 result and key argument at RCX.
+          tvptr=0x2f62080
+          if rt(tvptr+0x10)!=0xc8f6e0:raise SystemExit(f'FS_RESOLVER_FAIL=slot10:{rt(tvptr+0x10)}')
+          if rt(tvptr+0x18)!=0xc91200:raise SystemExit(f'FS_RESOLVER_FAIL=slot18:{rt(tvptr+0x18)}')
+          print('FS_RESOLVER_PASS=TTibia_slot10_0xc8f6e0')
+          print('FS_RESOLVER_PASS=TTibia_slot18_0xc91200')
+          for label,a,b in [('SLOT10',0xc8f6e0,0xc8fb80),('SLOT18',0xc91200,0xc91580)]:
+              blob=b_at(a,b-a)
+              print(f'FS_RESOLVER_{label}_SHA256={hashlib.sha256(blob).hexdigest()}')
+              print(f'FS_RESOLVER_{label}_HEX={blob.hex()}')
+              print(f'FS_RESOLVER_{label}_RIP_STRINGS_BEGIN')
+              seen=set()
+              for i in range(len(blob)-7):
+                  if blob[i] not in range(0x48,0x50) or blob[i+1] not in (0x8d,0x8b):continue
+                  m=blob[i+2]
+                  if (m>>6)!=0 or (m&7)!=5:continue
+                  va=a+i;dst=va+7+struct.unpack_from('<i',blob,i+3)[0];txt=s_at(dst)
+                  if txt and (dst,txt) not in seen:
+                      seen.add((dst,txt));print(f'ref=0x{va:x} target=0x{dst:x} text={txt}')
+              print(f'FS_RESOLVER_{label}_RIP_STRINGS_END')
+          # Search exact BattlEye literals and show direct RIP LEAs from slot10/slot18 windows.
+          needles=(b'BattlEye\0',b'BEClient\0',b'bin\0',b'client\0')
+          print('FS_RESOLVER_LITERAL_OCCURRENCES_BEGIN')
+          for needle in needles:
+              poss=[];p=0
+              while True:
+                  j=d.find(needle,p)
+                  if j<0:break
+                  poss.append(j);p=j+1
+              print(f'literal={needle[:-1].decode("ascii")} count={len(poss)} file_offsets='+','.join(hex(x) for x in poss[:40]))
+          print('FS_RESOLVER_LITERAL_OCCURRENCES_END')
+          # Revalidate slot28 receives incoming category 9 through EDX and dispatches slot10 with it.
           for va,hx,label in [
-              (0xc9b8a7,'488b064989e54c89efff5028','call_ttibia_slot28'),
-              (0xc9b8b7,'660f6f1424488b542410','copy_slot28_result'),
-              (0xc9b8df,'f3410f6f1c24498b542410','copy_key_argument'),
-              (0xc9b905,'bf30000000','allocate_two_qstring_elements'),
-              (0xc9b96f,'4889de4889ef4c89fa41ffd6','call_base_slot78'),
+              (0xc9b624,'4189d6','slot28_save_category_edx'),
+              (0xc9b651,'4489f24c89ee4c89e7ff5010','slot28_pass_category_to_slot10'),
+              (0xc9b64a,'ff5018','slot28_call_slot18'),
           ]:
-              got=b_at(va,len(bytes.fromhex(hx)))
-              if got!=bytes.fromhex(hx):raise SystemExit(f'FS_RESOLVER_FAIL={label}:{got.hex()}')
+              want=bytes.fromhex(hx);got=b_at(va,len(want))
+              if got!=want:raise SystemExit(f'FS_RESOLVER_FAIL={label}:{got.hex()}')
               print(f'FS_RESOLVER_PASS={label}@0x{va:x}')
           print('FS_RESOLVER_EXECUTED_TARGET=false')
           print('FS_RESOLVER_LIVE_RUNTIME_OBSERVED=false')

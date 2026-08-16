@@ -7,8 +7,10 @@ from typing import Any, Callable, Mapping
 
 from .ipc_client import (
     BridgeClientError,
+    BridgePeerIdentityError,
     BridgeProtocolError,
     BridgeTransportError,
+    PeerIdentityExpectation,
     request,
     session_status,
 )
@@ -91,6 +93,16 @@ class RuntimeIdentity:
             client_sha256=_sha256(registration.get("client_sha256"), "client_sha256"),
         )
 
+    def peer_expectation(self) -> PeerIdentityExpectation:
+        return PeerIdentityExpectation(
+            boot_id_sha256=self.boot_id_sha256,
+            pid=self.pid,
+            process_start_ticks=self.process_start_ticks,
+            client_version=self.client_version,
+            client_size=self.client_size,
+            client_sha256=self.client_sha256,
+        )
+
 
 @dataclass(frozen=True)
 class BridgeBinding:
@@ -170,9 +182,10 @@ RetryHook = Callable[[int, BridgeHealth], None]
 class BridgeSession:
     """Fail-closed P1 view over an explicitly supplied runtime binding.
 
-    The session never reads canonical runtime state itself and never launches, restarts,
-    logs in, signals, attaches to, or mutates a client. A caller/RUNTIME producer must
-    supply each current identity and endpoint explicitly.
+    The session never discovers a candidate PID and never launches, restarts, logs in,
+    signals, attaches to, or mutates a client. A caller/RUNTIME producer must supply
+    each current identity and endpoint explicitly. The default IPC transport verifies
+    every Unix connection against that exact boot/PID/start/executable identity.
     """
 
     def __init__(
@@ -295,15 +308,73 @@ class BridgeSession:
             identity=identity,
         )
 
+    def _peer_identity_failure(self, stage: str, exc: BridgePeerIdentityError) -> BridgeHealth:
+        identity = self._binding.identity if self._binding is not None else None
+        self._binding = None
+        return self._health(
+            HealthState.STALE_IDENTITY,
+            False,
+            None,
+            f"{stage}: {exc}",
+            identity=identity,
+        )
+
+    def _ping_identity_guard(self, ping: dict[str, Any], identity: RuntimeIdentity) -> BridgeHealth | None:
+        expected: dict[str, object] = {
+            "boot_id_sha256": identity.boot_id_sha256,
+            "pid": identity.pid,
+            "process_start_ticks": identity.process_start_ticks,
+            "client_version": identity.client_version,
+            "client_size": identity.client_size,
+            "client_sha256": identity.client_sha256,
+        }
+        if (
+            not isinstance(ping.get("boot_id_sha256"), str)
+            or not isinstance(ping.get("pid"), int)
+            or isinstance(ping.get("pid"), bool)
+            or not isinstance(ping.get("process_start_ticks"), int)
+            or isinstance(ping.get("process_start_ticks"), bool)
+            or not isinstance(ping.get("client_version"), str)
+            or not isinstance(ping.get("client_size"), int)
+            or isinstance(ping.get("client_size"), bool)
+            or not isinstance(ping.get("client_sha256"), str)
+        ):
+            return self._health(
+                HealthState.MALFORMED,
+                False,
+                None,
+                "PING response is missing the exact runtime identity envelope",
+            )
+        mismatched = [field for field, value in expected.items() if ping.get(field) != value]
+        if mismatched:
+            stale_identity = self._binding.identity if self._binding is not None else identity
+            self._binding = None
+            return self._health(
+                HealthState.STALE_IDENTITY,
+                False,
+                None,
+                "PING runtime identity mismatch: " + ", ".join(mismatched),
+                identity=stale_identity,
+            )
+        return None
+
     def probe(self) -> BridgeHealth:
         guard = self._identity_guard("before PING")
         if guard is not None:
             return guard
         assert self._binding is not None
         binding = self._binding
+        expected_identity = binding.identity.peer_expectation()
 
         try:
-            ping = self._request(binding.socket_path, "PING", timeout=self._timeout)
+            ping = self._request(
+                binding.socket_path,
+                "PING",
+                timeout=self._timeout,
+                expected_identity=expected_identity,
+            )
+        except BridgePeerIdentityError as exc:
+            return self._peer_identity_failure("PING peer verification", exc)
         except BridgeTransportError as exc:
             return self._health(HealthState.UNREACHABLE, False, None, str(exc))
         except BridgeProtocolError as exc:
@@ -313,14 +384,21 @@ class BridgeSession:
 
         if not isinstance(ping, dict):
             return self._health(HealthState.MALFORMED, False, None, "PING response must be an object")
-        if ping.get("command") != "PING" or not isinstance(ping.get("main_base_resolved"), bool):
+        if (
+            not isinstance(ping.get("ok"), bool)
+            or ping.get("command") != "PING"
+            or not isinstance(ping.get("main_base_resolved"), bool)
+        ):
             return self._health(
                 HealthState.MALFORMED,
                 False,
                 None,
                 "PING response is structurally incomplete",
             )
-        if not ping.get("ok") or not ping["main_base_resolved"]:
+        peer_guard = self._ping_identity_guard(ping, binding.identity)
+        if peer_guard is not None:
+            return peer_guard
+        if not ping["ok"] or not ping["main_base_resolved"]:
             return self._health(HealthState.DEGRADED, False, None, "PING did not establish a ready bridge")
 
         guard = self._identity_guard("after PING")
@@ -329,7 +407,13 @@ class BridgeSession:
         assert self._binding is not None
 
         try:
-            status = self._session_status(self._binding.socket_path, timeout=self._timeout)
+            status = self._session_status(
+                self._binding.socket_path,
+                timeout=self._timeout,
+                expected_identity=self._binding.identity.peer_expectation(),
+            )
+        except BridgePeerIdentityError as exc:
+            return self._peer_identity_failure("session-status peer verification", exc)
         except BridgeTransportError as exc:
             return self._health(HealthState.UNREACHABLE, False, None, str(exc))
         except BridgeProtocolError as exc:
@@ -344,7 +428,12 @@ class BridgeSession:
         if not isinstance(status, dict) or not isinstance(status.get("ok"), bool):
             return self._health(HealthState.MALFORMED, False, None, "session-status response is structurally invalid")
         if not status["ok"]:
-            return self._health(HealthState.DEGRADED, False, False, "session-status reported a bridge-side discovery failure")
+            return self._health(
+                HealthState.DEGRADED,
+                False,
+                False,
+                "session-status reported a bridge-side discovery failure",
+            )
         candidate = status.get("in_game_candidate")
         evidence_level = status.get("evidence_level")
         if not isinstance(candidate, bool) or evidence_level != DERIVED_SESSION_EVIDENCE:
@@ -358,7 +447,7 @@ class BridgeSession:
             HealthState.HEALTHY,
             True,
             candidate,
-            "bridge and bounded read API are responsive",
+            "bridge and identity-bound bounded read API are responsive",
             evidence_level=DERIVED_SESSION_EVIDENCE,
         )
 

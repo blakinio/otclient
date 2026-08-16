@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-canonical-live-bootstrap-contract
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-20260816-0416-bootstrap
 session_role: bootstrap-contract-integrator
@@ -9,14 +9,14 @@ project_lane: otclient
 lane: track-a-runtime-governance
 track_id: official-client-re
 task_kind: contract
-phase: integrate
+phase: validate
 branch: docs/OTC-20260815-track-a-canonical-live-bootstrap-contract
 base_branch: main
 base_main: 25700f08c3f5729e4ee38bf8c0a3ca04020379be
 risk: medium
 related_pr: 318
-updated: 2026-08-16T04:18:00+02:00
-lease_expires_at: 2026-08-16T05:03:00+02:00
+updated: 2026-08-16T04:24:00+02:00
+lease_expires_at: 2026-08-16T05:09:00+02:00
 lease_released_at: null
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-canonical-live-bootstrap-contract.md
@@ -36,18 +36,18 @@ continuation_policy: stop_at_task_boundary
 task_completion_policy: protected_merge_then_archive
 user_communication: terminal_only
 implementation_authorized: false
-last_progress_at: 2026-08-16T04:18:00+02:00
+last_progress_at: 2026-08-16T04:24:00+02:00
 context_pressure: medium
 context_growth: stable
 context_score: 7
 estimate_confidence: high
 decomposition_decision: single
-validation_level: focused
+validation_level: full
 heavy_validation_runs: 0
 stale_takeover_count: 0
 human_interruptions: 0
-last_completed_step: verified PR #316 and fresh manager closeout #319 are merged on current main, verified this task is unassigned with released lease, and clean-restacked PR #318 branch on main@25700f08c3f5729e4ee38bf8c0a3ca04020379be
-next_action: reconcile TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md against the final out-of-band supervisor semantics, then review the exact diff and run exact-head checks before protected merge; do not launch/login a client
+last_completed_step: reconciled the bootstrap contract against final main guard-run source and reviewed the complete PR #318 diff; scope is exactly the contract plus this task record, with no PR #303 runtime-owned paths, Track B, live runtime or credential mutation
+next_action: require zero unresolved review findings and exact-head repository CI PASS on this frozen combined head, then protected-merge PR #318 and perform fresh post-merge task archival/release before claiming PR #311
 ---
 
 # Objective

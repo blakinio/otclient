@@ -1,6 +1,6 @@
 {
   "schema": "otclient.tibia-re.coverage-current-overlay.v2",
-  "snapshot_main": "0b3bdec0a4145f558806448a4657413664d80729",
+  "snapshot_main": "f8e628a255a18ec92839bbb45ef0e3b40bef8605",
   "registry_promotion_pr": 454,
   "semantic_denominator_integration_pr": 460,
   "source_baseline": {"pr":304,"head":"43a60bd96cc644b656b200c9edbfb75578b330b6"},
@@ -64,11 +64,14 @@
     "physical_identity_classification": "XRES_PROVES_VIEWABLE_WINDOW_OWNED_BY_EXACT_CLIENT",
     "identity_archive_merge": "c55e3523e6e9d50df511e65dce9145a8f951a5f5",
     "xres_client_base_helper_fix_merge": "1eb4a8edecba3966aa1e6155e241b404eb4d30cb",
+    "canonical_raw_xres_window_identity_integration_pr": 465,
+    "canonical_raw_xres_window_identity_integration_merge": "f8e628a255a18ec92839bbb45ef0e3b40bef8605",
+    "canonical_raw_xres_window_identity_integration_promoted": true,
     "current_exact_client_pid": "NOT_REGISTERED",
     "current_exact_client_session": "NOT_REGISTERED",
     "canonical_gate_b": "NOT_PROVEN",
     "current_structural_in_game": "NOT_PROVEN",
-    "next_discriminator": "fresh_P0_RUNTIME_admission_then_require_legal_current_IN_GAME_lifecycle_or_fail_closed",
+    "next_discriminator": "fresh_RUNTIME_admission_to_establish_or_fail_closed_on_current_canonical_registration_gate_b_and_legal_IN_GAME_lifecycle",
     "canonical_bootstrap_for_p0_authorized": false
   },
   "programme": {"complete":false,"global_coordinator_checkpoint_current":false}

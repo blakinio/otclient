@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260817-track-a-p2-dual-nested-vcall-resolution
-status: investigating
+status: ready
 agent: ChatGPT
 session_role: draft_researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: validate
 branch: research/OTC-20260817-track-a-p2-dual-nested-vcall-resolution
 base_branch: main
 base_main: 2ba207cef6d53dc847542b33ec94e7b53fd35b1f
@@ -15,10 +15,6 @@ risk: medium
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-p2-dual-nested-vcall-resolution.md
   - docs/agents/evidence/OTC-20260817-track-a-p2-dual-nested-vcall-resolution/**
-  - .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-resolution.py
-  - .github/workflows/tibia-official-client-re-p2-dual-nested-vcall-resolution.yml
-  - .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-bridge.py
-  - .github/workflows/tibia-official-client-re-p2-dual-nested-vcall-bridge.yml
 modules_touched: []
 depends_on:
   - PR #481 merged as 2ba207cef6d53dc847542b33ec94e7b53fd35b1f
@@ -52,7 +48,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
 promotion_authority: coordinator_only
-research_output: IN_PROGRESS_NOT_PROMOTED
+research_output: DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW
 feature_scope:
   type: protocol
   user_facing: false
@@ -66,94 +62,129 @@ exact_client:
   size: 51965216
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
   platform: official_native_linux_only
-accepted_input:
-  canonical_chain: persistent_QBuffer_to_TProtocolClientMessageProcessor_to_TGameserverNetworkPacketRawDataProcessor_to_same_message_to_TGameserverDualConnection_plus_0x80_plus_0x78
-  nested_vcall_1: 0xb56c93
-  nested_vcall_2: 0xb57042
-  b40630_reachability: UNKNOWN
-  final_binary_egress: UNKNOWN
 research_result:
-  b56c93_receiver_provenance: FACT:nested_pointer_chain_current_entry_plus_0x20_plus_0x20
-  b56c93_outer_guard_vslot_plus_0x98_target: FACT:0xb3eda0
-  b56c93_outer_guard_type: FACT:tibia::network::TGameserverNetworkPacketConnection
-  b56c93_outer_guard_vtable_ap: FACT:0x3084ba8
-  b56c93_intermediate_guard_vslot_plus_0x60_target: FACT:0xf45cf0
-  b56c93_intermediate_type: FACT:tibia::network::TGameserverNetworkPacketProcessor
-  b56c93_intermediate_vtable_ap: FACT:0x30b7a68
-  b56c93_intermediate_plus0x20_source: FACT:constructor_stack_local_rbp_minus_0xc0
-  b56c93_receiver_exact_dynamic_type: UNKNOWN
-  b56c93_virtual_slot: FACT:+0x10
-  b56c93_concrete_target: UNKNOWN
-  b56c93_second_argument: FACT:original_b56970_second_argument_rsi
   b56c93_same_message_preserved: FACT
-  b56c93_target_equals_b40630: UNKNOWN
+  outer_type: FACT:tibia::network::TGameserverNetworkPacketConnection
+  outer_vtable_ap: FACT:0x3084ba8
+  intermediate_type: FACT:tibia::network::TGameserverNetworkPacketProcessor
+  intermediate_vtable_ap: FACT:0x30b7a68
+  final_receiver_vtable_ap: FACT:0x2f741d8
+  final_receiver_rtti_pointer: FACT:0x30b7548
+  final_receiver_exact_dynamic_type: UNKNOWN
+  b56c93_virtual_slot: FACT:+0x10
+  b56c93_concrete_target: FACT:0xf50090
+  b56c93_target_equals_b40630: DISPROVEN
   b57042_same_message_preserved: DISPROVEN
-  b57042_is_same_message_edge_to_b40630: DISPROVEN
-generation_1:
-  run: 32033753449
-  source_job: 95399308395
-  hosted_job: 95400245919
-  source_artifact: 9289952632
-  source_artifact_digest: sha256:176a174bafd8f77fb82ff8ea3737b0850be5b0327dc2ba6065e0d9bf51574e5a
-  final_artifact: 9289961937
-  final_artifact_digest: sha256:fa1cddd5410454d9f5b717afe0d625d404a7750fb82ffb4b8a9d288cbc9ac64a
-  result: SUCCESS
-additional_evidence_required: true
-next_action: stage only exact file bytes 0xb4aea0..0xb4b800 and decode hosted to resolve the source and concrete vtable of constructor local [rbp-0xc0], which is the final b56c93 receiver
+  dualconnection_to_binary_egress: UNKNOWN
+  final_binary_egress: UNKNOWN
+  final_socket_ownership: UNKNOWN
+  framing: UNKNOWN
+  sequence: UNKNOWN
+  compression: UNKNOWN
+  encryption: UNKNOWN
+generations:
+  - run: 32033753449
+    source_job: 95399308395
+    hosted_job: 95400245919
+    source_artifact: 9289952632
+    source_digest: sha256:176a174bafd8f77fb82ff8ea3737b0850be5b0327dc2ba6065e0d9bf51574e5a
+    final_artifact: 9289961937
+    final_digest: sha256:fa1cddd5410454d9f5b717afe0d625d404a7750fb82ffb4b8a9d288cbc9ac64a
+    result: SUCCESS
+  - run: 32034648596
+    source_job: 95402114226
+    hosted_job: 95402454465
+    source_artifact: 9290206232
+    source_digest: sha256:27e946c3a864aac6257675e3ff6403eec93476223efed400bd72907cdb10f1a4
+    final_artifact: 9290395475
+    final_digest: sha256:a0b396081570a1729e964bf8c57ad726ab95d91e3cf54f6857ebb43248afdebf
+    result: SUCCESS
+  - run: 32035436709
+    source_job: 95404656415
+    hosted_job: 95404893228
+    source_artifact: 9290490800
+    source_digest: sha256:f70f2f1ecc4e4af15323c6bee8998938cc79c25c454d72101672c1d9a0a68fa6
+    final_artifact: 9290498273
+    final_digest: sha256:4aa991a9912c3fb56cc08863ba94ac9e73e78a466a966c00353e85ce39a85323
+    result: SUCCESS
+cleanup:
+  one_shot_workflows_removed: true
+  one_shot_scripts_removed: true
+validation:
+  source_exact_fences: PASS
+  hosted_primary_review: PASS
+  artifact_redownload_rehash: PASS
+  no_world_map_evidence: true
+  no_runtime_access: true
+  raw_client_uploaded: false
+  final_exact_head_governance: PENDING
+  final_exact_head_ci: PENDING
+  review_hygiene: PENDING
+next_action: coordinator independently review artifacts and durable evidence, promote accepted result, then continue P2 at exact target 0xf50090
 ---
 
 # Track A P2 — DualConnection nested virtual-call resolution
 
-## Objective
+## Terminal researcher result
 
-Resolve the remaining exact same-message reachability edge after the canonical #450 handoff. The surviving call is `0xb56c93`; `0xb57042` is already disproven as a same-message continuation.
+The two nested `+0x10` candidates downstream of the canonical #450 chain are now resolved to the strongest exact evidence required by this task.
 
-## Generation 1 result
-
-Run `32033753449` fenced the exact client and completed source job `95399308395` plus hosted job `95400245919`, both `SUCCESS`. Source artifact `9289952632` and final artifact `9289961937` were independently re-hashed to the GitHub-recorded digests.
-
-Hosted decoding recovered valid Itanium-style vtable/RTTI identities rather than relying on address adjacency:
-
-- outer guard address point `0x3084ba8`, RTTI `tibia::network::TGameserverNetworkPacketConnection`; its slot `+0x98 = 0xb3eda0`;
-- intermediate address point `0x30b7a68`, RTTI `tibia::network::TGameserverNetworkPacketProcessor`; its slot `+0x60 = 0xf45cf0`.
-
-The exact forwarding methods are:
+For `TGameserverDualConnection +0x78@0xb56970`, the original second argument is preserved to `0xb56c93`. Exact vtable/RTTI and constructor evidence binds the receiver chain:
 
 ```text
-0xb3eda0: this+0x20 -> check processor +0x60 == 0xf45cf0 -> this+0x20 -> call receiver +0x10
-0xf45cf0: this+0x20 -> jmp receiver +0x10
+same post-RawDataProcessor message
+ -> TGameserverDualConnection +0x78
+ -> tibia::network::TGameserverNetworkPacketConnection
+ -> tibia::network::TGameserverNetworkPacketProcessor
+ -> receiver vtable AP 0x2f741d8
+ -> slot +0x10
+ -> 0xf50090
 ```
 
-Constructor evidence around `0xb4aea0` installs the outer vptr, allocates/constructs the processor object at `r15+0x10`, installs `0x30b7a68`, stores that processor object into outer `+0x20`, and writes:
+The concrete slot target is therefore `FACT:0xf50090`; the historical/current candidate `target == 0xb40630` is `DISPROVEN` for this surviving same-message branch.
 
-```text
-[r15+0x30] = [rbp-0xc0]
+For `0xb57042`, the exact visible taken branch retains `rsi=0x100000001`, so same-message preservation is `DISPROVEN` and it is not used as a continuation edge.
+
+No final-egress or layer semantic is invented:
+
+```yaml
+DUALCONNECTION_TO_BINARY_EGRESS: UNKNOWN
+FINAL_BINARY_EGRESS: UNKNOWN
+FINAL_SOCKET_OWNER: UNKNOWN
+FRAMING: UNKNOWN
+SEQUENCE: UNKNOWN
+COMPRESSION: UNKNOWN
+ENCRYPTION: UNKNOWN
 ```
 
-Because the processor object begins at `r15+0x10`, `r15+0x30` is exactly processor `this+0x20`, i.e. exactly the final receiver dereferenced by `0xf45cf0` / `0xb56c93`.
+## Evidence / validation
 
-The first generated xref windows do not cover the assignment that produced `[rbp-0xc0]`. Therefore the only remaining object-provenance gap is one stack local in one constructor.
+Three exact-fenced bounded generations completed successfully. Source stages performed file-only deterministic byte mapping; semantic decode occurred on GitHub-hosted Ubuntu. Downloaded artifacts were independently re-hashed against GitHub digests. No raw executable/package, live client, process memory, login/gameplay, world-map evidence or owner-funded AI/API was used.
 
-## Generation 2 bound
+Durable evidence:
 
-The follow-up generation is limited to the single file-backed executable window `0xb4aea0..0xb4b800`. Source-side operation is exact-fenced byte copying only; source-side disassembly/semantics remain forbidden. Hosted Ubuntu alone disassembles the window. No raw executable/package, client process, process memory, runtime, login or gameplay is involved.
+- `docs/agents/evidence/OTC-20260817-track-a-p2-dual-nested-vcall-resolution/20260817-nested-vcall-dataflow.md`
+- `docs/agents/evidence/OTC-20260817-track-a-p2-dual-nested-vcall-resolution/result.json`
+
+All temporary workflows/scripts were removed after evidence consumption.
 
 ## Acceptance inventory
 
-- [x] exact client size/SHA fenced for generation 1;
-- [x] both nested callsite dataflows reconstructed;
-- [x] `0xb56c93` same-message preservation = FACT;
-- [x] `0xb57042` same-message preservation = DISPROVEN;
-- [x] outer receiver type/vtable = `TGameserverNetworkPacketConnection` / `0x3084ba8`;
-- [x] intermediate type/vtable = `TGameserverNetworkPacketProcessor` / `0x30b7a68`;
-- [x] final receiver source reduced to constructor local `[rbp-0xc0]`;
-- [ ] resolve `[rbp-0xc0]` source and receiver vtable;
-- [ ] resolve `0xb56c93` concrete `+0x10` target;
-- [ ] exact test `target == 0xb40630`;
-- [ ] final reachability/layer classifications persisted without semantic overpromotion;
-- [ ] temporary producer surfaces removed;
-- [ ] final Draft governance/CI and review hygiene green before coordinator promotion.
+- [x] exact client size/SHA fenced for all new source generations;
+- [x] `0xb56c93` same-message preservation proven;
+- [x] outer/intermediate vtable identities proven with RTTI and exact slots;
+- [x] final receiver bound through constructor object/member provenance;
+- [x] final receiver vtable AP `0x2f741d8` proven;
+- [x] concrete `+0x10` target `0xf50090` proven;
+- [x] exact `target == 0xb40630` test resolved `DISPROVEN`;
+- [x] `0xb57042` same-message continuation disproven;
+- [x] framing/sequence/compression/encryption/final egress/socket ownership retained independently as `UNKNOWN`;
+- [x] temporary staging surfaces removed;
+- [x] durable Markdown/JSON persisted;
+- [ ] final exact-head Track A governance/CI and review hygiene verified.
 
-## Scope boundary
+## Handover
 
-No world-map evidence. No target inference from adjacency/class names alone. No runtime/login/process-memory work. No owner-funded AI/API.
+Researcher status: `DRAFT_NOT_PROMOTED / READY_FOR_COORDINATOR_REVIEW`.
+
+Next smallest P2 discriminator after coordinator promotion is exact bounded disassembly/dataflow of `0xf50090`, preserving the same second argument and identifying either a concrete binary-write sink or the next exact transform/forward target.

@@ -14,7 +14,7 @@ base_branch: main
 base_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
 pr: 455
 risk: high
-updated: 2026-08-17T11:07:00+02:00
+updated: 2026-08-17T11:09:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -27,7 +27,7 @@ task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 runtime_access: ephemeral_isolated
 runtime_owner_task: OTC-20260817-track-a-xres-raw-pid-identity
-runtime_namespace: task_owned_ephemeral_generated_by_fenced_post_rhi_harness
+runtime_namespace: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-xres-raw-pid-identity/ephemeral-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -35,7 +35,7 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
+target_uniqueness: PROVEN
 mutation_authorized: true
 client_byte_mutation_authorized: false
 persistent_session_role: none
@@ -71,6 +71,17 @@ safety:
   exact_client_launch_limit: 1
   track_b_access: false
   broad_process_cleanup: forbidden
+uniqueness_proof:
+  task_marker: OTCLIENT_TIBIA_RE_DIAG_TASK=OTC-20260817-track-a-xres-raw-pid-identity
+  state_root_is_per_task: true
+  state_leaf_is_run_and_attempt_scoped: true
+  namespace_must_not_preexist: true
+  x11_display_selected_only_from_free_231_250: true
+  warp_port_selected_only_if_not_listening: true
+  vnc_port_selected_only_if_not_listening: true
+  cleanup_signals_only_processes_with_task_marker_and_role: true
+  canonical_namespace_referenced: false
+  inherited_canonical_task_marker_rebound_by_v2_adapter: true
 acceptance:
   - fresh base-main and branch authorization fence passes immediately before physical execution
   - Track A runtime governance check passes on the exact PR head/base
@@ -100,10 +111,10 @@ validation:
   repair:
     hypothesis: post-RHI transform v2 shifts the PYALLX snapshot anchor indentation from two spaces to four spaces
     evidence: historical accepted XRes v2 adapter on source lineage applied the same two-to-four-space anchor correction
-    action: add a bounded v2 adapter and use it in hosted and physical generation paths
+    action: v2 adapter now applies the indent correction and rebinds the inherited canonical task marker to this exact child task before any launch
     identical_retry: false
-last_completed_step: first hosted generation failed closed before client launch on a deterministic transform-anchor mismatch; the v2 indentation adapter is now staged and physical execution remains unconsumed
-next_action: observe the new exact-head hosted preflight; only if it passes may the one authorized physical job execute.
+last_completed_step: the inherited transform ownership was rebound to this child task, the concrete run-scoped namespace and free-display/port/process-marker fences prove isolated target uniqueness, and no physical launch has yet been consumed
+next_action: execute the new exact-head hosted preflight and then exactly one physical PID-identity discriminator if governance and base fences pass.
 ---
 
 # Raw XRes PID identity discriminator

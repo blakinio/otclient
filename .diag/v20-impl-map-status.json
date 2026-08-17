@@ -1,0 +1,15 @@
+{
+  "schema": "v20-impl-map-terminal-v1",
+  "target_sha": "286f5a82230aeeb5bf85f31d3ad77a9498c89028",
+  "run_id": 32078418888,
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 95536365950,
+      "name": "recover",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

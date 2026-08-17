@@ -1,0 +1,15 @@
+{
+  "schema": "v20-auth-qmeta-terminal-v1",
+  "target_sha": "072f48266696b513cba0e19d22d3a4dbee797940",
+  "run_id": 32078491162,
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 95536575180,
+      "name": "classify",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

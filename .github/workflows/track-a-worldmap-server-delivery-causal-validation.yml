@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: track-a-worldmap-server-delivery-causal-validation-gdb-repair-login-v1
+  group: track-a-worldmap-server-delivery-causal-validation-gdb-repair-login-v2
   cancel-in-progress: false
 
 jobs:
@@ -23,17 +23,29 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Manual exact PR checkout without external actions
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
+          if [[ ! -d .git ]]; then
+            git init
+            git remote add origin https://github.com/blakinio/otclient.git
+          fi
+          git remote set-url origin https://github.com/blakinio/otclient.git
+          git fetch --no-tags --prune origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/pull/475/merge:refs/remotes/pull/475/merge
+          git checkout --detach --force refs/remotes/pull/475/merge
+          echo "WORLDMAP_CHECKOUT_SHA=$(git rev-parse HEAD)"
 
       - name: Fresh admission and trusted-base fence
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
-          git fetch --no-tags origin main
-          actual="$(git rev-parse origin/main)"
+          actual="$(git rev-parse refs/remotes/origin/main)"
           echo "WORLDMAP_LOGIN_MAIN_SHA=$actual"
           [[ "$actual" == c1adcf491580e28d40f215356a9e559af2ccadc4 ]] || exit 98
           python3 - <<'PY'

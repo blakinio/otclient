@@ -10,23 +10,85 @@ permissions:
   contents: read
 
 concurrency:
-  group: track-a-worldmap-server-delivery-causal-validation-terminal-baseline-hold
+  group: track-a-worldmap-v7-static-no-client
   cancel-in-progress: false
 
+env:
+  HEAD_BRANCH: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+  ARM_SUBJECT: 'ci(track-a): validate v7 native character activation statically'
+
 jobs:
-  no-client-hold:
-    name: Terminal no-client hold after consumed baseline login
+  static-v7:
+    name: Static v7 native character activation composition
     runs-on: ubuntu-latest
     steps:
-      - name: Publish fail-closed terminal baseline state
+      - name: Exact merge checkout and static safety fence
         shell: bash
         run: |
           set -Eeuo pipefail
-          echo 'WORLDMAP_BASELINE_HOLD=ACTIVE'
-          echo 'WORLDMAP_BASELINE_LOGIN_BUDGET_CONSUMED=1'
-          echo 'WORLDMAP_BASELINE_LOGIN_RETRY_ALLOWED=false'
-          echo 'WORLDMAP_BASELINE_LAST_CHARACTER_SELECTION_TRANSITION=PROVEN_AGGREGATE'
-          echo 'WORLDMAP_BASELINE_LAST_STRUCTURAL_IN_GAME=NOT_PROVEN'
-          echo 'WORLDMAP_BASELINE_TERMINAL_DISCRIMINATOR=character_row_interaction_not_observed_after_consumed_login'
-          echo 'WORLDMAP_BASELINE_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_BASELINE_SECRET_USED=false'
+          git init -q "$RUNNER_TEMP/repo"
+          cd "$RUNNER_TEMP/repo"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --no-tags origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/task-head" \
+            "+refs/pull/475/merge:refs/remotes/pull/475/merge"
+          git checkout -q --detach refs/remotes/pull/475/merge
+          main_sha="$(git rev-parse refs/remotes/origin/main)"
+          head_sha="$(git rev-parse refs/remotes/origin/task-head)"
+          [[ "$(git rev-parse HEAD^1)" == "$main_sha" && "$(git rev-parse HEAD^2)" == "$head_sha" ]]
+          [[ "$(git log -1 --format=%s "$head_sha")" == "$ARM_SUBJECT" ]]
+          echo "WORLDMAP_V7_STATIC_MAIN=$main_sha"
+          echo "WORLDMAP_V7_STATIC_HEAD=$head_sha"
+          echo 'WORLDMAP_V7_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_V7_SECRET_USED=false'
+
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py \
+            .github/scripts/track-a-worldmap-causal-baseline-login-v6-repair.py \
+            .github/scripts/track-a-worldmap-causal-character-selection-v7-repair.py \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py \
+            .github/scripts/track-a-worldmap-causal-ui-window.py \
+            .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            .github/scripts/tibia-official-client-re-xres-wire.py
+
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$RUNNER_TEMP/v7-gdb.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            "$RUNNER_TEMP/v7-gdb.sh" "$RUNNER_TEMP/v7-v2.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py \
+            "$RUNNER_TEMP/v7-v2.sh" "$RUNNER_TEMP/v7-v3.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py \
+            "$RUNNER_TEMP/v7-v3.sh" "$RUNNER_TEMP/v7-v4.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py \
+            "$RUNNER_TEMP/v7-v4.sh" "$RUNNER_TEMP/v7-v5.sh"
+          python3 .github/scripts/track-a-worldmap-causal-baseline-login-v6-repair.py \
+            "$RUNNER_TEMP/v7-v5.sh" "$RUNNER_TEMP/v7-v6.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-selection-v7-repair.py \
+            "$RUNNER_TEMP/v7-v6.sh" "$RUNNER_TEMP/v7.sh"
+          bash -n "$RUNNER_TEMP/v7.sh"
+
+          grep -Fq 'UI_WIN="$WIN"' "$RUNNER_TEMP/v7.sh"
+          grep -Fq "M(0xcfb374,'ShowCharacterSelection')" "$RUNNER_TEMP/v7.sh"
+          grep -Fq "M(0xd47300,'RequestCharacterLogin')" "$RUNNER_TEMP/v7.sh"
+          grep -Fq "M(0xcfb2e7,'RequestCharacterGameserverLogin')" "$RUNNER_TEMP/v7.sh"
+          grep -Fq "M(0xcfb122,'StartGameServerLogin')" "$RUNNER_TEMP/v7.sh"
+          grep -Fq 'WORLDMAP_BASELINE_NATIVE_CHARACTER_SELECTION_STATE=PASS' "$RUNNER_TEMP/v7.sh"
+          grep -Fq 'WORLDMAP_BASELINE_NATIVE_CHARACTER_REQUEST=PASS' "$RUNNER_TEMP/v7.sh"
+          grep -Fq 'WORLDMAP_BASELINE_NATIVE_GAME_LOGIN_STATE=PASS' "$RUNNER_TEMP/v7.sh"
+          grep -Fq 'WORLDMAP_BASELINE_STRUCTURAL_IN_GAME=PASS' "$RUNNER_TEMP/v7.sh"
+          grep -Fq 'WORLDMAP_BASELINE_PRESECRET_READY=true' "$RUNNER_TEMP/v7.sh"
+          grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$RUNNER_TEMP/v7.sh"
+          ! grep -Fq 'WORLDMAP_BASELINE_CHARACTER_ROW_TARGET=' "$RUNNER_TEMP/v7.sh"
+          ! grep -Fq 'WORLDMAP_BASELINE_CHARACTER_ROW_ROI=' "$RUNNER_TEMP/v7.sh"
+          ! grep -Fq 'translated_character_row' "$RUNNER_TEMP/v7.sh"
+          ! grep -Fq 'character_row_interaction_not_observed' "$RUNNER_TEMP/v7.sh"
+          ! grep -Fq 'LOGIN_X=590' "$RUNNER_TEMP/v7.sh"
+          ! grep -Fq '"$XWD" -root' "$RUNNER_TEMP/v7.sh"
+          ! grep -Fq 'xrandr --output' "$RUNNER_TEMP/v7.sh"
+          ! grep -Fq 'wmctrl -r' "$RUNNER_TEMP/v7.sh"
+          echo 'WORLDMAP_V7_STATIC_COMPOSITION=PASS'

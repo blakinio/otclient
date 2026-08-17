@@ -1,0 +1,80 @@
+name: Track A v19 game-login generator validation
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-worldmap-v19-generator-static.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Compose v18 plus v19 and execute embedded generator
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-native-single-confirm-v18-repair.py \
+            .github/scripts/track-a-worldmap-native-game-login-v19-repair.py
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$RUNNER_TEMP/v-gdb.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$RUNNER_TEMP/v-gdb.sh" "$RUNNER_TEMP/v2.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py "$RUNNER_TEMP/v2.sh" "$RUNNER_TEMP/v3.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py "$RUNNER_TEMP/v3.sh" "$RUNNER_TEMP/v4.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$RUNNER_TEMP/v4.sh" "$RUNNER_TEMP/v5.sh"
+          python3 .github/scripts/track-a-worldmap-causal-baseline-login-v6-repair.py "$RUNNER_TEMP/v5.sh" "$RUNNER_TEMP/v6.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-selection-v7-repair.py "$RUNNER_TEMP/v6.sh" "$RUNNER_TEMP/v7.sh"
+          python3 .github/scripts/track-a-worldmap-causal-auth-submit-v9-anchor-adapter.py .github/scripts/track-a-worldmap-causal-auth-submit-v9-repair.py "$RUNNER_TEMP/v7.sh" "$RUNNER_TEMP/v9.sh"
+          python3 .github/scripts/track-a-worldmap-causal-press-cancel-v10-repair.py "$RUNNER_TEMP/v9.sh" "$RUNNER_TEMP/v10.sh"
+          python3 .github/scripts/track-a-worldmap-causal-auth-state-v11-repair.py "$RUNNER_TEMP/v10.sh" "$RUNNER_TEMP/v11.sh"
+          python3 .github/scripts/track-a-worldmap-causal-transport-visual-v12-repair.py "$RUNNER_TEMP/v11.sh" "$RUNNER_TEMP/v12.sh"
+          python3 .github/scripts/track-a-worldmap-causal-pinned-login-v13-repair.py "$RUNNER_TEMP/v12.sh" "$RUNNER_TEMP/v13.sh"
+          python3 .github/scripts/track-a-worldmap-causal-character-activation-v14-repair.py "$RUNNER_TEMP/v13.sh" "$RUNNER_TEMP/v14.sh"
+          python3 .github/scripts/track-a-worldmap-native-single-confirm-v18-repair.py "$RUNNER_TEMP/v14.sh" "$RUNNER_TEMP/v18.sh"
+          python3 .github/scripts/track-a-worldmap-native-game-login-v19-repair.py "$RUNNER_TEMP/v18.sh" "$RUNNER_TEMP/v19.sh"
+          bash -n "$RUNNER_TEMP/v19.sh"
+
+          python3 - "$RUNNER_TEMP/v19.sh" "$RUNNER_TEMP/gen.py" <<'PY'
+          from pathlib import Path
+          import sys
+          h=Path(sys.argv[1]).read_text()
+          start='python3 - "$GCMD" "$PID" "$bias" "$EVENTS" "$STRIPS" <<\'PY\'\n'
+          a=h.find(start);assert a>=0;a+=len(start)
+          b=h.find('\nPY\nchmod 600 "$GCMD"',a);assert b>a
+          src=h[a:b]
+          compile(src,'<v19-generator>','exec')
+          Path(sys.argv[2]).write_text(src)
+          print('WORLDMAP_V19_EMBEDDED_GENERATOR_COMPILE=PASS')
+          PY
+          python3 "$RUNNER_TEMP/gen.py" "$RUNNER_TEMP/generated.gdb" 12345 0 "$RUNNER_TEMP/events" "$RUNNER_TEMP/strips"
+          test -s "$RUNNER_TEMP/generated.gdb"
+          for marker in \
+            "M(0x856880,'RequestCharacterLoginSignalActivate')" \
+            "M(0xcfb2e7,'RequestCharacterGameserverLogin')" \
+            "M(0xcfb122,'StartGameServerLogin')" \
+            "M(0xd06660,'ConnectExistingCredentials')" \
+            "M(0xd066e0,'GameSessionConnected')" \
+            "M(0xd066c8,'GameSessionLoginSuccessful')" \
+            'WORLDMAP_V19_SCHEDULER_LOCKING_RESTORED=PASS' \
+            'WORLDMAP_V19_AUTH_FALLBACK=PASS' \
+            'WORLDMAP_V19_AUTH_METHOD5_QMETA_INVOCATION=PASS'; do grep -Fq "$marker" "$RUNNER_TEMP/generated.gdb";done
+          test "$(grep -Fc 'set scheduler-locking on' "$RUNNER_TEMP/generated.gdb")" -eq 2
+          test "$(grep -Fc 'set scheduler-locking off' "$RUNNER_TEMP/generated.gdb")" -eq 2
+          grep -Fq 'WORLDMAP_V19_REQUEST_CHARACTER_SIGNAL_COUNT=' "$RUNNER_TEMP/v19.sh"
+          grep -Fq 'structural_world_entry_not_observed_after_v19_game_login' "$RUNNER_TEMP/v19.sh"
+          ! grep -Fq "M(0xd47300,'RequestCharacterLogin')" "$RUNNER_TEMP/generated.gdb"
+          ! grep -Fq "M(0xd47130,'CharacterSelectionConfirmed')" "$RUNNER_TEMP/generated.gdb"
+          ! grep -Fq 'Invalid Monk' "$RUNNER_TEMP/v19.sh"
+          echo 'WORLDMAP_V19_GENERATOR_STATIC=PASS'
+          echo 'WORLDMAP_V19_GENERATOR_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_V19_GENERATOR_SECRET_USED=false'

@@ -32,7 +32,10 @@ jobs:
           bases=[0xd0f340,0xdd8150,0xb07cf0,0xdd8010,0xafcc20,0xdd7840,0xe00380]
           h=b''.join(R(a,a+0x100) for a in bases);v=R(0x3085ce0,0x3085de0)
           with open(sys.argv[2],'a') as q:
-           for k,d in [('h',h),('v',v)]:z=hashlib.sha256(d).hexdigest();q.write(f'{k}={d.hex()}\n{k}s={z}\n')
+           q.write(f'h={h.hex()}\n')
+           q.write(f's={hashlib.sha256(h).hexdigest()}\n')
+           q.write(f'v={v.hex()}\n')
+           q.write(f'vs={hashlib.sha256(v).hexdigest()}\n')
           print('AUTHSESSION_PHASE6B_EXACT_FILE_FENCE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none');print('AUTHSESSION_PHASE6B_SOURCE_DISASSEMBLY=false');print('AUTHSESSION_PHASE6B_SOURCE_SECRET_ACCESS=false')
           PY
   hosted:

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "max_parallel_workers": 2,
+  "selection": {
+    "require_owned_paths": true,
+    "hold_unresolved_external_dependencies": true
+  },
+  "context": {
+    "require_pressure": true,
+    "pressure_bands": {
+      "low": [0, 5],
+      "medium": [6, 9],
+      "high": [10, 12],
+      "unbounded": [13, 15]
+    },
+    "rotate_at_pressure": ["high", "unbounded"],
+    "rotate_medium_when_growth": ["rising", "rapid"],
+    "provider_remaining_ratio_rotate_below": 0.2
+  },
+  "executor": {
+    "mode": "dry_run",
+    "real_model_executor_enabled": false,
+    "owner_funded_ai_allowed": false
+  }
+}

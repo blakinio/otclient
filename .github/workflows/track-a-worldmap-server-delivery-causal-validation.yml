@@ -14,42 +14,83 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  xdotool-loader-static:
-    name: Xdotool toolroot closure and helper composition (no client)
+  behavioral-ephemeral-baseline:
+    name: Behavioral 1020x650 baseline structural worldmap capture
     runs-on: [otclient, synology]
-    timeout-minutes: 4
+    timeout-minutes: 12
     steps:
       - name: Checkout exact head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Prove xdotool dynamic-link closure without client or secrets
+      - name: Revalidate current-main Track A admission
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          base_sha="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "$base_sha" "origin/$HEAD_BRANCH"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$base_sha" --expected-branch "$HEAD_BRANCH"
+          echo "WORLDMAP_BASELINE_CURRENT_MAIN=$base_sha"
+          echo 'WORLDMAP_BASELINE_CURRENT_MAIN_ANCESTRY=PASS'
+          echo 'WORLDMAP_CAUSAL_EPHEMERAL_BASELINE_ADMISSION=PASS'
+
+      - name: Require canonical controller plane idle without mutating it
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import fcntl,json,os,time
+          from pathlib import Path
+          state=Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          lock=state/'coordination.lock'; lease_path=state/'lease.json'; reg=state/'runtime-registration.json'
+          if not lock.is_file() or not lease_path.is_file(): raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
+          fd=os.open(lock,os.O_RDONLY|getattr(os,'O_NOATIME',0))
+          try:
+              fcntl.flock(fd,fcntl.LOCK_SH)
+              lease=json.loads(lease_path.read_text())
+              safe={'generation':lease.get('generation'),'status':lease.get('status'),'controller_task':lease.get('controller_task'),'controller_session':lease.get('controller_session'),'expired':bool(lease.get('status')=='active' and isinstance(lease.get('expires_at'),int) and lease['expires_at']<=int(time.time()))}
+              print('WORLDMAP_BASELINE_CANONICAL_LEASE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
+              if safe['status']!='released' or safe['controller_task'] is not None or safe['controller_session'] is not None: raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_lease_not_idle')
+              if reg.exists(): raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_registration_present')
+          finally:
+              try: fcntl.flock(fd,fcntl.LOCK_UN)
+              except OSError: pass
+              os.close(fd)
+          print('WORLDMAP_BASELINE_CANONICAL_REGISTRATION=ABSENT')
+          print('WORLDMAP_BASELINE_CANONICAL_CONTROLLER_IDLE=PASS')
+          PY
+
+      - name: Revalidate XWD and xdotool toolroot dynamic-link closure without client
         shell: bash
         run: |
           set -Eeuo pipefail
           TOOL=/home/runner/_work/_otclient_tibia_re_state/toolroot
           [[ -d "$TOOL" ]] || TOOL=/work/_otclient_tibia_re_state/toolroot
-          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_XDO_STATIC_ERROR=toolroot_missing' >&2; exit 1; }
-          XDO="$TOOL/usr/bin/xdotool"
-          [[ -x "$XDO" ]] || { echo 'WORLDMAP_XDO_STATIC_ERROR=xdotool_missing' >&2; exit 1; }
+          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_UI_PREFLIGHT_ERROR=toolroot_missing' >&2; exit 1; }
           LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
-          deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XDO")"
-          if grep -F 'not found' <<<"$deps"; then
-            echo 'WORLDMAP_XDO_STATIC_ERROR=dependency_not_found' >&2
+          XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
+          XDO="$TOOL/usr/bin/xdotool"
+          [[ -x "$XWD" ]] || { echo 'WORLDMAP_UI_PREFLIGHT_ERROR=xwd_missing' >&2; exit 1; }
+          [[ -x "$XDO" ]] || { echo 'WORLDMAP_UI_PREFLIGHT_ERROR=xdotool_missing' >&2; exit 1; }
+          xwd_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XWD")"
+          xdo_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XDO")"
+          if grep -F 'not found' <<<"$xwd_deps" || grep -F 'not found' <<<"$xdo_deps"; then
+            echo 'WORLDMAP_UI_PREFLIGHT_ERROR=dependency_not_found' >&2
             exit 1
           fi
-          grep -F 'libxdo.so.3 =>' <<<"$deps" >/dev/null || {
-            echo 'WORLDMAP_XDO_STATIC_ERROR=libxdo_resolution_missing' >&2
-            exit 1
-          }
-          echo 'WORLDMAP_XDO_LIBXDO_RESOLUTION=PASS'
+          grep -F 'libxdo.so.3 =>' <<<"$xdo_deps" >/dev/null || { echo 'WORLDMAP_UI_PREFLIGHT_ERROR=libxdo_resolution_missing' >&2; exit 1; }
+          echo 'WORLDMAP_XWD_TOOLROOT_DYNAMIC_LINK=PASS'
           echo 'WORLDMAP_XDO_TOOLROOT_DYNAMIC_LINK=PASS'
-          echo 'WORLDMAP_XDO_STATIC_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_XDO_STATIC_SECRET_USED=false'
 
-      - name: Validate composed helper uses loader-safe xdo wrapper
+      - name: Compose validated behavioral baseline helper
+        id: compose
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -57,25 +98,63 @@ jobs:
             .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
             .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
             .github/scripts/track-a-worldmap-causal-xwd-compare.py \
-            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py
-          screen="$RUNNER_TEMP/worldmap-xdo-screen.sh"
-          gdb="$RUNNER_TEMP/worldmap-xdo-gdb.sh"
-          combined="$RUNNER_TEMP/worldmap-xdo-combined.sh"
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            .github/scripts/tibia-official-client-re-xres-wire.py
+          screen_repaired="$RUNNER_TEMP/worldmap-baseline-1020.sh"
+          gdb_repaired="$RUNNER_TEMP/worldmap-baseline-1020-gdb.sh"
+          combined="$RUNNER_TEMP/worldmap-baseline-1020-gdb-behavior.sh"
           python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
-            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
-          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
-          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$combined"
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen_repaired"
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            "$screen_repaired" "$gdb_repaired"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            "$gdb_repaired" "$combined"
           bash -n "$combined"
-          grep -F 'XDO_TOOLROOT_LIBS="$XWD_TOOLROOT_LIBS"' "$combined" >/dev/null
-          grep -F 'LD_LIBRARY_PATH="$XDO_TOOLROOT_LIBS" "$XDOTOOL" "$@"' "$combined" >/dev/null
-          grep -F 'xdo windowfocus --sync' "$combined" >/dev/null
-          grep -F 'xdo mousemove --window' "$combined" >/dev/null
+          test -x "$combined"
+          grep -F 'WORLDMAP_BASELINE_DESKTOP_GEOMETRY=1020x650' "$combined" >/dev/null
           grep -F 'WORLDMAP_BASELINE_GDB_ATTACH=PASS' "$combined" >/dev/null
+          grep -F 'for _ in $(seq 1 40); do' "$combined" >/dev/null
+          grep -F 'sleep .25' "$combined" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=MANIFEST_PROVEN' "$combined" >/dev/null
           grep -F 'WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_EDITABLE_FIELDS' "$combined" >/dev/null
-          if grep -F 'DISPLAY="$DISPLAY" "$XDOTOOL"' "$combined"; then
-            echo 'WORLDMAP_XDO_STATIC_ERROR=unsafe_direct_xdotool_survived' >&2
+          grep -F 'track-a-worldmap-causal-xwd-compare.py' "$combined" >/dev/null
+          grep -F 'WORLDMAP_XWD_EDITABLE_MASK_OVERLAP_RATIO' .github/scripts/track-a-worldmap-causal-xwd-compare.py >/dev/null
+          grep -F 'default=0.80' .github/scripts/track-a-worldmap-causal-xwd-compare.py >/dev/null
+          grep -F 'LD_LIBRARY_PATH="$XDO_TOOLROOT_LIBS" "$XDOTOOL" "$@"' "$combined" >/dev/null
+          grep -F 'xdo windowactivate --sync "$WIN" key --clearmodifiers Right' "$combined" >/dev/null
+          grep -F 'xdo key --clearmodifiers Left' "$combined" >/dev/null
+          grep -F 'EMAIL_X=535' "$combined" >/dev/null
+          grep -F 'PASS_Y=304' "$combined" >/dev/null
+          grep -F 'LOGIN_X=590' "$combined" >/dev/null
+          grep -F 'ROW_X=285' "$combined" >/dev/null
+          if grep -F 'login_form_geometry_not_revalidated' "$combined"; then
+            echo 'WORLDMAP_COMBINED_REPAIR_ERROR=obsolete_grayscale_gate_survived' >&2
             exit 1
           fi
-          echo 'WORLDMAP_XDO_HELPER_COMPOSITION=PASS'
-          echo 'WORLDMAP_XDO_COMPOSE_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_XDO_COMPOSE_SECRET_USED=false'
+          if grep -E 'tesseract|capture_ocr|LOGIN_OCR_ANCHORS|SELECT_TSV|PRE_TSV' "$combined"; then
+            echo 'WORLDMAP_COMBINED_REPAIR_ERROR=ocr_surface_survived' >&2
+            exit 1
+          fi
+          echo "combined=$combined" >> "$GITHUB_OUTPUT"
+          echo 'WORLDMAP_BASELINE_COMBINED_REPAIR=PASS'
+
+      - name: Execute exactly one behavioral baseline login and structural capture
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+          COMBINED: ${{ steps.compose.outputs.combined }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          "$COMBINED"
+
+      - name: Upload privacy-safe structural baseline evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worldmap-causal-baseline-${{ github.run_id }}
+          path: ${{ runner.temp }}/worldmap-baseline-evidence
+          if-no-files-found: error
+          retention-days: 7

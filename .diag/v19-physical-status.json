@@ -1,0 +1,33 @@
+{
+  "schema": "v19-physical-terminal-v1",
+  "target_sha": "271a673ac9ec5d394945d59998c64117a427fd23",
+  "run_id": 32077589147,
+  "status": "completed",
+  "conclusion": "failure",
+  "jobs": [
+    {
+      "id": 95533934309,
+      "name": "Static v19 downstream game-login composition",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 95533971920,
+      "name": "Physical baseline v19 downstream game-login and screenshot",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 95534084047,
+      "name": "luacheck",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 95534224625,
+      "name": "cppcheck",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

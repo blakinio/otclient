@@ -1,7 +1,7 @@
 {
   "schema": "otclient.tibia-re.coverage-summary.v3",
   "source_baseline_head": "43a60bd96cc644b656b200c9edbfb75578b330b6",
-  "current_overlay_snapshot": "1eb4a8edecba3966aa1e6155e241b404eb4d30cb",
+  "current_overlay_snapshot": "0b3bdec0a4145f558806448a4657413664d80729",
   "semantic_denominator_integration_pr": 460,
   "programme_completion": "NOT_CLAIMED",
   "audit_result_after_merge": "FAIL_MATERIAL_GAPS_OPEN",

@@ -78,6 +78,14 @@ def changed_count(a: Path, b: Path, roi: tuple[int, int, int, int] | None = None
     return len(changed_mask(a, b, roi))
 
 
+def mask_bbox(mask: set[int], width: int) -> str:
+    if not mask:
+        return "NONE"
+    xs=[idx % width for idx in mask]
+    ys=[idx // width for idx in mask]
+    return f"{min(xs)},{min(ys)},{max(xs)+1},{max(ys)+1}"
+
+
 def roi_cycle(args: argparse.Namespace) -> int:
     roi=(args.x0,args.y0,args.x1,args.y1)
     typed_mask=changed_mask(args.before,args.typed,roi)
@@ -94,6 +102,7 @@ def roi_cycle(args: argparse.Namespace) -> int:
     print(f"WORLDMAP_XWD_EDITABLE_RESIDUAL_CHANGED={residual}")
     print(f"WORLDMAP_XWD_EDITABLE_MASK_OVERLAP={overlap}")
     print(f"WORLDMAP_XWD_EDITABLE_MASK_OVERLAP_RATIO={overlap_ratio:.6f}")
+    print(f"WORLDMAP_XWD_EDITABLE_TYPED_BBOX={mask_bbox(typed_mask, EXPECTED['width'])}")
     max_residual=max(80,int(typed*0.55))
     if (
         typed < args.min_changed
@@ -109,8 +118,10 @@ def roi_cycle(args: argparse.Namespace) -> int:
 
 def simple_change(args: argparse.Namespace) -> int:
     roi=None if args.x0 is None else (args.x0,args.y0,args.x1,args.y1)
-    changed=changed_count(args.before,args.after,roi)
+    mask=changed_mask(args.before,args.after,roi)
+    changed=len(mask)
     print(f"WORLDMAP_XWD_CHANGED_PIXELS={changed}")
+    print(f"WORLDMAP_XWD_CHANGED_BBOX={mask_bbox(mask, EXPECTED['width'])}")
     if changed < args.min_changed:
         print("WORLDMAP_XWD_CHANGE=FAIL")
         return 3

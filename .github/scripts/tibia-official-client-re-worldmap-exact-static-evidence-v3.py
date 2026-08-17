@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Final constructor/caller discriminator for world-map exact-static evidence.
+"""Last bounded cross-check for the protocol-handler outer owner.
 
-This phase is intentionally narrow: it stages the exact protocol-handler
-constructor neighbourhood and rel32 callers whose targets fall inside that
-small constructor range. Source execution remains read-only; disassembly remains
-GitHub-hosted over bounded sanitized windows only.
+The source executor verifies and reads only the exact client. It emits direct
+rel32 callers and exact Itanium-vtable membership candidates for 0x00804620,
+plus bounded contexts. No client execution, mutation or source-side disassembly.
 """
 
 from __future__ import annotations
@@ -25,11 +24,7 @@ v2 = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(v2)
 base = v2.base
 _ORIGINAL_VALIDATE_SOURCE_BUNDLE = v2.validate_source_bundle
-
-CONSTRUCTOR_RANGE_START = 0x00803900
-CONSTRUCTOR_RANGE_END = 0x00803C20
-CONSTRUCTOR_CONTEXT_START = 0x00803800
-CONSTRUCTOR_CONTEXT_SIZE = 0x850
+TARGET = 0x00804620
 
 
 def fmt_addr(value: int) -> str:
@@ -51,29 +46,69 @@ def validate_source_bundle_order_tolerant(bundle_dir: Path):
 v2.validate_source_bundle = validate_source_bundle_order_tolerant
 
 
-def scan_rel32_targets_in_range(elf: Any, lo: int, hi: int) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
+def scan_rel32_xrefs(elf: Any, target: int) -> list[dict[str, Any]]:
+    out = []
     for seg in elf.loads:
         if not (seg["flags"] & 1):
             continue
         blob = elf.data[seg["offset"]:seg["offset"] + seg["filesz"]]
         for i in range(max(0, len(blob) - 5)):
-            opcode = blob[i]
-            if opcode not in (0xE8, 0xE9):
+            if blob[i] not in (0xE8, 0xE9):
                 continue
             disp = struct.unpack_from("<i", blob, i + 1)[0]
             address = seg["vaddr"] + i
-            target = address + 5 + disp
-            if lo <= target <= hi:
-                out.append({
-                    "instruction_address": fmt_addr(address),
-                    "opcode": "call_rel32" if opcode == 0xE8 else "jmp_rel32",
-                    "instruction_bytes": blob[i:i + 5].hex(),
-                    "resolved_target": fmt_addr(target),
-                    "classification": "candidate_until_hosted_instruction_boundary_confirmation",
-                })
-    unique = {(item["instruction_address"], item["resolved_target"]): item for item in out}
+            resolved = address + 5 + disp
+            if resolved != target:
+                continue
+            out.append({
+                "instruction_address": fmt_addr(address),
+                "opcode": "call_rel32" if blob[i] == 0xE8 else "jmp_rel32",
+                "instruction_bytes": blob[i:i + 5].hex(),
+                "resolved_target": fmt_addr(target),
+                "classification": "candidate_until_hosted_instruction_boundary_confirmation",
+            })
+    unique = {item["instruction_address"]: item for item in out}
     return [unique[key] for key in sorted(unique)]
+
+
+def typeinfo_name(elf: Any, typeinfo: int) -> tuple[int | None, str | None]:
+    name_ptr, _ = elf.resolved_qword(typeinfo + 8)
+    return (name_ptr, elf.cstring(name_ptr, 512)) if name_ptr is not None else (None, None)
+
+
+def memberships(elf: Any, target: int) -> list[dict[str, Any]]:
+    out = {}
+    for function_slot in sorted(set(elf.relative_target_to_slots.get(target, ()))):
+        for index in range(96):
+            vptr = function_slot - index * 8
+            if vptr < 16:
+                continue
+            off, off_rel = elf.resolved_qword(vptr - 16)
+            ti, ti_rel = elf.resolved_qword(vptr - 8)
+            if off is None or ti is None or not elf.mapped(ti) or abs(base.signed64(off)) >= (1 << 20):
+                continue
+            name_ptr, name = typeinfo_name(elf, ti)
+            if not name:
+                continue
+            resolved, relation = elf.resolved_qword(function_slot)
+            if resolved != target:
+                continue
+            key = (vptr, index)
+            out[key] = {
+                "function_target": fmt_addr(target),
+                "function_slot": fmt_addr(function_slot),
+                "slot_index": index,
+                "vptr_address_point": fmt_addr(vptr),
+                "offset_to_top_signed": base.signed64(off),
+                "offset_to_top_relation": off_rel,
+                "typeinfo_address": fmt_addr(ti),
+                "typeinfo_relation": ti_rel,
+                "typeinfo_name_pointer": base.fmt_addr(name_ptr),
+                "rtti_name": name,
+                "demangled_name": base.demangle_type_name(name),
+                "function_slot_relation": relation,
+            }
+    return [out[key] for key in sorted(out)]
 
 
 def source_mode(args: argparse.Namespace) -> int:
@@ -82,35 +117,29 @@ def source_mode(args: argparse.Namespace) -> int:
     rc = v2.source_mode(args)
     if rc != 0:
         return rc
-
     outdir = Path(args.outdir)
     bundle_path = outdir / "worldmap-static-evidence.json"
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
     elf = base.Elf64(Path(args.client))
-    windows: list[dict[str, Any]] = bundle["source_code_windows"]
+    windows = bundle["source_code_windows"]
     seen = {int(item["start_address"], 16) for item in windows}
     budget = [int(bundle["source_code_window_raw_bytes"])]
 
     v2.append_window(
         windows, seen, elf,
-        purpose="second_pack_protocol_handler_constructor_context",
-        start=CONSTRUCTOR_CONTEXT_START,
-        size=CONSTRUCTOR_CONTEXT_SIZE,
+        purpose="second_pack_outer_owner_target",
+        start=TARGET,
+        size=0x900,
         geometry_related=False,
-        metadata={
-            "known_vptr_write": "0x00803c01 -> 0x030871d8",
-            "known_handler_storage_candidate_field": "+0x10/+0x18 shared_ptr pair",
-            "known_handler_extent_source_field": "+0xb0/+0xb4 initialized from 0x01cdd958",
-        },
+        metadata={"target": fmt_addr(TARGET)},
         raw_budget=budget,
     )
-
-    candidates = scan_rel32_targets_in_range(elf, CONSTRUCTOR_RANGE_START, CONSTRUCTOR_RANGE_END)
-    for item in candidates[:128]:
+    callers = scan_rel32_xrefs(elf, TARGET)
+    for item in callers[:96]:
         address = int(item["instruction_address"], 16)
         v2.append_window(
             windows, seen, elf,
-            purpose="second_pack_protocol_handler_constructor_caller_candidate",
+            purpose="second_pack_outer_owner_caller",
             start=max(0, address - 0x300),
             size=0x700,
             geometry_related=False,
@@ -118,16 +147,16 @@ def source_mode(args: argparse.Namespace) -> int:
             raw_budget=budget,
         )
 
+    member = memberships(elf, TARGET)
     bundle["source_code_window_raw_bytes"] = budget[0]
     bundle["second_pack"] = {
-        "schema": "track-a-worldmap-exact-static-second-pack-handler-constructor-v5",
-        "objective": "close_protocol_handler_plus_0x10_dependency_type",
-        "constructor_range": {
-            "start": fmt_addr(CONSTRUCTOR_RANGE_START),
-            "end": fmt_addr(CONSTRUCTOR_RANGE_END),
-        },
-        "rel32_candidates_into_constructor_range": candidates,
-        "rel32_candidate_count": len(candidates),
+        "schema": "track-a-worldmap-exact-static-second-pack-outer-owner-v6",
+        "objective": "last_cross_check_for_outer_plus_0x2f8_storage_owner",
+        "target": fmt_addr(TARGET),
+        "rel32_callers": callers,
+        "rel32_caller_count": len(callers),
+        "vtable_memberships": member,
+        "vtable_membership_count": len(member),
         "raw_window_budget_bytes": v2.MAX_SOURCE_CODE_BYTES,
         "raw_window_bytes_used": budget[0],
         "bounded_window_count": len(windows),
@@ -136,7 +165,6 @@ def source_mode(args: argparse.Namespace) -> int:
         "client_bytes_mutated": False,
         "raw_client_uploaded": False,
     }
-
     bundle_path.write_text(json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (outdir / "worldmap-static-evidence.md").write_text(base.markdown_report(bundle), encoding="utf-8")
     fence_path = outdir / "source-fence.txt"
@@ -145,27 +173,28 @@ def source_mode(args: argparse.Namespace) -> int:
         "WORLD_MAP_SECOND_PACK_SOURCE=PASS",
         f"WORLD_MAP_SECOND_PACK_BOUNDED_WINDOWS={len(windows)}",
         f"WORLD_MAP_SECOND_PACK_BOUNDED_RAW_BYTES={budget[0]}",
-        f"WORLD_MAP_SECOND_PACK_HANDLER_CTOR_CALLER_CANDIDATES={len(candidates)}",
+        f"WORLD_MAP_SECOND_PACK_OUTER_OWNER_CALLERS={len(callers)}",
+        f"WORLD_MAP_SECOND_PACK_OUTER_OWNER_VTABLE_MEMBERSHIPS={len(member)}",
         "WORLD_MAP_SECOND_PACK_SOURCE_DISASSEMBLY=none",
         "WORLD_MAP_SECOND_PACK_HOSTED_CONFIRMATION_REQUIRED=true",
         "",
     ]), encoding="utf-8")
-
     print("WORLD_MAP_SECOND_PACK_SOURCE=PASS")
     print(f"WORLD_MAP_SECOND_PACK_BOUNDED_WINDOWS={len(windows)}")
     print(f"WORLD_MAP_SECOND_PACK_BOUNDED_RAW_BYTES={budget[0]}")
-    print(f"WORLD_MAP_SECOND_PACK_HANDLER_CTOR_CALLER_CANDIDATES={len(candidates)}")
+    print(f"WORLD_MAP_SECOND_PACK_OUTER_OWNER_CALLERS={len(callers)}")
+    print(f"WORLD_MAP_SECOND_PACK_OUTER_OWNER_VTABLE_MEMBERSHIPS={len(member)}")
     return 0
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("source", "validate"))
-    parser.add_argument("--client")
-    parser.add_argument("--candidate-index", default="-1")
-    parser.add_argument("--bundle-dir")
-    parser.add_argument("--outdir", required=True)
-    return parser.parse_args()
+    p = argparse.ArgumentParser()
+    p.add_argument("mode", choices=("source", "validate"))
+    p.add_argument("--client")
+    p.add_argument("--candidate-index", default="-1")
+    p.add_argument("--bundle-dir")
+    p.add_argument("--outdir", required=True)
+    return p.parse_args()
 
 
 def main() -> int:

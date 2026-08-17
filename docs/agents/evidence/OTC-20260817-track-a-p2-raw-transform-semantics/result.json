@@ -1,0 +1,104 @@
+{
+  "schema": "track-a-p2-raw-transform-semantics-researcher-v1",
+  "date": "2026-08-17",
+  "task": "OTC-20260817-track-a-p2-raw-transform-semantics",
+  "source_pr": 497,
+  "integration_base": "8a5fcfd72f2554261eef91a2129c9cc076e730ea",
+  "decision": "DRAFT_READY_FOR_COORDINATOR_REVIEW",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official_native_linux_only"
+  },
+  "canonical_inputs": {
+    "persistent_qbuffer_to_clientprocessor": "PROVEN",
+    "clientprocessor_to_rawdataprocessor": "PROVEN",
+    "same_message_downstream_to_qtcpsocket": "PROVEN",
+    "framing": "PROVEN",
+    "sequence": "PROVEN",
+    "final_binary_egress": "PROVEN_AT_QT_QTCPSOCKET_BOUNDARY"
+  },
+  "generation": {
+    "txtea_concrete_transform": {
+      "run": 32046592885,
+      "source_job": 95435821666,
+      "hosted_job": 95435860761,
+      "transform_window": "0xf861e0..0xf864c0",
+      "transform_sha256": "f45afa6aaf3337850d4d892692d533140f896444e4a1342c83f73cb7053de3be",
+      "vtable_window": "0x2f63138..0x2f63188",
+      "vtable_sha256": "a2c5fbc512e3510ac14f876e840e9ec02dfbb1b13db6620a63b4e6ba02399e64",
+      "vtable_address_point": "0x2f63148",
+      "typeinfo": "0x3077800",
+      "rtti_name": "N6shared11TXteaHelperE",
+      "slot_plus_0x20": "0xf85eb0",
+      "slot_plus_0x28": "0xf861e0"
+    },
+    "txtea_backend_trace": {
+      "run": 32046849472,
+      "source_job": 95436633057,
+      "hosted_job": 95437765778,
+      "crypto_window": "0x196cdf0..0x196d180",
+      "crypto_sha256": "cc358f4b322493ca83402309f88eebef2d2613362b7cc2c4e16cc7387fffc7a7",
+      "setup_window": "0x1943ae0..0x1943e80",
+      "setup_sha256": "78120e7a2984277385ace93de2b7ed3c4c84fbb8bcfd0c22037c02fcda1ec5df",
+      "use": "supporting control-flow only; exact XTEA round-core identity is not promoted from these callees"
+    },
+    "outbound_transform_census": {
+      "run": 32059752436,
+      "source_job": 95478101478,
+      "hosted_job": 95478152304,
+      "protocol_window": "0xc2df80..0xc2e500",
+      "protocol_sha256": "00cea4d539c6f4ac8695ae908535b88af7af849f27f4f69578e20cc6f49557b9",
+      "raw_window": "0xb47130..0xb47440",
+      "raw_sha256": "d0cd15d635e9452788f628f0d61d26025665d859eb6315b1c188a97d6795f993"
+    }
+  },
+  "claims": {
+    "framing": "PROVEN",
+    "sequence": "PROVEN",
+    "encryption": "PROVEN",
+    "encryption_gate": "FACT:message_plus_0x28_equals_2",
+    "encryption_receiver": "FACT:shared::TXteaHelper",
+    "encryption_receiver_vtable_ap": "FACT:0x2f63148",
+    "encryption_transform_slot": "FACT:vslot_plus_0x28_at_0xf861e0",
+    "encryption_effect": "FACT:padded_source_QByteArray_is_transformed_into_replacement_QByteArray_on_same_outbound_message_path",
+    "xtea_round_core": "UNKNOWN_NOT_REQUIRED_FOR_ENCRYPTION_ROLE_CLASSIFICATION",
+    "compression": "DISPROVEN_ON_PROVEN_OUTBOUND_PATH",
+    "compression_scope": "persistent_QBuffer_read_through_TProtocolClientMessageProcessor_0xc2df80_and_RawDataProcessor_0xb47130_then_canonical_same_message_downstream_to_QTcpSocket",
+    "compression_outside_proven_outbound_path": "UNKNOWN",
+    "final_binary_egress": "PROVEN_AT_QT_QTCPSOCKET_BOUNDARY",
+    "final_socket_owner": "FACT:TGameserverTCPConnection",
+    "final_os_socket_syscall": "UNKNOWN_OPTIONAL"
+  },
+  "compression_falsification": {
+    "clientprocessor_local_body": "persistent QBuffer bytes are read/copied into the network message while +0x28/+0x34 mode metadata are selected; no compression byte transform is present in the proven data path",
+    "rawdataprocessor_local_body": "the complete proven data-changing sequence is prefix insertion, padding to 8-byte alignment, storing appended-byte count in prefix, optional TXteaHelper transform for mode 2, then assignment back to the same message",
+    "downstream": "canonical coordinator evidence preserves the same message through DualConnection/NetworkPacketProcessor and the framing writer to QDataStream/QTcpSocket without a compression transform",
+    "scope_guard": "does not claim compression is absent from inbound traffic, unrelated client subsystems, or paths outside the proven outbound chain"
+  },
+  "negative_controls": {
+    "rtti_name_alone_used_as_encryption_proof": false,
+    "eight_byte_alignment_alone_used_as_encryption_proof": false,
+    "backend_name_or_expected_tibia_protocol_used_as_proof": false,
+    "generic_qt_census_used_as_proof": false,
+    "b40630_or_b4066b_reintroduced_as_final_egress": false,
+    "compression_absence_globalized_beyond_proven_path": false,
+    "runtime_or_login_used": false,
+    "full_executable_uploaded": false,
+    "owner_funded_ai_api_used": false
+  },
+  "audit": {
+    "result": "PASS_BOUNDED",
+    "material_findings_open": 0
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static exact-file/disassembly evidence only"
+  },
+  "promotion": {
+    "authority": "coordinator_only",
+    "researcher_self_promotion": false
+  },
+  "next_frontier": "Coordinator independently falsifies/promotes encryption and scoped compression result. The Linux syscall below the already-proven QTcpSocket boundary remains optional and is not required for protocol reconstruction."
+}

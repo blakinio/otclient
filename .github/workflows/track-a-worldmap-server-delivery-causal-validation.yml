@@ -50,8 +50,8 @@ jobs:
           grep -F 'WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY=1020x650' "$combined" >/dev/null
           grep -F -- '--owner-helper "$UI_OWNER_HELPER" --wire-helper "$UI_WIRE_HELPER"' "$combined" >/dev/null
           grep -F 'LD_LIBRARY_PATH="$XWD_TOOLROOT_LIBS" "$XWD"' "$combined" >/dev/null
-          if grep -F 'search --onlyvisible --pid' "$combined"; then
-            echo 'WORLDMAP_UI_WINDOW_STATIC_ERROR=legacy_pid_selector_survived' >&2
+          if grep -E '("\$XDOTOOL"|\$XDOTOOL|xdotool)[[:space:]]+search[[:space:]]+--onlyvisible[[:space:]]+--pid' "$combined"; then
+            echo 'WORLDMAP_UI_WINDOW_STATIC_ERROR=legacy_pid_selector_executable_survived' >&2
             exit 1
           fi
           if grep -E 'tesseract|capture_ocr|LOGIN_OCR_ANCHORS|SELECT_TSV|PRE_TSV' "$combined"; then

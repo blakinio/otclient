@@ -1,23 +1,23 @@
 ---
 task_id: OTC-20260816-track-a-coverage-audit-refresh
-status: validating
-agent: ChatGPT
+status: ready
+agent: unassigned
 session_id: chatgpt-coverage-audit-refresh-v4-20260817
 session_role: researcher_auditor
 project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: audit
-phase: current-main-821276-refresh-validation
+phase: coordinator-review-ready
 branch: research/OTC-20260816-track-a-coverage-audit-refresh-v2
 base_branch: main
 base_main: 8212765956a9bfafd2d8a7687440c02716c87170
 current_main: 8212765956a9bfafd2d8a7687440c02716c87170
 pull_request: 390
 supersedes_pr: 369
-coordinator_disposition: RETURN_FOR_EVIDENCE
+coordinator_disposition: PENDING_FRESH_REVIEW
 coordinator_comment: 5313208545
-updated: 2026-08-17T09:47:00+02:00
+updated: 2026-08-17T09:49:00+02:00
 risk: low
 researcher_delivery: draft_only
 implementation_authorized: false
@@ -25,19 +25,11 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-coverage-audit-refresh.md
   - docs/agents/reports/OTCLIENT-20260816-track-a-coverage-audit-refresh.md
 modules_touched: []
-reuses:
-  - closed Draft PR #304 accepted bounded coverage-registry evidence
-  - merged P2 coordinator promotion #450
-  - merged worldmap exact-static producers #437 and #446
-  - current live Track A PR/task state read-only
-  - promoted current-main Track A evidence read-only
-depends_on: []
-blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
 execution_mode: github-only
-execution_reason: refresh current-main/live-state audit after merged #450 and concurrent worldmap producer merges #437/#446; no physical runtime work belongs to this audit lane
+execution_reason: current-main/live-state coverage audit refreshed through merged #450/#437/#446; no physical runtime work belongs to this audit lane
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
@@ -95,12 +87,6 @@ historical_coverage_baseline:
 return_for_evidence_findings_addressed:
   - TACOORD-390-20260817-001 current-main snapshot refreshed through 82127659 including merged #450/#437/#446
   - TACOORD-390-20260817-002 merged P2 barrier consumed; global coordinator staleness intentionally preserved as AUD-COV-007
-resolved_or_reclassified_since_prior_handoff:
-  - AUD-COV-006 RESOLVED: P1 coordinator promotion #414 merged and #372 closed superseded
-  - AUD-COV-005 RESOLVED_AS_MATERIAL_GAP: #435/#437/#446 promote compliant bounded exact-static evidence patterns
-  - P2 #310 partial-Draft state SUPERSEDED: #450 merged bounded downstream chain while framing/sequence/compression/encryption/final egress remain UNKNOWN
-  - viewport static graph incomplete SUPERSEDED_IN_LIVE_DRAFT: #367 now reports STATIC_PATCH_GRAPH_READY=true and MUTATION_DESIGN_READY=false
-  - raw-XRes helper not validated SUPERSEDED_IN_LIVE_DRAFT: #447 validates helper; #448 promotion remains open
 open_findings:
   - AUD-COV-001 HIGH canonical item-level registry absent from current main
   - AUD-COV-002 HIGH required semantic denominators incomplete
@@ -126,31 +112,37 @@ validation_history:
   f753_repository_ci_run: 32007418914
   f753_required_ci_job: 95319703945
   f753_result: SUCCESS_INVALIDATED_BY_MAIN_ADVANCE_TO_821276
-ci_check_generation: current-main-821276-restack-pending
+  semantic_final_head: 08d2c83c8f567098976620bdfa1425759ee78978
+  semantic_final_governance_run: 32007585127
+  semantic_final_governance_result: SUCCESS
+  semantic_final_repository_ci_run: 32007585431
+  semantic_final_required_ci_job: 95320196351
+  semantic_final_repository_ci_result: SUCCESS
+ci_check_generation: terminal-handoff-head-pending
 ci_checks_for_current_head: 0
 terminal_ci_checks_for_current_generation: 0
-last_completed_step: consumed consecutive worldmap producer merges #437/#446, updated live #367 head and preserved five material findings with current Draft-vs-main boundaries
-next_action: restack this same two-file Draft onto main@82127659, obtain exact-head Track A governance/repository CI, verify review hygiene/no further load-bearing main drift, then return the same Draft for fresh coordinator disposition
+last_completed_step: refreshed report through current main 82127659, consumed merged #450/#437/#446, rechecked registry absence, preserved five material findings, and passed exact semantic-head governance/CI with zero review threads
+next_action: obtain final exact-head governance/repository CI for this task-only handoff commit, verify main remains current and review hygiene stays clean, then perform fresh coordinator disposition on this same Draft
 ---
 
-# Track A coverage audit refresh — coordinator return-for-evidence continuation
+# Track A coverage audit refresh — current-main researcher handoff
 
 ## Acceptance
 
 - [x] coordinator finding comment `5313208545` consumed;
 - [x] current main through `8212765956a9bfafd2d8a7687440c02716c87170` consumed;
-- [x] merged P2 #450/barrier consumed;
-- [x] merged worldmap producers #437/#446 consumed;
+- [x] merged P2 #450 and worldmap producers #437/#446 consumed;
 - [x] P0 #302 current disposition consumed;
 - [x] RUNTIME #447/#448 source/promotion split consumed without treating Draft as trusted-main implementation;
 - [x] live #367 `STATIC_PATCH_GRAPH_READY=true` consumed without authorizing mutation;
 - [x] canonical coverage registry absence rechecked;
 - [x] five material findings preserved at 3 HIGH + 2 MEDIUM;
-- [ ] exact current-main restacked head passes Track A governance and repository CI;
-- [ ] review submissions/threads remain clean and no load-bearing main drift occurs before coordinator handoff.
+- [x] semantic final head `08d2c83c...` passed Track A governance and repository CI;
+- [x] review submissions/threads were clean and main was stable at semantic final validation;
+- [ ] terminal handoff head passes Track A governance/repository CI and final no-drift check.
 
 ## Result
 
 `FAIL_MATERIAL_GAPS_OPEN` / `DRAFT_NOT_PROMOTED`.
 
-Current material findings: **5 = 3 HIGH + 2 MEDIUM**. The requested live-state evidence is refreshed through current main; exact-head validation remains before coordinator handoff.
+Current material findings: **5 = 3 HIGH + 2 MEDIUM**. Researcher refresh is complete; coordinator disposition is the remaining delivery gate.

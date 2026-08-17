@@ -16,8 +16,14 @@ SPEC.loader.exec_module(wire)
 
 MAJOR_OPCODE = 150
 RESOURCE_XID = 0x00C00011
+RESOURCE_CLIENT_BASE = 0x00C00000
 PID = 4242
+PHYSICAL_V2_PID = 13648
 SEQUENCE = 0x1234
+PHYSICAL_V2_REPLY = bytes.fromhex(
+    "0100030004000000010000000000000000000000000000000000000000000000"
+    "0000c000020000000400000050350000"
+)
 
 
 def version_reply(
@@ -196,6 +202,37 @@ class XResQueryClientIdsTests(unittest.TestCase):
         )
         self.assertEqual(wire.extract_local_client_pid(records, RESOURCE_XID), PID)
 
+    def test_accepts_returned_owner_client_base_for_requested_resource(self) -> None:
+        records = (
+            wire.ClientIdValue(
+                RESOURCE_CLIENT_BASE,
+                wire.XRES_CLIENT_ID_MASK_LOCAL_CLIENT_PID,
+                (PID,),
+            ),
+        )
+        self.assertEqual(wire.extract_local_client_pid(records, RESOURCE_XID), PID)
+
+    def test_accepts_retained_physical_v2_reply_client_base(self) -> None:
+        records = wire.parse_query_client_ids_reply(
+            PHYSICAL_V2_REPLY,
+            "little",
+            expected_sequence=3,
+        )
+        self.assertEqual(
+            records,
+            (
+                wire.ClientIdValue(
+                    RESOURCE_CLIENT_BASE,
+                    wire.XRES_CLIENT_ID_MASK_LOCAL_CLIENT_PID,
+                    (PHYSICAL_V2_PID,),
+                ),
+            ),
+        )
+        self.assertEqual(
+            wire.extract_local_client_pid(records, RESOURCE_XID),
+            PHYSICAL_V2_PID,
+        )
+
     def test_zero_id_reply_is_unresolved_not_fabricated(self) -> None:
         records = wire.parse_query_client_ids_reply(client_ids_reply([]), "little")
         self.assertEqual(records, ())
@@ -308,8 +345,10 @@ class XResQueryClientIdsTests(unittest.TestCase):
         with self.assertRaises(wire.XResWireError):
             wire.extract_local_client_pid(records, RESOURCE_XID)
 
-    def test_rejects_nonempty_reply_without_requested_resource(self) -> None:
-        records = (wire.ClientIdValue(RESOURCE_XID + 1, 2, (PID,)),)
+    def test_rejects_zero_returned_client_identifier(self) -> None:
+        records = (
+            wire.ClientIdValue(0, wire.XRES_CLIENT_ID_MASK_LOCAL_CLIENT_PID, (PID,)),
+        )
         with self.assertRaises(wire.XResWireError):
             wire.extract_local_client_pid(records, RESOURCE_XID)
 

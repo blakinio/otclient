@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/tibia-official-client-re-xres-raw-pid-identity.yml
       - .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch.py
+      - .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch-v2.py
       - .github/scripts/tibia-official-client-re-xres-wire.py
       - docs/agents/tasks/active/OTC-20260817-track-a-xres-raw-pid-identity.md
 
@@ -35,7 +36,8 @@ jobs:
           [[ "$(git hash-object .github/scripts/tibia-official-client-re-xres-wire.py)" == ce5992bc1171eef9f24a71dfc97da728f18627a9 ]]
           python3 -m py_compile \
             .github/scripts/tibia-official-client-re-xres-wire.py \
-            .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch.py
+            .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch.py \
+            .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch-v2.py
           tmp="$(mktemp -d)"
           trap 'rm -rf -- "$tmp"' EXIT
           harness="$tmp/harness.yml"
@@ -54,7 +56,7 @@ jobs:
           [[ "$(git hash-object "$t2")" == b9d15f8d1131339b06bfa9cb1e81940c2163a283 ]]
           python3 -m py_compile "$t1" "$t2"
           python3 "$t2" "$harness" "$base_script"
-          python3 .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch.py "$base_script" "$final_script"
+          python3 .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch-v2.py "$base_script" "$final_script"
           bash -n "$final_script"
           python3 - "$final_script" <<'PY'
           from pathlib import Path
@@ -143,7 +145,7 @@ jobs:
           [[ "$(git hash-object "$t1")" == d663a40c446983c7359265bf834113ba49e6a5d1 ]]
           [[ "$(git hash-object "$t2")" == b9d15f8d1131339b06bfa9cb1e81940c2163a283 ]]
           python3 "$t2" "$harness" "$base_script"
-          python3 .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch.py "$base_script" "$final_script"
+          python3 .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch-v2.py "$base_script" "$final_script"
           bash -n "$final_script"
           mkdir -p artifacts/xres-raw-pid
           set +e

@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file fixed QIODevice provenance bytes
+    name: Stage exact-file TCP-to-writer bridge bytes
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -27,18 +27,17 @@ jobs:
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     outputs:
-      bundle_b64: ${{ steps.stage.outputs.bundle_b64 }}
-      bundle_sha256: ${{ steps.stage.outputs.bundle_sha256 }}
+      bridge_hex: ${{ steps.stage.outputs.bridge_hex }}
+      bridge_sha256: ${{ steps.stage.outputs.bridge_sha256 }}
     steps:
       - id: stage
-        name: Exact-fence and copy fixed caller/table evidence
+        name: Exact-fence and copy one bridge window
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 61
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 62
-          [[ "$RUNNER_OS" == Linux && "$RUNNER_ARCH" == X64 ]] || exit 63
-          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 64
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 63
           candidates=(
             '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
             '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
@@ -58,69 +57,48 @@ jobs:
           done
           [[ -n "$source_client" ]] || exit 50
           python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
-          import base64,hashlib,json,struct,sys
+          import hashlib,struct,sys
           from pathlib import Path
-          p=Path(sys.argv[1]); out=Path(sys.argv[2])
+          p=Path(sys.argv[1]); out=Path(sys.argv[2]); start=0xb4ae90; end=0xb4b290
           with p.open('rb') as f:
               ident=f.read(16); rest=f.read(48)
               if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(51)
               fs=struct.unpack('<HHIQQQIHHHHHH',rest); phoff,phentsize,phnum=fs[4],fs[8],fs[9]
-              seg=[]
+              data=None
               for i in range(phnum):
                   f.seek(phoff+i*phentsize); r=f.read(56)
                   t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
-                  if t==1 and sz: seg.append((va,sz,off,flags))
-          def readva(va,n):
-              for base,sz,off,flags in seg:
-                  if base<=va and va+n<=base+sz:
-                      with p.open('rb') as f: f.seek(off+va-base); d=f.read(n)
-                      return d,flags
-              raise ValueError(hex(va))
-          def win(start,end,need_exec=False):
-              d,flags=readva(start,end-start)
-              if need_exec and not(flags&1): raise SystemExit(52)
-              return {'start':start,'end':end,'sha256':hashlib.sha256(d).hexdigest(),'hex':d.hex()}
-          ap=0x3084b38
-          header=win(ap-0x20,ap+0xe0)
-          ti=struct.unpack('<Q',readva(ap-8,8)[0])[0]
-          tiwin=win(ti,ti+0x40)
-          nameptr=struct.unpack('<Q',readva(ti+8,8)[0])[0]
-          raw,_=readva(nameptr,0x100); nul=raw.find(b'\0'); name=raw if nul<0 else raw[:nul+1]
-          bundle={
-            'schema':'track-a-p2-4dd250-fixed-provenance-v2',
-            'exact_client':{'version':'15.32.df7b29','size':51965216,'sha256':'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'},
-            'runtime_access':'none','source_disassembly':False,'source_semantic_classification':False,
-            'client_process_accessed':False,'process_memory_accessed':False,'client_executed':False,'raw_client_uploaded':False,
-            'caller1_extended':win(0x196fc00,0x1970290,True),
-            'caller2_extended':win(0x19702c0,0x1970610,True),
-            'known_ap':ap,'known_ap_header':header,'known_ap_typeinfo':ti,'known_ap_typeinfo_window':tiwin,
-            'known_ap_name_pointer':nameptr,'known_ap_name_hex':name.hex(),'known_ap_name_sha256':hashlib.sha256(name).hexdigest()
-          }
-          raw=json.dumps(bundle,separators=(',',':')).encode(); enc=base64.b64encode(raw).decode(); dig=hashlib.sha256(raw).hexdigest()
-          if len(enc)>700000: raise SystemExit(53)
-          with out.open('a') as f: f.write(f'bundle_b64={enc}\nbundle_sha256={dig}\n')
-          print('P2_4DD250_FIXED_SOURCE=PASS')
-          print(f'P2_4DD250_KNOWN_AP=0x{ap:x}')
-          print(f'P2_4DD250_KNOWN_AP_TYPEINFO=0x{ti:x}')
-          print(f'P2_4DD250_KNOWN_AP_NAME_PTR=0x{nameptr:x}')
-          print(f'P2_4DD250_KNOWN_AP_NAME_HEX={name.hex()}')
+                  if t==1 and (flags&1) and va<=start and end<=va+sz:
+                      f.seek(off+start-va); data=f.read(end-start); break
+          if data is None or len(data)!=end-start: raise SystemExit(52)
+          dig=hashlib.sha256(data).hexdigest()
+          with out.open('a') as f: f.write(f'bridge_hex={data.hex()}\nbridge_sha256={dig}\n')
+          print('P2_4DD250_BRIDGE_SOURCE=PASS')
+          print('P2_4DD250_CLIENT_VERSION=15.32.df7b29')
+          print('P2_4DD250_CLIENT_SIZE=51965216')
+          print('P2_4DD250_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
+          print(f'P2_4DD250_BRIDGE_WINDOW=0x{start:x}..0x{end:x}')
+          print(f'P2_4DD250_BRIDGE_SHA256={dig}')
           print('P2_4DD250_RUNTIME_ACCESS=none')
           print('P2_4DD250_SOURCE_DISASSEMBLY=false')
           print('P2_4DD250_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('P2_4DD250_CLIENT_PROCESS_ACCESSED=false')
+          print('P2_4DD250_PROCESS_MEMORY_ACCESSED=false')
+          print('P2_4DD250_RAW_CLIENT_UPLOADED=false')
           PY
 
   hosted-validate:
-    name: Decode fixed QIODevice provenance on GitHub-hosted Linux
+    name: Decode TCP-to-writer bridge on GitHub-hosted Linux
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-4dd250-qiodevice-provenance
-      BUNDLE_B64: ${{ needs.source-sanitize.outputs.bundle_b64 }}
-      BUNDLE_SHA256: ${{ needs.source-sanitize.outputs.bundle_sha256 }}
+      BRIDGE_HEX: ${{ needs.source-sanitize.outputs.bridge_hex }}
+      BRIDGE_SHA256: ${{ needs.source-sanitize.outputs.bridge_sha256 }}
     steps:
-      - name: Verify and decode fixed evidence
+      - name: Verify and disassemble exact bridge
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -128,23 +106,21 @@ jobs:
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
           [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 73
           python3 - <<'PY'
-          import base64,hashlib,json,os,subprocess,tempfile
+          import hashlib,os,subprocess,tempfile
           from pathlib import Path
-          raw=base64.b64decode(os.environ['BUNDLE_B64'])
-          if hashlib.sha256(raw).hexdigest()!=os.environ['BUNDLE_SHA256']: raise SystemExit(74)
-          b=json.loads(raw); e=b['exact_client']
-          if e['sha256']!='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe' or b['runtime_access']!='none': raise SystemExit(75)
-          def dis(label,w):
-              d=bytes.fromhex(w['hex'])
-              if hashlib.sha256(d).hexdigest()!=w['sha256']: raise SystemExit(76)
-              with tempfile.TemporaryDirectory() as td:
-                  p=Path(td)/'x.bin';p.write_bytes(d)
-                  return subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f"--adjust-vma=0x{w['start']:x}",str(p)],check=True,text=True,stdout=subprocess.PIPE).stdout
-          name=bytes.fromhex(b['known_ap_name_hex']).rstrip(b'\0').decode('ascii','replace')
-          print('P2_4DD250_FIXED_HOSTED=PASS')
-          print(f"P2_4DD250_KNOWN_AP=0x{b['known_ap']:x}")
-          print(f"P2_4DD250_KNOWN_AP_TYPEINFO=0x{b['known_ap_typeinfo']:x}")
-          print(f'P2_4DD250_KNOWN_AP_RTTI_NAME={name}')
-          print('P2_4DD250_CALLER1_EXT_BEGIN');print(dis('c1',b['caller1_extended']),end='');print('P2_4DD250_CALLER1_EXT_END')
-          print('P2_4DD250_CALLER2_EXT_BEGIN');print(dis('c2',b['caller2_extended']),end='');print('P2_4DD250_CALLER2_EXT_END')
+          start=0xb4ae90; end=0xb4b290; d=bytes.fromhex(os.environ['BRIDGE_HEX'])
+          if len(d)!=end-start or hashlib.sha256(d).hexdigest()!=os.environ['BRIDGE_SHA256']: raise SystemExit(74)
+          with tempfile.TemporaryDirectory() as td:
+              p=Path(td)/'bridge.bin';p.write_bytes(d)
+              text=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE).stdout
+          required=['b4aece:','b4aee1:','b4b1ee:','b4b1f2:','b4b1f6:','b4b230:','b4b253:','b4b26f:','b4b273:']
+          for x in required:
+              if x not in text: raise SystemExit('P2_4DD250_FAIL=anchor_'+x)
+          print('P2_4DD250_BRIDGE_HOSTED=PASS')
+          print('P2_4DD250_CLIENT_VERSION=15.32.df7b29')
+          print('P2_4DD250_CLIENT_SIZE=51965216')
+          print('P2_4DD250_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
+          print('P2_4DD250_EXECUTION_CLASS=github_hosted')
+          print('P2_4DD250_RUNTIME_ACCESS=none')
+          print('P2_4DD250_BRIDGE_DISASSEMBLY_BEGIN');print(text,end='');print('P2_4DD250_BRIDGE_DISASSEMBLY_END')
           PY

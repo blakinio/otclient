@@ -24,7 +24,7 @@
       "job": 95410901806,
       "window": "0xf50040..0xf50480",
       "sha256": "1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea",
-      "role": "exact f50090 field-to-QDataStream write order"
+      "role": "exact 0xf50090 field-to-writer ordering"
     },
     {
       "run": 31904696996,
@@ -43,17 +43,23 @@
     {
       "artifact": 9251725866,
       "sha256": "f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e",
-      "role": "accepted TIODeviceWriter/QDataStream helper identity and byte-order configuration support"
+      "role": "accepted TIODeviceWriter/QDataStream helper identity"
+    },
+    {
+      "canonical_path": "docs/agents/evidence/OTC-20260817-track-a-p2-qtcpsocket-boundary-promotion/result.json",
+      "blob_sha": "8a489244f59d3f4a7f5bb753629b85b5a47b10da",
+      "role": "current-main canonical dynamic writer/QTcpSocket provenance and stage order"
     }
   ],
   "proven_facts": [
-    "Current main PR #492 canonically proves the same outbound QByteArray/message reaches TGameserverTCPConnection::write at 0xb40a10 and then QDataStream::writeRawData at 0x4dd250 on a concrete TGameserverTCPConnection-owned QTcpSocket.",
-    "At 0xf50090 the canonical message is retained in rbp and its QByteArray size is loaded from message+0x18.",
-    "Before the raw payload write, 0xf500c6..0xf500f7 computes ceil(payload_length/8) for nonnegative payload lengths, forwards its low 16-bit value through the writer scalar slot, and writes it to the same underlying QDataStream.",
-    "Next, 0xf50107..0xf50121 loads a 32-bit scalar from message+0 and writes it through the next writer scalar slot to the same underlying QDataStream.",
-    "Only after those two scalar writes, 0xf5013d..0xf50153 forwards the payload pointer and payload length preserved from message+0x8/+0x18 into QDataStream::writeRawData at 0x4dd250.",
+    "Current main PR #492 canonically proves the post-RawDataProcessor same message reaches TGameserverDualConnection+0x78, TGameserverNetworkPacketConnection, TGameserverNetworkPacketProcessor, receiver vtable AP 0x2f741d8 slot +0x10, exact target 0xf50090, TIODeviceWriter AP 0x2f69d48, and a QDataStream bound to the TGameserverTCPConnection-owned QTcpSocket before QDataStream::writeRawData at 0x4dd250.",
+    "At 0xf50090 the canonical message is retained in rbp and its payload length is loaded from message+0x18.",
+    "Before the raw payload operation, 0xf500c6..0xf500f7 computes ceil(payload_length/8) for nonnegative payload lengths and forwards its low 16-bit value through a TIODeviceWriter scalar operation.",
+    "Next, 0xf50107..0xf50121 loads a 32-bit scalar from message+0 and forwards it through the next TIODeviceWriter scalar operation.",
+    "Only after those two scalar operations, 0xf5013d..0xf50153 forwards the payload pointer and payload length preserved from message+0x8/+0x18 into QDataStream::writeRawData at 0x4dd250.",
+    "Current-main PR #492 proves the dynamic writer is TIODeviceWriter and its underlying QDataStream is bound to the concrete TGameserverTCPConnection-owned QTcpSocket, so the ordered scalar-before-raw operations belong to the same outbound QTcpSocket-bound serialization path.",
     "The exact RawDataProcessor at 0xb47130 prepends one byte, appends bytes until the QByteArray length is divisible by 8, stores the number of appended bytes in the first byte, and assigns the transformed QByteArray back to the same message.",
-    "The existence and order of two deterministic pre-payload scalar writes on the already-proven QTcpSocket-bound QDataStream is sufficient to prove an outbound framing layer at this boundary without assigning semantic names to those scalars."
+    "The deterministic ordered pre-payload scalar fields on the already-proven QTcpSocket-bound writer path are sufficient to classify outbound framing as PROVEN without assigning a semantic name to either scalar."
   ],
   "terminal_classification": {
     "dualconnection_to_binary_egress": "PROVEN",
@@ -69,23 +75,26 @@
     "persistent QBuffer",
     "TProtocolClientMessageProcessor+0x10@0xc2df80",
     "TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
-    "same QByteArray/message after block-alignment envelope transform",
-    "TGameserverDualConnection +0x80/+0x78 same-message handoff",
-    "first virtual +0x30 dispatch @0xb56c93",
-    "TConnectionMultiplexer::write@0xf50040",
-    "second virtual +0x30 serialization dispatch @0xf50090",
-    "pre-payload scalar derived from ceil(payload_length/8), low 16-bit value",
-    "32-bit scalar loaded from message+0",
-    "raw payload",
-    "TGameserverTCPConnection::write@0xb40a10 / QTcpSocket-bound QDataStream",
+    "same QByteArray/message after proven 8-byte-alignment envelope transform",
+    "TGameserverDualConnection+0x78@0xb56970",
+    "TGameserverNetworkPacketConnection",
+    "TGameserverNetworkPacketProcessor",
+    "receiver_vtable_AP_0x2f741d8_plus_0x10",
+    "0xf50090 structured message field decomposition",
+    "scalar A source low16(ceil(payload_length/8))",
+    "scalar B source DWORD(message+0), semantics UNKNOWN",
+    "raw payload pointer/length",
+    "TIODeviceWriter_AP_0x2f69d48",
+    "QDataStream_bound_to_TGameserverTCPConnection_QTcpSocket",
     "QDataStream::writeRawData@0x4dd250",
+    "Qt/QTcpSocket-bound binary boundary",
     "Linux socket syscall UNKNOWN"
   ],
   "rejected_or_controlled_candidates": [
     {
       "candidate": "0xb40630/0xb4066b",
       "classification": "DISPROVEN_AS_DUALCONNECTION_EGRESS",
-      "reason": "Current canonical vtable/dataflow path reaches 0xf50090 and 0xb40a10 instead; 0xb4066b remains a real QIODevice::write call inside a distinct function but not this DualConnection egress branch."
+      "reason": "Current canonical vtable/dataflow resolves the DualConnection branch through the NetworkPacketConnection/Processor chain to receiver slot target 0xf50090; 0xb4066b remains a real QIODevice::write call inside distinct function 0xb40630 but not this branch."
     },
     {
       "candidate": "0xb46bd0",
@@ -105,6 +114,7 @@
   ],
   "unknowns": [
     "semantic identity of the 32-bit message+0 scalar; it is not called a sequence number",
+    "exact scalar operator semantic names and encoded byte order are not promoted by this task",
     "semantic identity of the helper whose returned byte is appended by RawDataProcessor padding",
     "semantic identity of the optional post-padding indirect transform in RawDataProcessor",
     "compression semantics",

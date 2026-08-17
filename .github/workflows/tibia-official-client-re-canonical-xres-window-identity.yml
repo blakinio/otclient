@@ -5,9 +5,9 @@ on:
     branches: [main]
     paths:
       - .github/scripts/tibia-official-client-re-xres-window-owner.py
-      - .github/scripts/test_tibia_official_client_re_xres_window_owner.py
+      - .github/scripts/test_tibia_official_client_re-xres-window-owner.py
       - .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py
-      - .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
+      - .github/scripts/test_tibia_official_client_re-canonical-xres-worker-adapter.py
       - .github/scripts/tibia-official-client-re-xres-wire.py
       - .github/scripts/tibia-official-client-re-canonical-live-session.sh
       - .github/scripts/tibia-official-client-re-canonical-live-transition.py
@@ -40,7 +40,7 @@ jobs:
             .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py \
             .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
           python3 .github/scripts/test_tibia_official_client_re_xres_window_owner.py
-          python3 .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical-xres-worker-adapter.py
           python3 .github/scripts/test_tibia_official_client_re_xres_wire.py
 
       - name: Validate generated canonical worker against current source
@@ -55,7 +55,10 @@ jobs:
             --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
           bash -n "$generated"
           test -x "$generated"
-          ! grep -F 'search --onlyvisible --pid' "$generated"
+          if grep -F 'search --onlyvisible --pid' "$generated"; then
+            echo 'legacy xdotool PID/name selector remains' >&2
+            exit 1
+          fi
           grep -F 'tibia-official-client-re-xres-window-owner.py' "$generated"
           grep -F -- '--wire-helper' "$generated"
 
@@ -70,7 +73,10 @@ jobs:
         run: |
           set -Eeuo pipefail
           test "${RUNNER_NAME}" != synology-otclient-01
-          ! grep -R -E 'TIBIA_TEST_(EMAIL|PASSWORD)|runtime-registration\.json' \
+          if grep -R -E 'TIBIA_TEST_(EMAIL|PASSWORD)|runtime-registration\.json' \
             .github/scripts/tibia-official-client-re-xres-window-owner.py \
-            .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py
+            .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py; then
+            echo 'hosted-only integration contains a forbidden runtime reference' >&2
+            exit 1
+          fi
           printf 'TRACK_A_CANONICAL_XRES_HOSTED_ONLY=PASS\n'

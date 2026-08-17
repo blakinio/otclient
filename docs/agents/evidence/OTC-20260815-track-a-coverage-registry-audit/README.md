@@ -1,38 +1,41 @@
 # Track A canonical coverage registry
 
-This directory is the canonical machine-readable Track A coverage registry once the integration tree containing it is on `main`.
+This directory is the canonical machine-readable Track A coverage registry. The immutable quantitative baseline comes from closed Draft PR #304 at exact head `43a60bd96cc644b656b200c9edbfb75578b330b6`, coordinator-disposed `ACCEPT_WITH_EDITS` as bounded inventory/provenance evidence only, exact-client fenced to official native Linux Tibia `15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
 
-## Authority boundary
-
-The quantitative baseline comes from closed source Draft PR #304 at exact head `43a60bd96cc644b656b200c9edbfb75578b330b6`, previously coordinator-disposed `ACCEPT_WITH_EDITS` as **bounded inventory/provenance evidence only**. The baseline is exact-client fenced to official native Linux Tibia `15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
-
-The canonical registry deliberately has two layers:
+The registry has three layers:
 
 1. **immutable accepted baseline** — exact #304 blobs for inventories, selected subsets, provenance and supersessions;
-2. **current-main overlay** — current programme dispositions that may advance independently of the historical inventory source.
+2. **finite denominator registries** — one canonical row for every currently normalized protocol, Tibia-owned QMeta, P0 item and P1 item;
+3. **current-main overlay** — programme dispositions that may advance independently of the historical baseline.
 
-Never rewrite historical baseline records to make them look current. Read `canonical-manifest.json` and `current-main-overlay.json` together.
+Never rewrite baseline records to make them look current. A complete denominator is not semantic completion.
 
 ## Canonical machine-readable entry points
 
-- `capabilities.jsonl` — 16 top-level P0 requirement-group records; this is not an item-level live-read denominator.
-- `protocol_messages.jsonl` — exact 349-name generated-message inventory, 189 server→client + 160 client→server.
-- `runtime_types.jsonl` — bounded 47-handler QMeta/runtime inventory; this is not the full Tibia-owned runtime-type denominator.
-- `provenance.json` — accepted source/run/job/head provenance.
-- `supersessions.jsonl` — retained `DISPROVEN/SUPERSEDED` and scope-`UNKNOWN` evidence.
-- `bridge_fields.jsonl`, `protocol_direct_qmeta_cases.json`, `gameaction_connects.json`, `legacy_qobject_connect_edges.json` — supporting bounded selected-set evidence.
-- `coverage-summary.json` — current canonical coverage boundary, not a semantic-completion score.
-- `current-main-overlay.json` — live programme-state overlay for this registry generation.
-- `canonical-manifest.json` — source-fence and exact Git-blob map.
-- `validate_registry.py` — deterministic baseline and overlay validator.
+- `protocol_messages.jsonl` — exact generated-message inventory: 349 identifiers = 189 server→client + 160 client→server.
+- `protocol_message_semantics.jsonl` — E51 denominator: 349/349 identifiers, deterministic lexical family label plus explicit semantic state. Current semantic support remains `UNKNOWN/349`; lexical grouping is not semantic proof.
+- `runtime_type_semantics.jsonl` — E52 denominator: 642/642 unique `tibia::` QMeta records from exact retained run `31790507112`, job `94736106350`; semantic role remains `UNKNOWN/642`. The historical 47 handler records are a bounded subset of this denominator.
+- `p0_items.jsonl` — normalized P0 denominator: 180 individual read/state/action requirements grouped under the 16 normative programme headings. The 16 headings are grouping only.
+- `p1_items.jsonl` — normalized P1 denominator: 28 bridge/read/evidence requirements. The seven profile discovery targets are an implementation subset, not the global denominator.
+- `capabilities.jsonl`, `runtime_types.jsonl`, `bridge_fields.jsonl`, `protocol_direct_qmeta_cases.json`, `gameaction_connects.json`, `legacy_qobject_connect_edges.json` — preserved historical/bounded evidence.
+- `provenance.json`, `supersessions.jsonl` — accepted source provenance and retained `DISPROVEN/SUPERSEDED` / `UNKNOWN` evidence.
+- `coverage-summary.json` — current quantitative boundary.
+- `current-main-overlay.json` — current programme-state overlay.
+- `canonical-manifest.json` — immutable source-fence and Git-blob map.
+- `validate_registry.py` — deterministic baseline, denominator and overlay validator.
 
-Exact historical source files whose wording became stale are retained with `source-` prefixes. They are provenance artifacts, not current programme instructions.
+## Current normalized denominator boundary
 
-## Nonclaims
+| Surface | Complete denominator | Semantic numerator |
+|---|---:|---:|
+| generated protocol messages | 349 / 349 | UNKNOWN / 349 |
+| full retained `tibia::` QMeta | 642 / 642 | UNKNOWN / 642 |
+| P0 individual requirements | 180 / 180 | UNKNOWN / 180 |
+| P1 individual requirements | 28 / 28 | UNKNOWN / 28 |
 
-`349/349`, `47/47`, `2184/2184`, `16/16`, `7/7`, `40/41` and `29/31` retain their original bounded meanings. They do **not** establish global protocol semantics, full QMeta/runtime semantics, P0/P1 item-level completion, canonical live runtime authority, restart/relogin stability, or Track A completion.
+`100%` in the denominator column means every denominator member is represented. It does **not** mean support, correctness, live authority or restart stability is proven.
 
-E51, E52, normalized P0/P1 denominators, the `612` vs historical `1004` action/QMeta denominator conflict, and physical runtime semantic/restart proof remain separate work.
+The separate `612` versus historical `1004` action/QMeta definition conflict, current canonical live semantics, restart/relogin proof and stale global coordinator checkpoint remain unresolved programme work.
 
 ## Validation
 

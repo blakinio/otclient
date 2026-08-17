@@ -1,0 +1,39 @@
+{
+  "boundaries": {
+    "denominator_complete_is_not_semantic_complete": true,
+    "runtime_used": false,
+    "unknown_retained": true
+  },
+  "e51": {
+    "denominator": 349,
+    "semantic_proven": 0,
+    "unknown": 349
+  },
+  "e52": {
+    "denominator": 642,
+    "retained_summary": {
+      "TRACK_A_QMETA_NON_TIBIA_COUNT": 66,
+      "TRACK_A_QMETA_STRUCTURAL_RECORD_COUNT": 708,
+      "TRACK_A_QMETA_TIBIA_OWNED_COUNT": 642,
+      "TRACK_A_QMETA_TIBIA_UNCLASSIFIED_COUNT": 0
+    },
+    "semantic_proven": 0,
+    "source_job": 94736106350,
+    "source_run": 31790507112,
+    "unknown": 642
+  },
+  "exact_client": {
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "size": 51965216,
+    "version": "15.32.df7b29"
+  },
+  "p0": {
+    "denominator": 180,
+    "groups": 16
+  },
+  "p1": {
+    "denominator": 28,
+    "historical_discovery_targets": 7
+  },
+  "schema": "otclient.tibia-re.semantic-denominators.v1"
+}

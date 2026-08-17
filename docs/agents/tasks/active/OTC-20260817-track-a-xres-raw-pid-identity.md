@@ -1,0 +1,93 @@
+---
+task_id: OTC-20260817-track-a-xres-raw-pid-identity
+status: implementing
+agent: ChatGPT
+session_id: chatgpt-xres-raw-pid-identity-20260817
+session_role: runtime_discriminator
+project_lane: otclient
+lane: RUNTIME
+track_id: official-client-re
+task_kind: runtime_discriminator
+phase: implement
+branch: diag/OTC-20260817-track-a-xres-raw-pid-identity-physical-authorized-v1
+base_branch: main
+base_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
+risk: high
+updated: 2026-08-17T10:59:00+02:00
+policy_version: 2
+prompting_standard_version: 2.1
+execution_mode: github-only
+execution_class: synology_physical_runtime
+runner: synology-otclient-01
+routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
+run_scope: autonomous_program
+continuation_policy: continue_until_real_stop
+task_completion_policy: finalize_archive_and_continue
+user_communication: low_noise
+runtime_access: ephemeral_isolated
+runtime_owner_task: OTC-20260817-track-a-xres-raw-pid-identity
+runtime_namespace: task_owned_ephemeral_generated_by_fenced_post_rhi_harness
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: REQUIRED_TO_PROVE_IN_JOB
+mutation_authorized: true
+client_byte_mutation_authorized: false
+persistent_session_role: none
+physical_e2e_required: true
+owner_funded_ai_api_authorized: false
+owner_authorization_basis: current owner invocation 2026-08-17 requesting completion of the full follow-on task after the mutation-design closeout
+exact_client:
+  version: 15.32.df7b29
+  size: 51965216
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  platform: official_native_linux_only
+prerequisites:
+  raw_xres_helper_pr: 448
+  raw_xres_helper_merge: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
+  raw_xres_helper_path: .github/scripts/tibia-official-client-re-xres-wire.py
+  prior_physical_discriminator: 31973388722
+  prior_result: XRES_IDENTITY_UNRESOLVED_HELPER_UNAVAILABLE
+owned_paths:
+  - docs/agents/tasks/active/OTC-20260817-track-a-xres-raw-pid-identity.md
+  - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/**
+  - .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch.py
+  - .github/workflows/tibia-official-client-re-xres-raw-pid-identity.yml
+modules_touched:
+  - track-a-xres-runtime-discriminator
+safety:
+  canonical_state_access: forbidden
+  credentials_allowed: false
+  login_allowed: false
+  gameplay_allowed: false
+  process_memory_access: false
+  client_byte_mutation: false
+  exact_client_launch_limit: 1
+  track_b_access: false
+  broad_process_cleanup: forbidden
+acceptance:
+  - fresh base-main and branch authorization fence passes immediately before physical execution
+  - Track A runtime governance check passes on the exact PR head/base
+  - immutable same-repository historical post-RHI harness and transforms pass exact blob fences
+  - exactly one task-owned isolated exact fenced official Linux client is launched
+  - raw non-root full-display VIEWABLE X11 resource is rediscovered in this run
+  - promoted transport-free XRes codec is used for QueryVersion and one-spec QueryClientIds(LocalClientPid)
+  - QueryExtension is obtained from the same fresh XCB connection without libxcb-res/libXRes dependency
+  - at least one VIEWABLE 1920x1080 XID directly returns the exact launched client PID
+  - task-owned process/display state is cleaned completely
+  - no canonical registration/lease/state, credentials, login or gameplay is touched
+  - exact-head repository/governance CI passes before promotion/closeout
+classification:
+  desired: XRES_PROVES_VIEWABLE_WINDOW_OWNED_BY_EXACT_CLIENT
+  failure_is_evidence: true
+last_completed_step: raw XRes codec promotion #448 merged to trusted main and source #447 is terminally closed superseded
+next_action: add a bounded raw-XRes runtime transport patcher and one-shot physical workflow, open the Draft PR, and execute exactly one isolated discriminator if all fresh admission/base gates pass.
+---
+
+# Raw XRes PID identity discriminator
+
+This child task performs the one physical discriminator unlocked by merged #448. It does not relax canonical window identity and does not perform login/gameplay. It reuses the previously proven isolated post-RHI launch harness but replaces the unavailable convenience `libxcb-res` path with the promoted pure XRes wire codec plus a minimal task-local transport over a fresh XCB connection.

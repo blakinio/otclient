@@ -58,24 +58,29 @@ wait_character_request() {
   return 1
 }
 
-# Attempt 1: native character-selection state normally owns the current/default
-# selection. Return is the least invasive activation and is accepted only when
-# requestCharacterLogin(TCharacter) fires.
 xdo windowactivate --sync "$UI_WIN" 2>/dev/null || true
 xdo windowfocus --sync "$UI_WIN"
-xdo key --window "$UI_WIN" --clearmodifiers Return
-if wait_character_request; then
-  echo 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_METHOD=RETURN_ON_NATIVE_CHARACTER_SELECTION'
+
+# If the native state machine has already auto-requested a character, do not
+# send a second activation. Otherwise use only bounded keyboard/list semantics.
+if character_request_seen; then
+  echo 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_METHOD=AUTO_NATIVE_REQUEST'
 else
-  # Attempt 2: use only list-navigation semantics. Prove that Down changes a
-  # localized region after subtracting temporal XWD noise before Return is sent.
-  K0="$ROOT/char-key-idle0.xwd"; K1="$ROOT/char-key-idle1.xwd"; KB="$ROOT/char-key-before.xwd"; KA="$ROOT/char-key-after.xwd"
-  capture_xwd "$K0"; sleep .20; capture_xwd "$K1"; sleep .20; capture_xwd "$KB"
-  xdo key --window "$UI_WIN" --clearmodifiers Down
-  sleep .30
-  capture_xwd "$KA"
-  set +e
-  KEY_OUT="$(python3 - "$COMPARE" "$K0" "$K1" "$KB" "$KA" <<'PY'
+  # Attempt 1: Return on the native character-selection state. Acceptance is
+  # exclusively the requestCharacterLogin(TCharacter) breakpoint.
+  xdo key --window "$UI_WIN" --clearmodifiers Return
+  if wait_character_request; then
+    echo 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_METHOD=RETURN_ON_NATIVE_CHARACTER_SELECTION'
+  else
+    # Attempt 2: use list navigation. Prove Down changes a localized region
+    # after temporal XWD-noise subtraction before Return is sent.
+    K0="$ROOT/char-key-idle0.xwd"; K1="$ROOT/char-key-idle1.xwd"; KB="$ROOT/char-key-before.xwd"; KA="$ROOT/char-key-after.xwd"
+    capture_xwd "$K0"; sleep .20; capture_xwd "$K1"; sleep .20; capture_xwd "$KB"
+    xdo key --window "$UI_WIN" --clearmodifiers Down
+    sleep .30
+    capture_xwd "$KA"
+    set +e
+    KEY_OUT="$(python3 - "$COMPARE" "$K0" "$K1" "$KB" "$KA" <<'PY'
 import importlib.util,sys
 from pathlib import Path
 compare,i0,i1,before,after=sys.argv[1:]
@@ -95,14 +100,15 @@ print('WORLDMAP_V7_KEYBOARD_SELECTION_CHANGE='+('PASS' if passed else 'FAIL'))
 raise SystemExit(0 if passed else 3)
 PY
 )"
-  KEY_RC=$?
-  set -e
-  rm -f "$K0" "$K1" "$KB" "$KA"
-  printf '%s\n' "$KEY_OUT"
-  if [[ "$KEY_RC" -eq 0 ]]; then
-    xdo key --window "$UI_WIN" --clearmodifiers Return
-    if wait_character_request; then
-      echo 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_METHOD=DOWN_LOCAL_CHANGE_THEN_RETURN'
+    KEY_RC=$?
+    set -e
+    rm -f "$K0" "$K1" "$KB" "$KA"
+    printf '%s\n' "$KEY_OUT"
+    if [[ "$KEY_RC" -eq 0 ]]; then
+      xdo key --window "$UI_WIN" --clearmodifiers Return
+      if wait_character_request; then
+        echo 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_METHOD=DOWN_LOCAL_CHANGE_THEN_RETURN'
+      fi
     fi
   fi
 fi

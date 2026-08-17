@@ -7,6 +7,38 @@ from pathlib import Path
 START = "# V10 pre-secret locator:"
 END = "# Secrets enter this helper only through the already-created mode-0600 FIFO,\n"
 
+SOCK_OLD = r'''local_socks_count() {
+  ss -ntp 2>/dev/null | awk -v needle="pid=$PID," -v port="$WARP_PORT" '
+    index($0,needle) && ($5=="127.0.0.1:"port || $5=="[::1]:"port) {n++}
+    END {print n+0}'
+}
+'''
+
+SOCK_NEW = r'''local_socks_count() {
+  python3 - "$PID" "$WARP_PORT" <<'PY'
+from pathlib import Path
+import os,sys
+pid=int(sys.argv[1]); port=int(sys.argv[2]); inodes=set()
+for fd in (Path('/proc')/str(pid)/'fd').iterdir():
+    try: target=os.readlink(fd)
+    except OSError: continue
+    if target.startswith('socket:[') and target.endswith(']'):
+        inodes.add(target[8:-1])
+count=0
+for name in ('tcp','tcp6'):
+    p=Path('/proc/net')/name
+    if not p.exists(): continue
+    for line in p.read_text().splitlines()[1:]:
+        f=line.split()
+        if len(f)<10 or f[9] not in inodes or f[3] != '01': continue
+        try: remote_port=int(f[2].rsplit(':',1)[1],16)
+        except (ValueError,IndexError): continue
+        if remote_port == port: count += 1
+print(count)
+PY
+}
+'''
+
 REPLACEMENT = r'''# V13: v10 already physically proved the Login control on this exact
 # official client / 1920x1080 / manifest-owned XID topology. Requiring its
 # pressed-state animation on every launch is flaky and is not one of the
@@ -48,6 +80,10 @@ def transform(text: str) -> str:
     end += len(END)
     out = text[:start] + REPLACEMENT + text[end:]
 
+    if out.count(SOCK_OLD) != 1:
+        raise TransformRefused(f"SOCK_OLD_COUNT:{out.count(SOCK_OLD)}")
+    out = out.replace(SOCK_OLD, SOCK_NEW, 1)
+
     required = (
         "WORLDMAP_BASELINE_EMAIL_FIELD_EDITABLE=PASS",
         "WORLDMAP_BASELINE_PASSWORD_FIELD_EDITABLE=PASS",
@@ -60,6 +96,7 @@ def transform(text: str) -> str:
         "WORLDMAP_BASELINE_LOGIN_TRANSPORT_ACTIVITY=PASS",
         "WORLDMAP_BASELINE_POST_LOGIN_UI_TRANSITION=PASS",
         "WORLDMAP_BASELINE_STRUCTURAL_IN_GAME=PASS",
+        "Path('/proc/net')",
         'UI_WIN="$WIN"',
     )
     missing = [x for x in required if x not in out]
@@ -72,6 +109,7 @@ def transform(text: str) -> str:
         "WORLDMAP_V10_PRESECRET_LOGIN_BUTTON=PROVEN_PRESS_CANCEL",
         "mousedown --window",
         "mouseup --window",
+        "ss -ntp",
         '"$XWD" -root',
         "xwd -root",
         "xrandr --output",

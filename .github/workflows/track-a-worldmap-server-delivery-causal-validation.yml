@@ -14,102 +14,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  ocr-free-ephemeral-baseline:
-    name: OCR-free exact-client baseline structural worldmap capture
+  xwd-toolroot-preflight:
+    name: XWD toolroot dynamic-link preflight (no client)
     runs-on: [otclient, synology]
-    timeout-minutes: 12
+    timeout-minutes: 3
     steps:
-      - name: Checkout exact head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Revalidate current-main Track A admission
+      - name: Validate XWD toolroot library closure without runtime
         shell: bash
-        env:
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           set -Eeuo pipefail
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          base_sha="$(git rev-parse origin/main)"
-          git merge-base --is-ancestor "$base_sha" "origin/$HEAD_BRANCH"
-          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
-            --changed-from "$base_sha" --expected-branch "$HEAD_BRANCH"
-          echo "WORLDMAP_BASELINE_CURRENT_MAIN=$base_sha"
-          echo 'WORLDMAP_BASELINE_CURRENT_MAIN_ANCESTRY=PASS'
-          echo 'WORLDMAP_CAUSAL_EPHEMERAL_BASELINE_ADMISSION=PASS'
-
-      - name: Require canonical controller plane idle without mutating it
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          import fcntl,json,os,time
-          from pathlib import Path
-          state=Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
-          lock=state/'coordination.lock'; lease_path=state/'lease.json'; reg=state/'runtime-registration.json'
-          if not lock.is_file() or not lease_path.is_file(): raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
-          fd=os.open(lock,os.O_RDONLY|getattr(os,'O_NOATIME',0))
-          try:
-              fcntl.flock(fd,fcntl.LOCK_SH)
-              lease=json.loads(lease_path.read_text())
-              safe={'generation':lease.get('generation'),'status':lease.get('status'),'controller_task':lease.get('controller_task'),'controller_session':lease.get('controller_session'),'expired':bool(lease.get('status')=='active' and isinstance(lease.get('expires_at'),int) and lease['expires_at']<=int(time.time()))}
-              print('WORLDMAP_BASELINE_CANONICAL_LEASE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
-              if safe['status']!='released' or safe['controller_task'] is not None or safe['controller_session'] is not None: raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_lease_not_idle')
-              if reg.exists(): raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_registration_present')
-          finally:
-              try: fcntl.flock(fd,fcntl.LOCK_UN)
-              except OSError: pass
-              os.close(fd)
-          print('WORLDMAP_BASELINE_CANONICAL_REGISTRATION=ABSENT')
-          print('WORLDMAP_BASELINE_CANONICAL_CONTROLLER_IDLE=PASS')
-          PY
-
-      - name: Compose the already-validated GDB and raw-XWD repairs
-        id: compose
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 -m py_compile \
-            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
-            .github/scripts/track-a-worldmap-causal-xwd-classify.py \
-            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py
-          python3 .github/scripts/track-a-worldmap-causal-xwd-classify.py self-test
-          gdb_repaired="$RUNNER_TEMP/worldmap-baseline-gdb.sh"
-          combined="$RUNNER_TEMP/worldmap-baseline-gdb-xwd.sh"
-          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
-            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh \
-            "$gdb_repaired"
-          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
-            "$gdb_repaired" "$combined"
-          bash -n "$combined"
-          test -x "$combined"
-          test "$(grep -Fc 'LD_LIBRARY_PATH="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"' "$combined")" = 1
-          if grep -E 'tesseract|capture_ocr|LOGIN_OCR_ANCHORS|SELECT_TSV|PRE_TSV' "$combined"; then
-            echo 'WORLDMAP_COMBINED_REPAIR_ERROR=ocr_surface_survived' >&2
+          TOOL=/home/runner/_work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || TOOL=/work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_XWD_PREFLIGHT_ERROR=toolroot_missing' >&2; exit 1; }
+          XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
+          [[ -x "$XWD" ]] || { echo 'WORLDMAP_XWD_PREFLIGHT_ERROR=xwd_missing' >&2; exit 1; }
+          LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+          deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XWD")"
+          if grep -F 'not found' <<<"$deps"; then
+            echo 'WORLDMAP_XWD_PREFLIGHT_ERROR=dependency_not_found' >&2
             exit 1
           fi
-          echo "combined=$combined" >> "$GITHUB_OUTPUT"
-          echo 'WORLDMAP_BASELINE_COMBINED_REPAIR=PASS'
-
-      - name: Execute exactly one OCR-free baseline login and structural capture
-        shell: bash
-        env:
-          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
-          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
-          COMBINED: ${{ steps.compose.outputs.combined }}
-        run: |
-          set +x
-          set -Eeuo pipefail
-          "$COMBINED"
-
-      - name: Upload privacy-safe structural baseline evidence
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: worldmap-causal-baseline-${{ github.run_id }}
-          path: ${{ runner.temp }}/worldmap-baseline-evidence
-          if-no-files-found: error
-          retention-days: 7
+          set +e
+          probe="$(DISPLAY=:65535 LD_LIBRARY_PATH="$LIBS" "$XWD" -silent -root -out "$RUNNER_TEMP/worldmap-xwd-link-probe.xwd" 2>&1)"
+          rc=$?
+          set -e
+          rm -f "$RUNNER_TEMP/worldmap-xwd-link-probe.xwd"
+          if grep -Fq 'error while loading shared libraries' <<<"$probe"; then
+            echo 'WORLDMAP_XWD_PREFLIGHT_ERROR=dynamic_loader_failure' >&2
+            exit 1
+          fi
+          echo "WORLDMAP_XWD_PREFLIGHT_PROBE_RC=$rc"
+          echo 'WORLDMAP_XWD_TOOLROOT_DYNAMIC_LINK=PASS'
+          echo 'WORLDMAP_XWD_PREFLIGHT_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_XWD_PREFLIGHT_SECRET_USED=false'

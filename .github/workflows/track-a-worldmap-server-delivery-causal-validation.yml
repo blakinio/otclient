@@ -14,109 +14,72 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  normalized-xres-worker-static:
-    name: Normalized XRes worker binding diagnostic (no client)
-    runs-on: [otclient, synology]
-    timeout-minutes: 4
+  xres-geometry-census-static:
+    name: Raw-XRes geometry census transform (no client)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
-      - name: Checkout exact head without codeload action
-        shell: bash
-        env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -Eeuo pipefail
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          mkdir -p "$GITHUB_WORKSPACE"
-          cd "$GITHUB_WORKSPACE"
-          git init -q
-          git remote remove origin 2>/dev/null || true
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags --prune origin \
-            "+refs/heads/main:refs/remotes/origin/main" \
-            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
-          git cat-file -e "$HEAD_SHA^{commit}"
-          git checkout -q -f --detach "$HEAD_SHA"
-          git clean -ffdx
-          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
-          echo 'WORLDMAP_XRES_BINDING_CHECKOUT=PASS'
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
 
-      - name: Reproduce task-local worker composition without client or secrets
+      - name: Validate task-local geometry census selector
         shell: bash
         run: |
-          set +x
           set -Eeuo pipefail
-          ROOT="$RUNNER_TEMP/worldmap-xres-binding-static"
-          STAGE="$ROOT/stage-worker.sh"
-          WORKER="$ROOT/worker.sh"
-          OWNER="$ROOT/tibia-official-client-re-xres-window-owner.py"
-          mkdir -p "$ROOT"
-          chmod 700 "$ROOT"
-          cleanup() { rm -rf --one-file-system "$ROOT"; }
-          trap cleanup EXIT INT TERM
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-xres-geometry-census-repair.py \
+            .github/scripts/tibia-official-client-re-xres-window-owner.py
+          tmp="$RUNNER_TEMP/worldmap-xres-census-static"
+          mkdir -p "$tmp"
+          owner="$tmp/tibia-official-client-re-xres-window-owner.py"
+          python3 .github/scripts/track-a-worldmap-causal-xres-geometry-census-repair.py \
+            .github/scripts/tibia-official-client-re-xres-window-owner.py "$owner"
+          python3 -m py_compile "$owner"
 
-          python3 - "$STAGE" <<'PY'
-          from pathlib import Path
-          import sys
-          out=Path(sys.argv[1])
-          src=Path('.github/scripts/tibia-official-client-re-canonical-live-session.sh').read_text()
-          old='ROOT="$BASE/canonical-live-runtime"'
-          new='ROOT="$BASE/tasks/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/worldmap-xres-binding-static"'
-          if src.count(old)!=1: raise SystemExit('WORLDMAP_XRES_BINDING_ERROR=root_anchor')
-          src=src.replace(old,new,1)
-          oldmark='OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1'
-          newmark='OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-xres-binding-static'
-          if src.count(oldmark)<5: raise SystemExit('WORLDMAP_XRES_BINDING_ERROR=marker_anchor')
-          src=src.replace(oldmark,newmark)
-          oldscreen='-screen 0 1920x1080x24'
-          if src.count(oldscreen)!=1: raise SystemExit('WORLDMAP_XRES_BINDING_ERROR=screen_anchor')
-          src=src.replace(oldscreen,'-screen 0 1020x650x24',1)
-          out.write_text(src); out.chmod(0o700)
-          PY
-
-          python3 - "$OWNER" <<'PY'
-          from pathlib import Path
-          import sys
-          out=Path(sys.argv[1])
-          src=Path('.github/scripts/tibia-official-client-re-xres-window-owner.py').read_text()
-          for old,new in (('TARGET_WIDTH = 1920','TARGET_WIDTH = 1020'),('TARGET_HEIGHT = 1080','TARGET_HEIGHT = 650')):
-              if src.count(old)!=1: raise SystemExit('WORLDMAP_XRES_BINDING_ERROR=owner_anchor:'+old)
-              src=src.replace(old,new,1)
-          out.write_text(src); out.chmod(0o600)
-          PY
-
-          python3 .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py \
-            "$STAGE" "$WORKER" \
-            --owner-helper "$OWNER" \
-            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
-          bash -n "$WORKER"
-          grep -F -- '-screen 0 1020x650x24' "$WORKER" >/dev/null
-          ! grep -F -- '-screen 0 1920x1080x24' "$WORKER" >/dev/null
-
-          python3 - "$OWNER" <<'PY'
+          python3 - "$owner" <<'PY'
           import importlib.util,sys
           from pathlib import Path
           p=Path(sys.argv[1])
-          spec=importlib.util.spec_from_file_location('wm_owner_static',p)
-          m=importlib.util.module_from_spec(spec); sys.modules[spec.name]=m; spec.loader.exec_module(m)
-          print('WORLDMAP_XRES_BINDING_OWNER_WIDTH='+str(m.TARGET_WIDTH))
-          print('WORLDMAP_XRES_BINDING_OWNER_HEIGHT='+str(m.TARGET_HEIGHT))
-          if (m.TARGET_WIDTH,m.TARGET_HEIGHT)!=(1020,650): raise SystemExit('WORLDMAP_XRES_BINDING_ERROR=owner_constants')
+          spec=importlib.util.spec_from_file_location('wm_geometry_census_static',p)
+          m=importlib.util.module_from_spec(spec)
+          sys.modules[spec.name]=m
+          spec.loader.exec_module(m)
+          C=m.WindowCandidate
+
+          candidates=[C(0x10,300,200),C(0x20,1020,650),C(0x30,1800,1000)]
+          owners={0x10:77,0x20:77,0x30:88}
+          selected=m.select_owned_xid(candidates,77,lambda xid: owners.get(xid))
+          if selected != 0x20:
+              raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=largest_owned_selection')
+
+          if m.select_owned_xid(candidates,99,lambda xid: owners.get(xid)) is not None:
+              raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=foreign_pid_not_ignored')
+
+          tied=[C(0x40,1000,500),C(0x50,500,1000)]
+          try:
+              m.select_owned_xid(tied,77,lambda _xid:77)
+          except m.WindowOwnerError as exc:
+              if 'ambiguous' not in str(exc):
+                  raise
+          else:
+              raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=largest_area_tie_not_rejected')
+
+          text=p.read_text()
+          if 'and int(attr.width) == TARGET_WIDTH' in text or 'and int(attr.height) == TARGET_HEIGHT' in text:
+              raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=target_geometry_filter_survived')
+          for marker in (
+              'WORLDMAP_XRES_OWNED_VIEWABLE_COUNT=',
+              'WORLDMAP_XRES_OWNED_GEOMETRY=',
+              'WORLDMAP_XRES_SELECTED_GEOMETRY=',
+          ):
+              if marker not in text:
+                  raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=missing_marker:'+marker)
+          print('WORLDMAP_XRES_GEOMETRY_CENSUS_STATIC=PASS')
+          print('WORLDMAP_XRES_GEOMETRY_CENSUS_CLIENT_EXECUTED=false')
+          print('WORLDMAP_XRES_GEOMETRY_CENSUS_SECRET_USED=false')
           PY
 
-          owner_abs="$(readlink -f "$OWNER")"
-          grep -F -- "$owner_abs" "$WORKER" >/dev/null || {
-            echo 'WORLDMAP_XRES_BINDING_ERROR=normalized_owner_path_not_embedded' >&2
-            exit 1
-          }
-          if grep -F -- "$(readlink -f .github/scripts/tibia-official-client-re-xres-window-owner.py)" "$WORKER" >/dev/null; then
-            echo 'WORLDMAP_XRES_BINDING_ERROR=repository_owner_path_embedded' >&2
-            exit 1
-          fi
-          binding_line="$(grep -nF 'tibia-official-client-re-xres-window-owner.py' "$WORKER" | head -1 | cut -d: -f1)"
-          [[ "$binding_line" =~ ^[1-9][0-9]*$ ]]
-          echo "WORLDMAP_XRES_BINDING_WORKER_LINE=$binding_line"
-          echo 'WORLDMAP_XRES_BINDING_NORMALIZED_OWNER_EMBEDDED=PASS'
-          echo 'WORLDMAP_XRES_BINDING_NORMALIZED_SCREEN_EMBEDDED=PASS'
-          echo 'WORLDMAP_XRES_BINDING_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_XRES_BINDING_SECRET_USED=false'
+          rm -rf "$tmp"

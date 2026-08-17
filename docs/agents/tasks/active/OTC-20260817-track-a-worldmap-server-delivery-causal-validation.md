@@ -14,7 +14,7 @@ base_branch: main
 base_sha: c1adcf491580e28d40f215356a9e559af2ccadc4
 restack_commit: 91759e0a8d9db1c2a736c88f7e48d2bb5a3ffc59
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T17:36:00+02:00
+updated: 2026-08-17T18:03:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -75,8 +75,8 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
-mutation_authorized: false
+target_uniqueness: PROVEN
+mutation_authorized: true
 credentials_allowed: true
 login_allowed: true
 gameplay_allowed: true
@@ -86,7 +86,7 @@ bootstrap_for_worldmap_authorized: true
 login_for_worldmap_authorized: true
 second_live_session_authorized: false
 owner_authorization_source: current conversation
-owner_authorization_text: "wykonaj i czekam na wyniki"; reaffirmed "kontynuuj prace i masz moje zgody"
+owner_authorization_text: "wykonaj i czekam na wyniki"; reaffirmed "kontynuuj prace i masz moje zgody"; reaffirmed "wykonaj bo czekam na wynik logowania"
 owner_authorization_scope: bounded exact baseline versus first [19,14] causal worldmap server-delivery experiment, including login/relogin, one reversible movement pair, instrumentation and rollback
 owner_funded_ai_api_authorized: false
 exact_client:
@@ -129,14 +129,14 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T17:36:00+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: native_presecret_static_pass
+last_progress_at: 2026-08-17T18:03:00+02:00
+ci_checks_for_current_head: 3
+ci_check_generation: physical_inventory_pass
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 2
-repair_cycles_for_current_gate: 8
+repair_cycles_for_current_gate: 9
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -182,6 +182,15 @@ Fresh persistent-HOME parity discriminators, all on `synology-otclient-01` witho
 - historical successful world-entry `31736998731 / 94570936207` was re-inspected at source workflow commit `4392cf4c01703afa344ba074495894a292048eb9` and also launched `packages/Tibia/bin/client` directly with `HOME=/data/home`; therefore the external `Tibia` ELF is not required as the historical successful launch entrypoint;
 - `32039938342 / 95417353337 = SUCCESS`: sanitized omitted-state manifest contains exactly 10 entries, digest `9e03d67e62bfda836583f8430b6054a7e4f0bfa11aa919b6936135902ee5b709`; outside package + `launchermetadata.json` these are Qt shader/pipeline cache objects, the external-ELF symlink and `log` directory. No CipSoft/Tibia-named state was found under `.config` or `.local/state` by this bounded inventory.
 
+Fresh post-restack admission:
+
+- `32044149511 / 95428496133 = SUCCESS` on `synology-otclient-01` with proven runner labels `[otclient, synology]`;
+- `WORLDMAP_ADMISSION_TASK_NAMESPACE_PROCESS_COUNT=0`;
+- `WORLDMAP_ADMISSION_OFFICIAL_CLIENT_CANDIDATE_COUNT=0`;
+- `WORLDMAP_ADMISSION_CLIENT_EXECUTED=false`;
+- `WORLDMAP_ADMISSION_SECRET_USED=false`;
+- `WORLDMAP_ADMISSION_TARGET_UNIQUENESS=PROVEN`.
+
 # Current interpretation boundary
 
 - `external_launcher_required_for_successful_login = DISPROVEN` by the historical successful direct-package-client workflow;
@@ -189,10 +198,10 @@ Fresh persistent-HOME parity discriminators, all on `synology-otclient-01` witho
 - the strongest blocker remains semantic pre-secret UI discrimination, but the execution contract is now native to `.github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh` rather than supplied only by a later transformer;
 - the native helper now fails if `TIBIA_TEST_EMAIL` or `TIBIA_TEST_PASSWORD` is present in its environment before the pre-secret gates, proves both fields with harmless dummy text, clears both fields, creates a mode-0600 FIFO, and only then waits for credential handoff;
 - legacy OCR/tesseract anchors are absent from the native helper;
-- exact-head hosted workflow run `32042635828 / 95424571898 = SUCCESS` physically emitted `WORLDMAP_STATIC_NATIVE_PRESECRET_CONTRACT=PASS`; its physical Synology job was `skipped`;
-- exact-head Track A runtime-governance run `32042635853 = SUCCESS`;
-- current `main` was re-read after those runs and remains `c1adcf491580e28d40f215356a9e559af2ccadc4`;
-- trusted-base restack itself is `91759e0a8d9db1c2a736c88f7e48d2bb5a3ffc59`; current task head after native-source/workflow/checkpoint commits was `f97457aab2c5824cb58b455c6e2b86b9a0859e8b` before this task-checkpoint update.
+- exact-head hosted workflow run `32042635828 / 95424571898 = SUCCESS` physically emitted `WORLDMAP_STATIC_NATIVE_PRESECRET_CONTRACT=PASS`;
+- exact-head Track A runtime-governance checks passed after restack;
+- current `main` remains `c1adcf491580e28d40f215356a9e559af2ccadc4` at the last trusted-base read;
+- a runner-selector regression was identified: the queued job requested `[self-hosted, otclient, synology]` with `runner_id=0`, while prior physical successes and the fresh admission run use `[otclient, synology]` and bind to `synology-otclient-01`.
 
 Durable evidence includes:
 
@@ -205,7 +214,7 @@ Durable evidence includes:
 
 # Workflow safety state
 
-The PR workflow is now fail-closed in three explicit physical modes: `inventory_only`, `presecret_only`, and `baseline_login`. Pull-request execution runs only the deterministic hosted native composition check; the physical job is skipped unless deliberately activated. The `baseline_login` step is the only workflow block that references protected login secrets, and it can run only after the helper has emitted both editability PASS markers plus `WORLDMAP_BASELINE_PRESECRET_READY=true`. The helper itself never receives those secrets through its environment; credential values cross only the mode-0600 task-owned FIFO after the gates.
+The physical path remains fail-closed: fresh target uniqueness is now physically proven, but protected credentials may be exposed only after a new client launch proves both harmless editability gates and the helper emits `WORLDMAP_BASELINE_PRESECRET_READY=true`. The helper never receives credentials through its environment; values may cross only the mode-0600 task-owned FIFO after the gates. The single baseline login budget remains unconsumed.
 
 # Execution phases
 
@@ -213,7 +222,7 @@ The PR workflow is now fail-closed in three explicit physical modes: `inventory_
 2. **DONE** isolated exact-client WARP/XRes path.
 3. **DONE** pre-Storage observer gate.
 4. **DONE** 1020x650 normalization, manifest XRes identity, loader/GDB repair and native aggregate behavioral pre-login composition validation.
-5. **ACTIVE / BLOCKED_ON_POST_RESTACK_READMISSION** run `inventory_only` with no client/no secret; persist fresh target uniqueness; then run `presecret_only` and stop before secret handoff; only after both proofs may the single baseline login budget be used.
+5. **ACTIVE / PRESECRET_NEXT** fresh no-client/no-secret target uniqueness is proven; execute one physical pre-secret launch, require both dummy editability gates, then perform the single baseline login only if those gates pass in the same bounded runtime.
 6. **PENDING** patched namespace/preimage/target-uniqueness admission.
 7. **PENDING** one task-owned `[19,14]` login/capture under identical 1020x650 instrumentation.
 8. **PENDING** patched rollback/source rehash/cleanup.
@@ -228,8 +237,8 @@ Any failure **after** `WORLDMAP_BASELINE_LOGIN_SUBMITTED=true` consumes the one 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 14
-updated_at: 2026-08-17T17:36:00+02:00
+checkpoint_version: 15
+updated_at: 2026-08-17T18:03:00+02:00
 base_main: c1adcf491580e28d40f215356a9e559af2ccadc4
 current_main_observed: c1adcf491580e28d40f215356a9e559af2ccadc4
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
@@ -237,14 +246,14 @@ pr: 475
 status: investigating
 phase: baseline_ephemeral_behavioral_login_capture
 runtime_access: ephemeral_isolated
-target_uniqueness: UNKNOWN
-mutation_authorized: false
-workflow_mode: manual_inventory_presecret_login_with_hosted_static_gate
+target_uniqueness: PROVEN
+mutation_authorized: true
+workflow_mode: fresh_inventory_pass_presecret_next
 baseline_client_launches_consumed: 10
 baseline_login_consumed: 0
 patched_login_consumed: 0
-last_completed_step: restacked PR #475 onto current main and made the pre-secret editability/FIFO contract native to the baseline helper; exact-head hosted static composition and Track A governance both passed without running the physical job
+last_completed_step: fresh post-restack no-client/no-secret inventory on synology-otclient-01 proved zero task-owned namespace processes and zero official-client candidates; target uniqueness is freshly PROVEN
 blockers:
-  - post_restack_target_uniqueness_not_yet_reproven
-next_action: execute exactly one no-client/no-secret inventory_only pass on synology-otclient-01; if and only if it proves zero task-namespace processes and zero official-client candidates, persist target_uniqueness=PROVEN before any client launch. Then execute presecret_only and require both dummy editability gates plus exact cleanup with no login submission before exposing any protected credential.
+  - presecret_editability_not_yet_physically_proven
+next_action: execute one task-owned exact-client pre-secret launch using the proven [otclient, synology] runner selector; require both harmless dummy editability gates and PRESECRET_READY before any protected credential handoff. If all gates pass in the same bounded runtime, hand off the protected credentials through the mode-0600 FIFO and consume the single baseline login budget exactly once.
 ```

@@ -1,0 +1,82 @@
+name: Track A canonical XRes window identity repair
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/tibia-official-client-re-xres-window-owner.py
+      - .github/scripts/test_tibia_official_client_re_xres_window_owner.py
+      - .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py
+      - .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
+      - .github/scripts/tibia-official-client-re-xres-wire.py
+      - .github/scripts/tibia-official-client-re-canonical-live-session.sh
+      - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - .github/workflows/tibia-official-client-re-canonical-xres-window-identity.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
+      - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-xres-window:
+    name: Hosted canonical XRes window validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Compile and run deterministic XRes ownership tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            .github/scripts/test_tibia_official_client_re_xres_window_owner.py \
+            .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py \
+            .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
+          python3 .github/scripts/test_tibia_official_client_re_xres_window_owner.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
+          python3 .github/scripts/test_tibia_official_client_re_xres_wire.py
+
+      - name: Validate generated canonical worker against current source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          generated="$RUNNER_TEMP/canonical-xres-worker"
+          python3 .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py \
+            .github/scripts/tibia-official-client-re-canonical-live-session.sh \
+            "$generated" \
+            --owner-helper .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
+          bash -n "$generated"
+          test -x "$generated"
+          if grep -F 'search --onlyvisible --pid' "$generated"; then
+            echo 'legacy xdotool PID/name selector remains' >&2
+            exit 1
+          fi
+          grep -F 'tibia-official-client-re-xres-window-owner.py' "$generated"
+          grep -F -- '--wire-helper' "$generated"
+
+      - name: Preserve canonical transition regression coverage
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+
+      - name: Prove hosted-only integration boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "${RUNNER_NAME}" != synology-otclient-01
+          if grep -R -E 'TIBIA_TEST_(EMAIL|PASSWORD)|runtime-registration\.json' \
+            .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py; then
+            echo 'hosted-only integration contains a forbidden runtime reference' >&2
+            exit 1
+          fi
+          printf 'TRACK_A_CANONICAL_XRES_HOSTED_ONLY=PASS\n'

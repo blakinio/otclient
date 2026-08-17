@@ -1,0 +1,79 @@
+{
+  "schema": "track-a-p2-f50090-downstream-v1",
+  "date": "2026-08-17",
+  "task": "OTC-20260817-track-a-p2-f50090-downstream",
+  "research_status": "DRAFT_NOT_PROMOTED",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official_native_linux_only"
+  },
+  "runtime_access": "none",
+  "generation": {
+    "producer_head": "ea8113028a07ef84518f4a8b705bcecd97604376",
+    "run": 32037248323,
+    "source_job": 95410048084,
+    "hosted_job": 95410072413,
+    "source_result": "SUCCESS",
+    "hosted_result": "SUCCESS",
+    "code_window": "0xf50040..0xf50480",
+    "code_length": 1088,
+    "code_sha256": "1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea",
+    "source_candidate_index": 1,
+    "source_disassembly": false,
+    "source_semantic_classification": false,
+    "client_process_accessed": false,
+    "process_memory_accessed": false,
+    "canonical_runtime_state_accessed": false,
+    "client_executed": false,
+    "client_mutated": false,
+    "raw_client_uploaded": false
+  },
+  "claims": {
+    "f50090_function_entry": "FACT:0xf50090",
+    "next_aligned_function_entry": "FACT:0xf501e0",
+    "f50090_second_argument": "FACT:canonical_same_message",
+    "f50090_saved_message_pointer": "FACT:rbp",
+    "f50090_decomposes_message_into_fields": "FACT",
+    "target_0x4dc3d0": "FACT:length-derived scalar from canonical message+0x18",
+    "target_0x4daaf0": "FACT:scalar from canonical message+0x00",
+    "f50153_target": "FACT:0x4dd250",
+    "f50153_rsi": "FACT:value copied from canonical message+0x10",
+    "f50153_rdx": "FACT:value copied from canonical message+0x18",
+    "f50153_receiver_provenance": "FACT:nested receiver from f50090 this+0x08 then +0x18",
+    "raw_payload_pointer_length_edge_to_0x4dd250": "FACT",
+    "f50090_forwards_original_message_pointer_as_whole": "DISPROVEN",
+    "semantic_role_of_0x4dd250": "UNKNOWN",
+    "receiver_exact_dynamic_type_at_0x4dd250": "UNKNOWN",
+    "0x4dd250_is_final_binary_socket_write": "UNKNOWN",
+    "final_binary_egress": "UNKNOWN",
+    "final_socket_ownership": "UNKNOWN",
+    "framing": "UNKNOWN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN"
+  },
+  "proven_stage_order": [
+    "persistent QBuffer",
+    "TProtocolClientMessageProcessor+0x10@0xc2df80",
+    "TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "same QByteArray/message",
+    "TGameserverDualConnection+0x78@0xb56970",
+    "TGameserverNetworkPacketConnection",
+    "TGameserverNetworkPacketProcessor",
+    "receiver_vtable_AP_0x2f741d8_plus_0x10",
+    "0xf50090",
+    "message_decomposition",
+    "raw_payload_pointer_message_plus_0x10_and_length_message_plus_0x18",
+    "0x4dd250"
+  ],
+  "frontier": {
+    "next_exact_target": "0x4dd250",
+    "next_discriminator": "resolve exact identity/receiver/downstream dataflow of 0x4dd250 without inferring socket/framing/compression/encryption semantics from calling convention alone"
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static exact-file/disassembly evidence only"
+  }
+}

@@ -14,7 +14,7 @@ base_branch: main
 base_main: 60ab740872d52f3f7c4802d49fd5275a9968d085
 pr: 457
 risk: high
-updated: 2026-08-17T11:35:00+02:00
+updated: 2026-08-17T11:37:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -87,6 +87,13 @@ physical_v2:
   gameplay: false
   process_memory_access: false
   client_bytes_mutated: false
+terminal_tree:
+  one_shot_workflow_present: false
+  one_shot_patcher_present: false
+  changed_paths:
+    - docs/agents/tasks/active/OTC-20260817-track-a-xres-raw-pid-identity.md
+    - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/20260817-v2-physical-pid-identity.md
+    - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/20260817-v2-final-audit.md
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-xres-raw-pid-identity.md
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/**
@@ -135,8 +142,8 @@ evidence:
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/20260817-helper-fix-audit.md
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/20260817-v2-physical-pid-identity.md
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/20260817-v2-final-audit.md
-last_completed_step: physical v2 raw XRes evidence directly bound the unique VIEWABLE 1920x1080 resource 0x00c00011 to exact launched client PID 13648; cleanup completed and no further identity launch is required
-next_action: remove consumed one-shot v2 runtime surfaces, validate terminal #457 exact head, merge, then archive this task and release ownership; downstream RUNTIME work may consume the proven identity only under its own fresh admission.
+last_completed_step: physical v2 raw XRes evidence directly bound the unique VIEWABLE 1920x1080 resource 0x00c00011 to exact launched client PID 13648; cleanup completed and consumed one-shot runtime surfaces are absent from the terminal tree
+next_action: validate terminal #457 exact head, merge, then archive this task and release ownership; downstream RUNTIME work may consume the proven identity only under its own fresh admission.
 ---
 
 # Raw XRes PID identity discriminator — terminal validation

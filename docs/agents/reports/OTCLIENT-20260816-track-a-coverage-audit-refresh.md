@@ -4,7 +4,7 @@
 
 ```yaml
 lane: COVERAGE-AUDIT
-snapshot_main: 0b3bdec0a4145f558806448a4657413664d80729
+snapshot_main: f8e628a255a18ec92839bbb45ef0e3b40bef8605
 semantic_denominator_task: OTC-20260817-track-a-semantic-denominator-normalization
 semantic_denominator_pr: 460
 audit_result: FAIL_MATERIAL_GAPS_OPEN
@@ -46,9 +46,9 @@ P0 normalizes the 16 programme headings into 180 individual read/state/action re
 
 ## Current runtime / P0 frontier
 
-Physical XRes resource ownership is no longer a missing prerequisite. PR #457 merged as `16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc`; run `32015479835`, job `95344000918` preserves a LocalClientPid reply matching the exact launched official-client PID. Identity archive #459 merged as `c55e3523e6e9d50df511e65dce9145a8f951a5f5`; helper client-base semantics were corrected by #461 at `1eb4a8edecba3966aa1e6155e241b404eb4d30cb`.
+Physical XRes resource ownership is no longer a missing prerequisite. PR #457 merged as `16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc`; run `32015479835`, job `95344000918` preserves a LocalClientPid reply matching the exact launched official-client PID. Identity archive #459 merged as `c55e3523e6e9d50df511e65dce9145a8f951a5f5`; helper client-base semantics were corrected by #461 at `1eb4a8edecba3966aa1e6155e241b404eb4d30cb`. PR #465 then promoted the canonical raw-XRes window-identity integration as `f8e628a255a18ec92839bbb45ef0e3b40bef8605`.
 
-This historical proof does **not** create a current canonical registration. Current nonclaims remain:
+Those promoted identity components still do **not** create a current canonical registration or Gate-B session. Current nonclaims remain:
 
 ```yaml
 current_exact_client_pid: NOT_REGISTERED
@@ -59,13 +59,13 @@ P0_direct_authoritative_xyz: UNKNOWN
 restart_relogin_stability: UNKNOWN
 ```
 
-A future P0/RUNTIME invocation must freshly admit runtime work and require a legal current `IN_GAME` lifecycle; it must fail closed if that lifecycle is unavailable and must not bootstrap solely to satisfy P0.
+A future RUNTIME invocation must freshly admit physical work and establish, or fail closed on, a current authoritative registration/Gate-B identity and legal `IN_GAME` lifecycle before semantic P0/P1 claims resume. This coverage task does not authorize bootstrap, login, gameplay or canonical mutation.
 
 ## P2 and worldmap boundaries
 
 P2 retains the merged bounded processor chain and `PROVEN_PARTIAL` stage order. Framing, sequence, compression, encryption, final binary egress and final socket ownership remain `UNKNOWN`.
 
-Worldmap static graph and mutation design are promoted. The separately authorized physical canary task is now archived on main via #466. It proved bounded offline patch/startup/rollback but observed no handler canary in its no-login startup window: `NO_HANDLER_CANARY_OBSERVED_BOUNDED`. Therefore causal propagation and safe mutation remain unproven and no additional physical launch is authorized by this coverage task.
+Worldmap static graph and mutation design are promoted. The separately authorized physical canary task is archived on main via #466. It proved bounded offline patch/startup/rollback but observed no handler canary in its no-login startup window: `NO_HANDLER_CANARY_OBSERVED_BOUNDED`. Therefore causal propagation and safe mutation remain unproven and no additional physical launch is authorized by this coverage task.
 
 ## Resolved findings
 
@@ -75,14 +75,14 @@ PR #454/#456 promoted the exact source-fenced baseline, provenance/supersessions
 
 ### AUD-COV-002 — RESOLVED — finite semantic denominators materialized
 
-PR #460 candidate materializes:
+PR #460 materializes:
 
 - `protocol_message_semantics.jsonl`: 349/349 generated identifiers;
 - `runtime_type_semantics.jsonl`: 642/642 retained Tibia-owned QMeta records;
 - `p0_items.jsonl`: 180/180 normalized P0 requirements;
 - `p1_items.jsonl`: 28/28 normalized P1 requirements.
 
-Hosted generation run `32017799293`, job `95350885329`, artifact `9284175545`, digest `sha256:cf2fb874e39af2465de76445347a118077893d9bbf213b69809b793ed4d7f577` passed deterministic generation and artifact validation. Independent inspection matched the digest, counts, unique IDs, protocol 189/160 split, 27 direct QMeta links and full QMeta provenance. Integrated validator run `32018548728`, job `95353113344` then passed the complete candidate tree.
+Hosted generation run `32017799293`, job `95350885329`, artifact `9284175545`, digest `sha256:cf2fb874e39af2465de76445347a118077893d9bbf213b69809b793ed4d7f577` passed deterministic generation and artifact validation. Independent inspection matched the digest, counts, unique IDs, protocol 189/160 split, 27 direct QMeta links and full QMeta provenance. Integrated validator run `32018548728`, job `95353113344` passed the complete candidate tree.
 
 Resolution is **denominator completeness only**. Protocol semantics remain `UNKNOWN/349`, full QMeta semantics `UNKNOWN/642`, P0 live semantics `UNKNOWN/180`, and P1 live semantics `UNKNOWN/28`.
 
@@ -96,9 +96,9 @@ The values represent different historical inventory/filter definitions and remai
 
 ### AUD-COV-004 — HIGH — current canonical live semantic/restart proof unavailable
 
-Physical resource→exact-client PID identity is proven historically for the controlled v2 run, but there is no current registered/Gate-B `IN_GAME` session proving authoritative player/world semantics, direct XYZ, live P1 correlation or restart/relogin stability.
+Physical resource→exact-client PID identity and the raw-XRes window-identity integration are promoted, but there is still no current authoritative registered/Gate-B `IN_GAME` session proving player/world semantics, direct XYZ, live P1 correlation or restart/relogin stability.
 
-**Next discriminator:** fresh P0/RUNTIME admission; use only a legal current canonical `IN_GAME` lifecycle and fail closed when absent.
+**Next discriminator:** fresh RUNTIME admission; establish or fail closed on current canonical registration/Gate-B identity and a legal current `IN_GAME` lifecycle before semantic experiments.
 
 ### AUD-COV-007 — MEDIUM — durable global coordinator checkpoint materially stale
 
@@ -119,6 +119,7 @@ p0_live_semantics_complete: false
 p1_item_level_denominator_complete: true
 p1_live_semantics_complete: false
 physical_resource_to_exact_client_pid_identity_proven: true
+canonical_raw_xres_window_identity_integration_promoted: true
 canonical_current_runtime_semantics_proven: false
 p2_transport_semantics_complete: false
 worldmap_mutation_design_ready: true

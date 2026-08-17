@@ -67,28 +67,28 @@ exact_client:
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
   platform: official_native_linux_only
 invocation_started_at: 2026-08-17T18:44:21+02:00
-last_progress_at: 2026-08-17T18:45:54+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+last_progress_at: 2026-08-17T18:50:20+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: phase1
 terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
+terminal_ci_checks_for_current_generation: 1
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-next_action: stage exact-fenced bounded TGameClient/auth/character/game-login code and vtable windows, decode only on GitHub-hosted Linux, and resolve the primary receiver vtable+0x68 target without runtime/login/secret access
+next_action: run phase2 bounded static discriminator for exact QObject receiver provenance and concrete existing-credentials/connect/session targets without runtime/login/secret access
 ---
 
 # Track A — native authentication/session flow (static)
 
-## Objective and acceptance
+## Objective
 
 Recover the exact-client native authentication/session control and credential lifecycle required by the owner's `OTS_NATIVE_AUTH_SESSION_RESEARCH_AGENT` charter, without automating UI and without bypassing server authentication.
 
 Required final artifact: `docs/research/native-client/NATIVE_AUTH_SESSION_FLOW.md`.
 
-The task is not complete until evidence supports or explicitly leaves `UNKNOWN`/`PARTIAL` for:
+Required final decisions:
 
 ```text
 CAN_SKIP_LOGIN_FORM: YES | NO | PARTIAL
@@ -98,9 +98,7 @@ PASSWORD_REQUIRED_FOR_GAME_LOGIN: YES | NO | UNKNOWN
 DIRECT_CHARACTER_LOGIN_POSSIBLE: YES | NO | UNKNOWN
 ```
 
-It must also cover the lowest safe below-UI entry point, credential source/lifecycle, auth request/response, session creation/storage/consumption/expiry, character-list and selection flow, game-server login credential, reconnect, logout and change-character behavior.
-
-## Exact-client starting facts
+## Exact-client fence
 
 ```text
 version: 15.32.df7b29
@@ -109,7 +107,7 @@ sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 platform: official native Linux only
 ```
 
-Corrected proven game-login signal route:
+## Accepted starting chain
 
 ```text
 TLoginProtocolMessageHandler::sendLoginMessage PMF 0xcf2950
@@ -119,9 +117,9 @@ TLoginProtocolMessageHandler::sendLoginMessage PMF 0xcf2950
  -> receiver virtual slot +0x68
 ```
 
-`0xcf2ca0` is a Qt static-metacall case and `0xbd36a0` is not proven to be the final wire serializer.
+`0xcf2ca0` is a Qt static-metacall case. `0xbd36a0` is a delegator, not a proven final serializer.
 
-Exact-SHA transition leads:
+Known transition leads:
 
 ```text
 TAuthenticationProcessController::requestCharacterGameserverLogin     0xcfb2e7
@@ -133,66 +131,104 @@ TGameClient::onGameSessionConnected                                    0xd066e0
 TGameserverLoginProcessController::onGameserverTCPConnectionConnected  0xcfa0e0
 ```
 
-Promoted exact-SHA vptr lead: `TGameClient 0x3076908`.
+Promoted exact-SHA primary vptr lead: `TGameClient 0x3076908`.
 
 ## Safety boundary
 
-This task remains `runtime_access: none`. It does not inherit or consume PR #475's physical worldmap runtime/login budget. It must not observe/mutate a live client, process memory or X11; perform login/relogin/game actions; use debugger/input/OCR/screen automation; persist credentials/tokens/session values/secret payloads; upload the full executable; or use owner-funded Codex/OpenAI/API.
+`runtime_access: none` remains binding. This task does not inherit or consume PR #475's physical worldmap runtime/login budget. No live process/X11 observation or mutation; no login/relogin/game action; no process memory/debugger/input/OCR/screen automation; no credentials/cookies/tokens/session values/secret payloads; no full executable upload; no owner-funded Codex/OpenAI/API.
 
-The Synology source job may only exact-fence the retained executable and stage small bounded file-backed byte windows. Source-side disassembly and semantic classification are forbidden; decode belongs on GitHub-hosted Linux.
+The Synology job may only exact-fence the retained executable and stage small bounded file-backed byte windows. Source-side disassembly and semantic classification are forbidden. Decode is GitHub-hosted.
+
+## Phase 1 checkpoint
+
+Durable evidence:
+
+`docs/agents/evidence/OTC-20260817-track-a-auth-session-flow-static/phase1-existing-credentials-chain.md`
+
+Exact execution:
+
+```text
+workflow head: 053a5717a6d9306f70c80e61164e144e4143d075
+run:           32047266485
+source job:    95437930193  SUCCESS
+hosted job:    95437962909  SUCCESS
+```
+
+Source safety markers prove exact file fence PASS, `runtime_access=none`, process/X11/login/secret/disassembly/semantic-classification all false, full client upload false, bounded file windows only.
+
+### FACT — primary TGameClient +0x68 result
+
+```text
+TGameClient primary vptr: 0x3076908
+TGameClient typeinfo:     0x3070398
+primary-vptr +0x68:       0x6cc7b0
+```
+
+`0x6cc7b0` is a large construction-heavy routine initializing many object members/callback structures, not a proven login serializer.
+
+### INFERENCE — rejected receiver shortcut
+
+Confidence: high.
+
+The promoted primary `TGameClient` vptr cannot be used as proof that `0xbd36a0`'s receiver is the desired login serializer object. Exact receiver provenance must be recovered from the connection setup rather than guessed from this vptr.
+
+### FACT — concrete wrapper implementation targets
+
+```text
+connectClientToGameserverWithExistingCredentials 0xd06660 -> 0x6ef1d0
+onGameSessionConnected                            0xd066e0 -> 0x6ee130
+onConnectClientToGameserver                       0xd06810 -> 0x6fe480
+```
+
+### FACT — character-selection structure
+
+`requestCharacterLogin @ 0xd47300` reads selected state at offsets `+0x50` (word), `+0x54` (dword), `+0x58` (dword/mode), passes the first two through `0x858a50`, then moves a three-qword result into storage referenced by `r12`. Exact field meanings and `r12` identity remain unknown.
+
+### FACT — auth state transition
+
+`requestCharacterGameserverLogin @ 0xcfb2e7` sets dispatch/state value `5` before jumping to the common authentication-controller transition route. Semantic meaning beyond the named method boundary remains unassigned.
 
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 1
-updated_at: 2026-08-17T18:45:54+02:00
-head: f48e62d8eff7ad0a1708e3440c086e8346ab3b71
+checkpoint_version: 2
+updated_at: 2026-08-17T18:50:20+02:00
+head_before_checkpoint_commit: f24f66a03fc00418514c52199dab1f667bf1e5c5
 branch: docs/OTC-20260817-track-a-auth-session-flow-static
 pr: 498
 status: investigating
-context_routes:
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-  - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
-  - docs/agents/prompts/OTCLIENT_TIBIA_RE_CANONICAL.md
-  - docs/agents/reports/OTCLIENT-20260813-tibia-re-canonical-state.md
-  - docs/agents/reports/OTCLIENT-20260813-tibia-re-login-recovery-import.md
-  - PR #284 tools/tibia-global-login-lab/evidence/official-1532-game-login-oracle.md
-owned_paths:
-  - docs/agents/tasks/active/OTC-20260817-track-a-auth-session-flow-static.md
-  - docs/agents/evidence/OTC-20260817-track-a-auth-session-flow-static/**
-  - docs/research/native-client/NATIVE_AUTH_SESSION_FLOW.md
-  - .github/workflows/tibia-official-client-re-auth-session-static.yml
 proven:
-  - exact client fence above
-  - sendLoginMessage reaches adapter 0xbd36a0 then receiver virtual slot +0x68
-  - TGameClient primary-vptr candidate 0x3076908 is promoted exact-SHA evidence
-  - PR #498 is the dedicated Draft lane for this task
-derived:
-  - static exact-fenced work can proceed independently of PR #475 physical runtime
+  - exact client fence
+  - 0xbd36a0 virtual delegation through receiver +0x68
+  - primary TGameClient vptr +0x68 resolves to 0x6cc7b0
+  - existing-credentials/connect/session wrappers resolve to 0x6ef1d0 / 0x6fe480 / 0x6ee130
+  - phase1 workflow source and hosted jobs both succeeded
+inferences:
+  - primary TGameClient vptr is insufficient to identify the 0xbd36a0 receiver; connection provenance is required
 unknown:
-  - exact primary receiver behind adapter 0xbd36a0
-  - final game-login serializer and ordered public/pre-secret fields
-  - initial account-auth request and response parser
-  - session credential type/storage/lifetime
+  - exact 0xbd36a0 receiver identity/vptr
+  - semantics of 0x6ef1d0 / 0x6fe480 / 0x6ee130
+  - semantics of 0x858a50 and r12 destination
+  - final game-login serializer/fields
+  - initial account-auth request/response
+  - session credential/lifetime
   - password participation after initial auth
-  - reconnect and character-switch credential behavior
-conflicts:
-  - none
+  - reconnect/logout/change-character credential behavior
 first_failure:
   marker: none
   evidence: none
 rejected_hypotheses:
-  - 0xcf2ca0 is final serializer: disproven by Qt metacall classification
-  - 0xbd36a0 is already proven final serializer: disproven by virtual delegation
+  - primary TGameClient vptr +0x68 directly proves the 0xbd36a0 final game-login serializer
 changed_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-auth-session-flow-static.md
+  - docs/agents/evidence/OTC-20260817-track-a-auth-session-flow-static/phase1-existing-credentials-chain.md
+  - .github/workflows/tibia-official-client-re-auth-session-static.yml
 validation:
-  - command: live repository/governance/overlap preflight
-    result: PASS
-    evidence: main 8a5fcfd72f2554261eef91a2129c9cc076e730ea; open PR inventory checked; no overlapping Track A auth/session PR
-blockers:
-  - none
-next_action: stage exact-fenced bounded TGameClient/auth/character/game-login code and vtable windows, decode only on GitHub-hosted Linux, and resolve the primary receiver vtable+0x68 target without runtime/login/secret access
+  - run: 32047266485
+    source_job: 95437930193 SUCCESS
+    hosted_job: 95437962909 SUCCESS
+blockers: []
+next_action: phase2 bounded static discriminator for QObject receiver provenance, 0x6ef1d0, 0x6fe480, 0x6ee130, 0x858a50 and enclosing character-selection provenance
 ```
 
 ## Recovery checkpoint
@@ -200,22 +236,23 @@ next_action: stage exact-fenced bounded TGameClient/auth/character/game-login co
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
+  generation: 2
   session_id: auth-session-static-20260817T184421+0200
   session_started_at: 2026-08-17T18:44:21+02:00
-  checkpointed_at: 2026-08-17T18:45:54+02:00
-  last_progress_at: 2026-08-17T18:45:54+02:00
-  phase: static-receiver-and-existing-credentials-chain
-  exact_head: f48e62d8eff7ad0a1708e3440c086e8346ab3b71
+  checkpointed_at: 2026-08-17T18:50:20+02:00
+  last_progress_at: 2026-08-17T18:50:20+02:00
+  phase: phase2-receiver-and-existing-credentials-implementations
+  exact_head_before_checkpoint_commit: f24f66a03fc00418514c52199dab1f667bf1e5c5
   pull_request: 498
-  active_operation: stage bounded exact-client file windows and hosted decode
+  completed_runs: [32047266485]
+  active_operation: update temporary workflow to stage phase2 exact-fenced file windows
   external_run_ids: []
   operation_started_at: null
   wait_deadline_at: null
-  check_generation: draft
-  checks_used: 0
+  check_generation: phase2-pending
+  checks_used: 1
   status: active
   safe_to_resume: true
-  resume_condition: PR #498/branch ownership remains unchanged and runtime_access remains none
-  next_action: stage exact-fenced bounded TGameClient/auth/character/game-login code and vtable windows, decode only on GitHub-hosted Linux, and resolve the primary receiver vtable+0x68 target without runtime/login/secret access
+  resume_condition: PR #498 ownership remains unchanged and runtime_access remains none
+  next_action: run phase2 bounded static discriminator for exact QObject receiver provenance and concrete existing-credentials/connect/session targets
 ```

@@ -20,6 +20,16 @@
 - If the central controller posts a P0/P1 finding before merge, treat it as an unresolved material review finding: address or explicitly disposition it under the repository's normal review rules, then rerun any validation invalidated by the resulting change.
 - `no-spark-review` opts a PR out of the central controller. `spark-review` may force consideration of an otherwise ignored path class, but it never bypasses draft, fork, bot, CI, exact-head, size, model, or safety fences.
 
+## Native login-to-ingame direct Spark — standing owner authorization
+
+- The owner explicitly authorizes repository workers executing the exact `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` alias/task family to invoke exactly `gpt-5.3-codex-spark` directly through ChatGPT-managed Codex authentication or another repository-approved managed path. This section is the explicit standing exception to the generic prior-permission rule above for that exact alias/task family only.
+- Allowed use is bounded repository/code analysis, reverse-engineering assistance, implementation assistance, falsification, and review inside the declared native-login task. Spark may inspect repository code/diffs and sanitized secret-free evidence needed for those purposes.
+- This exception does **not** authorize any other model/provider, OpenAI API use, `OPENAI_API_KEY`, hosted Codex Code Review as fallback, or exporting/reading/using owner-supplied AI API keys, tokens, sessions, or other AI credentials.
+- Do not send Tibia credentials, 2FA values, session/auth secrets, secret-bearing process-memory or packet material, or raw proprietary official-client binaries to Spark. Preserve all repository/client secret and proprietary-artifact rules.
+- Direct Spark use never creates or expands Track A runtime ownership, login/session budget, mutation authority, admission PASS, lease/registration authority, promotion authority, or completion evidence. Spark output is advisory and never replaces exact-SHA proof, current runtime evidence, fresh audit, real E2E, exact-head CI, review, or merge gates.
+- If exact `gpt-5.3-codex-spark` or the approved managed authentication path is unavailable, do not silently fall back to another model/provider. Continue with a genuinely permitted non-owner-funded alternative when one exists or report the exact blocker if the task cannot proceed.
+- This native-login exception is distinct from the central Spark PR pre-review authorization above; neither exception broadens the other.
+
 ## Instruction order
 
 1. This root `AGENTS.md`.

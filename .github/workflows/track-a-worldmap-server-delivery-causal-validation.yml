@@ -16,11 +16,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  canonical-baseline-bootstrap:
-    name: One admitted exact-client canonical baseline bootstrap
+  failed-bootstrap-cleanup-audit:
+    name: Verify failed canonical bootstrap rollback
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation' }}
     runs-on: [otclient, synology]
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
       - name: Checkout exact head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Revalidate admitted bootstrap transaction
+      - name: Revalidate Track A runtime admission
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
@@ -38,96 +38,88 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
             --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
-          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_ADMISSION_POLICY=PASS'
+          echo 'WORLDMAP_CAUSAL_CLEANUP_ADMISSION_POLICY=PASS'
 
-      - name: Acquire fresh canonical lease and bootstrap exact baseline without credentials
+      - name: Verify controller state and task-owned bootstrap resources are clean
         shell: bash
-        env:
-          TASK_ID: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-          SESSION_ID: worldmap-causal-baseline-20260817
         run: |
           set +x
           set -Eeuo pipefail
-          STATE=/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
-          TASK_STATE=/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-          TOKEN="$TASK_STATE/canonical-lease.token"
-          LEASE=.github/scripts/tibia-official-client-re-canonical-live-lease.py
-          TRANSITION=.github/scripts/tibia-official-client-re-canonical-live-transition.py
-          WORKER=.github/scripts/tibia-official-client-re-canonical-live-session.sh
+          python3 - <<'PY'
+          from __future__ import annotations
 
-          mkdir -p "$TASK_STATE"
-          chmod 700 "$TASK_STATE"
-          rm -f "$TOKEN"
+          import fcntl
+          import json
+          import os
+          from pathlib import Path
+          import time
 
-          acquired=0
-          keep=0
-          cleanup_failure() {
-            rc=$?
-            if [[ "$keep" != 1 && "$acquired" == 1 ]]; then
-              python3 "$LEASE" --state-dir "$STATE" release \
-                --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" >/dev/null 2>&1 || true
-              rm -f "$TOKEN"
-            fi
-            exit "$rc"
-          }
-          trap cleanup_failure EXIT
+          state = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          lock = state / 'coordination.lock'
+          lease_path = state / 'lease.json'
+          reg = state / 'runtime-registration.json'
+          session = state / 'session'
+          task_state = Path('/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-worldmap-server-delivery-causal-validation')
+          token = task_state / 'canonical-lease.token'
 
-          python3 "$LEASE" --state-dir "$STATE" acquire \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" \
-            --ttl-seconds 2700
-          acquired=1
-          [[ "$(stat -c '%a' "$TOKEN")" == 600 ]]
+          if not lock.is_file():
+              raise SystemExit('WORLDMAP_CAUSAL_CLEANUP_ERROR=coordination_lock_missing')
 
-          python3 "$LEASE" --state-dir "$STATE" validate \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN"
-          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_GATE_A_LEASE=PASS'
+          fd = os.open(lock, os.O_RDONLY | getattr(os, 'O_NOATIME', 0))
+          try:
+              fcntl.flock(fd, fcntl.LOCK_SH)
+              lease = json.loads(lease_path.read_text()) if lease_path.exists() else None
+              if lease is None:
+                  raise SystemExit('WORLDMAP_CAUSAL_CLEANUP_ERROR=lease_state_missing')
+              public = {
+                  'schema_version': lease.get('schema_version'),
+                  'runtime_id': lease.get('runtime_id'),
+                  'status': lease.get('status'),
+                  'generation': lease.get('generation'),
+                  'controller_task': lease.get('controller_task'),
+                  'controller_session': lease.get('controller_session'),
+                  'expired': bool(lease.get('status') == 'active' and isinstance(lease.get('expires_at'), int) and lease['expires_at'] <= int(time.time())),
+              }
+              print('WORLDMAP_CAUSAL_CLEANUP_LEASE=' + json.dumps(public, sort_keys=True, separators=(',', ':')))
+              if public['generation'] != 8:
+                  raise SystemExit('WORLDMAP_CAUSAL_CLEANUP_ERROR=unexpected_lease_generation')
+              if public['status'] != 'released' or public['controller_task'] is not None or public['controller_session'] is not None:
+                  raise SystemExit('WORLDMAP_CAUSAL_CLEANUP_ERROR=lease_not_released')
+              if reg.exists():
+                  raise SystemExit('WORLDMAP_CAUSAL_CLEANUP_ERROR=registration_survived_failed_bootstrap')
+              if session.exists():
+                  raise SystemExit('WORLDMAP_CAUSAL_CLEANUP_ERROR=session_root_survived_failed_bootstrap')
+              if token.exists():
+                  raise SystemExit('WORLDMAP_CAUSAL_CLEANUP_ERROR=lease_token_survived_failed_bootstrap')
+          finally:
+              try:
+                  fcntl.flock(fd, fcntl.LOCK_UN)
+              except OSError:
+                  pass
+              os.close(fd)
 
-          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            python3 "$TRANSITION" bootstrap \
-              --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" \
-              --worker "$WORKER" --worker-timeout 180
+          # Narrow read-only orphan census: only processes explicitly marked as canonical Track A runtime.
+          marked = []
+          proc = Path('/proc')
+          for child in proc.iterdir():
+              if not child.name.isdigit():
+                  continue
+              envp = child / 'environ'
+              try:
+                  data = envp.read_bytes()
+              except (OSError, PermissionError):
+                  continue
+              fields = set(data.split(b'\0'))
+              if b'OTCLIENT_TIBIA_RE_TRACK=official-client-re' in fields and b'OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1' in fields:
+                  role = next((f.decode('utf-8', 'replace') for f in fields if f.startswith(b'OTCLIENT_TIBIA_RE_ROLE=')), 'role=unknown')
+                  marked.append({'pid': int(child.name), 'role': role})
+          print('WORLDMAP_CAUSAL_CLEANUP_MARKED_PROCESS_COUNT=' + str(len(marked)))
+          if marked:
+              print('WORLDMAP_CAUSAL_CLEANUP_MARKED_PROCESSES=' + json.dumps(marked, sort_keys=True, separators=(',', ':')))
+              raise SystemExit('WORLDMAP_CAUSAL_CLEANUP_ERROR=canonical_marked_process_survived')
 
-          python3 "$LEASE" --state-dir "$STATE" validate \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN"
-
-          python3 - "$STATE/runtime-registration.json" "$TASK_ID" "$GITHUB_RUN_ID" <<'PY'
-          import json, pathlib, sys
-          path = pathlib.Path(sys.argv[1])
-          task = sys.argv[2]
-          run = sys.argv[3]
-          data = json.loads(path.read_text())
-          required = {
-              'schema_version': 1,
-              'runtime_id': 'track-a-canonical-live',
-              'client_version': '15.32.df7b29',
-              'client_size': 51965216,
-              'client_sha256': 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
-              'source_task': task,
-              'source_run': run,
-          }
-          for key, expected in required.items():
-              if data.get(key) != expected:
-                  raise SystemExit(f'WORLDMAP_CAUSAL_BOOTSTRAP_ERROR=registration_{key}_mismatch')
-          if not isinstance(data.get('pid'), int) or data['pid'] <= 0:
-              raise SystemExit('WORLDMAP_CAUSAL_BOOTSTRAP_ERROR=registration_pid_invalid')
-          if data.get('remote_view_mapping') != 'PROVEN':
-              raise SystemExit('WORLDMAP_CAUSAL_BOOTSTRAP_ERROR=remote_view_mapping_not_proven')
-          if data.get('state') != 'UNKNOWN':
-              raise SystemExit('WORLDMAP_CAUSAL_BOOTSTRAP_ERROR=unexpected_prelogin_state')
-          safe = {key: data.get(key) for key in (
-              'schema_version','runtime_id','registration_generation','lease_generation','registered_at',
-              'boot_id_sha256','pid','process_start_ticks','client_version','client_size','client_sha256',
-              'display','window_identity','remote_view_endpoint','remote_view_mapping','state','source_task','source_run'
-          )}
-          print('WORLDMAP_CAUSAL_BOOTSTRAP_REGISTRATION=' + json.dumps(safe, sort_keys=True, separators=(',', ':')))
-          print('WORLDMAP_CAUSAL_BOOTSTRAP_REGISTRATION_FENCE=PASS')
+          print('WORLDMAP_CAUSAL_CLEANUP_REGISTRATION=ABSENT')
+          print('WORLDMAP_CAUSAL_CLEANUP_SESSION_ROOT=ABSENT')
+          print('WORLDMAP_CAUSAL_CLEANUP_TOKEN=ABSENT')
+          print('WORLDMAP_CAUSAL_CLEANUP_ROLLBACK=PASS')
           PY
-
-          python3 "$LEASE" --state-dir "$STATE" status --json
-          echo "WORLDMAP_CAUSAL_BOOTSTRAP_TOKEN_PATH=$TOKEN"
-          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_CREDENTIALS_USED=false'
-          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_LOGIN_USED=false'
-          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_GAMEPLAY_USED=false'
-          echo 'WORLDMAP_CAUSAL_BOOTSTRAP=PASS'
-          keep=1
-          trap - EXIT

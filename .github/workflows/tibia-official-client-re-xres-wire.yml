@@ -30,7 +30,7 @@ jobs:
           python3 -m py_compile \
             .github/scripts/tibia-official-client-re-xres-wire.py \
             .github/scripts/test_tibia_official_client_re_xres_wire.py
-          python3 .github/scripts/test_tibia_official_client_re-xres-wire.py
+          python3 .github/scripts/test_tibia_official_client_re_xres_wire.py
 
       - name: Prove helper is pure and transport-free
         shell: bash

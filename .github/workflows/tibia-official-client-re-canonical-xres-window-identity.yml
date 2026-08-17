@@ -5,9 +5,9 @@ on:
     branches: [main]
     paths:
       - .github/scripts/tibia-official-client-re-xres-window-owner.py
-      - .github/scripts/test_tibia_official_client_re-xres-window-owner.py
+      - .github/scripts/test_tibia_official_client_re_xres_window_owner.py
       - .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py
-      - .github/scripts/test_tibia_official_client_re-canonical-xres-worker-adapter.py
+      - .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
       - .github/scripts/tibia-official-client-re-xres-wire.py
       - .github/scripts/tibia-official-client-re-canonical-live-session.sh
       - .github/scripts/tibia-official-client-re-canonical-live-transition.py
@@ -40,7 +40,7 @@ jobs:
             .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py \
             .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
           python3 .github/scripts/test_tibia_official_client_re_xres_window_owner.py
-          python3 .github/scripts/test_tibia_official_client_re_canonical-xres-worker-adapter.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
           python3 .github/scripts/test_tibia_official_client_re_xres_wire.py
 
       - name: Validate generated canonical worker against current source

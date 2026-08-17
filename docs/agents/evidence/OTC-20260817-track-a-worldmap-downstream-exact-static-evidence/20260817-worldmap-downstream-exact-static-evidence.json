@@ -1,0 +1,211 @@
+{
+  "schema": "track-a-worldmap-downstream-curated-evidence-v1",
+  "task_id": "OTC-20260817-track-a-worldmap-downstream-exact-static-evidence",
+  "producer_pr": 446,
+  "consumer_pr": 367,
+  "WORLD_MAP_DOWNSTREAM_STATIC_EVIDENCE_READY": true,
+  "client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official native Linux"
+  },
+  "policy": {
+    "runtime_access": "none",
+    "client_executed": false,
+    "process_memory_accessed": false,
+    "canonical_state_accessed": false,
+    "x11_vnc_accessed": false,
+    "login_gameplay_accessed": false,
+    "client_bytes_mutated": false,
+    "raw_client_uploaded": false,
+    "owner_funded_ai_api_used": false
+  },
+  "provenance": {
+    "broad_run": 32001356705,
+    "broad_source_job": 95302168871,
+    "broad_source_artifact": 9278519216,
+    "broad_source_digest": "sha256:e10347435bece4cbedc7fca54b782cea76f9f1dab3b042082fe3bcc15f7c0728",
+    "broad_hosted_job": 95302411849,
+    "broad_final_artifact": 9278527206,
+    "broad_final_digest": "sha256:af12b2af9c725ca402224876c3cbd0c01306f47b37e717548c5817310dd3bc9b",
+    "broad_windows": 236,
+    "broad_raw_bytes": 532736,
+    "targeted_run": 32002326947,
+    "targeted_source_job": 95304896213,
+    "targeted_source_artifact": 9278827774,
+    "targeted_source_digest": "sha256:8f6a9feaea607475f6f9d25d200d858f52714f9384561bd4010405d26a78009a",
+    "targeted_hosted_job": 95305039463,
+    "targeted_final_artifact": 9278833445,
+    "targeted_final_digest": "sha256:7505aeae6e79e8829adf60261e1a3b50f27e0514f50136161e5f715a27124218",
+    "targeted_windows": 15,
+    "targeted_raw_bytes": 38400
+  },
+  "upstream_18_14_chain": {
+    "classification": "FACT",
+    "handler_identity": {
+      "vptr": "0x030871d8",
+      "typeinfo": "0x03085fb8",
+      "rtti": "tibia::worldmap::TWorldmapProtocolMessageHandler"
+    },
+    "handler_constructor": {
+      "anchor": "0x00803c01",
+      "instructions": [
+        "0x00803c01 lea rax,[rip+...] -> 0x030871d8",
+        "0x00803c08 mov QWORD PTR [rbx],rax",
+        "0x00803d6f lea rax,[rip+...] -> 0x02f615a0",
+        "0x00803d76 mov QWORD PTR [rbx+0x90],rax",
+        "0x00803d7d mov rax,QWORD PTR [rip+...] -> 0x01cdd958",
+        "0x00803d8b mov QWORD PTR [rbx+0xb0],rax"
+      ],
+      "literal_data": {
+        "address": "0x01cdd958",
+        "bytes_prefix": "120000000e0000000800000006000000",
+        "qword0": "0x0000000e00000012",
+        "dword_low": 18,
+        "dword_high": 14
+      },
+      "conclusion": "The exact Handler constructor installs the static packed 18/14 default into Handler+0xb0/+0xb4."
+    },
+    "fullmap_to_geometry_fanout": {
+      "fact_from_consumer_pr_367": "FullMap@0x00cec8d0 directly calls 0x00cdb770(owner); owner is the worldmap Handler.",
+      "direct_call_site": "0x00cec955",
+      "function": "0x00cdb770"
+    },
+    "snapshot_builder": {
+      "function": "0x00bc6350",
+      "call_site": "0x00cdb796",
+      "source_argument": "Handler+0x90",
+      "instructions": [
+        "0x00cdb772 lea rsi,[rdi+0x90]",
+        "0x00cdb78b lea r14,[rsp+0x90]",
+        "0x00cdb793 mov rdi,r14",
+        "0x00cdb796 call 0x00bc6350",
+        "0x00bc6368 movq xmm0,QWORD PTR [rsi+0x8]",
+        "0x00bc636d movq xmm2,QWORD PTR [rsi+0x38]",
+        "0x00bc6372 movq xmm1,QWORD PTR [rsi+0x20]",
+        "0x00bc63af movq QWORD PTR [rax+0x38],xmm1"
+      ],
+      "address_relation": "source=Handler+0x90, therefore source+0x20=Handler+0xb0; snapshot+0x38 receives that exact QWORD.",
+      "conclusion": "The snapshot passed onward contains exact 18/14 at snapshot+0x38 when the Handler master pair is at its constructor default."
+    },
+    "storage_dispatch": {
+      "instructions": [
+        "0x00cdb79b mov rdi,QWORD PTR [r12+0x10]",
+        "0x00cdb7a5 mov rsi,r14",
+        "0x00cdb7a8 mov rax,QWORD PTR [rdi]",
+        "0x00cdb7ab call QWORD PTR [rax+0x60]"
+      ],
+      "consumer_runtime_correlation": "PR #367 retained exact runtime proves Handler+0x10 has static vptr 0x0308ce70.",
+      "exact_static_identity": "vptr 0x0308ce70 = tibia::worldmap::TWorldMapStorage",
+      "slot_relation": "TWorldMapStorage primary vtable slot 12 is address point +0x60 and resolves to 0x00cc6cd0."
+    },
+    "storage_slot12": {
+      "function": "0x00cc6cd0",
+      "instructions": [
+        "0x00cc6cf3 movq xmm0,QWORD PTR [rsi+0x38]",
+        "0x00cc6d2c movq QWORD PTR [r13+0x48],xmm0"
+      ],
+      "conclusion": "Storage slot 12 copies the snapshot 18/14 pair into Storage+0x48/+0x4c."
+    },
+    "end_to_end_conclusion": "static literal 18/14 @0x01cdd958 -> Handler+0xb0/+0xb4 -> snapshot+0x38 -> Handler+0x10 exact TWorldMapStorage slot12 -> Storage+0x48/+0x4c",
+    "mutability_classification": {
+      "handler_constructor_default": "hardcoded static literal 18/14",
+      "storage_constructor_default": "zero",
+      "storage_runtime_update": "mutable/copy-driven from snapshot",
+      "handler_master_pair_after_construction": "UNKNOWN; this producer did not prove a complete later-writer census"
+    }
+  },
+  "viewport": {
+    "classification": "FACT",
+    "vptr": "0x0308c9a8",
+    "typeinfo": "0x0308b590",
+    "constructor": "0x00cbf680",
+    "constructor_extent_pair": {
+      "data": "0x01cdd958",
+      "values": [18, 14],
+      "write": "0x00cbf6b0 load QWORD 0x01cdd958; 0x00cbf6be store QWORD to Viewport+0x40"
+    },
+    "recompute": {
+      "function": "0x00cbf700",
+      "delta_data": "0x01d63cd0",
+      "delta_dwords": [15, 11],
+      "facts": [
+        "reads packed QWORDs from Viewport+0x10 and +0x18",
+        "writes a recomputed packed QWORD to Viewport+0x40",
+        "uses signed vector arithmetic and a later divide-by-32 family",
+        "resets Viewport+0x48 to 8"
+      ]
+    },
+    "conclusion": "Viewport has an exact 18/14 constructor default but Viewport+0x40 is subsequently recomputed; it must not be treated as immutable."
+  },
+  "render_provider": {
+    "classification": "FACT_WITH_SEMANTIC_INFERENCES_LABELED",
+    "vptr": "0x02f6c258",
+    "typeinfo": "0x03089b70",
+    "rtti": "tibia::worldmap::TWorldMapRenderProvider",
+    "primary_vtable_slot_range": "0..21",
+    "curation_note": "Raw source scan continued into adjacent tables after slot 21; those later entries are excluded.",
+    "facts": [
+      "slot 16 / 0x00cd08b0 iterates fixed-size 0x30-byte records and uses &0x1f plus signed shift/divide-by-32 style coordinate arithmetic before marking/filtering records",
+      "slot 14 / 0x00cd2260 consumes a dependency from this+0x68, rejects negative/out-of-range coordinates against dependency dimension fields, linearizes y*width+x, and bounds-checks the resulting vector/index range",
+      "slot 13 / 0x00cd1e50 iterates 0x20-byte entries obtained through another virtual range producer and constructs extent/ordered-state records",
+      "slots 10 / 0x00cea540 and 11 / 0x00cec020 repeatedly use &0x1f and shifts by 5 / multiples of 32",
+      "slot 21 / 0x00ce9700 constructs exact TWorldMapExtent/TWorldMapSubfieldExtent-related state and includes a fixed 0x20 allocation plus bounded bit/modulo-style selection"
+    ],
+    "inference": "These are direct 32-cell/chunk clipping, culling and render-iteration dependencies; exact source member names remain unknown."
+  },
+  "picker": {
+    "classification": "FACT",
+    "vptr": "0x02f6b7c8",
+    "typeinfo": "0x03086888",
+    "rtti": "tibia::worldmap::TWorldMapPicker",
+    "primary_vtable_slot_range": "0..7",
+    "curation_note": "Raw scan entries after slot 7 belong to adjacent metadata/vtables and are excluded.",
+    "facts": [
+      "slot 5 / 0x00cd0400 transforms packed coordinates with shl 5, a 0x1f sign/floor correction mask, paddd and psrad 5, and writes the converted packed pair",
+      "slot 4 / 0x00cd65b0 performs range iteration using shl/sar 5 and steps of 0x20 while building 0x18-byte extent-like records",
+      "slot 7 / 0x00ce80c0 obtains an extent/range, uses shl 5 and coordinate subtraction, builds bounds, and iterates 0x28-byte candidates"
+    ],
+    "conclusion": "Picker screen/world conversion paths are directly coupled to a fixed 32-cell scale. No direct hardcoded 18/14 literal was proven in these primary Picker slots."
+  },
+  "camera": {
+    "classification": "FACT_LAYOUT_ONLY_PROJECTION_SEMANTICS_UNKNOWN",
+    "vptr": "0x03083968",
+    "typeinfo": "0x03080500",
+    "rtti": "tibia::renderer::TWorldMapCamera",
+    "primary_vtable_slot_range": "0..4",
+    "curation_note": "Primary virtual slots are lifecycle/meta-heavy; raw scan entries after slot 4 belong to adjacent tables and are excluded.",
+    "constructor_layout_facts": [
+      "exact constructors allocate/initialize approximately 0xe0 bytes for direct Camera objects",
+      "exact Camera vptr 0x03083968 is installed",
+      "two 64-byte groups of XMM constant state are initialized from static constants around 0x01cd5910..0x01cd5940",
+      "embedded address point 0x02f69278 is installed in two subobjects around Camera+0x98 and Camera+0xb8",
+      "Camera+0xd0 is initialized to float bit pattern 0x3f800000 (1.0)",
+      "several surrounding fields are zero-initialized"
+    ],
+    "inference": "The repeated vector blocks and scalar 1.0 are transform/scale-like state.",
+    "unknown": "This producer does not directly prove a named projection matrix, a viewport clipping limit, or a safe camera patch site."
+  },
+  "fixed_bounds_and_literals": {
+    "facts": [
+      "exact packed literal 18/14 at 0x01cdd958",
+      "exact Viewport constructor consumes that 18/14 pair",
+      "exact Handler constructor consumes that same 18/14 pair",
+      "multiple RenderProvider and Picker consumers are coupled to 32 through shift-by-5, &0x1f, 0x20-byte stepping/allocation or equivalent arithmetic",
+      "no new primary RenderProvider/Picker immediate writer of 18/14 was promoted from the broad raw scan"
+    ]
+  },
+  "unknowns": [
+    "Complete later-writer census for Handler+0xb0/+0xb4 after constructor initialization.",
+    "Exact source-level member names/units of Handler, Viewport and Storage geometry fields.",
+    "Exact semantic projection/scale formula inside TWorldMapCamera sufficient to design a camera mutation.",
+    "Whether widening only the 18/14 master extent is sufficient without coordinated Viewport/RenderProvider/Picker updates.",
+    "No client-byte patch site is authorized or asserted by this producer."
+  ],
+  "raw_false_positive_corrections": [
+    "Generic [vtable+0x60] call candidates are not treated as Storage slot12 ownership without Handler+0x10 type anchoring.",
+    "Raw reverse-vtable candidate address point 0x0028f728 for 0x00cc6cd0 is rejected because it has RAW/non-relocation header evidence and non-zero offset-to-top; canonical Storage address point 0x0308ce70 / slot12 is the accepted relation.",
+    "Raw vtable scans for RenderProvider/Camera/Picker crossed into adjacent vtables; only curated primary ranges are promoted."
+  ]
+}

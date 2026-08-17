@@ -8,10 +8,12 @@ jobs:
   source:
     runs-on: [otclient, synology]
     outputs:
-      h: ${{ steps.x.outputs.h }}
-      s: ${{ steps.x.outputs.s }}
-      v: ${{ steps.x.outputs.v }}
-      vs: ${{ steps.x.outputs.vs }}
+      meta: ${{ steps.x.outputs.meta }}
+      metas: ${{ steps.x.outputs.metas }}
+      slot: ${{ steps.x.outputs.slot }}
+      slots: ${{ steps.x.outputs.slots }}
+      dtor: ${{ steps.x.outputs.dtor }}
+      dtors: ${{ steps.x.outputs.dtors }}
     steps:
       - id: x
         shell: bash
@@ -21,45 +23,49 @@ jobs:
           [[ "$(stat -c %s "$C")" == 51965216 && "$(sha256sum "$C"|cut -d' ' -f1)" == e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe ]] || exit 50
           python3 - "$C" "$GITHUB_OUTPUT" <<'PY'
           import struct,hashlib,sys
-          f=open(sys.argv[1],'rb');f.seek(16);e=struct.unpack('<HHIQQQIHHHHHH',f.read(48));s=[]
+          f=open(sys.argv[1],'rb');f.seek(16);e=struct.unpack('<HHIQQQIHHHHHH',f.read(48));segs=[]
           for i in range(e[9]):
            f.seek(e[4]+i*e[8]);r=struct.unpack('<IIQQQQQQ',f.read(56));
-           if r[0]==1:s.append((r[2],r[3],r[5]))
+           if r[0]==1:segs.append((r[2],r[3],r[5],r[1]))
           def R(a,b):
-           for o,v,z in s:
-            if v<=a and b<=v+z:f.seek(o+a-v);return f.read(b-a)
+           for o,v,z,flags in segs:
+            if v<=a and b<=v+z:
+             f.seek(o+a-v);d=f.read(b-a)
+             if len(d)==b-a:return d
            raise SystemExit(54)
-          bases=[0xd0f340,0xdd8150,0xb07cf0,0xdd8010,0xafcc20,0xdd7840,0xe00380]
-          h=b''.join(R(a,a+0x100) for a in bases);v=R(0x3085ce0,0x3085de0)
+          wins={'meta':R(0xb07d20,0xb07ed0),'slot':R(0xb11ee0,0xb12280),'dtor':R(0xb11c80,0xb11e00)}
           with open(sys.argv[2],'a') as q:
-           q.write(f'h={h.hex()}\n')
-           q.write(f's={hashlib.sha256(h).hexdigest()}\n')
-           q.write(f'v={v.hex()}\n')
-           q.write(f'vs={hashlib.sha256(v).hexdigest()}\n')
-          print('AUTHSESSION_PHASE6B_EXACT_FILE_FENCE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none');print('AUTHSESSION_PHASE6B_SOURCE_DISASSEMBLY=false');print('AUTHSESSION_PHASE6B_SOURCE_SECRET_ACCESS=false')
+           for k,d in wins.items():
+            q.write(f'{k}={d.hex()}\n{k}s={hashlib.sha256(d).hexdigest()}\n')
+          print('AUTHSESSION_PHASE6C_EXACT_FILE_FENCE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none');print('AUTHSESSION_PHASE6C_SOURCE_DISASSEMBLY=false');print('AUTHSESSION_PHASE6C_SOURCE_SEMANTIC_CLASSIFICATION=false');print('AUTHSESSION_PHASE6C_SOURCE_SECRET_ACCESS=false');print('AUTHSESSION_PHASE6C_RAW_CLIENT_UPLOADED=false')
           PY
   hosted:
     needs: source
     runs-on: ubuntu-24.04
     steps:
       - env:
-          H: ${{ needs.source.outputs.h }}
-          S: ${{ needs.source.outputs.s }}
-          V: ${{ needs.source.outputs.v }}
-          VS: ${{ needs.source.outputs.vs }}
+          META: ${{ needs.source.outputs.meta }}
+          METAS: ${{ needs.source.outputs.metas }}
+          SLOT: ${{ needs.source.outputs.slot }}
+          SLOTS: ${{ needs.source.outputs.slots }}
+          DTOR: ${{ needs.source.outputs.dtor }}
+          DTORS: ${{ needs.source.outputs.dtors }}
         run: |
+          set -Eeuo pipefail
           python3 - <<'PY'
-          import os,hashlib,subprocess,tempfile,re,struct
+          import os,hashlib,subprocess,tempfile,re
           from pathlib import Path
-          h=bytes.fromhex(os.environ['H']);v=bytes.fromhex(os.environ['V']);assert len(h)==0x700 and hashlib.sha256(h).hexdigest()==os.environ['S'];assert len(v)==0x100 and hashlib.sha256(v).hexdigest()==os.environ['VS']
-          bases=[0xd0f340,0xdd8150,0xb07cf0,0xdd8010,0xafcc20,0xdd7840,0xe00380]
-          print('AUTHSESSION_PHASE6B_HOSTED_DECODE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none')
-          for i,b in enumerate(bases):
+          specs=[('META',0xb07d20,0x1b0),('SLOT',0xb11ee0,0x3a0),('DTOR',0xb11c80,0x180)]
+          print('AUTHSESSION_PHASE6C_HOSTED_DECODE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none')
+          for k,start,n in specs:
+           d=bytes.fromhex(os.environ[k]);assert len(d)==n and hashlib.sha256(d).hexdigest()==os.environ[k+'S']
            with tempfile.TemporaryDirectory() as td:
-            p=Path(td)/'x';p.write_bytes(h[i*0x100:(i+1)*0x100]);t=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{b:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE).stdout
-           hits=[l.strip() for l in t.splitlines() if '# 0x3085b60' in l]
-           print(f'AUTHSESSION_PHASE6B_CANDIDATE_{i}_BASE=0x{b:x}');print('AUTHSESSION_PHASE6B_CANDIDATE_'+str(i)+'_QMETA_HITS='+' || '.join(hits))
-          print('AUTHSESSION_PHASE6B_VTABLE_QWORDS_BEGIN')
-          for i in range(0,len(v),8):print(f'0x{0x3085ce0+i:x}=0x{struct.unpack_from("<Q",v,i)[0]:x}')
-          print('AUTHSESSION_PHASE6B_VTABLE_QWORDS_END')
+            p=Path(td)/'x';p.write_bytes(d);t=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE).stdout
+           print('AUTHSESSION_PHASE6C_'+k+'_BEGIN')
+           for l in t.splitlines():
+            m=re.match(r'^\s*([0-9a-f]+):\s+([0-9a-f ]+)\s+(.+)$',l)
+            if m:print(m.group(1)+': '+m.group(3).strip())
+           refs=sorted(set(int(x,16) for x in re.findall(r'#\s*0x([0-9a-f]+)',t)))
+           print('AUTHSESSION_PHASE6C_'+k+'_RIP_REFS='+','.join(hex(x) for x in refs))
+           print('AUTHSESSION_PHASE6C_'+k+'_BEGIN_END')
           PY

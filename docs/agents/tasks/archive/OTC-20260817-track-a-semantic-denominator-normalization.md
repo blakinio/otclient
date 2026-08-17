@@ -99,7 +99,7 @@ closeout:
   ready_state_required_ci_required: true
   review_threads_required_zero: true
 last_completed_step: four finite canonical denominator registries materialized, integrated validator and fresh audit passed, and current-main runtime/worldmap drift through f8e628a was reconciled without changing denominator membership
-next_action: none for this task after PR #460 merge
+next_action: run exact-head required CI and review hygiene on the refreshed PR #460 head, then merge if main remains compatible
 ---
 
 # Track A semantic denominator normalization — archived

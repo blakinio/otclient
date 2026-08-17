@@ -14,22 +14,72 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  safety-hold:
-    name: Hold after cross-launch Tab identity falsification
+  adaptive-field-static:
+    name: Same-launch adaptive field classifier (no client)
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 4
     steps:
-      - name: Preserve run 32037993455 before same-launch adaptive probe
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate variant classifier fixtures
         shell: bash
         run: |
           set -Eeuo pipefail
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD=PASS'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_REASON=cross_launch_tab_identity_not_stable'
-          echo 'WORLDMAP_CAUSAL_LAST_TEXT_RUN=32037993455'
-          echo 'WORLDMAP_CAUSAL_LAST_TEXT_JOB=95412099981'
-          echo 'WORLDMAP_CAUSAL_LAST_TEXT_FIELD_CANDIDATE_COUNT=0'
-          echo 'WORLDMAP_CAUSAL_LAST_TEXT_SECRET_USED=false'
-          echo 'WORLDMAP_CAUSAL_LAST_TEXT_LOGIN_SUBMITTED=false'
-          echo 'WORLDMAP_CAUSAL_NEXT_DISCRIMINATOR=same_launch_discover_then_classify'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_SECRET_USED=false'
+          C=.github/scripts/track-a-worldmap-causal-text-variant-classify.py
+          python3 -m py_compile "$C"
+          python3 "$C" 100,100,160,115 102,100,162,115 120 118 | tee "$RUNNER_TEMP/masked.out"
+          grep -F 'WORLDMAP_TEXT_VARIANT_CLASS=MASKED_LIKE' "$RUNNER_TEMP/masked.out" >/dev/null
+          python3 "$C" 100,100,130,115 100,100,190,115 100 220 | tee "$RUNNER_TEMP/unmasked.out"
+          grep -F 'WORLDMAP_TEXT_VARIANT_CLASS=UNMASKED_LIKE' "$RUNNER_TEMP/unmasked.out" >/dev/null
+          python3 "$C" 100,100,150,115 100,100,160,115 100 105 | tee "$RUNNER_TEMP/ambiguous.out"
+          grep -F 'WORLDMAP_TEXT_VARIANT_CLASS=AMBIGUOUS' "$RUNNER_TEMP/ambiguous.out" >/dev/null
+          echo 'WORLDMAP_ADAPTIVE_VARIANT_FIXTURES=PASS'
+
+      - name: Validate no-secret adaptive composition
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py \
+            .github/scripts/track-a-worldmap-causal-xwd-text-semantics.py \
+            .github/scripts/track-a-worldmap-causal-text-variant-classify.py \
+            .github/scripts/track-a-worldmap-causal-xres-geometry-census-repair.py \
+            .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-prelogin-adaptive-field-scan-repair.py
+          screen="$RUNNER_TEMP/wm-adaptive-screen.sh"
+          gdb="$RUNNER_TEMP/wm-adaptive-gdb.sh"
+          ui="$RUNNER_TEMP/wm-adaptive-ui.sh"
+          scan="$RUNNER_TEMP/wm-adaptive-scan.sh"
+          python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$ui"
+          python3 .github/scripts/track-a-worldmap-causal-prelogin-adaptive-field-scan-repair.py "$ui" "$scan"
+          bash -n "$scan"
+          grep -F 'WORLDMAP_ADAPTIVE_FIELD_SCAN_SECRET_ENV=ABSENT' "$scan" >/dev/null
+          grep -F 'WORLDMAP_ADAPTIVE_FIELD_SCAN_MODE=SAME_LAUNCH_DISCOVER_TEXT_AND_VARIANT' "$scan" >/dev/null
+          grep -F "'abc'" "$scan" >/dev/null
+          grep -F "'abcdefghijklm'" "$scan" >/dev/null
+          grep -F "'iiiiii'" "$scan" >/dev/null
+          grep -F "'WWWWWW'" "$scan" >/dev/null
+          grep -F 'WORLDMAP_ADAPTIVE_TEXT_FIELD=' "$scan" >/dev/null
+          if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
+            echo 'WORLDMAP_ADAPTIVE_STATIC_ERROR=credential_submission_survived' >&2
+            exit 1
+          fi
+          if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
+            echo 'WORLDMAP_ADAPTIVE_STATIC_ERROR=login_or_gameplay_surface_survived' >&2
+            exit 1
+          fi
+          echo 'WORLDMAP_ADAPTIVE_COMPOSITION=PASS'
+          echo 'WORLDMAP_ADAPTIVE_STATIC_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_ADAPTIVE_STATIC_SECRET_USED=false'

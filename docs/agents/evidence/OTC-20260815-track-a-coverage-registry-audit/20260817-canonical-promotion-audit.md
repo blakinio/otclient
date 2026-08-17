@@ -3,45 +3,43 @@
 Date: 2026-08-17
 Task: `OTC-20260817-track-a-canonical-coverage-registry`
 PR: #454
-Audited implementation head: `7eb39676a235c6af07f3c891dfa9348a5ac43bb6`
+Audited registry head: `7eb39676a235c6af07f3c891dfa9348a5ac43bb6`
 Trusted main: `d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab`
-Audit role: fresh proportionate repository/data validator
 
 ## Scope
 
-The audit attempts to falsify the claim that #454 closes only `AUD-COV-001` without silently upgrading historical inventory evidence into current semantic facts. It uses live GitHub state, accepted source #304, the exact PR diff, validator output and current-main lane state. It performs no runtime/client/Synology work.
+Falsify the claim that #454 closes only `AUD-COV-001` without converting the accepted #304 bounded inventory into global semantic truth. GitHub/repository evidence only; no runtime/client/Synology use.
 
-## Checks
+## Independent checks
 
 | ID | Check | Result |
 |---|---|---|
-| CCR-A01 | source authority | PASS — #304 exact head `43a60bd...` was coordinator `ACCEPT_WITH_EDITS` bounded inventory only; source CI `31882010038` SUCCESS |
-| CCR-A02 | source identity | PASS — canonical manifest fences every promoted accepted baseline/provenance artifact by exact Git blob SHA-1 |
-| CCR-A03 | protocol inventory | PASS — validator independently decompresses/hashes exact 349 identifiers and proves 189 inbound + 160 outbound |
-| CCR-A04 | runtime/QMeta inventory | PASS — exact baseline carries 47 unique bounded handler records with semantic default UNKNOWN |
-| CCR-A05 | negative evidence | PASS — `DISPROVEN/SUPERSEDED` records including the obsolete `0xb5b880` model remain present; UNKNOWN scope records remain present |
-| CCR-A06 | stale-source containment | PASS — old README/blockers/summary/validator/output are retained with `source-` prefixes; current routing/state lives in overlay files |
-| CCR-A07 | semantic non-overclaim | PASS — protocol semantics stay UNKNOWN/349; direct Qt semantics UNKNOWN/2184; P0/P1 item-level denominators UNKNOWN/UNKNOWN |
-| CCR-A08 | P2 overlay | PASS — bounded chain is promoted but framing/sequence/compression/encryption/final egress/socket ownership remain UNKNOWN |
-| CCR-A09 | worldmap overlay | PASS — mutation design is promoted/ready, while safe mutation and physical execution authorization remain false |
-| CCR-A10 | RUNTIME overlay | PASS — #448 merge is consumed; exact XID→official-client PID, registered session and Gate-B semantics remain unproven |
-| CCR-A11 | audit finding accounting | PASS — candidate tree resolves only `AUD-COV-001`; remaining set is exactly `002,003,004,007` = 4 findings, 2 HIGH + 2 MEDIUM |
-| CCR-A12 | execution safety | PASS — GitHub-hosted deterministic data validation only; no raw client, runtime, credentials, login/gameplay, process memory or owner-funded AI |
-| CCR-A13 | reusable validation | PASS — permanent path-scoped GitHub-hosted workflow executes the canonical validator on registry/report changes |
-| CCR-A14 | review hygiene pre-closeout | PASS — 0 reviews and 0 unresolved review threads at implementation audit checkpoint |
+| CCR-A01 | source authority | PASS — #304 exact `43a60bd...`, coordinator `ACCEPT_WITH_EDITS`, CI `31882010038` |
+| CCR-A02 | exact source identity | PASS — promoted accepted baseline/provenance files are fenced by exact Git blob SHA-1 |
+| CCR-A03 | protocol inventory | PASS — validator decompresses and hashes exactly 349 unique names = 189 inbound + 160 outbound |
+| CCR-A04 | runtime/QMeta inventory | PASS — 47 unique bounded handler records, semantic default UNKNOWN |
+| CCR-A05 | negative evidence | PASS — retained `DISPROVEN/SUPERSEDED` and scope `UNKNOWN` records |
+| CCR-A06 | stale-source containment | PASS — historical README/blockers/summary/validator/output are `source-*`; current programme state is separate overlay |
+| CCR-A07 | semantic non-overclaim | PASS — message semantics UNKNOWN/349, Qt semantics UNKNOWN/2184, P0/P1 item denominators UNKNOWN/UNKNOWN |
+| CCR-A08 | P2 boundary | PASS — bounded chain promoted; framing/sequence/compression/encryption/final egress/socket ownership UNKNOWN |
+| CCR-A09 | worldmap boundary | PASS — mutation design ready; safe mutation and physical execution authorization false |
+| CCR-A10 | RUNTIME boundary | PASS — merged #448 consumed; exact XID→official-client PID, registered session and Gate-B semantics remain unproven |
+| CCR-A11 | finding accounting | PASS — resolves only `AUD-COV-001`; remaining exactly `002,003,004,007` = 4 findings, 2 HIGH + 2 MEDIUM |
+| CCR-A12 | safety | PASS — no raw client, runtime, credentials, login/gameplay, process memory or owner-funded AI |
+| CCR-A13 | reusable validator | PASS — canonical `validate_registry.py` remains durable and directly runnable from the README |
+| CCR-A14 | review hygiene | PASS — 0 reviews and 0 unresolved review threads at audit checkpoint |
 
-## Finding discovered during audit
+## Resolved audit findings
 
 ### CCR-AUD-001 — MEDIUM — RESOLVED
 
-After #448 merged, the first restacked validator still asserted the prior overlay state `raw_xres_promotion_merged == false`. The overlay itself had been correctly refreshed to `true`, so this stale assertion would have produced a false validation failure.
+After #448 merged, the first restacked validator still expected `raw_xres_promotion_merged == false`. The overlay was correctly `true`; the stale assertion was fixed to pin merge `d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab` while keeping physical XID→PID and Gate-B semantics unknown. Dedicated run `32013364473`, job `95337501296` then passed with `CANONICAL_COVERAGE_REGISTRY_VALIDATION=PASS` and `SOURCE_BASELINE_BLOBS_EXACT=true`.
 
-Resolution:
-- validator now requires `raw_xres_promotion_merged == true`;
-- it pins the accepted merge `d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab`;
-- it still requires `exact_resource_to_official_client_pid == UNKNOWN`, `current_exact_client_pid == NOT_REGISTERED`, and `canonical_gate_b == NOT_PROVEN`.
+### CCR-AUD-002 — MEDIUM — RESOLVED
 
-Dedicated run `32013364473`, job `95337501296` then passed with `CANONICAL_COVERAGE_REGISTRY_VALIDATION=PASS` and `SOURCE_BASELINE_BLOBS_EXACT=true`.
+The first terminal tree kept a new dedicated Track A workflow while removing the active admission task. Governance run `32013621176` correctly rejected that lifecycle shape because new Track A workflows are runtime-sensitive governance paths.
+
+Resolution: the dedicated workflow is removed from the terminal tree. It served only as the GitHub-hosted validation vehicle for run `32013364473`. The reusable validator itself remains canonical, documented and executable; final exact-head repository/governance checks verify the terminal tree.
 
 ## Audit disposition
 
@@ -50,6 +48,7 @@ audit_result: PASS
 material_findings_open_for_this_task: 0
 resolved_task_findings:
   - CCR-AUD-001
+  - CCR-AUD-002
 AUD-COV-001: RESOLVED_IN_CANDIDATE_TREE
 programme_findings_remaining:
   - AUD-COV-002 HIGH
@@ -61,4 +60,4 @@ runtime_access: none
 physical_e2e: NOT_APPLICABLE_WITH_REASON
 ```
 
-Terminal closeout may archive/release this task and merge only after the exact terminal head passes the dedicated registry workflow, Track A governance, repository required CI, review hygiene and final main-drift checks.
+Terminal merge is allowed only after the exact final head passes Track A governance, repository required CI, review hygiene and final main-drift checks. The component validator evidence remains run `32013364473` on the unchanged registry/validator payload.

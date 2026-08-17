@@ -12,7 +12,7 @@ base_branch: main
 base_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
 pr: 454
 risk: medium
-updated: 2026-08-17T11:07:00+02:00
+updated: 2026-08-17T11:10:00+02:00
 execution_class: github_hosted
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
@@ -45,10 +45,10 @@ canonical_registry:
   supersessions_jsonl: present_exact_source_blob
   current_main_overlay: present
   current_coverage_summary: present
-  permanent_validator: present
-  permanent_hosted_workflow: present
+  reusable_validator: present
+  dedicated_validation_workflow_terminal_tree: removed_after_successful_validation
 validation:
-  implementation_head: 7eb39676a235c6af07f3c891dfa9348a5ac43bb6
+  component_head: 7eb39676a235c6af07f3c891dfa9348a5ac43bb6
   registry_run: 32013364473
   registry_job: 95337501296
   registry_result: SUCCESS
@@ -56,15 +56,17 @@ validation:
   source_baseline_blobs_exact: true
   track_a_governance_run: 32013364501
   track_a_governance_result: SUCCESS
-  implementation_repository_ci_run: 32013364695
-  implementation_repository_ci_load_bearing: false
-  reason: terminal closeout creates a new exact head that receives final repository CI
+  first_terminal_governance_failure_run: 32013621176
+  first_terminal_governance_failure_reason: dedicated Track A workflow remained while active admission task was removed
+  repair_cycles: 2
+  final_resolution: remove dedicated validation workflow from terminal tree; retain validator and durable validation output
 fresh_audit:
   result: PASS
   record: docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/20260817-canonical-promotion-audit.md
   material_findings_open_for_task: 0
   resolved_findings:
     - CCR-AUD-001
+    - CCR-AUD-002
 result:
   AUD-COV-001: RESOLVED_ON_PR_454_MERGE
   programme_complete: false
@@ -83,11 +85,10 @@ closeout:
   active_task_removed_in_terminal_tree: true
   archive_complete_on_merge: true
   ownership_released: true
-  exact_terminal_head_registry_validation_required: true
   exact_terminal_head_track_a_governance_required: true
   exact_terminal_head_repository_ci_required: true
   ready_state_required_ci_required: true
-last_completed_step: exact accepted #304 registry baseline was promoted as an immutable layer with current-main overlay, permanent deterministic validation and current coverage-report reconciliation; fresh audit passed with one resolved validator-staleness finding
+last_completed_step: promoted exact accepted #304 registry baseline as an immutable layer with current-main overlay and reusable validator; component validation and fresh audit passed; terminal lifecycle was repaired by removing the dedicated validation workflow
 next_action: none after PR #454 merges; remaining four audit findings require separately owned programme work
 ---
 

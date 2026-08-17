@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260817-track-a-p2-f50090-framing
-status: investigating
+status: ready
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: review
 branch: docs/OTC-20260817-track-a-p2-f50090-framing
 base_branch: main
 base_main: c1adcf491580e28d40f215356a9e559af2ccadc4
@@ -18,9 +18,10 @@ owned_paths:
 modules_touched: []
 reuses:
   - PR #492 canonical Qt/QTcpSocket-bound egress promotion
-  - PR #449 exact-client bounded processor artifact run 32005141186
-  - PR #310 accepted downstream artifact run 31904696996
-  - PR #488 exact-client f50090 bounded hosted decode run 32037533068
+  - run 32037533068 / hosted job 95410901806
+  - run 31904696996 / artifact 9252025461
+  - run 32005141186 / artifacts 9279753620 and 9279759553
+  - exact helper artifact 9251725866
 depends_on:
   - main@c1adcf491580e28d40f215356a9e559af2ccadc4
   - PR #492 merged canonical outbound reachability
@@ -70,84 +71,67 @@ exact_client:
 
 ## Objective
 
-Use only already-retained exact-client bounded evidence to prove or falsify the smallest post-`#492` transport-semantic frontier:
+Prove or falsify framing on the already-canonical same-message path ending at the Qt/QTcpSocket-bound `QDataStream::writeRawData @ 0x4dd250`, using only retained exact-client bounded evidence.
+
+## Result
+
+`H1` is **PROVEN** at researcher level.
+
+Exact `0xf50090` bytes establish this ordered serialization before the raw payload:
 
 ```text
-Does the proven QTcpSocket-bound `0xf50090 -> 0x4dd250` path serialize a concrete frame header around the same outbound payload?
-```
-
-Do not broaden into a generic Qt write census, Linux syscall tracing, runtime/login, world-map work or unsupported protocol semantics.
-
-## Accepted canonical input
-
-Current `main@c1adcf491580e28d40f215356a9e559af2ccadc4` promotes:
-
-```text
-same outbound message
- -> TGameserverDualConnection +0x78 branch
- -> virtual +0x30 @ 0xb56c93
- -> TConnectionMultiplexer::write @ 0xf50040
- -> second virtual +0x30 @ 0xf50090
- -> TGameserverTCPConnection::write @ 0xb40a10
- -> concrete TGameserverTCPConnection-owned QTcpSocket
- -> QDataStream
+scalar A: low16(ceil(payload_length/8))
+ -> scalar B: DWORD(message+0), semantics UNKNOWN
+ -> raw payload pointer/length
  -> QDataStream::writeRawData @ 0x4dd250
 ```
 
-Canonical terminal state before this task:
+Current-main PR #492 independently binds this same QDataStream/raw write to the concrete `TGameserverTCPConnection`-owned QTcpSocket. Therefore the pre-payload fields are a concrete outbound framing layer rather than a local-only QBuffer representation.
+
+Exact `0xb47130` bytes additionally prove an earlier same-message envelope transform: prepend one byte, append helper-produced bytes until total QByteArray length is divisible by 8, store appended-byte count in the first byte, then assign the transformed QByteArray back. The helper and optional later indirect transform are not semantically classified.
+
+Researcher terminal classification:
 
 ```text
 DUALCONNECTION_TO_BINARY_EGRESS=PROVEN
-FINAL_BINARY_EGRESS=PROVEN_AT_QT_QTCPSOCKET_BOUNDARY
+FINAL_BINARY_EGRESS=QDataStream::writeRawData@0x4dd250_AT_QT_QTCPSOCKET_BOUNDARY
 FINAL_SOCKET_OWNER=TGameserverTCPConnection
-FRAMING=UNKNOWN
+FRAMING=PROVEN
 SEQUENCE=UNKNOWN
 COMPRESSION=UNKNOWN
 ENCRYPTION=UNKNOWN
 LINUX_SOCKET_SYSCALL=UNKNOWN
 ```
 
-## Hypothesis
+This is **not canonical until coordinator promotion**.
 
-`H1`: exact bounded bytes already retained for `0xf50090` prove a deterministic scalar header is serialized to the same QDataStream before the raw outbound payload, sufficient to classify framing as `PROVEN` at the Qt/QTcpSocket boundary.
+## Evidence
 
-A scalar's width/order may be proven without assigning a semantic name to the field. Sequence, compression and encryption remain separate hypotheses.
-
-## Evidence inventory
-
-Primary exact-client evidence to independently re-evaluate:
-
-- run `32037533068`, hosted job `95410901806`, main window `0xf50040..0xf50480`, SHA-256 `1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea`;
-- run `31904696996`, artifact `9252025461`, SHA-256 `2a866247558b079944d81c9ad33bd4c5361c8144a7f367b273ab3bc19a080991`;
-- run `32005141186`, source artifact `9279753620`, SHA-256 `6c970c23aa95856698eb71024937ed847502fb1f040701ce04c632da32c38d32`, hosted artifact `9279759553`, SHA-256 `8228d6c281cf99f45f5c880b76e7a2817130156fde4cc892a402eccf4af10528`;
-- current-main canonical QTcpSocket-bound promotion under `docs/agents/evidence/OTC-20260817-track-a-p2-qtcpsocket-boundary-promotion/`.
-
-No new source staging is authorized by this task unless existing evidence proves insufficient and a separately persisted minimal producer contract is first justified.
-
-## Negative controls
-
-Do not use as framing/egress proof:
-
-- `0xb40630/0xb4066b` as the DualConnection egress branch;
-- `0xb46bd0` QString/local8bit/newline path;
-- `0xc33259` QMatrix4x4/non-network path;
-- superseded `0xb5b880`;
-- generic Qt `QIODevice::write` census;
-- class names without dataflow;
-- vtable adjacency;
-- mere possession of a `QTcpSocket*`.
+- `docs/agents/evidence/OTC-20260817-track-a-p2-f50090-framing/result.json`
+- `docs/agents/evidence/OTC-20260817-track-a-p2-f50090-framing/20260817-f50090-egress-framing.md`
+- run `32037533068`, hosted job `95410901806`, exact window `0xf50040..0xf50480`, SHA-256 `1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea`
+- artifact `9252025461`, SHA-256 `2a866247558b079944d81c9ad33bd4c5361c8144a7f367b273ab3bc19a080991`
+- artifact `9279759553`, SHA-256 `8228d6c281cf99f45f5c880b76e7a2817130156fde4cc892a402eccf4af10528`
+- artifact `9251725866`, SHA-256 `f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e`
 
 ## Acceptance
 
-- [ ] independently bind every claimed scalar/raw write to exact instructions from an exact-client bounded artifact;
-- [ ] preserve same-message/payload provenance into the already-proven QTcpSocket-bound QDataStream;
-- [ ] state exact serialized stage order without inventing field semantics or byte order;
-- [ ] classify `FRAMING` as `PROVEN` only if the pre-payload header is instruction/dataflow-proven;
-- [ ] keep `SEQUENCE`, `COMPRESSION`, `ENCRYPTION` and Linux syscall boundary `UNKNOWN` unless separately direct evidence resolves them;
-- [ ] record RawDataProcessor padding behavior only to the strength directly shown by bytes; do not label its helper/encryption semantics without proof;
-- [ ] no live runtime, world-map, login, owner-funded AI, raw executable upload or proprietary full-binary commit;
-- [ ] publish only Draft researcher evidence and route it to coordinator review; researcher does not self-promote canonical state.
+- [x] scalar/raw write claims bound to exact-client instructions;
+- [x] same-message/payload provenance retained into canonical QTcpSocket-bound QDataStream;
+- [x] exact proven stage order recorded without naming unknown field semantics;
+- [x] `FRAMING=PROVEN` only from concrete pre-payload write order;
+- [x] `SEQUENCE`, `COMPRESSION`, `ENCRYPTION` and Linux syscall remain `UNKNOWN`;
+- [x] RawDataProcessor padding behavior limited to direct byte/dataflow proof;
+- [x] no runtime/login/world-map/new source staging/owner-funded AI/full executable upload;
+- [x] output remains Draft researcher evidence with coordinator-only promotion authority.
 
-## Current next action
+## Rejected / controlled candidates
 
-Independently decode the retained `0xf50090` write sequence and cross-check it against the current-main QTcpSocket-bound provenance. If the header is proven, persist a bounded Draft evidence package and stop this researcher frontier at the semantic boundary; leave the 32-bit field provenance as the next smallest falsifiable hypothesis.
+- `0xb40630/0xb4066b`: disproven as this DualConnection egress branch; the call at `0xb4066b` exists but belongs to a distinct function/path.
+- `0xb46bd0`: QString/local8bit/newline negative control; not used.
+- `0xc33259`: QMatrix4x4/non-network negative control; not used.
+- `0xb5b880`: superseded historical sink; not used.
+
+## Next action
+
+Coordinator independently review/falsify this Draft and, if accepted, promote `FRAMING=PROVEN`. After promotion, the next smallest independent frontier is exact producer/update provenance of `DWORD(message+0)` at `f50107`, to prove or disprove sequence semantics without inferring from width or position.

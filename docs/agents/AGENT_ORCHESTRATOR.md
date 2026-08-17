@@ -251,24 +251,27 @@ Enablement is fail-closed. The executor requires all of:
 - `owner_funded_ai_allowed: true` when that provider is classified `requires_owner_funded_ai: true`;
 - a finite timeout and bounded worker count.
 
-The worker receives one JSON request on stdin containing the compact `resume.py` prompt, exact task/branch/base identity, owned paths, isolated workspace and `worker-result-v1` contract. The subprocess runs with `shell=False` and an allowlisted environment.
+The worker receives one JSON request on stdin containing the compact `resume.py` prompt, exact task/branch/base identity, owned paths, isolated workspace and `worker-result-v1` contract. The subprocess runs with `shell=False` and an allowlisted environment. `HOME` is deliberately absent from the built-in environment because credential/config material commonly lives below it; a provider may receive `HOME` or another credential-bearing variable only when the authorized provider configuration names it explicitly in `pass_env`.
 
 For each selected task the adapter:
 
-1. verifies current task/dispatch branch and exact base SHA;
-2. creates a unique detached Git worktree at that exact base;
-3. launches one external worker process with a finite timeout;
-4. requires structured `worker-result-v1` JSON on stdout;
-5. rejects non-zero exit, malformed JSON or dirty/uncommitted worktree state;
-6. verifies returned `head_sha` equals the actual worktree `HEAD`;
-7. derives changed paths from `git diff <base>...HEAD` and requires an exact match with the worker result;
-8. applies the existing task/branch/base/path/evidence/context result validation;
-9. optionally publishes the result commit to the task branch using a normal non-force push only when the remote branch is absent or still equals the dispatch base;
-10. removes the isolated worktree.
+1. rediscovers the current task inventory and recomputes the selected wave so dependency, context, branch/head and ownership changes invalidate a stale plan before worker launch;
+2. verifies current task/dispatch branch and exact base SHA, rejecting `main`/`master` and invalid branch names;
+3. creates a unique detached Git worktree at that exact base;
+4. launches one external worker process with a finite timeout;
+5. requires structured `worker-result-v1` JSON on stdout;
+6. rejects non-zero exit, malformed JSON or dirty/uncommitted worktree state;
+7. verifies the actual worktree `HEAD` descends from the dispatch base and equals returned `head_sha`;
+8. derives changed paths from `git diff <base>...HEAD` and requires an exact match with the worker result;
+9. applies the existing task/branch/base/path/evidence/context result validation;
+10. for a worker with any changed path, requires `publish_results: true` and publishes the result commit to the task branch using a normal non-force push only when the remote branch is absent or still equals the dispatch base;
+11. verifies the published branch points at the accepted worker head, then removes the isolated worktree.
 
-A failed worker produces no accepted result file. The barrier therefore cannot promote a failed or mismatched worker as `DONE`.
+A failed worker produces no accepted result file. A writer whose commit is not durably published also fails closed; `publish_results: false` is valid only for a no-change/read-only worker. The barrier therefore cannot promote a failed, mismatched or unreachable writer result as `DONE`.
 
 The repository default configuration intentionally keeps this path disabled. A task command such as `next_action` is never converted into executable shell syntax.
+
+A detached Git worktree is an isolation mechanism for worker files, **not a hostile-worker sandbox**: worktrees share repository Git metadata. Before any concrete AI/model runtime is activated, its trusted wrapper/execution environment must separately bound repository-global Git ref/config mutation, credential access, network/process authority and any other provider-specific capability. The generic adapter does not grant that authority merely because it can launch a process.
 
 ## Barrier and iterative replanning
 
@@ -295,7 +298,7 @@ Invalid results prevent automatic next-wave computation. The coordinator must in
 
 ## GitHub-hosted smoke E2E
 
-`.github/workflows/agent-orchestrator-smoke.yml` proves the control-plane mechanics without an AI service. Its focused suite includes deterministic real-executor integration tests that create temporary Git repositories/worktrees and launch `fake_real_worker.py` as a genuine external process. The fixture proves successful committed output plus malformed JSON, non-zero exit, timeout, dirty worktree, head mismatch and ownership-escape failures.
+`.github/workflows/agent-orchestrator-smoke.yml` proves the control-plane mechanics without an AI service. Its focused suite includes deterministic real-executor integration tests that create temporary Git repositories/worktrees and launch `fake_real_worker.py` as a genuine external process. The fixture proves a successful committed writer is durably published to its task branch and accepted, while malformed JSON, non-zero exit, timeout, dirty worktree, head mismatch, stale plan, protected branch, ownership escape, missing durable publication and a moved remote task branch all fail closed. It also proves unlisted environment data, including `HOME`, is absent unless explicitly allowlisted.
 
 The existing fan-out/fan-in fixture also proves:
 
@@ -317,7 +320,9 @@ The adapter is implemented, but a concrete model/provider configuration remains 
 
 - exact authorization for any owner-funded AI/model/credential use;
 - a trusted worker wrapper that accepts the JSON request and emits `worker-result-v1`;
+- explicit `pass_env` entries only for the provider environment variables actually authorized;
 - one independently isolated worker process per selected task;
+- a provider-specific sandbox/capability boundary appropriate to repository-global Git metadata, credentials, network and process access;
 - repository-specific runtime/protected-resource admission gates;
 - fresh live ownership and dependency checks;
 - fresh validator roles where required by the task;
@@ -361,6 +366,7 @@ The orchestrator does not:
 - select or authorize a model/provider by itself;
 - treat credential availability as permission to consume owner-funded AI quota;
 - execute shell commands sourced from task prose;
+- provide a hostile-model sandbox merely by using Git worktrees;
 - bypass task ownership, runtime admission, audit, E2E, exact-head CI or merge gates;
 - claim deterministic fixtures are AI agents;
 - make `ACTIVE_WORK.md` a shared lock;

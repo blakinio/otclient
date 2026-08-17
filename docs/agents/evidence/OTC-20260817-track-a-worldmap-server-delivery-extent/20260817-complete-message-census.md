@@ -119,12 +119,14 @@ Existing exact-client evidence in `docs/agents/evidence/OTC-20260816-track-a-wor
 
 This proves a real protocol-to-worldmap geometry path. It still does not name the server-side maximum or prove that client-local `18/14` changes what the server sends.
 
-## Current classification boundary
+## Final classification boundary
+
+The follow-on targeted descriptor producer has completed. Its bounded result is persisted in `20260817-targeted-descriptor-boundary.md`.
 
 ```yaml
 SERVER_MAP_DELIVERY_DIRECTIONALITY: server_to_client_map_payload_families_proven
 OUTBOUND_EXPLICIT_EXTENT_MESSAGE_NAME: absent_in_complete_160_name_census
-OUTBOUND_GENERIC_MESSAGE_EXTENT_FIELD_CENSUS: pending_descriptor_probe
+OUTBOUND_GENERIC_MESSAGE_EXTENT_FIELD_CENSUS: NOT_RECOVERED
 SERVER_MAP_DELIVERY_MODEL: UNKNOWN
 SERVER_LARGER_RECTANGLE_SUPPORTED: UNKNOWN
 SERVER_FULL_FLOOR_DELIVERY_SUPPORTED: UNKNOWN
@@ -135,6 +137,6 @@ MAX_SERVER_DELIVERABLE_EXTENT: UNKNOWN
 
 Do not collapse `TopFloor`/`BottomFloor` names into a claim that an entire world floor is transferable. The names establish message families only.
 
-## Next discriminator
+## Static discriminator outcome
 
-A second bounded static producer is attempting to recover exact protobuf descriptor fields for the generic client messages plus the `FullMap`/row/column/floor server messages. Its result must be evaluated before promoting `SERVER_MAP_DELIVERY_MODEL` beyond `UNKNOWN`.
+The targeted descriptor probe validated its parser against the exact serialized `tibia.protobuf.shared.Coordinate` descriptor but did not recover exact descriptors for `Extent`, the generic outbound target messages, or the map-delivery server messages. That bounded failure does not justify another broader producer. The remaining extent-control distinction requires the separately authorized physical causal experiment defined by `docs/agents/reports/OTCLIENT-20260817-worldmap-server-delivery-extent.md`.

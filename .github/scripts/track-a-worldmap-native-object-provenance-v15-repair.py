@@ -45,8 +45,10 @@ root=os.path.dirname(ev); objfile=os.path.join(root,'v15-native-objects.json')
 with open(objfile,'w') as f:
     json.dump({'schema':'worldmap-native-object-provenance-v15','objects':objects},f,sort_keys=True,separators=(',',':'))
 os.chmod(objfile,0o600)
-for k in ('auth','charsel','gameclient','uploader'):
-    gdb.write('WORLDMAP_V15_LIVE_'+k.upper()+'_INSTANCE_COUNT='+str(len(objects[k]))+'\n')
+gdb.write('WORLDMAP_V15_LIVE_AUTH_INSTANCE_COUNT='+str(len(objects['auth']))+'\n')
+gdb.write('WORLDMAP_V15_LIVE_CHARSEL_INSTANCE_COUNT='+str(len(objects['charsel']))+'\n')
+gdb.write('WORLDMAP_V15_LIVE_GAMECLIENT_INSTANCE_COUNT='+str(len(objects['gameclient']))+'\n')
+gdb.write('WORLDMAP_V15_LIVE_UPLOADER_INSTANCE_COUNT='+str(len(objects['uploader']))+'\n')
 # Auth and GameClient are required before any credentials. Character-selection
 # controller is required for the native semantic continuation. Uploader may be
 # absent until a cold login request is constructed.

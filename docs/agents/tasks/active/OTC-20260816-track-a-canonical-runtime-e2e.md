@@ -2,18 +2,18 @@
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
 status: ready
 agent: ChatGPT
-session_id: chatgpt-coord-window-xres-promotion-20260817
+session_id: chatgpt-coord-xres-child-archive-20260817
 session_role: promotion_integration_coordinator
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: coordinator-promotion-post-rhi-xres-chain
-branch: docs/OTC-20260817-track-a-window-xres-promotion
+phase: raw-xres-helper-hosted-ready
+branch: docs/OTC-20260817-track-a-xres-child-archive
 base_branch: main
-base_main: 845adabba5f6d2bfecb6d54bc13834c47cc61c94
+base_main: 7540a679420689c388d9d11125c9fd8846956a10
 risk: high
-updated: 2026-08-17T08:20:00+02:00
+updated: 2026-08-17T08:32:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
@@ -22,16 +22,15 @@ reuses:
   - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-xvfb-dri-path-fix.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-dri-repair-isolated-client-revalidation.md
+  - docs/agents/tasks/archive/OTC-20260816-track-a-xres-window-identity.md
+  - docs/agents/tasks/archive/OTC-20260816-track-a-xres-support-inventory.md
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-  - source Draft #438 post-RHI window-state evidence
-  - source Draft #442 XRes identity helper-unavailable evidence
-  - source Draft #443 XRes support inventory evidence
 blocks:
   - OTC-20260815-track-a-p0-direct-position
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: coordinator review independently re-read the raw physical/support job logs for Drafts #438, #442 and #443. #438 and #442 are ACCEPT. #443 is ACCEPT_WITH_EDITS because its source Markdown contained two library hashes inconsistent with the raw job and an unsupported header digest; the promoted evidence corrects those fields without changing the helper-availability classification. Current work is promotion-only and grants no physical runtime authority. The next causal phase is a hosted/static raw-XRes encoder/parser before any new client launch.
+execution_reason: coordinator promotion #444 merged the independently audited post-RHI raw-X11, XRes helper-unavailable and corrected XRes support evidence. Source Drafts #438/#442/#443 are closed superseded. The two bounded XRes child tasks are archived and ownership-released by this lifecycle branch. The remaining canonical task now has one causal next step: a GitHub-hosted raw-XRes encoder/parser derived from the promoted observed XResproto wire layout, without Xvfb/client/canonical state access. Physical identity retry remains forbidden until that helper is validated and separately admitted.
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -55,131 +54,62 @@ mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
-runtime_nonclaims:
-  current_canonical_display: UNKNOWN
-  current_canonical_vnc_endpoint: UNKNOWN
-  current_exact_client_pid: NOT_REGISTERED
-  current_exact_client_session: NOT_REGISTERED
-  canonical_registration_authority: ABSENT_OR_UNPROVEN
-promoted_bootstrap_governance:
-  bootstrap_implementation_pr: 371
-  bootstrap_archive_pr: 375
-  admission_reconciliation_pr: 436
-  admission_reconciliation_merge: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
-  status: IMPLEMENTED_AND_GOVERNABLE
-  blind_bootstrap_retry_authorized: false
-promoted_graphics_prerequisite:
-  dri_repair_pr: 429
-  dri_repair_archive_pr: 430
-  isolated_revalidation_source_pr: 431
-  isolated_revalidation_promotion_pr: 432
-  isolated_revalidation_archive_pr: 434
-  x11_glx_present: true
-  prior_qxcb_no_glx_egl_failure_removed: true
-post_rhi_window_evidence:
-  source_pr: 438
-  coordinator_decision: ACCEPT
-  final_source_head: 171fbfa679c8c75dc9722fe39c19141962282f01
-  semantic_run: 31972261899
-  semantic_job: 95226396914
-  cleanup: COMPLETE
-  canonical_state_access: NONE
+promotion_chain:
+  coordinator_promotion_pr: 444
+  coordinator_promotion_head: 32b7cca056c875429db4f2a167385f7b95335b81
+  coordinator_promotion_merge: 7540a679420689c388d9d11125c9fd8846956a10
+  source_pr_438: CLOSED_SUPERSEDED_ACCEPTED
+  source_pr_442: CLOSED_SUPERSEDED_ACCEPTED
+  source_pr_443: CLOSED_SUPERSEDED_ACCEPTED_WITH_EDITS
+  promotion_governance_run: 32000325932
+  pre_ready_ci_run: 32000326108
+  pre_ready_required_ci_job: 95299301299
+  ready_ci_run: 32000366565
+  ready_required_ci_job: 95299428625
+  promotion_review_threads_open: 0
+promoted_window_identity_frontier:
   glx_present: true
-  glx_opcode: 150
-  render_present: true
-  render_opcode: 139
-  exact_client_alive_t05_t15_t35: true
-  raw_viewable_window_t15_t35: true
-  viewable_xid: 0x00c00011
-  viewable_geometry: 1920x1080
-  xdotool_named_visible_count_t05_t15_t35: 0
-  xdotool_pid_name_class_binding: ABSENT
-  exact_client_ownership_of_viewable_xid: UNKNOWN
-  opengl_context_created: true
-  opengl_renderer: Mesa_llvmpipe
-  qrhi_vulkan_initialized: true
-  qtquick_window_loaded: true
-  qobject_cross_thread_warning_present: true
-  qobject_cross_thread_warning_causal: UNKNOWN
-  classification: PROVEN_RAW_X11_TREE_HAS_VIEWABLE_1920X1080_NAMELESS_PIDLESS_WINDOW_FROM_T15_WHILE_XDOTOOL_NAMED_VISIBLE_SEARCH_RETURNS_ZERO_AND_EXACT_CLIENT_REMAINS_ALIVE_POST_GLX
-xres_identity_evidence:
-  source_pr: 442
-  coordinator_decision: ACCEPT
-  final_source_head: 80bd75a1352ef1ffe84c3dcc34bf51a0cf0a7c54
-  semantic_run: 31973388722
-  semantic_job: 95229260820
-  runtime_admission: PASS
-  exact_client_launch_count: 1
-  cleanup: COMPLETE
-  helper_t05_t15_t35: libxcb_true_libxcb_res_false_libX11_true
-  query_client_ids_executed: false
-  exact_client_ownership_of_viewable_xid: UNKNOWN
-  classification: PROVEN_XRES_IDENTITY_UNRESOLVED_BECAUSE_LIBXCB_RES_HELPER_UNAVAILABLE_ON_RUNNER_FIXED_ALLOWLIST
-  hardened_followup_run: 31973490169
-  hardened_followup_physical_job: SKIPPED
-xres_support_evidence:
-  source_pr: 443
-  coordinator_decision: ACCEPT_WITH_EDITS
-  final_source_head: 02c63797b0835ea745a08362c12874307129a9d1
-  support_run: 31973740033
-  support_job: 95230007324
-  runtime_access: read_only
-  xserver_started: false
-  client_started: false
-  canonical_state_access: NONE
-  libxcb_res_present: false
-  libXRes_present: false
-  contained_libxcb_present: true
-  contained_libX11_present: true
-  XResproto_header_present: true
-  xcb_res_generated_header_present: false
-  XRes_public_header_present: false
-  pkgconfig_present: false
+  raw_viewable_full_display_xid_present: true
+  raw_viewable_xid: 0x00c00011
+  raw_viewable_geometry: 1920x1080
+  xdotool_named_visible_count: 0
+  exact_client_pid_ownership_of_viewable_xid: UNKNOWN
+  convenience_libxcb_res_present: false
+  convenience_libXRes_present: false
+  contained_XResproto_present: true
   observed_query_client_ids_minor_opcode: 4
   observed_local_client_pid_mask: 0x02
   observed_query_client_ids_request_fixed_size: 8
   observed_query_client_ids_reply_fixed_size: 32
-  promoted_libxcb_sha256: 7958a0136b121bdc4c708968569ad152a9ed208ab026e2537b1005dde64ca440
-  promoted_libX11_sha256: c5b5d782bd9cab3420a62df88f5c991507edf3331a89f98464ddbc538c37b879
-  XResproto_sha256: NOT_CAPTURED
-  classification: HEADERS_PROTOCOL_BASIS_PRESENT_NO_HELPER_LIBRARY
-coordinator_review:
-  evidence_file: docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260817-window-xres-coordinator-review.md
-  material_findings_open: 0
-  corrected_source_claims:
-    - Draft #443 libxcb hash corrected to raw job value
-    - Draft #443 libX11 hash corrected to raw job value
-    - unsupported XResproto header digest removed
-    - system/core library path wording corrected to avoid false contained-path resolution claim
+  raw_xres_helper_implementation_validated: false
 safety:
   canonical_bootstrap_retry_authorized: false
   canonical_window_identity_relaxation_authorized: false
-  second_xres_client_launch_authorized: false
+  physical_identity_retry_authorized: false
   credentials_allowed: false
   login_allowed: false
   gameplay_allowed: false
   track_b_access: false
 forbidden:
-  - physical Synology execution from the coordinator promotion branch
-  - canonical lease/registration/session observation or mutation from the coordinator promotion branch
-  - accepting any viewable 1920x1080 XID as the official client without direct resource/PID identity proof
-  - another official-client launch before a raw-XRes helper is validated host-side and separately admitted
+  - any physical Synology/Xvfb/official-client execution before host-side raw-XRes helper validation and fresh separate admission
+  - canonical lease/registration/session observation or mutation during hosted helper work
+  - accepting a viewable XID as official-client-owned without direct resource/PID identity proof
+  - canonical bootstrap retry
+  - canonical window identity relaxation
   - credentials, login or gameplay
-  - Track B or historical PR #303 runtime surfaces
-acceptance:
-  - source #438 raw job independently cross-checked and bounded classification accepted
-  - source #442 raw job independently cross-checked and bounded helper-unavailable classification accepted
-  - source #443 raw job independently cross-checked and source evidence inconsistencies corrected
-  - promoted evidence contains no temporary workflow/runtime code
-  - exact current-main promotion branch owns only task/evidence paths
-  - Track A governance and repository CI pass on exact promotion head
-  - source Drafts become intentionally terminal after accepted promotion
-  - child tasks #442/#443 are archived and ownership released after promotion merge
-  - canonical task remains active and fail-closed for the next causal phase
-last_completed_step: coordinator independently falsified source Draft #438/#442/#443 claims against raw jobs 95226396914, 95229260820 and 95230007324, accepted #438/#442, accepted #443 with evidence corrections, and staged a docs/evidence-only current-main promotion bundle
-next_action: validate and merge the coordinator promotion bundle; close source Drafts #438/#442/#443 superseded by the promotion; archive/release the two bounded child tasks; then continue this canonical task with a hosted/static raw-XRes QueryVersion/QueryClientIds encoder-parser validation before any new physical identity run.
+  - Track B and historical PR #303 runtime surfaces
+acceptance_for_next_phase:
+  - implement pure hosted/static QueryVersion request encoder and reply parser from promoted observed wire constants
+  - implement pure hosted/static QueryClientIds request encoder for one resource XID and LocalClientPid mask
+  - implement bounded QueryClientIds reply parser with strict lengths/counts/mask validation
+  - include deterministic positive/negative/truncated/oversized/wrong-version fixtures
+  - no network/X server/client/canonical runtime access in helper validation
+  - pass exact-head Track A governance and repository CI
+  - only then create a separately admitted physical identity discriminator
+last_completed_step: coordinator promotion #444 merged as 7540a679420689c388d9d11125c9fd8846956a10; source Drafts #438/#442/#443 were closed superseded; child task archive/release is staged on the current lifecycle branch
+next_action: merge the child-task archive/release PR, then continue this same canonical task by implementing and validating a GitHub-hosted raw-XRes QueryVersion/QueryClientIds encoder-parser with deterministic fixtures and no physical runtime access.
 ---
 
-# Track A canonical runtime E2E — window/XRes promotion checkpoint
+# Track A canonical runtime E2E — raw-XRes helper frontier
 
-The current blocker is identity, not basic graphics initialization. A raw full-display X11 window is proven, but its exact client PID ownership remains unresolved because convenience XRes client libraries are absent. The contained protocol header provides the next hosted/static path; no canonical or physical retry is authorized from this checkpoint.
+The remaining unknown is exact resource-to-PID ownership of the proven viewable X11 window. The next phase is purely hosted protocol-helper validation; another physical client run remains forbidden until that helper passes.

@@ -14,7 +14,7 @@ base_branch: main
 base_sha: 83034227280dc3bfdf589a991f0fdbbabab7dc87
 restack_commit: f6848a59224ce891067b12a8b3f65da1609ee985
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T14:34:00+02:00
+updated: 2026-08-17T14:42:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -23,6 +23,7 @@ owned_paths:
   - docs/agents/reports/OTCLIENT-20260817-worldmap-server-delivery-causal-validation.md
   - .github/workflows/track-a-worldmap-server-delivery-causal-validation.yml
   - .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh
+  - .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py
   - .github/scripts/track-a-worldmap-causal-gdb-env-repair.py
   - .github/scripts/track-a-worldmap-causal-xwd-classify.py
   - .github/scripts/track-a-worldmap-causal-ui-window.py
@@ -103,12 +104,11 @@ mutation_design:
 launch_budget:
   canonical_exact_bootstrap_consumed: 1
   canonical_xres_repair_launch_consumed: 0
-  baseline_ephemeral_client_launches_consumed: 6
+  baseline_ephemeral_client_launches_consumed: 7
   baseline_ephemeral_login_max: 1
   baseline_ephemeral_login_consumed: 0
-  baseline_ephemeral_observer_repair_max: 1
   baseline_ephemeral_observer_repairs_consumed: 1
-  baseline_ephemeral_ui_locator_repairs_consumed: 2
+  baseline_ephemeral_ui_locator_repairs_consumed: 3
   baseline_ephemeral_pre_secret_loader_repairs_consumed: 1
   patched_ephemeral_login_max: 1
   patched_ephemeral_login_consumed: 0
@@ -126,21 +126,21 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T14:34:00+02:00
+last_progress_at: 2026-08-17T14:42:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: xres-ui-window-static-pass
+ci_check_generation: desktop-1020-static-pass
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 1
-repair_cycles_for_current_gate: 4
+repair_cycles_for_current_gate: 5
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
 
 # Objective
 
-Execute the owner-authorized causal discriminator from merged #473/#474. Compare exact baseline `[18,14]` against the first task-owned `[19,14]` mutation while measuring authoritative inbound worldmap delivery before Storage independently from Storage/render/picker effects.
+Compare exact baseline `[18,14]` against the first task-owned `[19,14]` mutation while measuring authoritative inbound worldmap delivery before Storage separately from Storage/render/picker effects.
 
 # Required result
 
@@ -156,47 +156,46 @@ RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 
 # Verified progression
 
-All physical repair attempts through `32029873507 / 95387243716` stopped before credential submission. Every launched exact-client repair generation ended with source rehash PASS and cleanup COMPLETE.
+All physical repair runs so far stopped before credential submission; every launched exact-client repair generation ended with original-source rehash PASS and cleanup COMPLETE.
 
-Load-bearing checkpoints:
+Load-bearing current chain:
 
-- `32026662197 / 95377398485`: isolated exact-client/XRes/WARP path and target uniqueness proven.
-- `32027110459 / 95378725544`: no-client GDB toolroot environment discriminator PASS.
-- `32027454382 / 95379752642`: pre-Storage observer physically ARMED; OCR dependency blocked pre-secret.
-- `32028641905 / 95383408028`: OCR-free helper stopped pre-secret on deterministic Bash nounset; repaired.
-- `32029117879 / 95384858852`: toolroot XWD loader stopped pre-secret; repaired. `32029164295 / 95385382498` was one already-queued identical retry of the same failure.
-- `32029511115 / 95386107932`: no-client XWD dynamic-link discriminator PASS.
-- `32029702980 / 95386713491`: repository admission correctly blocked invalid checkpoint enum before client launch; repaired to `target_uniqueness: PROVEN`.
-- `32029873507 / 95387243716`: admission, controller idle, WARP/XRes, target uniqueness and pre-Storage observer all PASS; raw-XWD then proved the task was capturing the promoted 1920x1080 runtime identity window rather than the historical 1020x650 UI window. Stopped before secret use; source rehash/cleanup PASS.
-- historical exact-client `31805408522 / 94783011926`: successful UI flow used a separate 1020x650 `Tibia` window; retained artifacts preserve its calibrated geometry.
-- `32030421837 / 95388952750`: no-client static validation of the new raw-XRes 1020x650 UI-window resolver and final composed helper SUCCESS. It preserves the 1920x1080 XRes runtime fence while requiring a distinct 1020x650 XRes `LocalClientPid` match for UI actions.
+- isolated exact-client + WARP + raw-XRes target ownership is proven;
+- pre-Storage FullMap/map-description observer is physically proven ARMED;
+- GDB toolroot environment and XWD toolroot library closure are proven;
+- OCR-free raw-XWD classifier is calibrated from retained exact-client 1020x650 login/selection artifacts;
+- current 1920x1080 run `32030582178 / 95389455836` proved no separate viewable 1020x650 XRes-owned UI candidate exists and stopped before secret use;
+- historical exact-client `31805408522 / 94783011926` proves the retained successful login flow used a 1020x650 window;
+- task-owned desktop normalization now requires both baseline and patched arms to use identical Xvfb 1020x650 and an XRes owner narrowed to the same geometry;
+- no-client static composition `32030958692 / 95390632587 = SUCCESS` validates screen normalization -> XRes identity -> GDB repair -> raw-XWD UI repair with no executable legacy PID selector and no OCR surface.
 
 Durable evidence:
 
-- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-presecret-ui-loader-repairs.md`
-- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-xres-ui-window-boundary.md`
+- `20260817-presecret-ui-loader-repairs.md`
+- `20260817-xres-ui-window-boundary.md`
+- `20260817-1020-desktop-normalization.md`
 
 # Execution phases
 
 1. **DONE** canonical boundary / cleanup.
-2. **DONE** isolated exact-client XRes/WARP path.
+2. **DONE** isolated exact-client WARP/XRes path.
 3. **DONE** pre-Storage observer gate.
-4. **DONE** OCR-free UI tooling, loader repair and XRes-owned 1020x650 UI-window resolver static validation.
+4. **DONE** OCR-free UI/loader/XRes repair and 1020x650 task-owned desktop normalization static validation.
 5. **ACTIVE** one baseline login + FullMap/map-description extent + Right/Left stimulus + transport confinement + cleanup.
 6. **PENDING** patched namespace/preimage/target-uniqueness admission.
-7. **PENDING** one task-owned `[19,14]` login/capture with identical structural instrumentation/stimulus.
+7. **PENDING** one task-owned `[19,14]` login/capture under the identical 1020x650 environment and instrumentation.
 8. **PENDING** patched rollback/source rehash/cleanup.
 9. **PENDING** causal classification, audit, temporary-resource removal, exact-head CI/review/merge/archive.
 
 # Stop criteria
 
-Fail closed on main drift, non-idle canonical controller state, namespace collision, target ambiguity, observer regression, inability to prove a distinct same-PID XRes 1020x650 UI window, live XWD classification mismatch, WARP/credential confinement failure, character-selection geometry failure, absence of FullMap/map-description proof, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or incomplete cleanup.
+Fail closed on main drift, non-idle canonical controller state, namespace collision, target ambiguity, observer regression, 1020x650 XRes identity failure, live XWD classification mismatch, WARP/credential confinement failure, character-selection geometry failure, absence of FullMap/map-description proof, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or incomplete cleanup.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 10
-updated_at: 2026-08-17T14:34:00+02:00
+checkpoint_version: 11
+updated_at: 2026-08-17T14:42:00+02:00
 base_main: 83034227280dc3bfdf589a991f0fdbbabab7dc87
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
@@ -206,7 +205,7 @@ runtime_access: ephemeral_isolated
 target_uniqueness: PROVEN
 baseline_login_consumed: 0
 patched_login_consumed: 0
-last_completed_step: no-client static composition of the distinct XRes-owned 1020x650 UI window resolver passed on 32030421837 / 95388952750
+last_completed_step: task-owned 1020x650 desktop normalization statically validated on 32030958692 / 95390632587 after the 1920 desktop proved no separate 1020 UI candidate
 blockers: []
-next_action: Restore the physical baseline workflow and execute one baseline generation. Before secret submission require current-main admission, idle canonical controller, exact target uniqueness, pre-Storage observer ARMED, distinct same-PID XRes UI_WIN=1020x650 and live LOGIN_FORM classification.
+next_action: Execute one normalized 1020x650 baseline generation. Require current-main admission, idle controller, exact XRes identity, pre-Storage observer ARMED and live LOGIN_FORM before secret submission.
 ```

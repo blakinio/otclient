@@ -60,10 +60,10 @@ Replace the simulator-only execution boundary with a fail-closed external-proces
 - [x] The current task inventory is rediscovered and the original selected dispatch set is revalidated before any worker mutation; stale dependency/ownership/context/branch/head selection fails closed and requires a new plan.
 - [x] Returned worker-result-v1 is validated against task id, branch, dispatch base, actual descendant worktree HEAD, clean worktree, actual Git changed paths and declared ownership before fan-in.
 - [x] Protected/default worker branches, malformed output, timeout, non-zero exit, dirty worktree, head mismatch or ownership escape fail closed.
-- [x] Worker environment is allowlisted; unlisted environment variables are not inherited by the external worker.
+- [x] Worker environment is allowlisted; `HOME` and unlisted variables are excluded unless the authorized provider configuration explicitly opts them into `pass_env`.
 - [x] Existing dry-run behavior remains the repository default and requires no model credentials or owner-funded AI.
-- [x] Optional worker-result publication uses a normal non-force push and refuses an existing remote task branch that moved away from the dispatch base.
-- [x] Focused tests exercise successful committed external-worker execution and fail-closed authorization, environment, stale-plan, branch, malformed-output, timeout/non-zero, dirty-worktree, head-mismatch and ownership-escape paths using deterministic temporary Git repositories.
+- [x] A writer with non-empty changed paths must use `publish_results: true`; normal non-force publication refuses a moved existing task branch and verifies the remote head before result acceptance.
+- [x] Focused tests cover successful committed/published execution plus authorization, environment, stale-plan, protected-branch, malformed-output, timeout/non-zero, dirty-worktree, head-mismatch, missing-publication, moved-remote and ownership-escape failures using deterministic temporary Git repositories.
 - [ ] Exact-final-head GitHub-hosted Agent Orchestrator Smoke and required CI pass.
 - [ ] Full final diff self-review and required independent audit have no unresolved material finding.
 - [x] No live AI/model call is claimed; a concrete provider/model/funding/credential use remains a separate activation gate under root AGENTS policy.
@@ -72,8 +72,8 @@ Replace the simulator-only execution boundary with a fail-closed external-proces
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-17T12:55:00Z
-head: 24dc9dfb5679b1b01d3f9fa7b29734a379cc496f
+updated_at: 2026-08-17T13:02:00Z
+head: 5dbcfc7cf6f2bb03c613b889cbb65bc19fbcdd65
 branch: feat/OTC-20260817-real-agent-executor
 pr: 479
 status: validating
@@ -94,9 +94,10 @@ proven:
   - main@83034227280dc3bfdf589a991f0fdbbabab7dc87 at admission includes merged orchestrator MVP #463, archive #476 and catalogue reconciliation #478.
   - PR #479 is the sole live owner found for this executor-adapter scope.
   - Repository default config remains dry_run with real_model_executor_enabled=false and owner_funded_ai_allowed=false.
-  - tools/agents/orchestrator_executor.py now provides a provider-neutral external-process boundary with fixed argv/no shell, finite timeout, allowlisted environment, fresh plan revalidation, isolated detached worktrees, actual Git head/diff/ownership verification and optional non-force branch publication.
-  - Agent Orchestrator Smoke run 32031599802 job 95392633636 on PR head b6acd7b6fb2e6d80d2c0357a6fb97cb14c21beb0 executed the integrated orchestrator plus external-executor suite: 24 tests PASS, including deterministic external process/worktree success and all then-defined negative paths.
-  - The b6acd7b validation is discovery/intermediate evidence only because later executor hardening and tests changed the head.
+  - The adapter now enforces fixed argv/no shell, finite timeout, explicit environment allowlisting, fresh plan revalidation, branch safety, isolated detached worktrees, descendant HEAD proof, actual Git diff/ownership verification and durable normal-push publication for writers.
+  - Intermediate Agent Orchestrator Smoke run 32031599802 job 95392633636 executed the integrated suite on b6acd7b6fb2e6d80d2c0357a6fb97cb14c21beb0 with 24 tests PASS; later hardening intentionally invalidated that result for final readiness.
+  - Self-review found and repaired stale-plan revalidation, protected-branch/ancestry checking, implicit HOME exposure, acceptance of non-durable writer commits and a malformed MODULE_CATALOG table separator.
+  - Git worktree file isolation is not treated as a hostile-provider sandbox; provider-specific Git-metadata, credential, network and process confinement is explicitly retained as an activation gate.
 derived:
   - A fixed external-process protocol is the smallest provider-neutral adapter that can support a separately authorized Codex or other agent runtime without coupling untrusted task prose to executable shell syntax.
 unknown:
@@ -109,7 +110,8 @@ first_failure:
 rejected_hypotheses:
   - Treating the #463 simulator as a real worker was rejected because its retained evidence explicitly proves orchestration mechanics only.
   - Inferring Codex/OpenAI authorization from an available credential, sibling-repository runner or prior unrelated task was rejected because root AGENTS requires exact provider/use authorization.
-  - Accepting a plan solely because task head/branch still matched was rejected; the executor now recomputes fresh selection and refuses stale dependency/ownership/context state before worker launch.
+  - Accepting a plan solely because task head/branch still matched was rejected; the executor recomputes fresh selection and refuses stale dependency/ownership/context state before worker launch.
+  - Treating detached writer commits as durable without branch publication was rejected; non-empty changed paths now require verified publication before acceptance.
 changed_paths:
   - tools/agents/orchestrator.py
   - tools/agents/orchestrator_executor.py
@@ -126,10 +128,10 @@ validation:
     evidence: main, #463/#476/#478, active task inventory, open PRs and governing orchestrator contracts inspected
   - command: Agent Orchestrator Smoke / Focused planner and context tests
     result: PASS
-    evidence: run 32031599802 job 95392633636; 24 tests passed on b6acd7b6fb2e6d80d2c0357a6fb97cb14c21beb0, superseded by later hardening
+    evidence: run 32031599802 job 95392633636; 24 tests passed on superseded intermediate head b6acd7b6fb2e6d80d2c0357a6fb97cb14c21beb0
   - command: live AI/model provider execution
     result: NOT_APPLICABLE
     evidence: no concrete provider/model/funding/credential use is authorized for this task; adapter delivery is provider-neutral and default-disabled
 blockers: []
-next_action: Verify exact-final-head Agent Orchestrator Smoke and required CI, then perform full-diff self-review and an independent exact-head audit before readiness.
+next_action: Verify exact-final-head Agent Orchestrator Smoke and required CI, then perform full-diff self-review and the pre-existing exact-head falsification audit before readiness.
 ```

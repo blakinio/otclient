@@ -1,0 +1,84 @@
+{
+  "schema": "track-a-p2-f50090-framing-coordinator-promotion-v1",
+  "date": "2026-08-17",
+  "source_task": "OTC-20260817-track-a-p2-f50090-framing",
+  "source_pr": 493,
+  "source_head": "6d01a7eb22548256e0d4f5aff9a6d13f95f84c19",
+  "integration_base": "c1adcf491580e28d40f215356a9e559af2ccadc4",
+  "decision": "ACCEPT_WITH_EDITS",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "source_validation": {
+    "governance_run": 32042849047,
+    "governance_result": "SUCCESS",
+    "ci_run": 32042849245,
+    "ci_result": "SUCCESS_AFTER_ONE_INFRASTRUCTURE_RETRY",
+    "required_job": 95429351299,
+    "required_result": "SUCCESS",
+    "changed_files": 3,
+    "reviews_before_disposition": 0,
+    "threads_before_disposition": 0
+  },
+  "primary_evidence": {
+    "f50090_run": 32037533068,
+    "f50090_hosted_job": 95410901806,
+    "f50090_window": "0xf50040..0xf50480",
+    "f50090_sha256": "1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea",
+    "processor_run": 32005141186,
+    "processor_source_artifact": 9279753620,
+    "processor_source_sha256": "6c970c23aa95856698eb71024937ed847502fb1f040701ce04c632da32c38d32",
+    "processor_hosted_artifact": 9279759553,
+    "processor_hosted_sha256": "8228d6c281cf99f45f5c880b76e7a2817130156fde4cc892a402eccf4af10528",
+    "writer_artifact": 9251725866,
+    "writer_artifact_sha256": "f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e"
+  },
+  "claims": {
+    "dualconnection_to_binary_egress": "PROVEN",
+    "final_binary_egress": "PROVEN_AT_QT_QTCPSOCKET_BOUNDARY",
+    "final_socket_owner": "FACT:TGameserverTCPConnection",
+    "final_os_socket_syscall": "UNKNOWN",
+    "framing": "PROVEN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN",
+    "scalar_a_source": "FACT:low16(ceil(nonnegative_payload_length/8))",
+    "scalar_b_source": "FACT:DWORD(message+0)",
+    "scalar_b_semantics": "UNKNOWN",
+    "rawdataprocessor_prefix_zero": "FACT",
+    "rawdataprocessor_aligns_total_qbytearray_to_multiple_of_8": "FACT",
+    "rawdataprocessor_first_byte_is_appended_byte_count": "FACT",
+    "rawdataprocessor_conditional_member_transform_when_message_plus_0x28_eq_2": "FACT",
+    "rawdataprocessor_padding_helper_semantics": "UNKNOWN",
+    "rawdataprocessor_conditional_transform_semantics": "UNKNOWN"
+  },
+  "proven_stage_order": [
+    "persistent QBuffer",
+    "TProtocolClientMessageProcessor+0x10@0xc2df80",
+    "TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "same message after alignment-envelope transform",
+    "TGameserverDualConnection+0x78@0xb56970",
+    "TGameserverNetworkPacketConnection",
+    "TGameserverNetworkPacketProcessor",
+    "receiver_vtable_AP_0x2f741d8_plus_0x10",
+    "0xf50090 structured message decomposition",
+    "scalar A source low16(ceil(payload_length/8))",
+    "scalar B source DWORD(message+0), semantics UNKNOWN",
+    "raw payload pointer/length",
+    "TIODeviceWriter_AP_0x2f69d48",
+    "QDataStream_bound_to_TGameserverTCPConnection_QTcpSocket",
+    "QDataStream::writeRawData@0x4dd250",
+    "Qt/QTcpSocket-bound binary boundary"
+  ],
+  "audit": {
+    "result": "PASS_BOUNDED",
+    "material_findings_open": 0
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static exact-file/disassembly evidence only"
+  },
+  "next_frontier": "Trace exact producer/update provenance of DWORD(message+0) at f50107 and prove or disprove connection-scoped monotonic sequence semantics."
+}

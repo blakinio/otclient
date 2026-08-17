@@ -69,7 +69,7 @@ def extract_one_spec_local_pid(records: Sequence[object], local_pid_mask: int) -
     client = getattr(record, "client", None)
     mask = getattr(record, "mask", None)
     values = getattr(record, "values", None)
-    if not isinstance(client, int) or client < 0 or client > 0xFFFFFFFF:
+    if not isinstance(client, int) or client <= 0 or client > 0xFFFFFFFF:
         raise WindowOwnerError("invalid XRes client resource base")
     if mask != local_pid_mask:
         raise WindowOwnerError("unexpected XRes client-id mask")

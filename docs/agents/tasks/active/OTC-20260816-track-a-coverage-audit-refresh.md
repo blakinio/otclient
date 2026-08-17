@@ -8,16 +8,16 @@ project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: audit
-phase: current-main-f753-refresh-validation
+phase: current-main-821276-refresh-validation
 branch: research/OTC-20260816-track-a-coverage-audit-refresh-v2
 base_branch: main
-base_main: f753b5aa94e9aeb6b5554fd5bb827823bda80256
-current_main: f753b5aa94e9aeb6b5554fd5bb827823bda80256
+base_main: 8212765956a9bfafd2d8a7687440c02716c87170
+current_main: 8212765956a9bfafd2d8a7687440c02716c87170
 pull_request: 390
 supersedes_pr: 369
 coordinator_disposition: RETURN_FOR_EVIDENCE
 coordinator_comment: 5313208545
-updated: 2026-08-17T09:46:41+02:00
+updated: 2026-08-17T09:47:00+02:00
 risk: low
 researcher_delivery: draft_only
 implementation_authorized: false
@@ -28,7 +28,7 @@ modules_touched: []
 reuses:
   - closed Draft PR #304 accepted bounded coverage-registry evidence
   - merged P2 coordinator promotion #450
-  - merged worldmap exact-static producer #437
+  - merged worldmap exact-static producers #437 and #446
   - current live Track A PR/task state read-only
   - promoted current-main Track A evidence read-only
 depends_on: []
@@ -37,7 +37,7 @@ policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
 execution_mode: github-only
-execution_reason: refresh current-main/live-state audit after merged #450 and subsequent #437 main advance; no physical runtime work belongs to this audit lane
+execution_reason: refresh current-main/live-state audit after merged #450 and concurrent worldmap producer merges #437/#446; no physical runtime work belongs to this audit lane
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
@@ -75,14 +75,14 @@ runtime_nonclaims:
   current_exact_client_session: NOT_REGISTERED
   current_canonical_gate_b: NOT_PROVEN
 snapshot_heads:
-  MAIN: f753b5aa94e9aeb6b5554fd5bb827823bda80256
+  MAIN: 8212765956a9bfafd2d8a7687440c02716c87170
   P0_PR302: 3ddf4f35e00cdfe899b4ce3daf716d71b4c3cce6
   P0_CYCLOPEDIA_PR435_MERGE: 8c9486e2c6109a7a39b564804c8acd707659b5e0
   P1_PROMOTION_PR414_MERGE: 070a066488d22126483e13fc8a08b17df5090918
   P2_PROMOTION_PR450_MERGE: cbc6388e8607bb92120281a9a15148577994d3a6
-  VIEWPORT_PR367: f381cd657642ce592b2cbbc95783813ae72fcf6a
+  VIEWPORT_PR367: 8f4fd11b63d4261f209e02063003e6d698039f71
   EXACT_STATIC_PRODUCER_PR437_MERGE: f753b5aa94e9aeb6b5554fd5bb827823bda80256
-  DOWNSTREAM_STATIC_PRODUCER_PR446: be0149bf59226194001ce24cda2743dbb6492bca
+  DOWNSTREAM_STATIC_PRODUCER_PR446_MERGE: 8212765956a9bfafd2d8a7687440c02716c87170
   RUNTIME_RAW_XRES_SOURCE_PR447: 32c61120b9086904b328e7b4aa50526d64bef807
   RUNTIME_RAW_XRES_PROMOTION_PR448: 08f7c2e7946a2283f5d0a4f5c68ab4eb589b197b
   RUNTIME_PROMOTION_PR444_MERGE: 7540a679420689c388d9d11125c9fd8846956a10
@@ -93,11 +93,11 @@ historical_coverage_baseline:
   disposition: ACCEPT_WITH_EDITS_BOUNDED_INVENTORY_ONLY
   merged: false
 return_for_evidence_findings_addressed:
-  - TACOORD-390-20260817-001 current-main snapshot refreshed through f753b5aa including merged #450 and #437
+  - TACOORD-390-20260817-001 current-main snapshot refreshed through 82127659 including merged #450/#437/#446
   - TACOORD-390-20260817-002 merged P2 barrier consumed; global coordinator staleness intentionally preserved as AUD-COV-007
 resolved_or_reclassified_since_prior_handoff:
   - AUD-COV-006 RESOLVED: P1 coordinator promotion #414 merged and #372 closed superseded
-  - AUD-COV-005 RESOLVED_AS_MATERIAL_GAP: #435 and merged #437 promote compliant bounded exact-static evidence patterns
+  - AUD-COV-005 RESOLVED_AS_MATERIAL_GAP: #435/#437/#446 promote compliant bounded exact-static evidence patterns
   - P2 #310 partial-Draft state SUPERSEDED: #450 merged bounded downstream chain while framing/sequence/compression/encryption/final egress remain UNKNOWN
   - viewport static graph incomplete SUPERSEDED_IN_LIVE_DRAFT: #367 now reports STATIC_PATCH_GRAPH_READY=true and MUTATION_DESIGN_READY=false
   - raw-XRes helper not validated SUPERSEDED_IN_LIVE_DRAFT: #447 validates helper; #448 promotion remains open
@@ -120,12 +120,17 @@ validation_history:
   cbc_governance_run: 32007220472
   cbc_repository_ci_run: 32007220493
   cbc_required_ci_job: 95319122982
-  cbc_result: SUCCESS_INVALIDATED_BY_MAIN_ADVANCE_TO_F753
-ci_check_generation: current-main-f753-restack-pending
+  cbc_result: SUCCESS_INVALIDATED_BY_MAIN_ADVANCE
+  f753_restack_head: 46f81d75349ee6dead6a59d51003f57b1f81da38
+  f753_governance_run: 32007418778
+  f753_repository_ci_run: 32007418914
+  f753_required_ci_job: 95319703945
+  f753_result: SUCCESS_INVALIDATED_BY_MAIN_ADVANCE_TO_821276
+ci_check_generation: current-main-821276-restack-pending
 ci_checks_for_current_head: 0
 terminal_ci_checks_for_current_generation: 0
-last_completed_step: consumed merged #437 after its concurrent main advance, updated the report's worldmap provenance while preserving five material findings and current Draft-vs-main authority boundaries
-next_action: restack this same two-file Draft onto main@f753b5aa, obtain exact-head Track A governance and repository CI, verify review hygiene/no further main drift, then return the same Draft for fresh coordinator disposition
+last_completed_step: consumed consecutive worldmap producer merges #437/#446, updated live #367 head and preserved five material findings with current Draft-vs-main boundaries
+next_action: restack this same two-file Draft onto main@82127659, obtain exact-head Track A governance/repository CI, verify review hygiene/no further load-bearing main drift, then return the same Draft for fresh coordinator disposition
 ---
 
 # Track A coverage audit refresh — coordinator return-for-evidence continuation
@@ -133,17 +138,16 @@ next_action: restack this same two-file Draft onto main@f753b5aa, obtain exact-h
 ## Acceptance
 
 - [x] coordinator finding comment `5313208545` consumed;
-- [x] current main through `f753b5aa94e9aeb6b5554fd5bb827823bda80256` consumed;
+- [x] current main through `8212765956a9bfafd2d8a7687440c02716c87170` consumed;
 - [x] merged P2 #450/barrier consumed;
-- [x] merged worldmap exact-static producer #437 consumed;
+- [x] merged worldmap producers #437/#446 consumed;
 - [x] P0 #302 current disposition consumed;
 - [x] RUNTIME #447/#448 source/promotion split consumed without treating Draft as trusted-main implementation;
 - [x] live #367 `STATIC_PATCH_GRAPH_READY=true` consumed without authorizing mutation;
-- [x] #446 retained as open terminal-closeout Draft only;
 - [x] canonical coverage registry absence rechecked;
 - [x] five material findings preserved at 3 HIGH + 2 MEDIUM;
 - [ ] exact current-main restacked head passes Track A governance and repository CI;
-- [ ] review submissions/threads remain clean and no main drift occurs before coordinator handoff.
+- [ ] review submissions/threads remain clean and no load-bearing main drift occurs before coordinator handoff.
 
 ## Result
 

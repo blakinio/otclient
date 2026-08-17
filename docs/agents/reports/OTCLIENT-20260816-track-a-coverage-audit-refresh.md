@@ -6,8 +6,8 @@
 task: OTC-20260816-track-a-coverage-audit-refresh
 lane: COVERAGE-AUDIT
 researcher_delivery: draft_only
-snapshot_main: f753b5aa94e9aeb6b5554fd5bb827823bda80256
-snapshot_time: 2026-08-17T09:46:41+02:00
+snapshot_main: 8212765956a9bfafd2d8a7687440c02716c87170
+snapshot_time: 2026-08-17T09:47:00+02:00
 audit_result: FAIL_MATERIAL_GAPS_OPEN
 programme_complete: false
 material_findings_open: 5
@@ -17,13 +17,13 @@ runtime_access: none
 physical_e2e: NOT_APPLICABLE_WITH_REASON
 ```
 
-This refresh answers coordinator finding comment `5313208545` on Draft PR #390. It consumes merged P2 coordinator promotion #450, subsequent worldmap exact-static producer merge #437, and current live P0/RUNTIME/worldmap heads. Draft-only lane evidence remains explicitly distinct from trusted-main programme truth.
+This refresh answers coordinator finding comment `5313208545` on Draft PR #390. It consumes merged P2 promotion #450 and both terminal worldmap producer merges #437/#446, plus current live P0, RUNTIME and worldmap consumer heads. Draft-only evidence remains distinct from trusted-main programme truth.
 
 ## Authority and nonclaims
 
-This audit used GitHub/repository evidence only. It did not use Synology, execute or inspect an official client process, access process memory, canonical runtime state, X11/VNC/network/login/gameplay, or owner-funded Codex/OpenAI API quota.
+This audit used GitHub/repository evidence only. It did not use Synology, execute/inspect an official client, access process memory, canonical runtime state, X11/VNC/network/login/gameplay, or owner-funded Codex/OpenAI API quota.
 
-Exact historical installed-client fence used by Track A evidence:
+Exact historical installed-client fence:
 
 ```yaml
 client_version: 15.32.df7b29
@@ -43,7 +43,7 @@ current_canonical_gate_b: NOT_PROVEN
 current_structural_in_game: NOT_PROVEN
 ```
 
-Current-main canonical RUNTIME task remains `raw-xres-helper-hosted-ready` and records exact resource-to-official-client PID ownership as UNKNOWN. Source PR #447 has validated a pure raw-XRes helper, but coordinator promotion #448 is still open and unmerged; physical identity retry remains forbidden.
+Trusted-main canonical RUNTIME task remains `raw-xres-helper-hosted-ready`. Source #447 validates a pure raw-XRes helper, but promotion #448 remains open/unmerged; exact XID→official-client PID ownership and physical identity retry remain unresolved/forbidden.
 
 ## Accepted historical quantitative baseline
 
@@ -70,21 +70,26 @@ Fresh current-main searches found no canonical `capabilities.jsonl`, `protocol_m
 
 ### P1 promotion gap remains resolved
 
-Coordinator promotion #414 merged as `070a066488d22126483e13fc8a08b17df5090918`; source #372 is closed superseded. Live attached-session correlation and restart/relogin stability remain unproven.
+Coordinator promotion #414 merged as `070a066488d22126483e13fc8a08b17df5090918`; source #372 is closed superseded. Live session correlation and restart/relogin stability remain unproven.
 
 ### RUNTIME helper is validated in Draft, not yet promoted
 
-- source #447 head `32c61120b9086904b328e7b4aa50526d64bef807` validates QueryVersion and QueryClientIds(LocalClientPid) byte encoding/parsing with strict deterministic fixtures;
-- promotion #448 head `08f7c2e7946a2283f5d0a4f5c68ab4eb589b197b` remains open and unmerged;
+- source #447 head `32c61120b9086904b328e7b4aa50526d64bef807` validates QueryVersion and QueryClientIds(LocalClientPid) codec behavior with deterministic fixtures;
+- coordinator promotion #448 head `08f7c2e7946a2283f5d0a4f5c68ab4eb589b197b` remains open and unmerged;
 - trusted main therefore still lacks the validated helper implementation;
-- exact viewable-XID -> official-client PID identity remains UNKNOWN;
-- physical identity retry remains forbidden until promotion and fresh separate RUNTIME admission.
+- exact resource-to-official-client PID ownership remains UNKNOWN;
+- physical identity retry remains forbidden until helper promotion and fresh separate RUNTIME admission.
 
 ### Exact-static production is promoted and no longer a material staging gap
 
-P0 producer #435 already promoted the compliant task-scoped sanitized exact-static pattern. Worldmap producer #437 has now also merged as `f753b5aa94e9aeb6b5554fd5bb827823bda80256`, promoting durable exact-client worldmap evidence and its archive while removing one-shot tooling.
+P0 producer #435 already promoted the compliant task-scoped sanitized exact-static pattern.
 
-Downstream worldmap producer #446 head `be0149bf59226194001ce24cda2743dbb6492bca` remains open in terminal closeout and is not treated as merged current-main truth.
+Worldmap exact-static producers are now both on trusted main:
+
+- #437 merged as `f753b5aa94e9aeb6b5554fd5bb827823bda80256`, promoting exact identity/storage/handler evidence and archive state;
+- #446 merged as current `main@8212765956a9bfafd2d8a7687440c02716c87170`, promoting downstream RenderProvider/Picker/Camera bounded evidence and archive state.
+
+One-shot producer tooling was removed in the terminal trees; no client-byte mutation is authorized.
 
 ### P0 direct authoritative XYZ remains unproven
 
@@ -92,7 +97,7 @@ P0 #302 head `3ddf4f35e00cdfe899b4ce3daf716d71b4c3cce6` has consumed merged #435
 
 ### P2 bounded downstream chain is promoted on main
 
-Coordinator promotion #450 merged as `cbc6388e8607bb92120281a9a15148577994d3a6`; source #310 and producer #449 are archived/closed unmerged. Trusted-main evidence now records:
+Coordinator promotion #450 merged as `cbc6388e8607bb92120281a9a15148577994d3a6`; source #310 and producer #449 are archived/closed unmerged. Trusted-main evidence records:
 
 ```yaml
 persistent_qbuffer_to_clientprocessor_this_plus_0x18: PROVEN
@@ -108,11 +113,11 @@ final_binary_egress: UNKNOWN
 final_socket_ownership: UNKNOWN
 ```
 
-This closes coordinator refresh findings `TACOORD-390-20260817-001` and `TACOORD-390-20260817-002`. It does not close any of the five material coverage/programme findings below.
+This closes coordinator refresh findings `TACOORD-390-20260817-001` and `TACOORD-390-20260817-002`; it does not close any of the five programme-level findings below.
 
-### Worldmap static dependency graph is READY in live Draft; identity producer is now on main
+### Worldmap static dependency graph is READY in live consumer Draft with both producers promoted
 
-Live #367 head `f381cd657642ce592b2cbbc95783813ae72fcf6a` reports:
+Live #367 head `8f4fd11b63d4261f209e02063003e6d698039f71` reports:
 
 ```yaml
 static_classification: STATIC_DEPENDENCY_GRAPH_RECOVERED
@@ -122,17 +127,19 @@ client_byte_mutation_authorized: false
 remaining_static_blocker: NONE_FOR_STATIC_DEPENDENCY_DISCOVERY
 ```
 
-The graph covers the packed `18/14` Handler source, Storage slot-12 propagation, dynamic Viewport geometry, RenderProvider fixed-32 clipping/indexing, Picker fixed-32 transforms and bounded Camera dependency evidence. #437 provenance is now merged; #446 and #367 remain open and are not silently promoted. Mutation design and physical validation remain unauthorized.
+Both producer inputs #437/#446 are now merged on trusted main. The consumer Draft graph covers packed `18/14` Handler source, Storage slot-12 propagation, dynamic Viewport geometry, RenderProvider fixed-32 clipping/indexing, Picker transforms and bounded Camera dependency evidence.
+
+#367 itself remains Draft and is not silently promoted. Mutation design and physical validation remain separately authorized future work.
 
 ### Durable global coordinator checkpoint remains materially stale
 
-Trusted main still contains `docs/agents/tasks/active/OTC-20260816-track-a-promotion-coordination.md` with `base_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f` and old global barriers. #450 added a correct P2-specific barrier, but that lane-local evidence does not refresh the global coordinator task. AUD-COV-007 remains open.
+Trusted main still contains `docs/agents/tasks/active/OTC-20260816-track-a-promotion-coordination.md` with `base_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f` and obsolete global barriers. #450 added a correct P2-specific barrier but did not refresh the global coordinator task. AUD-COV-007 remains open.
 
 ## Current open material findings
 
-### AUD-COV-001 — HIGH — canonical item-level coverage registry absent from current main
+### AUD-COV-001 — HIGH — canonical item-level coverage registry absent
 
-No canonical `capabilities.jsonl`, `protocol_messages.jsonl` or `runtime_types.jsonl` package is present on `main@f753b5aa...`.
+No canonical `capabilities.jsonl`, `protocol_messages.jsonl` or `runtime_types.jsonl` package is present on `main@82127659...`.
 
 **Impact:** coverage cannot be deterministically recomputed from canonical current-main state.
 
@@ -164,7 +171,7 @@ The raw-XRes helper is validated in #447 but not promoted on trusted main; direc
 
 ### AUD-COV-007 — MEDIUM — durable global coordinator checkpoint materially stale
 
-The active coordinator task still advertises `ddf7dd...` and obsolete global barriers; P2 is corrected only by a lane-local barrier.
+The active coordinator task still advertises `ddf7dd...` and obsolete global barriers; lane-local P2 evidence does not repair the global record.
 
 **Impact:** repository-resolved continuation can select stale work unless live Git is reconstructed every invocation.
 
@@ -175,11 +182,11 @@ The active coordinator task still advertises `ddf7dd...` and obsolete global bar
 | Prior state | Current disposition |
 |---|---|
 | AUD-COV-006 P1 not promoted | `RESOLVED`: #414 merged; #372 closed superseded |
-| AUD-COV-005 no compliant exact-static evidence path | `RESOLVED_AS_MATERIAL_GAP`: #435 and now merged #437 demonstrate/promote the bounded pattern |
+| AUD-COV-005 no compliant exact-static evidence path | `RESOLVED_AS_MATERIAL_GAP`: #435/#437/#446 promote bounded sanitized evidence patterns |
 | P2 #310 open/partial-only | `SUPERSEDED`: #450 merged bounded chain; framing/crypto/egress remain UNKNOWN |
-| viewport static graph incomplete | `SUPERSEDED_IN_LIVE_DRAFT`: #367 now has `STATIC_PATCH_GRAPH_READY=true`; mutation design false |
+| viewport static graph incomplete | `SUPERSEDED_IN_LIVE_DRAFT`: #367 has `STATIC_PATCH_GRAPH_READY=true`; mutation design false |
 | raw-XRes helper not validated | `SUPERSEDED_IN_LIVE_DRAFT`: #447 validates helper; #448 promotion remains open |
-| worldmap exact-static producer unpromoted | `RESOLVED`: #437 merged as `f753b5aa...` |
+| worldmap producers unpromoted | `RESOLVED`: #437 and #446 are now merged on trusted main |
 
 ## Missing-proof queue ordered by information gain
 
@@ -197,7 +204,7 @@ The active coordinator task still advertises `ddf7dd...` and obsolete global bar
 | 10 | restart/relogin stability | RUNTIME + P0/P1 | fresh PID/PIE/session reacquisition and repeated semantic correlation |
 | 11 | P2 framing/sequence/compression/encryption/final egress | P2 | continue one exact stage at a time from merged #450 evidence |
 | 12 | action/QMeta denominator normalization | COVERAGE-AUDIT/QMeta | reconcile 612 vs 1004 provenance |
-| 13 | worldmap downstream promotion / mutation boundary | coordinator + worldmap | finish #446/#367 terminal review/promotion if accepted; mutation design remains a separately authorized later task |
+| 13 | worldmap consumer promotion / mutation boundary | coordinator + worldmap | independently review #367 against merged #437/#446, promote durable static graph if accepted, then use a separately authorized mutation-design/physical-validation task |
 
 ## Campaign completeness verdict
 
@@ -216,14 +223,15 @@ p2_bounded_downstream_chain_promoted: true
 p2_framing_sequence_compression_encryption_egress_complete: false
 exact_static_task_scoped_producer_process_proven: true
 worldmap_exact_static_identity_producer_promoted: true
+worldmap_downstream_static_producer_promoted: true
+worldmap_static_patch_graph_ready_in_live_draft: true
+worldmap_static_patch_graph_promoted_to_main: false
+worldmap_mutation_design_ready: false
 canonical_raw_xres_helper_promoted: false
 canonical_resource_to_pid_identity_proven: false
 canonical_physical_runtime_semantics_proven: false
 restart_relogin_stability_proven: false
 stable_live_bridge_semantics_proven: false
-worldmap_static_patch_graph_ready_in_live_draft: true
-worldmap_downstream_static_producer_promoted: false
-worldmap_mutation_design_ready: false
 programme_complete: false
 ```
 
@@ -238,6 +246,7 @@ audit:
   p1_promotion_gap_resolved: true
   exact_static_staging_material_gap_resolved: true
   p2_bounded_chain_promoted: true
+  worldmap_producer_chain_promoted: true
   inventory_vs_semantic_boundary_preserved: true
   draft_lane_evidence_promoted_without_merge: false
 e2e:

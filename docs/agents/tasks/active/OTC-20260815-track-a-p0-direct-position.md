@@ -1,42 +1,35 @@
 ---
 task_id: OTC-20260815-track-a-p0-direct-position
-status: waiting
+status: implementing
 agent: ChatGPT
-session_id: chatgpt-p0-consume-merged-cyclopedia-20260817
+session_id: chatgpt-p0-player-state-continuation-20260817
 session_role: researcher
-session_rotation_count: 6
+session_rotation_count: 7
 project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: runtime-research
-phase: p0-runtime-semantic-confirmation
+phase: runtime_snapshot_producer_tooling
 branch: research/OTC-20260815-track-a-p0-direct-position
 base_branch: main
-base_main: dbd9520e2f8cc5a26f556bffaae2a83e139615f9
-current_main: 8c9486e2c6109a7a39b564804c8acd707659b5e0
-worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260815-track-a-p0-direct-position
-worktree_mode: isolated_branch_checkout_equivalent
+current_main: 26c89a7d3b044acf88299f8d68eee4ac16b5d13c
 risk: medium
-updated: 2026-08-17T09:11:00+02:00
+updated: 2026-08-17T15:29:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-p0-direct-position.md
   - docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/**
   - .github/workflows/tibia-official-client-re-p0-direct-position.yml
   - .github/scripts/tibia-official-client-re-p0-direct-position.py
+  - .github/scripts/tibia-official-client-re-p0-runtime-snapshot.py
+  - .github/scripts/test_tibia_official_client_re_p0_runtime_snapshot.py
+  - .github/workflows/tibia-official-client-re-p0-runtime-snapshot-hosted.yml
 reuses:
-  - workflow artifact 9248797952 / sha256:04835ab0bac7ffc43e161e8b2118c90a3d2197f7011385a6758cd7706c93a584
-  - exact structural anchors from code-bearing head a3068a6a9460525cb1946186cf439caf7832e176
-  - merged producer PR #435 / main commit 8c9486e2c6109a7a39b564804c8acd707659b5e0
-  - final producer run 32000921225 / source head 40b5efd2f6371b8f5c0a00036084960ab66eefd0
-  - final consumer artifact 9278368790 / track-a-p0-cyclopedia-sanitized-32000921225
-  - docs/agents/evidence/OTC-20260816-track-a-p0-cyclopedia-sanitized-bundle/p0-cyclopedia-sanitized-evidence.md
-  - docs/agents/evidence/OTC-20260816-track-a-p0-cyclopedia-sanitized-bundle/evidence-data.json
-  - docs/agents/evidence/OTC-20260816-track-a-p0-cyclopedia-sanitized-bundle/selected-code-windows.txt
-  - docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/20260817-consume-merged-cyclopedia-evidence.md
-depends_on:
-  - RUNTIME establishment of exact physical client PID/resource identity under current admission
-  - RUNTIME-owned bounded semantic XYZ/world correlation, negative controls and fresh-PID/relogin evidence
-blocks: []
+  - merged producer PR #435 / merge 8c9486e2c6109a7a39b564804c8acd707659b5e0
+  - physical XRes identity PR #457 / merge 16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc
+  - XRes client-base correction PR #461 / merge 1eb4a8edecba3966aa1e6155e241b404eb4d30cb
+  - canonical XRes integration PR #465 / merge f8e628a255a18ec92839bbb45ef0e3b40bef8605
+  - fresh P0 current-admission PR #482 / merge a94e931cdc454e0e28c2ef628be23b926c4e3657
+  - P0 admission archive/release PR #486 / merge 26c89a7d3b044acf88299f8d68eee4ac16b5d13c
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
@@ -61,137 +54,92 @@ run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
 user_communication: low_noise
-code_bearing_head: a3068a6a9460525cb1946186cf439caf7832e176
-last_evidence_head: e588223b549a160d084694ed8b39b4e228508a41
-ci_checks_for_current_head: 0
-ci_check_generation: merged-cyclopedia-consumption-checkpoint
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
-identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 3
-stall_warnings: 0
-legacy_runtime_pr_303: CLOSED_SUPERSEDED_HISTORICAL_EVIDENCE_ONLY
 static_input_blocker: CLOSED_BY_MERGED_PR_435
+xid_pid_research: COMPLETE_DO_NOT_REPEAT
 semantic_player_xyz_proven: false
-runtime_provider_task: OTC-20260816-track-a-canonical-runtime-e2e
-runtime_provider_state: RAW_XRES_HELPER_PROMOTION_PENDING
-runtime_provider_hosted_helper_source_pr: 447
-runtime_provider_hosted_helper_promotion_pr: 448
-runtime_provider_physical_identity_retry_authorized: false
-hosted_attempts:
-  archive_referer:
-    run: 31947502633
-    result: HTTP_403_INPUT_BLOCKED
-  package_manifest:
-    run: 31948000086
-    result: HTTP_403_INPUT_BLOCKED_AT_PACKAGE_VERSION
-  launcher_equivalent_and_direct_ip:
-    run: 31948567275
-    result: HTTP_403_DOMAIN_AND_TWO_RESOLVED_IPV4_INPUT_BLOCKED
-final_cyclopedia_producer:
-  pr: 435
-  merge_commit: 8c9486e2c6109a7a39b564804c8acd707659b5e0
-  source_run: 32000921225
-  source_head: 40b5efd2f6371b8f5c0a00036084960ab66eefd0
-  artifact: 9278368790
-  artifact_name: track-a-p0-cyclopedia-sanitized-32000921225
-  accepted_zip_digest: sha256:49f48d4283e63dd613b32a99300dc86eb98d68d7d7f640ec621c72e854c30c87
-  target_labels: 9
-  direct_relocations: 4
-  typeinfo_candidate: 0x3089a50
-  vtable_address_point: 0x3089db0
-  unique_rip_xrefs: 4
-  disassembly_windows: 4
-  hosted_validation: PASS
-  runtime_access: none
-  semantic_player_xyz_proven: false
-last_checkpoint:
-  - docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/20260817-consume-merged-cyclopedia-evidence.md
-  - docs/agents/evidence/OTC-20260816-track-a-p0-cyclopedia-sanitized-bundle/p0-cyclopedia-sanitized-evidence.md
-next_action: consume only a fresh RUNTIME-owned physical discriminator after exact client PID/resource identity is proven under current admission; require two or more direct-position observations correlated with independent structural world coordinates, negative controls, and fresh-PID/relogin repeatability before promoting authoritative XYZ
+exact_client:
+  version: 15.32.df7b29
+  size: 51965216
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  platform: official_native_linux_only
+strongest_candidate:
+  type_route: TPlayerData
+  primary_vptr_offset: 0x308ca70
+  object_live_identity: UNKNOWN
+  x_offset: 0x78
+  y_offset: 0x7c
+  z_offset: 0x80
+  representation: signed_i32_x3
+  static_property_site: 0x8367c1
+  classification: XYZ_SHAPED_CANDIDATE_NOT_SEMANTICALLY_PROVEN
+fresh_canonical_admission:
+  producer_pr: 482
+  physical_run: 32033237388
+  physical_job: 95397745114
+  runner: synology-otclient-01
+  lease_status: released
+  lease_generation: 8
+  authoritative_registration: ABSENT
+  legal_registered_in_game_lifecycle: false
+  result: BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE
+independent_runtime_provider_candidate:
+  pr: 475
+  task: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+  ownership: OTHER_ACTIVE_RUNTIME_TASK
+  runtime_access: ephemeral_isolated
+  target_uniqueness_checkpoint: PROVEN
+  current_head: 062cf9396480a6012278cd5e0068aee403bdcc47
+  current_run: 32035179935
+  current_job: 95404298697
+  current_mode: no_client_persistent_home_metadata_only
+  current_client_executed: false
+  current_in_game: false
+  p0_direct_observation_legal_now: false
+  note: P0 must not touch the task-owned runtime directly; only the RUNTIME owner may produce a bounded handoff if its independently authorized lifecycle later reaches IN_GAME and its own admission permits the extra read-only evidence capture.
+acceptance:
+  exact_fence: PASS
+  typed_candidate_discovery: PASS
+  direct_offsets_static_support: PASS
+  current_exact_pid_start_identity: MISSING
+  current_xres_ownership: MISSING_FOR_CURRENT_LIFECYCLE
+  structurally_verified_in_game: MISSING
+  direct_xyz_observations: 0
+  independent_structural_world_coordinate_observations: 0
+  known_delta_correlation: NOT_RUN
+  inverse_control: NOT_RUN
+  camera_viewport_map_origin_stale_copy_negatives: NOT_RUN
+  repeatability: NOT_VERIFIED
+  restart_relogin_stability: NOT_VERIFIED
+  direct_player_xyz: INCONCLUSIVE
+hard_stop_policy:
+  p0_only_bootstrap_authorized: false
+  p0_only_login_authorized: false
+  second_logged_in_session_authorized: false
+  process_memory_write_authorized: false
+  worldmap_research_authorized_for_p0: false
+producer_tooling_goal:
+  purpose: prepare a deterministic read-only direct snapshot helper that a legally admitted RUNTIME owner can execute inside an independently authorized existing lifecycle without an extra login or movement stimulus
+  required_snapshot_labels: [before, stepped, restored]
+  direct_fields: [0x78, 0x7c, 0x80]
+  exact_typed_vptr: 0x308ca70
+  must_record: [pid, process_start_ticks, boot_id_sha256, main_base, typed_object, private_data_pointer, signed_i32_xyz, wall_time_ns, monotonic_ns]
+  must_not_claim: semantic authority without causal correlation and negative controls
+last_completed_step: fresh generation-8 canonical admission evidence was promoted and archived through #482/#486; current main is 26c89a7d3b044acf88299f8d68eee4ac16b5d13c; active independent RUNTIME #475 was inspected without touching its runtime and its current head is explicitly no-client, so no legal P0 live read exists yet
+next_action: implement and hosted-validate the read-only direct snapshot helper, then publish a bounded producer handoff request to the active RUNTIME owner; execute no live P0 observation unless that owner independently reaches a legal IN_GAME lifecycle and accepts the handoff under its own current admission
 ---
 
 # Objective
 
-Recover and causally validate a direct standalone authoritative player-position read for the exact official native Linux client, distinct from derived viewport/map/camera coordinates. Research output remains Draft-only; canonical promotion belongs to the Track A coordinator.
+Recover and causally validate a direct standalone authoritative player-position read for the exact official native Linux client, distinct from camera, viewport, map-origin and stale/copy coordinates.
 
-# Exact client fence
-
-```yaml
-version_mapping: 15.32.df7b29
-size: 51965216
-sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-platform: official_native_linux_only
-TPlayerData_primary_vptr: 0x308ca70
-```
-
-# Routing boundary
-
-P0 remains GitHub-hosted with `runtime_access:none`. It does not own Synology physical runtime, X11/VNC, login/relogin, process attach, input or gameplay mutation. RUNTIME is the exclusive physical causal/restart evidence provider.
-
-# Acceptance gate
-
-- [x] exact SHA/size fence defined before build-specific offsets are used;
-- [x] candidate discovery is type/owner-graph constrained rather than a blind XYZ scan;
-- [x] direct read remains distinct from the accepted DERIVED viewport-center coordinate;
-- [x] P0 deterministic workflow is GitHub-hosted / no physical runtime;
-- [x] failed direct GitHub-hosted CDN retrieval paths are exhausted without blind retry;
-- [x] merged producer #435 supplies a compliant exact-client sanitized Cyclopedia RTTI/vtable/metadata/xref bundle on trusted main;
-- [x] P0 consumed the merged #435 evidence and closed the generic static-input blocker;
-- [ ] exact authoritative in-process XYZ storage/read semantics proven;
-- [ ] negative controls reject camera/map-origin/viewport/copy candidates;
-- [ ] at least two live observations demonstrate correct value stability/change semantics;
-- [ ] direct value independently compared with structural world evidence;
-- [ ] fresh PID/relogin stability proven by RUNTIME;
-- [ ] exact final Draft-head CI green after the final semantic evidence checkpoint.
-
-# Structural evidence — FACT
-
-Retained exact-build evidence preserves `TPlayerData` primary vptr `0x308ca70`, `playerPosition` literal `0x1cdde3f`, its bounded xrefs `0x8367c1/0x8367c2`, and relocation-backed worldmap/player-provider type relationships.
-
-Merged #435 now canonically adds the Cyclopedia structural route:
+# Current classification
 
 ```text
-TCyclopediaMapStorage typeinfo candidate  0x3089a50
-TCyclopediaMapStorage vtable address point 0x3089db0
-vtable typeinfo relocation slot            0x3089da8
-code xrefs to vtable                        0x812952, 0x812e12, 0xeb0ea2
-metadata xref                               0xd299ed -> 0x1d2a8d8
+DIRECT_PLAYER_XYZ=INCONCLUSIVE
 ```
 
-The exact client also contains the compact metadata neighborhood containing `TCyclopediaMapStorage`, `playerPositionChanged`, `TWorldMapCoordinate`, `onPlayerCreatureAddedToGameSession`, `weak_ptr<TCreature>`, `pPlayer`, and `onPlayerPositionWasUpdated`.
+Static exact-client evidence supports `TPlayerData +0x78/+0x7c/+0x80` as the strongest direct XYZ-shaped candidate, represented as three signed 32-bit fields. This is not semantic proof of authoritative current player position.
 
-At `0xeb0ea2`, code installs the recovered vtable at `[rbx]` and initializes a large member-relative object graph. This is structural object-initializer evidence only.
+The former XID→PID dependency is complete through #457/#461/#465 and must not be repeated. Fresh canonical admission #482 proved lease generation 8 released and authoritative registration absent; #486 archived and released that RUNTIME task.
 
-# Classification
-
-## FACT
-
-- exact client fence is stable for all accepted P0 static evidence;
-- the P0 static-input staging gap is closed by merged PR #435;
-- the requested Cyclopedia/player metadata, RTTI/typeinfo/vtable graph, relocations and four unique code xrefs are on trusted main;
-- P0 has no physical runtime authority;
-- current RUNTIME has not yet produced the required semantic direct-position discriminator.
-
-## STRUCTURAL_DERIVATION
-
-The `0xeb0ea2` path is associated with a `TCyclopediaMapStorage` object initializer. The compact player-position metadata neighborhood is a valid route for further static discovery, but metadata locality alone does not identify callback implementations or player coordinate storage.
-
-## UNKNOWN / INCONCLUSIVE
-
-- authoritative live XYZ member/accessor and owning runtime object;
-- executable implementations of the specific Cyclopedia position callbacks;
-- live discrimination against map/camera/viewport/copy candidates;
-- repeatability across movement and fresh PID/relogin.
-
-# RUNTIME dependency
-
-Current RUNTIME work has advanced beyond the older `client_window_missing` frontier. Raw X11 evidence proves a viewable full-display resource exists, but exact XID-to-official-client PID ownership is still unresolved. Hosted raw-XRes helper PR #447 has passed deterministic validation and coordinator promotion PR #448 is open. A physical identity retry remains unauthorized until promotion completes and a fresh separately admitted RUNTIME discriminator is created.
-
-Once RUNTIME reaches that admitted state, P0 requires only the bounded physical discriminator documented in `20260817-consume-merged-cyclopedia-evidence.md`; P0 must not create a parallel runtime session.
-
-# Side-effect budget
-
-This continuation performed repository/GitHub evidence reads and P0 task/evidence updates only. It used no client execution, process-memory access, X11/VNC, login/session action, gameplay stimulus, raw proprietary-client upload or owner-funded Codex/OpenAI API quota.
+P0 remains a GitHub-hosted evidence consumer. It does not bootstrap/login, create a second logged-in session, mutate client bytes, write process memory, or take over another task's runtime. A current legal IN_GAME lifecycle must be supplied by RUNTIME. Until then the only legal continuation is deterministic producer tooling and coordination, not another generic static-analysis substitute.

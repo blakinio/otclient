@@ -7,7 +7,7 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: review
+phase: validate
 branch: research/OTC-20260817-track-a-p2-sequence-provenance
 base_branch: main
 base_main: 0aed48da9a51730c590d0ffe4688f149b359a170
@@ -86,7 +86,7 @@ generation:
   window: 0xb56d60..0xb57280
   window_digest: sha256:e5cf009bb1aec3065da4ff0dd3231268af1255cffa50fbb48f8817777907d557
 cleanup:
-  one_shot_workflow_removed: pending
+  one_shot_workflow_removed: true
 validation:
   source_exact_fence: PASS
   hosted_decode: PASS
@@ -96,7 +96,7 @@ validation:
   final_exact_head_governance: PENDING
   final_exact_head_ci: PENDING
   review_hygiene: PENDING
-next_action: remove the one-shot workflow, obtain final exact-head governance/CI/review hygiene, then coordinator independently promote SEQUENCE=PROVEN; afterwards resolve RawDataProcessor member transform 0xb3ec30 for encryption
+next_action: obtain final exact-head governance/CI/review hygiene, then coordinator independently promote SEQUENCE=PROVEN; afterwards resolve RawDataProcessor member transform 0xb3ec30 for encryption
 ---
 
 # Track A P2 — outbound sequence provenance

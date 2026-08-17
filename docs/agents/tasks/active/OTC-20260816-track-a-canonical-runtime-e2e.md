@@ -8,45 +8,45 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: p0-canonical-final-control-plane-admission-probe
+phase: p0-terminal-no-legal-in-game-lifecycle
 branch: runtime/OTC-20260816-track-a-canonical-runtime-p0-final-admission
 base_branch: main
 base_main: f8e628a255a18ec92839bbb45ef0e3b40bef8605
 risk: high
-updated: 2026-08-17T12:16:00+02:00
+updated: 2026-08-17T12:18:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
-  - .github/workflows/tibia-official-client-re-p0-canonical-final-admission-inventory.yml
 modules_touched:
   - track-a-canonical-control-plane-admission
 blocks:
   - OTC-20260815-track-a-p0-direct-position
 policy_version: 2
 prompting_standard_version: 2.1
-execution_mode: github-orchestrated-synology
+execution_mode: github-only
+execution_reason: post-#465 physical admission established the terminal current prerequisite failure for P0; no further runtime access is authorized until an independently legitimate canonical lifecycle reaches structurally verified IN_GAME
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
-validation_level: heavy
+validation_level: focused
 track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
-execution_class: synology_physical_runtime
-runner: synology-otclient-01
-runtime_access: canonical_bootstrap
-runtime_owner_task: OTC-20260816-track-a-canonical-runtime-e2e
-runtime_namespace: canonical-live-runtime
-canonical_registration: UNKNOWN
-canonical_lease_generation: UNKNOWN
+execution_class: github_hosted
+runner: github-hosted
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
-gate_a: REQUIRED_NOT_PROVEN
+gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
-bootstrap: REQUIRED_NOT_PROVEN
-target_uniqueness: UNKNOWN
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 client_byte_mutation_authorized: false
-persistent_session_role: canonical_runtime_owner
+persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
 exact_client:
@@ -75,79 +75,61 @@ current_nonclaims:
   historical_isolated_pid_13648_is_current: false
   historical_isolated_xid_0x00c00011_is_current: false
   historical_isolated_display_231_is_current: false
-  current_exact_client_pid: NOT_REGISTERED_UNTIL_FRESH_GATE_B
-  current_exact_client_session: NOT_REGISTERED_UNTIL_FRESH_GATE_B
-p0_admission_probe:
-  admission_purpose: fail_closed_transition_discovery_only
-  bootstrap_for_p0_authorized: false
-  bootstrap_attempt_limit_for_p0: 0
-  purpose: discover only current canonical controller metadata after the trusted #465 merge; registration absence is a terminal P0 blocker rather than launch authorization
-  state_root: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
-  coordination_lock: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/coordination.lock
-  lease_record: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/lease.json
-  runtime_registration: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/runtime-registration.json
-  allowed_observation:
-    - existing canonical state-root presence
-    - existing coordination-lock presence
-    - nonblocking shared flock acquisition on the existing coordination lock
-    - whitelist-only lease metadata snapshot under that shared flock
-    - whitelist-only registration metadata snapshot under that shared flock
-  forbidden_observation:
-    - /proc client/process inspection
-    - X11/window inspection
-    - VNC/RFB probing
-    - input
-    - network/session probing
-    - credentials/login/gameplay
-  forbidden_mutation:
-    - creating canonical state directory or coordination lock
-    - acquiring/renewing/releasing controller lease
-    - registration write/rebind/bootstrap
-    - client launch/stop/signal/attach
-  probe_can_authorize_runtime_reuse: false
-  probe_can_authorize_bootstrap: false
-  probe_can_only_select_next_admission_transition: true
-prior_inventory:
-  source_pr: 464
-  source_pr_disposition: CLOSED_UNMERGED_AFTER_HANDOFF
-  corrected_head: 04177dccd56ec54d7d4a57aa037fb7124168d3b4
-  governance_run: 32017860971
-  inventory_run: 32017860986
-  inventory_job: 95351075477
+  current_exact_client_pid: NOT_ESTABLISHED
+  current_exact_client_session: NOT_ESTABLISHED
+final_p0_inventory:
+  admission_pr: 467
+  admission_physical_head: 2e35d0666b9fe73812abce4b4c09073e31c45e82
+  workflow_run: 32019313320
+  job: 95355423148
+  runner: synology-otclient-01
+  job_conclusion: SUCCESS
+  governance: PASS
   lease_present: true
+  lease_runtime_id: track-a-canonical-live
   lease_status: released
   lease_generation: 7
-  registration: ABSENT
+  lease_controller_task: null
+  lease_controller_session: null
+  authoritative_registration: ABSENT
+  admission_result: REGISTRATION_ABSENT
   control_metadata_unchanged: true
   process_observation: false
   x11_observation: false
   client_mutation: false
-  disposition: BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE_AT_THAT_INVENTORY
+  bootstrap: false
+  login: false
+  one_shot_workflow_removed: true
+p0_disposition: BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE
+semantic_player_xyz: INCONCLUSIVE
 safety:
+  canonical_state_access: false
   canonical_state_write: false
   credentials_allowed: false
   login_allowed: false
   gameplay_allowed: false
   process_memory_access: false
-  process_identity_observation_allowed_in_probe: false
-  x11_observation_allowed_in_probe: false
+  process_identity_observation: false
+  x11_observation: false
   client_byte_mutation: false
   physical_identity_retry_authorized: false
   bootstrap_for_p0_authorized: false
   second_logged_in_session_authorized: false
   track_b_access: false
 acceptance:
-  - admission record exists and passes deterministic governance before Synology controller-plane observation
-  - controller-plane probe creates no canonical files and writes no canonical metadata
-  - if canonical namespace or registration is absent, ordinary reuse stops fail-closed and P0 does not bootstrap a session solely for validation
-  - if registration exists, only its non-secret contract fields are read; no live identity claim is made until a later fresh Gate A/rebind/Gate B transition passes
-  - any active lease owned by another task blocks takeover
-  - current state is never inferred from historical PID/XID/display/session evidence
-  - execute exactly one post-#465 inventory, remove the one-shot workflow, persist the exact result and hand it to consumer #302
-last_completed_step: canonical raw-XRes window integration PR #465 passed exact-head hosted validation and protected CI, then merged to trusted main as f8e628a255a18ec92839bbb45ef0e3b40bef8605
-next_action: require deterministic admission PASS, run exactly one non-mutating post-#465 Synology controller-plane inventory, remove the one-shot inventory workflow, persist its result, then either continue through a legal existing-runtime path or stop if registration is absent/authority cannot be established
+  - final post-#465 admission record passed deterministic governance before Synology controller-plane observation
+  - exactly one non-mutating post-#465 Synology inventory completed
+  - controller-plane probe created no canonical files and wrote no canonical metadata
+  - authoritative runtime registration was absent and the lease was released
+  - no process/X11/client observation or mutation occurred
+  - one-shot inventory workflow was removed immediately after use
+  - exact result is persisted under docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260817-p0-final-admission.md
+  - consumer #302 receives the exact terminal handoff
+  - P0 is not bootstrapped or logged in solely to manufacture semantic evidence
+last_completed_step: final post-#465 admission run 32019313320 / job 95355423148 passed governance on synology-otclient-01 and proved lease generation 7 released with authoritative runtime-registration.json absent; one-shot workflow was removed and durable evidence persisted
+next_action: no runtime action is legal for P0 now; wait until a separately authorized legitimate canonical lifecycle exists and reaches structurally verified IN_GAME, then refresh this task from trusted main and perform a fresh RUNTIME admission and ownership/generation gates before any P0 discriminator
 ---
 
-# Track A canonical runtime E2E — final P0 admission
+# Track A canonical runtime E2E — P0 terminal lifecycle blocker
 
-This phase does not observe the client. `canonical_bootstrap` is used only as the governance classification for fail-closed transition discovery; bootstrap mutation is explicitly forbidden for P0. The one-shot controller-plane inventory decides whether an already registered reusable runtime path exists after #465 reached trusted main.
+The post-#465 controller-plane admission is complete. There is no authoritative canonical registration and no legal current `IN_GAME` lifecycle for P0 to reuse. P0-specific bootstrap/login is prohibited, so semantic player XYZ remains inconclusive and consumer #302 stays unpromoted until the independently required lifecycle prerequisite exists.

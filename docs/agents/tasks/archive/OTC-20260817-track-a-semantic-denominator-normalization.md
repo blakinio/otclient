@@ -9,7 +9,7 @@ track_id: official-client-re
 task_kind: implementation
 phase: archived
 base_branch: main
-base_main: 0b3bdec0a4145f558806448a4657413664d80729
+base_main: f8e628a255a18ec92839bbb45ef0e3b40bef8605
 pr: 460
 execution_class: github_hosted
 runtime_access: none
@@ -19,7 +19,6 @@ physical_e2e_required: false
 owner_funded_ai_api_authorized: false
 ownership_released: true
 owned_paths: []
-additional_task_allowance_consumed: true
 source_registry:
   canonical_pr: 454
   source_baseline_pr: 304
@@ -57,17 +56,23 @@ component_validation:
   result: SUCCESS
   canonical_marker: CANONICAL_COVERAGE_REGISTRY_VALIDATION_PASS
   baseline_blob_fence: PASS
-  validated_data_payload_unchanged_after_run: true
+  validated_denominator_payload_unchanged_after_run: true
 fresh_audit:
   result: PASS
   record: docs/agents/evidence/OTC-20260817-track-a-semantic-denominator-normalization/20260817-final-audit.md
   material_findings_open_for_task: 0
 current_main_drift_reconciliation:
-  merged_main: 0b3bdec0a4145f558806448a4657413664d80729
-  drift_domain: worldmap_physical_validation_only
+  merged_main: f8e628a255a18ec92839bbb45ef0e3b40bef8605
   denominator_counts_changed: false
-  worldmap_result: NO_HANDLER_CANARY_OBSERVED_BOUNDED
-  worldmap_causal_propagation_proven: false
+  consumed_merges:
+    - worldmap physical validation/archive through #466; NO_HANDLER_CANARY_OBSERVED_BOUNDED; causal propagation unproven
+    - raw XRes physical resource-to-exact-client PID evidence through #457/#459
+    - raw XRes client-base helper correction through #461
+    - canonical raw XRes window-identity integration #465 at f8e628a255a18ec92839bbb45ef0e3b40bef8605
+  current_exact_client_pid: NOT_REGISTERED
+  current_exact_client_session: NOT_REGISTERED
+  canonical_gate_b: NOT_PROVEN
+  current_structural_in_game: NOT_PROVEN
 result:
   AUD-COV-002: RESOLVED_AS_DENOMINATOR_COMPLETENESS
   protocol_denominator: 349
@@ -93,8 +98,8 @@ closeout:
   exact_terminal_head_repository_ci_required: true
   ready_state_required_ci_required: true
   review_threads_required_zero: true
-last_completed_step: four finite canonical denominator registries materialized, integrated validator passed, fresh audit passed, worldmap-only main drift reconciled, and terminal lifecycle tree prepared
-next_action: none for this task after PR #460 merge; remaining programme findings require a later invocation because this invocation has consumed its one additional-task allowance
+last_completed_step: four finite canonical denominator registries materialized, integrated validator and fresh audit passed, and current-main runtime/worldmap drift through f8e628a was reconciled without changing denominator membership
+next_action: none for this task after PR #460 merge
 ---
 
 # Track A semantic denominator normalization — archived

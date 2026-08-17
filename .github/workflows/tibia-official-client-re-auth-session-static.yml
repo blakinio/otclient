@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file auth/session phase4 windows
+    name: Stage exact-file phase5 QMeta windows
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -25,18 +25,10 @@ jobs:
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     outputs:
-      setup_a_hex: ${{ steps.stage.outputs.setup_a_hex }}
-      setup_a_sha256: ${{ steps.stage.outputs.setup_a_sha256 }}
-      setup_b_hex: ${{ steps.stage.outputs.setup_b_hex }}
-      setup_b_sha256: ${{ steps.stage.outputs.setup_b_sha256 }}
-      strings_d_hex: ${{ steps.stage.outputs.strings_d_hex }}
-      strings_d_sha256: ${{ steps.stage.outputs.strings_d_sha256 }}
-      strings_e_hex: ${{ steps.stage.outputs.strings_e_hex }}
-      strings_e_sha256: ${{ steps.stage.outputs.strings_e_sha256 }}
-      strings_f_hex: ${{ steps.stage.outputs.strings_f_hex }}
-      strings_f_sha256: ${{ steps.stage.outputs.strings_f_sha256 }}
-      strings_g_hex: ${{ steps.stage.outputs.strings_g_hex }}
-      strings_g_sha256: ${{ steps.stage.outputs.strings_g_sha256 }}
+      unknown_qmeta_hex: ${{ steps.stage.outputs.unknown_qmeta_hex }}
+      unknown_qmeta_sha256: ${{ steps.stage.outputs.unknown_qmeta_sha256 }}
+      known_qmeta_hex: ${{ steps.stage.outputs.known_qmeta_hex }}
+      known_qmeta_sha256: ${{ steps.stage.outputs.known_qmeta_sha256 }}
     steps:
       - id: stage
         shell: bash
@@ -62,7 +54,6 @@ jobs:
           PY
           done
           [[ -n "$source_client" ]] || exit 50
-
           python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
           import hashlib,struct,sys
           from pathlib import Path
@@ -77,61 +68,46 @@ jobs:
                   f.seek(phoff+i*phentsize); r=f.read(56)
                   t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
                   if t==1: segs.append((off,va,sz,flags))
-              def read_va(start,end,exec_required):
-                  if end<=start or end-start>0x1000: raise SystemExit(52)
+              def read_va(a,b):
                   for off,va,sz,flags in segs:
-                      if va<=start and end<=va+sz:
-                          if exec_required and not (flags&1): raise SystemExit(53)
-                          f.seek(off+start-va); d=f.read(end-start)
-                          if len(d)==end-start: return d
+                      if va<=a and b<=va+sz:
+                          f.seek(off+a-va); d=f.read(b-a)
+                          if len(d)==b-a: return d
                   raise SystemExit(54)
               windows={
-                  'setup_a':   (0x7d3400,0x7d4400,True),
-                  'setup_b':   (0x7d4400,0x7d5400,True),
-                  'strings_d': (0x1c96cd0,0x1c96f20,False),
-                  'strings_e': (0x1ce7240,0x1ce72b0,False),
-                  'strings_f': (0x28a7c60,0x28a7cd0,False),
-                  'strings_g': (0x1d910f0,0x1d91160,False),
+                  'unknown_qmeta':(0x3085b20,0x3085be0),
+                  'known_qmeta':(0x3084f60,0x3085020),
               }
-              staged={k:read_va(a,b,x) for k,(a,b,x) in windows.items()}
+              staged={k:read_va(a,b) for k,(a,b) in windows.items()}
           rows=[]
           for key,data in staged.items():
               dig=hashlib.sha256(data).hexdigest()
               rows.append(f'{key}_hex={data.hex()}\n{key}_sha256={dig}\n')
-              print(f'AUTHSESSION_PHASE4_SOURCE_{key.upper()}_SHA256={dig}')
+              print(f'AUTHSESSION_PHASE5_SOURCE_{key.upper()}_SHA256={dig}')
           with out.open('a') as h: h.write(''.join(rows))
-          print('AUTHSESSION_PHASE4_EXACT_FILE_FENCE=PASS')
+          print('AUTHSESSION_PHASE5_EXACT_FILE_FENCE=PASS')
           print('AUTHSESSION_RUNTIME_ACCESS=none')
-          print('AUTHSESSION_PHASE4_SOURCE_PROCESS_OBSERVATION=false')
-          print('AUTHSESSION_PHASE4_SOURCE_X11_OBSERVATION=false')
-          print('AUTHSESSION_PHASE4_SOURCE_LOGIN=false')
-          print('AUTHSESSION_PHASE4_SOURCE_SECRET_ACCESS=false')
-          print('AUTHSESSION_PHASE4_SOURCE_DISASSEMBLY=false')
-          print('AUTHSESSION_PHASE4_SOURCE_SEMANTIC_CLASSIFICATION=false')
-          print('AUTHSESSION_PHASE4_RAW_CLIENT_UPLOADED=false')
-          print('AUTHSESSION_PHASE4_BOUNDED_FILE_WINDOWS_STAGED=true')
+          print('AUTHSESSION_PHASE5_SOURCE_PROCESS_OBSERVATION=false')
+          print('AUTHSESSION_PHASE5_SOURCE_X11_OBSERVATION=false')
+          print('AUTHSESSION_PHASE5_SOURCE_LOGIN=false')
+          print('AUTHSESSION_PHASE5_SOURCE_SECRET_ACCESS=false')
+          print('AUTHSESSION_PHASE5_SOURCE_DISASSEMBLY=false')
+          print('AUTHSESSION_PHASE5_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('AUTHSESSION_PHASE5_RAW_CLIENT_UPLOADED=false')
           PY
 
   hosted-decode:
-    name: Decode phase4 auth/session object provenance
+    name: Decode phase5 QMeta identity
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: docs/OTC-20260817-track-a-auth-session-flow-static
-      SETUP_A_HEX: ${{ needs.source-sanitize.outputs.setup_a_hex }}
-      SETUP_A_SHA256: ${{ needs.source-sanitize.outputs.setup_a_sha256 }}
-      SETUP_B_HEX: ${{ needs.source-sanitize.outputs.setup_b_hex }}
-      SETUP_B_SHA256: ${{ needs.source-sanitize.outputs.setup_b_sha256 }}
-      STRINGS_D_HEX: ${{ needs.source-sanitize.outputs.strings_d_hex }}
-      STRINGS_D_SHA256: ${{ needs.source-sanitize.outputs.strings_d_sha256 }}
-      STRINGS_E_HEX: ${{ needs.source-sanitize.outputs.strings_e_hex }}
-      STRINGS_E_SHA256: ${{ needs.source-sanitize.outputs.strings_e_sha256 }}
-      STRINGS_F_HEX: ${{ needs.source-sanitize.outputs.strings_f_hex }}
-      STRINGS_F_SHA256: ${{ needs.source-sanitize.outputs.strings_f_sha256 }}
-      STRINGS_G_HEX: ${{ needs.source-sanitize.outputs.strings_g_hex }}
-      STRINGS_G_SHA256: ${{ needs.source-sanitize.outputs.strings_g_sha256 }}
+      UNKNOWN_QMETA_HEX: ${{ needs.source-sanitize.outputs.unknown_qmeta_hex }}
+      UNKNOWN_QMETA_SHA256: ${{ needs.source-sanitize.outputs.unknown_qmeta_sha256 }}
+      KNOWN_QMETA_HEX: ${{ needs.source-sanitize.outputs.known_qmeta_hex }}
+      KNOWN_QMETA_SHA256: ${{ needs.source-sanitize.outputs.known_qmeta_sha256 }}
     steps:
       - shell: bash
         run: |
@@ -140,58 +116,25 @@ jobs:
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
           [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 73
           python3 - <<'PY'
-          import hashlib,os,re,subprocess,tempfile
-          from pathlib import Path
-          specs={
-            'SETUP_A':(0x7d3400,0x1000),'SETUP_B':(0x7d4400,0x1000),
-            'STRINGS_D':(0x1c96cd0,0x250),'STRINGS_E':(0x1ce7240,0x70),
-            'STRINGS_F':(0x28a7c60,0x70),'STRINGS_G':(0x1d910f0,0x70),
-          }
+          import hashlib,os,struct
+          specs={'UNKNOWN_QMETA':(0x3085b20,0xc0),'KNOWN_QMETA':(0x3084f60,0xc0)}
           def get(name,n):
               d=bytes.fromhex(os.environ[name+'_HEX'])
               if len(d)!=n: raise SystemExit(74)
               if hashlib.sha256(d).hexdigest()!=os.environ[name+'_SHA256']: raise SystemExit(75)
               return d
-          def asm(name,start,n):
-              data=get(name,n)
-              with tempfile.TemporaryDirectory(prefix='auth-session-p4-') as td:
-                  p=Path(td)/(name.lower()+'.bin'); p.write_bytes(data)
-                  txt=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
-              rows=[]
-              for line in txt.splitlines():
-                  m=re.match(r'^\s*([0-9a-f]+):\s+([0-9a-f ]+)\s+(.+)$',line)
-                  if m: rows.append((int(m.group(1),16),m.group(3).strip()))
-              return rows
-          wanted={0x3076908,0x3070398,0x3084fa0}
-          print('AUTHSESSION_PHASE4_HOSTED_DECODE=PASS')
+          print('AUTHSESSION_PHASE5_HOSTED_DECODE=PASS')
           print('AUTHSESSION_RUNTIME_ACCESS=none')
-          for name,start in [('SETUP_A',0x7d3400),('SETUP_B',0x7d4400)]:
-              rows=asm(name,start,0x1000)
-              chosen=set()
-              for idx,(a,ins) in enumerate(rows):
-                  refs=[int(x,16) for x in re.findall(r'#\s*0x([0-9a-f]+)',ins)]
-                  interesting=(any(x in wanted for x in refs)
-                              or '[rbx+0x88]' in ins or '[rbx+0x9c0]' in ins
-                              or re.search(r'\bmov\s+rbx,rdi\b',ins)
-                              or re.search(r'\bmov\s+rbx,rsi\b',ins)
-                              or (ins.startswith('push   rbp') if False else False))
-                  if interesting:
-                      for j in range(max(0,idx-5),min(len(rows),idx+7)): chosen.add(j)
-              print(f'AUTHSESSION_PHASE4_{name}_PROVENANCE_BEGIN')
-              for j in sorted(chosen)[:220]:
-                  a,ins=rows[j]; print(f'{a:x}: {ins}')
-              print(f'AUTHSESSION_PHASE4_{name}_PROVENANCE_END')
-              print(f'AUTHSESSION_PHASE4_{name}_KNOWN_REF_HITS='+','.join(
-                    f'0x{a:x}->0x{x:x}' for a,ins in rows for x in [int(y,16) for y in re.findall(r'#\s*0x([0-9a-f]+)',ins)] if x in wanted))
-          def cstring(name,start,target):
-              data=get(name,specs[name][1]); off=target-start
-              if not 0<=off<len(data): raise SystemExit(76)
-              s=data[off:off+128].split(b'\0',1)[0]
-              safe=''.join(chr(b) if 32<=b<127 else f'\\x{b:02x}' for b in s)
-              print(f'AUTHSESSION_PHASE4_STATIC_STRING_0x{target:x}={safe}')
-          cstring('STRINGS_D',0x1c96cd0,0x1c96d0b)
-          cstring('STRINGS_D',0x1c96cd0,0x1c96e88)
-          cstring('STRINGS_E',0x1ce7240,0x1ce7262)
-          cstring('STRINGS_F',0x28a7c60,0x28a7c92)
-          cstring('STRINGS_G',0x1d910f0,0x1d91113)
+          for name,(start,n) in specs.items():
+              d=get(name,n)
+              print(f'AUTHSESSION_PHASE5_{name}_QWORDS_BEGIN')
+              for off in range(0,n,8):
+                  q=struct.unpack_from('<Q',d,off)[0]
+                  print(f'0x{start+off:x}=0x{q:x}')
+              print(f'AUTHSESSION_PHASE5_{name}_QWORDS_END')
+              print(f'AUTHSESSION_PHASE5_{name}_DWORDS_BEGIN')
+              for off in range(0,n,4):
+                  u=struct.unpack_from('<I',d,off)[0]
+                  if u or off in range(0x30,0x90): print(f'0x{start+off:x}=0x{u:x}')
+              print(f'AUTHSESSION_PHASE5_{name}_DWORDS_END')
           PY

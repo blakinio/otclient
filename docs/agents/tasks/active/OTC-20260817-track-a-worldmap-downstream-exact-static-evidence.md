@@ -15,12 +15,15 @@ base_branch: main
 base_main: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
 live_main_at_claim: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
 risk: medium
-updated: 2026-08-17T08:12:00+02:00
+updated: 2026-08-17T08:27:00+02:00
+producer_pr: 446
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence.md
   - docs/agents/evidence/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence/**
   - .github/scripts/tibia-official-client-re-worldmap-downstream-exact-static.py
   - .github/workflows/tibia-official-client-re-worldmap-downstream-exact-static.yml
+  - .github/scripts/tibia-official-client-re-worldmap-downstream-targeted-static.py
+  - .github/workflows/tibia-official-client-re-worldmap-downstream-targeted-static.yml
 modules_touched: []
 reuses:
   - PR #367 / OTC-20260816-track-a-worldmap-extent-static-re as consumer only; do not modify its branch from this producer
@@ -41,7 +44,7 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: checkpoint_only
 user_communication: low_noise
 execution_mode: github-actions
-execution_reason: GitHub-only producer with one bounded read-only exact-file staging step on synology-otclient-01 and disposable hosted decoding; no live client/runtime access
+execution_reason: GitHub-only producer with bounded read-only exact-file staging on synology-otclient-01 and disposable hosted decoding; no live client/runtime access
 execution_class: github_hosted
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
@@ -114,35 +117,61 @@ consumer_contract:
 acceptance_inventory:
   - exact source fence re-proven before any read
   - no client process, process memory, canonical state, X11/VNC, login/gameplay or client-byte mutation
-  - recover relocation-aware vtable slots for RenderProvider/Camera/Picker and stage non-trivial executable slots/callers rather than destructor/first-slot-only windows
-  - recover direct xrefs/callers of Storage slot-12 function 0x00cc6cd0 and bounded caller windows sufficient to trace the source of its rsi+0x38 pair when statically possible
+  - recover primary vtable boundaries and non-trivial executable slots for RenderProvider/Camera/Picker
+  - recover bounded Storage slot-12 caller contexts and trace rsi+0x38 upstream when statically possible
   - hosted disassembly/analysis over bounded sanitized windows only; raw client never uploaded
-  - persist FACT/INFERENCE/UNKNOWN separately; do not infer missing immediate 18/14 writes
+  - persist FACT/INFERENCE/UNKNOWN separately; do not infer missing relations
   - durable evidence usable by #367 without Synology access
   - exact-head governance/CI green for the producer Draft PR
 researcher_delivery: draft_only
 WORLD_MAP_DOWNSTREAM_STATIC_EVIDENCE_READY: false
 programme_complete: false
 invocation_started_at: 2026-08-17T08:12:00+02:00
-last_progress_at: 2026-08-17T08:12:00+02:00
+last_progress_at: 2026-08-17T08:27:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: producer-initial
+ci_check_generation: targeted-discriminator-prepared
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
+validation_state:
+  semantic_source_run: 32001356705
+  semantic_source_job: 95302168871
+  semantic_source_result: SUCCESS
+  source_artifact_id: 9278519216
+  source_artifact_digest: e10347435bece4cbedc7fca54b782cea76f9f1dab3b042082fe3bcc15f7c0728
+  semantic_hosted_job: 95302411849
+  semantic_hosted_result: SUCCESS
+  final_artifact_id: 9278527206
+  final_artifact_digest: af12b2af9c725ca402224876c3cbd0c01306f47b37e717548c5817310dd3bc9b
+  code_windows: 236
+  code_raw_bytes: 532736
+  primary_vtable_boundaries_curated:
+    render_provider: slots_0_through_21
+    camera: slots_0_through_4
+    picker: slots_0_through_7
 recovery_checkpoint:
-  status: CLAIMED_BEFORE_FIRST_SOURCE_RUN
-  fresh_overlap_check: no open downstream worldmap exact-static producer found; open worldmap PRs are consumer #367 and prior producer #437 only
-  source_run_id: NOT_STARTED
-  source_job_id: NOT_STARTED
-  prohibited_repeat: do not repeat v7 GUI/client_window_missing; do not rescan exhausted retained inventory; do not depend on source-side objdump/llvm-objdump because prior producer proved both absent
-next_action: open a Draft producer PR, implement a disassembler-free exact-ELF source sanitizer that stages non-trivial vtable/caller windows for Storage slot 12, RenderProvider, Camera and Picker, then hosted-disassemble and persist consumer-ready evidence for PR #367
+  status: FIRST_BUNDLE_SUCCESS_TARGETED_REVERSE_VTABLE_DISCRIMINATOR_REQUIRED
+  fresh_overlap_check: no open downstream worldmap exact-static producer found at claim time; this PR remains the sole downstream producer
+  exact_source_candidate_index: 1
+  source_run_id: 32001356705
+  source_job_id: 95302168871
+  source_result: SUCCESS
+  hosted_job_id: 95302411849
+  hosted_result: SUCCESS
+  first_bundle_findings:
+    - exact packed bytes 120000000e000000 occur at static data address 0x01cdd958
+    - exact TWorldMapViewport constructor 0x00cbf680 loads QWORD 0x01cdd958 into Viewport+0x40, so Viewport embedded TWorldMapExtent payload begins with constructor values 18/14
+    - generic [vtable+0x60] scan produced false-positive candidate contexts; type anchoring is required before assigning Storage slot-12 caller identity
+    - candidate 0x00cdb770 constructs a geometry-like stack object with 0x00bc6350, passes it to object member this+0x10 vslot+0x60, then passes the same object to further dependencies; the member type is not yet directly proven
+  new_discriminator: recover handler/viewport primary vtables plus reverse vtable ownership for 0x00cdb770 and bounded body of 0x00bc6350; stage exact data constants used by Viewport
+  prohibited_repeat: do not repeat the broad generic [vtable+0x60] scan as proof; do not repeat v7 GUI/client_window_missing; do not rescan exhausted retained inventory
+next_action: execute one narrower reverse-vtable/data-source staging run, use it to classify candidate 0x00cdb770 and the 0x00bc6350 snapshot producer, then curate durable downstream evidence and return it to PR #367
 ---
 
 # Track A world-map downstream exact static evidence producer
 
-This task exists only to produce the new exact static input requested by consumer PR #367. It owns no consumer files and does not design or apply a client patch.
+This task produces only new exact static input requested by consumer PR #367. The first bundle is physically and hosted validated; its broad virtual-call candidate list is intentionally not treated as semantic proof until the targeted discriminator resolves type ownership.

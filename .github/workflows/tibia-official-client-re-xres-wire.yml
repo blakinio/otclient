@@ -1,0 +1,65 @@
+name: Track A raw XRes wire helper
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/scripts/tibia-official-client-re-xres-wire.py
+      - .github/scripts/test_tibia_official_client_re_xres_wire.py
+      - .github/workflows/tibia-official-client-re-xres-wire.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
+
+permissions:
+  contents: read
+
+jobs:
+  xres-wire:
+    name: Hosted raw XRes wire validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Compile and run deterministic wire fixtures
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-xres-wire.py \
+            .github/scripts/test_tibia_official_client_re_xres_wire.py
+          python3 .github/scripts/test_tibia_official_client_re_xres_wire.py
+
+      - name: Prove helper is pure and transport-free
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('.github/scripts/tibia-official-client-re-xres-wire.py')
+          tree = ast.parse(path.read_text(encoding='utf-8'))
+          allowed_imports = {'__future__', 'dataclasses', 'struct'}
+          imports = set()
+          forbidden_names = {
+              'socket', 'subprocess', 'os', 'pathlib', 'urllib', 'requests',
+              'http', 'ftplib', 'asyncio', 'open', 'exec', 'eval', '__import__',
+          }
+          used_forbidden = set()
+          for node in ast.walk(tree):
+              if isinstance(node, ast.Import):
+                  imports.update(alias.name.split('.', 1)[0] for alias in node.names)
+              elif isinstance(node, ast.ImportFrom):
+                  imports.add((node.module or '').split('.', 1)[0])
+              elif isinstance(node, ast.Name) and node.id in forbidden_names:
+                  used_forbidden.add(node.id)
+          unexpected = imports - allowed_imports
+          if unexpected:
+              raise SystemExit(f'XRES_WIRE_UNEXPECTED_IMPORTS={sorted(unexpected)}')
+          if used_forbidden:
+              raise SystemExit(f'XRES_WIRE_FORBIDDEN_NAMES={sorted(used_forbidden)}')
+          print('XRES_WIRE_PURE_TRANSPORT_FREE=PASS')
+          PY

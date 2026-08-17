@@ -1,27 +1,28 @@
 ---
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
-status: ready
+status: validating
 agent: ChatGPT
-session_id: chatgpt-coord-xres-child-archive-20260817
+session_id: chatgpt-raw-xres-helper-promotion-20260817
 session_role: promotion_integration_coordinator
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: raw-xres-helper-hosted-ready
-branch: docs/OTC-20260817-track-a-xres-child-archive
+phase: coordinator-promotion-raw-xres-wire
+branch: feat/OTC-20260817-track-a-raw-xres-helper-promote
 base_branch: main
-base_main: 7540a679420689c388d9d11125c9fd8846956a10
+base_main: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
 risk: high
-updated: 2026-08-17T08:32:00+02:00
+updated: 2026-08-17T08:56:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
-modules_touched: []
+  - .github/scripts/tibia-official-client-re-xres-wire.py
+  - .github/scripts/test_tibia_official_client_re_xres_wire.py
+  - .github/workflows/tibia-official-client-re-xres-wire.yml
+modules_touched:
+  - track-a-xres-wire-helper
 reuses:
-  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-bootstrap-implementation.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-canonical-xvfb-dri-path-fix.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-dri-repair-isolated-client-revalidation.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-xres-window-identity.md
   - docs/agents/tasks/archive/OTC-20260816-track-a-xres-support-inventory.md
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
@@ -30,7 +31,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: coordinator promotion #444 merged the independently audited post-RHI raw-X11, XRes helper-unavailable and corrected XRes support evidence. Source Drafts #438/#442/#443 are closed superseded. The two bounded XRes child tasks are archived and ownership-released by this lifecycle branch. The remaining canonical task now has one causal next step: a GitHub-hosted raw-XRes encoder/parser derived from the promoted observed XResproto wire layout, without Xvfb/client/canonical state access. Physical identity retry remains forbidden until that helper is validated and separately admitted.
+execution_reason: coordinator independently reviewed source Draft #447, found and resolved one fail-closed ambiguity before terminal source closeout, and verified the final source head with dedicated hosted tests, Track A governance, repository CI and zero review threads. This branch is an exact conflict-free source tree replay on trusted main plus coordinator checkpoint metadata. No physical runtime access is authorized by this promotion.
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -54,62 +55,80 @@ mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
-promotion_chain:
-  coordinator_promotion_pr: 444
-  coordinator_promotion_head: 32b7cca056c875429db4f2a167385f7b95335b81
-  coordinator_promotion_merge: 7540a679420689c388d9d11125c9fd8846956a10
-  source_pr_438: CLOSED_SUPERSEDED_ACCEPTED
-  source_pr_442: CLOSED_SUPERSEDED_ACCEPTED
-  source_pr_443: CLOSED_SUPERSEDED_ACCEPTED_WITH_EDITS
-  promotion_governance_run: 32000325932
-  pre_ready_ci_run: 32000326108
-  pre_ready_required_ci_job: 95299301299
-  ready_ci_run: 32000366565
-  ready_required_ci_job: 95299428625
-  promotion_review_threads_open: 0
-promoted_window_identity_frontier:
-  glx_present: true
-  raw_viewable_full_display_xid_present: true
-  raw_viewable_xid: 0x00c00011
-  raw_viewable_geometry: 1920x1080
-  xdotool_named_visible_count: 0
-  exact_client_pid_ownership_of_viewable_xid: UNKNOWN
-  convenience_libxcb_res_present: false
-  convenience_libXRes_present: false
-  contained_XResproto_present: true
-  observed_query_client_ids_minor_opcode: 4
-  observed_local_client_pid_mask: 0x02
-  observed_query_client_ids_request_fixed_size: 8
-  observed_query_client_ids_reply_fixed_size: 32
-  raw_xres_helper_implementation_validated: false
+source_review:
+  source_pr: 447
+  source_final_head: 32c61120b9086904b328e7b4aa50526d64bef807
+  coordinator_decision: ACCEPT
+  source_merge_tree: 56b1a50be3194b0c11bfda0ee1a502f33cef923e
+  replay_seed_commit: 0a6709deec8082221323286a20b416ea8e9a606a
+  material_findings_open: 0
+  hardening_finding: one-spec QueryClientIds extraction originally ignored unrelated extra records
+  hardening_resolution: nonempty one-spec result must contain exactly one record total
+  hardening_fixture: test_rejects_extra_non_target_record_even_with_target
+source_validation:
+  semantic_helper_head: 06c6f18fc4a8920428ca353173b0596758a0190a
+  semantic_dedicated_run: 32001448940
+  semantic_dedicated_job: 95302425720
+  semantic_dedicated_result: SUCCESS
+  deterministic_tests: 33
+  deterministic_tests_passed: 33
+  purity_contract: XRES_WIRE_PURE_TRANSPORT_FREE_PASS
+  source_final_dedicated_run: 32001585699
+  source_final_dedicated_job: 95302804376
+  source_final_dedicated_result: SUCCESS
+  source_final_governance_run: 32001585708
+  source_final_governance_result: SUCCESS
+  source_final_repository_ci_run: 32001585992
+  source_final_required_ci_job: 95303113378
+  source_final_required_ci_result: SUCCESS
+  source_review_threads_open: 0
+implementation:
+  helper_path: .github/scripts/tibia-official-client-re-xres-wire.py
+  helper_blob: ce5992bc1171eef9f24a71dfc97da728f18627a9
+  test_path: .github/scripts/test_tibia_official_client_re_xres_wire.py
+  dedicated_workflow: .github/workflows/tibia-official-client-re-xres-wire.yml
+  query_version_encoder: PASS
+  query_version_reply_parser: PASS
+  query_client_ids_encoder: PASS
+  query_client_ids_reply_parser: PASS
+  local_client_pid_extractor: PASS
+  transport_free: true
+  exactly_one_record_for_one_spec_required: true
+classification:
+  primary: PROVEN_HOSTED_RAW_XRES_WIRE_CODEC_FAIL_CLOSED_AND_TRANSPORT_FREE_WITH_33_DETERMINISTIC_FIXTURES
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260817-raw-xres-wire-hosted.md
 safety:
   canonical_bootstrap_retry_authorized: false
   canonical_window_identity_relaxation_authorized: false
-  physical_identity_retry_authorized: false
+  physical_identity_retry_authorized_before_promotion_merge: false
   credentials_allowed: false
   login_allowed: false
   gameplay_allowed: false
   track_b_access: false
 forbidden:
-  - any physical Synology/Xvfb/official-client execution before host-side raw-XRes helper validation and fresh separate admission
-  - canonical lease/registration/session observation or mutation during hosted helper work
-  - accepting a viewable XID as official-client-owned without direct resource/PID identity proof
-  - canonical bootstrap retry
-  - canonical window identity relaxation
+  - Synology/Xvfb/official-client execution from this promotion branch
+  - network/socket/X11 connection in helper tests
+  - canonical lease/registration/session observation or mutation
   - credentials, login or gameplay
+  - canonical bootstrap retry
+  - canonical window identity relaxation before direct physical XID-to-PID proof
   - Track B and historical PR #303 runtime surfaces
-acceptance_for_next_phase:
-  - implement pure hosted/static QueryVersion request encoder and reply parser from promoted observed wire constants
-  - implement pure hosted/static QueryClientIds request encoder for one resource XID and LocalClientPid mask
-  - implement bounded QueryClientIds reply parser with strict lengths/counts/mask validation
-  - include deterministic positive/negative/truncated/oversized/wrong-version fixtures
-  - no network/X server/client/canonical runtime access in helper validation
-  - pass exact-head Track A governance and repository CI
-  - only then create a separately admitted physical identity discriminator
-last_completed_step: coordinator promotion #444 merged as 7540a679420689c388d9d11125c9fd8846956a10; source Drafts #438/#442/#443 were closed superseded; child task archive/release is staged on the current lifecycle branch
-next_action: merge the child-task archive/release PR, then continue this same canonical task by implementing and validating a GitHub-hosted raw-XRes QueryVersion/QueryClientIds encoder-parser with deterministic fixtures and no physical runtime access.
+acceptance:
+  - exact source tree replayed without manual code rewrite
+  - source dedicated validation and purity PASS
+  - source Track A governance PASS
+  - source CI Required PASS
+  - source review threads zero
+  - coordinator material findings zero
+  - promotion exact-head dedicated workflow PASS
+  - promotion Track A governance PASS
+  - promotion repository CI Required PASS pre-ready and ready-state
+  - no physical runtime access occurs
+last_completed_step: source #447 final head passed dedicated raw-XRes validation, Track A governance and repository CI; coordinator decision is ACCEPT and the exact source merge tree is replayed linearly on trusted main for promotion
+next_action: validate promotion exact head, mark ready, protected auto-merge, close #447 superseded, then freshly admit a separate task-owned isolated physical XRes PID-identity discriminator using the promoted helper; canonical bootstrap and window-identity relaxation remain forbidden until that physical proof succeeds.
 ---
 
-# Track A canonical runtime E2E — raw-XRes helper frontier
+# Track A canonical runtime E2E — raw-XRes helper promotion
 
-The remaining unknown is exact resource-to-PID ownership of the proven viewable X11 window. The next phase is purely hosted protocol-helper validation; another physical client run remains forbidden until that helper passes.
+This promotion makes the pure wire codec durable on trusted main. It does not itself prove physical resource ownership or authorize canonical startup.

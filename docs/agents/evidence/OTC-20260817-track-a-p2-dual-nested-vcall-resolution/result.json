@@ -1,13 +1,14 @@
 {
-  "schema": "track-a-p2-dual-nested-vcall-resolution-v1",
+  "schema": "track-a-p2-dual-nested-vcall-resolution-v2",
   "date": "2026-08-17",
   "task": "OTC-20260817-track-a-p2-dual-nested-vcall-resolution",
-  "research_status": "DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW",
+  "research_status": "DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW_AFTER_FINAL_CI",
   "exact_client": {
     "version": "15.32.df7b29",
     "size": 51965216,
     "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
   },
+  "runtime_access": "none",
   "input_artifact": {
     "run": 32016842999,
     "hosted_job": 95348295109,
@@ -15,37 +16,94 @@
     "artifact_sha256": "2df8405269431397f3da0601ef24d9a9a8787dc33f3b5fdd43774f1eca36922c",
     "independent_redownload_rehash": "PASS"
   },
-  "runtime_access": "none",
+  "generations": [
+    {
+      "run": 32033753449,
+      "source_job": 95399308395,
+      "hosted_job": 95400245919,
+      "source_artifact": 9289952632,
+      "source_artifact_sha256": "176a174bafd8f77fb82ff8ea3737b0850be5b0327dc2ba6065e0d9bf51574e5a",
+      "final_artifact": 9289961937,
+      "final_artifact_sha256": "fa1cddd5410454d9f5b717afe0d625d404a7750fb82ffb4b8a9d288cbc9ac64a",
+      "result": "SUCCESS"
+    },
+    {
+      "run": 32034648596,
+      "source_job": 95402114226,
+      "hosted_job": 95402454465,
+      "source_artifact": 9290206232,
+      "source_artifact_sha256": "27e946c3a864aac6257675e3ff6403eec93476223efed400bd72907cdb10f1a4",
+      "final_artifact": 9290395475,
+      "final_artifact_sha256": "a0b396081570a1729e964bf8c57ad726ab95d91e3cf54f6857ebb43248afdebf",
+      "result": "SUCCESS",
+      "code_window": "0xb4aea0..0xb4b800"
+    },
+    {
+      "run": 32035436709,
+      "source_job": 95404656415,
+      "hosted_job": 95404893228,
+      "source_artifact": 9290490800,
+      "source_artifact_sha256": "f70f2f1ecc4e4af15323c6bee8998938cc79c25c454d72101672c1d9a0a68fa6",
+      "final_artifact": 9290498273,
+      "final_artifact_sha256": "4aa991a9912c3fb56cc08863ba94ac9e73e78a466a966c00353e85ce39a85323",
+      "result": "SUCCESS",
+      "code_window": "0xb4aea0..0xb4b800",
+      "data_window": "0x2f741c0..0x2f74250"
+    }
+  ],
   "claims": {
-    "b56c93_receiver_provenance": "FACT:nested_pointer_chain_current_entry_plus_0x20_plus_0x20",
+    "b56c93_receiver_provenance": "FACT:TGameserverNetworkPacketConnection_this+0x20_to_TGameserverNetworkPacketProcessor_this+0x20_to_receiver",
+    "b56c93_outer_guard_vtable_ap": "FACT:0x3084ba8",
+    "b56c93_outer_guard_type": "FACT:tibia::network::TGameserverNetworkPacketConnection",
     "b56c93_outer_guard_vslot_plus_0x98_target": "FACT:0xb3eda0",
-    "b56c93_intermediate_guard_vslot_plus_0x60_target": "FACT:0xf45cf0",
+    "b56c93_intermediate_vtable_ap": "FACT:0x30b7a68",
+    "b56c93_intermediate_type": "FACT:tibia::network::TGameserverNetworkPacketProcessor",
+    "b56c93_intermediate_vslot_plus_0x60_target": "FACT:0xf45cf0",
+    "b56c93_receiver_vtable_address_point": "FACT:0x2f741d8",
+    "b56c93_receiver_rtti_pointer": "FACT:0x30b7548",
     "b56c93_receiver_exact_dynamic_type": "UNKNOWN",
     "b56c93_virtual_slot": "FACT:+0x10",
-    "b56c93_concrete_target": "UNKNOWN",
+    "b56c93_concrete_target": "FACT:0xf50090",
     "b56c93_second_argument": "FACT:original_b56970_second_argument_rsi",
     "b56c93_same_message_preserved": "FACT",
-    "b56c93_target_equals_b40630": "UNKNOWN",
-    "b57042_receiver_provenance": "FACT:internal_rbx_object_selected_from_plus_0x80_path",
-    "b57042_receiver_exact_dynamic_type": "UNKNOWN",
-    "b57042_virtual_slot": "FACT:+0x10",
-    "b57042_concrete_target": "UNKNOWN",
+    "b56c93_target_equals_b40630": "DISPROVEN",
     "b57042_rsi_on_taken_branch": "FACT:0x100000001",
     "b57042_same_message_preserved": "DISPROVEN",
     "b57042_is_same_message_edge_to_b40630": "DISPROVEN",
+    "dualconnection_to_binary_egress": "UNKNOWN",
+    "final_binary_egress": "UNKNOWN",
+    "final_socket_ownership": "UNKNOWN",
     "framing": "UNKNOWN",
     "sequence": "UNKNOWN",
     "compression": "UNKNOWN",
-    "encryption": "UNKNOWN",
-    "final_binary_egress": "UNKNOWN",
-    "final_socket_ownership": "UNKNOWN"
+    "encryption": "UNKNOWN"
+  },
+  "proven_stage_order": [
+    "persistent QBuffer",
+    "TProtocolClientMessageProcessor+0x10@0xc2df80",
+    "TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "same QByteArray/message",
+    "TGameserverDualConnection+0x78@0xb56970",
+    "tibia::network::TGameserverNetworkPacketConnection",
+    "tibia::network::TGameserverNetworkPacketProcessor",
+    "receiver_vtable_AP_0x2f741d8_plus_0x10",
+    "0xf50090"
+  ],
+  "negative_controls": {
+    "b4066b_as_dualconnection_plus_0x90_final_egress": "DISPROVEN",
+    "direct_qtcpsocket_sink_at_b4066b": "DISPROVEN",
+    "b56c93_to_b40630": "DISPROVEN",
+    "b57042_same_message_continuation": "DISPROVEN",
+    "b46bd0": "QString/local8bit/newline_not_binary_gameplay_proof",
+    "c33259": "DISPROVEN_QMatrix4x4_non_network",
+    "b5b880": "SUPERSEDED"
   },
   "frontier": {
-    "remaining_candidate": "0xb56c93",
-    "next_discriminator": "resolve exact dynamic receiver/vtable +0x10 target after the 0xb3eda0/0xf45cf0 guarded chain and test target == 0xb40630"
+    "next_exact_target": "0xf50090",
+    "next_discriminator": "bounded exact-client disassembly/dataflow of 0xf50090 preserving the same second argument; identify a concrete binary-write sink or the next exact transform/forward target without semantic guessing"
   },
   "e2e": {
     "result": "NOT_APPLICABLE",
-    "reason": "static exact-artifact dataflow analysis only"
+    "reason": "static exact-file/disassembly evidence only"
   }
 }

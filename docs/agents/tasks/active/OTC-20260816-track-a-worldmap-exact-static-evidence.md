@@ -8,17 +8,18 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: evidence_staging
-phase: consumer-ready-exact-static-evidence
+phase: second-pack-consumer-ready-exact-static-evidence
 branch: research/OTC-20260816-track-a-worldmap-exact-static-evidence
 base_branch: main
 base_main: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
-current_main_at_admission: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
+current_main_at_initial_admission: b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4
+second_pack_main_at_preflight: 8c9486e2c6109a7a39b564804c8acd707659b5e0
 worktree: github-only://blakinio/otclient/refs/heads/research/OTC-20260816-track-a-worldmap-exact-static-evidence
 worktree_mode: isolated_branch_checkout_equivalent
 risk: medium
-updated: 2026-08-16T23:22:42+02:00
+updated: 2026-08-17T09:15:00+02:00
 producer_pr: 437
-producer_evidence_head: d605640d5d949067e4e178e5086bf5b8873e9989
+producer_evidence_head: 93a9df8cb999e173658cee4c1763afa092973e15
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-worldmap-exact-static-evidence.md
   - docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/**
@@ -29,11 +30,9 @@ owned_paths:
   - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py
 modules_touched: []
 reuses:
-  - PR #367 / OTC-20260816-track-a-worldmap-extent-static-re as consumer only; its branch is not owned or modified by this producer
-  - PR #405 / runtime v7 as historical client_window_missing evidence only
-  - PR #431/#432/#434 as the fresh post-v7 GUI discriminator and exact-source selector precedent
-  - immutable exact-source selector in commit cb557da12ebb41c597340909b2db717ee59cdfe1
-  - PR #435 as read-only source-staging precedent only; its stale retained-run path was not reused
+  - PR #367 / OTC-20260816-track-a-worldmap-extent-static-re as read-only consumer; its branch is not owned or modified by this producer
+  - PR #405 / runtime v7 as historical evidence only; no historical PID/session/display promoted as current
+  - immutable exact-source selector precedent and existing first-pack #437 evidence
   - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
   - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 policy_version: 2
@@ -64,7 +63,6 @@ runtime_nonclaims:
   current_exact_client_session: NOT_REGISTERED
 source_staging_exception:
   coordinator_approved: true
-  reason: user-directed RUNTIME continuation required physical exact-file evidence for PR #367; current routing permits bounded read-only host-local exact-file staging when retained GitHub evidence is insufficient
   source_executor: synology-otclient-01
   source_access: read_only_file_only
   source_runtime_access: none
@@ -89,126 +87,147 @@ consumer_contract:
   task: OTC-20260816-track-a-worldmap-extent-static-re
   consumer_branch: research/OTC-20260816-track-a-worldmap-extent-static-re
   consumer_branch_modified: false
-  requested_identity_windows:
-    - 0x030871c8..0x030871d7 for vptr 0x030871d8
-    - 0x0308ce60..0x0308ce6f for vptr 0x0308ce70
-    - 0x02f683c0..0x02f683cf for vptr 0x02f683d0
-  requested_geometry_offsets:
-    - +0x18
-    - +0x1c
-    - +0x30
-    - +0x34
-    - +0x48
-    - +0x4c
-  priority_values:
-    - +0x48 = 18
-    - +0x4c = 14
-  physical_confirmation_owner: RUNTIME
 researcher_delivery: draft_only
 WORLD_MAP_STATIC_EVIDENCE_READY: true
+WORLD_MAP_DOWNSTREAM_EVIDENCE_READY: true
+STORAGE_EXTENT_UPSTREAM_SOURCE_PROVEN: true
+RENDER_LIMITS_RECOVERED: true
+CAMERA_GEOMETRY_RECOVERED: false
+PICKER_BOUNDS_RECOVERED: true
+FIXED_TILE_LIMIT_FOUND: UNKNOWN
 programme_complete: false
 delivery_state: CONSUMER_READY_DRAFT
-identity_results:
-  recovered: 3
-  total: 3
+
+first_pack:
+  durable_json: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260816-worldmap-exact-static-evidence.json
+  durable_handoff: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260816-worldmap-exact-static-evidence.md
+  storage_vptr: 0x0308ce70
+  storage_typeinfo: 0x0308b5f0
+  storage_constructor: 0x00cbf37a
+  storage_slot12: 0x00cc6cd0
+  storage_slot12_extent_writer: 0x00cc6d2c
+  storage_slot14_bounds: 0x00cb01d0
+
+second_pack:
+  durable_json:
+    path: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260817-worldmap-second-pack-evidence.json
+    commit: a7853827d18a2551b72e126ccb030378b875b486
+  durable_handoff:
+    path: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260817-worldmap-second-pack-evidence.md
+    commit: 93a9df8cb999e173658cee4c1763afa092973e15
+  preflight:
+    path: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260817-second-pack-preflight.md
+    commit: 87ea0f679175d676d9cb2721b1d6f3f810481cb4
+  runs:
+    - {run: 32002543926, source_job: 95305539737, source_artifact: 9278903625, hosted_job: 95305685220, final_artifact: 9278908515, result: success}
+    - {run: 32003065517, source_job: 95307020627, source_artifact: 9279071635, hosted_job: 95307179088, final_artifact: 9279075470, result: success}
+    - {run: 32003607118, source_job: 95308578004, source_artifact: 9279245326, hosted_job: 95308725378, final_artifact: 9279250068, result: success}
+    - {run: 32004356610, source_job: 95310743900, source_artifact: 9279498428, hosted_job: 95310922681, final_artifact: 9279503543, result: success}
+    - {run: 32004614539, source_job: 95311482128, source_artifact: 9279577899, hosted_job: 95311635844, final_artifact: 9279583871, result: success}
+    - {run: 32004839610, source_job: 95312106162, source_artifact: 9279649834, hosted_job: 95312291576, final_artifact: 9279654629, result: success}
+
+upstream_results:
   protocol_handler:
     vptr: 0x030871d8
     typeinfo: 0x03085fb8
-    rtti: tibia::worldmap::TWorldmapProtocolMessageHandler
-  storage:
-    vptr: 0x0308ce70
-    typeinfo: 0x0308b5f0
-    rtti: tibia::worldmap::TWorldMapStorage
-  control_block:
-    vptr: 0x02f683d0
-    typeinfo: 0x0307fb20
-    rtti: std::_Sp_counted_ptr_inplace<tibia::worldmap::TWorldMapStorage,...>
-geometry_results:
-  constructor: 0x00cbf37a
-  storage_writer_vtable_slot_12: 0x00cc6cd0
-  storage_bounds_reader_vtable_slot_14: 0x00cb01d0
-  storage_paired_reader_vtable_slot_13: 0x00cb0180
-  embedded_extent_vptr: 0x02f61578
-  embedded_extent_typeinfo: 0x0306fc60
-  embedded_extent_rtti: tibia::worldmap::TWorldMapExtent
-  requested_offsets_initialized: [+0x18, +0x1c, +0x30, +0x34, +0x48, +0x4c]
-  requested_offsets_mutated: [+0x18, +0x1c, +0x30, +0x34, +0x48, +0x4c]
-  requested_offsets_direct_bounds_read: [+0x18, +0x1c, +0x30, +0x34]
-  requested_extent_pair_read: [+0x48, +0x4c]
-  extent_pair_read_abi_role: INFERENCE_HIDDEN_SRET
-  priority_pair_writer: 0x00cc6d2c
-  priority_pair_writer_semantics: copies one QWORD from argument rsi+0x38 into TWorldMapStorage+0x48, covering +0x48/+0x4c
-  direct_immediate_18_writer_found: false
-  direct_immediate_14_writer_found: false
-  exact_dynamic_upstream_origin_of_18_14: UNKNOWN
-  configured_vs_computed_vs_parser_derived: UNKNOWN
-  classification: MUTABLE_COPY_DRIVEN_AT_TWORLDMAPSTORAGE_LAYER
-follow_on_rtti:
-  TWorldMapViewport: {typeinfo: 0x0308b590, vptr: 0x0308c9a8, first_slot: 0x00dee920}
-  TWorldMapStorage: {typeinfo: 0x0308b5f0, vptr: 0x0308ce70, first_slot: 0x00dee8e0}
-  TWorldMapRenderProvider: {typeinfo: 0x03089b70, vptr: 0x02f6c258, first_slot: 0x00820970}
-  TWorldMapCamera: {typeinfo: 0x03080500, vptr: 0x03083968, first_slot: 0x00dedda0}
-  TWorldMapPicker: {typeinfo: 0x03086888, vptr: 0x02f6b7c8, first_slot: 0x008205c0}
-source_validation:
-  source_run: 31972743782
-  source_job: 95227595548
-  source_result: success
-  source_artifact_id: 9270235755
-  source_artifact_sha256: 039d22fe5f88a07784c4ddc32cf6b1d9c2d07a34e90ed5902ffd21d3acd5735b
-  identity_windows_recovered: 3
-  direct_vptr_xrefs: 9
-  bounded_code_windows: 49
-  bounded_code_raw_bytes: 52992
-hosted_validation:
-  recovery_run: 31972915689
-  recovery_job: 95228024727
-  recovery_result: success
-  final_artifact_id: 9270276361
-  final_artifact_sha256: 0dc8d0a44e5a2550ef79c219bda14787796ef7accc0ab1627fecd7c6d55330bc
-  raw_client_present: false
-  exact_fence_validated: true
-  sanitized_boundary: pass
-prior_failures_and_discriminators:
-  - run: 31972285354
-    job: 95226438379
-    result: failed_precondition_before_selector
-    repeated_identically: false
-  - run: 31972499618
-    job: 95226977563
-    result: exact_source_candidate_1_proven_but_objdump_and_llvm_objdump_absent
-    repeated_identically: false
-  - run: 31972743782
-    job: 95227676658
-    result: hosted_derived_markdown_ordering_guard_only
-    recovery: hosted_only_run_31972915689_from_preserved_source_artifact
-    repeated_physical_read_for_recovery: false
-durable_evidence:
-  json:
-    path: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260816-worldmap-exact-static-evidence.json
-    commit: 400fe33cf66a3385a91063a74e8fba646b3369e0
-  handoff:
-    path: docs/agents/evidence/OTC-20260816-track-a-worldmap-exact-static-evidence/20260816-worldmap-exact-static-evidence.md
-    commit: d605640d5d949067e4e178e5086bf5b8873e9989
-curation:
-  raw_generic_displacement_classifier_promoted_as_direct_field_proof: false
-  stack_only_plus_0x4c_hit_promoted: false
-  adjacent_TWorldMapViewport_plus_0x48_immediate_8_promoted_as_storage: false
-  direct_storage_plus_0x4c_coverage: QWORD writes/reads at Storage+0x48 span both DWORD +0x48 and +0x4c
+    static_metaobject: 0x03087800
+    static_metacall: 0x00df2a60
+    constructor: 0x00803ab0
+    hardcoded_pair_source: 0x01cdd958
+    hardcoded_pair: [18, 14]
+    master_pair_fields: [+0xb0, +0xb4]
+    snapshot_method: 0x00cdb770
+  snapshot_builder:
+    function: 0x00bc6350
+    source_pair_load: 0x00bc6372
+    output_pair_store: 0x00bc63af
+    output_pair_offset: +0x38
+  storage_feed:
+    handler_dependency_offset: +0x10
+    virtual_call: 0x00cdb7ab
+    virtual_slot: 12
+    exact_storage_slot12: 0x00cc6cd0
+    exact_storage_pair_write: 0x00cc6d2c
+    exact_storage_pair_fields: [+0x48, +0x4c]
+  receiver_identity_static_structure: INFERENCE
+  receiver_identity_retained_vptr_cross_check: FACT
+  complete_later_writer_census_for_handler_master_pair: UNKNOWN
+
+viewport_results:
+  constructor: 0x00cbf680
+  constructor_default_source: 0x01cdd958
+  constructor_default_pair: [18, 14]
+  constructor_margin_source: 0x01d32ef0
+  constructor_margin_prefix: [1, 2, 1, 2]
+  recompute: 0x00cbf700
+  recompute_base_source: 0x01d63cd0
+  recompute_base_pair: [15, 11]
+  dynamic_extent_setter: 0x00cb2220
+  dynamic_extent_formula: ceil(pixel_dimension/32)+paired_margins
+  extent_output_fields: [+0x40, +0x44]
+  extent_aggregate: 0x00cb07b0
+  direct_viewport_to_storage_edge: NOT_PROVEN
+
+render_results:
+  vptr: 0x02f6c258
+  typeinfo: 0x03089b70
+  constructor_xref: 0x00ccfa02
+  dynamic_bounds_indexer: 0x00cd2260
+  fixed32_record_iteration: 0x00cd08b0
+  other_load_bearing_functions: [0x00cea540, 0x00cd1e50, 0x00ce9700]
+  fixed_allocation_bytes: 0x9fff6
+  fixed_record_stride: 0x0a
+  fixed_record_count: 65535
+  fixed_allocation_is_tile_limit: UNKNOWN
+  independent_18_14_limit: NOT_RECOVERED
+
+picker_results:
+  vptr: 0x02f6b7c8
+  typeinfo: 0x03086888
+  fixed32_transform: 0x00cd0400
+  other_load_bearing_functions: [0x00cd65b0, 0x00ce7aa0, 0x00ce80c0]
+  independent_18_14_limit: NOT_RECOVERED
+
+camera_results:
+  vptr: 0x03083968
+  typeinfo: 0x03080500
+  default_scalar_plus_d0: 1.0
+  dependency_function: 0x00ced1b0
+  dependency_field_chain: self+0x30 -> dependency+0xd0
+  multiplier_address: 0x029505a8
+  multiplier_double: 32.0
+  dependency_type: UNKNOWN
+  named_world_to_screen_formula: UNKNOWN
+  named_screen_to_world_formula: UNKNOWN
+
+limit_audit:
+  hardcoded_18_14: FACT
+  hardcoded_18_14_address: 0x01cdd958
+  fixed32_shift5_mask31: FACT
+  render_65535_x_10_table: FACT
+  render_table_is_tile_ceiling: UNKNOWN
+  storage_fixed_capacity_ceiling: NOT_RECOVERED
+  network_payload_extent_ceiling: NOT_RECOVERED
+  fixed_tile_limit: UNKNOWN
+
+patch_candidate_graph:
+  safe_single_parameter_proven: false
+  client_modified: false
+  summary: 0x01cdd958 -> Handler+0xb0/+0xb4 -> 0x00bc6350 snapshot+0x38 -> Handler+0x10 vslot12 -> Storage+0x48/+0x4c; separately the same literal initializes Viewport+0x40/+0x44 while 0x00cb2220 later recomputes Viewport from pixel size /32 plus margins; RenderProvider and Picker consume the fixed-32 representation.
+  warning: do not treat the shared literal as a safe one-byte/one-QWORD patch until Handler later-writer, protocol/network and capacity effects are fully proven
+
 remaining_unknowns:
-  - exact RTTI identity of embedded vptr 0x02f615a0 at Storage+0x10 and Storage+0x28
-  - exact member names and units for the six requested DWORD fields
-  - upstream producer of slot-12 input QWORD rsi+0x38 and exact dynamic origin of retained values 18/14
-  - storage capacity/eviction and fixed allocation constraints
-  - render clipping/culling and iteration bounds
-  - camera projection/scale limits
-  - picker screen/world limits
-  - parser packing/masks beyond the recovered geometry writer path
-  - any safe mutation or client patch design
-next_action: PR #367 may consume the durable evidence above without Synology access; producer PR #437 remains Draft per researcher_delivery=draft_only and must not modify the consumer branch
+  - complete post-construction writer census for ProtocolHandler master +0xb0/+0xb4
+  - exact static class identity tying the 0x00804620 outer owner to the first-pack outer+0x2f8 Storage construction path without relying on retained vptr evidence
+  - semantic role of RenderProvider fixed 65535 x 10-byte table as a possible tile/cache limit
+  - named Camera world-to-screen / screen-to-world projection functions and exact type behind 0x00ced1b0 self+0x30
+  - any network/parser limit that could cap live map delivery beyond the retained Storage extent
+  - a safe mutation design; mutation remains unauthorized
+next_action: PR #367 may consume the second-pack durable evidence without source-host access; producer PR #437 remains Draft and must not modify the consumer branch
 ---
 
-# Track A world-map exact static evidence producer — consumer-ready Draft
+# Track A world-map exact-static evidence producer — second package consumer-ready
 
-The requested exact static evidence is now durable in GitHub and sufficient to unblock PR #367's next static-reasoning step. The three identity windows are exact; the historical geometry object is proven to be `TWorldMapStorage`; all six requested geometry DWORDs have exact initialization and mutation coverage through three QWORD pairs; `+0x48/+0x4c` are fields of an embedded exact `TWorldMapExtent`; and the Storage vtable exposes the direct pair writer and half-open bound reader.
+The second package resolves the previous primary unknown: the packed `18/14` pair originates as a hardcoded exact ProtocolHandler constructor default at `0x01cdd958` and is copied through `0x00bc6350` into the geometry snapshot consumed by the Handler's dependency slot 12. Existing retained exact-vptr evidence plus first-pack RTTI closes that dependency as `TWorldMapStorage` without claiming any historical runtime is current.
 
-The exact upstream producer of the observed runtime `18/14` pair remains unknown. This producer does not convert that unknown into a patch hypothesis and does not claim current live-runtime authority.
+The package also proves that `TWorldMapViewport` has a dynamic `/32 + margins` extent setter, recovers RenderProvider clipping/indexing and Picker fixed-32 transform dependencies, and records a bounded Camera geometry dependency without inventing a named projection method. No client bytes were changed and no safe standalone extent patch is claimed.

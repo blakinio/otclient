@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file auth/session phase3 windows
+    name: Stage exact-file auth/session phase4 windows
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -25,24 +25,18 @@ jobs:
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     outputs:
-      connect_prelude_hex: ${{ steps.stage.outputs.connect_prelude_hex }}
-      connect_prelude_sha256: ${{ steps.stage.outputs.connect_prelude_sha256 }}
-      helper_88c2d0_hex: ${{ steps.stage.outputs.helper_88c2d0_hex }}
-      helper_88c2d0_sha256: ${{ steps.stage.outputs.helper_88c2d0_sha256 }}
-      helper_861d30_hex: ${{ steps.stage.outputs.helper_861d30_hex }}
-      helper_861d30_sha256: ${{ steps.stage.outputs.helper_861d30_sha256 }}
-      helper_197ce10_hex: ${{ steps.stage.outputs.helper_197ce10_hex }}
-      helper_197ce10_sha256: ${{ steps.stage.outputs.helper_197ce10_sha256 }}
-      existing_tail_hex: ${{ steps.stage.outputs.existing_tail_hex }}
-      existing_tail_sha256: ${{ steps.stage.outputs.existing_tail_sha256 }}
-      connect_tail_hex: ${{ steps.stage.outputs.connect_tail_hex }}
-      connect_tail_sha256: ${{ steps.stage.outputs.connect_tail_sha256 }}
-      strings_a_hex: ${{ steps.stage.outputs.strings_a_hex }}
-      strings_a_sha256: ${{ steps.stage.outputs.strings_a_sha256 }}
-      strings_b_hex: ${{ steps.stage.outputs.strings_b_hex }}
-      strings_b_sha256: ${{ steps.stage.outputs.strings_b_sha256 }}
-      strings_c_hex: ${{ steps.stage.outputs.strings_c_hex }}
-      strings_c_sha256: ${{ steps.stage.outputs.strings_c_sha256 }}
+      setup_a_hex: ${{ steps.stage.outputs.setup_a_hex }}
+      setup_a_sha256: ${{ steps.stage.outputs.setup_a_sha256 }}
+      setup_b_hex: ${{ steps.stage.outputs.setup_b_hex }}
+      setup_b_sha256: ${{ steps.stage.outputs.setup_b_sha256 }}
+      strings_d_hex: ${{ steps.stage.outputs.strings_d_hex }}
+      strings_d_sha256: ${{ steps.stage.outputs.strings_d_sha256 }}
+      strings_e_hex: ${{ steps.stage.outputs.strings_e_hex }}
+      strings_e_sha256: ${{ steps.stage.outputs.strings_e_sha256 }}
+      strings_f_hex: ${{ steps.stage.outputs.strings_f_hex }}
+      strings_f_sha256: ${{ steps.stage.outputs.strings_f_sha256 }}
+      strings_g_hex: ${{ steps.stage.outputs.strings_g_hex }}
+      strings_g_sha256: ${{ steps.stage.outputs.strings_g_sha256 }}
     steps:
       - id: stage
         shell: bash
@@ -51,7 +45,6 @@ jobs:
           [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 61
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 62
           [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 63
-
           candidates=(
             '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
             '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
@@ -73,7 +66,6 @@ jobs:
           python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
           import hashlib,struct,sys
           from pathlib import Path
-
           p=Path(sys.argv[1]); out=Path(sys.argv[2])
           with p.open('rb') as f:
               ident=f.read(16); rest=f.read(48)
@@ -85,73 +77,61 @@ jobs:
                   f.seek(phoff+i*phentsize); r=f.read(56)
                   t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
                   if t==1: segs.append((off,va,sz,flags))
-
               def read_va(start,end,exec_required):
-                  if end <= start or end-start > 0x1000: raise SystemExit(52)
+                  if end<=start or end-start>0x1000: raise SystemExit(52)
                   for off,va,sz,flags in segs:
-                      if va <= start and end <= va+sz:
-                          if exec_required and not (flags & 1): raise SystemExit(53)
+                      if va<=start and end<=va+sz:
+                          if exec_required and not (flags&1): raise SystemExit(53)
                           f.seek(off+start-va); d=f.read(end-start)
                           if len(d)==end-start: return d
                   raise SystemExit(54)
-
               windows={
-                  'connect_prelude':  (0x7d5400,0x7d55f0,True),
-                  'helper_88c2d0':    (0x88c280,0x88c760,True),
-                  'helper_861d30':    (0x861d00,0x862080,True),
-                  'helper_197ce10':   (0x197cde0,0x197d180,True),
-                  'existing_tail':    (0x6ef3b0,0x6ef900,True),
-                  'connect_tail':     (0x6fe6a0,0x6fec00,True),
-                  'strings_a':        (0x1c96bf0,0x1c96c60,False),
-                  'strings_b':        (0x1ce2290,0x1ce2320,False),
-                  'strings_c':        (0x1ce2ff0,0x1ce3070,False),
+                  'setup_a':   (0x7d3400,0x7d4400,True),
+                  'setup_b':   (0x7d4400,0x7d5400,True),
+                  'strings_d': (0x1c96cd0,0x1c96f20,False),
+                  'strings_e': (0x1ce7240,0x1ce72b0,False),
+                  'strings_f': (0x28a7c60,0x28a7cd0,False),
+                  'strings_g': (0x1d910f0,0x1d91160,False),
               }
               staged={k:read_va(a,b,x) for k,(a,b,x) in windows.items()}
-
           rows=[]
           for key,data in staged.items():
               dig=hashlib.sha256(data).hexdigest()
               rows.append(f'{key}_hex={data.hex()}\n{key}_sha256={dig}\n')
-              print(f'AUTHSESSION_PHASE3_SOURCE_{key.upper()}_SHA256={dig}')
+              print(f'AUTHSESSION_PHASE4_SOURCE_{key.upper()}_SHA256={dig}')
           with out.open('a') as h: h.write(''.join(rows))
-          print('AUTHSESSION_PHASE3_EXACT_FILE_FENCE=PASS')
+          print('AUTHSESSION_PHASE4_EXACT_FILE_FENCE=PASS')
           print('AUTHSESSION_RUNTIME_ACCESS=none')
-          print('AUTHSESSION_PHASE3_SOURCE_PROCESS_OBSERVATION=false')
-          print('AUTHSESSION_PHASE3_SOURCE_X11_OBSERVATION=false')
-          print('AUTHSESSION_PHASE3_SOURCE_LOGIN=false')
-          print('AUTHSESSION_PHASE3_SOURCE_SECRET_ACCESS=false')
-          print('AUTHSESSION_PHASE3_SOURCE_DISASSEMBLY=false')
-          print('AUTHSESSION_PHASE3_SOURCE_SEMANTIC_CLASSIFICATION=false')
-          print('AUTHSESSION_PHASE3_RAW_CLIENT_UPLOADED=false')
-          print('AUTHSESSION_PHASE3_BOUNDED_FILE_WINDOWS_STAGED=true')
+          print('AUTHSESSION_PHASE4_SOURCE_PROCESS_OBSERVATION=false')
+          print('AUTHSESSION_PHASE4_SOURCE_X11_OBSERVATION=false')
+          print('AUTHSESSION_PHASE4_SOURCE_LOGIN=false')
+          print('AUTHSESSION_PHASE4_SOURCE_SECRET_ACCESS=false')
+          print('AUTHSESSION_PHASE4_SOURCE_DISASSEMBLY=false')
+          print('AUTHSESSION_PHASE4_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('AUTHSESSION_PHASE4_RAW_CLIENT_UPLOADED=false')
+          print('AUTHSESSION_PHASE4_BOUNDED_FILE_WINDOWS_STAGED=true')
           PY
 
   hosted-decode:
-    name: Decode phase3 auth/session provenance
+    name: Decode phase4 auth/session object provenance
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: docs/OTC-20260817-track-a-auth-session-flow-static
-      CONNECT_PRELUDE_HEX: ${{ needs.source-sanitize.outputs.connect_prelude_hex }}
-      CONNECT_PRELUDE_SHA256: ${{ needs.source-sanitize.outputs.connect_prelude_sha256 }}
-      HELPER_88C2D0_HEX: ${{ needs.source-sanitize.outputs.helper_88c2d0_hex }}
-      HELPER_88C2D0_SHA256: ${{ needs.source-sanitize.outputs.helper_88c2d0_sha256 }}
-      HELPER_861D30_HEX: ${{ needs.source-sanitize.outputs.helper_861d30_hex }}
-      HELPER_861D30_SHA256: ${{ needs.source-sanitize.outputs.helper_861d30_sha256 }}
-      HELPER_197CE10_HEX: ${{ needs.source-sanitize.outputs.helper_197ce10_hex }}
-      HELPER_197CE10_SHA256: ${{ needs.source-sanitize.outputs.helper_197ce10_sha256 }}
-      EXISTING_TAIL_HEX: ${{ needs.source-sanitize.outputs.existing_tail_hex }}
-      EXISTING_TAIL_SHA256: ${{ needs.source-sanitize.outputs.existing_tail_sha256 }}
-      CONNECT_TAIL_HEX: ${{ needs.source-sanitize.outputs.connect_tail_hex }}
-      CONNECT_TAIL_SHA256: ${{ needs.source-sanitize.outputs.connect_tail_sha256 }}
-      STRINGS_A_HEX: ${{ needs.source-sanitize.outputs.strings_a_hex }}
-      STRINGS_A_SHA256: ${{ needs.source-sanitize.outputs.strings_a_sha256 }}
-      STRINGS_B_HEX: ${{ needs.source-sanitize.outputs.strings_b_hex }}
-      STRINGS_B_SHA256: ${{ needs.source-sanitize.outputs.strings_b_sha256 }}
-      STRINGS_C_HEX: ${{ needs.source-sanitize.outputs.strings_c_hex }}
-      STRINGS_C_SHA256: ${{ needs.source-sanitize.outputs.strings_c_sha256 }}
+      SETUP_A_HEX: ${{ needs.source-sanitize.outputs.setup_a_hex }}
+      SETUP_A_SHA256: ${{ needs.source-sanitize.outputs.setup_a_sha256 }}
+      SETUP_B_HEX: ${{ needs.source-sanitize.outputs.setup_b_hex }}
+      SETUP_B_SHA256: ${{ needs.source-sanitize.outputs.setup_b_sha256 }}
+      STRINGS_D_HEX: ${{ needs.source-sanitize.outputs.strings_d_hex }}
+      STRINGS_D_SHA256: ${{ needs.source-sanitize.outputs.strings_d_sha256 }}
+      STRINGS_E_HEX: ${{ needs.source-sanitize.outputs.strings_e_hex }}
+      STRINGS_E_SHA256: ${{ needs.source-sanitize.outputs.strings_e_sha256 }}
+      STRINGS_F_HEX: ${{ needs.source-sanitize.outputs.strings_f_hex }}
+      STRINGS_F_SHA256: ${{ needs.source-sanitize.outputs.strings_f_sha256 }}
+      STRINGS_G_HEX: ${{ needs.source-sanitize.outputs.strings_g_hex }}
+      STRINGS_G_SHA256: ${{ needs.source-sanitize.outputs.strings_g_sha256 }}
     steps:
       - shell: bash
         run: |
@@ -162,17 +142,10 @@ jobs:
           python3 - <<'PY'
           import hashlib,os,re,subprocess,tempfile
           from pathlib import Path
-
           specs={
-              'CONNECT_PRELUDE': (0x7d5400,0x1f0),
-              'HELPER_88C2D0':   (0x88c280,0x4e0),
-              'HELPER_861D30':   (0x861d00,0x380),
-              'HELPER_197CE10':  (0x197cde0,0x3a0),
-              'EXISTING_TAIL':   (0x6ef3b0,0x550),
-              'CONNECT_TAIL':    (0x6fe6a0,0x560),
-              'STRINGS_A':       (0x1c96bf0,0x70),
-              'STRINGS_B':       (0x1ce2290,0x90),
-              'STRINGS_C':       (0x1ce2ff0,0x80),
+            'SETUP_A':(0x7d3400,0x1000),'SETUP_B':(0x7d4400,0x1000),
+            'STRINGS_D':(0x1c96cd0,0x250),'STRINGS_E':(0x1ce7240,0x70),
+            'STRINGS_F':(0x28a7c60,0x70),'STRINGS_G':(0x1d910f0,0x70),
           }
           def get(name,n):
               d=bytes.fromhex(os.environ[name+'_HEX'])
@@ -181,47 +154,44 @@ jobs:
               return d
           def asm(name,start,n):
               data=get(name,n)
-              with tempfile.TemporaryDirectory(prefix='auth-session-p3-') as td:
+              with tempfile.TemporaryDirectory(prefix='auth-session-p4-') as td:
                   p=Path(td)/(name.lower()+'.bin'); p.write_bytes(data)
                   txt=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
-              out=[]
+              rows=[]
               for line in txt.splitlines():
                   m=re.match(r'^\s*([0-9a-f]+):\s+([0-9a-f ]+)\s+(.+)$',line)
-                  if m: out.append((int(m.group(1),16),m.group(3).strip()))
-              return out
-          def print_slice(name,start,n,lo,hi,limit=96):
-              rows=[(a,i) for a,i in asm(name,start,n) if lo <= a < hi]
-              print(f'AUTHSESSION_PHASE3_{name}_SLICE_BEGIN')
-              for a,i in rows[:limit]: print(f'{a:x}: {i}')
-              print(f'AUTHSESSION_PHASE3_{name}_SLICE_END')
-          def call_contexts(name,start,n):
-              rows=asm(name,start,n); chosen=set()
-              for idx,(a,i) in enumerate(rows):
-                  if re.search(r'\bcall\b',i):
-                      for j in range(max(0,idx-3),min(len(rows),idx+2)): chosen.add(j)
-              print(f'AUTHSESSION_PHASE3_{name}_CALL_CONTEXTS_BEGIN')
-              for j in sorted(chosen)[:140]:
-                  a,i=rows[j]; print(f'{a:x}: {i}')
-              print(f'AUTHSESSION_PHASE3_{name}_CALL_CONTEXTS_END')
+                  if m: rows.append((int(m.group(1),16),m.group(3).strip()))
+              return rows
+          wanted={0x3076908,0x3070398,0x3084fa0}
+          print('AUTHSESSION_PHASE4_HOSTED_DECODE=PASS')
+          print('AUTHSESSION_RUNTIME_ACCESS=none')
+          for name,start in [('SETUP_A',0x7d3400),('SETUP_B',0x7d4400)]:
+              rows=asm(name,start,0x1000)
+              chosen=set()
+              for idx,(a,ins) in enumerate(rows):
+                  refs=[int(x,16) for x in re.findall(r'#\s*0x([0-9a-f]+)',ins)]
+                  interesting=(any(x in wanted for x in refs)
+                              or '[rbx+0x88]' in ins or '[rbx+0x9c0]' in ins
+                              or re.search(r'\bmov\s+rbx,rdi\b',ins)
+                              or re.search(r'\bmov\s+rbx,rsi\b',ins)
+                              or (ins.startswith('push   rbp') if False else False))
+                  if interesting:
+                      for j in range(max(0,idx-5),min(len(rows),idx+7)): chosen.add(j)
+              print(f'AUTHSESSION_PHASE4_{name}_PROVENANCE_BEGIN')
+              for j in sorted(chosen)[:220]:
+                  a,ins=rows[j]; print(f'{a:x}: {ins}')
+              print(f'AUTHSESSION_PHASE4_{name}_PROVENANCE_END')
+              print(f'AUTHSESSION_PHASE4_{name}_KNOWN_REF_HITS='+','.join(
+                    f'0x{a:x}->0x{x:x}' for a,ins in rows for x in [int(y,16) for y in re.findall(r'#\s*0x([0-9a-f]+)',ins)] if x in wanted))
           def cstring(name,start,target):
               data=get(name,specs[name][1]); off=target-start
-              if not (0 <= off < len(data)): raise SystemExit(76)
-              s=data[off:off+96].split(b'\0',1)[0]
-              safe=''.join(chr(b) if 32 <= b < 127 else f'\\x{b:02x}' for b in s)
-              print(f'AUTHSESSION_PHASE3_STATIC_STRING_0x{target:x}={safe}')
-
-          print('AUTHSESSION_PHASE3_HOSTED_DECODE=PASS')
-          print('AUTHSESSION_RUNTIME_ACCESS=none')
-          print_slice('CONNECT_PRELUDE',0x7d5400,0x1f0,0x7d5480,0x7d55f0,120)
-          print_slice('HELPER_88C2D0',0x88c280,0x4e0,0x88c2d0,0x88c520,96)
-          print_slice('HELPER_861D30',0x861d00,0x380,0x861d30,0x861f20,80)
-          print_slice('HELPER_197CE10',0x197cde0,0x3a0,0x197ce10,0x197d030,80)
-          call_contexts('EXISTING_TAIL',0x6ef3b0,0x550)
-          call_contexts('CONNECT_TAIL',0x6fe6a0,0x560)
-          cstring('STRINGS_A',0x1c96bf0,0x1c96c11)
-          cstring('STRINGS_A',0x1c96bf0,0x1c96c28)
-          cstring('STRINGS_B',0x1ce2290,0x1ce22c4)
-          cstring('STRINGS_B',0x1ce2290,0x1ce22d0)
-          cstring('STRINGS_B',0x1ce2290,0x1ce22e0)
-          cstring('STRINGS_C',0x1ce2ff0,0x1ce3028)
+              if not 0<=off<len(data): raise SystemExit(76)
+              s=data[off:off+128].split(b'\0',1)[0]
+              safe=''.join(chr(b) if 32<=b<127 else f'\\x{b:02x}' for b in s)
+              print(f'AUTHSESSION_PHASE4_STATIC_STRING_0x{target:x}={safe}')
+          cstring('STRINGS_D',0x1c96cd0,0x1c96d0b)
+          cstring('STRINGS_D',0x1c96cd0,0x1c96e88)
+          cstring('STRINGS_E',0x1ce7240,0x1ce7262)
+          cstring('STRINGS_F',0x28a7c60,0x28a7c92)
+          cstring('STRINGS_G',0x1d910f0,0x1d91113)
           PY

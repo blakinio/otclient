@@ -14,11 +14,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  repair-hold:
-    name: Runtime repair hold — no physical execution
-    runs-on: ubuntu-24.04
+  gdb-environment-isolation:
+    name: Pre-login toolroot GDB environment isolation
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
     steps:
-      - name: Confirm physical runtime is intentionally paused
+      - name: Diagnose toolroot GDB without launching or observing client
+        shell: bash
         run: |
-          echo 'WORLDMAP_CAUSAL_RUNTIME_REPAIR_HOLD=true'
-          echo 'WORLDMAP_CAUSAL_PHYSICAL_EXECUTION=false'
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          TOOL=/work/_otclient_tibia_re_state/toolroot
+          GDB="$TOOL/usr/bin/gdb"
+          [[ -x "$GDB" ]]
+
+          set +e
+          env -u LD_LIBRARY_PATH -u PYTHONHOME -u PYTHONPATH "$GDB" --version >"$RUNNER_TEMP/gdb-no-toolroot-env.out" 2>&1
+          rc_plain=$?
+          env -u PYTHONHOME -u PYTHONPATH \
+            HOME=/home/runner \
+            PATH="$TOOL/usr/bin:$TOOL/usr/sbin:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu" \
+            "$GDB" --version >"$RUNNER_TEMP/gdb-toolroot-env.out" 2>&1
+          rc_toolroot=$?
+          set -e
+
+          echo "WORLDMAP_GDB_PLAIN_RC=$rc_plain"
+          echo "WORLDMAP_GDB_TOOLROOT_ENV_RC=$rc_toolroot"
+          if [[ "$rc_plain" != 0 ]]; then
+            echo 'WORLDMAP_GDB_PLAIN_DIAGNOSTIC_BEGIN'
+            sed -n '1,12p' "$RUNNER_TEMP/gdb-no-toolroot-env.out" | sed -E 's#(/home|/work)/[^ ]+#<PATH>#g'
+            echo 'WORLDMAP_GDB_PLAIN_DIAGNOSTIC_END'
+          fi
+          if [[ "$rc_toolroot" != 0 ]]; then
+            echo 'WORLDMAP_GDB_TOOLROOT_DIAGNOSTIC_BEGIN'
+            sed -n '1,12p' "$RUNNER_TEMP/gdb-toolroot-env.out" | sed -E 's#(/home|/work)/[^ ]+#<PATH>#g'
+            echo 'WORLDMAP_GDB_TOOLROOT_DIAGNOSTIC_END'
+          fi
+          [[ "$rc_toolroot" == 0 ]]
+          echo 'WORLDMAP_GDB_ENVIRONMENT_ISOLATION=PASS'
+          echo 'WORLDMAP_GDB_CLIENT_LAUNCHED=false'
+          echo 'WORLDMAP_GDB_PROCESS_OBSERVED=false'
+          echo 'WORLDMAP_GDB_CREDENTIALS_USED=false'

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/track-a-worldmap-server-delivery-causal-validation.yml
+      - .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh
       - docs/agents/tasks/active/OTC-20260817-track-a-worldmap-server-delivery-causal-validation.md
   workflow_dispatch:
 
@@ -16,11 +17,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  canonical-baseline-bootstrap-xres-repair:
-    name: One XRes-corrected exact-client canonical bootstrap repair
+  ephemeral-baseline:
+    name: Exact-client isolated baseline worldmap capture
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation' }}
     runs-on: [otclient, synology]
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - name: Checkout exact head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
@@ -28,7 +29,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Revalidate admitted XRes repair transaction
+      - name: Revalidate Track A runtime admission
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
@@ -38,130 +39,66 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
             --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
-          echo 'WORLDMAP_CAUSAL_XRES_REPAIR_ADMISSION_POLICY=PASS'
+          echo 'WORLDMAP_CAUSAL_EPHEMERAL_BASELINE_ADMISSION=PASS'
 
-      - name: Generate and verify merged-465 XRes canonical worker
-        id: worker
+      - name: Require canonical controller plane to be idle without mutating it
         shell: bash
-        run: |
-          set -Eeuo pipefail
-          generated="$RUNNER_TEMP/worldmap-causal-canonical-xres-worker"
-          python3 .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py \
-            .github/scripts/tibia-official-client-re-canonical-live-session.sh \
-            "$generated" \
-            --owner-helper .github/scripts/tibia-official-client-re-xres-window-owner.py \
-            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
-          bash -n "$generated"
-          test -x "$generated"
-          if grep -F 'search --onlyvisible --pid' "$generated"; then
-            echo 'WORLDMAP_CAUSAL_XRES_REPAIR_ERROR=legacy_selector_survived' >&2
-            exit 1
-          fi
-          grep -F 'tibia-official-client-re-xres-window-owner.py' "$generated" >/dev/null
-          grep -F 'tibia-official-client-re-xres-wire.py' "$generated" >/dev/null
-          echo "worker=$generated" >> "$GITHUB_OUTPUT"
-          echo 'WORLDMAP_CAUSAL_XRES_WORKER=PASS'
-
-      - name: Acquire generation-9 lease and bootstrap exact baseline through XRes worker
-        shell: bash
-        env:
-          TASK_ID: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-          SESSION_ID: worldmap-causal-baseline-xres-20260817
-          WORKER: ${{ steps.worker.outputs.worker }}
         run: |
           set +x
           set -Eeuo pipefail
-          STATE=/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
-          TASK_STATE=/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-          TOKEN="$TASK_STATE/canonical-lease.token"
-          LEASE=.github/scripts/tibia-official-client-re-canonical-live-lease.py
-          TRANSITION=.github/scripts/tibia-official-client-re-canonical-live-transition.py
+          python3 - <<'PY'
+          from __future__ import annotations
+          import fcntl, json, os, time
+          from pathlib import Path
 
-          mkdir -p "$TASK_STATE"
-          chmod 700 "$TASK_STATE"
-          rm -f "$TOKEN"
-
-          acquired=0
-          keep=0
-          cleanup_failure() {
-            rc=$?
-            if [[ "$keep" != 1 && "$acquired" == 1 ]]; then
-              python3 "$LEASE" --state-dir "$STATE" release \
-                --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" >/dev/null 2>&1 || true
-              rm -f "$TOKEN"
-            fi
-            exit "$rc"
-          }
-          trap cleanup_failure EXIT
-
-          python3 "$LEASE" --state-dir "$STATE" acquire \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" \
-            --ttl-seconds 2700
-          acquired=1
-          [[ "$(stat -c '%a' "$TOKEN")" == 600 ]]
-
-          status_json="$(python3 "$LEASE" --state-dir "$STATE" status --json)"
-          python3 - "$status_json" <<'PY'
-          import json, sys
-          state = json.loads(sys.argv[1])
-          if state.get('generation') != 9 or state.get('status') != 'active':
-              raise SystemExit('WORLDMAP_CAUSAL_XRES_REPAIR_ERROR=unexpected_acquired_generation')
-          print('WORLDMAP_CAUSAL_XRES_REPAIR_GENERATION_9=PASS')
+          state = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          lock = state / 'coordination.lock'
+          lease_path = state / 'lease.json'
+          reg = state / 'runtime-registration.json'
+          if not lock.is_file() or not lease_path.is_file():
+              raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
+          fd = os.open(lock, os.O_RDONLY | getattr(os, 'O_NOATIME', 0))
+          try:
+              fcntl.flock(fd, fcntl.LOCK_SH)
+              lease = json.loads(lease_path.read_text())
+              safe = {
+                  'schema_version': lease.get('schema_version'),
+                  'runtime_id': lease.get('runtime_id'),
+                  'generation': lease.get('generation'),
+                  'status': lease.get('status'),
+                  'controller_task': lease.get('controller_task'),
+                  'controller_session': lease.get('controller_session'),
+                  'expired': bool(lease.get('status') == 'active' and isinstance(lease.get('expires_at'), int) and lease['expires_at'] <= int(time.time())),
+              }
+              print('WORLDMAP_BASELINE_CANONICAL_LEASE=' + json.dumps(safe, sort_keys=True, separators=(',', ':')))
+              if safe['status'] != 'released' or safe['controller_task'] is not None or safe['controller_session'] is not None:
+                  raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_lease_not_idle')
+              if reg.exists():
+                  raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_registration_present')
+          finally:
+              try: fcntl.flock(fd, fcntl.LOCK_UN)
+              except OSError: pass
+              os.close(fd)
+          print('WORLDMAP_BASELINE_CANONICAL_REGISTRATION=ABSENT')
+          print('WORLDMAP_BASELINE_CANONICAL_CONTROLLER_IDLE=PASS')
           PY
 
-          python3 "$LEASE" --state-dir "$STATE" validate \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN"
-          echo 'WORLDMAP_CAUSAL_XRES_REPAIR_GATE_A_LEASE=PASS'
+      - name: Execute one exact-client isolated baseline login and structural capture
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          chmod 700 .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh
+          .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh
 
-          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            python3 "$TRANSITION" bootstrap \
-              --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" \
-              --worker "$WORKER" --worker-timeout 180
-
-          python3 "$LEASE" --state-dir "$STATE" validate \
-            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN"
-
-          python3 - "$STATE/runtime-registration.json" "$TASK_ID" "$GITHUB_RUN_ID" <<'PY'
-          import json, pathlib, re, sys
-          path = pathlib.Path(sys.argv[1])
-          task = sys.argv[2]
-          run = sys.argv[3]
-          data = json.loads(path.read_text())
-          required = {
-              'schema_version': 1,
-              'runtime_id': 'track-a-canonical-live',
-              'lease_generation': 9,
-              'registration_generation': 1,
-              'client_version': '15.32.df7b29',
-              'client_size': 51965216,
-              'client_sha256': 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
-              'source_task': task,
-              'source_run': run,
-          }
-          for key, expected in required.items():
-              if data.get(key) != expected:
-                  raise SystemExit(f'WORLDMAP_CAUSAL_XRES_REPAIR_ERROR=registration_{key}_mismatch')
-          if not isinstance(data.get('pid'), int) or data['pid'] <= 0:
-              raise SystemExit('WORLDMAP_CAUSAL_XRES_REPAIR_ERROR=registration_pid_invalid')
-          if not re.fullmatch(r'x11-window:[1-9][0-9]*', str(data.get('window_identity'))):
-              raise SystemExit('WORLDMAP_CAUSAL_XRES_REPAIR_ERROR=xres_window_identity_invalid')
-          if data.get('remote_view_mapping') != 'PROVEN':
-              raise SystemExit('WORLDMAP_CAUSAL_XRES_REPAIR_ERROR=remote_view_mapping_not_proven')
-          if data.get('state') != 'UNKNOWN':
-              raise SystemExit('WORLDMAP_CAUSAL_XRES_REPAIR_ERROR=unexpected_prelogin_state')
-          safe = {key: data.get(key) for key in (
-              'schema_version','runtime_id','registration_generation','lease_generation','registered_at',
-              'boot_id_sha256','pid','process_start_ticks','client_version','client_size','client_sha256',
-              'display','window_identity','remote_view_endpoint','remote_view_mapping','state','source_task','source_run'
-          )}
-          print('WORLDMAP_CAUSAL_XRES_REPAIR_REGISTRATION=' + json.dumps(safe, sort_keys=True, separators=(',', ':')))
-          print('WORLDMAP_CAUSAL_XRES_REPAIR_REGISTRATION_FENCE=PASS')
-          PY
-
-          echo "WORLDMAP_CAUSAL_XRES_REPAIR_TOKEN_PATH=$TOKEN"
-          echo 'WORLDMAP_CAUSAL_XRES_REPAIR_CREDENTIALS_USED=false'
-          echo 'WORLDMAP_CAUSAL_XRES_REPAIR_LOGIN_USED=false'
-          echo 'WORLDMAP_CAUSAL_XRES_REPAIR_GAMEPLAY_USED=false'
-          echo 'WORLDMAP_CAUSAL_XRES_REPAIR_BOOTSTRAP=PASS'
-          keep=1
-          trap - EXIT
+      - name: Upload privacy-safe structural baseline evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worldmap-causal-baseline-${{ github.run_id }}
+          path: ${{ runner.temp }}/worldmap-baseline-evidence
+          if-no-files-found: error
+          retention-days: 7

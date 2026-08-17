@@ -1,0 +1,193 @@
+name: Track A P0 final canonical admission inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-p0-canonical-final-admission-inventory.yml
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p0-canonical-final-admission-inventory
+  cancel-in-progress: false
+
+jobs:
+  controller-plane-inventory:
+    name: Non-mutating final canonical controller-plane inventory
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260816-track-a-canonical-runtime-p0-final-admission' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Revalidate fresh runtime admission
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          echo 'P0_FINAL_CANONICAL_ADMISSION_POLICY=PASS'
+
+      - name: Read only existing canonical controller metadata under shared flock
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import fcntl
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import stat
+          import time
+
+          STATE = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          LOCK = STATE / 'coordination.lock'
+          LEASE = STATE / 'lease.json'
+          REG = STATE / 'runtime-registration.json'
+          EXPECTED_TASK = 'OTC-20260816-track-a-canonical-runtime-e2e'
+
+          def emit(key: str, value) -> None:
+              print(f'{key}={json.dumps(value, sort_keys=True, separators=(",", ":"))}')
+
+          def fingerprint(path: Path):
+              if not path.exists():
+                  return None
+              st = path.stat()
+              if not stat.S_ISREG(st.st_mode):
+                  return {'kind': 'non_regular', 'mode': stat.S_IMODE(st.st_mode), 'size': st.st_size, 'mtime_ns': st.st_mtime_ns}
+              flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0)
+              fd = os.open(path, flags)
+              try:
+                  h = hashlib.sha256()
+                  while True:
+                      chunk = os.read(fd, 65536)
+                      if not chunk:
+                          break
+                      h.update(chunk)
+              finally:
+                  os.close(fd)
+              return {'kind': 'regular', 'mode': stat.S_IMODE(st.st_mode), 'size': st.st_size, 'mtime_ns': st.st_mtime_ns, 'sha256': h.hexdigest()}
+
+          def read_json_noatime(path: Path):
+              flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0)
+              fd = os.open(path, flags)
+              try:
+                  chunks = []
+                  while True:
+                      chunk = os.read(fd, 65536)
+                      if not chunk:
+                          break
+                      chunks.append(chunk)
+              finally:
+                  os.close(fd)
+              return json.loads(b''.join(chunks).decode('utf-8'))
+
+          if not STATE.is_dir():
+              emit('P0_FINAL_CANONICAL_NAMESPACE', 'ABSENT')
+              emit('P0_FINAL_CANONICAL_COORDINATION_LOCK', 'ABSENT')
+              emit('P0_FINAL_CANONICAL_LEASE', 'ABSENT')
+              emit('P0_FINAL_CANONICAL_REGISTRATION', 'ABSENT')
+              emit('P0_FINAL_CANONICAL_ADMISSION_RESULT', 'CANONICAL_NAMESPACE_ABSENT')
+              emit('P0_FINAL_CANONICAL_ADMISSION_INVENTORY', 'COMPLETE')
+              raise SystemExit(0)
+
+          if not LOCK.exists() or not LOCK.is_file():
+              emit('P0_FINAL_CANONICAL_NAMESPACE', 'PRESENT')
+              emit('P0_FINAL_CANONICAL_COORDINATION_LOCK', 'ABSENT_OR_INVALID')
+              emit('P0_FINAL_CANONICAL_ADMISSION_RESULT', 'CANONICAL_COORDINATION_LOCK_UNAVAILABLE')
+              emit('P0_FINAL_CANONICAL_ADMISSION_INVENTORY', 'COMPLETE')
+              raise SystemExit(0)
+
+          before = {str(p): fingerprint(p) for p in (LOCK, LEASE, REG)}
+          lock_flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0)
+          lock_fd = os.open(LOCK, lock_flags)
+          try:
+              try:
+                  fcntl.flock(lock_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+              except BlockingIOError:
+                  emit('P0_FINAL_CANONICAL_NAMESPACE', 'PRESENT')
+                  emit('P0_FINAL_CANONICAL_COORDINATION_LOCK', 'BUSY')
+                  emit('P0_FINAL_CANONICAL_ADMISSION_RESULT', 'COORDINATION_LOCK_BUSY')
+                  emit('P0_FINAL_CANONICAL_ADMISSION_INVENTORY', 'COMPLETE')
+                  raise SystemExit(0)
+
+              now = int(time.time())
+              lease = None
+              if LEASE.exists():
+                  lease = read_json_noatime(LEASE)
+                  if not isinstance(lease, dict):
+                      raise SystemExit('P0_FINAL_CANONICAL_ADMISSION_ERROR=LEASE_NOT_OBJECT')
+                  emit('P0_FINAL_CANONICAL_LEASE', 'PRESENT')
+                  emit('P0_FINAL_CANONICAL_LEASE_SCHEMA_VERSION', lease.get('schema_version'))
+                  emit('P0_FINAL_CANONICAL_LEASE_RUNTIME_ID', lease.get('runtime_id'))
+                  emit('P0_FINAL_CANONICAL_LEASE_STATUS', lease.get('status'))
+                  emit('P0_FINAL_CANONICAL_LEASE_GENERATION', lease.get('generation'))
+                  emit('P0_FINAL_CANONICAL_LEASE_CONTROLLER_TASK', lease.get('controller_task'))
+                  emit('P0_FINAL_CANONICAL_LEASE_CONTROLLER_SESSION', lease.get('controller_session'))
+                  expires = lease.get('expires_at')
+                  expired = bool(lease.get('status') == 'active' and isinstance(expires, int) and expires <= now)
+                  emit('P0_FINAL_CANONICAL_LEASE_EXPIRED', expired)
+              else:
+                  emit('P0_FINAL_CANONICAL_LEASE', 'ABSENT')
+
+              registration = None
+              if REG.exists():
+                  registration = read_json_noatime(REG)
+                  if not isinstance(registration, dict):
+                      raise SystemExit('P0_FINAL_CANONICAL_ADMISSION_ERROR=REGISTRATION_NOT_OBJECT')
+                  emit('P0_FINAL_CANONICAL_REGISTRATION', 'PRESENT')
+                  whitelist = (
+                      'schema_version', 'runtime_id', 'registration_generation', 'lease_generation',
+                      'registered_at', 'boot_id_sha256', 'pid', 'process_start_ticks',
+                      'client_version', 'client_size', 'client_sha256', 'display',
+                      'window_identity', 'remote_view_endpoint', 'remote_view_mapping',
+                      'state', 'source_task', 'source_run'
+                  )
+                  for key in whitelist:
+                      emit('P0_FINAL_CANONICAL_REG_' + key.upper(), registration.get(key))
+              else:
+                  emit('P0_FINAL_CANONICAL_REGISTRATION', 'ABSENT')
+
+              if registration is None:
+                  result = 'REGISTRATION_ABSENT'
+              elif lease and lease.get('status') == 'active' and not bool(
+                  isinstance(lease.get('expires_at'), int) and lease['expires_at'] <= now
+              ):
+                  if lease.get('controller_task') == EXPECTED_TASK:
+                      result = 'REGISTERED_CURRENT_TASK_ACTIVE_LEASE'
+                  else:
+                      result = 'REGISTERED_OTHER_TASK_ACTIVE_LEASE'
+              else:
+                  result = 'REGISTERED_NO_FRESH_ACTIVE_LEASE'
+              emit('P0_FINAL_CANONICAL_ADMISSION_RESULT', result)
+          finally:
+              try:
+                  fcntl.flock(lock_fd, fcntl.LOCK_UN)
+              except OSError:
+                  pass
+              os.close(lock_fd)
+
+          after = {str(p): fingerprint(p) for p in (LOCK, LEASE, REG)}
+          if before != after:
+              raise SystemExit('P0_FINAL_CANONICAL_ADMISSION_ERROR=CONTROL_METADATA_CHANGED_DURING_READ_ONLY_PROBE')
+          emit('P0_FINAL_CANONICAL_CONTROL_METADATA_UNCHANGED', True)
+          emit('P0_FINAL_CANONICAL_PROCESS_OBSERVATION', False)
+          emit('P0_FINAL_CANONICAL_X11_OBSERVATION', False)
+          emit('P0_FINAL_CANONICAL_CLIENT_MUTATION', False)
+          emit('P0_FINAL_CANONICAL_ADMISSION_INVENTORY', 'COMPLETE')
+          PY

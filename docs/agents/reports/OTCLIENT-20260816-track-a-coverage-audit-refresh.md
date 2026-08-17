@@ -4,7 +4,7 @@
 
 ```yaml
 lane: COVERAGE-AUDIT
-snapshot_main: f8e628a255a18ec92839bbb45ef0e3b40bef8605
+snapshot_main: ec75e2606f7f4ad834e4b6be968fb03bdbff55df
 semantic_denominator_task: OTC-20260817-track-a-semantic-denominator-normalization
 semantic_denominator_pr: 460
 audit_result: FAIL_MATERIAL_GAPS_OPEN
@@ -46,20 +46,26 @@ P0 normalizes the 16 programme headings into 180 individual read/state/action re
 
 ## Current runtime / P0 frontier
 
-Physical XRes resource ownership is no longer a missing prerequisite. PR #457 merged as `16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc`; run `32015479835`, job `95344000918` preserves a LocalClientPid reply matching the exact launched official-client PID. Identity archive #459 merged as `c55e3523e6e9d50df511e65dce9145a8f951a5f5`; helper client-base semantics were corrected by #461 at `1eb4a8edecba3966aa1e6155e241b404eb4d30cb`. PR #465 then promoted the canonical raw-XRes window-identity integration as `f8e628a255a18ec92839bbb45ef0e3b40bef8605`.
+Physical XRes resource ownership is no longer a missing prerequisite. PR #457 merged as `16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc`; run `32015479835`, job `95344000918` preserves a LocalClientPid reply matching the exact launched official-client PID. Identity archive #459 merged as `c55e3523e6e9d50df511e65dce9145a8f951a5f5`; helper client-base semantics were corrected by #461 at `1eb4a8edecba3966aa1e6155e241b404eb4d30cb`. PR #465 promoted the canonical raw-XRes window-identity integration as `f8e628a255a18ec92839bbb45ef0e3b40bef8605`.
 
-Those promoted identity components still do **not** create a current canonical registration or Gate-B session. Current nonclaims remain:
+PR #467 then performed the fresh post-#465 P0 controller-plane admission (run `32019313320`, job `95355423148`) and established the exact current blocker: canonical lease generation 7 is released and the authoritative runtime registration is `ABSENT`. No process/X11/client observation or mutation occurred. Therefore there is no legal existing canonical `IN_GAME` lifecycle for P0 to reuse, and P0-only bootstrap/login remains forbidden.
+
+Current nonclaims/disposition:
 
 ```yaml
+canonical_registration: ABSENT
+canonical_lease_status: released
+canonical_lease_generation: 7
 current_exact_client_pid: NOT_REGISTERED
 current_exact_client_session: NOT_REGISTERED
 current_canonical_gate_b: NOT_PROVEN
 current_structural_in_game: NOT_PROVEN
-P0_direct_authoritative_xyz: UNKNOWN
+P0_direct_authoritative_xyz: INCONCLUSIVE
+P0_disposition: BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE
 restart_relogin_stability: UNKNOWN
 ```
 
-A future RUNTIME invocation must freshly admit physical work and establish, or fail closed on, a current authoritative registration/Gate-B identity and legal `IN_GAME` lifecycle before semantic P0/P1 claims resume. This coverage task does not authorize bootstrap, login, gameplay or canonical mutation.
+`AUD-COV-004` therefore remains open. Its next legal discriminator requires a separately authorized legitimate canonical lifecycle to exist and reach structurally verified `IN_GAME`; only then may a fresh RUNTIME admission and ownership/generation gates precede semantic experiments.
 
 ## P2 and worldmap boundaries
 
@@ -96,9 +102,9 @@ The values represent different historical inventory/filter definitions and remai
 
 ### AUD-COV-004 — HIGH — current canonical live semantic/restart proof unavailable
 
-Physical resource→exact-client PID identity and the raw-XRes window-identity integration are promoted, but there is still no current authoritative registered/Gate-B `IN_GAME` session proving player/world semantics, direct XYZ, live P1 correlation or restart/relogin stability.
+Identity tooling and historical isolated resource→PID proof are promoted, but #467 proves the authoritative canonical registration is currently absent. No legal existing `IN_GAME` lifecycle can be reused, so authoritative player/world semantics, direct XYZ, live P1 correlation and restart/relogin stability remain unproven.
 
-**Next discriminator:** fresh RUNTIME admission; establish or fail closed on current canonical registration/Gate-B identity and a legal current `IN_GAME` lifecycle before semantic experiments.
+**Next discriminator:** wait for a separately authorized legitimate canonical lifecycle to exist and reach structurally verified `IN_GAME`; then perform fresh RUNTIME admission and ownership/generation gates before semantic experiments. Do not bootstrap/login solely for P0.
 
 ### AUD-COV-007 — MEDIUM — durable global coordinator checkpoint materially stale
 
@@ -118,8 +124,9 @@ p0_item_level_denominator_complete: true
 p0_live_semantics_complete: false
 p1_item_level_denominator_complete: true
 p1_live_semantics_complete: false
-physical_resource_to_exact_client_pid_identity_proven: true
+physical_resource_to_exact_client_pid_identity_proven_for_historical_run: true
 canonical_raw_xres_window_identity_integration_promoted: true
+canonical_registration_current: false
 canonical_current_runtime_semantics_proven: false
 p2_transport_semantics_complete: false
 worldmap_mutation_design_ready: true

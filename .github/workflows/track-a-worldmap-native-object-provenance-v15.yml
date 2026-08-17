@@ -1,0 +1,182 @@
+name: Track A native object provenance v15
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-worldmap-native-object-provenance-v15.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-worldmap-native-object-provenance-v15
+  cancel-in-progress: false
+
+env:
+  HEAD_BRANCH: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+  TASK_PATH: docs/agents/tasks/active/OTC-20260817-track-a-worldmap-server-delivery-causal-validation.md
+
+jobs:
+  static:
+    name: Static native object provenance composition
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compose no-secret helper
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git init -q "$RUNNER_TEMP/repo"; cd "$RUNNER_TEMP/repo"
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --no-tags origin "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/task-head"
+          git checkout -q --detach refs/remotes/origin/task-head
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-native-object-provenance-v15-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$RUNNER_TEMP/v15-gdb.sh"
+          python3 .github/scripts/track-a-worldmap-native-object-provenance-v15-repair.py "$RUNNER_TEMP/v15-gdb.sh" "$RUNNER_TEMP/v15-obj.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$RUNNER_TEMP/v15-obj.sh" "$RUNNER_TEMP/v15-v2.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py "$RUNNER_TEMP/v15-v2.sh" "$RUNNER_TEMP/v15-v3.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py "$RUNNER_TEMP/v15-v3.sh" "$RUNNER_TEMP/v15-v4.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$RUNNER_TEMP/v15-v4.sh" "$RUNNER_TEMP/v15.sh"
+          bash -n "$RUNNER_TEMP/v15.sh"
+          for marker in \
+            'WORLDMAP_V15_LIVE_AUTH_INSTANCE_COUNT=' \
+            'WORLDMAP_V15_LIVE_CHARSEL_INSTANCE_COUNT=' \
+            'WORLDMAP_V15_LIVE_GAMECLIENT_INSTANCE_COUNT=' \
+            'WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS' \
+            'WORLDMAP_BASELINE_PRESECRET_READY=true'; do grep -Fq "$marker" "$RUNNER_TEMP/v15.sh"; done
+          ! grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$RUNNER_TEMP/v15.sh"
+          ! grep -Eiq 'tesseract|ocrmypdf' "$RUNNER_TEMP/v15.sh"
+          echo 'WORLDMAP_V15_PROVENANCE_STATIC=PASS'
+          echo 'WORLDMAP_V15_PROVENANCE_STATIC_SECRET_USED=false'
+
+  physical:
+    name: Physical no-secret native object provenance
+    needs: static
+    runs-on: [otclient, synology]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact task head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.HEAD_BRANCH }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Fresh no-client inventory and compose helper
+        id: compose
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          grep -Fq 'phase: baseline_native_semantic_character_v15_world_entry_screenshot' "$TASK_PATH"
+          grep -Fq 'baseline_ephemeral_login_consumed: 6' "$TASK_PATH"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,hashlib
+          SIZE=51965216; SHA='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          marks=(b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1',b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-patched-ephemeral-v1')
+          task=[]; clients=[]
+          def digest(p):
+              h=hashlib.sha256()
+              with p.open('rb',buffering=0) as f:
+                  for b in iter(lambda:f.read(1<<20),b''): h.update(b)
+              return h.hexdigest()
+          for p in Path('/proc').iterdir():
+              if not p.name.isdigit(): continue
+              try:
+                  env=set((p/'environ').read_bytes().split(b'\0')); exe=Path(os.readlink(p/'exe')); st=exe.stat(); cmd=(p/'cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace')
+              except (OSError,PermissionError): continue
+              if any(m in env for m in marks): task.append(int(p.name))
+              hinted='CipSoft GmbH/Tibia/packages/Tibia' in cmd or '/Tibia/packages/Tibia/' in str(exe)
+              if hinted or st.st_size==SIZE:
+                  try: sha=digest(exe)
+                  except OSError: continue
+                  if hinted or (st.st_size==SIZE and sha==SHA): clients.append(int(p.name))
+          print('WORLDMAP_V15_PRE_TASK_COUNT='+str(len(set(task))))
+          print('WORLDMAP_V15_PRE_CLIENT_COUNT='+str(len(set(clients))))
+          if task or clients: raise SystemExit(1)
+          PY
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$RUNNER_TEMP/v15-gdb.sh"
+          python3 .github/scripts/track-a-worldmap-native-object-provenance-v15-repair.py "$RUNNER_TEMP/v15-gdb.sh" "$RUNNER_TEMP/v15-obj.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$RUNNER_TEMP/v15-obj.sh" "$RUNNER_TEMP/v15-v2.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py "$RUNNER_TEMP/v15-v2.sh" "$RUNNER_TEMP/v15-v3.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py "$RUNNER_TEMP/v15-v3.sh" "$RUNNER_TEMP/v15-v4.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$RUNNER_TEMP/v15-v4.sh" "$RUNNER_TEMP/v15.sh"
+          bash -n "$RUNNER_TEMP/v15.sh"; chmod 700 "$RUNNER_TEMP/v15.sh"
+          echo "helper=$RUNNER_TEMP/v15.sh" >>"$GITHUB_OUTPUT"
+          echo 'WORLDMAP_V15_PROVENANCE_COMPOSITION=PASS'
+
+      - name: Run no-secret provenance and mandatory pre-secret gates
+        shell: bash
+        env:
+          HELPER: ${{ steps.compose.outputs.helper }}
+        run: |
+          set +x; set -Eeuo pipefail
+          control="$RUNNER_TEMP/worldmap-baseline-control"; mkdir -p "$control"; chmod 700 "$control"
+          rm -f "$control"/helper.pid "$control"/helper.log "$control"/presecret.ready "$control"/credentials.fifo "$control"/result "$control"/result.* 2>/dev/null || true
+          nohup setsid env -i HOME="$HOME" PATH="$PATH" RUNNER_NAME="$RUNNER_NAME" RUNNER_TEMP="$RUNNER_TEMP" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" GITHUB_WORKSPACE="$GITHUB_WORKSPACE" bash "$HELPER" >"$control/helper.log" 2>&1 </dev/null &
+          hp=$!; printf '%s\n' "$hp" >"$control/helper.pid"; chmod 600 "$control/helper.pid" "$control/helper.log"
+          ready=0
+          for _ in $(seq 1 1800); do
+            if [[ -f "$control/result" ]]; then rc="$(tr -cd '0-9' <"$control/result")"; cat "$control/helper.log"; exit "${rc:-95}"; fi
+            if [[ -f "$control/presecret.ready" && -p "$control/credentials.fifo" ]]; then ready=1; break; fi
+            kill -0 "$hp" 2>/dev/null || { cat "$control/helper.log"; exit 94; }
+            sleep .5
+          done
+          [[ "$ready" == 1 ]]
+          ! grep -azq '^TIBIA_TEST_EMAIL=' "/proc/$hp/environ"
+          ! grep -azq '^TIBIA_TEST_PASSWORD=' "/proc/$hp/environ"
+          for marker in \
+            'WORLDMAP_BASELINE_GDB_ATTACH=PASS' \
+            'WORLDMAP_BASELINE_PRE_STORAGE_OBSERVER=ARMED' \
+            'WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=MANIFEST_PROVEN' \
+            'WORLDMAP_BASELINE_EMAIL_FIELD_EDITABLE=PASS' \
+            'WORLDMAP_BASELINE_PASSWORD_FIELD_EDITABLE=PASS' \
+            'WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_EDITABLE_FIELDS' \
+            'WORLDMAP_BASELINE_PRESECRET_READY=true'; do grep -Fq "$marker" "$control/helper.log"; done
+          root=/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/worldmap-causal-baseline-ephemeral-v1
+          gout="$root/worldmap-gdb.stdout"; obj="$root/v15-native-objects.json"
+          for _ in $(seq 1 80); do grep -Fq 'WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS' "$gout" 2>/dev/null && break; sleep .25; done
+          grep -Fq 'WORLDMAP_V15_LIVE_AUTH_INSTANCE_COUNT=1' "$gout"
+          grep -Fq 'WORLDMAP_V15_LIVE_CHARSEL_INSTANCE_COUNT=1' "$gout"
+          grep -Fq 'WORLDMAP_V15_LIVE_GAMECLIENT_INSTANCE_COUNT=1' "$gout"
+          grep -Fq 'WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS' "$gout"
+          [[ -s "$obj" && "$(stat -c '%a' "$obj")" == 600 ]]
+          python3 - "$obj" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1])); o=d['objects']
+          assert len(o['auth'])==len(o['charsel'])==len(o['gameclient'])==1
+          print('WORLDMAP_V15_OBJECT_FILE_SCHEMA=PASS')
+          print('WORLDMAP_V15_UPLOADER_INSTANCE_COUNT='+str(len(o['uploader'])))
+          PY
+          ! grep -Fq 'WORLDMAP_BASELINE_CREDENTIAL_HANDOFF=' "$control/helper.log"
+          ! grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"
+          echo 'WORLDMAP_V15_PHYSICAL_NATIVE_OBJECT_PROVENANCE=PASS'
+          echo 'WORLDMAP_V15_PHYSICAL_SECRET_USED=false'
+
+      - name: Exact cleanup without credential handoff
+        if: always()
+        shell: bash
+        run: |
+          set +x; set -Eeuo pipefail
+          control="$RUNNER_TEMP/worldmap-baseline-control"
+          if [[ -r "$control/helper.pid" ]]; then hp="$(tr -cd '0-9' <"$control/helper.pid")"; if [[ "$hp" =~ ^[1-9][0-9]*$ ]] && kill -0 "$hp" 2>/dev/null; then kill -TERM "$hp" 2>/dev/null || true; sleep 1; kill -KILL "$hp" 2>/dev/null || true; fi; fi
+          python3 - <<'PY'
+          from pathlib import Path
+          marks=(b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1',b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-patched-ephemeral-v1')
+          found=[]
+          for p in Path('/proc').iterdir():
+              if not p.name.isdigit(): continue
+              try: env=set((p/'environ').read_bytes().split(b'\0'))
+              except OSError: continue
+              if any(m in env for m in marks): found.append(int(p.name))
+          print('WORLDMAP_FINAL_NAMESPACE_PROCESS_COUNT='+str(len(found)))
+          if found: raise SystemExit(1)
+          print('WORLDMAP_V15_PROVENANCE_CLEANUP=PASS')
+          PY

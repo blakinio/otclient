@@ -8,13 +8,13 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: baseline_ephemeral_login_capture
+phase: baseline_ephemeral_behavioral_login_capture
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
 base_sha: 83034227280dc3bfdf589a991f0fdbbabab7dc87
 restack_commit: f6848a59224ce891067b12a8b3f65da1609ee985
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T14:42:00+02:00
+updated: 2026-08-17T14:58:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -26,8 +26,10 @@ owned_paths:
   - .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py
   - .github/scripts/track-a-worldmap-causal-gdb-env-repair.py
   - .github/scripts/track-a-worldmap-causal-xwd-classify.py
+  - .github/scripts/track-a-worldmap-causal-xwd-compare.py
   - .github/scripts/track-a-worldmap-causal-ui-window.py
   - .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py
+  - .github/scripts/track-a-worldmap-causal-patched-copy-repair.py
 modules_touched:
   - track-a-runtime
   - agent-evidence
@@ -39,7 +41,7 @@ reuses:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-control-plus-synology-ephemeral-runtime
-execution_reason: Repository admission explicitly supports task-owned ephemeral_isolated physical sessions; canonical one-shot remains consumed and is not bypassed.
+execution_reason: Repository admission supports task-owned ephemeral_isolated physical sessions; canonical one-shot remains consumed and is not bypassed.
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -104,11 +106,11 @@ mutation_design:
 launch_budget:
   canonical_exact_bootstrap_consumed: 1
   canonical_xres_repair_launch_consumed: 0
-  baseline_ephemeral_client_launches_consumed: 7
+  baseline_ephemeral_client_launches_consumed: 10
   baseline_ephemeral_login_max: 1
   baseline_ephemeral_login_consumed: 0
   baseline_ephemeral_observer_repairs_consumed: 1
-  baseline_ephemeral_ui_locator_repairs_consumed: 3
+  baseline_ephemeral_ui_locator_repairs_consumed: 5
   baseline_ephemeral_pre_secret_loader_repairs_consumed: 1
   patched_ephemeral_login_max: 1
   patched_ephemeral_login_consumed: 0
@@ -119,6 +121,7 @@ safety:
   raw_client_commit_or_upload: forbidden
   credentials_in_logs_or_artifacts: forbidden
   screenshots_or_ocr_artifacts: forbidden
+  transient_xwd_only: true
   broad_process_cleanup: forbidden
   canonical_runtime_namespace_use: forbidden_for_ephemeral_phase
   canonical_source_patch_in_place: forbidden
@@ -126,14 +129,14 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T14:42:00+02:00
+last_progress_at: 2026-08-17T14:58:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: desktop-1020-static-pass
+ci_check_generation: behavioral-prelogin-static-pass
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
-identical_failure_retries: 1
-repair_cycles_for_current_gate: 5
+identical_failure_retries: 2
+repair_cycles_for_current_gate: 7
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -156,56 +159,69 @@ RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 
 # Verified progression
 
-All physical repair runs so far stopped before credential submission; every launched exact-client repair generation ended with original-source rehash PASS and cleanup COMPLETE.
+All physical repair runs through `32031856344 / 95393435891` stopped **before credential submission**. Every launched exact-client repair generation ended with original-source rehash PASS and cleanup COMPLETE.
 
 Load-bearing current chain:
 
-- isolated exact-client + WARP + raw-XRes target ownership is proven;
+- isolated exact-client + WARP + raw-XRes target ownership is physically proven;
 - pre-Storage FullMap/map-description observer is physically proven ARMED;
 - GDB toolroot environment and XWD toolroot library closure are proven;
-- OCR-free raw-XWD classifier is calibrated from retained exact-client 1020x650 login/selection artifacts;
-- current 1920x1080 run `32030582178 / 95389455836` proved no separate viewable 1020x650 XRes-owned UI candidate exists and stopped before secret use;
-- historical exact-client `31805408522 / 94783011926` proves the retained successful login flow used a 1020x650 window;
-- task-owned desktop normalization now requires both baseline and patched arms to use identical Xvfb 1020x650 and an XRes owner narrowed to the same geometry;
-- no-client static composition `32030958692 / 95390632587 = SUCCESS` validates screen normalization -> XRes identity -> GDB repair -> raw-XWD UI repair with no executable legacy PID selector and no OCR surface.
+- both baseline and future patched arm are normalized to the identical task-owned Xvfb `1020x650` environment;
+- manifest `WIN` is accepted only after raw-XRes `LocalClientPid` matches the exact task PID under the task-local 1020x650 owner helper;
+- runs `32031603546 / 95392645496` and `32031856344 / 95393435891` proved live XWD shape `1020x650` but falsified the retained grayscale/color gate as an authoritative login-form discriminator; neither submitted credentials;
+- evidence label for artifact `9221131366` is corrected: its producing run `31805408522 / 94783011926` captured character selection, not an empty login form;
+- historical effective exact-client controls remain `email 535,275`, `password 535,304`, `login 590,388`, first row `285,193`;
+- replacement pre-secret proof uses harmless dummy text plus localized aggregate XWD pixel changes to prove both expected fields are editable before any real credential is exposed;
+- after real login submission, the helper requires a >5000-pixel aggregate transition, then a localized first-row selection change before `Return`; world entry itself remains structural `FullMap + >=10 map-description strips`;
+- no-client static composition `32032410153 / 95395158148 = SUCCESS` on helper head `8181fe41abe8fcad5b38d26c624b29075ba4ede6`.
 
-Durable evidence:
+Durable evidence includes:
 
 - `20260817-presecret-ui-loader-repairs.md`
 - `20260817-xres-ui-window-boundary.md`
 - `20260817-1020-desktop-normalization.md`
+- `20260817-manifest-owned-ui-window.md`
+- `20260817-prelogin-behavioral-proof.md`
+
+# Workflow safety state
+
+The PR workflow is currently a **no-client static validator**. This prevents script/task/document synchronize commits from accidentally launching another physical baseline while the helper is being repaired. Physical runtime may be restored only as a single deliberate workflow commit after exact static validation, and no other branch commit is permitted while that physical workflow is active.
 
 # Execution phases
 
 1. **DONE** canonical boundary / cleanup.
 2. **DONE** isolated exact-client WARP/XRes path.
 3. **DONE** pre-Storage observer gate.
-4. **DONE** OCR-free UI/loader/XRes repair and 1020x650 task-owned desktop normalization static validation.
-5. **ACTIVE** one baseline login + FullMap/map-description extent + Right/Left stimulus + transport confinement + cleanup.
+4. **DONE** 1020x650 normalization, manifest XRes identity, loader/GDB repair and aggregate behavioral pre-login proof static validation.
+5. **ACTIVE** exactly one baseline login + FullMap/map-description extent + Right/Left stimulus + transport confinement + cleanup.
 6. **PENDING** patched namespace/preimage/target-uniqueness admission.
-7. **PENDING** one task-owned `[19,14]` login/capture under the identical 1020x650 environment and instrumentation.
+7. **PENDING** one task-owned `[19,14]` login/capture under identical 1020x650 instrumentation.
 8. **PENDING** patched rollback/source rehash/cleanup.
 9. **PENDING** causal classification, audit, temporary-resource removal, exact-head CI/review/merge/archive.
 
 # Stop criteria
 
-Fail closed on main drift, non-idle canonical controller state, namespace collision, target ambiguity, observer regression, 1020x650 XRes identity failure, live XWD classification mismatch, WARP/credential confinement failure, character-selection geometry failure, absence of FullMap/map-description proof, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or incomplete cleanup.
+Fail closed on main drift, non-idle canonical controller state, namespace collision, target ambiguity, observer regression, 1020x650 XRes identity failure, failure of either harmless editable-field probe, WARP/credential confinement failure, post-submit visual-transition failure, first-row interaction failure, absence of FullMap/map-description proof, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or incomplete cleanup.
+
+Any failure **after** `WORLDMAP_BASELINE_LOGIN_SUBMITTED=true` consumes the one baseline login budget and must not be silently retried.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 11
-updated_at: 2026-08-17T14:42:00+02:00
+checkpoint_version: 12
+updated_at: 2026-08-17T14:58:00+02:00
 base_main: 83034227280dc3bfdf589a991f0fdbbabab7dc87
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
-phase: baseline_ephemeral_login_capture
+phase: baseline_ephemeral_behavioral_login_capture
 runtime_access: ephemeral_isolated
 target_uniqueness: PROVEN
+workflow_mode: static_no_client_prelogin_validator
+baseline_client_launches_consumed: 10
 baseline_login_consumed: 0
 patched_login_consumed: 0
-last_completed_step: task-owned 1020x650 desktop normalization statically validated on 32030958692 / 95390632587 after the 1920 desktop proved no separate 1020 UI candidate
+last_completed_step: aggregate editable-field/login-transition/character-row helper composition passed no-client validation on 32032410153 / 95395158148
 blockers: []
-next_action: Execute one normalized 1020x650 baseline generation. Require current-main admission, idle controller, exact XRes identity, pre-Storage observer ARMED and live LOGIN_FORM before secret submission.
+next_action: Verify the static validator remains green on this checkpoint head, then switch the workflow exactly once to the behavioral physical baseline and make no further branch commits until that run reaches terminal state.
 ```

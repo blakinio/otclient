@@ -38,6 +38,11 @@ class RealExecutorTests(unittest.TestCase):
         run("git", "commit", "-q", "-m", "test: base", cwd=self.repo)
         self.base = run("git", "rev-parse", "HEAD", cwd=self.repo)
 
+        self.remote = self.root / "remote.git"
+        run("git", "init", "-q", "--bare", str(self.remote), cwd=self.root)
+        run("git", "remote", "add", "origin", str(self.remote), cwd=self.repo)
+        run("git", "push", "-q", "origin", "HEAD:refs/heads/main", cwd=self.repo)
+
         self.tasks = self.root / "tasks"
         self.tasks.mkdir()
         self.task_path = self.tasks / "OTC-EXECUTOR-TEST.md"
@@ -104,7 +109,7 @@ next_action: implement worker fixture
             "timeout_seconds": 2,
             "max_parallel_workers": 2,
             "pass_env": ["FAKE_WORKER_MODE"],
-            "publish_results": False,
+            "publish_results": True,
             "remote": "origin",
         }
         executor.update(executor_overrides)
@@ -159,14 +164,27 @@ next_action: implement worker fixture
         with self.assertRaisesRegex(orchestrator_executor.ExecutorError, "owner-funded"):
             orchestrator_executor.validate_executor_enabled(config)
 
-    def test_worker_environment_does_not_inherit_unlisted_secret(self) -> None:
+    def test_worker_environment_excludes_home_and_unlisted_secret_by_default(self) -> None:
         config = self._config()
         executor = config["executor"]
         assert isinstance(executor, dict)
-        with patch.dict(os.environ, {"UNLISTED_SECRET": "do-not-pass", "FAKE_WORKER_MODE": "success"}, clear=False):
+        with patch.dict(
+            os.environ,
+            {"HOME": "/credential-bearing-home", "UNLISTED_SECRET": "do-not-pass", "FAKE_WORKER_MODE": "success"},
+            clear=False,
+        ):
             env = orchestrator_executor._sanitized_env(executor)
+        self.assertNotIn("HOME", env)
         self.assertNotIn("UNLISTED_SECRET", env)
         self.assertEqual(env["FAKE_WORKER_MODE"], "success")
+
+    def test_worker_environment_can_explicitly_opt_in_home(self) -> None:
+        config = self._config(pass_env=["FAKE_WORKER_MODE", "HOME"])
+        executor = config["executor"]
+        assert isinstance(executor, dict)
+        with patch.dict(os.environ, {"HOME": "/authorized-home", "FAKE_WORKER_MODE": "success"}, clear=False):
+            env = orchestrator_executor._sanitized_env(executor)
+        self.assertEqual(env["HOME"], "/authorized-home")
 
     def test_protected_branch_is_rejected(self) -> None:
         with self.assertRaisesRegex(orchestrator_executor.ExecutorError, "protected branch"):
@@ -186,7 +204,7 @@ next_action: implement worker fixture
                 workspace_root=self.workspace_root,
             )
 
-    def test_successful_external_worker_is_accepted_from_isolated_worktree(self) -> None:
+    def test_successful_external_worker_is_published_and_accepted(self) -> None:
         summary = self._execute("success")
         self.assertEqual(summary["accepted"], ["OTC-EXECUTOR-TEST"])
         self.assertEqual(summary["failures"], [])
@@ -194,7 +212,25 @@ next_action: implement worker fixture
         result = json.loads(result_path.read_text(encoding="utf-8"))
         self.assertEqual(result["changed_paths"], ["src/a/worker.txt"])
         self.assertEqual(run("git", "cat-file", "-t", result["head_sha"], cwd=self.repo), "commit")
+        remote = run("git", "ls-remote", "origin", "refs/heads/feat/executor-test", cwd=self.repo)
+        self.assertEqual(remote.split()[0], result["head_sha"])
         self.assertFalse((self.workspace_root / "OTC-EXECUTOR-TEST").exists())
+
+    def test_write_worker_without_publication_fails_closed(self) -> None:
+        summary = self._execute("success", self._config(publish_results=False))
+        self.assertEqual(summary["accepted"], [])
+        self.assertIn("requires publish_results=true", summary["failures"][0]["error"])
+        self.assertEqual(list(self.results.glob("*.json")), [])
+
+    def test_moved_remote_task_branch_fails_closed(self) -> None:
+        (self.repo / "REMOTE_ONLY").write_text("moved\n", encoding="utf-8")
+        run("git", "add", "REMOTE_ONLY", cwd=self.repo)
+        run("git", "commit", "-q", "-m", "test: move remote task branch", cwd=self.repo)
+        run("git", "push", "-q", "origin", "HEAD:refs/heads/feat/executor-test", cwd=self.repo)
+        summary = self._execute("success")
+        self.assertEqual(summary["accepted"], [])
+        self.assertIn("remote task branch moved since dispatch", summary["failures"][0]["error"])
+        self.assertEqual(list(self.results.glob("*.json")), [])
 
     def test_resume_request_is_built_from_current_checkpoint(self) -> None:
         config = self._config()

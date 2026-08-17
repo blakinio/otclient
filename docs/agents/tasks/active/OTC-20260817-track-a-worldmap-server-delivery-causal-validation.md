@@ -8,14 +8,14 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: runtime_admission
+phase: canonical_baseline_bootstrap
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
 base_sha: e1ae4054b17792607c88552f72cdc68ef3a1f294
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T13:20:00+02:00
+updated: 2026-08-17T13:31:00+02:00
 risk: critical
-related_pr: pending
+related_pr: 475
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-worldmap-server-delivery-causal-validation.md
   - docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/
@@ -34,7 +34,7 @@ reuses:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only-control-plus-synology-runtime
-execution_reason: Repository/GitHub controls the task and evidence; the authorized physical runtime experiment must execute on the canonical Synology Track A runner.
+execution_reason: Repository/GitHub controls task state and evidence; the owner-authorized physical experiment executes on the canonical Synology Track A runner.
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -61,15 +61,20 @@ track_id_admission: official-client-re
 runtime_access: canonical_bootstrap
 runtime_owner_task: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 runtime_namespace: canonical-live-runtime
-canonical_registration: UNKNOWN
+canonical_registration: ABSENT
 canonical_lease_generation: UNKNOWN
-registration_lease_generation: UNKNOWN
+registration_lease_generation: NOT_APPLICABLE
 gate_a: REQUIRED_NOT_PROVEN
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
-bootstrap: REQUIRED_NOT_PROVEN
+bootstrap: PASS
 target_uniqueness: UNKNOWN
-mutation_authorized: false
+mutation_authorized: true
+bootstrap_attempt_limit: 1
+credentials_allowed: false
+login_allowed: false
+gameplay_allowed: false
+live_runtime_authorization_source: owner_current_conversation_2026-08-17_worldmap_causal_validation
 client_byte_mutation_authorized: true
 bootstrap_for_worldmap_authorized: true
 login_for_worldmap_authorized: true
@@ -113,11 +118,9 @@ safety:
 
 # Objective
 
-Execute the separately owner-authorized causal runtime discriminator frozen by the merged server-delivery report. Determine whether changing the exact client-local worldmap pair from `[18,14]` to the conservative one-byte `[19,14]` can cause additional authoritative server-delivered map data to arrive, while keeping authoritative inbound delivery, Storage capacity and rendered/pickable extent as separate measurements.
+Execute the separately owner-authorized causal runtime discriminator frozen by merged #473/#474. Compare the exact baseline `[18,14]` with the conservative one-byte `[19,14]` task-owned mutation and determine whether additional authoritative map data arrives from the server. Authoritative inbound delivery, Storage and rendered/pickable extent are separate measurements.
 
-# Required causal comparison
-
-Baseline exact client and the first patched task-owned copy must be compared under bounded, serialized physical runtime conditions. Record at minimum:
+# Required result
 
 ```text
 SERVER_MAP_DELIVERY_MODEL=CLIENT_DRIVEN|SERVER_DRIVEN|NEGOTIATED|FIXED_PROTOCOL|UNKNOWN
@@ -129,51 +132,57 @@ STORAGE_EXTENT_CHANGE=true|false|UNKNOWN
 RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 ```
 
-Do not infer server delivery from Storage/render growth. The authoritative inbound discriminator must be placed before Storage mutation, using the smallest currently proven exact handler/map-description surface or another directly verified pre-Storage boundary.
+# Fresh admission evidence
 
-# Authorization boundary
-
-The owner has now explicitly authorized the physical runtime and exact client-byte mutation needed for this experiment. This removes the prior #466/#469 owner-authority stop. It does not bypass runtime governance: before any launch/login/mutation the task must establish fresh lease/admission, authoritative registration state, Gate A/required bootstrap/rebind/Gate B, exact identity and uniqueness.
-
-The current admission is deliberately fail-closed discovery state:
+Controller-plane inventory run `32025074618`, job `95372681355`, exact head `9ce5c5cafebb833275f6d375fdfeca21049e1c0c`, runner `synology-otclient-01` completed successfully and directly proved:
 
 ```yaml
-runtime_access: canonical_bootstrap
-canonical_registration: UNKNOWN
-gate_a: REQUIRED_NOT_PROVEN
-bootstrap: REQUIRED_NOT_PROVEN
-mutation_authorized: false
+lease: PRESENT
+lease_status: released
+lease_generation_before_new_task_acquire: 7
+lease_controller_task: null
+lease_controller_session: null
+lease_expired: false
+canonical_registration: ABSENT
+admission_result: REGISTRATION_ABSENT
+control_metadata_unchanged: true
+process_observation: false
+x11_observation: false
+client_mutation: false
 ```
 
-No live operation beyond a controller-plane admission inventory is legal until the task checkpoint is updated from fresh direct evidence.
+Track A runtime governance on that exact head: run `32025074494` / #786 = SUCCESS.
+
+Because registration is directly proven ABSENT and the reviewed bootstrap implementation from #371 is present on trusted main, this checkpoint authorizes exactly one bootstrap transaction. The bootstrap transaction itself may launch only the exact fenced client plus canonical Xvfb/VNC/WARP helpers. It may not use credentials, login or gameplay. Those require a later admission update after authoritative registration/lease/identity are proven.
 
 # Execution phases
 
-1. **Admission inventory** — under the current self-hosted runner, read only canonical controller metadata permitted by governance. Do not inspect client/X11/process state yet.
-2. **Canonical baseline bootstrap/reuse** — if registration is absent, use the reviewed #371 implementation under current authoritative lease and canonical flock. If present, use required rebind/Gate B. Never create a second exact logged-in canonical session.
-3. **Baseline login/world entry** — owner-authorized bounded credential injection; verify SOCKS-only transport and structural/independent IN_GAME state. Credentials must be absent from persistent processes and artifacts.
-4. **Baseline pre-Storage capture** — instrument the proven inbound worldmap handler/map-description boundary and record authoritative coordinate/extent/floor envelope plus relevant outbound generic-message serialization where safely recoverable.
-5. **Baseline bounded stimulus** — at most one safe adjacent movement plus inverse if needed, closed-loop and structurally confirmed.
-6. **Sequential transition** — end/unregister/clean the exact baseline session before any patched login; do not overlap logged-in sessions.
-7. **Patched `[19,14]` run** — create a task-owned copy only, verify exact preimage/one-byte diff/patched SHA, launch in an isolated unique namespace with the same confinement, login under the separately authorized one-run budget, and repeat the identical capture/stimulus.
-8. **Rollback** — terminate only task-owned patched descendants, remove patched copy, prove original exact source hash unchanged, leave no credential-bearing helper or temporary runtime tooling.
-9. **Classification/audit** — compare authoritative inbound envelope before Storage, outbound negotiation, Storage and render/picker separately; preserve `UNKNOWN` for any unmeasured plane. Remove one-shot workflow before final merge.
+1. **DONE — admission inventory.** Controller metadata only; no process/X11/client observation.
+2. **ACTIVE — canonical baseline bootstrap.** Acquire a fresh task-owned canonical lease, execute the reviewed cancellation-safe bootstrap transaction and require exact identity, uniqueness, WARP, window and registration publication.
+3. **PENDING — baseline login/world entry.** Update admission first; then owner-authorized bounded credential injection and structural/independent IN_GAME proof.
+4. **PENDING — baseline pre-Storage capture.** Instrument the accepted `FullMap @ 0x00cec8d0` / `MapDescription @ 0x019a8a80` surface before Storage and record authoritative coordinate/floor envelope.
+5. **PENDING — bounded baseline stimulus.** At most one safe adjacent movement plus inverse, closed-loop.
+6. **PENDING — sequential transition.** End/unregister/clean exact session before patched login; never overlap logged-in sessions.
+7. **PENDING — patched `[19,14]` run.** Task-owned copy only; exact preimage/one-byte diff/SHA; same confinement and equivalent capture.
+8. **PENDING — rollback.** Remove only task-owned patched descendants/copy and prove original source hash unchanged.
+9. **PENDING — classification/audit/cleanup.** Preserve UNKNOWN for any unmeasured plane; remove one-shot workflow before merge.
 
 # Stop criteria
 
-Stop fail-closed on registration/lease/generation drift, competing official-client candidate/session, inability to prove target uniqueness, credential or egress confinement failure, UI/state ambiguity that prevents structural IN_GAME proof, parser/instrumentation anomaly, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or inability to cleanly separate baseline and patched sessions.
+Fail closed on lease/generation/registration drift, competing exact-client candidate, inability to prove target uniqueness, WARP/credential confinement failure, ambiguous world entry, instrumentation anomaly, source/preimage/hash mismatch, crash, unexpected gameplay/account side effect, or inability to separate baseline and patched sessions.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 1
-updated_at: 2026-08-17T13:20:00+02:00
+checkpoint_version: 2
+updated_at: 2026-08-17T13:31:00+02:00
 base_main: e1ae4054b17792607c88552f72cdc68ef3a1f294
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+pr: 475
 status: investigating
-phase: runtime_admission
+phase: canonical_baseline_bootstrap
 runtime_access: canonical_bootstrap
-last_completed_step: fresh physical task claimed from current main with explicit owner authorization recorded; prior static/design/startup evidence will be reused without repetition
+last_completed_step: fresh controller-plane inventory proved registration absent and released generation-7 lease with no live observation or mutation
 blockers: []
-next_action: Run one controller-plane Synology admission inventory that reads only canonical lease/registration metadata; update admission before any process/X11/client observation or launch.
+next_action: Acquire a new task-owned canonical lease and execute exactly one reviewed #371 bootstrap transaction with credentials/login/gameplay disabled; persist resulting registration/lease/identity before any login.
 ```

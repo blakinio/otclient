@@ -1,0 +1,130 @@
+name: Track A P2 sequence provenance
+
+on:
+  push:
+    branches:
+      - research/OTC-20260817-track-a-p2-sequence-provenance
+    paths:
+      - .github/workflows/tibia-official-client-re-p2-sequence-provenance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p2-sequence-provenance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-sanitize:
+    name: Stage exact-file DualConnection +0x80 bytes
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-sequence-provenance
+      EXPECTED_RUNNER_NAME: synology-otclient-01
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    outputs:
+      window_hex: ${{ steps.stage.outputs.window_hex }}
+      window_sha256: ${{ steps.stage.outputs.window_sha256 }}
+    steps:
+      - id: stage
+        name: Exact-fence and copy one bounded executable window
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 61
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 62
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 63
+          candidates=(
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+          )
+          source_client=''
+          for candidate in "${candidates[@]}"; do
+            [[ -f "$candidate" && ! -L "$candidate" ]] || continue
+            [[ "$(stat -c %s "$candidate")" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
+          import hashlib,sys
+          h=hashlib.sha256()
+          with open(sys.argv[1],'rb') as f:
+              for c in iter(lambda:f.read(1024*1024),b''): h.update(c)
+          raise SystemExit(h.hexdigest()!=sys.argv[2])
+          PY
+            then source_client="$candidate"; break; fi
+          done
+          [[ -n "$source_client" ]] || exit 50
+          python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
+          import hashlib,struct,sys
+          from pathlib import Path
+          p=Path(sys.argv[1]); out=Path(sys.argv[2]); start=0xb56d60; end=0xb57280
+          with p.open('rb') as f:
+              ident=f.read(16); rest=f.read(48)
+              if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(51)
+              fs=struct.unpack('<HHIQQQIHHHHHH',rest); phoff,phentsize,phnum=fs[4],fs[8],fs[9]
+              data=None
+              for i in range(phnum):
+                  f.seek(phoff+i*phentsize); r=f.read(56)
+                  t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
+                  if t==1 and (flags&1) and va<=start and end<=va+sz:
+                      f.seek(off+start-va); data=f.read(end-start); break
+          if data is None or len(data)!=end-start: raise SystemExit(52)
+          dig=hashlib.sha256(data).hexdigest()
+          with out.open('a') as f:
+              f.write(f'window_hex={data.hex()}\nwindow_sha256={dig}\n')
+          print('P2_SEQUENCE_SOURCE=PASS')
+          print('P2_SEQUENCE_CLIENT_VERSION=15.32.df7b29')
+          print('P2_SEQUENCE_CLIENT_SIZE=51965216')
+          print('P2_SEQUENCE_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
+          print(f'P2_SEQUENCE_WINDOW=0x{start:x}..0x{end:x}')
+          print(f'P2_SEQUENCE_WINDOW_SHA256={dig}')
+          print('P2_SEQUENCE_RUNTIME_ACCESS=none')
+          print('P2_SEQUENCE_SOURCE_DISASSEMBLY=false')
+          print('P2_SEQUENCE_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('P2_SEQUENCE_CLIENT_PROCESS_ACCESSED=false')
+          print('P2_SEQUENCE_PROCESS_MEMORY_ACCESSED=false')
+          print('P2_SEQUENCE_RAW_CLIENT_UPLOADED=false')
+          PY
+
+  hosted-validate:
+    name: Decode DualConnection +0x80 on GitHub-hosted Linux
+    needs: source-sanitize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-sequence-provenance
+      WINDOW_HEX: ${{ needs.source-sanitize.outputs.window_hex }}
+      WINDOW_SHA256: ${{ needs.source-sanitize.outputs.window_sha256 }}
+    steps:
+      - name: Verify and disassemble exact bounded window
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 71
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 73
+          command -v objdump >/dev/null
+          python3 - <<'PY'
+          import hashlib,os,subprocess,tempfile
+          from pathlib import Path
+          start=0xb56d60; end=0xb57280; data=bytes.fromhex(os.environ['WINDOW_HEX'])
+          if len(data)!=end-start: raise SystemExit(74)
+          if hashlib.sha256(data).hexdigest()!=os.environ['WINDOW_SHA256']: raise SystemExit(75)
+          with tempfile.TemporaryDirectory(prefix='p2-sequence-') as td:
+              p=Path(td)/'dual80.bin'; p.write_bytes(data)
+              text=subprocess.run(
+                  ['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],
+                  check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+          for anchor in ('b56d60:','b57042:','b57266:'):
+              if anchor not in text: raise SystemExit('P2_SEQUENCE_FAIL=anchor_'+anchor)
+          print('P2_SEQUENCE_HOSTED=PASS')
+          print('P2_SEQUENCE_EXECUTION_CLASS=github_hosted')
+          print('P2_SEQUENCE_RUNTIME_ACCESS=none')
+          print(f'P2_SEQUENCE_WINDOW_SHA256={os.environ["WINDOW_SHA256"]}')
+          print('P2_SEQUENCE_DISASSEMBLY_BEGIN')
+          print(text,end='')
+          print('P2_SEQUENCE_DISASSEMBLY_END')
+          PY

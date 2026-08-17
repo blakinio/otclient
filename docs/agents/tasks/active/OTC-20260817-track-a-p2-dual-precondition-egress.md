@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260817-track-a-p2-dual-precondition-egress
-status: investigating
+status: waiting
 agent: ChatGPT
 session_id: chatgpt-p2-egress-20260817-1141
 session_role: draft_researcher
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: validate
 branch: research/OTC-20260817-track-a-p2-dual-precondition-egress
 worktree: github-only-ref:research/OTC-20260817-track-a-p2-dual-precondition-egress
 base_branch: main
-base_main: 60ab740872d52f3f7c4802d49fd5275a9968d085
+base_main: 16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc
 risk: medium
 created: 2026-08-17T11:41:00+02:00
-updated: 2026-08-17T11:41:00+02:00
+updated: 2026-08-17T11:46:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-p2-dual-precondition-egress.md
   - docs/agents/evidence/OTC-20260817-track-a-p2-dual-precondition-egress/**
@@ -78,12 +78,12 @@ exact_client:
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
   platform: official_native_linux_only
 invocation_started_at: 2026-08-17T11:36:00+02:00
-last_progress_at: 2026-08-17T11:41:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+last_progress_at: 2026-08-17T11:45:40+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: draft_experiment
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 2
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
@@ -97,11 +97,11 @@ additional_task_allowance_consumed: false
 
 Resolve the first still-UNKNOWN transport boundary immediately downstream of the promoted P2 chain by recovering exact-client dataflow around `TGameserverDualConnection` precondition `+0x90 @ 0xb40370`, especially the `QIODevice::write(QByteArray const&)` call observed at `0xb4066b` in accepted non-quarantined artifact `9252025461`.
 
-The task must determine, from exact fenced native-Linux client bytes, whether that write is causally tied to the same post-`TGameserverNetworkPacketRawDataProcessor` gameplay message and what concrete QIODevice/object owns the destination. It may narrow framing/sequence/compression/encryption ordering only when direct instruction/dataflow evidence supports the claim.
+Bounded question: is that write causally tied to the same post-`TGameserverNetworkPacketRawDataProcessor` gameplay message, and which concrete QIODevice/object owns the destination? Framing, sequence, compression, encryption and final socket ownership must remain `UNKNOWN` unless direct exact-byte dataflow proves them.
 
 ## Current canonical boundary consumed
 
-Coordinator promotion PR #450 established:
+PR #450 promoted exactly:
 
 ```text
 persistent QBuffer
@@ -113,24 +113,17 @@ persistent QBuffer
 
 `protocol_stage_order = PROVEN_PARTIAL`.
 
-Still canonical `UNKNOWN` at task start:
+Still canonical `UNKNOWN`: framing, sequence, compression, encryption, final binary egress, final socket ownership and complete transport ordering beyond the recovered processor chain.
 
-- framing;
-- sequence;
-- compression;
-- encryption;
-- final binary egress;
-- final socket ownership;
-- complete transport ordering beyond the recovered processor chain.
+## Admission / ownership / uniqueness / drift
 
-## Fresh admission / ownership / uniqueness / drift preflight
-
-- `main@60ab740872d52f3f7c4802d49fd5275a9968d085` verified at dispatch.
-- No open `P2-NETWORK` PR and no active branch/task matching this responsibility was found.
-- Existing open Track A work is disjoint: RUNTIME discriminator PR #457 and P0 PR #302 do not own these task/evidence/workflow/script paths.
-- Old P2 source PRs #301/#308/#310/#368/#449 are closed; #450 is the accepted canonical dependency.
-- This worker owns only the four path classes declared in front matter.
-- Parallel-research contract applies: researcher output remains Draft-only; coordinator alone may promote/merge semantic conclusions.
+- Initial dispatch base: `main@60ab740872d52f3f7c4802d49fd5275a9968d085`.
+- Fresh main drift was detected while Draft #458 was opened: `main` advanced by exactly one disjoint RUNTIME/XRes merge to `16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc`.
+- `60ab740..16c6fb` changed only `docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/**` and `docs/agents/tasks/active/OTC-20260817-track-a-xres-raw-pid-identity.md`; no P2 owned/evidence path overlapped.
+- Branch was restacked without force-push through merge commit `bc562567f6d0a502323d5f2911db3f94fec82b52`, preserving the task commit and current main tree.
+- No other open `P2-NETWORK` PR or active task owns this responsibility or these paths.
+- Old P2 source PRs #301/#308/#310/#368/#449 are closed; #450 is the accepted dependency.
+- Draft PR: #458. Researcher output is Draft-only; coordinator alone may promote/merge semantic conclusions.
 
 ## Runtime admission
 
@@ -152,74 +145,66 @@ mutation_authorized: false
 
 No client process, process memory, canonical state, X11/VNC, login/session, gameplay, packet replay or client-byte mutation is authorized.
 
-If exact executable bytes are required, the only permitted non-hosted step is the previously accepted #449-style source-staging boundary: verify the retained regular file against exact size/SHA and copy narrowly enumerated file-byte windows as small UTF-8 hex/metadata. That source step performs no disassembly or semantic classification and uploads no raw executable/package. All disassembly and semantic decisions occur on GitHub-hosted runners.
+The one permitted non-hosted operation follows accepted #449 precedent: verify the retained regular file against exact size/SHA and copy only bounded file-byte windows as small UTF-8 hex/metadata. Source staging performs no disassembly or semantic classification and uploads no raw executable/package. All disassembly/semantic review is GitHub-hosted.
 
-## Primary hypothesis
+## Experiment generation 1
 
-`H1`: the call at `0xb4066b` is part of the concrete binary gameplay egress path reachable after the promoted same-message handoff into `TGameserverDualConnection`, and exact dataflow can identify the QIODevice receiver and its relation to the proven `TGameserverTCPConnection::QTcpSocket*` ownership graph.
+Draft exact workflow head: `37c455f2ab3170457a0d084a7745eaa42e28aff1`.
 
-This hypothesis may be accepted, narrowed or disproven. A successful workflow alone is not semantic evidence.
+Owned one-shot tooling:
 
-## Initial discriminator window
+- `.github/scripts/tibia-official-client-re-p2-dual-precondition-egress.py`
+- `.github/workflows/tibia-official-client-re-p2-dual-precondition-egress.yml`
 
-Recover exact bytes sufficient to decode at least:
+Exact staged code windows requested, total `0xe20` / 3616 bytes:
 
-- `0xb40370..0xb40880` (the full known precondition FDE/window);
-- exact `TGameserverDualConnection` vtable words needed to revalidate `+0x78`, `+0x80`, `+0x90` dispatch identity;
-- only additional bounded code/data windows that are directly required to resolve a concrete receiver/callee discovered from the first window.
+- `dual_precondition`: `0xb40370..0xb40880`;
+- `dual_entry_78`: `0xb56970..0xb56d60`;
+- `dual_entry_80`: `0xb56d60..0xb57280`.
 
-At minimum classify the dataflow around:
+Source side is limited to ELF file VA-to-offset mapping and exact byte copying. Hosted side independently runs `objdump` on reconstructed bounded binary windows and fail-closes on known exact anchors including `0xb4066b -> QIODevice::write(QByteArray)`.
 
-- indirect `+0x78` call near `0xb40643`;
-- `QBuffer::buffer` near `0xb40656`;
-- indirect/helper call near `0xb40662`;
-- `QIODevice::write(QByteArray const&)` at `0xb4066b`;
-- later `QBuffer::buffer`, `QByteArray::remove`, `QIODevice::readAll` and virtual `+0x10` sequence through roughly `0xb40735`.
+Workflow:
+
+```yaml
+run_id: 32016842999
+head: 37c455f2ab3170457a0d084a7745eaa42e28aff1
+source_job_id: 95348018877
+last_observed_status: in_progress
+last_observed_step: Set up job
+source_runner_contract: [otclient, synology] / synology-otclient-01
+semantic_runner: ubuntu-24.04 github-hosted
+runtime_access: none
+```
+
+Two ordinary state observations on this exact head found the experiment still in progress. Per `ANTI_STALL_AND_EXECUTION_BUDGET.md`, this worker does not poll a third time in the same invocation.
 
 ## Acceptance inventory
 
-- [ ] Exact client size/SHA is reverified before any source bytes are staged.
-- [ ] Source staging is file-only, non-semantic, bounded, UTF-8-safe and contains no raw ELF/package.
-- [ ] Hosted validation independently disassembles the staged bytes and records exact instruction/dataflow evidence.
-- [ ] The QIODevice receiver at `0xb4066b` is classified as `FACT`, `INFERENCE`, `UNKNOWN` or `DISPROVEN` with exact evidence.
-- [ ] Relationship of the written QByteArray to the promoted same-message path is classified without using names/vtable adjacency as proof.
-- [ ] Final socket ownership is promoted in the Draft only if exact object/dataflow proves it; otherwise remains `UNKNOWN`.
-- [ ] Framing, sequence, compression and encryption are each classified separately and remain `UNKNOWN` unless directly evidenced.
-- [ ] Negative controls preserve `0xb46bd0` as a proven QString/newline QTcpSocket write but DISPROVEN as gameplay-binary proof, `0xc33259` as QMatrix4x4/non-network, and `0xb5b880` as SUPERSEDED.
-- [ ] No quarantined run `31944051248` is used as current proof.
-- [ ] No live runtime, process memory, credentials, login, gameplay or owner-funded AI quota is used.
-- [ ] Draft PR records raw run/artifact IDs and enough primary evidence for an independent coordinator review.
-
-## Validation / E2E boundary
-
-Focused validation is deterministic parser/disassembly/dataflow checking on GitHub-hosted Linux. Repository governance/CI applies to the exact Draft head.
-
-Physical/runtime E2E is `NOT_APPLICABLE` for this static research producer because it changes no client/runtime behavior and claims no live transport observation. Any future causal live validation belongs to separately admitted RUNTIME work.
+- [ ] Exact client size/SHA reverified before source bytes are staged.
+- [ ] Source staging file-only/non-semantic/bounded; no raw ELF/package.
+- [ ] Hosted validation independently disassembles primary bytes and validates exact anchors.
+- [ ] `0xb4066b` QIODevice receiver classified from primary disassembly.
+- [ ] Payload relationship to promoted same-message path classified from exact dataflow.
+- [ ] Final binary egress and final socket ownership promoted only if directly proven; otherwise `UNKNOWN`.
+- [ ] Framing, sequence, compression and encryption classified separately without semantic overclaim.
+- [x] Negative controls preserve `0xb46bd0` as text/newline QTcpSocket write but not gameplay-binary proof; `0xc33259` DISPROVEN; `0xb5b880` SUPERSEDED.
+- [x] Quarantined run `31944051248` is not used as current proof.
+- [x] No runtime/process-memory/login/gameplay/credentials/owner-funded AI quota used.
+- [x] Draft PR #458 exists and exposes task/owned paths before evidence execution.
 
 ## Negative controls
 
-Do not use as proof:
-
-- generic `QIODevice::write` enumeration;
-- symbol/type naming without concrete dataflow;
-- vtable adjacency as temporal/ownership proof;
-- old final-socket candidate `0xc33259`;
-- old endpoint `0xb5b880`;
-- text/newline writer `0xb46bd0` as gameplay-binary sink;
-- quarantined Synology static-analysis run `31944051248`;
-- workflow success or generated `result.json` without primary byte/disassembly review.
-
-## Stop conditions
-
-Stop only for a real ownership/safety conflict, inability to obtain the narrowly required exact-fenced file bytes under the permitted staging boundary, exhausted bounded repair budget, or a Draft result that is complete enough for coordinator review.
+Never use generic `QIODevice::write` enumeration, symbol/type naming alone, vtable adjacency, workflow colour, generated `result.json`, `0xb46bd0`, `0xc33259`, `0xb5b880` or quarantined run `31944051248` as substitute proof of gameplay binary egress.
 
 ## Current checkpoint
 
 ```yaml
 proven:
   - PR #450 promoted the persistent-QBuffer -> ClientMessageProcessor -> RawDataProcessor -> DualConnection same-message chain.
-  - Accepted non-quarantined artifact 9252025461 contains a QIODevice::write(QByteArray) call at 0xb4066b inside dual_precondition@0xb40370.
-  - Current canonical evidence proves TGameserverTCPConnection owns a concrete QTcpSocket at +0x10, but 0xb46bd0 is text/newline output and not gameplay-binary proof.
+  - Accepted non-quarantined artifact 9252025461 contains QIODevice::write(QByteArray) at 0xb4066b in dual_precondition@0xb40370.
+  - Current canonical evidence proves TGameserverTCPConnection owns a concrete QTcpSocket at +0x10, while 0xb46bd0 is not gameplay-binary proof.
+  - task ownership/admission/uniqueness are fresh and branch is restacked on main@16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc.
 unknown:
   - exact receiver and payload identity at 0xb4066b
   - final binary egress
@@ -232,6 +217,7 @@ conflicts: []
 rejected_hypotheses:
   - 0xc33259 as gameplay sink
   - 0xb5b880 as gameplay endpoint
-last_completed_step: fresh trusted-base, admission, ownership, uniqueness and P2 barrier preflight; unique task/branch claimed
-next_action: add one-shot exact-file bounded source slicer plus GitHub-hosted decoder for the 0xb40370 discriminator and run it once
+last_completed_step: created Draft #458, one-shot source/hosted tooling and started run 32016842999 on exact head 37c455f2ab3170457a0d084a7745eaa42e28aff1
+blocker: experiment run 32016842999 is still in progress after the maximum two ordinary state observations for this exact head
+next_action: once run 32016842999 is terminal, consume its source/final artifacts and independently inspect primary hosted disassembly before any semantic classification
 ```

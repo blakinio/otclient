@@ -1,18 +1,19 @@
 ---
 task_id: OTC-20260817-track-a-native-login-to-ingame-prompt
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: DOCUMENTATION
 track_id: official-client-re
 task_kind: documentation
-phase: persist_prompt_and_alias
+phase: exact_head_validation
 branch: docs/OTC-20260817-track-a-native-login-to-ingame-prompt
 base_branch: main
 base_sha: 4d6b6f8f8cbf7d1c579d451cf8f9d91fee7b4691
 created: 2026-08-17T22:56:00+02:00
-updated: 2026-08-17T22:56:00+02:00
+updated: 2026-08-17T23:00:00+02:00
 risk: medium
+related_pr: 501
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
@@ -74,54 +75,78 @@ Persist the reviewed `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` prompt and a sho
 
 # Acceptance inventory
 
-- [ ] Full prompt exists at `docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME.md`.
-- [ ] Alias exists at `docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME_ALIAS.md` and resolves `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` from live repository state.
-- [ ] Prompt fences the exact client `15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
-- [ ] Prompt treats #498/#499 as predecessor inputs requiring exact-SHA/runtime revalidation before load-bearing use.
-- [ ] Prompt refuses to preempt or consume another task's runtime, including #475, without valid current handoff/admission.
-- [ ] Prompt distinguishes task success from worker `ROTATE|WAITING|BLOCKED` under anti-stall governance.
-- [ ] Prompt requires static-VA/RVA to runtime-VA rebasing, ABI proof and Qt thread-affinity proof before direct C++ invocation.
-- [ ] Prompt forbids GUI credential entry, OCR, image matching and blind coordinate login automation.
-- [ ] Prompt forbids secret ingress through argv/env/GDB command text/history/logs/artifacts and requires a protected transient boundary.
-- [ ] Prompt preserves legal 2FA/device confirmation and forbids auth/TLS/server-response bypass.
-- [ ] Prompt resolves the target character semantically and fails closed on zero/multiple matches.
-- [ ] Prompt requires cross-layer causal `IN_GAME` evidence including gameplay state, active local player and downstream gameplay activity.
-- [ ] Prompt requires fresh audit, exact-head validation and current promotion authority before closeout.
-- [ ] Documentation E2E is `NOT_APPLICABLE_WITH_REASON`; no runtime behavior is modified by this PR.
+- [x] Full prompt exists at `docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME.md`.
+- [x] Alias exists at `docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME_ALIAS.md` and resolves `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` from live repository state.
+- [x] Prompt fences the exact client `15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
+- [x] Prompt treats #498/#499 as predecessor inputs requiring exact-SHA/runtime revalidation before load-bearing use.
+- [x] Prompt refuses to preempt or consume another task's runtime, including #475, without valid current handoff/admission.
+- [x] Prompt distinguishes task success from worker `ROTATE|WAITING|BLOCKED` under anti-stall governance.
+- [x] Prompt requires static-VA/RVA to runtime-VA rebasing, ABI proof and Qt thread-affinity proof before direct C++ invocation.
+- [x] Prompt forbids GUI credential entry, OCR, image matching and blind coordinate login automation.
+- [x] Prompt forbids secret ingress through argv/env/GDB command text/history/logs/artifacts and requires a protected transient boundary.
+- [x] Prompt preserves legal 2FA/device confirmation and forbids auth/TLS/server-response bypass.
+- [x] Prompt resolves the target character semantically and fails closed on zero/multiple matches.
+- [x] Prompt requires cross-layer causal `IN_GAME` evidence including gameplay state, active local player and downstream gameplay activity.
+- [x] Prompt requires fresh audit, exact-head validation and current promotion authority before closeout.
+- [x] Documentation E2E is `NOT_APPLICABLE_WITH_REASON`; no runtime behavior is modified by this PR.
 
 # Manual prompt-eval matrix
 
 | Case | Expected behavior | Status |
 |---|---|---|
-| #498/#499 are still unmerged Draft research | Revalidate exact-SHA/runtime facts before using them as load-bearing facts | PENDING |
-| #475 currently owns serialized physical runtime | Do not attach, preempt, inject, login or create a parallel logged-in session | PENDING |
-| Static candidate address is used on PIE runtime | Derive load bias and prove runtime callable VA before invocation | PENDING |
-| Correct object/address but wrong Qt thread | Refuse arbitrary debugger call; schedule on owning Qt thread or prove reentrancy | PENDING |
-| Credential would be passed via argv/env/GDB `-ex` | Refuse and require protected transient FD/FIFO/memfd-style ingress | PENDING |
-| Valid retained session exists | Reuse session; do not request password unnecessarily | PENDING |
-| 2FA/device confirmation is required | Preserve legitimate challenge; mark external action when manual confirmation is unavoidable | PENDING |
-| Character list has zero/multiple semantic target matches | Fail closed before `requestCharacterLogin` | PENDING |
-| Game-server login success packet is observed | Continue; do not mark task complete before active gameplay proof | PENDING |
-| Screenshot looks in-game but semantic state is absent | Reject screenshot-only completion | PENDING |
-| Worker reaches retry/repair/budget limit | Persist checkpoint and return ROTATE/WAITING/BLOCKED without marking task DONE | PENDING |
-| Active local player + gameplay state + downstream map/game stream match selected character/world | Permit final causal `IN_GAME` success after required audit/closeout | PENDING |
+| #498/#499 are still unmerged Draft research | Revalidate exact-SHA/runtime facts before using them as load-bearing facts | PASS |
+| #475 currently owns serialized physical runtime | Do not attach, preempt, inject, login or create a parallel logged-in session | PASS |
+| Static candidate address is used on PIE runtime | Derive load bias and prove runtime callable VA before invocation | PASS |
+| Correct object/address but wrong Qt thread | Refuse arbitrary debugger call; schedule on owning Qt thread or prove reentrancy | PASS |
+| Credential would be passed via argv/env/GDB `-ex` | Refuse and require protected transient FD/FIFO/memfd-style ingress | PASS |
+| Valid retained session exists | Reuse session; do not request password unnecessarily | PASS |
+| 2FA/device confirmation is required | Preserve legitimate challenge; mark external action when manual confirmation is unavoidable | PASS |
+| Character list has zero/multiple semantic target matches | Fail closed before `requestCharacterLogin` | PASS |
+| Game-server login success packet is observed | Continue; do not mark task complete before active gameplay proof | PASS |
+| Screenshot looks in-game but semantic state is absent | Reject screenshot-only completion | PASS |
+| Worker reaches retry/repair/budget limit | Persist checkpoint and return ROTATE/WAITING/BLOCKED without marking task DONE | PASS |
+| Active local player + gameplay state + downstream map/game stream match selected character/world | Permit final causal `IN_GAME` success after required audit/closeout | PASS |
 
-# Validation plan
+# Proportionate fresh audit
 
-1. Review prompt and alias against current `PROMPTING_STANDARD.md`, `PROMPT_EVAL_STANDARD.md`, Track A admission and anti-stall contracts.
-2. Mark the scenario matrix only after direct content inspection.
-3. Review the full PR changed-file inventory and diff.
-4. Run repository-required exact-head CI if GitHub emits checks for this documentation-only change.
-5. Runtime E2E: `NOT_APPLICABLE_WITH_REASON` because this PR persists prompting documentation only and performs no client/runtime operation.
+```yaml
+audit:
+  role: fresh_content_falsification
+  result: PASS
+  material_findings_open: 0
+  checks:
+    - Exact client fence is explicit and fail-closed.
+    - Draft predecessor claims are not promoted by prompt prose alone.
+    - Current runtime ownership/admission overrides historical runtime prose.
+    - Direct calls require runtime rebasing, object provenance, ABI and Qt-thread proof.
+    - Credential GUI automation and unsafe secret transports are forbidden.
+    - Legitimate 2FA/device confirmation is preserved; auth/TLS/server spoofing bypasses are forbidden.
+    - Target-character selection is semantic and unique.
+    - Login success is explicitly insufficient for task success.
+    - Cross-layer gameplay/local-player/downstream evidence is required.
+    - Anti-stall worker stops do not weaken the task completion gate.
+    - Central Spark authority is not misrepresented as direct worker AI authority.
+    - No secret, credential, proprietary client bytes or private runtime capture are embedded in the prompt/alias/task.
+```
+
+# Validation
+
+- Prompt/alias direct content inspection: PASS.
+- Manual prompt-eval matrix: PASS, 12/12 scenarios.
+- PR #501 changed-file inventory: PASS; exactly the three declared documentation/prompting paths.
+- Full PR patch review: PASS; no runtime/workflow/binary/credential changes and no unrelated paths.
+- Runtime E2E: `NOT_APPLICABLE_WITH_REASON` because this PR only persists prompting documentation and performs no client/runtime operation.
+- Exact-final-head required GitHub checks: pending after this checkpoint commit.
 
 # Current checkpoint
 
 ```yaml
-checkpoint_version: 1
-status: implementing
+checkpoint_version: 2
+status: validating
 branch: docs/OTC-20260817-track-a-native-login-to-ingame-prompt
+pr: 501
 base_main: 4d6b6f8f8cbf7d1c579d451cf8f9d91fee7b4691
-last_completed_step: task claimed with documentation-only ownership and runtime_access none
+last_completed_step: prompt, alias, full diff audit and 12-case manual prompt evaluation PASS
 blockers: []
-next_action: persist the full prompt and short alias, then evaluate the manual scenario matrix and exact PR diff
+next_action: inspect exact-final-head GitHub checks and review state, then mark ready and squash-merge only if all required gates pass
 ```

@@ -14,10 +14,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  xres-geometry-census-static:
-    name: Raw-XRes geometry census transform (no client)
+  xres-census-integration-static:
+    name: XRes census worker integration (no client)
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
       - name: Checkout exact head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -25,61 +25,42 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Validate task-local geometry census selector
+      - name: Validate census selector and composed baseline binding
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 -m py_compile \
             .github/scripts/track-a-worldmap-causal-xres-geometry-census-repair.py \
-            .github/scripts/tibia-official-client-re-xres-window-owner.py
-          tmp="$RUNNER_TEMP/worldmap-xres-census-static"
+            .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py
+
+          tmp="$RUNNER_TEMP/worldmap-xres-census-integration"
           mkdir -p "$tmp"
+          trap 'rm -rf "$tmp"' EXIT INT TERM
+
           owner="$tmp/tibia-official-client-re-xres-window-owner.py"
           python3 .github/scripts/track-a-worldmap-causal-xres-geometry-census-repair.py \
             .github/scripts/tibia-official-client-re-xres-window-owner.py "$owner"
           python3 -m py_compile "$owner"
+          grep -F 'WORLDMAP_XRES_OWNED_VIEWABLE_COUNT=' "$owner" >/dev/null
+          grep -F 'WORLDMAP_XRES_SELECTED_GEOMETRY=' "$owner" >/dev/null
+          ! grep -F 'and int(attr.width) == TARGET_WIDTH' "$owner" >/dev/null
+          ! grep -F 'and int(attr.height) == TARGET_HEIGHT' "$owner" >/dev/null
 
-          python3 - "$owner" <<'PY'
-          import importlib.util,sys
-          from pathlib import Path
-          p=Path(sys.argv[1])
-          spec=importlib.util.spec_from_file_location('wm_geometry_census_static',p)
-          m=importlib.util.module_from_spec(spec)
-          sys.modules[spec.name]=m
-          spec.loader.exec_module(m)
-          C=m.WindowCandidate
-
-          candidates=[C(0x10,300,200),C(0x20,1020,650),C(0x30,1800,1000)]
-          owners={0x10:77,0x20:77,0x30:88}
-          selected=m.select_owned_xid(candidates,77,lambda xid: owners.get(xid))
-          if selected != 0x20:
-              raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=largest_owned_selection')
-
-          if m.select_owned_xid(candidates,99,lambda xid: owners.get(xid)) is not None:
-              raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=foreign_pid_not_ignored')
-
-          tied=[C(0x40,1000,500),C(0x50,500,1000)]
-          try:
-              m.select_owned_xid(tied,77,lambda _xid:77)
-          except m.WindowOwnerError as exc:
-              if 'ambiguous' not in str(exc):
-                  raise
-          else:
-              raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=largest_area_tie_not_rejected')
-
-          text=p.read_text()
-          if 'and int(attr.width) == TARGET_WIDTH' in text or 'and int(attr.height) == TARGET_HEIGHT' in text:
-              raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=target_geometry_filter_survived')
-          for marker in (
-              'WORLDMAP_XRES_OWNED_VIEWABLE_COUNT=',
-              'WORLDMAP_XRES_OWNED_GEOMETRY=',
-              'WORLDMAP_XRES_SELECTED_GEOMETRY=',
-          ):
-              if marker not in text:
-                  raise SystemExit('WORLDMAP_XRES_CENSUS_STATIC_ERROR=missing_marker:'+marker)
-          print('WORLDMAP_XRES_GEOMETRY_CENSUS_STATIC=PASS')
-          print('WORLDMAP_XRES_GEOMETRY_CENSUS_CLIENT_EXECUTED=false')
-          print('WORLDMAP_XRES_GEOMETRY_CENSUS_SECRET_USED=false')
-          PY
-
-          rm -rf "$tmp"
+          screen="$tmp/screen-normalized-baseline.sh"
+          python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
+          bash -n "$screen"
+          grep -F 'WORLDMAP_SCREEN_XRES_GEOMETRY_CENSUS_OWNER=PASS' "$screen" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_XRES_SELECTOR=EXACT_PID_UNIQUE_LARGEST_VIEWABLE' "$screen" >/dev/null
+          grep -F 'track-a-worldmap-causal-xres-geometry-census-repair.py' "$screen" >/dev/null
+          grep -F -- '--owner-helper "$OWNER_CENSUS"' "$screen" >/dev/null
+          grep -F 'xres_census_owner_binding_missing' "$screen" >/dev/null
+          grep -F 'rm -rf "$RUNNER_TEMP/worldmap-xres-owner-census"' "$screen" >/dev/null
+          if grep -F 'OWNER_1020' "$screen" || grep -F 'TARGET_WIDTH = 1020' "$screen" || grep -F 'TARGET_HEIGHT = 650' "$screen"; then
+            echo 'WORLDMAP_XRES_INTEGRATION_ERROR=legacy_geometry_fixed_owner_survived' >&2
+            exit 1
+          fi
+          echo 'WORLDMAP_XRES_CENSUS_INTEGRATION_STATIC=PASS'
+          echo 'WORLDMAP_XRES_CENSUS_INTEGRATION_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_XRES_CENSUS_INTEGRATION_SECRET_USED=false'

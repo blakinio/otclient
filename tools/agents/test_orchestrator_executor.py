@@ -159,6 +159,33 @@ next_action: implement worker fixture
         with self.assertRaisesRegex(orchestrator_executor.ExecutorError, "owner-funded"):
             orchestrator_executor.validate_executor_enabled(config)
 
+    def test_worker_environment_does_not_inherit_unlisted_secret(self) -> None:
+        config = self._config()
+        executor = config["executor"]
+        assert isinstance(executor, dict)
+        with patch.dict(os.environ, {"UNLISTED_SECRET": "do-not-pass", "FAKE_WORKER_MODE": "success"}, clear=False):
+            env = orchestrator_executor._sanitized_env(executor)
+        self.assertNotIn("UNLISTED_SECRET", env)
+        self.assertEqual(env["FAKE_WORKER_MODE"], "success")
+
+    def test_protected_branch_is_rejected(self) -> None:
+        with self.assertRaisesRegex(orchestrator_executor.ExecutorError, "protected branch"):
+            orchestrator_executor._validate_branch(self.repo, "main")
+
+    def test_stale_plan_is_rejected_before_worker_launch(self) -> None:
+        config = self._config()
+        plan = self._plan(config)
+        self.task_path.write_text(self._task_text().replace("status: ready", "status: waiting"), encoding="utf-8")
+        with self.assertRaisesRegex(orchestrator_executor.ExecutorError, "plan is stale"):
+            orchestrator_executor.execute_plan(
+                self.repo,
+                self.tasks,
+                plan,
+                config,
+                self.results,
+                workspace_root=self.workspace_root,
+            )
+
     def test_successful_external_worker_is_accepted_from_isolated_worktree(self) -> None:
         summary = self._execute("success")
         self.assertEqual(summary["accepted"], ["OTC-EXECUTOR-TEST"])

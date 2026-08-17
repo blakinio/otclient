@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
-status: implementing
+status: ready
 agent: ChatGPT
 session_id: chatgpt-raw-xres-helper-hosted-20260817
 session_role: hosted_protocol_helper_researcher
@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: raw-xres-helper-hosted-validation
+phase: coordinator-promotion-ready-raw-xres-wire
 branch: diag/OTC-20260817-track-a-raw-xres-helper-hosted
 base_branch: main
 base_main: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
 risk: high
-updated: 2026-08-17T08:40:00+02:00
+updated: 2026-08-17T08:48:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
@@ -33,7 +33,7 @@ blocks:
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: trusted main now contains coordinator-promoted evidence proving a raw full-display viewable X11 resource exists but exact client PID ownership remains UNKNOWN; libxcb-res/libXRes convenience libraries are absent while contained XResproto protocol definitions expose the QueryClientIds/LocalClientPid wire basis. This phase implements only a pure hosted/static byte encoder/parser for XRes QueryVersion and QueryClientIds. It performs no socket connection, QueryExtension discovery, X server/client launch, Synology access, canonical state access, credentials/login/gameplay or Track B work. Physical identity retry remains forbidden until this helper is validated and separately admitted.
+execution_reason: the pure hosted/static raw-XRes wire codec is implemented and validated after one coordinator code-review hardening cycle. It performs no socket/network/process/runtime I/O, encodes/parses QueryVersion and one-spec QueryClientIds(LocalClientPid), rejects malformed/ambiguous replies fail-closed, and has deterministic little/big-endian fixtures. Physical identity retry remains forbidden until coordinator promotes this code to trusted main and a fresh separately admitted RUNTIME discriminator is created.
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -89,17 +89,51 @@ wire_contract:
   helper_network_access: false
   helper_socket_access: false
   helper_query_extension_access: false
-implementation_scope:
-  - encode QueryVersion request for caller-provided extension major opcode
-  - parse exact bounded QueryVersion reply and optionally fence sequence
-  - require server XRes version at least 1.2
-  - encode one-resource QueryClientIds request with LocalClientPid mask
-  - parse bounded QueryClientIds replies into client/mask/value records
-  - extract exactly one positive LocalClientPid only from exact requested resource/mask/value shape
-  - reject truncation, declared-length mismatch, oversized payloads, excessive counts, malformed value lengths, duplicate target records, wrong mask, wrong resource and sequence mismatch
+implementation:
+  helper_path: .github/scripts/tibia-official-client-re-xres-wire.py
+  helper_blob: ce5992bc1171eef9f24a71dfc97da728f18627a9
+  test_path: .github/scripts/test_tibia_official_client_re_xres_wire.py
+  dedicated_workflow: .github/workflows/tibia-official-client-re-xres-wire.yml
+  query_version_encoder: PASS
+  query_version_reply_parser: PASS
+  minimum_version_fence: PASS
+  query_client_ids_one_spec_encoder: PASS
+  bounded_reply_parser: PASS
+  local_client_pid_extractor: PASS
+  exactly_one_record_for_one_spec_required: true
+  zero_id_reply_returns_unresolved_none: true
+  transport_free: true
+coordinator_review:
+  material_findings_open: 0
+  hardening_finding: one-spec extraction originally ignored unrelated extra records
+  hardening_resolution: require exactly one record total for any nonempty one-spec result
+  hardening_test: test_rejects_extra_non_target_record_even_with_target
+validation:
+  semantic_head_before_terminal_checkpoint: 06c6f18fc4a8920428ca353173b0596758a0190a
+  dedicated_workflow_run: 32001448940
+  dedicated_workflow_job: 95302425720
+  dedicated_result: SUCCESS
+  deterministic_tests: 33
+  deterministic_tests_passed: 33
+  purity_contract: XRES_WIRE_PURE_TRANSPORT_FREE_PASS
+  track_a_governance_run: 32001448948
+  track_a_governance_result: SUCCESS
+  physical_runtime_access: NONE
+evidence:
+  - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260817-raw-xres-wire-hosted.md
+classification:
+  primary: PROVEN_HOSTED_RAW_XRES_WIRE_CODEC_FAIL_CLOSED_AND_TRANSPORT_FREE_WITH_33_DETERMINISTIC_FIXTURES
+safety:
+  canonical_bootstrap_retry_authorized: false
+  canonical_window_identity_relaxation_authorized: false
+  physical_identity_retry_authorized_before_promotion: false
+  credentials_allowed: false
+  login_allowed: false
+  gameplay_allowed: false
+  track_b_access: false
 forbidden:
-  - any network/socket/X11 connection in the helper or tests
-  - any physical Synology/Xvfb/official-client execution during this phase
+  - any physical Synology/Xvfb/official-client execution from this source Draft
+  - any network/socket/X11 connection in helper/tests
   - canonical lease/registration/session observation or mutation
   - credentials, login or gameplay
   - accepting a viewable XID as official-client-owned without direct resource/PID identity proof
@@ -107,21 +141,21 @@ forbidden:
   - canonical window identity relaxation
   - Track B and historical PR #303 runtime surfaces
 acceptance:
-  - helper has no network/socket/process/runtime imports or side effects
-  - QueryVersion little-endian and big-endian exact request fixtures pass
-  - QueryVersion valid reply/sequence/version checks pass
-  - QueryVersion malformed/truncated/non-reply/length-mismatch/wrong-version cases reject
-  - QueryClientIds little-endian and big-endian exact request fixtures pass
-  - QueryClientIds valid single-PID and zero-ID replies parse deterministically
-  - QueryClientIds malformed/truncated/declared-length/count/value-length/oversize cases reject
-  - exact resource/mask/duplicate/PID validity checks reject ambiguous identity
-  - dedicated GitHub-hosted workflow passes
-  - Track A governance and repository CI pass on exact head
-  - no physical runtime access occurs
-last_completed_step: coordinator promotion #444 and lifecycle #445 are merged on trusted main; XRes child tasks are archived and ownership-released; the canonical task is freshly rebound to a pure hosted raw-wire validation branch
-next_action: implement the pure XRes wire helper, deterministic unit fixtures and hosted-only validation workflow; run exact-head governance/CI and hand the validated helper to coordinator for code promotion before any physical identity retry.
+  - QueryVersion exact little/big fixtures: PASS
+  - QueryVersion valid/malformed/version/sequence cases: PASS
+  - QueryClientIds exact little/big fixtures: PASS
+  - valid single PID and zero-ID unresolved cases: PASS
+  - malformed/truncated/declared-length/count/value/oversize cases: PASS
+  - exact resource/mask/PID/duplicate/extra-record ambiguity cases: PASS
+  - dedicated GitHub-hosted validation: PASS
+  - AST transport-free contract: PASS
+  - Track A governance: PASS
+  - evidence persisted: PASS
+  - physical runtime access: NONE
+last_completed_step: pure raw-XRes helper passed 33/33 deterministic fixtures and AST transport-free validation on run 32001448940/job 95302425720 after coordinator hardening required exact one-record semantics for the one-spec LocalClientPid query; evidence is persisted and no physical action occurred
+next_action: coordinator independently review and promote the persistent helper/test/workflow plus this bounded evidence to current trusted main. Only after promotion may a fresh separately admitted task-owned physical identity discriminator be created; do not launch the official client or alter canonical window identity before that promotion.
 ---
 
-# Track A canonical runtime E2E — hosted raw-XRes helper validation
+# Track A canonical runtime E2E — raw-XRes helper terminal source
 
-This phase is deliberately non-runtime. It produces a strict reusable wire codec only; socket/X server/client use remains a later separately admitted RUNTIME step.
+The reusable wire codec is ready for coordinator promotion. It proves only encoding/parsing behavior, not physical XID ownership.

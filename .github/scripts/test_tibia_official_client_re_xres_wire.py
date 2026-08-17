@@ -53,7 +53,7 @@ def client_ids_reply(
 ) -> bytes:
     prefix = "<" if byte_order == "little" else ">"
     payload = b"".join(
-        struct.pack(prefix + "III", client, mask, len(values))
+        struct.pack(prefix + "III", client, mask, len(values) * 4)
         + (struct.pack(prefix + f"{len(values)}I", *values) if values else b"")
         for client, mask, values in records
     )
@@ -156,6 +156,13 @@ class XResQueryClientIdsTests(unittest.TestCase):
         with self.assertRaises(wire.XResWireError):
             wire.encode_query_client_ids(MAJOR_OPCODE, 0, "little")
 
+    def test_local_pid_wire_length_is_four_bytes(self) -> None:
+        data = client_ids_reply(
+            [(RESOURCE_XID, wire.XRES_CLIENT_ID_MASK_LOCAL_CLIENT_PID, (PID,))]
+        )
+        self.assertEqual(struct.unpack_from("<I", data, 40)[0], 4)
+        self.assertEqual(len(data), 48)
+
     def test_parse_and_extract_single_local_pid(self) -> None:
         data = client_ids_reply(
             [(RESOURCE_XID, wire.XRES_CLIENT_ID_MASK_LOCAL_CLIENT_PID, (PID,))]
@@ -225,6 +232,12 @@ class XResQueryClientIdsTests(unittest.TestCase):
         struct.pack_into("<I", fixed, 4, (len(shortened) - 32) // 4)
         with self.assertRaises(wire.XResWireError):
             wire.parse_query_client_ids_reply(bytes(fixed), "little")
+
+    def test_rejects_non_card32_aligned_value_byte_length(self) -> None:
+        data = bytearray(client_ids_reply([(RESOURCE_XID, 2, (PID,))]))
+        struct.pack_into("<I", data, 40, 3)
+        with self.assertRaises(wire.XResWireError):
+            wire.parse_query_client_ids_reply(bytes(data), "little")
 
     def test_rejects_unparsed_trailing_payload(self) -> None:
         data = client_ids_reply([], declared_words=1) + b"\0\0\0\0"

@@ -8,12 +8,13 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: baseline_ephemeral_observer_repair
+phase: baseline_ephemeral_observer_repair_confirmed
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
-base_sha: e1ae4054b17792607c88552f72cdc68ef3a1f294
+base_sha: 7fa86095667dcc71005fbf366921c4cb565ebc3f
+restack_commit: d14b3f6449ba45307e0889cb5f52d45a5722bbdd
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T13:52:00+02:00
+updated: 2026-08-17T13:55:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -27,14 +28,13 @@ modules_touched:
   - agent-evidence
 reuses:
   - docs/agents/reports/OTCLIENT-20260817-worldmap-server-delivery-extent.md
-  - docs/agents/tasks/archive/OTC-20260817-track-a-worldmap-server-delivery-extent.md
   - docs/agents/tasks/archive/OTC-20260817-track-a-worldmap-mutation-design.md
   - docs/agents/tasks/archive/OTC-20260817-track-a-worldmap-mutation-physical-validation.md
   - merged PRs #371, #452, #462, #465, #473, #474
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-control-plus-synology-ephemeral-runtime
-execution_reason: The canonical bootstrap one-shot was consumed before registration by an obsolete worker composition; repository admission explicitly supports task-owned ephemeral_isolated physical sessions without canonical registration or lease mutation.
+execution_reason: Repository admission explicitly supports task-owned ephemeral_isolated physical sessions without canonical registration or lease mutation; the canonical bootstrap one-shot remains consumed and is not bypassed.
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -42,7 +42,7 @@ user_communication: low_noise
 context_pressure: high
 context_growth: stable
 context_score: 11
-estimate_confidence: medium
+estimate_confidence: high
 decomposition_decision: phased
 feature_scope:
   type: protocol
@@ -80,7 +80,7 @@ login_for_worldmap_authorized: true
 second_live_session_authorized: false
 owner_authorization_source: current conversation after explicit statement that physical runtime plus client-byte mutation required separate authorization
 owner_authorization_text: "wykonaj i czekam na wyniki"
-owner_authorization_scope: bounded baseline exact-client versus first [19,14] causal worldmap server-delivery experiment, including required login/relogin, reversible movement, instrumentation and rollback
+owner_authorization_scope: bounded exact baseline versus first [19,14] causal worldmap server-delivery experiment, including login/relogin, one reversible movement pair, instrumentation and rollback
 owner_funded_ai_api_authorized: false
 exact_client:
   version: 15.32.df7b29
@@ -120,9 +120,9 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T13:52:00+02:00
+last_progress_at: 2026-08-17T13:55:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: baseline-observer-repair
+ci_check_generation: baseline-observer-repair-confirmed
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -134,7 +134,7 @@ stall_warnings: 0
 
 # Objective
 
-Execute the owner-authorized causal runtime discriminator frozen by merged #473/#474. Compare the exact baseline `[18,14]` with the conservative one-byte `[19,14]` task-owned mutation and determine whether additional authoritative map data arrives from the server. Authoritative inbound delivery, Storage and rendered/pickable extent remain separate measurements.
+Execute the owner-authorized causal discriminator from merged #473/#474. Compare the exact `[18,14]` baseline against the first task-owned `[19,14]` mutation and measure authoritative inbound worldmap delivery before Storage independently from Storage/render/picker effects.
 
 # Required result
 
@@ -148,68 +148,48 @@ STORAGE_EXTENT_CHANGE=true|false|UNKNOWN
 RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 ```
 
-# Canonical boundary
+# Current verified boundary
 
-Controller inventory run `32025074618` proved released generation-7 lease and absent registration. Canonical bootstrap run `32025398762` physically launched once and failed the obsolete raw-worker `client_window_missing` selector before registration, credentials or login. Cleanup run `32025665881` proved generation-8 lease released, registration/session/token absent and zero canonical-marked survivors. A proposed canonical XRes retry was then correctly refused pre-launch by governance in run `32025860356` because canonical bootstrap is one-shot. This guardrail remains intact.
+- Controller inventory `32025074618 / 95372681355`: released canonical generation 7; registration absent; no live process/X11 observation.
+- Canonical bootstrap `32025398762 / 95373646537`: one physical exact-client launch; obsolete raw selector failed before registration/credentials/login. Cleanup `32025665881 / 95374436911`: released generation 8, registration/session/token absent, zero canonical survivors.
+- Canonical XRes repair `32025860356 / 95375014679`: refused by governance before worker/client launch because canonical bootstrap is one-shot.
+- Ephemeral baseline attempt 1 `32026662197 / 95377398485`: current XRes path and task-owned namespace physically proved through a verified exact-client window and target uniqueness; observer exited before credentials, login or gameplay. Source rehash and cleanup passed.
+- Deterministic GDB isolation `32027110459 / 95378725544` on restacked head `d14b3f6449ba45307e0889cb5f52d45a5722bbdd`: raw toolroot GDB returned `127` because `libpython3.12.so.1.0` was unavailable; the same binary with toolroot runtime library environment returned `0`. The observer failure root cause is therefore directly proven.
+- Main drift from `e1ae4054...` to `7fa86095667dcc71005fbf366921c4cb565ebc3f` contained only independent agent-orchestrator tooling/lifecycle files. Branch restack commit: `d14b3f6449ba45307e0889cb5f52d45a5722bbdd`.
 
-# Ephemeral baseline attempt 1
+Durable evidence:
+- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-baseline-bootstrap-attempt-1.md`
+- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-ephemeral-baseline-attempt-1.md`
+- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-gdb-environment-isolation.md`
 
-Run `32026662197`, job `95377398485`, head `68e1bbaa75305c54689b8d7e1d2015a112f55c0c` directly proved the task-owned isolated path works through exact client/XRes identity:
+# Active repair
 
-```text
-WORLDMAP_CAUSAL_EPHEMERAL_BASELINE_ADMISSION=PASS
-WORLDMAP_BASELINE_CANONICAL_CONTROLLER_IDLE=PASS
-WORLDMAP_BASELINE_PREEXISTING_NAMESPACE_PROCESS_COUNT=0
-TRACK_A_CANONICAL_XRES_ADAPTER=PASS
-WORLDMAP_BASELINE_EPHEMERAL_XRES_WORKER=PASS
-TRACK_A_CANONICAL_STAGE=warp_egress_probe_pass
-TRACK_A_CANONICAL_STAGE=client_window_wait_pass
-WORLDMAP_BASELINE_MANIFEST_FENCE=PASS
-WORLDMAP_BASELINE_CLIENT_PID=25587
-WORLDMAP_BASELINE_WINDOW_IDENTITY=x11-window:12582929
-WORLDMAP_BASELINE_TARGET_UNIQUENESS=PROVEN
-```
-
-The run then stopped before any account credential was used because the pre-Storage GDB observer process exited before attachment could be proven:
-
-```text
-WORLDMAP_BASELINE_ERROR=gdb_observer_not_alive
-WORLDMAP_BASELINE_ORIGINAL_SOURCE_REHASH=PASS
-WORLDMAP_BASELINE_CLEANUP=COMPLETE
-```
-
-No login was submitted, no gameplay input occurred, and no structural evidence artifact was uploaded. Durable record: `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-ephemeral-baseline-attempt-1.md`.
-
-Historical accepted observer commit `734f845deace5a26efa09b96a168bea0c05272f0` ran the same toolroot GDB under task/toolroot `HOME`, `DISPLAY`, `PATH` and `LD_LIBRARY_PATH`. The attempt-1 harness supplied the GDB executable path but omitted that toolroot runtime environment. This is the single current evidence-based repair hypothesis. The repair must also emit a sanitized pre-login GDB diagnostic on another attach failure; no credential values exist at that gate.
+The only permitted baseline observer repair is to preserve the exact baseline experiment while launching the observer with the proven toolroot GDB runtime library environment. This is not an identical retry. The repair must still arm the observer before credential use; a second attach failure stops this gate.
 
 # Execution phases
 
-1. **DONE — canonical admission / one-shot boundary and rollback.**
-2. **DONE — exact ephemeral client/XRes/WARP namespace path physically proven.**
-3. **ACTIVE — one pre-login observer repair with toolroot GDB runtime environment.**
-4. **PENDING — baseline login + structural FullMap/map-description capture + Right/Left.**
-5. **PENDING — persist baseline measured extent and prove cleanup.**
-6. **PENDING — fresh patched namespace uniqueness/source/preimage admission.**
-7. **PENDING — task-owned `[19,14]` ephemeral run with identical capture/stimulus.**
-8. **PENDING — patched rollback/source rehash/cleanup.**
-9. **PENDING — causal comparison/classification/audit/workflow+helper removal/CI/review/merge/archive.**
-
-# Stop criteria
-
-Fail closed on non-idle canonical controller state, namespace collision, target ambiguity, WARP/credential confinement failure, missing secret/tooling before safe login, second observer attach failure after the one materially changed repair, ambiguous character selection, absence of structural FullMap/map-description proof, instrumentation anomaly, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, inability to cleanly terminate the exact session, or inability to prove baseline and patched sessions are non-overlapping.
+1. **DONE** canonical boundary and cleanup.
+2. **DONE** isolated exact client/XRes/WARP path proven.
+3. **DONE** observer failure root cause mechanically proven without client launch.
+4. **ACTIVE** one repaired exact baseline attempt with toolroot GDB environment.
+5. **PENDING** persist measured baseline extent and terminal cleanup.
+6. **PENDING** fresh patched namespace uniqueness/source/preimage admission.
+7. **PENDING** `[19,14]` task-owned ephemeral run with identical capture/stimulus.
+8. **PENDING** patched rollback/source rehash/cleanup.
+9. **PENDING** causal classification, independent audit, temporary resource removal, exact-head CI/review/merge/archive.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 5
-updated_at: 2026-08-17T13:52:00+02:00
-base_main: e1ae4054b17792607c88552f72cdc68ef3a1f294
+checkpoint_version: 6
+updated_at: 2026-08-17T13:55:00+02:00
+base_main: 7fa86095667dcc71005fbf366921c4cb565ebc3f
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
-phase: baseline_ephemeral_observer_repair
+phase: baseline_ephemeral_observer_repair_confirmed
 runtime_access: ephemeral_isolated
-last_completed_step: exact isolated client/XRes path proven; attempt stopped pre-credentials at observer attach and cleaned up with source rehash PASS
+last_completed_step: branch restacked on current main and GDB observer root cause directly isolated to missing toolroot libpython runtime path
 blockers: []
-next_action: Supply historical toolroot HOME/DISPLAY/PATH/LD_LIBRARY_PATH to GDB, expose a sanitized pre-login attach diagnostic if it still exits, then execute exactly one repaired baseline attempt.
+next_action: Re-enable exactly one baseline workflow generation with the proven toolroot GDB LD_LIBRARY_PATH supplied only to the observer process; preserve all other baseline gates and stop on any second observer attach failure.
 ```

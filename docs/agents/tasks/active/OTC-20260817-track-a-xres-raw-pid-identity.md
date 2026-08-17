@@ -12,8 +12,9 @@ phase: implement
 branch: diag/OTC-20260817-track-a-xres-raw-pid-identity-physical-authorized-v1
 base_branch: main
 base_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
+pr: 455
 risk: high
-updated: 2026-08-17T11:01:00+02:00
+updated: 2026-08-17T11:07:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -56,6 +57,7 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-xres-raw-pid-identity.md
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/**
   - .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch.py
+  - .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch-v2.py
   - .github/workflows/tibia-official-client-re-xres-raw-pid-identity.yml
 modules_touched:
   - track-a-xres-runtime-discriminator
@@ -85,8 +87,23 @@ acceptance:
 classification:
   desired: XRES_PROVES_VIEWABLE_WINDOW_OWNED_BY_EXACT_CLIENT
   failure_is_evidence: true
-last_completed_step: raw XRes codec promotion #448 merged to trusted main, source #447 is terminally closed superseded, and the raw transport patcher is staged on this task branch
-next_action: add the one-shot physical workflow, open the Draft PR, and execute exactly one isolated discriminator if all fresh admission/base gates pass.
+validation:
+  first_generation:
+    head: 87e1bda874c5fdc48833c367054b5be9fcf96ad1
+    run: 32013415890
+    hosted_job: 95337663549
+    result: FAILED_BEFORE_PHYSICAL_EXECUTION
+    first_error: XRES_RAW_PATCH_REFUSED=SNAPSHOT_RAW_XRES_INSERT_COUNT:0
+    physical_job: 95337705295
+    physical_job_result: SKIPPED
+    exact_client_launches: 0
+  repair:
+    hypothesis: post-RHI transform v2 shifts the PYALLX snapshot anchor indentation from two spaces to four spaces
+    evidence: historical accepted XRes v2 adapter on source lineage applied the same two-to-four-space anchor correction
+    action: add a bounded v2 adapter and use it in hosted and physical generation paths
+    identical_retry: false
+last_completed_step: first hosted generation failed closed before client launch on a deterministic transform-anchor mismatch; the v2 indentation adapter is now staged and physical execution remains unconsumed
+next_action: observe the new exact-head hosted preflight; only if it passes may the one authorized physical job execute.
 ---
 
 # Raw XRes PID identity discriminator

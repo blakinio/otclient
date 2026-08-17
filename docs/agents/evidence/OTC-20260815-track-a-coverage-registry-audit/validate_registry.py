@@ -58,7 +58,7 @@ assert byid["p1:health.restart_relogin_semantic_reacquisition"]["semantic_state"
 
 summary=load("coverage-summary.json")
 assert summary["schema"]=="otclient.tibia-re.coverage-summary.v3"
-assert summary["current_overlay_snapshot"]=="0b3bdec0a4145f558806448a4657413664d80729"
+assert summary["current_overlay_snapshot"]=="ec75e2606f7f4ad834e4b6be968fb03bdbff55df"
 assert (summary["material_findings_after_merge"],summary["high_findings_after_merge"],summary["medium_findings_after_merge"])==(3,1,2)
 assert summary["resolved_findings"]==["AUD-COV-001","AUD-COV-002"]
 assert summary["remaining_findings"]==["AUD-COV-003","AUD-COV-004","AUD-COV-007"]
@@ -74,7 +74,7 @@ assert summary["metrics"]["p0_item_denominator_registry"]["denominator"]==180 an
 assert summary["metrics"]["p1_item_denominator_registry"]["denominator"]==28 and summary["metrics"]["p1_live_semantic_coverage"]["numerator"] is None
 
 ov=load("current-main-overlay.json")
-assert ov["schema"]=="otclient.tibia-re.coverage-current-overlay.v2" and ov["snapshot_main"]=="0b3bdec0a4145f558806448a4657413664d80729"
+assert ov["schema"]=="otclient.tibia-re.coverage-current-overlay.v2" and ov["snapshot_main"]=="ec75e2606f7f4ad834e4b6be968fb03bdbff55df"
 assert [x["id"] for x in ov["audit"]["remaining_findings"]]==["AUD-COV-003","AUD-COV-004","AUD-COV-007"]
 assert (ov["audit"]["remaining_material_findings"],ov["audit"]["remaining_high"],ov["audit"]["remaining_medium"])==(3,1,2)
 assert ov["coverage_boundaries"]["protocol_semantic_denominator"]["denominator"]==349
@@ -84,6 +84,13 @@ assert ov["coverage_boundaries"]["p1_item_denominator"]["denominator"]==28
 for k in ("framing","sequence","compression","encryption","final_binary_egress","final_socket_ownership"):assert ov["p2"][k]=="UNKNOWN"
 assert ov["worldmap"]["physical_validation_result"]=="NO_HANDLER_CANARY_OBSERVED_BOUNDED" and ov["worldmap"]["causal_propagation_proven"] is False
 assert ov["runtime"]["physical_resource_to_exact_client_pid_identity"]=="PROVEN_AT_RUN"
+assert ov["runtime"]["canonical_raw_xres_window_identity_integration_merge"]=="f8e628a255a18ec92839bbb45ef0e3b40bef8605"
+assert ov["runtime"]["canonical_raw_xres_window_identity_integration_promoted"] is True
+assert ov["runtime"]["final_p0_admission_merge"]=="ec75e2606f7f4ad834e4b6be968fb03bdbff55df"
+assert ov["runtime"]["final_p0_admission_run"]==32019313320 and ov["runtime"]["final_p0_admission_job"]==95355423148
+assert ov["runtime"]["canonical_lease_status"]=="released" and ov["runtime"]["canonical_lease_generation"]==7
+assert ov["runtime"]["authoritative_registration"]=="ABSENT"
+assert ov["runtime"]["p0_disposition"]=="BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE"
 assert ov["runtime"]["current_exact_client_pid"]=="NOT_REGISTERED" and ov["runtime"]["canonical_gate_b"]=="NOT_PROVEN"
 assert ov["programme"]["complete"] is False
 
@@ -92,7 +99,7 @@ assert [x["id"] for x in b["resolved"]]==["AUD-COV-001","AUD-COV-002"]
 assert [x[0] for x in b["items"]]==["AUD-COV-003","AUD-COV-004","AUD-COV-007"]
 
 repo=root.parents[3];report=(repo/"docs/agents/reports/OTCLIENT-20260816-track-a-coverage-audit-refresh.md").read_text()
-for t in ("material_findings_open: 3","high_findings_open: 1","medium_findings_open: 2","AUD-COV-002 — RESOLVED","E51 denominator: 349","E52 denominator: 642","P0 item denominator: 180","P1 item denominator: 28","programme_complete: false"):assert t in report,t
+for t in ("snapshot_main: ec75e2606f7f4ad834e4b6be968fb03bdbff55df","material_findings_open: 3","high_findings_open: 1","medium_findings_open: 2","AUD-COV-002 — RESOLVED","E51 denominator: 349","E52 denominator: 642","P0 item denominator: 180","P1 item denominator: 28","programme_complete: false","BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE"):assert t in report,t
 
 print("CANONICAL_COVERAGE_REGISTRY_VALIDATION=PASS")
 print("SOURCE_BASELINE_BLOBS_EXACT=true")
@@ -100,6 +107,6 @@ print("E51_DENOMINATOR=349 semantics=UNKNOWN/349 direct_qmeta=27")
 print("E52_DENOMINATOR=642 semantics=UNKNOWN/642 handlers=47 action_handlers=28")
 print("P0_ITEM_DENOMINATOR=180 semantics=UNKNOWN/180")
 print("P1_ITEM_DENOMINATOR=28 live_semantics=UNKNOWN/28")
-print("WORLD_MAP_PHYSICAL_VALIDATION=NO_HANDLER_CANARY_OBSERVED_BOUNDED")
+print("P0_RUNTIME_DISPOSITION=BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE")
 print("AUD_COV_002=RESOLVED_AS_DENOMINATOR_COMPLETENESS")
 print("REMAINING_FINDINGS=3 high=1 medium=2")

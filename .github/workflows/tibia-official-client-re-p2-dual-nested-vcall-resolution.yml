@@ -1,0 +1,232 @@
+name: Track A P2 nested vcall evidence
+
+on:
+  push:
+    branches:
+      - research/OTC-20260817-track-a-p2-dual-nested-vcall-resolution
+    paths:
+      - .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-resolution.py
+      - .github/workflows/tibia-official-client-re-p2-dual-nested-vcall-resolution.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p2-nested-vcall-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-sanitize:
+    name: Stage bounded exact-file nested-vcall bytes
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-dual-nested-vcall-resolution
+      EXPECTED_RUNNER_NAME: synology-otclient-01
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Checkout exact producer branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify file-only source boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || { echo P2_NESTED_VCALL_REFUSED=REPOSITORY_BOUNDARY; exit 61; }
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || { echo P2_NESTED_VCALL_REFUSED=REF_BOUNDARY; exit 62; }
+          [[ "$RUNNER_OS" == Linux ]] || { echo P2_NESTED_VCALL_REFUSED=OS_BOUNDARY; exit 63; }
+          [[ "$RUNNER_ARCH" == X64 ]] || { echo P2_NESTED_VCALL_REFUSED=ARCH_BOUNDARY; exit 64; }
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || { echo P2_NESTED_VCALL_REFUSED=RUNNER_BOUNDARY; exit 65; }
+          command -v python3 >/dev/null || { echo P2_NESTED_VCALL_REFUSED=PYTHON3_MISSING; exit 66; }
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-resolution.py
+
+          candidates=(
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+          )
+          source_client=''
+          source_index=''
+          for index in 0 1; do
+            candidate="${candidates[$index]}"
+            [[ -f "$candidate" && ! -L "$candidate" ]] || continue
+            [[ "$(stat -c %s "$candidate" 2>/dev/null || echo STAT_FAILED)" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
+          import hashlib
+          import sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          expected = sys.argv[2]
+          digest = hashlib.sha256()
+          with path.open('rb') as handle:
+              for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                  digest.update(chunk)
+          raise SystemExit(0 if digest.hexdigest() == expected else 1)
+          PY
+            then
+              source_client="$candidate"
+              source_index="$index"
+              break
+            fi
+          done
+          [[ -n "$source_client" ]] || { echo P2_NESTED_VCALL_REFUSED=EXACT_SOURCE_MISSING; exit 50; }
+          {
+            echo "SOURCE_CLIENT=$source_client"
+            echo "SOURCE_CANDIDATE_INDEX=$source_index"
+          } >> "$GITHUB_ENV"
+
+          echo P2_NESTED_VCALL_SOURCE_BOUNDARY=PASS
+          echo "P2_NESTED_VCALL_SOURCE_CANDIDATE_INDEX=$source_index"
+          echo P2_NESTED_VCALL_RUNTIME_ACCESS=none
+          echo P2_NESTED_VCALL_SOURCE_OPERATION=bounded_file_byte_mapping_and_structural_index_only
+          echo P2_NESTED_VCALL_SOURCE_DISASSEMBLY=false
+          echo P2_NESTED_VCALL_SOURCE_SEMANTIC_CLASSIFICATION=false
+          echo P2_NESTED_VCALL_CLIENT_PROCESS_ACCESS=false
+          echo P2_NESTED_VCALL_PROCESS_MEMORY_ACCESS=false
+          echo P2_NESTED_VCALL_CANONICAL_STATE_ACCESS=false
+          echo P2_NESTED_VCALL_CLIENT_EXECUTED=false
+          echo P2_NESTED_VCALL_CLIENT_BYTE_MUTATION=false
+
+      - name: Copy bounded exact-file evidence without disassembly
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf artifacts/source
+          mkdir -p artifacts/source
+          python3 .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-resolution.py \
+            source \
+            --client "$SOURCE_CLIENT" \
+            --candidate-index "$SOURCE_CANDIDATE_INDEX" \
+            --outdir artifacts/source
+
+          grep -Fxq "P2_NESTED_VCALL_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/source/source-fence.txt
+          grep -Fxq "P2_NESTED_VCALL_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/source/source-fence.txt
+          grep -Fxq "P2_NESTED_VCALL_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/source/source-fence.txt
+          grep -Fxq 'P2_NESTED_VCALL_RUNTIME_ACCESS=none' artifacts/source/source-fence.txt
+          grep -Fxq 'P2_NESTED_VCALL_SOURCE_DISASSEMBLY=false' artifacts/source/source-fence.txt
+          grep -Fxq 'P2_NESTED_VCALL_SOURCE_SEMANTIC_CLASSIFICATION=false' artifacts/source/source-fence.txt
+          grep -Fxq 'P2_NESTED_VCALL_RAW_CLIENT_UPLOADED=false' artifacts/source/source-fence.txt
+
+      - name: Enforce sanitized source artifact boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('artifacts/source')
+          allowed = {'source-evidence.json', 'source-fence.txt'}
+          actual = {p.name for p in root.iterdir() if p.is_file()}
+          if actual != allowed:
+              raise SystemExit(f'unsafe source artifact file set: {sorted(actual)}')
+          for path in root.iterdir():
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              if len(data) > 1024 * 1024:
+                  raise SystemExit(f'oversized sanitized output: {path}:{len(data)}')
+              if data.startswith(b'\x7fELF') or data[:2] == b'MZ':
+                  raise SystemExit(f'raw executable payload refused: {path}')
+              data.decode('utf-8')
+          print('P2_NESTED_VCALL_SOURCE_SANITIZED_BOUNDARY=PASS')
+          PY
+
+      - name: Upload bounded source evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-nested-vcall-source-${{ github.run_id }}
+          path: artifacts/source/**
+          if-no-files-found: error
+          retention-days: 7
+
+  hosted-validate:
+    name: Decode nested-vcall evidence on GitHub-hosted Linux
+    needs: source-sanitize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-dual-nested-vcall-resolution
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Checkout exact producer branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify GitHub-hosted semantic boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          [[ "$RUNNER_ARCH" == X64 ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          command -v objdump >/dev/null
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-resolution.py
+          echo P2_NESTED_VCALL_EXECUTION_CLASS=github_hosted
+          echo P2_NESTED_VCALL_RUNTIME_ACCESS=none
+          echo P2_NESTED_VCALL_RAW_CLIENT_PRESENT=false
+
+      - name: Download bounded source bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: track-a-p2-nested-vcall-source-${{ github.run_id }}
+          path: artifacts/source
+
+      - name: Disassemble and validate exact bounded evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf artifacts/final
+          mkdir -p artifacts/final
+          python3 .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-resolution.py \
+            hosted \
+            --bundle-dir artifacts/source \
+            --outdir artifacts/final
+
+          grep -Fxq 'P2_NESTED_VCALL_HOSTED_VALIDATION=PASS' artifacts/final/hosted-validation.txt
+          grep -Fxq "P2_NESTED_VCALL_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/final/hosted-validation.txt
+          grep -Fxq "P2_NESTED_VCALL_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/final/hosted-validation.txt
+          grep -Fxq "P2_NESTED_VCALL_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/final/hosted-validation.txt
+          grep -Fxq 'P2_NESTED_VCALL_EXECUTION_CLASS=github_hosted' artifacts/final/hosted-validation.txt
+          grep -Fxq 'P2_NESTED_VCALL_RUNTIME_ACCESS=none' artifacts/final/hosted-validation.txt
+          grep -Fxq 'P2_NESTED_VCALL_PRIMARY_BYTES_EXACT_FENCED=true' artifacts/final/hosted-validation.txt
+
+      - name: Enforce final artifact boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('artifacts/final')
+          allowed = {'disassembly.txt', 'candidate-tables.txt', 'result.json', 'hosted-validation.txt'}
+          actual = {p.name for p in root.iterdir() if p.is_file()}
+          if actual != allowed:
+              raise SystemExit(f'unsafe final artifact file set: {sorted(actual)}')
+          for path in root.iterdir():
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              if len(data) > 1024 * 1024:
+                  raise SystemExit(f'oversized final output: {path}:{len(data)}')
+              if data.startswith(b'\x7fELF') or data[:2] == b'MZ':
+                  raise SystemExit(f'raw executable payload refused: {path}')
+              data.decode('utf-8')
+          print('P2_NESTED_VCALL_FINAL_SANITIZED_BOUNDARY=PASS')
+          PY
+
+      - name: Upload consumer-facing sanitized evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-nested-vcall-final-${{ github.run_id }}
+          path: artifacts/final/**
+          if-no-files-found: error
+          retention-days: 30

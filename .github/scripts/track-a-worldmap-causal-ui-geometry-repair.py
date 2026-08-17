@@ -9,30 +9,24 @@ START = "# Screenshot/OCR is used only to locate login/character-selection contr
 END = "world=0\n"
 
 REPLACEMENT = r'''# Raw XWD bootstrap geometry is used only to locate login/character-selection controls.
-# It is calibrated from retained exact-client artifacts and is never world-state evidence.
+# The task-owned desktop has already been normalized to 1020x650 before launch.
 XWD="$(command -v xwd 2>/dev/null || true)"
 [[ -n "$XWD" ]] || XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
 CLASSIFIER="${GITHUB_WORKSPACE:-$PWD}/.github/scripts/track-a-worldmap-causal-xwd-classify.py"
-UI_WINDOW_RESOLVER="${GITHUB_WORKSPACE:-$PWD}/.github/scripts/track-a-worldmap-causal-ui-window.py"
-UI_OWNER_HELPER="${GITHUB_WORKSPACE:-$PWD}/.github/scripts/tibia-official-client-re-xres-window-owner.py"
-UI_WIRE_HELPER="${GITHUB_WORKSPACE:-$PWD}/.github/scripts/tibia-official-client-re-xres-wire.py"
 [[ -x "$XWD" ]] || fail xwd_missing_before_secret_use
 [[ -f "$CLASSIFIER" ]] || fail xwd_classifier_missing
-[[ -f "$UI_WINDOW_RESOLVER" && -f "$UI_OWNER_HELPER" && -f "$UI_WIRE_HELPER" ]] || fail xres_ui_window_helper_missing
 python3 "$CLASSIFIER" self-test
 
-# This task normalizes the task-owned Xvfb desktop to 1020x650 before launch.
-# The bootstrap WIN is therefore already an XRes-owned 1020x650 identity fence.
-# Independently resolve the 1020x650 UI candidate and require it to be the same
-# XID for the same exact task-owned PID. No legacy _NET_WM_PID result is promoted.
-UI_WIN="$(python3 "$UI_WINDOW_RESOLVER" \
-  --display "$DISPLAY" --pid "$PID" --toolroot "$TOOL" \
-  --owner-helper "$UI_OWNER_HELPER" --wire-helper "$UI_WIRE_HELPER")" || fail xres_ui_window_unresolved
-[[ "$UI_WIN" =~ ^[1-9][0-9]*$ ]] || fail xres_ui_window_invalid
-[[ "$UI_WIN" == "$WIN" ]] || fail xres_ui_window_identity_mismatch
+# WIN came from the worker manifest only after raw-XRes LocalClientPid matched the
+# exact task-owned client PID under the task-local 1020x650 owner helper. Reuse
+# that already-proven XID instead of performing a redundant second XRes search.
+# The live raw-XWD classifier below independently revalidates current 1020x650
+# geometry and LOGIN_FORM immediately before any credential is typed.
+UI_WIN="$WIN"
+[[ "$UI_WIN" =~ ^[1-9][0-9]*$ ]] || fail manifest_ui_window_invalid
 echo "WORLDMAP_BASELINE_UI_WINDOW_IDENTITY=x11-window:$UI_WIN"
-echo 'WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=PROVEN'
-echo 'WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY=1020x650'
+echo 'WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=MANIFEST_PROVEN'
+echo 'WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY_EXPECTED=1020x650'
 echo 'WORLDMAP_BASELINE_UI_WINDOW_EQUALS_RUNTIME_IDENTITY=true'
 
 XWD_TOOLROOT_LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
@@ -119,26 +113,31 @@ def transform(text: str) -> str:
     start = text.index(START)
     end = text.index(END, start)
     output = text[:start] + REPLACEMENT + text[end:]
-    forbidden = ("tesseract", "capture_ocr", "LOGIN_OCR_ANCHORS", "SELECT_TSV", "PRE_TSV")
+    forbidden = (
+        "tesseract",
+        "capture_ocr",
+        "LOGIN_OCR_ANCHORS",
+        "SELECT_TSV",
+        "PRE_TSV",
+        "track-a-worldmap-causal-ui-window.py",
+    )
     survivors = [token for token in forbidden if token in output]
     if survivors:
-        raise TransformRefused("OCR_SURVIVORS:" + ",".join(survivors))
+        raise TransformRefused("FORBIDDEN_SURVIVORS:" + ",".join(survivors))
     required = (
-        "WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=PROVEN",
-        "WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY=1020x650",
+        "WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=MANIFEST_PROVEN",
+        "WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY_EXPECTED=1020x650",
         "WORLDMAP_BASELINE_UI_WINDOW_EQUALS_RUNTIME_IDENTITY=true",
         "WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_RAW_XWD_GEOMETRY",
         "WORLDMAP_BASELINE_CHARACTER_SELECTION=PROVEN_RAW_XWD_GEOMETRY",
+        'UI_WIN="$WIN"',
         "EMAIL_X=520",
         "ROW_X=300",
         'LD_LIBRARY_PATH="$XWD_TOOLROOT_LIBS" "$XWD"',
-        '--owner-helper "$UI_OWNER_HELPER" --wire-helper "$UI_WIRE_HELPER"',
     )
     missing = [token for token in required if token not in output]
     if missing:
         raise TransformRefused("REQUIRED_MISSING:" + ",".join(missing))
-    # The base helper intentionally contains a negative grep guard for the legacy
-    # selector text. Reject only an executable xdotool search invocation.
     executable_legacy = (
         '"$XDOTOOL" search --onlyvisible --pid',
         '$XDOTOOL search --onlyvisible --pid',

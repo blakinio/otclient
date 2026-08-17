@@ -1,27 +1,25 @@
 ---
 task_id: OTC-20260817-track-a-worldmap-server-delivery-extent
-status: investigating
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: official-client-re
 track: official-client-re
 task_kind: discovery
-phase: server-delivery-static-analysis
+phase: closeout-audit
 branch: research/OTC-20260817-track-a-worldmap-server-delivery-extent
 base_branch: main
 base_sha: f99ec371bafd0b9dbccb8fd6f4c8a3137e7d963b
 created: 2026-08-17T12:45:00+02:00
-updated: 2026-08-17T13:02:22+02:00
+updated: 2026-08-17T13:08:50+02:00
 risk: medium
 related_pr: 473
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-worldmap-server-delivery-extent.md
   - docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/
   - docs/agents/reports/OTCLIENT-20260817-worldmap-server-delivery-extent.md
-  - .github/workflows/track-a-worldmap-server-delivery-static.yml
 modules_touched:
   - agent-evidence
-  - github-actions-temporary
 reuses:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_WORLDMAP_MUTATION_DESIGN.md
   - docs/agents/reports/OTCLIENT-20260816-worldmap-extent-static-re.md
@@ -38,7 +36,7 @@ user_communication: low_noise
 context_pressure: high
 context_growth: stable
 context_score: 10
-estimate_confidence: medium
+estimate_confidence: high
 decomposition_decision: phased
 feature_scope:
   type: protocol
@@ -57,9 +55,9 @@ runtime_access: none
 client_byte_mutation_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-17T12:45:00+02:00
-last_progress_at: 2026-08-17T13:02:22+02:00
+last_progress_at: 2026-08-17T13:08:50+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: evidence-production
+ci_check_generation: closeout-pre-ci
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -87,86 +85,90 @@ Forbidden in this task:
 
 # Live-state preflight
 
-- `main` exact head at claim: `f99ec371bafd0b9dbccb8fd6f4c8a3137e7d963b` (merged PR #472, prompt v1.1.0).
+- `main` exact head at claim remains current during closeout: `f99ec371bafd0b9dbccb8fd6f4c8a3137e7d963b` (merged PR #472, prompt v1.1.0).
 - PR #471 merged the durable alias/handover; #472 merged the server-delivered-map-extent acceptance extension.
-- Prior mutation-design task #452/#453 is terminal and must not be recreated.
+- Prior mutation-design task #452/#453 is terminal and was not recreated.
 - Prior physical startup-canary #462/#466 is terminal; it proved patched-copy startup only and did not establish IN_GAME semantics or causal worldmap object propagation.
 - Draft PR #473 is the sole current task PR.
 
-# Acceptance inventory
-
-Persist direct-evidence classifications for:
+# Direct result
 
 ```text
-SERVER_MAP_DELIVERY_MODEL=CLIENT_DRIVEN|SERVER_DRIVEN|NEGOTIATED|FIXED_PROTOCOL|UNKNOWN
-SERVER_LARGER_RECTANGLE_SUPPORTED=true|false|UNKNOWN
-SERVER_FULL_FLOOR_DELIVERY_SUPPORTED=true|false|UNKNOWN
-SERVER_MULTI_FLOOR_BULK_DELIVERY_SUPPORTED=true|false|UNKNOWN
-SERVER_WHOLE_MAP_DELIVERY_SUPPORTED=true|false|UNKNOWN
-MAX_SERVER_DELIVERABLE_EXTENT=<proven bound or UNKNOWN>
+SERVER_MAP_DELIVERY_MODEL=UNKNOWN
+SERVER_LARGER_RECTANGLE_SUPPORTED=UNKNOWN
+SERVER_FULL_FLOOR_DELIVERY_SUPPORTED=UNKNOWN
+SERVER_MULTI_FLOOR_BULK_DELIVERY_SUPPORTED=UNKNOWN
+SERVER_WHOLE_MAP_DELIVERY_SUPPORTED=UNKNOWN
+MAX_SERVER_DELIVERABLE_EXTENT=UNKNOWN
 ```
 
-Also:
-- [x] Separate client Storage capacity, render/viewport extent and server-delivered protocol extent in the evidence model.
+These are evidence-bounded results, not missing work disguised as success. Exact generated-message directionality is proven server->client for normal map payload families, but the exact field surface required to distinguish negotiated/client-driven/fixed/server-driven extent control was not recovered through the authorized static surface. The causal distinction is isolated into one separately authorized physical runtime experiment in the final report.
+
+# Acceptance inventory
+
+- [x] Separate client Storage capacity, render/viewport extent and server-delivered protocol extent.
 - [x] Recover complete exact generated-message directionality for `FullMap`, field, directional row/column and floor-change families.
-- [ ] Determine whether any exact official-client path negotiates/requests aware range or width/height, including generic outbound message fields.
-- [ ] Search bounded parser/network evidence for width/height, strip/floor counts, coordinate or length ceilings.
-- [ ] Record bounded negative evidence rather than global impossibility claims.
-- [ ] Design one separately-authorized runtime discriminator if static evidence cannot distinguish server transmission from client-local storage/render growth.
+- [x] Bound the aware-range/width-height negotiation question: no separately named outbound extent/range message exists in the complete 160-name census; generic outbound fields remain `NOT_RECOVERED`, therefore model remains `UNKNOWN`.
+- [x] Search bounded parser/network evidence for width/height, strip/floor counts, coordinate or length ceilings; retain `UNKNOWN` where no exact ceiling was recovered.
+- [x] Record bounded negative evidence rather than global impossibility claims.
+- [x] Design one separately-authorized causal runtime discriminator that separates authoritative inbound growth from Storage/render/picker growth.
 - [ ] Fresh independent documentation/evidence audit with zero material findings or an explicit blocker.
 - [ ] Exact-head changed-file audit, required CI, review hygiene and terminal task lifecycle.
 
-# Evidence checkpoint
+# Evidence summary
 
 ## PROVEN
 
 - Exact official Linux client fence: version `15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
 - Accepted client-local geometry chain starts from packed `18/14` and propagates through exact `TWorldmapProtocolMessageHandler` to Storage; Viewport/RenderProvider/Picker are separate downstream dependencies.
-- Previous physical `[19,14]` canary proved patched-copy startup only; no accepted worldmap object instance was present in its no-login startup census.
-- Historical exact-client protocol inventory run `31651220862`, job `94295767215`, recovered 349 generated message names total: 160 client->server and 189 server->client.
-- New exact-client run `32022209943`, job `95364071999`, completed successfully and persisted the complete 349-name census in artifact `9285763750` (`worldmap-server-delivery-static-32022209943`).
-- Complete outbound name-level census has no `aware|range|extent|viewport|fullmap|fielddata|width|height` generated message name.
-- Complete inbound census directly contains `GameserverMessageFullMap`, `GameserverMessageFieldData`, `GameserverMessageLeftColumn`, `GameserverMessageRightColumn`, `GameserverMessageTopRow`, `GameserverMessageBottomRow`, `GameserverMessageTopFloor` and `GameserverMessageBottomFloor`.
-- Exact binary strings additionally contain protocol concepts `Extent`, `MapFieldData`, `ColumnData`, `RowData`, `AdditionalRowsTop`, `AdditionalRowsBottom`, `Columns`, and `Rows`.
-- Durable census evidence: `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-complete-message-census.md`.
+- Historical inventory run `31651220862`, job `94295767215`, recovered 349 generated message names total but emitted only a filtered subset.
+- New exact-client run `32022209943`, job `95364071999`, producer head `553e447c0662892b0c1b9cab994c4545d09f22c8`, completed successfully and persisted the complete 349-name census in artifact `9285763750`.
+- Complete census: 160 client->server, 189 server->client; no client->server generated name contains `aware|range|extent|viewport|fullmap|fielddata|width|height`.
+- Inbound exact names directly include `GameserverMessageFullMap`, `FieldData`, `Left/RightColumn`, `Top/BottomRow`, `Top/BottomFloor` and map mutation messages.
+- Final targeted descriptor run `32022973229`, job `95366330613`, producer head `ae5778d1f8b0e79b77bfa68c14692a3d599b25c5`, completed successfully and retained artifact `9286040543`.
+- That probe validates exact raw descriptor recovery by proving `Coordinate.x/y/z` are optional `uint32` fields 1/2/3, but does not recover `Extent` or target generic/map message descriptors.
+- Retained artifact `9227370490` contains normal strip observations consistent with an 18-wide baseline; it is not an atomic packet trace and does not prove multi-floor bulk delivery.
+- Temporary branch-only evidence workflow was removed at commit `174def652ae494f337897d79996ec7c8a47408cf`; final diff contains only durable docs/evidence/task state.
 
 ## FAILED PRODUCER ATTEMPTS — DIAGNOSED, NOT RETRIED IDENTICALLY
 
-- Descriptor run `32022548050`, job `95365067677`, head `888630af1de1d05be1f131df428360c9b4d215ba`: failed with `descriptor_file_count=0` / `no target protocol descriptors recovered`. Static inspection found a producer bug: it treated `FileDescriptorProto` field 6 as `message_type`; the correct field is 4.
-- Descriptor run `32022815851`, job `95365868589`, head `57b3068a16fe4d0ee9255fe20bbed4a17f272b9f`: after correcting field 4, it still returned `descriptor_file_count=0`, proving the strict file-descriptor start heuristic remained invalid for this exact generated layout.
-- No failed producer was rerun identically. The current repair abandons the file-start heuristic and anchors directly on exact `DescriptorProto` message-name encodings, while preserving bounded neighborhoods even on assertion failure.
-
-## BOUNDED NEGATIVE / GAP
-
-- Absence of a named outbound extent/range message is direct only at generated-message-name level. Generic messages (`ClientDetails`, `Login`, `SecondaryLogin`, `EnterWorld`, `SetClientOptions`) may still carry a negotiation field until their exact descriptors/handlers are bounded.
-- Accepted second-pack worldmap evidence records `network_payload_extent_ceiling=NOT_RECOVERED` and `complete_handler_master_pair_writer_census=UNKNOWN`.
+- Run `32022548050`, job `95365067677`, head `888630af1de1d05be1f131df428360c9b4d215ba`: failed because producer used `FileDescriptorProto` field 6 instead of `message_type` field 4.
+- Run `32022815851`, job `95365868589`, head `57b3068a16fe4d0ee9255fe20bbed4a17f272b9f`: corrected field number but strict raw protocol FileDescriptorProto start/layout heuristic still did not match the exact generated layout.
+- Run `32022973229` changed hypothesis to targeted `DescriptorProto` anchors, succeeded and closed producer escalation.
 
 ## UNKNOWN
 
-- Server delivery model (`CLIENT_DRIVEN|SERVER_DRIVEN|NEGOTIATED|FIXED_PROTOCOL|UNKNOWN`).
-- Whether changing the client-local 18/14 pair causes additional authoritative tiles to arrive.
-- Larger rectangle/full-floor/multi-floor/whole-map delivery support and any maximum extent.
-- Any exact parser/network ceiling not yet recovered.
+- Whether a generic outbound login/client-details/options/enter-world field carries extent negotiation.
+- Whether changing the client-local `18/14` pair causes additional authoritative tiles to arrive.
+- Larger rectangle/full-floor/multi-floor-bulk/whole-map delivery support and maximum server-deliverable extent.
+- Any exact parser/network extent ceiling beyond the bounded evidence already retained.
 
-# Current producer
+# Durable outputs
 
-Temporary branch-only workflow head `ae5778d1f8b0e79b77bfa68c14692a3d599b25c5`, run `32022973229`, performs targeted exact `DescriptorProto` recovery from message-name anchors and uploads bounded text neighborhoods with `if: always()`. It does not execute the client and does not upload proprietary client bytes. The temporary workflow must be removed before terminal merge.
+- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-complete-message-census.md`
+- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-targeted-descriptor-boundary.md`
+- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-retained-strip-observation.md`
+- `docs/agents/reports/OTCLIENT-20260817-worldmap-server-delivery-extent.md`
+
+# E2E classification
+
+`NOT_APPLICABLE_WITH_REASON`: this task is a static/evidence research slice with `feature_scope.e2e_required=false` and `RUNTIME_ACCESS=none`. Physical causal validation is explicitly a separately authorized follow-on and is not required to close this bounded static task because the contract permits direct `UNKNOWN` classifications when the authorized evidence cannot prove a stronger value.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 3
-updated_at: 2026-08-17T13:02:22+02:00
+checkpoint_version: 4
+updated_at: 2026-08-17T13:08:50+02:00
 base_main: f99ec371bafd0b9dbccb8fd6f4c8a3137e7d963b
 branch: research/OTC-20260817-track-a-worldmap-server-delivery-extent
 pr: 473
-status: investigating
-phase: server-delivery-static-analysis
+status: validating
+phase: closeout-audit
 runtime_access: none
-last_completed_step: complete exact message census persisted; first two descriptor-probe failures isolated to producer heuristics with distinct repairs
+last_completed_step: reconciled final static classifications, removed temporary evidence workflow and entered closeout audit
 validation_level: focused
 heavy_validation_runs: 0
 session_rotation_count: 0
 blockers: []
-next_action: Inspect the text artifact from targeted descriptor run 32022973229; classify exact generic outbound and map-message fields if recovered, otherwise preserve the bounded negative result and stop producer escalation at the three-repair ceiling.
+next_action: Perform a fresh independent audit of the current five-file durable diff against prompt v1.1.0 and repository closeout contracts; resolve any findings before exact-head CI/review/merge.
 ```

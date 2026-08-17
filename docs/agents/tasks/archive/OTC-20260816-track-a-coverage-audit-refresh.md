@@ -11,7 +11,7 @@ phase: archived
 base_branch: main
 base_main: f5daad1bbb7e00dcaa26acafc0a69d10a3a1b696
 risk: low
-updated: 2026-08-17T09:57:00+02:00
+updated: 2026-08-17T10:00:00+02:00
 execution_class: github_hosted
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
@@ -34,8 +34,10 @@ source_pr:
   number: 390
   branch: research/OTC-20260816-track-a-coverage-audit-refresh-v2
   accepted_head: c29ae0e117101cc176c8f44b06f0885daf5dc5d0
+  final_state: closed_unmerged
   final_disposition: ACCEPT_WITH_EDITS
   coordinator_accept_comment: 5313336753
+  post_accept_drift_comment: 5313363942
   reason_for_edits: worldmap consumer PR 367 merged after source final ACCEPT and before canonical promotion; coordinator promotion absorbed that load-bearing main drift
   source_final_track_a_governance_run: 32007714865
   source_final_track_a_governance_result: SUCCESS
@@ -50,6 +52,10 @@ promotion:
   branch: docs/OTC-20260817-track-a-coverage-audit-refresh-promote
   mode: current_main_report_plus_archive_only
   trusted_base: f5daad1bbb7e00dcaa26acafc0a69d10a3a1b696
+  preliminary_head: f5ffd2883987ed84d5f06094eef379d08aefbc3f
+  preliminary_ci_run: 32008097207
+  preliminary_required_ci_job: 95321719854
+  preliminary_ci_result: SUCCESS
   researcher_active_checkpoint_promoted: false
   source_branch_merged_directly: false
   final_exact_head_ci_required_before_merge: true
@@ -98,10 +104,10 @@ e2e:
   reason: documentation/evidence-only coverage audit with runtime_access none; physical E2E belongs to separately admitted RUNTIME work
 closeout:
   report_promoted: true
-  source_pr_terminal_required: true
+  source_pr_terminal: true
   archive_complete_on_promotion_merge: true
   ownership_released: true
-last_completed_step: independently validated current-main coverage audit, preserved five material findings, absorbed post-accept worldmap consumer merge in coordinator promotion, and prepared report-plus-archive terminal integration
+last_completed_step: independently validated current-main coverage audit, preserved five material findings, absorbed post-accept worldmap consumer merge in coordinator promotion, closed source #390 unmerged, and passed preliminary promotion-head required CI
 next_action: none for this audit task after PR #451 merge; unresolved findings remain programme work owned by their respective future tasks
 ---
 

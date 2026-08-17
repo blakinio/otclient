@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file TXteaHelper callees
+    name: Stage exact-file outbound transform census
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -25,10 +25,10 @@ jobs:
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     outputs:
-      crypto_hex: ${{ steps.stage.outputs.crypto_hex }}
-      crypto_sha256: ${{ steps.stage.outputs.crypto_sha256 }}
-      setup_hex: ${{ steps.stage.outputs.setup_hex }}
-      setup_sha256: ${{ steps.stage.outputs.setup_sha256 }}
+      protocol_hex: ${{ steps.stage.outputs.protocol_hex }}
+      protocol_sha256: ${{ steps.stage.outputs.protocol_sha256 }}
+      raw_hex: ${{ steps.stage.outputs.raw_hex }}
+      raw_sha256: ${{ steps.stage.outputs.raw_sha256 }}
     steps:
       - id: stage
         shell: bash
@@ -58,7 +58,7 @@ jobs:
           import hashlib,struct,sys
           from pathlib import Path
           p=Path(sys.argv[1]); out=Path(sys.argv[2])
-          windows={'crypto':(0x196cdf0,0x196d180),'setup':(0x1943ae0,0x1943e80)}
+          windows={'protocol':(0xc2df80,0xc2e500),'raw':(0xb47130,0xb47440)}
           with p.open('rb') as f:
               ident=f.read(16); rest=f.read(48)
               if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(51)
@@ -80,7 +80,7 @@ jobs:
                   print(f'P2_RAWTRANSFORM_{name.upper()}_WINDOW=0x{start:x}..0x{end:x}')
                   print(f'P2_RAWTRANSFORM_{name.upper()}_SHA256={dig}')
               with out.open('a') as h: h.write(''.join(rows))
-          print('P2_RAWTRANSFORM_CALLEES_SOURCE=PASS')
+          print('P2_RAWTRANSFORM_CENSUS_SOURCE=PASS')
           print('P2_RAWTRANSFORM_CLIENT_VERSION=15.32.df7b29')
           print('P2_RAWTRANSFORM_CLIENT_SIZE=51965216')
           print('P2_RAWTRANSFORM_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
@@ -91,17 +91,17 @@ jobs:
           PY
 
   hosted-validate:
-    name: Decode TXteaHelper callees on GitHub-hosted Linux
+    name: Decode outbound transform census on GitHub-hosted Linux
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-raw-transform-semantics
-      CRYPTO_HEX: ${{ needs.source-sanitize.outputs.crypto_hex }}
-      CRYPTO_SHA256: ${{ needs.source-sanitize.outputs.crypto_sha256 }}
-      SETUP_HEX: ${{ needs.source-sanitize.outputs.setup_hex }}
-      SETUP_SHA256: ${{ needs.source-sanitize.outputs.setup_sha256 }}
+      PROTOCOL_HEX: ${{ needs.source-sanitize.outputs.protocol_hex }}
+      PROTOCOL_SHA256: ${{ needs.source-sanitize.outputs.protocol_sha256 }}
+      RAW_HEX: ${{ needs.source-sanitize.outputs.raw_hex }}
+      RAW_SHA256: ${{ needs.source-sanitize.outputs.raw_sha256 }}
     steps:
       - shell: bash
         run: |
@@ -113,10 +113,10 @@ jobs:
           import hashlib,os,subprocess,tempfile
           from pathlib import Path
           records={
-            'crypto':(0x196cdf0,0x196d180,os.environ['CRYPTO_HEX'],os.environ['CRYPTO_SHA256']),
-            'setup':(0x1943ae0,0x1943e80,os.environ['SETUP_HEX'],os.environ['SETUP_SHA256']),
+            'protocol':(0xc2df80,0xc2e500,os.environ['PROTOCOL_HEX'],os.environ['PROTOCOL_SHA256']),
+            'raw':(0xb47130,0xb47440,os.environ['RAW_HEX'],os.environ['RAW_SHA256']),
           }
-          with tempfile.TemporaryDirectory(prefix='p2-xtea-callees-') as td:
+          with tempfile.TemporaryDirectory(prefix='p2-outbound-census-') as td:
               for name,(start,end,hx,expected) in records.items():
                   data=bytes.fromhex(hx)
                   if len(data)!=end-start or hashlib.sha256(data).hexdigest()!=expected: raise SystemExit(74)
@@ -126,7 +126,7 @@ jobs:
                   print(f'P2_RAWTRANSFORM_{name.upper()}_DISASSEMBLY_BEGIN')
                   print(text,end='')
                   print(f'P2_RAWTRANSFORM_{name.upper()}_DISASSEMBLY_END')
-          print('P2_RAWTRANSFORM_CALLEES_HOSTED=PASS')
+          print('P2_RAWTRANSFORM_CENSUS_HOSTED=PASS')
           print('P2_RAWTRANSFORM_EXECUTION_CLASS=github_hosted')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
           PY

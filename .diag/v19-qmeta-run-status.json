@@ -1,0 +1,21 @@
+{
+  "schema": "v19-qmeta-run-terminal-diagnostic-v1",
+  "target_sha": "91dd47a241504dbf6106f83978182de9df92235b",
+  "run_id": 32076820770,
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 95531684126,
+      "name": "recover",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 95531837924,
+      "name": "luacheck",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

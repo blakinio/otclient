@@ -1,0 +1,15 @@
+{
+  "schema": "v19-generator-terminal-v1",
+  "target_sha": "43853097d0bcfe0e3a164114dbf933bbe18534dd",
+  "run_id": 32077455082,
+  "status": "completed",
+  "conclusion": "failure",
+  "jobs": [
+    {
+      "id": 95533551385,
+      "name": "validate",
+      "status": "completed",
+      "conclusion": "failure"
+    }
+  ]
+}

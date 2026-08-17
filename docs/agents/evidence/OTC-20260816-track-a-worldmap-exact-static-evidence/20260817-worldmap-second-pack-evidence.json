@@ -1,0 +1,197 @@
+{
+  "schema": "track-a-worldmap-exact-static-second-pack-curated-v1",
+  "task_id": "OTC-20260816-track-a-worldmap-exact-static-evidence",
+  "producer_pr": 437,
+  "consumer_task": "OTC-20260816-track-a-worldmap-extent-static-re",
+  "consumer_pr": 367,
+  "consumer_branch_modified": false,
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "execution_fence": {
+    "execution_class": "github_hosted",
+    "source_executor": "synology-otclient-01",
+    "source_access": "read_only_file_only",
+    "runtime_access": "none",
+    "client_executed": false,
+    "client_bytes_mutated": false,
+    "process_memory_accessed": false,
+    "canonical_runtime_accessed": false,
+    "raw_client_uploaded": false,
+    "owner_funded_ai_api_used": false
+  },
+  "second_pack_runs": [
+    {
+      "purpose": "broad vtable/caller census",
+      "run": 32002543926,
+      "head": "f4598e2612b7a52769c2306040526703aab86c69",
+      "source_job": 95305539737,
+      "source_artifact": 9278903625,
+      "source_artifact_sha256": "6adbdb16f4774595aad922e2dc7ba3b08ebc595509b905d3d7c884bb46eb8b83",
+      "hosted_job": 95305685220,
+      "final_artifact": 9278908515,
+      "final_artifact_sha256": "830781859702a6687b6e5c65a7400574ae636b64a0dcb2705207c6a84602676b",
+      "result": "success"
+    },
+    {
+      "purpose": "targeted caller/data/RenderProvider/Picker/Viewport/Camera discriminators",
+      "run": 32003065517,
+      "head": "bad366b76bf1b8cefa3187bcd26213ae332cf62b",
+      "source_job": 95307020627,
+      "source_artifact": 9279071635,
+      "source_artifact_sha256": "0548a083f394397f93a177c2c2a5d3359998c6dae554c73018f7bcee3309346e",
+      "hosted_job": 95307179088,
+      "final_artifact": 9279075470,
+      "final_artifact_sha256": "24c188b8c6a1c466eada3b6e80ad36cbf2b1897c079ca222d0257dd375dba8b4",
+      "result": "success"
+    },
+    {
+      "purpose": "Storage-slot12 producer / Viewport-slot14 / Camera discriminator",
+      "run": 32003607118,
+      "head": "d4a8b375ca62769056123515003824bfdab2c008",
+      "source_job": 95308578004,
+      "source_artifact": 9279245326,
+      "source_artifact_sha256": "23e599d98983b54dd0f938f902692c2a0a21ba9ed60f1ec805ab1b3fb188c043",
+      "hosted_job": 95308725378,
+      "final_artifact": 9279250068,
+      "final_artifact_sha256": "1ea9d11c392a7f0014308af8629725e9da6659bbcc9d24229cf6c0886662e36b",
+      "result": "success"
+    },
+    {
+      "purpose": "ProtocolHandler Qt-metaobject identity",
+      "run": 32004356610,
+      "head": "2a6761ae0354f7acff7b48ada727a9197a5a7e25",
+      "source_job": 95310743900,
+      "source_artifact": 9279498428,
+      "source_artifact_sha256": "e0686e162d4a515ab96f4e5b58711e237421dde6ca3b81bd927673f0e2b7aa62",
+      "hosted_job": 95310922681,
+      "final_artifact": 9279503543,
+      "final_artifact_sha256": "6f9bcb94cc3f39be17a1fe4325d443cb80599623d56a491c2d3dd2962688f1f9",
+      "result": "success"
+    },
+    {
+      "purpose": "ProtocolHandler constructor dependency caller",
+      "run": 32004614539,
+      "head": "bd836537ed69c2a972d3d9eca7bd16792dd353c6",
+      "source_job": 95311482128,
+      "source_artifact": 9279577899,
+      "source_artifact_sha256": "58275b6d44e293bb0c8c0a0bf5d109f8ac841de4c884155d1072819a9a73cd46",
+      "hosted_job": 95311635844,
+      "final_artifact": 9279583871,
+      "final_artifact_sha256": "48da336f11dd0ac94a0973973af729b95872b4291b99e040ddb31cbfa091aeb3",
+      "result": "success"
+    },
+    {
+      "purpose": "last outer-owner cross-check",
+      "run": 32004839610,
+      "head": "51ad1b04975920531b3a2608bcbdc11730f65530",
+      "source_job": 95312106162,
+      "source_artifact": 9279649834,
+      "source_artifact_sha256": "f783e550811479415bbf5fd226b9b56bea699ce159e13400c192d9fdc61dff3f",
+      "hosted_job": 95312291576,
+      "final_artifact": 9279654629,
+      "final_artifact_sha256": "f4605cc42e032d7ce3ca91bda17aa54dfdb2b8b427d8758fadc30d10748c30b7",
+      "result": "success",
+      "rel32_caller_to_0x00804620": "0x007de331",
+      "vtable_membership_for_0x00804620": "not_recovered"
+    }
+  ],
+  "identity": {
+    "TWorldmapProtocolMessageHandler": {"vptr": "0x030871d8", "typeinfo": "0x03085fb8", "static_metaobject": "0x03087800", "static_metacall": "0x00df2a60"},
+    "TWorldMapStorage": {"vptr": "0x0308ce70", "typeinfo": "0x0308b5f0", "constructor": "0x00cbf37a", "slot12": "0x00cc6cd0", "slot14": "0x00cb01d0"},
+    "TWorldMapViewport": {"vptr": "0x0308c9a8", "typeinfo": "0x0308b590", "constructor": "0x00cbf680", "recompute": "0x00cbf700", "dynamic_extent_setter": "0x00cb2220", "extent_aggregate": "0x00cb07b0"},
+    "TWorldMapRenderProvider": {"vptr": "0x02f6c258", "typeinfo": "0x03089b70", "constructor_xref": "0x00ccfa02"},
+    "TWorldMapCamera": {"vptr": "0x03083968", "typeinfo": "0x03080500"},
+    "TWorldMapPicker": {"vptr": "0x02f6b7c8", "typeinfo": "0x03086888"},
+    "TWorldMapCoordinate": {"vptr": "0x02f615a0", "typeinfo": "0x0306fc78"},
+    "TWorldMapExtent": {"vptr": "0x02f61578", "typeinfo": "0x0306fc60"},
+    "TWorldMapSubfieldCoordinate": {"vptr": "0x02f69278", "typeinfo": "0x030804e8"}
+  },
+  "storage_extent_upstream": {
+    "classification": "PROVEN_SOURCE_WITH_RECEIVER_IDENTITY_CROSS_CHECK",
+    "literal_address": "0x01cdd958",
+    "literal_bytes_prefix": "120000000e0000000800000006000000",
+    "literal_pair": [18, 14],
+    "handler_constructor": "0x00803ab0",
+    "handler_vptr_write": "0x00803c01",
+    "handler_extent_write": "0x00803d8b -> Handler+0xb0/+0xb4",
+    "handler_snapshot_method": "0x00cdb770",
+    "snapshot_builder": "0x00bc6350",
+    "snapshot_extent_copy": "0x00bc6372 [source+0x20] -> 0x00bc63af output+0x38",
+    "slot12_virtual_call": "0x00cdb7ab call [vptr+0x60] with rsi=snapshot",
+    "storage_slot12_writer": "0x00cc6d2c snapshot+0x38 -> Storage+0x48/+0x4c",
+    "static_receiver_structure": "Handler+0x10/+0x18 is constructor-supplied shared_ptr from outer+0x2f8/+0x300; first-pack Storage construction writes exact Storage pointer/control block to an outer +0x2f8/+0x300 pair. Last v6 cross-check found one caller of 0x00804620 at 0x007de331 but no Itanium vtable membership, so same-outer class identity is not promoted from static structure alone.",
+    "receiver_type_cross_check": "consumer #367 retained exact runtime evidence fixes Handler+0x10 object vptr=0x0308ce70; producer #437 first-pack RTTI proves that vptr is exact TWorldMapStorage. This is historical evidence, not a claim about a current PID/session.",
+    "complete_later_writer_census_Handler_plus_b0_b4": "UNKNOWN"
+  },
+  "viewport": {
+    "classification": "PROVEN_DYNAMIC_COMPUTED_GEOMETRY",
+    "constructor_default_pair": [18, 14],
+    "constructor_default_source": "0x01cdd958",
+    "constructor_margin_block_address": "0x01d32ef0",
+    "constructor_margin_u32_prefix": [1, 2, 1, 2],
+    "recompute_base_pair_address": "0x01d63cd0",
+    "recompute_base_pair": [15, 11],
+    "dynamic_extent_function": "0x00cb2220",
+    "dynamic_extent_formula_for_nonnegative_pixel_dimensions": "width=ceil(width_px/32)+field_0x10+field_0x14; height=ceil(height_px/32)+field_0x18+field_0x1c",
+    "extent_payload_fields": ["+0x40", "+0x44"],
+    "extent_aggregate_function": "0x00cb07b0",
+    "extent_aggregate_payload": "Viewport+0x40/+0x44 -> output+0x38",
+    "direct_viewport_to_storage_slot12_edge": "NOT_PROVEN"
+  },
+  "render_provider": {
+    "classification": "PROVEN_DYNAMIC_CLIPPING_INDEXING_ITERATION_DEPENDENCY",
+    "load_bearing_functions": ["0x00cd2260", "0x00cd08b0", "0x00cea540", "0x00cd1e50", "0x00ce9700"],
+    "bounds": "0x00cd2260 rejects negative/out-of-range coordinates against dynamic dependency width/height and then bounds-checks a linearized index",
+    "representation": "shift-by-5 / mask 0x1f / 32-cell arithmetic appears in exact functions",
+    "constructor_allocation": "0x00ccfb8e allocates 0x9fff6 bytes and 0x00ccfc1c forms end=base+0x9fff6 while stepping 0x0a-byte records",
+    "constructor_record_count": 65535,
+    "constructor_record_role_as_tile_cap": "UNKNOWN",
+    "independent_literal_18_or_14_limit_recovered": false
+  },
+  "picker": {
+    "classification": "PROVEN_FIXED32_SCREEN_WORLD_AND_BOUNDS_DEPENDENCY",
+    "load_bearing_functions": ["0x00cd0400", "0x00cd65b0", "0x00ce7aa0", "0x00ce80c0"],
+    "slot5": "0x00cd0400 uses shl 5, signed floor correction from 0x01ce70c8=[31,31], then arithmetic shift-right 5 into TWorldMapCoordinate",
+    "independent_literal_18_or_14_limit_recovered": false
+  },
+  "camera": {
+    "classification": "PARTIAL_EXACT_GEOMETRY_DEPENDENCY_NOT_NAMED_PROJECTION",
+    "constructor_scalar": "exact Camera initialization includes +0xd0=1.0f",
+    "candidate_function": "0x00ced1b0",
+    "candidate_dependency": "0x00ced437 loads self+0x30 pointer; 0x00ced43b reads dependency+0xd0; 0x00ced44c multiplies by double constant at 0x029505a8",
+    "constant_0x029505a8_double": 32.0,
+    "dependency_type_at_self_plus_0x30": "UNKNOWN",
+    "named_world_to_screen_or_screen_to_world_camera_method": "NOT_RECOVERED",
+    "read_only_consumer_cross_check": "#367/#446 independently recovers Camera co-ownership with a Viewport-compatible object and no direct Camera-to-Storage extent mutation edge in bounded exact-vptr neighborhoods"
+  },
+  "limit_audit": {
+    "hardcoded_18_14_found": true,
+    "hardcoded_18_14_location": "0x01cdd958",
+    "hardcoded_18_14_consumers": ["TWorldmapProtocolMessageHandler constructor", "TWorldMapViewport constructor"],
+    "fixed32_representation_found": true,
+    "mask_0x1f_found": true,
+    "render_fixed_allocation_found": true,
+    "render_fixed_allocation_role_as_tile_limit": "UNKNOWN",
+    "storage_fixed_capacity_ceiling": "NOT_RECOVERED",
+    "network_payload_extent_ceiling": "NOT_RECOVERED",
+    "complete_handler_master_pair_writer_census": "UNKNOWN",
+    "fixed_tile_limit_found": "UNKNOWN"
+  },
+  "patch_candidate_graph": {
+    "client_modified": false,
+    "safe_single_parameter_proven": false,
+    "graph": "0x01cdd958 packed 18/14 -> Handler+0xb0/+0xb4 -> 0x00bc6350 snapshot+0x38 -> Handler+0x10 vslot12 -> TWorldMapStorage+0x48/+0x4c; separately 0x01cdd958 -> Viewport+0x40/+0x44 and 0x00cb2220 dynamically recomputes Viewport extent from pixels/32+margins; RenderProvider and Picker consume dynamic geometry through fixed-32 representation.",
+    "warning": "Changing only Viewport geometry is insufficient proof of maintaining more live map data; changing the shared literal is not classified safe because Handler later-writer coverage and all downstream capacity/network effects are not complete."
+  },
+  "acceptance": {
+    "WORLD_MAP_DOWNSTREAM_EVIDENCE_READY": true,
+    "STORAGE_EXTENT_UPSTREAM_SOURCE_PROVEN": true,
+    "RENDER_LIMITS_RECOVERED": true,
+    "CAMERA_GEOMETRY_RECOVERED": false,
+    "PICKER_BOUNDS_RECOVERED": true,
+    "FIXED_TILE_LIMIT_FOUND": "UNKNOWN"
+  }
+}

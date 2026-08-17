@@ -13,7 +13,7 @@ branch: diag/OTC-20260817-track-a-xres-raw-pid-identity-physical-authorized-v1
 base_branch: main
 base_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
 risk: high
-updated: 2026-08-17T10:59:00+02:00
+updated: 2026-08-17T11:01:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -34,7 +34,7 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: REQUIRED_TO_PROVE_IN_JOB
+target_uniqueness: UNKNOWN
 mutation_authorized: true
 client_byte_mutation_authorized: false
 persistent_session_role: none
@@ -74,6 +74,7 @@ acceptance:
   - Track A runtime governance check passes on the exact PR head/base
   - immutable same-repository historical post-RHI harness and transforms pass exact blob fences
   - exactly one task-owned isolated exact fenced official Linux client is launched
+  - target uniqueness is proven from the task-owned process/display namespace before observation is promoted
   - raw non-root full-display VIEWABLE X11 resource is rediscovered in this run
   - promoted transport-free XRes codec is used for QueryVersion and one-spec QueryClientIds(LocalClientPid)
   - QueryExtension is obtained from the same fresh XCB connection without libxcb-res/libXRes dependency
@@ -84,8 +85,8 @@ acceptance:
 classification:
   desired: XRES_PROVES_VIEWABLE_WINDOW_OWNED_BY_EXACT_CLIENT
   failure_is_evidence: true
-last_completed_step: raw XRes codec promotion #448 merged to trusted main and source #447 is terminally closed superseded
-next_action: add a bounded raw-XRes runtime transport patcher and one-shot physical workflow, open the Draft PR, and execute exactly one isolated discriminator if all fresh admission/base gates pass.
+last_completed_step: raw XRes codec promotion #448 merged to trusted main, source #447 is terminally closed superseded, and the raw transport patcher is staged on this task branch
+next_action: add the one-shot physical workflow, open the Draft PR, and execute exactly one isolated discriminator if all fresh admission/base gates pass.
 ---
 
 # Raw XRes PID identity discriminator

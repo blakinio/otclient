@@ -93,7 +93,6 @@ jobs:
           header[17]=8; header[18]=256; header[19]=0
           header[20]=width; header[21]=height
           packed=struct.pack('>25I',*header)
-          pixels=width*height
 
           def image(changes):
               payload=bytearray(stride*height)
@@ -102,13 +101,14 @@ jobs:
                   payload[off:off+4]=b'\x11\x22\x33\x00'
               return packed+payload
 
+          roi_indices=[y*width+x for y in range(20) for x in range(100)]
           (root/'before.xwd').write_bytes(image(set()))
-          (root/'pass-typed.xwd').write_bytes(image(set(range(200))))
+          (root/'pass-typed.xwd').write_bytes(image(set(roi_indices[:200])))
           (root/'pass-cleared.xwd').write_bytes(image(set()))
 
-          overlap=set(range(750))
-          a_only=set(range(750,1000))
-          b_only=set(range(1000,1250))
+          overlap=set(roi_indices[:750])
+          a_only=set(roi_indices[750:1000])
+          b_only=set(roi_indices[1000:1250])
           (root/'neg-typed.xwd').write_bytes(image(overlap|a_only))
           (root/'neg-cleared.xwd').write_bytes(image(a_only|b_only))
           PY

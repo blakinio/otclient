@@ -10,12 +10,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: track-a-worldmap-v11-authority-checkpoint-v2
+  group: track-a-worldmap-v11-authority-checkpoint-v3
   cancel-in-progress: false
 
 env:
   HEAD_BRANCH: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-  ARM_SUBJECT: 'ci(track-a): run v11 authority checkpoint'
+  ARM_SUBJECT: 'ci(track-a): checkpoint v11 authority with token'
   TASK_PATH: docs/agents/tasks/active/OTC-20260817-track-a-worldmap-server-delivery-causal-validation.md
 
 jobs:
@@ -23,15 +23,17 @@ jobs:
     name: Checkpoint v11 authority without client execution
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout task branch with write token
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.HEAD_BRANCH }}
+          persist-credentials: true
+          fetch-depth: 0
+
       - name: Persist v10 discriminator and v11 login budget
         shell: bash
         run: |
           set -Eeuo pipefail
-          git init -q "$RUNNER_TEMP/repo"
-          cd "$RUNNER_TEMP/repo"
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch -q --no-tags origin "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/task-head"
-          git checkout -q -B "$HEAD_BRANCH" refs/remotes/origin/task-head
           [[ "$(git log -1 --format=%s)" == "$ARM_SUBJECT" ]]
           python3 .github/scripts/track-a-worldmap-causal-v11-authority-checkpoint.py "$TASK_PATH"
           grep -Fq 'baseline_ephemeral_login_max: 4' "$TASK_PATH"

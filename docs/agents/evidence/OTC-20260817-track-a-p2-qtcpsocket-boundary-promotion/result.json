@@ -1,0 +1,120 @@
+{
+  "schema": "track-a-p2-qtcpsocket-boundary-coordinator-promotion-v1",
+  "date": "2026-08-17",
+  "source_task": "OTC-20260817-track-a-p2-4dd250-qiodevice-provenance",
+  "source_pr": 490,
+  "source_head": "6d6211b89c802600ab7e749d3b08ba3f7a60840f",
+  "integration_base": "c1ddb0e0a8a6a1634668f025837aab72d20af64e",
+  "decision": "ACCEPT_WITH_EDITS",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "source_validation": {
+    "governance_run": 32039404811,
+    "governance_result": "SUCCESS",
+    "ci_run": 32039405213,
+    "required_job": 95416178014,
+    "required_result": "SUCCESS",
+    "changed_files": 3,
+    "reviews_before_disposition": 0,
+    "threads_before_disposition": 0,
+    "one_shot_surface_present": false
+  },
+  "new_generations": [
+    {
+      "run": 32038672531,
+      "source_job": 95413976848,
+      "hosted_job": 95414062445,
+      "result": "SUCCESS",
+      "direct_calls_to_b4aea0": ["0x1970285", "0x1970608"]
+    },
+    {
+      "run": 32038917855,
+      "source_job": 95414621259,
+      "hosted_job": 95414649302,
+      "result": "SUCCESS",
+      "bundle_sha256": "3fa3b3118c0a988000de6c77fc9c52514f9670f9f3d7b52f2d07f63ba53071b7",
+      "tcp_vtable_ap": "0x3084b38",
+      "tcp_typeinfo": "0x3080630",
+      "tcp_rtti_name": "N5tibia7network24TGameserverTCPConnectionE"
+    },
+    {
+      "run": 32039061786,
+      "source_job": 95415015967,
+      "hosted_job": 95415041166,
+      "result": "SUCCESS",
+      "bridge_window": "0xb4ae90..0xb4b290",
+      "bridge_sha256": "4bc45e68bc7c1530579860dfb7769d48e162a82f80fad17a098d2a695760f596"
+    }
+  ],
+  "accepted_crosschecks": {
+    "writer_pr": 308,
+    "writer_artifact": 9251725866,
+    "writer_artifact_sha256": "f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e",
+    "writer_helper": "0x1960340",
+    "writer_type": "TIODeviceWriter",
+    "writer_vtable_ap": "0x2f69d48",
+    "writer_rtti": "0x3080718",
+    "writer_qiodevice_pair": "+0x08/+0x10",
+    "writer_qdatastream_pair": "+0x18/+0x20",
+    "qdatastream_write_raw_data": "0x4dd250",
+    "tcp_pr": 299,
+    "tcp_merge": "8fca1c3eee453d0d4ef8a47e0f15c9dbae491b45",
+    "tcp_vtable_ap": "0x3084b38",
+    "tcp_rtti": "0x3080630",
+    "tcp_qtcpsocket_member": "this+0x10"
+  },
+  "claims": {
+    "current_writer_type": "FACT:TIODeviceWriter",
+    "current_writer_vtable_ap": "FACT:0x2f69d48",
+    "current_qiodevice_type": "FACT:QTcpSocket",
+    "current_qiodevice_owner": "FACT:TGameserverTCPConnection",
+    "current_qiodevice_shared_pair": "FACT:TGameserverTCPConnection_this_plus_0x10_plus_0x18",
+    "target_0x4dd250_identity": "FACT:QDataStream::writeRawData(char const*, qint64)",
+    "canonical_payload_pointer_to_0x4dd250": "FACT",
+    "canonical_payload_length_to_0x4dd250": "FACT",
+    "qdatastream_bound_device": "FACT:QTcpSocket",
+    "qt_qtcpsocket_bound_binary_boundary": "PROVEN",
+    "final_binary_egress": "PROVEN_AT_QT_QTCPSOCKET_BOUNDARY",
+    "final_socket_owner": "FACT:TGameserverTCPConnection",
+    "final_os_socket_syscall": "UNKNOWN",
+    "framing": "UNKNOWN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN"
+  },
+  "proven_stage_order": [
+    "persistent QBuffer",
+    "TProtocolClientMessageProcessor+0x10@0xc2df80",
+    "TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "same QByteArray/message",
+    "TGameserverDualConnection+0x78@0xb56970",
+    "TGameserverNetworkPacketConnection",
+    "TGameserverNetworkPacketProcessor",
+    "receiver_vtable_AP_0x2f741d8_plus_0x10",
+    "0xf50090",
+    "structured_message_field_decomposition",
+    "TIODeviceWriter_AP_0x2f69d48",
+    "QDataStream_bound_to_TGameserverTCPConnection_QTcpSocket",
+    "QDataStream::writeRawData@0x4dd250",
+    "Qt_QTcpSocket_bound_binary_boundary"
+  ],
+  "audit": {
+    "result": "PASS_BOUNDED",
+    "material_findings_open": 0
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static exact-file/disassembly evidence only"
+  },
+  "next_research_task_created": false,
+  "future_frontiers": [
+    "optional Qt/QTcpSocket to Linux syscall/kernel transition",
+    "framing",
+    "sequence",
+    "compression",
+    "encryption ordering before the proven QTcpSocket boundary"
+  ]
+}

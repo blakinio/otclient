@@ -1,4 +1,4 @@
-name: Diagnostic v19 qmeta run discovery
+name: Diagnostic v19 confirmation-tail run discovery
 
 on:
   push:
@@ -12,8 +12,8 @@ permissions:
   actions: read
 
 env:
-  TARGET_SHA: 91dd47a241504dbf6106f83978182de9df92235b
-  TARGET_PATH: .github/workflows/track-a-worldmap-auth-gameclient-qmeta-tables-v19.yml
+  TARGET_SHA: beaf9daf30a4b577419b2bb3b659b183c4647839
+  TARGET_PATH: .github/workflows/track-a-worldmap-confirm-tail-static-v19.yml
 
 jobs:
   discover:
@@ -34,24 +34,21 @@ jobs:
           set -Eeuo pipefail
           api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$TARGET_SHA&event=push&per_page=50"
           run_id=''
-          for _ in $(seq 1 60); do
+          for _ in $(seq 1 60);do
             payload="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$api")"
-            run_id="$(jq -r --arg p "$TARGET_PATH" '.workflow_runs[] | select(.path==$p) | .id' <<<"$payload" | head -1)"
-            [[ "$run_id" =~ ^[1-9][0-9]*$ ]] && break
-            sleep 5
+            run_id="$(jq -r --arg p "$TARGET_PATH" '.workflow_runs[]|select(.path==$p)|.id'<<<"$payload"|head -1)"
+            [[ "$run_id" =~ ^[1-9][0-9]*$ ]]&&break;sleep 5
           done
           [[ "$run_id" =~ ^[1-9][0-9]*$ ]]
-          status=''; conclusion=''
-          for _ in $(seq 1 120); do
+          status='';conclusion=''
+          for _ in $(seq 1 120);do
             one="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
-            status="$(jq -r '.status' <<<"$one")"; conclusion="$(jq -r '.conclusion // ""' <<<"$one")"
-            [[ "$status" == completed ]] && break
-            sleep 10
+            status="$(jq -r '.status'<<<"$one")";conclusion="$(jq -r '.conclusion//""'<<<"$one")"
+            [[ "$status" == completed ]]&&break;sleep 10
           done
           jobs="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
           mkdir -p .diag
-          jq -n --arg target_sha "$TARGET_SHA" --argjson run_id "$run_id" --arg status "$status" --arg conclusion "$conclusion" --argjson jobs "$(jq '[.jobs[] | {id,name,status,conclusion}]' <<<"$jobs")" '{schema:"v19-qmeta-run-terminal-diagnostic-v1",target_sha:$target_sha,run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' > .diag/v19-qmeta-run-status.json
-          cat .diag/v19-qmeta-run-status.json
+          jq -n --arg target_sha "$TARGET_SHA" --argjson run_id "$run_id" --arg status "$status" --arg conclusion "$conclusion" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion}]'<<<"$jobs")" '{schema:"v19-confirm-tail-terminal-v1",target_sha:$target_sha,run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/v19-confirm-tail-status.json
           [[ "$status" == completed ]]
 
       - name: Persist terminal diagnostic
@@ -59,8 +56,8 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          test -s .diag/v19-qmeta-run-status.json
-          git config user.name 'github-actions[bot]'; git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .diag/v19-qmeta-run-status.json
-          git commit -m 'diag(track-a): persist terminal v19 qmeta run status'
+          test -s .diag/v19-confirm-tail-status.json
+          git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .diag/v19-confirm-tail-status.json
+          git commit -m 'diag(track-a): persist terminal v19 confirmation-tail status'
           git push origin HEAD:diag/OTC-20260818-v18-run-discovery

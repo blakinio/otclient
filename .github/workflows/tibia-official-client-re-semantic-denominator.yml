@@ -73,6 +73,13 @@ jobs:
             git push origin "HEAD:${HEAD_BRANCH}"
           fi
 
+      - name: Validate integrated canonical registry
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/validate_registry.py
+          python3 docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/validate_registry.py \
+            docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit
+
       - name: Upload sanitized denominator package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

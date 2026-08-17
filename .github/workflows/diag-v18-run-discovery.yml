@@ -1,4 +1,4 @@
-name: Diagnostic auth metacall fence run
+name: Diagnostic v19 generator validation
 
 on:
   push:
@@ -12,8 +12,8 @@ permissions:
   actions: read
 
 env:
-  TARGET_SHA: c5f363d04b217fb7ee709cafc671695b4f6c60ad
-  TARGET_PATH: .github/workflows/track-a-worldmap-auth-metacall-prologue-v19.yml
+  TARGET_SHA: 43853097d0bcfe0e3a164114dbf933bbe18534dd
+  TARGET_PATH: .github/workflows/track-a-worldmap-v19-generator-static.yml
 
 jobs:
   discover:
@@ -47,15 +47,15 @@ jobs:
           done
           jobs="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
           mkdir -p .diag
-          jq -n --arg target_sha "$TARGET_SHA" --argjson run_id "$run_id" --arg status "$status" --arg conclusion "$conclusion" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion}]'<<<"$jobs")" '{schema:"auth-metacall-fence-terminal-v1",target_sha:$target_sha,run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/auth-metacall-fence-status.json
+          jq -n --arg target_sha "$TARGET_SHA" --argjson run_id "$run_id" --arg status "$status" --arg conclusion "$conclusion" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion}]'<<<"$jobs")" '{schema:"v19-generator-terminal-v1",target_sha:$target_sha,run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/v19-generator-status.json
           [[ "$status" == completed ]]
       - name: Persist terminal diagnostic
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
-          test -s .diag/auth-metacall-fence-status.json
+          test -s .diag/v19-generator-status.json
           git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .diag/auth-metacall-fence-status.json
-          git commit -m 'diag(track-a): persist auth-metacall fence status'
+          git add .diag/v19-generator-status.json
+          git commit -m 'diag(track-a): persist v19 generator status'
           git push origin HEAD:diag/OTC-20260818-v18-run-discovery

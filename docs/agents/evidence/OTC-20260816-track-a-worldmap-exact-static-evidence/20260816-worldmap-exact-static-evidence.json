@@ -1,0 +1,206 @@
+{
+  "schema": "track-a-worldmap-exact-static-curated-evidence-v1",
+  "task_id": "OTC-20260816-track-a-worldmap-exact-static-evidence",
+  "consumer_pr": 367,
+  "producer_pr": 437,
+  "WORLD_MAP_STATIC_EVIDENCE_READY": true,
+  "client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official native Linux",
+    "source_runner": "synology-otclient-01",
+    "source_candidate_index": 1
+  },
+  "provenance": {
+    "source_run_id": 31972743782,
+    "source_job_id": 95227595548,
+    "source_artifact_id": 9270235755,
+    "source_artifact_name": "track-a-worldmap-exact-static-source-31972743782",
+    "source_artifact_digest": "sha256:039d22fe5f88a07784c4ddc32cf6b1d9c2d07a34e90ed5902ffd21d3acd5735b",
+    "hosted_recovery_run_id": 31972915689,
+    "hosted_recovery_job_id": 95228024727,
+    "final_artifact_id": 9270276361,
+    "final_artifact_name": "track-a-worldmap-exact-static-final-recovery-31972915689",
+    "final_artifact_digest": "sha256:0dc8d0a44e5a2550ef79c219bda14787796ef7accc0ab1627fecd7c6d55330bc",
+    "bounded_code_windows": 49,
+    "bounded_code_raw_bytes": 52992
+  },
+  "policy": {
+    "runtime_access": "none",
+    "canonical_runtime_accessed": false,
+    "client_executed": false,
+    "process_memory_accessed": false,
+    "client_bytes_mutated": false,
+    "x11_vnc_accessed": false,
+    "login_session_accessed": false,
+    "gameplay_accessed": false,
+    "raw_client_uploaded": false,
+    "owner_funded_ai_api_used": false
+  },
+  "identity_windows": [
+    {
+      "role": "protocol_handler",
+      "window": "0x030871c8..0x030871d7",
+      "vptr_address_point": "0x030871d8",
+      "bytes_hex": "0000000000000000b85f080300000000",
+      "offset_to_top": 0,
+      "typeinfo_pointer": "0x03085fb8",
+      "typeinfo_pointer_relation": "RELA:R_X86_64_RELATIVE",
+      "typeinfo_name_pointer": "0x01cd59a0",
+      "typeinfo_name_pointer_relation": "RELA:R_X86_64_RELATIVE",
+      "rtti_mangled": "N5tibia8worldmap31TWorldmapProtocolMessageHandlerE",
+      "rtti_demangled": "tibia::worldmap::TWorldmapProtocolMessageHandler",
+      "itanium_layout_consistent": true,
+      "first_vtable_slot": "0x00dee8c0"
+    },
+    {
+      "role": "storage",
+      "window": "0x0308ce60..0x0308ce6f",
+      "vptr_address_point": "0x0308ce70",
+      "bytes_hex": "0000000000000000f0b5080300000000",
+      "offset_to_top": 0,
+      "typeinfo_pointer": "0x0308b5f0",
+      "typeinfo_pointer_relation": "RELA:R_X86_64_RELATIVE",
+      "typeinfo_name_pointer": "0x01ce1c00",
+      "typeinfo_name_pointer_relation": "RELA:R_X86_64_RELATIVE",
+      "rtti_mangled": "N5tibia8worldmap16TWorldMapStorageE",
+      "rtti_demangled": "tibia::worldmap::TWorldMapStorage",
+      "itanium_layout_consistent": true,
+      "first_vtable_slot": "0x00dee8e0"
+    },
+    {
+      "role": "storage_shared_ptr_control_block",
+      "window": "0x02f683c0..0x02f683cf",
+      "vptr_address_point": "0x02f683d0",
+      "bytes_hex": "000000000000000020fb070300000000",
+      "offset_to_top": 0,
+      "typeinfo_pointer": "0x0307fb20",
+      "typeinfo_pointer_relation": "RELA:R_X86_64_RELATIVE",
+      "typeinfo_name_pointer": "0x01ca9180",
+      "typeinfo_name_pointer_relation": "RELA:R_X86_64_RELATIVE",
+      "rtti_mangled": "St23_Sp_counted_ptr_inplaceIN5tibia8worldmap16TWorldMapStorageESaIvELN9__gnu_cxx12_Lock_policyE2EE",
+      "rtti_demangled": "std::_Sp_counted_ptr_inplace<tibia::worldmap::TWorldMapStorage, std::allocator<void>, (__gnu_cxx::_Lock_policy)2>",
+      "itanium_layout_consistent": true,
+      "first_vtable_slot": "0x006f3360"
+    }
+  ],
+  "direct_vptr_xrefs": {
+    "0x030871d8": ["0x00803c01", "0x00803f8a", "0x00826891", "0x00826bc1"],
+    "0x0308ce70": ["0x0083f492", "0x0083f682", "0x00cbf37a"],
+    "0x02f683d0": ["0x007e9f04", "0x00a464b1"]
+  },
+  "storage_geometry": {
+    "constructor": {
+      "address": "0x00cbf37a",
+      "proof": [
+        "0x00cbf37a: lea rax,[rip+...] -> 0x0308ce70",
+        "0x00cbf389: mov QWORD PTR [rbx],rax",
+        "0x00cbf381: mov QWORD PTR [rbx+0x18],0",
+        "0x00cbf3bc: mov QWORD PTR [rbx+0x30],0",
+        "0x00cbf3a2: mov QWORD PTR [rbx+0x40],0x02f61578 via preceding lea",
+        "0x00cbf3cb: mov QWORD PTR [rbx+0x48],0"
+      ],
+      "direct_conclusion": "rbx is the TWorldMapStorage object in this constructor; QWORD stores initialize paired DWORD fields +0x18/+0x1c, +0x30/+0x34 and +0x48/+0x4c to zero."
+    },
+    "embedded_extent": {
+      "storage_subobject_offset": "+0x40",
+      "vptr": "0x02f61578",
+      "typeinfo": "0x0306fc60",
+      "rtti_mangled": "N5tibia8worldmap15TWorldMapExtentE",
+      "rtti_demangled": "tibia::worldmap::TWorldMapExtent",
+      "rtti_string": "0x01c8fee0",
+      "first_vtable_slot": "0x007c24e0",
+      "direct_conclusion": "Storage +0x48 and +0x4c are the first two DWORD payload positions (+0x8/+0xc) inside an exact TWorldMapExtent subobject beginning at Storage+0x40."
+    },
+    "writer_slot_12": {
+      "vtable_slot_index": 12,
+      "vtable_entry": "0x0308ced0",
+      "function": "0x00cc6cd0",
+      "proof": [
+        "0x00cc6cd9: mov r13,rdi",
+        "0x00cc6ce4: mov rax,QWORD PTR [rsi+0x8]",
+        "0x00cc6ceb: movq xmm1,QWORD PTR [rsi+0x20]",
+        "0x00cc6cf3: movq xmm0,QWORD PTR [rsi+0x38]",
+        "0x00cc6d12: mov QWORD PTR [r13+0x18],rax",
+        "0x00cc6d26: movq QWORD PTR [r13+0x30],xmm1",
+        "0x00cc6d2c: movq QWORD PTR [r13+0x48],xmm0"
+      ],
+      "direct_conclusion": "This TWorldMapStorage virtual method mutates all three paired geometry regions. In particular it replaces the full +0x48/+0x4c pair from one QWORD supplied at argument rsi+0x38."
+    },
+    "bounds_reader_slot_14": {
+      "vtable_slot_index": 14,
+      "vtable_entry": "0x0308cee0",
+      "function": "0x00cb01d0",
+      "proof": [
+        "0x00cb01d1: mov rbx,rdi",
+        "0x00cb021f: cmp DWORD PTR [rbx+0x18],edx; reject when lower > value",
+        "0x00cb0224: cmp DWORD PTR [rbx+0x30],edx; reject when upper <= value",
+        "0x00cb0229: cmp DWORD PTR [rbx+0x1c],eax; reject when lower > value",
+        "0x00cb022e: cmp DWORD PTR [rbx+0x34],eax; reject when upper <= value"
+      ],
+      "direct_conclusion": "+0x18/+0x30 and +0x1c/+0x34 participate as lower/upper pairs in half-open containment checks: lower <= coordinate < upper."
+    },
+    "paired_reader_slot_13": {
+      "vtable_slot_index": 13,
+      "vtable_entry": "0x0308ced8",
+      "function": "0x00cb0180",
+      "proof": [
+        "0x00cb0180: mov rdx,QWORD PTR [rsi+0x18]",
+        "0x00cb0191: mov rcx,QWORD PTR [rsi+0x30]",
+        "0x00cb01ad: mov rdx,QWORD PTR [rsi+0x48]",
+        "0x00cb0184: mov rax,rdi; function returns rax"
+      ],
+      "inference": "The signature shape is consistent with a hidden sret pointer in rdi and TWorldMapStorage this in rsi; under that ABI interpretation the method reads and exports all three paired regions, including +0x48/+0x4c together."
+    },
+    "requested_offsets": {
+      "+0x18": {"initialized": true, "changed": true, "read": true, "representation": "low DWORD of QWORD pair at +0x18"},
+      "+0x1c": {"initialized": true, "changed": true, "read": true, "representation": "high DWORD of QWORD pair at +0x18"},
+      "+0x30": {"initialized": true, "changed": true, "read": true, "representation": "low DWORD of QWORD pair at +0x30"},
+      "+0x34": {"initialized": true, "changed": true, "read": true, "representation": "high DWORD of QWORD pair at +0x30"},
+      "+0x48": {"initialized": true, "changed": true, "read": true, "representation": "low DWORD of QWORD TWorldMapExtent pair at +0x48"},
+      "+0x4c": {"initialized": true, "changed": true, "read": true, "representation": "high DWORD of QWORD TWorldMapExtent pair at +0x48; no separate [this+0x4c] write is required for pair updates"}
+    },
+    "runtime_correlation_from_consumer_pr_367": {
+      "source_file": "docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-retained-owner-geometry-object.md",
+      "historical_runtime_vptr": "0x0308ce70",
+      "observed": {
+        "+0x18": 32537,
+        "+0x1c": 32503,
+        "+0x30": 32555,
+        "+0x34": 32517,
+        "+0x48": 18,
+        "+0x4c": 14
+      },
+      "relations": ["32555 - 32537 = 18", "32517 - 32503 = 14"],
+      "new_exact_identity": "The previously unidentified runtime object is TWorldMapStorage, not TWorldMapViewport."
+    },
+    "priority_pair_18_14": {
+      "constructor_literal": false,
+      "direct_immediate_write_18_to_this_plus_0x48_in_bounded_windows": false,
+      "direct_immediate_write_14_to_this_plus_0x4c_in_bounded_windows": false,
+      "direct_pair_writer_found": true,
+      "pair_writer": "0x00cc6d2c copies QWORD [rsi+0x38] to TWorldMapStorage+0x48, covering both +0x48/+0x4c",
+      "classification": "mutable/copy-driven at this layer",
+      "upstream_origin_of_exact_18_14": "UNKNOWN",
+      "configured_vs_computed_vs_parser_derived": "UNKNOWN"
+    }
+  },
+  "follow_on_rtti": {
+    "TWorldMapViewport": {"rtti_string": "0x01ce1b60", "typeinfo": "0x0308b590", "vptr": "0x0308c9a8", "first_slot": "0x00dee920"},
+    "TWorldMapStorage": {"rtti_string": "0x01ce1c00", "typeinfo": "0x0308b5f0", "vptr": "0x0308ce70", "first_slot": "0x00dee8e0"},
+    "TWorldMapRenderProvider": {"rtti_string": "0x01cddd20", "typeinfo": "0x03089b70", "vptr": "0x02f6c258", "first_slot": "0x00820970"},
+    "TWorldMapCamera": {"rtti_string": "0x01cabce0", "typeinfo": "0x03080500", "vptr": "0x03083968", "first_slot": "0x00dedda0"},
+    "TWorldMapPicker": {"rtti_string": "0x01cdb600", "typeinfo": "0x03086888", "vptr": "0x02f6b7c8", "first_slot": "0x008205c0"},
+    "TWorldMapExtent": {"rtti_string": "0x01c8fee0", "typeinfo": "0x0306fc60", "vptr": "0x02f61578", "first_slot": "0x007c24e0"},
+    "TWorldMapSubfieldExtent": {"rtti_string": "0x01c9fe20", "typeinfo": "0x0307d1f8", "vptr": "0x02f63fa8", "first_slot": "0x00748330"}
+  },
+  "unknowns": [
+    "Exact RTTI identity of embedded vptr 0x02f615a0 at Storage+0x10 and Storage+0x28 is not recovered by this producer bundle.",
+    "Exact C++ member names and units for the six requested DWORD fields are not recovered.",
+    "The upstream producer of the QWORD supplied at slot-12 argument rsi+0x38, including the exact dynamic origin of values 18 and 14, is not recovered.",
+    "Storage capacity/eviction, render culling bounds, camera projection and picker screen/world limits are not established merely by the RTTI identities above.",
+    "No safe mutation site or patch design is asserted."
+  ],
+  "curation_note": "The raw hosted classifier marked any requested displacement inside geometry-tagged bounded windows. This curated record removes stack-only and adjacent-function false associations and relies only on type-anchored constructor/vtable evidence or explicitly labeled ABI inference."
+}

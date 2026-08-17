@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: baseline_ephemeral_runtime
+phase: baseline_ephemeral_observer_repair
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
 base_sha: e1ae4054b17792607c88552f72cdc68ef3a1f294
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T13:39:00+02:00
+updated: 2026-08-17T13:52:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -99,8 +99,11 @@ mutation_design:
 launch_budget:
   canonical_exact_bootstrap_consumed: 1
   canonical_xres_repair_launch_consumed: 0
+  baseline_ephemeral_client_launches_consumed: 1
   baseline_ephemeral_login_max: 1
   baseline_ephemeral_login_consumed: 0
+  baseline_ephemeral_observer_repair_max: 1
+  baseline_ephemeral_observer_repairs_consumed: 0
   patched_ephemeral_login_max: 1
   patched_ephemeral_login_consumed: 0
   simultaneous_logged_in_sessions_max: 1
@@ -117,9 +120,9 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T13:39:00+02:00
+last_progress_at: 2026-08-17T13:52:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: baseline-ephemeral
+ci_check_generation: baseline-observer-repair
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -145,49 +148,68 @@ STORAGE_EXTENT_CHANGE=true|false|UNKNOWN
 RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 ```
 
-# Canonical attempt boundary
+# Canonical boundary
 
-Fresh controller-plane inventory run `32025074618`, job `95372681355`, proved released generation-7 lease and absent canonical registration without process/X11/client observation.
+Controller inventory run `32025074618` proved released generation-7 lease and absent registration. Canonical bootstrap run `32025398762` physically launched once and failed the obsolete raw-worker `client_window_missing` selector before registration, credentials or login. Cleanup run `32025665881` proved generation-8 lease released, registration/session/token absent and zero canonical-marked survivors. A proposed canonical XRes retry was then correctly refused pre-launch by governance in run `32025860356` because canonical bootstrap is one-shot. This guardrail remains intact.
 
-Canonical bootstrap attempt 1, run `32025398762`, job `95373646537`, acquired generation 8 and reached exact-client `client_start`, then failed on the obsolete raw-worker `client_window_missing` selector before registration. It used no credentials/login/gameplay/mutation. Cleanup audit run `32025665881`, job `95374436911`, proved generation-8 lease released, registration/session/token absent and zero canonical-marked survivors.
+# Ephemeral baseline attempt 1
 
-The intended XRes repair run `32025860356`, job `95375014679`, was refused by the admission validator before worker generation or client launch because authorized canonical bootstrap is deliberately one-shot (`bootstrap_attempt_limit=1`). No second canonical physical launch occurred. The validator is not bypassed.
+Run `32026662197`, job `95377398485`, head `68e1bbaa75305c54689b8d7e1d2015a112f55c0c` directly proved the task-owned isolated path works through exact client/XRes identity:
 
-# Current legal execution class
+```text
+WORLDMAP_CAUSAL_EPHEMERAL_BASELINE_ADMISSION=PASS
+WORLDMAP_BASELINE_CANONICAL_CONTROLLER_IDLE=PASS
+WORLDMAP_BASELINE_PREEXISTING_NAMESPACE_PROCESS_COUNT=0
+TRACK_A_CANONICAL_XRES_ADAPTER=PASS
+WORLDMAP_BASELINE_EPHEMERAL_XRES_WORKER=PASS
+TRACK_A_CANONICAL_STAGE=warp_egress_probe_pass
+TRACK_A_CANONICAL_STAGE=client_window_wait_pass
+WORLDMAP_BASELINE_MANIFEST_FENCE=PASS
+WORLDMAP_BASELINE_CLIENT_PID=25587
+WORLDMAP_BASELINE_WINDOW_IDENTITY=x11-window:12582929
+WORLDMAP_BASELINE_TARGET_UNIQUENESS=PROVEN
+```
 
-This checkpoint changes the task to `ephemeral_isolated`, which is explicitly supported by Track A admission and does not use canonical lease or `runtime-registration.json`. The baseline namespace is `worldmap-causal-baseline-ephemeral-v1` under this task's state root. The workflow additionally requires the canonical controller plane to remain idle and registration absent before starting the isolated session.
+The run then stopped before any account credential was used because the pre-Storage GDB observer process exited before attachment could be proven:
 
-The baseline helper must prove immediately before launch that no process already carries its exact namespace marker. Persistent child processes carry task/ephemeral markers and no credential environment. The exact baseline source is copied into the task-owned session home and remains SHA-fenced. The accepted merged #465 raw-XRes resolver owns the window identity. A pre-Storage GDB observer is armed before login at the accepted FullMap/map-description surfaces, and structural `IN_GAME` requires a real `FullMap` plus map-description strip records.
+```text
+WORLDMAP_BASELINE_ERROR=gdb_observer_not_alive
+WORLDMAP_BASELINE_ORIGINAL_SOURCE_REHASH=PASS
+WORLDMAP_BASELINE_CLEANUP=COMPLETE
+```
 
-OCR, if available on the runner, is allowed only to locate login/character-selection UI controls; screenshots and OCR text remain task-local and are destroyed. They are never used as world-state evidence or uploaded. Network acceptance requires at least one established client connection to its local WARP/SOCKS endpoint and zero direct client TCP / zero client UDP. The only gameplay stimulus is one `Right` followed by `Left` reversal; command delivery is not treated as movement success.
+No login was submitted, no gameplay input occurred, and no structural evidence artifact was uploaded. Durable record: `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-ephemeral-baseline-attempt-1.md`.
+
+Historical accepted observer commit `734f845deace5a26efa09b96a168bea0c05272f0` ran the same toolroot GDB under task/toolroot `HOME`, `DISPLAY`, `PATH` and `LD_LIBRARY_PATH`. The attempt-1 harness supplied the GDB executable path but omitted that toolroot runtime environment. This is the single current evidence-based repair hypothesis. The repair must also emit a sanitized pre-login GDB diagnostic on another attach failure; no credential values exist at that gate.
 
 # Execution phases
 
-1. **DONE — canonical admission inventory.**
-2. **DONE — canonical one-shot failure isolated and rollback-clean.**
-3. **ACTIVE — exact baseline ephemeral login + pre-Storage structural capture + bounded Right/Left.**
-4. **PENDING — persist baseline measured extent and prove complete cleanup.**
-5. **PENDING — fresh patched-namespace uniqueness/source/preimage admission.**
-6. **PENDING — task-owned `[19,14]` ephemeral run with identical capture/stimulus.**
-7. **PENDING — patched rollback/source rehash/cleanup.**
-8. **PENDING — causal comparison/classification/audit/workflow+helper removal/CI/review/merge/archive.**
+1. **DONE — canonical admission / one-shot boundary and rollback.**
+2. **DONE — exact ephemeral client/XRes/WARP namespace path physically proven.**
+3. **ACTIVE — one pre-login observer repair with toolroot GDB runtime environment.**
+4. **PENDING — baseline login + structural FullMap/map-description capture + Right/Left.**
+5. **PENDING — persist baseline measured extent and prove cleanup.**
+6. **PENDING — fresh patched namespace uniqueness/source/preimage admission.**
+7. **PENDING — task-owned `[19,14]` ephemeral run with identical capture/stimulus.**
+8. **PENDING — patched rollback/source rehash/cleanup.**
+9. **PENDING — causal comparison/classification/audit/workflow+helper removal/CI/review/merge/archive.**
 
 # Stop criteria
 
-Fail closed on non-idle canonical controller state, namespace collision, target ambiguity, WARP/credential confinement failure, missing secret/tooling before safe login, ambiguous character selection, absence of structural FullMap/map-description proof, instrumentation anomaly, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, inability to cleanly terminate the exact session, or inability to prove baseline and patched sessions are non-overlapping.
+Fail closed on non-idle canonical controller state, namespace collision, target ambiguity, WARP/credential confinement failure, missing secret/tooling before safe login, second observer attach failure after the one materially changed repair, ambiguous character selection, absence of structural FullMap/map-description proof, instrumentation anomaly, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, inability to cleanly terminate the exact session, or inability to prove baseline and patched sessions are non-overlapping.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 4
-updated_at: 2026-08-17T13:39:00+02:00
+checkpoint_version: 5
+updated_at: 2026-08-17T13:52:00+02:00
 base_main: e1ae4054b17792607c88552f72cdc68ef3a1f294
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
-phase: baseline_ephemeral_runtime
+phase: baseline_ephemeral_observer_repair
 runtime_access: ephemeral_isolated
-last_completed_step: canonical one-shot retry was correctly refused pre-launch; execution rerouted to repository-supported task-owned ephemeral isolation without canonical state mutation
+last_completed_step: exact isolated client/XRes path proven; attempt stopped pre-credentials at observer attach and cleaned up with source rehash PASS
 blockers: []
-next_action: Execute exactly one exact-client ephemeral baseline login/capture in the proven task-owned namespace; persist only sanitized structural coordinate/extent evidence and prove cleanup before any patched phase.
+next_action: Supply historical toolroot HOME/DISPLAY/PATH/LD_LIBRARY_PATH to GDB, expose a sanitized pre-login attach diagnostic if it still exits, then execute exactly one repaired baseline attempt.
 ```

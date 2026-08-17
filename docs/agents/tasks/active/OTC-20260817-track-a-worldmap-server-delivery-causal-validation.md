@@ -8,13 +8,13 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: baseline_ephemeral_behavioral_login_capture
+phase: baseline_presecret_ui_discriminator
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
-base_sha: c1adcf491580e28d40f215356a9e559af2ccadc4
+base_sha: 8a5fcfd72f2554261eef91a2129c9cc076e730ea
 restack_commit: 91759e0a8d9db1c2a736c88f7e48d2bb5a3ffc59
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T18:03:00+02:00
+updated: 2026-08-17T18:49:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -106,11 +106,11 @@ mutation_design:
 launch_budget:
   canonical_exact_bootstrap_consumed: 1
   canonical_xres_repair_launch_consumed: 0
-  baseline_ephemeral_client_launches_consumed: 10
+  baseline_ephemeral_client_launches_consumed: 11
   baseline_ephemeral_login_max: 1
   baseline_ephemeral_login_consumed: 0
   baseline_ephemeral_observer_repairs_consumed: 1
-  baseline_ephemeral_ui_locator_repairs_consumed: 5
+  baseline_ephemeral_ui_locator_repairs_consumed: 6
   baseline_ephemeral_pre_secret_loader_repairs_consumed: 1
   patched_ephemeral_login_max: 1
   patched_ephemeral_login_consumed: 0
@@ -129,14 +129,14 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T18:03:00+02:00
+last_progress_at: 2026-08-17T18:46:43+02:00
 ci_checks_for_current_head: 3
-ci_check_generation: physical_inventory_pass
+ci_check_generation: presecret_exact_window_geometry_pass_field_semantics_zero_candidates
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 2
-repair_cycles_for_current_gate: 9
+repair_cycles_for_current_gate: 10
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -159,20 +159,23 @@ RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 
 # Verified progression
 
-All physical repair runs through `32031856344 / 95393435891` stopped **before credential submission**. Every launched exact-client repair generation ended with original-source rehash PASS and cleanup COMPLETE.
+All physical repair runs through the current pre-secret generation stopped **before credential submission**. Every launched exact-client repair generation ended with original-source rehash PASS and cleanup COMPLETE.
 
 Load-bearing established chain:
 
 - isolated exact-client + WARP + raw-XRes target ownership is physically proven in prior task-owned repair generations;
 - pre-Storage FullMap/map-description observer is physically proven ARMED;
 - GDB toolroot environment and XWD toolroot library closure are proven;
-- both baseline and future patched arm are normalized to the identical task-owned Xvfb `1020x650` environment;
-- manifest `WIN` is accepted only after raw-XRes `LocalClientPid` matches the exact task PID under the task-local 1020x650 owner helper;
-- runs `32031603546 / 95392645496` and `32031856344 / 95393435891` proved live XWD shape `1020x650` but falsified the retained grayscale/color gate as an authoritative login-form discriminator; neither submitted credentials;
-- evidence label for artifact `9221131366` is corrected: its producing run `31805408522 / 94783011926` captured character selection, not an empty login form;
-- historical effective exact-client controls remain `email 535,275`, `password 535,304`, `login 590,388`, first row `285,193`;
-- replacement pre-secret proof uses harmless dummy text plus localized aggregate XWD pixel changes to prove both expected fields are editable before any real credential is exposed;
-- after real login submission, the helper requires a >5000-pixel aggregate transition, then a localized first-row selection change before `Return`; world entry itself remains structural `FullMap + >=10 map-description strips`.
+- historical normalized `1020x650` generations physically existed and were useful for earlier bounded UI discriminators, but they are no longer an assumption for the current native restacked helper;
+- current native runtime physically selects the manifest-owned raw-XRes exact-PID top-level client window at `1920x1080`;
+- run `32046786429 / 95436438152` proved the exact runtime/UI/XWD target remained `x11-window:12582929`, actual X11 geometry was `1920x1080`, root geometry was `1920x1080`, the window was a borderless direct root child, and there were zero child or same-PID alternate viewable drawables;
+- the same run proved XWD pixmap geometry `1920x1080`, XWD window-header geometry `1920x1080`, stride `7680`, and exact-XID capture identity without root fallback;
+- therefore the earlier `XwdError:shape_width:1920!=1020` was a stale fixed geometry assertion in the XWD parser/proof, not a wrong XID, XRes failure, root fallback, decorator mismatch or hidden `1020x650` child drawable;
+- `.github/scripts/track-a-worldmap-causal-xwd-compare.py` now keeps strict XWD format/depth/mask validation while accepting geometry only when it matches the separately inspected exact manifest-owned X11 window;
+- `.github/scripts/track-a-worldmap-causal-ui-window.py` now inspects only the supplied manifest XID and cannot select a replacement window;
+- the pre-secret transform keeps `UI_WIN="$WIN"`, prohibits root capture/window geometry mutation, and contains no credential/login path in its physical diagnostic generation;
+- the current coordinate-free Tab/text-growth/masked-variant discriminator reached the repaired XWD boundary but classified zero unique text-field candidates (`unmasked=0;masked=0`), so email/password editability remains NOT_PROVEN;
+- no protected credential was handed off, no login was submitted, and the baseline login budget remains `0/1`.
 
 Fresh persistent-HOME parity discriminators, all on `synology-otclient-01` without client execution or secret use:
 
@@ -182,26 +185,38 @@ Fresh persistent-HOME parity discriminators, all on `synology-otclient-01` witho
 - historical successful world-entry `31736998731 / 94570936207` was re-inspected at source workflow commit `4392cf4c01703afa344ba074495894a292048eb9` and also launched `packages/Tibia/bin/client` directly with `HOME=/data/home`; therefore the external `Tibia` ELF is not required as the historical successful launch entrypoint;
 - `32039938342 / 95417353337 = SUCCESS`: sanitized omitted-state manifest contains exactly 10 entries, digest `9e03d67e62bfda836583f8430b6054a7e4f0bfa11aa919b6936135902ee5b709`; outside package + `launchermetadata.json` these are Qt shader/pipeline cache objects, the external-ELF symlink and `log` directory. No CipSoft/Tibia-named state was found under `.config` or `.local/state` by this bounded inventory.
 
-Fresh post-restack admission:
+Fresh exact-window physical discriminator:
 
-- `32044149511 / 95428496133 = SUCCESS` on `synology-otclient-01` with proven runner labels `[otclient, synology]`;
-- `WORLDMAP_ADMISSION_TASK_NAMESPACE_PROCESS_COUNT=0`;
-- `WORLDMAP_ADMISSION_OFFICIAL_CLIENT_CANDIDATE_COUNT=0`;
-- `WORLDMAP_ADMISSION_CLIENT_EXECUTED=false`;
-- `WORLDMAP_ADMISSION_SECRET_USED=false`;
-- `WORLDMAP_ADMISSION_TARGET_UNIQUENESS=PROVEN`.
+- `32046786429 / 95436438152` on `synology-otclient-01`;
+- exact current-main merge fence: `8a5fcfd72f2554261eef91a2129c9cc076e730ea` = PASS;
+- `WORLDMAP_PRESECRET_TASK_NAMESPACE_PROCESS_COUNT=0`;
+- `WORLDMAP_PRESECRET_OFFICIAL_CLIENT_CANDIDATE_COUNT=0`;
+- `WORLDMAP_PRESECRET_TARGET_UNIQUENESS=PROVEN`;
+- `WORLDMAP_BASELINE_WINDOW_IDENTITY=x11-window:12582929`;
+- `WORLDMAP_BASELINE_GDB_ATTACH=PASS`;
+- `WORLDMAP_BASELINE_PRE_STORAGE_OBSERVER=ARMED`;
+- `WORLDMAP_UI_EXACT_GEOMETRY=1920x1080`;
+- `WORLDMAP_XWD_PIXMAP_GEOMETRY=1920x1080`;
+- `WORLDMAP_XWD_WINDOW_GEOMETRY=1920x1080`;
+- `WORLDMAP_BASELINE_XWD_GEOMETRY_PROOF=PASS`;
+- `WORLDMAP_BASELINE_VNC_MAPPING_PRESERVED=MANIFEST_RUNTIME_UNCHANGED`;
+- terminal semantic discriminator: `unique_field_classes_required:unmasked=0;masked=0`;
+- `WORLDMAP_BASELINE_ORIGINAL_SOURCE_REHASH=PASS`;
+- `WORLDMAP_BASELINE_CLEANUP=COMPLETE`;
+- `WORLDMAP_FINAL_NAMESPACE_PROCESS_COUNT=0`.
 
 # Current interpretation boundary
 
 - `external_launcher_required_for_successful_login = DISPROVEN` by the historical successful direct-package-client workflow;
 - `missing_persistent_account_or_login_layout_state_in_scanned_XDG_paths = NOT_OBSERVED`; this weakens but does not prove false every possible HOME-state hypothesis;
-- the strongest blocker remains semantic pre-secret UI discrimination, but the execution contract is now native to `.github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh` rather than supplied only by a later transformer;
-- the native helper now fails if `TIBIA_TEST_EMAIL` or `TIBIA_TEST_PASSWORD` is present in its environment before the pre-secret gates, proves both fields with harmless dummy text, clears both fields, creates a mode-0600 FIFO, and only then waits for credential handoff;
-- legacy OCR/tesseract anchors are absent from the native helper;
-- exact-head hosted workflow run `32042635828 / 95424571898 = SUCCESS` physically emitted `WORLDMAP_STATIC_NATIVE_PRESECRET_CONTRACT=PASS`;
-- exact-head Track A runtime-governance checks passed after restack;
-- current `main` remains `c1adcf491580e28d40f215356a9e559af2ccadc4` at the last trusted-base read;
-- a runner-selector regression was identified: the queued job requested `[self-hosted, otclient, synology]` with `runner_id=0`, while prior physical successes and the fresh admission run use `[otclient, synology]` and bind to `synology-otclient-01`.
+- `XWD_1920_VS_1020_ROOT_CAUSE = STALE_FIXED_PROOF_GEOMETRY`; this is physically proven by exact X11 topology plus XWD header/pixmap geometry on the same manifest XID;
+- `WRONG_WINDOW_ID = DISPROVEN` for the current discriminator; runtime identity, UI identity and exact inspected XID were all `12582929`;
+- `ROOT_WINDOW_FALLBACK = NOT_USED`; the command remained `xwd -id "$UI_WIN"`, and static composition rejected root capture;
+- `DECORATOR_OR_CHILD_GEOMETRY_MISMATCH = NOT_OBSERVED`; the target was a borderless direct root child with no children or same-PID alternate viewable drawables;
+- `VNC_MAPPING_PRESERVED = PROVEN_WITHIN_CURRENT_RUNTIME_CONTRACT`; VNC startup passed, the manifest runtime/window identity remained unchanged, and the proof performed no resize/reparent/recreate operation;
+- the remaining blocker is now **after** geometry proof: the coordinate-free semantic Tab scan did not establish any email/password field on the `1920x1080` startup surface;
+- this semantic zero-candidate result is the required causal discriminator for the failed pre-secret gate and must not be retried unchanged;
+- the workflow is now a no-client hold. No physical retry and no protected credential path may be armed until a materially new UI-state/editability discriminator is designed and statically validated.
 
 Durable evidence includes:
 
@@ -211,49 +226,50 @@ Durable evidence includes:
 - `20260817-manifest-owned-ui-window.md`
 - `20260817-prelogin-behavioral-proof.md`
 - `20260817-restack-native-presecret-source.md`
+- `20260817-exact-window-xwd-geometry-causal-discriminator.md`
 
 # Workflow safety state
 
-The physical path remains fail-closed: fresh target uniqueness is now physically proven, but protected credentials may be exposed only after a new client launch proves both harmless editability gates and the helper emits `WORLDMAP_BASELINE_PRESECRET_READY=true`. The helper never receives credentials through its environment; values may cross only the mode-0600 task-owned FIFO after the gates. The single baseline login budget remains unconsumed.
+The PR is in an explicit **no-client hold** after `32046786429 / 95436438152`. Protected credentials remain forbidden until a future physical generation independently passes both harmless editability gates and emits `WORLDMAP_BASELINE_PRESECRET_READY=true`. The baseline login budget remains unconsumed.
 
 # Execution phases
 
 1. **DONE** canonical boundary / cleanup.
 2. **DONE** isolated exact-client WARP/XRes path.
 3. **DONE** pre-Storage observer gate.
-4. **DONE** 1020x650 normalization, manifest XRes identity, loader/GDB repair and native aggregate behavioral pre-login composition validation.
-5. **ACTIVE / PRESECRET_NEXT** fresh no-client/no-secret target uniqueness is proven; execute one physical pre-secret launch, require both dummy editability gates, then perform the single baseline login only if those gates pass in the same bounded runtime.
+4. **DONE** exact manifest-window topology and dynamic XWD geometry proof; stale fixed `1020x650` parser assumption removed without changing XID/VNC/window topology.
+5. **ACTIVE / BLOCKED_ON_NEW_UI_DISCRIMINATOR** physical exact-window pre-secret run reached semantic field discovery but returned zero masked/unmasked text-field candidates; credentials skipped, login budget `0/1`, cleanup complete.
 6. **PENDING** patched namespace/preimage/target-uniqueness admission.
-7. **PENDING** one task-owned `[19,14]` login/capture under identical 1020x650 instrumentation.
+7. **PENDING** one task-owned `[19,14]` login/capture after baseline is physically completed.
 8. **PENDING** patched rollback/source rehash/cleanup.
 9. **PENDING** causal classification, audit, temporary-resource removal, exact-head CI/review/merge/archive.
 
 # Stop criteria
 
-Fail closed on main drift, non-idle/competing official-client candidate state, namespace collision, target ambiguity, observer regression, 1020x650 XRes identity failure, failure of either harmless editable-field probe, any credential-bearing environment before handoff, WARP/credential confinement failure, post-submit visual-transition failure, first-row interaction failure, absence of FullMap/map-description proof, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or incomplete cleanup.
+Fail closed on main drift, non-idle/competing official-client candidate state, namespace collision, target ambiguity, observer regression, failure to prove exact manifest XID ownership/topology/XWD geometry, failure of either harmless editable-field probe, any credential-bearing state before handoff, WARP/credential confinement failure, post-submit visual-transition failure, first-row interaction failure, absence of FullMap/map-description proof, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or incomplete cleanup.
 
 Any failure **after** `WORLDMAP_BASELINE_LOGIN_SUBMITTED=true` consumes the one baseline login budget and must not be silently retried.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 15
-updated_at: 2026-08-17T18:03:00+02:00
-base_main: c1adcf491580e28d40f215356a9e559af2ccadc4
-current_main_observed: c1adcf491580e28d40f215356a9e559af2ccadc4
+checkpoint_version: 16
+updated_at: 2026-08-17T18:49:00+02:00
+base_main: 8a5fcfd72f2554261eef91a2129c9cc076e730ea
+current_main_observed: 8a5fcfd72f2554261eef91a2129c9cc076e730ea
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
-phase: baseline_ephemeral_behavioral_login_capture
+phase: baseline_presecret_ui_discriminator
 runtime_access: ephemeral_isolated
 target_uniqueness: PROVEN
 mutation_authorized: true
-workflow_mode: fresh_inventory_pass_presecret_next
-baseline_client_launches_consumed: 10
+workflow_mode: no_client_hold_after_presecret_discriminator
+baseline_client_launches_consumed: 11
 baseline_login_consumed: 0
 patched_login_consumed: 0
-last_completed_step: fresh post-restack no-client/no-secret inventory on synology-otclient-01 proved zero task-owned namespace processes and zero official-client candidates; target uniqueness is freshly PROVEN
+last_completed_step: physical exact-window run 32046786429 / 95436438152 proved manifest XID 12582929, XRes ownership, GDB attach, pre-Storage observer, actual X11 geometry 1920x1080 and matching XWD geometry 1920x1080 without changing window topology; coordinate-free semantic field discovery then returned zero masked/unmasked candidates and failed closed before credentials
 blockers:
-  - presecret_editability_not_yet_physically_proven
-next_action: execute one task-owned exact-client pre-secret launch using the proven [otclient, synology] runner selector; require both harmless dummy editability gates and PRESECRET_READY before any protected credential handoff. If all gates pass in the same bounded runtime, hand off the protected credentials through the mode-0600 FIFO and consume the single baseline login budget exactly once.
+  - presecret_semantic_field_discriminator_zero_candidates
+next_action: design and statically validate a materially new no-secret UI-state/editability discriminator using the now-proven exact 1920x1080 manifest window; do not rerun the same Tab/text-growth classifier, do not arm credential handoff, and keep the workflow no-client until the new discriminator has a distinct causal hypothesis.
 ```

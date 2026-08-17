@@ -11,7 +11,7 @@ branch: docs/OTC-20260817-native-login-spark-authorization
 base_branch: main
 base_sha: 097aa12a992cd4a303656d50cbab9e593079642a
 created: 2026-08-17T23:14:00+02:00
-updated: 2026-08-17T23:14:00+02:00
+updated: 2026-08-17T23:18:00+02:00
 risk: medium
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
@@ -25,7 +25,9 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
-owner_funded_ai_api_authorized: true
+direct_codex_spark_authorized: true
+direct_codex_spark_model: gpt-5.3-codex-spark
+owner_funded_ai_api_authorized: false
 owned_paths:
   - AGENTS.md
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME_ALIAS.md
@@ -112,11 +114,11 @@ Allowed only for invocations resolved through the exact alias/task family `OTCLI
 # Checkpoint
 
 ```yaml
-checkpoint_version: 1
+checkpoint_version: 2
 status: implementing
 branch: docs/OTC-20260817-native-login-spark-authorization
 base_main: 097aa12a992cd4a303656d50cbab9e593079642a
-last_completed_step: task claimed with runtime_access none and bounded owner authorization scope
+last_completed_step: corrected task metadata so direct Spark is authorized while OpenAI API remains explicitly unauthorized
 blockers: []
-next_action: update root AGENTS.md and the native-login alias, then run prompt-policy falsification and exact-head validation
+next_action: re-review the exact PR diff, mark the manual eval matrix, and validate exact-head CI/governance
 ```

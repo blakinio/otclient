@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260817-track-a-p2-f50090-downstream
-status: investigating
+status: ready
 agent: ChatGPT
 session_role: draft_researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: validate
 branch: research/OTC-20260817-track-a-p2-f50090-downstream
 base_branch: main
 base_main: 696db6ce34acd23a3d0081b9b1b94e1eabbe1cbe
@@ -15,8 +15,6 @@ risk: medium
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-p2-f50090-downstream.md
   - docs/agents/evidence/OTC-20260817-track-a-p2-f50090-downstream/**
-  - .github/scripts/tibia-official-client-re-p2-f50090-downstream.py
-  - .github/workflows/tibia-official-client-re-p2-f50090-downstream.yml
 modules_touched: []
 depends_on:
   - PR #487 merged as 696db6ce34acd23a3d0081b9b1b94e1eabbe1cbe
@@ -36,7 +34,6 @@ validation_level: focused
 execution_class: github_hosted
 source_staging_class: coordinator_approved_exact_fenced_file_only_nonsemantic_bridge
 source_staging_runner: synology-otclient-01
-source_staging_reason: exact retained official-client file is host-local; Synology step may only hash and copy bounded file-backed bytes, while all disassembly and semantic classification run GitHub-hosted
 runtime_access: none
 persistent_session_role: none
 physical_e2e_required: false
@@ -53,6 +50,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
 promotion_authority: coordinator_only
+research_output: DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW
 feature_scope:
   type: protocol
   user_facing: false
@@ -69,75 +67,87 @@ exact_client:
 accepted_input:
   same_message_to_f50090: FACT
   target: 0xf50090
+research_result:
+  f50090_function_entry: FACT:0xf50090
+  next_aligned_function_entry: FACT:0xf501e0
+  f50090_second_argument: FACT:canonical_same_message
+  f50090_saved_message_pointer: FACT:rbp
+  f50090_decomposes_message_into_fields: FACT
+  target_0x4dc3d0: FACT:length_derived_scalar_from_message_plus_0x18
+  target_0x4daaf0: FACT:scalar_from_message_plus_0x00
+  raw_payload_target: FACT:0x4dd250
+  raw_payload_rsi: FACT:value_from_message_plus_0x10
+  raw_payload_rdx: FACT:value_from_message_plus_0x18
+  raw_payload_receiver_provenance: FACT:f50090_this_plus_0x08_then_plus_0x18
+  f50090_forwards_original_message_pointer_as_whole: DISPROVEN
+  semantic_role_of_0x4dd250: UNKNOWN
   final_binary_egress: UNKNOWN
   final_socket_ownership: UNKNOWN
   framing: UNKNOWN
   sequence: UNKNOWN
   compression: UNKNOWN
   encryption: UNKNOWN
-source_generation_1:
-  producer_head: e7c13ea31f42b9c1e1c08103cd576a56cfadc554
-  workflow: Track A P2 f50090 downstream evidence
-  run: 32036648847
-  attempt_2_source_job: 95409105697
-  attempt_2_result: FAILURE_BEFORE_SOURCE_ACCESS
-  attempt_2_failure: codeload_github_actions_checkout_http_429_after_3_download_attempts
-  attempt_3_state_last_observed: in_progress
+generation:
+  producer_head: ea8113028a07ef84518f4a8b705bcecd97604376
+  run: 32037248323
+  source_job: 95410048084
+  hosted_job: 95410072413
   code_window: 0xf50040..0xf50480
-  runner: synology-otclient-01
+  code_length: 1088
+  code_sha256: 1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea
+  source_candidate_index: 1
+  result: SUCCESS
+cleanup:
+  one_shot_workflow_removal: PENDING
+  one_shot_script_removal: PENDING
+validation:
+  exact_source_fence: PASS
+  hosted_primary_decode: PASS
+  no_world_map_evidence: true
+  no_runtime_access: true
+  raw_client_uploaded: false
+  final_exact_head_governance: PENDING
+  final_exact_head_ci: PENDING
+  review_hygiene: PENDING
 anti_stall:
   invocation_started_at: 2026-08-17T15:50:00+02:00
-  last_progress_at: 2026-08-17T15:54:00+02:00
+  last_progress_at: 2026-08-17T15:58:00+02:00
   ci_checks_for_current_head: 0
   ci_check_generation: draft
   terminal_ci_wait_started_at: null
   terminal_ci_checks_for_current_generation: 0
   unchanged_state_checks: 0
   identical_failure_retries: 1
-  repair_cycles_for_current_gate: 0
+  repair_cycles_for_current_gate: 1
   context_reconstruction_attempts: 1
   stall_warnings: 0
-blocker: none while policy-allowed attempt 3 is active; if the identical codeload 429 repeats, another identical retry is forbidden and the producer mechanism must change
-next_action: inspect attempt 3 after state change; on success independently review hosted disassembly and classify the same-message edge from 0xf50090; on identical codeload 429 replace the checkout-dependent one-shot staging mechanism with a materially different fail-closed bridge rather than retrying again
+next_action: remove the one-shot producer workflow/script, then verify final exact-head governance/CI/review hygiene and hand the Draft to coordinator promotion
 ---
 
 # Track A P2 — `0xf50090` downstream discriminator
 
-## Objective
+## Terminal researcher result
 
-Continue only the coordinator-promoted same-message branch:
+The coordinator-promoted same message enters `0xf50090` in SysV `rsi`; exact entry dataflow saves that pointer in `rbp` and then decomposes the message into fields rather than forwarding the whole object.
+
+The strongest exact downstream payload edge is:
 
 ```text
-... -> TGameserverDualConnection +0x78
- -> TGameserverNetworkPacketConnection
- -> TGameserverNetworkPacketProcessor
- -> receiver vtable 0x2f741d8 +0x10
+canonical message
  -> 0xf50090
+ -> message+0x10 value as rsi
+ -> message+0x18 value as rdx
+ -> nested receiver from this+0x08 then +0x18
+ -> call 0x4dd250
 ```
 
-Recover the smallest exact downstream edge from `0xf50090` while preserving the same input argument.
+Earlier concrete calls receive only message-derived scalar values: `0x4dc3d0` receives a length-derived scalar and `0x4daaf0` receives `message+0x00` as a scalar. No downstream call in the bounded function receives the original saved message pointer as a whole.
 
-## Execution boundary
+The exact semantic identity of `0x4dd250`, its receiver dynamic type, final binary egress, final socket ownership, framing, sequence, compression and encryption remain `UNKNOWN`. No semantic is inferred from calling convention alone.
 
-This worker is static-only (`runtime_access:none`). The exact retained client file is not available on GitHub-hosted runners, so the coordinator-selected staging bridge may use `synology-otclient-01` only to locate a regular exact-size/exact-SHA file and copy a bounded file-backed byte window. The source step must not execute/disassemble the client, inspect processes or process memory, read canonical runtime state, perform login/gameplay, or make semantic classifications. Disassembly and all interpretation run on GitHub-hosted Linux from the sanitized bounded evidence. No raw executable/package may be uploaded.
+Durable evidence:
 
-## Acceptance inventory
+- `docs/agents/evidence/OTC-20260817-track-a-p2-f50090-downstream/20260817-f50090-downstream-dataflow.md`
+- `docs/agents/evidence/OTC-20260817-track-a-p2-f50090-downstream/result.json`
 
-- [ ] exact client size/SHA fenced before any new bytes are consumed;
-- [ ] function boundary and SysV input dataflow for `0xf50090` reconstructed from exact bytes;
-- [ ] relationship of the canonical same message to `0xf50090` arguments classified FACT/DISPROVEN/UNKNOWN;
-- [ ] first downstream concrete call/virtual target carrying that message resolved when exact evidence permits;
-- [ ] if a direct binary-write sink is present, receiver/payload ownership proven from dataflow rather than names;
-- [ ] if no sink is present, next exact transform/forward target identified without semantic guessing;
-- [ ] framing/sequence/compression/encryption/final socket ownership remain UNKNOWN unless independently proven;
-- [ ] no world-map evidence, live runtime, process memory, login/gameplay, OTClient/Canary/CrystalServer behavioral proof or owner-funded AI used;
-- [ ] one-shot staging surfaces removed after evidence capture;
-- [ ] final Draft exact-head governance/CI/review hygiene green before coordinator review.
-
-## Current generation
-
-Run `32036648847` is the single bounded generation. Attempt 2 failed during GitHub Actions setup while downloading pinned `actions/checkout` because `codeload.github.com` returned HTTP 429 three times; no source/client step executed. Attempt 3 is the one policy-allowed identical retry. A repeated identical 429 must change the producer mechanism rather than trigger another identical retry.
-
-## Stop condition
-
-Stop once the same-message path through `0xf50090` has one exact falsifiable downstream classification. Do not broaden into a generic Qt/network census.
+E2E: `NOT_APPLICABLE` — static exact-file/disassembly evidence only.

@@ -1,129 +1,112 @@
 #!/usr/bin/env python3
 import base64, hashlib, json, math, sys, zlib
+from collections import Counter
 from pathlib import Path
 
-root = Path(sys.argv[1] if len(sys.argv) > 1 else ".")
-ALLOWED = {"FACT","INFERENCE","ASSUMPTION","RECOMMENDATION","UNKNOWN","DISPROVEN/SUPERSEDED","NOT_APPLICABLE_WITH_REASON"}
+root=Path(sys.argv[1] if len(sys.argv)>1 else ".")
+BASE_ALLOWED={"FACT","INFERENCE","ASSUMPTION","RECOMMENDATION","UNKNOWN","DISPROVEN/SUPERSEDED","NOT_APPLICABLE_WITH_REASON"}
+SUMMARY_ALLOWED=BASE_ALLOWED|{"CONFLICT"}
+def load(n):return json.loads((root/n).read_text(encoding="utf-8"))
+def jl(n):return [json.loads(x) for x in (root/n).read_text(encoding="utf-8").splitlines() if x.strip()]
+def blob_sha(p):
+    d=p.read_bytes();return hashlib.sha1(f"blob {len(d)}\0".encode()+d).hexdigest()
+def pct(n,d):return n*100.0/d
 
-def load(name): return json.loads((root / name).read_text(encoding="utf-8"))
-def jl(name): return [json.loads(x) for x in (root / name).read_text(encoding="utf-8").splitlines() if x.strip()]
-def blob_sha(path):
-    data = path.read_bytes()
-    return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
-def refs(row):
-    value = row.get("provenance_refs", row.get("provenance"))
-    if isinstance(value, str): return [value]
-    return value if isinstance(value, list) else []
+# Immutable accepted #304 baseline remains byte-for-byte fenced.
+manifest=load("canonical-manifest.json")
+assert manifest["schema"]=="otclient.tibia-re.canonical-coverage-registry.v1"
+assert manifest["source"]["head"]=="43a60bd96cc644b656b200c9edbfb75578b330b6"
+assert manifest["source"]["client"]["sha256"]=="e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+for name,expected in manifest["baseline_git_blob_sha1"].items():
+    assert (root/name).is_file() and blob_sha(root/name)==expected,f"baseline drift: {name}"
 
-manifest = load("canonical-manifest.json")
-assert manifest["schema"] == "otclient.tibia-re.canonical-coverage-registry.v1"
-assert manifest["source"]["pr"] == 304
-assert manifest["source"]["head"] == "43a60bd96cc644b656b200c9edbfb75578b330b6"
-assert manifest["source"]["client"]["sha256"] == "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
-assert manifest["source"]["client"]["size"] == 51965216
-for name, expected in manifest["baseline_git_blob_sha1"].items():
-    path = root / name
-    assert path.is_file(), f"missing fenced baseline {name}"
-    assert blob_sha(path) == expected, f"baseline drift: {name}"
-
-provenance = load("provenance.json")
-source_ids = set(provenance["sources"])
-assert source_ids and provenance["client_ref"]["sha256"] == manifest["source"]["client"]["sha256"]
-
-record_files = ["protocol_messages.jsonl","runtime_types.jsonl","capabilities.jsonl","bridge_fields.jsonl","supersessions.jsonl"]
-records = {name: jl(name) for name in record_files}
-ids = []
-for name, rows in records.items():
-    for i, row in enumerate(rows, 1):
-        assert row.get("classification") in ALLOWED, f"classification {name}:{i}"
-        assert row.get("id"), f"missing id {name}:{i}"
-        ids.append(row["id"])
-        r = refs(row)
-        assert r and set(r) <= source_ids, f"provenance {name}:{i}"
-assert len(ids) == len(set(ids))
-
-protocol = records["protocol_messages.jsonl"]
-assert len(protocol) == 2 and sum(x["count"] for x in protocol) == 349
-names = []
+protocol=jl("protocol_messages.jsonl");names=[]
+assert len(protocol)==2 and sum(x["count"] for x in protocol)==349
 for row in protocol:
-    raw = zlib.decompress(base64.b64decode(row["items_zlib_b64"]))
-    assert hashlib.sha256(raw).hexdigest() == row["items_raw_sha256"]
-    part = raw.decode().splitlines()
-    assert len(part) == row["count"] and all(x.startswith(row["item_prefix"]) for x in part)
-    names.extend(part)
-assert len(names) == len(set(names)) == 349
-assert sum(x.startswith("GameserverMessage") for x in names) == 189
-assert sum(x.startswith("GameclientMessage") for x in names) == 160
+    raw=zlib.decompress(base64.b64decode(row["items_zlib_b64"]));assert hashlib.sha256(raw).hexdigest()==row["items_raw_sha256"]
+    part=raw.decode().splitlines();assert len(part)==row["count"];names.extend(part)
+assert len(names)==len(set(names))==349
+assert sum(x.startswith("GameserverMessage") for x in names)==189
+assert sum(x.startswith("GameclientMessage") for x in names)==160
+direct=load("protocol_direct_qmeta_cases.json");assert direct["count"]==len(set(direct["ids"]))==27 and set(direct["ids"])<=set(names)
 
-runtime = records["runtime_types.jsonl"]
-assert len(runtime) == 1 and runtime[0]["count"] == len(set(runtime[0]["items"])) == 47
-assert runtime[0]["semantic_default"] == "UNKNOWN"
-caps = records["capabilities.jsonl"]
-assert len(caps) == 16 and sorted(int(x["id"].split(":")[1]) for x in caps) == list(range(16))
-assert len(records["bridge_fields.jsonl"]) == 8
-assert any("b5b880" in x["claim"] and x["classification"] == "DISPROVEN/SUPERSEDED" for x in records["supersessions.jsonl"])
-assert any(x["classification"] == "UNKNOWN" for x in records["supersessions.jsonl"])
+# E51: complete generated-message denominator, not complete semantics.
+e51=jl("protocol_message_semantics.jsonl")
+assert len(e51)==349==len({x["id"] for x in e51})
+assert {x["identifier"] for x in e51}==set(names)
+assert Counter(x["direction"] for x in e51)==Counter({"server_to_client":189,"client_to_server":160})
+assert all(x["denominator_membership"]=="INCLUDED" for x in e51)
+assert all(x["semantic_state"]=="UNKNOWN" for x in e51)
+assert all(x["family"] and x["family_classification"] in {"LEXICAL_NORMALIZATION","UNCLASSIFIED"} for x in e51)
+assert {x["identifier"] for x in e51 if x["direct_qmeta_structural_link"]}==set(direct["ids"])
 
-direct = load("protocol_direct_qmeta_cases.json")
-assert direct["classification"] in ALLOWED and direct["count"] == len(set(direct["ids"])) == 27
-assert all(x in names for x in direct["ids"])
-gameaction = load("gameaction_connects.json")
-assert gameaction["classification"] in ALLOWED and gameaction["count"] == len(gameaction["items"]) == 31
-assert gameaction["summary"] == {"exact":29,"mismatch":1,"semantic_edge_default":"UNKNOWN","unresolved":1}
-legacy = load("legacy_qobject_connect_edges.json")
-assert legacy["classification"] in ALLOWED and legacy["count"] == 41 and legacy["classified"] == 40 and legacy["unclassified"] == 1
+# E52: complete retained exact-client tibia:: QMeta denominator.
+e52=jl("runtime_type_semantics.jsonl")
+assert len(e52)==642==len({x["id"] for x in e52})==len({x["type_name"] for x in e52})==len({x["qmeta_record_va"] for x in e52})
+assert all(x["type_name"].startswith("tibia::") and x["scope_decision"]=="INCLUDED_TIBIA_QMETA" for x in e52)
+assert all(x["semantic_state"]=="UNKNOWN" and x["denominator_membership"]=="INCLUDED" for x in e52)
+assert Counter(x["kind_detail"] for x in e52)==Counter({"OTHER_QMETA":303,"CONTROLLER":187,"STORAGE":77,"HANDLER":47,"ACTION_HANDLER":28})
+for x in e52:
+    p=x["provenance"][0];assert (p["run"],p["job"],p["source_head"])==(31790507112,94736106350,"c04ff82918f954af019ab533bf6af0792dc730bf")
 
-summary = load("coverage-summary.json")
-assert summary["schema"] == "otclient.tibia-re.coverage-summary.v2"
-assert (summary["material_findings_after_merge"], summary["high_findings_after_merge"], summary["medium_findings_after_merge"]) == (4,2,2)
-assert summary["resolved_by_registry_promotion"] == ["AUD-COV-001"]
-assert summary["remaining_findings"] == ["AUD-COV-002","AUD-COV-003","AUD-COV-004","AUD-COV-007"]
-for name, metric in summary["metrics"].items():
-    assert metric.get("classification") in ALLOWED, f"summary classification {name}"
-    if any(k in metric for k in ("numerator","denominator","percent")):
-        n, d, p = metric.get("numerator"), metric.get("denominator"), metric.get("percent")
-        if n is None or d is None: assert p is None
-        else:
-            assert d > 0 and 0 <= n <= d
-            assert p is not None and math.isclose(p, n * 100.0 / d, rel_tol=0.0, abs_tol=1e-8)
-assert summary["metrics"]["generated_message_semantic_support"]["numerator"] is None
-assert summary["metrics"]["p0_live_read_coverage"]["denominator"] is None
-assert summary["metrics"]["p1_overall_field_to_evidence_coverage"]["denominator"] is None
-assert summary["metrics"]["p2_transport_semantics"]["classification"] == "UNKNOWN"
+# P0: item-level denominator; group headings are grouping only.
+p0=jl("p0_items.jsonl");assert len(p0)==180==len({x["id"] for x in p0})
+assert set(x["group"] for x in p0)==set(range(16)) and all(x["denominator_membership"]=="INCLUDED" for x in p0)
+assert all(x["classification"]=="REQUIREMENT" and x["semantic_state"]=="UNKNOWN" for x in p0)
+assert Counter(x["kind"] for x in p0)==Counter({"READ_OR_STATE":166,"ACTION":14})
 
-overlay = load("current-main-overlay.json")
-assert overlay["snapshot_main"] == manifest["trusted_base"]
-assert [x["id"] for x in overlay["audit"]["remaining_findings"]] == ["AUD-COV-002","AUD-COV-003","AUD-COV-004","AUD-COV-007"]
-assert (overlay["audit"]["remaining_material_findings"], overlay["audit"]["remaining_high"], overlay["audit"]["remaining_medium"]) == (4,2,2)
-for key in ("framing","sequence","compression","encryption","final_binary_egress","final_socket_ownership"):
-    assert overlay["p2"][key] == "UNKNOWN"
-assert overlay["worldmap"]["mutation_design_ready"] is True
-assert overlay["worldmap"]["safe_mutation_proven"] is False
-assert overlay["worldmap"]["physical_validation_execution_authorized"] is False
-assert overlay["runtime"]["raw_xres_promotion_merged"] is True
-assert overlay["runtime"]["raw_xres_promotion_merge"] == "d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab"
-assert overlay["runtime"]["exact_resource_to_official_client_pid"] == "UNKNOWN"
-assert overlay["runtime"]["current_exact_client_pid"] == "NOT_REGISTERED"
-assert overlay["runtime"]["canonical_gate_b"] == "NOT_PROVEN"
-assert overlay["programme"]["complete"] is False
+# P1: item-level bridge/read/evidence denominator; seven discovery targets are subset only.
+p1=jl("p1_items.jsonl");assert len(p1)==28==len({x["id"] for x in p1})
+assert sum(x["kind"]=="DISCOVERY_TARGET" for x in p1)==7 and all(x["denominator_membership"]=="INCLUDED" for x in p1)
+byid={x["id"]:x for x in p1}
+assert byid["p1:session_status.in_game_candidate"]["semantic_state"]=="DERIVED_UNTIL_LIVE_CORRELATION"
+assert byid["p1:health.restart_relogin_semantic_reacquisition"]["semantic_state"]=="UNKNOWN"
 
-blockers = load("blockers.json")
-assert blockers["resolved"][0]["id"] == "AUD-COV-001"
-assert [x[0] for x in blockers["items"]] == ["AUD-COV-002","AUD-COV-003","AUD-COV-004","AUD-COV-007"]
+summary=load("coverage-summary.json")
+assert summary["schema"]=="otclient.tibia-re.coverage-summary.v3"
+assert (summary["material_findings_after_merge"],summary["high_findings_after_merge"],summary["medium_findings_after_merge"])==(3,1,2)
+assert summary["resolved_findings"]==["AUD-COV-001","AUD-COV-002"]
+assert summary["remaining_findings"]==["AUD-COV-003","AUD-COV-004","AUD-COV-007"]
+for name,m in summary["metrics"].items():
+    assert m.get("classification") in SUMMARY_ALLOWED,f"summary classification: {name}"
+    if any(k in m for k in ("numerator","denominator","percent")):
+        n,d,p=m.get("numerator"),m.get("denominator"),m.get("percent")
+        if n is None or d is None:assert p is None
+        else:assert d>0 and 0<=n<=d and p is not None and math.isclose(p,pct(n,d),rel_tol=0,abs_tol=1e-8)
+assert summary["metrics"]["protocol_semantic_denominator_registry"]["denominator"]==349
+assert summary["metrics"]["protocol_semantic_support"]["numerator"] is None
+assert summary["metrics"]["full_tibia_qmeta_denominator_registry"]["denominator"]==642
+assert summary["metrics"]["full_tibia_qmeta_semantic_support"]["numerator"] is None
+assert summary["metrics"]["p0_item_denominator_registry"]["denominator"]==180
+assert summary["metrics"]["p0_live_semantic_coverage"]["numerator"] is None
+assert summary["metrics"]["p1_item_denominator_registry"]["denominator"]==28
+assert summary["metrics"]["p1_live_semantic_coverage"]["numerator"] is None
 
-repo = root.parents[3]
-report = (repo / "docs/agents/reports/OTCLIENT-20260816-track-a-coverage-audit-refresh.md").read_text(encoding="utf-8")
-for text in ("material_findings_open: 4","high_findings_open: 2","medium_findings_open: 2","AUD-COV-001 — RESOLVED","canonical_raw_xres_helper_promoted: true","programme_complete: false"):
-    assert text in report, f"report mismatch: {text}"
-for finding in ("AUD-COV-002","AUD-COV-003","AUD-COV-004","AUD-COV-007"):
-    assert f"### {finding}" in report
+ov=load("current-main-overlay.json")
+assert ov["schema"]=="otclient.tibia-re.coverage-current-overlay.v2" and ov["snapshot_main"]=="1eb4a8edecba3966aa1e6155e241b404eb4d30cb"
+assert [x["id"] for x in ov["audit"]["remaining_findings"]]==["AUD-COV-003","AUD-COV-004","AUD-COV-007"]
+assert (ov["audit"]["remaining_material_findings"],ov["audit"]["remaining_high"],ov["audit"]["remaining_medium"])==(3,1,2)
+assert ov["coverage_boundaries"]["protocol_semantic_denominator"]["denominator"]==349
+assert ov["coverage_boundaries"]["full_tibia_qmeta_denominator"]["denominator"]==642
+assert ov["coverage_boundaries"]["p0_item_denominator"]["denominator"]==180
+assert ov["coverage_boundaries"]["p1_item_denominator"]["denominator"]==28
+for k in ("framing","sequence","compression","encryption","final_binary_egress","final_socket_ownership"):assert ov["p2"][k]=="UNKNOWN"
+assert ov["runtime"]["physical_resource_to_exact_client_pid_identity"]=="PROVEN_AT_RUN"
+assert ov["runtime"]["current_exact_client_pid"]=="NOT_REGISTERED" and ov["runtime"]["canonical_gate_b"]=="NOT_PROVEN"
+assert ov["programme"]["complete"] is False
+
+b=load("blockers.json")
+assert [x["id"] for x in b["resolved"]]==["AUD-COV-001","AUD-COV-002"]
+assert [x[0] for x in b["items"]]==["AUD-COV-003","AUD-COV-004","AUD-COV-007"]
+
+repo=root.parents[3];report=(repo/"docs/agents/reports/OTCLIENT-20260816-track-a-coverage-audit-refresh.md").read_text()
+for t in ("material_findings_open: 3","high_findings_open: 1","medium_findings_open: 2","AUD-COV-002 — RESOLVED","E51 denominator: 349","E52 denominator: 642","P0 item denominator: 180","P1 item denominator: 28","programme_complete: false"):assert t in report,t
 
 print("CANONICAL_COVERAGE_REGISTRY_VALIDATION=PASS")
 print("SOURCE_BASELINE_BLOBS_EXACT=true")
-print("PROTOCOL_MESSAGES=349 inbound=189 outbound=160 semantics=UNKNOWN/349")
-print("PROTOCOL_HANDLER_QMETA=47 full_runtime_semantics=UNKNOWN")
-print("P0_GROUPS=16 item_level_live_read=UNKNOWN/UNKNOWN")
-print("P1_ITEM_LEVEL=UNKNOWN/UNKNOWN")
-print("RAW_XRES_HELPER_PROMOTED=true physical_xid_pid=UNKNOWN")
-print("AUD_COV_001=RESOLVED_IN_CANDIDATE_TREE")
-print("REMAINING_FINDINGS=4 high=2 medium=2")
+print("E51_DENOMINATOR=349 semantics=UNKNOWN/349 direct_qmeta=27")
+print("E52_DENOMINATOR=642 semantics=UNKNOWN/642 handlers=47 action_handlers=28")
+print("P0_ITEM_DENOMINATOR=180 semantics=UNKNOWN/180")
+print("P1_ITEM_DENOMINATOR=28 live_semantics=UNKNOWN/28")
+print("AUD_COV_002=RESOLVED_AS_DENOMINATOR_COMPLETENESS")
+print("REMAINING_FINDINGS=3 high=1 medium=2")

@@ -4,7 +4,9 @@ Date: 2026-08-17
 Task: `OTC-20260817-track-a-canonical-coverage-registry`
 PR: #454
 Audited registry head: `7eb39676a235c6af07f3c891dfa9348a5ac43bb6`
-Trusted main: `d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab`
+Trusted main at integration start: `d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab`
+Final promotion head: `66d8f78b9a6ce15cd83d8ba340d9b25e85aadb6e`
+Merge: `45ca2eb41aa1a5d3625d1888a9badf492dd445bc`
 
 ## Scope
 
@@ -27,7 +29,7 @@ Falsify the claim that #454 closes only `AUD-COV-001` without converting the acc
 | CCR-A11 | finding accounting | PASS — resolves only `AUD-COV-001`; remaining exactly `002,003,004,007` = 4 findings, 2 HIGH + 2 MEDIUM |
 | CCR-A12 | safety | PASS — no raw client, runtime, credentials, login/gameplay, process memory or owner-funded AI |
 | CCR-A13 | reusable validator | PASS — canonical `validate_registry.py` remains durable and directly runnable from the README |
-| CCR-A14 | review hygiene | PASS — 0 reviews and 0 unresolved review threads at audit checkpoint |
+| CCR-A14 | review hygiene | PASS — 0 reviews and 0 unresolved review threads at merge gate |
 
 ## Resolved audit findings
 
@@ -39,7 +41,14 @@ After #448 merged, the first restacked validator still expected `raw_xres_promot
 
 The first terminal tree kept a new dedicated Track A workflow while removing the active admission task. Governance run `32013621176` correctly rejected that lifecycle shape because new Track A workflows are runtime-sensitive governance paths.
 
-Resolution: the dedicated workflow is removed from the terminal tree. It served only as the GitHub-hosted validation vehicle for run `32013364473`. The reusable validator itself remains canonical, documented and executable; final exact-head repository/governance checks verify the terminal tree.
+Resolution: the dedicated workflow was removed from the terminal tree. It served only as the GitHub-hosted validation vehicle for run `32013364473`. The reusable validator itself remains canonical, documented and executable.
+
+The applicable terminal gates were then:
+- component Track A governance `32013364501 = SUCCESS` on the active-task registry payload;
+- final docs/data-only head `66d8f78b...` contained no new Track A workflow or active admission task, so Track A governance did **not** trigger on that terminal head;
+- final repository CI `32013769118`, `CI / Required` `95338793036 = SUCCESS`;
+- ready-state CI `32013938826`, `CI / Required` `95339315357 = SUCCESS`;
+- reviews/threads `0/0` and no main drift before merge.
 
 ## Audit disposition
 
@@ -49,7 +58,7 @@ material_findings_open_for_this_task: 0
 resolved_task_findings:
   - CCR-AUD-001
   - CCR-AUD-002
-AUD-COV-001: RESOLVED_IN_CANDIDATE_TREE
+AUD-COV-001: RESOLVED_ON_MAIN
 programme_findings_remaining:
   - AUD-COV-002 HIGH
   - AUD-COV-003 MEDIUM
@@ -60,4 +69,4 @@ runtime_access: none
 physical_e2e: NOT_APPLICABLE_WITH_REASON
 ```
 
-Terminal merge is allowed only after the exact final head passes Track A governance, repository required CI, review hygiene and final main-drift checks. The component validator evidence remains run `32013364473` on the unchanged registry/validator payload.
+Post-merge audit confirmed the canonical registry, manifest, overlay, validator, report and archive on `main@45ca2eb41aa1a5d3625d1888a9badf492dd445bc`, with the active task and dedicated validation workflow absent from the terminal tree.

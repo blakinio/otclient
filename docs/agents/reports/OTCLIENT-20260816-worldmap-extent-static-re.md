@@ -48,7 +48,7 @@ Canonical evidence lives under:
 - `docs/agents/evidence/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence/`
 - `docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260817-coordinator-producer-acceptance-closeout.md`
 
-No raw client was promoted, no live client process/runtime state was used by this consumer, and no client bytes were modified.
+No raw exact game-client executable was promoted by this closeout, no live exact-client process/runtime state was used by this consumer, and no client bytes were modified. Historical launcher/bootstrap artifact provenance remains documented separately and is not the fenced exact game-client executable.
 
 ## Exact geometry source chain
 

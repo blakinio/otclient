@@ -19,11 +19,27 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 8
     steps:
-      - name: Checkout exact head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          fetch-depth: 0
+      - name: Checkout exact head without codeload action
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          mkdir -p "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
+          git init -q
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
+          git cat-file -e "$HEAD_SHA^{commit}"
+          git checkout -q -f --detach "$HEAD_SHA"
+          git clean -ffdx
+          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
+          echo 'WORLDMAP_FOCUS_ANONYMOUS_GIT_CHECKOUT=PASS'
 
       - name: Revalidate current-main Track A admission
         shell: bash
@@ -135,4 +151,4 @@ jobs:
           set +x
           set -Eeuo pipefail
           [[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]]
-          "$SCAN"
+          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD "$SCAN"

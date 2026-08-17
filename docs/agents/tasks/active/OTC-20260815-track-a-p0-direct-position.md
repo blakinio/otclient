@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260815-track-a-p0-direct-position
-status: implementing
+status: waiting
 agent: ChatGPT
 session_id: chatgpt-p0-player-state-continuation-20260817
 session_role: researcher
@@ -9,12 +9,12 @@ project_lane: otclient
 lane: P0-STATE
 track_id: official-client-re
 task_kind: runtime-research
-phase: runtime_snapshot_producer_tooling
+phase: runtime_handoff_ready
 branch: research/OTC-20260815-track-a-p0-direct-position
 base_branch: main
 current_main: 26c89a7d3b044acf88299f8d68eee4ac16b5d13c
 risk: medium
-updated: 2026-08-17T15:29:00+02:00
+updated: 2026-08-17T15:37:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-p0-direct-position.md
   - docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/**
@@ -82,20 +82,40 @@ fresh_canonical_admission:
   authoritative_registration: ABSENT
   legal_registered_in_game_lifecycle: false
   result: BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE
-independent_runtime_provider_candidate:
-  pr: 475
-  task: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-  ownership: OTHER_ACTIVE_RUNTIME_TASK
-  runtime_access: ephemeral_isolated
-  target_uniqueness_checkpoint: PROVEN
-  current_head: 062cf9396480a6012278cd5e0068aee403bdcc47
-  current_run: 32035179935
-  current_job: 95404298697
-  current_mode: no_client_persistent_home_metadata_only
-  current_client_executed: false
+runtime_snapshot_helper:
+  path: .github/scripts/tibia-official-client-re-p0-runtime-snapshot.py
+  blob_sha: afd8cd7023ad667421eddce71dbc1575770e0f32
+  fields: [0x78, 0x7c, 0x80]
+  representation: signed_i32_x3
+  memory_access: read_only
+  memory_writes: 0
+  records: [pid, process_start_ticks, boot_id_sha256, main_base, typed_object, private_data_pointer, xyz, wall_time_ns, monotonic_ns]
+  semantic_claim_emitted: false
+  validation_head: 74ee39fc0136142f2dd0b425a34e6e75fa38430e
+  validation_run: 32035752607
+  validation_job: 95405675923
+  validation_result: SUCCESS
+  handoff_doc_head: 01c4c169a119a2d4ad50762ee72c10941f5cc1de
+  handoff_doc_validation_run: 32035842654
+  handoff_doc_validation_result: SUCCESS
+runtime_producer_handoff:
+  evidence_contract: docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/20260817-runtime-producer-handoff-v2.md
+  active_provider_pr: 475
+  provider_task: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+  provider_ownership: OTHER_ACTIVE_RUNTIME_TASK
+  provider_runtime_access: ephemeral_isolated
+  producer_request_comment: 5316768394
+  no_extra_login_requested: true
+  no_extra_movement_requested: true
+  requested_existing_stimulus: Right_then_Left_restore
+  requested_snapshots: [before, stepped, restored]
+  direct_runtime_takeover_by_p0: forbidden
+provider_current_state:
+  checked_head: 1b68f7508ea2e8618799af58f1a59863dcd56cdd
+  checked_commit_purpose: one_no_secret_prelogin_focus_scan
   current_in_game: false
-  p0_direct_observation_legal_now: false
-  note: P0 must not touch the task-owned runtime directly; only the RUNTIME owner may produce a bounded handoff if its independently authorized lifecycle later reaches IN_GAME and its own admission permits the extra read-only evidence capture.
+  current_p0_live_read_available: false
+  note: provider remains pre-login/no-secret at this checkpoint; P0 must not infer future IN_GAME or consume the provider runtime until the RUNTIME owner reaches it under its own admission and accepts the handoff
 acceptance:
   exact_fence: PASS
   typed_candidate_discovery: PASS
@@ -117,15 +137,8 @@ hard_stop_policy:
   second_logged_in_session_authorized: false
   process_memory_write_authorized: false
   worldmap_research_authorized_for_p0: false
-producer_tooling_goal:
-  purpose: prepare a deterministic read-only direct snapshot helper that a legally admitted RUNTIME owner can execute inside an independently authorized existing lifecycle without an extra login or movement stimulus
-  required_snapshot_labels: [before, stepped, restored]
-  direct_fields: [0x78, 0x7c, 0x80]
-  exact_typed_vptr: 0x308ca70
-  must_record: [pid, process_start_ticks, boot_id_sha256, main_base, typed_object, private_data_pointer, signed_i32_xyz, wall_time_ns, monotonic_ns]
-  must_not_claim: semantic authority without causal correlation and negative controls
-last_completed_step: fresh generation-8 canonical admission evidence was promoted and archived through #482/#486; current main is 26c89a7d3b044acf88299f8d68eee4ac16b5d13c; active independent RUNTIME #475 was inspected without touching its runtime and its current head is explicitly no-client, so no legal P0 live read exists yet
-next_action: implement and hosted-validate the read-only direct snapshot helper, then publish a bounded producer handoff request to the active RUNTIME owner; execute no live P0 observation unless that owner independently reaches a legal IN_GAME lifecycle and accepts the handoff under its own current admission
+last_completed_step: implemented and hosted-validated a bounded O_RDONLY runtime snapshot helper for exact TPlayerData +0x78/+0x7c/+0x80; persisted the same-session RUNTIME producer contract and sent it to active provider #475 without touching that task-owned runtime; #475 remains pre-login/no-secret, so no legal P0 live observation exists yet
+next_action: no P0 worker should touch a live runtime now; resume only when a RUNTIME owner independently reaches a legal exact-client IN_GAME lifecycle and explicitly accepts the same-session handoff, then consume before/stepped/restored read-only snapshots plus current identity, independent coordinate/control and negative-control evidence
 ---
 
 # Objective
@@ -142,4 +155,4 @@ Static exact-client evidence supports `TPlayerData +0x78/+0x7c/+0x80` as the str
 
 The former XID→PID dependency is complete through #457/#461/#465 and must not be repeated. Fresh canonical admission #482 proved lease generation 8 released and authoritative registration absent; #486 archived and released that RUNTIME task.
 
-P0 remains a GitHub-hosted evidence consumer. It does not bootstrap/login, create a second logged-in session, mutate client bytes, write process memory, or take over another task's runtime. A current legal IN_GAME lifecycle must be supplied by RUNTIME. Until then the only legal continuation is deterministic producer tooling and coordination, not another generic static-analysis substitute.
+P0 now has a deterministic, hosted-validated read-only snapshot helper and a precise same-session producer contract. The active RUNTIME provider candidate #475 is currently pre-login/no-secret and remains owned by another task. P0 therefore waits without taking over that runtime, creating another session, or treating world-map research as its target.

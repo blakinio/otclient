@@ -1,0 +1,202 @@
+name: Track A P2 nested vcall bridge evidence
+
+on:
+  push:
+    branches:
+      - research/OTC-20260817-track-a-p2-dual-nested-vcall-resolution
+    paths:
+      - .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-bridge.py
+      - .github/workflows/tibia-official-client-re-p2-dual-nested-vcall-bridge.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p2-nested-vcall-bridge-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-sanitize:
+    name: Stage exact-file receiver bridge bytes
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-dual-nested-vcall-resolution
+      EXPECTED_RUNNER_NAME: synology-otclient-01
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Checkout exact producer branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify file-only source boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 61
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 62
+          [[ "$RUNNER_OS" == Linux && "$RUNNER_ARCH" == X64 ]] || exit 63
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 64
+          command -v python3 >/dev/null
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-bridge.py
+          candidates=(
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+          )
+          source_client=''
+          source_index=''
+          for index in 0 1; do
+            candidate="${candidates[$index]}"
+            [[ -f "$candidate" && ! -L "$candidate" ]] || continue
+            [[ "$(stat -c %s "$candidate" 2>/dev/null || true)" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
+          import hashlib, sys
+          from pathlib import Path
+          h = hashlib.sha256()
+          with Path(sys.argv[1]).open('rb') as f:
+              for c in iter(lambda: f.read(1024*1024), b''):
+                  h.update(c)
+          raise SystemExit(0 if h.hexdigest() == sys.argv[2] else 1)
+          PY
+            then
+              source_client="$candidate"
+              source_index="$index"
+              break
+            fi
+          done
+          [[ -n "$source_client" ]] || { echo P2_NESTED_BRIDGE_REFUSED=EXACT_SOURCE_MISSING; exit 50; }
+          {
+            echo "SOURCE_CLIENT=$source_client"
+            echo "SOURCE_CANDIDATE_INDEX=$source_index"
+          } >> "$GITHUB_ENV"
+          echo P2_NESTED_BRIDGE_SOURCE_BOUNDARY=PASS
+          echo P2_NESTED_BRIDGE_RUNTIME_ACCESS=none
+          echo P2_NESTED_BRIDGE_SOURCE_DISASSEMBLY=false
+          echo P2_NESTED_BRIDGE_SOURCE_SEMANTIC_CLASSIFICATION=false
+
+      - name: Copy only receiver bridge window
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf artifacts/source
+          mkdir -p artifacts/source
+          python3 .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-bridge.py \
+            source --client "$SOURCE_CLIENT" --candidate-index "$SOURCE_CANDIDATE_INDEX" --outdir artifacts/source
+          grep -Fxq "P2_NESTED_BRIDGE_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/source/source-fence.txt
+          grep -Fxq "P2_NESTED_BRIDGE_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/source/source-fence.txt
+          grep -Fxq "P2_NESTED_BRIDGE_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/source/source-fence.txt
+          grep -Fxq 'P2_NESTED_BRIDGE_RUNTIME_ACCESS=none' artifacts/source/source-fence.txt
+          grep -Fxq 'P2_NESTED_BRIDGE_SOURCE_DISASSEMBLY=false' artifacts/source/source-fence.txt
+          grep -Fxq 'P2_NESTED_BRIDGE_SOURCE_SEMANTIC_CLASSIFICATION=false' artifacts/source/source-fence.txt
+          grep -Fxq 'P2_NESTED_BRIDGE_RAW_CLIENT_UPLOADED=false' artifacts/source/source-fence.txt
+
+      - name: Enforce source artifact boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('artifacts/source')
+          allowed={'source-evidence.json','source-fence.txt'}
+          actual={p.name for p in root.iterdir() if p.is_file()}
+          assert actual == allowed, actual
+          for p in root.iterdir():
+              if not p.is_file(): continue
+              b=p.read_bytes()
+              assert len(b) < 1024*1024
+              assert not b.startswith(b'\x7fELF') and b[:2] != b'MZ'
+              b.decode('utf-8')
+          print('P2_NESTED_BRIDGE_SOURCE_SANITIZED_BOUNDARY=PASS')
+          PY
+
+      - name: Upload bounded source evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-nested-vcall-bridge-source-${{ github.run_id }}
+          path: artifacts/source/**
+          if-no-files-found: error
+          retention-days: 7
+
+  hosted-validate:
+    name: Decode receiver bridge on GitHub-hosted Linux
+    needs: source-sanitize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-dual-nested-vcall-resolution
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    steps:
+      - name: Checkout exact producer branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Verify hosted boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]]
+          [[ "$RUNNER_OS" == Linux && "$RUNNER_ARCH" == X64 ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          command -v objdump >/dev/null
+          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-bridge.py
+          echo P2_NESTED_BRIDGE_EXECUTION_CLASS=github_hosted
+          echo P2_NESTED_BRIDGE_RUNTIME_ACCESS=none
+
+      - name: Download bounded source bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: track-a-p2-nested-vcall-bridge-source-${{ github.run_id }}
+          path: artifacts/source
+
+      - name: Decode exact bridge window
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf artifacts/final
+          mkdir -p artifacts/final
+          python3 .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-bridge.py \
+            hosted --bundle-dir artifacts/source --outdir artifacts/final
+          grep -Fxq 'P2_NESTED_BRIDGE_HOSTED_VALIDATION=PASS' artifacts/final/hosted-validation.txt
+          grep -Fxq "P2_NESTED_BRIDGE_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/final/hosted-validation.txt
+          grep -Fxq "P2_NESTED_BRIDGE_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/final/hosted-validation.txt
+          grep -Fxq "P2_NESTED_BRIDGE_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/final/hosted-validation.txt
+          grep -Fxq 'P2_NESTED_BRIDGE_EXECUTION_CLASS=github_hosted' artifacts/final/hosted-validation.txt
+          grep -Fxq 'P2_NESTED_BRIDGE_RUNTIME_ACCESS=none' artifacts/final/hosted-validation.txt
+          grep -Fxq 'P2_NESTED_BRIDGE_PRIMARY_BYTES_EXACT_FENCED=true' artifacts/final/hosted-validation.txt
+
+      - name: Enforce final artifact boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('artifacts/final')
+          allowed={'disassembly.txt','result.json','hosted-validation.txt'}
+          actual={p.name for p in root.iterdir() if p.is_file()}
+          assert actual == allowed, actual
+          for p in root.iterdir():
+              if not p.is_file(): continue
+              b=p.read_bytes()
+              assert len(b) < 1024*1024
+              assert not b.startswith(b'\x7fELF') and b[:2] != b'MZ'
+              b.decode('utf-8')
+          print('P2_NESTED_BRIDGE_FINAL_SANITIZED_BOUNDARY=PASS')
+          PY
+
+      - name: Upload final bridge evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-p2-nested-vcall-bridge-final-${{ github.run_id }}
+          path: artifacts/final/**
+          if-no-files-found: error
+          retention-days: 30

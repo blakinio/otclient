@@ -1,6 +1,6 @@
 {
   "schema": "otclient.tibia-re.coverage-current-overlay.v2",
-  "snapshot_main": "f8e628a255a18ec92839bbb45ef0e3b40bef8605",
+  "snapshot_main": "ec75e2606f7f4ad834e4b6be968fb03bdbff55df",
   "registry_promotion_pr": 454,
   "semantic_denominator_integration_pr": 460,
   "source_baseline": {"pr":304,"head":"43a60bd96cc644b656b200c9edbfb75578b330b6"},
@@ -67,11 +67,19 @@
     "canonical_raw_xres_window_identity_integration_pr": 465,
     "canonical_raw_xres_window_identity_integration_merge": "f8e628a255a18ec92839bbb45ef0e3b40bef8605",
     "canonical_raw_xres_window_identity_integration_promoted": true,
+    "final_p0_admission_pr": 467,
+    "final_p0_admission_merge": "ec75e2606f7f4ad834e4b6be968fb03bdbff55df",
+    "final_p0_admission_run": 32019313320,
+    "final_p0_admission_job": 95355423148,
+    "canonical_lease_status": "released",
+    "canonical_lease_generation": 7,
+    "authoritative_registration": "ABSENT",
+    "p0_disposition": "BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE",
     "current_exact_client_pid": "NOT_REGISTERED",
     "current_exact_client_session": "NOT_REGISTERED",
     "canonical_gate_b": "NOT_PROVEN",
     "current_structural_in_game": "NOT_PROVEN",
-    "next_discriminator": "fresh_RUNTIME_admission_to_establish_or_fail_closed_on_current_canonical_registration_gate_b_and_legal_IN_GAME_lifecycle",
+    "next_discriminator": "wait_for_separately_authorized_legitimate_canonical_lifecycle_reaching_structurally_verified_IN_GAME_then_fresh_RUNTIME_admission",
     "canonical_bootstrap_for_p0_authorized": false
   },
   "programme": {"complete":false,"global_coordinator_checkpoint_current":false}

@@ -1,0 +1,108 @@
+{
+  "schema": "track-a-p2-transform-coordinator-promotion-v1",
+  "date": "2026-08-17",
+  "source_task": "OTC-20260817-track-a-p2-raw-transform-semantics",
+  "source_pr": 497,
+  "source_head": "b2a3f6ee9cbc785c20df429b5a482d6ffc92b0d9",
+  "integration_base": "8a5fcfd72f2554261eef91a2129c9cc076e730ea",
+  "decision": "ACCEPT_WITH_EDITS",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official_native_linux_only"
+  },
+  "source_validation": {
+    "governance_run": 32060048976,
+    "governance_result": "SUCCESS",
+    "ci_run": 32060049189,
+    "required_job": 95479139576,
+    "required_result": "SUCCESS",
+    "changed_files": 3,
+    "reviews": 0,
+    "threads": 0,
+    "one_shot_workflow_present": false
+  },
+  "independent_evidence": {
+    "canonical_same_message_chain": {
+      "source": "docs/agents/evidence/OTC-20260815-track-a-p2-buffer-downstream-consumer/20260817-coordinator-accepted-downstream-chain.json",
+      "persistent_qbuffer_to_clientprocessor": "PROVEN",
+      "clientprocessor_to_rawdataprocessor": "PROVEN",
+      "same_message_downstream": "PROVEN"
+    },
+    "txtea_transform": {
+      "run": 32046592885,
+      "source_job": 95435821666,
+      "hosted_job": 95435860761,
+      "transform_window": "0xf861e0..0xf864c0",
+      "transform_sha256": "f45afa6aaf3337850d4d892692d533140f896444e4a1342c83f73cb7053de3be",
+      "vtable_window": "0x2f63138..0x2f63188",
+      "vtable_sha256": "a2c5fbc512e3510ac14f876e840e9ec02dfbb1b13db6620a63b4e6ba02399e64",
+      "vtable_address_point": "0x2f63148",
+      "typeinfo": "0x3077800",
+      "rtti_name": "N6shared11TXteaHelperE",
+      "slot_plus_0x20": "0xf85eb0",
+      "slot_plus_0x28": "0xf861e0"
+    },
+    "outbound_transform_census": {
+      "run": 32059752436,
+      "source_job": 95478101478,
+      "hosted_job": 95478152304,
+      "protocol_window": "0xc2df80..0xc2e500",
+      "protocol_sha256": "00cea4d539c6f4ac8695ae908535b88af7af849f27f4f69578e20cc6f49557b9",
+      "raw_window": "0xb47130..0xb47440",
+      "raw_sha256": "d0cd15d635e9452788f628f0d61d26025665d859eb6315b1c188a97d6795f993"
+    }
+  },
+  "claims": {
+    "framing": "PROVEN",
+    "sequence": "PROVEN",
+    "encryption": "PROVEN",
+    "encryption_gate": "FACT:message_plus_0x28_equals_2",
+    "encryption_receiver": "FACT:shared::TXteaHelper",
+    "encryption_receiver_vtable_ap": "FACT:0x2f63148",
+    "encryption_transform_slot": "FACT:vslot_plus_0x28_at_0xf861e0",
+    "encryption_effect": "FACT:padded_source_QByteArray_is_transformed_into_replacement_QByteArray_on_same_outbound_message_path",
+    "xtea_round_core": "UNKNOWN_NOT_REQUIRED_FOR_ENCRYPTION_ROLE_CLASSIFICATION",
+    "compression": "DISPROVEN_ON_PROVEN_OUTBOUND_PATH",
+    "compression_scope": "persistent_QBuffer_to_TProtocolClientMessageProcessor_0xc2df80_to_RawDataProcessor_0xb47130_to_canonical_same_message_downstream_to_QTcpSocket",
+    "compression_outside_proven_outbound_path": "UNKNOWN",
+    "final_binary_egress": "PROVEN_AT_QT_QTCPSOCKET_BOUNDARY",
+    "final_socket_owner": "FACT:TGameserverTCPConnection",
+    "final_os_socket_syscall": "UNKNOWN_OPTIONAL"
+  },
+  "coordinator_review": {
+    "worker_summary_used_as_proof": false,
+    "researcher_result_used_as_primary_proof": false,
+    "exact_hosted_logs_rechecked": true,
+    "canonical_same_message_chain_rechecked": true,
+    "source_final_diff_rechecked": true,
+    "scope_guard_rechecked": true,
+    "material_findings_open": 0
+  },
+  "negative_controls": {
+    "rtti_name_alone_used_as_encryption_proof": false,
+    "eight_byte_alignment_alone_used_as_encryption_proof": false,
+    "expected_tibia_or_canary_semantics_used_as_proof": false,
+    "generic_qt_census_used_as_proof": false,
+    "b40630_or_b4066b_reintroduced_as_final_egress": false,
+    "compression_absence_globalized_beyond_proven_path": false,
+    "runtime_or_login_used": false,
+    "full_executable_uploaded": false,
+    "owner_funded_ai_api_used": false
+  },
+  "audit": {
+    "result": "PASS_BOUNDED",
+    "material_findings_open": 0
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static exact-file/disassembly evidence promotion only"
+  },
+  "completion": {
+    "p2_outbound_protocol_reconstruction_at_qt_boundary": "COMPLETE",
+    "remaining_non_optional_p2_semantic_frontiers": 0,
+    "optional_lower_boundary": "Linux_socket_syscall_below_Qt_QTcpSocket"
+  },
+  "next_frontier": "No non-optional P2 outbound protocol-semantic frontier remains. Linux syscall tracing below the proven QTcpSocket boundary is optional and not required for protocol reconstruction."
+}

@@ -164,7 +164,13 @@ def parse_query_client_ids_reply(
     max_ids: int = DEFAULT_MAX_IDS,
     max_values_per_id: int = DEFAULT_MAX_VALUES_PER_ID,
 ) -> tuple[ClientIdValue, ...]:
-    """Parse a bounded XRes QueryClientIds reply into immutable records."""
+    """Parse a bounded XRes QueryClientIds reply into immutable records.
+
+    XRes 1.2's CLIENTIDVALUE.length field is a byte count. In particular,
+    LocalClientPid uses length=4 followed by exactly one CARD32 PID. Keep the
+    public limit expressed in CARD32 values while validating the wire byte count
+    is naturally aligned before unpacking.
+    """
 
     prefix = _endian(byte_order)
     expected = _expected_sequence(expected_sequence)
@@ -201,16 +207,18 @@ def parse_query_client_ids_reply(
     for _ in range(num_ids):
         if offset + XRES_CLIENT_ID_VALUE_FIXED_SIZE > len(data):
             raise XResWireError("QueryClientIds client-id record is truncated")
-        client, mask, value_length = struct.unpack_from(prefix + "III", data, offset)
-        if value_length > max_values_per_id:
+        client, mask, value_length_bytes = struct.unpack_from(prefix + "III", data, offset)
+        if value_length_bytes % 4 != 0:
+            raise XResWireError("QueryClientIds client-id value byte length is not CARD32 aligned")
+        value_count = value_length_bytes // 4
+        if value_count > max_values_per_id:
             raise XResWireError("QueryClientIds value count exceeds configured cap")
-        value_bytes = value_length * 4
-        end = offset + XRES_CLIENT_ID_VALUE_FIXED_SIZE + value_bytes
+        end = offset + XRES_CLIENT_ID_VALUE_FIXED_SIZE + value_length_bytes
         if end > len(data):
             raise XResWireError("QueryClientIds client-id value payload is truncated")
         values = (
-            tuple(struct.unpack_from(prefix + f"{value_length}I", data, offset + 12))
-            if value_length
+            tuple(struct.unpack_from(prefix + f"{value_count}I", data, offset + 12))
+            if value_count
             else ()
         )
         records.append(ClientIdValue(client, mask, values))

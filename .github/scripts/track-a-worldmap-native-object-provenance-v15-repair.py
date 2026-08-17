@@ -43,19 +43,18 @@ def scan_ptr(value):
 objects={k:scan_ptr(v) for k,v in vptrs.items()}
 root=os.path.dirname(ev); objfile=os.path.join(root,'v15-native-objects.json')
 with open(objfile,'w') as f:
-    json.dump({'schema':'worldmap-native-object-provenance-v15','objects':objects},f,sort_keys=True,separators=(',',':'))
+    json.dump({'schema':'worldmap-native-object-provenance-v15','phase':'preauth','objects':objects},f,sort_keys=True,separators=(',',':'))
 os.chmod(objfile,0o600)
 gdb.write('WORLDMAP_V15_LIVE_AUTH_INSTANCE_COUNT='+str(len(objects['auth']))+'\n')
 gdb.write('WORLDMAP_V15_LIVE_CHARSEL_INSTANCE_COUNT='+str(len(objects['charsel']))+'\n')
 gdb.write('WORLDMAP_V15_LIVE_GAMECLIENT_INSTANCE_COUNT='+str(len(objects['gameclient']))+'\n')
 gdb.write('WORLDMAP_V15_LIVE_UPLOADER_INSTANCE_COUNT='+str(len(objects['uploader']))+'\n')
-# Auth and GameClient are required before any credentials. Character-selection
-# controller is required for the native semantic continuation. Uploader may be
-# absent until a cold login request is constructed.
-if len(objects['auth'])==1 and len(objects['charsel'])==1 and len(objects['gameclient'])==1:
-    gdb.write('WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS\n')
+# At the login form, AUTH and GAMECLIENT must already exist. CHARSEL is lifecycle-
+# dependent and may be constructed only after successful account authentication.
+if len(objects['auth'])==1 and len(objects['gameclient'])==1:
+    gdb.write('WORLDMAP_V15_PREAUTH_NATIVE_OBJECT_PROVENANCE=PASS\n')
 else:
-    gdb.write('WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=FAIL\n')
+    gdb.write('WORLDMAP_V15_PREAUTH_NATIVE_OBJECT_PROVENANCE=FAIL\n')
 end
 continue
 '''
@@ -74,13 +73,13 @@ def transform(text: str) -> str:
         "WORLDMAP_V15_LIVE_CHARSEL_INSTANCE_COUNT=",
         "WORLDMAP_V15_LIVE_GAMECLIENT_INSTANCE_COUNT=",
         "WORLDMAP_V15_LIVE_UPLOADER_INSTANCE_COUNT=",
-        "WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS",
+        "WORLDMAP_V15_PREAUTH_NATIVE_OBJECT_PROVENANCE=PASS",
         "v15-native-objects.json",
         "0x307f1b0","0x308ed68","0x3076908","0x30d36f8",
     )
     missing=[x for x in required if x not in out]
     if missing: raise TransformRefused('REQUIRED_MISSING:'+','.join(missing))
-    if out.count("WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS") != 1:
+    if out.count("WORLDMAP_V15_PREAUTH_NATIVE_OBJECT_PROVENANCE=PASS") != 1:
         raise TransformRefused('PROVENANCE_MARKER_NOT_UNIQUE')
     return out
 

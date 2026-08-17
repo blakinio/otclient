@@ -5,7 +5,6 @@ on:
     branches:
       - research/OTC-20260817-track-a-p2-f50090-downstream
     paths:
-      - .github/scripts/tibia-official-client-re-p2-f50090-downstream.py
       - .github/workflows/tibia-official-client-re-p2-f50090-downstream.yml
   workflow_dispatch:
 
@@ -18,7 +17,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file f50090 bytes
+    name: Stage exact-file f50090 bytes without marketplace actions
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -28,13 +27,24 @@ jobs:
       EXPECTED_CLIENT_VERSION: 15.32.df7b29
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      CODE_START: '0xf50040'
+      CODE_END: '0xf50480'
+    outputs:
+      code_chunk_0: ${{ steps.stage.outputs.code_chunk_0 }}
+      code_chunk_1: ${{ steps.stage.outputs.code_chunk_1 }}
+      code_chunk_2: ${{ steps.stage.outputs.code_chunk_2 }}
+      code_chunk_3: ${{ steps.stage.outputs.code_chunk_3 }}
+      code_chunk_4: ${{ steps.stage.outputs.code_chunk_4 }}
+      code_chunk_5: ${{ steps.stage.outputs.code_chunk_5 }}
+      code_chunk_6: ${{ steps.stage.outputs.code_chunk_6 }}
+      code_chunk_7: ${{ steps.stage.outputs.code_chunk_7 }}
+      code_chunk_8: ${{ steps.stage.outputs.code_chunk_8 }}
+      code_sha256: ${{ steps.stage.outputs.code_sha256 }}
+      code_length: ${{ steps.stage.outputs.code_length }}
+      source_candidate_index: ${{ steps.stage.outputs.source_candidate_index }}
     steps:
-      - name: Checkout exact producer branch
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-
-      - name: Verify file-only source boundary
+      - id: stage
+        name: Exact-fence and emit bounded byte chunks only
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -43,7 +53,7 @@ jobs:
           [[ "$RUNNER_OS" == Linux && "$RUNNER_ARCH" == X64 ]] || exit 63
           [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 64
           command -v python3 >/dev/null
-          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-f50090-downstream.py
+
           candidates=(
             '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
             '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
@@ -70,65 +80,85 @@ jobs:
             fi
           done
           [[ -n "$source_client" ]] || { echo P2_F50090_REFUSED=EXACT_SOURCE_MISSING; exit 50; }
-          {
-            echo "SOURCE_CLIENT=$source_client"
-            echo "SOURCE_CANDIDATE_INDEX=$source_index"
-          } >> "$GITHUB_ENV"
-          echo P2_F50090_SOURCE_BOUNDARY=PASS
-          echo P2_F50090_RUNTIME_ACCESS=none
-          echo P2_F50090_SOURCE_DISASSEMBLY=false
-          echo P2_F50090_SOURCE_SEMANTIC_CLASSIFICATION=false
-          echo P2_F50090_CLIENT_PROCESS_ACCESS=false
-          echo P2_F50090_PROCESS_MEMORY_ACCESS=false
-          echo P2_F50090_CANONICAL_STATE_ACCESS=false
-          echo P2_F50090_CLIENT_EXECUTED=false
 
-      - name: Copy bounded exact-file bytes only
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          rm -rf artifacts/source
-          mkdir -p artifacts/source
-          python3 .github/scripts/tibia-official-client-re-p2-f50090-downstream.py \
-            source --client "$SOURCE_CLIENT" --candidate-index "$SOURCE_CANDIDATE_INDEX" --outdir artifacts/source
-          grep -Fxq "P2_F50090_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/source/source-fence.txt
-          grep -Fxq "P2_F50090_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/source/source-fence.txt
-          grep -Fxq "P2_F50090_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/source/source-fence.txt
-          grep -Fxq 'P2_F50090_RUNTIME_ACCESS=none' artifacts/source/source-fence.txt
-          grep -Fxq 'P2_F50090_SOURCE_DISASSEMBLY=false' artifacts/source/source-fence.txt
-          grep -Fxq 'P2_F50090_SOURCE_SEMANTIC_CLASSIFICATION=false' artifacts/source/source-fence.txt
-          grep -Fxq 'P2_F50090_RAW_CLIENT_UPLOADED=false' artifacts/source/source-fence.txt
-
-      - name: Enforce source artifact boundary
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 - <<'PY'
+          python3 - "$source_client" "$source_index" "$GITHUB_OUTPUT" "$CODE_START" "$CODE_END" <<'PY'
+          import hashlib
+          import stat
+          import struct
+          import sys
           from pathlib import Path
-          root = Path('artifacts/source')
-          allowed = {'source-evidence.json', 'source-fence.txt'}
-          actual = {p.name for p in root.iterdir() if p.is_file()}
-          assert actual == allowed, actual
-          for path in root.iterdir():
-              if not path.is_file():
-                  continue
-              data = path.read_bytes()
-              assert len(data) < 1024 * 1024
-              assert not data.startswith(b'\x7fELF') and data[:2] != b'MZ'
-              data.decode('utf-8')
-          print('P2_F50090_SOURCE_SANITIZED_BOUNDARY=PASS')
+
+          path = Path(sys.argv[1]).resolve()
+          source_index = sys.argv[2]
+          output_path = Path(sys.argv[3])
+          start = int(sys.argv[4], 0)
+          end = int(sys.argv[5], 0)
+          expected_size = 51965216
+          expected_sha = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+
+          if not path.is_file() or path.is_symlink() or not stat.S_ISREG(path.stat().st_mode):
+              raise SystemExit('P2_F50090_FAIL=source_regular_file')
+          if path.stat().st_size != expected_size:
+              raise SystemExit('P2_F50090_FAIL=source_exact_size')
+          h = hashlib.sha256()
+          with path.open('rb') as f:
+              for block in iter(lambda: f.read(1024 * 1024), b''):
+                  h.update(block)
+          if h.hexdigest() != expected_sha:
+              raise SystemExit('P2_F50090_FAIL=source_exact_sha256')
+
+          with path.open('rb') as f:
+              ident = f.read(16)
+              if ident[:4] != b'\x7fELF' or ident[4] != 2 or ident[5] != 1:
+                  raise SystemExit('P2_F50090_FAIL=elf64_little')
+              rest = f.read(48)
+              fields = struct.unpack('<HHIQQQIHHHHHH', rest)
+              phoff, phentsize, phnum = fields[4], fields[8], fields[9]
+              if phentsize < 56 or not (0 < phnum < 128):
+                  raise SystemExit('P2_F50090_FAIL=program_headers')
+              code = None
+              for i in range(phnum):
+                  f.seek(phoff + i * phentsize)
+                  row = f.read(56)
+                  p_type, _flags, p_offset, p_vaddr, _paddr, p_filesz, _pmemsz, _align = struct.unpack('<IIQQQQQQ', row)
+                  if p_type == 1 and start >= p_vaddr and end <= p_vaddr + p_filesz:
+                      f.seek(p_offset + start - p_vaddr)
+                      code = f.read(end - start)
+                      break
+          if code is None or len(code) != end - start:
+              raise SystemExit('P2_F50090_FAIL=range_not_file_backed')
+
+          chunks = [code[i:i+128] for i in range(0, len(code), 128)]
+          if len(chunks) != 9:
+              raise SystemExit('P2_F50090_FAIL=unexpected_chunk_count')
+          with output_path.open('a') as out:
+              for index, chunk in enumerate(chunks):
+                  out.write(f"code_chunk_{index}={','.join(str(b) for b in chunk)}\n")
+              out.write(f"code_sha256={hashlib.sha256(code).hexdigest()}\n")
+              out.write(f"code_length={len(code)}\n")
+              out.write(f"source_candidate_index={source_index}\n")
+
+          print('P2_F50090_SOURCE_BOUNDARY=PASS')
+          print('P2_F50090_CLIENT_VERSION=15.32.df7b29')
+          print(f'P2_F50090_CLIENT_SIZE={expected_size}')
+          print(f'P2_F50090_CLIENT_SHA256={expected_sha}')
+          print(f'P2_F50090_CODE_WINDOW=0x{start:x}..0x{end:x}')
+          print(f'P2_F50090_CODE_LENGTH={len(code)}')
+          print(f'P2_F50090_CODE_SHA256={hashlib.sha256(code).hexdigest()}')
+          print('P2_F50090_RUNTIME_ACCESS=none')
+          print('P2_F50090_SOURCE_OPERATION=single_bounded_file_backed_code_window_only')
+          print('P2_F50090_SOURCE_DISASSEMBLY=false')
+          print('P2_F50090_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('P2_F50090_CLIENT_PROCESS_ACCESSED=false')
+          print('P2_F50090_PROCESS_MEMORY_ACCESSED=false')
+          print('P2_F50090_CANONICAL_STATE_ACCESSED=false')
+          print('P2_F50090_CLIENT_EXECUTED=false')
+          print('P2_F50090_CLIENT_BYTE_MUTATED=false')
+          print('P2_F50090_RAW_CLIENT_UPLOADED=false')
           PY
 
-      - name: Upload bounded source evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: track-a-p2-f50090-source-${{ github.run_id }}
-          path: artifacts/source/**
-          if-no-files-found: error
-          retention-days: 7
-
   hosted-validate:
-    name: Decode f50090 on GitHub-hosted Linux
+    name: Decode f50090 on GitHub-hosted Linux without marketplace actions
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -138,72 +168,79 @@ jobs:
       EXPECTED_CLIENT_VERSION: 15.32.df7b29
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      CODE_START: '0xf50040'
+      CODE_END: '0xf50480'
+      CODE_CHUNK_0: ${{ needs.source-sanitize.outputs.code_chunk_0 }}
+      CODE_CHUNK_1: ${{ needs.source-sanitize.outputs.code_chunk_1 }}
+      CODE_CHUNK_2: ${{ needs.source-sanitize.outputs.code_chunk_2 }}
+      CODE_CHUNK_3: ${{ needs.source-sanitize.outputs.code_chunk_3 }}
+      CODE_CHUNK_4: ${{ needs.source-sanitize.outputs.code_chunk_4 }}
+      CODE_CHUNK_5: ${{ needs.source-sanitize.outputs.code_chunk_5 }}
+      CODE_CHUNK_6: ${{ needs.source-sanitize.outputs.code_chunk_6 }}
+      CODE_CHUNK_7: ${{ needs.source-sanitize.outputs.code_chunk_7 }}
+      CODE_CHUNK_8: ${{ needs.source-sanitize.outputs.code_chunk_8 }}
+      CODE_SHA256: ${{ needs.source-sanitize.outputs.code_sha256 }}
+      CODE_LENGTH: ${{ needs.source-sanitize.outputs.code_length }}
+      SOURCE_CANDIDATE_INDEX: ${{ needs.source-sanitize.outputs.source_candidate_index }}
     steps:
-      - name: Checkout exact producer branch
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-
-      - name: Verify hosted boundary
+      - name: Reconstruct, verify and disassemble exact bounded evidence
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]]
-          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]]
-          [[ "$RUNNER_OS" == Linux && "$RUNNER_ARCH" == X64 ]]
-          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 71
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
+          [[ "$RUNNER_OS" == Linux && "$RUNNER_ARCH" == X64 ]] || exit 73
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 74
+          command -v python3 >/dev/null
           command -v objdump >/dev/null
-          python3 -m py_compile .github/scripts/tibia-official-client-re-p2-f50090-downstream.py
-          echo P2_F50090_EXECUTION_CLASS=github_hosted
-          echo P2_F50090_RUNTIME_ACCESS=none
-          echo P2_F50090_RAW_CLIENT_PRESENT=false
 
-      - name: Download bounded source bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: track-a-p2-f50090-source-${{ github.run_id }}
-          path: artifacts/source
-
-      - name: Decode exact bounded evidence
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          rm -rf artifacts/final
-          mkdir -p artifacts/final
-          python3 .github/scripts/tibia-official-client-re-p2-f50090-downstream.py \
-            hosted --bundle-dir artifacts/source --outdir artifacts/final
-          grep -Fxq 'P2_F50090_HOSTED_VALIDATION=PASS' artifacts/final/hosted-validation.txt
-          grep -Fxq "P2_F50090_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/final/hosted-validation.txt
-          grep -Fxq "P2_F50090_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/final/hosted-validation.txt
-          grep -Fxq "P2_F50090_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/final/hosted-validation.txt
-          grep -Fxq 'P2_F50090_EXECUTION_CLASS=github_hosted' artifacts/final/hosted-validation.txt
-          grep -Fxq 'P2_F50090_RUNTIME_ACCESS=none' artifacts/final/hosted-validation.txt
-          grep -Fxq 'P2_F50090_PRIMARY_BYTES_EXACT_FENCED=true' artifacts/final/hosted-validation.txt
-
-      - name: Enforce final artifact boundary
-        shell: bash
-        run: |
-          set -Eeuo pipefail
           python3 - <<'PY'
+          import hashlib
+          import os
+          import subprocess
+          import tempfile
           from pathlib import Path
-          root = Path('artifacts/final')
-          allowed = {'disassembly.txt', 'result.json', 'hosted-validation.txt'}
-          actual = {p.name for p in root.iterdir() if p.is_file()}
-          assert actual == allowed, actual
-          for path in root.iterdir():
-              if not path.is_file():
-                  continue
-              data = path.read_bytes()
-              assert len(data) < 1024 * 1024
-              assert not data.startswith(b'\x7fELF') and data[:2] != b'MZ'
-              data.decode('utf-8')
-          print('P2_F50090_FINAL_SANITIZED_BOUNDARY=PASS')
-          PY
 
-      - name: Upload hosted evidence
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: track-a-p2-f50090-final-${{ github.run_id }}
-          path: artifacts/final/**
-          if-no-files-found: error
-          retention-days: 30
+          start = int(os.environ['CODE_START'], 0)
+          end = int(os.environ['CODE_END'], 0)
+          expected_len = end - start
+          values = []
+          for index in range(9):
+              raw = os.environ[f'CODE_CHUNK_{index}']
+              if not raw:
+                  raise SystemExit(f'P2_F50090_FAIL=missing_chunk_{index}')
+              values.extend(int(part) for part in raw.split(',') if part)
+          code = bytes(values)
+          if len(code) != expected_len or str(len(code)) != os.environ['CODE_LENGTH']:
+              raise SystemExit('P2_F50090_FAIL=hosted_length')
+          digest = hashlib.sha256(code).hexdigest()
+          if digest != os.environ['CODE_SHA256']:
+              raise SystemExit('P2_F50090_FAIL=hosted_digest')
+
+          with tempfile.TemporaryDirectory(prefix='p2-f50090-hosted-') as td:
+              raw_path = Path(td) / 'f50090.bin'
+              raw_path.write_bytes(code)
+              proc = subprocess.run(
+                  ['objdump', '-D', '-b', 'binary', '-m', 'i386:x86-64', '-M', 'intel',
+                   f'--adjust-vma=0x{start:x}', str(raw_path)],
+                  check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+              )
+              disassembly = proc.stdout
+
+          if 'f50090:' not in disassembly:
+              raise SystemExit('P2_F50090_FAIL=target_anchor_missing')
+
+          print('P2_F50090_HOSTED_VALIDATION=PASS')
+          print('P2_F50090_CLIENT_VERSION=15.32.df7b29')
+          print('P2_F50090_CLIENT_SIZE=51965216')
+          print('P2_F50090_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
+          print(f'P2_F50090_CODE_WINDOW=0x{start:x}..0x{end:x}')
+          print(f'P2_F50090_CODE_SHA256={digest}')
+          print(f'P2_F50090_SOURCE_CANDIDATE_INDEX={os.environ["SOURCE_CANDIDATE_INDEX"]}')
+          print('P2_F50090_EXECUTION_CLASS=github_hosted')
+          print('P2_F50090_RUNTIME_ACCESS=none')
+          print('P2_F50090_PRIMARY_BYTES_EXACT_FENCED=true')
+          print('P2_F50090_DISASSEMBLY_BEGIN')
+          print(disassembly, end='')
+          print('P2_F50090_DISASSEMBLY_END')
+          PY

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file transform entries
+    name: Stage exact-file member provenance entry
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -25,10 +25,8 @@ jobs:
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     outputs:
-      transform_hex: ${{ steps.stage.outputs.transform_hex }}
-      transform_sha256: ${{ steps.stage.outputs.transform_sha256 }}
-      padding_hex: ${{ steps.stage.outputs.padding_hex }}
-      padding_sha256: ${{ steps.stage.outputs.padding_sha256 }}
+      accessor_hex: ${{ steps.stage.outputs.accessor_hex }}
+      accessor_sha256: ${{ steps.stage.outputs.accessor_sha256 }}
     steps:
       - id: stage
         shell: bash
@@ -57,30 +55,23 @@ jobs:
           python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
           import hashlib,struct,sys
           from pathlib import Path
-          p=Path(sys.argv[1]); out=Path(sys.argv[2])
-          windows={'transform':(0xb3ec30,0xb3ef30),'padding':(0xf85eb0,0xf86100)}
+          p=Path(sys.argv[1]); out=Path(sys.argv[2]); start=0xe0d890; end=0xe0dc90
           with p.open('rb') as f:
               ident=f.read(16); rest=f.read(48)
               if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(51)
               fs=struct.unpack('<HHIQQQIHHHHHH',rest); phoff,phentsize,phnum=fs[4],fs[8],fs[9]
-              segs=[]
+              data=None
               for i in range(phnum):
                   f.seek(phoff+i*phentsize); r=f.read(56)
                   t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
-                  if t==1 and (flags&1): segs.append((off,va,sz))
-              rows=[]
-              for name,(start,end) in windows.items():
-                  data=None
-                  for off,va,sz in segs:
-                      if va<=start and end<=va+sz:
-                          f.seek(off+start-va); data=f.read(end-start); break
-                  if data is None or len(data)!=end-start: raise SystemExit(52)
-                  dig=hashlib.sha256(data).hexdigest()
-                  rows.append(f'{name}_hex={data.hex()}\n{name}_sha256={dig}\n')
-                  print(f'P2_RAWTRANSFORM_{name.upper()}_WINDOW=0x{start:x}..0x{end:x}')
-                  print(f'P2_RAWTRANSFORM_{name.upper()}_SHA256={dig}')
-              with out.open('a') as h: h.write(''.join(rows))
-          print('P2_RAWTRANSFORM_ENTRY_SOURCE=PASS')
+                  if t==1 and (flags&1) and va<=start and end<=va+sz:
+                      f.seek(off+start-va); data=f.read(end-start); break
+          if data is None or len(data)!=end-start: raise SystemExit(52)
+          dig=hashlib.sha256(data).hexdigest()
+          with out.open('a') as h: h.write(f'accessor_hex={data.hex()}\naccessor_sha256={dig}\n')
+          print('P2_RAWTRANSFORM_ACCESSOR_SOURCE=PASS')
+          print(f'P2_RAWTRANSFORM_ACCESSOR_WINDOW=0x{start:x}..0x{end:x}')
+          print(f'P2_RAWTRANSFORM_ACCESSOR_SHA256={dig}')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
           print('P2_RAWTRANSFORM_SOURCE_DISASSEMBLY=false')
           print('P2_RAWTRANSFORM_SOURCE_SEMANTIC_CLASSIFICATION=false')
@@ -88,17 +79,15 @@ jobs:
           PY
 
   hosted-validate:
-    name: Decode exact transform entries on GitHub-hosted Linux
+    name: Decode member provenance entry on GitHub-hosted Linux
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-raw-transform-semantics
-      TRANSFORM_HEX: ${{ needs.source-sanitize.outputs.transform_hex }}
-      TRANSFORM_SHA256: ${{ needs.source-sanitize.outputs.transform_sha256 }}
-      PADDING_HEX: ${{ needs.source-sanitize.outputs.padding_hex }}
-      PADDING_SHA256: ${{ needs.source-sanitize.outputs.padding_sha256 }}
+      ACCESSOR_HEX: ${{ needs.source-sanitize.outputs.accessor_hex }}
+      ACCESSOR_SHA256: ${{ needs.source-sanitize.outputs.accessor_sha256 }}
     steps:
       - shell: bash
         run: |
@@ -109,24 +98,16 @@ jobs:
           python3 - <<'PY'
           import hashlib,os,subprocess,tempfile
           from pathlib import Path
-          records={
-            'transform':(0xb3ec30,0xb3ef30,os.environ['TRANSFORM_HEX'],os.environ['TRANSFORM_SHA256']),
-            'padding':(0xf85eb0,0xf86100,os.environ['PADDING_HEX'],os.environ['PADDING_SHA256']),
-          }
-          texts={}
-          with tempfile.TemporaryDirectory(prefix='p2-raw-entries-') as td:
-              for name,(start,end,hx,expected) in records.items():
-                  data=bytes.fromhex(hx)
-                  if len(data)!=end-start or hashlib.sha256(data).hexdigest()!=expected: raise SystemExit(74)
-                  p=Path(td)/(name+'.bin'); p.write_bytes(data)
-                  texts[name]=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
-          if 'b3ec30:' not in texts['transform']: raise SystemExit('P2_RAWTRANSFORM_FAIL=missing_b3ec30')
-          if 'f85eb0:' not in texts['padding']: raise SystemExit('P2_RAWTRANSFORM_FAIL=missing_f85eb0')
-          print('P2_RAWTRANSFORM_ENTRY_HOSTED=PASS')
+          start=0xe0d890; end=0xe0dc90; data=bytes.fromhex(os.environ['ACCESSOR_HEX'])
+          if len(data)!=end-start or hashlib.sha256(data).hexdigest()!=os.environ['ACCESSOR_SHA256']: raise SystemExit(74)
+          with tempfile.TemporaryDirectory(prefix='p2-raw-accessor-') as td:
+              p=Path(td)/'accessor.bin'; p.write_bytes(data)
+              text=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+          if 'e0d890:' not in text: raise SystemExit('P2_RAWTRANSFORM_FAIL=missing_e0d890')
+          print('P2_RAWTRANSFORM_ACCESSOR_HOSTED=PASS')
           print('P2_RAWTRANSFORM_EXECUTION_CLASS=github_hosted')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
-          for name in ('transform','padding'):
-              print(f'P2_RAWTRANSFORM_{name.upper()}_DISASSEMBLY_BEGIN')
-              print(texts[name],end='')
-              print(f'P2_RAWTRANSFORM_{name.upper()}_DISASSEMBLY_END')
+          print('P2_RAWTRANSFORM_ACCESSOR_DISASSEMBLY_BEGIN')
+          print(text,end='')
+          print('P2_RAWTRANSFORM_ACCESSOR_DISASSEMBLY_END')
           PY

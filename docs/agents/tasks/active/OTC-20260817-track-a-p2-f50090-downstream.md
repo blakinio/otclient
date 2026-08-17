@@ -50,7 +50,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
 promotion_authority: coordinator_only
-research_output: DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW
+research_output: DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW_AFTER_FINAL_CI
 feature_scope:
   type: protocol
   user_facing: false
@@ -69,17 +69,25 @@ accepted_input:
   target: 0xf50090
 research_result:
   f50090_function_entry: FACT:0xf50090
-  next_aligned_function_entry: FACT:0xf501e0
   f50090_second_argument: FACT:canonical_same_message
   f50090_saved_message_pointer: FACT:rbp
   f50090_decomposes_message_into_fields: FACT
-  target_0x4dc3d0: FACT:length_derived_scalar_from_message_plus_0x18
-  target_0x4daaf0: FACT:scalar_from_message_plus_0x00
+  writer_guard_slot: FACT:+0x58
+  writer_guard_exact_target: FACT:0xcb2960
+  raw_payload_pointer: FACT:value_from_message_plus_0x10
+  raw_payload_length: FACT:value_from_message_plus_0x18
+  underlying_receiver: FACT:writer_plus_0x18_on_direct_guarded_branch
   raw_payload_target: FACT:0x4dd250
-  raw_payload_rsi: FACT:value_from_message_plus_0x10
-  raw_payload_rdx: FACT:value_from_message_plus_0x18
-  raw_payload_receiver_provenance: FACT:f50090_this_plus_0x08_then_plus_0x18
+  cb2960_payload_pointer: FACT:subobject_plus_0x08
+  cb2960_payload_length: FACT:subobject_plus_0x10
+  cb2960_underlying_receiver: FACT:wrapper_plus_0x18
+  cb2960_target: FACT:0x4dd250
+  constructor_installed_vptr: FACT:0x2f69d48_in_constructor_0x1960340
+  constructor_nested_object_member: FACT:this_plus_0x18_in_constructor_0x1960340
+  constructor_owner_control_member: FACT:this_plus_0x20_in_constructor_0x1960340
   f50090_forwards_original_message_pointer_as_whole: DISPROVEN
+  writer_exact_dynamic_type: UNKNOWN
+  underlying_receiver_exact_dynamic_type: UNKNOWN
   semantic_role_of_0x4dd250: UNKNOWN
   final_binary_egress: UNKNOWN
   final_socket_ownership: UNKNOWN
@@ -87,19 +95,28 @@ research_result:
   sequence: UNKNOWN
   compression: UNKNOWN
   encryption: UNKNOWN
-generation:
-  producer_head: ea8113028a07ef84518f4a8b705bcecd97604376
-  run: 32037248323
-  source_job: 95410048084
-  hosted_job: 95410072413
-  code_window: 0xf50040..0xf50480
-  code_length: 1088
-  code_sha256: 1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea
-  source_candidate_index: 1
-  result: SUCCESS
+generations:
+  - producer_head: ea8113028a07ef84518f4a8b705bcecd97604376
+    run: 32037248323
+    source_job: 95410048084
+    hosted_job: 95410072413
+    main_window: 0xf50040..0xf50480
+    main_sha256: 1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea
+    result: SUCCESS
+  - producer_head: 8642b419ca8ef3034ba747f689a14e24cf9a0152
+    run: 32037533068
+    source_job: 95410828633
+    hosted_job: 95410901806
+    main_window: 0xf50040..0xf50480
+    main_sha256: 1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea
+    ctor_window: 0x1960300..0x1960600
+    ctor_sha256: bc03c482e3ae04c0f9a91288d5f79612b2f0f08680ef10ffecdf9a927ec0371f
+    vcall_window: 0xcb2900..0xcb29c0
+    vcall_sha256: dc04038b7740f39095ed6ab599bc10048c368fab9eff126c3d0853930c62af14
+    result: SUCCESS
 cleanup:
-  one_shot_workflow_removal: PENDING
-  one_shot_script_removal: PENDING
+  one_shot_workflow_removed: true
+  one_shot_script_removed: true
 validation:
   exact_source_fence: PASS
   hosted_primary_decode: PASS
@@ -111,7 +128,7 @@ validation:
   review_hygiene: PENDING
 anti_stall:
   invocation_started_at: 2026-08-17T15:50:00+02:00
-  last_progress_at: 2026-08-17T15:58:00+02:00
+  last_progress_at: 2026-08-17T16:04:00+02:00
   ci_checks_for_current_head: 0
   ci_check_generation: draft
   terminal_ci_wait_started_at: null
@@ -121,32 +138,32 @@ anti_stall:
   repair_cycles_for_current_gate: 1
   context_reconstruction_attempts: 1
   stall_warnings: 0
-next_action: remove the one-shot producer workflow/script, then verify final exact-head governance/CI/review hygiene and hand the Draft to coordinator promotion
+next_action: verify final exact-head governance/CI/review hygiene, then coordinator independently review and promote the accepted bounded result; do not start another research frontier in this invocation
 ---
 
 # Track A P2 — `0xf50090` downstream discriminator
 
 ## Terminal researcher result
 
-The coordinator-promoted same message enters `0xf50090` in SysV `rsi`; exact entry dataflow saves that pointer in `rbp` and then decomposes the message into fields rather than forwarding the whole object.
-
-The strongest exact downstream payload edge is:
+The coordinator-promoted same message enters `0xf50090` in SysV `rsi`. Exact dataflow saves that pointer in `rbp`, decomposes the message into fields, and on the directly guarded writer path proves:
 
 ```text
-canonical message
+canonical same message
  -> 0xf50090
- -> message+0x10 value as rsi
- -> message+0x18 value as rdx
- -> nested receiver from this+0x08 then +0x18
- -> call 0x4dd250
+ -> writer vslot +0x58 guard == 0xcb2960
+ -> payload pointer from message+0x10
+ -> payload length from message+0x18
+ -> underlying receiver at writer+0x18
+ -> exact target 0x4dd250
 ```
 
-Earlier concrete calls receive only message-derived scalar values: `0x4dc3d0` receives a length-derived scalar and `0x4daaf0` receives `message+0x00` as a scalar. No downstream call in the bounded function receives the original saved message pointer as a whole.
+Generation 3 independently decodes `0xcb2960`, which repeats the same structural contract by extracting `subobject+0x08` as data pointer, `subobject+0x10` as length and forwarding through wrapper `this+0x18` to `0x4dd250`.
 
-The exact semantic identity of `0x4dd250`, its receiver dynamic type, final binary egress, final socket ownership, framing, sequence, compression and encryption remain `UNKNOWN`. No semantic is inferred from calling convention alone.
+Constructor-like function `0x1960340` independently installs vptr `0x2f69d48` and binds a nested object at `this+0x18`, but this task does not overpromote that structural constructor into the exact current dynamic type without separate RTTI/vtable provenance.
+
+The exact dynamic types, semantic role of `0x4dd250`, final binary egress, final socket ownership, framing, sequence, compression and encryption remain `UNKNOWN`.
 
 Durable evidence:
-
 - `docs/agents/evidence/OTC-20260817-track-a-p2-f50090-downstream/20260817-f50090-downstream-dataflow.md`
 - `docs/agents/evidence/OTC-20260817-track-a-p2-f50090-downstream/result.json`
 

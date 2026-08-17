@@ -14,18 +14,81 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prelogin-focus-scan-static:
-    name: Pre-login focus scan composition (no client)
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
+  prelogin-focus-scan:
+    name: Pre-login reversible focus scan (no secrets)
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
     steps:
       - name: Checkout exact head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Validate no-secret reversible Tab scan composition
+      - name: Revalidate current-main Track A admission
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          base_sha="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "$base_sha" "origin/$HEAD_BRANCH"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$base_sha" --expected-branch "$HEAD_BRANCH"
+          echo "WORLDMAP_FOCUS_CURRENT_MAIN=$base_sha"
+          echo 'WORLDMAP_FOCUS_CURRENT_MAIN_ANCESTRY=PASS'
+          echo 'WORLDMAP_FOCUS_ADMISSION=PASS'
+
+      - name: Require canonical controller plane idle without mutating it
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import fcntl,json,os,time
+          from pathlib import Path
+          state=Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          lock=state/'coordination.lock'; lease_path=state/'lease.json'; reg=state/'runtime-registration.json'
+          if not lock.is_file() or not lease_path.is_file(): raise SystemExit('WORLDMAP_FOCUS_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
+          fd=os.open(lock,os.O_RDONLY|getattr(os,'O_NOATIME',0))
+          try:
+              fcntl.flock(fd,fcntl.LOCK_SH)
+              lease=json.loads(lease_path.read_text())
+              safe={'generation':lease.get('generation'),'status':lease.get('status'),'controller_task':lease.get('controller_task'),'controller_session':lease.get('controller_session'),'expired':bool(lease.get('status')=='active' and isinstance(lease.get('expires_at'),int) and lease['expires_at']<=int(time.time()))}
+              print('WORLDMAP_FOCUS_CANONICAL_LEASE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
+              if safe['status']!='released' or safe['controller_task'] is not None or safe['controller_session'] is not None: raise SystemExit('WORLDMAP_FOCUS_PREFLIGHT_ERROR=canonical_lease_not_idle')
+              if reg.exists(): raise SystemExit('WORLDMAP_FOCUS_PREFLIGHT_ERROR=canonical_registration_present')
+          finally:
+              try: fcntl.flock(fd,fcntl.LOCK_UN)
+              except OSError: pass
+              os.close(fd)
+          print('WORLDMAP_FOCUS_CANONICAL_REGISTRATION=ABSENT')
+          print('WORLDMAP_FOCUS_CANONICAL_CONTROLLER_IDLE=PASS')
+          PY
+
+      - name: Revalidate task-local UI tool dynamic-link closure without client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TOOL=/home/runner/_work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || TOOL=/work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_FOCUS_UI_PREFLIGHT_ERROR=toolroot_missing' >&2; exit 1; }
+          LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+          XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
+          XDO="$TOOL/usr/bin/xdotool"
+          [[ -x "$XWD" && -x "$XDO" ]] || { echo 'WORLDMAP_FOCUS_UI_PREFLIGHT_ERROR=ui_tool_missing' >&2; exit 1; }
+          xwd_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XWD")"
+          xdo_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XDO")"
+          if grep -F 'not found' <<<"$xwd_deps" || grep -F 'not found' <<<"$xdo_deps"; then
+            echo 'WORLDMAP_FOCUS_UI_PREFLIGHT_ERROR=dependency_not_found' >&2
+            exit 1
+          fi
+          grep -F 'libxdo.so.3 =>' <<<"$xdo_deps" >/dev/null || { echo 'WORLDMAP_FOCUS_UI_PREFLIGHT_ERROR=libxdo_resolution_missing' >&2; exit 1; }
+          echo 'WORLDMAP_FOCUS_UI_TOOLROOT_DYNAMIC_LINK=PASS'
+
+      - name: Compose no-secret reversible focus scan
+        id: compose
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -47,32 +110,29 @@ jobs:
           bash -n "$scan"
           grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_SECRET_ENV=ABSENT' "$scan" >/dev/null
           grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_MODE=TAB_REVERSIBLE_DUMMY_TEXT' "$scan" >/dev/null
-          grep -F 'WORLDMAP_PRELOGIN_EDITABLE_CANDIDATE=' "$scan" >/dev/null
-          grep -F 'WORLDMAP_PRELOGIN_EDITABLE_CANDIDATE_COUNT=' "$scan" >/dev/null
-          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN=COMPLETE_NO_SECRET' "$scan" >/dev/null
-          grep -F 'xdo key --window "$UI_WIN" --clearmodifiers Tab' "$scan" >/dev/null
-          grep -F "'wmprobe7'" "$scan" >/dev/null
-          grep -F "'iiiiii'" "$scan" >/dev/null
-          grep -F "'WWWWWW'" "$scan" >/dev/null
-          grep -F 'exit 0' "$scan" >/dev/null
           grep -F '[[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]] || fail prelogin_focus_scan_secret_env_present' "$scan" >/dev/null
           grep -F 'env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD' "$scan" >/dev/null
           if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
-            echo 'WORLDMAP_FOCUS_STATIC_ERROR=credential_submission_survived' >&2
+            echo 'WORLDMAP_FOCUS_COMPOSE_ERROR=credential_submission_survived' >&2
             exit 1
           fi
-          if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan"; then
-            echo 'WORLDMAP_FOCUS_STATIC_ERROR=login_submission_survived' >&2
+          if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
+            echo 'WORLDMAP_FOCUS_COMPOSE_ERROR=login_or_gameplay_surface_survived' >&2
             exit 1
           fi
-          if grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan"; then
-            echo 'WORLDMAP_FOCUS_STATIC_ERROR=character_activation_survived' >&2
-            exit 1
-          fi
-          if grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
-            echo 'WORLDMAP_FOCUS_STATIC_ERROR=gameplay_stimulus_survived' >&2
-            exit 1
-          fi
-          echo 'WORLDMAP_PRELOGIN_FOCUS_SCAN_STATIC=PASS'
-          echo 'WORLDMAP_PRELOGIN_FOCUS_SCAN_CLIENT_EXECUTED=false'
+          echo "scan=$scan" >> "$GITHUB_OUTPUT"
+          echo 'WORLDMAP_PRELOGIN_FOCUS_SCAN_COMPOSITION=PASS'
           echo 'WORLDMAP_PRELOGIN_FOCUS_SCAN_SECRET_USED=false'
+
+      - name: Execute one reversible pre-login focus scan without secrets
+        shell: bash
+        env:
+          SCAN: ${{ steps.compose.outputs.scan }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]]
+          "$SCAN"

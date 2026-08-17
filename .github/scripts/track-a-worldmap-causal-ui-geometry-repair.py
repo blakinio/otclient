@@ -17,6 +17,16 @@ CLASSIFIER="${GITHUB_WORKSPACE:-$PWD}/.github/scripts/track-a-worldmap-causal-xw
 [[ -f "$CLASSIFIER" ]] || fail xwd_classifier_missing
 python3 "$CLASSIFIER" self-test
 
+XWD_TOOLROOT_LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+capture_xwd() {
+  local outfile="$1"
+  if [[ "$XWD" == "$TOOL/"* ]]; then
+    DISPLAY="$DISPLAY" LD_LIBRARY_PATH="$XWD_TOOLROOT_LIBS" "$XWD" -silent -id "$WIN" -out "$outfile"
+  else
+    DISPLAY="$DISPLAY" "$XWD" -silent -id "$WIN" -out "$outfile"
+  fi
+}
+
 echo 'WORLDMAP_BASELINE_LOGIN_UI_TOOLING=RAW_XWD_GEOMETRY_PASS'
 
 SCREEN_CLASS=''
@@ -24,7 +34,7 @@ SCREEN_RESULT=''
 classify_screen() {
   local stem="$1"
   local xwdfile="$ROOT/$stem.xwd"
-  DISPLAY="$DISPLAY" "$XWD" -silent -id "$WIN" -out "$xwdfile"
+  capture_xwd "$xwdfile"
   if ! SCREEN_RESULT="$(python3 "$CLASSIFIER" classify "$xwdfile")"; then
     rm -f "$xwdfile"
     printf '%s\n' "$SCREEN_RESULT"
@@ -98,10 +108,16 @@ def transform(text: str) -> str:
     required = (
         "WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_RAW_XWD_GEOMETRY",
         "WORLDMAP_BASELINE_CHARACTER_SELECTION=PROVEN_RAW_XWD_GEOMETRY",
+        "WORLDMAP_XWD_TOOLROOT_DYNAMIC_LINK=PASS",
         "EMAIL_X=520",
         "ROW_X=300",
     )
-    missing = [token for token in required if token not in output]
+    # The dynamic-link marker is emitted by the no-client workflow preflight rather
+    # than by the transformed runtime helper; require the actual library-bound call here.
+    output_required = tuple(x for x in required if x != "WORLDMAP_XWD_TOOLROOT_DYNAMIC_LINK=PASS") + (
+        'LD_LIBRARY_PATH="$XWD_TOOLROOT_LIBS" "$XWD"',
+    )
+    missing = [token for token in output_required if token not in output]
     if missing:
         raise TransformRefused("REQUIRED_MISSING:" + ",".join(missing))
     return output

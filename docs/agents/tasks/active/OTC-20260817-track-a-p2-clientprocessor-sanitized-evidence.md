@@ -14,7 +14,7 @@ base_branch: main
 base_main: 8c9486e2c6109a7a39b564804c8acd707659b5e0
 risk: medium
 created: 2026-08-17T09:10:00+02:00
-updated: 2026-08-17T09:20:00+02:00
+updated: 2026-08-17T09:21:00+02:00
 producer_pr: 449
 consumer_pr: 310
 consumer_task: OTC-20260815-track-a-p2-buffer-downstream-consumer
@@ -25,11 +25,6 @@ owned_paths:
   - .github/scripts/tibia-official-client-re-p2-clientprocessor-sanitized-evidence.py
   - .github/workflows/tibia-official-client-re-p2-clientprocessor-sanitized-evidence.yml
 modules_touched: []
-reuses:
-  - PR #308 artifact 9251725866 for the already-promoted persistent-QBuffer boundary
-  - PR #310 artifact 9252025461 for prior targeted processor observations only
-  - current-main final-write reconciliation for canonical TGameserverDualConnection owner-field typing
-  - PR #446 bounded file-only source-sanitize -> hosted-decode method
 policy_version: 2
 prompting_standard_version: 2.1
 run_scope: autonomous_program
@@ -69,7 +64,6 @@ source_staging_exception:
   gameplay_access: forbidden
   raw_client_upload: forbidden
   client_byte_mutation: forbidden
-  allowed_output: exact fence metadata plus bounded hex-encoded file windows only
   hosted_validation_executor: ubuntu-latest
 exact_client:
   version: 15.32.df7b29
@@ -88,26 +82,23 @@ validation:
   evidence_result: SUCCESS
   evidence_head: 1b615736726049e70c902a88d0fde5004044e7e0
   source_job: 95312954329
-  source_job_result: SUCCESS
   source_artifact: 9279753620
   source_artifact_digest: sha256:6c970c23aa95856698eb71024937ed847502fb1f040701ce04c632da32c38d32
   hosted_job: 95313213503
-  hosted_job_result: SUCCESS
   final_artifact: 9279759553
   final_artifact_digest: sha256:8228d6c281cf99f45f5c880b76e7a2817130156fde4cc892a402eccf4af10528
   evidence_head_track_a_governance_run: 32005159534
   evidence_head_track_a_governance_result: SUCCESS
   evidence_head_repository_ci_run: 32005159706
   evidence_head_repository_ci_result: SUCCESS
-  final_task_only_head: 5064af2222bd1f8830cb656270f488eca45b052e
-  final_task_only_head_checks: PENDING
+  checkpoint_head_before_this_commit: 0fb61dbaa423e2bf695d8a8d0235ee9477397bef
+  current_task_only_head_checks: PENDING
 independent_coordinator_review:
   result: PASS_BOUNDED
   artifact_result_json_trusted_as_summary: false
   source_bundle_redecoded_independently: true
   exact_fence_reverified: true
-  file_boundary_reverified: true
-  setup_identity_gap_closed: true
+  source_file_boundary_reverified: true
   persistent_qbuffer_to_clientprocessor_this_plus_0x18: PROVEN
   clientprocessor_vslot_plus_0x10: PROVEN_0x00c2df80
   qiodevice_readall_from_same_member: PROVEN
@@ -136,10 +127,10 @@ findings_closed:
 e2e:
   result: NOT_APPLICABLE
   reason: static exact-client evidence producer only; no runtime behavior or client state changed
-last_completed_step: independently re-decoded artifact 9279753620 and cross-checked artifact 9279759553 against accepted #308 and current-main canonical network ownership evidence; the missing #310 object-identity gap is closed
-next_action: coordinator should classify #310 ACCEPT_WITH_EDITS, promote only the bounded evidence on current main without the obsolete #310 staging workflow, then close/archive #310 and this producer intentionally
+last_completed_step: independent coordinator re-decoded the source artifact and cross-checked its exact instruction/data flow against accepted #308 plus current-main canonical DualConnection ownership evidence
+next_action: coordinator should classify #310 ACCEPT_WITH_EDITS and promote only the bounded evidence from current main; the obsolete #310 staging workflow must remain unmerged
 ---
 
 # Track A P2 ClientMessageProcessor sanitized exact-client evidence
 
-The producer closed only the object-identity evidence gap for consumer PR #310. Framing, sequence, compression, encryption, final binary egress and socket ownership remain unknown.
+This producer closes only the exact object-identity gap for consumer #310. Transport semantics beyond the proven partial stage order remain unknown.

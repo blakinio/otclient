@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Qt-metaobject discriminator for the world-map exact-static second package.
+"""Final constructor/caller discriminator for world-map exact-static evidence.
 
-The source side only verifies/reads the exact client and emits bounded sanitized
-windows/data. It never executes or disassembles the client. Hosted validation
-continues to disassemble only the emitted byte windows.
+This phase is intentionally narrow: it stages the exact protocol-handler
+constructor neighbourhood and rel32 callers whose targets fall inside that
+small constructor range. Source execution remains read-only; disassembly remains
+GitHub-hosted over bounded sanitized windows only.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
-import re
+import struct
 import sys
 from typing import Any
 
@@ -25,16 +26,10 @@ SPEC.loader.exec_module(v2)
 base = v2.base
 _ORIGINAL_VALIDATE_SOURCE_BUNDLE = v2.validate_source_bundle
 
-OWNER_STATIC_METAOBJECT = 0x03087800
-OWNER_NEARBY_VPTR = 0x0308C128
-
-# New, bounded regions only: the immediate ordinary-method cluster containing
-# cdb770 and the upstream updater cluster containing cec8d0.
-CODE_RANGES = (
-    ("cdb_owner_method_cluster", 0x00CDA000, 0x2000),
-    ("cec_owner_updater_cluster", 0x00CEC000, 0x1200),
-    ("df_owner_qmeta_wrapper_cluster", 0x00DF2800, 0x700),
-)
+CONSTRUCTOR_RANGE_START = 0x00803900
+CONSTRUCTOR_RANGE_END = 0x00803C20
+CONSTRUCTOR_CONTEXT_START = 0x00803800
+CONSTRUCTOR_CONTEXT_SIZE = 0x850
 
 
 def fmt_addr(value: int) -> str:
@@ -56,60 +51,29 @@ def validate_source_bundle_order_tolerant(bundle_dir: Path):
 v2.validate_source_bundle = validate_source_bundle_order_tolerant
 
 
-def printable_runs(blob: bytes, minimum: int = 4) -> list[dict[str, Any]]:
-    out = []
-    for match in re.finditer(rb"[ -~]{%d,}" % minimum, blob):
-        text = match.group(0).decode("ascii", "replace")
-        out.append({"offset": match.start(), "text": text[:256]})
-    return out[:96]
-
-
-def mapped_probe(elf: Any, address: int, size: int) -> dict[str, Any]:
-    blob = elf.bytes_at(address, size)
-    if blob is None:
-        return {"address": fmt_addr(address), "mapped": False, "requested_bytes": size}
-    return {
-        "address": fmt_addr(address),
-        "mapped": True,
-        "byte_count": len(blob),
-        "bytes_hex": blob.hex(),
-        "printable_runs": printable_runs(blob),
-    }
-
-
-def qt_metaobject_probe(elf: Any, address: int) -> dict[str, Any]:
-    """Read Qt6-style QMetaObject pointer fields without assigning semantics blindly."""
-    record: dict[str, Any] = {
-        "address": fmt_addr(address),
-        "qwords": [],
-        "followed_mapped_blocks": [],
-    }
-    seen_follow = set()
-    for index in range(7):
-        slot = address + index * 8
-        raw = elf.qword(slot)
-        resolved, relation = elf.resolved_qword(slot)
-        item: dict[str, Any] = {
-            "index": index,
-            "slot": fmt_addr(slot),
-            "raw": base.fmt_qword(raw),
-            "resolved": base.fmt_addr(resolved),
-            "relation": relation,
-            "relocations": base.reloc_view(elf.relocations(slot)),
-            "resolved_executable": bool(resolved is not None and elf.executable(resolved)),
-            "resolved_mapped": bool(resolved is not None and elf.mapped(resolved)),
-        }
-        if resolved is not None and elf.mapped(resolved):
-            text = elf.cstring(resolved, 512)
-            if text:
-                item["resolved_cstring"] = text
-            if resolved not in seen_follow:
-                seen_follow.add(resolved)
-                follow = mapped_probe(elf, resolved, 0x500)
-                follow["source_qword_index"] = index
-                record["followed_mapped_blocks"].append(follow)
-        record["qwords"].append(item)
-    return record
+def scan_rel32_targets_in_range(elf: Any, lo: int, hi: int) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for seg in elf.loads:
+        if not (seg["flags"] & 1):
+            continue
+        blob = elf.data[seg["offset"]:seg["offset"] + seg["filesz"]]
+        for i in range(max(0, len(blob) - 5)):
+            opcode = blob[i]
+            if opcode not in (0xE8, 0xE9):
+                continue
+            disp = struct.unpack_from("<i", blob, i + 1)[0]
+            address = seg["vaddr"] + i
+            target = address + 5 + disp
+            if lo <= target <= hi:
+                out.append({
+                    "instruction_address": fmt_addr(address),
+                    "opcode": "call_rel32" if opcode == 0xE8 else "jmp_rel32",
+                    "instruction_bytes": blob[i:i + 5].hex(),
+                    "resolved_target": fmt_addr(target),
+                    "classification": "candidate_until_hosted_instruction_boundary_confirmation",
+                })
+    unique = {(item["instruction_address"], item["resolved_target"]): item for item in out}
+    return [unique[key] for key in sorted(unique)]
 
 
 def source_mode(args: argparse.Namespace) -> int:
@@ -123,55 +87,47 @@ def source_mode(args: argparse.Namespace) -> int:
     bundle_path = outdir / "worldmap-static-evidence.json"
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
     elf = base.Elf64(Path(args.client))
-
     windows: list[dict[str, Any]] = bundle["source_code_windows"]
     seen = {int(item["start_address"], 16) for item in windows}
     budget = [int(bundle["source_code_window_raw_bytes"])]
 
-    for label, start, size in CODE_RANGES:
+    v2.append_window(
+        windows, seen, elf,
+        purpose="second_pack_protocol_handler_constructor_context",
+        start=CONSTRUCTOR_CONTEXT_START,
+        size=CONSTRUCTOR_CONTEXT_SIZE,
+        geometry_related=False,
+        metadata={
+            "known_vptr_write": "0x00803c01 -> 0x030871d8",
+            "known_handler_storage_candidate_field": "+0x10/+0x18 shared_ptr pair",
+            "known_handler_extent_source_field": "+0xb0/+0xb4 initialized from 0x01cdd958",
+        },
+        raw_budget=budget,
+    )
+
+    candidates = scan_rel32_targets_in_range(elf, CONSTRUCTOR_RANGE_START, CONSTRUCTOR_RANGE_END)
+    for item in candidates[:128]:
+        address = int(item["instruction_address"], 16)
         v2.append_window(
             windows, seen, elf,
-            purpose="second_pack_owner_cluster",
-            start=start,
-            size=size,
+            purpose="second_pack_protocol_handler_constructor_caller_candidate",
+            start=max(0, address - 0x300),
+            size=0x700,
             geometry_related=False,
-            metadata={"cluster": label},
+            metadata=item,
             raw_budget=budget,
         )
 
-    xrefs = v2.scan_rip_lea_xrefs(elf, {OWNER_STATIC_METAOBJECT, OWNER_NEARBY_VPTR})
-    for target, items in xrefs.items():
-        for item in items[:64]:
-            address = int(item["instruction_address"], 16)
-            v2.append_window(
-                windows, seen, elf,
-                purpose="second_pack_owner_identity_xref",
-                start=max(0, address - 0x240),
-                size=0x580,
-                geometry_related=False,
-                metadata={"identity_target": fmt_addr(target), **item},
-                raw_budget=budget,
-            )
-
-    owner_vptr_identity = base.identity_record(elf, {
-        "label": "owner_nearby_vptr_candidate",
-        "header_start": OWNER_NEARBY_VPTR - 16,
-        "header_end": OWNER_NEARBY_VPTR - 1,
-        "vptr": OWNER_NEARBY_VPTR,
-    })
-
     bundle["source_code_window_raw_bytes"] = budget[0]
     bundle["second_pack"] = {
-        "schema": "track-a-worldmap-exact-static-second-pack-owner-meta-v4",
-        "objective": "identify_cdb770_owner_and_receiver_dependency_without_broad_rescan",
-        "owner_static_metaobject": qt_metaobject_probe(elf, OWNER_STATIC_METAOBJECT),
-        "owner_static_metaobject_xrefs": xrefs.get(OWNER_STATIC_METAOBJECT, []),
-        "owner_nearby_vptr_identity": owner_vptr_identity,
-        "owner_nearby_vptr_xrefs": xrefs.get(OWNER_NEARBY_VPTR, []),
-        "bounded_clusters": [
-            {"label": label, "start": fmt_addr(start), "size": size}
-            for label, start, size in CODE_RANGES
-        ],
+        "schema": "track-a-worldmap-exact-static-second-pack-handler-constructor-v5",
+        "objective": "close_protocol_handler_plus_0x10_dependency_type",
+        "constructor_range": {
+            "start": fmt_addr(CONSTRUCTOR_RANGE_START),
+            "end": fmt_addr(CONSTRUCTOR_RANGE_END),
+        },
+        "rel32_candidates_into_constructor_range": candidates,
+        "rel32_candidate_count": len(candidates),
         "raw_window_budget_bytes": v2.MAX_SOURCE_CODE_BYTES,
         "raw_window_bytes_used": budget[0],
         "bounded_window_count": len(windows),
@@ -189,8 +145,7 @@ def source_mode(args: argparse.Namespace) -> int:
         "WORLD_MAP_SECOND_PACK_SOURCE=PASS",
         f"WORLD_MAP_SECOND_PACK_BOUNDED_WINDOWS={len(windows)}",
         f"WORLD_MAP_SECOND_PACK_BOUNDED_RAW_BYTES={budget[0]}",
-        f"WORLD_MAP_SECOND_PACK_OWNER_METAOBJECT_XREFS={len(xrefs.get(OWNER_STATIC_METAOBJECT, []))}",
-        f"WORLD_MAP_SECOND_PACK_OWNER_VPTR_XREFS={len(xrefs.get(OWNER_NEARBY_VPTR, []))}",
+        f"WORLD_MAP_SECOND_PACK_HANDLER_CTOR_CALLER_CANDIDATES={len(candidates)}",
         "WORLD_MAP_SECOND_PACK_SOURCE_DISASSEMBLY=none",
         "WORLD_MAP_SECOND_PACK_HOSTED_CONFIRMATION_REQUIRED=true",
         "",
@@ -199,8 +154,7 @@ def source_mode(args: argparse.Namespace) -> int:
     print("WORLD_MAP_SECOND_PACK_SOURCE=PASS")
     print(f"WORLD_MAP_SECOND_PACK_BOUNDED_WINDOWS={len(windows)}")
     print(f"WORLD_MAP_SECOND_PACK_BOUNDED_RAW_BYTES={budget[0]}")
-    print(f"WORLD_MAP_SECOND_PACK_OWNER_METAOBJECT_XREFS={len(xrefs.get(OWNER_STATIC_METAOBJECT, []))}")
-    print(f"WORLD_MAP_SECOND_PACK_OWNER_VPTR_XREFS={len(xrefs.get(OWNER_NEARBY_VPTR, []))}")
+    print(f"WORLD_MAP_SECOND_PACK_HANDLER_CTOR_CALLER_CANDIDATES={len(candidates)}")
     return 0
 
 

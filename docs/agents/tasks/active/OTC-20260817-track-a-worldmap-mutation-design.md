@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260817-track-a-worldmap-mutation-design
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-worldmap-mutation-design-20260817
 session_role: mutation_design_coordinator
@@ -8,13 +8,13 @@ project_lane: otclient
 lane: STATIC-RE
 track_id: official-client-re
 task_kind: discovery
-phase: validate
+phase: integrate
 branch: docs/OTC-20260817-track-a-worldmap-mutation-design
 base_branch: main
 base_main: 2ad6565f6f598b15acaeb3d182a3ffb70d187ba6
 pr: 452
 created: 2026-08-17T10:39:00+02:00
-updated: 2026-08-17T10:45:00+02:00
+updated: 2026-08-17T10:49:00+02:00
 risk: high
 policy_version: 2
 prompting_standard_version: 2.1
@@ -46,7 +46,7 @@ persistent_session_role: none
 physical_e2e_required: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-17T10:34:00+02:00
-last_progress_at: 2026-08-17T10:45:00+02:00
+last_progress_at: 2026-08-17T10:49:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -70,6 +70,16 @@ result:
   PHYSICAL_VALIDATION_EXECUTION_AUTHORIZED: false
   client_byte_mutation_authorized: false
   first_canary_recommendation: [19, 14]
+validation:
+  audit:
+    result: PASS
+    record: docs/agents/evidence/OTC-20260817-track-a-worldmap-mutation-design/20260817-final-audit.md
+    material_findings_open: 0
+    resolved_findings:
+      - WM-MD-AUD-001
+  e2e:
+    result: NOT_APPLICABLE
+    reason: documentation/design-only PR; no executable, official-client or runtime behavior is changed
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-worldmap-mutation-design.md
   - docs/agents/evidence/OTC-20260817-track-a-worldmap-mutation-design/**
@@ -90,29 +100,9 @@ blocks: []
 
 # World-map extent mutation design
 
-## Objective
+## Terminal design result
 
-Produce an exact, reversible and fail-closed design for a bounded world-map extent byte mutation of the fenced official native-Linux Tibia client. Consume the frozen accepted static graph from #367/#437/#446; do not reopen completed static discovery without a new discriminator.
-
-This task is documentation/static design only. It does not authorize execution or mutation of the client.
-
-## Acceptance inventory
-
-- [x] Fresh uniqueness/ownership preflight found no open worldmap mutation-design task/PR/branch.
-- [x] Preserved exact client fence and `runtime_access:none` admission.
-- [x] Derived an exact future VA->file-offset algorithm from retained producer `Elf64.vaddr_to_offset()` rather than assuming VA equals file offset.
-- [x] Defined exact 16-byte preimage guard at VA `0x01cdd958` and a target-parameterized little-endian postimage.
-- [x] Defined fail-closed source SHA/size/ELF/mapping/preimage/full-diff gates.
-- [x] Defined non-in-place operation on a task-owned copy and rollback by deleting the patched copy plus re-hashing the untouched exact source.
-- [x] Accounted for the shared Handler/Viewport literal and Viewport dynamic recomputation without inventing a second patch site.
-- [x] Preserved later-writer/network/capacity/RenderProvider/Camera unknowns and kept `SAFE_MUTATION_PROVEN=false`.
-- [x] Defined a separate physical-validation discriminator and patched-runtime identity/session boundary without executing it.
-- [x] Classified design, safety, physical contract and mutation authority independently.
-- [ ] Fresh proportionate final audit on exact PR diff with zero material findings.
-- [ ] Exact-final-head required repository CI.
-- [ ] Review-thread/PR hygiene and terminal archival/ownership release.
-
-## Current exact design
+The task has produced an exact reversible fail-closed mutation experiment design without executing or modifying the official client.
 
 ```yaml
 shared_literal_va: 0x01cdd958
@@ -126,16 +116,15 @@ first_canary_postimage_prefix_8_hex: 130000000e000000
 first_canary_changed_bytes: 1
 ```
 
-`[19,14]` is a minimal one-axis causal canary, not a final desired extent.
+`[19,14]` is a one-axis causal canary recommendation, not a final desired extent. All accepted later-writer, capacity/network, RenderProvider-allocation and Camera unknowns remain explicit. No second patch site is authorized by this design.
 
-## Durable evidence
+## Durable records
 
 - `docs/agents/evidence/OTC-20260817-track-a-worldmap-mutation-design/20260817-worldmap-mutation-design.md`
+- `docs/agents/evidence/OTC-20260817-track-a-worldmap-mutation-design/20260817-final-audit.md`
 - `docs/agents/reports/OTCLIENT-20260817-worldmap-mutation-design.md`
 
-Additional exact-fence mapping corroboration was inspected from historical run `31892019505`, artifact `9248797952`. It records nearby exact `file_offset == vaddr` mappings, but the design deliberately does not hardcode the target file offset from proximity.
-
-## Current admission record
+## Current admission
 
 ```yaml
 track_id: official-client-re
@@ -153,11 +142,11 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 ```
 
-## Checkpoint
+## Ready checkpoint
 
 ```yaml
-status: validating
-phase: validate
+status: ready
+phase: integrate
 branch: docs/OTC-20260817-track-a-worldmap-mutation-design
 pr: 452
 MUTATION_DESIGN_READY: true
@@ -165,9 +154,9 @@ SAFE_MUTATION_PROVEN: false
 PHYSICAL_VALIDATION_CONTRACT_READY: true
 PHYSICAL_VALIDATION_EXECUTION_AUTHORIZED: false
 client_byte_mutation_authorized: false
+audit_result: PASS
+material_findings_open: 0
 physical_e2e: NOT_APPLICABLE
-physical_e2e_reason: documentation/design-only PR changes no client/runtime behavior
-current_runtime_helper_promotion: PR #448 open/draft at latest check; not trusted-main
 blockers: []
-next_action: independently audit the exact PR #452 diff against the frozen #367/#437/#446 evidence, remediate any material contradiction, then run exact-head required CI and close out the PR/task.
+next_action: verify exact final PR diff and review threads, obtain required exact-head CI for the ready PR generation, merge #452 if every gate passes, then archive this task and release ownership as lifecycle closeout.
 ```

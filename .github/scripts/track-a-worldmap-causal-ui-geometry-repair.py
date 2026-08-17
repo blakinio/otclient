@@ -22,7 +22,8 @@ echo 'WORLDMAP_BASELINE_LOGIN_UI_TOOLING=RAW_XWD_GEOMETRY_PASS'
 SCREEN_CLASS=''
 SCREEN_RESULT=''
 classify_screen() {
-  local stem="$1" xwdfile="$ROOT/$stem.xwd"
+  local stem="$1"
+  local xwdfile="$ROOT/$stem.xwd"
   DISPLAY="$DISPLAY" "$XWD" -silent -id "$WIN" -out "$xwdfile"
   if ! SCREEN_RESULT="$(python3 "$CLASSIFIER" classify "$xwdfile")"; then
     rm -f "$xwdfile"

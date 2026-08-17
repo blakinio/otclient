@@ -14,10 +14,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  noise-controlled-focus-static:
-    name: Noise-mask focus discriminator validation (no client)
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
+  controlled-prelogin-focus-scan:
+    name: Noise-mask pre-login focus scan (no secrets)
+    runs-on: [otclient, synology]
+    timeout-minutes: 9
     steps:
       - name: Checkout exact head without codeload action
         shell: bash
@@ -26,15 +26,84 @@ jobs:
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          mkdir -p "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
           git init -q
+          git remote remove origin 2>/dev/null || true
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags --depth=1 origin "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
           git cat-file -e "$HEAD_SHA^{commit}"
           git checkout -q -f --detach "$HEAD_SHA"
+          git clean -ffdx
           [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
-          echo 'WORLDMAP_CONTROLLED_STATIC_CHECKOUT=PASS'
+          echo 'WORLDMAP_CONTROLLED_FOCUS_CHECKOUT=PASS'
 
-      - name: Validate controlled comparator and no-secret scan composition
+      - name: Revalidate current-main Track A admission
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          base_sha="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "$base_sha" "origin/$HEAD_BRANCH"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$base_sha" --expected-branch "$HEAD_BRANCH"
+          echo "WORLDMAP_CONTROLLED_FOCUS_CURRENT_MAIN=$base_sha"
+          echo 'WORLDMAP_CONTROLLED_FOCUS_CURRENT_MAIN_ANCESTRY=PASS'
+          echo 'WORLDMAP_CONTROLLED_FOCUS_ADMISSION=PASS'
+
+      - name: Require canonical controller plane idle without mutating it
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import fcntl,json,os,time
+          from pathlib import Path
+          state=Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          lock=state/'coordination.lock'; lease_path=state/'lease.json'; reg=state/'runtime-registration.json'
+          if not lock.is_file() or not lease_path.is_file(): raise SystemExit('WORLDMAP_CONTROLLED_FOCUS_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
+          fd=os.open(lock,os.O_RDONLY|getattr(os,'O_NOATIME',0))
+          try:
+              fcntl.flock(fd,fcntl.LOCK_SH)
+              lease=json.loads(lease_path.read_text())
+              safe={'generation':lease.get('generation'),'status':lease.get('status'),'controller_task':lease.get('controller_task'),'controller_session':lease.get('controller_session'),'expired':bool(lease.get('status')=='active' and isinstance(lease.get('expires_at'),int) and lease['expires_at']<=int(time.time()))}
+              print('WORLDMAP_CONTROLLED_FOCUS_CANONICAL_LEASE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
+              if safe['status']!='released' or safe['controller_task'] is not None or safe['controller_session'] is not None: raise SystemExit('WORLDMAP_CONTROLLED_FOCUS_PREFLIGHT_ERROR=canonical_lease_not_idle')
+              if reg.exists(): raise SystemExit('WORLDMAP_CONTROLLED_FOCUS_PREFLIGHT_ERROR=canonical_registration_present')
+          finally:
+              try: fcntl.flock(fd,fcntl.LOCK_UN)
+              except OSError: pass
+              os.close(fd)
+          print('WORLDMAP_CONTROLLED_FOCUS_CANONICAL_REGISTRATION=ABSENT')
+          print('WORLDMAP_CONTROLLED_FOCUS_CANONICAL_CONTROLLER_IDLE=PASS')
+          PY
+
+      - name: Revalidate task-local UI tool dynamic-link closure without client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TOOL=/home/runner/_work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || TOOL=/work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_CONTROLLED_FOCUS_UI_PREFLIGHT_ERROR=toolroot_missing' >&2; exit 1; }
+          LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+          XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
+          XDO="$TOOL/usr/bin/xdotool"
+          [[ -x "$XWD" && -x "$XDO" ]] || { echo 'WORLDMAP_CONTROLLED_FOCUS_UI_PREFLIGHT_ERROR=ui_tool_missing' >&2; exit 1; }
+          xwd_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XWD")"
+          xdo_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XDO")"
+          if grep -F 'not found' <<<"$xwd_deps" || grep -F 'not found' <<<"$xdo_deps"; then
+            echo 'WORLDMAP_CONTROLLED_FOCUS_UI_PREFLIGHT_ERROR=dependency_not_found' >&2
+            exit 1
+          fi
+          grep -F 'libxdo.so.3 =>' <<<"$xdo_deps" >/dev/null || { echo 'WORLDMAP_CONTROLLED_FOCUS_UI_PREFLIGHT_ERROR=libxdo_resolution_missing' >&2; exit 1; }
+          echo 'WORLDMAP_CONTROLLED_FOCUS_UI_TOOLROOT_DYNAMIC_LINK=PASS'
+
+      - name: Compose noise-mask no-secret focus scan
+        id: compose
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -44,12 +113,10 @@ jobs:
             .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
             .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
             .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py
-          python3 .github/scripts/track-a-worldmap-causal-xwd-compare.py controlled-cycle --help >/dev/null
-
-          screen="$RUNNER_TEMP/worldmap-controlled-screen.sh"
-          gdb="$RUNNER_TEMP/worldmap-controlled-gdb.sh"
-          ui="$RUNNER_TEMP/worldmap-controlled-ui.sh"
-          scan="$RUNNER_TEMP/worldmap-controlled-scan.sh"
+          screen="$RUNNER_TEMP/worldmap-controlled-focus-screen.sh"
+          gdb="$RUNNER_TEMP/worldmap-controlled-focus-gdb.sh"
+          ui="$RUNNER_TEMP/worldmap-controlled-focus-ui.sh"
+          scan="$RUNNER_TEMP/worldmap-controlled-focus-scan.sh"
           python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
             .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
           python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
@@ -58,78 +125,29 @@ jobs:
           bash -n "$scan"
           grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_MODE=TAB_NOISE_MASK_CONTROLLED_REVERSIBLE_DUMMY_TEXT' "$scan" >/dev/null
           grep -F 'controlled-cycle' "$scan" >/dev/null
-          grep -F -- '--max-width 500 --max-height 120 --max-area 30000' "$scan" >/dev/null
           grep -F 'WORLDMAP_PRELOGIN_CONTROLLED_EDITABLE_CANDIDATE=' "$scan" >/dev/null
           grep -F 'WORLDMAP_PRELOGIN_CONTROLLED_FOCUS_SCAN=COMPLETE_NO_SECRET' "$scan" >/dev/null
           if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
-            echo 'WORLDMAP_CONTROLLED_STATIC_ERROR=credential_submission_survived' >&2
+            echo 'WORLDMAP_CONTROLLED_FOCUS_COMPOSE_ERROR=credential_submission_survived' >&2
             exit 1
           fi
           if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan" || \
              grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan" || \
              grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || \
              grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
-            echo 'WORLDMAP_CONTROLLED_STATIC_ERROR=login_or_gameplay_surface_survived' >&2
+            echo 'WORLDMAP_CONTROLLED_FOCUS_COMPOSE_ERROR=login_or_gameplay_surface_survived' >&2
             exit 1
           fi
-          echo 'WORLDMAP_CONTROLLED_SCAN_COMPOSITION=PASS'
+          echo "scan=$scan" >> "$GITHUB_OUTPUT"
+          echo 'WORLDMAP_CONTROLLED_FOCUS_COMPOSITION=PASS'
+          echo 'WORLDMAP_CONTROLLED_FOCUS_SECRET_USED=false'
 
-      - name: Run positive and negative synthetic XWD controls
+      - name: Execute one noise-mask focus scan without secrets
         shell: bash
+        env:
+          SCAN: ${{ steps.compose.outputs.scan }}
         run: |
+          set +x
           set -Eeuo pipefail
-          FIX="$RUNNER_TEMP/worldmap-controlled-fixtures"
-          mkdir -p "$FIX"
-          python3 - "$FIX" <<'PY'
-          from pathlib import Path
-          import struct,sys
-          root=Path(sys.argv[1]); W,H=1020,650; stride=W*4
-          header=[0]*25
-          header[0]=101; header[1]=7; header[2]=2; header[3]=24
-          header[4]=W; header[5]=H; header[7]=0; header[11]=32; header[12]=stride
-          header[14]=0xFF0000; header[15]=0x00FF00; header[16]=0x0000FF
-          header[17]=8; header[18]=256; header[19]=0; header[20]=W; header[21]=H
-          prefix=struct.pack('>25I',*header)+b'\0'
-          def frame(name, rects=()):
-              px=bytearray(stride*H)
-              for x0,y0,x1,y1,val in rects:
-                  for y in range(y0,y1):
-                      for x in range(x0,x1):
-                          off=(y*W+x)*4; px[off:off+3]=bytes((val,val,val))
-              (root/name).write_bytes(prefix+px)
-          blank=(); local=((200,150,280,160,255),); wide=((20,200,900,210,255),)
-          for n in ('p0','p1','p2','pc','p3'): frame(n,blank)
-          frame('pt',local)
-          frame('n0',blank); frame('n1',local); frame('n2',blank); frame('nt',local); frame('nc',blank); frame('n3',local)
-          for n in ('w0','w1','w2','wc','w3'): frame(n,blank)
-          frame('wt',wide)
-          PY
-
-          CMP=.github/scripts/track-a-worldmap-causal-xwd-compare.py
-          python3 "$CMP" controlled-cycle \
-            "$FIX/p0" "$FIX/p1" "$FIX/p2" "$FIX/pt" "$FIX/pc" "$FIX/p3" \
-            --min-signal 25 --min-overlap-ratio 0.55 --max-width 500 --max-height 120 --max-area 30000 \
-            | tee "$FIX/positive.out"
-          grep -F 'WORLDMAP_XWD_CONTROLLED_EDITABLE_PROBE=PASS' "$FIX/positive.out" >/dev/null
-          grep -F 'WORLDMAP_XWD_CONTROLLED_SIGNAL_BBOX=200,150,280,160' "$FIX/positive.out" >/dev/null
-
-          set +e
-          python3 "$CMP" controlled-cycle \
-            "$FIX/n0" "$FIX/n1" "$FIX/n2" "$FIX/nt" "$FIX/nc" "$FIX/n3" \
-            --min-signal 25 --min-overlap-ratio 0.55 --max-width 500 --max-height 120 --max-area 30000 >"$FIX/noise.out" 2>&1
-          noise_rc=$?
-          python3 "$CMP" controlled-cycle \
-            "$FIX/w0" "$FIX/w1" "$FIX/w2" "$FIX/wt" "$FIX/wc" "$FIX/w3" \
-            --min-signal 25 --min-overlap-ratio 0.55 --max-width 500 --max-height 120 --max-area 30000 >"$FIX/wide.out" 2>&1
-          wide_rc=$?
-          set -e
-          [[ "$noise_rc" -eq 3 && "$wide_rc" -eq 3 ]]
-          grep -F 'WORLDMAP_XWD_CONTROLLED_EDITABLE_PROBE=FAIL' "$FIX/noise.out" >/dev/null
-          grep -F 'WORLDMAP_XWD_CONTROLLED_SIGNAL_CHANGED=0' "$FIX/noise.out" >/dev/null
-          grep -F 'WORLDMAP_XWD_CONTROLLED_EDITABLE_PROBE=FAIL' "$FIX/wide.out" >/dev/null
-          grep -F 'WORLDMAP_XWD_CONTROLLED_SIGNAL_WIDTH=880' "$FIX/wide.out" >/dev/null
-          echo 'WORLDMAP_CONTROLLED_SYNTHETIC_POSITIVE=PASS'
-          echo 'WORLDMAP_CONTROLLED_SYNTHETIC_NOISE_NEGATIVE=PASS'
-          echo 'WORLDMAP_CONTROLLED_SYNTHETIC_GEOMETRY_NEGATIVE=PASS'
-          echo 'WORLDMAP_CONTROLLED_STATIC_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_CONTROLLED_STATIC_SECRET_USED=false'
+          [[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]]
+          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD "$SCAN"

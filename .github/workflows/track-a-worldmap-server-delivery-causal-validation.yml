@@ -14,12 +14,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  tibia-entrypoint-parity:
-    name: Persistent Tibia entrypoint parity discriminator (no client)
+  tibia-target-file-classifier:
+    name: Persistent Tibia target file classifier (no client)
     runs-on: [otclient, synology]
     timeout-minutes: 3
     steps:
-      - name: Classify persistent Tibia symlink target only
+      - name: Classify target metadata without interpreting content
         shell: bash
         run: |
           set +x
@@ -37,32 +37,21 @@ jobs:
           ]
           home = next((p for p in roots if p.is_dir()), None)
           if home is None:
-              raise SystemExit('WORLDMAP_ENTRYPOINT_PARITY_ERROR=home_missing')
+              raise SystemExit('WORLDMAP_TARGET_CLASSIFIER_ERROR=home_missing')
 
-          share = home / '.local/share/CipSoft GmbH/Tibia'
+          vendor = home / '.local/share/CipSoft GmbH'
+          share = vendor / 'Tibia'
           link = share / 'Tibia'
-          package = share / 'packages/Tibia'
-          package_client = package / 'bin/client'
-          metadata = share / 'launchermetadata.json'
-
+          package_client = share / 'packages/Tibia/bin/client'
           if not link.is_symlink():
-              raise SystemExit('WORLDMAP_ENTRYPOINT_PARITY_ERROR=link_missing')
-          if not package.is_dir():
-              raise SystemExit('WORLDMAP_ENTRYPOINT_PARITY_ERROR=package_missing')
+              raise SystemExit('WORLDMAP_TARGET_CLASSIFIER_ERROR=link_missing')
           if not package_client.is_file():
-              raise SystemExit('WORLDMAP_ENTRYPOINT_PARITY_ERROR=package_client_missing')
+              raise SystemExit('WORLDMAP_TARGET_CLASSIFIER_ERROR=package_client_missing')
 
           target = link.resolve(strict=True)
-
-          def kind(path: Path) -> str:
-              mode = path.lstat().st_mode
-              if stat.S_ISDIR(mode):
-                  return 'DIR'
-              if stat.S_ISREG(mode):
-                  return 'FILE'
-              if stat.S_ISLNK(mode):
-                  return 'SYMLINK'
-              return 'OTHER'
+          st = target.stat()
+          if not stat.S_ISREG(st.st_mode):
+              raise SystemExit('WORLDMAP_TARGET_CLASSIFIER_ERROR=target_not_regular_file')
 
           def sha256(path: Path) -> str:
               h = hashlib.sha256()
@@ -71,40 +60,64 @@ jobs:
                       h.update(chunk)
               return h.hexdigest()
 
-          target_kind = kind(target)
-          same_package_client = target.is_file() and os.path.samefile(target, package_client)
-          target_sha = sha256(target) if target.is_file() else 'NOT_FILE'
-          target_exact = target_sha == EXPECTED_SHA
-          package_sha = sha256(package_client)
-          package_exact = package_sha == EXPECTED_SHA
-          target_under_package = False
-          target_relative = 'OUTSIDE_PACKAGE'
-          try:
-              target_relative = str(target.relative_to(package))
-              target_under_package = True
-          except ValueError:
-              pass
+          target_sha = sha256(target)
+          with target.open('rb') as f:
+              magic = f.read(4).hex()
 
-          print('WORLDMAP_ENTRYPOINT_TARGET_KIND=' + target_kind)
-          print('WORLDMAP_ENTRYPOINT_TARGET_SAMEFILE_PACKAGE_CLIENT=' + str(same_package_client).lower())
-          print('WORLDMAP_ENTRYPOINT_TARGET_SHA_MATCH_EXACT=' + str(target_exact).lower())
-          print('WORLDMAP_ENTRYPOINT_PACKAGE_CLIENT_SHA_MATCH_EXACT=' + str(package_exact).lower())
-          print('WORLDMAP_ENTRYPOINT_TARGET_UNDER_PACKAGE=' + str(target_under_package).lower())
-          print('WORLDMAP_ENTRYPOINT_TARGET_RELATIVE_TO_PACKAGE=' + target_relative)
-          print('WORLDMAP_ENTRYPOINT_METADATA_PRESENT=' + str(metadata.is_file() and not metadata.is_symlink()).lower())
-          print('WORLDMAP_ENTRYPOINT_CLIENT_EXECUTED=false')
-          print('WORLDMAP_ENTRYPOINT_SECRET_USED=false')
+          def relative_or(path: Path, root: Path, fallback: str) -> str:
+              try:
+                  return str(path.relative_to(root))
+              except ValueError:
+                  return fallback
+
+          raw = os.readlink(link)
+          raw_path = Path(raw)
+          home_rel = relative_or(target, home, 'OUTSIDE_HOME')
+          vendor_rel = relative_or(target, vendor, 'OUTSIDE_VENDOR_ROOT')
+          share_rel = relative_or(target, share, 'OUTSIDE_TIBIA_SHARE')
+          package_rel = relative_or(target, share / 'packages/Tibia', 'OUTSIDE_PACKAGE')
+
+          vendor_entries = []
+          if vendor.is_dir():
+              for p in sorted(vendor.iterdir(), key=lambda x: x.name):
+                  try:
+                      mode = p.lstat().st_mode
+                  except OSError:
+                      continue
+                  kind = 'SYMLINK' if stat.S_ISLNK(mode) else 'DIR' if stat.S_ISDIR(mode) else 'FILE' if stat.S_ISREG(mode) else 'OTHER'
+                  vendor_entries.append(kind + ':' + p.name)
+
+          print('WORLDMAP_TARGET_RAW_LINK_IS_ABSOLUTE=' + str(raw_path.is_absolute()).lower())
+          print('WORLDMAP_TARGET_BASENAME=' + target.name)
+          print('WORLDMAP_TARGET_HOME_RELATIVE=' + home_rel)
+          print('WORLDMAP_TARGET_VENDOR_RELATIVE=' + vendor_rel)
+          print('WORLDMAP_TARGET_SHARE_RELATIVE=' + share_rel)
+          print('WORLDMAP_TARGET_PACKAGE_RELATIVE=' + package_rel)
+          print('WORLDMAP_TARGET_SIZE=' + str(st.st_size))
+          print('WORLDMAP_TARGET_EXECUTABLE=' + str(bool(st.st_mode & 0o111)).lower())
+          print('WORLDMAP_TARGET_MAGIC4_HEX=' + magic)
+          print('WORLDMAP_TARGET_SHA256=' + target_sha)
+          print('WORLDMAP_TARGET_SHA_MATCH_EXACT=' + str(target_sha == EXPECTED_SHA).lower())
+          print('WORLDMAP_VENDOR_TOP=' + ','.join(vendor_entries))
+          print('WORLDMAP_TARGET_FILE_EXECUTED=false')
+          print('WORLDMAP_TARGET_CONTENT_INTERPRETED=false')
+          print('WORLDMAP_TARGET_SECRET_USED=false')
 
           summary = ';'.join([
-              'kind=' + target_kind,
-              'same_package_client=' + str(same_package_client).lower(),
-              'target_exact=' + str(target_exact).lower(),
-              'package_exact=' + str(package_exact).lower(),
-              'under_package=' + str(target_under_package).lower(),
-              'relative=' + target_relative,
-              'metadata=' + str(metadata.is_file() and not metadata.is_symlink()).lower(),
-              'client_executed=false',
+              'basename=' + target.name,
+              'home_rel=' + home_rel,
+              'vendor_rel=' + vendor_rel,
+              'share_rel=' + share_rel,
+              'package_rel=' + package_rel,
+              'size=' + str(st.st_size),
+              'executable=' + str(bool(st.st_mode & 0o111)).lower(),
+              'magic4=' + magic,
+              'sha256=' + target_sha,
+              'target_exact=' + str(target_sha == EXPECTED_SHA).lower(),
+              'vendor_top=' + ','.join(vendor_entries),
+              'file_executed=false',
+              'content_interpreted=false',
               'secret_used=false',
           ])
-          print('::notice title=Tibia entrypoint parity::' + summary)
+          print('::notice title=Tibia symlink target file::' + summary)
           PY

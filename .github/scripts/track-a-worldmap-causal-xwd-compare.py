@@ -125,7 +125,7 @@ def main() -> int:
     c.add_argument("before",type=Path); c.add_argument("typed",type=Path); c.add_argument("cleared",type=Path)
     c.add_argument("x0",type=int); c.add_argument("y0",type=int); c.add_argument("x1",type=int); c.add_argument("y1",type=int)
     c.add_argument("--min-changed",type=int,default=60)
-    c.add_argument("--min-overlap-ratio",type=float,default=0.60)
+    c.add_argument("--min-overlap-ratio",type=float,default=0.80)
     s=sub.add_parser("change")
     s.add_argument("before",type=Path); s.add_argument("after",type=Path); s.add_argument("--min-changed",type=int,required=True)
     s.add_argument("--x0",type=int); s.add_argument("--y0",type=int); s.add_argument("--x1",type=int); s.add_argument("--y1",type=int)

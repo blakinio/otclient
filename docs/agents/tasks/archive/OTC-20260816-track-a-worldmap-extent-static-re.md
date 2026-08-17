@@ -69,11 +69,13 @@ carried_unknowns:
   - any safe client-byte mutation design
 safety_boundary:
   runtime_access: none
-  client_executed: false
+  exact_game_client_executed: false
   process_memory_accessed: false
   canonical_runtime_accessed: false
   client_bytes_mutated: false
-  raw_client_uploaded: false
+  raw_exact_game_client_uploaded: false
+  historical_launcher_artifact_uploaded: true
+  historical_launcher_is_exact_game_client: false
   owner_funded_ai_api_used: false
 validation:
   coordinator_decision: ACCEPT_WITH_EDITS_COMPLETED

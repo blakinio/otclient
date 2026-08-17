@@ -14,17 +14,68 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  safety-hold:
-    name: Worldmap causal safety hold after pre-login field probe failure (no client)
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
+  persistent-home-metadata:
+    name: CipSoft persistent-home metadata discriminator (no client)
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
     steps:
-      - name: Hold physical runtime while fresh-screen interaction is discriminated
+      - name: Inspect only CipSoft/Tibia path metadata without file contents
+        shell: bash
         run: |
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD=PASS'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_REASON=email_editable_probe_zero_change'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_GDB_ATTACH_LAST_PHYSICAL=PASS'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_LOGIN_SUBMITTED_LAST_PHYSICAL=false'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_SOURCE_REHASH_LAST_PHYSICAL=PASS'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_SECRET_USED=false'
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          roots = [
+              Path('/home/runner/_work/_otclient_tibia_re_state/home'),
+              Path('/work/_otclient_tibia_re_state/home'),
+          ]
+          home = next((p for p in roots if p.is_dir()), None)
+          if home is None:
+              raise SystemExit('WORLDMAP_HOME_META_ERROR=persistent_home_missing')
+
+          prune_names = {'packages', 'crashdump'}
+          findings = []
+          for base_name in ('.config', '.cache', '.local/share'):
+              base = home / base_name
+              if not base.exists():
+                  continue
+              for root, dirs, files in os.walk(base):
+                  rp = Path(root)
+                  rel_root = rp.relative_to(home)
+                  dirs[:] = [d for d in dirs if d not in prune_names]
+                  depth = len(rel_root.parts)
+                  if depth > 7:
+                      dirs[:] = []
+                      continue
+                  text = str(rel_root).lower()
+                  relevant_dir = 'tibia' in text or 'cipsoft' in text
+                  if relevant_dir:
+                      findings.append(('DIR', str(rel_root), 0))
+                  for name in files:
+                      rel = rel_root / name
+                      low = str(rel).lower()
+                      if 'tibia' not in low and 'cipsoft' not in low and not relevant_dir:
+                          continue
+                      p = home / rel
+                      try:
+                          st = p.lstat()
+                      except OSError:
+                          continue
+                      kind = 'SYMLINK' if p.is_symlink() else 'FILE'
+                      findings.append((kind, str(rel), st.st_size))
+
+          findings = sorted(set(findings), key=lambda x: (x[1], x[0], x[2]))
+          print('WORLDMAP_HOME_META_FINDING_COUNT=' + str(len(findings)))
+          for kind, rel, size in findings[:200]:
+              # Metadata only: path/type/size. Never read or print file values.
+              print(f'WORLDMAP_HOME_META={kind}\t{rel}\t{size}')
+          if len(findings) > 200:
+              print('WORLDMAP_HOME_META_TRUNCATED=true')
+          print('WORLDMAP_HOME_META_FILE_CONTENT_READ=false')
+          print('WORLDMAP_HOME_META_CLIENT_EXECUTED=false')
+          print('WORLDMAP_HOME_META_SECRET_USED=false')
+          PY

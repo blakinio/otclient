@@ -2,18 +2,18 @@
 task_id: OTC-20260816-track-a-canonical-runtime-e2e
 status: validating
 agent: ChatGPT
-session_id: chatgpt-raw-xres-helper-promotion-20260817
-session_role: promotion_integration_coordinator
+session_id: chatgpt-xres-client-base-followup-20260817
+session_role: canonical_runtime_integration
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: coordinator-promotion-raw-xres-wire
-branch: feat/OTC-20260817-track-a-raw-xres-helper-promote
+phase: xres-client-base-helper-followup
+branch: fix/OTC-20260816-track-a-canonical-runtime-xres-client-base
 base_branch: main
-base_main: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
+base_main: c55e3523e6e9d50df511e65dce9145a8f951a5f5
 risk: high
-updated: 2026-08-17T08:56:00+02:00
+updated: 2026-08-17T11:44:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
   - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
@@ -22,16 +22,12 @@ owned_paths:
   - .github/workflows/tibia-official-client-re-xres-wire.yml
 modules_touched:
   - track-a-xres-wire-helper
-reuses:
-  - docs/agents/tasks/archive/OTC-20260816-track-a-xres-window-identity.md
-  - docs/agents/tasks/archive/OTC-20260816-track-a-xres-support-inventory.md
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 blocks:
   - OTC-20260815-track-a-p0-direct-position
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: coordinator independently reviewed source Draft #447, found and resolved one fail-closed ambiguity before terminal source closeout, and verified the final source head with dedicated hosted tests, Track A governance, repository CI and zero review threads. This branch is an exact conflict-free source tree replay on trusted main plus coordinator checkpoint metadata. No physical runtime access is authorized by this promotion.
+execution_reason: physical XRes identity is now promoted and archived; the retained v2 raw reply disproved the helper's exact-resource-echo assumption, so the next bounded step is a hosted-only semantic correction using the retained reply as a deterministic regression fixture before any later RUNTIME consumer reuses the helper.
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
@@ -52,83 +48,68 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
+client_byte_mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
 owner_funded_ai_api_authorized: false
-source_review:
-  source_pr: 447
-  source_final_head: 32c61120b9086904b328e7b4aa50526d64bef807
-  coordinator_decision: ACCEPT
-  source_merge_tree: 56b1a50be3194b0c11bfda0ee1a502f33cef923e
-  replay_seed_commit: 0a6709deec8082221323286a20b416ea8e9a606a
-  material_findings_open: 0
-  hardening_finding: one-spec QueryClientIds extraction originally ignored unrelated extra records
-  hardening_resolution: nonempty one-spec result must contain exactly one record total
-  hardening_fixture: test_rejects_extra_non_target_record_even_with_target
-source_validation:
-  semantic_helper_head: 06c6f18fc4a8920428ca353173b0596758a0190a
-  semantic_dedicated_run: 32001448940
-  semantic_dedicated_job: 95302425720
-  semantic_dedicated_result: SUCCESS
-  deterministic_tests: 33
-  deterministic_tests_passed: 33
-  purity_contract: XRES_WIRE_PURE_TRANSPORT_FREE_PASS
-  source_final_dedicated_run: 32001585699
-  source_final_dedicated_job: 95302804376
-  source_final_dedicated_result: SUCCESS
-  source_final_governance_run: 32001585708
-  source_final_governance_result: SUCCESS
-  source_final_repository_ci_run: 32001585992
-  source_final_required_ci_job: 95303113378
-  source_final_required_ci_result: SUCCESS
-  source_review_threads_open: 0
-implementation:
-  helper_path: .github/scripts/tibia-official-client-re-xres-wire.py
-  helper_blob: ce5992bc1171eef9f24a71dfc97da728f18627a9
-  test_path: .github/scripts/test_tibia_official_client_re_xres_wire.py
-  dedicated_workflow: .github/workflows/tibia-official-client-re-xres-wire.yml
-  query_version_encoder: PASS
-  query_version_reply_parser: PASS
-  query_client_ids_encoder: PASS
-  query_client_ids_reply_parser: PASS
-  local_client_pid_extractor: PASS
-  transport_free: true
-  exactly_one_record_for_one_spec_required: true
-classification:
-  primary: PROVEN_HOSTED_RAW_XRES_WIRE_CODEC_FAIL_CLOSED_AND_TRANSPORT_FREE_WITH_33_DETERMINISTIC_FIXTURES
-evidence:
-  - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/20260817-raw-xres-wire-hosted.md
+exact_client:
+  version: 15.32.df7b29
+  size: 51965216
+  sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+  platform: official_native_linux_only
+identity_chain:
+  raw_xres_helper_promotion_pr: 448
+  raw_xres_helper_promotion_merge: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
+  client_id_length_fix_pr: 455
+  client_id_length_fix_merge: 60ab740872d52f3f7c4802d49fd5275a9968d085
+  physical_identity_pr: 457
+  physical_identity_merge: 16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc
+  physical_identity_run: 32015479835
+  physical_identity_job: 95344000918
+  physical_identity: PROVEN
+  physical_identity_classification: XRES_PROVES_VIEWABLE_WINDOW_OWNED_BY_EXACT_CLIENT
+  physical_identity_cleanup: COMPLETE
+  identity_archive_pr: 459
+  identity_archive_merge: c55e3523e6e9d50df511e65dce9145a8f951a5f5
+  identity_ownership_released: true
+retained_v2_fixture:
+  queried_resource_xid: '0x00c00011'
+  returned_client_base: '0x00c00000'
+  returned_mask: LocalClientPid
+  returned_pid: 13648
+  exact_launched_pid: 13648
+  raw_reply_hex: 01000300040000000100000000000000000000000000000000000000000000000000c000020000000400000050350000
+helper_followup:
+  finding: XRES-V2-AUD-001
+  severity: LOW
+  current_helper_blob: ac3c292087918d01e10006d153f84170210d81d5
+  issue: extract_local_client_pid incorrectly requires CLIENTIDVALUE.spec.client to echo the exact queried resource XID; the X server selects the owner from the requested resource and may return the owning client resource-base instead.
+  correction: retain one-spec exactly-one-record fail-closed behavior, require nonzero returned client identifier, exact LocalClientPid mask, exactly one positive CARD32 PID, and do not require exact resource-XID echo.
+  additional_physical_run_required: false
+  additional_physical_run_authorized: false
 safety:
-  canonical_bootstrap_retry_authorized: false
-  canonical_window_identity_relaxation_authorized: false
-  physical_identity_retry_authorized_before_promotion_merge: false
+  canonical_state_access: forbidden_during_hosted_fix
   credentials_allowed: false
   login_allowed: false
   gameplay_allowed: false
+  process_memory_access: false
+  client_byte_mutation: false
+  physical_identity_retry_authorized: false
   track_b_access: false
-forbidden:
-  - Synology/Xvfb/official-client execution from this promotion branch
-  - network/socket/X11 connection in helper tests
-  - canonical lease/registration/session observation or mutation
-  - credentials, login or gameplay
-  - canonical bootstrap retry
-  - canonical window identity relaxation before direct physical XID-to-PID proof
-  - Track B and historical PR #303 runtime surfaces
 acceptance:
-  - exact source tree replayed without manual code rewrite
-  - source dedicated validation and purity PASS
-  - source Track A governance PASS
-  - source CI Required PASS
-  - source review threads zero
-  - coordinator material findings zero
-  - promotion exact-head dedicated workflow PASS
-  - promotion Track A governance PASS
-  - promotion repository CI Required PASS pre-ready and ready-state
-  - no physical runtime access occurs
-last_completed_step: source #447 final head passed dedicated raw-XRes validation, Track A governance and repository CI; coordinator decision is ACCEPT and the exact source merge tree is replayed linearly on trusted main for promotion
-next_action: validate promotion exact head, mark ready, protected auto-merge, close #447 superseded, then freshly admit a separate task-owned isolated physical XRes PID-identity discriminator using the promoted helper; canonical bootstrap and window-identity relaxation remain forbidden until that physical proof succeeds.
+  - persistent helper accepts the retained v2 resource-to-client-base reply and extracts PID 13648
+  - zero returned client identifiers remain rejected
+  - wrong mask, wrong value shape, zero PID and multi-record replies remain rejected
+  - deterministic helper tests pass
+  - helper remains transport-free and performs no I/O
+  - exact-head Track A runtime governance passes
+  - exact-head repository CI passes
+  - no Synology, X11, official-client or canonical-state access occurs in this hosted fix
+  - after promotion, any P0 physical work starts with its own fresh RUNTIME admission and may proceed only if a legal current IN_GAME lifecycle exists; do not bootstrap a session solely for P0
+last_completed_step: PR #457 promoted direct physical resource-to-exact-client PID identity and PR #459 archived that discriminator with ownership released; the only immediate canonical follow-up is the retained-reply helper semantic correction
+next_action: implement and validate the hosted-only XRes client-base helper correction, promote it, then perform fresh P0 RUNTIME admission and stop fail-closed if no legal current IN_GAME lifecycle is available
 ---
 
-# Track A canonical runtime E2E — raw-XRes helper promotion
+# Track A canonical runtime E2E — XRes client-base helper follow-up
 
-This promotion makes the pure wire codec durable on trusted main. It does not itself prove physical resource ownership or authorize canonical startup.
+Physical X11 resource ownership is proven and durable. This branch does not repeat that physical experiment. It corrects the persistent pure wire helper using the retained real v2 reply, then returns control to a separately admitted downstream RUNTIME phase.

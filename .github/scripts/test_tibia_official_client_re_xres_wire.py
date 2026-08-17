@@ -221,9 +221,8 @@ class XResQueryClientIdsTests(unittest.TestCase):
     def test_rejects_value_payload_truncation(self) -> None:
         data = client_ids_reply([(RESOURCE_XID, 2, (PID,))])
         shortened = data[:-4]
-        prefix = "<"
         fixed = bytearray(shortened)
-        struct.pack_into(prefix + "I", fixed, 4, (len(shortened) - 32) // 4)
+        struct.pack_into("<I", fixed, 4, (len(shortened) - 32) // 4)
         with self.assertRaises(wire.XResWireError):
             wire.parse_query_client_ids_reply(bytes(fixed), "little")
 
@@ -284,6 +283,14 @@ class XResQueryClientIdsTests(unittest.TestCase):
         records = (
             wire.ClientIdValue(RESOURCE_XID, 2, (PID,)),
             wire.ClientIdValue(RESOURCE_XID, 2, (PID,)),
+        )
+        with self.assertRaises(wire.XResWireError):
+            wire.extract_local_client_pid(records, RESOURCE_XID)
+
+    def test_rejects_extra_non_target_record_even_with_target(self) -> None:
+        records = (
+            wire.ClientIdValue(RESOURCE_XID, 2, (PID,)),
+            wire.ClientIdValue(RESOURCE_XID + 1, 2, (PID + 1,)),
         )
         with self.assertRaises(wire.XResWireError):
             wire.extract_local_client_pid(records, RESOURCE_XID)

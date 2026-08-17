@@ -1,6 +1,6 @@
 {
   "schema": "otclient.tibia-re.coverage-current-overlay.v2",
-  "snapshot_main": "1eb4a8edecba3966aa1e6155e241b404eb4d30cb",
+  "snapshot_main": "0b3bdec0a4145f558806448a4657413664d80729",
   "registry_promotion_pr": 454,
   "semantic_denominator_integration_pr": 460,
   "source_baseline": {"pr":304,"head":"43a60bd96cc644b656b200c9edbfb75578b330b6"},
@@ -45,11 +45,14 @@
   "worldmap": {
     "static_graph_merge": "f5daad1bbb7e00dcaa26acafc0a69d10a3a1b696",
     "mutation_design_merge": "1e6fcb5ab83c4bb8b762088326cc936857c8e64d",
+    "physical_validation_archive_merge": "0b3bdec0a4145f558806448a4657413664d80729",
     "static_patch_graph_ready": true,
     "mutation_design_ready": true,
+    "physical_validation_executed": true,
+    "physical_validation_result": "NO_HANDLER_CANARY_OBSERVED_BOUNDED",
+    "causal_propagation_proven": false,
     "safe_mutation_proven": false,
-    "physical_validation_execution_authorized": false,
-    "client_byte_mutation_authorized": false
+    "additional_physical_launch_authorized": false
   },
   "runtime": {
     "raw_xres_helper_promotion_merge": "d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab",

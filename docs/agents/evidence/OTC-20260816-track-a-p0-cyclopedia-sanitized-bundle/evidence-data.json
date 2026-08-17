@@ -1,0 +1,194 @@
+{
+  "artifact": {
+    "id": 9278368790,
+    "name": "track-a-p0-cyclopedia-sanitized-32000921225",
+    "zip_digest": "sha256:49f48d4283e63dd613b32a99300dc86eb98d68d7d7f640ec621c72e854c30c87"
+  },
+  "client": {
+    "platform": "official_native_linux_only",
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "size": 51965216,
+    "version": "15.32.df7b29"
+  },
+  "consumer_pr": 302,
+  "derived_typeinfo_candidates": [
+    "0x3089a50"
+  ],
+  "derived_vtable_candidates": [
+    {
+      "derived_address_point": "0x3089db0",
+      "section": ".rela.dyn",
+      "typeinfo_candidate": "0x3089a50",
+      "typeinfo_relocation_offset": "0x3089da8"
+    }
+  ],
+  "direct_relocations": [
+    {
+      "addend": "0x1cdda40",
+      "offset": "0x3089a58",
+      "section": ".rela.dyn",
+      "target_labels": [
+        "cyclopedia_map_storage_rtti"
+      ],
+      "type": 8
+    },
+    {
+      "addend": "0x1c91120",
+      "offset": "0x3138ef8",
+      "section": ".rela.dyn",
+      "target_labels": [
+        "world_map_coordinate"
+      ],
+      "type": 8
+    },
+    {
+      "addend": "0x1c93260",
+      "offset": "0x31393f8",
+      "section": ".rela.dyn",
+      "target_labels": [
+        "weak_player_type"
+      ],
+      "type": 8
+    },
+    {
+      "addend": "0x1d2a580",
+      "offset": "0x31516b8",
+      "section": ".rela.dyn",
+      "target_labels": [
+        "cyclopedia_map_storage_meta"
+      ],
+      "type": 8
+    }
+  ],
+  "disassembly_window_count": 4,
+  "hosted_validation": {
+    "derived_vtable_candidates": 1,
+    "direct_relocations": 4,
+    "disassembly_window_count": 4,
+    "exact_fence": "PASS",
+    "hosted_validation": "PASS",
+    "physical_confirmation_owner": "RUNTIME",
+    "rip_xrefs": 4,
+    "sanitized_text_only": true,
+    "semantic_player_xyz_proven": false,
+    "target_labels": 9
+  },
+  "producer_pr": 435,
+  "rip_xrefs": [
+    {
+      "address": "0x812952",
+      "kind": "lea",
+      "labels": [
+        "derived_vtable_address_point"
+      ],
+      "target": "0x3089db0"
+    },
+    {
+      "address": "0x812e12",
+      "kind": "lea",
+      "labels": [
+        "derived_vtable_address_point"
+      ],
+      "target": "0x3089db0"
+    },
+    {
+      "address": "0xd299ed",
+      "kind": "lea",
+      "labels": [
+        "cyclopedia_map_storage_meta"
+      ],
+      "target": "0x1d2a8d8"
+    },
+    {
+      "address": "0xeb0ea2",
+      "kind": "lea",
+      "labels": [
+        "derived_vtable_address_point"
+      ],
+      "target": "0x3089db0"
+    }
+  ],
+  "safety": {
+    "canonical_runtime_accessed": false,
+    "client_executed": false,
+    "network_accessed": false,
+    "physical_confirmation_owner": "RUNTIME",
+    "process_memory_accessed": false,
+    "raw_client_uploaded": false,
+    "runtime_access": "none",
+    "semantic_player_xyz_proven": false
+  },
+  "schema": "OTC-20260816-track-a-p0-cyclopedia-sanitized-bundle-durable-v1",
+  "source_file_integrity": {
+    "bundle-summary.txt": "sha256:af1f307660bb18f6529dfc2919feba27f2b516e0b7556e6caa5152053e8b7653",
+    "bundle.json": "sha256:a537891368c0bb8888ed8caeca3bbfc9fc910d9c37bc2a1e852188eb4671b4a6",
+    "cyclopedia-code-windows.txt": "sha256:f660005cc2a8fef15ac35ba891430cb67157ee45f5a282d05ad884ae60368002",
+    "hosted-validation.json": "sha256:103c0d092fbf650b849205d4e648636ba5010706a4eeacf61810415a6dfe7591",
+    "hosted-validation.txt": "sha256:49ddc67ae0d175e56e2dd256c06d04e983f31dfbc323e879fca7257f150eded6"
+  },
+  "source_head": "40b5efd2f6371b8f5c0a00036084960ab66eefd0",
+  "source_run": 32000921225,
+  "target_vaddrs": {
+    "cyclopedia_map_storage_meta": [
+      "0x1d2a580",
+      "0x1d2a8d8"
+    ],
+    "cyclopedia_map_storage_rtti": [
+      "0x1cdda40"
+    ],
+    "on_player_position_changed": [
+      "0x1cf422b",
+      "0x1d2a4f5",
+      "0x1d8f874"
+    ],
+    "p_player": [
+      "0x1c94430",
+      "0x1c9b05b",
+      "0x1cab92c",
+      "0x1cd4dfb",
+      "0x1cd8813",
+      "0x1cd9955",
+      "0x1ce115f",
+      "0x1ce156b",
+      "0x1cf85e9",
+      "0x1d2aa98",
+      "0x1d47ec5",
+      "0x1d70591",
+      "0x1d7346d"
+    ],
+    "player_creature_added": [
+      "0x1d2aa4a",
+      "0x1d70542"
+    ],
+    "player_position_changed": [
+      "0x1d2a937"
+    ],
+    "player_position_updated": [
+      "0x1d2aaa0"
+    ],
+    "weak_player_type": [
+      "0x1c93260",
+      "0x1c94405",
+      "0x1c9b030",
+      "0x1cab901",
+      "0x1cd4dd0",
+      "0x1cd87e8",
+      "0x1cd9624",
+      "0x1cd992a",
+      "0x1cf85be",
+      "0x1d2aa6d",
+      "0x1d70566",
+      "0x1d73442"
+    ],
+    "world_map_coordinate": [
+      "0x1c7bdf1",
+      "0x1c91120",
+      "0x1c976c8",
+      "0x1cf4243",
+      "0x1cf4d6e",
+      "0x1d19560",
+      "0x1d2a95d",
+      "0x1d8f88c"
+    ]
+  }
+}

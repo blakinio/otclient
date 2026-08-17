@@ -6,6 +6,7 @@ on:
       - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
     paths:
       - .github/workflows/track-a-worldmap-native-object-provenance-v15.yml
+      - .github/scripts/track-a-worldmap-native-object-provenance-v15-repair.py
 
 permissions:
   contents: read

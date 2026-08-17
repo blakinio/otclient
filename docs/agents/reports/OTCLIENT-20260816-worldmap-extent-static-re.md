@@ -1,7 +1,7 @@
 # OTCLIENT-TIBIA-RE — worldmap extent static dependency recovery
 
 ```yaml
-report_date: 2026-08-16
+report_date: 2026-08-17
 repository: blakinio/otclient
 task: OTC-20260816-track-a-worldmap-extent-static-re
 pr: 367
@@ -12,173 +12,140 @@ client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 implementation_status: NOT_IMPLEMENTED
 client_byte_mutation: NOT_PERFORMED
 runtime_used_by_this_task: false
-original_blocker: BLOCKED_EXACT_STATIC_BYTES_NOT_DURABLY_STAGED
-original_blocker_status: RESOLVED_BY_PR_437
-static_classification: MORE_STATIC_RE_NEEDED
-static_patch_graph_ready: false
-remaining_blocker: DOWNSTREAM_EXACT_WORLD_MAP_CONSUMER_WINDOWS_NOT_DURABLY_STAGED
+static_classification: STATIC_DEPENDENCY_GRAPH_RECOVERED
+static_patch_graph_ready: true
+mutation_design_ready: false
+remaining_blocker: NONE_FOR_STATIC_DEPENDENCY_DISCOVERY
 ```
 
 ## Result
 
-A new governance-bounded sanitized exact-client producer, Draft PR #437 (`OTC-20260816-track-a-worldmap-exact-static-evidence`), has resolved the exact identity/writer blocker that previously stopped PR #367. The producer fenced the official native-Linux client to version `15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`, and produced no raw-client artifact.
+The original exact-static input blocker was resolved by producer PR #437. The remaining upstream/downstream blocker is now resolved by new producer Draft PR #446 (`OTC-20260817-track-a-worldmap-downstream-exact-static-evidence`) at exact evidence head `f7f16af614a88100cc82ff7ecf0b112cb2e0605c`.
 
-Source run `31972743782` / job `95227595548` produced artifact `9270235755`; hosted run `31972915689` / job `95228024727` produced the final sanitized artifact `9270276361`. In this continuation both artifact ZIP digests were independently checked and exactly matched producer metadata. The hosted artifact reports `WORLD_MAP_STATIC_HOSTED_VALIDATION=PASS` and `WORLD_MAP_STATIC_EVIDENCE_READY=true`.
-
-No exhausted historical-artifact scan was repeated, no failed CDN fetch was retried, no live Synology/static-analysis fallback was used by #367, and no client bytes were changed.
-
-Durable consumer evidence:
-
-`docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260816-new-exact-static-unblock-and-downstream-recovery.md`
-
-## Exact identity correction
-
-All three requested vtable/typeinfo windows are now exact:
+Producer #446 exact-head validation passed:
 
 ```text
-0x030871c8..0x030871d7 -> vptr 0x030871d8
-bytes    0000000000000000b85f080300000000
-typeinfo 0x03085fb8
-class    tibia::worldmap::TWorldmapProtocolMessageHandler
-
-0x0308ce60..0x0308ce6f -> vptr 0x0308ce70
-bytes    0000000000000000f0b5080300000000
-typeinfo 0x0308b5f0
-class    tibia::worldmap::TWorldMapStorage
-
-0x02f683c0..0x02f683cf -> vptr 0x02f683d0
-bytes    000000000000000020fb070300000000
-typeinfo 0x0307fb20
-class    std::_Sp_counted_ptr_inplace<tibia::worldmap::TWorldMapStorage,...>
+Track A governance run  32003664983  SUCCESS
+repository CI run        32003665239  SUCCESS
+CI / Required job        95309109578  SUCCESS
 ```
 
-**FACT:** the historical `owner+0x10` object carrying retained `+0x48=18`, `+0x4c=14` is `TWorldMapStorage`, not `TWorldMapViewport`.
+No raw client was uploaded, no live client process/runtime state was used, and no client bytes were modified.
 
-**FACT:** the adjacent counted control block is the counted `TWorldMapStorage` allocation wrapper.
+Final durable consumer evidence:
 
-The previous strong Viewport correlation for this specific object/control pair is superseded by direct RTTI evidence.
+`docs/agents/evidence/OTC-20260816-track-a-worldmap-extent-static-re/20260817-downstream-exact-static-consumption.md`
 
-## Storage geometry — exact writers and meaning
+## Exact geometry source chain
 
-Exact Storage constructor `0x00cbf37a` installs vptr `0x0308ce70` and initializes:
+The `18/14` pair is no longer an unexplained Storage runtime value.
 
 ```text
-QWORD Storage+0x18 -> DWORD +0x18/+0x1c
-QWORD Storage+0x30 -> DWORD +0x30/+0x34
-QWORD Storage+0x48 -> DWORD +0x48/+0x4c
+static packed 18/14 @ 0x01cdd958
+ -> Handler constructor default at Handler+0xb0/+0xb4
+ -> 0x00bc6350 geometry snapshot +0x38
+ -> 0x00cdb770 Handler+0x10 virtual slot +0x60
+ -> exact TWorldMapStorage slot 12 0x00cc6cd0
+ -> Storage+0x48/+0x4c
 ```
 
-The same constructor installs exact `TWorldMapExtent` vptr `0x02f61578` at `Storage+0x40`, so `+0x48/+0x4c` are the first two DWORD payload fields inside the embedded `TWorldMapExtent` beginning at `+0x40`.
+The exact Handler constructor is anchored by vptr `0x030871d8`; the exact Storage object is vptr `0x0308ce70`. Storage slot 12 reads snapshot QWORD `+0x38` and writes it to Storage `+0x48`, covering both DWORDs `+0x48/+0x4c`.
 
-Storage vtable slot 12 at `0x00cc6cd0` mutates all three groups. The priority pair is copied as one QWORD at `0x00cc6d2c`:
-
-```text
-[rsi+0x38] -> Storage+0x48
-```
-
-Thus all requested offsets `+0x18/+0x1c/+0x30/+0x34/+0x48/+0x4c` have direct initialization and mutation coverage. The observed `18/14` are not constructor literals; the exact upstream producer of the slot-12 input at `rsi+0x38` remains `UNKNOWN`.
-
-## Storage lower/upper bounds — PROVEN
-
-Storage vtable slot 14 at `0x00cb01d0` directly enforces:
-
-```text
-Storage+0x18 <= x < Storage+0x30
-Storage+0x1c <= y < Storage+0x34
-Storage+0x20 <= z < Storage+0x38
-```
-
-Therefore the retained runtime coordinate pairs are exact half-open 3D lower/upper bounds. The historical arithmetic:
-
-```text
-32555 - 32537 = 18
-32517 - 32503 = 14
-```
-
-is now directly correlated with Storage bounds plus a separate embedded extent payload `18/14`.
-
-Exact C++ field names and units for the embedded extent payload remain unknown.
-
-## Storage update, eviction and collection state
-
-The Storage slot-12 geometry mutator traverses the Storage-owned ordered node structure after replacing bounds. Nodes outside the new half-open bounds are removed, and `Storage+0x88` is decremented on removal. Storage slots `0x00cc7d60` and `0x00cc80c0` independently traverse the same tree and consume `Storage+0x88` while exporting/filtering extent-aware entries.
-
-**FACT:** geometry/extent changes drive out-of-bounds Storage entry removal.
-
-**FACT:** `Storage+0x88` participates as a live node/collection count-size relation.
-
-**UNKNOWN:** no fixed maximum capacity, cache ceiling or eviction-policy limit is proven from the staged bytes.
-
-The staged lookup/traversal paths are coordinate-indexed and extent-aware rather than fixed loops bounded by literal 18/14.
-
-## Exact Viewport separation
-
-The new bounded bytes also stage a distinct exact `TWorldMapViewport` constructor at `0x00cbf680`, anchored by Viewport vptr `0x0308c9a8` / typeinfo `0x0308b590`.
-
-It installs its own `TWorldMapExtent` subobject and initializes independent geometry fields including:
-
-```text
-Viewport+0x48 = 8
-Viewport+0x60 = 4
-```
-
-A following geometry update routine at `0x00cbf700` recomputes Viewport state and performs signed arithmetic including an arithmetic right shift by 5.
-
-**FACT:** Viewport has separate computed geometry state and is not the historical Storage object holding retained `18/14`.
-
-**INFERENCE:** the shift-by-5 is consistent with the separately proven worldmap ×32 grid/scale boundary; exact source-level field semantics remain unproven.
-
-**UNKNOWN:** this bundle does not directly establish the concrete Storage↔Viewport ownership/call edge.
-
-## RenderProvider / Camera / Picker frontier
-
-Exact RTTI/vtable anchors are now available:
-
-```text
-TWorldMapRenderProvider typeinfo 0x03089b70 vptr 0x02f6c258 first staged slot 0x00820970
-TWorldMapCamera         typeinfo 0x03080500 vptr 0x03083968 first staged slot 0x00dedda0
-TWorldMapPicker         typeinfo 0x03086888 vptr 0x02f6b7c8 first staged slot 0x008205c0
-```
-
-However the current bounded windows do not finish their semantic graph:
-
-- RenderProvider first-slot evidence is dominated by destructor/member cleanup and does not prove clipping/culling/iteration bounds.
-- Camera first-slot evidence is trivial/metaobject-like and does not expose projection/scale coupling.
-- Picker first-slot evidence is destructor/ownership cleanup and does not expose screen/world transform logic.
-
-No downstream rule is invented from destructor adjacency or class names alone.
-
-## Current classification
+Classification:
 
 ```yaml
-identity_windows_3_of_3: PROVEN
-protocol_handler_identity: PROVEN
-historical_18_14_object_identity: TWorldMapStorage_PROVEN
-historical_control_block_identity: counted_TWorldMapStorage_PROVEN
-geometry_six_requested_offsets_initialized: PROVEN
-geometry_six_requested_offsets_mutated: PROVEN
-storage_half_open_3d_bounds: PROVEN
-storage_extent_driven_oob_eviction: PROVEN
-storage_live_collection_count_relation: PROVEN
-viewport_exact_separate_identity_and_geometry: PROVEN
-upstream_source_of_storage_slot12_rsi_plus_0x38: UNKNOWN
-render_clipping_culling_iteration: UNKNOWN
-camera_projection_scale: UNKNOWN
-picker_screen_world_transform: UNKNOWN
-fixed_allocation_mask_packing_full_audit: INCOMPLETE
-static_patch_graph_ready: false
-classification: MORE_STATIC_RE_NEEDED
-remaining_blocker: DOWNSTREAM_EXACT_WORLD_MAP_CONSUMER_WINDOWS_NOT_DURABLY_STAGED
+Handler master pair:
+  constructor_default: hardcoded 18/14
+  complete_later_writer_census: UNKNOWN
+TWorldMapViewport:
+  constructor_default: hardcoded 18/14
+  later_recomputation: PROVEN
+TWorldMapStorage:
+  constructor_default: zero
+  runtime_update: mutable/copy-driven via slot 12
 ```
 
-## Next action
+## Storage dependency
 
-Continue this same task/PR only with a new bounded exact-client producer that stages:
+Exact Storage evidence remains authoritative:
 
-1. the caller/upstream object feeding Storage slot 12, especially input `rsi+0x38`;
-2. non-destructor RenderProvider virtual/caller windows for iteration/clipping/culling;
-3. non-meta Camera projection/scale/viewport windows;
-4. non-destructor Picker screen/world transform windows;
-5. fixed-allocation, loop-bound, mask and packing sites tied to those paths.
+- lower XYZ `+0x18/+0x1c/+0x20` and upper XYZ `+0x30/+0x34/+0x38` are half-open bounds;
+- `+0x48/+0x4c` are payload DWORDs of embedded exact `TWorldMapExtent` at Storage `+0x40`;
+- slot 12 replaces geometry and removes nodes outside the resulting bounds;
+- `Storage+0x88` is live collection-count/size state;
+- no fixed maximum cache capacity is proven;
+- Storage traversal is extent/coordinate driven rather than a literal fixed 18×14 allocation.
 
-Do not rescan the already exhausted retained inventory, repeat the identical failed CDN fetch, use physical Synology as an unauthorized static-analysis fallback, or design/modify client bytes before the complete downstream dependency graph is proven.
+## Viewport dependency
+
+Exact Viewport vptr `0x0308c9a8`, constructor `0x00cbf680`, and geometry recompute `0x00cbf700` are proven.
+
+The constructor consumes the same packed `18/14` default at `0x01cdd958`, but `0x00cbf700` later recomputes the extent from Viewport state, consumes packed `15/11` delta state and applies signed shift-by-5 / divide-by-32-family arithmetic.
+
+Viewport is therefore a computed geometry dependency, not a second immutable literal-only surface.
+
+## RenderProvider dependency
+
+Exact `TWorldMapRenderProvider` vptr `0x02f6c258` / typeinfo `0x03089b70` has curated primary slots `0..21`.
+
+Load-bearing exact paths prove:
+
+- fixed-size record iteration (`0x20` and `0x30` surfaces depending on path);
+- `&0x1f`, shift-by-5 and 32-cell/chunk arithmetic;
+- explicit negative/out-of-range coordinate rejection;
+- linearized `y*width+x`-style indexing with indexed/vector bounds checks;
+- exact `TWorldMapExtent` / `TWorldMapSubfieldExtent`-related construction.
+
+RenderProvider is a direct clipping/culling/indexing/iteration dependency for any future extent change.
+
+## Picker dependency
+
+Exact `TWorldMapPicker` vptr `0x02f6b7c8` / typeinfo `0x03086888` has curated primary slots `0..7`.
+
+Primary paths prove packed coordinate conversions and range traversal using shift-by-5, `0x1f` floor/sign correction and `0x20` stepping. Picker is therefore a direct fixed-32 screen/world transform and bounds dependency.
+
+## Camera dependency
+
+Exact `TWorldMapCamera` vptr `0x03083968` / typeinfo `0x03080500` is proven. Camera constructors initialize vector-state blocks, embedded address points and scalar `1.0` transform-like state.
+
+A dedicated producer pass enumerated all 11 exact Camera-vptr xrefs, staged 11 bounded neighborhoods (225,280 source bytes) and hosted-disassembled 37,325 unique instructions. One exact higher-level construction path co-owns/coordinates a Viewport-compatible object at owner `+0xa8` and counted Camera at owner `+0xc8/+0xd0`, then calls exact Viewport recompute `0x00cbf700`.
+
+No type-anchored Camera-field chain to Storage slot 12, Handler master `18/14`, or Storage `+0x48/+0x4c` was recovered in those exact-vptr neighborhoods. This is a bounded negative result, not a global absence proof.
+
+For the static graph, Camera is a co-owned transform/post-change validation dependency; no Camera mutation site or named projection formula is invented.
+
+## Fixed representation dependencies
+
+Recovered exact/static representation surfaces include:
+
+```text
+18/14 packed default  0x01cdd958
+Viewport delta         15/11 @ 0x01d63cd0
+32-cell scale          shift 5
+floor/chunk mask       0x1f
+record/allocation      0x18, 0x20, 0x28, 0x30 on different consumers
+```
+
+These are dependency constraints, not a proposed patch list.
+
+## Final graph disposition
+
+```yaml
+protocol_handler_identity: PROVEN
+storage_identity_and_bounds: PROVEN
+upstream_storage_extent_source: PROVEN
+viewport_default_and_recompute: PROVEN
+storage_extent_driven_eviction: PROVEN
+render_clipping_culling_iteration: PROVEN
+picker_screen_world_transform: PROVEN
+camera_layout_and_viewport_coownership: PROVEN
+camera_direct_extent_mutation_edge_in_exact_vptr_neighborhoods: NOT_RECOVERED_BOUNDED
+fixed_allocation_mask_packing_dependencies: PROVEN
+complete_handler_master_later_writer_census: UNKNOWN
+named_camera_projection_formula: UNKNOWN
+static_patch_graph_ready: true
+mutation_design_ready: false
+client_byte_mutation_authorized: false
+```
+
+The discovery task has enough exact evidence to freeze the dependency graph. The explicit remaining unknowns must be carried into a separately authorized mutation-design and physical-validation phase; they are not grounds to invent additional static patch sites.

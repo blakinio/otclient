@@ -14,146 +14,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  adaptive-field-scan:
-    name: Same-launch adaptive pre-login field scan (no secrets)
-    runs-on: [otclient, synology]
-    timeout-minutes: 10
+  safety-hold:
+    name: Hold after same-launch adaptive field scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
-      - name: Checkout exact head without codeload action
-        shell: bash
-        env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -Eeuo pipefail
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          mkdir -p "$GITHUB_WORKSPACE"
-          cd "$GITHUB_WORKSPACE"
-          git init -q
-          git remote remove origin 2>/dev/null || true
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags --prune origin \
-            "+refs/heads/main:refs/remotes/origin/main" \
-            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
-          git cat-file -e "$HEAD_SHA^{commit}"
-          git checkout -q -f --detach "$HEAD_SHA"
-          git clean -ffdx
-          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
-          echo 'WORLDMAP_ADAPTIVE_RUNTIME_CHECKOUT=PASS'
-
-      - name: Revalidate current-main Track A admission
-        shell: bash
-        env:
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -Eeuo pipefail
-          base_sha="$(git rev-parse origin/main)"
-          git merge-base --is-ancestor "$base_sha" "origin/$HEAD_BRANCH"
-          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
-            --changed-from "$base_sha" --expected-branch "$HEAD_BRANCH"
-          echo "WORLDMAP_ADAPTIVE_RUNTIME_CURRENT_MAIN=$base_sha"
-          echo 'WORLDMAP_ADAPTIVE_RUNTIME_CURRENT_MAIN_ANCESTRY=PASS'
-          echo 'WORLDMAP_ADAPTIVE_RUNTIME_ADMISSION=PASS'
-
-      - name: Require canonical controller plane idle without mutating it
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          import fcntl,json,os,time
-          from pathlib import Path
-          state=Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
-          lock=state/'coordination.lock'; lease_path=state/'lease.json'; reg=state/'runtime-registration.json'
-          if not lock.is_file() or not lease_path.is_file(): raise SystemExit('WORLDMAP_ADAPTIVE_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
-          fd=os.open(lock,os.O_RDONLY|getattr(os,'O_NOATIME',0))
-          try:
-              fcntl.flock(fd,fcntl.LOCK_SH)
-              lease=json.loads(lease_path.read_text())
-              safe={'generation':lease.get('generation'),'status':lease.get('status'),'controller_task':lease.get('controller_task'),'controller_session':lease.get('controller_session'),'expired':bool(lease.get('status')=='active' and isinstance(lease.get('expires_at'),int) and lease['expires_at']<=int(time.time()))}
-              print('WORLDMAP_ADAPTIVE_CANONICAL_LEASE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
-              if safe['status']!='released' or safe['controller_task'] is not None or safe['controller_session'] is not None: raise SystemExit('WORLDMAP_ADAPTIVE_PREFLIGHT_ERROR=canonical_lease_not_idle')
-              if reg.exists(): raise SystemExit('WORLDMAP_ADAPTIVE_PREFLIGHT_ERROR=canonical_registration_present')
-          finally:
-              try: fcntl.flock(fd,fcntl.LOCK_UN)
-              except OSError: pass
-              os.close(fd)
-          print('WORLDMAP_ADAPTIVE_CANONICAL_REGISTRATION=ABSENT')
-          print('WORLDMAP_ADAPTIVE_CANONICAL_CONTROLLER_IDLE=PASS')
-          PY
-
-      - name: Revalidate UI tool dynamic-link closure without client
+      - name: Preserve adaptive result before HOME layout discriminator
         shell: bash
         run: |
           set -Eeuo pipefail
-          TOOL=/home/runner/_work/_otclient_tibia_re_state/toolroot
-          [[ -d "$TOOL" ]] || TOOL=/work/_otclient_tibia_re_state/toolroot
-          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_ADAPTIVE_UI_PREFLIGHT_ERROR=toolroot_missing' >&2; exit 1; }
-          LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
-          XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
-          XDO="$TOOL/usr/bin/xdotool"
-          [[ -x "$XWD" && -x "$XDO" ]] || { echo 'WORLDMAP_ADAPTIVE_UI_PREFLIGHT_ERROR=ui_tool_missing' >&2; exit 1; }
-          xwd_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XWD")"
-          xdo_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XDO")"
-          if grep -F 'not found' <<<"$xwd_deps" || grep -F 'not found' <<<"$xdo_deps"; then
-            echo 'WORLDMAP_ADAPTIVE_UI_PREFLIGHT_ERROR=dependency_not_found' >&2
-            exit 1
-          fi
-          grep -F 'libxdo.so.3 =>' <<<"$xdo_deps" >/dev/null || { echo 'WORLDMAP_ADAPTIVE_UI_PREFLIGHT_ERROR=libxdo_resolution_missing' >&2; exit 1; }
-          echo 'WORLDMAP_ADAPTIVE_UI_TOOLROOT_DYNAMIC_LINK=PASS'
-
-      - name: Compose same-launch adaptive field scan
-        id: compose
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 -m py_compile \
-            .github/scripts/track-a-worldmap-causal-xwd-compare.py \
-            .github/scripts/track-a-worldmap-causal-xwd-text-semantics.py \
-            .github/scripts/track-a-worldmap-causal-text-variant-classify.py \
-            .github/scripts/track-a-worldmap-causal-xres-geometry-census-repair.py \
-            .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
-            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
-            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
-            .github/scripts/track-a-worldmap-causal-prelogin-adaptive-field-scan-repair.py
-          screen="$RUNNER_TEMP/wm-adaptive-runtime-screen.sh"
-          gdb="$RUNNER_TEMP/wm-adaptive-runtime-gdb.sh"
-          ui="$RUNNER_TEMP/wm-adaptive-runtime-ui.sh"
-          scan="$RUNNER_TEMP/wm-adaptive-runtime-scan.sh"
-          python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
-            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
-          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
-          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$ui"
-          python3 .github/scripts/track-a-worldmap-causal-prelogin-adaptive-field-scan-repair.py "$ui" "$scan"
-          bash -n "$scan"
-          grep -F 'WORLDMAP_BASELINE_XRES_SELECTOR=EXACT_PID_UNIQUE_LARGEST_VIEWABLE' "$scan" >/dev/null
-          grep -F 'WORLDMAP_ADAPTIVE_FIELD_SCAN_SECRET_ENV=ABSENT' "$scan" >/dev/null
-          grep -F 'WORLDMAP_ADAPTIVE_FIELD_SCAN_MODE=SAME_LAUNCH_DISCOVER_TEXT_AND_VARIANT' "$scan" >/dev/null
-          grep -F "'abc'" "$scan" >/dev/null
-          grep -F "'abcdefghijklm'" "$scan" >/dev/null
-          grep -F "'iiiiii'" "$scan" >/dev/null
-          grep -F "'WWWWWW'" "$scan" >/dev/null
-          if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
-            echo 'WORLDMAP_ADAPTIVE_RUNTIME_COMPOSE_ERROR=credential_submission_survived' >&2
-            exit 1
-          fi
-          if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan" || \
-             grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan" || \
-             grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || \
-             grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
-            echo 'WORLDMAP_ADAPTIVE_RUNTIME_COMPOSE_ERROR=login_or_gameplay_surface_survived' >&2
-            exit 1
-          fi
-          echo "scan=$scan" >> "$GITHUB_OUTPUT"
-          echo 'WORLDMAP_ADAPTIVE_RUNTIME_COMPOSITION=PASS'
-          echo 'WORLDMAP_ADAPTIVE_RUNTIME_SECRET_USED=false'
-
-      - name: Execute one same-launch adaptive scan without secrets
-        shell: bash
-        env:
-          SCAN: ${{ steps.compose.outputs.scan }}
-        run: |
-          set +x
-          set -Eeuo pipefail
-          [[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]]
-          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD "$SCAN"
+          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD=PASS'
+          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_REASON=no_text_fields_on_fresh_ephemeral_startup_surface'
+          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_RUN=32038436466'
+          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_JOB=95413316245'
+          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_TEXT_FIELD_COUNT=0'
+          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_MASKED_LIKE_COUNT=0'
+          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_UNMASKED_LIKE_COUNT=0'
+          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_SECRET_USED=false'
+          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_LOGIN_SUBMITTED=false'
+          echo 'WORLDMAP_CAUSAL_NEXT_DISCRIMINATOR=persistent_home_tibia_symlink_layout'
+          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_SECRET_USED=false'

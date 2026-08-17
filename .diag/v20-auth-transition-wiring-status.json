@@ -1,0 +1,27 @@
+{
+  "schema": "v20-auth-transition-wiring-terminal-v1",
+  "target_sha": "976823acd1d5f7f947c0bac9bd8d8277f1c47686",
+  "run_id": 32078630942,
+  "status": "completed",
+  "conclusion": "failure",
+  "jobs": [
+    {
+      "id": 95536969199,
+      "name": "recover",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 95537211351,
+      "name": "luacheck",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 95537344813,
+      "name": "cppcheck",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

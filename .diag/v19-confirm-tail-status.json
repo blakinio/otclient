@@ -1,0 +1,15 @@
+{
+  "schema": "v19-confirm-tail-terminal-v1",
+  "target_sha": "beaf9daf30a4b577419b2bb3b659b183c4647839",
+  "run_id": 32076966187,
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 95532124926,
+      "name": "recover",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

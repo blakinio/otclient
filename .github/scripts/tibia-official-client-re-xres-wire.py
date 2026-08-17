@@ -225,7 +225,7 @@ def extract_local_client_pid(
     records: tuple[ClientIdValue, ...],
     resource_xid: int,
 ) -> int | None:
-    """Return one unambiguous LocalClientPid for the requested resource XID."""
+    """Return one unambiguous LocalClientPid for the requested one-spec query."""
 
     xid = _uint(resource_xid, 32, "resource XID")
     if xid == 0:
@@ -234,14 +234,12 @@ def extract_local_client_pid(
         raise XResWireError("records must be a tuple of ClientIdValue objects")
     if not records:
         return None
+    if len(records) != 1:
+        raise XResWireError("one-spec QueryClientIds reply must contain exactly one record")
 
-    matches = [item for item in records if item.client == xid]
-    if not matches:
-        raise XResWireError("QueryClientIds reply omitted the requested resource")
-    if len(matches) != 1:
-        raise XResWireError("QueryClientIds reply duplicated the requested resource")
-
-    record = matches[0]
+    record = records[0]
+    if record.client != xid:
+        raise XResWireError("QueryClientIds reply did not identify the requested resource")
     if record.mask != XRES_CLIENT_ID_MASK_LOCAL_CLIENT_PID:
         raise XResWireError("QueryClientIds target record returned an unexpected mask")
     if len(record.values) != 1:

@@ -1,0 +1,36 @@
+{
+  "schema": "otclient.tibia-re.coverage-summary.v2",
+  "source_baseline_head": "43a60bd96cc644b656b200c9edbfb75578b330b6",
+  "current_overlay_snapshot": "d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab",
+  "programme_completion": "NOT_CLAIMED",
+  "audit_result_after_merge": "FAIL_MATERIAL_GAPS_OPEN",
+  "material_findings_after_merge": 4,
+  "high_findings_after_merge": 2,
+  "medium_findings_after_merge": 2,
+  "resolved_by_registry_promotion": ["AUD-COV-001"],
+  "remaining_findings": ["AUD-COV-002","AUD-COV-003","AUD-COV-004","AUD-COV-007"],
+  "metrics": {
+    "protocol_identifier_inventory": {"classification":"FACT","numerator":349,"denominator":349,"percent":100.0,"kind":"INVENTORY_ONLY"},
+    "protocol_direction_assignment": {"classification":"FACT","numerator":349,"denominator":349,"percent":100.0,"kind":"STRUCTURAL_METADATA"},
+    "generated_message_structurally_identified_in_baseline": {"classification":"FACT","numerator":27,"denominator":349,"percent":7.7363896848,"kind":"BOUNDED_STRUCTURAL_EVIDENCE"},
+    "generated_message_semantic_support": {"classification":"UNKNOWN","numerator":null,"denominator":349,"percent":null,"kind":"SEMANTIC"},
+    "protocol_handler_qmeta_records": {"classification":"FACT","numerator":47,"denominator":47,"percent":100.0,"kind":"STRUCTURAL_QMETA_INVENTORY"},
+    "direct_qt_connection_raw_census": {"classification":"FACT","numerator":2184,"denominator":2184,"percent":100.0,"kind":"RAW_CALLSITE_INVENTORY"},
+    "direct_qt_connection_semantic_classification": {"classification":"UNKNOWN","numerator":null,"denominator":2184,"percent":null,"kind":"SEMANTIC"},
+    "legacy_qobject_connect_edges": {"classification":"FACT","numerator":40,"denominator":41,"percent":97.5609756098,"kind":"SELECTED_SUBSET"},
+    "high_information_gameaction_sender_metaobjects": {"classification":"FACT","numerator":29,"denominator":31,"percent":93.5483870968,"kind":"SELECTED_SUBSET","mismatch":1,"unresolved":1},
+    "p0_top_level_group_registry": {"classification":"FACT","numerator":16,"denominator":16,"percent":100.0,"kind":"REQUIREMENT_REGISTRY_ONLY"},
+    "p0_live_read_coverage": {"classification":"UNKNOWN","numerator":null,"denominator":null,"percent":null,"kind":"SEMANTIC_LIVE_READ"},
+    "bridge_v1_profile_target_inventory": {"classification":"FACT","numerator":7,"denominator":7,"percent":100.0,"kind":"P1_IMPLEMENTATION_INVENTORY_ONLY"},
+    "p1_overall_field_to_evidence_coverage": {"classification":"UNKNOWN","numerator":null,"denominator":null,"percent":null,"kind":"P1_PROGRAMME"},
+    "p2_bounded_downstream_chain": {"classification":"FACT","state":"PROVEN_PARTIAL","kind":"P2_STRUCTURAL_CHAIN"},
+    "p2_transport_semantics": {"classification":"UNKNOWN","fields":["framing","sequence","compression","encryption","final_binary_egress","final_socket_ownership"],"kind":"P2_SEMANTIC_COMPLETION"},
+    "restart_relogin_stability": {"classification":"UNKNOWN","numerator":null,"denominator":1,"percent":null,"kind":"RUNTIME_STABILITY"}
+  },
+  "rules": {
+    "100pct": "inventory/subset completeness only unless a semantic denominator is explicitly proven",
+    "p0": "16 groups are requirement groups only; item-level live-read numerator and denominator remain UNKNOWN",
+    "p1": "7 bridge discovery targets are implementation inventory only; global item-level denominator remains UNKNOWN",
+    "p2": "bounded downstream processor order is partially proven; framing/sequence/compression/encryption/final egress remain UNKNOWN"
+  }
+}

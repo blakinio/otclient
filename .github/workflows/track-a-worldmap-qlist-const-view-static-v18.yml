@@ -39,7 +39,7 @@ jobs:
           import hashlib,lzma,pathlib,sys,struct
           from elftools.elf.elffile import ELFFile
           from capstone import Cs,CS_ARCH_X86,CS_MODE_64
-          from capstone.x86_const import X86_OP_MEM,X86_REG_R14,X86_REG_RSI
+          from capstone.x86_const import X86_OP_MEM,X86_REG_R14
           src=pathlib.Path(sys.argv[1]);out=pathlib.Path(sys.argv[2]);b=src.read_bytes();q=b[32];lc=q%9;z=q//9;lp=z%5;pb=z//5;ds=int.from_bytes(b[33:37],'little')
           raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
           assert len(raw)==51965216 and hashlib.sha256(raw).hexdigest()=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
@@ -53,23 +53,30 @@ jobs:
           start=0x856550; end=0x85684e
           md=Cs(CS_ARCH_X86,CS_MODE_64);md.detail=True
           ins=list(md.disasm(raw[vo(start):vo(end)],start))
-          # Exact entry must bind incoming QList<int> const& from RSI to R14.
+          # Exact entry binds incoming QList<int> const& from RSI to R14.
           entry=[(x.address,x.mnemonic,x.op_str) for x in ins[:8]]
           assert any(a==0x856554 and m=='mov' and 'rsi' in o and 'r14' in o for a,m,o in entry), entry
-          refs=[]
+          refs=[]; repurpose=None
           for x in ins:
+            if x.address>0x856554:
+              dst=x.op_str.split(',',1)[0].strip() if x.op_str else ''
+              if dst in ('r14','r14d','r14w','r14b'):
+                repurpose=(x.address,x.mnemonic,x.op_str)
+                break
             for op in x.operands:
               if op.type==X86_OP_MEM and op.mem.base==X86_REG_R14:
                 refs.append((x.address,op.mem.disp,x.mnemonic,x.op_str))
-          print('WORLDMAP_V18_CONST_QLIST_R14_REFS_BEGIN')
+          print('WORLDMAP_V18_CONST_QLIST_R14_ALIAS_REFS_BEGIN')
           for a,d,m,o in refs: print(f'0x{a:x};disp=0x{d:x};{m} {o}')
-          print('WORLDMAP_V18_CONST_QLIST_R14_REFS_END')
+          print('WORLDMAP_V18_CONST_QLIST_R14_ALIAS_REFS_END')
+          assert repurpose is not None
+          print(f'WORLDMAP_V18_R14_REPURPOSE=0x{repurpose[0]:x};{repurpose[1]} {repurpose[2]}')
           disps=[d for _,d,_,_ in refs]
-          # The input list header/refcount at +0 is never read. Only pointer +8
-          # and qsizetype +16 are observed before R14 is repurposed at 0x85684e.
+          # While R14 still aliases the input const QList, the exact callee reads
+          # only data pointer +8 and qsizetype +16. The header/refcount +0 is not
+          # observed and no ownership operation is performed on the input object.
           assert disps==[8,16], disps
-          assert all(a<0x85684e for a,_,_,_ in refs)
-          # QMeta wrapper method 11 is proven pass-through: argv[1] -> RSI -> impl.
+          # QMeta wrapper method 11 is a direct pass-through: argv[1] -> RSI -> impl.
           wrapper=raw[vo(0xd46900):vo(0xd4691b)]
           wins=list(md.disasm(wrapper,0xd46900))
           print('WORLDMAP_V18_QMETA11_WRAPPER_BEGIN')

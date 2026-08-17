@@ -47,6 +47,11 @@ Thus the observed response `0x00c00000 / LocalClientPid / 13648` is the expected
 
 The XRes protocol specification likewise permits a client to be selected by a resource allocated by that client and documents resource-base as a client identifier.
 
+Primary references checked independently outside the implementer summary:
+
+- X.Org xorgproto `resproto.txt`, XRes client-id specification and QueryClientIds semantics;
+- X.Org X server `Xext/xres.c`, `ConstructClientIds` and `ConstructClientIdValue`.
+
 ## Audit matrix
 
 | Check | Result |
@@ -67,6 +72,7 @@ The XRes protocol specification likewise permits a client to be selected by a re
 | process memory | NO |
 | client bytes mutated | NO |
 | cleanup | PASS |
+| one-shot v2 workflow/patcher retained in terminal PR tree | NO |
 
 ## Findings
 
@@ -84,6 +90,7 @@ nonblocking_helper_findings: 1
 additional_physical_retry_required: false
 additional_physical_retry_authorized: false
 cleanup: COMPLETE
+one_shot_runtime_surfaces_retained: false
 ```
 
-The physical identity discriminator is complete. The v2 one-shot workflow and patcher must be removed before merge. Later runtime work must obtain its own admission; this result alone does not authorize canonical bootstrap/login, process-memory access, gameplay, or client-byte mutation.
+The physical identity discriminator is complete. The consumed v2 one-shot workflow and patcher are absent from the terminal PR tree. Later runtime work must obtain its own admission; this result alone does not authorize canonical bootstrap/login, process-memory access, gameplay, or client-byte mutation.

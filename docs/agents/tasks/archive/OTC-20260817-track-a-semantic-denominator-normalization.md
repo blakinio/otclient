@@ -9,7 +9,7 @@ track_id: official-client-re
 task_kind: implementation
 phase: archived
 base_branch: main
-base_main: 1eb4a8edecba3966aa1e6155e241b404eb4d30cb
+base_main: 0b3bdec0a4145f558806448a4657413664d80729
 pr: 460
 execution_class: github_hosted
 runtime_access: none
@@ -57,10 +57,17 @@ component_validation:
   result: SUCCESS
   canonical_marker: CANONICAL_COVERAGE_REGISTRY_VALIDATION_PASS
   baseline_blob_fence: PASS
+  validated_data_payload_unchanged_after_run: true
 fresh_audit:
   result: PASS
   record: docs/agents/evidence/OTC-20260817-track-a-semantic-denominator-normalization/20260817-final-audit.md
   material_findings_open_for_task: 0
+current_main_drift_reconciliation:
+  merged_main: 0b3bdec0a4145f558806448a4657413664d80729
+  drift_domain: worldmap_physical_validation_only
+  denominator_counts_changed: false
+  worldmap_result: NO_HANDLER_CANARY_OBSERVED_BOUNDED
+  worldmap_causal_propagation_proven: false
 result:
   AUD-COV-002: RESOLVED_AS_DENOMINATOR_COMPLETENESS
   protocol_denominator: 349
@@ -80,13 +87,13 @@ e2e:
   result: NOT_APPLICABLE
   reason: deterministic repository coverage/denominator integration; no client/runtime/user-facing behavior changed
 closeout:
-  temporary_generator_terminal_tree: absent_required
-  temporary_workflow_terminal_tree: absent_required
-  active_task_terminal_tree: absent_required
+  temporary_generator_terminal_tree: absent
+  temporary_workflow_terminal_tree: absent
+  active_task_terminal_tree: absent
   exact_terminal_head_repository_ci_required: true
   ready_state_required_ci_required: true
   review_threads_required_zero: true
-last_completed_step: four finite canonical denominator registries materialized, integrated validator passed, fresh audit passed, and terminal lifecycle tree prepared
+last_completed_step: four finite canonical denominator registries materialized, integrated validator passed, fresh audit passed, worldmap-only main drift reconciled, and terminal lifecycle tree prepared
 next_action: none for this task after PR #460 merge; remaining programme findings require a later invocation because this invocation has consumed its one additional-task allowance
 ---
 

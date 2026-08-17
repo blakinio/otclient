@@ -14,13 +14,123 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  safety-hold:
-    name: Worldmap causal safety hold (no client)
+  static-prelogin-and-gdb-proof:
+    name: GDB attach and behavioral pre-login validation (no client)
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 4
     steps:
-      - name: Hold physical runtime after behavioral baseline terminal result
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate composed helper and bounded GDB attach
+        shell: bash
         run: |
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD=PASS'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_SECRET_USED=false'
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            .github/scripts/tibia-official-client-re-xres-wire.py
+
+          screen_repaired="$RUNNER_TEMP/worldmap-baseline-1020.sh"
+          gdb_repaired="$RUNNER_TEMP/worldmap-baseline-1020-gdb.sh"
+          combined="$RUNNER_TEMP/worldmap-baseline-1020-gdb-behavior.sh"
+          python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen_repaired"
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            "$screen_repaired" "$gdb_repaired"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            "$gdb_repaired" "$combined"
+          bash -n "$combined"
+          test -x "$combined"
+
+          grep -F 'WORLDMAP_BASELINE_DESKTOP_GEOMETRY=1020x650' "$combined" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_GDB_ATTACH=PASS' "$combined" >/dev/null
+          grep -F 'for _ in $(seq 1 40); do' "$combined" >/dev/null
+          grep -F 'sleep .25' "$combined" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=MANIFEST_PROVEN' "$combined" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_EDITABLE_FIELDS' "$combined" >/dev/null
+          grep -F 'WORLDMAP_XWD_EDITABLE_MASK_OVERLAP_RATIO' \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py >/dev/null
+          grep -F 'default=0.80' \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py >/dev/null
+
+          python3 - "$combined" <<'PY'
+          import pathlib,sys
+          text=pathlib.Path(sys.argv[1]).read_text()
+          stale='''sleep 2\nkill -0 "$PID" || fail client_died_while_arming_observer\nkill -0 "$GDB_PID" || fail gdb_observer_not_alive\n[[ "$(awk '/^TracerPid:/{print $2}' "/proc/$PID/status")" == "$GDB_PID" ]] || fail gdb_not_attached_to_exact_client'''
+          if stale in text:
+              raise SystemExit('WORLDMAP_STATIC_ERROR=fixed_sleep_gdb_attach_survived')
+          if 'tesseract' in text or 'capture_ocr' in text:
+              raise SystemExit('WORLDMAP_STATIC_ERROR=ocr_surface_survived')
+          print('WORLDMAP_GDB_ATTACH_STATIC=PASS')
+          PY
+
+      - name: Falsify editable-field mask correlation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          fixture="$RUNNER_TEMP/xwd-fixture"
+          mkdir -p "$fixture"
+          python3 - "$fixture" <<'PY'
+          from pathlib import Path
+          import struct,sys
+
+          root=Path(sys.argv[1])
+          width,height=1020,650
+          stride=4080
+          header=[0]*25
+          header[0]=100; header[1]=7; header[2]=2; header[3]=24
+          header[4]=width; header[5]=height; header[7]=0
+          header[8]=32; header[9]=0; header[10]=32; header[11]=32
+          header[12]=stride; header[13]=4
+          header[14]=0xFF0000; header[15]=0x00FF00; header[16]=0x0000FF
+          header[17]=8; header[18]=256; header[19]=0
+          header[20]=width; header[21]=height
+          packed=struct.pack('>25I',*header)
+          pixels=width*height
+
+          def image(changes):
+              payload=bytearray(stride*height)
+              for idx in changes:
+                  off=(idx//width)*stride+(idx%width)*4
+                  payload[off:off+4]=b'\x11\x22\x33\x00'
+              return packed+payload
+
+          (root/'before.xwd').write_bytes(image(set()))
+          (root/'pass-typed.xwd').write_bytes(image(set(range(200))))
+          (root/'pass-cleared.xwd').write_bytes(image(set()))
+
+          overlap=set(range(750))
+          a_only=set(range(750,1000))
+          b_only=set(range(1000,1250))
+          (root/'neg-typed.xwd').write_bytes(image(overlap|a_only))
+          (root/'neg-cleared.xwd').write_bytes(image(a_only|b_only))
+          PY
+
+          python3 .github/scripts/track-a-worldmap-causal-xwd-compare.py roi-cycle \
+            "$fixture/before.xwd" "$fixture/pass-typed.xwd" "$fixture/pass-cleared.xwd" \
+            0 0 100 20 --min-changed 60 >"$fixture/pass.out"
+          grep -F 'WORLDMAP_XWD_EDITABLE_MASK_OVERLAP_RATIO=1.000000' "$fixture/pass.out" >/dev/null
+          grep -F 'WORLDMAP_XWD_EDITABLE_PROBE=PASS' "$fixture/pass.out" >/dev/null
+
+          set +e
+          python3 .github/scripts/track-a-worldmap-causal-xwd-compare.py roi-cycle \
+            "$fixture/before.xwd" "$fixture/neg-typed.xwd" "$fixture/neg-cleared.xwd" \
+            0 0 100 20 --min-changed 60 >"$fixture/negative.out"
+          rc=$?
+          set -e
+          [[ "$rc" -eq 3 ]]
+          grep -F 'WORLDMAP_XWD_EDITABLE_MASK_OVERLAP_RATIO=0.750000' "$fixture/negative.out" >/dev/null
+          grep -F 'WORLDMAP_XWD_EDITABLE_RESIDUAL_CHANGED=500' "$fixture/negative.out" >/dev/null
+          grep -F 'WORLDMAP_XWD_EDITABLE_PROBE=FAIL' "$fixture/negative.out" >/dev/null
+          rm -rf "$fixture"
+
+          echo 'WORLDMAP_EDITABLE_MASK_CORRELATION_STATIC=PASS'
+          echo 'WORLDMAP_PRELOGIN_GDB_STATIC_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_PRELOGIN_GDB_STATIC_SECRET_USED=false'

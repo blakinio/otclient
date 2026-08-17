@@ -1,0 +1,56 @@
+name: Track A semantic denominator generation
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/tibia-official-client-re-semantic-denominator.py'
+      - '.github/workflows/tibia-official-client-re-semantic-denominator.yml'
+      - 'docs/agents/tasks/active/OTC-20260817-track-a-semantic-denominator-normalization.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Generate finite semantic denominators
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile .github/scripts/tibia-official-client-re-semantic-denominator.py
+          rm -rf semantic-denominator-output
+          python3 .github/scripts/tibia-official-client-re-semantic-denominator.py semantic-denominator-output | tee semantic-denominator-output/validation.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('semantic-denominator-output')
+          result = json.loads((root/'result.json').read_text())
+          assert result['e51']['denominator'] == 349
+          assert result['e52']['denominator'] > 47
+          assert result['p0']['denominator'] > 16
+          assert result['p1']['denominator'] > 7
+          assert result['boundaries']['denominator_complete_is_not_semantic_complete'] is True
+          for name in ('protocol_message_semantics.jsonl','runtime_type_semantics.jsonl','p0_items.jsonl','p1_items.jsonl'):
+              rows=[json.loads(x) for x in (root/name).read_text().splitlines() if x.strip()]
+              assert rows and len({r['id'] for r in rows}) == len(rows)
+              assert all(r['denominator_membership'] == 'INCLUDED' for r in rows)
+          print('SEMANTIC_DENOMINATOR_ARTIFACT_VALIDATION=PASS')
+          PY
+
+      - name: Upload sanitized denominator package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-semantic-denominators-${{ github.run_id }}
+          path: semantic-denominator-output/
+          if-no-files-found: error
+          retention-days: 7

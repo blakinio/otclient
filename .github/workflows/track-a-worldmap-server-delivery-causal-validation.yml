@@ -14,52 +14,97 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  symlink-target-layout:
-    name: Persistent Tibia symlink target layout (no client)
+  tibia-entrypoint-parity:
+    name: Persistent Tibia entrypoint parity discriminator (no client)
     runs-on: [otclient, synology]
     timeout-minutes: 3
     steps:
-      - name: Compare symlink target and package metadata only
+      - name: Classify persistent Tibia symlink target only
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
           python3 - <<'PY'
-          import hashlib, os, stat
+          import hashlib
+          import os
+          import stat
           from pathlib import Path
-          roots=[Path('/home/runner/_work/_otclient_tibia_re_state/home'),Path('/work/_otclient_tibia_re_state/home')]
-          home=next((p for p in roots if p.is_dir()),None)
-          if home is None: raise SystemExit('WORLDMAP_SYMLINK_LAYOUT_ERROR=home_missing')
-          share=home/'.local/share/CipSoft GmbH/Tibia'
-          link=share/'Tibia'; package=share/'packages/Tibia'
-          if not link.is_symlink(): raise SystemExit('WORLDMAP_SYMLINK_LAYOUT_ERROR=link_missing')
-          target=link.resolve()
-          if not target.exists(): raise SystemExit('WORLDMAP_SYMLINK_LAYOUT_ERROR=target_missing')
-          def kind(p):
-              m=p.lstat().st_mode
-              return 'DIR' if stat.S_ISDIR(m) else 'FILE' if stat.S_ISREG(m) else 'SYMLINK' if stat.S_ISLNK(m) else 'OTHER'
-          def top(root):
-              out=[]
-              if root.is_dir():
-                  for p in sorted(root.iterdir(),key=lambda x:x.name):
-                      try: out.append((p.name,kind(p),p.lstat().st_size))
-                      except OSError: pass
-              return out
-          print('WORLDMAP_SYMLINK_TARGET_KIND='+kind(target))
-          print('WORLDMAP_SYMLINK_PACKAGE_KIND='+kind(package))
-          for name,k,size in top(target): print(f'WORLDMAP_SYMLINK_TARGET_TOP={k}\t{name}\t{size}')
-          for name,k,size in top(package): print(f'WORLDMAP_SYMLINK_PACKAGE_TOP={k}\t{name}\t{size}')
-          for label,root in [('TARGET',target),('PACKAGE',package)]:
-              candidates=[root/'bin/client',root/'client']
-              c=next((p for p in candidates if p.is_file()),None)
-              print(f'WORLDMAP_SYMLINK_{label}_CLIENT_PATH='+('NONE' if c is None else str(c.relative_to(root))))
-              if c:
-                  h=hashlib.sha256()
-                  with c.open('rb') as f:
-                      for ch in iter(lambda:f.read(1024*1024),b''): h.update(ch)
-                  print(f'WORLDMAP_SYMLINK_{label}_CLIENT_SHA256='+h.hexdigest())
-          print('WORLDMAP_SYMLINK_TARGET_SAMEFILE_PACKAGE='+str(os.path.samefile(target,package) if package.exists() else False).lower())
-          print('WORLDMAP_SYMLINK_LAYOUT_FILE_CONTENT_INTERPRETED=false')
-          print('WORLDMAP_SYMLINK_LAYOUT_CLIENT_EXECUTED=false')
-          print('WORLDMAP_SYMLINK_LAYOUT_SECRET_USED=false')
+
+          EXPECTED_SHA = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          roots = [
+              Path('/home/runner/_work/_otclient_tibia_re_state/home'),
+              Path('/work/_otclient_tibia_re_state/home'),
+          ]
+          home = next((p for p in roots if p.is_dir()), None)
+          if home is None:
+              raise SystemExit('WORLDMAP_ENTRYPOINT_PARITY_ERROR=home_missing')
+
+          share = home / '.local/share/CipSoft GmbH/Tibia'
+          link = share / 'Tibia'
+          package = share / 'packages/Tibia'
+          package_client = package / 'bin/client'
+          metadata = share / 'launchermetadata.json'
+
+          if not link.is_symlink():
+              raise SystemExit('WORLDMAP_ENTRYPOINT_PARITY_ERROR=link_missing')
+          if not package.is_dir():
+              raise SystemExit('WORLDMAP_ENTRYPOINT_PARITY_ERROR=package_missing')
+          if not package_client.is_file():
+              raise SystemExit('WORLDMAP_ENTRYPOINT_PARITY_ERROR=package_client_missing')
+
+          target = link.resolve(strict=True)
+
+          def kind(path: Path) -> str:
+              mode = path.lstat().st_mode
+              if stat.S_ISDIR(mode):
+                  return 'DIR'
+              if stat.S_ISREG(mode):
+                  return 'FILE'
+              if stat.S_ISLNK(mode):
+                  return 'SYMLINK'
+              return 'OTHER'
+
+          def sha256(path: Path) -> str:
+              h = hashlib.sha256()
+              with path.open('rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          target_kind = kind(target)
+          same_package_client = target.is_file() and os.path.samefile(target, package_client)
+          target_sha = sha256(target) if target.is_file() else 'NOT_FILE'
+          target_exact = target_sha == EXPECTED_SHA
+          package_sha = sha256(package_client)
+          package_exact = package_sha == EXPECTED_SHA
+          target_under_package = False
+          target_relative = 'OUTSIDE_PACKAGE'
+          try:
+              target_relative = str(target.relative_to(package))
+              target_under_package = True
+          except ValueError:
+              pass
+
+          print('WORLDMAP_ENTRYPOINT_TARGET_KIND=' + target_kind)
+          print('WORLDMAP_ENTRYPOINT_TARGET_SAMEFILE_PACKAGE_CLIENT=' + str(same_package_client).lower())
+          print('WORLDMAP_ENTRYPOINT_TARGET_SHA_MATCH_EXACT=' + str(target_exact).lower())
+          print('WORLDMAP_ENTRYPOINT_PACKAGE_CLIENT_SHA_MATCH_EXACT=' + str(package_exact).lower())
+          print('WORLDMAP_ENTRYPOINT_TARGET_UNDER_PACKAGE=' + str(target_under_package).lower())
+          print('WORLDMAP_ENTRYPOINT_TARGET_RELATIVE_TO_PACKAGE=' + target_relative)
+          print('WORLDMAP_ENTRYPOINT_METADATA_PRESENT=' + str(metadata.is_file() and not metadata.is_symlink()).lower())
+          print('WORLDMAP_ENTRYPOINT_CLIENT_EXECUTED=false')
+          print('WORLDMAP_ENTRYPOINT_SECRET_USED=false')
+
+          summary = ';'.join([
+              'kind=' + target_kind,
+              'same_package_client=' + str(same_package_client).lower(),
+              'target_exact=' + str(target_exact).lower(),
+              'package_exact=' + str(package_exact).lower(),
+              'under_package=' + str(target_under_package).lower(),
+              'relative=' + target_relative,
+              'metadata=' + str(metadata.is_file() and not metadata.is_symlink()).lower(),
+              'client_executed=false',
+              'secret_used=false',
+          ])
+          print('::notice title=Tibia entrypoint parity::' + summary)
           PY

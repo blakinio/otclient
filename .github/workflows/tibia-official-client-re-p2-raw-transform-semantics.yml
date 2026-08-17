@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file vtable candidates
+    name: Stage exact-file concrete transform evidence
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -25,8 +25,14 @@ jobs:
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     outputs:
-      scan_b64: ${{ steps.stage.outputs.scan_b64 }}
-      scan_sha256: ${{ steps.stage.outputs.scan_sha256 }}
+      transform_hex: ${{ steps.stage.outputs.transform_hex }}
+      transform_sha256: ${{ steps.stage.outputs.transform_sha256 }}
+      vtable_hex: ${{ steps.stage.outputs.vtable_hex }}
+      vtable_sha256: ${{ steps.stage.outputs.vtable_sha256 }}
+      rtti_hex: ${{ steps.stage.outputs.rtti_hex }}
+      rtti_sha256: ${{ steps.stage.outputs.rtti_sha256 }}
+      name_hex: ${{ steps.stage.outputs.name_hex }}
+      name_sha256: ${{ steps.stage.outputs.name_sha256 }}
     steps:
       - id: stage
         shell: bash
@@ -53,41 +59,41 @@ jobs:
           done
           [[ -n "$source_client" ]] || exit 50
           python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
-          import base64,hashlib,json,struct,sys
+          import hashlib,struct,sys
           from pathlib import Path
-          p=Path(sys.argv[1]); out=Path(sys.argv[2]); target=0xf85eb0
-          blob=p.read_bytes()
-          if len(blob)!=51965216: raise SystemExit(51)
+          p=Path(sys.argv[1]); out=Path(sys.argv[2])
           with p.open('rb') as f:
               ident=f.read(16); rest=f.read(48)
-              if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(52)
+              if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(51)
               fs=struct.unpack('<HHIQQQIHHHHHH',rest); phoff,phentsize,phnum=fs[4],fs[8],fs[9]
               segs=[]
               for i in range(phnum):
                   f.seek(phoff+i*phentsize); r=f.read(56)
                   t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
                   if t==1: segs.append((off,va,sz,flags))
-          pat=struct.pack('<Q',target); hits=[]; pos=0
-          while True:
-              off=blob.find(pat,pos)
-              if off<0: break
-              pos=off+1
-              va=None; flags=None
-              for so,sv,ss,sf in segs:
-                  if so<=off<so+ss:
-                      va=sv+(off-so); flags=sf; break
-              if va is None: continue
-              start_off=off-0x30; end_off=off+0x30
-              if start_off<0 or end_off>len(blob): continue
-              hits.append({'file_offset':off,'va':va,'segment_flags':flags,'window_start_va':va-0x30,'window_hex':blob[start_off:end_off].hex()})
-          if not hits or len(hits)>16: raise SystemExit(53)
-          payload=json.dumps({'target':'0xf85eb0','hits':hits},separators=(',',':')).encode()
-          dig=hashlib.sha256(payload).hexdigest(); enc=base64.b64encode(payload).decode()
-          with out.open('a') as h:
-              h.write(f'scan_b64={enc}\nscan_sha256={dig}\n')
-          print('P2_RAWTRANSFORM_VTABLE_SOURCE=PASS')
-          print(f'P2_RAWTRANSFORM_VTABLE_HIT_COUNT={len(hits)}')
-          print(f'P2_RAWTRANSFORM_SCAN_SHA256={dig}')
+              def read_va(start,end):
+                  for off,va,sz,flags in segs:
+                      if va<=start and end<=va+sz:
+                          f.seek(off+start-va); d=f.read(end-start)
+                          if len(d)==end-start: return d,flags
+                  raise SystemExit(52)
+              transform,_=read_va(0xf861e0,0xf864c0)
+              vtable,_=read_va(0x2f63138,0x2f63188)
+              rtti,_=read_va(0x3070778,0x3070788)
+              name_ptr=struct.unpack_from('<Q',rtti,8)[0]
+              name,_=read_va(name_ptr,name_ptr+0x80)
+              name=name.split(b'\0',1)[0]+b'\0'
+          rows=[]
+          for key,data in [('transform',transform),('vtable',vtable),('rtti',rtti),('name',name)]:
+              dig=hashlib.sha256(data).hexdigest()
+              rows.append(f'{key}_hex={data.hex()}\n{key}_sha256={dig}\n')
+              print(f'P2_RAWTRANSFORM_{key.upper()}_SHA256={dig}')
+          with out.open('a') as h: h.write(''.join(rows))
+          print('P2_RAWTRANSFORM_CONCRETE_SOURCE=PASS')
+          print('P2_RAWTRANSFORM_TRANSFORM_WINDOW=0xf861e0..0xf864c0')
+          print('P2_RAWTRANSFORM_VTABLE_WINDOW=0x2f63138..0x2f63188')
+          print('P2_RAWTRANSFORM_RTTI=0x3070778')
+          print(f'P2_RAWTRANSFORM_RTTI_NAME_PTR=0x{name_ptr:x}')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
           print('P2_RAWTRANSFORM_SOURCE_DISASSEMBLY=false')
           print('P2_RAWTRANSFORM_SOURCE_SEMANTIC_CLASSIFICATION=false')
@@ -95,15 +101,21 @@ jobs:
           PY
 
   hosted-validate:
-    name: Resolve concrete vtable slots on GitHub-hosted Linux
+    name: Decode concrete transform on GitHub-hosted Linux
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-raw-transform-semantics
-      SCAN_B64: ${{ needs.source-sanitize.outputs.scan_b64 }}
-      SCAN_SHA256: ${{ needs.source-sanitize.outputs.scan_sha256 }}
+      TRANSFORM_HEX: ${{ needs.source-sanitize.outputs.transform_hex }}
+      TRANSFORM_SHA256: ${{ needs.source-sanitize.outputs.transform_sha256 }}
+      VTABLE_HEX: ${{ needs.source-sanitize.outputs.vtable_hex }}
+      VTABLE_SHA256: ${{ needs.source-sanitize.outputs.vtable_sha256 }}
+      RTTI_HEX: ${{ needs.source-sanitize.outputs.rtti_hex }}
+      RTTI_SHA256: ${{ needs.source-sanitize.outputs.rtti_sha256 }}
+      NAME_HEX: ${{ needs.source-sanitize.outputs.name_hex }}
+      NAME_SHA256: ${{ needs.source-sanitize.outputs.name_sha256 }}
     steps:
       - shell: bash
         run: |
@@ -112,30 +124,43 @@ jobs:
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
           [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 73
           python3 - <<'PY'
-          import base64,hashlib,json,os,struct
-          raw=base64.b64decode(os.environ['SCAN_B64'])
-          if hashlib.sha256(raw).hexdigest()!=os.environ['SCAN_SHA256']: raise SystemExit(74)
-          obj=json.loads(raw)
-          if obj.get('target')!='0xf85eb0': raise SystemExit(75)
-          print('P2_RAWTRANSFORM_VTABLE_HOSTED=PASS')
+          import hashlib,os,struct,subprocess,tempfile
+          from pathlib import Path
+          def get(name,expected_len=None):
+              d=bytes.fromhex(os.environ[name+'_HEX'])
+              if hashlib.sha256(d).hexdigest()!=os.environ[name+'_SHA256']: raise SystemExit(74)
+              if expected_len is not None and len(d)!=expected_len: raise SystemExit(75)
+              return d
+          transform=get('TRANSFORM',0x2e0)
+          vtable=get('VTABLE',0x50)
+          rtti=get('RTTI',0x10)
+          name=get('NAME')
+          q=lambda d,o: struct.unpack_from('<Q',d,o)[0]
+          if q(vtable,0x00)!=0: raise SystemExit('P2_RAWTRANSFORM_FAIL=offset_to_top')
+          if q(vtable,0x08)!=0x3070778: raise SystemExit('P2_RAWTRANSFORM_FAIL=typeinfo')
+          if q(vtable,0x30)!=0xf85eb0: raise SystemExit('P2_RAWTRANSFORM_FAIL=slot20')
+          if q(vtable,0x38)!=0xf861e0: raise SystemExit('P2_RAWTRANSFORM_FAIL=slot28')
+          with tempfile.TemporaryDirectory(prefix='p2-transform-') as td:
+              p=Path(td)/'transform.bin'; p.write_bytes(transform)
+              text=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel','--adjust-vma=0xf861e0',str(p)],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+          if 'f861e0:' not in text: raise SystemExit('P2_RAWTRANSFORM_FAIL=entry')
+          print('P2_RAWTRANSFORM_CONCRETE_HOSTED=PASS')
           print('P2_RAWTRANSFORM_EXECUTION_CLASS=github_hosted')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
-          print(f'P2_RAWTRANSFORM_VTABLE_HIT_COUNT={len(obj["hits"])}')
-          for i,h in enumerate(obj['hits']):
-              data=bytes.fromhex(h['window_hex'])
-              if len(data)!=0x60: raise SystemExit(76)
-              # target occurrence is at window +0x30; if it is vslot +0x20, AP is window +0x10.
-              ap=h['va']-0x20
-              q=lambda off: struct.unpack_from('<Q',data,off)[0]
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_OCCURRENCE_VA=0x{h["va"]:x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_SEGMENT_FLAGS={h["segment_flags"]}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_AP=0x{ap:x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_OFFSET_TO_TOP=0x{q(0x10):x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_TYPEINFO=0x{q(0x18):x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_SLOT_00=0x{q(0x20):x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_SLOT_08=0x{q(0x28):x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_SLOT_10=0x{q(0x30):x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_SLOT_18=0x{q(0x38):x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_SLOT_20=0x{q(0x40):x}')
-              print(f'P2_RAWTRANSFORM_CANDIDATE_{i}_SLOT_28=0x{q(0x48):x}')
+          print('P2_RAWTRANSFORM_VTABLE_AP=0x2f63148')
+          print('P2_RAWTRANSFORM_VTABLE_OFFSET_TO_TOP=0')
+          print('P2_RAWTRANSFORM_VTABLE_TYPEINFO=0x3070778')
+          print(f'P2_RAWTRANSFORM_RTTI_VPTR=0x{q(rtti,0):x}')
+          print(f'P2_RAWTRANSFORM_RTTI_NAME_PTR=0x{q(rtti,8):x}')
+          print('P2_RAWTRANSFORM_RTTI_NAME='+name.rstrip(b'\0').decode('ascii','backslashreplace'))
+          print(f'P2_RAWTRANSFORM_SLOT_00=0x{q(vtable,0x10):x}')
+          print(f'P2_RAWTRANSFORM_SLOT_08=0x{q(vtable,0x18):x}')
+          print(f'P2_RAWTRANSFORM_SLOT_10=0x{q(vtable,0x20):x}')
+          print(f'P2_RAWTRANSFORM_SLOT_18=0x{q(vtable,0x28):x}')
+          print(f'P2_RAWTRANSFORM_SLOT_20=0x{q(vtable,0x30):x}')
+          print(f'P2_RAWTRANSFORM_SLOT_28=0x{q(vtable,0x38):x}')
+          print(f'P2_RAWTRANSFORM_SLOT_30=0x{q(vtable,0x40):x}')
+          print('P2_RAWTRANSFORM_TRANSFORM_DISASSEMBLY_BEGIN')
+          print(text,end='')
+          print('P2_RAWTRANSFORM_TRANSFORM_DISASSEMBLY_END')
           PY

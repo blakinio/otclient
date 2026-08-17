@@ -10,23 +10,30 @@ jobs:
     outputs:
       h: ${{ steps.x.outputs.h }}
       s: ${{ steps.x.outputs.s }}
+      v: ${{ steps.x.outputs.v }}
+      vs: ${{ steps.x.outputs.vs }}
     steps:
       - id: x
         shell: bash
         run: |
           set -Eeuo pipefail
-          C='/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
-          [[ -f "$C" ]] || C='/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+          C='/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'; [[ -f "$C" ]] || C='/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
           [[ "$(stat -c %s "$C")" == 51965216 && "$(sha256sum "$C"|cut -d' ' -f1)" == e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe ]] || exit 50
           python3 - "$C" "$GITHUB_OUTPUT" <<'PY'
           import struct,hashlib,sys
-          f=open(sys.argv[1],'rb');f.seek(16);e=struct.unpack('<HHIQQQIHHHHHH',f.read(48))
+          f=open(sys.argv[1],'rb');f.seek(16);e=struct.unpack('<HHIQQQIHHHHHH',f.read(48));s=[]
           for i in range(e[9]):
-           f.seek(e[4]+i*e[8]);r=struct.unpack('<IIQQQQQQ',f.read(56));o,v,z=r[2],r[3],r[5]
-           if v<=0x3085000 and 0x3086000<=v+z:f.seek(o+0x3085000-v);d=f.read(0x1000);break
-          else:raise SystemExit(54)
-          s=hashlib.sha256(d).hexdigest();open(sys.argv[2],'a').write(f'h={d.hex()}\ns={s}\n')
-          print('AUTHSESSION_PHASE6_EXACT_FILE_FENCE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none');print('AUTHSESSION_PHASE6_SOURCE_DISASSEMBLY=false');print('AUTHSESSION_PHASE6_SOURCE_SECRET_ACCESS=false');print('AUTHSESSION_PHASE6_RAW_CLIENT_UPLOADED=false')
+           f.seek(e[4]+i*e[8]);r=struct.unpack('<IIQQQQQQ',f.read(56));
+           if r[0]==1:s.append((r[2],r[3],r[5]))
+          def R(a,b):
+           for o,v,z in s:
+            if v<=a and b<=v+z:f.seek(o+a-v);return f.read(b-a)
+           raise SystemExit(54)
+          bases=[0xd0f340,0xdd8150,0xb07cf0,0xdd8010,0xafcc20,0xdd7840,0xe00380]
+          h=b''.join(R(a,a+0x100) for a in bases);v=R(0x3085ce0,0x3085de0)
+          with open(sys.argv[2],'a') as q:
+           for k,d in [('h',h),('v',v)]:z=hashlib.sha256(d).hexdigest();q.write(f'{k}={d.hex()}\n{k}s={z}\n')
+          print('AUTHSESSION_PHASE6B_EXACT_FILE_FENCE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none');print('AUTHSESSION_PHASE6B_SOURCE_DISASSEMBLY=false');print('AUTHSESSION_PHASE6B_SOURCE_SECRET_ACCESS=false')
           PY
   hosted:
     needs: source
@@ -35,18 +42,21 @@ jobs:
       - env:
           H: ${{ needs.source.outputs.h }}
           S: ${{ needs.source.outputs.s }}
+          V: ${{ needs.source.outputs.v }}
+          VS: ${{ needs.source.outputs.vs }}
         run: |
           python3 - <<'PY'
-          import os,hashlib,struct
-          d=bytes.fromhex(os.environ['H']);assert len(d)==0x1000 and hashlib.sha256(d).hexdigest()==os.environ['S'];q=[struct.unpack_from('<Q',d,i)[0] for i in range(0,0x1000,8)]
-          print('AUTHSESSION_PHASE6_HOSTED_DECODE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none');print('AUTHSESSION_PHASE6_CODE_QWORD_RUNS_BEGIN')
-          i=0
-          while i<len(q):
-           if 0x400000<=q[i]<0x1a00000:
-            j=i
-            while j<len(q) and 0x400000<=q[j]<0x1a00000:j+=1
-            if j-i>=3:print(hex(0x3085000+8*i),','.join(hex(x) for x in q[i:j]))
-            i=j
-           else:i+=1
-          print('AUTHSESSION_PHASE6_CODE_QWORD_RUNS_END')
+          import os,hashlib,subprocess,tempfile,re,struct
+          from pathlib import Path
+          h=bytes.fromhex(os.environ['H']);v=bytes.fromhex(os.environ['V']);assert len(h)==0x700 and hashlib.sha256(h).hexdigest()==os.environ['S'];assert len(v)==0x100 and hashlib.sha256(v).hexdigest()==os.environ['VS']
+          bases=[0xd0f340,0xdd8150,0xb07cf0,0xdd8010,0xafcc20,0xdd7840,0xe00380]
+          print('AUTHSESSION_PHASE6B_HOSTED_DECODE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none')
+          for i,b in enumerate(bases):
+           with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/'x';p.write_bytes(h[i*0x100:(i+1)*0x100]);t=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{b:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE).stdout
+           hits=[l.strip() for l in t.splitlines() if '# 0x3085b60' in l]
+           print(f'AUTHSESSION_PHASE6B_CANDIDATE_{i}_BASE=0x{b:x}');print('AUTHSESSION_PHASE6B_CANDIDATE_'+str(i)+'_QMETA_HITS='+' || '.join(hits))
+          print('AUTHSESSION_PHASE6B_VTABLE_QWORDS_BEGIN')
+          for i in range(0,len(v),8):print(f'0x{0x3085ce0+i:x}=0x{struct.unpack_from("<Q",v,i)[0]:x}')
+          print('AUTHSESSION_PHASE6B_VTABLE_QWORDS_END')
           PY

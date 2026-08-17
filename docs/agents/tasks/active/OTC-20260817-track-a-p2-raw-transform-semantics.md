@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260817-track-a-p2-raw-transform-semantics
-status: investigating
+status: ready
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: review
 branch: research/OTC-20260817-track-a-p2-raw-transform-semantics
 base_branch: main
 base_main: 8a5fcfd72f2554261eef91a2129c9cc076e730ea
@@ -15,12 +15,14 @@ risk: medium
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-p2-raw-transform-semantics.md
   - docs/agents/evidence/OTC-20260817-track-a-p2-raw-transform-semantics/**
-  - .github/workflows/tibia-official-client-re-p2-raw-transform-semantics.yml
 modules_touched: []
 reuses:
   - PR #496 canonical sequence promotion
   - PR #494 canonical framing promotion
-  - run 32005141186 accepted RawDataProcessor/setup evidence
+  - docs/agents/evidence/OTC-20260815-track-a-p2-buffer-downstream-consumer/20260817-coordinator-accepted-downstream-chain.json
+  - run 32046592885 concrete TXteaHelper transform and RTTI
+  - run 32046849472 bounded backend trace
+  - run 32059752436 outbound transform census
 depends_on:
   - main@8a5fcfd72f2554261eef91a2129c9cc076e730ea
 blocks: []
@@ -68,39 +70,97 @@ accepted_input:
   sequence: PROVEN
   compression: UNKNOWN
   encryption: UNKNOWN
-  rawdataprocessor_member_pair: FACT:copied_from_outer_plus_a20_object_plus_c0
-  rawdataprocessor_member_vslot_plus_0x20_fast_target: FACT:0xf85eb0
-  rawdataprocessor_member_vslot_plus_0x28_fast_target: FACT:0xb3ec30
-  conditional_transform_gate: FACT:message_plus_0x28_equals_2
-hypotheses:
-  h1: 0xb3ec30_is_the_in_place_binary_encryption_transform
-  h2: 0xf85eb0_supplies_padding_bytes_only_and_is_not_the_primary_transform
-  h3: compression_is_independent_and_remains_UNKNOWN_unless_directly_observed
-next_action: exact-fence and stage bounded windows for 0xb3ec30, 0xf85eb0 and the setup/owner construction around 0x196f000..0x1972200; decode only on GitHub-hosted Linux and bind transform input/output plus dynamic object provenance
+  persistent_qbuffer_to_clientprocessor: PROVEN
+  same_message_downstream_to_qtcpsocket: PROVEN
+result:
+  framing: PROVEN
+  sequence: PROVEN
+  encryption: PROVEN
+  encryption_receiver: FACT:shared::TXteaHelper
+  encryption_vtable_ap: FACT:0x2f63148
+  encryption_slot_plus_0x28: FACT:0xf861e0
+  compression: DISPROVEN_ON_PROVEN_OUTBOUND_PATH
+  compression_outside_proven_outbound_path: UNKNOWN
+  final_binary_egress: PROVEN_AT_QT_QTCPSOCKET_BOUNDARY
+  final_socket_owner: FACT:TGameserverTCPConnection
+  linux_socket_syscall: UNKNOWN_OPTIONAL
+promotion_status: DRAFT_READY_FOR_COORDINATOR_REVIEW
+next_action: coordinator independently falsifies exact run evidence and final diff, then promotes only accepted encryption and scoped compression claims; Linux syscall is optional and not required for protocol reconstruction
 ---
 
 # Track A P2 — RawDataProcessor transform semantics
 
 ## Objective
 
-Resolve the smallest remaining byte-transform frontier before the already-proven framing/sequence/QTcpSocket boundary:
+Resolve the last protocol-semantic byte-transform frontier before the already-proven framing/sequence/QTcpSocket boundary, while classifying encryption and compression independently.
+
+## Researcher conclusion
 
 ```text
-RawDataProcessor this+0x8/+0x10 member
- -> padding vslot +0x20 / 0xf85eb0
- -> conditional vslot +0x28 / 0xb3ec30 when message+0x28 == 2
+persistent QBuffer
+ -> TProtocolClientMessageProcessor+0x10 @ 0xc2df80
+ -> TGameserverNetworkPacketRawDataProcessor+0x10 @ 0xb47130
+ -> prefix + padding
+ -> conditional shared::TXteaHelper transform when message+0x28 == 2
+ -> canonical same-message downstream chain
+ -> framing / sequence
+ -> QDataStream::writeRawData
+ -> QTcpSocket
 ```
 
-Classify encryption and compression independently from exact dataflow. Do not infer either from names, 8-byte alignment or known Tibia protocol expectations.
+Classification:
+
+```text
+FRAMING=PROVEN
+SEQUENCE=PROVEN
+ENCRYPTION=PROVEN
+COMPRESSION=DISPROVEN_ON_PROVEN_OUTBOUND_PATH
+FINAL_BINARY_EGRESS=PROVEN_AT_QT_QTCPSOCKET_BOUNDARY
+LINUX_SOCKET_SYSCALL=UNKNOWN_OPTIONAL
+```
+
+The compression result is strictly scoped to the canonical outbound path from the persistent QBuffer to QTcpSocket. It is not a claim about inbound traffic or unrelated client code.
+
+## Exact evidence
+
+### Concrete encryption receiver
+
+Run `32046592885`:
+
+- source job `95435821666`;
+- hosted job `95435860761`;
+- transform `0xf861e0..0xf864c0`, SHA-256 `f45afa6aaf3337850d4d892692d533140f896444e4a1342c83f73cb7053de3be`;
+- vtable AP `0x2f63148`, typeinfo `0x3077800`;
+- RTTI `N6shared11TXteaHelperE`;
+- vslot `+0x20 = 0xf85eb0`;
+- vslot `+0x28 = 0xf861e0`.
+
+The encryption verdict uses concrete byte-container input/output dataflow plus exact receiver type. RTTI naming or 8-byte alignment alone is not used as proof. Exact XTEA round-core reconstruction remains outside the promoted claim.
+
+### Compression falsification
+
+Run `32059752436`:
+
+- source job `95478101478`;
+- hosted job `95478152304`;
+- `0xc2df80..0xc2e500`, SHA-256 `00cea4d539c6f4ac8695ae908535b88af7af849f27f4f69578e20cc6f49557b9`;
+- `0xb47130..0xb47440`, SHA-256 `d0cd15d635e9452788f628f0d61d26025665d859eb6315b1c188a97d6795f993`.
+
+The client-processor body reads/copies persistent-QBuffer bytes into the message and selects mode metadata. The complete RawDataProcessor byte-changing sequence is prefix insertion, 8-byte padding, padding-count store, optional concrete TXteaHelper transform and assignment back to the same message. Canonical downstream evidence preserves that message through framing and QTcpSocket. No separate compression transform exists on this proven path.
 
 ## Acceptance
 
-- [ ] source runner only exact-fences and copies bounded file-backed bytes;
-- [ ] semantic disassembly and classification are GitHub-hosted;
-- [ ] identify exact `0xb3ec30` function boundary and its byte-container input/output effect;
-- [ ] bind its receiver to the RawDataProcessor member object, and resolve dynamic type/provenance where exact evidence permits;
-- [ ] identify `0xf85eb0` concrete effect sufficiently to distinguish padding-byte generation from the main transform;
-- [ ] classify `ENCRYPTION=PROVEN|DISPROVEN|UNKNOWN` only from direct transform evidence;
-- [ ] classify `COMPRESSION=PROVEN|DISPROVEN|UNKNOWN` separately;
-- [ ] preserve canonical `FRAMING=PROVEN`, `SEQUENCE=PROVEN` and QTcpSocket boundary;
-- [ ] no runtime/login/world-map/process-memory/full executable upload/owner-funded AI.
+- [x] source runner only exact-fenced and copied bounded file-backed bytes;
+- [x] semantic disassembly and classification were GitHub-hosted;
+- [x] concrete RawDataProcessor conditional transform was resolved by exact vtable/RTTI and byte-container dataflow;
+- [x] `0xf85eb0` is separated from the main transform and used by the padding path;
+- [x] `ENCRYPTION=PROVEN` is supported by direct transform evidence rather than naming alone;
+- [x] `COMPRESSION=DISPROVEN_ON_PROVEN_OUTBOUND_PATH` is independently bounded and scope-guarded;
+- [x] canonical `FRAMING=PROVEN`, `SEQUENCE=PROVEN` and QTcpSocket boundary are preserved;
+- [x] no runtime/login/world-map/process-memory/full executable upload/owner-funded AI;
+- [x] researcher does not self-promote.
+
+Durable evidence:
+
+- `docs/agents/evidence/OTC-20260817-track-a-p2-raw-transform-semantics/result.json`
+- `docs/agents/evidence/OTC-20260817-track-a-p2-raw-transform-semantics/20260817-outbound-transform-semantics.md`

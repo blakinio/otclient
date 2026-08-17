@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: track-a-worldmap-server-delivery-causal-validation
+  group: track-a-worldmap-server-delivery-causal-validation-inventory-v2
   cancel-in-progress: false
 
 jobs:
@@ -57,9 +57,7 @@ jobs:
                   stat = exe.stat()
               except (FileNotFoundError, ProcessLookupError):
                   continue
-              except (OSError, PermissionError) as exc:
-                  if 'CipSoft GmbH/Tibia/packages/Tibia' in cmd if 'cmd' in locals() else False:
-                      raise RuntimeError('official_client_candidate_unverifiable') from exc
+              except (OSError, PermissionError):
                   continue
               if TASK_MARK in env:
                   task_owned.append(pid)

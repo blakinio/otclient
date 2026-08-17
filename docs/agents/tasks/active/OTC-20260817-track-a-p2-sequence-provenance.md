@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260817-track-a-p2-sequence-provenance
-status: investigating
+status: ready
 agent: ChatGPT
-session_role: researcher
+session_role: draft_researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: review
 branch: research/OTC-20260817-track-a-p2-sequence-provenance
 base_branch: main
 base_main: 0aed48da9a51730c590d0ffe4688f149b359a170
@@ -15,7 +15,6 @@ risk: medium
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-p2-sequence-provenance.md
   - docs/agents/evidence/OTC-20260817-track-a-p2-sequence-provenance/**
-  - .github/workflows/tibia-official-client-re-p2-sequence-provenance.yml
 modules_touched: []
 reuses:
   - PR #494 canonical framing promotion
@@ -51,6 +50,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
 promotion_authority: coordinator_only
+research_output: DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW
 feature_scope:
   type: protocol
   user_facing: false
@@ -64,49 +64,69 @@ exact_client:
   size: 51965216
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
   platform: official_native_linux_only
-accepted_input:
+research_result:
   framing: PROVEN
-  sequence: UNKNOWN
-  sequence_candidate_field: FACT:DWORD_message_plus_0_written_before_raw_payload_at_f50107
-  clientprocessor_initial_message_qword_0: FACT:0x0000000100000000_at_c2dff2
-  rawdataprocessor_modifies_message_plus_0: NOT_OBSERVED_IN_ACCEPTED_BOUNDED_BODY
-  dualconnection_plus_0x80_runs_before_plus_0x78: PROVEN
-hypothesis:
-  h1: TGameserverDualConnection_plus_0x80_or_one_exact_nested_callee_updates_message_plus_0_before_plus_0x78_send_path
-  h2: if_updated_value_is_connection_scoped_monotonic_then_sequence_semantics_may_be_PROVEN
-next_action: exact-fence and stage only 0xb56d60..0xb57280 for hosted disassembly; trace every write/call carrying the same message and classify the message+0 producer edge without semantic guessing
+  sequence: PROVEN
+  compression: UNKNOWN
+  encryption: UNKNOWN
+  final_binary_egress: PROVEN_AT_QT_QTCPSOCKET_BOUNDARY
+  final_socket_owner: FACT:TGameserverTCPConnection
+  final_os_socket_syscall: UNKNOWN
+  sequence_field: FACT:DWORD_message_plus_0
+  sequence_owner: FACT:TGameserverDualConnection_this_plus_0x9c
+  sequence_mode: FACT:message_plus_0x34_equals_3
+  sequence_update: FACT:store_current_then_increment_by_one
+  sequence_nonmatching_mode: FACT:message_plus_0_zero
+  sequence_initialization_or_reset_policy: UNKNOWN
+generation:
+  run: 32044825898
+  source_job: 95430326316
+  hosted_job: 95430351866
+  result: SUCCESS
+  window: 0xb56d60..0xb57280
+  window_digest: sha256:e5cf009bb1aec3065da4ff0dd3231268af1255cffa50fbb48f8817777907d557
+cleanup:
+  one_shot_workflow_removed: pending
+validation:
+  source_exact_fence: PASS
+  hosted_decode: PASS
+  no_runtime_access: true
+  no_world_map_evidence: true
+  raw_client_uploaded: false
+  final_exact_head_governance: PENDING
+  final_exact_head_ci: PENDING
+  review_hygiene: PENDING
+next_action: remove the one-shot workflow, obtain final exact-head governance/CI/review hygiene, then coordinator independently promote SEQUENCE=PROVEN; afterwards resolve RawDataProcessor member transform 0xb3ec30 for encryption
 ---
 
-# Track A P2 — sequence provenance
+# Track A P2 — outbound sequence provenance
 
-## Objective
+## Terminal researcher result
 
-Trace only the producer/update provenance of the canonical 32-bit `message+0` field serialized at `f50107` before the raw payload.
+The canonical pre-payload `DWORD(message+0)` is directly produced by `TGameserverDualConnection+0x80@0xb56d60`.
 
-Canonical order before this task:
+For `message+0x34 == 3`:
 
 ```text
-ClientMessageProcessor
- -> RawDataProcessor
- -> DualConnection +0x80
- -> DualConnection +0x78
- -> NetworkPacketConnection/Processor
- -> 0xf50090
- -> scalar A framing field
- -> DWORD(message+0), semantics UNKNOWN
- -> raw payload
- -> QDataStream/QTcpSocket boundary
+b57058  eax = DWORD[DualConnection this+0x9c]
+b5705f  DWORD[message+0] = eax
+b57061  eax += 1
+b57064  DWORD[DualConnection this+0x9c] = eax
 ```
 
-The exact ClientMessageProcessor initializes message qword `+0` to `0x0000000100000000`, so low DWORD `message+0` begins as zero. The accepted RawDataProcessor body operates on the QByteArray beginning at `message+0x8` and does not by itself prove a low-DWORD update. Therefore the first bounded discriminator is the already-proven intervening `DualConnection +0x80` call.
+For the nonmatching branch, `b56f5a` explicitly writes zero to `DWORD(message+0)`.
 
-## Acceptance
+The same message is saved at entry (`b56d75`) and restored before this update (`b56f46`). Canonical framing PR #494 independently proves that exact field is serialized before the raw payload. Therefore the outbound sequence-number mechanism is instruction/dataflow-proven rather than inferred from field width or location.
 
-- [ ] source-side work is exact-fenced byte copying only; semantic decode is GitHub-hosted;
-- [ ] trace the same `rsi=message` argument through the exact `+0x80@0xb56d60` body;
-- [ ] identify every direct write to message `+0` or exact nested call receiving the same message;
-- [ ] if a concrete producer is found, prove value provenance and update rule;
-- [ ] call it `sequence` only if connection-scoped monotonic/update semantics are directly evidenced;
-- [ ] otherwise retain `SEQUENCE=UNKNOWN` and leave one smaller concrete callee/frontier;
-- [ ] do not alter `FRAMING=PROVEN`, QTcpSocket egress, compression or encryption classifications without direct new evidence;
-- [ ] no runtime/login/world-map/full executable upload/owner-funded AI.
+```text
+FRAMING=PROVEN
+SEQUENCE=PROVEN
+COMPRESSION=UNKNOWN
+ENCRYPTION=UNKNOWN
+```
+
+Durable evidence:
+- `docs/agents/evidence/OTC-20260817-track-a-p2-sequence-provenance/20260817-sequence-provenance.md`
+- `docs/agents/evidence/OTC-20260817-track-a-p2-sequence-provenance/result.json`
+
+Promotion authority remains coordinator-only. E2E: `NOT_APPLICABLE` — static exact-file/disassembly evidence only.

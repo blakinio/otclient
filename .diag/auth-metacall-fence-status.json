@@ -1,0 +1,15 @@
+{
+  "schema": "auth-metacall-fence-terminal-v1",
+  "target_sha": "c5f363d04b217fb7ee709cafc671695b4f6c60ad",
+  "run_id": 32077227864,
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 95532901819,
+      "name": "prove",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

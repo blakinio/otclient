@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file transform windows
+    name: Stage exact-file transform core
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -27,15 +27,11 @@ jobs:
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     outputs:
-      transform_hex: ${{ steps.stage.outputs.transform_hex }}
-      transform_sha256: ${{ steps.stage.outputs.transform_sha256 }}
-      padding_hex: ${{ steps.stage.outputs.padding_hex }}
-      padding_sha256: ${{ steps.stage.outputs.padding_sha256 }}
-      setup_hex: ${{ steps.stage.outputs.setup_hex }}
-      setup_sha256: ${{ steps.stage.outputs.setup_sha256 }}
+      core_hex: ${{ steps.stage.outputs.core_hex }}
+      core_sha256: ${{ steps.stage.outputs.core_sha256 }}
     steps:
       - id: stage
-        name: Exact-fence and copy bounded windows only
+        name: Exact-fence and copy one bounded core window only
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -63,37 +59,27 @@ jobs:
           python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
           import hashlib,struct,sys
           from pathlib import Path
-          p=Path(sys.argv[1]); out=Path(sys.argv[2])
-          windows={
-            'transform':(0xb3ebc0,0xb3ee40),
-            'padding':(0xf85e40,0xf85f80),
-            'setup':(0x196f000,0x1972200),
-          }
+          p=Path(sys.argv[1]); out=Path(sys.argv[2]); start=0xb3dc00; end=0xb3e100
           with p.open('rb') as f:
               ident=f.read(16); rest=f.read(48)
               if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(51)
               fs=struct.unpack('<HHIQQQIHHHHHH',rest); phoff,phentsize,phnum=fs[4],fs[8],fs[9]
-              segs=[]
+              data=None
               for i in range(phnum):
                   f.seek(phoff+i*phentsize); r=f.read(56)
                   t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
-                  if t==1 and (flags&1): segs.append((off,va,sz))
-              rows=[]
-              for name,(start,end) in windows.items():
-                  data=None
-                  for off,va,sz in segs:
-                      if va<=start and end<=va+sz:
-                          f.seek(off+start-va); data=f.read(end-start); break
-                  if data is None or len(data)!=end-start: raise SystemExit(52)
-                  dig=hashlib.sha256(data).hexdigest()
-                  rows.append(f'{name}_hex={data.hex()}\n{name}_sha256={dig}\n')
-                  print(f'P2_RAWTRANSFORM_{name.upper()}_WINDOW=0x{start:x}..0x{end:x}')
-                  print(f'P2_RAWTRANSFORM_{name.upper()}_SHA256={dig}')
-              with out.open('a') as h: h.write(''.join(rows))
-          print('P2_RAWTRANSFORM_SOURCE=PASS')
+                  if t==1 and (flags&1) and va<=start and end<=va+sz:
+                      f.seek(off+start-va); data=f.read(end-start); break
+          if data is None or len(data)!=end-start: raise SystemExit(52)
+          dig=hashlib.sha256(data).hexdigest()
+          with out.open('a') as h:
+              h.write(f'core_hex={data.hex()}\ncore_sha256={dig}\n')
+          print('P2_RAWTRANSFORM_CORE_SOURCE=PASS')
           print('P2_RAWTRANSFORM_CLIENT_VERSION=15.32.df7b29')
           print('P2_RAWTRANSFORM_CLIENT_SIZE=51965216')
           print('P2_RAWTRANSFORM_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
+          print(f'P2_RAWTRANSFORM_CORE_WINDOW=0x{start:x}..0x{end:x}')
+          print(f'P2_RAWTRANSFORM_CORE_SHA256={dig}')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
           print('P2_RAWTRANSFORM_SOURCE_DISASSEMBLY=false')
           print('P2_RAWTRANSFORM_SOURCE_SEMANTIC_CLASSIFICATION=false')
@@ -103,21 +89,17 @@ jobs:
           PY
 
   hosted-validate:
-    name: Decode transform windows on GitHub-hosted Linux
+    name: Decode transform core on GitHub-hosted Linux
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-raw-transform-semantics
-      TRANSFORM_HEX: ${{ needs.source-sanitize.outputs.transform_hex }}
-      TRANSFORM_SHA256: ${{ needs.source-sanitize.outputs.transform_sha256 }}
-      PADDING_HEX: ${{ needs.source-sanitize.outputs.padding_hex }}
-      PADDING_SHA256: ${{ needs.source-sanitize.outputs.padding_sha256 }}
-      SETUP_HEX: ${{ needs.source-sanitize.outputs.setup_hex }}
-      SETUP_SHA256: ${{ needs.source-sanitize.outputs.setup_sha256 }}
+      CORE_HEX: ${{ needs.source-sanitize.outputs.core_hex }}
+      CORE_SHA256: ${{ needs.source-sanitize.outputs.core_sha256 }}
     steps:
-      - name: Verify and disassemble exact bounded evidence
+      - name: Verify and disassemble exact transform core
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -128,35 +110,19 @@ jobs:
           python3 - <<'PY'
           import hashlib,os,subprocess,tempfile
           from pathlib import Path
-          records={
-            'transform':(0xb3ebc0,0xb3ee40,os.environ['TRANSFORM_HEX'],os.environ['TRANSFORM_SHA256']),
-            'padding':(0xf85e40,0xf85f80,os.environ['PADDING_HEX'],os.environ['PADDING_SHA256']),
-            'setup':(0x196f000,0x1972200,os.environ['SETUP_HEX'],os.environ['SETUP_SHA256']),
-          }
-          texts={}
-          with tempfile.TemporaryDirectory(prefix='p2-raw-transform-') as td:
-              for name,(start,end,hx,expected) in records.items():
-                  data=bytes.fromhex(hx)
-                  if len(data)!=end-start or hashlib.sha256(data).hexdigest()!=expected: raise SystemExit(74)
-                  p=Path(td)/(name+'.bin'); p.write_bytes(data)
-                  texts[name]=subprocess.run(
-                      ['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],
-                      check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
-          required={
-            'transform':['b3ec30:','b3ed90:'],
-            'padding':['f85eb0:'],
-            'setup':['19711d7:','19711ee:','1971217:','1971250:','1971258:'],
-          }
-          for name,anchors in required.items():
-              for anchor in anchors:
-                  if anchor not in texts[name]: raise SystemExit('P2_RAWTRANSFORM_FAIL='+name+'_'+anchor)
-          print('P2_RAWTRANSFORM_HOSTED=PASS')
+          start=0xb3dc00; end=0xb3e100; data=bytes.fromhex(os.environ['CORE_HEX'])
+          if len(data)!=end-start or hashlib.sha256(data).hexdigest()!=os.environ['CORE_SHA256']: raise SystemExit(74)
+          with tempfile.TemporaryDirectory(prefix='p2-raw-core-') as td:
+              p=Path(td)/'core.bin'; p.write_bytes(data)
+              text=subprocess.run(
+                  ['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],
+                  check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+          if 'b3dcc0:' not in text: raise SystemExit('P2_RAWTRANSFORM_FAIL=missing_b3dcc0')
+          print('P2_RAWTRANSFORM_CORE_HOSTED=PASS')
           print('P2_RAWTRANSFORM_EXECUTION_CLASS=github_hosted')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
-          for name,(start,end,_hx,expected) in records.items():
-              print(f'P2_RAWTRANSFORM_{name.upper()}_WINDOW=0x{start:x}..0x{end:x}')
-              print(f'P2_RAWTRANSFORM_{name.upper()}_SHA256={expected}')
-              print(f'P2_RAWTRANSFORM_{name.upper()}_DISASSEMBLY_BEGIN')
-              print(texts[name],end='')
-              print(f'P2_RAWTRANSFORM_{name.upper()}_DISASSEMBLY_END')
+          print(f'P2_RAWTRANSFORM_CORE_SHA256={os.environ["CORE_SHA256"]}')
+          print('P2_RAWTRANSFORM_CORE_DISASSEMBLY_BEGIN')
+          print(text,end='')
+          print('P2_RAWTRANSFORM_CORE_DISASSEMBLY_END')
           PY

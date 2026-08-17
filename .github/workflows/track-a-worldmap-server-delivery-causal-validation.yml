@@ -14,59 +14,143 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  xres-census-integration-static:
-    name: XRes census worker integration (no client)
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
+  controlled-prelogin-focus-scan:
+    name: XRes-census noise-mask pre-login focus scan (no secrets)
+    runs-on: [otclient, synology]
+    timeout-minutes: 9
     steps:
-      - name: Checkout exact head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          fetch-depth: 1
+      - name: Checkout exact head without codeload action
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          mkdir -p "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
+          git init -q
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
+          git cat-file -e "$HEAD_SHA^{commit}"
+          git checkout -q -f --detach "$HEAD_SHA"
+          git clean -ffdx
+          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
+          echo 'WORLDMAP_CONTROLLED_FOCUS_CHECKOUT=PASS'
 
-      - name: Validate census selector and composed baseline binding
+      - name: Revalidate current-main Track A admission
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          base_sha="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "$base_sha" "origin/$HEAD_BRANCH"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$base_sha" --expected-branch "$HEAD_BRANCH"
+          echo "WORLDMAP_CONTROLLED_FOCUS_CURRENT_MAIN=$base_sha"
+          echo 'WORLDMAP_CONTROLLED_FOCUS_CURRENT_MAIN_ANCESTRY=PASS'
+          echo 'WORLDMAP_CONTROLLED_FOCUS_ADMISSION=PASS'
+
+      - name: Require canonical controller plane idle without mutating it
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import fcntl,json,os,time
+          from pathlib import Path
+          state=Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          lock=state/'coordination.lock'; lease_path=state/'lease.json'; reg=state/'runtime-registration.json'
+          if not lock.is_file() or not lease_path.is_file(): raise SystemExit('WORLDMAP_CONTROLLED_FOCUS_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
+          fd=os.open(lock,os.O_RDONLY|getattr(os,'O_NOATIME',0))
+          try:
+              fcntl.flock(fd,fcntl.LOCK_SH)
+              lease=json.loads(lease_path.read_text())
+              safe={'generation':lease.get('generation'),'status':lease.get('status'),'controller_task':lease.get('controller_task'),'controller_session':lease.get('controller_session'),'expired':bool(lease.get('status')=='active' and isinstance(lease.get('expires_at'),int) and lease['expires_at']<=int(time.time()))}
+              print('WORLDMAP_CONTROLLED_FOCUS_CANONICAL_LEASE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
+              if safe['status']!='released' or safe['controller_task'] is not None or safe['controller_session'] is not None: raise SystemExit('WORLDMAP_CONTROLLED_FOCUS_PREFLIGHT_ERROR=canonical_lease_not_idle')
+              if reg.exists(): raise SystemExit('WORLDMAP_CONTROLLED_FOCUS_PREFLIGHT_ERROR=canonical_registration_present')
+          finally:
+              try: fcntl.flock(fd,fcntl.LOCK_UN)
+              except OSError: pass
+              os.close(fd)
+          print('WORLDMAP_CONTROLLED_FOCUS_CANONICAL_REGISTRATION=ABSENT')
+          print('WORLDMAP_CONTROLLED_FOCUS_CANONICAL_CONTROLLER_IDLE=PASS')
+          PY
+
+      - name: Revalidate task-local UI tool dynamic-link closure without client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TOOL=/home/runner/_work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || TOOL=/work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_CONTROLLED_FOCUS_UI_PREFLIGHT_ERROR=toolroot_missing' >&2; exit 1; }
+          LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+          XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
+          XDO="$TOOL/usr/bin/xdotool"
+          [[ -x "$XWD" && -x "$XDO" ]] || { echo 'WORLDMAP_CONTROLLED_FOCUS_UI_PREFLIGHT_ERROR=ui_tool_missing' >&2; exit 1; }
+          xwd_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XWD")"
+          xdo_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XDO")"
+          if grep -F 'not found' <<<"$xwd_deps" || grep -F 'not found' <<<"$xdo_deps"; then
+            echo 'WORLDMAP_CONTROLLED_FOCUS_UI_PREFLIGHT_ERROR=dependency_not_found' >&2
+            exit 1
+          fi
+          grep -F 'libxdo.so.3 =>' <<<"$xdo_deps" >/dev/null || { echo 'WORLDMAP_CONTROLLED_FOCUS_UI_PREFLIGHT_ERROR=libxdo_resolution_missing' >&2; exit 1; }
+          echo 'WORLDMAP_CONTROLLED_FOCUS_UI_TOOLROOT_DYNAMIC_LINK=PASS'
+
+      - name: Compose XRes-census noise-mask no-secret focus scan
+        id: compose
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 -m py_compile \
             .github/scripts/track-a-worldmap-causal-xres-geometry-census-repair.py \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py \
             .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
-            .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py
-
-          tmp="$RUNNER_TEMP/worldmap-xres-census-integration"
-          mkdir -p "$tmp"
-          trap 'rm -rf "$tmp"' EXIT INT TERM
-
-          owner="$tmp/tibia-official-client-re-xres-window-owner.py"
-          python3 .github/scripts/track-a-worldmap-causal-xres-geometry-census-repair.py \
-            .github/scripts/tibia-official-client-re-xres-window-owner.py "$owner"
-          python3 -m py_compile "$owner"
-          grep -F 'WORLDMAP_XRES_OWNED_VIEWABLE_COUNT=' "$owner" >/dev/null
-          grep -F 'WORLDMAP_XRES_SELECTED_GEOMETRY=' "$owner" >/dev/null
-          if grep -F 'and int(attr.width) == TARGET_WIDTH' "$owner" >/dev/null; then
-            echo 'WORLDMAP_XRES_INTEGRATION_ERROR=legacy_width_constraint_survived' >&2
-            exit 1
-          fi
-          if grep -F 'and int(attr.height) == TARGET_HEIGHT' "$owner" >/dev/null; then
-            echo 'WORLDMAP_XRES_INTEGRATION_ERROR=legacy_height_constraint_survived' >&2
-            exit 1
-          fi
-
-          screen="$tmp/screen-normalized-baseline.sh"
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py
+          screen="$RUNNER_TEMP/worldmap-controlled-focus-screen.sh"
+          gdb="$RUNNER_TEMP/worldmap-controlled-focus-gdb.sh"
+          ui="$RUNNER_TEMP/worldmap-controlled-focus-ui.sh"
+          scan="$RUNNER_TEMP/worldmap-controlled-focus-scan.sh"
           python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
             .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
-          bash -n "$screen"
-          grep -F 'WORLDMAP_SCREEN_XRES_GEOMETRY_CENSUS_OWNER=PASS' "$screen" >/dev/null
-          grep -F 'WORLDMAP_BASELINE_XRES_SELECTOR=EXACT_PID_UNIQUE_LARGEST_VIEWABLE' "$screen" >/dev/null
-          grep -F 'track-a-worldmap-causal-xres-geometry-census-repair.py' "$screen" >/dev/null
-          grep -F -- '--owner-helper "$OWNER_CENSUS"' "$screen" >/dev/null
-          grep -F 'xres_census_owner_binding_missing' "$screen" >/dev/null
-          grep -F 'rm -rf "$RUNNER_TEMP/worldmap-xres-owner-census"' "$screen" >/dev/null
-          if grep -F 'OWNER_1020' "$screen" || grep -F 'TARGET_WIDTH = 1020' "$screen" || grep -F 'TARGET_HEIGHT = 650' "$screen"; then
-            echo 'WORLDMAP_XRES_INTEGRATION_ERROR=legacy_geometry_fixed_owner_survived' >&2
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$ui"
+          python3 .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py "$ui" "$scan"
+          bash -n "$scan"
+          grep -F 'WORLDMAP_BASELINE_XRES_SELECTOR=EXACT_PID_UNIQUE_LARGEST_VIEWABLE' "$scan" >/dev/null
+          grep -F 'WORLDMAP_SCREEN_XRES_GEOMETRY_CENSUS_OWNER=PASS' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_MODE=TAB_NOISE_MASK_CONTROLLED_REVERSIBLE_DUMMY_TEXT' "$scan" >/dev/null
+          grep -F 'controlled-cycle' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_CONTROLLED_EDITABLE_CANDIDATE=' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_CONTROLLED_FOCUS_SCAN=COMPLETE_NO_SECRET' "$scan" >/dev/null
+          if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
+            echo 'WORLDMAP_CONTROLLED_FOCUS_COMPOSE_ERROR=credential_submission_survived' >&2
             exit 1
           fi
-          echo 'WORLDMAP_XRES_CENSUS_INTEGRATION_STATIC=PASS'
-          echo 'WORLDMAP_XRES_CENSUS_INTEGRATION_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_XRES_CENSUS_INTEGRATION_SECRET_USED=false'
+          if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
+            echo 'WORLDMAP_CONTROLLED_FOCUS_COMPOSE_ERROR=login_or_gameplay_surface_survived' >&2
+            exit 1
+          fi
+          echo "scan=$scan" >> "$GITHUB_OUTPUT"
+          echo 'WORLDMAP_CONTROLLED_FOCUS_COMPOSITION=PASS'
+          echo 'WORLDMAP_CONTROLLED_FOCUS_SECRET_USED=false'
+
+      - name: Execute one XRes-census noise-mask focus scan without secrets
+        shell: bash
+        env:
+          SCAN: ${{ steps.compose.outputs.scan }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]]
+          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD "$SCAN"

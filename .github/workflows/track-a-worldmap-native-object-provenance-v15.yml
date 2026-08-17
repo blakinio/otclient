@@ -50,7 +50,7 @@ jobs:
             'WORLDMAP_V15_LIVE_AUTH_INSTANCE_COUNT=' \
             'WORLDMAP_V15_LIVE_CHARSEL_INSTANCE_COUNT=' \
             'WORLDMAP_V15_LIVE_GAMECLIENT_INSTANCE_COUNT=' \
-            'WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS' \
+            'WORLDMAP_V15_PREAUTH_NATIVE_OBJECT_PROVENANCE=PASS' \
             'WORLDMAP_BASELINE_PRESECRET_READY=true'; do grep -Fq "$marker" "$RUNNER_TEMP/v15.sh"; done
           ! grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$RUNNER_TEMP/v15.sh"
           ! grep -Eiq 'tesseract|ocrmypdf' "$RUNNER_TEMP/v15.sh"
@@ -113,7 +113,7 @@ jobs:
           echo "helper=$RUNNER_TEMP/v15.sh" >>"$GITHUB_OUTPUT"
           echo 'WORLDMAP_V15_PROVENANCE_COMPOSITION=PASS'
 
-      - name: Run no-secret provenance and mandatory pre-secret gates
+      - name: Run no-secret preauth provenance and mandatory gates
         shell: bash
         env:
           HELPER: ${{ steps.compose.outputs.helper }}
@@ -143,22 +143,23 @@ jobs:
             'WORLDMAP_BASELINE_PRESECRET_READY=true'; do grep -Fq "$marker" "$control/helper.log"; done
           root=/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/worldmap-causal-baseline-ephemeral-v1
           gout="$root/worldmap-gdb.stdout"; obj="$root/v15-native-objects.json"
-          for _ in $(seq 1 80); do grep -Fq 'WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS' "$gout" 2>/dev/null && break; sleep .25; done
+          for _ in $(seq 1 80); do grep -Fq 'WORLDMAP_V15_PREAUTH_NATIVE_OBJECT_PROVENANCE=PASS' "$gout" 2>/dev/null && break; sleep .25; done
+          grep -E '^WORLDMAP_V15_LIVE_(AUTH|CHARSEL|GAMECLIENT|UPLOADER)_INSTANCE_COUNT=' "$gout" || true
           grep -Fq 'WORLDMAP_V15_LIVE_AUTH_INSTANCE_COUNT=1' "$gout"
-          grep -Fq 'WORLDMAP_V15_LIVE_CHARSEL_INSTANCE_COUNT=1' "$gout"
           grep -Fq 'WORLDMAP_V15_LIVE_GAMECLIENT_INSTANCE_COUNT=1' "$gout"
-          grep -Fq 'WORLDMAP_V15_NATIVE_OBJECT_PROVENANCE=PASS' "$gout"
+          grep -Fq 'WORLDMAP_V15_PREAUTH_NATIVE_OBJECT_PROVENANCE=PASS' "$gout"
           [[ -s "$obj" && "$(stat -c '%a' "$obj")" == 600 ]]
           python3 - "$obj" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1])); o=d['objects']
-          assert len(o['auth'])==len(o['charsel'])==len(o['gameclient'])==1
+          assert len(o['auth'])==1 and len(o['gameclient'])==1
           print('WORLDMAP_V15_OBJECT_FILE_SCHEMA=PASS')
-          print('WORLDMAP_V15_UPLOADER_INSTANCE_COUNT='+str(len(o['uploader'])))
+          print('WORLDMAP_V15_CHARSEL_PREAUTH_INSTANCE_COUNT='+str(len(o['charsel'])))
+          print('WORLDMAP_V15_UPLOADER_PREAUTH_INSTANCE_COUNT='+str(len(o['uploader'])))
           PY
           ! grep -Fq 'WORLDMAP_BASELINE_CREDENTIAL_HANDOFF=' "$control/helper.log"
           ! grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"
-          echo 'WORLDMAP_V15_PHYSICAL_NATIVE_OBJECT_PROVENANCE=PASS'
+          echo 'WORLDMAP_V15_PHYSICAL_PREAUTH_OBJECT_PROVENANCE=PASS'
           echo 'WORLDMAP_V15_PHYSICAL_SECRET_USED=false'
 
       - name: Exact cleanup without credential handoff

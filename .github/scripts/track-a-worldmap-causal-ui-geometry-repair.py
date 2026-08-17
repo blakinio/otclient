@@ -26,6 +26,7 @@ echo 'WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY_EXPECTED=1020x650'
 echo 'WORLDMAP_BASELINE_UI_WINDOW_EQUALS_RUNTIME_IDENTITY=true'
 
 XWD_TOOLROOT_LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+XDO_TOOLROOT_LIBS="$XWD_TOOLROOT_LIBS"
 capture_xwd() {
   local outfile="$1"
   if [[ "$XWD" == "$TOOL/"* ]]; then
@@ -33,6 +34,9 @@ capture_xwd() {
   else
     DISPLAY="$DISPLAY" "$XWD" -silent -id "$UI_WIN" -out "$outfile"
   fi
+}
+xdo() {
+  DISPLAY="$DISPLAY" LD_LIBRARY_PATH="$XDO_TOOLROOT_LIBS" "$XDOTOOL" "$@"
 }
 
 # Historical exact-client 1020x650 coordinates are taken from the effective
@@ -46,8 +50,8 @@ LOGIN_Y=388
 ROW_X=285
 ROW_Y=193
 
-DISPLAY="$DISPLAY" "$XDOTOOL" windowactivate --sync "$UI_WIN" 2>/dev/null || true
-DISPLAY="$DISPLAY" "$XDOTOOL" windowfocus --sync "$UI_WIN"
+xdo windowactivate --sync "$UI_WIN" 2>/dev/null || true
+xdo windowfocus --sync "$UI_WIN"
 
 echo 'WORLDMAP_BASELINE_LOGIN_UI_TOOLING=RAW_XWD_AGGREGATE_BEHAVIOR_PASS'
 
@@ -67,14 +71,14 @@ probe_editable_field() {
   local typed="$ROOT/$name-typed.xwd"
   local cleared="$ROOT/$name-cleared.xwd"
 
-  DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$UI_WIN" "$x" "$y" click 1
-  DISPLAY="$DISPLAY" "$XDOTOOL" key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+  xdo mousemove --window "$UI_WIN" "$x" "$y" click 1
+  xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
   sleep .20
   capture_xwd "$before"
-  DISPLAY="$DISPLAY" "$XDOTOOL" type --window "$UI_WIN" --delay 10 -- "$dummy"
+  xdo type --window "$UI_WIN" --delay 10 -- "$dummy"
   sleep .25
   capture_xwd "$typed"
-  DISPLAY="$DISPLAY" "$XDOTOOL" key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+  xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
   sleep .25
   capture_xwd "$cleared"
   if ! python3 "$COMPARE" roi-cycle "$before" "$typed" "$cleared" \
@@ -93,21 +97,21 @@ echo 'WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_EDITABLE_FIELDS'
 
 # Capture a blank, no-secret reference after both dummy probes have been cleared.
 PRELOGIN_REFERENCE="$ROOT/prelogin-reference.xwd"
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$UI_WIN" "$EMAIL_X" "$EMAIL_Y" click 1
-DISPLAY="$DISPLAY" "$XDOTOOL" key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$UI_WIN" "$PASS_X" "$PASS_Y" click 1
-DISPLAY="$DISPLAY" "$XDOTOOL" key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+xdo mousemove --window "$UI_WIN" "$EMAIL_X" "$EMAIL_Y" click 1
+xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+xdo mousemove --window "$UI_WIN" "$PASS_X" "$PASS_Y" click 1
+xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
 sleep .25
 capture_xwd "$PRELOGIN_REFERENCE"
 
 # Only now may the bounded baseline credential submission occur.
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$UI_WIN" "$EMAIL_X" "$EMAIL_Y" click 1
-DISPLAY="$DISPLAY" "$XDOTOOL" key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
-printf '%s' "$TIBIA_TEST_EMAIL" | DISPLAY="$DISPLAY" "$XDOTOOL" type --window "$UI_WIN" --delay 10 --file -
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$UI_WIN" "$PASS_X" "$PASS_Y" click 1
-DISPLAY="$DISPLAY" "$XDOTOOL" key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
-printf '%s' "$TIBIA_TEST_PASSWORD" | DISPLAY="$DISPLAY" "$XDOTOOL" type --window "$UI_WIN" --delay 10 --file -
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$UI_WIN" "$LOGIN_X" "$LOGIN_Y" click 1
+xdo mousemove --window "$UI_WIN" "$EMAIL_X" "$EMAIL_Y" click 1
+xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+printf '%s' "$TIBIA_TEST_EMAIL" | xdo type --window "$UI_WIN" --delay 10 --file -
+xdo mousemove --window "$UI_WIN" "$PASS_X" "$PASS_Y" click 1
+xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+printf '%s' "$TIBIA_TEST_PASSWORD" | xdo type --window "$UI_WIN" --delay 10 --file -
+xdo mousemove --window "$UI_WIN" "$LOGIN_X" "$LOGIN_Y" click 1
 unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
 echo 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true'
 
@@ -136,9 +140,9 @@ sleep 3
 SELECT_BEFORE="$ROOT/select-before.xwd"
 SELECT_AFTER="$ROOT/select-after.xwd"
 capture_xwd "$SELECT_BEFORE"
-DISPLAY="$DISPLAY" "$XDOTOOL" windowactivate --sync "$UI_WIN" 2>/dev/null || true
-DISPLAY="$DISPLAY" "$XDOTOOL" windowfocus --sync "$UI_WIN"
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$UI_WIN" "$ROW_X" "$ROW_Y" click 1
+xdo windowactivate --sync "$UI_WIN" 2>/dev/null || true
+xdo windowfocus --sync "$UI_WIN"
+xdo mousemove --window "$UI_WIN" "$ROW_X" "$ROW_Y" click 1
 sleep .35
 capture_xwd "$SELECT_AFTER"
 if ! python3 "$COMPARE" change "$SELECT_BEFORE" "$SELECT_AFTER" --min-changed 80 \
@@ -148,7 +152,7 @@ if ! python3 "$COMPARE" change "$SELECT_BEFORE" "$SELECT_AFTER" --min-changed 80
 fi
 rm -f "$POST_LOGIN_XWD" "$SELECT_BEFORE" "$SELECT_AFTER"
 echo 'WORLDMAP_BASELINE_CHARACTER_ROW_SELECTION=PROVEN_AGGREGATE'
-DISPLAY="$DISPLAY" "$XDOTOOL" key --window "$UI_WIN" Return
+xdo key --window "$UI_WIN" Return
 echo 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true'
 
 '''
@@ -176,6 +180,7 @@ def transform(text: str) -> str:
         "login_form_geometry_not_revalidated",
         "WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_RAW_XWD_GEOMETRY",
         "WORLDMAP_BASELINE_CHARACTER_SELECTION=PROVEN_RAW_XWD_GEOMETRY",
+        'DISPLAY="$DISPLAY" "$XDOTOOL"',
     )
     survivors = [token for token in forbidden if token in output]
     if survivors:
@@ -200,6 +205,8 @@ def transform(text: str) -> str:
         "ROW_X=285",
         "ROW_Y=193",
         'LD_LIBRARY_PATH="$XWD_TOOLROOT_LIBS" "$XWD"',
+        'LD_LIBRARY_PATH="$XDO_TOOLROOT_LIBS" "$XDOTOOL"',
+        "xdo windowfocus --sync",
     )
     missing = [token for token in required if token not in output]
     if missing:

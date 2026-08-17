@@ -16,11 +16,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  controller-plane-inventory:
-    name: Read-only canonical controller-plane admission inventory
+  canonical-baseline-bootstrap:
+    name: One admitted exact-client canonical baseline bootstrap
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.ref == 'runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation' }}
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - name: Checkout exact head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Revalidate Track A runtime admission
+      - name: Revalidate admitted bootstrap transaction
         shell: bash
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
@@ -38,158 +38,96 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           python3 .github/scripts/test_track_a_agent_runtime_governance.py \
             --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
-          echo 'WORLDMAP_CAUSAL_ADMISSION_POLICY=PASS'
+          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_ADMISSION_POLICY=PASS'
 
-      - name: Read only existing canonical controller metadata under shared flock
+      - name: Acquire fresh canonical lease and bootstrap exact baseline without credentials
         shell: bash
+        env:
+          TASK_ID: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+          SESSION_ID: worldmap-causal-baseline-20260817
         run: |
           set +x
           set -Eeuo pipefail
-          python3 - <<'PY'
-          from __future__ import annotations
+          STATE=/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+          TASK_STATE=/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+          TOKEN="$TASK_STATE/canonical-lease.token"
+          LEASE=.github/scripts/tibia-official-client-re-canonical-live-lease.py
+          TRANSITION=.github/scripts/tibia-official-client-re-canonical-live-transition.py
+          WORKER=.github/scripts/tibia-official-client-re-canonical-live-session.sh
 
-          import fcntl
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-          import stat
-          import time
+          mkdir -p "$TASK_STATE"
+          chmod 700 "$TASK_STATE"
+          rm -f "$TOKEN"
 
-          STATE = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
-          LOCK = STATE / 'coordination.lock'
-          LEASE = STATE / 'lease.json'
-          REG = STATE / 'runtime-registration.json'
-          EXPECTED_TASK = 'OTC-20260817-track-a-worldmap-server-delivery-causal-validation'
-          PREFIX = 'WORLDMAP_CAUSAL_CANONICAL_'
+          acquired=0
+          keep=0
+          cleanup_failure() {
+            rc=$?
+            if [[ "$keep" != 1 && "$acquired" == 1 ]]; then
+              python3 "$LEASE" --state-dir "$STATE" release \
+                --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" >/dev/null 2>&1 || true
+              rm -f "$TOKEN"
+            fi
+            exit "$rc"
+          }
+          trap cleanup_failure EXIT
 
-          def emit(key: str, value) -> None:
-              print(f'{PREFIX}{key}={json.dumps(value, sort_keys=True, separators=(",", ":"))}')
+          python3 "$LEASE" --state-dir "$STATE" acquire \
+            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" \
+            --ttl-seconds 2700
+          acquired=1
+          [[ "$(stat -c '%a' "$TOKEN")" == 600 ]]
 
-          def fingerprint(path: Path):
-              if not path.exists():
-                  return None
-              st = path.stat()
-              if not stat.S_ISREG(st.st_mode):
-                  return {'kind': 'non_regular', 'mode': stat.S_IMODE(st.st_mode), 'size': st.st_size, 'mtime_ns': st.st_mtime_ns}
-              flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0)
-              fd = os.open(path, flags)
-              try:
-                  h = hashlib.sha256()
-                  while True:
-                      chunk = os.read(fd, 65536)
-                      if not chunk:
-                          break
-                      h.update(chunk)
-              finally:
-                  os.close(fd)
-              return {'kind': 'regular', 'mode': stat.S_IMODE(st.st_mode), 'size': st.st_size, 'mtime_ns': st.st_mtime_ns, 'sha256': h.hexdigest()}
+          python3 "$LEASE" --state-dir "$STATE" validate \
+            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN"
+          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_GATE_A_LEASE=PASS'
 
-          def read_json_noatime(path: Path):
-              flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0)
-              fd = os.open(path, flags)
-              try:
-                  chunks = []
-                  while True:
-                      chunk = os.read(fd, 65536)
-                      if not chunk:
-                          break
-                      chunks.append(chunk)
-              finally:
-                  os.close(fd)
-              return json.loads(b''.join(chunks).decode('utf-8'))
+          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            python3 "$TRANSITION" bootstrap \
+              --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN" \
+              --worker "$WORKER" --worker-timeout 180
 
-          if not STATE.is_dir():
-              emit('NAMESPACE', 'ABSENT')
-              emit('COORDINATION_LOCK', 'ABSENT')
-              emit('LEASE', 'ABSENT')
-              emit('REGISTRATION', 'ABSENT')
-              emit('ADMISSION_RESULT', 'CANONICAL_NAMESPACE_ABSENT')
-              emit('ADMISSION_INVENTORY', 'COMPLETE')
-              raise SystemExit(0)
+          python3 "$LEASE" --state-dir "$STATE" validate \
+            --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN"
 
-          if not LOCK.exists() or not LOCK.is_file():
-              emit('NAMESPACE', 'PRESENT')
-              emit('COORDINATION_LOCK', 'ABSENT_OR_INVALID')
-              emit('ADMISSION_RESULT', 'CANONICAL_COORDINATION_LOCK_UNAVAILABLE')
-              emit('ADMISSION_INVENTORY', 'COMPLETE')
-              raise SystemExit(0)
-
-          before = {str(p): fingerprint(p) for p in (LOCK, LEASE, REG)}
-          lock_flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0)
-          lock_fd = os.open(LOCK, lock_flags)
-          try:
-              try:
-                  fcntl.flock(lock_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
-              except BlockingIOError:
-                  emit('NAMESPACE', 'PRESENT')
-                  emit('COORDINATION_LOCK', 'BUSY')
-                  emit('ADMISSION_RESULT', 'COORDINATION_LOCK_BUSY')
-                  emit('ADMISSION_INVENTORY', 'COMPLETE')
-                  raise SystemExit(0)
-
-              now = int(time.time())
-              lease = None
-              if LEASE.exists():
-                  lease = read_json_noatime(LEASE)
-                  if not isinstance(lease, dict):
-                      raise SystemExit('WORLDMAP_CAUSAL_ADMISSION_ERROR=LEASE_NOT_OBJECT')
-                  emit('LEASE', 'PRESENT')
-                  emit('LEASE_SCHEMA_VERSION', lease.get('schema_version'))
-                  emit('LEASE_RUNTIME_ID', lease.get('runtime_id'))
-                  emit('LEASE_STATUS', lease.get('status'))
-                  emit('LEASE_GENERATION', lease.get('generation'))
-                  emit('LEASE_CONTROLLER_TASK', lease.get('controller_task'))
-                  emit('LEASE_CONTROLLER_SESSION', lease.get('controller_session'))
-                  expires = lease.get('expires_at')
-                  expired = bool(lease.get('status') == 'active' and isinstance(expires, int) and expires <= now)
-                  emit('LEASE_EXPIRED', expired)
-              else:
-                  emit('LEASE', 'ABSENT')
-
-              registration = None
-              if REG.exists():
-                  registration = read_json_noatime(REG)
-                  if not isinstance(registration, dict):
-                      raise SystemExit('WORLDMAP_CAUSAL_ADMISSION_ERROR=REGISTRATION_NOT_OBJECT')
-                  emit('REGISTRATION', 'PRESENT')
-                  whitelist = (
-                      'schema_version', 'runtime_id', 'registration_generation', 'lease_generation',
-                      'registered_at', 'boot_id_sha256', 'pid', 'process_start_ticks',
-                      'client_version', 'client_size', 'client_sha256', 'display',
-                      'window_identity', 'remote_view_endpoint', 'remote_view_mapping',
-                      'state', 'source_task', 'source_run'
-                  )
-                  for key in whitelist:
-                      emit('REG_' + key.upper(), registration.get(key))
-              else:
-                  emit('REGISTRATION', 'ABSENT')
-
-              if registration is None:
-                  result = 'REGISTRATION_ABSENT'
-              elif lease and lease.get('status') == 'active' and not bool(
-                  isinstance(lease.get('expires_at'), int) and lease['expires_at'] <= now
-              ):
-                  if lease.get('controller_task') == EXPECTED_TASK:
-                      result = 'REGISTERED_CURRENT_TASK_ACTIVE_LEASE'
-                  else:
-                      result = 'REGISTERED_OTHER_TASK_ACTIVE_LEASE'
-              else:
-                  result = 'REGISTERED_NO_FRESH_ACTIVE_LEASE'
-              emit('ADMISSION_RESULT', result)
-          finally:
-              try:
-                  fcntl.flock(lock_fd, fcntl.LOCK_UN)
-              except OSError:
-                  pass
-              os.close(lock_fd)
-
-          after = {str(p): fingerprint(p) for p in (LOCK, LEASE, REG)}
-          if before != after:
-              raise SystemExit('WORLDMAP_CAUSAL_ADMISSION_ERROR=CONTROL_METADATA_CHANGED_DURING_READ_ONLY_PROBE')
-          emit('CONTROL_METADATA_UNCHANGED', True)
-          emit('PROCESS_OBSERVATION', False)
-          emit('X11_OBSERVATION', False)
-          emit('CLIENT_MUTATION', False)
-          emit('ADMISSION_INVENTORY', 'COMPLETE')
+          python3 - "$STATE/runtime-registration.json" "$TASK_ID" "$GITHUB_RUN_ID" <<'PY'
+          import json, pathlib, sys
+          path = pathlib.Path(sys.argv[1])
+          task = sys.argv[2]
+          run = sys.argv[3]
+          data = json.loads(path.read_text())
+          required = {
+              'schema_version': 1,
+              'runtime_id': 'track-a-canonical-live',
+              'client_version': '15.32.df7b29',
+              'client_size': 51965216,
+              'client_sha256': 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
+              'source_task': task,
+              'source_run': run,
+          }
+          for key, expected in required.items():
+              if data.get(key) != expected:
+                  raise SystemExit(f'WORLDMAP_CAUSAL_BOOTSTRAP_ERROR=registration_{key}_mismatch')
+          if not isinstance(data.get('pid'), int) or data['pid'] <= 0:
+              raise SystemExit('WORLDMAP_CAUSAL_BOOTSTRAP_ERROR=registration_pid_invalid')
+          if data.get('remote_view_mapping') != 'PROVEN':
+              raise SystemExit('WORLDMAP_CAUSAL_BOOTSTRAP_ERROR=remote_view_mapping_not_proven')
+          if data.get('state') != 'UNKNOWN':
+              raise SystemExit('WORLDMAP_CAUSAL_BOOTSTRAP_ERROR=unexpected_prelogin_state')
+          safe = {key: data.get(key) for key in (
+              'schema_version','runtime_id','registration_generation','lease_generation','registered_at',
+              'boot_id_sha256','pid','process_start_ticks','client_version','client_size','client_sha256',
+              'display','window_identity','remote_view_endpoint','remote_view_mapping','state','source_task','source_run'
+          )}
+          print('WORLDMAP_CAUSAL_BOOTSTRAP_REGISTRATION=' + json.dumps(safe, sort_keys=True, separators=(',', ':')))
+          print('WORLDMAP_CAUSAL_BOOTSTRAP_REGISTRATION_FENCE=PASS')
           PY
+
+          python3 "$LEASE" --state-dir "$STATE" status --json
+          echo "WORLDMAP_CAUSAL_BOOTSTRAP_TOKEN_PATH=$TOKEN"
+          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_CREDENTIALS_USED=false'
+          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_LOGIN_USED=false'
+          echo 'WORLDMAP_CAUSAL_BOOTSTRAP_GAMEPLAY_USED=false'
+          echo 'WORLDMAP_CAUSAL_BOOTSTRAP=PASS'
+          keep=1
+          trap - EXIT

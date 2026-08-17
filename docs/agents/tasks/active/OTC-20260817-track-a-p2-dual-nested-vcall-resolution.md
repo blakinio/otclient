@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260817-track-a-p2-dual-nested-vcall-resolution
-status: ready
+status: investigating
 agent: ChatGPT
 session_role: draft_researcher
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: discovery
-phase: validate
+phase: investigate
 branch: research/OTC-20260817-track-a-p2-dual-nested-vcall-resolution
 base_branch: main
 base_main: 2ba207cef6d53dc847542b33ec94e7b53fd35b1f
@@ -15,6 +15,8 @@ risk: medium
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-p2-dual-nested-vcall-resolution.md
   - docs/agents/evidence/OTC-20260817-track-a-p2-dual-nested-vcall-resolution/**
+  - .github/scripts/tibia-official-client-re-p2-dual-nested-vcall-resolution.py
+  - .github/workflows/tibia-official-client-re-p2-dual-nested-vcall-resolution.yml
 modules_touched: []
 depends_on:
   - PR #481 merged as 2ba207cef6d53dc847542b33ec94e7b53fd35b1f
@@ -23,15 +25,15 @@ blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: bounded exact-client static discriminator reusing an independently rehashed exact-fenced predecessor artifact; no live runtime required
+execution_reason: exact-fenced bounded static discriminator with file-only source staging and GitHub-hosted semantic analysis
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
-task_completion_policy: checkpoint_only
+task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 decomposition_decision: single
 validation_level: focused
 execution_class: github_hosted
-source_staging_class: none_new_reused_exact_fenced_sanitized_artifact
+source_staging_class: exact_fenced_file_only_nonsemantic
 runtime_access: none
 persistent_session_role: none
 physical_e2e_required: false
@@ -48,7 +50,7 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
 promotion_authority: coordinator_only
-research_output: DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW
+research_output: IN_PROGRESS_NOT_PROMOTED
 feature_scope:
   type: protocol
   user_facing: false
@@ -91,60 +93,57 @@ research_result:
   b57042_rsi_on_taken_branch: FACT:0x100000001
   b57042_same_message_preserved: DISPROVEN
   b57042_is_same_message_edge_to_b40630: DISPROVEN
-unknown:
-  - b56c93_receiver_exact_dynamic_type
-  - b56c93_concrete_target
-  - b56c93_target_equals_b40630
-  - b57042_receiver_exact_dynamic_type
-  - b57042_concrete_target
-  - framing
-  - sequence
-  - compression
-  - encryption
-  - final_binary_egress
-  - final_socket_ownership
-  - complete_transport_stage_order_beyond_promoted_chain
-validation:
-  exact_artifact_redownload_rehash: PASS
-  exact_dataflow_b56c93: PASS
-  exact_dataflow_b57042: PASS
-  no_world_map_evidence: true
-  no_vtable_adjacency_as_target_proof: true
-  no_runtime_access: true
-  new_staging_surfaces: 0
-  final_exact_head_ci: PENDING
-  final_exact_head_governance: PENDING
-  review_threads_open: PENDING
-next_action: coordinator independently review the exact artifact-backed dataflow, then if accepted resolve only the b56c93 nested receiver vtable +0x10 concrete target after the 0xb3eda0/0xf45cf0 guarded chain and test target == 0xb40630; do not broaden into generic network RE
+additional_evidence_required: true
+next_action: run one exact-fenced bounded source generation that mechanically recovers candidate vtable/RTTI/address-point evidence and bounded constructor xref windows for the surviving 0xb56c93 receiver, then resolve its exact +0x10 target on GitHub-hosted infrastructure
 ---
 
 # Track A P2 — DualConnection nested virtual-call resolution
 
-## Objective and current result
+## Objective
 
-This bounded task reduced the two still-untyped nested `+0x10` calls downstream of the canonical #450 same-message handoff.
+Resolve the remaining same-message reachability edge downstream of the canonical #450 chain. The task is not terminal while `0xb56c93` still has an unresolved concrete `+0x10` target and a safe bounded exact-client discriminator remains available.
 
-Exact artifact-backed dataflow proves:
+## Reused exact-artifact result
 
-- `0xb56c93` receives the original `0xb56970` second argument, so the canonical same post-RawDataProcessor message is preserved to this unresolved nested vslot;
-- the receiver is reached through the exact nested chain `current=[r12] -> +0x20 -> +0x20`, guarded by concrete virtual-target comparisons `+0x98 -> 0xb3eda0` and `+0x60 -> 0xf45cf0`;
-- the receiver's exact dynamic type and its `+0x10` concrete target remain `UNKNOWN`, so `target == 0xb40630` remains `UNKNOWN`;
-- `0xb57042` is not the same-message continuation: on the direct taken branch `rsi` remains `0x100000001`, so the same-message edge to `0xb40630` is `DISPROVEN` for that call.
+Independent re-download/re-hash of accepted exact-fenced artifact `9283858910` proved:
 
-No framing, sequence, compression, encryption, final egress or socket-ownership semantic is promoted.
+- `0xb56c93` preserves the original `0xb56970` second SysV argument in `r14`, restores it to `rsi`, and calls receiver vslot `+0x10`; canonical #450 therefore makes same-message preservation to this call a FACT;
+- the `0xb56c93` receiver is reached as `current=[r12] -> +0x20 -> +0x20`, with exact guard targets `outer vslot +0x98 -> 0xb3eda0` and `intermediate vslot +0x60 -> 0xf45cf0`;
+- `0xb57042` is not a same-message continuation: its direct taken path has `rsi=0x100000001` at the call, so that candidate is DISPROVEN as the same-message edge to `0xb40630`.
+
+The accepted #310 exact-SHA artifact was also checked and does not contain the surviving receiver vtable identity. Reusing only old artifacts cannot resolve the final edge.
+
+## Bounded evidence generation
+
+One temporary exact-fenced producer is authorized within this task. Source-side execution on the retained exact regular file may only perform deterministic file-byte mapping and structural indexing; it may not disassemble or semantically classify. It will stage only:
+
+1. small exact code windows around the `0xb56c93` guarded chain and the relevant exact function targets `0xb3eda0`, `0xf45cf0`, `0xb40630` and `0xb57470`;
+2. exact file-backed occurrences of those target pointers;
+3. mechanically derived candidate vtable address-point windows from the callsite-tested slot offsets (`+0x98`, `+0x60`, `+0x10`, `+0x80`);
+4. bounded RTTI/name bytes reached from those candidate tables;
+5. bounded executable raw-byte windows around structural RIP-relative references to candidate address points, for hosted decoding only.
+
+No raw ELF/package is uploaded. All instruction decoding, type interpretation, constructor/object-provenance reasoning and final semantic classification occur on GitHub-hosted Ubuntu. The one-shot workflow/script must be removed immediately after evidence consumption.
 
 ## Acceptance inventory
 
-- [x] exact sanitized predecessor artifact independently re-downloaded and re-hashed;
-- [x] both nested callsite receiver/dataflow paths reconstructed from exact-fenced bytes;
-- [x] `0xb56c93` same-message preservation classified `FACT`;
-- [x] `0xb57042` same-message preservation classified `DISPROVEN`;
-- [x] unresolved concrete vtable targets retained as `UNKNOWN` rather than guessed;
-- [x] no world-map/map evidence used;
-- [x] no runtime/login/gameplay/process-memory work;
-- [x] no new one-shot staging workflow/script required;
-- [ ] final exact-head governance/CI and review hygiene verified.
+- [ ] exact client size/SHA fenced before new bytes are staged;
+- [x] both nested callsite dataflows reconstructed from exact-fenced bytes;
+- [x] `0xb56c93` same-message preservation = FACT;
+- [x] `0xb57042` same-message preservation = DISPROVEN;
+- [ ] surviving `0xb56c93` receiver vtable/object-construction provenance resolved to strongest exact evidence;
+- [ ] `0xb56c93` concrete vslot `+0x10` target resolved, or retained UNKNOWN only after the new discriminator is exhausted;
+- [ ] exact test `b56c93 target == 0xb40630`;
+- [ ] final `DUALCONNECTION_TO_BINARY_EGRESS` classification updated without inventing a replacement sink;
+- [ ] framing/sequence/compression/encryption/final-socket properties kept independently PROVEN/UNKNOWN as evidence warrants;
+- [ ] temporary workflow/script removed after the single evidence generation;
+- [ ] durable Markdown + JSON evidence persisted;
+- [ ] final exact-head governance/CI and review hygiene green before coordinator promotion.
 
-## Stop condition / handover
+## Scope boundary
 
-The two-call discriminator is complete to the strongest evidence available in the reused exact artifact. The only live same-message reachability candidate is now `0xb56c93`. The next smallest discriminator is to recover the exact receiver vtable/object-construction provenance for that call and resolve only its `+0x10` target, testing whether it is exactly `0xb40630`.
+Do not infer targets from address proximity, vtable adjacency, class names alone or Qt semantics. Do not revisit world-map/map evidence. No runtime/login/gameplay/process-memory work is authorized. No owner-funded AI/API use is authorized.
+
+## Stop condition
+
+Stop only after the surviving `0xb56c93` exact target is resolved to the strongest evidence available from the bounded producer and the task has completed researcher validation/cleanup. If the bounded constructor/vtable evidence cannot bind the receiver, record the exact exhausted discriminator as `UNKNOWN` rather than broadening into generic network reverse engineering.

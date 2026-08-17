@@ -23,6 +23,7 @@ class ExecutorError(RuntimeError):
 
 
 _WORKTREE_LOCK = threading.Lock()
+_PROTECTED_BRANCHES = {"main", "master"}
 
 
 def _executor_config(config: dict[str, Any]) -> dict[str, Any]:
@@ -77,6 +78,14 @@ def _run_git(repo: Path, *args: str, check: bool = True) -> subprocess.Completed
     return run
 
 
+def _validate_branch(repo_root: Path, branch: str) -> None:
+    if branch in _PROTECTED_BRANCHES:
+        raise ExecutorError(f"protected branch cannot be a worker branch: {branch}")
+    check = _run_git(repo_root, "check-ref-format", "--branch", branch, check=False)
+    if check.returncode:
+        raise ExecutorError(f"invalid worker branch: {branch}")
+
+
 def _changed_paths(worktree: Path, base_sha: str) -> list[str]:
     run = _run_git(worktree, "diff", "--name-only", f"{base_sha}...HEAD")
     return sorted(line.strip() for line in run.stdout.splitlines() if line.strip())
@@ -124,6 +133,17 @@ def _publish_result(worktree: Path, branch: str, base_sha: str, head_sha: str, c
         raise ExecutorError("published branch head does not match worker result")
 
 
+def _dispatch_projection(item: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        item.get("task_id"),
+        item.get("task_path"),
+        item.get("branch"),
+        item.get("dispatch_head"),
+        tuple(item.get("owned_paths", [])),
+        tuple(item.get("depends_on", [])),
+    )
+
+
 def execute_dispatch(
     repo_root: Path,
     dispatch: dict[str, Any],
@@ -134,9 +154,11 @@ def execute_dispatch(
     cfg = validate_executor_enabled(config)
     task_id = str(dispatch["task_id"])
     base_sha = str(dispatch["dispatch_head"])
+    branch = str(dispatch.get("branch", ""))
     if not orchestrator_core.SHA_RE.fullmatch(base_sha):
         raise ExecutorError("dispatch head must be a 40-hex commit id")
-    if dispatch.get("branch") != task.branch:
+    _validate_branch(repo_root, branch)
+    if branch != task.branch:
         raise ExecutorError("dispatch branch differs from current task branch")
     if task.head != base_sha:
         raise ExecutorError("task head moved since plan creation")
@@ -196,6 +218,9 @@ def execute_dispatch(
         if status:
             raise ExecutorError("worker left an uncommitted/dirty worktree")
         actual_head = _run_git(worktree, "rev-parse", "HEAD").stdout.strip()
+        ancestry = _run_git(worktree, "merge-base", "--is-ancestor", base_sha, actual_head, check=False)
+        if ancestry.returncode:
+            raise ExecutorError("worker HEAD is not a descendant of the dispatch base")
         if result.get("head_sha") != actual_head:
             raise ExecutorError("worker result head_sha does not match actual worktree HEAD")
         actual_changed = _changed_paths(worktree, base_sha)
@@ -244,6 +269,17 @@ def execute_plan(
         raise ExecutorError("selected workers require concrete branches")
     if len(set(branches)) != len(branches):
         raise ExecutorError("selected workers must use distinct branches")
+
+    fresh_plan = orchestrator_core.build_plan(
+        tasks,
+        config,
+        lane=plan.get("lane"),
+        max_parallel=plan.get("max_parallel_workers"),
+    )
+    if [_dispatch_projection(item) for item in fresh_plan["selected"]] != [
+        _dispatch_projection(item) for item in selected
+    ]:
+        raise ExecutorError("plan is stale; live task/dependency/ownership state changed, rerun plan")
 
     results_dir.mkdir(parents=True, exist_ok=True)
     root_ctx = tempfile.TemporaryDirectory(prefix="orchestrator-workers-") if workspace_root is None else None

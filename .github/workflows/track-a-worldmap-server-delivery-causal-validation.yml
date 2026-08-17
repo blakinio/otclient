@@ -1,0 +1,81 @@
+name: Track A worldmap server-delivery causal validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-worldmap-server-delivery-causal-validation.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-worldmap-server-delivery-causal-validation
+  cancel-in-progress: false
+
+jobs:
+  xdotool-loader-static:
+    name: Xdotool toolroot closure and helper composition (no client)
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Prove xdotool dynamic-link closure without client or secrets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TOOL=/home/runner/_work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || TOOL=/work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_XDO_STATIC_ERROR=toolroot_missing' >&2; exit 1; }
+          XDO="$TOOL/usr/bin/xdotool"
+          [[ -x "$XDO" ]] || { echo 'WORLDMAP_XDO_STATIC_ERROR=xdotool_missing' >&2; exit 1; }
+          LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+          deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XDO")"
+          if grep -F 'not found' <<<"$deps"; then
+            echo 'WORLDMAP_XDO_STATIC_ERROR=dependency_not_found' >&2
+            exit 1
+          fi
+          grep -F 'libxdo.so.3 =>' <<<"$deps" >/dev/null || {
+            echo 'WORLDMAP_XDO_STATIC_ERROR=libxdo_resolution_missing' >&2
+            exit 1
+          }
+          echo 'WORLDMAP_XDO_LIBXDO_RESOLUTION=PASS'
+          echo 'WORLDMAP_XDO_TOOLROOT_DYNAMIC_LINK=PASS'
+          echo 'WORLDMAP_XDO_STATIC_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_XDO_STATIC_SECRET_USED=false'
+
+      - name: Validate composed helper uses loader-safe xdo wrapper
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py
+          screen="$RUNNER_TEMP/worldmap-xdo-screen.sh"
+          gdb="$RUNNER_TEMP/worldmap-xdo-gdb.sh"
+          combined="$RUNNER_TEMP/worldmap-xdo-combined.sh"
+          python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$combined"
+          bash -n "$combined"
+          grep -F 'XDO_TOOLROOT_LIBS="$XWD_TOOLROOT_LIBS"' "$combined" >/dev/null
+          grep -F 'LD_LIBRARY_PATH="$XDO_TOOLROOT_LIBS" "$XDOTOOL" "$@"' "$combined" >/dev/null
+          grep -F 'xdo windowfocus --sync' "$combined" >/dev/null
+          grep -F 'xdo mousemove --window' "$combined" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_GDB_ATTACH=PASS' "$combined" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_EDITABLE_FIELDS' "$combined" >/dev/null
+          if grep -F 'DISPLAY="$DISPLAY" "$XDOTOOL"' "$combined"; then
+            echo 'WORLDMAP_XDO_STATIC_ERROR=unsafe_direct_xdotool_survived' >&2
+            exit 1
+          fi
+          echo 'WORLDMAP_XDO_HELPER_COMPOSITION=PASS'
+          echo 'WORLDMAP_XDO_COMPOSE_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_XDO_COMPOSE_SECRET_USED=false'

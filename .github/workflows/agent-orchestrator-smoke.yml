@@ -67,6 +67,64 @@ jobs:
           assert payload["exact_remaining_tokens_known"] is False
           PY
 
+  live-plan-only:
+    name: Live repo plan-only audit
+    needs: focused-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Plan against real active task inventory without dispatch
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "${RUNNER_TEMP}/orchestrator-live"
+          python3 tools/agents/orchestrator.py \
+            --config docs/agents/AGENT_ORCHESTRATOR.json \
+            plan \
+            --tasks-root docs/agents/tasks/active \
+            --lane otclient \
+            --output "${RUNNER_TEMP}/orchestrator-live/plan.json"
+
+      - name: Verify plan-only safety invariants
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - "${RUNNER_TEMP}/orchestrator-live/plan.json" <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          plan = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert plan["executor"]["real_model_executor_enabled"] is False
+          assert plan["executor"]["owner_funded_ai_allowed"] is False
+          assert len(plan["selected"]) <= plan["max_parallel_workers"] <= 4
+          assert len({item["task_id"] for item in plan["selected"]}) == len(plan["selected"])
+          for item in plan["selected"]:
+              context = item["context"]
+              assert context["pressure"] in {"low", "medium"}
+              if context["pressure"] == "medium":
+                  assert context["growth"] not in {"rising", "rapid"}
+              assert item["dispatch_head"] and len(item["dispatch_head"]) == 40
+              assert item["resume_command"].startswith("python tools/agents/resume.py --task ")
+          print(
+              "LIVE_PLAN_ONLY_PASS=true "
+              f"selected={len(plan['selected'])} held={len(plan['held'])} inactive={len(plan['inactive'])}"
+          )
+          PY
+
+      - name: Upload live plan-only evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: orchestrator-live-plan-only
+          path: ${{ runner.temp }}/orchestrator-live/plan.json
+          if-no-files-found: error
+
   plan-wave:
     name: Plan independent wave
     needs: focused-tests
@@ -227,3 +285,104 @@ jobs:
           name: orchestrator-smoke-barrier
           path: ${{ runner.temp }}/orchestrator-smoke/barrier.json
           if-no-files-found: error
+
+  fresh-audit:
+    name: Fresh falsification audit
+    needs: [barrier, live-plan-only]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Falsify trust, ownership, context and result binding
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PYTHONPATH=tools/agents python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import tempfile
+          from types import SimpleNamespace
+
+          import orchestrator
+
+          config = orchestrator.load_config(Path("docs/agents/AGENT_ORCHESTRATOR.json"))
+          assert config["executor"]["real_model_executor_enabled"] is False
+          assert config["executor"]["owner_funded_ai_allowed"] is False
+
+          def task_text(task_id, priority, owned, pressure="low", score=1, next_action="continue"):
+              head_char = {10: "1", 20: "2", 30: "3", 40: "4", 50: "5"}[priority]
+              return f"""---
+          task_id: {task_id}
+          project_lane: otclient
+          status: ready
+          branch: feat/{task_id.lower()}
+          orchestrator_priority: {priority}
+          context_pressure: {pressure}
+          context_growth: stable
+          context_score: {score}
+          owned_paths:
+            - {owned}
+          depends_on: []
+          ---
+          # Audit task
+          ## Context checkpoint
+          ```yaml
+          checkpoint_version: 1
+          head: {head_char * 40}
+          branch: feat/{task_id.lower()}
+          status: ready
+          context_pressure: {pressure}
+          context_growth: stable
+          context_score: {score}
+          owned_paths:
+            - {owned}
+          next_action: {next_action}
+          ```
+          """
+
+          with tempfile.TemporaryDirectory() as tmp:
+              root = Path(tmp)
+              (root / "OTC-AUDIT-SAFE1.md").write_text(
+                  task_text("OTC-AUDIT-SAFE1", 10, "src/a/file1.cpp"), encoding="utf-8"
+              )
+              (root / "OTC-AUDIT-SAFE2.md").write_text(
+                  task_text("OTC-AUDIT-SAFE2", 20, "src/a/file2.cpp"), encoding="utf-8"
+              )
+              (root / "OTC-AUDIT-HIGH.md").write_text(
+                  task_text("OTC-AUDIT-HIGH", 30, "src/high/**", "high", 11), encoding="utf-8"
+              )
+              (root / "OTC-AUDIT-BROAD.md").write_text(
+                  task_text("OTC-AUDIT-BROAD", 40, "**"), encoding="utf-8"
+              )
+              malicious = "rm -rf /; echo injected"
+              (root / "OTC-AUDIT-UNTRUSTED.md").write_text(
+                  task_text("OTC-AUDIT-UNTRUSTED", 50, "src/untrusted/**", next_action=malicious),
+                  encoding="utf-8",
+              )
+              tasks = orchestrator.discover_tasks(root, config)
+              plan = orchestrator.build_plan(tasks, config, max_parallel=4)
+              selected = [item["task_id"] for item in plan["selected"]]
+              held = {item["task_id"]: item for item in plan["held"]}
+              assert "OTC-AUDIT-SAFE1" in selected and "OTC-AUDIT-SAFE2" in selected
+              assert held["OTC-AUDIT-HIGH"]["reasons"] == ["CONTEXT_ROTATE_REQUIRED"]
+              assert "OWNERSHIP_OVERLAP" in held["OTC-AUDIT-BROAD"]["reasons"]
+              assert malicious not in json.dumps(plan)
+              dispatch = next(item for item in plan["selected"] if item["task_id"] == "OTC-AUDIT-SAFE1")
+              result = orchestrator.simulate_worker(
+                  SimpleNamespace(
+                      task_id=dispatch["task_id"],
+                      branch=dispatch["branch"],
+                      dispatch_head=dispatch["dispatch_head"],
+                  )
+              )
+              result["base_sha"] = "f" * 40
+              barrier = orchestrator.run_barrier(tasks, config, plan, [result])
+              assert barrier["invalid_results"]
+              assert barrier["next_wave"] is None
+          print("FRESH_ORCHESTRATOR_AUDIT_PASS=true")
+          PY

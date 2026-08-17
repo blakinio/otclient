@@ -14,18 +14,96 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  text-semantics-static:
-    name: Targeted text semantics validation (no client)
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
+  targeted-text-semantics:
+    name: Targeted pre-login text semantics (no secrets)
+    runs-on: [otclient, synology]
+    timeout-minutes: 9
     steps:
-      - name: Checkout exact head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          fetch-depth: 1
+      - name: Checkout exact head without codeload action
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          mkdir -p "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE"
+          git init -q
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
+          git cat-file -e "$HEAD_SHA^{commit}"
+          git checkout -q -f --detach "$HEAD_SHA"
+          git clean -ffdx
+          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
+          echo 'WORLDMAP_TEXT_RUNTIME_CHECKOUT=PASS'
 
-      - name: Validate no-secret transform composition
+      - name: Revalidate current-main Track A admission
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          base_sha="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "$base_sha" "origin/$HEAD_BRANCH"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$base_sha" --expected-branch "$HEAD_BRANCH"
+          echo "WORLDMAP_TEXT_RUNTIME_CURRENT_MAIN=$base_sha"
+          echo 'WORLDMAP_TEXT_RUNTIME_CURRENT_MAIN_ANCESTRY=PASS'
+          echo 'WORLDMAP_TEXT_RUNTIME_ADMISSION=PASS'
+
+      - name: Require canonical controller plane idle without mutating it
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import fcntl,json,os,time
+          from pathlib import Path
+          state=Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          lock=state/'coordination.lock'; lease_path=state/'lease.json'; reg=state/'runtime-registration.json'
+          if not lock.is_file() or not lease_path.is_file(): raise SystemExit('WORLDMAP_TEXT_RUNTIME_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
+          fd=os.open(lock,os.O_RDONLY|getattr(os,'O_NOATIME',0))
+          try:
+              fcntl.flock(fd,fcntl.LOCK_SH)
+              lease=json.loads(lease_path.read_text())
+              safe={'generation':lease.get('generation'),'status':lease.get('status'),'controller_task':lease.get('controller_task'),'controller_session':lease.get('controller_session'),'expired':bool(lease.get('status')=='active' and isinstance(lease.get('expires_at'),int) and lease['expires_at']<=int(time.time()))}
+              print('WORLDMAP_TEXT_RUNTIME_CANONICAL_LEASE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
+              if safe['status']!='released' or safe['controller_task'] is not None or safe['controller_session'] is not None: raise SystemExit('WORLDMAP_TEXT_RUNTIME_PREFLIGHT_ERROR=canonical_lease_not_idle')
+              if reg.exists(): raise SystemExit('WORLDMAP_TEXT_RUNTIME_PREFLIGHT_ERROR=canonical_registration_present')
+          finally:
+              try: fcntl.flock(fd,fcntl.LOCK_UN)
+              except OSError: pass
+              os.close(fd)
+          print('WORLDMAP_TEXT_RUNTIME_CANONICAL_REGISTRATION=ABSENT')
+          print('WORLDMAP_TEXT_RUNTIME_CANONICAL_CONTROLLER_IDLE=PASS')
+          PY
+
+      - name: Revalidate task-local UI tool dynamic-link closure without client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TOOL=/home/runner/_work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || TOOL=/work/_otclient_tibia_re_state/toolroot
+          [[ -d "$TOOL" ]] || { echo 'WORLDMAP_TEXT_RUNTIME_UI_PREFLIGHT_ERROR=toolroot_missing' >&2; exit 1; }
+          LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+          XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
+          XDO="$TOOL/usr/bin/xdotool"
+          [[ -x "$XWD" && -x "$XDO" ]] || { echo 'WORLDMAP_TEXT_RUNTIME_UI_PREFLIGHT_ERROR=ui_tool_missing' >&2; exit 1; }
+          xwd_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XWD")"
+          xdo_deps="$(LD_LIBRARY_PATH="$LIBS" ldd "$XDO")"
+          if grep -F 'not found' <<<"$xwd_deps" || grep -F 'not found' <<<"$xdo_deps"; then
+            echo 'WORLDMAP_TEXT_RUNTIME_UI_PREFLIGHT_ERROR=dependency_not_found' >&2
+            exit 1
+          fi
+          grep -F 'libxdo.so.3 =>' <<<"$xdo_deps" >/dev/null || { echo 'WORLDMAP_TEXT_RUNTIME_UI_PREFLIGHT_ERROR=libxdo_resolution_missing' >&2; exit 1; }
+          echo 'WORLDMAP_TEXT_RUNTIME_UI_TOOLROOT_DYNAMIC_LINK=PASS'
+
+      - name: Compose targeted no-secret text semantics
+        id: compose
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -37,95 +115,43 @@ jobs:
             .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
             .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
             .github/scripts/track-a-worldmap-causal-prelogin-text-semantics-repair.py
-          screen="$RUNNER_TEMP/wm-text-screen.sh"
-          gdb="$RUNNER_TEMP/wm-text-gdb.sh"
-          ui="$RUNNER_TEMP/wm-text-ui.sh"
-          probe="$RUNNER_TEMP/wm-text-probe.sh"
+          screen="$RUNNER_TEMP/wm-text-runtime-screen.sh"
+          gdb="$RUNNER_TEMP/wm-text-runtime-gdb.sh"
+          ui="$RUNNER_TEMP/wm-text-runtime-ui.sh"
+          probe="$RUNNER_TEMP/wm-text-runtime-probe.sh"
           python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
             .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
           python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
           python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$ui"
           python3 .github/scripts/track-a-worldmap-causal-prelogin-text-semantics-repair.py "$ui" "$probe"
           bash -n "$probe"
+          grep -F 'WORLDMAP_BASELINE_XRES_SELECTOR=EXACT_PID_UNIQUE_LARGEST_VIEWABLE' "$probe" >/dev/null
           grep -F 'WORLDMAP_PRELOGIN_TEXT_SEMANTICS_SECRET_ENV=ABSENT' "$probe" >/dev/null
           grep -F 'WORLDMAP_PRELOGIN_TEXT_SEMANTICS_TARGETS=tab2,tab3,tab5' "$probe" >/dev/null
           grep -F 'track-a-worldmap-causal-xwd-text-semantics.py' "$probe" >/dev/null
           grep -F "'abc'" "$probe" >/dev/null
           grep -F "'abcdefghijklm'" "$probe" >/dev/null
-          grep -F 'WORLDMAP_PRELOGIN_TEXT_FIELD_CANDIDATE=' "$probe" >/dev/null
           if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$probe" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$probe"; then
-            echo 'WORLDMAP_TEXT_STATIC_ERROR=credential_submission_survived' >&2
+            echo 'WORLDMAP_TEXT_RUNTIME_COMPOSE_ERROR=credential_submission_survived' >&2
             exit 1
           fi
           if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$probe" || \
              grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$probe" || \
              grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$probe" || \
              grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$probe"; then
-            echo 'WORLDMAP_TEXT_STATIC_ERROR=login_or_gameplay_surface_survived' >&2
+            echo 'WORLDMAP_TEXT_RUNTIME_COMPOSE_ERROR=login_or_gameplay_surface_survived' >&2
             exit 1
           fi
-          echo 'WORLDMAP_TEXT_SEMANTICS_COMPOSITION=PASS'
+          echo "probe=$probe" >> "$GITHUB_OUTPUT"
+          echo 'WORLDMAP_TEXT_RUNTIME_COMPOSITION=PASS'
+          echo 'WORLDMAP_TEXT_RUNTIME_SECRET_USED=false'
 
-      - name: Run positive and negative synthetic text controls
+      - name: Execute one targeted text-semantics scan without secrets
         shell: bash
+        env:
+          PROBE: ${{ steps.compose.outputs.probe }}
         run: |
+          set +x
           set -Eeuo pipefail
-          FIX="$RUNNER_TEMP/wm-text-fixtures"
-          mkdir -p "$FIX"
-          python3 - "$FIX" <<'PY'
-          from pathlib import Path
-          import struct,sys
-          root=Path(sys.argv[1]); W,H=1020,650; stride=W*4
-          h=[0]*25
-          h[0]=101; h[1]=7; h[2]=2; h[3]=24; h[4]=W; h[5]=H; h[7]=0
-          h[11]=32; h[12]=stride; h[14]=0xFF0000; h[15]=0x00FF00; h[16]=0x0000FF
-          h[17]=8; h[18]=256; h[19]=0; h[20]=W; h[21]=H
-          prefix=struct.pack('>25I',*h)+b'\0'
-          def frame(name,rects=()):
-              px=bytearray(stride*H)
-              for x0,y0,x1,y1,v in rects:
-                  for y in range(y0,y1):
-                      for x in range(x0,x1):
-                          o=(y*W+x)*4; px[o:o+3]=bytes((v,v,v))
-              (root/name).write_bytes(prefix+px)
-          blank=()
-          short=((200,150,230,160,255),)
-          long=((200,150,300,160,255),)
-          wide=((100,150,800,160,255),)
-          # positive
-          for n in ('p0','p1','p2','pcs','pcl','p3'): frame(n,blank)
-          frame('ps',short); frame('pl',long)
-          # no-growth negative
-          for n in ('n0','n1','n2','ncs','ncl','n3'): frame(n,blank)
-          frame('ns',short); frame('nl',short)
-          # too-wide negative
-          for n in ('w0','w1','w2','wcs','wcl','w3'): frame(n,blank)
-          frame('ws',short); frame('wl',wide)
-          PY
-          SEM=.github/scripts/track-a-worldmap-causal-xwd-text-semantics.py
-          CMP=.github/scripts/track-a-worldmap-causal-xwd-compare.py
-          python3 "$SEM" "$CMP" \
-            "$FIX/p0" "$FIX/p1" "$FIX/p2" "$FIX/ps" "$FIX/pcs" "$FIX/pl" "$FIX/pcl" "$FIX/p3" \
-            | tee "$FIX/positive.out"
-          grep -F 'WORLDMAP_TEXT_SEMANTICS_FIELD=PASS' "$FIX/positive.out" >/dev/null
-          grep -F 'WORLDMAP_TEXT_SEMANTICS_SHORT_BBOX=200,150,230,160' "$FIX/positive.out" >/dev/null
-          grep -F 'WORLDMAP_TEXT_SEMANTICS_LONG_BBOX=200,150,300,160' "$FIX/positive.out" >/dev/null
-          set +e
-          python3 "$SEM" "$CMP" \
-            "$FIX/n0" "$FIX/n1" "$FIX/n2" "$FIX/ns" "$FIX/ncs" "$FIX/nl" "$FIX/ncl" "$FIX/n3" \
-            >"$FIX/nogrowth.out" 2>&1
-          ng_rc=$?
-          python3 "$SEM" "$CMP" \
-            "$FIX/w0" "$FIX/w1" "$FIX/w2" "$FIX/ws" "$FIX/wcs" "$FIX/wl" "$FIX/wcl" "$FIX/w3" \
-            >"$FIX/wide.out" 2>&1
-          wide_rc=$?
-          set -e
-          [[ "$ng_rc" -eq 3 && "$wide_rc" -eq 3 ]]
-          grep -F 'WORLDMAP_TEXT_SEMANTICS_FIELD=FAIL' "$FIX/nogrowth.out" >/dev/null
-          grep -F 'WORLDMAP_TEXT_SEMANTICS_GROWTH_PIXELS=0' "$FIX/nogrowth.out" >/dev/null
-          grep -F 'WORLDMAP_TEXT_SEMANTICS_FIELD=FAIL' "$FIX/wide.out" >/dev/null
-          echo 'WORLDMAP_TEXT_SEMANTICS_SYNTHETIC_POSITIVE=PASS'
-          echo 'WORLDMAP_TEXT_SEMANTICS_SYNTHETIC_NOGROWTH_NEGATIVE=PASS'
-          echo 'WORLDMAP_TEXT_SEMANTICS_SYNTHETIC_WIDE_NEGATIVE=PASS'
-          echo 'WORLDMAP_TEXT_SEMANTICS_STATIC_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_TEXT_SEMANTICS_STATIC_SECRET_USED=false'
+          [[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]]
+          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD "$PROBE"

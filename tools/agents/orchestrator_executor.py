@@ -107,7 +107,9 @@ def _render_request(dispatch: dict[str, Any], task_path: Path, worktree: Path) -
 
 
 def _sanitized_env(cfg: dict[str, Any]) -> dict[str, str]:
-    allow = {"PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "WINDIR"}
+    # HOME is intentionally excluded. Provider credentials/config often live below HOME and
+    # must be opted into explicitly through pass_env only after the relevant authorization gate.
+    allow = {"PATH", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT", "WINDIR"}
     extra = cfg.get("pass_env", [])
     if not isinstance(extra, list) or not all(isinstance(item, str) and item for item in extra):
         raise ExecutorError("executor.pass_env must be a list of variable names")
@@ -227,6 +229,8 @@ def execute_dispatch(
         result_changed = sorted(result.get("changed_paths", [])) if isinstance(result.get("changed_paths"), list) else []
         if actual_changed != result_changed:
             raise ExecutorError("worker changed_paths do not match actual Git diff")
+        if actual_changed and not cfg.get("publish_results", False):
+            raise ExecutorError("write worker requires publish_results=true for durable branch state")
         errors = orchestrator_results.validate_worker_result(result, dispatch, task, config)
         if errors:
             raise ExecutorError("invalid worker-result-v1: " + "; ".join(errors))

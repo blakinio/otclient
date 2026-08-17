@@ -1,0 +1,256 @@
+name: Track A worldmap downstream exact static evidence
+
+on:
+  push:
+    branches:
+      - research/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence
+    paths:
+      - .github/scripts/tibia-official-client-re-worldmap-downstream-exact-static.py
+      - .github/workflows/tibia-official-client-re-worldmap-downstream-exact-static.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-worldmap-downstream-exact-static-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-sanitize:
+    name: Source sanitize downstream worldmap exact evidence
+    runs-on: [otclient, synology]
+    timeout-minutes: 15
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence
+      EXPECTED_RUNNER_NAME: synology-otclient-01
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      PRIOR_PRODUCER_HEAD: ce8b1f59d02bfc7ecc498dd80f73b09cf2970510
+    steps:
+      - name: Checkout downstream producer branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned prior exact-static producer
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ env.PRIOR_PRODUCER_HEAD }}
+          path: prior-producer
+          persist-credentials: false
+
+      - name: Verify source boundary and select exact client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || { echo WORLD_MAP_DOWNSTREAM_REFUSED=REPOSITORY_BOUNDARY; exit 61; }
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || { echo WORLD_MAP_DOWNSTREAM_REFUSED=REF_BOUNDARY; exit 62; }
+          [[ "$RUNNER_OS" == Linux ]] || { echo WORLD_MAP_DOWNSTREAM_REFUSED=OS_BOUNDARY; exit 63; }
+          [[ "$RUNNER_ARCH" == X64 ]] || { echo WORLD_MAP_DOWNSTREAM_REFUSED=ARCH_BOUNDARY; exit 64; }
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || { echo WORLD_MAP_DOWNSTREAM_REFUSED=RUNNER_BOUNDARY; exit 65; }
+          command -v python3 >/dev/null 2>&1 || { echo WORLD_MAP_DOWNSTREAM_REFUSED=PYTHON3_MISSING; exit 66; }
+
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-worldmap-downstream-exact-static.py \
+            prior-producer/.github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
+            prior-producer/.github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
+
+          candidates=(
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+          )
+          source_client=''
+          source_index=''
+          for index in 0 1; do
+            candidate="${candidates[$index]}"
+            [[ -f "$candidate" && ! -L "$candidate" ]] || continue
+            candidate_size="$(stat -c %s "$candidate" 2>/dev/null || echo STAT_FAILED)"
+            [[ "$candidate_size" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
+          import hashlib
+          import sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          expected = sys.argv[2]
+          digest = hashlib.sha256()
+          with path.open('rb') as handle:
+              for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+                  digest.update(chunk)
+          raise SystemExit(0 if digest.hexdigest() == expected else 1)
+          PY
+            then
+              source_client="$candidate"
+              source_index="$index"
+              break
+            fi
+          done
+          [[ -n "$source_client" ]] || { echo WORLD_MAP_DOWNSTREAM_REFUSED=EXACT_SOURCE_MISSING; exit 50; }
+          {
+            echo "SOURCE_CLIENT=$source_client"
+            echo "SOURCE_CANDIDATE_INDEX=$source_index"
+          } >> "$GITHUB_ENV"
+
+          echo WORLD_MAP_DOWNSTREAM_SOURCE_BOUNDARY=PASS
+          echo "WORLD_MAP_DOWNSTREAM_SOURCE_CANDIDATE_INDEX=$source_index"
+          echo "WORLD_MAP_DOWNSTREAM_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION"
+          echo "WORLD_MAP_DOWNSTREAM_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE"
+          echo "WORLD_MAP_DOWNSTREAM_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256"
+          echo WORLD_MAP_DOWNSTREAM_RUNTIME_ACCESS=none
+          echo WORLD_MAP_DOWNSTREAM_CLIENT_PROCESS_ACCESS=false
+          echo WORLD_MAP_DOWNSTREAM_PROCESS_MEMORY_ACCESS=false
+          echo WORLD_MAP_DOWNSTREAM_CANONICAL_STATE_ACCESS=false
+          echo WORLD_MAP_DOWNSTREAM_CLIENT_EXECUTED=false
+          echo WORLD_MAP_DOWNSTREAM_CLIENT_BYTE_MUTATION=false
+
+      - name: Produce bounded sanitized downstream source windows
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf artifacts/source
+          mkdir -p artifacts/source
+          python3 .github/scripts/tibia-official-client-re-worldmap-downstream-exact-static.py \
+            source \
+            --client "$SOURCE_CLIENT" \
+            --candidate-index "$SOURCE_CANDIDATE_INDEX" \
+            --prior-v2 prior-producer/.github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
+            --outdir artifacts/source
+
+          grep -Fxq "WORLD_MAP_DOWNSTREAM_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/source/source-fence.txt
+          grep -Fxq "WORLD_MAP_DOWNSTREAM_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/source/source-fence.txt
+          grep -Fxq "WORLD_MAP_DOWNSTREAM_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_DOWNSTREAM_RUNTIME_ACCESS=none' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_DOWNSTREAM_CLIENT_EXECUTED=false' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_DOWNSTREAM_PROCESS_MEMORY_ACCESSED=false' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_DOWNSTREAM_CANONICAL_STATE_ACCESSED=false' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_DOWNSTREAM_RAW_CLIENT_UPLOADED=false' artifacts/source/source-fence.txt
+
+      - name: Enforce sanitized source artifact boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('artifacts/source')
+          allowed = {'downstream-source-evidence.json', 'downstream-source-evidence.md', 'source-fence.txt'}
+          actual = {p.name for p in root.iterdir() if p.is_file()}
+          if actual != allowed:
+              raise SystemExit(f'unsafe source artifact file set: {sorted(actual)}')
+          for path in sorted(root.iterdir()):
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              if len(data) > 8 * 1024 * 1024:
+                  raise SystemExit(f'oversized sanitized output: {path}:{len(data)}')
+              if data.startswith(b'\x7fELF') or data[:2] == b'MZ':
+                  raise SystemExit(f'raw executable payload refused: {path}')
+              data.decode('utf-8')
+          print('WORLD_MAP_DOWNSTREAM_SOURCE_SANITIZED_BOUNDARY=PASS')
+          PY
+
+      - name: Upload sanitized downstream source evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-worldmap-downstream-exact-static-source-${{ github.run_id }}
+          path: artifacts/source/**
+          if-no-files-found: error
+          retention-days: 7
+
+  hosted-validate:
+    name: Validate downstream worldmap evidence on GitHub-hosted runner
+    needs: source-sanitize
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence
+      EXPECTED_CLIENT_VERSION: 15.32.df7b29
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      PRIOR_PRODUCER_HEAD: ce8b1f59d02bfc7ecc498dd80f73b09cf2970510
+    steps:
+      - name: Checkout downstream producer branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+
+      - name: Checkout pinned prior exact-static producer
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ env.PRIOR_PRODUCER_HEAD }}
+          path: prior-producer
+          persist-credentials: false
+
+      - name: Verify GitHub-hosted boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]]
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]]
+          [[ "$RUNNER_OS" == Linux ]]
+          [[ "$RUNNER_ARCH" == X64 ]]
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+          command -v objdump >/dev/null
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-worldmap-downstream-exact-static.py \
+            prior-producer/.github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
+            prior-producer/.github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
+          echo WORLD_MAP_DOWNSTREAM_EXECUTION_CLASS=github_hosted
+          echo WORLD_MAP_DOWNSTREAM_RUNTIME_ACCESS=none
+          echo WORLD_MAP_DOWNSTREAM_RAW_CLIENT_PRESENT=false
+
+      - name: Download sanitized downstream source evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: track-a-worldmap-downstream-exact-static-source-${{ github.run_id }}
+          path: artifacts/source
+
+      - name: Disassemble bounded windows and validate downstream evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf artifacts/final
+          mkdir -p artifacts/final
+          python3 .github/scripts/tibia-official-client-re-worldmap-downstream-exact-static.py \
+            hosted \
+            --bundle-dir artifacts/source \
+            --prior-v2 prior-producer/.github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
+            --outdir artifacts/final
+
+          grep -Fxq 'WORLD_MAP_DOWNSTREAM_HOSTED_VALIDATION=PASS' artifacts/final/hosted-validation.txt
+          grep -Fxq "WORLD_MAP_DOWNSTREAM_CLIENT_VERSION=$EXPECTED_CLIENT_VERSION" artifacts/final/hosted-validation.txt
+          grep -Fxq "WORLD_MAP_DOWNSTREAM_CLIENT_SIZE=$EXPECTED_CLIENT_SIZE" artifacts/final/hosted-validation.txt
+          grep -Fxq "WORLD_MAP_DOWNSTREAM_CLIENT_SHA256=$EXPECTED_CLIENT_SHA256" artifacts/final/hosted-validation.txt
+
+      - name: Enforce final consumer artifact boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('artifacts/final')
+          allowed = {'worldmap-downstream-exact-static-evidence.json', 'worldmap-downstream-exact-static-evidence.md', 'hosted-validation.txt'}
+          actual = {p.name for p in root.iterdir() if p.is_file()}
+          if actual != allowed:
+              raise SystemExit(f'unsafe final artifact file set: {sorted(actual)}')
+          for path in sorted(root.iterdir()):
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              if len(data) > 8 * 1024 * 1024:
+                  raise SystemExit(f'oversized final output: {path}:{len(data)}')
+              if data.startswith(b'\x7fELF') or data[:2] == b'MZ':
+                  raise SystemExit(f'raw executable payload refused: {path}')
+              data.decode('utf-8')
+          print('WORLD_MAP_DOWNSTREAM_FINAL_SANITIZED_BOUNDARY=PASS')
+          PY
+
+      - name: Upload consumer-facing downstream exact evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-worldmap-downstream-exact-static-final-${{ github.run_id }}
+          path: artifacts/final/**
+          if-no-files-found: error
+          retention-days: 30

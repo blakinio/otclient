@@ -70,6 +70,7 @@ current_main_drift_reconciliation:
     - raw XRes client-base helper correction through #461
     - canonical raw XRes window-identity integration #465 at f8e628a255a18ec92839bbb45ef0e3b40bef8605
     - final P0 controller-plane admission #467 at ec75e2606f7f4ad834e4b6be968fb03bdbff55df
+    - canonical runtime archive #469; blocker unchanged, ownership released
   canonical_lease_status: released
   canonical_lease_generation: 7
   authoritative_registration: ABSENT
@@ -91,7 +92,7 @@ result:
   programme_complete: false
 remaining_findings:
   - AUD-COV-003 MEDIUM action/QMeta 612-vs-1004 denominator definition conflict
-  - AUD-COV-004 HIGH current canonical live semantic/restart proof unavailable; #467 proves no legal existing IN_GAME lifecycle
+  - AUD-COV-004 HIGH current canonical live semantic/restart proof unavailable; no legal existing IN_GAME lifecycle
   - AUD-COV-007 MEDIUM durable global coordinator checkpoint stale
 e2e:
   result: NOT_APPLICABLE
@@ -102,8 +103,8 @@ closeout:
   active_task_terminal_tree: absent
   exact_terminal_head_repository_ci_required: true
   review_threads_required_zero: true
-last_completed_step: denominator payload and current-main overlay are frozen after consuming #467; only exact-head required CI/review hygiene and merge remain
-next_action: merge PR #460 only after exact-head required CI succeeds and main remains compatible
+last_completed_step: denominator payload and current-main overlay are frozen; required CI is green on the current PR content, and protected merge requires the branch to absorb the current main merge base before the final required check can satisfy repository rules
+next_action: fast-forward the branch to GitHub's conflict-free merge-ref containing current main, rerun required CI on that exact updated branch head, then merge
 ---
 
 # Track A semantic denominator normalization — archived

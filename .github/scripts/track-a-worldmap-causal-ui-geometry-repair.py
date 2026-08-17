@@ -21,18 +21,19 @@ UI_WIRE_HELPER="${GITHUB_WORKSPACE:-$PWD}/.github/scripts/tibia-official-client-
 [[ -f "$UI_WINDOW_RESOLVER" && -f "$UI_OWNER_HELPER" && -f "$UI_WIRE_HELPER" ]] || fail xres_ui_window_helper_missing
 python3 "$CLASSIFIER" self-test
 
-# Runtime identity remains the already-proven XRes-owned 1920x1080 WIN. Resolve a
-# separate 1020x650 UI-control XID and independently require XRes LocalClientPid
-# to equal the same exact task-owned client PID. No legacy _NET_WM_PID result is
-# promoted as ownership evidence.
+# This task normalizes the task-owned Xvfb desktop to 1020x650 before launch.
+# The bootstrap WIN is therefore already an XRes-owned 1020x650 identity fence.
+# Independently resolve the 1020x650 UI candidate and require it to be the same
+# XID for the same exact task-owned PID. No legacy _NET_WM_PID result is promoted.
 UI_WIN="$(python3 "$UI_WINDOW_RESOLVER" \
   --display "$DISPLAY" --pid "$PID" --toolroot "$TOOL" \
   --owner-helper "$UI_OWNER_HELPER" --wire-helper "$UI_WIRE_HELPER")" || fail xres_ui_window_unresolved
 [[ "$UI_WIN" =~ ^[1-9][0-9]*$ ]] || fail xres_ui_window_invalid
-[[ "$UI_WIN" != "$WIN" ]] || fail ui_window_must_be_distinct_from_identity_window
+[[ "$UI_WIN" == "$WIN" ]] || fail xres_ui_window_identity_mismatch
 echo "WORLDMAP_BASELINE_UI_WINDOW_IDENTITY=x11-window:$UI_WIN"
 echo 'WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=PROVEN'
 echo 'WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY=1020x650'
+echo 'WORLDMAP_BASELINE_UI_WINDOW_EQUALS_RUNTIME_IDENTITY=true'
 
 XWD_TOOLROOT_LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
 capture_xwd() {
@@ -125,6 +126,7 @@ def transform(text: str) -> str:
     required = (
         "WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=PROVEN",
         "WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY=1020x650",
+        "WORLDMAP_BASELINE_UI_WINDOW_EQUALS_RUNTIME_IDENTITY=true",
         "WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_RAW_XWD_GEOMETRY",
         "WORLDMAP_BASELINE_CHARACTER_SELECTION=PROVEN_RAW_XWD_GEOMETRY",
         "EMAIL_X=520",

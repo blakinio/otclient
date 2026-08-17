@@ -9,10 +9,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: track-a-worldmap-server-delivery-causal-validation
+  cancel-in-progress: false
+
 jobs:
-  validate-gdb-repair:
-    name: Validate baseline GDB repair without physical runtime
-    runs-on: ubuntu-24.04
+  repaired-ephemeral-baseline:
+    name: Repaired exact-client isolated baseline worldmap capture
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
     steps:
       - name: Checkout exact head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -20,18 +25,80 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Compile and transform baseline harness
+      - name: Revalidate current-main Track A admission
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          base_sha="$(git rev-parse origin/main)"
+          git merge-base --is-ancestor "$base_sha" "origin/$HEAD_BRANCH"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$base_sha" --expected-branch "$HEAD_BRANCH"
+          echo "WORLDMAP_BASELINE_CURRENT_MAIN=$base_sha"
+          echo 'WORLDMAP_BASELINE_CURRENT_MAIN_ANCESTRY=PASS'
+          echo 'WORLDMAP_CAUSAL_EPHEMERAL_BASELINE_ADMISSION=PASS'
+
+      - name: Require canonical controller plane idle without mutating it
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import fcntl,json,os,time
+          from pathlib import Path
+          state=Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          lock=state/'coordination.lock'; lease_path=state/'lease.json'; reg=state/'runtime-registration.json'
+          if not lock.is_file() or not lease_path.is_file(): raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_controller_metadata_missing')
+          fd=os.open(lock,os.O_RDONLY|getattr(os,'O_NOATIME',0))
+          try:
+              fcntl.flock(fd,fcntl.LOCK_SH)
+              lease=json.loads(lease_path.read_text())
+              safe={'generation':lease.get('generation'),'status':lease.get('status'),'controller_task':lease.get('controller_task'),'controller_session':lease.get('controller_session'),'expired':bool(lease.get('status')=='active' and isinstance(lease.get('expires_at'),int) and lease['expires_at']<=int(time.time()))}
+              print('WORLDMAP_BASELINE_CANONICAL_LEASE='+json.dumps(safe,sort_keys=True,separators=(',',':')))
+              if safe['status']!='released' or safe['controller_task'] is not None or safe['controller_session'] is not None: raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_lease_not_idle')
+              if reg.exists(): raise SystemExit('WORLDMAP_BASELINE_PREFLIGHT_ERROR=canonical_registration_present')
+          finally:
+              try: fcntl.flock(fd,fcntl.LOCK_UN)
+              except OSError: pass
+              os.close(fd)
+          print('WORLDMAP_BASELINE_CANONICAL_REGISTRATION=ABSENT')
+          print('WORLDMAP_BASELINE_CANONICAL_CONTROLLER_IDLE=PASS')
+          PY
+
+      - name: Generate validated GDB-environment repaired baseline helper
+        id: repair
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 -m py_compile .github/scripts/track-a-worldmap-causal-gdb-env-repair.py
-          repaired="$RUNNER_TEMP/worldmap-baseline-repaired.sh"
+          repaired="$RUNNER_TEMP/worldmap-causal-ephemeral-baseline-gdb-repaired.sh"
           python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
             .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh \
             "$repaired"
           bash -n "$repaired"
           test -x "$repaired"
           test "$(grep -Fc 'LD_LIBRARY_PATH="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"' "$repaired")" = 1
-          grep -F 'WORLDMAP_BASELINE_GDB_ATTACH_DIAGNOSTIC_BEGIN' "$repaired" >/dev/null
-          echo 'WORLDMAP_GDB_REPAIR_STATIC_VALIDATION=PASS'
-          echo 'WORLDMAP_PHYSICAL_EXECUTION=false'
+          echo "repaired=$repaired" >> "$GITHUB_OUTPUT"
+          echo 'WORLDMAP_BASELINE_GDB_REPAIR_STATIC_RECHECK=PASS'
+
+      - name: Execute exactly one repaired isolated baseline login and capture
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+          REPAIRED: ${{ steps.repair.outputs.repaired }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          "$REPAIRED"
+
+      - name: Upload privacy-safe structural baseline evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worldmap-causal-baseline-${{ github.run_id }}
+          path: ${{ runner.temp }}/worldmap-baseline-evidence
+          if-no-files-found: error
+          retention-days: 7

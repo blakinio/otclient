@@ -79,7 +79,7 @@ jobs:
                   raise SystemExit(52)
               transform,_=read_va(0xf861e0,0xf864c0)
               vtable,_=read_va(0x2f63138,0x2f63188)
-              rtti,_=read_va(0x3070778,0x3070788)
+              rtti,_=read_va(0x3077800,0x3077810)
               name_ptr=struct.unpack_from('<Q',rtti,8)[0]
               name,_=read_va(name_ptr,name_ptr+0x80)
               name=name.split(b'\0',1)[0]+b'\0'
@@ -92,7 +92,7 @@ jobs:
           print('P2_RAWTRANSFORM_CONCRETE_SOURCE=PASS')
           print('P2_RAWTRANSFORM_TRANSFORM_WINDOW=0xf861e0..0xf864c0')
           print('P2_RAWTRANSFORM_VTABLE_WINDOW=0x2f63138..0x2f63188')
-          print('P2_RAWTRANSFORM_RTTI=0x3070778')
+          print('P2_RAWTRANSFORM_RTTI=0x3077800')
           print(f'P2_RAWTRANSFORM_RTTI_NAME_PTR=0x{name_ptr:x}')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
           print('P2_RAWTRANSFORM_SOURCE_DISASSEMBLY=false')
@@ -137,7 +137,7 @@ jobs:
           name=get('NAME')
           q=lambda d,o: struct.unpack_from('<Q',d,o)[0]
           if q(vtable,0x00)!=0: raise SystemExit('P2_RAWTRANSFORM_FAIL=offset_to_top')
-          if q(vtable,0x08)!=0x3070778: raise SystemExit('P2_RAWTRANSFORM_FAIL=typeinfo')
+          if q(vtable,0x08)!=0x3077800: raise SystemExit('P2_RAWTRANSFORM_FAIL=typeinfo')
           if q(vtable,0x30)!=0xf85eb0: raise SystemExit('P2_RAWTRANSFORM_FAIL=slot20')
           if q(vtable,0x38)!=0xf861e0: raise SystemExit('P2_RAWTRANSFORM_FAIL=slot28')
           with tempfile.TemporaryDirectory(prefix='p2-transform-') as td:
@@ -149,7 +149,7 @@ jobs:
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
           print('P2_RAWTRANSFORM_VTABLE_AP=0x2f63148')
           print('P2_RAWTRANSFORM_VTABLE_OFFSET_TO_TOP=0')
-          print('P2_RAWTRANSFORM_VTABLE_TYPEINFO=0x3070778')
+          print('P2_RAWTRANSFORM_VTABLE_TYPEINFO=0x3077800')
           print(f'P2_RAWTRANSFORM_RTTI_VPTR=0x{q(rtti,0):x}')
           print(f'P2_RAWTRANSFORM_RTTI_NAME_PTR=0x{q(rtti,8):x}')
           print('P2_RAWTRANSFORM_RTTI_NAME='+name.rstrip(b'\0').decode('ascii','backslashreplace'))

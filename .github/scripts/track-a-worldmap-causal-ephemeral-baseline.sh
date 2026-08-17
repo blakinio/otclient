@@ -16,6 +16,10 @@ GCMD="$RUNNER_TEMP/worldmap-baseline.gdb"
 EVENTS="$ROOT/worldmap-events.tsv"
 STRIPS="$ROOT/worldmap-strips.tsv"
 GOUT="$ROOT/worldmap-gdb.stdout"
+CONTROL="$RUNNER_TEMP/worldmap-baseline-control"
+CRED_FIFO="$CONTROL/credentials.fifo"
+READY="$CONTROL/presecret.ready"
+RESULT="$CONTROL/result"
 EXPECTED_SHA=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 EPHEMERAL_MARK="OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=$NAMESPACE"
 GDB_PID=''
@@ -23,9 +27,20 @@ PGID=''
 
 fail() { printf 'WORLDMAP_BASELINE_ERROR=%s\n' "$1" >&2; exit 1; }
 
+write_result() {
+  local rc="$1" tmp
+  mkdir -p "$CONTROL" 2>/dev/null || return 0
+  chmod 700 "$CONTROL" 2>/dev/null || true
+  tmp="$CONTROL/result.$$"
+  printf '%s\n' "$rc" >"$tmp" 2>/dev/null || return 0
+  chmod 600 "$tmp" 2>/dev/null || true
+  mv -f "$tmp" "$RESULT" 2>/dev/null || true
+}
+
 cleanup() {
-  local rc=$? pid source
+  local rc=$? source
   set +e
+  rm -f "$READY" "$CRED_FIFO" 2>/dev/null || true
   if [[ -n "$GDB_PID" && "$GDB_PID" =~ ^[1-9][0-9]*$ ]] && kill -0 "$GDB_PID" 2>/dev/null; then
     kill -INT "$GDB_PID" 2>/dev/null || true
     for _ in $(seq 1 40); do kill -0 "$GDB_PID" 2>/dev/null || break; sleep .1; done
@@ -54,13 +69,18 @@ cleanup() {
     [[ $rc -ne 0 ]] || rc=97
   fi
   echo 'WORLDMAP_BASELINE_CLEANUP=COMPLETE'
+  write_result "$rc"
   exit "$rc"
 }
 trap cleanup EXIT INT TERM
 
 [[ "${RUNNER_NAME:-}" == synology-otclient-01 ]] || fail wrong_runner
 [[ "${GITHUB_REPOSITORY:-}" == blakinio/otclient ]] || fail wrong_repository
-[[ -n "${TIBIA_TEST_EMAIL:-}" && -n "${TIBIA_TEST_PASSWORD:-}" ]] || fail protected_login_secrets_missing
+[[ ${TIBIA_TEST_EMAIL+x} != x && ${TIBIA_TEST_PASSWORD+x} != x ]] || fail secret_env_present_before_presecret_gate
+
+mkdir -p "$CONTROL"
+chmod 700 "$CONTROL"
+rm -f "$CRED_FIFO" "$READY" "$RESULT" "$CONTROL"/result.* 2>/dev/null || true
 
 # Fail closed if any process from this task-owned namespace survived a prior run.
 python3 - "$EPHEMERAL_MARK" <<'PY'
@@ -201,121 +221,153 @@ kill -0 "$GDB_PID" || fail gdb_observer_not_alive
 [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$PID/status")" == "$GDB_PID" ]] || fail gdb_not_attached_to_exact_client
 echo 'WORLDMAP_BASELINE_PRE_STORAGE_OBSERVER=ARMED'
 
-# Screenshot/OCR is used only to locate login/character-selection controls. No screenshot or OCR text is retained.
+# Native pre-secret UI gate: no OCR and no credential-bearing environment.
+# Raw XWD is transient and used only for aggregate changed-pixel classification.
+echo 'WORLDMAP_BASELINE_NATIVE_PRESECRET_GATE_VERSION=1'
 XWD="$(command -v xwd 2>/dev/null || true)"
 [[ -n "$XWD" ]] || XWD="$(find "$TOOL" -xdev -type f -name xwd -perm -111 -print -quit 2>/dev/null || true)"
-TESS="$(command -v tesseract 2>/dev/null || true)"
-CONVERT="$(command -v convert 2>/dev/null || true)"
-MAGICK="$(command -v magick 2>/dev/null || true)"
+COMPARE="${GITHUB_WORKSPACE:-$PWD}/.github/scripts/track-a-worldmap-causal-xwd-compare.py"
 [[ -x "$XWD" ]] || fail xwd_missing_before_secret_use
-[[ -x "$TESS" ]] || fail tesseract_missing_before_secret_use
-[[ -x "$CONVERT" || -x "$MAGICK" ]] || fail imagemagick_missing_before_secret_use
+[[ -f "$COMPARE" ]] || fail xwd_compare_missing
+[[ ${TIBIA_TEST_EMAIL+x} != x && ${TIBIA_TEST_PASSWORD+x} != x ]] || fail secret_env_present_before_editability_gates
 
-echo 'WORLDMAP_BASELINE_LOGIN_UI_TOOLING=PASS'
+UI_WIN="$WIN"
+[[ "$UI_WIN" =~ ^[1-9][0-9]*$ ]] || fail manifest_ui_window_invalid
+echo "WORLDMAP_BASELINE_UI_WINDOW_IDENTITY=x11-window:$UI_WIN"
+echo 'WORLDMAP_BASELINE_UI_WINDOW_XRES_OWNER=MANIFEST_PROVEN'
+echo 'WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY_EXPECTED=1020x650'
+echo 'WORLDMAP_BASELINE_UI_WINDOW_EQUALS_RUNTIME_IDENTITY=true'
 
-capture_ocr() {
-  local stem="$1" xwdfile="$ROOT/$stem.xwd" png="$ROOT/$stem.png" tsv="$ROOT/$stem.tsv"
-  DISPLAY="$DISPLAY" "$XWD" -silent -id "$WIN" -out "$xwdfile"
-  if [[ -x "$MAGICK" ]]; then "$MAGICK" "$xwdfile" "$png" >/dev/null 2>&1; else "$CONVERT" "$xwdfile" "$png" >/dev/null 2>&1; fi
-  "$TESS" "$png" stdout --psm 6 tsv 2>/dev/null >"$tsv"
-  rm -f "$xwdfile" "$png"
-  printf '%s\n' "$tsv"
+XWD_TOOLROOT_LIBS="$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+XDO_TOOLROOT_LIBS="$XWD_TOOLROOT_LIBS"
+capture_xwd() {
+  local outfile="$1"
+  if [[ "$XWD" == "$TOOL/"* ]]; then
+    DISPLAY="$DISPLAY" LD_LIBRARY_PATH="$XWD_TOOLROOT_LIBS" "$XWD" -silent -id "$UI_WIN" -out "$outfile"
+  else
+    DISPLAY="$DISPLAY" "$XWD" -silent -id "$UI_WIN" -out "$outfile"
+  fi
+}
+xdo() {
+  DISPLAY="$DISPLAY" LD_LIBRARY_PATH="$XDO_TOOLROOT_LIBS" "$XDOTOOL" "$@"
 }
 
-PRE_TSV="$(capture_ocr prelogin)"
-COORDS="$(python3 - "$PRE_TSV" <<'PY'
-import csv,json,sys
-a=[]
-with open(sys.argv[1],newline='',errors='replace') as f:
-    for r in csv.DictReader(f,delimiter='\t'):
-        text=(r.get('text') or '').strip(); low=text.casefold().strip(':')
-        try: conf=float(r.get('conf') or -1)
-        except: conf=-1
-        if not text or conf<20: continue
-        try: box=[int(r[k]) for k in ('left','top','width','height')]
-        except: continue
-        a.append((low,box))
-def pick(word,which='first'):
-    hits=[b for t,b in a if t==word or t.startswith(word)]
-    if not hits:return None
-    b=(max(hits,key=lambda x:x[1]) if which=='lowest' else min(hits,key=lambda x:x[1]))
-    return [b[0]+b[2]//2,b[1]+b[3]//2]
-out={'email':pick('email'),'password':pick('password'),'login':pick('login','lowest')}
-print(json.dumps(out,separators=(',',':')))
-PY
-)"
-rm -f "$PRE_TSV"
-python3 - "$COORDS" <<'PY'
-import json,sys
-c=json.loads(sys.argv[1])
-if not all(c.get(k) for k in ('email','password','login')): raise SystemExit('WORLDMAP_BASELINE_ERROR=login_ocr_anchors_missing')
-print('WORLDMAP_BASELINE_LOGIN_OCR_ANCHORS=PASS')
-PY
-EMAIL_X="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["email"][0])' "$COORDS")"
-EMAIL_Y="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["email"][1])' "$COORDS")"
-PASS_X="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["password"][0])' "$COORDS")"
-PASS_Y="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["password"][1])' "$COORDS")"
-LOGIN_X="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["login"][0])' "$COORDS")"
-LOGIN_Y="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["login"][1])' "$COORDS")"
+# Historical exact-client 1020x650 coordinates were physically validated in this task chain.
+EMAIL_X=535
+EMAIL_Y=275
+PASS_X=535
+PASS_Y=304
+LOGIN_X=590
+LOGIN_Y=388
+ROW_X=285
+ROW_Y=193
 
-DISPLAY="$DISPLAY" "$XDOTOOL" windowactivate --sync "$WIN"
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$WIN" "$EMAIL_X" "$EMAIL_Y" click 1 key --clearmodifiers ctrl+a
-printf '%s' "$TIBIA_TEST_EMAIL" | DISPLAY="$DISPLAY" "$XDOTOOL" type --window "$WIN" --clearmodifiers --file -
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$WIN" "$PASS_X" "$PASS_Y" click 1 key --clearmodifiers ctrl+a
-printf '%s' "$TIBIA_TEST_PASSWORD" | DISPLAY="$DISPLAY" "$XDOTOOL" type --window "$WIN" --clearmodifiers --file -
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$WIN" "$LOGIN_X" "$LOGIN_Y" click 1
-unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+xdo windowactivate --sync "$UI_WIN" 2>/dev/null || true
+xdo windowfocus --sync "$UI_WIN"
+echo 'WORLDMAP_BASELINE_LOGIN_UI_TOOLING=RAW_XWD_AGGREGATE_BEHAVIOR_PASS'
+
+probe_editable_field() {
+  local name="$1" x="$2" y="$3" dummy="$4" x0="$5" y0="$6" x1="$7" y1="$8"
+  local before="$ROOT/$name-before.xwd"
+  local typed="$ROOT/$name-typed.xwd"
+  local cleared="$ROOT/$name-cleared.xwd"
+
+  xdo mousemove --window "$UI_WIN" "$x" "$y" click 1
+  xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+  sleep .20
+  capture_xwd "$before"
+  xdo type --window "$UI_WIN" --delay 10 -- "$dummy"
+  sleep .25
+  capture_xwd "$typed"
+  xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+  sleep .25
+  capture_xwd "$cleared"
+  if ! python3 "$COMPARE" roi-cycle "$before" "$typed" "$cleared" \
+      "$x0" "$y0" "$x1" "$y1" --min-changed 60; then
+    rm -f "$before" "$typed" "$cleared"
+    fail "${name}_editable_probe_failed"
+  fi
+  rm -f "$before" "$typed" "$cleared"
+}
+
+probe_editable_field email "$EMAIL_X" "$EMAIL_Y" 'wm-probe@example.invalid' 330 255 720 293
+echo 'WORLDMAP_BASELINE_EMAIL_FIELD_EDITABLE=PASS'
+probe_editable_field password "$PASS_X" "$PASS_Y" 'wm-probe-7' 330 289 720 325
+echo 'WORLDMAP_BASELINE_PASSWORD_FIELD_EDITABLE=PASS'
+echo 'WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_EDITABLE_FIELDS'
+
+# Clear both fields again, then publish the only credential-handoff gate.
+PRELOGIN_REFERENCE="$ROOT/prelogin-reference.xwd"
+xdo mousemove --window "$UI_WIN" "$EMAIL_X" "$EMAIL_Y" click 1
+xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+xdo mousemove --window "$UI_WIN" "$PASS_X" "$PASS_Y" click 1
+xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+sleep .25
+capture_xwd "$PRELOGIN_REFERENCE"
+
+[[ ${TIBIA_TEST_EMAIL+x} != x && ${TIBIA_TEST_PASSWORD+x} != x ]] || fail secret_env_present_before_handoff
+rm -f "$CRED_FIFO" "$READY"
+mkfifo -m 600 "$CRED_FIFO"
+printf '%s\n' 'WORLDMAP_BASELINE_PRESECRET_READY=true' >"$READY.tmp"
+chmod 600 "$READY.tmp"
+mv -f "$READY.tmp" "$READY"
+echo 'WORLDMAP_BASELINE_PRESECRET_READY=true'
+
+# Secrets enter this shell only through the protected FIFO after both dummy gates.
+exec {CRED_FD}<>"$CRED_FIFO"
+EMAIL_SECRET=''
+PASSWORD_SECRET=''
+IFS= read -r -d '' -t 180 -u "$CRED_FD" EMAIL_SECRET || fail credential_email_handoff_timeout
+IFS= read -r -d '' -t 30 -u "$CRED_FD" PASSWORD_SECRET || fail credential_password_handoff_timeout
+exec {CRED_FD}>&-
+rm -f "$CRED_FIFO" "$READY"
+[[ -n "$EMAIL_SECRET" && -n "$PASSWORD_SECRET" ]] || fail credential_handoff_empty
+echo 'WORLDMAP_BASELINE_CREDENTIAL_HANDOFF=RECEIVED_AFTER_PRESECRET_GATES'
+
+xdo mousemove --window "$UI_WIN" "$EMAIL_X" "$EMAIL_Y" click 1
+xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+printf '%s' "$EMAIL_SECRET" | xdo type --window "$UI_WIN" --delay 10 --file -
+xdo mousemove --window "$UI_WIN" "$PASS_X" "$PASS_Y" click 1
+xdo key --window "$UI_WIN" --clearmodifiers ctrl+a BackSpace
+printf '%s' "$PASSWORD_SECRET" | xdo type --window "$UI_WIN" --delay 10 --file -
+EMAIL_SECRET=''
+PASSWORD_SECRET=''
+unset EMAIL_SECRET PASSWORD_SECRET
+xdo mousemove --window "$UI_WIN" "$LOGIN_X" "$LOGIN_Y" click 1
 echo 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true'
 
-SELECT_TSV=''
-for i in $(seq 1 35); do
-  sleep 2
-  tsv="$(capture_ocr "select-$i")"
-  if python3 - "$tsv" <<'PY'
-import csv,sys
-w=[]
-with open(sys.argv[1],newline='',errors='replace') as f:
-    for r in csv.DictReader(f,delimiter='\t'):
-        t=(r.get('text') or '').strip().casefold().strip(':')
-        try:c=float(r.get('conf') or -1)
-        except:c=-1
-        if c>=20 and t:w.append(t)
-raise SystemExit(0 if any(x.startswith('character') for x in w) and any(x.startswith('status') for x in w) else 1)
-PY
-  then SELECT_TSV="$tsv"; break; fi
-  rm -f "$tsv"
+POST_LOGIN_XWD=''
+for i in $(seq 1 40); do
+  sleep 1
+  candidate="$ROOT/post-login-$i.xwd"
+  capture_xwd "$candidate"
+  if python3 "$COMPARE" change "$PRELOGIN_REFERENCE" "$candidate" --min-changed 5000; then
+    POST_LOGIN_XWD="$candidate"
+    break
+  fi
+  rm -f "$candidate"
 done
-[[ -n "$SELECT_TSV" ]] || fail character_selection_transition_not_observed
-echo 'WORLDMAP_BASELINE_CHARACTER_SELECTION=PROVEN_UI_TRANSITION'
+rm -f "$PRELOGIN_REFERENCE"
+[[ -n "$POST_LOGIN_XWD" ]] || fail post_login_visual_transition_not_observed
+echo 'WORLDMAP_BASELINE_POST_LOGIN_VISUAL_TRANSITION=PROVEN_AGGREGATE'
 
-ROW="$(python3 - "$SELECT_TSV" <<'PY'
-import csv,json,sys,collections
-rows=[]
-with open(sys.argv[1],newline='',errors='replace') as f:
-    for r in csv.DictReader(f,delimiter='\t'):
-        t=(r.get('text') or '').strip(); low=t.casefold().strip(':')
-        try:c=float(r.get('conf') or -1); left=int(r['left']);top=int(r['top']);width=int(r['width']);height=int(r['height'])
-        except:continue
-        if c<20 or not t:continue
-        rows.append((low,left,top,width,height))
-headers=[r for r in rows if r[0].startswith('character')]
-if not headers: raise SystemExit(2)
-h=min(headers,key=lambda r:r[2]); hy=h[2]+h[4]//2; hx=h[1]+h[3]//2
-b=collections.defaultdict(list)
-for r in rows:
-    cy=r[2]+r[4]//2
-    if cy<=hy+18:continue
-    key=round(cy/8)*8;b[key].append(r)
-cand=sorted((y,grp) for y,grp in b.items() if len(grp)>=2)
-if not cand: y=hy+60
-else:y=cand[0][0]
-print(json.dumps({'x':hx,'y':y},separators=(',',':')))
-PY
-)"
-rm -f "$SELECT_TSV"
-ROW_X="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["x"])' "$ROW")"
-ROW_Y="$(python3 -c 'import json,sys;print(json.loads(sys.argv[1])["y"])' "$ROW")"
-DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$WIN" "$ROW_X" "$ROW_Y" click 1 key Return
+sleep 3
+SELECT_BEFORE="$ROOT/select-before.xwd"
+SELECT_AFTER="$ROOT/select-after.xwd"
+capture_xwd "$SELECT_BEFORE"
+xdo windowactivate --sync "$UI_WIN" 2>/dev/null || true
+xdo windowfocus --sync "$UI_WIN"
+xdo mousemove --window "$UI_WIN" "$ROW_X" "$ROW_Y" click 1
+sleep .35
+capture_xwd "$SELECT_AFTER"
+if ! python3 "$COMPARE" change "$SELECT_BEFORE" "$SELECT_AFTER" --min-changed 80 \
+    --x0 100 --y0 165 --x1 900 --y1 230; then
+  rm -f "$POST_LOGIN_XWD" "$SELECT_BEFORE" "$SELECT_AFTER"
+  fail character_row_interaction_not_observed
+fi
+rm -f "$POST_LOGIN_XWD" "$SELECT_BEFORE" "$SELECT_AFTER"
+echo 'WORLDMAP_BASELINE_CHARACTER_ROW_SELECTION=PROVEN_AGGREGATE'
+xdo key --window "$UI_WIN" Return
 echo 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true'
 
 world=0
@@ -324,7 +376,7 @@ for _ in $(seq 1 40); do
   if grep -Fq $'\tFullMap' "$EVENTS" 2>/dev/null && [[ "$(wc -l <"$STRIPS")" -ge 10 ]]; then world=1; break; fi
 done
 if [[ "$world" != 1 ]]; then
-  DISPLAY="$DISPLAY" "$XDOTOOL" mousemove --window "$WIN" "$ROW_X" "$ROW_Y" click --repeat 2 --delay 120 1 key Return
+  xdo mousemove --window "$WIN" "$ROW_X" "$ROW_Y" click --repeat 2 --delay 120 1 key Return
   echo 'WORLDMAP_BASELINE_CHARACTER_DOUBLECLICK_FALLBACK_SENT=true'
   for _ in $(seq 1 30); do
     sleep 1
@@ -371,10 +423,10 @@ if socks<1 or direct!=0 or udp:raise SystemExit('WORLDMAP_BASELINE_ERROR=network
 PY
 
 # One bounded movement plus inverse; structural delivery is measured, command success is not assumed.
-DISPLAY="$DISPLAY" "$XDOTOOL" windowactivate --sync "$WIN" key --clearmodifiers Right
+xdo windowactivate --sync "$WIN" key --clearmodifiers Right
 sleep 3
 MID_COUNT="$(wc -l <"$STRIPS")"
-DISPLAY="$DISPLAY" "$XDOTOOL" key --clearmodifiers Left
+xdo key --clearmodifiers Left
 sleep 3
 POST_MOVE_COUNT="$(wc -l <"$STRIPS")"
 echo "WORLDMAP_BASELINE_STRIP_COUNT_AFTER_RIGHT=$MID_COUNT"

@@ -12,9 +12,9 @@ task_kind: runtime-research
 phase: runtime_handoff_ready
 branch: research/OTC-20260815-track-a-p0-direct-position
 base_branch: main
-current_main: 26c89a7d3b044acf88299f8d68eee4ac16b5d13c
+current_main: dd54e6d14b214045baa2a67a7a57edaff40e8599
 risk: medium
-updated: 2026-08-17T15:37:00+02:00
+updated: 2026-08-17T15:43:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260815-track-a-p0-direct-position.md
   - docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/**
@@ -91,13 +91,27 @@ runtime_snapshot_helper:
   memory_writes: 0
   records: [pid, process_start_ticks, boot_id_sha256, main_base, typed_object, private_data_pointer, xyz, wall_time_ns, monotonic_ns]
   semantic_claim_emitted: false
-  validation_head: 74ee39fc0136142f2dd0b425a34e6e75fa38430e
-  validation_run: 32035752607
-  validation_job: 95405675923
-  validation_result: SUCCESS
-  handoff_doc_head: 01c4c169a119a2d4ad50762ee72c10941f5cc1de
+  initial_validation_run: 32035752607
+  initial_validation_job: 95405675923
+  initial_validation_result: SUCCESS
   handoff_doc_validation_run: 32035842654
   handoff_doc_validation_result: SUCCESS
+  final_code_head_before_checkpoint: eada4cd66a1b6ea994502fba93b42b9689ec4dca
+  final_helper_validation_run: 32036191045
+  final_helper_validation_job: 95407036166
+  final_helper_validation_result: SUCCESS
+  final_track_a_governance_run: 32036195438
+  final_track_a_governance_result: SUCCESS
+  final_repository_ci_run: 32036195551
+  final_repository_required_job: 95407335153
+  final_repository_required_result: SUCCESS
+  actionlint_repair:
+    prior_head: aaea52397b7ac870b988457dad24a48fc2d59003
+    prior_ci_run: 32035946312
+    prior_failure_1: external GitHub codeload HTTP 429 while downloading dorny/paths-filter; exact failed job was rerun
+    prior_failure_2: actionlint/shellcheck SC2251 on standalone ! grep in the write-surface guard
+    repair: explicit if-grep-then-exit fail-closed guard
+    semantic_result_changed: false
 runtime_producer_handoff:
   evidence_contract: docs/agents/evidence/OTC-20260815-track-a-p0-direct-position/20260817-runtime-producer-handoff-v2.md
   active_provider_pr: 475
@@ -113,9 +127,19 @@ runtime_producer_handoff:
 provider_current_state:
   checked_head: 1b68f7508ea2e8618799af58f1a59863dcd56cdd
   checked_commit_purpose: one_no_secret_prelogin_focus_scan
+  checked_physical_run: 32035722151
+  checked_physical_job: 95405990902
+  checked_physical_result: FAILED_BEFORE_CHECKOUT_EXTERNAL_HTTP_429
+  client_executed_in_checked_run: false
   current_in_game: false
   current_p0_live_read_available: false
-  note: provider remains pre-login/no-secret at this checkpoint; P0 must not infer future IN_GAME or consume the provider runtime until the RUNTIME owner reaches it under its own admission and accepts the handoff
+  note: P0 did not retry or mutate the other task's workflow/runtime; provider remains without a consumable IN_GAME lifecycle at this checkpoint
+main_drift:
+  previous_main: 26c89a7d3b044acf88299f8d68eee4ac16b5d13c
+  current_main: dd54e6d14b214045baa2a67a7a57edaff40e8599
+  scope: archive/release of the real-agent-executor task only
+  affects_track_a_runtime_contracts: false
+  affects_p0_candidate_or_evidence: false
 acceptance:
   exact_fence: PASS
   typed_candidate_discovery: PASS
@@ -137,7 +161,7 @@ hard_stop_policy:
   second_logged_in_session_authorized: false
   process_memory_write_authorized: false
   worldmap_research_authorized_for_p0: false
-last_completed_step: implemented and hosted-validated a bounded O_RDONLY runtime snapshot helper for exact TPlayerData +0x78/+0x7c/+0x80; persisted the same-session RUNTIME producer contract and sent it to active provider #475 without touching that task-owned runtime; #475 remains pre-login/no-secret, so no legal P0 live observation exists yet
+last_completed_step: implemented, hardened and exact-head-validated a bounded O_RDONLY runtime snapshot helper for exact TPlayerData +0x78/+0x7c/+0x80; persisted the same-session RUNTIME producer contract and sent it to active provider #475 without touching that task-owned runtime; no provider IN_GAME lifecycle exists yet
 next_action: no P0 worker should touch a live runtime now; resume only when a RUNTIME owner independently reaches a legal exact-client IN_GAME lifecycle and explicitly accepts the same-session handoff, then consume before/stepped/restored read-only snapshots plus current identity, independent coordinate/control and negative-control evidence
 ---
 
@@ -155,4 +179,4 @@ Static exact-client evidence supports `TPlayerData +0x78/+0x7c/+0x80` as the str
 
 The former XID→PID dependency is complete through #457/#461/#465 and must not be repeated. Fresh canonical admission #482 proved lease generation 8 released and authoritative registration absent; #486 archived and released that RUNTIME task.
 
-P0 now has a deterministic, hosted-validated read-only snapshot helper and a precise same-session producer contract. The active RUNTIME provider candidate #475 is currently pre-login/no-secret and remains owned by another task. P0 therefore waits without taking over that runtime, creating another session, or treating world-map research as its target.
+P0 now has a deterministic, hosted-validated read-only snapshot helper and a precise same-session producer contract. The active RUNTIME provider candidate #475 has not yet supplied a legal IN_GAME lifecycle and remains owned by another task. P0 therefore waits without taking over that runtime, creating another session, or treating world-map research as its target.

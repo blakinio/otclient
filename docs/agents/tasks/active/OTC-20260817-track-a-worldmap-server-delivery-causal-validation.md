@@ -2,16 +2,16 @@
 task_id: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 status: implementing
 agent: ChatGPT
-session_id: chatgpt-worldmap-server-delivery-causal-20260817-v17
+session_id: chatgpt-worldmap-server-delivery-causal-20260817-v18
 session_role: isolated_runtime_owner
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: baseline_native_semantic_character_v17_world_entry_screenshot
+phase: baseline_native_single_character_confirmation_v18_world_entry_screenshot
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
-updated: 2026-08-17T23:58:00+02:00
+updated: 2026-08-18T00:22:00+02:00
 risk: critical
 related_pr: 475
 runtime_access: ephemeral_isolated
@@ -21,11 +21,11 @@ PHYSICAL_E2E_REQUIRED: true
 credentials_allowed: true
 login_allowed: true
 gameplay_allowed: true
-seventh_baseline_login_attempt_authorized: true
+eighth_baseline_login_attempt_authorized: true
 second_live_session_authorized: false
 owner_authorization_source: current conversation
 owner_authorization_text: "dokoncz zadanie"
-owner_authorization_scope: one additional sequential real baseline login attempt may be used only by the native-semantic v17 path after exact-SHA static vptr/QMeta/ABI proof and the already-completed no-secret lifecycle discriminator; because AUTH/CHARSEL are proven lifecycle-dependent and absent at the login form, their live object provenance must be established after legitimate account authentication and before any semantic character invocation; no character identity may be imported from memory/chat; character choice must come only from current native runtime state; IN_GAME remains FullMap plus map-description strips; one map-only screenshot only after structural IN_GAME; no parallel session
+owner_authorization_scope: exactly one additional sequential baseline login attempt for v18 after v17b consumed the seventh attempt; v18 may only use current-session native character state discovered after legitimate account authentication; the authenticated native characterList cardinality is runtime-proven as exactly one, therefore native index 0 is the only deterministic selection; no character name, row order, screenshot/OCR or memory from another session may influence selection; invoke native onCharacterSelectionConfirmed so the original client itself constructs TCharacterLoginData and performs game login; accept completion only on FullMap plus at least 10 map-description strips and one post-structural map screenshot; no parallel session
 owner_funded_ai_api_authorized: false
 exact_client:
   version: 15.32.df7b29
@@ -35,22 +35,19 @@ exact_client:
 native_qmeta_corrected:
   character_selection_static_metacall_va: '0x00d46550'
   invoke_method_jump_table_va: '0x01d7701c'
-  property_read_jump_table_va: '0x01d77084'
   request_character_login_method_index: 0
   request_character_login_case_va: '0x00d46930'
   on_character_selection_confirmed_method_index: 11
   on_character_selection_confirmed_case_va: '0x00d46900'
   on_character_selection_confirmed_impl_va: '0x00856550'
+  property_read_jump_table_va: '0x01d77084'
   old_d47300_classification: property_read_accountPremiumStatus
-  old_d47130_classification: property_read_case_not_character_confirmation
 native_vptrs:
-  authentication_process_controller: '0x0307f1b0'
   character_selection_controller: '0x0308ed68'
   game_client: '0x03076908'
-  login_request_uploader: '0x030d36f8'
 launch_budget:
-  baseline_ephemeral_login_max: 7
-  baseline_ephemeral_login_consumed: 6
+  baseline_ephemeral_login_max: 8
+  baseline_ephemeral_login_consumed: 7
   patched_ephemeral_login_max: 1
   patched_ephemeral_login_consumed: 0
   simultaneous_logged_in_sessions_max: 1
@@ -68,77 +65,93 @@ safety:
   canonical_source_patch_in_place: forbidden
   rollback_required: true
   coordinate_character_selection_control: forbidden
-ci_check_generation: v17_native_semantic_character_login
+ci_check_generation: v18_native_single_character_confirmation
 ---
 
 # Objective
 
-Reach the real game world on the exact official Linux client, prove `IN_GAME` structurally with pre-Storage `FullMap` plus at least 10 map-description strip records, and persist one cropped map-only screenshot. The current user stop condition is successful world entry plus screenshot.
+Reach the real game world on the exact official Linux client, prove `IN_GAME` structurally with pre-Storage `FullMap` plus at least 10 map-description strip records, and persist one cropped map-only screenshot. The owner stop condition remains successful world entry plus screenshot.
 
-# Proven account-login chain
+# Proven account login
 
-V13 physical rerun `32067963829 / 95506276673` proved protected credential handoff, non-empty protected fields, real Login submission, local SOCKS activity and persistent post-login UI transition. Account authentication is not the current blocker.
+V13 and later physical runs prove protected credential handoff, non-empty protected fields, real Login submission, local SOCKS activity and persistent post-login UI transition. Account authentication is not the blocker.
 
-# V14 correction
+# Corrected native character control
 
-Run `32069479572 / 95509250730` consumed the sixth baseline login and did not produce `FullMap`. Its historical negative `RequestCharacterLogin` discriminator is invalid because the breakpoint was placed at `0xd47300`.
-
-Exact-SHA v16 QMeta recovery proved:
+Exact-SHA static recovery proves:
 
 ```text
 TCharacterSelectionController::qt_static_metacall = 0xd46550
-InvokeMetaMethod jump table                         = 0x1d7701c
+InvokeMetaMethod table                              = 0x1d7701c
 requestCharacterLogin method index 0               = case 0xd46930
 onCharacterSelectionConfirmed method index 11      = case 0xd46900
-PropertyRead jump table                             = 0x1d77084
+onCharacterSelectionConfirmed implementation       = 0x856550
+PropertyRead table                                  = 0x1d77084
 0xd47300                                             = accountPremiumStatus property read
 ```
 
-Therefore v14 proves only that its bounded GUI stimuli did not produce structural world entry. It does not prove that native `requestCharacterLogin` was absent.
+The generated QMeta case for method 11 is a direct non-owning pass-through:
 
-# Native model proof
-
-Exact-SHA static recovery proved:
-
-```text
-characterList     : QList<QObject*>
-lastSelectedIndex : int
-getCharacterIndexForSearchString(QString) -> int
+```asm
+d46900: mov rsi, qword ptr [r12 + 8]
+...
+d46916: jmp 0x856550
 ```
 
-`onCharacterSelectionConfirmed(QList<int>)` implementation is `0x856550`. It consumes selected native character indexes, validates them against the controller's live list, resolves native character model/session data, creates `TCharacterLoginData`, and drives the native request path.
+Thus argv[1] is passed as `QList<int> const&` to the implementation without a QMeta-side copy.
 
-The controller also owns a native `TCharacterLoginData` vector at offsets `+0x140..+0x148`, with `0x70`-byte elements. A v17 direct semantic request is permitted only when this current-session vector contains exactly one live element; no synthetic `TCharacterLoginData` may be constructed.
+# V17b terminal discriminator
 
-# Lifecycle/object-provenance correction
+Run `32074894984`, physical job `95525929518`, consumed the seventh baseline login. Mandatory pre-secret gates, account login, transport and post-login transition passed. Sanitized native runtime markers:
 
-The no-secret physical discriminator found exactly one live `TGameClient` at the login form but zero AUTH/CHARSEL/UPLOADER controller instances. This is a lifecycle result, not a provenance failure: character-selection objects are created after legitimate account authentication.
+```text
+WORLDMAP_V17_POSTAUTH_CHARSEL_INSTANCE_COUNT=1
+WORLDMAP_V17_RUNTIME_ADDRESS_PROVEN=PASS
+WORLDMAP_V17_NATIVE_CHARACTER_LIST_COUNT=1
+WORLDMAP_V17_NATIVE_SELECTED_LOGIN_DATA_COUNT=0
+WORLDMAP_V17_SEMANTIC_RESULT=FAIL:single_native_selected_login_data_not_proven
+```
 
-V17 therefore requires:
+Cleanup/source rehash passed. This is a material positive discriminator: the current authenticated account exposes exactly one native character object. No external identity is needed; index `0` is the only possible current-session selection.
 
-1. exact SHA, XID/XRes, GDB and pre-Storage gates before secrets;
-2. normal proven account-login submission and transport/UI proof;
-3. only then read-only scan for the exact relocated `TCharacterSelectionController` primary vptr and require exactly one live instance;
-4. verify its executable mapping/load bias and `qt_static_metacall` instruction bytes;
-5. switch GDB to the main LWP and prove Qt thread affinity by comparing `QObject::thread(charsel)` with `QThread::currentThread()`;
-6. inspect only non-secret structural model values: character-list cardinality and current native selected-login-data cardinality;
-7. require exactly one current native selected `TCharacterLoginData` element; do not choose by name, order, row or memory from another session;
-8. call `TCharacterSelectionController::qt_static_metacall(this, InvokeMetaMethod, 0, argv)` with an argv pointer to that already-live native `TCharacterLoginData` object;
-9. allow the original client to perform game-server login;
-10. accept success only on `FullMap` plus >=10 strip records;
-11. only then capture the exact manifest-owned XID, export the cropped PNG, delete transient XWD and persist the screenshot.
+# Exact onCharacterSelectionConfirmed behavior
 
-If step 7 is not satisfied, v17 fails closed without inventing a character or fabricating a non-trivial Qt/C++ object.
+Static run `32075412911 / 95527418954` proves `0x856550`:
+
+1. receives `this` in RDI and `QList<int> const&` in RSI;
+2. clears the controller-owned previous `TCharacterLoginData` vector at `this+0x140..+0x148`;
+3. reads the incoming selection list data pointer at `list+0x8` and size at `list+0x10`;
+4. validates every selected index against native `characterList` count at `this+0x108`;
+5. fetches the corresponding native QObject from `this+0x100 + index*8`;
+6. QMeta-casts it to the character information model;
+7. copies/refcounts the real model/session fields and constructs controller-owned `TCharacterLoginData` objects;
+8. emits/activates the native request path using those client-owned objects.
+
+Therefore v18 must invoke method 11 with the single current-session index `0`. It must not synthesize `TCharacterLoginData`.
+
+# V18 execution contract
+
+1. repeat exact SHA/XID/XRes/GDB/pre-Storage/editability gates;
+2. perform the already-proven legitimate account login;
+3. require exactly one post-auth `TCharacterSelectionController` instance;
+4. require `characterList` cardinality exactly `1`;
+5. prove the exact callee only observes the input `QList<int>` selection range and does not take ownership of it; use an ABI-proven transient const selection frame for exactly one integer `0`, or a Qt-owned constructed list if the static gate finds a suitable constructor/allocator;
+6. switch to the main LWP and require Qt thread affinity before invocation;
+7. invoke `qt_static_metacall(charsel, InvokeMetaMethod, 11, argv)` so the native client executes `onCharacterSelectionConfirmed`;
+8. require the client-owned selected `TCharacterLoginData` vector to become non-empty and the normal native game-login chain to continue;
+9. accept success only when `FullMap` plus >=10 map-description strips are observed;
+10. only then capture exact manifest-owned XID, export map PNG, delete transient XWD, persist screenshot and cleanup.
 
 # Required result
 
 ```text
 ACCOUNT_LOGIN_TRANSPORT=PASS
 POSTAUTH_CHARACTER_CONTROLLER_PROVENANCE=PASS
+NATIVE_CHARACTER_LIST_COUNT=1
+NATIVE_SELECTION_INDEX=0
 QT_THREAD_AFFINITY=PASS
-NATIVE_CHARACTER_LIST_DISCOVERY=PASS
-NATIVE_SELECTED_LOGIN_DATA_COUNT=1
-NATIVE_CHARACTER_QMETA_INVOCATION=PASS
+NATIVE_CHARACTER_CONFIRMATION_QMETA=PASS
+NATIVE_SELECTED_LOGIN_DATA_AFTER_CONFIRMATION>=1
 STRUCTURAL_IN_GAME=PASS
 MAP_SCREENSHOT=PASS
 ```
@@ -158,13 +171,13 @@ RENDER_PICKER_EXTENT_CHANGE=UNKNOWN
 # Checkpoint
 
 ```yaml
-checkpoint_version: 28
+checkpoint_version: 29
 status: implementing
-phase: baseline_native_semantic_character_v17_world_entry_screenshot
-baseline_login_max: 7
-baseline_login_consumed: 6
+phase: baseline_native_single_character_confirmation_v18_world_entry_screenshot
+baseline_login_max: 8
+baseline_login_consumed: 7
 patched_login_consumed: 0
-last_completed_step: exact-SHA v16 recovered the correct character QMeta method table, native character model properties, controller primary vptr and onCharacterSelectionConfirmed implementation; no-secret runtime proved GameClient exists preauth while AUTH/CHARSEL are lifecycle-dependent
+last_completed_step: v17b physically proved one post-auth character controller, exact runtime address, and native characterList count exactly 1; its direct request path failed only because selected TCharacterLoginData cache is correctly empty before confirmation; cleanup/source rehash passed
 blockers: []
-next_action: static-compose v17 GDB post-auth semantic invocation, then execute the seventh sequential baseline login and stop only at FullMap+screenshot or a genuine fail-closed native-model condition
+next_action: finish exact-SHA const-QList selection-frame ownership proof, then run v18 method-11 native confirmation for the sole runtime character index 0 and require FullMap plus screenshot
 ```

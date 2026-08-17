@@ -59,7 +59,6 @@ jobs:
           import json
           import lzma
           import pathlib
-          import re
 
           root = pathlib.Path('/tmp/worldmap-server-delivery')
           packed = (root / 'client/client.lzma').read_bytes()
@@ -199,8 +198,8 @@ jobs:
 
           descriptors = []
           for start, file_name in find_descriptor_starts():
-              # Generated FileDescriptorProto fields are serialized in nondecreasing field-number order.
-              # Grow until the first invalid/decreasing top-level record after at least name+package+message data.
+              # FileDescriptorProto.message_type is field 4. Generated descriptors are serialized
+              # in nondecreasing field-number order, so the bounded parser grows until that ordering breaks.
               pos = start
               previous = 0
               records = []
@@ -238,7 +237,7 @@ jobs:
               names = strings_for(records, 1)
               messages = []
               for f, w, v, _, _ in records:
-                  if f == 6 and w == 2:
+                  if f == 4 and w == 2:
                       try:
                           m = parse_message_descriptor(v)
                           if m['name']:
@@ -274,7 +273,6 @@ jobs:
                           'fields': message['fields'],
                       })
 
-          # Bounded byte-neighborhood fallback around exact target tokens; escaped text only.
           fallback_tokens = sorted(targets | {
               'FullMapMessage', 'FieldDataMessage', 'LeftColumnMessage', 'RightColumnMessage',
               'TopRowMessage', 'BottomRowMessage', 'TopFloorMessage', 'BottomFloorMessage',
@@ -298,7 +296,7 @@ jobs:
                   neighborhoods.append({'token': token, 'offset': at, 'window_start': lo, 'window_end': hi, 'escaped': escaped})
 
           summary = {
-              'schema': 'track-a-worldmap-server-delivery-descriptor-probe-v1',
+              'schema': 'track-a-worldmap-server-delivery-descriptor-probe-v2',
               'client': {'version': '15.32.df7b29', 'size': len(client), 'sha256': exact_sha},
               'descriptor_file_count': len(descriptors),
               'descriptor_files': [

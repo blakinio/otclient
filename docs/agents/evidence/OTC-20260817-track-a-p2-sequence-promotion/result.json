@@ -1,0 +1,57 @@
+{
+  "schema": "track-a-p2-sequence-coordinator-promotion-v1",
+  "date": "2026-08-17",
+  "source_task": "OTC-20260817-track-a-p2-sequence-provenance",
+  "source_pr": 495,
+  "source_head": "4a98632046936fba070653196d91e9f82e6b07e7",
+  "integration_base": "0aed48da9a51730c590d0ffe4688f149b359a170",
+  "decision": "ACCEPT_WITH_EDITS",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "source_validation": {
+    "governance_run": 32045117129,
+    "governance_result": "SUCCESS",
+    "ci_run": 32045117287,
+    "required_job": 95431242465,
+    "required_result": "SUCCESS",
+    "changed_files": 3,
+    "reviews": 0,
+    "threads": 0,
+    "one_shot_workflow_present": false
+  },
+  "generation": {
+    "run": 32044825898,
+    "source_job": 95430326316,
+    "hosted_job": 95430351866,
+    "window": "0xb56d60..0xb57280",
+    "window_sha256": "e5cf009bb1aec3065da4ff0dd3231268af1255cffa50fbb48f8817777907d557"
+  },
+  "claims": {
+    "framing": "PROVEN",
+    "sequence": "PROVEN",
+    "sequence_field": "FACT:DWORD_message_plus_0",
+    "sequence_owner": "FACT:TGameserverDualConnection_this_plus_0x9c",
+    "sequence_mode": "FACT:message_plus_0x34_equals_3",
+    "sequence_update": "FACT:store_current_then_increment_by_one",
+    "sequence_nonmatching_mode": "FACT:message_plus_0_zero",
+    "sequence_width": "FACT:32_bit",
+    "sequence_initialization_or_reset_policy": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN",
+    "final_binary_egress": "PROVEN_AT_QT_QTCPSOCKET_BOUNDARY",
+    "final_socket_owner": "FACT:TGameserverTCPConnection",
+    "final_os_socket_syscall": "UNKNOWN"
+  },
+  "audit": {
+    "result": "PASS_BOUNDED",
+    "material_findings_open": 0
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static exact-file/disassembly evidence only"
+  },
+  "next_frontier": "Resolve RawDataProcessor this+0x8/+0x10 member dynamic type and 0xb3ec30 input/output effect; test encryption directly, compression separately."
+}

@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: canonical_baseline_bootstrap
+phase: canonical_baseline_bootstrap_repair
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
 base_sha: e1ae4054b17792607c88552f72cdc68ef3a1f294
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T13:31:00+02:00
+updated: 2026-08-17T13:37:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -70,7 +70,7 @@ gate_b: NOT_APPLICABLE
 bootstrap: PASS
 target_uniqueness: UNKNOWN
 mutation_authorized: true
-bootstrap_attempt_limit: 1
+bootstrap_attempt_limit: 2
 credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
@@ -98,10 +98,11 @@ mutation_design:
   changed_bytes_expected: 1
   patched_sha256_prior_startup_canary: 7c8d936fa43e4a026d2a69c32ff30fdea149bb7eff7938c1b1acfc173899b44c
 launch_budget:
-  canonical_exact_bootstrap_max: 1
+  canonical_exact_bootstrap_max: 2
+  canonical_exact_bootstrap_repair_reason: attempt 1 used obsolete raw worker instead of trusted-main #465 XRes-composed worker; no login/gameplay and rollback independently clean
   patched_ephemeral_login_max: 1
   simultaneous_logged_in_sessions_max: 1
-  consumed_canonical_exact_bootstrap: 0
+  consumed_canonical_exact_bootstrap: 1
   consumed_patched_ephemeral_login: 0
 safety:
   direct_unapproved_egress: forbidden
@@ -114,6 +115,17 @@ safety:
   rollback_required: true
   canonical_registration_manual_edit: forbidden
   owner_funded_ai_api: forbidden
+invocation_started_at: 2026-08-17T13:20:00+02:00
+last_progress_at: 2026-08-17T13:37:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: runtime-repair
+terminal_ci_wait_started_at: null
+terminal_ci_checks_for_current_generation: 0
+unchanged_state_checks: 0
+identical_failure_retries: 0
+repair_cycles_for_current_gate: 1
+context_reconstruction_attempts: 0
+stall_warnings: 0
 ---
 
 # Objective
@@ -132,57 +144,46 @@ STORAGE_EXTENT_CHANGE=true|false|UNKNOWN
 RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 ```
 
-# Fresh admission evidence
+# Admission and attempt history
 
-Controller-plane inventory run `32025074618`, job `95372681355`, exact head `9ce5c5cafebb833275f6d375fdfeca21049e1c0c`, runner `synology-otclient-01` completed successfully and directly proved:
+Fresh controller-plane inventory run `32025074618`, job `95372681355`, exact head `9ce5c5cafebb833275f6d375fdfeca21049e1c0c` proved released generation-7 lease, no registration, unchanged metadata and no process/X11/client observation.
 
-```yaml
-lease: PRESENT
-lease_status: released
-lease_generation_before_new_task_acquire: 7
-lease_controller_task: null
-lease_controller_session: null
-lease_expired: false
-canonical_registration: ABSENT
-admission_result: REGISTRATION_ABSENT
-control_metadata_unchanged: true
-process_observation: false
-x11_observation: false
-client_mutation: false
-```
+Bootstrap attempt 1: run `32025398762`, job `95373646537`, exact head `4296c2376fc8585fa62f6edf040ee88db453dbc3` acquired generation 8, proved WARP/Xvfb/VNC startup and physically reached `client_start`, then failed `client_window_missing` / `bootstrap_worker_failed`. No credentials/login/gameplay/mutation occurred.
 
-Track A runtime governance on that exact head: run `32025074494` / #786 = SUCCESS.
+The attempt used `.github/scripts/tibia-official-client-re-canonical-live-session.sh` directly, which still contains the legacy xdotool PID/name selector. Trusted main already contains merged #465 (`f8e628a255a18ec92839bbb45ef0e3b40bef8605`) whose explicit purpose is to generate a canonical worker replacing that selector with raw XRes XID→PID ownership. Therefore the first failure is an execution-composition defect, not a client/worldmap semantic failure.
 
-Because registration is directly proven ABSENT and the reviewed bootstrap implementation from #371 is present on trusted main, this checkpoint authorizes exactly one bootstrap transaction. The bootstrap transaction itself may launch only the exact fenced client plus canonical Xvfb/VNC/WARP helpers. It may not use credentials, login or gameplay. Those require a later admission update after authoritative registration/lease/identity are proven.
+Independent rollback audit run `32025665881`, job `95374436911`, head `4d011ebef3fe500a125caae7fda287ac8498ff52` proved generation-8 lease released, registration absent, session root absent, token absent and zero canonical-marked processes. Durable record: `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-baseline-bootstrap-attempt-1.md`.
+
+Under `ANTI_STALL_AND_EXECUTION_BUDGET.md`, this checkpoint authorizes exactly one evidence-based repair with materially changed input. It does not authorize an identical retry. Attempt 2 must generate the #465 XRes-composed worker, prove the legacy selector is absent, and pass that generated worker to the same reviewed #371 transition. Any second physical bootstrap failure is analyzed once; no third bootstrap is authorized by this checkpoint.
 
 # Execution phases
 
-1. **DONE — admission inventory.** Controller metadata only; no process/X11/client observation.
-2. **ACTIVE — canonical baseline bootstrap.** Acquire a fresh task-owned canonical lease, execute the reviewed cancellation-safe bootstrap transaction and require exact identity, uniqueness, WARP, window and registration publication.
-3. **PENDING — baseline login/world entry.** Update admission first; then owner-authorized bounded credential injection and structural/independent IN_GAME proof.
-4. **PENDING — baseline pre-Storage capture.** Instrument the accepted `FullMap @ 0x00cec8d0` / `MapDescription @ 0x019a8a80` surface before Storage and record authoritative coordinate/floor envelope.
-5. **PENDING — bounded baseline stimulus.** At most one safe adjacent movement plus inverse, closed-loop.
-6. **PENDING — sequential transition.** End/unregister/clean exact session before patched login; never overlap logged-in sessions.
-7. **PENDING — patched `[19,14]` run.** Task-owned copy only; exact preimage/one-byte diff/SHA; same confinement and equivalent capture.
-8. **PENDING — rollback.** Remove only task-owned patched descendants/copy and prove original source hash unchanged.
-9. **PENDING — classification/audit/cleanup.** Preserve UNKNOWN for any unmeasured plane; remove one-shot workflow before merge.
+1. **DONE — admission inventory.**
+2. **ACTIVE — one XRes-corrected canonical baseline bootstrap repair.**
+3. **PENDING — baseline login/world entry after fresh registration/Gate B admission update.**
+4. **PENDING — baseline pre-Storage worldmap capture.**
+5. **PENDING — bounded baseline movement stimulus.**
+6. **PENDING — sequential exact-session teardown/unregister before patched run.**
+7. **PENDING — task-owned patched `[19,14]` run.**
+8. **PENDING — rollback/source rehash/cleanup.**
+9. **PENDING — causal classification, audit, workflow removal, CI/review/merge/archive.**
 
 # Stop criteria
 
-Fail closed on lease/generation/registration drift, competing exact-client candidate, inability to prove target uniqueness, WARP/credential confinement failure, ambiguous world entry, instrumentation anomaly, source/preimage/hash mismatch, crash, unexpected gameplay/account side effect, or inability to separate baseline and patched sessions.
+Fail closed on lease/generation/registration drift, competing exact-client candidate, inability to prove target uniqueness, WARP/credential confinement failure, ambiguous world entry, instrumentation anomaly, source/preimage/hash mismatch, crash, unexpected gameplay/account side effect, inability to separate baseline and patched sessions, or exhaustion of the single XRes repair attempt.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 2
-updated_at: 2026-08-17T13:31:00+02:00
+checkpoint_version: 3
+updated_at: 2026-08-17T13:37:00+02:00
 base_main: e1ae4054b17792607c88552f72cdc68ef3a1f294
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
-phase: canonical_baseline_bootstrap
+phase: canonical_baseline_bootstrap_repair
 runtime_access: canonical_bootstrap
-last_completed_step: fresh controller-plane inventory proved registration absent and released generation-7 lease with no live observation or mutation
+last_completed_step: attempt-1 failure isolated to obsolete worker composition and independently proven rollback-clean
 blockers: []
-next_action: Acquire a new task-owned canonical lease and execute exactly one reviewed #371 bootstrap transaction with credentials/login/gameplay disabled; persist resulting registration/lease/identity before any login.
+next_action: Generate the merged-#465 XRes canonical worker, verify the legacy selector is absent, then execute exactly one repaired bootstrap transaction with credentials/login/gameplay disabled.
 ```

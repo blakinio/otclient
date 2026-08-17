@@ -40,6 +40,9 @@ def validate_executor_enabled(config: dict[str, Any]) -> dict[str, Any]:
     timeout_seconds = cfg.get("timeout_seconds", 1200)
     if not isinstance(timeout_seconds, int) or not 1 <= timeout_seconds <= 2700:
         raise ExecutorError("executor.timeout_seconds must be in 1..2700")
+    max_workers = cfg.get("max_parallel_workers", config.get("max_parallel_workers"))
+    if not isinstance(max_workers, int) or max_workers < 1:
+        raise ExecutorError("executor.max_parallel_workers must be a positive integer")
     return cfg
 
 
@@ -106,6 +109,10 @@ def execute_dispatch(
     if task.head != base_sha:
         raise ExecutorError("task head moved since plan creation")
 
+    coordinator_task_path = repo_root / dispatch["task_path"]
+    if not coordinator_task_path.is_file():
+        raise ExecutorError("current coordinator task checkpoint is missing")
+
     workspace_root.mkdir(parents=True, exist_ok=True)
     worktree = workspace_root / _safe_name(task_id)
     if worktree.exists():
@@ -124,10 +131,7 @@ def execute_dispatch(
             raise ExecutorError(f"git worktree add failed: {(add.stderr or '').strip()[-800:]}")
         added = True
 
-        task_path = worktree / dispatch["task_path"]
-        if not task_path.is_file():
-            raise ExecutorError("task checkpoint missing from isolated worktree")
-        request = _render_request(dispatch, task_path, worktree)
+        request = _render_request(dispatch, coordinator_task_path, worktree)
         command = list(cfg["command"])
         try:
             run = subprocess.run(
@@ -194,13 +198,15 @@ def execute_plan(
     tasks = orchestrator_core.discover_tasks(tasks_root, config)
     task_map = {task.task_id: task for task in tasks}
     selected = plan.get("selected", [])
-    if not isinstance(selected, list):
-        raise ExecutorError("plan.selected must be a list")
+    if not isinstance(selected, list) or not all(isinstance(item, dict) for item in selected):
+        raise ExecutorError("plan.selected must be a list of objects")
     if plan.get("executor") != config.get("executor"):
         raise ExecutorError("plan executor policy differs from current executor config")
-    if len({item.get("task_id") for item in selected if isinstance(item, dict)}) != len(selected):
+    if len({item.get("task_id") for item in selected}) != len(selected):
         raise ExecutorError("plan contains duplicate selected task ids")
-    branches = [item.get("branch") for item in selected if isinstance(item, dict)]
+    branches = [item.get("branch") for item in selected]
+    if any(not isinstance(branch, str) or not branch for branch in branches):
+        raise ExecutorError("selected workers require concrete branches")
     if len(set(branches)) != len(branches):
         raise ExecutorError("selected workers must use distinct branches")
 

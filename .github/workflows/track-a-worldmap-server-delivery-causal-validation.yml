@@ -120,8 +120,13 @@ jobs:
           PY
 
   physical-baseline:
-    name: Physical baseline / ${{ inputs.physical_mode }}
-    if: github.event_name == 'workflow_dispatch'
+    name: Physical baseline / ${{ github.event_name == 'pull_request' && 'inventory_only' || inputs.physical_mode }}
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.number == 475 &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor == 'blakinio')
     needs: static-presecret-contract
     runs-on: [self-hosted, otclient, synology]
     timeout-minutes: 10
@@ -241,14 +246,14 @@ jobs:
           PY
 
       - name: Inventory-only admission result
-        if: inputs.physical_mode == 'inventory_only'
+        if: github.event_name == 'pull_request' || inputs.physical_mode == 'inventory_only'
         shell: bash
         run: |
           set -Eeuo pipefail
           echo 'WORLDMAP_ADMISSION_INVENTORY_ONLY=PASS'
 
       - name: Launch pre-secret helper without credentials
-        if: inputs.physical_mode != 'inventory_only'
+        if: github.event_name == 'workflow_dispatch' && inputs.physical_mode != 'inventory_only'
         shell: bash
         run: |
           set +x
@@ -309,7 +314,7 @@ jobs:
           echo 'WORLDMAP_PHYSICAL_PRESECRET_GATE=PASS'
 
       - name: Stop after pre-secret proof
-        if: inputs.physical_mode == 'presecret_only'
+        if: github.event_name == 'workflow_dispatch' && inputs.physical_mode == 'presecret_only'
         shell: bash
         run: |
           set +x
@@ -352,7 +357,7 @@ jobs:
           echo 'WORLDMAP_PHYSICAL_PRESECRET_NO_SECRET_CAPTURE=PASS'
 
       - name: Hand off protected credentials after gates
-        if: inputs.physical_mode == 'baseline_login'
+        if: github.event_name == 'workflow_dispatch' && inputs.physical_mode == 'baseline_login'
         shell: bash
         env:
           TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
@@ -400,7 +405,7 @@ jobs:
           echo 'WORLDMAP_PHYSICAL_BASELINE_LOGIN_CAPTURE=PASS'
 
       - name: Upload privacy-safe structural evidence
-        if: inputs.physical_mode == 'baseline_login' && success()
+        if: github.event_name == 'workflow_dispatch' && inputs.physical_mode == 'baseline_login' && success()
         uses: actions/upload-artifact@v4
         with:
           name: worldmap-causal-baseline-structural

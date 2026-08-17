@@ -14,7 +14,7 @@ GDB_NEW = (
 )
 
 START = "POST_LOGIN_XWD=''\n"
-END = "world=0\n"
+END = "[[ \"$world\" == 1 ]] || fail structural_world_entry_not_observed\n"
 
 REPLACEMENT = r'''# V7: native state/event proof replaces the failed translated historical row target.
 # Wait for the exact native authentication state-machine entry into character selection.
@@ -141,6 +141,14 @@ done
 echo 'WORLDMAP_BASELINE_NATIVE_GAME_LOGIN_STATE=PASS'
 
 world=0
+for _ in $(seq 1 60); do
+  sleep 1
+  if grep -Fq $'\tFullMap' "$EVENTS" 2>/dev/null && [[ "$(wc -l <"$STRIPS")" -ge 10 ]]; then
+    world=1
+    break
+  fi
+done
+[[ "$world" == 1 ]] || fail structural_world_entry_not_observed
 '''
 
 
@@ -184,6 +192,9 @@ def transform(text: str) -> str:
         "WORLDMAP_BASELINE_CHARACTER_ROW_ROI=",
         "translated_character_row",
         "character_row_interaction_not_observed",
+        "WORLDMAP_BASELINE_CHARACTER_DOUBLECLICK_FALLBACK_SENT=true",
+        "SELECT_X",
+        "SELECT_Y",
         "LOGIN_X=590",
         '"$XWD" -root',
         "xwd -root",

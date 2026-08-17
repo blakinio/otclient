@@ -14,13 +14,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  safety-hold:
-    name: Worldmap causal safety hold (no client)
+  static-1020-normalization:
+    name: 1020x650 causal desktop normalization validation (no client)
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
-      - name: Hold physical runtime while 1020x650 desktop normalization is validated
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate normalized desktop and UI helper composition
+        shell: bash
         run: |
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD=PASS'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_SECRET_USED=false'
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-xwd-classify.py \
+            .github/scripts/track-a-worldmap-causal-ui-window.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            .github/scripts/tibia-official-client-re-xres-wire.py
+          python3 .github/scripts/track-a-worldmap-causal-xwd-classify.py self-test
+          screen_repaired="$RUNNER_TEMP/worldmap-baseline-1020.sh"
+          gdb_repaired="$RUNNER_TEMP/worldmap-baseline-1020-gdb.sh"
+          combined="$RUNNER_TEMP/worldmap-baseline-1020-gdb-xwd.sh"
+          python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen_repaired"
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            "$screen_repaired" "$gdb_repaired"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            "$gdb_repaired" "$combined"
+          bash -n "$combined"
+          grep -F 'WORLDMAP_BASELINE_DESKTOP_GEOMETRY=1020x650' "$combined" >/dev/null
+          grep -F 'WORLDMAP_SCREEN_NORMALIZE_STAGE=PASS' "$combined" >/dev/null
+          grep -F 'WORLDMAP_SCREEN_NORMALIZE_OWNER=PASS' "$combined" >/dev/null
+          grep -F 'TARGET_WIDTH = 1020' "$combined" >/dev/null
+          grep -F 'TARGET_HEIGHT = 650' "$combined" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_UI_WINDOW_EQUALS_RUNTIME_IDENTITY=true' "$combined" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_UI_WINDOW_GEOMETRY=1020x650' "$combined" >/dev/null
+          grep -F 'LD_LIBRARY_PATH="$XWD_TOOLROOT_LIBS" "$XWD"' "$combined" >/dev/null
+          if grep -E '("\$XDOTOOL"|\$XDOTOOL|xdotool)[[:space:]]+search[[:space:]]+--onlyvisible[[:space:]]+--pid' "$combined"; then
+            echo 'WORLDMAP_1020_STATIC_ERROR=legacy_pid_selector_executable_survived' >&2
+            exit 1
+          fi
+          if grep -E 'tesseract|capture_ocr|LOGIN_OCR_ANCHORS|SELECT_TSV|PRE_TSV' "$combined"; then
+            echo 'WORLDMAP_1020_STATIC_ERROR=ocr_surface_survived' >&2
+            exit 1
+          fi
+          echo 'WORLDMAP_1020_NORMALIZATION_STATIC=PASS'
+          echo 'WORLDMAP_1020_NORMALIZATION_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_1020_NORMALIZATION_SECRET_USED=false'

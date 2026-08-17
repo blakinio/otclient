@@ -135,8 +135,16 @@ def transform(text: str) -> str:
     missing = [token for token in required if token not in output]
     if missing:
         raise TransformRefused("REQUIRED_MISSING:" + ",".join(missing))
-    if 'search --onlyvisible --pid' in output:
-        raise TransformRefused("LEGACY_PID_WINDOW_SELECTOR_SURVIVED")
+    # The base helper intentionally contains a negative grep guard for the legacy
+    # selector text. Reject only an executable xdotool search invocation.
+    executable_legacy = (
+        '"$XDOTOOL" search --onlyvisible --pid',
+        '$XDOTOOL search --onlyvisible --pid',
+        'xdotool search --onlyvisible --pid',
+    )
+    survivors = [token for token in executable_legacy if token in output]
+    if survivors:
+        raise TransformRefused("LEGACY_PID_WINDOW_SELECTOR_EXECUTABLE_SURVIVED")
     return output
 
 

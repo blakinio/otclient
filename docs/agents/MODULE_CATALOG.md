@@ -72,7 +72,7 @@ Detailed maintenance boundaries are in `docs/architecture/LEGACY_OTCLIENT_ARCHIT
 
 | Item | Status | Paths | Note |
 |---|---|---|---|
-| Agent orchestrator control plane | PR #463 | `tools/agents/orchestrator*.py`, `tools/agents/orchestrator_worker_result.schema.json`, `.github/workflows/agent-orchestrator-smoke.yml`, `docs/agents/AGENT_ORCHESTRATOR.*` | Deterministic bounded-wave planner, result fan-in/barrier recomputation and context governor. Current worker executor is simulated/dry-run only; it invokes no AI service, model credential or owner-funded quota. A real model executor remains a separately authorized adapter. |
+| Agent orchestrator control plane | merged PR #463; archived by #476 | `tools/agents/orchestrator*.py`, `tools/agents/orchestrator_worker_result.schema.json`, `.github/workflows/agent-orchestrator-smoke.yml`, `docs/agents/AGENT_ORCHESTRATOR.*` | Deterministic bounded-wave planner, result fan-in/barrier recomputation and context governor. Current worker executor is simulated/dry-run only; it invokes no AI service, model credential or owner-funded quota. A real model executor remains a separately authorized adapter. |
 | Existing agent handoff | active PR #4 | `AGENT_HANDOFF.md` | Reconcile with root/nested agent docs; avoid contradictory rules. |
 | Official Tibia Linux runner analysis | draft operational PR #48 | dedicated workflow and task record | One-off non-merge operational analysis; does not own Rust workspace/product paths. |
 

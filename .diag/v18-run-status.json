@@ -1,0 +1,33 @@
+{
+  "schema": "v18-run-terminal-diagnostic-v1",
+  "target_sha": "3fb6131710fe7f110fb5a34b13ef8286615fa243",
+  "run_id": 32076063134,
+  "status": "completed",
+  "conclusion": "failure",
+  "jobs": [
+    {
+      "id": 95529435820,
+      "name": "Static v18 native confirmation composition",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 95529595652,
+      "name": "Physical baseline v18 native confirmation and screenshot",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 95529680006,
+      "name": "luacheck",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 95529795325,
+      "name": "cppcheck",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ]
+}

@@ -6,8 +6,8 @@
 task: OTC-20260816-track-a-coverage-audit-refresh
 lane: COVERAGE-AUDIT
 researcher_delivery: draft_only
-snapshot_main: 8c9486e2c6109a7a39b564804c8acd707659b5e0
-snapshot_time: 2026-08-17T08:31:00+02:00
+snapshot_main: cbc6388e8607bb92120281a9a15148577994d3a6
+snapshot_time: 2026-08-17T09:41:00+02:00
 audit_result: FAIL_MATERIAL_GAPS_OPEN
 programme_complete: false
 material_findings_open: 5
@@ -17,7 +17,7 @@ runtime_access: none
 physical_e2e: NOT_APPLICABLE_WITH_REASON
 ```
 
-This refresh answers coordinator `RETURN_FOR_EVIDENCE` on Draft PR #390 and includes the main-advance that landed P0 Cyclopedia exact-client evidence in #435 during final validation. It preserves the accepted bounded #304 denominators, updates only live-state conclusions that changed, and does not promote Draft lane evidence into global programme truth.
+This refresh answers coordinator finding comment `5313208545` on Draft PR #390. It restates the audit from current `main@cbc6388e8607bb92120281a9a15148577994d3a6`, consumes merged P2 coordinator promotion #450, and refreshes live P0, RUNTIME and worldmap heads without promoting Draft-only lane evidence into canonical programme truth.
 
 ## Authority and nonclaims
 
@@ -43,11 +43,11 @@ current_canonical_gate_b: NOT_PROVEN
 current_structural_in_game: NOT_PROVEN
 ```
 
-Isolated graphics/X11/XRes evidence is not canonical registration, PID ownership, `IN_GAME`, accepted movement, restart stability or gameplay semantic proof.
+Current-main canonical RUNTIME task remains `raw-xres-helper-hosted-ready` and explicitly records `exact_client_pid_ownership_of_viewable_xid: UNKNOWN`, `raw_xres_helper_implementation_validated: false`, and `physical_identity_retry_authorized: false`. Live source PR #447 has validated the pure raw-XRes helper, but coordinator promotion PR #448 is still open; Draft evidence is not treated as trusted-main implementation.
 
 ## Accepted historical quantitative baseline
 
-Closed-unmerged PR #304 head `43a60bd96cc644b656b200c9edbfb75578b330b6` remains the accepted bounded item-level denominator source. Its machine-readable registry package is still absent from current main.
+Closed-unmerged PR #304 head `43a60bd96cc644b656b200c9edbfb75578b330b6` remains the accepted bounded denominator source. Its machine-readable registry package is still absent from current main.
 
 | Metric | Numerator / denominator | Percentage | Boundary |
 |---|---:|---:|---|
@@ -64,104 +64,99 @@ Closed-unmerged PR #304 head `43a60bd96cc644b656b200c9edbfb75578b330b6` remains 
 | P1 global field/evidence denominator | UNKNOWN / UNKNOWN | UNKNOWN | normalized registry absent |
 | restart-validated global capability denominator | 0 / UNKNOWN | not computable | normalized denominator absent |
 
-Historical P0 group-stage distribution remains `7 INVENTORIED / 6 STRUCTURALLY_IDENTIFIED / 1 SEMANTICALLY_SUPPORTED / 2 UNKNOWN`; it is not item-level live coverage.
+Current-main searches again found no canonical `capabilities.jsonl`, `protocol_messages.jsonl` or `runtime_types.jsonl` files.
 
-## Current-main delta
+## Current-main / live-state delta
 
-### P1 promotion gap is resolved
+### P1 promotion gap remains resolved
 
-Coordinator promotion PR #414 merged as `070a066488d22126483e13fc8a08b17df5090918`; source #372 is closed superseded. The accepted P1 implementation/profile/test surface is therefore promoted.
+Coordinator promotion PR #414 merged as `070a066488d22126483e13fc8a08b17df5090918`; source #372 is closed superseded. Live attached-session correlation, restart/relogin stability and authoritative runtime values remain RUNTIME-owned and unproven.
 
-Live attached-session correlation, restart/relogin stability and authoritative runtime values remain RUNTIME-owned and unproven. Those belong under the live semantic/restart finding, not a separate P1 promotion finding.
+### RUNTIME helper is validated in Draft, not yet promoted
 
-### RUNTIME is at raw XRes resource-to-PID identity frontier
+Trusted main still contains canonical task phase `raw-xres-helper-hosted-ready`. The current live dependency has advanced:
 
-The old xkbcomp-era #390 snapshot is obsolete. Current promoted chain includes:
+- source PR #447 head `32c61120b9086904b328e7b4aa50526d64bef807` validated a pure QueryVersion/QueryClientIds(LocalClientPid) byte codec with deterministic fixtures;
+- coordinator promotion PR #448 head `08f7c2e7946a2283f5d0a4f5c68ab4eb589b197b` is open and not merged;
+- exact resource-to-official-client PID ownership therefore remains UNKNOWN on trusted main;
+- physical identity retry remains forbidden until the helper is promoted and a fresh separately admitted RUNTIME discriminator exists.
 
-- coordinator-required #415 isolated evidence: Xvfb advertised no GLX extension; Qt discovered/loaded bundled `xcb_glx`, then reported neither GLX nor EGL enabled; Vulkan initialized; no visible window through 35 seconds. This remains isolated/non-canonical historical evidence.
-- contained DRI provider repair and revalidation (#429/#430, #431/#432/#434) removed the earlier missing-GLX environment condition without proving canonical success.
-- admission reconciliation #436 merged as `b9260379bebfba8e0e8d8a45c63e24ea65b9c6e4`, keeping blind retry forbidden.
-- accepted post-RHI raw X11 evidence proves a raw viewable `1920x1080` XID `0x00c00011` while normal xdotool named-visible search is zero; exact official-client PID ownership remains UNKNOWN.
-- XRes evidence proved convenience `libxcb-res`/`libXRes` helpers unavailable but contained `XResproto` wire definitions present.
-- coordinator promotion #444 merged the audited raw-X11/XRes chain; #445 archived child tasks and moved the canonical task to `raw-xres-helper-hosted-ready`.
+The live RUNTIME blocker remains exact resource-to-official-client PID ownership, not generic graphics startup.
 
-Current canonical task requires a **GitHub-hosted QueryVersion/QueryClientIds encoder/parser** before any new physical identity attempt. Physical identity retry, canonical bootstrap retry, window-identity relaxation, credentials, login and gameplay are forbidden until that hosted helper is validated and separately admitted.
+### Exact-static evidence production is no longer a material staging blocker
 
-The live blocker is therefore exact resource-to-official-client PID ownership, not generic graphics startup.
+P0 producer #435 is merged on main and proves the task-scoped exact-fence → sanitized-source → GitHub-hosted decode pattern without promoting semantic player XYZ. This remains sufficient to close the former material exact-static staging gap.
 
-### Exact-static evidence production is now a proven promoted process, not a material staging blocker
+Worldmap producers have advanced further in live Draft closeout:
 
-The old finding that no compliant exact-static evidence path exists is resolved.
+- #437 head `3b6942ba543fec499d43c0697debfe80eb19471a` is Ready/terminal-closeout, promoting durable exact-static evidence only;
+- #446 head `be0149bf59226194001ce24cda2743dbb6492bca` is Ready/terminal-closeout, promoting durable downstream exact-static evidence only.
 
-Worldmap producer #437 proved a bounded process:
+Neither open producer is treated as merged current-main truth.
+
+### P0 direct authoritative XYZ remains unproven
+
+P0 #302 head `3ddf4f35e00cdfe899b4ce3daf716d71b4c3cce6` has already consumed merged producer #435 and now explicitly reports:
 
 ```text
-read-only exact-client source-window staging
-→ sanitized artifact only
-→ GitHub-hosted disassembly/recovery/validation
-→ no raw client upload
-→ no client execution/mutation
+WAITING_ON_RUNTIME_SEMANTIC_CONFIRMATION / DRAFT_NOT_PROMOTED
 ```
 
-Consumer #367 used that producer and explicitly resolved its prior exact-static staging blocker.
+The former static-input blocker is closed. Direct authoritative XYZ remains `UNKNOWN / INCONCLUSIVE` because physical causal correlation requires a proven exact-client resource/PID identity and separately admitted RUNTIME execution.
 
-During this audit's final validation, P0 producer closeout #435 merged as `8c9486e2c6109a7a39b564804c8acd707659b5e0`. It promotes the final sanitized Cyclopedia structural bundle for consumer #302:
+### P2 bounded downstream chain is now promoted on main
 
-- source run `32000921225` SUCCESS;
-- hosted validation SUCCESS;
-- artifact `9278368790`, digest `sha256:49f48d4283e63dd613b32a99300dc86eb98d68d7d7f640ec621c72e854c30c87`;
-- 9 target labels, 0 missing;
-- 4 direct relocations;
-- one typeinfo candidate `0x3089a50`;
-- vtable address point `0x3089db0`;
-- 4 unique RIP xrefs and 4 hosted disassembly windows.
+The prior #390 statement that #310 was merely a partial open Draft is superseded.
 
-The bundle explicitly states `SEMANTIC_PLAYER_XYZ_PROVEN=false`. Thus static evidence delivery is proven and promoted, while semantic XYZ remains open. A generalized full-binary hosted service is no longer required to unblock current static lanes and is removed from the material finding set.
-
-### P0 direct authoritative XYZ remains unproven, but its static bundle is now on main
-
-P0 #302 still classifies direct authoritative XYZ as `UNKNOWN / INCONCLUSIVE`; its branch has not yet consumed newly merged #435.
-
-The Cyclopedia route now has promoted exact-client structural evidence on main, but it still proves structure/metadata only. Physical XYZ/world correlation, negative controls, exact client PID/session identity, repeatability and fresh-PID/relogin stability remain solely RUNTIME-owned.
-
-The next P0 action is no longer "obtain a compliant bundle"; it is **consume promoted #435 and determine what exact semantic/member/accessor inference is justified**, keeping physical confirmation separate.
-
-### P2 remains partial Draft evidence
-
-P2 #310 head `9b99b6b4bda2cf01e8fadcd8a00a6827de35d825` remains Draft-only and supports:
+Coordinator promotion #450 merged as current `main@cbc6388e8607bb92120281a9a15148577994d3a6`. Source #310 and one-shot producer #449 are archived and closed unmerged. Current-main durable evidence now promotes the bounded chain:
 
 ```yaml
-persistent_qbuffer_to_readAll: PROVEN
+persistent_qbuffer_to_clientprocessor_this_plus_0x18: PROVEN
 first_downstream_consumer: PROVEN:TProtocolClientMessageProcessor+0x10@0xc2df80
 first_downstream_transform: PROVEN:TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130
-same_message_handoff_to_dual_connection: PROVEN
+same_message_handoff_to_dualconnection_plus_0x80_plus_0x78: PROVEN
 protocol_stage_order: PROVEN_PARTIAL
 framing: UNKNOWN
 sequence: UNKNOWN
 compression: UNKNOWN
 encryption: UNKNOWN
 final_binary_egress: UNKNOWN
+final_socket_ownership: UNKNOWN
 ```
 
-No framing/crypto/egress completion is promoted here.
+This resolves coordinator findings `TACOORD-390-20260817-001` and `TACOORD-390-20260817-002` for the current refresh. It does not close any of this audit's five material programme findings.
 
-### Viewport/worldmap advanced materially but is not patch-ready
+### Worldmap static dependency discovery is READY in live Draft, not promoted mutation design
 
-Draft #367 head `a69179e5cf4681a9d41014a562a0bfd0d1cd9ffb` consumes #437 and directly identifies exact `TWorldmapProtocolMessageHandler`, `TWorldMapStorage` and counted Storage control block. The historical 18x14 object is corrected to exact Storage extent state, not Viewport.
+Live #367 head `f381cd657642ce592b2cbbc95783813ae72fcf6a` now reports:
 
-Remaining work includes the upstream Storage slot-12 source, RenderProvider clipping/culling, Camera projection/scale, Picker transforms, fixed allocation/loop/mask/packing sites and a safe patch-site graph. `STATIC_PATCH_GRAPH_READY=false` remains correct.
+```yaml
+static_classification: STATIC_DEPENDENCY_GRAPH_RECOVERED
+STATIC_PATCH_GRAPH_READY: true
+MUTATION_DESIGN_READY: false
+client_byte_mutation_authorized: false
+remaining_static_blocker: NONE_FOR_STATIC_DEPENDENCY_DISCOVERY
+```
 
-### Durable coordinator checkpoint remains materially stale
+The recovered Draft graph includes the hardcoded packed `18/14` Handler source, Storage slot-12 propagation, dynamic Viewport geometry, RenderProvider fixed-32 clipping/indexing and Picker fixed-32 transforms. Camera has exact identity/layout plus a bounded negative result for a direct extent edge.
 
-`docs/agents/tasks/active/OTC-20260816-track-a-promotion-coordination.md` on current main still records `base_main: ddf7dd...`, old #357/#358/#360/#356 barriers and pre-#414/pre-#445 conclusions.
+This corrects the prior report's `STATIC_PATCH_GRAPH_READY=false` statement. It does not claim that #367 or producer closeouts #437/#446 are merged, nor that mutation design or physical validation is authorized.
 
-Live Git overrides it, but the durable mismatch remains a material continuation risk.
+### Durable global coordinator checkpoint remains materially stale
+
+Current main still contains `docs/agents/tasks/active/OTC-20260816-track-a-promotion-coordination.md` with `base_main: ddf7dd9408116fbeaca05bfeb69663f30f7cd34f` and old P1/RUNTIME/P2 barriers.
+
+Merged #450 added a current P2-specific barrier at:
+
+`docs/agents/evidence/OTC-20260816-track-a-promotion-coordination/20260817-p2-network-barrier-update.md`
+
+That fixes P2 local continuation but does not refresh the global coordinator task. AUD-COV-007 therefore remains open.
 
 ## Current open material findings
 
 ### AUD-COV-001 — HIGH — canonical item-level coverage registry absent from current main
 
-Current-main search still finds no canonical `capabilities.jsonl`, `protocol_messages.jsonl` or `runtime_types.jsonl` package.
+No canonical `capabilities.jsonl`, `protocol_messages.jsonl` or `runtime_types.jsonl` package is present on `main@cbc6388e...`.
 
 **Impact:** coverage cannot be deterministically recomputed from canonical current-main state.
 
@@ -177,7 +172,7 @@ E51 full 349-message family/semantic classification, E52 full Tibia-owned QMeta/
 
 ### AUD-COV-003 — MEDIUM — action/QMeta denominator conflict `612` vs historical `1004`
 
-The durable census still states these came from different inventory/filter definitions.
+The durable census still records different inventory/filter definitions without one normalized versioned denominator.
 
 **Impact:** action coverage percentages remain non-comparable.
 
@@ -185,30 +180,30 @@ The durable census still states these came from different inventory/filter defin
 
 ### AUD-COV-004 — HIGH — canonical live semantic/restart proof remains unavailable
 
-Promoted isolated evidence has advanced to raw X11 resource identity, but exact resource-to-official-client PID ownership remains UNKNOWN and no current canonical Gate-B/registered-session semantic proof is promoted.
+The raw-XRes helper is validated in source Draft #447, but trusted main still lacks the promoted helper and direct resource-to-official-client PID proof. No current canonical Gate-B/registered-session semantic proof is promoted.
 
 **Impact:** authoritative `IN_GAME`, direct XYZ causality, live P1 correlation, accepted actions and restart/relogin stability cannot be counted complete.
 
-**Next discriminator:** implement/validate the hosted raw-XRes QueryVersion/QueryClientIds helper; then perform one separately admitted physical resource-to-PID identity discriminator. Only after direct identity proof may canonical semantic experiments resume.
+**Next discriminator:** finish coordinator promotion #448 onto current main with current-main freshness and exact-head checks; then create one separately admitted physical resource-to-PID discriminator. Only after direct identity proof may canonical semantic experiments resume.
 
-### AUD-COV-007 — MEDIUM — durable coordinator checkpoint materially stale
+### AUD-COV-007 — MEDIUM — durable global coordinator checkpoint materially stale
 
-The coordinator task still advertises `ddf7dd...` and obsolete barriers.
+The active coordinator task still advertises `ddf7dd...` and obsolete global barriers. The new #450 P2 barrier is lane-local only.
 
 **Impact:** repository-resolved continuation can select stale work unless every invocation reconstructs live Git.
 
-**Next discriminator:** refresh the durable coordinator checkpoint from current main, including promoted P1 #414, current RUNTIME raw-XRes frontier, P0 #302 + merged producer #435, P2 #310 and viewport #367/#437.
+**Next discriminator:** refresh the durable coordinator task from current main, preserving lane-local accepted barriers and live open promotion dependencies.
 
 ## Resolved / reclassified since prior #390 handoff
 
 | Prior state | Current disposition |
 |---|---|
 | AUD-COV-006 P1 not promoted | `RESOLVED`: #414 merged; #372 closed superseded |
-| AUD-COV-005 no compliant exact-static evidence path | `RESOLVED_AS_MATERIAL_GAP`: #437 proved the process; #435 promoted the same pattern for P0 |
-| xkbcomp/Xvfb current RUNTIME blocker | `SUPERSEDED`: current frontier is raw X11 resource-to-PID identity |
-| #415 isolated no-GLX result as latest graphics state | `HISTORICAL_ACCEPTED`: later DRI/post-RHI evidence is the current frontier |
-
-Previously resolved #360 transition, #356 QLibrary-validator and #363 viewport-prompt findings remain resolved.
+| AUD-COV-005 no compliant exact-static evidence path | `RESOLVED_AS_MATERIAL_GAP`: #435 promoted a compliant bounded pattern |
+| P2 #310 open/partial-only | `SUPERSEDED`: #450 merged bounded P2 chain; framing/crypto/egress still UNKNOWN |
+| viewport static graph incomplete | `SUPERSEDED_IN_LIVE_DRAFT`: #367 now reports `STATIC_PATCH_GRAPH_READY=true`; mutation design still false |
+| raw-XRes helper not yet implemented/validated | `SUPERSEDED_IN_LIVE_DRAFT`: #447 validates helper; #448 promotion remains open |
+| xkbcomp/Xvfb current RUNTIME blocker | `SUPERSEDED`: current frontier remains resource-to-PID identity |
 
 ## Missing-proof queue ordered by information gain
 
@@ -218,15 +213,15 @@ Previously resolved #360 transition, #356 QLibrary-validator and #363 viewport-p
 | 2 | full 349-message semantic/family classification | protocol/COVERAGE-AUDIT | E51 classify every identifier or explicit `UNCLASSIFIED` |
 | 3 | full Tibia-owned QMeta/runtime denominator | QMeta/COVERAGE-AUDIT | E52 enumerate/classify every relevant type/controller/storage or ignored-with-reason |
 | 4 | normalized P0/P1 item denominators | COVERAGE-AUDIT + lane owners | materialize every read/action/field item including UNKNOWN/restart state |
-| 5 | current coordinator barrier | coordinator | replace stale `ddf7dd` checkpoint with current live state |
-| 6 | raw XRes encoder/parser | RUNTIME hosted phase | deterministic QueryVersion/QueryClientIds encoder/parser + positive/negative/truncated/oversized/wrong-version fixtures |
-| 7 | exact XID -> official-client PID identity | RUNTIME physical | separately admitted resource-to-PID discriminator after helper validation |
-| 8 | P0 direct authoritative XYZ | P0 + RUNTIME | consume promoted #435, recover justified structural/member semantics, then live XYZ/world/negative controls after identity proof |
+| 5 | current global coordinator barrier | coordinator | replace stale `ddf7dd` active checkpoint with current live state |
+| 6 | raw XRes helper promotion | RUNTIME/coordinator | restack/promote accepted #447 helper via #448 with current-main exact-head validation |
+| 7 | exact XID -> official-client PID identity | RUNTIME physical | separately admitted resource-to-PID discriminator after helper promotion |
+| 8 | P0 direct authoritative XYZ | P0 + RUNTIME | execute bounded world/negative-control correlation only after identity proof |
 | 9 | structural current `IN_GAME` + live P1 correlation | RUNTIME + promoted P1 | bounded proof only after identified canonical session exists |
 | 10 | restart/relogin stability | RUNTIME + P0/P1 | fresh PID/PIE/session reacquisition and repeated semantic correlation |
-| 11 | P2 framing/sequence/compression/encryption/final egress | P2 | continue one exact stage at a time |
+| 11 | P2 framing/sequence/compression/encryption/final egress | P2 | continue one exact stage at a time from merged #450 evidence |
 | 12 | action/QMeta denominator normalization | COVERAGE-AUDIT/QMeta | reconcile 612 vs 1004 provenance |
-| 13 | viewport downstream patch graph | viewport #367 | Storage upstream + RenderProvider/Camera/Picker/fixed-bound windows before any mutation design |
+| 13 | worldmap promotion / mutation-design boundary | coordinator + worldmap | terminally review #367/#437/#446, promote durable static graph if accepted, then use a separately authorized mutation-design/physical-validation task |
 
 ## Campaign completeness verdict
 
@@ -241,14 +236,17 @@ p0_exact_static_cyclopedia_bundle_promoted: true
 p0_direct_authoritative_xyz_proven: false
 p1_semantic_implementation_promoted: true
 p1_live_session_correlation_proven: false
-p2_structural_chain_partial: true
+p2_bounded_downstream_chain_promoted: true
 p2_framing_sequence_compression_encryption_egress_complete: false
 exact_static_task_scoped_producer_process_proven: true
+canonical_raw_xres_helper_promoted: false
 canonical_resource_to_pid_identity_proven: false
 canonical_physical_runtime_semantics_proven: false
 restart_relogin_stability_proven: false
 stable_live_bridge_semantics_proven: false
-viewport_static_patch_graph_ready: false
+worldmap_static_patch_graph_ready_in_live_draft: true
+worldmap_static_patch_graph_promoted_to_main: false
+worldmap_mutation_design_ready: false
 programme_complete: false
 ```
 
@@ -262,8 +260,9 @@ audit:
     medium: 2
   p1_promotion_gap_resolved: true
   exact_static_staging_material_gap_resolved: true
+  p2_bounded_chain_promoted: true
   inventory_vs_semantic_boundary_preserved: true
-  isolated_runtime_promoted_to_canonical: false
+  draft_lane_evidence_promoted_without_merge: false
 e2e:
   result: NOT_APPLICABLE_WITH_REASON
   reason: documentation/evidence-only COVERAGE-AUDIT with runtime_access none; physical E2E belongs to separately admitted RUNTIME work

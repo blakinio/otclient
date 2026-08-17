@@ -1,0 +1,136 @@
+{
+  "schema": "track-a-p2-downstream-coordinator-promotion-v1",
+  "date": "2026-08-17",
+  "consumer_task": "OTC-20260815-track-a-p2-buffer-downstream-consumer",
+  "source_pr": 310,
+  "source_head": "9b99b6b4bda2cf01e8fadcd8a00a6827de35d825",
+  "producer_task": "OTC-20260817-track-a-p2-clientprocessor-sanitized-evidence",
+  "producer_pr": 449,
+  "decision": "ACCEPT_WITH_EDITS",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official_native_linux_only"
+  },
+  "evidence": {
+    "accepted_buffer_boundary": {
+      "pr": 308,
+      "run": 31903490468,
+      "artifact": 9251725866,
+      "artifact_digest": "sha256:f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e"
+    },
+    "original_processor_bundle": {
+      "run": 31904696996,
+      "artifact": 9252025461,
+      "artifact_digest": "sha256:2a866247558b079944d81c9ad33bd4c5361c8144a7f367b273ab3bc19a080991"
+    },
+    "gap_closing_bundle": {
+      "run": 32005141186,
+      "head": "1b615736726049e70c902a88d0fde5004044e7e0",
+      "source_artifact": 9279753620,
+      "source_artifact_digest": "sha256:6c970c23aa95856698eb71024937ed847502fb1f040701ce04c632da32c38d32",
+      "final_artifact": 9279759553,
+      "final_artifact_digest": "sha256:8228d6c281cf99f45f5c880b76e7a2817130156fde4cc892a402eccf4af10528",
+      "track_a_governance_run": 32005159534,
+      "track_a_governance_result": "SUCCESS",
+      "repository_ci_run": 32005159706,
+      "repository_ci_result": "SUCCESS"
+    },
+    "dualconnection_typing": {
+      "source": "docs/agents/evidence/OTC-20260813-official-client-re/20260814-final-write-reconciliation-generation-5.md",
+      "owner_member": "+0xc18/+0xc20",
+      "type": "TGameserverDualConnection",
+      "slot_0x80": "0xb56d60",
+      "slot_0x78": "0xb56970"
+    }
+  },
+  "coordinator_review": {
+    "worker_summary_used_as_proof": false,
+    "generated_result_json_used_as_primary_proof": false,
+    "source_bundle_redecoded_independently": true,
+    "source_file_boundary_reverified": true,
+    "exact_fence_reverified": true,
+    "material_findings_open": 0,
+    "closed_findings": [
+      "TACOORD-310-20260817-001",
+      "TACOORD-310-20260817-002"
+    ]
+  },
+  "claims": {
+    "persistent_qbuffer_to_clientprocessor_this_plus_0x18": "PROVEN",
+    "first_downstream_consumer": "PROVEN:TProtocolClientMessageProcessor+0x10@0xc2df80",
+    "first_downstream_transform": "PROVEN:TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "same_message_handoff_to_dualconnection_plus_0x80_plus_0x78": "PROVEN",
+    "protocol_stage_order": "PROVEN_PARTIAL",
+    "framing": "UNKNOWN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN",
+    "final_binary_egress": "UNKNOWN",
+    "final_socket_ownership": "UNKNOWN"
+  },
+  "instruction_anchors": {
+    "qbuffer_object": [
+      "0x01970c96",
+      "0x01970ca6",
+      "0x01970cad",
+      "0x01970cc6"
+    ],
+    "clientprocessor_store": [
+      "0x0197104f",
+      "0x01971056",
+      "0x0197105d",
+      "0x01971084",
+      "0x0197108f",
+      "0x019710a7"
+    ],
+    "clientprocessor_read": [
+      "0x00c2dfa5",
+      "0x00c2dfd5",
+      "0x00c2dfeb",
+      "0x00c2e012"
+    ],
+    "same_message_invoker": [
+      "0x007dd66c",
+      "0x007dd672",
+      "0x007dd675",
+      "0x007dd67f",
+      "0x007dd686",
+      "0x007dd689",
+      "0x007dd693",
+      "0x007dd69a",
+      "0x007dd69d",
+      "0x007dd6a7",
+      "0x007dd6b1",
+      "0x007dd6b4",
+      "0x007dd6be"
+    ],
+    "raw_transform": [
+      "0x00b47132",
+      "0x00b47151",
+      "0x00b47189",
+      "0x00b47206",
+      "0x00b472f8",
+      "0x00b47300"
+    ]
+  },
+  "negative_controls": {
+    "generic_qt_census_used_as_proof": false,
+    "vtable_adjacency_used_as_temporal_order": false,
+    "quarantined_synology_run_31944051248_used_as_proof": false,
+    "historical_final_socket_evidence_used_as_proof": false,
+    "rawprocessor_name_used_as_framing_compression_or_encryption_semantics": false,
+    "dualconnection_slots_labeled_final_egress": false,
+    "guessed_direct_http_staging_reopened": false
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static reverse-engineering evidence promotion only; no runtime behavior changed"
+  },
+  "integration": {
+    "source_pr_branch_promoted_directly": false,
+    "obsolete_source_workflow_promoted": false,
+    "promotion_mode": "current_main_docs_evidence_only"
+  }
+}

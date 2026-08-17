@@ -45,7 +45,10 @@ jobs:
         run: |
           set -Eeuo pipefail
           helper=.github/scripts/tibia-official-client-re-p0-runtime-snapshot.py
-          ! grep -Eq 'os\.pwrite|O_RDWR|O_WRONLY|process_vm_writev|ptrace.*POKE' "$helper"
+          if grep -Eq 'os\.pwrite|O_RDWR|O_WRONLY|process_vm_writev|ptrace.*POKE' "$helper"; then
+            echo 'TRACK_A_P0_RUNTIME_SNAPSHOT_ERROR=process_memory_write_surface_detected' >&2
+            exit 1
+          fi
           grep -Fq 'os.O_RDONLY | os.O_CLOEXEC' "$helper"
           grep -Fq '"process_memory_writes": 0' "$helper"
           grep -Fq '"semantic_player_xyz_proven": False' "$helper"

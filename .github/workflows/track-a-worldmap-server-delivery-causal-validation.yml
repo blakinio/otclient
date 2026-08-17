@@ -14,14 +14,75 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  safety-hold:
-    name: Worldmap causal safety hold after no-secret focus scan
+  ambient-focus-static:
+    name: Ambient-controlled focus scan composition (no client)
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 4
     steps:
-      - name: Hold runtime while ambient-controlled discriminator is prepared
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate ambient-controlled no-secret scan
+        shell: bash
         run: |
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD=PASS'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_REASON=focus_scan_ambient_repaint_confounded'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_SECRET_USED=false'
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py
+
+          screen="$RUNNER_TEMP/worldmap-ambient-screen.sh"
+          gdb="$RUNNER_TEMP/worldmap-ambient-gdb.sh"
+          ui="$RUNNER_TEMP/worldmap-ambient-ui.sh"
+          scan="$RUNNER_TEMP/worldmap-ambient-scan.sh"
+          python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$ui"
+          python3 .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py "$ui" "$scan"
+          bash -n "$scan"
+          test -x "$scan"
+
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_SECRET_ENV=ABSENT' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_MODE=TAB_REVERSIBLE_DUMMY_TEXT_AMBIENT_CONTROLLED' "$scan" >/dev/null
+          grep -F 'ACTION_DELTA_MIN=80' "$scan" >/dev/null
+          grep -F 'change "$idle0" "$idle1" --min-changed 0' "$scan" >/dev/null
+          grep -F 'change "$cleared" "$postidle" --min-changed 0' "$scan" >/dev/null
+          grep -F 'roi-cycle "$idle1" "$typed" "$cleared" 0 0 1020 650 --min-changed 60' "$scan" >/dev/null
+          grep -F 'typed_delta=$((typed_changed-ambient))' "$scan" >/dev/null
+          grep -F 'cleared_delta=$((cleared_changed-ambient))' "$scan" >/dev/null
+          grep -F '"$typed_delta" -ge "$ACTION_DELTA_MIN"' "$scan" >/dev/null
+          grep -F '"$cleared_delta" -ge "$ACTION_DELTA_MIN"' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_METRIC=' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_EDITABLE_CANDIDATE=' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN=COMPLETE_NO_SECRET_AMBIENT_CONTROLLED' "$scan" >/dev/null
+          grep -F 'rm -f "$idle0" "$idle1" "$typed" "$cleared" "$postidle"' "$scan" >/dev/null
+          grep -F '[[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]] || fail prelogin_focus_scan_secret_env_present' "$scan" >/dev/null
+          grep -F 'env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD' "$scan" >/dev/null
+          grep -F 'WORLDMAP_BASELINE_GDB_ATTACH=PASS' "$scan" >/dev/null
+          grep -F 'default=0.80' .github/scripts/track-a-worldmap-causal-xwd-compare.py >/dev/null
+
+          if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
+            echo 'WORLDMAP_AMBIENT_STATIC_ERROR=credential_submission_survived' >&2
+            exit 1
+          fi
+          if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || \
+             grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
+            echo 'WORLDMAP_AMBIENT_STATIC_ERROR=login_or_gameplay_surface_survived' >&2
+            exit 1
+          fi
+          if grep -E 'tesseract|capture_ocr|LOGIN_OCR_ANCHORS|SELECT_TSV|PRE_TSV' "$scan"; then
+            echo 'WORLDMAP_AMBIENT_STATIC_ERROR=ocr_surface_survived' >&2
+            exit 1
+          fi
+
+          echo 'WORLDMAP_AMBIENT_FOCUS_STATIC=PASS'
+          echo 'WORLDMAP_AMBIENT_FOCUS_STATIC_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_AMBIENT_FOCUS_STATIC_SECRET_USED=false'

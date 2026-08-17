@@ -1,22 +1,21 @@
 ---
 task_id: OTC-20260817-track-a-p2-clientprocessor-sanitized-evidence
-status: implementing
-agent: ChatGPT
+status: ready
+agent: unassigned
 session_id: chatgpt-p2-clientprocessor-sanitized-evidence-20260817
 session_role: researcher_producer_under_coordinator_dispatch
 project_lane: otclient
 lane: P2-NETWORK
 track_id: official-client-re
 task_kind: evidence_staging
-phase: exact-client-object-identity-gap
+phase: coordinator-review-ready
 branch: research/OTC-20260817-track-a-p2-clientprocessor-sanitized-evidence
 base_branch: main
 base_main: 8c9486e2c6109a7a39b564804c8acd707659b5e0
-live_main_at_claim: 8c9486e2c6109a7a39b564804c8acd707659b5e0
 risk: medium
 created: 2026-08-17T09:10:00+02:00
-updated: 2026-08-17T09:10:00+02:00
-producer_pr: pending
+updated: 2026-08-17T09:20:00+02:00
+producer_pr: 449
 consumer_pr: 310
 consumer_task: OTC-20260815-track-a-p2-buffer-downstream-consumer
 consumer_head_at_claim: 9b99b6b4bda2cf01e8fadcd8a00a6827de35d825
@@ -27,25 +26,16 @@ owned_paths:
   - .github/workflows/tibia-official-client-re-p2-clientprocessor-sanitized-evidence.yml
 modules_touched: []
 reuses:
-  - PR #310 / artifact 9252025461 as admitted prior targeted processor evidence, not as proof of the missing setup identity edge
-  - PR #308 / artifact 9251725866 as coordinator-accepted retained persistent-QBuffer boundary
-  - PR #446 source-sanitize -> hosted-decode method as a current bounded evidence-staging pattern only
-  - docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
-  - docs/agents/programs/OTCLIENT_TIBIA_RE_PARALLEL_RESEARCH_COORDINATION.md
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-depends_on:
-  - exact official native-Linux client fence 15.32.df7b29 / 51965216 / e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-  - PR #310 RETURN_FOR_EVIDENCE findings TACOORD-310-20260817-001 and TACOORD-310-20260817-002
-blocks:
-  - PR #310 coordinator promotion until this producer is independently reviewed
+  - PR #308 artifact 9251725866 for the already-promoted persistent-QBuffer boundary
+  - PR #310 artifact 9252025461 for prior targeted processor observations only
+  - current-main final-write reconciliation for canonical TGameserverDualConnection owner-field typing
+  - PR #446 bounded file-only source-sanitize -> hosted-decode method
 policy_version: 2
 prompting_standard_version: 2.1
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: checkpoint_only
 user_communication: low_noise
-execution_mode: github-actions
-execution_reason: bounded read-only exact-file source slicing only on the host-local source runner; all disassembly and semantic validation occur on GitHub-hosted runners
 execution_class: github_hosted
 runtime_access: none
 persistent_session_role: consumer_of_runtime_evidence
@@ -65,7 +55,6 @@ owner_funded_ai_api_authorized: false
 source_staging_exception:
   coordinator_approved: true
   owner_continuation_authorized: true
-  reason: existing admitted bundles were independently checked and do not contain the load-bearing setup window; one narrow producer is therefore a real evidence need, not duplicate research. The owner's explicit prohibition on Synology static-analysis fallback is preserved because the source runner may only exact-fence and copy bounded file bytes; it performs no disassembly or semantic classification.
   source_executor: synology-otclient-01
   source_access: read_only_file_only
   source_runtime_access: none
@@ -94,43 +83,61 @@ feature_scope:
   integration_required: true
   e2e_required: false
   completion_claim: partial_producer
-requested_windows:
-  setup_graph: 0x01970c80..0x019716c0
-  required_setup_subset: 0x01970c80..0x019710b5
-  invoker: 0x007dd630..0x007dd720
-  client_processor: 0x00c2df80..0x00c2e080
-  raw_processor: 0x00b47130..0x00b47320
-  client_processor_vtable_address_point: 0x02f6a208
-  raw_processor_vtable_address_point: 0x02f6a230
-acceptance_inventory:
-  - exact source size/SHA fence is re-proven before any byte read
-  - source runner performs no disassembly, symbol resolution or semantic classification
-  - bounded setup bytes include the persistent-QBuffer scratch reload and ClientMessageProcessor this+0x18 store
-  - hosted decoding proves the same saved object pointer is stored into the actual ClientMessageProcessor member
-  - hosted decoding binds ClientMessageProcessor vslot +0x10 to 0x00c2df80 and RawDataProcessor vslot +0x10 to 0x00b47130 using source-extracted vtable words
-  - hosted decoding preserves same-stack-message ABI flow through ClientMessageProcessor then RawDataProcessor
-  - hosted decoding verifies QIODevice::readAll target at 0x004ded50 and QByteArray mutation/assignment targets already present in admitted prior evidence
-  - framing, sequence, compression, encryption and final binary egress remain UNKNOWN
-  - no claim is promoted from generic Qt census, vtable adjacency, quarantined run 31944051248 or historical final-socket evidence
-  - consumer-facing artifact contains no raw executable/package and no secret/private runtime data
-researcher_delivery: draft_only
-invocation_started_at: 2026-08-17T09:10:00+02:00
-last_progress_at: 2026-08-17T09:10:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: producer-construction
-terminal_ci_wait_started_at: null
-terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
-identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 0
-stall_warnings: 0
+validation:
+  evidence_run: 32005141186
+  evidence_result: SUCCESS
+  evidence_head: 1b615736726049e70c902a88d0fde5004044e7e0
+  source_job: 95312954329
+  source_job_result: SUCCESS
+  source_artifact: 9279753620
+  source_artifact_digest: sha256:6c970c23aa95856698eb71024937ed847502fb1f040701ce04c632da32c38d32
+  hosted_job: 95313213503
+  hosted_job_result: SUCCESS
+  final_artifact: 9279759553
+  final_artifact_digest: sha256:8228d6c281cf99f45f5c880b76e7a2817130156fde4cc892a402eccf4af10528
+  track_a_governance_run: 32005159534
+  track_a_governance_result: SUCCESS
+  repository_ci_run: 32005159706
+  repository_ci_result: SUCCESS
+independent_coordinator_review:
+  result: PASS_BOUNDED
+  artifact_result_json_trusted_as_summary: false
+  source_bundle_redecoded_independently: true
+  exact_fence_reverified: true
+  file_boundary_reverified: true
+  setup_identity_gap_closed: true
+  persistent_qbuffer_to_clientprocessor_this_plus_0x18: PROVEN
+  clientprocessor_vslot_plus_0x10: PROVEN_0x00c2df80
+  qiodevice_readall_from_same_member: PROVEN
+  same_stack_message_to_rawprocessor: PROVEN
+  rawprocessor_vslot_plus_0x10: PROVEN_0x00b47130
+  rawprocessor_inplace_qbytearray_transform: PROVEN
+  same_stack_message_to_owner_c18_slots_plus_0x80_plus_0x78: PROVEN
+  dualconnection_typing_source: current-main canonical final-write reconciliation
+  protocol_stage_order: PROVEN_PARTIAL
+  framing: UNKNOWN
+  sequence: UNKNOWN
+  compression: UNKNOWN
+  encryption: UNKNOWN
+  final_binary_egress: UNKNOWN
+  final_socket_ownership: UNKNOWN
+negative_controls:
+  generic_qt_census_used_as_proof: false
+  vtable_adjacency_used_as_temporal_order: false
+  quarantined_run_31944051248_used_as_proof: false
+  historical_final_socket_evidence_used_as_proof: false
+  rawprocessor_labeled_framing_compression_or_encryption: false
+  dual_slots_labeled_final_egress: false
+findings_closed:
+  - TACOORD-310-20260817-001
+  - TACOORD-310-20260817-002
 e2e:
   result: NOT_APPLICABLE
-  reason: static exact-client evidence producer only; no runtime behavior or client state is changed
-next_action: create the narrow source-sanitize/hosted-decode workflow and run exactly one evidence generation; then independently review its consumer artifact before changing PR #310 disposition
+  reason: static exact-client evidence producer only; no runtime behavior or client state changed
+last_completed_step: independently re-decoded artifact 9279753620 and cross-checked artifact 9279759553 against accepted #308 and current-main canonical network ownership evidence; the missing #310 object-identity gap is closed
+next_action: coordinator should classify #310 ACCEPT_WITH_EDITS, promote only the bounded evidence on current main without the obsolete #310 staging workflow, then close/archive #310 and this producer intentionally
 ---
 
 # Track A P2 ClientMessageProcessor sanitized exact-client evidence
 
-This producer exists only to close the exact object-identity gap recorded on consumer Draft PR #310. It must not broaden into framing, encryption, sequence or final socket research.
+The producer closed only the object-identity evidence gap for consumer PR #310. Framing, sequence, compression, encryption, final binary egress and socket ownership remain unknown.

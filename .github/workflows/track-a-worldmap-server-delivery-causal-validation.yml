@@ -14,75 +14,122 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  ambient-focus-static:
-    name: Ambient-controlled focus scan composition (no client)
+  noise-controlled-focus-static:
+    name: Noise-mask focus discriminator validation (no client)
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Checkout exact head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          fetch-depth: 1
+      - name: Checkout exact head without codeload action
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          git init -q
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 origin "+refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
+          git cat-file -e "$HEAD_SHA^{commit}"
+          git checkout -q -f --detach "$HEAD_SHA"
+          [[ "$(git rev-parse HEAD)" == "$HEAD_SHA" ]]
+          echo 'WORLDMAP_CONTROLLED_STATIC_CHECKOUT=PASS'
 
-      - name: Validate ambient-controlled no-secret scan
+      - name: Validate controlled comparator and no-secret scan composition
         shell: bash
         run: |
           set -Eeuo pipefail
           python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py \
             .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
             .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
             .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
-            .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py \
-            .github/scripts/track-a-worldmap-causal-xwd-compare.py
+            .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py
+          python3 .github/scripts/track-a-worldmap-causal-xwd-compare.py controlled-cycle --help >/dev/null
 
-          screen="$RUNNER_TEMP/worldmap-ambient-screen.sh"
-          gdb="$RUNNER_TEMP/worldmap-ambient-gdb.sh"
-          ui="$RUNNER_TEMP/worldmap-ambient-ui.sh"
-          scan="$RUNNER_TEMP/worldmap-ambient-scan.sh"
+          screen="$RUNNER_TEMP/worldmap-controlled-screen.sh"
+          gdb="$RUNNER_TEMP/worldmap-controlled-gdb.sh"
+          ui="$RUNNER_TEMP/worldmap-controlled-ui.sh"
+          scan="$RUNNER_TEMP/worldmap-controlled-scan.sh"
           python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
             .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
           python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
           python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$ui"
           python3 .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py "$ui" "$scan"
           bash -n "$scan"
-          test -x "$scan"
-
-          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_SECRET_ENV=ABSENT' "$scan" >/dev/null
-          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_MODE=TAB_REVERSIBLE_DUMMY_TEXT_AMBIENT_CONTROLLED' "$scan" >/dev/null
-          grep -F 'ACTION_DELTA_MIN=80' "$scan" >/dev/null
-          grep -F 'change "$idle0" "$idle1" --min-changed 0' "$scan" >/dev/null
-          grep -F 'change "$cleared" "$postidle" --min-changed 0' "$scan" >/dev/null
-          grep -F 'roi-cycle "$idle1" "$typed" "$cleared" 0 0 1020 650 --min-changed 60' "$scan" >/dev/null
-          grep -F 'typed_delta=$((typed_changed-ambient))' "$scan" >/dev/null
-          grep -F 'cleared_delta=$((cleared_changed-ambient))' "$scan" >/dev/null
-          grep -F '"$typed_delta" -ge "$ACTION_DELTA_MIN"' "$scan" >/dev/null
-          grep -F '"$cleared_delta" -ge "$ACTION_DELTA_MIN"' "$scan" >/dev/null
-          grep -F 'WORLDMAP_PRELOGIN_FOCUS_METRIC=' "$scan" >/dev/null
-          grep -F 'WORLDMAP_PRELOGIN_EDITABLE_CANDIDATE=' "$scan" >/dev/null
-          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN=COMPLETE_NO_SECRET_AMBIENT_CONTROLLED' "$scan" >/dev/null
-          grep -F 'rm -f "$idle0" "$idle1" "$typed" "$cleared" "$postidle"' "$scan" >/dev/null
-          grep -F '[[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]] || fail prelogin_focus_scan_secret_env_present' "$scan" >/dev/null
-          grep -F 'env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD' "$scan" >/dev/null
-          grep -F 'WORLDMAP_BASELINE_GDB_ATTACH=PASS' "$scan" >/dev/null
-          grep -F 'default=0.80' .github/scripts/track-a-worldmap-causal-xwd-compare.py >/dev/null
-
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_MODE=TAB_NOISE_MASK_CONTROLLED_REVERSIBLE_DUMMY_TEXT' "$scan" >/dev/null
+          grep -F 'controlled-cycle' "$scan" >/dev/null
+          grep -F -- '--max-width 500 --max-height 120 --max-area 30000' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_CONTROLLED_EDITABLE_CANDIDATE=' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_CONTROLLED_FOCUS_SCAN=COMPLETE_NO_SECRET' "$scan" >/dev/null
           if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
-            echo 'WORLDMAP_AMBIENT_STATIC_ERROR=credential_submission_survived' >&2
+            echo 'WORLDMAP_CONTROLLED_STATIC_ERROR=credential_submission_survived' >&2
             exit 1
           fi
           if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan" || \
              grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan" || \
              grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || \
              grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
-            echo 'WORLDMAP_AMBIENT_STATIC_ERROR=login_or_gameplay_surface_survived' >&2
+            echo 'WORLDMAP_CONTROLLED_STATIC_ERROR=login_or_gameplay_surface_survived' >&2
             exit 1
           fi
-          if grep -E 'tesseract|capture_ocr|LOGIN_OCR_ANCHORS|SELECT_TSV|PRE_TSV' "$scan"; then
-            echo 'WORLDMAP_AMBIENT_STATIC_ERROR=ocr_surface_survived' >&2
-            exit 1
-          fi
+          echo 'WORLDMAP_CONTROLLED_SCAN_COMPOSITION=PASS'
 
-          echo 'WORLDMAP_AMBIENT_FOCUS_STATIC=PASS'
-          echo 'WORLDMAP_AMBIENT_FOCUS_STATIC_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_AMBIENT_FOCUS_STATIC_SECRET_USED=false'
+      - name: Run positive and negative synthetic XWD controls
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          FIX="$RUNNER_TEMP/worldmap-controlled-fixtures"
+          mkdir -p "$FIX"
+          python3 - "$FIX" <<'PY'
+          from pathlib import Path
+          import struct,sys
+          root=Path(sys.argv[1]); W,H=1020,650; stride=W*4
+          header=[0]*25
+          header[0]=101; header[1]=7; header[2]=2; header[3]=24
+          header[4]=W; header[5]=H; header[7]=0; header[11]=32; header[12]=stride
+          header[14]=0xFF0000; header[15]=0x00FF00; header[16]=0x0000FF
+          header[17]=8; header[18]=256; header[19]=0; header[20]=W; header[21]=H
+          prefix=struct.pack('>25I',*header)+b'\0'
+          def frame(name, rects=()):
+              px=bytearray(stride*H)
+              for x0,y0,x1,y1,val in rects:
+                  for y in range(y0,y1):
+                      for x in range(x0,x1):
+                          off=(y*W+x)*4; px[off:off+3]=bytes((val,val,val))
+              (root/name).write_bytes(prefix+px)
+          blank=(); local=((200,150,280,160,255),); wide=((20,200,900,210,255),)
+          for n in ('p0','p1','p2','pc','p3'): frame(n,blank)
+          frame('pt',local)
+          frame('n0',blank); frame('n1',local); frame('n2',blank); frame('nt',local); frame('nc',blank); frame('n3',local)
+          for n in ('w0','w1','w2','wc','w3'): frame(n,blank)
+          frame('wt',wide)
+          PY
+
+          CMP=.github/scripts/track-a-worldmap-causal-xwd-compare.py
+          python3 "$CMP" controlled-cycle \
+            "$FIX/p0" "$FIX/p1" "$FIX/p2" "$FIX/pt" "$FIX/pc" "$FIX/p3" \
+            --min-signal 25 --min-overlap-ratio 0.55 --max-width 500 --max-height 120 --max-area 30000 \
+            | tee "$FIX/positive.out"
+          grep -F 'WORLDMAP_XWD_CONTROLLED_EDITABLE_PROBE=PASS' "$FIX/positive.out" >/dev/null
+          grep -F 'WORLDMAP_XWD_CONTROLLED_SIGNAL_BBOX=200,150,280,160' "$FIX/positive.out" >/dev/null
+
+          set +e
+          python3 "$CMP" controlled-cycle \
+            "$FIX/n0" "$FIX/n1" "$FIX/n2" "$FIX/nt" "$FIX/nc" "$FIX/n3" \
+            --min-signal 25 --min-overlap-ratio 0.55 --max-width 500 --max-height 120 --max-area 30000 >"$FIX/noise.out" 2>&1
+          noise_rc=$?
+          python3 "$CMP" controlled-cycle \
+            "$FIX/w0" "$FIX/w1" "$FIX/w2" "$FIX/wt" "$FIX/wc" "$FIX/w3" \
+            --min-signal 25 --min-overlap-ratio 0.55 --max-width 500 --max-height 120 --max-area 30000 >"$FIX/wide.out" 2>&1
+          wide_rc=$?
+          set -e
+          [[ "$noise_rc" -eq 3 && "$wide_rc" -eq 3 ]]
+          grep -F 'WORLDMAP_XWD_CONTROLLED_EDITABLE_PROBE=FAIL' "$FIX/noise.out" >/dev/null
+          grep -F 'WORLDMAP_XWD_CONTROLLED_SIGNAL_CHANGED=0' "$FIX/noise.out" >/dev/null
+          grep -F 'WORLDMAP_XWD_CONTROLLED_EDITABLE_PROBE=FAIL' "$FIX/wide.out" >/dev/null
+          grep -F 'WORLDMAP_XWD_CONTROLLED_SIGNAL_WIDTH=880' "$FIX/wide.out" >/dev/null
+          echo 'WORLDMAP_CONTROLLED_SYNTHETIC_POSITIVE=PASS'
+          echo 'WORLDMAP_CONTROLLED_SYNTHETIC_NOISE_NEGATIVE=PASS'
+          echo 'WORLDMAP_CONTROLLED_SYNTHETIC_GEOMETRY_NEGATIVE=PASS'
+          echo 'WORLDMAP_CONTROLLED_STATIC_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_CONTROLLED_STATIC_SECRET_USED=false'

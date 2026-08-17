@@ -1,11 +1,8 @@
 {
   "schema": "otclient.tibia-re.coverage-current-overlay.v1",
-  "snapshot_main": "103d50277bc339760bdb531d89f8ec34cdd090cc",
+  "snapshot_main": "d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab",
   "registry_promotion_pr": 454,
-  "source_baseline": {
-    "pr": 304,
-    "head": "43a60bd96cc644b656b200c9edbfb75578b330b6"
-  },
+  "source_baseline": {"pr":304,"head":"43a60bd96cc644b656b200c9edbfb75578b330b6"},
   "audit": {
     "source_report_merge": "2ad6565f6f598b15acaeb3d182a3ffb70d187ba6",
     "result_after_this_tree_merges": "FAIL_MATERIAL_GAPS_OPEN",
@@ -62,16 +59,15 @@
     "raw_xres_source_head": "32c61120b9086904b328e7b4aa50526d64bef807",
     "raw_xres_helper_validated_in_source": true,
     "raw_xres_promotion_pr": 448,
-    "raw_xres_promotion_head": "cbf19367a5f6aeab2916839f4af32a07030bd55c",
-    "raw_xres_promotion_merged": false,
+    "raw_xres_promotion_merge": "d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab",
+    "raw_xres_promotion_merged": true,
     "exact_resource_to_official_client_pid": "UNKNOWN",
     "current_exact_client_pid": "NOT_REGISTERED",
     "current_exact_client_session": "NOT_REGISTERED",
     "canonical_gate_b": "NOT_PROVEN",
-    "physical_identity_retry_authorized": false
+    "next_discriminator": "fresh_separately_admitted_physical_xres_resource_to_pid_identity",
+    "canonical_bootstrap_retry_authorized": false,
+    "canonical_window_identity_relaxation_authorized": false
   },
-  "programme": {
-    "complete": false,
-    "global_coordinator_checkpoint_current": false
-  }
+  "programme": {"complete":false,"global_coordinator_checkpoint_current":false}
 }

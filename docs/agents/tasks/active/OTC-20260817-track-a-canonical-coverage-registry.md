@@ -8,17 +8,17 @@ project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: implementation
-phase: canonical_registry_candidate
+phase: canonical_registry_restack_after_xres_promotion
 branch: docs/OTC-20260817-track-a-canonical-coverage-registry
 base_branch: main
-base_main: 103d50277bc339760bdb531d89f8ec34cdd090cc
+base_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
 pr: 454
 risk: medium
 created: 2026-08-17T10:47:00+02:00
-updated: 2026-08-17T10:54:00+02:00
+updated: 2026-08-17T10:57:00+02:00
 invocation_started_at: 2026-08-17T10:47:00+02:00
-last_progress_at: 2026-08-17T10:54:00+02:00
-lease_expires_at: 2026-08-17T11:39:00+02:00
+last_progress_at: 2026-08-17T10:57:00+02:00
+lease_expires_at: 2026-08-17T11:42:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 run_scope: autonomous_program
@@ -26,7 +26,7 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 execution_mode: github-only
-execution_reason: promote previously accepted #304 bounded registry and normalize current-main programme state without runtime access
+execution_reason: promote accepted #304 bounded registry and normalize current-main programme state without runtime access
 execution_class: github_hosted
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
@@ -80,13 +80,12 @@ source_registry:
   repository_ci_run: 31882010038
   disposition: ACCEPT_WITH_EDITS_BOUNDED_INVENTORY_ONLY
 current_overlay:
-  snapshot_main: 103d50277bc339760bdb531d89f8ec34cdd090cc
+  snapshot_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
   p2_promotion: cbc6388e8607bb92120281a9a15148577994d3a6
   worldmap_static_graph: f5daad1bbb7e00dcaa26acafc0a69d10a3a1b696
   worldmap_mutation_design: 1e6fcb5ab83c4bb8b762088326cc936857c8e64d
-  worldmap_mutation_design_archive: 103d50277bc339760bdb531d89f8ec34cdd090cc
-  raw_xres_promotion_pr: 448
-  raw_xres_promotion_merged: false
+  raw_xres_promotion: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
+  exact_resource_to_official_client_pid: UNKNOWN
 acceptance:
   canonical_registry_on_main:
     - capabilities.jsonl
@@ -103,8 +102,14 @@ acceptance:
   other_audit_findings_remain_open: true
   runtime_or_synology_use: forbidden
   owner_funded_ai_use: forbidden
+validation_history:
+  pre_xres_drift_head: 41986ab8965b634f25150f35565cd8b4e737f671
+  pre_xres_drift_registry_run: 32012965642
+  pre_xres_drift_repository_ci_run: 32012965784
+  pre_xres_drift_governance_run: 32012965633
+  invalidated_by_main_advance: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
 ci_checks_for_current_head: 0
-ci_check_generation: implementation
+ci_check_generation: implementation-restack
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -112,10 +117,10 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-last_completed_step: built layered canonical registry candidate with exact #304 blob fences, current-main overlay, current audit summary and permanent hosted validator workflow
-next_action: commit the candidate on current main, run deterministic registry workflow and repository governance/CI, then perform a fresh independent audit and close out
+last_completed_step: consumed merged raw-XRes helper #448 and advanced AUD-COV-004 next discriminator to separately admitted physical XID-to-PID identity without altering its HIGH/open classification
+next_action: restack candidate on main@d9529da3, run deterministic registry/governance/repository CI, then perform fresh independent audit and terminal closeout
 ---
 
 # Track A canonical coverage registry promotion
 
-This task closes only `AUD-COV-001`. The accepted #304 inventory/provenance baseline remains byte-for-byte fenced; current programme state is a separate overlay. E51/E52, P0/P1 item-level denominators, the 612-vs-1004 conflict and canonical live runtime semantics remain outside this task.
+This task closes only `AUD-COV-001`. The accepted #304 baseline is byte-for-byte fenced; current programme state is a separate overlay. E51/E52, P0/P1 item-level denominators, 612-vs-1004 reconciliation and physical runtime semantics remain outside this task.

@@ -2,7 +2,7 @@
   "schema": "otclient.tibia-re.canonical-coverage-registry.v1",
   "task_id": "OTC-20260817-track-a-canonical-coverage-registry",
   "promotion_pr": 454,
-  "trusted_base": "103d50277bc339760bdb531d89f8ec34cdd090cc",
+  "trusted_base": "d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab",
   "source": {
     "pr": 304,
     "head": "43a60bd96cc644b656b200c9edbfb75578b330b6",
@@ -31,15 +31,7 @@
     "source-validate_registry.py": "6d42020c3b7e84589c8feaeac603339b5bb1c0d9",
     "source-validation-output.txt": "8f7ec24329bb34841a4e64a9fd98325e501f4af0"
   },
-  "canonical_entry_points": [
-    "capabilities.jsonl",
-    "protocol_messages.jsonl",
-    "runtime_types.jsonl",
-    "provenance.json",
-    "supersessions.jsonl",
-    "coverage-summary.json",
-    "current-main-overlay.json"
-  ],
+  "canonical_entry_points": ["capabilities.jsonl","protocol_messages.jsonl","runtime_types.jsonl","provenance.json","supersessions.jsonl","coverage-summary.json","current-main-overlay.json"],
   "rules": {
     "baseline_blobs_must_remain_exact": true,
     "inventory_percentages_are_not_semantic_completion": true,

@@ -40,7 +40,11 @@ jobs:
             echo 'WORLDMAP_XDO_STATIC_ERROR=dependency_not_found' >&2
             exit 1
           fi
-          LD_LIBRARY_PATH="$LIBS" "$XDO" version
+          grep -F 'libxdo.so.3 =>' <<<"$deps" >/dev/null || {
+            echo 'WORLDMAP_XDO_STATIC_ERROR=libxdo_resolution_missing' >&2
+            exit 1
+          }
+          echo 'WORLDMAP_XDO_LIBXDO_RESOLUTION=PASS'
           echo 'WORLDMAP_XDO_TOOLROOT_DYNAMIC_LINK=PASS'
           echo 'WORLDMAP_XDO_STATIC_CLIENT_EXECUTED=false'
           echo 'WORLDMAP_XDO_STATIC_SECRET_USED=false'

@@ -6,12 +6,12 @@ project_lane: otclient
 lane: official-client-re
 track: official-client-re
 task_kind: discovery
-phase: closeout-audit
+phase: final-ci-review
 branch: research/OTC-20260817-track-a-worldmap-server-delivery-extent
 base_branch: main
 base_sha: f99ec371bafd0b9dbccb8fd6f4c8a3137e7d963b
 created: 2026-08-17T12:45:00+02:00
-updated: 2026-08-17T13:08:50+02:00
+updated: 2026-08-17T13:10:25+02:00
 risk: medium
 related_pr: 473
 owned_paths:
@@ -55,10 +55,10 @@ runtime_access: none
 client_byte_mutation_authorized: false
 owner_funded_ai_api_authorized: false
 invocation_started_at: 2026-08-17T12:45:00+02:00
-last_progress_at: 2026-08-17T13:08:50+02:00
+last_progress_at: 2026-08-17T13:10:25+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: closeout-pre-ci
-terminal_ci_wait_started_at: null
+ci_check_generation: final-gate
+terminal_ci_wait_started_at: 2026-08-17T13:10:25+02:00
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
@@ -83,13 +83,13 @@ Forbidden in this task:
 - raw official-client binary promotion into Git;
 - treating third-party OTClient behavior as proof of official-server behavior.
 
-# Live-state preflight
+# Live-state
 
-- `main` exact head at claim remains current during closeout: `f99ec371bafd0b9dbccb8fd6f4c8a3137e7d963b` (merged PR #472, prompt v1.1.0).
-- PR #471 merged the durable alias/handover; #472 merged the server-delivered-map-extent acceptance extension.
-- Prior mutation-design task #452/#453 is terminal and was not recreated.
-- Prior physical startup-canary #462/#466 is terminal; it proved patched-copy startup only and did not establish IN_GAME semantics or causal worldmap object propagation.
-- Draft PR #473 is the sole current task PR.
+- Current `main` during final-gate entry remains `f99ec371bafd0b9dbccb8fd6f4c8a3137e7d963b`.
+- PR #471/#472 are merged predecessor handover/contract changes.
+- Prior mutation-design #452/#453 and startup-canary #462/#466 are terminal and were not recreated.
+- PR #473 is the sole current task PR.
+- Temporary branch-only evidence workflow was removed at commit `174def652ae494f337897d79996ec7c8a47408cf`.
 
 # Direct result
 
@@ -102,73 +102,55 @@ SERVER_WHOLE_MAP_DELIVERY_SUPPORTED=UNKNOWN
 MAX_SERVER_DELIVERABLE_EXTENT=UNKNOWN
 ```
 
-These are evidence-bounded results, not missing work disguised as success. Exact generated-message directionality is proven server->client for normal map payload families, but the exact field surface required to distinguish negotiated/client-driven/fixed/server-driven extent control was not recovered through the authorized static surface. The causal distinction is isolated into one separately authorized physical runtime experiment in the final report.
+These are evidence-bounded values. Exact generated-message directionality is proven server->client for normal map payload families, but the static evidence does not recover the generic outbound field surface required to distinguish negotiated/client-driven/fixed/server-driven extent control. The remaining causal distinction is isolated into one separately authorized physical runtime experiment in the final report.
 
 # Acceptance inventory
 
 - [x] Separate client Storage capacity, render/viewport extent and server-delivered protocol extent.
 - [x] Recover complete exact generated-message directionality for `FullMap`, field, directional row/column and floor-change families.
-- [x] Bound the aware-range/width-height negotiation question: no separately named outbound extent/range message exists in the complete 160-name census; generic outbound fields remain `NOT_RECOVERED`, therefore model remains `UNKNOWN`.
-- [x] Search bounded parser/network evidence for width/height, strip/floor counts, coordinate or length ceilings; retain `UNKNOWN` where no exact ceiling was recovered.
+- [x] Bound aware-range/width-height negotiation: no separately named outbound extent/range message in the complete 160-name census; generic outbound fields remain `NOT_RECOVERED`, so the model remains `UNKNOWN`.
+- [x] Search bounded parser/network evidence for width/height, strip/floor counts, coordinate or length ceilings; preserve `UNKNOWN` where no exact ceiling was recovered.
 - [x] Record bounded negative evidence rather than global impossibility claims.
 - [x] Design one separately-authorized causal runtime discriminator that separates authoritative inbound growth from Storage/render/picker growth.
-- [ ] Fresh independent documentation/evidence audit with zero material findings or an explicit blocker.
+- [x] Fresh independent documentation/evidence audit: `20260817-closeout-audit.md`, `MATERIAL_FINDINGS=0`, `RESOLVED_FINDINGS=1`, `AUDIT_RESULT=PASS`.
 - [ ] Exact-head changed-file audit, required CI, review hygiene and terminal task lifecycle.
 
-# Evidence summary
+# Evidence / validation summary
 
-## PROVEN
-
-- Exact official Linux client fence: version `15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
-- Accepted client-local geometry chain starts from packed `18/14` and propagates through exact `TWorldmapProtocolMessageHandler` to Storage; Viewport/RenderProvider/Picker are separate downstream dependencies.
-- Historical inventory run `31651220862`, job `94295767215`, recovered 349 generated message names total but emitted only a filtered subset.
-- New exact-client run `32022209943`, job `95364071999`, producer head `553e447c0662892b0c1b9cab994c4545d09f22c8`, completed successfully and persisted the complete 349-name census in artifact `9285763750`.
-- Complete census: 160 client->server, 189 server->client; no client->server generated name contains `aware|range|extent|viewport|fullmap|fielddata|width|height`.
-- Inbound exact names directly include `GameserverMessageFullMap`, `FieldData`, `Left/RightColumn`, `Top/BottomRow`, `Top/BottomFloor` and map mutation messages.
-- Final targeted descriptor run `32022973229`, job `95366330613`, producer head `ae5778d1f8b0e79b77bfa68c14692a3d599b25c5`, completed successfully and retained artifact `9286040543`.
-- That probe validates exact raw descriptor recovery by proving `Coordinate.x/y/z` are optional `uint32` fields 1/2/3, but does not recover `Extent` or target generic/map message descriptors.
-- Retained artifact `9227370490` contains normal strip observations consistent with an 18-wide baseline; it is not an atomic packet trace and does not prove multi-floor bulk delivery.
-- Temporary branch-only evidence workflow was removed at commit `174def652ae494f337897d79996ec7c8a47408cf`; final diff contains only durable docs/evidence/task state.
-
-## FAILED PRODUCER ATTEMPTS — DIAGNOSED, NOT RETRIED IDENTICALLY
-
-- Run `32022548050`, job `95365067677`, head `888630af1de1d05be1f131df428360c9b4d215ba`: failed because producer used `FileDescriptorProto` field 6 instead of `message_type` field 4.
-- Run `32022815851`, job `95365868589`, head `57b3068a16fe4d0ee9255fe20bbed4a17f272b9f`: corrected field number but strict raw protocol FileDescriptorProto start/layout heuristic still did not match the exact generated layout.
-- Run `32022973229` changed hypothesis to targeted `DescriptorProto` anchors, succeeded and closed producer escalation.
-
-## UNKNOWN
-
-- Whether a generic outbound login/client-details/options/enter-world field carries extent negotiation.
-- Whether changing the client-local `18/14` pair causes additional authoritative tiles to arrive.
-- Larger rectangle/full-floor/multi-floor-bulk/whole-map delivery support and maximum server-deliverable extent.
-- Any exact parser/network extent ceiling beyond the bounded evidence already retained.
+- Exact official Linux client: `15.32.df7b29`, size `51965216`, SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
+- Complete message census: run `32022209943`, job `95364071999`, producer `553e447c0662892b0c1b9cab994c4545d09f22c8`, artifact `9285763750`: 349 generated names, 160 client->server, 189 server->client; inbound exact names include FullMap/FieldData/rows/columns/floors/map mutations; no separately named outbound aware/range/extent/viewport/fullmap/fielddata/width/height message.
+- Targeted descriptor boundary: run `32022973229`, job `95366330613`, producer `ae5778d1f8b0e79b77bfa68c14692a3d599b25c5`, artifact `9286040543`: exact `Coordinate.x/y/z` optional `uint32` recovered; target `Extent`/generic outbound/map-delivery descriptors not recovered.
+- Descriptor failures `32022548050` and `32022815851` were diagnosed and repaired with changed hypotheses; no identical failure retry.
+- Retained artifact `9227370490` is consistent with an 18-wide normal strip baseline but is not an atomic packet trace and does not prove larger/full-floor/multi-floor/whole-map delivery.
+- Closeout audit at audited head `5a1f42ebb8b0eac061229f08774f87c16def2511` found zero material findings. Its one stale-checkpoint finding was already resolved by `07c2056129db2fc93dafe3cbd311f3bc3be90f39`.
 
 # Durable outputs
 
 - `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-complete-message-census.md`
 - `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-targeted-descriptor-boundary.md`
 - `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-retained-strip-observation.md`
+- `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-closeout-audit.md`
 - `docs/agents/reports/OTCLIENT-20260817-worldmap-server-delivery-extent.md`
 
 # E2E classification
 
-`NOT_APPLICABLE_WITH_REASON`: this task is a static/evidence research slice with `feature_scope.e2e_required=false` and `RUNTIME_ACCESS=none`. Physical causal validation is explicitly a separately authorized follow-on and is not required to close this bounded static task because the contract permits direct `UNKNOWN` classifications when the authorized evidence cannot prove a stronger value.
+`NOT_APPLICABLE_WITH_REASON`: this task is a static/evidence research slice with `feature_scope.e2e_required=false` and `RUNTIME_ACCESS=none`. Physical causal validation is explicitly a separately authorized follow-on. The contract permits direct `UNKNOWN` classifications when the authorized evidence cannot prove a stronger value, so physical E2E is not a closeout requirement for this bounded static task.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 4
-updated_at: 2026-08-17T13:08:50+02:00
+checkpoint_version: 5
+updated_at: 2026-08-17T13:10:25+02:00
 base_main: f99ec371bafd0b9dbccb8fd6f4c8a3137e7d963b
 branch: research/OTC-20260817-track-a-worldmap-server-delivery-extent
 pr: 473
 status: validating
-phase: closeout-audit
+phase: final-ci-review
 runtime_access: none
-last_completed_step: reconciled final static classifications, removed temporary evidence workflow and entered closeout audit
+last_completed_step: independent closeout audit passed with zero material findings
 validation_level: focused
 heavy_validation_runs: 0
 session_rotation_count: 0
 blockers: []
-next_action: Perform a fresh independent audit of the current five-file durable diff against prompt v1.1.0 and repository closeout contracts; resolve any findings before exact-head CI/review/merge.
+next_action: Verify the exact current head changed-file set, required checks, PR review/threads and mergeability; resolve any final gate before marking PR ready and merging.
 ```

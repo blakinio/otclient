@@ -8,6 +8,7 @@ on:
       - .github/workflows/tibia-official-client-re-worldmap-exact-static-evidence.yml
       - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py
       - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
+      - .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py
   workflow_dispatch:
 
 permissions:
@@ -47,7 +48,8 @@ jobs:
           command -v python3 >/dev/null 2>&1 || { echo 'WORLD_MAP_STATIC_REFUSED=PYTHON3_MISSING'; exit 66; }
           python3 -m py_compile \
             .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
-            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py
 
           candidates=(
             '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
@@ -102,13 +104,13 @@ jobs:
           echo WORLD_MAP_STATIC_GAMEPLAY_ACCESS=false
           echo WORLD_MAP_STATIC_CLIENT_BYTE_MUTATION=false
 
-      - name: Produce bounded sanitized source windows
+      - name: Produce bounded sanitized second-pack source windows
         shell: bash
         run: |
           set -Eeuo pipefail
           rm -rf artifacts/source
           mkdir -p artifacts/source
-          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
+          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py \
             source \
             --client "$SOURCE_CLIENT" \
             --candidate-index "$SOURCE_CANDIDATE_INDEX" \
@@ -125,6 +127,9 @@ jobs:
           grep -Fxq 'WORLD_MAP_STATIC_RAW_CLIENT_UPLOADED=false' artifacts/source/source-fence.txt
           grep -Fxq 'WORLD_MAP_STATIC_SOURCE_DISASSEMBLY=none' artifacts/source/source-fence.txt
           grep -Fxq 'WORLD_MAP_STATIC_HOSTED_DISASSEMBLY_REQUIRED=true' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_SECOND_PACK_SOURCE=PASS' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_SECOND_PACK_SOURCE_DISASSEMBLY=none' artifacts/source/source-fence.txt
+          grep -Fxq 'WORLD_MAP_SECOND_PACK_HOSTED_CONFIRMATION_REQUIRED=true' artifacts/source/source-fence.txt
 
       - name: Enforce sanitized source artifact boundary
         shell: bash
@@ -191,7 +196,8 @@ jobs:
           command -v objdump >/dev/null
           python3 -m py_compile \
             .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence.py \
-            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
+            .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py
           echo WORLD_MAP_STATIC_EXECUTION_CLASS=github_hosted
           echo WORLD_MAP_STATIC_RUNTIME_ACCESS=none
           echo WORLD_MAP_STATIC_RAW_CLIENT_PRESENT=false
@@ -209,7 +215,7 @@ jobs:
           set -Eeuo pipefail
           rm -rf artifacts/hosted-validation artifacts/final
           mkdir -p artifacts/hosted-validation artifacts/final
-          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v2.py \
+          python3 .github/scripts/tibia-official-client-re-worldmap-exact-static-evidence-v3.py \
             validate \
             --bundle-dir artifacts/source \
             --outdir artifacts/hosted-validation

@@ -1,0 +1,116 @@
+{
+  "schema_version": 2,
+  "task_id": "OTC-20260817-track-a-p2-f50090-framing",
+  "status": "READY_FOR_COORDINATOR_REVIEW",
+  "research_output": "DRAFT_NOT_PROMOTED",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official_native_linux_only"
+  },
+  "base_main": "c1adcf491580e28d40f215356a9e559af2ccadc4",
+  "execution": {
+    "execution_class": "github_hosted",
+    "runtime_access": "none",
+    "source_staging": "existing_exact_client_artifact_reuse",
+    "new_source_run": false,
+    "world_map_used": false,
+    "owner_funded_ai_api_used": false
+  },
+  "primary_evidence": [
+    {
+      "run": 32037533068,
+      "job": 95410901806,
+      "window": "0xf50040..0xf50480",
+      "sha256": "1d14d72f683455daa3ab065bd48c3588f8755798ce63e70b838569353c3e2cea",
+      "role": "exact f50090 field-to-QDataStream write order"
+    },
+    {
+      "run": 31904696996,
+      "artifact": 9252025461,
+      "sha256": "2a866247558b079944d81c9ad33bd4c5361c8144a7f367b273ab3bc19a080991",
+      "role": "exact RawDataProcessor QByteArray transform and imported Qt identities"
+    },
+    {
+      "run": 32005141186,
+      "source_artifact": 9279753620,
+      "source_sha256": "6c970c23aa95856698eb71024937ed847502fb1f040701ce04c632da32c38d32",
+      "hosted_artifact": 9279759553,
+      "hosted_sha256": "8228d6c281cf99f45f5c880b76e7a2817130156fde4cc892a402eccf4af10528",
+      "role": "accepted same-message processor chain"
+    },
+    {
+      "artifact": 9251725866,
+      "sha256": "f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e",
+      "role": "accepted TIODeviceWriter/QDataStream helper identity and byte-order configuration support"
+    }
+  ],
+  "proven_facts": [
+    "Current main PR #492 canonically proves the same outbound QByteArray/message reaches TGameserverTCPConnection::write at 0xb40a10 and then QDataStream::writeRawData at 0x4dd250 on a concrete TGameserverTCPConnection-owned QTcpSocket.",
+    "At 0xf50090 the canonical message is retained in rbp and its QByteArray size is loaded from message+0x18.",
+    "Before the raw payload write, 0xf500c6..0xf500f7 computes ceil(payload_length/8) for nonnegative payload lengths, forwards its low 16-bit value through the writer scalar slot, and writes it to the same underlying QDataStream.",
+    "Next, 0xf50107..0xf50121 loads a 32-bit scalar from message+0 and writes it through the next writer scalar slot to the same underlying QDataStream.",
+    "Only after those two scalar writes, 0xf5013d..0xf50153 forwards the payload pointer and payload length preserved from message+0x8/+0x18 into QDataStream::writeRawData at 0x4dd250.",
+    "The exact RawDataProcessor at 0xb47130 prepends one byte, appends bytes until the QByteArray length is divisible by 8, stores the number of appended bytes in the first byte, and assigns the transformed QByteArray back to the same message.",
+    "The existence and order of two deterministic pre-payload scalar writes on the already-proven QTcpSocket-bound QDataStream is sufficient to prove an outbound framing layer at this boundary without assigning semantic names to those scalars."
+  ],
+  "terminal_classification": {
+    "dualconnection_to_binary_egress": "PROVEN",
+    "final_binary_egress": "QDataStream::writeRawData@0x4dd250_AT_QT_QTCPSOCKET_BOUNDARY",
+    "linux_socket_syscall_boundary": "UNKNOWN",
+    "final_socket_owner": "TGameserverTCPConnection",
+    "framing": "PROVEN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN"
+  },
+  "proven_stage_order": [
+    "persistent QBuffer",
+    "TProtocolClientMessageProcessor+0x10@0xc2df80",
+    "TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "same QByteArray/message after block-alignment envelope transform",
+    "TGameserverDualConnection +0x80/+0x78 same-message handoff",
+    "first virtual +0x30 dispatch @0xb56c93",
+    "TConnectionMultiplexer::write@0xf50040",
+    "second virtual +0x30 serialization dispatch @0xf50090",
+    "pre-payload scalar derived from ceil(payload_length/8), low 16-bit value",
+    "32-bit scalar loaded from message+0",
+    "raw payload",
+    "TGameserverTCPConnection::write@0xb40a10 / QTcpSocket-bound QDataStream",
+    "QDataStream::writeRawData@0x4dd250",
+    "Linux socket syscall UNKNOWN"
+  ],
+  "rejected_or_controlled_candidates": [
+    {
+      "candidate": "0xb40630/0xb4066b",
+      "classification": "DISPROVEN_AS_DUALCONNECTION_EGRESS",
+      "reason": "Current canonical vtable/dataflow path reaches 0xf50090 and 0xb40a10 instead; 0xb4066b remains a real QIODevice::write call inside a distinct function but not this DualConnection egress branch."
+    },
+    {
+      "candidate": "0xb46bd0",
+      "classification": "NEGATIVE_CONTROL_NOT_USED",
+      "reason": "QString/local8bit/newline path is not admitted as binary gameplay proof."
+    },
+    {
+      "candidate": "0xc33259",
+      "classification": "NEGATIVE_CONTROL_NOT_USED",
+      "reason": "QMatrix4x4/non-network path is not admitted as network proof."
+    },
+    {
+      "candidate": "0xb5b880",
+      "classification": "SUPERSEDED_NOT_USED",
+      "reason": "Historical superseded sink candidate."
+    }
+  ],
+  "unknowns": [
+    "semantic identity of the 32-bit message+0 scalar; it is not called a sequence number",
+    "semantic identity of the helper whose returned byte is appended by RawDataProcessor padding",
+    "semantic identity of the optional post-padding indirect transform in RawDataProcessor",
+    "compression semantics",
+    "encryption semantics",
+    "Linux socket syscall boundary"
+  ],
+  "next_falsifiable_frontier": "Trace the exact producer/update provenance of the 32-bit message+0 scalar written at 0xf50107 and test whether it is connection-scoped monotonic sequence state. Do not infer sequence from width or frame position alone.",
+  "promotion_authority": "coordinator_only"
+}

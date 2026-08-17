@@ -14,7 +14,7 @@ base_branch: main
 base_sha: 83034227280dc3bfdf589a991f0fdbbabab7dc87
 restack_commit: f6848a59224ce891067b12a8b3f65da1609ee985
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T14:24:00+02:00
+updated: 2026-08-17T14:26:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -71,7 +71,7 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN_FOR_PRESECRET_BASELINE_RUNS
+target_uniqueness: PROVEN
 mutation_authorized: false
 credentials_allowed: true
 login_allowed: true
@@ -126,9 +126,9 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T14:24:00+02:00
+last_progress_at: 2026-08-17T14:26:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: xwd-loader-preflight-pass
+ci_check_generation: baseline-admission-enum-fix
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -154,42 +154,31 @@ STORAGE_EXTENT_CHANGE=true|false|UNKNOWN
 RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 ```
 
-# Verified runtime progression
+# Verified progression
 
-- `32025074618 / 95372681355`: fresh controller inventory, released canonical lease, registration absent, no live observation.
-- `32025398762 / 95373646537`: one canonical exact-client launch failed obsolete legacy window selector before registration/credentials/login; rollback verified by `32025665881 / 95374436911`.
-- `32025860356 / 95375014679`: canonical XRes retry refused pre-launch by the one-shot admission guardrail.
-- `32026662197 / 95377398485`: first isolated exact-client/XRes/WARP path proved target uniqueness; observer exited before credentials. Cleanup/source rehash passed.
-- `32027110459 / 95378725544`: deterministic no-client test proved observer exit root cause was missing toolroot `libpython3.12.so.1.0`; same GDB with toolroot `LD_LIBRARY_PATH` returned success.
-- `32027454382 / 95379752642`: repaired physical baseline proved `WORLDMAP_BASELINE_PRE_STORAGE_OBSERVER=ARMED`, then stopped at `tesseract_missing_before_secret_use`; credentials/login/gameplay were unused. Cleanup/source rehash passed.
-- `32028641905 / 95383408028`: OCR-free helper reached the pre-Storage observer and failed before screen capture/secret use on deterministic Bash `stem: unbound variable`; source rehash and cleanup passed.
-- `32029117879 / 95384858852` and `32029164295 / 95385382498`: after the nounset repair, both reached the pre-Storage observer and failed before secret submission because toolroot `xwd` lacked its toolroot runtime library search path (`libxkbfile.so.1`); both source rehashes and cleanups passed. The second generation was an already-queued identical failure and is counted as one identical retry, not as a consumed login.
-- `32029511115 / 95386107932`: no-client safety-hold discriminator proved the isolated toolroot library roots close the XWD dependency set and reach normal XWD execution: `WORLDMAP_XWD_TOOLROOT_DYNAMIC_LINK=PASS`, `CLIENT_EXECUTED=false`, `SECRET_USED=false`.
+- `32025074618 / 95372681355`: fresh controller inventory; released canonical lease; registration absent.
+- `32025398762 / 95373646537`: canonical bootstrap attempt stopped before credentials/login on obsolete legacy window selector; rollback verified separately.
+- `32026662197 / 95377398485`: first isolated exact-client/XRes/WARP path proved task target uniqueness; observer exited before credentials.
+- `32027110459 / 95378725544`: no-client discriminator proved GDB needed toolroot `LD_LIBRARY_PATH`.
+- `32027454382 / 95379752642`: pre-Storage observer physically armed; stopped before secret use because OCR tooling was unavailable; cleanup/source rehash PASS.
+- `32028641905 / 95383408028`: OCR-free helper reached observer and stopped before secret use on Bash `stem: unbound variable`; cleanup/source rehash PASS.
+- `32029117879 / 95384858852` and `32029164295 / 95385382498`: both reached observer and stopped before secret use because toolroot `xwd` lacked its library search path; cleanup/source rehash PASS. The second was an already-queued identical retry.
+- `32029511115 / 95386107932`: no-client XWD changed-hypothesis discriminator proved dynamic-link closure with the isolated toolroot libraries: `WORLDMAP_XWD_TOOLROOT_DYNAMIC_LINK=PASS`, client false, secret false.
+- `32029702980 / 95386713491`: physical generation was fail-closed at repository admission before client execution because the checkpoint used a non-enum descriptive `target_uniqueness`; corrected to the repository-valid `PROVEN` value. No runtime/login budget consumed.
 
-Durable repair record: `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-presecret-ui-loader-repairs.md`.
-
-# OCR-free UI repair
-
-Retained exact-client artifacts were re-inspected without persisting account identity:
-
-- artifact `9221131366` / run `31805408522`: empty login-form XWD, exact window `1020x650`, safe points email `[520,275]`, password `[520,305]`, login `[590,389]`;
-- artifact `9221234379` / run `31730884814`: selection/world XWDs, exact window `1020x650`, first full character-row safe point `[300,195]`.
-
-Raw-XWD grayscale ratio calibration over the fixed ROI is durable in `20260817-ui-geometry-without-ocr.md`: login `0.159848...`, select `0.989090...`, world `0.435`, loading `0.003787...`. The runtime classifier requires exact XWD header geometry and bounded pixel/luminance predicates. It is bootstrap geometry only; structural `IN_GAME` still requires actual FullMap plus map-description records.
-
-The combined helper now has three independently bounded prerequisites before credentials: proven GDB toolroot environment, proven raw-XWD classifier geometry, and proven toolroot XWD dynamic-link closure. No prior repair run emitted `WORLDMAP_BASELINE_LOGIN_SUBMITTED=true`.
+Durable pre-secret repair record: `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-presecret-ui-loader-repairs.md`.
 
 # Execution phases
 
 1. **DONE** canonical boundary / cleanup.
 2. **DONE** isolated exact-client XRes/WARP path.
-3. **DONE** pre-Storage observer gate after one GDB environment repair.
-4. **DONE** OCR-free raw-XWD UI locator and toolroot loader repair, including no-client dynamic-link discriminator.
-5. **ACTIVE** first actual baseline login + FullMap/map-description extent + Right/Left + transport confinement + cleanup.
+3. **DONE** pre-Storage observer gate.
+4. **DONE** OCR-free UI locator + toolroot XWD loader repair, with no-client discriminator.
+5. **ACTIVE** one baseline login + FullMap/map-description extent + Right/Left stimulus + transport confinement + cleanup.
 6. **PENDING** patched namespace/preimage/target-uniqueness admission.
 7. **PENDING** one task-owned `[19,14]` login/capture with identical structural instrumentation/stimulus.
 8. **PENDING** patched rollback/source rehash/cleanup.
-9. **PENDING** causal classification, independent audit, temporary-resource removal, exact-head CI/review/merge/archive.
+9. **PENDING** causal classification, audit, temporary-resource removal, exact-head CI/review/merge/archive.
 
 # Stop criteria
 
@@ -198,18 +187,18 @@ Fail closed on main drift, non-idle canonical controller state, namespace collis
 # Checkpoint
 
 ```yaml
-checkpoint_version: 8
-updated_at: 2026-08-17T14:24:00+02:00
+checkpoint_version: 9
+updated_at: 2026-08-17T14:26:00+02:00
 base_main: 83034227280dc3bfdf589a991f0fdbbabab7dc87
-restack_commit: f6848a59224ce891067b12a8b3f65da1609ee985
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
 phase: baseline_ephemeral_login_capture
 runtime_access: ephemeral_isolated
+target_uniqueness: PROVEN
 baseline_login_consumed: 0
 patched_login_consumed: 0
-last_completed_step: no-client XWD toolroot dynamic-link discriminator passed after all prior physical repair generations stopped before credential submission; source rehash/cleanup remained clean
+last_completed_step: admission metadata repaired after XWD no-client dynamic-link discriminator passed
 blockers: []
-next_action: Restore the admitted physical baseline workflow with the proven XWD library binding and execute the single baseline login/capture. Persist only sanitized structural extent if FullMap/map-description and transport confinement pass.
+next_action: Execute the one admitted baseline login/capture with current-main ancestry, idle controller, proven observer and XWD library binding; persist only sanitized structural evidence if FullMap/map-description and confinement pass.
 ```

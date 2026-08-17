@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repository-native wave orchestrator CLI; no model executor is invoked."""
+"""Repository-native wave orchestrator CLI with fail-closed executor boundary."""
 
 from __future__ import annotations
 
@@ -33,6 +33,8 @@ from orchestrator_results import (
     validate_worker_result,
     write_json,
 )
+from orchestrator_executor import ExecutorError, execute_plan
+
 
 def assess_context(args: argparse.Namespace, config: dict[str, Any]) -> dict[str, Any]:
     dimensions = {
@@ -81,6 +83,13 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--max-parallel", type=int)
     plan.add_argument("--output", type=Path)
 
+    execute = subparsers.add_parser("execute", help="Run selected workers through the configured executor.")
+    execute.add_argument("--tasks-root", type=Path, default=Path("docs/agents/tasks/active"))
+    execute.add_argument("--plan", type=Path, required=True)
+    execute.add_argument("--results-dir", type=Path, required=True)
+    execute.add_argument("--workspace-root", type=Path)
+    execute.add_argument("--output", type=Path)
+
     barrier = subparsers.add_parser("barrier", help="Validate worker results and build the next wave.")
     barrier.add_argument("--tasks-root", type=Path, default=Path("docs/agents/tasks/active"))
     barrier.add_argument("--plan", type=Path, required=True)
@@ -115,11 +124,21 @@ def main(argv: list[str] | None = None) -> int:
         config = load_config(args.config)
         if args.command == "plan":
             tasks = discover_tasks(args.tasks_root, config)
-            payload = build_plan(
-                tasks, config, lane=args.lane, max_parallel=args.max_parallel
-            )
+            payload = build_plan(tasks, config, lane=args.lane, max_parallel=args.max_parallel)
             write_json(payload, args.output)
             return 0
+        if args.command == "execute":
+            plan = json.loads(args.plan.read_text(encoding="utf-8"))
+            payload = execute_plan(
+                Path.cwd(),
+                args.tasks_root,
+                plan,
+                config,
+                args.results_dir,
+                workspace_root=args.workspace_root,
+            )
+            write_json(payload, args.output)
+            return 2 if payload["failures"] else 0
         if args.command == "barrier":
             tasks = discover_tasks(args.tasks_root, config)
             plan = json.loads(args.plan.read_text(encoding="utf-8"))
@@ -137,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
             payload = assess_context(args, config)
             write_json(payload, args.output)
             return 0
-    except (OSError, json.JSONDecodeError, OrchestratorError) as exc:
+    except (OSError, json.JSONDecodeError, OrchestratorError, ExecutorError) as exc:
         print(f"orchestrator error: {exc}", file=sys.stderr)
         return 1
     return 1

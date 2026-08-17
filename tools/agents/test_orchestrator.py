@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 import orchestrator
+import test_orchestrator_executor
 
 HERE = Path(__file__).resolve().parent
 FIXTURE_ROOT = HERE / "testdata" / "orchestrator"
@@ -78,7 +79,6 @@ class OrchestratorTests(unittest.TestCase):
         result["branch"] = "feat/wrong"
         errors = orchestrator.validate_worker_result(result, dispatch, task, self.config)
         self.assertIn("branch does not match dispatch", errors)
-
 
     def test_empty_evidence_is_rejected(self) -> None:
         plan = orchestrator.build_plan(self.tasks, self.config)
@@ -187,7 +187,6 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(payload["context"]["pressure"], "medium")
         self.assertFalse(payload["exact_remaining_tokens_known"])
 
-
     def test_invalid_provider_context_ratio_is_rejected(self) -> None:
         args = type(
             "Args",
@@ -263,6 +262,11 @@ class OrchestratorTests(unittest.TestCase):
             plan = orchestrator.build_plan([task], self.config)
             self.assertEqual(plan["selected"], [])
             self.assertEqual(plan["held"][0]["reasons"], ["EXTERNAL_DEPENDENCY_UNRESOLVED"])
+
+
+def load_tests(loader: unittest.TestLoader, tests: unittest.TestSuite, pattern: str | None) -> unittest.TestSuite:
+    tests.addTests(loader.loadTestsFromModule(test_orchestrator_executor))
+    return tests
 
 
 if __name__ == "__main__":

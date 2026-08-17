@@ -1,6 +1,6 @@
 # Repository-native Agent Orchestrator
 
-Status: experimental MVP for `blakinio/otclient`.
+Status: experimental orchestrator with a fail-closed real-worker adapter for `blakinio/otclient`.
 
 ## Purpose
 
@@ -28,7 +28,7 @@ live task records + Git/PR state
 
 The coordinator remains responsible for task selection, dependency/barrier state, ownership, acceptance, audit/E2E requirements, PR hygiene and final integration. Workers remain disposable sessions. Durable state remains in Git, task records, PRs, CI and referenced evidence.
 
-The MVP intentionally does **not** invoke an AI/model service. `docs/agents/AGENT_ORCHESTRATOR.json` keeps `real_model_executor_enabled: false`. The GitHub Actions smoke workers are deterministic simulators that prove fan-out/fan-in mechanics only. A real model executor is a later adapter and must independently satisfy repository authorization, credential and owner-funded-AI policy.
+The repository default still invokes **no AI/model service**. `docs/agents/AGENT_ORCHESTRATOR.json` keeps `mode: dry_run` and `real_model_executor_enabled: false`. The repository now also contains `tools/agents/orchestrator_executor.py`, a provider-neutral external-process adapter that can execute a trusted fixed argv worker in an isolated detached worktree when a separately authorized provider configuration enables it. Deterministic fixtures prove the executor plumbing without consuming model quota.
 
 ## Existing contracts reused
 
@@ -66,14 +66,14 @@ The sum maps to the existing bands:
 13..15 unbounded
 ```
 
-Default MVP policy:
+Default policy:
 
 - `low` -> dispatch is allowed when every other gate passes;
 - `medium` + stable/falling growth -> dispatch is allowed;
 - `medium` + rising/rapid growth -> checkpoint and rotate the same task before dispatch;
 - `high` or `unbounded` -> checkpoint and rotate the same task before dispatch;
 - missing context classification -> hold rather than guess;
-- if a future executor provides a **verified** remaining-context ratio, `<= 0.20` also triggers rotation. This signal is optional and is never fabricated.
+- if an enabled executor provides a **verified** remaining-context ratio, `<= 0.20` also triggers rotation. This signal is optional and is never fabricated.
 
 A rotation is not a new task. The worker persists a compact checkpoint, ends that session, and a fresh worker resumes the same task using `tools/agents/resume.py`.
 
@@ -89,7 +89,7 @@ python tools/agents/orchestrator.py assess-context \
   --growth stable
 ```
 
-The result contains the score, pressure band, `dispatch|rotate|hold` action and reasons. It also emits `exact_remaining_tokens_known: false` unless a future executor owns a verified provider signal; the current MVP never changes that field to true.
+The result contains the score, pressure band, `dispatch|rotate|hold` action and reasons. It also emits `exact_remaining_tokens_known: false`; provider-specific remaining-context data is carried only in worker results when it is independently verified.
 
 ### Why this reduces coordinator context pressure
 
@@ -99,7 +99,7 @@ The coordinator does not ingest worker transcripts. A selected worker receives a
 python tools/agents/resume.py --task <task-path>
 ```
 
-The worker returns only a standardized result containing task/branch/base/head identity, changed paths, validation/evidence references, context state, status and one next action while incomplete. Large logs remain workflow/repository artifacts.
+The real-worker adapter renders that durable bundle into the worker request. The worker returns only a standardized result containing task/branch/base/head identity, changed paths, validation/evidence references, context state, status and one next action while incomplete. Large logs remain workflow/repository artifacts.
 
 This lets the coordinator discard worker narration after every wave and recompute the programme from durable state.
 
@@ -229,9 +229,53 @@ The barrier rejects at least:
 
 A missing result is treated as `WAITING` for that barrier computation and is not immediately redispatched from stale pre-wave task state.
 
+## External real-worker execution
+
+`tools/agents/orchestrator_executor.py` is the provider-neutral adapter. The CLI entry point is:
+
+```bash
+python tools/agents/orchestrator.py \
+  --config <authorized-executor-config.json> \
+  execute \
+  --plan /tmp/agent-wave.json \
+  --results-dir /tmp/worker-results \
+  --output /tmp/executor-summary.json
+```
+
+Enablement is fail-closed. The executor requires all of:
+
+- `mode: external_process`;
+- `real_model_executor_enabled: true`;
+- a concrete `provider` identifier;
+- a fixed non-empty `command` argv list owned by trusted configuration, never task prose;
+- `owner_funded_ai_allowed: true` when that provider is classified `requires_owner_funded_ai: true`;
+- a finite timeout and bounded worker count.
+
+The worker receives one JSON request on stdin containing the compact `resume.py` prompt, exact task/branch/base identity, owned paths, isolated workspace and `worker-result-v1` contract. The subprocess runs with `shell=False` and an allowlisted environment. `HOME` is deliberately absent from the built-in environment because credential/config material commonly lives below it; a provider may receive `HOME` or another credential-bearing variable only when the authorized provider configuration names it explicitly in `pass_env`.
+
+For each selected task the adapter:
+
+1. rediscovers the current task inventory and recomputes the selected wave so dependency, context, branch/head and ownership changes invalidate a stale plan before worker launch;
+2. verifies current task/dispatch branch and exact base SHA, rejecting `main`/`master` and invalid branch names;
+3. creates a unique detached Git worktree at that exact base;
+4. launches one external worker process with a finite timeout;
+5. requires structured `worker-result-v1` JSON on stdout;
+6. rejects non-zero exit, malformed JSON or dirty/uncommitted worktree state;
+7. verifies the actual worktree `HEAD` descends from the dispatch base and equals returned `head_sha`;
+8. derives changed paths from `git diff <base>...HEAD` and requires an exact match with the worker result;
+9. applies the existing task/branch/base/path/evidence/context result validation;
+10. for a worker with any changed path, requires `publish_results: true` and publishes the result commit to the task branch using a normal non-force push only when the remote branch is absent or still equals the dispatch base;
+11. verifies the published branch points at the accepted worker head, then removes the isolated worktree.
+
+A failed worker produces no accepted result file. A writer whose commit is not durably published also fails closed; `publish_results: false` is valid only for a no-change/read-only worker. The barrier therefore cannot promote a failed, mismatched or unreachable writer result as `DONE`.
+
+The repository default configuration intentionally keeps this path disabled. A task command such as `next_action` is never converted into executable shell syntax.
+
+A detached Git worktree is an isolation mechanism for worker files, **not a hostile-worker sandbox**: worktrees share repository Git metadata. Before any concrete AI/model runtime is activated, its trusted wrapper/execution environment must separately bound repository-global Git ref/config mutation, credential access, network/process authority and any other provider-specific capability. The generic adapter does not grant that authority merely because it can launch a process.
+
 ## Barrier and iterative replanning
 
-Given a wave plan and a directory of worker result JSON files:
+Given a wave plan and a directory of accepted worker result JSON files:
 
 ```bash
 python tools/agents/orchestrator.py barrier \
@@ -254,11 +298,12 @@ Invalid results prevent automatic next-wave computation. The coordinator must in
 
 ## GitHub-hosted smoke E2E
 
-`.github/workflows/agent-orchestrator-smoke.yml` proves the control-plane mechanics without an AI service:
+`.github/workflows/agent-orchestrator-smoke.yml` proves the control-plane mechanics without an AI service. Its focused suite includes deterministic real-executor integration tests that create temporary Git repositories/worktrees and launch `fake_real_worker.py` as a genuine external process. The fixture proves a successful committed writer is durably published to its task branch and accepted, while malformed JSON, non-zero exit, timeout, dirty worktree, head mismatch, stale plan, protected branch, ownership escape, missing durable publication and a moved remote task branch all fail closed. It also proves unlisted environment data, including `HOME`, is absent unless explicitly allowlisted.
+
+The existing fan-out/fan-in fixture also proves:
 
 ```text
-focused unit tests
-    -> plan fixture wave [A, B]
+plan fixture wave [A, B]
     -> GitHub Actions matrix runs A and B in parallel
     -> each emits worker-result-v1 JSON
     -> barrier validates both
@@ -267,38 +312,35 @@ focused unit tests
     -> high-context task D remains held for rotation
 ```
 
-The fixture additionally proves path-overlap serialization and max-parallel capacity.
+This is real GitHub-hosted process/worktree and orchestration E2E. It is **not** evidence that an AI/model provider was invoked.
 
-This is a real GitHub Actions fan-out/fan-in E2E for the orchestration mechanism. It is **not** evidence that parallel AI workers have been executed.
+## Provider activation boundary
 
-## Real model executor boundary
+The adapter is implemented, but a concrete model/provider configuration remains a separate activation decision. Before a provider is enabled, repository policy still requires:
 
-A later executor adapter may consume each selected plan item and launch one independent model/agent process. It must satisfy all of the following before enablement:
-
-- a separately authorized AI/model funding/credential policy;
-- one worker session per selected task;
-- one branch/worktree per writer and no shared worktree;
-- fresh live ownership and dependency verification immediately before mutation;
-- prompt construction from the compact `resume.py` bundle, not prior chat transcripts;
-- finite runtime/retry/context budgets;
-- no arbitrary command execution sourced from untrusted task prose;
-- worker-result-v1 output on every terminal/rotation path;
-- exact branch/base/head binding and changed-path enforcement;
+- exact authorization for any owner-funded AI/model/credential use;
+- a trusted worker wrapper that accepts the JSON request and emits `worker-result-v1`;
+- explicit `pass_env` entries only for the provider environment variables actually authorized;
+- one independently isolated worker process per selected task;
+- a provider-specific sandbox/capability boundary appropriate to repository-global Git metadata, credentials, network and process access;
 - repository-specific runtime/protected-resource admission gates;
-- fresh validator roles where required by the task.
+- fresh live ownership and dependency checks;
+- fresh validator roles where required by the task;
+- provider-specific context/retry limits that do not weaken the repository anti-stall budget.
 
 The coordinator may then loop `plan -> execute -> barrier -> plan` until a real stop condition or programme budget is reached.
 
 ## Safe rollout for this repository
 
-Use staged proof rather than turning on autonomous writers immediately:
+Use staged proof rather than turning on autonomous model writers immediately:
 
-1. **MVP smoke** — deterministic fixture fan-out/fan-in; no AI; no worker writes.
-2. **Live repo plan-only** — run `plan` against active task records and review selection/holds; no workers.
-3. **Read-only real workers** — after an authorized executor exists, use validator/research tasks with no write ownership.
-4. **Two disjoint writers** — only after plan-only/read-only evidence is clean; unique branches/worktrees and non-overlapping paths.
-5. **Adaptive waves** — enable barrier-driven second/third waves after result contract and context rotation have proved reliable.
-6. **Cross-repository port** — copy the small tool/config/workflow surface, then replace repository-specific task-ID patterns, lane rules and governance references rather than copying live OTClient task state.
+1. **MVP smoke** — deterministic fixture fan-out/fan-in; no AI.
+2. **Live repo plan-only** — run `plan` against active task records; no workers.
+3. **External-process fixture** — real detached worktree/process/commit/result validation with deterministic fake workers; no AI.
+4. **Read-only provider workers** — after a concrete provider is authorized and configured, use validator/research tasks with no write ownership.
+5. **Two disjoint provider writers** — only after read-only evidence is clean; unique branches/worktrees and non-overlapping paths.
+6. **Adaptive waves** — enable barrier-driven second/third waves after result contract and context rotation have proved reliable.
+7. **Cross-repository port** — copy the small tool/config/workflow surface, then replace repository-specific task-ID patterns, lane rules and governance references rather than copying live OTClient task state.
 
 Do not move to the next stage by weakening a failed gate.
 
@@ -311,20 +353,21 @@ For another repository:
 - provide a compact resume/handoff generator;
 - set path-ownership semantics and maximum worker count;
 - map the local context-pressure policy and rotate threshold;
-- keep real model executor credentials and funding authority outside task data;
-- create repository-specific workflow fixtures proving dependency, overlap, context and fan-out/fan-in behavior;
-- run plan-only against the real task inventory before enabling writers;
+- keep provider credentials and funding authority outside task data;
+- create repository-specific workflow fixtures proving dependency, overlap, context, external-process execution and fan-out/fan-in behavior;
+- run plan-only against the real task inventory before enabling provider workers;
 - keep one coordinator responsible for integration and terminal acceptance.
 
 ## Current non-goals
 
-The MVP does not:
+The orchestrator does not:
 
 - estimate exact ChatGPT/model tokens remaining;
-- spawn ChatGPT/Codex/OpenAI workers;
-- consume owner-funded AI quota;
-- mutate another task's branch;
-- claim GitHub matrix jobs are AI agents;
-- replace fresh audit, real product E2E, exact-head CI or merge gates;
+- select or authorize a model/provider by itself;
+- treat credential availability as permission to consume owner-funded AI quota;
+- execute shell commands sourced from task prose;
+- provide a hostile-model sandbox merely by using Git worktrees;
+- bypass task ownership, runtime admission, audit, E2E, exact-head CI or merge gates;
+- claim deterministic fixtures are AI agents;
 - make `ACTIVE_WORK.md` a shared lock;
 - create one canonical-runtime session per parallel worker.

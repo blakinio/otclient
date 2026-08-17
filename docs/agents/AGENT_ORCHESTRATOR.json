@@ -19,7 +19,15 @@
   },
   "executor": {
     "mode": "dry_run",
+    "provider": null,
+    "command": [],
     "real_model_executor_enabled": false,
-    "owner_funded_ai_allowed": false
+    "requires_owner_funded_ai": true,
+    "owner_funded_ai_allowed": false,
+    "timeout_seconds": 1200,
+    "max_parallel_workers": 4,
+    "pass_env": [],
+    "publish_results": false,
+    "remote": "origin"
   }
 }

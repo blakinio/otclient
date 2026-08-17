@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260817-track-a-p2-f50090-downstream
-status: waiting
+status: investigating
 agent: ChatGPT
 session_role: draft_researcher
 project_lane: otclient
@@ -79,24 +79,26 @@ source_generation_1:
   producer_head: e7c13ea31f42b9c1e1c08103cd576a56cfadc554
   workflow: Track A P2 f50090 downstream evidence
   run: 32036648847
-  source_job: 95408380165
-  source_job_state_last_observed: queued
+  attempt_2_source_job: 95409105697
+  attempt_2_result: FAILURE_BEFORE_SOURCE_ACCESS
+  attempt_2_failure: codeload_github_actions_checkout_http_429_after_3_download_attempts
+  attempt_3_state_last_observed: in_progress
   code_window: 0xf50040..0xf50480
-  runner_visibility_probe: FORBIDDEN_BY_INTEGRATION_403
+  runner: synology-otclient-01
 anti_stall:
-  invocation_started_at: 2026-08-17T15:40:00+02:00
-  last_progress_at: 2026-08-17T15:49:00+02:00
+  invocation_started_at: 2026-08-17T15:50:00+02:00
+  last_progress_at: 2026-08-17T15:54:00+02:00
   ci_checks_for_current_head: 0
   ci_check_generation: draft
   terminal_ci_wait_started_at: null
   terminal_ci_checks_for_current_generation: 0
-  unchanged_state_checks: 2
-  identical_failure_retries: 0
+  unchanged_state_checks: 0
+  identical_failure_retries: 1
   repair_cycles_for_current_gate: 0
   context_reconstruction_attempts: 1
   stall_warnings: 0
-blocker: external source-staging job 95408380165 remains queued on the exact-file Synology runner; GitHub integration cannot inspect self-hosted runner availability (403 Resource not accessible by integration), and anti-stall forbids a third unchanged external-state poll in this invocation
-next_action: inspect run 32036648847 after its state changes; if source/hosted jobs succeed, independently review the final artifact disassembly and classify the same-message edge from 0xf50090 before deciding whether one narrower follow-up byte window is required
+blocker: none while policy-allowed attempt 3 is active; if the identical codeload 429 repeats, another identical retry is forbidden and the producer mechanism must change
+next_action: inspect attempt 3 after state change; on success independently review hosted disassembly and classify the same-message edge from 0xf50090; on identical codeload 429 replace the checkout-dependent one-shot staging mechanism with a materially different fail-closed bridge rather than retrying again
 ---
 
 # Track A P2 — `0xf50090` downstream discriminator
@@ -117,7 +119,7 @@ Recover the smallest exact downstream edge from `0xf50090` while preserving the 
 
 ## Execution boundary
 
-This worker is static-only (`runtime_access:none`). The exact retained client file is not available on GitHub-hosted runners, so the coordinator-selected staging bridge may use `synology-otclient-01` only to locate a regular exact-size/exact-SHA file and copy a bounded file-backed byte window. The source step must not execute/disassemble the client, inspect processes or process memory, read canonical runtime state, perform login/gameplay, or make semantic classifications. Disassembly and all interpretation run on GitHub-hosted Linux from the sanitized bounded artifact. No raw executable/package may be uploaded.
+This worker is static-only (`runtime_access:none`). The exact retained client file is not available on GitHub-hosted runners, so the coordinator-selected staging bridge may use `synology-otclient-01` only to locate a regular exact-size/exact-SHA file and copy a bounded file-backed byte window. The source step must not execute/disassemble the client, inspect processes or process memory, read canonical runtime state, perform login/gameplay, or make semantic classifications. Disassembly and all interpretation run on GitHub-hosted Linux from the sanitized bounded evidence. No raw executable/package may be uploaded.
 
 ## Acceptance inventory
 
@@ -132,9 +134,9 @@ This worker is static-only (`runtime_access:none`). The exact retained client fi
 - [ ] one-shot staging surfaces removed after evidence capture;
 - [ ] final Draft exact-head governance/CI/review hygiene green before coordinator review.
 
-## Current external wait
+## Current generation
 
-Generation 1 producer run `32036648847` is queued on the file-only source-staging runner. Two unchanged-state observations have already been consumed in this invocation. The repository anti-stall contract requires this worker to stop polling until that external state changes.
+Run `32036648847` is the single bounded generation. Attempt 2 failed during GitHub Actions setup while downloading pinned `actions/checkout` because `codeload.github.com` returned HTTP 429 three times; no source/client step executed. Attempt 3 is the one policy-allowed identical retry. A repeated identical 429 must change the producer mechanism rather than trigger another identical retry.
 
 ## Stop condition
 

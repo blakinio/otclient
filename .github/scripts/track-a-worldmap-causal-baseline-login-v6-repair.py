@@ -127,7 +127,6 @@ for _ in $(seq 1 45); do
   fi
 done
 if [[ "$world" != 1 ]]; then
-  # One bounded fallback on the already-proven same row target only.
   xdo mousemove --window "$UI_WIN" "$SELECT_X" "$SELECT_Y" click --repeat 2 --delay 120 1
   xdo key --window "$UI_WIN" --clearmodifiers Return
   echo 'WORLDMAP_BASELINE_CHARACTER_DOUBLECLICK_FALLBACK_SENT=true'
@@ -147,8 +146,6 @@ echo 'WORLDMAP_BASELINE_STRUCTURAL_IN_GAME=PASS'
 echo "WORLDMAP_BASELINE_STRUCTURAL_FULLMAP_COUNT=$FULLMAP_COUNT"
 echo "WORLDMAP_BASELINE_STRUCTURAL_PRE_MOVE_STRIP_COUNT=$PRE_MOVE_COUNT"
 
-# Verify exact-client transport remains confined to the task-owned local SOCKS
-# endpoint before any gameplay stimulus.
 python3 - "$PID" "$WARP_PORT" <<'PY'
 from pathlib import Path
 import os,socket,struct,sys
@@ -178,7 +175,6 @@ if socks<1 or direct!=0 or udp:raise SystemExit('WORLDMAP_BASELINE_ERROR=network
 PY
 echo 'WORLDMAP_BASELINE_TRANSPORT_CONFINEMENT=PASS'
 
-# One reversible movement pair. Evidence is count/extent only.
 xdo windowactivate --sync "$UI_WIN" 2>/dev/null || true
 xdo key --window "$UI_WIN" --clearmodifiers Right
 sleep 3
@@ -253,8 +249,8 @@ def transform(text: str) -> str:
         'xwd -root',
         'xrandr --output',
         'wmctrl -r',
-        'TIBIA_TEST_EMAIL',
-        'TIBIA_TEST_PASSWORD',
+        'printf \'%s\' "$TIBIA_TEST_EMAIL"',
+        'printf \'%s\' "$TIBIA_TEST_PASSWORD"',
         'EMAIL_X=535',
         'PASS_X=535',
         'LOGIN_X=590',

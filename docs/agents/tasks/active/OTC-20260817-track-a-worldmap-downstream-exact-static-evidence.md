@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260817-track-a-worldmap-downstream-exact-static-evidence
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-worldmap-downstream-static-producer-20260817
 session_role: researcher_producer_under_coordinator_dispatch
@@ -15,7 +15,7 @@ base_branch: main
 base_main: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
 live_main_at_claim: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
 risk: medium
-updated: 2026-08-17T08:27:00+02:00
+updated: 2026-08-17T08:45:00+02:00
 producer_pr: 446
 owned_paths:
   - docs/agents/tasks/active/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence.md
@@ -124,12 +124,12 @@ acceptance_inventory:
   - durable evidence usable by #367 without Synology access
   - exact-head governance/CI green for the producer Draft PR
 researcher_delivery: draft_only
-WORLD_MAP_DOWNSTREAM_STATIC_EVIDENCE_READY: false
+WORLD_MAP_DOWNSTREAM_STATIC_EVIDENCE_READY: true
 programme_complete: false
 invocation_started_at: 2026-08-17T08:12:00+02:00
-last_progress_at: 2026-08-17T08:27:00+02:00
+last_progress_at: 2026-08-17T08:45:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: targeted-discriminator-prepared
+ci_check_generation: consumer-ready-evidence
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -138,40 +138,49 @@ repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 validation_state:
-  semantic_source_run: 32001356705
-  semantic_source_job: 95302168871
-  semantic_source_result: SUCCESS
-  source_artifact_id: 9278519216
-  source_artifact_digest: e10347435bece4cbedc7fca54b782cea76f9f1dab3b042082fe3bcc15f7c0728
-  semantic_hosted_job: 95302411849
-  semantic_hosted_result: SUCCESS
-  final_artifact_id: 9278527206
-  final_artifact_digest: af12b2af9c725ca402224876c3cbd0c01306f47b37e717548c5817310dd3bc9b
-  code_windows: 236
-  code_raw_bytes: 532736
+  broad_source_run: 32001356705
+  broad_source_job: 95302168871
+  broad_source_result: SUCCESS
+  broad_source_artifact_id: 9278519216
+  broad_source_artifact_digest: e10347435bece4cbedc7fca54b782cea76f9f1dab3b042082fe3bcc15f7c0728
+  broad_hosted_job: 95302411849
+  broad_hosted_result: SUCCESS
+  broad_final_artifact_id: 9278527206
+  broad_final_artifact_digest: af12b2af9c725ca402224876c3cbd0c01306f47b37e717548c5817310dd3bc9b
+  broad_code_windows: 236
+  broad_code_raw_bytes: 532736
+  targeted_run: 32002326947
+  targeted_source_job: 95304896213
+  targeted_source_result: SUCCESS
+  targeted_source_artifact_id: 9278827774
+  targeted_source_artifact_digest: 8f6a9feaea607475f6f9d25d200d858f52714f9384561bd4010405d26a78009a
+  targeted_hosted_job: 95305039463
+  targeted_hosted_result: SUCCESS
+  targeted_final_artifact_id: 9278833445
+  targeted_final_artifact_digest: 7505aeae6e79e8829adf60261e1a3b50f27e0514f50136161e5f715a27124218
+  targeted_code_windows: 15
+  targeted_code_raw_bytes: 38400
   primary_vtable_boundaries_curated:
     render_provider: slots_0_through_21
     camera: slots_0_through_4
     picker: slots_0_through_7
+  durable_evidence:
+    - docs/agents/evidence/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence/20260817-worldmap-downstream-exact-static-evidence.md
+    - docs/agents/evidence/OTC-20260817-track-a-worldmap-downstream-exact-static-evidence/20260817-worldmap-downstream-exact-static-evidence.json
 recovery_checkpoint:
-  status: FIRST_BUNDLE_SUCCESS_TARGETED_REVERSE_VTABLE_DISCRIMINATOR_REQUIRED
-  fresh_overlap_check: no open downstream worldmap exact-static producer found at claim time; this PR remains the sole downstream producer
+  status: CURATED_DOWNSTREAM_EVIDENCE_READY_FOR_CONSUMER
+  fresh_overlap_check: no competing downstream worldmap exact-static producer existed at claim time
   exact_source_candidate_index: 1
-  source_run_id: 32001356705
-  source_job_id: 95302168871
-  source_result: SUCCESS
-  hosted_job_id: 95302411849
-  hosted_result: SUCCESS
-  first_bundle_findings:
-    - exact packed bytes 120000000e000000 occur at static data address 0x01cdd958
-    - exact TWorldMapViewport constructor 0x00cbf680 loads QWORD 0x01cdd958 into Viewport+0x40, so Viewport embedded TWorldMapExtent payload begins with constructor values 18/14
-    - generic [vtable+0x60] scan produced false-positive candidate contexts; type anchoring is required before assigning Storage slot-12 caller identity
-    - candidate 0x00cdb770 constructs a geometry-like stack object with 0x00bc6350, passes it to object member this+0x10 vslot+0x60, then passes the same object to further dependencies; the member type is not yet directly proven
-  new_discriminator: recover handler/viewport primary vtables plus reverse vtable ownership for 0x00cdb770 and bounded body of 0x00bc6350; stage exact data constants used by Viewport
-  prohibited_repeat: do not repeat the broad generic [vtable+0x60] scan as proof; do not repeat v7 GUI/client_window_missing; do not rescan exhausted retained inventory
-next_action: execute one narrower reverse-vtable/data-source staging run, use it to classify candidate 0x00cdb770 and the 0x00bc6350 snapshot producer, then curate durable downstream evidence and return it to PR #367
+  proven_upstream_chain: static 18/14 literal at 0x01cdd958 -> Handler+0xb0/+0xb4 -> snapshot+0x38 via 0x00bc6350 -> Handler+0x10 exact TWorldMapStorage slot12 -> Storage+0x48/+0x4c
+  fixed_default_classification: Handler and Viewport constructors use static 18/14; Storage constructor uses zero and Storage slot12 copies mutable snapshot state
+  later_handler_master_writer_census: UNKNOWN
+  render_provider_result: direct 32-cell clipping/culling/indexing/iteration dependencies recovered
+  picker_result: direct fixed-32 screen/world conversion and bounds dependencies recovered
+  camera_result: exact transform-like layout and scale-default facts recovered; named projection formula remains UNKNOWN
+  prohibited_repeat: do not repeat broad generic [vtable+0x60] scans as semantic proof; do not repeat v7 GUI/client_window_missing; do not rescan exhausted retained inventory
+next_action: require exact-head Track A governance and repository CI green for PR #446, then hand the curated durable evidence to consumer PR #367 and continue its static patch/dependency reconciliation without client-byte mutation
 ---
 
 # Track A world-map downstream exact static evidence producer
 
-This task produces only new exact static input requested by consumer PR #367. The first bundle is physically and hosted validated; its broad virtual-call candidate list is intentionally not treated as semantic proof until the targeted discriminator resolves type ownership.
+The new downstream exact-static evidence is curated and consumer-ready. The producer remains Draft-only and owns no #367 files. No client bytes were modified.

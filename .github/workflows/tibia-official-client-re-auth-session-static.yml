@@ -1,140 +1,110 @@
 name: Track A native auth session static proof
-
 on:
   push:
     branches: [docs/OTC-20260817-track-a-auth-session-flow-static]
     paths: [.github/workflows/tibia-official-client-re-auth-session-static.yml]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: track-a-auth-session-static-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   source-sanitize:
-    name: Stage exact-file phase5 QMeta windows
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
-      EXPECTED_REPOSITORY: blakinio/otclient
-      EXPECTED_BRANCH: docs/OTC-20260817-track-a-auth-session-flow-static
-      EXPECTED_RUNNER_NAME: synology-otclient-01
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
     outputs:
-      unknown_qmeta_hex: ${{ steps.stage.outputs.unknown_qmeta_hex }}
-      unknown_qmeta_sha256: ${{ steps.stage.outputs.unknown_qmeta_sha256 }}
-      known_qmeta_hex: ${{ steps.stage.outputs.known_qmeta_hex }}
-      known_qmeta_sha256: ${{ steps.stage.outputs.known_qmeta_sha256 }}
+      ustr_hex: ${{ steps.s.outputs.ustr_hex }}
+      ustr_sha: ${{ steps.s.outputs.ustr_sha }}
+      kstr_hex: ${{ steps.s.outputs.kstr_hex }}
+      kstr_sha: ${{ steps.s.outputs.kstr_sha }}
+      umeta_hex: ${{ steps.s.outputs.umeta_hex }}
+      umeta_sha: ${{ steps.s.outputs.umeta_sha }}
+      setup_hex: ${{ steps.s.outputs.setup_hex }}
+      setup_sha: ${{ steps.s.outputs.setup_sha }}
     steps:
-      - id: stage
+      - id: s
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 61
-          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 62
-          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 63
-          candidates=(
-            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
-            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
-          )
-          source_client=''
-          for candidate in "${candidates[@]}"; do
-            [[ -f "$candidate" && ! -L "$candidate" ]] || continue
-            [[ "$(stat -c %s "$candidate")" == "$EXPECTED_CLIENT_SIZE" ]] || continue
-            python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY' && { source_client="$candidate"; break; }
-          import hashlib,sys
-          h=hashlib.sha256()
-          with open(sys.argv[1],'rb') as f:
-              for c in iter(lambda:f.read(1024*1024),b''): h.update(c)
-          raise SystemExit(h.hexdigest()!=sys.argv[2])
-          PY
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]] || exit 61
+          [[ "$GITHUB_REF_NAME" == docs/OTC-20260817-track-a-auth-session-flow-static ]] || exit 62
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]] || exit 63
+          for c in '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client' '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'; do
+            [[ -f "$c" && ! -L "$c" && "$(stat -c %s "$c")" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            got="$(sha256sum "$c" | awk '{print $1}')"
+            [[ "$got" == "$EXPECTED_CLIENT_SHA256" ]] && { client="$c"; break; }
           done
-          [[ -n "$source_client" ]] || exit 50
-          python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
+          [[ -n "${client:-}" ]] || exit 50
+          python3 - "$client" "$GITHUB_OUTPUT" <<'PY'
           import hashlib,struct,sys
-          from pathlib import Path
-          p=Path(sys.argv[1]); out=Path(sys.argv[2])
-          with p.open('rb') as f:
-              ident=f.read(16); rest=f.read(48)
-              if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(51)
-              fs=struct.unpack('<HHIQQQIHHHHHH',rest)
-              phoff,phentsize,phnum=fs[4],fs[8],fs[9]
-              segs=[]
-              for i in range(phnum):
-                  f.seek(phoff+i*phentsize); r=f.read(56)
-                  t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
-                  if t==1: segs.append((off,va,sz,flags))
-              def read_va(a,b):
-                  for off,va,sz,flags in segs:
-                      if va<=a and b<=va+sz:
-                          f.seek(off+a-va); d=f.read(b-a)
-                          if len(d)==b-a: return d
+          p=sys.argv[1]; out=sys.argv[2]
+          with open(p,'rb') as f:
+              ident=f.read(16); rest=f.read(48); h=struct.unpack('<HHIQQQIHHHHHH',rest)
+              seg=[]
+              for i in range(h[9]):
+                  f.seek(h[4]+i*h[8]); r=f.read(56); t,fl,o,v,pa,s,ms,a=struct.unpack('<IIQQQQQQ',r)
+                  if t==1: seg.append((o,v,s,fl))
+              def rv(a,b,x=False):
+                  for o,v,s,fl in seg:
+                      if v<=a and b<=v+s:
+                          if x and not fl&1: raise SystemExit(53)
+                          f.seek(o+a-v); d=f.read(b-a)
+                          if len(d)==b-a:return d
                   raise SystemExit(54)
-              windows={
-                  'unknown_qmeta':(0x3085b20,0x3085be0),
-                  'known_qmeta':(0x3084f60,0x3085020),
-              }
-              staged={k:read_va(a,b) for k,(a,b) in windows.items()}
-          rows=[]
-          for key,data in staged.items():
-              dig=hashlib.sha256(data).hexdigest()
-              rows.append(f'{key}_hex={data.hex()}\n{key}_sha256={dig}\n')
-              print(f'AUTHSESSION_PHASE5_SOURCE_{key.upper()}_SHA256={dig}')
-          with out.open('a') as h: h.write(''.join(rows))
-          print('AUTHSESSION_PHASE5_EXACT_FILE_FENCE=PASS')
+              w={'ustr':rv(0x1cc9800,0x1cc9c00),'kstr':rv(0x1cae500,0x1cae900),'umeta':rv(0x1cc65e0,0x1cc69e0),'setup':rv(0x7d51b0,0x7d52f0,True)}
+          with open(out,'a') as q:
+              for k,d in w.items():
+                  z=hashlib.sha256(d).hexdigest(); q.write(f'{k}_hex={d.hex()}\n{k}_sha={z}\n'); print(f'AUTHSESSION_PHASE5B_{k.upper()}_SHA256={z}')
+          print('AUTHSESSION_PHASE5B_EXACT_FILE_FENCE=PASS')
           print('AUTHSESSION_RUNTIME_ACCESS=none')
-          print('AUTHSESSION_PHASE5_SOURCE_PROCESS_OBSERVATION=false')
-          print('AUTHSESSION_PHASE5_SOURCE_X11_OBSERVATION=false')
-          print('AUTHSESSION_PHASE5_SOURCE_LOGIN=false')
-          print('AUTHSESSION_PHASE5_SOURCE_SECRET_ACCESS=false')
-          print('AUTHSESSION_PHASE5_SOURCE_DISASSEMBLY=false')
-          print('AUTHSESSION_PHASE5_SOURCE_SEMANTIC_CLASSIFICATION=false')
-          print('AUTHSESSION_PHASE5_RAW_CLIENT_UPLOADED=false')
+          print('AUTHSESSION_PHASE5B_SOURCE_PROCESS_OBSERVATION=false')
+          print('AUTHSESSION_PHASE5B_SOURCE_LOGIN=false')
+          print('AUTHSESSION_PHASE5B_SOURCE_SECRET_ACCESS=false')
+          print('AUTHSESSION_PHASE5B_SOURCE_DISASSEMBLY=false')
+          print('AUTHSESSION_PHASE5B_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('AUTHSESSION_PHASE5B_RAW_CLIENT_UPLOADED=false')
           PY
-
   hosted-decode:
-    name: Decode phase5 QMeta identity
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      EXPECTED_REPOSITORY: blakinio/otclient
-      EXPECTED_BRANCH: docs/OTC-20260817-track-a-auth-session-flow-static
-      UNKNOWN_QMETA_HEX: ${{ needs.source-sanitize.outputs.unknown_qmeta_hex }}
-      UNKNOWN_QMETA_SHA256: ${{ needs.source-sanitize.outputs.unknown_qmeta_sha256 }}
-      KNOWN_QMETA_HEX: ${{ needs.source-sanitize.outputs.known_qmeta_hex }}
-      KNOWN_QMETA_SHA256: ${{ needs.source-sanitize.outputs.known_qmeta_sha256 }}
+      USTR_HEX: ${{ needs.source-sanitize.outputs.ustr_hex }}
+      USTR_SHA: ${{ needs.source-sanitize.outputs.ustr_sha }}
+      KSTR_HEX: ${{ needs.source-sanitize.outputs.kstr_hex }}
+      KSTR_SHA: ${{ needs.source-sanitize.outputs.kstr_sha }}
+      UMETA_HEX: ${{ needs.source-sanitize.outputs.umeta_hex }}
+      UMETA_SHA: ${{ needs.source-sanitize.outputs.umeta_sha }}
+      SETUP_HEX: ${{ needs.source-sanitize.outputs.setup_hex }}
+      SETUP_SHA: ${{ needs.source-sanitize.outputs.setup_sha }}
     steps:
       - shell: bash
         run: |
           set -Eeuo pipefail
-          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 71
-          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
           [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 73
           python3 - <<'PY'
-          import hashlib,os,struct
-          specs={'UNKNOWN_QMETA':(0x3085b20,0xc0),'KNOWN_QMETA':(0x3084f60,0xc0)}
-          def get(name,n):
-              d=bytes.fromhex(os.environ[name+'_HEX'])
-              if len(d)!=n: raise SystemExit(74)
-              if hashlib.sha256(d).hexdigest()!=os.environ[name+'_SHA256']: raise SystemExit(75)
-              return d
-          print('AUTHSESSION_PHASE5_HOSTED_DECODE=PASS')
-          print('AUTHSESSION_RUNTIME_ACCESS=none')
-          for name,(start,n) in specs.items():
-              d=get(name,n)
-              print(f'AUTHSESSION_PHASE5_{name}_QWORDS_BEGIN')
-              for off in range(0,n,8):
-                  q=struct.unpack_from('<Q',d,off)[0]
-                  print(f'0x{start+off:x}=0x{q:x}')
-              print(f'AUTHSESSION_PHASE5_{name}_QWORDS_END')
-              print(f'AUTHSESSION_PHASE5_{name}_DWORDS_BEGIN')
-              for off in range(0,n,4):
-                  u=struct.unpack_from('<I',d,off)[0]
-                  if u or off in range(0x30,0x90): print(f'0x{start+off:x}=0x{u:x}')
-              print(f'AUTHSESSION_PHASE5_{name}_DWORDS_END')
+          import hashlib,os,re,struct,subprocess,tempfile
+          from pathlib import Path
+          def g(k,n):
+              d=bytes.fromhex(os.environ[k+'_HEX']); assert len(d)==n; assert hashlib.sha256(d).hexdigest()==os.environ[k+'_SHA']; return d
+          print('AUTHSESSION_PHASE5B_HOSTED_DECODE=PASS'); print('AUTHSESSION_RUNTIME_ACCESS=none')
+          for k,n in [('USTR',0x400),('KSTR',0x400)]:
+              d=g(k,n); print('AUTHSESSION_PHASE5B_'+k+'_ASCII_BEGIN')
+              for m in list(re.finditer(rb'[ -~]{4,}',d))[:80]: print(f'+0x{m.start():x}='+m.group().decode())
+              print('AUTHSESSION_PHASE5B_'+k+'_ASCII_END')
+          d=g('UMETA',0x400); print('AUTHSESSION_PHASE5B_UMETA_DWORDS_BEGIN')
+          for i in range(48): print(f'+0x{i*4:x}=0x{struct.unpack_from("<I",d,i*4)[0]:x}')
+          print('AUTHSESSION_PHASE5B_UMETA_DWORDS_END')
+          d=g('SETUP',0x140)
+          with tempfile.TemporaryDirectory() as td:
+              p=Path(td)/'s.bin';p.write_bytes(d);t=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel','--adjust-vma=0x7d51b0',str(p)],check=True,text=True,stdout=subprocess.PIPE).stdout
+          print('AUTHSESSION_PHASE5B_SETUP_BEGIN')
+          for l in t.splitlines():
+              m=re.match(r'^\s*([0-9a-f]+):\s+([0-9a-f ]+)\s+(.+)$',l)
+              if m: print(m.group(1)+': '+m.group(3).strip())
+          print('AUTHSESSION_PHASE5B_SETUP_END')
           PY

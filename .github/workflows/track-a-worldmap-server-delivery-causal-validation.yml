@@ -14,50 +14,52 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  persistent-home-layout:
-    name: Persistent Tibia HOME layout discriminator (no client)
+  symlink-target-layout:
+    name: Persistent Tibia symlink target layout (no client)
     runs-on: [otclient, synology]
     timeout-minutes: 3
     steps:
-      - name: Inspect symlink and package metadata only
+      - name: Compare symlink target and package metadata only
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           python3 - <<'PY'
-          import hashlib, os
+          import hashlib, os, stat
           from pathlib import Path
-
           roots=[Path('/home/runner/_work/_otclient_tibia_re_state/home'),Path('/work/_otclient_tibia_re_state/home')]
           home=next((p for p in roots if p.is_dir()),None)
-          if home is None: raise SystemExit('WORLDMAP_HOME_LAYOUT_ERROR=persistent_home_missing')
+          if home is None: raise SystemExit('WORLDMAP_SYMLINK_LAYOUT_ERROR=home_missing')
           share=home/'.local/share/CipSoft GmbH/Tibia'
-          link=share/'Tibia'
-          meta=share/'launchermetadata.json'
-          package=share/'packages/Tibia'
-          client=package/'bin/client'
-          if not link.is_symlink(): raise SystemExit('WORLDMAP_HOME_LAYOUT_ERROR=tibia_symlink_missing')
-          raw=os.readlink(link)
-          resolved=link.resolve(strict=False)
-          print('WORLDMAP_HOME_LAYOUT_SYMLINK_RAW='+raw)
-          print('WORLDMAP_HOME_LAYOUT_SYMLINK_RESOLVED='+str(resolved.relative_to(home) if resolved.is_relative_to(home) else resolved))
-          print('WORLDMAP_HOME_LAYOUT_SYMLINK_TARGET_EXISTS='+str(resolved.exists()).lower())
-          print('WORLDMAP_HOME_LAYOUT_PACKAGE_EXISTS='+str(package.is_dir()).lower())
-          print('WORLDMAP_HOME_LAYOUT_CLIENT_EXISTS='+str(client.is_file()).lower())
-          print('WORLDMAP_HOME_LAYOUT_SYMLINK_EQUALS_PACKAGE='+str(resolved==package.resolve()).lower())
-          if meta.is_file():
-              data=meta.read_bytes()
-              print('WORLDMAP_HOME_LAYOUT_METADATA_SIZE='+str(len(data)))
-              print('WORLDMAP_HOME_LAYOUT_METADATA_SHA256='+hashlib.sha256(data).hexdigest())
-          else:
-              raise SystemExit('WORLDMAP_HOME_LAYOUT_ERROR=launchermetadata_missing')
-          if client.is_file():
-              h=hashlib.sha256()
-              with client.open('rb') as f:
-                  for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
-              print('WORLDMAP_HOME_LAYOUT_CLIENT_SHA256='+h.hexdigest())
-          print('WORLDMAP_HOME_LAYOUT_FILE_CONTENT_INTERPRETED=false')
-          print('WORLDMAP_HOME_LAYOUT_CLIENT_EXECUTED=false')
-          print('WORLDMAP_HOME_LAYOUT_SECRET_USED=false')
+          link=share/'Tibia'; package=share/'packages/Tibia'
+          if not link.is_symlink(): raise SystemExit('WORLDMAP_SYMLINK_LAYOUT_ERROR=link_missing')
+          target=link.resolve()
+          if not target.exists(): raise SystemExit('WORLDMAP_SYMLINK_LAYOUT_ERROR=target_missing')
+          def kind(p):
+              m=p.lstat().st_mode
+              return 'DIR' if stat.S_ISDIR(m) else 'FILE' if stat.S_ISREG(m) else 'SYMLINK' if stat.S_ISLNK(m) else 'OTHER'
+          def top(root):
+              out=[]
+              if root.is_dir():
+                  for p in sorted(root.iterdir(),key=lambda x:x.name):
+                      try: out.append((p.name,kind(p),p.lstat().st_size))
+                      except OSError: pass
+              return out
+          print('WORLDMAP_SYMLINK_TARGET_KIND='+kind(target))
+          print('WORLDMAP_SYMLINK_PACKAGE_KIND='+kind(package))
+          for name,k,size in top(target): print(f'WORLDMAP_SYMLINK_TARGET_TOP={k}\t{name}\t{size}')
+          for name,k,size in top(package): print(f'WORLDMAP_SYMLINK_PACKAGE_TOP={k}\t{name}\t{size}')
+          for label,root in [('TARGET',target),('PACKAGE',package)]:
+              candidates=[root/'bin/client',root/'client']
+              c=next((p for p in candidates if p.is_file()),None)
+              print(f'WORLDMAP_SYMLINK_{label}_CLIENT_PATH='+('NONE' if c is None else str(c.relative_to(root))))
+              if c:
+                  h=hashlib.sha256()
+                  with c.open('rb') as f:
+                      for ch in iter(lambda:f.read(1024*1024),b''): h.update(ch)
+                  print(f'WORLDMAP_SYMLINK_{label}_CLIENT_SHA256='+h.hexdigest())
+          print('WORLDMAP_SYMLINK_TARGET_SAMEFILE_PACKAGE='+str(os.path.samefile(target,package) if package.exists() else False).lower())
+          print('WORLDMAP_SYMLINK_LAYOUT_FILE_CONTENT_INTERPRETED=false')
+          print('WORLDMAP_SYMLINK_LAYOUT_CLIENT_EXECUTED=false')
+          print('WORLDMAP_SYMLINK_LAYOUT_SECRET_USED=false')
           PY

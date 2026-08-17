@@ -29,6 +29,7 @@ jobs:
           set -Eeuo pipefail
           python3 -m py_compile .github/scripts/tibia-official-client-re-semantic-denominator.py
           rm -rf semantic-denominator-output
+          mkdir -p semantic-denominator-output
           python3 .github/scripts/tibia-official-client-re-semantic-denominator.py semantic-denominator-output | tee semantic-denominator-output/validation.txt
           python3 - <<'PY'
           import json

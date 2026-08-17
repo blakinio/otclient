@@ -34,6 +34,11 @@ def validate_executor_enabled(config: dict[str, Any]) -> dict[str, Any]:
         raise ExecutorError("real model executor is disabled")
     if cfg.get("mode") != "external_process":
         raise ExecutorError("executor.mode must be external_process")
+    provider = cfg.get("provider")
+    if not isinstance(provider, str) or not provider.strip():
+        raise ExecutorError("executor.provider must identify the concrete worker runtime")
+    if cfg.get("requires_owner_funded_ai", True) and not cfg.get("owner_funded_ai_allowed", False):
+        raise ExecutorError("executor provider requires owner-funded AI but authorization is false")
     command = cfg.get("command")
     if not isinstance(command, list) or not command or not all(isinstance(x, str) and x for x in command):
         raise ExecutorError("executor.command must be a non-empty argv list")
@@ -43,6 +48,11 @@ def validate_executor_enabled(config: dict[str, Any]) -> dict[str, Any]:
     max_workers = cfg.get("max_parallel_workers", config.get("max_parallel_workers"))
     if not isinstance(max_workers, int) or max_workers < 1:
         raise ExecutorError("executor.max_parallel_workers must be a positive integer")
+    if not isinstance(cfg.get("publish_results", False), bool):
+        raise ExecutorError("executor.publish_results must be boolean")
+    remote = cfg.get("remote", "origin")
+    if not isinstance(remote, str) or not remote.strip():
+        raise ExecutorError("executor.remote must be a non-empty remote name")
     return cfg
 
 
@@ -90,6 +100,24 @@ def _sanitized_env(cfg: dict[str, Any]) -> dict[str, str]:
         raise ExecutorError("executor.pass_env must be a list of variable names")
     allow.update(extra)
     return {key: value for key, value in os.environ.items() if key in allow}
+
+
+def _publish_result(worktree: Path, branch: str, base_sha: str, head_sha: str, cfg: dict[str, Any]) -> None:
+    if not cfg.get("publish_results", False):
+        return
+    remote = str(cfg.get("remote", "origin"))
+    remote_ref = f"refs/heads/{branch}"
+    before = _run_git(worktree, "ls-remote", remote, remote_ref).stdout.strip()
+    if before:
+        remote_head = before.split()[0]
+        if remote_head != base_sha:
+            raise ExecutorError("remote task branch moved since dispatch")
+    push = _run_git(worktree, "push", remote, f"HEAD:{remote_ref}", check=False)
+    if push.returncode:
+        raise ExecutorError(f"git push failed: {(push.stderr or '').strip()[-800:]}")
+    after = _run_git(worktree, "ls-remote", remote, remote_ref).stdout.strip()
+    if not after or after.split()[0] != head_sha:
+        raise ExecutorError("published branch head does not match worker result")
 
 
 def execute_dispatch(
@@ -172,6 +200,7 @@ def execute_dispatch(
         errors = orchestrator_results.validate_worker_result(result, dispatch, task, config)
         if errors:
             raise ExecutorError("invalid worker-result-v1: " + "; ".join(errors))
+        _publish_result(worktree, task.branch, base_sha, actual_head, cfg)
         return result
     finally:
         if added:
@@ -233,7 +262,7 @@ def execute_plan(
                 task_id = str(dispatch.get("task_id", ""))
                 try:
                     result_task_id, result = future.result()
-                except Exception as exc:  # bounded summary; failures never become accepted results
+                except Exception as exc:
                     failures.append({"task_id": task_id, "error": str(exc)})
                     continue
                 orchestrator_results.write_json(result, results_dir / f"{_safe_name(result_task_id)}.json")
@@ -245,6 +274,7 @@ def execute_plan(
     return {
         "schema_version": 1,
         "wave_id": plan.get("wave_id"),
+        "provider": cfg.get("provider"),
         "accepted": sorted(accepted),
         "failures": sorted(failures, key=lambda item: item["task_id"]),
         "results_dir": str(results_dir),

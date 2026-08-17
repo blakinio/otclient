@@ -9,7 +9,7 @@ track_id: official-client-re
 task_kind: implementation
 phase: archived
 base_branch: main
-base_main: f8e628a255a18ec92839bbb45ef0e3b40bef8605
+base_main: ec75e2606f7f4ad834e4b6be968fb03bdbff55df
 pr: 460
 execution_class: github_hosted
 runtime_access: none
@@ -62,17 +62,22 @@ fresh_audit:
   record: docs/agents/evidence/OTC-20260817-track-a-semantic-denominator-normalization/20260817-final-audit.md
   material_findings_open_for_task: 0
 current_main_drift_reconciliation:
-  merged_main: f8e628a255a18ec92839bbb45ef0e3b40bef8605
+  merged_main: ec75e2606f7f4ad834e4b6be968fb03bdbff55df
   denominator_counts_changed: false
   consumed_merges:
     - worldmap physical validation/archive through #466; NO_HANDLER_CANARY_OBSERVED_BOUNDED; causal propagation unproven
     - raw XRes physical resource-to-exact-client PID evidence through #457/#459
     - raw XRes client-base helper correction through #461
     - canonical raw XRes window-identity integration #465 at f8e628a255a18ec92839bbb45ef0e3b40bef8605
+    - final P0 controller-plane admission #467 at ec75e2606f7f4ad834e4b6be968fb03bdbff55df
+  canonical_lease_status: released
+  canonical_lease_generation: 7
+  authoritative_registration: ABSENT
   current_exact_client_pid: NOT_REGISTERED
   current_exact_client_session: NOT_REGISTERED
   canonical_gate_b: NOT_PROVEN
   current_structural_in_game: NOT_PROVEN
+  p0_disposition: BLOCKED_NO_LEGAL_EXISTING_IN_GAME_LIFECYCLE
 result:
   AUD-COV-002: RESOLVED_AS_DENOMINATOR_COMPLETENESS
   protocol_denominator: 349
@@ -86,7 +91,7 @@ result:
   programme_complete: false
 remaining_findings:
   - AUD-COV-003 MEDIUM action/QMeta 612-vs-1004 denominator definition conflict
-  - AUD-COV-004 HIGH current canonical live semantic/restart proof unavailable
+  - AUD-COV-004 HIGH current canonical live semantic/restart proof unavailable; #467 proves no legal existing IN_GAME lifecycle
   - AUD-COV-007 MEDIUM durable global coordinator checkpoint stale
 e2e:
   result: NOT_APPLICABLE
@@ -96,9 +101,8 @@ closeout:
   temporary_workflow_terminal_tree: absent
   active_task_terminal_tree: absent
   exact_terminal_head_repository_ci_required: true
-  ready_state_required_ci_required: true
   review_threads_required_zero: true
-last_completed_step: four finite canonical denominator registries materialized, integrated validator and fresh audit passed, and current-main runtime/worldmap drift through f8e628a was reconciled without changing denominator membership
+last_completed_step: four finite canonical denominator registries materialized, integrated validator and fresh audit passed, and current-main drift through final P0 admission #467 was reconciled without changing denominator membership
 next_action: run exact-head required CI and review hygiene on the refreshed PR #460 head, then merge if main remains compatible
 ---
 

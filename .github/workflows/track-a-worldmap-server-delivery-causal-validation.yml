@@ -55,6 +55,12 @@ jobs:
           grep -F "'iiiiii'" "$scan" >/dev/null
           grep -F "'WWWWWW'" "$scan" >/dev/null
           grep -F 'exit 0' "$scan" >/dev/null
+          grep -F '[[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]] || fail prelogin_focus_scan_secret_env_present' "$scan" >/dev/null
+          grep -F 'env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD' "$scan" >/dev/null
+          if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
+            echo 'WORLDMAP_FOCUS_STATIC_ERROR=credential_submission_survived' >&2
+            exit 1
+          fi
           if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan"; then
             echo 'WORLDMAP_FOCUS_STATIC_ERROR=login_submission_survived' >&2
             exit 1
@@ -65,10 +71,6 @@ jobs:
           fi
           if grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
             echo 'WORLDMAP_FOCUS_STATIC_ERROR=gameplay_stimulus_survived' >&2
-            exit 1
-          fi
-          if grep -F 'TIBIA_TEST_EMAIL' "$scan" || grep -F 'TIBIA_TEST_PASSWORD' "$scan"; then
-            echo 'WORLDMAP_FOCUS_STATIC_ERROR=credential_surface_survived' >&2
             exit 1
           fi
           echo 'WORLDMAP_PRELOGIN_FOCUS_SCAN_STATIC=PASS'

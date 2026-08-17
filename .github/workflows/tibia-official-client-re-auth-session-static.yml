@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file auth/session phase2 windows
+    name: Stage exact-file auth/session phase2b windows
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
@@ -84,7 +84,7 @@ jobs:
                   if t==1: segs.append((off,va,sz,flags))
 
               def read_va(start,end):
-                  if end <= start or end-start > 0x2000: raise SystemExit(52)
+                  if end <= start or end-start > 0x1000: raise SystemExit(52)
                   for off,va,sz,flags in segs:
                       if va <= start and end <= va+sz:
                           if not (flags & 1): raise SystemExit(53)
@@ -93,13 +93,13 @@ jobs:
                   raise SystemExit(54)
 
               windows={
-                  'connect_context':      (0x7d5400,0x7d5800),
-                  'existing_credentials': (0x6ef180,0x6ef900),
-                  'connect_impl':         (0x6fe400,0x6fec00),
-                  'session_connected':    (0x6ee080,0x6ee800),
-                  'character_helper':     (0x858980,0x859140),
-                  'character_enclosing':  (0xd46c00,0xd47400),
-                  'login_handlers':       (0xcf2e80,0xcf3280),
+                  'connect_context':      (0x7d55c0,0x7d56c0),
+                  'existing_credentials': (0x6ef1c0,0x6ef460),
+                  'connect_impl':         (0x6fe440,0x6fe760),
+                  'session_connected':    (0x6ee100,0x6ee3e0),
+                  'character_helper':     (0x858a20,0x858cf0),
+                  'character_enclosing':  (0xd47240,0xd47400),
+                  'login_handlers':       (0xcf2e80,0xcf3160),
               }
               staged={k:read_va(a,b) for k,(a,b) in windows.items()}
 
@@ -107,23 +107,23 @@ jobs:
           for key,data in staged.items():
               dig=hashlib.sha256(data).hexdigest()
               rows.append(f'{key}_hex={data.hex()}\n{key}_sha256={dig}\n')
-              print(f'AUTHSESSION_PHASE2_SOURCE_{key.upper()}_SHA256={dig}')
+              print(f'AUTHSESSION_PHASE2B_SOURCE_{key.upper()}_SHA256={dig}')
           with out.open('a') as h: h.write(''.join(rows))
 
-          print('AUTHSESSION_PHASE2_EXACT_FILE_FENCE=PASS')
+          print('AUTHSESSION_PHASE2B_EXACT_FILE_FENCE=PASS')
           print('AUTHSESSION_RUNTIME_ACCESS=none')
-          print('AUTHSESSION_PHASE2_SOURCE_PROCESS_OBSERVATION=false')
-          print('AUTHSESSION_PHASE2_SOURCE_X11_OBSERVATION=false')
-          print('AUTHSESSION_PHASE2_SOURCE_LOGIN=false')
-          print('AUTHSESSION_PHASE2_SOURCE_SECRET_ACCESS=false')
-          print('AUTHSESSION_PHASE2_SOURCE_DISASSEMBLY=false')
-          print('AUTHSESSION_PHASE2_SOURCE_SEMANTIC_CLASSIFICATION=false')
-          print('AUTHSESSION_PHASE2_RAW_CLIENT_UPLOADED=false')
-          print('AUTHSESSION_PHASE2_BOUNDED_FILE_WINDOWS_STAGED=true')
+          print('AUTHSESSION_PHASE2B_SOURCE_PROCESS_OBSERVATION=false')
+          print('AUTHSESSION_PHASE2B_SOURCE_X11_OBSERVATION=false')
+          print('AUTHSESSION_PHASE2B_SOURCE_LOGIN=false')
+          print('AUTHSESSION_PHASE2B_SOURCE_SECRET_ACCESS=false')
+          print('AUTHSESSION_PHASE2B_SOURCE_DISASSEMBLY=false')
+          print('AUTHSESSION_PHASE2B_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('AUTHSESSION_PHASE2B_RAW_CLIENT_UPLOADED=false')
+          print('AUTHSESSION_PHASE2B_BOUNDED_FILE_WINDOWS_STAGED=true')
           PY
 
   hosted-decode:
-    name: Decode auth/session phase2 on GitHub-hosted Linux
+    name: Decode compact phase2b auth/session evidence
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -156,13 +156,13 @@ jobs:
           from pathlib import Path
 
           specs={
-              'CONNECT_CONTEXT':      (0x7d5400,0x400),
-              'EXISTING_CREDENTIALS': (0x6ef180,0x780),
-              'CONNECT_IMPL':         (0x6fe400,0x800),
-              'SESSION_CONNECTED':    (0x6ee080,0x780),
-              'CHARACTER_HELPER':     (0x858980,0x7c0),
-              'CHARACTER_ENCLOSING':  (0xd46c00,0x800),
-              'LOGIN_HANDLERS':       (0xcf2e80,0x400),
+              'CONNECT_CONTEXT':      (0x7d55c0,0x100,0x7d55f0,0x7d5688),
+              'EXISTING_CREDENTIALS': (0x6ef1c0,0x2a0,0x6ef1d0,0x6ef3c0),
+              'CONNECT_IMPL':         (0x6fe440,0x320,0x6fe480,0x6fe6b0),
+              'SESSION_CONNECTED':    (0x6ee100,0x2e0,0x6ee130,0x6ee330),
+              'CHARACTER_HELPER':     (0x858a20,0x2d0,0x858a50,0x858c60),
+              'CHARACTER_ENCLOSING':  (0xd47240,0x1c0,0xd47280,0xd473c0),
+              'LOGIN_HANDLERS':       (0xcf2e80,0x2e0,0xcf2e80,0xcf30e0),
           }
 
           def get(name,n):
@@ -172,25 +172,34 @@ jobs:
                   raise SystemExit(75)
               return d
 
-          def disasm(name,start,n):
+          def compact(name,start,n,lo,hi):
               data=get(name,n)
-              with tempfile.TemporaryDirectory(prefix='auth-session-p2-') as td:
+              with tempfile.TemporaryDirectory(prefix='auth-session-p2b-') as td:
                   p=Path(td)/(name.lower()+'.bin'); p.write_bytes(data)
                   text=subprocess.run([
                       'objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',
                       f'--adjust-vma=0x{start:x}',str(p)
                   ],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
-              calls=sorted(set(int(x,16) for x in re.findall(r'\bcall\s+(?:0x)?([0-9a-f]+)\b',text)))
-              jumps=sorted(set(int(x,16) for x in re.findall(r'\bjmp\s+(?:0x)?([0-9a-f]+)\b',text)))
-              refs=sorted(set(int(x,16) for x in re.findall(r'#\s*0x([0-9a-f]+)',text)))
-              print(f'AUTHSESSION_PHASE2_{name}_CALL_TARGETS='+','.join(f'0x{x:x}' for x in calls))
-              print(f'AUTHSESSION_PHASE2_{name}_JUMP_TARGETS='+','.join(f'0x{x:x}' for x in jumps))
-              print(f'AUTHSESSION_PHASE2_{name}_RIP_REFS='+','.join(f'0x{x:x}' for x in refs))
-              print(f'AUTHSESSION_PHASE2_{name}_DISASSEMBLY_BEGIN')
-              print(text,end='')
-              print(f'AUTHSESSION_PHASE2_{name}_DISASSEMBLY_END')
+              selected=[]; calls=[]; refs=[]
+              for line in text.splitlines():
+                  m=re.match(r'^\s*([0-9a-f]+):\s+([0-9a-f ]+)\s+(.+)$',line)
+                  if not m: continue
+                  addr=int(m.group(1),16)
+                  if not (lo <= addr < hi): continue
+                  ins=m.group(3).strip()
+                  selected.append(f'{addr:x}: {ins}')
+                  cm=re.search(r'\bcall\s+(?:0x)?([0-9a-f]+)',ins)
+                  if cm: calls.append(int(cm.group(1),16))
+                  rm=re.search(r'#\s*0x([0-9a-f]+)',ins)
+                  if rm: refs.append(int(rm.group(1),16))
+              if not selected: raise SystemExit(76)
+              print(f'AUTHSESSION_PHASE2B_{name}_CALL_TARGETS='+','.join(f'0x{x:x}' for x in sorted(set(calls))))
+              print(f'AUTHSESSION_PHASE2B_{name}_RIP_REFS='+','.join(f'0x{x:x}' for x in sorted(set(refs))))
+              print(f'AUTHSESSION_PHASE2B_{name}_SLICE_BEGIN')
+              print('\n'.join(selected[:96]))
+              print(f'AUTHSESSION_PHASE2B_{name}_SLICE_END')
 
-          print('AUTHSESSION_PHASE2_HOSTED_DECODE=PASS')
+          print('AUTHSESSION_PHASE2B_HOSTED_DECODE=PASS')
           print('AUTHSESSION_RUNTIME_ACCESS=none')
-          for name,(start,n) in specs.items(): disasm(name,start,n)
+          for name,args in specs.items(): compact(name,*args)
           PY

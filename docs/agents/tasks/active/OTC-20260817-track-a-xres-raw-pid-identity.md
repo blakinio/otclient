@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260817-track-a-xres-raw-pid-identity
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-xres-raw-pid-identity-20260817
 session_role: runtime_discriminator
@@ -8,26 +8,26 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: runtime_discriminator
-phase: implement
+phase: validate-helper-fix
 branch: diag/OTC-20260817-track-a-xres-raw-pid-identity-physical-authorized-v1
 base_branch: main
 base_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
 pr: 455
 risk: high
-updated: 2026-08-17T11:09:00+02:00
+updated: 2026-08-17T11:14:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_class: synology_physical_runtime
-runner: synology-otclient-01
+execution_class: github_hosted
+runner: github-hosted
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 run_scope: autonomous_program
 continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
-runtime_access: ephemeral_isolated
-runtime_owner_task: OTC-20260817-track-a-xres-raw-pid-identity
-runtime_namespace: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-xres-raw-pid-identity/ephemeral-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -35,8 +35,8 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
-mutation_authorized: true
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
 client_byte_mutation_authorized: false
 persistent_session_role: none
 physical_e2e_required: true
@@ -54,49 +54,66 @@ prerequisites:
   prior_physical_discriminator: 31973388722
   prior_result: XRES_IDENTITY_UNRESOLVED_HELPER_UNAVAILABLE
 owned_paths:
+  - .github/scripts/tibia-official-client-re-xres-wire.py
+  - .github/scripts/test_tibia_official_client_re_xres_wire.py
   - docs/agents/tasks/active/OTC-20260817-track-a-xres-raw-pid-identity.md
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/**
-  - .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch.py
-  - .github/scripts/tibia-official-client-re-xres-raw-pid-identity-patch-v2.py
-  - .github/workflows/tibia-official-client-re-xres-raw-pid-identity.yml
 modules_touched:
+  - track-a-xres-wire-helper
   - track-a-xres-runtime-discriminator
 safety:
+  current_phase_runtime_access: none
   canonical_state_access: forbidden
   credentials_allowed: false
   login_allowed: false
   gameplay_allowed: false
   process_memory_access: false
   client_byte_mutation: false
-  exact_client_launch_limit: 1
+  v1_exact_client_launch_limit: 1
+  v1_exact_client_launches_consumed: 1
   track_b_access: false
   broad_process_cleanup: forbidden
-uniqueness_proof:
-  task_marker: OTCLIENT_TIBIA_RE_DIAG_TASK=OTC-20260817-track-a-xres-raw-pid-identity
-  state_root_is_per_task: true
-  state_leaf_is_run_and_attempt_scoped: true
-  namespace_must_not_preexist: true
-  x11_display_selected_only_from_free_231_250: true
-  warp_port_selected_only_if_not_listening: true
-  vnc_port_selected_only_if_not_listening: true
-  cleanup_signals_only_processes_with_task_marker_and_role: true
-  canonical_namespace_referenced: false
-  inherited_canonical_task_marker_rebound_by_v2_adapter: true
+physical_v1:
+  run: 32013868595
+  hosted_preflight_job: 95339063640
+  hosted_preflight_result: SUCCESS
+  physical_job: 95339104951
+  runtime_governance: PASS
+  exact_client_launches: 1
+  namespace: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-xres-raw-pid-identity/ephemeral-32013868595-1
+  source_fence: PASS
+  support_fence: PASS
+  warp: PASS
+  display: ':231'
+  xres_query_version: PROVEN
+  xres_server_version: '1.2'
+  xres_extension_major_opcode: 148
+  xres_query_client_ids_pid_identity: NOT_PROVEN
+  failure: QueryClientIds CLIENTIDVALUE.length was interpreted by promoted helper as CARD32-count rather than byte-count
+  cleanup: COMPLETE
+  canonical_state_access: NONE
+  login: false
+  gameplay: false
+helper_fix:
+  root_cause: XRes CLIENTIDVALUE.length is a byte count; LocalClientPid uses length=4 followed by one CARD32 PID, while promoted parser multiplied length by four again
+  parser_fix_commit: c466f1fcf350518f8b5d250439efc955dca7cf0d
+  regression_test_commit: 1a8de024e9d4274e5ea811f8aa9bafe743814239
+  one_shot_v1_workflow_retained: false
+  one_shot_v1_patchers_retained: false
+  physical_retry_on_v1_branch_authorized: false
 acceptance:
-  - fresh base-main and branch authorization fence passes immediately before physical execution
-  - Track A runtime governance check passes on the exact PR head/base
-  - immutable same-repository historical post-RHI harness and transforms pass exact blob fences
-  - exactly one task-owned isolated exact fenced official Linux client is launched
-  - target uniqueness is proven from the task-owned process/display namespace before observation is promoted
-  - raw non-root full-display VIEWABLE X11 resource is rediscovered in this run
-  - promoted transport-free XRes codec is used for QueryVersion and one-spec QueryClientIds(LocalClientPid)
-  - QueryExtension is obtained from the same fresh XCB connection without libxcb-res/libXRes dependency
-  - at least one VIEWABLE 1920x1080 XID directly returns the exact launched client PID
-  - task-owned process/display state is cleaned completely
-  - no canonical registration/lease/state, credentials, login or gameplay is touched
-  - exact-head repository/governance CI passes before promotion/closeout
+  - corrected helper treats CLIENTIDVALUE.length as bytes and rejects non-CARD32-aligned lengths
+  - LocalClientPid fixture encodes length=4 and one CARD32 PID for both byte orders
+  - deterministic malformed/truncated/oversized/ambiguous fixtures continue to fail closed
+  - helper remains pure and transport-free
+  - full #455 diff contains no reusable physical one-shot workflow/patcher
+  - fresh audit has zero material findings
+  - exact-head Track A governance, raw XRes helper workflow and repository CI pass
+  - #455 merges without claiming XID-to-PID identity proof
+  - same task then continues from merged main on a fresh physical-authorized-v2 branch with a new one-launch admission
 classification:
   desired: XRES_PROVES_VIEWABLE_WINDOW_OWNED_BY_EXACT_CLIENT
+  current: V1_PHYSICAL_DISCRIMINATOR_EXPOSED_PROMOTED_HELPER_PARSER_DEFECT
   failure_is_evidence: true
 validation:
   first_generation:
@@ -108,15 +125,24 @@ validation:
     physical_job: 95337705295
     physical_job_result: SKIPPED
     exact_client_launches: 0
-  repair:
-    hypothesis: post-RHI transform v2 shifts the PYALLX snapshot anchor indentation from two spaces to four spaces
-    evidence: historical accepted XRes v2 adapter on source lineage applied the same two-to-four-space anchor correction
-    action: v2 adapter now applies the indent correction and rebinds the inherited canonical task marker to this exact child task before any launch
-    identical_retry: false
-last_completed_step: the inherited transform ownership was rebound to this child task, the concrete run-scoped namespace and free-display/port/process-marker fences prove isolated target uniqueness, and no physical launch has yet been consumed
-next_action: execute the new exact-head hosted preflight and then exactly one physical PID-identity discriminator if governance and base fences pass.
+  ownership_generation:
+    run: 32013718874
+    hosted_job: 95338687963
+    hosted_result: SUCCESS
+    physical_job: 95338745980
+    physical_result: FAILED_ADMISSION_BEFORE_EXECUTION
+    exact_client_launches: 0
+  valid_physical_v1:
+    run: 32013868595
+    hosted_job: 95339063640
+    physical_job: 95339104951
+    result: PARSER_DEFECT_AFTER_ONE_LAUNCH
+    cleanup: COMPLETE
+    exact_client_launches: 1
+last_completed_step: one authorized v1 physical launch proved XRes 1.2 and exposed a deterministic CLIENTIDVALUE.length parser defect; cleanup completed, one-shot physical surfaces were removed, and the parser plus deterministic fixtures were corrected on #455
+next_action: validate the helper fix and terminal #455 diff on hosted exact head, perform a fresh audit, merge #455 when all gates pass, then continue this same task on a fresh physical-authorized-v2 branch from merged main.
 ---
 
 # Raw XRes PID identity discriminator
 
-This child task performs the one physical discriminator unlocked by merged #448. It does not relax canonical window identity and does not perform login/gameplay. It reuses the previously proven isolated post-RHI launch harness but replaces the unavailable convenience `libxcb-res` path with the promoted pure XRes wire codec plus a minimal task-local transport over a fresh XCB connection.
+The v1 physical discriminator is intentionally exhausted after exactly one isolated exact-client launch. It did not prove XID-to-PID ownership because it exposed a protocol-parser defect in the promoted #448 helper. Current work is static/hosted repair only; another physical launch requires a fresh v2 branch/admission after this helper fix reaches trusted `main`.

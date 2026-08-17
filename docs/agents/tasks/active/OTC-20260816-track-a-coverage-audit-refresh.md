@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260816-track-a-coverage-audit-refresh
-status: validating
+status: ready
 agent: ChatGPT
 session_id: chatgpt-coverage-audit-refresh-v3-20260817
 session_role: researcher_auditor
@@ -8,7 +8,7 @@ project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: audit
-phase: refresh-current-main-return-for-evidence
+phase: coordinator-review-ready
 branch: research/OTC-20260816-track-a-coverage-audit-refresh-v2
 base_branch: main
 base_main: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
@@ -18,7 +18,7 @@ supersedes_pr: 369
 coordinator_disposition: RETURN_FOR_EVIDENCE
 coordinator_comment: 5308970415
 coordinator_delta_comment: 5309008545
-updated: 2026-08-17T08:25:00+02:00
+updated: 2026-08-17T08:28:00+02:00
 risk: low
 researcher_delivery: draft_only
 implementation_authorized: false
@@ -100,11 +100,17 @@ open_findings:
   - AUD-COV-004 HIGH canonical live semantic/restart proof unavailable; current raw-XRes resource-to-PID identity frontier unresolved
   - AUD-COV-005 MEDIUM exact-client evidence production remains task-scoped rather than canonical/reusable
   - AUD-COV-007 MEDIUM durable coordinator checkpoint materially stale versus live Git
-ci_check_generation: refresh-v3-pending
+semantic_refresh_head: b53abf34230e0f98b75e3b7194b8fe165007676d
+semantic_refresh_governance_run: 32001872027
+semantic_refresh_governance_result: SUCCESS
+semantic_refresh_repository_ci_run: 32001872144
+semantic_refresh_repository_ci_result: SUCCESS
+semantic_refresh_changed_paths: 2
+ci_check_generation: final-task-status-head-pending
 ci_checks_for_current_head: 0
 terminal_ci_checks_for_current_generation: 0
-last_completed_step: consumed coordinator RETURN_FOR_EVIDENCE, reconciled current main through #445, resolved the P1 promotion finding, downgraded the staging finding after #437, and refreshed the missing-proof queue without weakening FAIL_MATERIAL_GAPS_OPEN
-next_action: update PR #390 on top of current main with exactly the refreshed report and task checkpoint, verify two-file diff, then run exact-head Track A governance plus repository CI and hand back to coordinator without merge/promotion
+last_completed_step: refreshed PR #390 onto exact main 55803133 with a two-file diff; semantic head b53abf34 passed Track A governance and repository CI without main drift
+next_action: validate this final task-status head with exact-head Track A governance and repository CI, verify review hygiene and two-file scope, then issue a no-head-change coordinator handoff; do not merge or promote
 ---
 
 # Track A coverage audit refresh — coordinator return-for-evidence continuation
@@ -121,12 +127,13 @@ next_action: update PR #390 on top of current main with exactly the refreshed re
 - [x] worldmap #367 and producer #437 consumed, including task-scoped sanitized exact-static production pattern;
 - [x] canonical coverage registry absence rechecked on current main;
 - [x] denominator boundaries and `FAIL_MATERIAL_GAPS_OPEN` preserved;
-- [ ] PR #390 refreshed onto current main with exactly two changed paths;
-- [ ] exact final-head Track A governance and repository CI succeed;
+- [x] PR #390 refreshed onto current main with exactly two changed paths;
+- [x] semantic refresh head passed Track A governance and repository CI;
+- [ ] final task-status exact head passes Track A governance and repository CI;
 - [ ] review submissions/threads remain clean before final coordinator handoff.
 
 ## Result
 
 `FAIL_MATERIAL_GAPS_OPEN` / `DRAFT_NOT_PROMOTED`.
 
-Current material findings: **6 = 3 HIGH + 3 MEDIUM**. The researcher does not merge or promote global coverage state.
+Current material findings: **6 = 3 HIGH + 3 MEDIUM**. Producer-side evidence refresh is complete; coordinator disposition remains the delivery gate.

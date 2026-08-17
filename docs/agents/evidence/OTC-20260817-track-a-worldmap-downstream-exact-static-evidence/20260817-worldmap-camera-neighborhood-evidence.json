@@ -1,0 +1,101 @@
+{
+  "schema": "track-a-worldmap-camera-neighborhood-curated-v1",
+  "task_id": "OTC-20260817-track-a-worldmap-downstream-exact-static-evidence",
+  "producer_pr": 446,
+  "consumer_pr": 367,
+  "client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "provenance": {
+    "run": 32003150333,
+    "source_job": 95307268007,
+    "source_result": "SUCCESS",
+    "source_artifact": 9279105537,
+    "source_artifact_digest": "sha256:9b44a39558c50ce86243dece3b3fac19bb1f7619112e913fa45b647878d9e28d",
+    "hosted_job": 95307487191,
+    "hosted_result": "SUCCESS",
+    "final_artifact": 9279111731,
+    "final_artifact_digest": "sha256:81620b3fd866e2203b2ed0a39a1a0979ba52b5e3af41b47ac7e247b09082effa",
+    "camera_vptr_xrefs": 11,
+    "bounded_windows": 11,
+    "bounded_raw_bytes": 225280,
+    "unique_hosted_instruction_records": 37325
+  },
+  "policy": {
+    "runtime_access": "none",
+    "client_executed": false,
+    "process_memory_accessed": false,
+    "canonical_state_accessed": false,
+    "client_bytes_mutated": false,
+    "raw_client_uploaded": false
+  },
+  "camera_identity": {
+    "vptr": "0x03083968",
+    "typeinfo": "0x03080500",
+    "typeinfo_relation": "RELA:R_X86_64_RELATIVE",
+    "rtti_name_pointer": "0x01cabce0",
+    "rtti_name_relation": "RELA:R_X86_64_RELATIVE",
+    "rtti": "tibia::renderer::TWorldMapCamera"
+  },
+  "camera_vptr_xrefs": [
+    "0x007e73ca",
+    "0x0082b630",
+    "0x00833dd0",
+    "0x00b39b48",
+    "0x00def35b",
+    "0x016bd85d",
+    "0x016bd97d",
+    "0x016c948b",
+    "0x016c967e",
+    "0x016e734d",
+    "0x016e746d"
+  ],
+  "constructor_layout": {
+    "anchor": "0x00def35b",
+    "facts": [
+      "0x00def35b loads exact Camera vptr 0x03083968 and 0x00def370 writes it to Camera+0x0",
+      "0x00def389 and 0x00def390 install embedded address point 0x02f69278 at Camera+0x98 and Camera+0xb8",
+      "0x00def3e4 writes scalar float bit pattern 0x3f800000 (1.0) to Camera+0xd0",
+      "0x00def3fc..0x00def418 initialize two four-vector blocks at Camera+0x10..+0x40 and Camera+0x54..+0x84 from static vector constants",
+      "surrounding Camera fields +0x50/+0x94/+0xa0/+0xa8/+0xb0/+0xc0/+0xc8/+0xdc are zero/default initialized"
+    ],
+    "inference": "The two vector blocks plus scalar 1.0 are transform/scale-like state, but this producer does not rename them as a projection matrix."
+  },
+  "coownership_edge": {
+    "classification": "FACT",
+    "higher_level_constructor_neighborhood": "0x007e73ca",
+    "facts": [
+      "0x007e73a4 installs counted TWorldMapCamera control vptr 0x02f692a0 and r15=control+0x10 is the inline Camera object",
+      "0x007e73ca installs exact Camera vptr 0x03083968 into that inline Camera object",
+      "0x007e7478 stores the Camera object pointer at higher-level owner+0xc8 and 0x007e7471 stores its counted block at owner+0xd0",
+      "0x007e7bbd later loads higher-level owner+0xa8 into rbp",
+      "0x007e7bf5 directly calls exact Viewport geometry recompute 0x00cbf700 with rbp, and the alternate dispatch at 0x007e7c2e jumps to the same recompute"
+    ],
+    "conclusion": "One exact higher-level world-map object co-owns/coordinates a TWorldMapViewport-compatible object at +0xa8 and counted TWorldMapCamera at +0xc8/+0xd0, and invokes Viewport recomputation after constructing the Camera state."
+  },
+  "bounded_dependency_result": {
+    "classification": "BOUNDED_NEGATIVE_RESULT",
+    "scope": "all 11 exact Camera-vptr xref neighborhoods, 225280 source bytes, 37325 unique hosted instructions",
+    "not_recovered": [
+      "no direct reference to exact TWorldMapStorage vptr 0x0308ce70",
+      "no direct reference to TWorldMapRenderProvider vptr 0x02f6c258",
+      "no direct reference to TWorldMapPicker vptr 0x02f6b7c8",
+      "no direct call to Storage slot12 0x00cc6cd0",
+      "no Camera-field read/write chain tied directly to Storage+0x48/+0x4c",
+      "no direct Camera-field read/write chain tied directly to Handler master extent +0xb0/+0xb4"
+    ],
+    "important_context": [
+      "the Camera neighborhoods do contain adjacent Viewport constructors/recompute because Camera and Viewport construction code is colocated and one higher-level owner coordinates both",
+      "the exact packed 18/14 literal 0x01cdd958 appears in the adjacent Viewport constructor, not as a promoted Camera field write"
+    ],
+    "conclusion": "No Camera mutation site or direct extent formula is proven. For the current dependency graph Camera is a co-owned transform/validation dependency; this bounded result does not prove global absence of an indirect Camera coupling elsewhere."
+  },
+  "consumer_disposition": {
+    "preidentified_camera_patch_site": false,
+    "camera_post_change_validation_required": true,
+    "named_projection_formula_recovered": false,
+    "safe_claim": "Camera exact layout and co-ownership are proven; direct extent coupling was not recovered in the fully enumerated exact-vptr neighborhoods."
+  }
+}

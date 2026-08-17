@@ -1,7 +1,7 @@
 ---
 task_id: OTC-20260817-agent-orchestrator-mvp
 project_lane: otclient
-status: implementing
+status: validating
 branch: feat/OTC-20260817-agent-orchestrator-mvp
 base_branch: main
 created: 2026-08-17
@@ -9,7 +9,7 @@ updated: 2026-08-17
 related_pr: "#463"
 policy_version: 2
 task_kind: implementation
-phase: implement
+phase: validate
 execution_mode: github
 execution_reason: repository-native Python tooling and GitHub Actions smoke are sufficient; no owner-funded AI execution is authorized
 context_pressure: medium
@@ -17,17 +17,17 @@ context_growth: stable
 context_score: 7
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: one reusable orchestrator MVP with deterministic planner, fan-out/fan-in smoke, context gate, then exact-head validation
+decomposition_reason: one reusable orchestrator MVP with deterministic planner, fan-out/fan-in smoke, context gate, live plan-only audit and exact-head validation
 session_id: gpt-5.6-sol-20260817-orchestrator-01
 session_role: implementer
 session_rotation_count: 0
-heavy_validation_runs: 0
+heavy_validation_runs: 2
 stale_takeover_count: 0
 human_interruptions: 0
 invocation_started_at: 2026-08-17T09:48:00Z
-last_progress_at: 2026-08-17T10:08:00Z
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+last_progress_at: 2026-08-17T10:15:00Z
+ci_checks_for_current_head: 3
+ci_check_generation: exact-head-pre-ready
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -102,10 +102,12 @@ The MVP does not invoke Codex, the OpenAI API, ChatGPT subscriptions, paid AI re
 - [x] Context governor never invents an exact token count; it consumes the repository 0-15 five-dimension pressure model and rotates `high`/`unbounded` work, rising medium pressure, or an optional verified low provider-context ratio.
 - [x] A worker-result contract validates task identity, branch/head identity, status, changed paths, validation/evidence references, context pressure, and one `next_action` while incomplete.
 - [x] `orchestrator.py barrier` ingests independent worker results, rejects malformed/mismatched results, overlays completed dependency state, and produces the next deterministic wave.
-- [ ] GitHub-hosted smoke workflow proves real matrix fan-out/fan-in with simulated workers and unlocks a dependent second wave without invoking any AI service.
+- [x] GitHub-hosted smoke workflow proves real matrix fan-out/fan-in with simulated workers and unlocks a dependent second wave without invoking any AI service.
 - [x] Focused tests cover independent selection, dependency hold/unlock, overlap serialization, context rotation, capacity, malformed result rejection, branch mismatch, provider ratio validation and deterministic ordering.
+- [x] Live repo plan-only audit parses the real active task inventory and fails closed rather than guessing when context/head evidence is missing.
+- [x] Fresh falsification audit independently exercises trust-boundary, ownership-overlap, context-rotation and result-base binding negatives.
 - [x] Documentation explains lifecycle, context rotation, trust boundary, executor adapter boundary, staged rollout and cross-repository porting.
-- [ ] Exact-head PR CI and dedicated orchestrator smoke workflow pass before any merge claim.
+- [ ] Final metadata head has exact-head required CI and Agent Orchestrator Smoke green before merge.
 
 ## Safety and non-goals
 
@@ -121,15 +123,17 @@ The MVP does not invoke Codex, the OpenAI API, ChatGPT subscriptions, paid AI re
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-17T10:08:00Z
-head: 3ae0ed05e7b3f1c09ebed6efec669d915c792d21
+updated_at: 2026-08-17T10:15:00Z
+head: 08208e7f9923ab3badaeb6129868eaaf5f14b69c
 branch: feat/OTC-20260817-agent-orchestrator-mvp
 pr: 463
-status: implementing
+status: validating
 context_routes:
   - agent-control-room
   - context-handoff
   - github-actions-smoke
+  - live-plan-only
+  - fresh-falsification-audit
 owned_paths:
   - tools/agents/orchestrator.py
   - tools/agents/orchestrator_core.py
@@ -146,13 +150,21 @@ proven:
   - Repository policy defines the five-dimension 0-15 context model and requires same-task rotation rather than guessing exact token capacity.
   - AUTONOMOUS_PROGRAM_CONTINUATION permits parallel independent owned paths while one coordinator retains barrier and integration responsibility.
   - Root AGENTS.md forbids owner-funded AI/model quota without explicit current authorization; this MVP invokes none.
-  - Main advanced from c55e3523e6e9d50df511e65dce9145a8f951a5f5 to 0b3bdec0a4145f558806448a4657413664d80729 during implementation; compare shows three commits and no overlap with orchestrator-owned paths.
+  - Main advanced from c55e3523e6e9d50df511e65dce9145a8f951a5f5 to 0b3bdec0a4145f558806448a4657413664d80729 during implementation; compare showed no overlap with orchestrator-owned paths, and 0b3bdec0a4145f558806448a4657413664d80729 is an explicit parent of implementation merge commit 5b071e4f2e3c908658aaef77f0d1189f3b0fde7f.
   - Local focused suite passes 14 tests after module refactor and includes CLI execution rather than py_compile-only evidence.
   - Fixture wave 1 deterministically selects OTC-TEST-A and OTC-TEST-B; barrier unlocks OTC-TEST-C in wave 2 while high-context OTC-TEST-D stays held.
+  - GitHub run 32018747718 on head 5b071e4f2e3c908658aaef77f0d1189f3b0fde7f completed SUCCESS and proved two matrix workers on distinct hosted runners followed by successful fan-in.
+  - GitHub run 32019049767 on head 08208e7f9923ab3badaeb6129868eaaf5f14b69c completed SUCCESS with focused tests, real inventory plan-only audit, parallel simulated workers, fan-in and fresh falsification audit.
+  - Live repo plan-only artifact 9284623311 reported selected=0, held=2, inactive=9; both held READY tasks were rejected with CONTEXT_UNKNOWN and HEAD_UNKNOWN rather than guessed into a wave.
+  - Fresh audit job 95354812788 emitted FRESH_ORCHESTRATOR_AUDIT_PASS=true after proving malicious next_action text is not propagated as an execution command, broad ownership conflicts serialize, high context rotates, and a mismatched result base SHA blocks the next wave.
+  - General CI run 32019049951 on head 08208e7f9923ab3badaeb6129868eaaf5f14b69c completed SUCCESS, including yamllint, pinned-source actionlint and informational static analysis.
+  - Track A governance run 32019049806 completed SUCCESS on the same head.
+  - PR #463 has no submitted reviews and no inline review threads as of this checkpoint.
 derived:
-  - The safe first production shape is deterministic control-plane mechanics plus a disabled model-executor boundary, followed by plan-only and read-only stages before any parallel writers.
+  - The safe first production shape is deterministic control-plane mechanics plus a disabled model-executor boundary, followed by explicit authorization and a read-only real-worker stage before parallel writers.
+  - Real active task inventory currently exposes no dispatchable otclient task under the new gates; metadata repair or future READY tasks will be needed before a real plan selects work.
 unknown:
-  - GitHub actionlint and the real hosted fan-out/fan-in result until PR #463 runs on the published implementation head.
+  - Exact-head workflow result for the metadata checkpoint commit created by this update.
 conflicts: []
 first_failure:
   marker: refactor-cli-missing-valid-growth-import
@@ -180,19 +192,31 @@ changed_paths:
 validation:
   - command: repository governance, live PR ownership and main-drift preflight
     result: PASS
-    evidence: no open tools/agents owner; current main 0b3bdec0a4145f558806448a4657413664d80729 differs only on Track A/XRes/runtime-evidence paths
+    evidence: no open tools/agents owner; current main 0b3bdec0a4145f558806448a4657413664d80729 was integrated as an implementation parent without owned-path overlap
   - command: PYTHONPATH=tools/agents python tools/agents/test_orchestrator.py
     result: PASS
     evidence: 14 tests passed including dependency, overlap, context, result-contract and deterministic-order cases
   - command: orchestrator CLI plan -> simulate A/B -> barrier -> assess-context
     result: PASS
     evidence: wave-1-9310b608fb68ad59 selected A+B; wave-2-f338f66bcf8a3d63 selected C+E; score 10 high produced rotate
-  - command: JSON and YAML parse checks
+  - command: GitHub Actions Agent Orchestrator Smoke run 32018747718
     result: PASS
-    evidence: orchestrator configs/schema parse as JSON; agent-orchestrator-smoke.yml parses as YAML
-  - command: GitHub Actions exact-head smoke and required CI
+    evidence: exact implementation head 5b071e4f2e3c908658aaef77f0d1189f3b0fde7f; two parallel matrix workers and fan-in succeeded
+  - command: GitHub Actions Agent Orchestrator Smoke run 32019049767
+    result: PASS
+    evidence: exact pre-checkpoint head 08208e7f9923ab3badaeb6129868eaaf5f14b69c; seven jobs including live plan-only and fresh falsification completed successfully
+  - command: live repo plan-only audit
+    result: PASS
+    evidence: artifact 9284623311; selected=0 held=2 inactive=9; held tasks fail closed on CONTEXT_UNKNOWN and HEAD_UNKNOWN
+  - command: fresh falsification audit
+    result: PASS
+    evidence: job 95354812788 emitted FRESH_ORCHESTRATOR_AUDIT_PASS=true
+  - command: general CI run 32019049951
+    result: PASS
+    evidence: exact pre-checkpoint head 08208e7f9923ab3badaeb6129868eaaf5f14b69c; CI completed SUCCESS
+  - command: exact-head final metadata CI
     result: NOT_RUN
-    evidence: pending publication of implementation commit
+    evidence: this checkpoint update creates the final metadata head and triggers the required workflows
 blockers: []
-next_action: Publish the implementation tree on top of current main and verify PR #463 exact-head Agent Orchestrator Smoke plus required CI.
+next_action: Verify exact-head workflows on the metadata checkpoint commit; if green and review state remains clean, mark PR #463 ready, merge it, then archive the task through the repository lifecycle closeout path.
 ```

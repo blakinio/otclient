@@ -233,7 +233,13 @@ def extract_local_client_pid(
     records: tuple[ClientIdValue, ...],
     resource_xid: int,
 ) -> int | None:
-    """Return one unambiguous LocalClientPid for the requested one-spec query."""
+    """Return one unambiguous LocalClientPid for the requested one-spec query.
+
+    QueryClientIds selects the owning X client from the requested resource XID,
+    but CLIENTIDVALUE.spec.client identifies that client and may be its resource
+    base rather than an echo of the exact resource XID. Fail closed on reply
+    cardinality, client identifier validity, mask and PID shape instead.
+    """
 
     xid = _uint(resource_xid, 32, "resource XID")
     if xid == 0:
@@ -246,13 +252,14 @@ def extract_local_client_pid(
         raise XResWireError("one-spec QueryClientIds reply must contain exactly one record")
 
     record = records[0]
-    if record.client != xid:
-        raise XResWireError("QueryClientIds reply did not identify the requested resource")
+    client = _uint(record.client, 32, "returned client identifier")
+    if client == 0:
+        raise XResWireError("QueryClientIds target record returned a zero client identifier")
     if record.mask != XRES_CLIENT_ID_MASK_LOCAL_CLIENT_PID:
         raise XResWireError("QueryClientIds target record returned an unexpected mask")
     if len(record.values) != 1:
         raise XResWireError("LocalClientPid record must contain exactly one CARD32 value")
-    pid = record.values[0]
+    pid = _uint(record.values[0], 32, "LocalClientPid")
     if pid == 0:
         raise XResWireError("LocalClientPid must be positive")
     return pid

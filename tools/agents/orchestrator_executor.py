@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
 from typing import Any
 
 import orchestrator_core
@@ -19,6 +20,9 @@ import resume
 
 class ExecutorError(RuntimeError):
     pass
+
+
+_WORKTREE_LOCK = threading.Lock()
 
 
 def _executor_config(config: dict[str, Any]) -> dict[str, Any]:
@@ -148,13 +152,14 @@ def execute_dispatch(
 
     added = False
     try:
-        add = subprocess.run(
-            ["git", "-C", str(repo_root), "worktree", "add", "--detach", str(worktree), base_sha],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
+        with _WORKTREE_LOCK:
+            add = subprocess.run(
+                ["git", "-C", str(repo_root), "worktree", "add", "--detach", str(worktree), base_sha],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
         if add.returncode:
             raise ExecutorError(f"git worktree add failed: {(add.stderr or '').strip()[-800:]}")
         added = True
@@ -204,13 +209,14 @@ def execute_dispatch(
         return result
     finally:
         if added:
-            subprocess.run(
-                ["git", "-C", str(repo_root), "worktree", "remove", "--force", str(worktree)],
-                text=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-            )
+            with _WORKTREE_LOCK:
+                subprocess.run(
+                    ["git", "-C", str(repo_root), "worktree", "remove", "--force", str(worktree)],
+                    text=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                )
         if worktree.exists():
             shutil.rmtree(worktree, ignore_errors=True)
 

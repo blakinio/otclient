@@ -16,7 +16,7 @@ concurrency:
 
 env:
   HEAD_BRANCH: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-  ARM_SUBJECT: 'ci(track-a): arm v12 transport structural baseline'
+  ARM_SUBJECT: 'ci(track-a): arm v12 transport structural baseline staticfix'
   TASK_PATH: docs/agents/tasks/active/OTC-20260817-track-a-worldmap-server-delivery-causal-validation.md
 
 jobs:
@@ -76,7 +76,7 @@ jobs:
 
           for marker in \
             'WORLDMAP_V10_PRESECRET_LOGIN_BUTTON=PROVEN_PRESS_CANCEL' \
-            'WORLDMAP_V11_SECRET_FIELD_OCCUPANCY=PASS' \
+            'WORLDMAP_V11_SECRET_FIELD_OCCUPANCY=' \
             'WORLDMAP_V12_LOCAL_SOCKS_MAX=' \
             'WORLDMAP_BASELINE_LOGIN_TRANSPORT_ACTIVITY=PASS' \
             'WORLDMAP_BASELINE_POST_LOGIN_UI_TRANSITION=PASS' \

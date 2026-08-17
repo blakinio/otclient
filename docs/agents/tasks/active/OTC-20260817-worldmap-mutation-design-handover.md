@@ -1,15 +1,16 @@
 ---
 task_id: OTC-20260817-worldmap-mutation-design-handover
-status: implementing
+status: validating
 agent: ChatGPT
 project_lane: otclient
 lane: DOCUMENTATION-PROMPTING
 task_kind: documentation_and_prompt_handover
-phase: implement
+phase: validate
 branch: docs/OTC-20260817-worldmap-mutation-design-handover
 base_branch: main
 base_main: f8e628a255a18ec92839bbb45ef0e3b40bef8605
-pr: null
+live_main_observed: ec75e2606f7f4ad834e4b6be968fb03bdbff55df
+pr: 468
 risk: low
 owned_paths:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_WORLDMAP_MUTATION_DESIGN.md
@@ -42,7 +43,15 @@ feature_scope:
 implementation_authorized: true
 client_byte_mutation_authorized: false
 owner_funded_ai_api_authorized: false
-next_action: persist handover and prompt evaluation, open Draft PR, validate exact head, archive task, then merge if repository gates pass
+prompt_eval:
+  mode: documented_manual_scenario_matrix
+  result: PASS_CONTRACT_INSPECTION
+  automated_trials: NOT_AVAILABLE_NOT_CLAIMED
+branch_drift:
+  ahead_by: 5
+  behind_by: 1
+  merge_base: f8e628a255a18ec92839bbb45ef0e3b40bef8605
+next_action: validate PR #468 exact head and changed paths/reviews/CI; archive task and merge only after repository gates pass
 ---
 
 # Worldmap mutation-design handover
@@ -53,9 +62,10 @@ Persist the completed #367 research outcome and provide one repository-owned aut
 
 ## Acceptance
 
-- full worker prompt exists and carries every material accepted fact/UNKNOWN from #367;
-- short alias resolves the worker prompt and requires live-state reuse rather than duplicate tasks;
-- prompt-as-code evaluation record exists per `PROMPT_EVAL_STANDARD.md`;
-- durable handover records what was proven, what it enables, what remains and the exact next phase;
-- documentation-only validation and exact-head CI pass;
-- final diff is scoped, review threads are clear, task is archived and PR is merged under normal repository policy.
+- [x] full worker prompt exists and carries every material accepted fact/UNKNOWN from #367;
+- [x] short alias resolves the worker prompt and requires live-state reuse rather than duplicate tasks;
+- [x] prompt-as-code evaluation record exists per `PROMPT_EVAL_STANDARD.md`;
+- [x] durable handover records what was proven, what it enables, what remains and the exact next phase;
+- [ ] documentation-only exact-head CI passes;
+- [ ] final diff is scoped and review threads are clear;
+- [ ] task is archived and PR is merged under normal repository policy.

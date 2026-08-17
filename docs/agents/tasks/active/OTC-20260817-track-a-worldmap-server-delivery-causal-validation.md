@@ -8,13 +8,13 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: baseline_ephemeral_ui_locator_repair
+phase: baseline_ephemeral_login_capture
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
-base_sha: 7fa86095667dcc71005fbf366921c4cb565ebc3f
-restack_commit: d14b3f6449ba45307e0889cb5f52d45a5722bbdd
+base_sha: 83034227280dc3bfdf589a991f0fdbbabab7dc87
+restack_commit: f6848a59224ce891067b12a8b3f65da1609ee985
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T14:13:00+02:00
+updated: 2026-08-17T14:24:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -71,7 +71,7 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: UNKNOWN
+target_uniqueness: PROVEN_FOR_PRESECRET_BASELINE_RUNS
 mutation_authorized: false
 credentials_allowed: true
 login_allowed: true
@@ -82,7 +82,7 @@ bootstrap_for_worldmap_authorized: true
 login_for_worldmap_authorized: true
 second_live_session_authorized: false
 owner_authorization_source: current conversation
-owner_authorization_text: "wykonaj i czekam na wyniki"
+owner_authorization_text: "wykonaj i czekam na wyniki"; reaffirmed "kontynuuj prace i masz moje zgody"
 owner_authorization_scope: bounded exact baseline versus first [19,14] causal worldmap server-delivery experiment, including login/relogin, one reversible movement pair, instrumentation and rollback
 owner_funded_ai_api_authorized: false
 exact_client:
@@ -102,13 +102,14 @@ mutation_design:
 launch_budget:
   canonical_exact_bootstrap_consumed: 1
   canonical_xres_repair_launch_consumed: 0
-  baseline_ephemeral_client_launches_consumed: 2
+  baseline_ephemeral_client_launches_consumed: 5
   baseline_ephemeral_login_max: 1
   baseline_ephemeral_login_consumed: 0
   baseline_ephemeral_observer_repair_max: 1
   baseline_ephemeral_observer_repairs_consumed: 1
   baseline_ephemeral_ui_locator_repair_max: 1
-  baseline_ephemeral_ui_locator_repairs_consumed: 0
+  baseline_ephemeral_ui_locator_repairs_consumed: 1
+  baseline_ephemeral_pre_secret_loader_repairs_consumed: 1
   patched_ephemeral_login_max: 1
   patched_ephemeral_login_consumed: 0
   simultaneous_logged_in_sessions_max: 1
@@ -125,14 +126,14 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T14:13:00+02:00
+last_progress_at: 2026-08-17T14:24:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: baseline-ui-locator-repair
+ci_check_generation: xwd-loader-preflight-pass
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
-identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+identical_failure_retries: 1
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -160,7 +161,12 @@ RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 - `32025860356 / 95375014679`: canonical XRes retry refused pre-launch by the one-shot admission guardrail.
 - `32026662197 / 95377398485`: first isolated exact-client/XRes/WARP path proved target uniqueness; observer exited before credentials. Cleanup/source rehash passed.
 - `32027110459 / 95378725544`: deterministic no-client test proved observer exit root cause was missing toolroot `libpython3.12.so.1.0`; same GDB with toolroot `LD_LIBRARY_PATH` returned success.
-- `32027454382 / 95379752642`: repaired physical baseline proved `WORLDMAP_BASELINE_PRE_STORAGE_OBSERVER=ARMED`, then stopped at `tesseract_missing_before_secret_use`; credentials/login/gameplay were still unused. Cleanup/source rehash passed. Durable record `20260817-ephemeral-baseline-attempt-2.md`.
+- `32027454382 / 95379752642`: repaired physical baseline proved `WORLDMAP_BASELINE_PRE_STORAGE_OBSERVER=ARMED`, then stopped at `tesseract_missing_before_secret_use`; credentials/login/gameplay were unused. Cleanup/source rehash passed.
+- `32028641905 / 95383408028`: OCR-free helper reached the pre-Storage observer and failed before screen capture/secret use on deterministic Bash `stem: unbound variable`; source rehash and cleanup passed.
+- `32029117879 / 95384858852` and `32029164295 / 95385382498`: after the nounset repair, both reached the pre-Storage observer and failed before secret submission because toolroot `xwd` lacked its toolroot runtime library search path (`libxkbfile.so.1`); both source rehashes and cleanups passed. The second generation was an already-queued identical failure and is counted as one identical retry, not as a consumed login.
+- `32029511115 / 95386107932`: no-client safety-hold discriminator proved the isolated toolroot library roots close the XWD dependency set and reach normal XWD execution: `WORLDMAP_XWD_TOOLROOT_DYNAMIC_LINK=PASS`, `CLIENT_EXECUTED=false`, `SECRET_USED=false`.
+
+Durable repair record: `docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260817-presecret-ui-loader-repairs.md`.
 
 # OCR-free UI repair
 
@@ -171,17 +177,15 @@ Retained exact-client artifacts were re-inspected without persisting account ide
 
 Raw-XWD grayscale ratio calibration over the fixed ROI is durable in `20260817-ui-geometry-without-ocr.md`: login `0.159848...`, select `0.989090...`, world `0.435`, loading `0.003787...`. The runtime classifier requires exact XWD header geometry and bounded pixel/luminance predicates. It is bootstrap geometry only; structural `IN_GAME` still requires actual FullMap plus map-description records.
 
-Static combined repair validation run `32028481996`, head `8bda8533a866a91079cdac0b256bf3f1b4f3b50d`, completed SUCCESS: Python compile, classifier self-test, GDB repair transform, raw-XWD UI transform, `bash -n`, exactly one toolroot GDB `LD_LIBRARY_PATH`, required geometry markers, and zero OCR/tesseract surface in the final helper. No physical runtime occurred in that validation.
-
-This checkpoint authorizes exactly one changed-hypothesis UI-locator repair. It must preserve the proven pre-login GDB observer. Before credentials, the live screen must classify as `LOGIN_FORM`; after login, the screen must classify as `SELECT_CHARACTER` before selecting the first row. Any classifier/geometry failure stops before further secret or gameplay action. World entry must be proved by FullMap/map-description, not pixels.
+The combined helper now has three independently bounded prerequisites before credentials: proven GDB toolroot environment, proven raw-XWD classifier geometry, and proven toolroot XWD dynamic-link closure. No prior repair run emitted `WORLDMAP_BASELINE_LOGIN_SUBMITTED=true`.
 
 # Execution phases
 
 1. **DONE** canonical boundary / cleanup.
 2. **DONE** isolated exact-client XRes/WARP path.
 3. **DONE** pre-Storage observer gate after one GDB environment repair.
-4. **ACTIVE** one OCR-free raw-XWD UI-locator repair leading to the first actual baseline login if all pre-secret gates pass.
-5. **PENDING** baseline FullMap/map-description extent + Right/Left + transport confinement + cleanup.
+4. **DONE** OCR-free raw-XWD UI locator and toolroot loader repair, including no-client dynamic-link discriminator.
+5. **ACTIVE** first actual baseline login + FullMap/map-description extent + Right/Left + transport confinement + cleanup.
 6. **PENDING** patched namespace/preimage/target-uniqueness admission.
 7. **PENDING** one task-owned `[19,14]` login/capture with identical structural instrumentation/stimulus.
 8. **PENDING** patched rollback/source rehash/cleanup.
@@ -194,15 +198,18 @@ Fail closed on main drift, non-idle canonical controller state, namespace collis
 # Checkpoint
 
 ```yaml
-checkpoint_version: 7
-updated_at: 2026-08-17T14:13:00+02:00
-base_main: 7fa86095667dcc71005fbf366921c4cb565ebc3f
+checkpoint_version: 8
+updated_at: 2026-08-17T14:24:00+02:00
+base_main: 83034227280dc3bfdf589a991f0fdbbabab7dc87
+restack_commit: f6848a59224ce891067b12a8b3f65da1609ee985
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
-phase: baseline_ephemeral_ui_locator_repair
+phase: baseline_ephemeral_login_capture
 runtime_access: ephemeral_isolated
-last_completed_step: pre-Storage observer physically armed; OCR tooling stop preserved pre-secret; raw-XWD OCR-free locator recovered from retained exact-client evidence and combined helper validation passed
+baseline_login_consumed: 0
+patched_login_consumed: 0
+last_completed_step: no-client XWD toolroot dynamic-link discriminator passed after all prior physical repair generations stopped before credential submission; source rehash/cleanup remained clean
 blockers: []
-next_action: Execute exactly one baseline generation with both already-proven GDB environment repair and statically validated raw-XWD UI locator; persist sanitized structural extent only if FullMap/map-description and transport confinement pass.
+next_action: Restore the admitted physical baseline workflow with the proven XWD library binding and execute the single baseline login/capture. Persist only sanitized structural extent if FullMap/map-description and transport confinement pass.
 ```

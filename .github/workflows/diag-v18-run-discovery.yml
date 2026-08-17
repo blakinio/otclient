@@ -37,16 +37,15 @@ jobs:
           from pathlib import Path
           import re,sys
           src=Path(sys.argv[1]).read_text(errors='replace').splitlines()
-          allow=re.compile(r'(WORLDMAP_V19_[A-Z0-9_]+(?:=[^\r\n]*)?|WORLDMAP_V18_(?:POSTAUTH_CHARSEL_INSTANCE_COUNT|RUNTIME_ADDRESS_PROVEN|NATIVE_CHARACTER_LIST_COUNT|NATIVE_CHARACTER_LIST_DISCOVERY|NATIVE_SELECTION_INDEX|QT_THREAD_AFFINITY|SELECTED_LOGIN_DATA_BEFORE|CONST_SELECTION_VIEW|SELECTED_LOGIN_DATA_AFTER|NATIVE_CHARACTER_CONFIRMATION_QMETA|SEMANTIC_RESULT)=[^\r\n]*|WORLDMAP_BASELINE_(?:ERROR|STRUCTURAL_IN_GAME|MAP_SCREENSHOT|LOGIN_SUBMITTED|LOGIN_TRANSPORT_ACTIVITY|POST_LOGIN_UI_TRANSITION|ORIGINAL_SOURCE_REHASH|CLEANUP|LOGIN_BUDGET_CONSUMED)=[^\r\n]*|WORLDMAP_FINAL_NAMESPACE_PROCESS_COUNT=[^\r\n]*)')
+          allow=re.compile(r'(WORLDMAP_V19_[A-Za-z0-9_]+=[^\r\n]*|WORLDMAP_V18_(?:POSTAUTH_CHARSEL_INSTANCE_COUNT|RUNTIME_ADDRESS_PROVEN|NATIVE_CHARACTER_LIST_COUNT|NATIVE_CHARACTER_LIST_DISCOVERY|NATIVE_SELECTION_INDEX|QT_THREAD_AFFINITY|SELECTED_LOGIN_DATA_BEFORE|CONST_SELECTION_VIEW|SELECTED_LOGIN_DATA_AFTER|NATIVE_CHARACTER_CONFIRMATION_QMETA|SEMANTIC_RESULT)=[^\r\n]*|WORLDMAP_BASELINE_(?:ERROR|STRUCTURAL_IN_GAME|MAP_SCREENSHOT|LOGIN_SUBMITTED|LOGIN_TRANSPORT_ACTIVITY|POST_LOGIN_UI_TRANSITION|ORIGINAL_SOURCE_REHASH|CLEANUP|LOGIN_BUDGET_CONSUMED)=[^\r\n]*|WORLDMAP_FINAL_NAMESPACE_PROCESS_COUNT=[^\r\n]*)')
           vals=[]
           for line in src:
-              m=allow.search(line)
-              if m:
+              for m in allow.finditer(line):
                   v=m.group(1).strip()
-                  if v not in vals: vals.append(v)
+                  if v not in vals:vals.append(v)
           Path(sys.argv[2]).write_text('\n'.join(vals)+'\n')
           print('\n'.join(vals))
-          if not vals: raise SystemExit('no sanitized markers')
+          if not vals:raise SystemExit('no sanitized markers')
           PY
           ! grep -Eiq '(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD|password=|email=|sessionkey|devicecookie|token=)' .diag/v19-physical-markers.txt
       - name: Persist sanitized markers
@@ -55,5 +54,5 @@ jobs:
           set -Eeuo pipefail
           git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .diag/v19-physical-markers.txt
-          git commit -m 'diag(track-a): persist sanitized v19 physical markers'
+          git commit -m 'diag(track-a): refresh sanitized v19 physical markers'
           git push origin HEAD:diag/OTC-20260818-v18-run-discovery

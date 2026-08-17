@@ -106,9 +106,9 @@ else:
                     current=int(gdb.parse_and_eval(f'((void*(*)())0x{qc:x})()')) if qc else -1
                 except Exception:
                     owner=0;current=-1
+                result=''
                 if owner==0 or owner!=current:
-                    gdb.execute('set scheduler-locking off',to_string=True)
-                    emit19('WORLDMAP_V19_AUTH_FALLBACK=FAIL:qt_thread_affinity')
+                    result='FAIL:qt_thread_affinity'
                 else:
                     emit19('WORLDMAP_V19_AUTH_QT_THREAD_AFFINITY=PASS')
                     ok=False
@@ -119,12 +119,13 @@ else:
                         )
                         ok=True
                     except Exception:ok=False
-                    gdb.execute('set scheduler-locking off',to_string=True)
                     if ok:
                         emit19('WORLDMAP_V19_AUTH_METHOD5_QMETA_INVOCATION=PASS')
-                        emit19('WORLDMAP_V19_AUTH_FALLBACK=PASS')
+                        result='PASS'
                     else:
-                        emit19('WORLDMAP_V19_AUTH_FALLBACK=FAIL:qmeta_invocation')
+                        result='FAIL:qmeta_invocation'
+                gdb.execute('set scheduler-locking off',to_string=True)
+                emit19('WORLDMAP_V19_AUTH_FALLBACK='+result)
 end
 continue
 '''
@@ -233,7 +234,6 @@ def transform(text: str) -> str:
     missing=[x for x in required if x not in out]
     if missing:raise TransformRefused('REQUIRED_MISSING:'+','.join(missing))
     forbidden=(
-        'set scheduler-locking on\',
         'Invalid Monk',
         "M(0xd47300,'RequestCharacterLogin')",
         "M(0xd47130,'CharacterSelectionConfirmed')",
@@ -243,12 +243,10 @@ def transform(text: str) -> str:
         'FIELD_DERIVED_ROW_DOUBLECLICK_RETURN',
         '"$XWD" -root','xwd -root','xrandr --output','wmctrl -r',
     )
-    # Scheduler-locking is allowed only when paired with an explicit off in the
-    # same semantic/fallback block; do not use the crude string check for it.
-    survivors=[x for x in forbidden[1:] if x in out]
+    survivors=[x for x in forbidden if x in out]
     if survivors:raise TransformRefused('FORBIDDEN_SURVIVORS:'+','.join(survivors))
-    if out.count("set scheduler-locking on") != out.count("set scheduler-locking off"):
-        raise TransformRefused(f"SCHEDULER_LOCKING_UNBALANCED:{out.count('set scheduler-locking on')}:{out.count('set scheduler-locking off')}")
+    if out.count("set scheduler-locking on") != 2 or out.count("set scheduler-locking off") != 2:
+        raise TransformRefused(f"SCHEDULER_LOCKING_EXPECTED_2_2:{out.count('set scheduler-locking on')}:{out.count('set scheduler-locking off')}")
     return out
 
 

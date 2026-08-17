@@ -1,0 +1,180 @@
+name: Track A worldmap mutation physical canary v1
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-worldmap-mutation-physical-v1.yml
+      - .github/scripts/tibia-official-client-re-worldmap-copy-patch.py
+      - .github/scripts/tibia-official-client-re-worldmap-mutation-physical-v1.py
+      - docs/agents/tasks/active/OTC-20260817-track-a-worldmap-mutation-physical-validation.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-worldmap-mutation-physical-v1
+  cancel-in-progress: false
+
+jobs:
+  hosted-preflight:
+    name: Hosted worldmap mutation canary preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Validate patch helper and generated sandbox script
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-worldmap-copy-patch.py \
+            .github/scripts/tibia-official-client-re-worldmap-mutation-physical-v1.py
+          python3 .github/scripts/tibia-official-client-re-worldmap-copy-patch.py self-test
+
+          tmp="$(mktemp -d)"
+          trap 'rm -rf -- "$tmp"' EXIT
+          harness="$tmp/harness.yml"
+          t1="$tmp/tibia-official-client-re-post-rhi-window-state-transform.py"
+          t2="$tmp/tibia-official-client-re-post-rhi-window-state-transform-v2.py"
+          base_script="$tmp/base.sh"
+          final_script="$tmp/final.sh"
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$harness" \
+            https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$t1" \
+            https://raw.githubusercontent.com/blakinio/otclient/8e9cc81011383922cf6bad75ca7207deb749fffb/.github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$t2" \
+            https://raw.githubusercontent.com/blakinio/otclient/8e9cc81011383922cf6bad75ca7207deb749fffb/.github/scripts/tibia-official-client-re-post-rhi-window-state-transform-v2.py
+          [[ "$(git hash-object "$harness")" == 1616edcc982be50ef2c95b8077160ec8fe9291fe ]]
+          [[ "$(git hash-object "$t1")" == d663a40c446983c7359265bf834113ba49e6a5d1 ]]
+          [[ "$(git hash-object "$t2")" == b9d15f8d1131339b06bfa9cb1e81940c2163a283 ]]
+          python3 -m py_compile "$t1" "$t2"
+          python3 "$t2" "$harness" "$base_script"
+          python3 .github/scripts/tibia-official-client-re-worldmap-mutation-physical-v1.py "$base_script" "$final_script"
+          bash -n "$final_script"
+          python3 - "$final_script" <<'PY'
+          from pathlib import Path
+          import sys
+          text = Path(sys.argv[1]).read_text(encoding='utf-8')
+          required = (
+              "task='OTC-20260817-track-a-worldmap-mutation-physical-validation'",
+              'tibia-official-client-re-worldmap-copy-patch.py',
+              'WORLDMAP_PATCH_CANDIDATE=19,14',
+              'WORLDMAP_PATCH_DIFF_BYTES=1',
+              'WORLDMAP_LIVE_PATCHED_PROCESS_FENCE=PASS',
+              'WM_HANDLER=',
+              'WM_STORAGE=',
+              'WORLDMAP_STRUCTURAL_CLASSIFICATION=',
+              'WORLDMAP_ORIGINAL_SOURCE_REHASH=PASS',
+              'WORLDMAP_PATCHED_COPY_REMOVED=PASS',
+              'WINDOW_DIAG_CLEANUP=COMPLETE',
+          )
+          missing = [x for x in required if x not in text]
+          if missing:
+              raise SystemExit(f'WORLDMAP_PREFLIGHT_MISSING={missing}')
+          forbidden = (
+              'runtime-registration.json',
+              'canonical-live-runtime',
+              'TIBIA_TEST_EMAIL=',
+              'TIBIA_TEST_PASSWORD=',
+              "'QT_XCB_GL_INTEGRATION': 'none'",
+              'QSG_RHI_BACKEND',
+          )
+          present = [x for x in forbidden if x in text]
+          if present:
+              raise SystemExit(f'WORLDMAP_PREFLIGHT_FORBIDDEN={present}')
+          if text.count('WORLDMAP_PATCH_CANDIDATE=19,14') != 1:
+              raise SystemExit('WORLDMAP_PREFLIGHT=CANARY_COUNT')
+          print('WORLDMAP_HOSTED_PREFLIGHT=PASS')
+          PY
+
+  physical-canary:
+    name: Physical worldmap patched-copy canary v1
+    if: ${{ endsWith(github.event.pull_request.head.ref, '-physical-authorized-v1') }}
+    needs: hosted-preflight
+    runs-on: [otclient, synology]
+    timeout-minutes: 14
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Revalidate Track A admission and live main fence
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          EXPECTED_BASE_SHA: 1eb4a8edecba3966aa1e6155e241b404eb4d30cb
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          [[ "$BASE_SHA" == "$EXPECTED_BASE_SHA" ]] || {
+            echo "WORLDMAP_REFUSED=EVENT_BASE_DRIFT:$BASE_SHA"
+            exit 44
+          }
+          git fetch --no-tags origin main
+          live_main="$(git rev-parse origin/main)"
+          [[ "$live_main" == "$EXPECTED_BASE_SHA" ]] || {
+            echo "WORLDMAP_REFUSED=LIVE_MAIN_DRIFT:$live_main"
+            exit 44
+          }
+          echo 'WORLDMAP_RUNTIME_ADMISSION=PASS'
+          echo "WORLDMAP_LIVE_MAIN=$live_main"
+
+      - name: Execute exactly one isolated patched-copy structural canary
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: 1eb4a8edecba3966aa1e6155e241b404eb4d30cb
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          python3 .github/scripts/tibia-official-client-re-worldmap-copy-patch.py self-test
+
+          tmp="$(mktemp -d)"
+          trap 'rm -rf -- "$tmp"' EXIT
+          harness="$tmp/harness.yml"
+          t1="$tmp/tibia-official-client-re-post-rhi-window-state-transform.py"
+          t2="$tmp/tibia-official-client-re-post-rhi-window-state-transform-v2.py"
+          base_script="$tmp/base.sh"
+          final_script="$tmp/final.sh"
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$harness" \
+            https://raw.githubusercontent.com/blakinio/otclient/cb557da12ebb41c597340909b2db717ee59cdfe1/.github/workflows/tibia-official-client-re-window-ownership-discriminator-v2.yml
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$t1" \
+            https://raw.githubusercontent.com/blakinio/otclient/8e9cc81011383922cf6bad75ca7207deb749fffb/.github/scripts/tibia-official-client-re-post-rhi-window-state-transform.py
+          curl -fsSL --retry 3 --connect-timeout 10 -o "$t2" \
+            https://raw.githubusercontent.com/blakinio/otclient/8e9cc81011383922cf6bad75ca7207deb749fffb/.github/scripts/tibia-official-client-re-post-rhi-window-state-transform-v2.py
+          [[ "$(git hash-object "$harness")" == 1616edcc982be50ef2c95b8077160ec8fe9291fe ]]
+          [[ "$(git hash-object "$t1")" == d663a40c446983c7359265bf834113ba49e6a5d1 ]]
+          [[ "$(git hash-object "$t2")" == b9d15f8d1131339b06bfa9cb1e81940c2163a283 ]]
+          python3 "$t2" "$harness" "$base_script"
+          python3 .github/scripts/tibia-official-client-re-worldmap-mutation-physical-v1.py "$base_script" "$final_script"
+          bash -n "$final_script"
+
+          mkdir -p artifacts/worldmap-mutation-v1
+          set +e
+          bash "$final_script" 2>&1 | tee artifacts/worldmap-mutation-v1/run.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "WORLDMAP_GENERATED_SCRIPT_RC=$rc" | tee -a artifacts/worldmap-mutation-v1/run.txt
+
+          grep -Fxq 'WORLDMAP_COPY_PATCH=PASS' artifacts/worldmap-mutation-v1/run.txt
+          grep -Fxq 'WORLDMAP_PATCH_CANDIDATE=19,14' artifacts/worldmap-mutation-v1/run.txt
+          grep -Fxq 'WORLDMAP_PATCH_DIFF_BYTES=1' artifacts/worldmap-mutation-v1/run.txt
+          grep -Fxq 'WORLDMAP_LIVE_PATCHED_PROCESS_FENCE=PASS' artifacts/worldmap-mutation-v1/run.txt
+          grep -Fq 'WORLDMAP_STRUCTURAL_CLASSIFICATION=' artifacts/worldmap-mutation-v1/run.txt
+          grep -Fxq 'WORLDMAP_ORIGINAL_SOURCE_REHASH=PASS' artifacts/worldmap-mutation-v1/run.txt
+          grep -Fxq 'WORLDMAP_PATCHED_COPY_REMOVED=PASS' artifacts/worldmap-mutation-v1/run.txt
+          grep -Fxq 'WINDOW_DIAG_CLEANUP=COMPLETE' artifacts/worldmap-mutation-v1/run.txt
+          [[ "$rc" -eq 0 ]]
+          echo 'WORLDMAP_PHYSICAL_CANARY_V1=PASS_EVIDENCE_CAPTURED'

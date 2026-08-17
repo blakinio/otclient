@@ -57,15 +57,16 @@ def transform(text: str) -> str:
     missing = [token for token in required if token not in output]
     if missing:
         raise TransformRefused("REQUIRED_MISSING:" + ",".join(missing))
-    forbidden = (
-        '"$XWD" -root',
+    lower = output.lower()
+    forbidden_lower = (
+        '"$xwd" -root',
         "xwd -root",
         "xrandr --output",
         "wmctrl -r",
         "tesseract",
         "ocrmypdf",
     )
-    survivors = [token for token in forbidden if token in output.lower()]
+    survivors = [token for token in forbidden_lower if token in lower]
     if survivors:
         raise TransformRefused("FORBIDDEN_SURVIVORS:" + ",".join(survivors))
     if output.count('UI_WIN="$WIN"') != 1:

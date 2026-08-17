@@ -1,0 +1,16 @@
+{
+  "schema": "otclient.tibia-re.coverage-blockers.v2",
+  "snapshot_main": "103d50277bc339760bdb531d89f8ec34cdd090cc",
+  "resolved": [
+    {
+      "id": "AUD-COV-001",
+      "resolution": "canonical machine-readable registry, provenance/supersessions, current overlay and deterministic validator are present in PR #454 candidate tree; terminal resolution occurs when #454 merges"
+    }
+  ],
+  "items": [
+    ["AUD-COV-002","E51_E52_AND_NORMALIZED_P0_P1","Complete all 349 message semantics, full Tibia-owned QMeta/runtime denominator, and normalized item-level P0/P1 denominators without converting UNKNOWN to assumptions"],
+    ["AUD-COV-003","ACTION_QMETA_DENOMINATOR","Reconstruct/deprecate historical 1004 definition with provenance and version one named denominator against current 612 inventory"],
+    ["AUD-COV-004","RUNTIME_IDENTITY_AND_SEMANTICS","Promote validated raw-XRes helper #448, then separately admit exact resource-to-official-client PID identity before canonical semantic/restart experiments"],
+    ["AUD-COV-007","GLOBAL_COORDINATOR_CHECKPOINT","Refresh durable global promotion-coordinator task from current main while preserving lane-local accepted barriers and live dependencies"]
+  ]
+}

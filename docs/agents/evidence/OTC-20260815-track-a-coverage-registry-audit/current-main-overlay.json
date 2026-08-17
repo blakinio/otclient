@@ -1,0 +1,77 @@
+{
+  "schema": "otclient.tibia-re.coverage-current-overlay.v1",
+  "snapshot_main": "103d50277bc339760bdb531d89f8ec34cdd090cc",
+  "registry_promotion_pr": 454,
+  "source_baseline": {
+    "pr": 304,
+    "head": "43a60bd96cc644b656b200c9edbfb75578b330b6"
+  },
+  "audit": {
+    "source_report_merge": "2ad6565f6f598b15acaeb3d182a3ffb70d187ba6",
+    "result_after_this_tree_merges": "FAIL_MATERIAL_GAPS_OPEN",
+    "resolved_by_this_tree": ["AUD-COV-001"],
+    "remaining_findings": [
+      {"id":"AUD-COV-002","severity":"HIGH","state":"OPEN"},
+      {"id":"AUD-COV-003","severity":"MEDIUM","state":"OPEN"},
+      {"id":"AUD-COV-004","severity":"HIGH","state":"OPEN"},
+      {"id":"AUD-COV-007","severity":"MEDIUM","state":"OPEN"}
+    ],
+    "remaining_material_findings": 4,
+    "remaining_high": 2,
+    "remaining_medium": 2
+  },
+  "coverage_boundaries": {
+    "protocol_identifier_inventory": {"classification":"FACT","numerator":349,"denominator":349,"meaning":"inventory_only"},
+    "protocol_direction_inventory": {"classification":"FACT","numerator":349,"denominator":349,"server_to_client":189,"client_to_server":160},
+    "protocol_semantic_support": {"classification":"UNKNOWN","numerator":null,"denominator":349,"follow_up":"E51"},
+    "protocol_handler_qmeta_inventory": {"classification":"FACT","numerator":47,"denominator":47,"meaning":"bounded_handler_subset"},
+    "full_qmeta_runtime_semantics": {"classification":"UNKNOWN","numerator":null,"denominator":null,"follow_up":"E52"},
+    "direct_qt_callsite_inventory": {"classification":"FACT","numerator":2184,"denominator":2184,"meaning":"raw_callsite_inventory"},
+    "direct_qt_semantics": {"classification":"UNKNOWN","numerator":null,"denominator":2184},
+    "p0_top_level_groups": {"classification":"FACT","numerator":16,"denominator":16,"meaning":"requirement_groups_only"},
+    "p0_item_level_live_read": {"classification":"UNKNOWN","numerator":null,"denominator":null},
+    "p1_item_level_field_evidence": {"classification":"UNKNOWN","numerator":null,"denominator":null},
+    "action_qmeta_denominator": {"classification":"CONFLICT","current_named_inventory":612,"historical_value":1004,"follow_up":"AUD-COV-003"}
+  },
+  "p2": {
+    "promotion_merge": "cbc6388e8607bb92120281a9a15148577994d3a6",
+    "persistent_qbuffer_to_clientprocessor": "PROVEN",
+    "first_downstream_consumer": "PROVEN:TProtocolClientMessageProcessor+0x10@0xc2df80",
+    "first_downstream_transform": "PROVEN:TGameserverNetworkPacketRawDataProcessor+0x10@0xb47130",
+    "same_message_to_dualconnection": "PROVEN",
+    "protocol_stage_order": "PROVEN_PARTIAL",
+    "framing": "UNKNOWN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN",
+    "final_binary_egress": "UNKNOWN",
+    "final_socket_ownership": "UNKNOWN"
+  },
+  "worldmap": {
+    "static_graph_merge": "f5daad1bbb7e00dcaa26acafc0a69d10a3a1b696",
+    "mutation_design_merge": "1e6fcb5ab83c4bb8b762088326cc936857c8e64d",
+    "mutation_design_archive_merge": "103d50277bc339760bdb531d89f8ec34cdd090cc",
+    "static_patch_graph_ready": true,
+    "mutation_design_ready": true,
+    "safe_mutation_proven": false,
+    "physical_validation_execution_authorized": false,
+    "client_byte_mutation_authorized": false
+  },
+  "runtime": {
+    "raw_xres_source_pr": 447,
+    "raw_xres_source_head": "32c61120b9086904b328e7b4aa50526d64bef807",
+    "raw_xres_helper_validated_in_source": true,
+    "raw_xres_promotion_pr": 448,
+    "raw_xres_promotion_head": "cbf19367a5f6aeab2916839f4af32a07030bd55c",
+    "raw_xres_promotion_merged": false,
+    "exact_resource_to_official_client_pid": "UNKNOWN",
+    "current_exact_client_pid": "NOT_REGISTERED",
+    "current_exact_client_session": "NOT_REGISTERED",
+    "canonical_gate_b": "NOT_PROVEN",
+    "physical_identity_retry_authorized": false
+  },
+  "programme": {
+    "complete": false,
+    "global_coordinator_checkpoint_current": false
+  }
+}

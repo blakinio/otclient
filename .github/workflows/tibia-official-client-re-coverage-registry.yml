@@ -1,0 +1,36 @@
+name: Track A coverage registry validation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/**'
+      - 'docs/agents/reports/OTCLIENT-20260816-track-a-coverage-audit-refresh.md'
+      - '.github/workflows/tibia-official-client-re-coverage-registry.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/**'
+      - 'docs/agents/reports/OTCLIENT-20260816-track-a-coverage-audit-refresh.md'
+      - '.github/workflows/tibia-official-client-re-coverage-registry.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Deterministic canonical registry audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - name: Validate canonical registry and overlay
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/validate_registry.py
+          python3 docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/validate_registry.py \
+            docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit

@@ -1,0 +1,52 @@
+{
+  "schema": "otclient.tibia-re.canonical-coverage-registry.v1",
+  "task_id": "OTC-20260817-track-a-canonical-coverage-registry",
+  "promotion_pr": 454,
+  "trusted_base": "103d50277bc339760bdb531d89f8ec34cdd090cc",
+  "source": {
+    "pr": 304,
+    "head": "43a60bd96cc644b656b200c9edbfb75578b330b6",
+    "disposition": "ACCEPT_WITH_EDITS_BOUNDED_INVENTORY_ONLY",
+    "repository_ci_run": 31882010038,
+    "client": {
+      "version": "15.32.df7b29",
+      "size": 51965216,
+      "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+      "platform": "official_native_linux_only"
+    }
+  },
+  "baseline_git_blob_sha1": {
+    "capabilities.jsonl": "07cf612467a5bd537345e653f7410d6f82ca8b5d",
+    "protocol_messages.jsonl": "eb6fb96d18e021ca1f39b9eb45ccf4a018c44b62",
+    "runtime_types.jsonl": "d1fec473f4e09f4340fbe0b0ce86f2b5a8d03669",
+    "bridge_fields.jsonl": "7858800f9eccda3a3bd57832def218faf5a6c7e1",
+    "supersessions.jsonl": "06ceea87b39c960ec9b0b82c3a6fa9aade62b807",
+    "gameaction_connects.json": "e051b56d094250c5aac7159045ccadcb860708c9",
+    "legacy_qobject_connect_edges.json": "c3940e942419dc6368b28b723d4bb8fe1a809643",
+    "protocol_direct_qmeta_cases.json": "0efa8c7a020bff5485ebb09836a0708626192ae6",
+    "provenance.json": "780304c88f80c87929e402417d8d895093972315",
+    "source-README.md": "5346b4675797c23b45b832fb221b8d79d0194a79",
+    "source-blockers.json": "ad4dfae0ae7e9b503a9c1f77455a7963bf877c6e",
+    "source-coverage-summary.json": "c9104227ce05d95e3a91b367a5763344dd0a93f1",
+    "source-validate_registry.py": "6d42020c3b7e84589c8feaeac603339b5bb1c0d9",
+    "source-validation-output.txt": "8f7ec24329bb34841a4e64a9fd98325e501f4af0"
+  },
+  "canonical_entry_points": [
+    "capabilities.jsonl",
+    "protocol_messages.jsonl",
+    "runtime_types.jsonl",
+    "provenance.json",
+    "supersessions.jsonl",
+    "coverage-summary.json",
+    "current-main-overlay.json"
+  ],
+  "rules": {
+    "baseline_blobs_must_remain_exact": true,
+    "inventory_percentages_are_not_semantic_completion": true,
+    "unknown_must_not_be_filled_by_assumption": true,
+    "disproven_superseded_must_be_retained": true,
+    "current_programme_state_lives_in_overlay": true,
+    "aud_cov_001_is_resolved_when_this_tree_is_on_main": true,
+    "aud_cov_002_003_004_007_remain_open": true
+  }
+}

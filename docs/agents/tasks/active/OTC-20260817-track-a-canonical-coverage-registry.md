@@ -8,16 +8,17 @@ project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: implementation
-phase: canonicalize_accepted_registry
+phase: canonical_registry_candidate
 branch: docs/OTC-20260817-track-a-canonical-coverage-registry
 base_branch: main
-base_main: 2ad6565f6f598b15acaeb3d182a3ffb70d187ba6
+base_main: 103d50277bc339760bdb531d89f8ec34cdd090cc
+pr: 454
 risk: medium
 created: 2026-08-17T10:47:00+02:00
-updated: 2026-08-17T10:47:00+02:00
+updated: 2026-08-17T10:54:00+02:00
 invocation_started_at: 2026-08-17T10:47:00+02:00
-last_progress_at: 2026-08-17T10:47:00+02:00
-lease_expires_at: 2026-08-17T11:32:00+02:00
+last_progress_at: 2026-08-17T10:54:00+02:00
+lease_expires_at: 2026-08-17T11:39:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 run_scope: autonomous_program
@@ -25,7 +26,7 @@ continuation_policy: continue_until_real_stop
 task_completion_policy: finalize_archive_and_continue
 user_communication: low_noise
 execution_mode: github-only
-execution_reason: accepted PR #304 registry package can be promoted and normalized from current main using repository/GitHub data only
+execution_reason: promote previously accepted #304 bounded registry and normalize current-main programme state without runtime access
 execution_class: github_hosted
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
@@ -47,7 +48,7 @@ context_growth: stable
 context_score: 8
 estimate_confidence: high
 decomposition_decision: single
-decomposition_reason: one bounded current-main data package promotion with validator, audit-report reconciliation, and terminal closeout
+decomposition_reason: one bounded current-main registry/data integration with deterministic validator and audit-report reconciliation
 validation_level: component
 implementation_authorized: true
 feature_scope:
@@ -63,12 +64,13 @@ owned_paths:
   - docs/agents/tasks/archive/OTC-20260817-track-a-canonical-coverage-registry.md
   - docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/**
   - docs/agents/reports/OTCLIENT-20260816-track-a-coverage-audit-refresh.md
+  - .github/workflows/tibia-official-client-re-coverage-registry.yml
 modules_touched: []
 reuses:
   - closed source Draft PR #304 exact head 43a60bd96cc644b656b200c9edbfb75578b330b6
   - coordinator disposition #304 comment 5302034228 ACCEPT_WITH_EDITS
-  - merged coverage audit #451 / main 2ad6565f6f598b15acaeb3d182a3ffb70d187ba6
-  - source validator docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/validate_registry.py
+  - merged coverage audit #451 / 2ad6565f6f598b15acaeb3d182a3ffb70d187ba6
+  - source #304 baseline blobs and validator
 depends_on: []
 blocks:
   - AUD-COV-001
@@ -77,6 +79,14 @@ source_registry:
   head: 43a60bd96cc644b656b200c9edbfb75578b330b6
   repository_ci_run: 31882010038
   disposition: ACCEPT_WITH_EDITS_BOUNDED_INVENTORY_ONLY
+current_overlay:
+  snapshot_main: 103d50277bc339760bdb531d89f8ec34cdd090cc
+  p2_promotion: cbc6388e8607bb92120281a9a15148577994d3a6
+  worldmap_static_graph: f5daad1bbb7e00dcaa26acafc0a69d10a3a1b696
+  worldmap_mutation_design: 1e6fcb5ab83c4bb8b762088326cc936857c8e64d
+  worldmap_mutation_design_archive: 103d50277bc339760bdb531d89f8ec34cdd090cc
+  raw_xres_promotion_pr: 448
+  raw_xres_promotion_merged: false
 acceptance:
   canonical_registry_on_main:
     - capabilities.jsonl
@@ -85,11 +95,12 @@ acceptance:
   provenance_preserved: true
   unknown_disproven_superseded_preserved: true
   source_baseline_not_relabelled_as_semantic_completion: true
-  current_main_overlay_required: true
-  validator_required: true
-  validator_must_fence_source_baseline: true
+  current_main_overlay_present: true
+  validator_present: true
+  validator_fences_source_baseline_by_git_blob: true
+  permanent_hosted_validation_workflow_present: true
   audit_cov_001_resolved_only_after_merge: true
-  other_audit_findings_must_remain_open: true
+  other_audit_findings_remain_open: true
   runtime_or_synology_use: forbidden
   owner_funded_ai_use: forbidden
 ci_checks_for_current_head: 0
@@ -101,12 +112,10 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-last_completed_step: fresh ownership/uniqueness/admission preflight selected accepted #304 as the sole bounded source for closing AUD-COV-001
-next_action: promote the accepted #304 machine-readable registry package, add a current-main manifest/overlay and validator fences, reconcile the coverage audit report, then run independent validation
+last_completed_step: built layered canonical registry candidate with exact #304 blob fences, current-main overlay, current audit summary and permanent hosted validator workflow
+next_action: commit the candidate on current main, run deterministic registry workflow and repository governance/CI, then perform a fresh independent audit and close out
 ---
 
 # Track A canonical coverage registry promotion
 
-This task closes only `AUD-COV-001`: absence of the accepted machine-readable coverage registry from trusted `main`.
-
-It must preserve the #304 bounded evidence/provenance boundary. It does not complete E51/E52, normalize the unresolved P0/P1 semantic denominators, resolve the 612-vs-1004 QMeta denominator conflict, or prove canonical live runtime semantics.
+This task closes only `AUD-COV-001`. The accepted #304 inventory/provenance baseline remains byte-for-byte fenced; current programme state is a separate overlay. E51/E52, P0/P1 item-level denominators, the 612-vs-1004 conflict and canonical live runtime semantics remain outside this task.

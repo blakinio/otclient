@@ -72,29 +72,40 @@ research_result:
   f50090_second_argument: FACT:canonical_same_message
   f50090_saved_message_pointer: FACT:rbp
   f50090_decomposes_message_into_fields: FACT
-  writer_guard_slot: FACT:+0x58
-  writer_guard_exact_target: FACT:0xcb2960
+  f50090_forwards_original_message_pointer_as_whole: DISPROVEN
+  writer_member: FACT:this_plus_0x08
+  writer_type: FACT:TIODeviceWriter
+  writer_vtable_ap: FACT:0x2f69d48
+  writer_rtti: FACT:0x3080718
+  writer_qiodevice_pair: FACT:plus_0x08_plus_0x10
+  writer_qdatastream_pair: FACT:plus_0x18_plus_0x20
+  writer_qdatastream_object: FACT:plus_0x18
+  writer_slot_0x30_guard_target: FACT:0xcb2930
+  writer_slot_0x38_guard_target: FACT:0xcb2940
+  writer_slot_0x58_guard_target: FACT:0xcb2960
   raw_payload_pointer: FACT:value_from_message_plus_0x10
   raw_payload_length: FACT:value_from_message_plus_0x18
-  underlying_receiver: FACT:writer_plus_0x18_on_direct_guarded_branch
-  raw_payload_target: FACT:0x4dd250
-  cb2960_payload_pointer: FACT:subobject_plus_0x08
-  cb2960_payload_length: FACT:subobject_plus_0x10
-  cb2960_underlying_receiver: FACT:wrapper_plus_0x18
-  cb2960_target: FACT:0x4dd250
-  constructor_installed_vptr: FACT:0x2f69d48_in_constructor_0x1960340
-  constructor_nested_object_member: FACT:this_plus_0x18_in_constructor_0x1960340
-  constructor_owner_control_member: FACT:this_plus_0x20_in_constructor_0x1960340
-  f50090_forwards_original_message_pointer_as_whole: DISPROVEN
-  writer_exact_dynamic_type: UNKNOWN
-  underlying_receiver_exact_dynamic_type: UNKNOWN
-  semantic_role_of_0x4dd250: UNKNOWN
+  raw_payload_receiver: FACT:TIODeviceWriter_plus_0x18_QDataStream
+  raw_payload_target: FACT:QDataStream_writeRawData_at_0x4dd250
+  representation_boundary: FACT:STRUCTURED_MESSAGE_FIELDS_TO_TIODEVICEWRITER_QDATASTREAM
+  f50090_direct_socket_sink: DISPROVEN
+  f50090_is_proven_final_binary_egress: DISPROVEN
+  current_tiodevice_concrete_type: UNKNOWN
   final_binary_egress: UNKNOWN
   final_socket_ownership: UNKNOWN
   framing: UNKNOWN
   sequence: UNKNOWN
   compression: UNKNOWN
   encryption: UNKNOWN
+accepted_predecessor_crosscheck:
+  pr: 308
+  artifact: 9251725866
+  artifact_digest: sha256:f669df2ace3db0e269f60287d82c51b69eff11eaf7c7f5b932e049492632bd1e
+  helper: 0x1960340
+  tiodevicewriter_ap: 0x2f69d48
+  tiodevicewriter_rtti: 0x3080718
+  qdatastream_member: plus_0x18
+  qdatastream_write_raw_data: 0x4dd250
 generations:
   - producer_head: ea8113028a07ef84518f4a8b705bcecd97604376
     run: 32037248323
@@ -120,6 +131,7 @@ cleanup:
 validation:
   exact_source_fence: PASS
   hosted_primary_decode: PASS
+  accepted_pr308_crosscheck: PASS
   no_world_map_evidence: true
   no_runtime_access: true
   raw_client_uploaded: false
@@ -128,7 +140,7 @@ validation:
   review_hygiene: PENDING
 anti_stall:
   invocation_started_at: 2026-08-17T15:50:00+02:00
-  last_progress_at: 2026-08-17T16:04:00+02:00
+  last_progress_at: 2026-08-17T16:08:00+02:00
   ci_checks_for_current_head: 0
   ci_check_generation: draft
   terminal_ci_wait_started_at: null
@@ -138,33 +150,44 @@ anti_stall:
   repair_cycles_for_current_gate: 1
   context_reconstruction_attempts: 1
   stall_warnings: 0
-next_action: verify final exact-head governance/CI/review hygiene, then coordinator independently review and promote the accepted bounded result; do not start another research frontier in this invocation
+next_action: verify final exact-head governance/CI/review hygiene, then coordinator independently review and promote the bounded TIODeviceWriter/QDataStream result; do not start another research frontier before this task is terminal
 ---
 
 # Track A P2 — `0xf50090` downstream discriminator
 
 ## Terminal researcher result
 
-The coordinator-promoted same message enters `0xf50090` in SysV `rsi`. Exact dataflow saves that pointer in `rbp`, decomposes the message into fields, and on the directly guarded writer path proves:
+The coordinator-promoted same message enters `0xf50090` in SysV `rsi`. Exact dataflow saves that pointer in `rbp`, decomposes it into structured fields and sends those fields through a constructor-bound `TIODeviceWriter`.
+
+The writer identity is exact:
+
+```text
+f50090 this+0x08
+ -> object initialized by helper 0x1960340
+ -> TIODeviceWriter AP 0x2f69d48 / RTTI 0x3080718
+ -> QDataStream object at TIODeviceWriter+0x18
+```
+
+The strongest raw-payload edge is:
 
 ```text
 canonical same message
  -> 0xf50090
- -> writer vslot +0x58 guard == 0xcb2960
- -> payload pointer from message+0x10
- -> payload length from message+0x18
- -> underlying receiver at writer+0x18
- -> exact target 0x4dd250
+ -> payload pointer copied from message+0x10
+ -> payload length copied from message+0x18
+ -> TIODeviceWriter slot +0x58 / wrapper 0xcb2960
+ -> TIODeviceWriter+0x18 QDataStream
+ -> QDataStream::writeRawData(char const*, qint64) @ 0x4dd250
 ```
 
-Generation 3 independently decodes `0xcb2960`, which repeats the same structural contract by extracting `subobject+0x08` as data pointer, `subobject+0x10` as length and forwarding through wrapper `this+0x18` to `0x4dd250`.
+The scalar paths through slots `+0x30/+0x38` also forward to the same QDataStream object. The exact overload names of the two scalar PLT calls are not promoted in this task.
 
-Constructor-like function `0x1960340` independently installs vptr `0x2f69d48` and binds a nested object at `this+0x18`, but this task does not overpromote that structural constructor into the exact current dynamic type without separate RTTI/vtable provenance.
-
-The exact dynamic types, semantic role of `0x4dd250`, final binary egress, final socket ownership, framing, sequence, compression and encryption remain `UNKNOWN`.
+This positively classifies `0xf50090` as a structured-field/QDataStream serialization stage. It is not a direct socket sink and is not proven final binary egress. The exact concrete QIODevice bound to this particular writer, final egress/socket ownership, framing, sequence, compression and encryption remain `UNKNOWN`.
 
 Durable evidence:
 - `docs/agents/evidence/OTC-20260817-track-a-p2-f50090-downstream/20260817-f50090-downstream-dataflow.md`
 - `docs/agents/evidence/OTC-20260817-track-a-p2-f50090-downstream/result.json`
+
+Next smallest frontier after coordinator promotion: resolve the exact QIODevice shared-pair provenance supplied to the current TIODeviceWriter at `b4b273 -> 0x1960340`, then follow its first post-serialization consumer without generic Qt/socket census.
 
 E2E: `NOT_APPLICABLE` — static exact-file/disassembly evidence only.

@@ -102,8 +102,8 @@ closeout:
   active_task_terminal_tree: absent
   exact_terminal_head_repository_ci_required: true
   review_threads_required_zero: true
-last_completed_step: four finite canonical denominator registries materialized, integrated validator and fresh audit passed, and current-main drift through final P0 admission #467 was reconciled without changing denominator membership
-next_action: run exact-head required CI and review hygiene on the refreshed PR #460 head, then merge if main remains compatible
+last_completed_step: denominator payload and current-main overlay are frozen after consuming #467; only exact-head required CI/review hygiene and merge remain
+next_action: merge PR #460 only after exact-head required CI succeeds and main remains compatible
 ---
 
 # Track A semantic denominator normalization — archived

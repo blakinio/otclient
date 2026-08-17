@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260817-track-a-p2-f50090-downstream
-status: investigating
+status: waiting
 agent: ChatGPT
 session_role: draft_researcher
 project_lane: otclient
@@ -75,19 +75,28 @@ accepted_input:
   sequence: UNKNOWN
   compression: UNKNOWN
   encryption: UNKNOWN
+source_generation_1:
+  producer_head: e7c13ea31f42b9c1e1c08103cd576a56cfadc554
+  workflow: Track A P2 f50090 downstream evidence
+  run: 32036648847
+  source_job: 95408380165
+  source_job_state_last_observed: queued
+  code_window: 0xf50040..0xf50480
+  runner_visibility_probe: FORBIDDEN_BY_INTEGRATION_403
 anti_stall:
   invocation_started_at: 2026-08-17T15:40:00+02:00
-  last_progress_at: 2026-08-17T15:43:33+02:00
+  last_progress_at: 2026-08-17T15:49:00+02:00
   ci_checks_for_current_head: 0
   ci_check_generation: draft
   terminal_ci_wait_started_at: null
   terminal_ci_checks_for_current_generation: 0
-  unchanged_state_checks: 0
+  unchanged_state_checks: 2
   identical_failure_retries: 0
   repair_cycles_for_current_gate: 0
   context_reconstruction_attempts: 1
   stall_warnings: 0
-next_action: create the bounded exact-fenced file-only staging workflow for a narrow 0xf50090 code window, then decode and classify only its same-message downstream dataflow on GitHub-hosted Linux
+blocker: external source-staging job 95408380165 remains queued on the exact-file Synology runner; GitHub integration cannot inspect self-hosted runner availability (403 Resource not accessible by integration), and anti-stall forbids a third unchanged external-state poll in this invocation
+next_action: inspect run 32036648847 after its state changes; if source/hosted jobs succeed, independently review the final artifact disassembly and classify the same-message edge from 0xf50090 before deciding whether one narrower follow-up byte window is required
 ---
 
 # Track A P2 — `0xf50090` downstream discriminator
@@ -122,6 +131,10 @@ This worker is static-only (`runtime_access:none`). The exact retained client fi
 - [ ] no world-map evidence, live runtime, process memory, login/gameplay, OTClient/Canary/CrystalServer behavioral proof or owner-funded AI used;
 - [ ] one-shot staging surfaces removed after evidence capture;
 - [ ] final Draft exact-head governance/CI/review hygiene green before coordinator review.
+
+## Current external wait
+
+Generation 1 producer run `32036648847` is queued on the file-only source-staging runner. Two unchanged-state observations have already been consumed in this invocation. The repository anti-stall contract requires this worker to stop polling until that external state changes.
 
 ## Stop condition
 

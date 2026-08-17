@@ -4,7 +4,7 @@
 
 ```yaml
 lane: COVERAGE-AUDIT
-snapshot_main: 1eb4a8edecba3966aa1e6155e241b404eb4d30cb
+snapshot_main: 0b3bdec0a4145f558806448a4657413664d80729
 semantic_denominator_task: OTC-20260817-track-a-semantic-denominator-normalization
 semantic_denominator_pr: 460
 audit_result: FAIL_MATERIAL_GAPS_OPEN
@@ -40,15 +40,15 @@ P1_live_semantics: UNKNOWN/28
 restart_relogin_stability: UNKNOWN/1
 ```
 
-The E51 family column is deterministic lexical normalization only; all 349 semantic states remain `UNKNOWN`. E52 comes from the full retained exact-client `tibia::` QMeta census run `31790507112`, job `94736106350`: 642 unique Tibia-owned QMeta records out of 708 structural records, with 66 non-Tibia records excluded by the census scope. The 642 rows include 303 `OTHER_QMETA`, 187 `CONTROLLER`, 77 `STORAGE`, 47 `HANDLER` and 28 `ACTION_HANDLER`; every semantic state remains `UNKNOWN` until item-specific evidence exists.
+E51 is a complete denominator with deterministic lexical family normalization only; all 349 semantic states remain `UNKNOWN`. E52 comes from the full retained exact-client `tibia::` QMeta census run `31790507112`, job `94736106350`: 642 unique Tibia-owned records out of 708 structural records, with 66 non-Tibia records outside scope. The 642 rows partition into 303 `OTHER_QMETA`, 187 `CONTROLLER`, 77 `STORAGE`, 47 `HANDLER` and 28 `ACTION_HANDLER`; all semantic states remain `UNKNOWN`.
 
 P0 normalizes the 16 programme headings into 180 individual read/state/action requirements. P1 normalizes the bridge contract into 28 individual identity/binding/read/discovery/health/lifecycle requirements. A finite denominator makes future coverage computable; it does not establish support.
 
 ## Current runtime / P0 frontier
 
-Physical XRes resource ownership is no longer a missing prerequisite. PR #457 merged as `16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc`; run `32015479835`, job `95344000918` preserves a direct LocalClientPid reply matching the exact launched official-client PID. Identity archive #459 merged as `c55e3523e6e9d50df511e65dce9145a8f951a5f5`; helper client-base semantics were corrected by #461 at `1eb4a8edecba3966aa1e6155e241b404eb4d30cb`.
+Physical XRes resource ownership is no longer a missing prerequisite. PR #457 merged as `16c6fb695a85a6ba3a809fcf5b031ce4ac7e11fc`; run `32015479835`, job `95344000918` preserves a LocalClientPid reply matching the exact launched official-client PID. Identity archive #459 merged as `c55e3523e6e9d50df511e65dce9145a8f951a5f5`; helper client-base semantics were corrected by #461 at `1eb4a8edecba3966aa1e6155e241b404eb4d30cb`.
 
-This does **not** prove a current canonical registered session. Current nonclaims remain:
+This historical proof does **not** create a current canonical registration. Current nonclaims remain:
 
 ```yaml
 current_exact_client_pid: NOT_REGISTERED
@@ -65,7 +65,7 @@ A future P0/RUNTIME invocation must freshly admit runtime work and require a leg
 
 P2 retains the merged bounded processor chain and `PROVEN_PARTIAL` stage order. Framing, sequence, compression, encryption, final binary egress and final socket ownership remain `UNKNOWN`.
 
-Worldmap static graph and mutation design are promoted. `STATIC_PATCH_GRAPH_READY=true` and `MUTATION_DESIGN_READY=true`, while `SAFE_MUTATION_PROVEN=false`, physical mutation execution is not authorized by this coverage task, and client-byte mutation remains unauthorized.
+Worldmap static graph and mutation design are promoted. The separately authorized physical canary task is now archived on main via #466. It proved bounded offline patch/startup/rollback but observed no handler canary in its no-login startup window: `NO_HANDLER_CANARY_OBSERVED_BOUNDED`. Therefore causal propagation and safe mutation remain unproven and no additional physical launch is authorized by this coverage task.
 
 ## Resolved findings
 
@@ -82,7 +82,7 @@ PR #460 candidate materializes:
 - `p0_items.jsonl`: 180/180 normalized P0 requirements;
 - `p1_items.jsonl`: 28/28 normalized P1 requirements.
 
-Hosted generation run `32017799293`, job `95350885329`, artifact `9284175545`, digest `sha256:cf2fb874e39af2465de76445347a118077893d9bbf213b69809b793ed4d7f577` passed deterministic generation and artifact validation. Independent inspection matched the digest, counts, unique IDs, protocol 189/160 split, 27 direct QMeta links and full QMeta provenance.
+Hosted generation run `32017799293`, job `95350885329`, artifact `9284175545`, digest `sha256:cf2fb874e39af2465de76445347a118077893d9bbf213b69809b793ed4d7f577` passed deterministic generation and artifact validation. Independent inspection matched the digest, counts, unique IDs, protocol 189/160 split, 27 direct QMeta links and full QMeta provenance. Integrated validator run `32018548728`, job `95353113344` then passed the complete candidate tree.
 
 Resolution is **denominator completeness only**. Protocol semantics remain `UNKNOWN/349`, full QMeta semantics `UNKNOWN/642`, P0 live semantics `UNKNOWN/180`, and P1 live semantics `UNKNOWN/28`.
 
@@ -122,7 +122,8 @@ physical_resource_to_exact_client_pid_identity_proven: true
 canonical_current_runtime_semantics_proven: false
 p2_transport_semantics_complete: false
 worldmap_mutation_design_ready: true
-worldmap_safe_mutation_proven: false
+worldmap_physical_canary_executed: true
+worldmap_causal_propagation_proven: false
 programme_complete: false
 ```
 

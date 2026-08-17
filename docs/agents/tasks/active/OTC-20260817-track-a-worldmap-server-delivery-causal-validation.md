@@ -14,7 +14,7 @@ base_branch: main
 base_sha: 83034227280dc3bfdf589a991f0fdbbabab7dc87
 restack_commit: f6848a59224ce891067b12a8b3f65da1609ee985
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T14:58:00+02:00
+updated: 2026-08-17T16:47:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -129,9 +129,9 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T14:58:00+02:00
+last_progress_at: 2026-08-17T16:47:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: behavioral-prelogin-static-pass
+ci_check_generation: persistent-home-parity-discriminator-pass
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -175,6 +175,21 @@ Load-bearing current chain:
 - after real login submission, the helper requires a >5000-pixel aggregate transition, then a localized first-row selection change before `Return`; world entry itself remains structural `FullMap + >=10 map-description strips`;
 - no-client static composition `32032410153 / 95395158148 = SUCCESS` on helper head `8181fe41abe8fcad5b38d26c624b29075ba4ede6`.
 
+Fresh persistent-HOME parity discriminators, all on `synology-otclient-01` without client execution or secret use:
+
+- `32038805389 / 95414327705 = SUCCESS`: persistent `.local/share/CipSoft GmbH/Tibia/Tibia` resolves to a FILE rather than the `packages/Tibia` directory;
+- `32039597397 / 95416437252 = SUCCESS`: the symlink target is outside `packages/Tibia`, is not the exact package client, while `packages/Tibia/bin/client` still matches the exact SHA;
+- `32039652204 / 95416574213 = SUCCESS`: the target is an executable ELF named `Tibia`, size `1460808`, SHA-256 `a5fc6e8ee8246868263c438539a54ea045bd048a1bea45f968fc2f498b682ca0`, outside the persistent HOME and not the exact client;
+- historical successful world-entry `31736998731 / 94570936207` was re-inspected at source workflow commit `4392cf4c01703afa344ba074495894a292048eb9` and also launched `packages/Tibia/bin/client` directly with `HOME=/data/home`; therefore the external `Tibia` ELF is not required as the historical successful launch entrypoint;
+- `32039938342 / 95417353337 = SUCCESS`: sanitized omitted-state manifest contains exactly 10 entries, digest `9e03d67e62bfda836583f8430b6054a7e4f0bfa11aa919b6936135902ee5b709`; outside package + `launchermetadata.json` these are Qt shader/pipeline cache objects, the external-ELF symlink and `log` directory. No CipSoft/Tibia-named state was found under `.config` or `.local/state` by this bounded inventory.
+
+Current interpretation boundary:
+
+- `external_launcher_required_for_successful_login = DISPROVEN` by the historical successful direct-package-client workflow;
+- `missing_persistent_account_or_login_layout_state_in_scanned_XDG_paths = NOT_OBSERVED`; this weakens but does not prove false every possible HOME-state hypothesis;
+- the strongest current blocker remains semantic pre-secret UI discrimination. The repository already has a fail-closed dummy editability transform in `.github/scripts/track-a-worldmap-causal-ui-geometry-repair.py`; the legacy OCR/secret block remains only in the base source helper and must never be executed without the reviewed transform chain;
+- physical retry is currently forbidden by the explicit main-drift stop until the branch is synchronized to current `main` and the complete transform composition is revalidated.
+
 Durable evidence includes:
 
 - `20260817-presecret-ui-loader-repairs.md`
@@ -185,7 +200,7 @@ Durable evidence includes:
 
 # Workflow safety state
 
-The PR workflow is currently a **no-client static validator**. This prevents script/task/document synchronize commits from accidentally launching another physical baseline while the helper is being repaired. Physical runtime may be restored only as a single deliberate workflow commit after exact static validation, and no other branch commit is permitted while that physical workflow is active.
+The PR workflow is currently a **no-client sanitized persistent-user-state inventory**. This prevents script/task/document synchronize commits from accidentally launching another physical baseline while the HOME-parity hypothesis is being resolved and the branch is behind current `main`. Physical runtime may be restored only as a single deliberate workflow commit after current-main synchronization and exact static validation of the complete repair chain; no other branch commit is permitted while that physical workflow is active.
 
 # Execution phases
 
@@ -193,7 +208,7 @@ The PR workflow is currently a **no-client static validator**. This prevents scr
 2. **DONE** isolated exact-client WARP/XRes path.
 3. **DONE** pre-Storage observer gate.
 4. **DONE** 1020x650 normalization, manifest XRes identity, loader/GDB repair and aggregate behavioral pre-login proof static validation.
-5. **ACTIVE** exactly one baseline login + FullMap/map-description extent + Right/Left stimulus + transport confinement + cleanup.
+5. **ACTIVE / BLOCKED_ON_RESTACK** exactly one baseline login + FullMap/map-description extent + Right/Left stimulus + transport confinement + cleanup.
 6. **PENDING** patched namespace/preimage/target-uniqueness admission.
 7. **PENDING** one task-owned `[19,14]` login/capture under identical 1020x650 instrumentation.
 8. **PENDING** patched rollback/source rehash/cleanup.
@@ -208,20 +223,22 @@ Any failure **after** `WORLDMAP_BASELINE_LOGIN_SUBMITTED=true` consumes the one 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 12
-updated_at: 2026-08-17T14:58:00+02:00
+checkpoint_version: 13
+updated_at: 2026-08-17T16:47:00+02:00
 base_main: 83034227280dc3bfdf589a991f0fdbbabab7dc87
+current_main_observed: c1adcf491580e28d40f215356a9e559af2ccadc4
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
 phase: baseline_ephemeral_behavioral_login_capture
 runtime_access: ephemeral_isolated
 target_uniqueness: PROVEN
-workflow_mode: static_no_client_prelogin_validator
+workflow_mode: static_no_client_persistent_home_parity_inventory
 baseline_client_launches_consumed: 10
 baseline_login_consumed: 0
 patched_login_consumed: 0
-last_completed_step: aggregate editable-field/login-transition/character-row helper composition passed no-client validation on 32032410153 / 95395158148
-blockers: []
-next_action: Verify the static validator remains green on this checkpoint head, then switch the workflow exactly once to the behavioral physical baseline and make no further branch commits until that run reaches terminal state.
+last_completed_step: persistent HOME parity hypothesis was physically bounded without launching the client; external launcher entrypoint was disproven as the historical success dependency and omitted persistent state was reduced to shader/pipeline caches, the external-ELF symlink and log directory
+blockers:
+  - main_drift_before_physical_runtime:c1adcf491580e28d40f215356a9e559af2ccadc4
+next_action: synchronize this branch to current main without losing the reviewed task-owned runtime helpers, rerun exact no-client composition checks, then restore exactly one fail-closed physical baseline whose harmless reversible field proofs must pass before any protected credential can be exposed.
 ```

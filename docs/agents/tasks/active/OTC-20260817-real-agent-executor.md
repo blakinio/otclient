@@ -1,14 +1,14 @@
 ---
 task_id: OTC-20260817-real-agent-executor
 project_lane: otclient
-status: implementing
-phase: implement
+status: validating
+phase: validate
 task_kind: implementation
 branch: feat/OTC-20260817-real-agent-executor
 base_branch: main
 created: 2026-08-17
 updated: 2026-08-17
-related_pr: ""
+related_pr: "479"
 policy_version: 2
 execution_mode: github
 execution_reason: GitHub-only implementation and Actions validation; no model invocation without a provider-specific owner grant.
@@ -20,13 +20,12 @@ orchestrator_priority: 10
 owned_paths:
   - tools/agents/orchestrator.py
   - tools/agents/orchestrator_executor.py
+  - tools/agents/test_orchestrator.py
   - tools/agents/test_orchestrator_executor.py
   - tools/agents/testdata/orchestrator/fake_real_worker.py
-  - tools/agents/testdata/orchestrator/executor_config.json
   - docs/agents/AGENT_ORCHESTRATOR.md
   - docs/agents/AGENT_ORCHESTRATOR.json
   - docs/agents/MODULE_CATALOG.md
-  - .github/workflows/agent-orchestrator-smoke.yml
   - docs/agents/tasks/active/OTC-20260817-real-agent-executor.md
 depends_on: []
 required_reads:
@@ -42,7 +41,7 @@ required_reads:
   - docs/agents/TERMINAL_CI_AND_COMMUNICATION_OVERRIDE.md
   - docs/agents/AGENT_ORCHESTRATOR.md
 search_first:
-  - open PRs/tasks owning tools/agents/orchestrator* or .github/workflows/agent-orchestrator-smoke.yml
+  - open PRs/tasks owning tools/agents/orchestrator*
 optional_reads: []
 ---
 
@@ -50,67 +49,87 @@ optional_reads: []
 
 ## Goal
 
-Replace the simulator-only execution boundary with a fail-closed external-process executor adapter that can launch one independently isolated worker process per selected task, build its prompt from the durable `resume.py` bundle, enforce exact dispatch/worktree/result identity, and feed worker-result-v1 into the existing barrier. Keep the repository default disabled until a separately authorized concrete model/provider is configured.
+Replace the simulator-only execution boundary with a fail-closed external-process executor adapter that can launch independently isolated worker processes from deterministic plan entries, build each prompt from the durable `resume.py` bundle, enforce fresh task/dependency/ownership state plus exact dispatch/worktree/result identity, and feed accepted worker-result-v1 records into the existing barrier. Keep the repository default disabled until a separately authorized concrete model/provider is configured.
 
 ## Acceptance criteria
 
-- A selected worker receives a compact repository-derived continuation prompt and structured dispatch metadata, never prior chat history.
-- The executor uses one temporary detached Git worktree per selected task at the exact dispatch head and never shares a worktree between workers.
-- The worker command is a fixed trusted argv supplied by executor configuration/CLI, invoked without a shell; task prose cannot supply commands.
-- Each worker has a finite timeout and bounded parallelism.
-- Returned worker-result-v1 is validated against task id, branch, dispatch base, actual worktree HEAD, clean worktree, actual changed paths and declared ownership before fan-in.
-- Malformed output, timeout, non-zero exit, dirty worktree, head mismatch or ownership escape fail closed.
-- Existing dry-run behavior remains the default and requires no model credentials or owner-funded AI.
-- Focused tests exercise success, malformed output, timeout/non-zero failure, head mismatch and changed-path escape using a deterministic fake process and temporary Git repositories.
-- GitHub-hosted smoke proves the executor plumbing with the deterministic fake process; it does not claim a live AI/model call.
-- A real model/provider call is made only if a concrete provider/model/funding/credential use is separately authorized by the owner and available in the execution environment.
+- [x] A selected worker receives a compact repository-derived continuation prompt and structured dispatch metadata, never prior chat history.
+- [x] The executor creates one temporary detached Git worktree per selected task at the exact dispatch head; Git worktree metadata operations are serialized while worker processes may run concurrently.
+- [x] The worker command is a fixed trusted argv supplied by executor configuration, invoked without a shell; task prose cannot supply commands.
+- [x] Each worker has a finite timeout and bounded parallelism.
+- [x] The current task inventory is rediscovered and the original selected dispatch set is revalidated before any worker mutation; stale dependency/ownership/context/branch/head selection fails closed and requires a new plan.
+- [x] Returned worker-result-v1 is validated against task id, branch, dispatch base, actual descendant worktree HEAD, clean worktree, actual Git changed paths and declared ownership before fan-in.
+- [x] Protected/default worker branches, malformed output, timeout, non-zero exit, dirty worktree, head mismatch or ownership escape fail closed.
+- [x] Worker environment is allowlisted; unlisted environment variables are not inherited by the external worker.
+- [x] Existing dry-run behavior remains the repository default and requires no model credentials or owner-funded AI.
+- [x] Optional worker-result publication uses a normal non-force push and refuses an existing remote task branch that moved away from the dispatch base.
+- [x] Focused tests exercise successful committed external-worker execution and fail-closed authorization, environment, stale-plan, branch, malformed-output, timeout/non-zero, dirty-worktree, head-mismatch and ownership-escape paths using deterministic temporary Git repositories.
+- [ ] Exact-final-head GitHub-hosted Agent Orchestrator Smoke and required CI pass.
+- [ ] Full final diff self-review and required independent audit have no unresolved material finding.
+- [x] No live AI/model call is claimed; a concrete provider/model/funding/credential use remains a separate activation gate under root AGENTS policy.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-17T12:35:00Z
-head: 83034227280dc3bfdf589a991f0fdbbabab7dc87
+updated_at: 2026-08-17T12:55:00Z
+head: 24dc9dfb5679b1b01d3f9fa7b29734a379cc496f
 branch: feat/OTC-20260817-real-agent-executor
-pr: none
-status: implementing
+pr: 479
+status: validating
 context_routes:
   - agent-governance
   - testing
 owned_paths:
   - tools/agents/orchestrator.py
   - tools/agents/orchestrator_executor.py
+  - tools/agents/test_orchestrator.py
   - tools/agents/test_orchestrator_executor.py
   - tools/agents/testdata/orchestrator/fake_real_worker.py
-  - tools/agents/testdata/orchestrator/executor_config.json
   - docs/agents/AGENT_ORCHESTRATOR.md
   - docs/agents/AGENT_ORCHESTRATOR.json
   - docs/agents/MODULE_CATALOG.md
-  - .github/workflows/agent-orchestrator-smoke.yml
   - docs/agents/tasks/active/OTC-20260817-real-agent-executor.md
 proven:
-  - main@83034227280dc3bfdf589a991f0fdbbabab7dc87 includes merged orchestrator MVP #463, archive #476 and catalogue reconciliation #478.
-  - Current orchestrator is simulator/dry-run only and documents a real external model executor as a separately authorized adapter boundary.
-  - No open executor task/PR or branch was found owning this scope at admission.
-  - Repository policy forbids owner-funded AI/model credentials without an exact provider/use authorization; this task implements and deterministically proves the adapter without making an unauthorized model call.
+  - main@83034227280dc3bfdf589a991f0fdbbabab7dc87 at admission includes merged orchestrator MVP #463, archive #476 and catalogue reconciliation #478.
+  - PR #479 is the sole live owner found for this executor-adapter scope.
+  - Repository default config remains dry_run with real_model_executor_enabled=false and owner_funded_ai_allowed=false.
+  - tools/agents/orchestrator_executor.py now provides a provider-neutral external-process boundary with fixed argv/no shell, finite timeout, allowlisted environment, fresh plan revalidation, isolated detached worktrees, actual Git head/diff/ownership verification and optional non-force branch publication.
+  - Agent Orchestrator Smoke run 32031599802 job 95392633636 on PR head b6acd7b6fb2e6d80d2c0357a6fb97cb14c21beb0 executed the integrated orchestrator plus external-executor suite: 24 tests PASS, including deterministic external process/worktree success and all then-defined negative paths.
+  - The b6acd7b validation is discovery/intermediate evidence only because later executor hardening and tests changed the head.
 derived:
-  - A fixed external-process protocol is the smallest provider-neutral adapter that can support Codex or another agent runtime later without coupling task data to credentials or shell syntax.
+  - A fixed external-process protocol is the smallest provider-neutral adapter that can support a separately authorized Codex or other agent runtime without coupling untrusted task prose to executable shell syntax.
 unknown:
-  - Which concrete model/provider the owner wants this adapter to invoke for the first live AI worker wave.
-  - Whether a permitted runner currently exposes that provider's authenticated CLI for this repository.
+  - Which concrete model/provider, if any, the owner will separately authorize for the first live AI worker wave.
+  - Whether a permitted otclient execution environment exposes that authorized provider's authenticated CLI/runtime.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
+  marker: direct_main_write_rejected
+  evidence: An initial task-file write attempt against protected main was rejected by GitHub with 409/required CI; no main mutation occurred and the task was then created correctly on its dedicated branch.
 rejected_hypotheses:
-  - Treating the simulator as a real worker was rejected because #463 explicitly proves orchestration mechanics only.
-  - Inferring a Codex/OpenAI provider from an available credential or sibling-repository runner was rejected because trusted-base policy requires exact provider/use authorization.
+  - Treating the #463 simulator as a real worker was rejected because its retained evidence explicitly proves orchestration mechanics only.
+  - Inferring Codex/OpenAI authorization from an available credential, sibling-repository runner or prior unrelated task was rejected because root AGENTS requires exact provider/use authorization.
+  - Accepting a plan solely because task head/branch still matched was rejected; the executor now recomputes fresh selection and refuses stale dependency/ownership/context state before worker launch.
 changed_paths:
+  - tools/agents/orchestrator.py
+  - tools/agents/orchestrator_executor.py
+  - tools/agents/test_orchestrator.py
+  - tools/agents/test_orchestrator_executor.py
+  - tools/agents/testdata/orchestrator/fake_real_worker.py
+  - docs/agents/AGENT_ORCHESTRATOR.md
+  - docs/agents/AGENT_ORCHESTRATOR.json
+  - docs/agents/MODULE_CATALOG.md
   - docs/agents/tasks/active/OTC-20260817-real-agent-executor.md
 validation:
   - command: live overlap and trusted-base preflight
     result: PASS
     evidence: main, #463/#476/#478, active task inventory, open PRs and governing orchestrator contracts inspected
+  - command: Agent Orchestrator Smoke / Focused planner and context tests
+    result: PASS
+    evidence: run 32031599802 job 95392633636; 24 tests passed on b6acd7b6fb2e6d80d2c0357a6fb97cb14c21beb0, superseded by later hardening
+  - command: live AI/model provider execution
+    result: NOT_APPLICABLE
+    evidence: no concrete provider/model/funding/credential use is authorized for this task; adapter delivery is provider-neutral and default-disabled
 blockers: []
-next_action: Implement the fail-closed external-process executor and deterministic tests on this branch, then open a draft PR.
+next_action: Verify exact-final-head Agent Orchestrator Smoke and required CI, then perform full-diff self-review and an independent exact-head audit before readiness.
 ```

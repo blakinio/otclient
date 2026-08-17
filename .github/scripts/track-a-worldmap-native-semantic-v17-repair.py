@@ -8,7 +8,7 @@ GDB_WRONG = ";M(0xcfb374,'ShowCharacterSelection');M(0xd47130,'CharacterSelectio
 GDB_CORRECTED = ";M(0xcfb374,'ShowCharacterSelection')"
 
 GDB_TAIL = "S()\nend\ncontinue\n'''\n"
-GDB_TAIL_REPLACEMENT = r'''S()
+GDB_TAIL_REPLACEMENT = r"""S()
 end
 continue
 python
@@ -133,6 +133,7 @@ except Exception:
 end
 continue
 '''
+"""
 
 CHAR_START = "# V14: account Login is already proven by local SOCKS activity plus a persistent\n"
 CHAR_END = '[[ "$world" == 1 ]] || fail structural_world_entry_not_observed_after_native_character_request\n'

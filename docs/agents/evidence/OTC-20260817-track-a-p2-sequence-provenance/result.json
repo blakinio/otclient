@@ -1,0 +1,66 @@
+{
+  "schema": "track-a-p2-sequence-provenance-v1",
+  "date": "2026-08-17",
+  "task": "OTC-20260817-track-a-p2-sequence-provenance",
+  "research_status": "DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "base_main": "0aed48da9a51730c590d0ffe4688f149b359a170",
+  "execution": {
+    "execution_class": "github_hosted",
+    "runtime_access": "none",
+    "source_staging_class": "exact_fenced_file_only_nonsemantic",
+    "raw_client_uploaded": false,
+    "world_map_used": false,
+    "owner_funded_ai_api_used": false
+  },
+  "generation": {
+    "run": 32044825898,
+    "source_job": 95430326316,
+    "hosted_job": 95430351866,
+    "result": "SUCCESS",
+    "window": "0xb56d60..0xb57280",
+    "window_sha256": "e5cf009bb1aec3065da4ff0dd3231268af1255cffa50fbb48f8817777907d557"
+  },
+  "claims": {
+    "same_message_saved_at_dual80_entry": "FACT",
+    "same_message_restored_before_sequence_update": "FACT",
+    "nonmatching_mode_message_plus_0": "FACT:0",
+    "sequenced_mode": "FACT:message_plus_0x34_equals_3",
+    "sequence_owner": "FACT:TGameserverDualConnection_this_plus_0x9c",
+    "sequence_field": "FACT:DWORD_message_plus_0",
+    "sequence_update": "FACT:store_current_counter_then_increment_counter_by_one",
+    "sequence_width": "FACT:32_bit",
+    "sequence_wrap_behavior": "FACT:modulo_2_pow_32_from_32_bit_arithmetic",
+    "sequence_initialization_or_reset_policy": "UNKNOWN",
+    "framing": "PROVEN",
+    "sequence": "PROVEN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN",
+    "final_binary_egress": "PROVEN_AT_QT_QTCPSOCKET_BOUNDARY",
+    "final_socket_owner": "FACT:TGameserverTCPConnection",
+    "final_os_socket_syscall": "UNKNOWN"
+  },
+  "load_bearing_instructions": [
+    "b56d62 mov r15,rdi",
+    "b56d75 mov [rsp+0x10],rsi",
+    "b56f46 mov rsi,[rsp+0x10]",
+    "b56f4b cmp DWORD PTR [rsi+0x34],0x3",
+    "b56f5a mov DWORD PTR [rax],0x0",
+    "b57058 mov eax,DWORD PTR [r15+0x9c]",
+    "b5705f mov DWORD PTR [rsi],eax",
+    "b57061 add eax,0x1",
+    "b57064 mov DWORD PTR [r15+0x9c],eax"
+  ],
+  "negative_controls": [
+    "No sequence inference from field width or serialization position alone.",
+    "No sequence inference from class or method names.",
+    "No claim that counter initial value/reset policy is known.",
+    "No compression or encryption claim from the 8-byte alignment envelope."
+  ],
+  "next_falsifiable_frontier": "Resolve exact dynamic type/provenance of RawDataProcessor this+0x8/+0x10 member object and the concrete effect of vslot +0x28 fast target 0xb3ec30; test encryption without semantic guessing.",
+  "promotion_authority": "coordinator_only"
+}

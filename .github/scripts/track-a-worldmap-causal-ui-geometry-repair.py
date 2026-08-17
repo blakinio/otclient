@@ -170,6 +170,16 @@ def transform(text: str) -> str:
     start = text.index(START)
     end = text.index(END, start)
     output = text[:start] + REPLACEMENT + text[end:]
+
+    # The base helper still owns three post-login/movement xdotool call sites
+    # after world=0. Route exactly those through the same loader-safe wrapper;
+    # fail closed if upstream changes their count rather than silently missing one.
+    direct_xdo = 'DISPLAY="$DISPLAY" "$XDOTOOL"'
+    direct_count = output.count(direct_xdo)
+    if direct_count != 3:
+        raise TransformRefused(f"POST_BLOCK_DIRECT_XDOTOOL_COUNT:{direct_count}")
+    output = output.replace(direct_xdo, "xdo")
+
     forbidden = (
         "tesseract",
         "capture_ocr",
@@ -180,7 +190,7 @@ def transform(text: str) -> str:
         "login_form_geometry_not_revalidated",
         "WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_RAW_XWD_GEOMETRY",
         "WORLDMAP_BASELINE_CHARACTER_SELECTION=PROVEN_RAW_XWD_GEOMETRY",
-        'DISPLAY="$DISPLAY" "$XDOTOOL"',
+        direct_xdo,
     )
     survivors = [token for token in forbidden if token in output]
     if survivors:
@@ -207,6 +217,9 @@ def transform(text: str) -> str:
         'LD_LIBRARY_PATH="$XWD_TOOLROOT_LIBS" "$XWD"',
         'LD_LIBRARY_PATH="$XDO_TOOLROOT_LIBS" "$XDOTOOL"',
         "xdo windowfocus --sync",
+        'xdo mousemove --window "$WIN" "$ROW_X" "$ROW_Y" click --repeat 2 --delay 120 1 key Return',
+        'xdo windowactivate --sync "$WIN" key --clearmodifiers Right',
+        'xdo key --clearmodifiers Left',
     )
     missing = [token for token in required if token not in output]
     if missing:

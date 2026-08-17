@@ -1,0 +1,84 @@
+{
+  "schema": "track-a-p2-dual-egress-research-v1",
+  "date": "2026-08-17",
+  "task": "OTC-20260817-track-a-p2-dual-precondition-egress",
+  "draft_pr": 458,
+  "research_status": "DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW",
+  "promotion_authority": "coordinator_only",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "platform": "official_native_linux_only"
+  },
+  "generation": {
+    "head": "37c455f2ab3170457a0d084a7745eaa42e28aff1",
+    "run": 32016842999,
+    "source_job": 95348018877,
+    "hosted_job": 95348295109,
+    "source_artifact": 9283851546,
+    "source_artifact_digest": "sha256:7e03ed66bff463e288b5f2414bad8190a27bf421161ba1218c2a74d7342baeab",
+    "final_artifact": 9283858910,
+    "final_artifact_digest": "sha256:2df8405269431397f3da0601ef24d9a9a8787dc33f3b5fdd43774f1eca36922c",
+    "governance_run": 32016848906,
+    "governance_result": "SUCCESS",
+    "runtime_access": "none",
+    "execution_class": "github_hosted_semantics_with_exact_fenced_file_only_source_staging"
+  },
+  "accepted_symbol_crosscheck": {
+    "artifact": 9252025461,
+    "artifact_digest": "sha256:2a866247558b079944d81c9ad33bd4c5361c8144a7f367b273ab3bc19a080991",
+    "client_sha_equal": true,
+    "targets": {
+      "0x4dac00": "QBuffer::buffer()",
+      "0x4de370": "QIODevice::write(QByteArray const&)"
+    },
+    "quarantined_run_31944051248_used_as_proof": false
+  },
+  "claims": {
+    "b4066b_inside_b40370_plus_0x90_function": "DISPROVEN",
+    "b40630_distinct_function_entry": "FACT",
+    "b4066b_qiodevice_write_callsite": "FACT",
+    "b4066b_receiver": "FACT:b40630_this_rbx_QBuffer_QIODevice_compatible",
+    "b4066b_receiver_exact_concrete_dynamic_type": "UNKNOWN",
+    "b4066b_payload": "FACT:original_b40630_second_argument_rsi",
+    "b4066b_direct_qtcpsocket_sink": "DISPROVEN",
+    "payload_relationship_to_promoted_same_message": "UNKNOWN",
+    "b40630_reachability_from_promoted_dualconnection_plus_0x78_or_plus_0x80": "UNKNOWN",
+    "framing": "UNKNOWN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN",
+    "final_binary_egress": "UNKNOWN",
+    "final_socket_ownership": "UNKNOWN",
+    "complete_transport_stage_order_beyond_promoted_chain": "UNKNOWN"
+  },
+  "hypothesis": {
+    "id": "H1",
+    "statement": "0xb4066b is the concrete binary gameplay egress candidate reachable after the promoted same-message handoff into TGameserverDualConnection",
+    "disposition": "DISPROVEN_IN_STATED_FORM",
+    "reasons": [
+      "0xb40370 returns by 0xb40421 and 0xb40630 is a distinct entry",
+      "0xb4066b uses the b40630 this object as QIODevice receiver and that same this is used for QBuffer::buffer()",
+      "no exact call/reachability edge from the promoted DualConnection +0x78/+0x80 windows to 0xb40630 was recovered"
+    ]
+  },
+  "instruction_anchors": {
+    "b40370_function_returns": ["0xb403e4", "0xb40412", "0xb40421"],
+    "b40630_entry": ["0xb40630", "0xb40634", "0xb40639"],
+    "b40630_dataflow": ["0xb40643", "0xb40656", "0xb40662", "0xb40665", "0xb40668", "0xb4066b", "0xb40673", "0xb40676", "0xb4068a"],
+    "promoted_dual_windows_indirect_nested_calls": ["0xb56c93", "0xb57042"]
+  },
+  "negative_controls": {
+    "b46bd0_gameplay_binary_sink": "DISPROVEN",
+    "c33259_gameplay_sink": "DISPROVEN",
+    "b5b880_gameplay_endpoint": "SUPERSEDED",
+    "vtable_adjacency_used_as_reachability_proof": false,
+    "workflow_success_used_as_semantic_proof": false
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static exact-file/disassembly research only; no client/runtime/network state changed or observed"
+  },
+  "next_action": "coordinator independently review Draft PR #458 primary artifacts and decide ACCEPT, RETURN_FOR_EVIDENCE, or SUPERSEDE"
+}

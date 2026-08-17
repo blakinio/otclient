@@ -13,8 +13,8 @@ on:
       - .github/scripts/tibia-official-client-re-canonical-live-transition.py
       - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
       - .github/workflows/tibia-official-client-re-canonical-xres-window-identity.yml
-      - docs/agents/tasks/active/OTC-20260817-track-a-canonical-xres-window-identity.md
-      - docs/agents/evidence/OTC-20260817-track-a-canonical-xres-window-identity/**
+      - docs/agents/tasks/active/OTC-20260816-track-a-canonical-runtime-e2e.md
+      - docs/agents/evidence/OTC-20260816-track-a-canonical-runtime-e2e/**
 
 permissions:
   contents: read
@@ -65,7 +65,7 @@ jobs:
           set -Eeuo pipefail
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
 
-      - name: Prove hosted-only repair boundary
+      - name: Prove hosted-only integration boundary
         shell: bash
         run: |
           set -Eeuo pipefail

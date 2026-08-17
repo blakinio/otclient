@@ -11,14 +11,24 @@ branch: docs/OTC-20260817-track-a-native-login-to-ingame-prompt
 base_branch: main
 base_sha: 4d6b6f8f8cbf7d1c579d451cf8f9d91fee7b4691
 created: 2026-08-17T22:56:00+02:00
-updated: 2026-08-17T23:00:00+02:00
+updated: 2026-08-17T23:02:00+02:00
 risk: medium
 related_pr: 501
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
 runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
+repair_cycles_for_current_gate: 1
+identical_failure_retries: 0
 owned_paths:
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME.md
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME_ALIAS.md
@@ -136,17 +146,21 @@ audit:
 - PR #501 changed-file inventory: PASS; exactly the three declared documentation/prompting paths.
 - Full PR patch review: PASS; no runtime/workflow/binary/credential changes and no unrelated paths.
 - Runtime E2E: `NOT_APPLICABLE_WITH_REASON` because this PR only persists prompting documentation and performs no client/runtime operation.
-- Exact-final-head required GitHub checks: pending after this checkpoint commit.
+- Track A governance run `32068869818`: FAILURE on exact head `d321b76efa7d034c97fab2db11ffff74f7c6cc3d`; `Fresh admission behavior audit` passed but `Deterministic admission-policy audit` failed because this new Track A active task omitted the complete admission frontmatter required by `test_track_a_agent_runtime_governance.py` even for `runtime_access: none`.
+- Repair: added the required fail-closed static admission fields (`canonical_*`, `gate_a`, `generation_rebind`, `gate_b`, `bootstrap`, `target_uniqueness`) as `NOT_APPLICABLE`; no prompt semantics/runtime scope changed.
+- Exact-final-head required GitHub checks: pending on the repaired head.
 
 # Current checkpoint
 
 ```yaml
-checkpoint_version: 2
+checkpoint_version: 3
 status: validating
 branch: docs/OTC-20260817-track-a-native-login-to-ingame-prompt
 pr: 501
 base_main: 4d6b6f8f8cbf7d1c579d451cf8f9d91fee7b4691
-last_completed_step: prompt, alias, full diff audit and 12-case manual prompt evaluation PASS
+last_completed_step: first exact-head governance failure isolated to missing static admission frontmatter and repaired without changing prompt semantics
+repair_cycles_for_current_gate: 1
+identical_failure_retries: 0
 blockers: []
-next_action: inspect exact-final-head GitHub checks and review state, then mark ready and squash-merge only if all required gates pass
+next_action: inspect repaired exact-head GitHub checks and review state, then mark ready and squash-merge only if all required gates pass
 ```

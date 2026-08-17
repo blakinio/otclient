@@ -10,231 +10,57 @@ permissions:
   contents: read
 
 concurrency:
-  group: track-a-worldmap-server-delivery-causal-validation-baseline-login-v1
+  group: track-a-worldmap-server-delivery-causal-validation-inventory-v3
   cancel-in-progress: false
 
 jobs:
-  gated-baseline-login:
-    name: Physical baseline / gated_login_once
+  inventory-only:
+    name: Physical baseline / post-failure inventory_only
     if: >-
       github.event.pull_request.number == 475 &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor == 'blakinio'
     runs-on: [otclient, synology]
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Fresh admission and exact trusted-base fence
+      - name: Re-admit isolated runtime inventory without client or secrets
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
-          git fetch --no-tags origin main
-          expected_main=c1adcf491580e28d40f215356a9e559af2ccadc4
-          actual_main="$(git rev-parse origin/main)"
-          echo "WORLDMAP_LOGIN_MAIN_SHA=$actual_main"
-          [[ "$actual_main" == "$expected_main" ]] || {
-            echo 'WORLDMAP_LOGIN_ERROR=main_drift'
-            exit 98
-          }
           python3 - <<'PY'
           from pathlib import Path
           import hashlib
           import os
-
-          SIZE = 51965216
-          SHA = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
-          TASK_MARK = b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1'
-          task_owned = []
-          candidates = []
-
+          SIZE=51965216
+          SHA='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          MARK=b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1'
+          task=[]; clients=[]
           def digest(path):
-              h = hashlib.sha256()
-              with path.open('rb', buffering=0) as handle:
-                  for block in iter(lambda: handle.read(1 << 20), b''):
-                      h.update(block)
+              h=hashlib.sha256()
+              with path.open('rb',buffering=0) as f:
+                  for block in iter(lambda:f.read(1<<20),b''): h.update(block)
               return h.hexdigest()
-
-          for entry in Path('/proc').iterdir():
-              if not entry.name.isdigit():
-                  continue
-              pid = int(entry.name)
-              try:
-                  env = set((entry / 'environ').read_bytes().split(b'\0'))
-                  cmd = (entry / 'cmdline').read_bytes().replace(b'\0', b' ').decode('utf-8', errors='replace')
-                  exe = Path(os.readlink(entry / 'exe'))
-                  stat = exe.stat()
-              except (FileNotFoundError, ProcessLookupError):
-                  continue
-              except (OSError, PermissionError):
-                  continue
-              if TASK_MARK in env:
-                  task_owned.append(pid)
-              hinted = 'CipSoft GmbH/Tibia/packages/Tibia' in cmd or '/Tibia/packages/Tibia/' in str(exe)
-              if hinted or stat.st_size == SIZE:
-                  try:
-                      sha = digest(exe)
-                  except OSError as exc:
-                      if hinted:
-                          raise RuntimeError('official_client_candidate_unverifiable') from exc
-                      continue
-                  if hinted or (stat.st_size == SIZE and sha == SHA):
-                      candidates.append(pid)
-
-          task_owned = sorted(set(task_owned))
-          candidates = sorted(set(candidates))
-          print('WORLDMAP_LOGIN_TASK_NAMESPACE_PROCESS_COUNT=' + str(len(task_owned)))
-          print('WORLDMAP_LOGIN_OFFICIAL_CLIENT_CANDIDATE_COUNT=' + str(len(candidates)))
-          if task_owned:
-              raise SystemExit('WORLDMAP_LOGIN_ERROR=task_namespace_not_unique')
-          if candidates:
-              raise SystemExit('WORLDMAP_LOGIN_ERROR=official_client_candidate_present')
-          print('WORLDMAP_LOGIN_TARGET_UNIQUENESS=PROVEN')
-          PY
-
-      - name: Launch helper with secrets scrubbed and prove pre-secret fields
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
-          helper=.github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh
-          control="$RUNNER_TEMP/worldmap-baseline-control"
-          mkdir -p "$control"
-          chmod 700 "$control"
-          rm -f "$control"/helper.pid "$control"/helper.log "$control"/presecret.ready \
-            "$control"/credentials.fifo "$control"/result "$control"/result.* 2>/dev/null || true
-
-          bash -n "$helper"
-          nohup setsid env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            bash "$helper" >"$control/helper.log" 2>&1 </dev/null &
-          helper_pid=$!
-          printf '%s\n' "$helper_pid" >"$control/helper.pid"
-          chmod 600 "$control/helper.pid" "$control/helper.log"
-
-          ready=0
-          for _ in $(seq 1 180); do
-            if [[ -f "$control/result" ]]; then
-              rc="$(tr -cd '0-9' <"$control/result")"
-              cat "$control/helper.log"
-              echo "WORLDMAP_PRESECRET_HELPER_EARLY_RESULT=${rc:-UNKNOWN}"
-              exit "${rc:-98}"
-            fi
-            if [[ -f "$control/presecret.ready" && -p "$control/credentials.fifo" ]]; then
-              ready=1
-              break
-            fi
-            if ! kill -0 "$helper_pid" 2>/dev/null; then
-              cat "$control/helper.log"
-              echo 'WORLDMAP_PRESECRET_ERROR=helper_exited_without_result'
-              exit 97
-            fi
-            sleep 1
-          done
-          [[ "$ready" == 1 ]] || {
-            cat "$control/helper.log"
-            echo 'WORLDMAP_PRESECRET_ERROR=ready_timeout'
-            exit 96
-          }
-
-          if grep -azq '^TIBIA_TEST_EMAIL=' "/proc/$helper_pid/environ"; then
-            echo 'WORLDMAP_PRESECRET_ERROR=email_in_helper_environment'
-            exit 95
-          fi
-          if grep -azq '^TIBIA_TEST_PASSWORD=' "/proc/$helper_pid/environ"; then
-            echo 'WORLDMAP_PRESECRET_ERROR=password_in_helper_environment'
-            exit 94
-          fi
-          grep -Fq 'WORLDMAP_BASELINE_EMAIL_FIELD_EDITABLE=PASS' "$control/helper.log"
-          grep -Fq 'WORLDMAP_BASELINE_PASSWORD_FIELD_EDITABLE=PASS' "$control/helper.log"
-          grep -Fq 'WORLDMAP_BASELINE_LOGIN_FORM=PROVEN_EDITABLE_FIELDS' "$control/helper.log"
-          grep -Fq 'WORLDMAP_BASELINE_PRESECRET_READY=true' "$control/helper.log"
-          if grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"; then
-            echo 'WORLDMAP_PRESECRET_ERROR=login_submitted_before_handoff'
-            exit 93
-          fi
-          echo 'WORLDMAP_PHYSICAL_PRESECRET_GATE=PASS'
-
-      - name: Hand off protected credentials only after pre-secret PASS
-        shell: bash
-        env:
-          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
-          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
-        run: |
-          set +x
-          set -Eeuo pipefail
-          control="$RUNNER_TEMP/worldmap-baseline-control"
-          helper_pid="$(tr -cd '0-9' <"$control/helper.pid")"
-          [[ "$helper_pid" =~ ^[1-9][0-9]*$ ]]
-          kill -0 "$helper_pid"
-          [[ -f "$control/presecret.ready" && -p "$control/credentials.fifo" ]]
-          [[ -n "${TIBIA_TEST_EMAIL:-}" && -n "${TIBIA_TEST_PASSWORD:-}" ]] || {
-            echo 'WORLDMAP_BASELINE_ERROR=protected_login_secrets_missing'
-            exit 92
-          }
-
-          exec 9>"$control/credentials.fifo"
-          printf '%s\0%s\0' "$TIBIA_TEST_EMAIL" "$TIBIA_TEST_PASSWORD" >&9
-          exec 9>&-
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          echo 'WORLDMAP_WORKFLOW_CREDENTIAL_HANDOFF=COMPLETE_AFTER_PRESECRET_GATE'
-
-          done_flag=0
-          for _ in $(seq 1 300); do
-            if [[ -f "$control/result" ]]; then
-              done_flag=1
-              break
-            fi
-            sleep 1
-          done
-          [[ "$done_flag" == 1 ]] || {
-            cat "$control/helper.log"
-            echo 'WORLDMAP_BASELINE_ERROR=physical_result_timeout'
-            exit 91
-          }
-          rc="$(tr -cd '0-9' <"$control/result")"
-          cat "$control/helper.log"
-          echo "WORLDMAP_BASELINE_HELPER_RESULT=${rc:-UNKNOWN}"
-          [[ "${rc:-UNKNOWN}" == 0 ]] || exit "${rc:-90}"
-          grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"
-          grep -Fq 'WORLDMAP_BASELINE_PHYSICAL_CAPTURE=PASS' "$control/helper.log"
-          grep -Fq 'WORLDMAP_BASELINE_ORIGINAL_SOURCE_REHASH=PASS' "$control/helper.log"
-          grep -Fq 'WORLDMAP_BASELINE_CLEANUP=COMPLETE' "$control/helper.log"
-          echo 'WORLDMAP_PHYSICAL_BASELINE_LOGIN_CAPTURE=PASS'
-
-      - name: Exact task-owned cleanup
-        if: always()
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
-          control="$RUNNER_TEMP/worldmap-baseline-control"
-          if [[ -r "$control/helper.pid" ]]; then
-            helper_pid="$(tr -cd '0-9' <"$control/helper.pid")"
-            if [[ "$helper_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$helper_pid" 2>/dev/null; then
-              kill -TERM "$helper_pid" 2>/dev/null || true
-              for _ in $(seq 1 40); do
-                kill -0 "$helper_pid" 2>/dev/null || break
-                sleep .25
-              done
-            fi
-          fi
-          python3 - <<'PY'
-          from pathlib import Path
-          marker=b'OTCLIENT_TIBIA_RE_EPHEMERAL_RUNTIME=worldmap-causal-baseline-ephemeral-v1'
-          found=[]
           for p in Path('/proc').iterdir():
-              if not p.name.isdigit():
-                  continue
+              if not p.name.isdigit(): continue
               try:
-                  fields=set((p/'environ').read_bytes().split(b'\0'))
-              except OSError:
-                  continue
-              if marker in fields:
-                  found.append(int(p.name))
-          print('WORLDMAP_FINAL_NAMESPACE_PROCESS_COUNT='+str(len(found)))
-          if found:
-              raise SystemExit('WORLDMAP_BASELINE_ERROR=final_namespace_cleanup_incomplete')
+                  env=set((p/'environ').read_bytes().split(b'\0'))
+                  cmd=(p/'cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace')
+                  exe=Path(os.readlink(p/'exe')); st=exe.stat()
+              except (OSError,PermissionError): continue
+              if MARK in env: task.append(int(p.name))
+              hinted='CipSoft GmbH/Tibia/packages/Tibia' in cmd or '/Tibia/packages/Tibia/' in str(exe)
+              if hinted or st.st_size==SIZE:
+                  try: sha=digest(exe)
+                  except OSError:
+                      if hinted: raise
+                      continue
+                  if hinted or (st.st_size==SIZE and sha==SHA): clients.append(int(p.name))
+          task=sorted(set(task)); clients=sorted(set(clients))
+          print('WORLDMAP_READMISSION_TASK_NAMESPACE_PROCESS_COUNT='+str(len(task)))
+          print('WORLDMAP_READMISSION_OFFICIAL_CLIENT_CANDIDATE_COUNT='+str(len(clients)))
+          print('WORLDMAP_READMISSION_CLIENT_EXECUTED=false')
+          print('WORLDMAP_READMISSION_SECRET_USED=false')
+          if task or clients: raise SystemExit('WORLDMAP_READMISSION_ERROR=target_not_unique')
+          print('WORLDMAP_READMISSION_TARGET_UNIQUENESS=PROVEN')
           PY

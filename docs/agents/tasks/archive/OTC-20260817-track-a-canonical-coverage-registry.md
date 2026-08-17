@@ -11,8 +11,9 @@ phase: archived
 base_branch: main
 base_main: d9529da35ada6ab2a7bf4d2e70205cc0dd7b14ab
 pr: 454
+merge_commit: 45ca2eb41aa1a5d3625d1888a9badf492dd445bc
 risk: medium
-updated: 2026-08-17T11:10:00+02:00
+updated: 2026-08-17T11:14:00+02:00
 execution_class: github_hosted
 runtime_access: none
 runtime_owner_task: NOT_APPLICABLE
@@ -46,7 +47,7 @@ canonical_registry:
   current_main_overlay: present
   current_coverage_summary: present
   reusable_validator: present
-  dedicated_validation_workflow_terminal_tree: removed_after_successful_validation
+  dedicated_validation_workflow_terminal_tree: absent_by_design
 validation:
   component_head: 7eb39676a235c6af07f3c891dfa9348a5ac43bb6
   registry_run: 32013364473
@@ -54,12 +55,22 @@ validation:
   registry_result: SUCCESS
   registry_marker: CANONICAL_COVERAGE_REGISTRY_VALIDATION=PASS
   source_baseline_blobs_exact: true
-  track_a_governance_run: 32013364501
-  track_a_governance_result: SUCCESS
+  component_track_a_governance_run: 32013364501
+  component_track_a_governance_result: SUCCESS
   first_terminal_governance_failure_run: 32013621176
   first_terminal_governance_failure_reason: dedicated Track A workflow remained while active admission task was removed
-  repair_cycles: 2
-  final_resolution: remove dedicated validation workflow from terminal tree; retain validator and durable validation output
+  final_resolution: remove dedicated validation workflow from terminal tree; retain reusable validator and durable validation output
+  terminal_head: 66d8f78b9a6ce15cd83d8ba340d9b25e85aadb6e
+  terminal_track_a_governance_triggered: false
+  terminal_track_a_governance_reason: final diff contained no new Track A workflow and no active admission task after governance-safe lifecycle repair
+  terminal_repository_ci_run: 32013769118
+  terminal_required_ci_job: 95338793036
+  terminal_repository_ci_result: SUCCESS
+  ready_state_ci_run: 32013938826
+  ready_state_required_ci_job: 95339315357
+  ready_state_repository_ci_result: SUCCESS
+  terminal_reviews: 0
+  terminal_review_threads: 0
 fresh_audit:
   result: PASS
   record: docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/20260817-canonical-promotion-audit.md
@@ -68,7 +79,7 @@ fresh_audit:
     - CCR-AUD-001
     - CCR-AUD-002
 result:
-  AUD-COV-001: RESOLVED_ON_PR_454_MERGE
+  AUD-COV-001: RESOLVED_ON_MAIN
   programme_complete: false
   remaining_material_findings: 4
   remaining_high: 2
@@ -82,14 +93,13 @@ e2e:
   result: NOT_APPLICABLE_WITH_REASON
   reason: internal repository data/evidence integration only; no client/runtime behavior changed
 closeout:
-  active_task_removed_in_terminal_tree: true
-  archive_complete_on_merge: true
+  active_task_terminal_tree: absent
+  dedicated_validation_workflow_terminal_tree: absent
+  archive_on_main: true
   ownership_released: true
-  exact_terminal_head_track_a_governance_required: true
-  exact_terminal_head_repository_ci_required: true
-  ready_state_required_ci_required: true
-last_completed_step: promoted exact accepted #304 registry baseline as an immutable layer with current-main overlay and reusable validator; component validation and fresh audit passed; terminal lifecycle was repaired by removing the dedicated validation workflow
-next_action: none after PR #454 merges; remaining four audit findings require separately owned programme work
+  postmerge_audit: PASS_WITH_DOCUMENTATION_CORRECTION
+last_completed_step: canonical registry merged as 45ca2eb41aa1a5d3625d1888a9badf492dd445bc; post-merge audit corrected durable wording to match the actual component-governance and terminal required-CI lifecycle
+next_action: none for this task; remaining four audit findings require separately owned programme work
 ---
 
 # Track A canonical coverage registry — archived

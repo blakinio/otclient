@@ -78,7 +78,6 @@ jobs:
           assert exact_sha == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
 
           evidence = root / 'evidence'
-          package = b'tibia.protobuf.protocol'
           field_type_names = {
               1: 'double', 2: 'float', 3: 'int64', 4: 'uint64', 5: 'int32', 6: 'fixed64',
               7: 'fixed32', 8: 'bool', 9: 'string', 10: 'group', 11: 'message', 12: 'bytes',
@@ -92,7 +91,6 @@ jobs:
           def read_varint(buf, pos, end):
               value = 0
               shift = 0
-              start = pos
               while pos < end and shift <= 63:
                   byte = buf[pos]
                   pos += 1
@@ -100,38 +98,30 @@ jobs:
                   if not (byte & 0x80):
                       return value, pos
                   shift += 7
-              raise ParseError(f'bad varint at {start}')
+              raise ParseError('bad varint')
 
-          def parse_wire(buf, start, end, max_field=32, require_nondecreasing=False):
+          def parse_wire(buf, start, end, max_field=32):
               pos = start
               out = []
-              previous_field = 0
               while pos < end:
                   record_start = pos
                   key, pos = read_varint(buf, pos, end)
                   field = key >> 3
                   wire = key & 7
                   if field == 0 or field > max_field or wire not in (0, 1, 2, 5):
-                      raise ParseError(f'invalid key field={field} wire={wire} at {record_start}')
-                  if require_nondecreasing and field < previous_field:
-                      raise ParseError(f'field order decreased {previous_field}->{field} at {record_start}')
-                  previous_field = field
+                      raise ParseError(f'invalid key field={field} wire={wire}')
                   if wire == 0:
                       value, pos = read_varint(buf, pos, end)
                   elif wire == 1:
                       if pos + 8 > end: raise ParseError('fixed64 overflow')
-                      value = buf[pos:pos+8]
-                      pos += 8
+                      value = buf[pos:pos+8]; pos += 8
                   elif wire == 5:
                       if pos + 4 > end: raise ParseError('fixed32 overflow')
-                      value = buf[pos:pos+4]
-                      pos += 4
+                      value = buf[pos:pos+4]; pos += 4
                   else:
                       length, pos = read_varint(buf, pos, end)
-                      if length < 0 or pos + length > end:
-                          raise ParseError('length overflow')
-                      value = buf[pos:pos+length]
-                      pos += length
+                      if pos + length > end: raise ParseError('length overflow')
+                      value = buf[pos:pos+length]; pos += length
                   out.append((field, wire, value, record_start, pos))
               return out
 
@@ -164,97 +154,10 @@ jobs:
               fields = []
               for f, w, v, _, _ in rec:
                   if f == 2 and w == 2:
-                      try:
-                          fields.append(parse_field_descriptor(v))
-                      except ParseError:
-                          pass
+                      fields.append(parse_field_descriptor(v))
               return {'name': names[0] if names else None, 'fields': fields}
 
-          def find_descriptor_starts():
-              starts = set()
-              p = 0
-              while True:
-                  package_pos = client.find(package, p)
-                  if package_pos < 0:
-                      break
-                  p = package_pos + 1
-                  package_key_pos = package_pos - 2
-                  if package_key_pos < 0 or client[package_key_pos] != 0x12 or client[package_pos-1] != len(package):
-                      continue
-                  for start in range(max(0, package_key_pos - 512), package_key_pos):
-                      if client[start] != 0x0a:
-                          continue
-                      try:
-                          name_len, name_pos = read_varint(client, start + 1, package_key_pos)
-                      except ParseError:
-                          continue
-                      name_end = name_pos + name_len
-                      if name_end != package_key_pos:
-                          continue
-                      name = client[name_pos:name_end]
-                      if name.endswith(b'.proto') and all(32 <= c < 127 for c in name):
-                          starts.add((start, name.decode('ascii')))
-              return sorted(starts)
-
-          descriptors = []
-          for start, file_name in find_descriptor_starts():
-              # FileDescriptorProto.message_type is field 4. Generated descriptors are serialized
-              # in nondecreasing field-number order, so the bounded parser grows until that ordering breaks.
-              pos = start
-              previous = 0
-              records = []
-              end_limit = min(len(client), start + 2_000_000)
-              while pos < end_limit:
-                  record_start = pos
-                  try:
-                      key, p2 = read_varint(client, pos, end_limit)
-                  except ParseError:
-                      break
-                  field = key >> 3
-                  wire = key & 7
-                  if field == 0 or field > 20 or wire not in (0, 1, 2, 5) or field < previous:
-                      break
-                  previous = field
-                  pos = p2
-                  try:
-                      if wire == 0:
-                          value, pos = read_varint(client, pos, end_limit)
-                      elif wire == 1:
-                          if pos + 8 > end_limit: break
-                          value = client[pos:pos+8]; pos += 8
-                      elif wire == 5:
-                          if pos + 4 > end_limit: break
-                          value = client[pos:pos+4]; pos += 4
-                      else:
-                          length, pos = read_varint(client, pos, end_limit)
-                          if length < 0 or pos + length > end_limit: break
-                          value = client[pos:pos+length]; pos += length
-                  except ParseError:
-                      break
-                  records.append((field, wire, value, record_start, pos))
-
-              pkg = strings_for(records, 2)
-              names = strings_for(records, 1)
-              messages = []
-              for f, w, v, _, _ in records:
-                  if f == 4 and w == 2:
-                      try:
-                          m = parse_message_descriptor(v)
-                          if m['name']:
-                              messages.append(m)
-                      except ParseError:
-                          pass
-              if pkg and pkg[0] == package.decode() and names and messages:
-                  descriptors.append({
-                      'file': names[0],
-                      'file_offset': start,
-                      'package': pkg[0],
-                      'parsed_span_bytes': pos - start,
-                      'message_count': len(messages),
-                      'messages': messages,
-                  })
-
-          targets = {
+          targets = [
               'Extent', 'Coordinate', 'MapFieldData', 'RowData', 'ColumnData',
               'GameclientMessageLogin', 'GameclientMessageSecondaryLogin', 'GameclientMessageClientDetails',
               'GameclientMessageEnterWorld', 'GameclientMessageSetClientOptions',
@@ -262,62 +165,95 @@ jobs:
               'GameserverMessageLeftColumn', 'GameserverMessageRightColumn',
               'GameserverMessageTopRow', 'GameserverMessageBottomRow',
               'GameserverMessageTopFloor', 'GameserverMessageBottomFloor',
-          }
-          target_messages = []
-          for descriptor in descriptors:
-              for message in descriptor['messages']:
-                  if message['name'] in targets:
-                      target_messages.append({
-                          'file': descriptor['file'],
-                          'name': message['name'],
-                          'fields': message['fields'],
-                      })
+          ]
 
-          fallback_tokens = sorted(targets | {
-              'FullMapMessage', 'FieldDataMessage', 'LeftColumnMessage', 'RightColumnMessage',
-              'TopRowMessage', 'BottomRowMessage', 'TopFloorMessage', 'BottomFloorMessage',
-              'AdditionalRowsTop', 'AdditionalRowsBottom', 'Columns', 'Rows',
-          })
+          recovered = []
           neighborhoods = []
-          for token in fallback_tokens:
-              needle = token.encode()
-              found = 0
-              p = 0
-              while found < 4:
-                  at = client.find(needle, p)
+          for target in targets:
+              name = target.encode()
+              if len(name) >= 128:
+                  raise AssertionError('target name unexpectedly long')
+              anchor = bytes([0x0a, len(name)]) + name
+              pos = 0
+              candidate_count = 0
+              while True:
+                  at = client.find(anchor, pos)
                   if at < 0:
                       break
-                  p = at + 1
-                  found += 1
-                  lo = max(0, at - 192)
-                  hi = min(len(client), at + len(needle) + 384)
+                  pos = at + 1
+                  lo = max(0, at - 96)
+                  hi = min(len(client), at + len(anchor) + 512)
                   sample = client[lo:hi]
                   escaped = ''.join(chr(b) if 32 <= b < 127 else f'\\x{b:02x}' for b in sample)
-                  neighborhoods.append({'token': token, 'offset': at, 'window_start': lo, 'window_end': hi, 'escaped': escaped})
+                  neighborhoods.append({'target': target, 'anchor_offset': at, 'window_start': lo, 'window_end': hi, 'escaped': escaped})
 
+                  # A top-level DescriptorProto is encoded inside FileDescriptorProto.message_type (field 4, wire 2 => key 0x22).
+                  for outer in range(max(0, at - 8), at):
+                      if client[outer] != 0x22:
+                          continue
+                      try:
+                          outer_len, payload_start = read_varint(client, outer + 1, at)
+                      except ParseError:
+                          continue
+                      if payload_start != at:
+                          continue
+                      payload_end = payload_start + outer_len
+                      if payload_end > len(client):
+                          continue
+                      try:
+                          message = parse_message_descriptor(client[payload_start:payload_end])
+                      except ParseError:
+                          continue
+                      if message['name'] != target:
+                          continue
+                      candidate_count += 1
+                      recovered.append({
+                          'name': target,
+                          'outer_key_offset': outer,
+                          'descriptor_offset': payload_start,
+                          'descriptor_size': outer_len,
+                          'fields': message['fields'],
+                      })
+              if candidate_count == 0:
+                  recovered.append({'name': target, 'descriptor_recovered': False})
+
+          package = b'tibia.protobuf.protocol'
+          package_neighborhoods = []
+          p = 0
+          while len(package_neighborhoods) < 8:
+              at = client.find(package, p)
+              if at < 0:
+                  break
+              p = at + 1
+              lo = max(0, at - 256)
+              hi = min(len(client), at + len(package) + 768)
+              sample = client[lo:hi]
+              escaped = ''.join(chr(b) if 32 <= b < 127 else f'\\x{b:02x}' for b in sample)
+              package_neighborhoods.append({'offset': at, 'window_start': lo, 'window_end': hi, 'escaped': escaped})
+
+          successful = [r for r in recovered if r.get('descriptor_recovered', True)]
           summary = {
-              'schema': 'track-a-worldmap-server-delivery-descriptor-probe-v2',
+              'schema': 'track-a-worldmap-server-delivery-targeted-descriptor-probe-v3',
               'client': {'version': '15.32.df7b29', 'size': len(client), 'sha256': exact_sha},
-              'descriptor_file_count': len(descriptors),
-              'descriptor_files': [
-                  {k: d[k] for k in ('file', 'file_offset', 'package', 'parsed_span_bytes', 'message_count')}
-                  for d in descriptors
-              ],
-              'target_message_count': len(target_messages),
-              'target_messages': target_messages,
+              'target_count': len(targets),
+              'recovered_descriptor_count': len(successful),
+              'recovered': recovered,
+              'package_neighborhood_count': len(package_neighborhoods),
           }
           (evidence / 'descriptor-summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
           (evidence / 'target-neighborhoods.json').write_text(json.dumps(neighborhoods, indent=2, sort_keys=True) + '\n')
+          (evidence / 'package-neighborhoods.json').write_text(json.dumps(package_neighborhoods, indent=2, sort_keys=True) + '\n')
 
           print('WORLDMAP_DESCRIPTOR_PROBE_BEGIN')
           print(json.dumps(summary, sort_keys=True))
           print('WORLDMAP_DESCRIPTOR_PROBE_END')
-          assert target_messages, 'no target protocol descriptors recovered'
+          assert successful, 'no targeted DescriptorProto recovered; bounded neighborhoods were still persisted locally'
           PY
 
           rm -f "$root/client/client.lzma"
 
       - name: Upload bounded descriptor evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: worldmap-server-delivery-descriptors-${{ github.run_id }}

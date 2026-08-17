@@ -44,8 +44,14 @@ jobs:
           python3 -m py_compile "$owner"
           grep -F 'WORLDMAP_XRES_OWNED_VIEWABLE_COUNT=' "$owner" >/dev/null
           grep -F 'WORLDMAP_XRES_SELECTED_GEOMETRY=' "$owner" >/dev/null
-          ! grep -F 'and int(attr.width) == TARGET_WIDTH' "$owner" >/dev/null
-          ! grep -F 'and int(attr.height) == TARGET_HEIGHT' "$owner" >/dev/null
+          if grep -F 'and int(attr.width) == TARGET_WIDTH' "$owner" >/dev/null; then
+            echo 'WORLDMAP_XRES_INTEGRATION_ERROR=legacy_width_constraint_survived' >&2
+            exit 1
+          fi
+          if grep -F 'and int(attr.height) == TARGET_HEIGHT' "$owner" >/dev/null; then
+            echo 'WORLDMAP_XRES_INTEGRATION_ERROR=legacy_height_constraint_survived' >&2
+            exit 1
+          fi
 
           screen="$tmp/screen-normalized-baseline.sh"
           python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \

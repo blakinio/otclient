@@ -1,0 +1,78 @@
+name: Track A worldmap server-delivery causal validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-worldmap-server-delivery-causal-validation.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-worldmap-server-delivery-causal-validation
+  cancel-in-progress: false
+
+jobs:
+  prelogin-focus-scan-static:
+    name: Pre-login focus scan composition (no client)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate no-secret reversible Tab scan composition
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-gdb-env-repair.py \
+            .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py \
+            .github/scripts/track-a-worldmap-causal-xwd-compare.py
+          screen="$RUNNER_TEMP/worldmap-focus-screen.sh"
+          gdb="$RUNNER_TEMP/worldmap-focus-gdb.sh"
+          ui="$RUNNER_TEMP/worldmap-focus-ui.sh"
+          scan="$RUNNER_TEMP/worldmap-focus-scan.sh"
+          python3 .github/scripts/track-a-worldmap-causal-screen-geometry-repair.py \
+            .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$screen"
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$screen" "$gdb"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$gdb" "$ui"
+          python3 .github/scripts/track-a-worldmap-causal-prelogin-focus-scan-repair.py "$ui" "$scan"
+          bash -n "$scan"
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_SECRET_ENV=ABSENT' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN_MODE=TAB_REVERSIBLE_DUMMY_TEXT' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_EDITABLE_CANDIDATE=' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_EDITABLE_CANDIDATE_COUNT=' "$scan" >/dev/null
+          grep -F 'WORLDMAP_PRELOGIN_FOCUS_SCAN=COMPLETE_NO_SECRET' "$scan" >/dev/null
+          grep -F 'xdo key --window "$UI_WIN" --clearmodifiers Tab' "$scan" >/dev/null
+          grep -F "'wmprobe7'" "$scan" >/dev/null
+          grep -F "'iiiiii'" "$scan" >/dev/null
+          grep -F "'WWWWWW'" "$scan" >/dev/null
+          grep -F 'exit 0' "$scan" >/dev/null
+          grep -F '[[ -z "${TIBIA_TEST_EMAIL:-}" && -z "${TIBIA_TEST_PASSWORD:-}" ]] || fail prelogin_focus_scan_secret_env_present' "$scan" >/dev/null
+          grep -F 'env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD' "$scan" >/dev/null
+          if grep -F 'printf '\''%s'\'' "$TIBIA_TEST_EMAIL"' "$scan" || grep -F 'printf '\''%s'\'' "$TIBIA_TEST_PASSWORD"' "$scan"; then
+            echo 'WORLDMAP_FOCUS_STATIC_ERROR=credential_submission_survived' >&2
+            exit 1
+          fi
+          if grep -F 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$scan"; then
+            echo 'WORLDMAP_FOCUS_STATIC_ERROR=login_submission_survived' >&2
+            exit 1
+          fi
+          if grep -F 'WORLDMAP_BASELINE_CHARACTER_ACTIVATION_SENT=true' "$scan"; then
+            echo 'WORLDMAP_FOCUS_STATIC_ERROR=character_activation_survived' >&2
+            exit 1
+          fi
+          if grep -F 'WORLDMAP_BASELINE_RIGHT_SENT=true' "$scan" || grep -F 'WORLDMAP_BASELINE_LEFT_SENT=true' "$scan"; then
+            echo 'WORLDMAP_FOCUS_STATIC_ERROR=gameplay_stimulus_survived' >&2
+            exit 1
+          fi
+          echo 'WORLDMAP_PRELOGIN_FOCUS_SCAN_STATIC=PASS'
+          echo 'WORLDMAP_PRELOGIN_FOCUS_SCAN_CLIENT_EXECUTED=false'
+          echo 'WORLDMAP_PRELOGIN_FOCUS_SCAN_SECRET_USED=false'

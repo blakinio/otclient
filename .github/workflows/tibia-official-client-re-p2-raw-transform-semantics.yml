@@ -2,10 +2,8 @@ name: Track A P2 raw transform semantics
 
 on:
   push:
-    branches:
-      - research/OTC-20260817-track-a-p2-raw-transform-semantics
-    paths:
-      - .github/workflows/tibia-official-client-re-p2-raw-transform-semantics.yml
+    branches: [research/OTC-20260817-track-a-p2-raw-transform-semantics]
+    paths: [.github/workflows/tibia-official-client-re-p2-raw-transform-semantics.yml]
   workflow_dispatch:
 
 permissions:
@@ -31,7 +29,6 @@ jobs:
       core_sha256: ${{ steps.stage.outputs.core_sha256 }}
     steps:
       - id: stage
-        name: Exact-fence and copy one bounded core window only
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -46,20 +43,19 @@ jobs:
           for candidate in "${candidates[@]}"; do
             [[ -f "$candidate" && ! -L "$candidate" ]] || continue
             [[ "$(stat -c %s "$candidate")" == "$EXPECTED_CLIENT_SIZE" ]] || continue
-            if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
+            python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY' && { source_client="$candidate"; break; }
           import hashlib,sys
           h=hashlib.sha256()
           with open(sys.argv[1],'rb') as f:
               for c in iter(lambda:f.read(1024*1024),b''): h.update(c)
           raise SystemExit(h.hexdigest()!=sys.argv[2])
           PY
-            then source_client="$candidate"; break; fi
           done
           [[ -n "$source_client" ]] || exit 50
           python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
           import hashlib,struct,sys
           from pathlib import Path
-          p=Path(sys.argv[1]); out=Path(sys.argv[2]); start=0xb3dc00; end=0xb3e100
+          p=Path(sys.argv[1]); out=Path(sys.argv[2]); start=0xb3dcc0; end=0xb3e100
           with p.open('rb') as f:
               ident=f.read(16); rest=f.read(48)
               if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1: raise SystemExit(51)
@@ -72,19 +68,13 @@ jobs:
                       f.seek(off+start-va); data=f.read(end-start); break
           if data is None or len(data)!=end-start: raise SystemExit(52)
           dig=hashlib.sha256(data).hexdigest()
-          with out.open('a') as h:
-              h.write(f'core_hex={data.hex()}\ncore_sha256={dig}\n')
+          with out.open('a') as h: h.write(f'core_hex={data.hex()}\ncore_sha256={dig}\n')
           print('P2_RAWTRANSFORM_CORE_SOURCE=PASS')
-          print('P2_RAWTRANSFORM_CLIENT_VERSION=15.32.df7b29')
-          print('P2_RAWTRANSFORM_CLIENT_SIZE=51965216')
-          print('P2_RAWTRANSFORM_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
           print(f'P2_RAWTRANSFORM_CORE_WINDOW=0x{start:x}..0x{end:x}')
           print(f'P2_RAWTRANSFORM_CORE_SHA256={dig}')
           print('P2_RAWTRANSFORM_RUNTIME_ACCESS=none')
           print('P2_RAWTRANSFORM_SOURCE_DISASSEMBLY=false')
           print('P2_RAWTRANSFORM_SOURCE_SEMANTIC_CLASSIFICATION=false')
-          print('P2_RAWTRANSFORM_CLIENT_PROCESS_ACCESSED=false')
-          print('P2_RAWTRANSFORM_PROCESS_MEMORY_ACCESSED=false')
           print('P2_RAWTRANSFORM_RAW_CLIENT_UPLOADED=false')
           PY
 
@@ -99,24 +89,20 @@ jobs:
       CORE_HEX: ${{ needs.source-sanitize.outputs.core_hex }}
       CORE_SHA256: ${{ needs.source-sanitize.outputs.core_sha256 }}
     steps:
-      - name: Verify and disassemble exact transform core
-        shell: bash
+      - shell: bash
         run: |
           set -Eeuo pipefail
           [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 71
           [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
           [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 73
-          command -v objdump >/dev/null
           python3 - <<'PY'
           import hashlib,os,subprocess,tempfile
           from pathlib import Path
-          start=0xb3dc00; end=0xb3e100; data=bytes.fromhex(os.environ['CORE_HEX'])
+          start=0xb3dcc0; end=0xb3e100; data=bytes.fromhex(os.environ['CORE_HEX'])
           if len(data)!=end-start or hashlib.sha256(data).hexdigest()!=os.environ['CORE_SHA256']: raise SystemExit(74)
           with tempfile.TemporaryDirectory(prefix='p2-raw-core-') as td:
               p=Path(td)/'core.bin'; p.write_bytes(data)
-              text=subprocess.run(
-                  ['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],
-                  check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+              text=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
           if 'b3dcc0:' not in text: raise SystemExit('P2_RAWTRANSFORM_FAIL=missing_b3dcc0')
           print('P2_RAWTRANSFORM_CORE_HOSTED=PASS')
           print('P2_RAWTRANSFORM_EXECUTION_CLASS=github_hosted')

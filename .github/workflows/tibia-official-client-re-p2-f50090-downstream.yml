@@ -17,34 +17,26 @@ concurrency:
 
 jobs:
   source-sanitize:
-    name: Stage exact-file f50090 bytes without marketplace actions
+    name: Stage exact-file f50090 writer evidence
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-f50090-downstream
       EXPECTED_RUNNER_NAME: synology-otclient-01
-      EXPECTED_CLIENT_VERSION: 15.32.df7b29
       EXPECTED_CLIENT_SIZE: '51965216'
       EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-      CODE_START: '0xf50040'
-      CODE_END: '0xf50480'
     outputs:
-      code_chunk_0: ${{ steps.stage.outputs.code_chunk_0 }}
-      code_chunk_1: ${{ steps.stage.outputs.code_chunk_1 }}
-      code_chunk_2: ${{ steps.stage.outputs.code_chunk_2 }}
-      code_chunk_3: ${{ steps.stage.outputs.code_chunk_3 }}
-      code_chunk_4: ${{ steps.stage.outputs.code_chunk_4 }}
-      code_chunk_5: ${{ steps.stage.outputs.code_chunk_5 }}
-      code_chunk_6: ${{ steps.stage.outputs.code_chunk_6 }}
-      code_chunk_7: ${{ steps.stage.outputs.code_chunk_7 }}
-      code_chunk_8: ${{ steps.stage.outputs.code_chunk_8 }}
-      code_sha256: ${{ steps.stage.outputs.code_sha256 }}
-      code_length: ${{ steps.stage.outputs.code_length }}
+      main_hex: ${{ steps.stage.outputs.main_hex }}
+      main_sha256: ${{ steps.stage.outputs.main_sha256 }}
+      ctor_hex: ${{ steps.stage.outputs.ctor_hex }}
+      ctor_sha256: ${{ steps.stage.outputs.ctor_sha256 }}
+      vcall_hex: ${{ steps.stage.outputs.vcall_hex }}
+      vcall_sha256: ${{ steps.stage.outputs.vcall_sha256 }}
       source_candidate_index: ${{ steps.stage.outputs.source_candidate_index }}
     steps:
       - id: stage
-        name: Exact-fence and emit bounded byte chunks only
+        name: Exact-fence and emit three bounded file windows only
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -81,20 +73,20 @@ jobs:
           done
           [[ -n "$source_client" ]] || { echo P2_F50090_REFUSED=EXACT_SOURCE_MISSING; exit 50; }
 
-          python3 - "$source_client" "$source_index" "$GITHUB_OUTPUT" "$CODE_START" "$CODE_END" <<'PY'
-          import hashlib
-          import stat
-          import struct
-          import sys
+          python3 - "$source_client" "$source_index" "$GITHUB_OUTPUT" <<'PY'
+          import hashlib, stat, struct, sys
           from pathlib import Path
 
           path = Path(sys.argv[1]).resolve()
           source_index = sys.argv[2]
           output_path = Path(sys.argv[3])
-          start = int(sys.argv[4], 0)
-          end = int(sys.argv[5], 0)
           expected_size = 51965216
           expected_sha = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          windows = {
+              'main': (0xF50040, 0xF50480),
+              'ctor': (0x1960300, 0x1960600),
+              'vcall': (0xCB2900, 0xCB29C0),
+          }
 
           if not path.is_file() or path.is_symlink() or not stat.S_ISREG(path.stat().st_mode):
               raise SystemExit('P2_F50090_FAIL=source_regular_file')
@@ -116,37 +108,46 @@ jobs:
               phoff, phentsize, phnum = fields[4], fields[8], fields[9]
               if phentsize < 56 or not (0 < phnum < 128):
                   raise SystemExit('P2_F50090_FAIL=program_headers')
-              code = None
+              segments = []
               for i in range(phnum):
                   f.seek(phoff + i * phentsize)
                   row = f.read(56)
-                  p_type, _flags, p_offset, p_vaddr, _paddr, p_filesz, _pmemsz, _align = struct.unpack('<IIQQQQQQ', row)
-                  if p_type == 1 and start >= p_vaddr and end <= p_vaddr + p_filesz:
-                      f.seek(p_offset + start - p_vaddr)
-                      code = f.read(end - start)
-                      break
-          if code is None or len(code) != end - start:
-              raise SystemExit('P2_F50090_FAIL=range_not_file_backed')
+                  p_type, p_flags, p_offset, p_vaddr, _paddr, p_filesz, _pmemsz, _align = struct.unpack('<IIQQQQQQ', row)
+                  if p_type == 1 and p_filesz:
+                      segments.append((p_vaddr, p_filesz, p_offset, p_flags))
 
-          chunks = [code[i:i+128] for i in range(0, len(code), 128)]
-          if len(chunks) != 9:
-              raise SystemExit('P2_F50090_FAIL=unexpected_chunk_count')
+              records = {}
+              for name, (start, end) in windows.items():
+                  data = None
+                  executable = False
+                  for vaddr, filesz, offset, flags in segments:
+                      if start >= vaddr and end <= vaddr + filesz:
+                          f.seek(offset + start - vaddr)
+                          data = f.read(end - start)
+                          executable = bool(flags & 1)
+                          break
+                  if data is None or len(data) != end - start:
+                      raise SystemExit(f'P2_F50090_FAIL={name}_range_not_file_backed')
+                  if not executable:
+                      raise SystemExit(f'P2_F50090_FAIL={name}_range_not_executable')
+                  records[name] = (start, end, data, hashlib.sha256(data).hexdigest())
+
           with output_path.open('a') as out:
-              for index, chunk in enumerate(chunks):
-                  out.write(f"code_chunk_{index}={','.join(str(b) for b in chunk)}\n")
-              out.write(f"code_sha256={hashlib.sha256(code).hexdigest()}\n")
-              out.write(f"code_length={len(code)}\n")
-              out.write(f"source_candidate_index={source_index}\n")
+              for name, (_start, _end, data, digest) in records.items():
+                  out.write(f'{name}_hex={data.hex()}\n')
+                  out.write(f'{name}_sha256={digest}\n')
+              out.write(f'source_candidate_index={source_index}\n')
 
           print('P2_F50090_SOURCE_BOUNDARY=PASS')
           print('P2_F50090_CLIENT_VERSION=15.32.df7b29')
           print(f'P2_F50090_CLIENT_SIZE={expected_size}')
           print(f'P2_F50090_CLIENT_SHA256={expected_sha}')
-          print(f'P2_F50090_CODE_WINDOW=0x{start:x}..0x{end:x}')
-          print(f'P2_F50090_CODE_LENGTH={len(code)}')
-          print(f'P2_F50090_CODE_SHA256={hashlib.sha256(code).hexdigest()}')
+          for name, (start, end, data, digest) in records.items():
+              print(f'P2_F50090_{name.upper()}_WINDOW=0x{start:x}..0x{end:x}')
+              print(f'P2_F50090_{name.upper()}_LENGTH={len(data)}')
+              print(f'P2_F50090_{name.upper()}_SHA256={digest}')
           print('P2_F50090_RUNTIME_ACCESS=none')
-          print('P2_F50090_SOURCE_OPERATION=single_bounded_file_backed_code_window_only')
+          print('P2_F50090_SOURCE_OPERATION=three_bounded_file_backed_executable_windows_only')
           print('P2_F50090_SOURCE_DISASSEMBLY=false')
           print('P2_F50090_SOURCE_SEMANTIC_CLASSIFICATION=false')
           print('P2_F50090_CLIENT_PROCESS_ACCESSED=false')
@@ -158,29 +159,19 @@ jobs:
           PY
 
   hosted-validate:
-    name: Decode f50090 on GitHub-hosted Linux without marketplace actions
+    name: Decode f50090 writer evidence on GitHub-hosted Linux
     needs: source-sanitize
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       EXPECTED_REPOSITORY: blakinio/otclient
       EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-f50090-downstream
-      EXPECTED_CLIENT_VERSION: 15.32.df7b29
-      EXPECTED_CLIENT_SIZE: '51965216'
-      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-      CODE_START: '0xf50040'
-      CODE_END: '0xf50480'
-      CODE_CHUNK_0: ${{ needs.source-sanitize.outputs.code_chunk_0 }}
-      CODE_CHUNK_1: ${{ needs.source-sanitize.outputs.code_chunk_1 }}
-      CODE_CHUNK_2: ${{ needs.source-sanitize.outputs.code_chunk_2 }}
-      CODE_CHUNK_3: ${{ needs.source-sanitize.outputs.code_chunk_3 }}
-      CODE_CHUNK_4: ${{ needs.source-sanitize.outputs.code_chunk_4 }}
-      CODE_CHUNK_5: ${{ needs.source-sanitize.outputs.code_chunk_5 }}
-      CODE_CHUNK_6: ${{ needs.source-sanitize.outputs.code_chunk_6 }}
-      CODE_CHUNK_7: ${{ needs.source-sanitize.outputs.code_chunk_7 }}
-      CODE_CHUNK_8: ${{ needs.source-sanitize.outputs.code_chunk_8 }}
-      CODE_SHA256: ${{ needs.source-sanitize.outputs.code_sha256 }}
-      CODE_LENGTH: ${{ needs.source-sanitize.outputs.code_length }}
+      MAIN_HEX: ${{ needs.source-sanitize.outputs.main_hex }}
+      MAIN_SHA256: ${{ needs.source-sanitize.outputs.main_sha256 }}
+      CTOR_HEX: ${{ needs.source-sanitize.outputs.ctor_hex }}
+      CTOR_SHA256: ${{ needs.source-sanitize.outputs.ctor_sha256 }}
+      VCALL_HEX: ${{ needs.source-sanitize.outputs.vcall_hex }}
+      VCALL_SHA256: ${{ needs.source-sanitize.outputs.vcall_sha256 }}
       SOURCE_CANDIDATE_INDEX: ${{ needs.source-sanitize.outputs.source_candidate_index }}
     steps:
       - name: Reconstruct, verify and disassemble exact bounded evidence
@@ -195,52 +186,53 @@ jobs:
           command -v objdump >/dev/null
 
           python3 - <<'PY'
-          import hashlib
-          import os
-          import subprocess
-          import tempfile
+          import hashlib, os, subprocess, tempfile
           from pathlib import Path
 
-          start = int(os.environ['CODE_START'], 0)
-          end = int(os.environ['CODE_END'], 0)
-          expected_len = end - start
-          values = []
-          for index in range(9):
-              raw = os.environ[f'CODE_CHUNK_{index}']
-              if not raw:
-                  raise SystemExit(f'P2_F50090_FAIL=missing_chunk_{index}')
-              values.extend(int(part) for part in raw.split(',') if part)
-          code = bytes(values)
-          if len(code) != expected_len or str(len(code)) != os.environ['CODE_LENGTH']:
-              raise SystemExit('P2_F50090_FAIL=hosted_length')
-          digest = hashlib.sha256(code).hexdigest()
-          if digest != os.environ['CODE_SHA256']:
-              raise SystemExit('P2_F50090_FAIL=hosted_digest')
+          records = {
+              'main': (0xF50040, 0xF50480, os.environ['MAIN_HEX'], os.environ['MAIN_SHA256']),
+              'ctor': (0x1960300, 0x1960600, os.environ['CTOR_HEX'], os.environ['CTOR_SHA256']),
+              'vcall': (0xCB2900, 0xCB29C0, os.environ['VCALL_HEX'], os.environ['VCALL_SHA256']),
+          }
+          disassemblies = {}
+          with tempfile.TemporaryDirectory(prefix='p2-f50090-writer-') as td:
+              for name, (start, end, hex_data, expected_sha) in records.items():
+                  data = bytes.fromhex(hex_data)
+                  if len(data) != end - start:
+                      raise SystemExit(f'P2_F50090_FAIL={name}_hosted_length')
+                  digest = hashlib.sha256(data).hexdigest()
+                  if digest != expected_sha:
+                      raise SystemExit(f'P2_F50090_FAIL={name}_hosted_digest')
+                  raw_path = Path(td) / f'{name}.bin'
+                  raw_path.write_bytes(data)
+                  proc = subprocess.run(
+                      ['objdump', '-D', '-b', 'binary', '-m', 'i386:x86-64', '-M', 'intel',
+                       f'--adjust-vma=0x{start:x}', str(raw_path)],
+                      check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                  )
+                  disassemblies[name] = proc.stdout
 
-          with tempfile.TemporaryDirectory(prefix='p2-f50090-hosted-') as td:
-              raw_path = Path(td) / 'f50090.bin'
-              raw_path.write_bytes(code)
-              proc = subprocess.run(
-                  ['objdump', '-D', '-b', 'binary', '-m', 'i386:x86-64', '-M', 'intel',
-                   f'--adjust-vma=0x{start:x}', str(raw_path)],
-                  check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-              )
-              disassembly = proc.stdout
-
-          if 'f50090:' not in disassembly:
-              raise SystemExit('P2_F50090_FAIL=target_anchor_missing')
+          if 'f50090:' not in disassemblies['main']:
+              raise SystemExit('P2_F50090_FAIL=main_target_anchor_missing')
+          if '1960340:' not in disassemblies['ctor']:
+              raise SystemExit('P2_F50090_FAIL=ctor_target_anchor_missing')
+          for anchor in ('cb2930:', 'cb2940:', 'cb2960:'):
+              if anchor not in disassemblies['vcall']:
+                  raise SystemExit(f'P2_F50090_FAIL=vcall_anchor_missing_{anchor}')
 
           print('P2_F50090_HOSTED_VALIDATION=PASS')
           print('P2_F50090_CLIENT_VERSION=15.32.df7b29')
           print('P2_F50090_CLIENT_SIZE=51965216')
           print('P2_F50090_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
-          print(f'P2_F50090_CODE_WINDOW=0x{start:x}..0x{end:x}')
-          print(f'P2_F50090_CODE_SHA256={digest}')
           print(f'P2_F50090_SOURCE_CANDIDATE_INDEX={os.environ["SOURCE_CANDIDATE_INDEX"]}')
           print('P2_F50090_EXECUTION_CLASS=github_hosted')
           print('P2_F50090_RUNTIME_ACCESS=none')
           print('P2_F50090_PRIMARY_BYTES_EXACT_FENCED=true')
-          print('P2_F50090_DISASSEMBLY_BEGIN')
-          print(disassembly, end='')
-          print('P2_F50090_DISASSEMBLY_END')
+          for name in ('main', 'ctor', 'vcall'):
+              start, end, _hex_data, expected_sha = records[name]
+              print(f'P2_F50090_{name.upper()}_WINDOW=0x{start:x}..0x{end:x}')
+              print(f'P2_F50090_{name.upper()}_SHA256={expected_sha}')
+              print(f'P2_F50090_{name.upper()}_DISASSEMBLY_BEGIN')
+              print(disassemblies[name], end='')
+              print(f'P2_F50090_{name.upper()}_DISASSEMBLY_END')
           PY

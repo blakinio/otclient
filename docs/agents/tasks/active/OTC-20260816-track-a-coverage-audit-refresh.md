@@ -11,14 +11,14 @@ task_kind: audit
 phase: coordinator-review-ready
 branch: research/OTC-20260816-track-a-coverage-audit-refresh-v2
 base_branch: main
-base_main: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
-current_main: 55803133a5abe8b1e75e4660da1d2b84b154ab9a
+base_main: 8c9486e2c6109a7a39b564804c8acd707659b5e0
+current_main: 8c9486e2c6109a7a39b564804c8acd707659b5e0
 pull_request: 390
 supersedes_pr: 369
 coordinator_disposition: RETURN_FOR_EVIDENCE
 coordinator_comment: 5308970415
 coordinator_delta_comment: 5309008545
-updated: 2026-08-17T08:28:00+02:00
+updated: 2026-08-17T08:32:00+02:00
 risk: low
 researcher_delivery: draft_only
 implementation_authorized: false
@@ -38,7 +38,7 @@ policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract_version: 1.0.0
 execution_mode: github-only
-execution_reason: coordinator returned the prior snapshot for stale live-state evidence; this refresh consumes only current GitHub/promoted evidence and updates the same two task-owned files without physical runtime access
+execution_reason: coordinator returned the prior snapshot for stale live-state evidence; this current-main refresh consumes promoted/live GitHub evidence only and keeps all physical runtime work outside the audit lane
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: draft_pr_only
@@ -66,9 +66,9 @@ physical_e2e_required: false
 owner_funded_ai_api_authorized: false
 programme_complete: false
 audit_result: FAIL_MATERIAL_GAPS_OPEN
-material_findings_open: 6
+material_findings_open: 5
 high_findings: 3
-medium_findings: 3
+medium_findings: 2
 runtime_nonclaims:
   current_canonical_display: UNKNOWN
   current_canonical_vnc_endpoint: UNKNOWN
@@ -77,6 +77,7 @@ runtime_nonclaims:
   current_canonical_gate_b: NOT_PROVEN
 snapshot_heads:
   P0_PR302: 8812e58d6fc84b39460dd5a1c9de960d20c5b55b
+  P0_CYCLOPEDIA_PR435_MERGE: 8c9486e2c6109a7a39b564804c8acd707659b5e0
   P1_PROMOTION_PR414_MERGE: 070a066488d22126483e13fc8a08b17df5090918
   P2_PR310: 9b99b6b4bda2cf01e8fadcd8a00a6827de35d825
   VIEWPORT_PR367: a69179e5cf4681a9d41014a562a0bfd0d1cd9ffb
@@ -90,7 +91,7 @@ historical_coverage_baseline:
   merged: false
 resolved_or_reclassified_since_prior_handoff:
   - AUD-COV-006 RESOLVED: P1 coordinator promotion #414 merged and #372 closed superseded
-  - AUD-COV-005 RECLASSIFIED HIGH_TO_MEDIUM: #437 proves task-scoped sanitized exact-static producer plus hosted validation; no canonical/global staging service yet
+  - AUD-COV-005 RESOLVED_AS_MATERIAL_GAP: #437 proved task-scoped sanitized exact-static production and #435 promoted the same process for P0 Cyclopedia evidence
   - old xkbcomp/Xvfb blocker SUPERSEDED: current RUNTIME frontier is raw X11 resource-to-PID identity via hosted raw-XRes helper
   - coordinator-requested #415 isolated graphics evidence consumed and kept historical/non-canonical after later DRI/post-RHI promotions
 open_findings:
@@ -98,19 +99,22 @@ open_findings:
   - AUD-COV-002 HIGH required semantic denominators incomplete
   - AUD-COV-003 MEDIUM action/QMeta 612-versus-1004 denominator conflict
   - AUD-COV-004 HIGH canonical live semantic/restart proof unavailable; current raw-XRes resource-to-PID identity frontier unresolved
-  - AUD-COV-005 MEDIUM exact-client evidence production remains task-scoped rather than canonical/reusable
   - AUD-COV-007 MEDIUM durable coordinator checkpoint materially stale versus live Git
-semantic_refresh_head: b53abf34230e0f98b75e3b7194b8fe165007676d
-semantic_refresh_governance_run: 32001872027
-semantic_refresh_governance_result: SUCCESS
-semantic_refresh_repository_ci_run: 32001872144
-semantic_refresh_repository_ci_result: SUCCESS
-semantic_refresh_changed_paths: 2
-ci_check_generation: final-task-status-head-pending
+prior_validation:
+  semantic_refresh_head: b53abf34230e0f98b75e3b7194b8fe165007676d
+  semantic_refresh_governance_run: 32001872027
+  semantic_refresh_repository_ci_run: 32001872144
+  task_status_head: 1341911b61c889473136060a359463c28a2c18b9
+  task_status_governance_run: 32001945623
+  task_status_repository_ci_run: 32001945776
+  result: SUCCESS
+  invalidated_by_main_advance: true
+  main_advance: 8c9486e2c6109a7a39b564804c8acd707659b5e0
+ci_check_generation: current-main-8c-final-pending
 ci_checks_for_current_head: 0
 terminal_ci_checks_for_current_generation: 0
-last_completed_step: refreshed PR #390 onto exact main 55803133 with a two-file diff; semantic head b53abf34 passed Track A governance and repository CI without main drift
-next_action: validate this final task-status head with exact-head Track A governance and repository CI, verify review hygiene and two-file scope, then issue a no-head-change coordinator handoff; do not merge or promote
+last_completed_step: reconciled the main advance that promoted P0 Cyclopedia exact-client evidence in #435; removed exact-static staging from the material finding set while preserving semantic XYZ as unproven and RUNTIME-owned
+next_action: validate this current-main restacked head with exact-head Track A governance and repository CI, verify two-file scope/review hygiene and no further main drift, then issue a no-head-change coordinator handoff; do not merge or promote
 ---
 
 # Track A coverage audit refresh — coordinator return-for-evidence continuation
@@ -118,22 +122,20 @@ next_action: validate this final task-status head with exact-head Track A govern
 ## Acceptance
 
 - [x] coordinator `RETURN_FOR_EVIDENCE` and delta comments consumed;
-- [x] exact current main recorded as `55803133a5abe8b1e75e4660da1d2b84b154ab9a`;
-- [x] current RUNTIME chain through #444/#445 replaces the stale xkbcomp-era snapshot;
-- [x] accepted #415 isolated graphics evidence is preserved as non-canonical historical input rather than sole-root-cause proof;
+- [x] current RUNTIME chain through #444/#445 consumed;
+- [x] #415 isolated graphics evidence retained as historical/non-canonical;
 - [x] P1 #414 merge replaces old #372 promotion gap;
-- [x] P0 current direct-XYZ/Cyclopedia observer state consumed;
-- [x] P2 current exact-head partial-chain state consumed;
-- [x] worldmap #367 and producer #437 consumed, including task-scoped sanitized exact-static production pattern;
-- [x] canonical coverage registry absence rechecked on current main;
+- [x] P0 #435 promoted Cyclopedia exact-client structural evidence consumed without promoting semantic XYZ;
+- [x] P2 current partial-chain state consumed;
+- [x] worldmap #367/#437 current exact-static state consumed;
+- [x] canonical coverage registry absence rechecked;
 - [x] denominator boundaries and `FAIL_MATERIAL_GAPS_OPEN` preserved;
-- [x] PR #390 refreshed onto current main with exactly two changed paths;
-- [x] semantic refresh head passed Track A governance and repository CI;
-- [ ] final task-status exact head passes Track A governance and repository CI;
-- [ ] review submissions/threads remain clean before final coordinator handoff.
+- [x] old exact-static staging material gap removed only after two demonstrated producer consumers (#367/#435);
+- [ ] exact current-main final head passes Track A governance and repository CI;
+- [ ] review submissions/threads remain clean and no main drift occurs before coordinator handoff.
 
 ## Result
 
 `FAIL_MATERIAL_GAPS_OPEN` / `DRAFT_NOT_PROMOTED`.
 
-Current material findings: **6 = 3 HIGH + 3 MEDIUM**. Producer-side evidence refresh is complete; coordinator disposition remains the delivery gate.
+Current material findings: **5 = 3 HIGH + 2 MEDIUM**. Producer-side refresh is complete; coordinator disposition remains the delivery gate.

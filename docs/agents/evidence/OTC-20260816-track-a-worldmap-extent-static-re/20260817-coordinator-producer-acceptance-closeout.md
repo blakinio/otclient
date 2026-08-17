@@ -26,7 +26,7 @@ sha256    e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 platform  official native Linux only
 ```
 
-No raw client was committed or uploaded by this consumer, the client was not executed by this consumer, process memory/canonical runtime state were not accessed, and no client bytes were changed.
+No raw exact game-client executable was committed or uploaded by this coordinator closeout, the exact game client was not executed by this consumer, process memory/canonical runtime state were not accessed, and no client bytes were changed. The separately documented historical owner-supplied launcher/bootstrap archive is not the fenced exact game-client executable and remains historical provenance only.
 
 ## Canonical producer #437
 

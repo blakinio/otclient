@@ -98,7 +98,9 @@ PR #454 promotes:
 - exact #304 provenance and retained `DISPROVEN/SUPERSEDED` / `UNKNOWN` evidence;
 - exact source Git-blob fences;
 - current-main overlay and current coverage summary;
-- permanent GitHub-hosted deterministic validator workflow.
+- canonical reusable deterministic validator plus durable successful GitHub-hosted validation evidence (`32013364473` / `95337501296`).
+
+The dedicated validation workflow used during implementation was intentionally removed from the terminal tree after Track A governance demonstrated that retaining a new Track A workflow without an active admission task was not a valid archived lifecycle shape. The validator itself remains canonical and directly runnable.
 
 This resolves **registry availability and deterministic recomputability only**. It does not resolve semantic denominator or runtime findings.
 

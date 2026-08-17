@@ -2,7 +2,6 @@
 task_id: OTC-20260817-track-a-p2-clientprocessor-sanitized-evidence
 status: ready
 agent: unassigned
-session_id: chatgpt-p2-clientprocessor-sanitized-evidence-20260817
 session_role: researcher_producer_under_coordinator_dispatch
 project_lane: otclient
 lane: P2-NETWORK
@@ -14,7 +13,7 @@ base_branch: main
 base_main: 8c9486e2c6109a7a39b564804c8acd707659b5e0
 risk: medium
 created: 2026-08-17T09:10:00+02:00
-updated: 2026-08-17T09:21:00+02:00
+updated: 2026-08-17T09:22:00+02:00
 producer_pr: 449
 consumer_pr: 310
 consumer_task: OTC-20260815-track-a-p2-buffer-downstream-consumer
@@ -24,7 +23,6 @@ owned_paths:
   - docs/agents/evidence/OTC-20260817-track-a-p2-clientprocessor-sanitized-evidence/**
   - .github/scripts/tibia-official-client-re-p2-clientprocessor-sanitized-evidence.py
   - .github/workflows/tibia-official-client-re-p2-clientprocessor-sanitized-evidence.yml
-modules_touched: []
 policy_version: 2
 prompting_standard_version: 2.1
 run_scope: autonomous_program
@@ -35,16 +33,6 @@ execution_class: github_hosted
 runtime_access: none
 persistent_session_role: consumer_of_runtime_evidence
 physical_e2e_required: false
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
-generation_rebind: NOT_APPLICABLE
-gate_b: NOT_APPLICABLE
-bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 owner_funded_ai_api_authorized: false
 source_staging_exception:
@@ -69,14 +57,6 @@ exact_client:
   version: 15.32.df7b29
   size: 51965216
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-feature_scope:
-  type: contract_producer
-  user_facing: false
-  backend_required: false
-  frontend_required: false
-  integration_required: true
-  e2e_required: false
-  completion_claim: partial_producer
 validation:
   evidence_run: 32005141186
   evidence_result: SUCCESS
@@ -91,11 +71,8 @@ validation:
   evidence_head_track_a_governance_result: SUCCESS
   evidence_head_repository_ci_run: 32005159706
   evidence_head_repository_ci_result: SUCCESS
-  checkpoint_head_before_this_commit: 0fb61dbaa423e2bf695d8a8d0235ee9477397bef
-  current_task_only_head_checks: PENDING
 independent_coordinator_review:
   result: PASS_BOUNDED
-  artifact_result_json_trusted_as_summary: false
   source_bundle_redecoded_independently: true
   exact_fence_reverified: true
   source_file_boundary_reverified: true
@@ -127,10 +104,10 @@ findings_closed:
 e2e:
   result: NOT_APPLICABLE
   reason: static exact-client evidence producer only; no runtime behavior or client state changed
-last_completed_step: independent coordinator re-decoded the source artifact and cross-checked its exact instruction/data flow against accepted #308 plus current-main canonical DualConnection ownership evidence
-next_action: coordinator should classify #310 ACCEPT_WITH_EDITS and promote only the bounded evidence from current main; the obsolete #310 staging workflow must remain unmerged
+last_completed_step: source artifact independently re-decoded; missing #310 object-identity evidence gap closed
+next_action: coordinator should classify #310 ACCEPT_WITH_EDITS and promote only the bounded evidence from current main; obsolete #310 staging workflow must remain unmerged
 ---
 
 # Track A P2 ClientMessageProcessor sanitized exact-client evidence
 
-This producer closes only the exact object-identity gap for consumer #310. Transport semantics beyond the proven partial stage order remain unknown.
+Transport semantics beyond the proven partial stage order remain unknown.

@@ -1,71 +1,287 @@
 name: Track A native auth session static proof
+
 on:
   push:
     branches: [docs/OTC-20260817-track-a-auth-session-flow-static]
+    paths: [.github/workflows/tibia-official-client-re-auth-session-static.yml]
+  workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
-  source:
-    runs-on: [otclient, synology]
-    outputs:
-      meta: ${{ steps.x.outputs.meta }}
-      metas: ${{ steps.x.outputs.metas }}
-      slot: ${{ steps.x.outputs.slot }}
-      slots: ${{ steps.x.outputs.slots }}
-      dtor: ${{ steps.x.outputs.dtor }}
-      dtors: ${{ steps.x.outputs.dtors }}
+  final-static-synthesis:
+    name: Final exact-client auth/session static synthesis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - id: x
+      - name: Fetch exact official client through WARP and fail closed
         shell: bash
         run: |
           set -Eeuo pipefail
-          C='/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'; [[ -f "$C" ]] || C='/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
-          [[ "$(stat -c %s "$C")" == 51965216 && "$(sha256sum "$C"|cut -d' ' -f1)" == e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe ]] || exit 50
-          python3 - "$C" "$GITHUB_OUTPUT" <<'PY'
-          import struct,hashlib,sys
-          f=open(sys.argv[1],'rb');f.seek(16);e=struct.unpack('<HHIQQQIHHHHHH',f.read(48));segs=[]
-          for i in range(e[9]):
-           f.seek(e[4]+i*e[8]);r=struct.unpack('<IIQQQQQQ',f.read(56));
-           if r[0]==1:segs.append((r[2],r[3],r[5],r[1]))
-          def R(a,b):
-           for o,v,z,flags in segs:
-            if v<=a and b<=v+z:
-             f.seek(o+a-v);d=f.read(b-a)
-             if len(d)==b-a:return d
-           raise SystemExit(54)
-          wins={'meta':R(0xb07d20,0xb07ed0),'slot':R(0xb11ee0,0xb12280),'dtor':R(0xb11c80,0xb11e00)}
-          with open(sys.argv[2],'a') as q:
-           for k,d in wins.items():
-            q.write(f'{k}={d.hex()}\n{k}s={hashlib.sha256(d).hexdigest()}\n')
-          print('AUTHSESSION_PHASE6C_EXACT_FILE_FENCE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none');print('AUTHSESSION_PHASE6C_SOURCE_DISASSEMBLY=false');print('AUTHSESSION_PHASE6C_SOURCE_SEMANTIC_CLASSIFICATION=false');print('AUTHSESSION_PHASE6C_SOURCE_SECRET_ACCESS=false');print('AUTHSESSION_PHASE6C_RAW_CLIENT_UPLOADED=false')
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends binutils curl python3-capstone python3-pyelftools
+          r=/tmp/auth-warp
+          mkdir -p "$r/bin" "$r/state" /tmp/auth-client
+          cd "$r/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c -
+          mkdir x
+          tar -xzf wp.tgz -C x
+          cp "$(find x -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+          cd "$r/state"
+          "$r/bin/wgcf" register --accept-tos >/dev/null
+          "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" > w.conf
+          nohup "$r/bin/wireproxy" -c w.conf >/tmp/auth-wireproxy.log 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/auth-warp-trace 2>/dev/null && break
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' /tmp/auth-warp-trace
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
+            "$u" -o /tmp/auth-client/client.lzma
+          echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  /tmp/auth-client/client.lzma' | sha256sum -c -
+          python3 - <<'PY'
+          import hashlib,lzma,pathlib
+          p=pathlib.Path('/tmp/auth-client/client.lzma')
+          b=p.read_bytes()
+          q=b[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
+          flt={'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[flt])
+          assert len(raw)==51965216
+          assert hashlib.sha256(raw).hexdigest()=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          pathlib.Path('/tmp/auth-client/client').write_bytes(raw)
+          print('AUTHSESSION_FINAL_EXACT_PACKED_SHA=PASS')
+          print('AUTHSESSION_FINAL_EXACT_CLIENT_SHA=PASS')
+          print('AUTHSESSION_RUNTIME_ACCESS=none')
+          print('AUTHSESSION_LOGIN_PERFORMED=false')
+          print('AUTHSESSION_SECRET_ACCESS=false')
+          print('AUTHSESSION_PROCESS_X11_OBSERVATION=false')
+          print('AUTHSESSION_RAW_CLIENT_UPLOADED=false')
           PY
-  hosted:
-    needs: source
-    runs-on: ubuntu-24.04
-    steps:
-      - env:
-          META: ${{ needs.source.outputs.meta }}
-          METAS: ${{ needs.source.outputs.metas }}
-          SLOT: ${{ needs.source.outputs.slot }}
-          SLOTS: ${{ needs.source.outputs.slots }}
-          DTOR: ${{ needs.source.outputs.dtor }}
-          DTORS: ${{ needs.source.outputs.dtors }}
+
+      - name: Recover auth, session, game-login and reconnect structure
+        shell: bash
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
-          import os,hashlib,subprocess,tempfile,re
           from pathlib import Path
-          specs=[('META',0xb07d20,0x1b0),('SLOT',0xb11ee0,0x3a0),('DTOR',0xb11c80,0x180)]
-          print('AUTHSESSION_PHASE6C_HOSTED_DECODE=PASS');print('AUTHSESSION_RUNTIME_ACCESS=none')
-          for k,start,n in specs:
-           d=bytes.fromhex(os.environ[k]);assert len(d)==n and hashlib.sha256(d).hexdigest()==os.environ[k+'S']
-           with tempfile.TemporaryDirectory() as td:
-            p=Path(td)/'x';p.write_bytes(d);t=subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f'--adjust-vma=0x{start:x}',str(p)],check=True,text=True,stdout=subprocess.PIPE).stdout
-           print('AUTHSESSION_PHASE6C_'+k+'_BEGIN')
-           for l in t.splitlines():
-            m=re.match(r'^\s*([0-9a-f]+):\s+([0-9a-f ]+)\s+(.+)$',l)
-            if m:print(m.group(1)+': '+m.group(3).strip())
-           refs=sorted(set(int(x,16) for x in re.findall(r'#\s*0x([0-9a-f]+)',t)))
-           print('AUTHSESSION_PHASE6C_'+k+'_RIP_REFS='+','.join(hex(x) for x in refs))
-           print('AUTHSESSION_PHASE6C_'+k+'_BEGIN_END')
+          from elftools.elf.elffile import ELFFile
+          from capstone import Cs,CS_ARCH_X86,CS_MODE_64
+          from capstone.x86_const import X86_OP_IMM,X86_OP_MEM,X86_REG_RIP
+          import hashlib,re,struct
+
+          client=Path('/tmp/auth-client/client')
+          raw=client.read_bytes()
+          assert len(raw)==51965216 and hashlib.sha256(raw).hexdigest()=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          with client.open('rb') as fh:
+            elf=ELFFile(fh)
+            secs=[(s.name,int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags'])) for s in elf.iter_sections()]
+          exec_secs=[x for x in secs if x[4]&4 and x[2]]
+          def vo(va):
+            for n,o,z,v,fl in secs:
+              if v<=va<v+z:return o+(va-v)
+            raise ValueError(hex(va))
+          def mapped(va):return any(v<=va<v+z for _,_,z,v,_ in secs)
+          def executable(va):return any((fl&4) and v<=va<v+z for _,_,z,v,fl in secs)
+          def u32(va):return struct.unpack_from('<I',raw,vo(va))[0]
+          def i32(va):return struct.unpack_from('<i',raw,vo(va))[0]
+          def q64(va):return struct.unpack_from('<Q',raw,vo(va))[0]
+          md=Cs(CS_ARCH_X86,CS_MODE_64);md.detail=True
+
+          # Known exact-QMeta records recovered on the same SHA in historical Track A.
+          qmeta={
+            'AUTH':(0x1c8b760,0x1c8b140,0xcfabb0),
+            'UPLOADER':(0x1ca5358,0x1ca51e0,0xcfb5a0),
+            'GAMECLIENT':(0x1c93cf4,0x1c93740,0xd06260),
+            'CHARSEL':(0x1ca3b34,0x1ca36e0,0xd46550),
+            'LOGINPROTO':(0x1cae518,0x1cae3e0,0xcf2aa0),
+            'DISCONNECT':(0x1c86698,0x1c86380,0xd5fb70),
+            'QUEUE':(0x1cc9800,0x1cc65e0,0xdf5fe0),
+          }
+          def parse_qmeta(s,m,st):
+            h=[u32(m+i*4) for i in range(14)]
+            rev,ci,_,_,mc,mdo,*_=h
+            def qs(idx):
+              e=s+idx*8; rel=u32(e); ln=u32(e+4)
+              if ln>16384 or rel>(1<<23):raise ValueError((idx,rel,ln))
+              off=vo(s+rel);return raw[off:off+ln].decode('utf8','replace')
+            rows=[]
+            for i in range(mc):
+              base=m+(mdo+i*6)*4
+              row=[u32(base+j*4) for j in range(6)]
+              argc=row[1]; po=row[2]
+              vals=[u32(m+(po+j)*4) for j in range(1+2*argc)]
+              types=vals[:argc+1]
+              def dtype(x):
+                if x&0x80000000:
+                  try:return qs(x&0x7fffffff)
+                  except:return f'unresolved#{x&0x7fffffff}'
+                return f'metatype#{x}'
+              rows.append((i,qs(row[0]),argc,[dtype(x) for x in types]))
+            # recover direct dispatch targets using the complete QMeta jump table
+            ins=list(md.disasm(raw[vo(st):vo(st)+0x380],st)); cands=[]
+            for pos,x in enumerate(ins):
+              if x.mnemonic!='lea' or len(x.operands)<2 or x.operands[1].type!=X86_OP_MEM or x.operands[1].mem.base!=X86_REG_RIP:continue
+              reg=x.operands[0].reg; table=x.address+x.size+x.operands[1].mem.disp
+              used=any(any(op.type==X86_OP_MEM and op.mem.base==reg and op.mem.scale==4 for op in y.operands) for y in ins[pos+1:pos+9])
+              if not used:continue
+              try:
+                tg=[table+i32(table+k*4) for k in range(mc)]
+                score=sum(executable(v) for v in tg);cands.append((score,table,tg))
+              except:pass
+            cands.sort(reverse=True);best=cands[0] if cands and cands[0][0]==mc else None
+            return qs(ci),rows,best
+
+          parsed={k:parse_qmeta(*v) for k,v in qmeta.items()}
+          wanted_methods={
+            'AUTH':{'advanceStateMachine','advanceStateMachineToLoginUpload','advanceStateMachineDirectlyToCharacterSelection','onLoginStateMachineStartedShortcutToCharacterSelection','onLoginStateMachineStarted','onShowCharacterSelectionStateEntered','onStartGameServerLoginStateEntered','requestCharacterGameserverLogin','onLoginFinishedSuccessfullyEntered'},
+            'UPLOADER':{'loginSuccessful','loginFailed','onFinished'},
+            'GAMECLIENT':{'connectClientToGameserverWithExistingCredentials','onRequestLoginWithCredentials','onConnectClientToGameserver','onGameSessionConnected','onGameSessionLoginSuccessful','onGameSessionDisconnected'},
+            'CHARSEL':{'requestCharacterLogin','onCharacterSelectionConfirmed'},
+            'LOGINPROTO':{'sendLoginMessage','sendSecondaryLoginMessage','gameLoginChallengeMessage','gameReadyForSecondaryConnection'},
+            'DISCONNECT':{'loginAgainAfterLoginWaitElapsed','onGameSessionConnected','onGameSessionLoginSuccessful','onWorldEntered','onSessionEndInformation','onGameSessionDisconnected','onConnectionError','onGameLoginErrorMessage','onGameLoginWaitMessage','onGameLoginChallengeMessage','onDialogResponseShowCharacterSelection','onDialogResponseShowLoginDialog','onWaitAbortedShowCharacterSelection','onGameSessionPingTimeout','onPingTimeoutWaitTimeElapsed'},
+            'QUEUE':{'sendEnterWorld'},
+          }
+          print('AUTHSESSION_QMETA_CONTRACT_BEGIN')
+          method_targets={}
+          for k,(cls,rows,best) in parsed.items():
+            print(f'CLASS_KEY={k} CLASS={cls} DIRECT_TABLE={"NONE" if not best else hex(best[1])}')
+            for idx,name,argc,types in rows:
+              if name in wanted_methods.get(k,set()):
+                target='UNPROVEN' if not best else hex(best[2][idx])
+                method_targets[(k,name)]=None if not best else best[2][idx]
+                print(f'  METHOD={name} INDEX={idx} ARGC={argc} TYPES={"|".join(types)} TARGET={target}')
+          print('AUTHSESSION_QMETA_CONTRACT_END')
+
+          # One full executable pass: direct-call xrefs plus RIP-relative refs to exact auth/session vocabulary.
+          direct_targets={
+            'advanceDirect':0xcfadcb,
+            'shortcutStarted':0xcfad8b,
+            'normalStarted':0xcfadd4,
+            'connectExistingWrapper':0xd06660,
+            'connectExistingImpl':0x6ef1d0,
+            'requestCharacterLogin':0xd47300,
+            'requestCharacterGameserverLogin':0xcfb2e7,
+            'startGameLogin':0xcfb122,
+          }
+          vocab=['loginWebService','stayLoggedInByDefault','sessionkey','SessionKey','playdata','devicecookie','trusteddevicetoken','stayloggedin','loginemail','loginconfirmationtoken','deviceverificationcode','emailcode']
+          string_vas={}
+          for s in vocab:
+            poss=[];start=0;needle=s.encode()+b'\0'
+            while True:
+              p=raw.find(needle,start)
+              if p<0:break
+              for n,o,z,v,fl in secs:
+                if o<=p<o+z:poss.append(v+(p-o));break
+              start=p+1
+            string_vas[s]=poss
+          reverse_strings={va:s for s,vs in string_vas.items() for va in vs}
+          call_refs={k:[] for k in direct_targets}; str_refs={s:[] for s in vocab}; qmeta_refs=[]; class_refs=[]
+          queue_class_vas=[]
+          needle=b'tibia::protocol::TProtocolMessageQueue\0';start=0
+          while True:
+            p=raw.find(needle,start)
+            if p<0:break
+            for n,o,z,v,fl in secs:
+              if o<=p<o+z:queue_class_vas.append(v+(p-o));break
+            start=p+1
+          queue_class_set=set(queue_class_vas)
+          for sec,off,size,base,fl in exec_secs:
+            code=raw[off:off+size]
+            for ins in md.disasm(code,base):
+              if ins.mnemonic=='call' and ins.operands and ins.operands[0].type==X86_OP_IMM:
+                dst=ins.operands[0].imm
+                for k,t in direct_targets.items():
+                  if dst==t:call_refs[k].append(ins.address)
+              for op in ins.operands:
+                if op.type==X86_OP_MEM and op.mem.base==X86_REG_RIP:
+                  dst=ins.address+ins.size+op.mem.disp
+                  if dst in reverse_strings:str_refs[reverse_strings[dst]].append(ins.address)
+                  if dst==0x3085b60:qmeta_refs.append(ins.address)
+                  if dst in queue_class_set:class_refs.append((ins.address,dst))
+          print('AUTHSESSION_DIRECT_CALL_XREFS_BEGIN')
+          for k in direct_targets:print(k+'='+','.join(hex(x) for x in call_refs[k]))
+          print('AUTHSESSION_DIRECT_CALL_XREFS_END')
+          print('AUTHSESSION_STATIC_VOCAB_BEGIN')
+          for s in vocab:
+            print(f'{s}:VAS='+','.join(hex(x) for x in string_vas[s])+' XREFS='+','.join(hex(x) for x in str_refs[s][:32]))
+          print('AUTHSESSION_STATIC_VOCAB_END')
+          print('AUTHSESSION_QUEUE_CLASS_VAS='+','.join(hex(x) for x in queue_class_vas))
+          print('AUTHSESSION_QUEUE_QMETA_XREFS='+','.join(hex(x) for x in qmeta_refs))
+          print('AUTHSESSION_QUEUE_CLASS_XREFS='+','.join(f'{hex(a)}->{hex(v)}' for a,v in class_refs))
+
+          # Candidate queue vtable recovered by previous bounded proof. Tie entries to class/QMeta xrefs.
+          vptr=0x3085cf8
+          entries=[q64(vptr+i*8) for i in range(26)]
+          print('AUTHSESSION_QUEUE_VTABLE_CANDIDATE_BEGIN')
+          print('VPTR='+hex(vptr))
+          for i,e in enumerate(entries):
+            hits_q=[x for x in qmeta_refs if e<=x<e+0x180]
+            hits_c=[x for x,_ in class_refs if e<=x<e+0x180]
+            print(f'SLOT=+0x{i*8:x} TARGET=0x{e:x} QMETA_XREF_NEAR='+','.join(hex(x) for x in hits_q)+' CLASS_XREF_NEAR='+','.join(hex(x) for x in hits_c))
+          print('DISPATCH_PLUS_0X68='+hex(q64(vptr+0x68)))
+          print('AUTHSESSION_QUEUE_VTABLE_CANDIDATE_END')
+
+          def summary(label,start,size=0x280):
+            ins=list(md.disasm(raw[vo(start):vo(start)+size],start))
+            calls=[];refs=[];jmps=[]
+            for x in ins:
+              if x.mnemonic=='call':
+                if x.operands and x.operands[0].type==X86_OP_IMM:calls.append(x.operands[0].imm)
+                else:calls.append(-1)
+              if x.mnemonic.startswith('j') and x.operands and x.operands[0].type==X86_OP_IMM:jmps.append(x.operands[0].imm)
+              for op in x.operands:
+                if op.type==X86_OP_MEM and op.mem.base==X86_REG_RIP:refs.append(x.address+x.size+op.mem.disp)
+            print(f'AUTHSESSION_FUNCTION {label} START=0x{start:x} CALLS='+','.join('INDIRECT' if x<0 else hex(x) for x in sorted(set(calls)))+' RIP_REFS='+','.join(hex(x) for x in sorted(set(refs)))+' JMPS='+','.join(hex(x) for x in sorted(set(jmps))))
+            for x in ins[:90]:print(f'  {x.address:x}: {x.mnemonic} {x.op_str}')
+
+          for label,start,size in [
+            ('AUTH_SHORTCUT_HANDLER',0xcfad70,0x100),
+            ('AUTH_ADVANCE_DIRECT',0xcfadcb,0x90),
+            ('AUTH_NORMAL_START',0xcfadd4,0x140),
+            ('GAMECLIENT_EXISTING_CREDENTIALS_IMPL',0x6ef1d0,0x500),
+            ('GAMECLIENT_ONCONNECT_IMPL',0x6fe480,0x500),
+            ('AUTH_START_GAME_LOGIN',0xcfb122,0x160),
+            ('CHARACTER_REQUEST',0xd47300,0x180),
+            ('QUEUE_PLUS_0X68_TARGET',q64(vptr+0x68),0x400),
+            ('LOGIN_UPLOADER_FINISHED',0xcfb800,0x500),
+          ]:
+            summary(label,start,size)
+
+          # Reconnect/change-character control surface: exact QMeta targets and bounded summaries.
+          print('AUTHSESSION_RECONNECT_SURFACE_BEGIN')
+          cls,rows,best=parsed['DISCONNECT']
+          reconnect_names=wanted_methods['DISCONNECT']
+          for idx,name,argc,types in rows:
+            if name in reconnect_names:
+              target=None if not best else best[2][idx]
+              print(f'RECONNECT_METHOD={name} TARGET={"UNPROVEN" if target is None else hex(target)} ARGC={argc} TYPES={"|".join(types)}')
+              if target is not None:summary('RECONNECT_'+name,target,0x140)
+          print('AUTHSESSION_RECONNECT_SURFACE_END')
+
+          # Inspect neighborhoods of protobuf login message names for field vocabulary.
+          print('AUTHSESSION_PROTOBUF_NEIGHBORHOODS_BEGIN')
+          needles=[b'GameclientMessageLogin',b'GameclientMessageSecondaryLogin']
+          keyre=re.compile(rb'[ -~]{3,}')
+          for needle in needles:
+            start=0
+            while True:
+              p=raw.find(needle,start)
+              if p<0:break
+              lo=max(0,p-0x1000);hi=min(len(raw),p+0x1800)
+              vals=[]
+              for m in keyre.finditer(raw[lo:hi]):
+                s=m.group().decode('ascii','replace')
+                if re.search(r'(login|session|character|world|password|account|challenge|token|key|timestamp|cookie)',s,re.I):vals.append(s)
+              print('NEEDLE='+needle.decode()+' FILEOFF='+hex(p)+' STRINGS='+' || '.join(dict.fromkeys(vals)))
+              start=p+1
+          print('AUTHSESSION_PROTOBUF_NEIGHBORHOODS_END')
+          print('AUTHSESSION_FINAL_STATIC_SYNTHESIS=PASS')
           PY

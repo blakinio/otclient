@@ -11,10 +11,10 @@ task_kind: e2e
 phase: baseline_ephemeral_behavioral_login_capture
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
-base_sha: 83034227280dc3bfdf589a991f0fdbbabab7dc87
-restack_commit: f6848a59224ce891067b12a8b3f65da1609ee985
+base_sha: c1adcf491580e28d40f215356a9e559af2ccadc4
+restack_commit: 91759e0a8d9db1c2a736c88f7e48d2bb5a3ffc59
 created: 2026-08-17T13:20:00+02:00
-updated: 2026-08-17T16:47:00+02:00
+updated: 2026-08-17T17:36:00+02:00
 risk: critical
 related_pr: 475
 owned_paths:
@@ -75,7 +75,7 @@ gate_a: NOT_APPLICABLE
 generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: UNKNOWN
 mutation_authorized: false
 credentials_allowed: true
 login_allowed: true
@@ -129,14 +129,14 @@ safety:
   rollback_required: true
   owner_funded_ai_api: forbidden
 invocation_started_at: 2026-08-17T13:20:00+02:00
-last_progress_at: 2026-08-17T16:47:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: persistent-home-parity-discriminator-pass
+last_progress_at: 2026-08-17T17:36:00+02:00
+ci_checks_for_current_head: 2
+ci_check_generation: native_presecret_static_pass
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 2
-repair_cycles_for_current_gate: 7
+repair_cycles_for_current_gate: 8
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -161,9 +161,9 @@ RENDER_PICKER_EXTENT_CHANGE=true|false|UNKNOWN
 
 All physical repair runs through `32031856344 / 95393435891` stopped **before credential submission**. Every launched exact-client repair generation ended with original-source rehash PASS and cleanup COMPLETE.
 
-Load-bearing current chain:
+Load-bearing established chain:
 
-- isolated exact-client + WARP + raw-XRes target ownership is physically proven;
+- isolated exact-client + WARP + raw-XRes target ownership is physically proven in prior task-owned repair generations;
 - pre-Storage FullMap/map-description observer is physically proven ARMED;
 - GDB toolroot environment and XWD toolroot library closure are proven;
 - both baseline and future patched arm are normalized to the identical task-owned Xvfb `1020x650` environment;
@@ -172,8 +172,7 @@ Load-bearing current chain:
 - evidence label for artifact `9221131366` is corrected: its producing run `31805408522 / 94783011926` captured character selection, not an empty login form;
 - historical effective exact-client controls remain `email 535,275`, `password 535,304`, `login 590,388`, first row `285,193`;
 - replacement pre-secret proof uses harmless dummy text plus localized aggregate XWD pixel changes to prove both expected fields are editable before any real credential is exposed;
-- after real login submission, the helper requires a >5000-pixel aggregate transition, then a localized first-row selection change before `Return`; world entry itself remains structural `FullMap + >=10 map-description strips`;
-- no-client static composition `32032410153 / 95395158148 = SUCCESS` on helper head `8181fe41abe8fcad5b38d26c624b29075ba4ede6`.
+- after real login submission, the helper requires a >5000-pixel aggregate transition, then a localized first-row selection change before `Return`; world entry itself remains structural `FullMap + >=10 map-description strips`.
 
 Fresh persistent-HOME parity discriminators, all on `synology-otclient-01` without client execution or secret use:
 
@@ -183,12 +182,17 @@ Fresh persistent-HOME parity discriminators, all on `synology-otclient-01` witho
 - historical successful world-entry `31736998731 / 94570936207` was re-inspected at source workflow commit `4392cf4c01703afa344ba074495894a292048eb9` and also launched `packages/Tibia/bin/client` directly with `HOME=/data/home`; therefore the external `Tibia` ELF is not required as the historical successful launch entrypoint;
 - `32039938342 / 95417353337 = SUCCESS`: sanitized omitted-state manifest contains exactly 10 entries, digest `9e03d67e62bfda836583f8430b6054a7e4f0bfa11aa919b6936135902ee5b709`; outside package + `launchermetadata.json` these are Qt shader/pipeline cache objects, the external-ELF symlink and `log` directory. No CipSoft/Tibia-named state was found under `.config` or `.local/state` by this bounded inventory.
 
-Current interpretation boundary:
+# Current interpretation boundary
 
 - `external_launcher_required_for_successful_login = DISPROVEN` by the historical successful direct-package-client workflow;
 - `missing_persistent_account_or_login_layout_state_in_scanned_XDG_paths = NOT_OBSERVED`; this weakens but does not prove false every possible HOME-state hypothesis;
-- the strongest current blocker remains semantic pre-secret UI discrimination. The repository already has a fail-closed dummy editability transform in `.github/scripts/track-a-worldmap-causal-ui-geometry-repair.py`; the legacy OCR/secret block remains only in the base source helper and must never be executed without the reviewed transform chain;
-- physical retry is currently forbidden by the explicit main-drift stop until the branch is synchronized to current `main` and the complete transform composition is revalidated.
+- the strongest blocker remains semantic pre-secret UI discrimination, but the execution contract is now native to `.github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh` rather than supplied only by a later transformer;
+- the native helper now fails if `TIBIA_TEST_EMAIL` or `TIBIA_TEST_PASSWORD` is present in its environment before the pre-secret gates, proves both fields with harmless dummy text, clears both fields, creates a mode-0600 FIFO, and only then waits for credential handoff;
+- legacy OCR/tesseract anchors are absent from the native helper;
+- exact-head hosted workflow run `32042635828 / 95424571898 = SUCCESS` physically emitted `WORLDMAP_STATIC_NATIVE_PRESECRET_CONTRACT=PASS`; its physical Synology job was `skipped`;
+- exact-head Track A runtime-governance run `32042635853 = SUCCESS`;
+- current `main` was re-read after those runs and remains `c1adcf491580e28d40f215356a9e559af2ccadc4`;
+- trusted-base restack itself is `91759e0a8d9db1c2a736c88f7e48d2bb5a3ffc59`; current task head after native-source/workflow/checkpoint commits was `f97457aab2c5824cb58b455c6e2b86b9a0859e8b` before this task-checkpoint update.
 
 Durable evidence includes:
 
@@ -197,18 +201,19 @@ Durable evidence includes:
 - `20260817-1020-desktop-normalization.md`
 - `20260817-manifest-owned-ui-window.md`
 - `20260817-prelogin-behavioral-proof.md`
+- `20260817-restack-native-presecret-source.md`
 
 # Workflow safety state
 
-The PR workflow is currently a **no-client sanitized persistent-user-state inventory**. This prevents script/task/document synchronize commits from accidentally launching another physical baseline while the HOME-parity hypothesis is being resolved and the branch is behind current `main`. Physical runtime may be restored only as a single deliberate workflow commit after current-main synchronization and exact static validation of the complete repair chain; no other branch commit is permitted while that physical workflow is active.
+The PR workflow is now fail-closed in three explicit physical modes: `inventory_only`, `presecret_only`, and `baseline_login`. Pull-request execution runs only the deterministic hosted native composition check; the physical job is skipped unless deliberately activated. The `baseline_login` step is the only workflow block that references protected login secrets, and it can run only after the helper has emitted both editability PASS markers plus `WORLDMAP_BASELINE_PRESECRET_READY=true`. The helper itself never receives those secrets through its environment; credential values cross only the mode-0600 task-owned FIFO after the gates.
 
 # Execution phases
 
 1. **DONE** canonical boundary / cleanup.
 2. **DONE** isolated exact-client WARP/XRes path.
 3. **DONE** pre-Storage observer gate.
-4. **DONE** 1020x650 normalization, manifest XRes identity, loader/GDB repair and aggregate behavioral pre-login proof static validation.
-5. **ACTIVE / BLOCKED_ON_RESTACK** exactly one baseline login + FullMap/map-description extent + Right/Left stimulus + transport confinement + cleanup.
+4. **DONE** 1020x650 normalization, manifest XRes identity, loader/GDB repair and native aggregate behavioral pre-login composition validation.
+5. **ACTIVE / BLOCKED_ON_POST_RESTACK_READMISSION** run `inventory_only` with no client/no secret; persist fresh target uniqueness; then run `presecret_only` and stop before secret handoff; only after both proofs may the single baseline login budget be used.
 6. **PENDING** patched namespace/preimage/target-uniqueness admission.
 7. **PENDING** one task-owned `[19,14]` login/capture under identical 1020x650 instrumentation.
 8. **PENDING** patched rollback/source rehash/cleanup.
@@ -216,29 +221,30 @@ The PR workflow is currently a **no-client sanitized persistent-user-state inven
 
 # Stop criteria
 
-Fail closed on main drift, non-idle canonical controller state, namespace collision, target ambiguity, observer regression, 1020x650 XRes identity failure, failure of either harmless editable-field probe, WARP/credential confinement failure, post-submit visual-transition failure, first-row interaction failure, absence of FullMap/map-description proof, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or incomplete cleanup.
+Fail closed on main drift, non-idle/competing official-client candidate state, namespace collision, target ambiguity, observer regression, 1020x650 XRes identity failure, failure of either harmless editable-field probe, any credential-bearing environment before handoff, WARP/credential confinement failure, post-submit visual-transition failure, first-row interaction failure, absence of FullMap/map-description proof, source/preimage/hash mismatch, unexpected gameplay/account side effect, crash, or incomplete cleanup.
 
 Any failure **after** `WORLDMAP_BASELINE_LOGIN_SUBMITTED=true` consumes the one baseline login budget and must not be silently retried.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 13
-updated_at: 2026-08-17T16:47:00+02:00
-base_main: 83034227280dc3bfdf589a991f0fdbbabab7dc87
+checkpoint_version: 14
+updated_at: 2026-08-17T17:36:00+02:00
+base_main: c1adcf491580e28d40f215356a9e559af2ccadc4
 current_main_observed: c1adcf491580e28d40f215356a9e559af2ccadc4
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 pr: 475
 status: investigating
 phase: baseline_ephemeral_behavioral_login_capture
 runtime_access: ephemeral_isolated
-target_uniqueness: PROVEN
-workflow_mode: static_no_client_persistent_home_parity_inventory
+target_uniqueness: UNKNOWN
+mutation_authorized: false
+workflow_mode: manual_inventory_presecret_login_with_hosted_static_gate
 baseline_client_launches_consumed: 10
 baseline_login_consumed: 0
 patched_login_consumed: 0
-last_completed_step: persistent HOME parity hypothesis was physically bounded without launching the client; external launcher entrypoint was disproven as the historical success dependency and omitted persistent state was reduced to shader/pipeline caches, the external-ELF symlink and log directory
+last_completed_step: restacked PR #475 onto current main and made the pre-secret editability/FIFO contract native to the baseline helper; exact-head hosted static composition and Track A governance both passed without running the physical job
 blockers:
-  - main_drift_before_physical_runtime:c1adcf491580e28d40f215356a9e559af2ccadc4
-next_action: synchronize this branch to current main without losing the reviewed task-owned runtime helpers, rerun exact no-client composition checks, then restore exactly one fail-closed physical baseline whose harmless reversible field proofs must pass before any protected credential can be exposed.
+  - post_restack_target_uniqueness_not_yet_reproven
+next_action: execute exactly one no-client/no-secret inventory_only pass on synology-otclient-01; if and only if it proves zero task-namespace processes and zero official-client candidates, persist target_uniqueness=PROVEN before any client launch. Then execute presecret_only and require both dummy editability gates plus exact cleanup with no login submission before exposing any protected credential.
 ```

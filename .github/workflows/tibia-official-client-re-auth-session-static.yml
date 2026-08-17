@@ -1,0 +1,218 @@
+name: Track A native auth session static proof
+
+on:
+  push:
+    branches: [docs/OTC-20260817-track-a-auth-session-flow-static]
+    paths: [.github/workflows/tibia-official-client-re-auth-session-static.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-auth-session-static-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-sanitize:
+    name: Stage exact-file auth/session windows
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: docs/OTC-20260817-track-a-auth-session-flow-static
+      EXPECTED_RUNNER_NAME: synology-otclient-01
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    outputs:
+      tgame_vtable_hex: ${{ steps.stage.outputs.tgame_vtable_hex }}
+      tgame_vtable_sha256: ${{ steps.stage.outputs.tgame_vtable_sha256 }}
+      adapter_hex: ${{ steps.stage.outputs.adapter_hex }}
+      adapter_sha256: ${{ steps.stage.outputs.adapter_sha256 }}
+      auth_controller_hex: ${{ steps.stage.outputs.auth_controller_hex }}
+      auth_controller_sha256: ${{ steps.stage.outputs.auth_controller_sha256 }}
+      character_select_hex: ${{ steps.stage.outputs.character_select_hex }}
+      character_select_sha256: ${{ steps.stage.outputs.character_select_sha256 }}
+      game_client_hex: ${{ steps.stage.outputs.game_client_hex }}
+      game_client_sha256: ${{ steps.stage.outputs.game_client_sha256 }}
+      game_login_controller_hex: ${{ steps.stage.outputs.game_login_controller_hex }}
+      game_login_controller_sha256: ${{ steps.stage.outputs.game_login_controller_sha256 }}
+      receiver_target_hex: ${{ steps.stage.outputs.receiver_target_hex }}
+      receiver_target_sha256: ${{ steps.stage.outputs.receiver_target_sha256 }}
+      receiver_target_start: ${{ steps.stage.outputs.receiver_target_start }}
+    steps:
+      - id: stage
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 61
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 62
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 63
+
+          candidates=(
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+          )
+          source_client=''
+          for candidate in "${candidates[@]}"; do
+            [[ -f "$candidate" && ! -L "$candidate" ]] || continue
+            [[ "$(stat -c %s "$candidate")" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY' && { source_client="$candidate"; break; }
+          import hashlib,sys
+          h=hashlib.sha256()
+          with open(sys.argv[1],'rb') as f:
+              for c in iter(lambda:f.read(1024*1024),b''): h.update(c)
+          raise SystemExit(h.hexdigest()!=sys.argv[2])
+          PY
+          done
+          [[ -n "$source_client" ]] || exit 50
+
+          python3 - "$source_client" "$GITHUB_OUTPUT" <<'PY'
+          import hashlib,struct,sys
+          from pathlib import Path
+
+          p=Path(sys.argv[1]); out=Path(sys.argv[2])
+          with p.open('rb') as f:
+              ident=f.read(16); rest=f.read(48)
+              if ident[:4]!=b'\x7fELF' or ident[4]!=2 or ident[5]!=1:
+                  raise SystemExit(51)
+              fs=struct.unpack('<HHIQQQIHHHHHH',rest)
+              phoff,phentsize,phnum=fs[4],fs[8],fs[9]
+              segs=[]
+              for i in range(phnum):
+                  f.seek(phoff+i*phentsize); r=f.read(56)
+                  t,flags,off,va,_pa,sz,_msz,_al=struct.unpack('<IIQQQQQQ',r)
+                  if t==1: segs.append((off,va,sz,flags))
+
+              def read_va(start,end,need_exec=None):
+                  if end <= start or end-start > 0x2000: raise SystemExit(52)
+                  for off,va,sz,flags in segs:
+                      if va <= start and end <= va+sz:
+                          if need_exec is True and not (flags & 1): raise SystemExit(53)
+                          f.seek(off+start-va); d=f.read(end-start)
+                          if len(d)==end-start: return d
+                  raise SystemExit(54)
+
+              windows={
+                  'tgame_vtable': (0x30768f8,0x30769b0,False),
+                  'adapter': (0xbd3600,0xbd38d0,True),
+                  'auth_controller': (0xcfaf80,0xcfb480,True),
+                  'character_select': (0xd471c0,0xd47580,True),
+                  'game_client': (0xd065c0,0xd06a40,True),
+                  'game_login_controller': (0xcf9f80,0xcfa300,True),
+              }
+              staged={k:read_va(a,b,x) for k,(a,b,x) in windows.items()}
+
+              # Promoted exact-SHA TGameClient primary vptr is the address point
+              # 0x3076908. The +0x68 virtual entry is therefore at 0x3076970,
+              # offset 0x78 in this AP-0x10 staging window. Following that qword
+              # selects a bounded file-backed code window only; no semantics are
+              # assigned on the source runner.
+              target=struct.unpack_from('<Q',staged['tgame_vtable'],0x78)[0]
+              if not (0x400000 <= target < 0x3000000): raise SystemExit(55)
+              target_start=target-0x40
+              staged['receiver_target']=read_va(target_start,target+0x640,True)
+
+          rows=[]
+          for key,data in staged.items():
+              dig=hashlib.sha256(data).hexdigest()
+              rows.append(f'{key}_hex={data.hex()}\n{key}_sha256={dig}\n')
+              print(f'AUTHSESSION_SOURCE_{key.upper()}_SHA256={dig}')
+          rows.append(f'receiver_target_start=0x{target_start:x}\n')
+          with out.open('a') as h: h.write(''.join(rows))
+
+          print('AUTHSESSION_EXACT_FILE_FENCE=PASS')
+          print('AUTHSESSION_RUNTIME_ACCESS=none')
+          print('AUTHSESSION_SOURCE_PROCESS_OBSERVATION=false')
+          print('AUTHSESSION_SOURCE_X11_OBSERVATION=false')
+          print('AUTHSESSION_SOURCE_LOGIN=false')
+          print('AUTHSESSION_SOURCE_SECRET_ACCESS=false')
+          print('AUTHSESSION_SOURCE_DISASSEMBLY=false')
+          print('AUTHSESSION_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('AUTHSESSION_RAW_CLIENT_UPLOADED=false')
+          print('AUTHSESSION_BOUNDED_FILE_WINDOWS_STAGED=true')
+          PY
+
+  hosted-decode:
+    name: Decode auth/session structure on GitHub-hosted Linux
+    needs: source-sanitize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: docs/OTC-20260817-track-a-auth-session-flow-static
+      TGAME_VTABLE_HEX: ${{ needs.source-sanitize.outputs.tgame_vtable_hex }}
+      TGAME_VTABLE_SHA256: ${{ needs.source-sanitize.outputs.tgame_vtable_sha256 }}
+      ADAPTER_HEX: ${{ needs.source-sanitize.outputs.adapter_hex }}
+      ADAPTER_SHA256: ${{ needs.source-sanitize.outputs.adapter_sha256 }}
+      AUTH_CONTROLLER_HEX: ${{ needs.source-sanitize.outputs.auth_controller_hex }}
+      AUTH_CONTROLLER_SHA256: ${{ needs.source-sanitize.outputs.auth_controller_sha256 }}
+      CHARACTER_SELECT_HEX: ${{ needs.source-sanitize.outputs.character_select_hex }}
+      CHARACTER_SELECT_SHA256: ${{ needs.source-sanitize.outputs.character_select_sha256 }}
+      GAME_CLIENT_HEX: ${{ needs.source-sanitize.outputs.game_client_hex }}
+      GAME_CLIENT_SHA256: ${{ needs.source-sanitize.outputs.game_client_sha256 }}
+      GAME_LOGIN_CONTROLLER_HEX: ${{ needs.source-sanitize.outputs.game_login_controller_hex }}
+      GAME_LOGIN_CONTROLLER_SHA256: ${{ needs.source-sanitize.outputs.game_login_controller_sha256 }}
+      RECEIVER_TARGET_HEX: ${{ needs.source-sanitize.outputs.receiver_target_hex }}
+      RECEIVER_TARGET_SHA256: ${{ needs.source-sanitize.outputs.receiver_target_sha256 }}
+      RECEIVER_TARGET_START: ${{ needs.source-sanitize.outputs.receiver_target_start }}
+    steps:
+      - shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 71
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 73
+          python3 - <<'PY'
+          import hashlib,os,re,struct,subprocess,tempfile
+          from pathlib import Path
+
+          def get(name,expected_len):
+              d=bytes.fromhex(os.environ[name+'_HEX'])
+              if hashlib.sha256(d).hexdigest()!=os.environ[name+'_SHA256']:
+                  raise SystemExit(74)
+              if len(d)!=expected_len: raise SystemExit(75)
+              return d
+
+          windows={
+              'TGAME_VTABLE': (get('TGAME_VTABLE',0xb8),0x30768f8),
+              'ADAPTER': (get('ADAPTER',0x2d0),0xbd3600),
+              'AUTH_CONTROLLER': (get('AUTH_CONTROLLER',0x500),0xcfaf80),
+              'CHARACTER_SELECT': (get('CHARACTER_SELECT',0x3c0),0xd471c0),
+              'GAME_CLIENT': (get('GAME_CLIENT',0x480),0xd065c0),
+              'GAME_LOGIN_CONTROLLER': (get('GAME_LOGIN_CONTROLLER',0x380),0xcf9f80),
+              'RECEIVER_TARGET': (get('RECEIVER_TARGET',0x680),int(os.environ['RECEIVER_TARGET_START'],16)),
+          }
+          q=lambda d,o: struct.unpack_from('<Q',d,o)[0]
+          vt=windows['TGAME_VTABLE'][0]
+          if q(vt,0x00)!=0: raise SystemExit('AUTHSESSION_FAIL=tgame_offset_to_top')
+          receiver_target=q(vt,0x78)
+          if windows['RECEIVER_TARGET'][1]+0x40 != receiver_target:
+              raise SystemExit('AUTHSESSION_FAIL=receiver_target_mismatch')
+
+          print('AUTHSESSION_HOSTED_DECODE=PASS')
+          print('AUTHSESSION_RUNTIME_ACCESS=none')
+          print('AUTHSESSION_TGAMECLIENT_VPTR=0x3076908')
+          print(f'AUTHSESSION_TGAMECLIENT_TYPEINFO=0x{q(vt,0x08):x}')
+          print(f'AUTHSESSION_TGAMECLIENT_VSLOT_PLUS_0X68_TARGET=0x{receiver_target:x}')
+
+          def disasm(name,data,start):
+              with tempfile.TemporaryDirectory(prefix='auth-session-') as td:
+                  p=Path(td)/(name.lower()+'.bin'); p.write_bytes(data)
+                  text=subprocess.run([
+                      'objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',
+                      f'--adjust-vma=0x{start:x}',str(p)
+                  ],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+              calls=sorted(set(int(x,16) for x in re.findall(r'\bcall\s+(?:0x)?([0-9a-f]+)\b',text)))
+              refs=sorted(set(int(x,16) for x in re.findall(r'#\s*0x([0-9a-f]+)',text)))
+              print(f'AUTHSESSION_{name}_CALL_TARGETS='+','.join(f'0x{x:x}' for x in calls))
+              print(f'AUTHSESSION_{name}_RIP_REFS='+','.join(f'0x{x:x}' for x in refs))
+              print(f'AUTHSESSION_{name}_DISASSEMBLY_BEGIN')
+              print(text,end='')
+              print(f'AUTHSESSION_{name}_DISASSEMBLY_END')
+              return text
+
+          for name,(data,start) in windows.items():
+              if name=='TGAME_VTABLE': continue
+              disasm(name,data,start)
+          PY

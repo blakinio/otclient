@@ -1,0 +1,328 @@
+name: Track A P2 4dd250 QIODevice provenance
+
+on:
+  push:
+    branches:
+      - research/OTC-20260817-track-a-p2-4dd250-qiodevice-provenance
+    paths:
+      - .github/workflows/tibia-official-client-re-p2-4dd250-qiodevice-provenance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-p2-4dd250-qiodevice-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-sanitize:
+    name: Stage exact-file QIODevice provenance bytes
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-4dd250-qiodevice-provenance
+      EXPECTED_RUNNER_NAME: synology-otclient-01
+      EXPECTED_CLIENT_SIZE: '51965216'
+      EXPECTED_CLIENT_SHA256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+    outputs:
+      bundle_b64: ${{ steps.stage.outputs.bundle_b64 }}
+      bundle_sha256: ${{ steps.stage.outputs.bundle_sha256 }}
+      source_candidate_index: ${{ steps.stage.outputs.source_candidate_index }}
+    steps:
+      - id: stage
+        name: Exact-fence and map bounded provenance evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 61
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 62
+          [[ "$RUNNER_OS" == Linux && "$RUNNER_ARCH" == X64 ]] || exit 63
+          [[ "$RUNNER_NAME" == "$EXPECTED_RUNNER_NAME" ]] || exit 64
+          command -v python3 >/dev/null
+
+          candidates=(
+            '/home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+            '/work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client'
+          )
+          source_client=''
+          source_index=''
+          for index in 0 1; do
+            candidate="${candidates[$index]}"
+            [[ -f "$candidate" && ! -L "$candidate" ]] || continue
+            [[ "$(stat -c %s "$candidate" 2>/dev/null || true)" == "$EXPECTED_CLIENT_SIZE" ]] || continue
+            if python3 - "$candidate" "$EXPECTED_CLIENT_SHA256" <<'PY'
+          import hashlib, sys
+          from pathlib import Path
+          h = hashlib.sha256()
+          with Path(sys.argv[1]).open('rb') as f:
+              for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                  h.update(chunk)
+          raise SystemExit(0 if h.hexdigest() == sys.argv[2] else 1)
+          PY
+            then
+              source_client="$candidate"
+              source_index="$index"
+              break
+            fi
+          done
+          [[ -n "$source_client" ]] || { echo P2_4DD250_REFUSED=EXACT_SOURCE_MISSING; exit 50; }
+
+          python3 - "$source_client" "$source_index" "$GITHUB_OUTPUT" <<'PY'
+          import base64, hashlib, json, stat, struct, sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1]).resolve()
+          source_index = sys.argv[2]
+          output_path = Path(sys.argv[3])
+          expected_size = 51965216
+          expected_sha = 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          target_ctor = 0xB4AEA0
+          target_names = [b'TGameserverTCPConnection', b'QTcpSocket']
+
+          if not path.is_file() or path.is_symlink() or not stat.S_ISREG(path.stat().st_mode):
+              raise SystemExit('P2_4DD250_FAIL=source_regular_file')
+          if path.stat().st_size != expected_size:
+              raise SystemExit('P2_4DD250_FAIL=source_exact_size')
+          h = hashlib.sha256()
+          with path.open('rb') as f:
+              for block in iter(lambda: f.read(1024 * 1024), b''):
+                  h.update(block)
+          if h.hexdigest() != expected_sha:
+              raise SystemExit('P2_4DD250_FAIL=source_exact_sha256')
+
+          with path.open('rb') as f:
+              ident = f.read(16)
+              if ident[:4] != b'\x7fELF' or ident[4] != 2 or ident[5] != 1:
+                  raise SystemExit('P2_4DD250_FAIL=elf64_little')
+              rest = f.read(48)
+              fields = struct.unpack('<HHIQQQIHHHHHH', rest)
+              phoff, phentsize, phnum = fields[4], fields[8], fields[9]
+              if phentsize < 56 or not (0 < phnum < 128):
+                  raise SystemExit('P2_4DD250_FAIL=program_headers')
+              segments = []
+              for i in range(phnum):
+                  f.seek(phoff + i * phentsize)
+                  row = f.read(56)
+                  p_type, p_flags, p_offset, p_vaddr, _paddr, p_filesz, _pmemsz, _align = struct.unpack('<IIQQQQQQ', row)
+                  if p_type == 1 and p_filesz:
+                      segments.append({'vaddr':p_vaddr,'filesz':p_filesz,'offset':p_offset,'flags':p_flags})
+
+          def seg_for(va, size=1):
+              for s in segments:
+                  if va >= s['vaddr'] and va + size <= s['vaddr'] + s['filesz']:
+                      return s
+              return None
+
+          def read_va(va, size):
+              s = seg_for(va, size)
+              if s is None:
+                  raise ValueError(hex(va))
+              with path.open('rb') as f:
+                  f.seek(s['offset'] + va - s['vaddr'])
+                  data = f.read(size)
+              if len(data) != size:
+                  raise ValueError(hex(va))
+              return data
+
+          def window(center, before=0x100, after=0x180):
+              s = seg_for(center, 1)
+              if s is None:
+                  return None
+              start=max(s['vaddr'], center-before)
+              end=min(s['vaddr']+s['filesz'], center+after)
+              data=read_va(start,end-start)
+              return {'start':start,'end':end,'sha256':hashlib.sha256(data).hexdigest(),'hex':data.hex()}
+
+          # Direct-call census to the exact constructor, executable segments only.
+          callsites=[]
+          with path.open('rb') as f:
+              for s in segments:
+                  if not (s['flags'] & 1):
+                      continue
+                  f.seek(s['offset']); data=f.read(s['filesz'])
+                  for i in range(0, max(0,len(data)-5)):
+                      if data[i] != 0xE8:
+                          continue
+                      disp=struct.unpack_from('<i',data,i+1)[0]
+                      va=s['vaddr']+i
+                      if va+5+disp == target_ctor:
+                          callsites.append(va)
+                          if len(callsites) >= 16:
+                              break
+                  if len(callsites) >= 16:
+                      break
+
+          # Locate RTTI name strings and mechanically derive Itanium typeinfo/vtable candidates.
+          raw_segments=[]
+          with path.open('rb') as f:
+              for s in segments:
+                  f.seek(s['offset']); raw_segments.append((s,f.read(s['filesz'])))
+
+          def qword_occurrences(value, max_hits=128):
+              needle=struct.pack('<Q',value); hits=[]
+              for s,data in raw_segments:
+                  pos=data.find(needle)
+                  while pos >= 0:
+                      hits.append(s['vaddr']+pos)
+                      if len(hits) >= max_hits: return hits
+                      pos=data.find(needle,pos+1)
+              return hits
+
+          name_records={}
+          candidate_aps=set()
+          for name in target_names:
+              name_hits=[]
+              for s,data in raw_segments:
+                  pos=data.find(name)
+                  while pos >= 0:
+                      name_hits.append(s['vaddr']+pos)
+                      if len(name_hits)>=16: break
+                      pos=data.find(name,pos+1)
+                  if len(name_hits)>=16: break
+              recs=[]
+              for name_va in name_hits:
+                  for name_ptr in qword_occurrences(name_va,64):
+                      typeinfo=name_ptr-8
+                      if seg_for(typeinfo,0x18) is None: continue
+                      for ti_ptr in qword_occurrences(typeinfo,128):
+                          ap=ti_ptr+8
+                          try:
+                              if struct.unpack('<Q',read_va(ap-0x10,8))[0] != 0: continue
+                              if struct.unpack('<Q',read_va(ap-0x8,8))[0] != typeinfo: continue
+                          except Exception:
+                              continue
+                          candidate_aps.add(ap)
+                          recs.append({'name_va':name_va,'typeinfo':typeinfo,'address_point':ap,'table':window(ap,0x20,0xe0)})
+              name_records[name.decode()] = recs[:16]
+
+          # RIP-relative LEA/MOV xrefs to candidate APs, executable only.
+          xrefs=[]
+          for s,data in raw_segments:
+              if not (s['flags'] & 1): continue
+              i=0
+              while i+7<=len(data):
+                  rex,opcode,modrm=data[i],data[i+1],data[i+2]
+                  if 0x40<=rex<=0x4f and opcode in (0x8d,0x8b) and (modrm&0xc7)==0x05:
+                      disp=struct.unpack_from('<i',data,i+3)[0]
+                      va=s['vaddr']+i
+                      target=va+7+disp
+                      if target in candidate_aps:
+                          xrefs.append({'target_ap':target,'xref':va,'window':window(va,0x100,0x180)})
+                          if len(xrefs)>=48: break
+                      i+=7; continue
+                  i+=1
+              if len(xrefs)>=48: break
+
+          bundle={
+              'schema':'track-a-p2-4dd250-qiodevice-source-v1',
+              'exact_client':{'version':'15.32.df7b29','size':expected_size,'sha256':expected_sha},
+              'source_candidate_index':source_index,
+              'runtime_access':'none',
+              'source_operation':'bounded_direct_call_and_rtti_structural_index_only',
+              'source_disassembly':False,
+              'source_semantic_classification':False,
+              'client_process_accessed':False,
+              'process_memory_accessed':False,
+              'canonical_state_accessed':False,
+              'client_executed':False,
+              'client_byte_mutated':False,
+              'raw_client_uploaded':False,
+              'direct_calls_to_b4aea0':callsites,
+              'caller_windows':[{'callsite':va,'window':window(va)} for va in callsites],
+              'rtti_candidates':name_records,
+              'candidate_ap_xrefs':xrefs,
+          }
+          raw=json.dumps(bundle,separators=(',',':')).encode()
+          encoded=base64.b64encode(raw).decode()
+          digest=hashlib.sha256(raw).hexdigest()
+          if len(encoded) > 700000:
+              raise SystemExit('P2_4DD250_FAIL=bundle_too_large')
+          with output_path.open('a') as out:
+              out.write(f'bundle_b64={encoded}\n')
+              out.write(f'bundle_sha256={digest}\n')
+              out.write(f'source_candidate_index={source_index}\n')
+
+          print('P2_4DD250_SOURCE_BOUNDARY=PASS')
+          print('P2_4DD250_CLIENT_VERSION=15.32.df7b29')
+          print(f'P2_4DD250_CLIENT_SIZE={expected_size}')
+          print(f'P2_4DD250_CLIENT_SHA256={expected_sha}')
+          print(f'P2_4DD250_DIRECT_CALL_COUNT={len(callsites)}')
+          print(f'P2_4DD250_TCP_RTTI_CANDIDATES={len(name_records.get("TGameserverTCPConnection",[]))}')
+          print(f'P2_4DD250_QTCPSOCKET_RTTI_CANDIDATES={len(name_records.get("QTcpSocket",[]))}')
+          print(f'P2_4DD250_AP_XREF_COUNT={len(xrefs)}')
+          print(f'P2_4DD250_BUNDLE_SHA256={digest}')
+          print('P2_4DD250_RUNTIME_ACCESS=none')
+          print('P2_4DD250_SOURCE_DISASSEMBLY=false')
+          print('P2_4DD250_SOURCE_SEMANTIC_CLASSIFICATION=false')
+          print('P2_4DD250_CLIENT_PROCESS_ACCESSED=false')
+          print('P2_4DD250_PROCESS_MEMORY_ACCESSED=false')
+          print('P2_4DD250_CLIENT_EXECUTED=false')
+          print('P2_4DD250_CLIENT_BYTE_MUTATED=false')
+          print('P2_4DD250_RAW_CLIENT_UPLOADED=false')
+          PY
+
+  hosted-validate:
+    name: Decode QIODevice provenance on GitHub-hosted Linux
+    needs: source-sanitize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_REPOSITORY: blakinio/otclient
+      EXPECTED_BRANCH: research/OTC-20260817-track-a-p2-4dd250-qiodevice-provenance
+      BUNDLE_B64: ${{ needs.source-sanitize.outputs.bundle_b64 }}
+      BUNDLE_SHA256: ${{ needs.source-sanitize.outputs.bundle_sha256 }}
+    steps:
+      - name: Verify and decode bounded provenance bundle
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REPOSITORY" == "$EXPECTED_REPOSITORY" ]] || exit 71
+          [[ "$GITHUB_REF_NAME" == "$EXPECTED_BRANCH" ]] || exit 72
+          [[ "$RUNNER_OS" == Linux && "$RUNNER_ARCH" == X64 ]] || exit 73
+          [[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]] || exit 74
+          command -v python3 >/dev/null
+          command -v objdump >/dev/null
+          python3 - <<'PY'
+          import base64, hashlib, json, os, subprocess, tempfile
+          from pathlib import Path
+          raw=base64.b64decode(os.environ['BUNDLE_B64'])
+          if hashlib.sha256(raw).hexdigest()!=os.environ['BUNDLE_SHA256']:
+              raise SystemExit('P2_4DD250_FAIL=hosted_bundle_digest')
+          b=json.loads(raw)
+          e=b['exact_client']
+          if e['version']!='15.32.df7b29' or e['size']!=51965216 or e['sha256']!='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe':
+              raise SystemExit('P2_4DD250_FAIL=hosted_exact_fence')
+          if b['runtime_access']!='none' or b['raw_client_uploaded'] is not False or b['source_disassembly'] is not False or b['source_semantic_classification'] is not False:
+              raise SystemExit('P2_4DD250_FAIL=hosted_source_boundary')
+
+          def disasm(label,w):
+              data=bytes.fromhex(w['hex'])
+              if hashlib.sha256(data).hexdigest()!=w['sha256'] or len(data)!=w['end']-w['start']:
+                  raise SystemExit(f'P2_4DD250_FAIL={label}_window_integrity')
+              with tempfile.TemporaryDirectory(prefix='p2-4dd250-') as td:
+                  p=Path(td)/f'{label}.bin'; p.write_bytes(data)
+                  return subprocess.run(['objdump','-D','-b','binary','-m','i386:x86-64','-M','intel',f"--adjust-vma=0x{w['start']:x}",str(p)],check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE).stdout
+
+          print('P2_4DD250_HOSTED_VALIDATION=PASS')
+          print('P2_4DD250_CLIENT_VERSION=15.32.df7b29')
+          print('P2_4DD250_CLIENT_SIZE=51965216')
+          print('P2_4DD250_CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe')
+          print('P2_4DD250_EXECUTION_CLASS=github_hosted')
+          print('P2_4DD250_RUNTIME_ACCESS=none')
+          print(f"P2_4DD250_DIRECT_CALLS={','.join(hex(x) for x in b['direct_calls_to_b4aea0'])}")
+          for idx,rec in enumerate(b['caller_windows']):
+              print(f'P2_4DD250_CALLER_{idx}_AT=0x{rec["callsite"]:x}')
+              print(f'P2_4DD250_CALLER_{idx}_DISASSEMBLY_BEGIN')
+              print(disasm(f'caller{idx}',rec['window']),end='')
+              print(f'P2_4DD250_CALLER_{idx}_DISASSEMBLY_END')
+          for name,recs in b['rtti_candidates'].items():
+              for idx,rec in enumerate(recs):
+                  print(f'P2_4DD250_RTTI_{name}_{idx}=name@0x{rec["name_va"]:x},typeinfo@0x{rec["typeinfo"]:x},ap@0x{rec["address_point"]:x}')
+          for idx,rec in enumerate(b['candidate_ap_xrefs']):
+              print(f'P2_4DD250_AP_XREF_{idx}=ap@0x{rec["target_ap"]:x},xref@0x{rec["xref"]:x}')
+              print(f'P2_4DD250_AP_XREF_{idx}_DISASSEMBLY_BEGIN')
+              print(disasm(f'xref{idx}',rec['window']),end='')
+              print(f'P2_4DD250_AP_XREF_{idx}_DISASSEMBLY_END')
+          PY

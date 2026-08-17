@@ -1,4 +1,4 @@
-name: Diagnostic v20 AUTH QMeta classification run
+name: Diagnostic v20 AUTH transition wiring run
 
 on:
   push:
@@ -12,13 +12,13 @@ permissions:
   actions: read
 
 env:
-  TARGET_SHA: 072f48266696b513cba0e19d22d3a4dbee797940
-  TARGET_PATH: .github/workflows/track-a-worldmap-auth-qmeta-flags-v20.yml
+  TARGET_SHA: 976823acd1d5f7f947c0bac9bd8d8277f1c47686
+  TARGET_PATH: .github/workflows/track-a-worldmap-auth-transition-wiring-v20.yml
 
 jobs:
   discover:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -34,12 +34,12 @@ jobs:
           api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$TARGET_SHA&event=push&per_page=50";run_id=''
           for _ in $(seq 1 60);do payload="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$api")";run_id="$(jq -r --arg p "$TARGET_PATH" '.workflow_runs[]|select(.path==$p)|.id'<<<"$payload"|head -1)";[[ "$run_id" =~ ^[1-9][0-9]*$ ]]&&break;sleep 5;done
           [[ "$run_id" =~ ^[1-9][0-9]*$ ]];status='';conclusion=''
-          for _ in $(seq 1 120);do one="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")";status="$(jq -r '.status'<<<"$one")";conclusion="$(jq -r '.conclusion//""'<<<"$one")";[[ "$status" == completed ]]&&break;sleep 10;done
+          for _ in $(seq 1 150);do one="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")";status="$(jq -r '.status'<<<"$one")";conclusion="$(jq -r '.conclusion//""'<<<"$one")";[[ "$status" == completed ]]&&break;sleep 10;done
           jobs="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")";mkdir -p .diag
-          jq -n --arg target_sha "$TARGET_SHA" --argjson run_id "$run_id" --arg status "$status" --arg conclusion "$conclusion" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion}]'<<<"$jobs")" '{schema:"v20-auth-qmeta-terminal-v1",target_sha:$target_sha,run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/v20-auth-qmeta-status.json
+          jq -n --arg target_sha "$TARGET_SHA" --argjson run_id "$run_id" --arg status "$status" --arg conclusion "$conclusion" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion}]'<<<"$jobs")" '{schema:"v20-auth-transition-wiring-terminal-v1",target_sha:$target_sha,run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/v20-auth-transition-wiring-status.json
           [[ "$status" == completed ]]
       - name: Persist terminal diagnostic
         if: always()
         shell: bash
         run: |
-          set -Eeuo pipefail;test -s .diag/v20-auth-qmeta-status.json;git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add .diag/v20-auth-qmeta-status.json;git commit -m 'diag(track-a): persist v20 auth qmeta status';git push origin HEAD:diag/OTC-20260818-v18-run-discovery
+          set -Eeuo pipefail;test -s .diag/v20-auth-transition-wiring-status.json;git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add .diag/v20-auth-transition-wiring-status.json;git commit -m 'diag(track-a): persist v20 auth transition wiring status';git push origin HEAD:diag/OTC-20260818-v18-run-discovery

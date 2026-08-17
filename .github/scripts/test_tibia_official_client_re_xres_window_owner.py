@@ -54,6 +54,11 @@ class Tests(unittest.TestCase):
         )
         self.assertEqual(owner.extract_one_spec_local_pid(records, 2), PHYSICAL_PID)
 
+    def test_rejects_zero_returned_client_identifier(self) -> None:
+        records = (wire.ClientIdValue(0, 2, (PHYSICAL_PID,)),)
+        with self.assertRaises(owner.WindowOwnerError):
+            owner.extract_one_spec_local_pid(records, 2)
+
     def test_rejects_multiple_one_spec_records(self) -> None:
         records = (
             wire.ClientIdValue(CLIENT_BASE, 2, (PHYSICAL_PID,)),

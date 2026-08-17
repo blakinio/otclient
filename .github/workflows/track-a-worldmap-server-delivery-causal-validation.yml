@@ -14,24 +14,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  safety-hold:
-    name: Hold after same-launch adaptive field scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
+  persistent-home-layout:
+    name: Persistent Tibia HOME layout discriminator (no client)
+    runs-on: [otclient, synology]
+    timeout-minutes: 3
     steps:
-      - name: Preserve adaptive result before HOME layout discriminator
+      - name: Inspect symlink and package metadata only
         shell: bash
         run: |
+          set +x
           set -Eeuo pipefail
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD=PASS'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_REASON=no_text_fields_on_fresh_ephemeral_startup_surface'
-          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_RUN=32038436466'
-          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_JOB=95413316245'
-          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_TEXT_FIELD_COUNT=0'
-          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_MASKED_LIKE_COUNT=0'
-          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_UNMASKED_LIKE_COUNT=0'
-          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_SECRET_USED=false'
-          echo 'WORLDMAP_CAUSAL_LAST_ADAPTIVE_LOGIN_SUBMITTED=false'
-          echo 'WORLDMAP_CAUSAL_NEXT_DISCRIMINATOR=persistent_home_tibia_symlink_layout'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_CLIENT_EXECUTED=false'
-          echo 'WORLDMAP_CAUSAL_SAFETY_HOLD_SECRET_USED=false'
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+
+          roots=[Path('/home/runner/_work/_otclient_tibia_re_state/home'),Path('/work/_otclient_tibia_re_state/home')]
+          home=next((p for p in roots if p.is_dir()),None)
+          if home is None: raise SystemExit('WORLDMAP_HOME_LAYOUT_ERROR=persistent_home_missing')
+          share=home/'.local/share/CipSoft GmbH/Tibia'
+          link=share/'Tibia'
+          meta=share/'launchermetadata.json'
+          package=share/'packages/Tibia'
+          client=package/'bin/client'
+          if not link.is_symlink(): raise SystemExit('WORLDMAP_HOME_LAYOUT_ERROR=tibia_symlink_missing')
+          raw=os.readlink(link)
+          resolved=link.resolve(strict=False)
+          print('WORLDMAP_HOME_LAYOUT_SYMLINK_RAW='+raw)
+          print('WORLDMAP_HOME_LAYOUT_SYMLINK_RESOLVED='+str(resolved.relative_to(home) if resolved.is_relative_to(home) else resolved))
+          print('WORLDMAP_HOME_LAYOUT_SYMLINK_TARGET_EXISTS='+str(resolved.exists()).lower())
+          print('WORLDMAP_HOME_LAYOUT_PACKAGE_EXISTS='+str(package.is_dir()).lower())
+          print('WORLDMAP_HOME_LAYOUT_CLIENT_EXISTS='+str(client.is_file()).lower())
+          print('WORLDMAP_HOME_LAYOUT_SYMLINK_EQUALS_PACKAGE='+str(resolved==package.resolve()).lower())
+          if meta.is_file():
+              data=meta.read_bytes()
+              print('WORLDMAP_HOME_LAYOUT_METADATA_SIZE='+str(len(data)))
+              print('WORLDMAP_HOME_LAYOUT_METADATA_SHA256='+hashlib.sha256(data).hexdigest())
+          else:
+              raise SystemExit('WORLDMAP_HOME_LAYOUT_ERROR=launchermetadata_missing')
+          if client.is_file():
+              h=hashlib.sha256()
+              with client.open('rb') as f:
+                  for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
+              print('WORLDMAP_HOME_LAYOUT_CLIENT_SHA256='+h.hexdigest())
+          print('WORLDMAP_HOME_LAYOUT_FILE_CONTENT_INTERPRETED=false')
+          print('WORLDMAP_HOME_LAYOUT_CLIENT_EXECUTED=false')
+          print('WORLDMAP_HOME_LAYOUT_SECRET_USED=false')
+          PY

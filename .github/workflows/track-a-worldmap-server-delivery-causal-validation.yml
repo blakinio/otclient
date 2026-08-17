@@ -291,18 +291,21 @@ jobs:
             exit 95
           }
 
-          ! grep -azq '^TIBIA_TEST_EMAIL=' "/proc/$helper_pid/environ" || {
+          if grep -azq '^TIBIA_TEST_EMAIL=' "/proc/$helper_pid/environ"; then
             echo 'WORLDMAP_PRESECRET_ERROR=email_in_helper_environment'
             exit 94
-          }
-          ! grep -azq '^TIBIA_TEST_PASSWORD=' "/proc/$helper_pid/environ" || {
+          fi
+          if grep -azq '^TIBIA_TEST_PASSWORD=' "/proc/$helper_pid/environ"; then
             echo 'WORLDMAP_PRESECRET_ERROR=password_in_helper_environment'
             exit 93
-          }
+          fi
           grep -Fq 'WORLDMAP_BASELINE_EMAIL_FIELD_EDITABLE=PASS' "$control/helper.log"
           grep -Fq 'WORLDMAP_BASELINE_PASSWORD_FIELD_EDITABLE=PASS' "$control/helper.log"
           grep -Fq 'WORLDMAP_BASELINE_PRESECRET_READY=true' "$control/helper.log"
-          ! grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"
+          if grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"; then
+            echo 'WORLDMAP_PRESECRET_ERROR=login_submitted_before_handoff'
+            exit 92
+          fi
           echo 'WORLDMAP_PHYSICAL_PRESECRET_GATE=PASS'
 
       - name: Stop after pre-secret proof
@@ -319,10 +322,10 @@ jobs:
             kill -0 "$helper_pid" 2>/dev/null || break
             sleep .25
           done
-          ! kill -0 "$helper_pid" 2>/dev/null || {
+          if kill -0 "$helper_pid" 2>/dev/null; then
             echo 'WORLDMAP_PRESECRET_ERROR=helper_cleanup_timeout'
             exit 92
-          }
+          fi
           sleep .5
           python3 - <<'PY'
           from pathlib import Path
@@ -342,7 +345,10 @@ jobs:
               raise SystemExit('WORLDMAP_PRESECRET_ERROR=namespace_cleanup_incomplete')
           PY
           cat "$control/helper.log"
-          ! grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"
+          if grep -Fq 'WORLDMAP_BASELINE_LOGIN_SUBMITTED=true' "$control/helper.log"; then
+            echo 'WORLDMAP_PRESECRET_ERROR=login_submitted_during_presecret_only'
+            exit 91
+          fi
           echo 'WORLDMAP_PHYSICAL_PRESECRET_NO_SECRET_CAPTURE=PASS'
 
       - name: Hand off protected credentials after gates

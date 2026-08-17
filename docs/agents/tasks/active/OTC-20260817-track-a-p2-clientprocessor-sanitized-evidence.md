@@ -95,10 +95,12 @@ validation:
   hosted_job_result: SUCCESS
   final_artifact: 9279759553
   final_artifact_digest: sha256:8228d6c281cf99f45f5c880b76e7a2817130156fde4cc892a402eccf4af10528
-  track_a_governance_run: 32005159534
-  track_a_governance_result: SUCCESS
-  repository_ci_run: 32005159706
-  repository_ci_result: SUCCESS
+  evidence_head_track_a_governance_run: 32005159534
+  evidence_head_track_a_governance_result: SUCCESS
+  evidence_head_repository_ci_run: 32005159706
+  evidence_head_repository_ci_result: SUCCESS
+  final_task_only_head: 5064af2222bd1f8830cb656270f488eca45b052e
+  final_task_only_head_checks: PENDING
 independent_coordinator_review:
   result: PASS_BOUNDED
   artifact_result_json_trusted_as_summary: false

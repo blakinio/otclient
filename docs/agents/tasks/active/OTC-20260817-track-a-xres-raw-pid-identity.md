@@ -14,7 +14,7 @@ base_branch: main
 base_main: 60ab740872d52f3f7c4802d49fd5275a9968d085
 pr: 457
 risk: high
-updated: 2026-08-17T11:37:00+02:00
+updated: 2026-08-17T11:38:00+02:00
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
@@ -122,6 +122,10 @@ helper_followup:
   additional_physical_run_required: false
   issue: persistent helper incorrectly requires returned CLIENTIDVALUE.spec.client to echo exact queried resource XID, while X server returns owning client resource-base
   owner: persistent raw-XRes helper owner / canonical runtime task
+validation:
+  v2_final_audit: PASS
+  v2_material_findings_open: 0
+  one_shot_runtime_surfaces_retained: false
 acceptance:
   - fresh physical v2 admission passed
   - exactly one v2 isolated exact-client launch occurred
@@ -142,7 +146,7 @@ evidence:
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/20260817-helper-fix-audit.md
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/20260817-v2-physical-pid-identity.md
   - docs/agents/evidence/OTC-20260817-track-a-xres-raw-pid-identity/20260817-v2-final-audit.md
-last_completed_step: physical v2 raw XRes evidence directly bound the unique VIEWABLE 1920x1080 resource 0x00c00011 to exact launched client PID 13648; cleanup completed and consumed one-shot runtime surfaces are absent from the terminal tree
+last_completed_step: final audit independently decoded the retained v2 raw reply and accepted physical identity with zero material findings; consumed v2 workflow/patcher are absent
 next_action: validate terminal #457 exact head, merge, then archive this task and release ownership; downstream RUNTIME work may consume the proven identity only under its own fresh admission.
 ---
 

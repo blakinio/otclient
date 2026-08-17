@@ -1,0 +1,51 @@
+{
+  "schema": "track-a-p2-dual-nested-vcall-resolution-v1",
+  "date": "2026-08-17",
+  "task": "OTC-20260817-track-a-p2-dual-nested-vcall-resolution",
+  "research_status": "DRAFT_NOT_PROMOTED_READY_FOR_COORDINATOR_REVIEW",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "input_artifact": {
+    "run": 32016842999,
+    "hosted_job": 95348295109,
+    "artifact": 9283858910,
+    "artifact_sha256": "2df8405269431397f3da0601ef24d9a9a8787dc33f3b5fdd43774f1eca36922c",
+    "independent_redownload_rehash": "PASS"
+  },
+  "runtime_access": "none",
+  "claims": {
+    "b56c93_receiver_provenance": "FACT:nested_pointer_chain_current_entry_plus_0x20_plus_0x20",
+    "b56c93_outer_guard_vslot_plus_0x98_target": "FACT:0xb3eda0",
+    "b56c93_intermediate_guard_vslot_plus_0x60_target": "FACT:0xf45cf0",
+    "b56c93_receiver_exact_dynamic_type": "UNKNOWN",
+    "b56c93_virtual_slot": "FACT:+0x10",
+    "b56c93_concrete_target": "UNKNOWN",
+    "b56c93_second_argument": "FACT:original_b56970_second_argument_rsi",
+    "b56c93_same_message_preserved": "FACT",
+    "b56c93_target_equals_b40630": "UNKNOWN",
+    "b57042_receiver_provenance": "FACT:internal_rbx_object_selected_from_plus_0x80_path",
+    "b57042_receiver_exact_dynamic_type": "UNKNOWN",
+    "b57042_virtual_slot": "FACT:+0x10",
+    "b57042_concrete_target": "UNKNOWN",
+    "b57042_rsi_on_taken_branch": "FACT:0x100000001",
+    "b57042_same_message_preserved": "DISPROVEN",
+    "b57042_is_same_message_edge_to_b40630": "DISPROVEN",
+    "framing": "UNKNOWN",
+    "sequence": "UNKNOWN",
+    "compression": "UNKNOWN",
+    "encryption": "UNKNOWN",
+    "final_binary_egress": "UNKNOWN",
+    "final_socket_ownership": "UNKNOWN"
+  },
+  "frontier": {
+    "remaining_candidate": "0xb56c93",
+    "next_discriminator": "resolve exact dynamic receiver/vtable +0x10 target after the 0xb3eda0/0xf45cf0 guarded chain and test target == 0xb40630"
+  },
+  "e2e": {
+    "result": "NOT_APPLICABLE",
+    "reason": "static exact-artifact dataflow analysis only"
+  }
+}

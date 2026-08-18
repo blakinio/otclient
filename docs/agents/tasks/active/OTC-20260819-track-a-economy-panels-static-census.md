@@ -8,7 +8,7 @@ project_lane: otclient
 lane: RESEARCH
 track_id: official-client-re
 task_kind: static_capability_census
-phase: research
+phase: review
 branch: docs/OTC-20260819-track-a-economy-panels-static-census
 base_branch: main
 base_main: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
@@ -86,12 +86,14 @@ acceptance:
 audit:
   result: pending_fresh_independent
   material_findings_open: unknown
-last_completed_step: authority freeze, overlap scan, trusted static-evidence inventory and physical-runtime reachability check completed
-next_action: write the task-owned G24-G31 static evidence report, verify the branch diff and publish a Draft research PR
+last_completed_step: task-owned G24-G31 static evidence report completed with exact-build protocol registry mapping, version-fenced prior UI/controller mapping, handler-family xrefs, safety boundaries and residual UNKNOWNs
+next_action: verify exact PR diff/head/checks; then leave Draft PR #544 for fresh independent audit/coordinator promotion
 ---
 
 # Track A economy panels static census
 
 `TIBIA-RE-ECONOMY-PANELS` is being executed as a bounded static research slice for G24-G31. The current owner instruction authorizes autonomous repository work, not login, GUI input, credentials, gameplay, process control or any economy/account transaction.
 
-The live Track A physical runtime is not used by this task. The configured Synology Remote Desktop Commander endpoint could not be live-revalidated as reachable in this session, so historical runtime state is non-authoritative and runtime semantics remain out of scope.
+Evidence report: `docs/agents/evidence/OTC-20260819-track-a-economy-panels-static-census/economy-panels-static-census.md`.
+
+The bounded static census is complete. The live Track A physical runtime was not used because the configured Synology Remote Desktop Commander endpoint could not be live-revalidated as reachable in this session. Historical runtime state is non-authoritative and runtime semantics remain out of scope. Repository policy requires this researcher delivery to remain Draft pending a fresh independent audit/coordinator promotion.

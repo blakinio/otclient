@@ -14,12 +14,12 @@ permissions:
 
 concurrency:
   group: track-a-kasmvnc-desktop
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
     name: Deploy persistent KasmVNC desktop on Synology
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: self-hosted
     timeout-minutes: 30
     env:
       TASK_ID: OTC-20260818-track-a-persistent-viewer-handoff
@@ -39,15 +39,21 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Verify isolated Track A admission
         shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
         run: |
           set +x
           set -Eeuo pipefail
           umask 077
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$HEAD_BRANCH" == fix/OTC-20260818-track-a-persistent-viewer-handoff ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
           grep -q '^track_id: official-client-re$' "$TASK_FILE"
           grep -q '^status: implementing$' "$TASK_FILE"
           grep -q '^execution_class: synology_physical_runtime$' "$TASK_FILE"

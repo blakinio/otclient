@@ -1,0 +1,75 @@
+{
+  "schema": "track-a-s1-unfiltered-static-census-result-v1",
+  "task": "OTC-20260818-track-a-s1-unfiltered-static-census",
+  "pr": 509,
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "packed_lzma_sha256": "496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b"
+  },
+  "execution": {
+    "class": "github_hosted",
+    "runtime_access": "none",
+    "client_executed": false,
+    "secret_access": false,
+    "pr475_runtime_touched": false,
+    "raw_client_committed_or_uploaded": false
+  },
+  "fresh_producer": {
+    "head": "cb575cec2077c8002bb6712ffac4d4dc77420499",
+    "run": 32112814216,
+    "job": 95635760592,
+    "conclusion": "SUCCESS",
+    "artifact": 9315562574,
+    "artifact_digest": "sha256:583c8c217fa2eaa2411f79995473cd910b8803d8599f80574491ca27b8ab9860"
+  },
+  "independent_control": {
+    "source_pr": 473,
+    "run": 32022209943,
+    "artifact": 9285763750,
+    "artifact_digest": "sha256:0f71be3021885f3f8881199c5f74839fca6c6c5081594fab48998298abaadbd6",
+    "protocol_all_sha256": "55f7cf2d6d4a63df6e24b8b156e38f1a2a64a9d6394357aa914661ab48fd983b",
+    "client_to_server_sha256": "621ecb7aa1a62aae559e8d793d1aebe9289d84811bc43c4339a7153458b553f0",
+    "server_to_client_sha256": "e642f661546c2e6e89ddcd77ac5e8aa9cd517408a309f95a3a367af943550d96"
+  },
+  "protocol": {
+    "total": 349,
+    "client_to_server": 160,
+    "server_to_client": 189,
+    "fresh_lists_byte_identical_to_control": true,
+    "all_189_inbound_names_persisted": true,
+    "all_160_outbound_names_persisted": true
+  },
+  "inbound_static_surface": {
+    "inbound_oriented_method_strings": 542,
+    "messages_with_lexical_handler_surface": 188,
+    "messages_without_lexical_handler_surface": 1,
+    "sole_unmatched_generated_message": "GameserverMessageTrackQuestFlags",
+    "relevant_demangled_types_in_artifact": 148,
+    "direct_code_to_string_xref_strings": 51,
+    "direct_code_to_string_xrefs": 52,
+    "protocol_message_handler_classes_with_direct_code_string_xref": 47,
+    "semantic_common_inbound_dispatcher": "UNKNOWN"
+  },
+  "exact_build_anchor_resolution": {
+    "player_protocol_handler": "0x308a008",
+    "player_data": "0x308ca70",
+    "creature_storage": "0x308d078",
+    "container_storage": "0x308a1a0",
+    "gameserver_game_session": "0x3078ba0",
+    "game_client": "0x3076908",
+    "worldmap_handler": "0x30871d8",
+    "all_unique": true
+  },
+  "classification": {
+    "generated_message_denominator": "FACT",
+    "handler_class_type_presence": "FACT",
+    "direct_code_to_handler_class_string_xrefs": "FACT",
+    "message_name_to_similar_received_or_handle_method_name": "INFERENCE_STATIC_LEXICAL_ONLY",
+    "message_to_concrete_handler_dispatch": "UNKNOWN",
+    "handler_to_storage_or_controller_edge": "UNKNOWN",
+    "one_common_inbound_dispatcher": "UNKNOWN"
+  },
+  "diagnostic_family_bucket_warning": "Producer protocol-server-families.json used substring-only diagnostics and is not promoted as semantic evidence; e.g. Market names can collide with Mark/row substrings. Durable conclusions use exact names and explicit evidence classes instead."
+}

@@ -1,4 +1,4 @@
-name: Track A live VNC observer v23
+name: Track A live VNC observer v24
 
 on:
   push:
@@ -7,12 +7,13 @@ on:
     paths:
       - .github/workflows/track-a-vnc-observer-live-v23.yml
       - .github/scripts/track-a-worldmap-vnc-observer-access-v23-repair.py
+      - .github/scripts/track-a-worldmap-vnc-observer-hold-v24-repair.py
 
 permissions:
   contents: read
 
 concurrency:
-  group: track-a-vnc-observer-live-v23
+  group: track-a-vnc-observer-live-v24
   cancel-in-progress: false
 
 jobs:
@@ -28,16 +29,25 @@ jobs:
           set -Eeuo pipefail
           python3 -m py_compile \
             .github/scripts/track-a-worldmap-vnc-observer-access-v23-repair.py \
-            .github/scripts/track-a-worldmap-vnc-observer-integrate-v23-repair.py
+            .github/scripts/track-a-worldmap-vnc-observer-integrate-v23-repair.py \
+            .github/scripts/track-a-worldmap-vnc-observer-hold-v24-repair.py
           python3 .github/scripts/track-a-worldmap-vnc-observer-integrate-v23-repair.py \
             .github/scripts/track-a-worldmap-causal-ephemeral-baseline.sh "$RUNNER_TEMP/base-vnc.sh"
-          grep -Fq 'track-a-worldmap-vnc-observer-access-v23-repair.py' "$RUNNER_TEMP/base-vnc.sh"
+          python3 .github/scripts/track-a-worldmap-causal-gdb-env-repair.py "$RUNNER_TEMP/base-vnc.sh" "$RUNNER_TEMP/a"
+          python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$RUNNER_TEMP/a" "$RUNNER_TEMP/b"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py "$RUNNER_TEMP/b" "$RUNNER_TEMP/c"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py "$RUNNER_TEMP/c" "$RUNNER_TEMP/d"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$RUNNER_TEMP/d" "$RUNNER_TEMP/e"
+          python3 .github/scripts/track-a-worldmap-vnc-observer-hold-v24-repair.py "$RUNNER_TEMP/e" "$RUNNER_TEMP/helper.sh"
+          bash -n "$RUNNER_TEMP/helper.sh"
+          grep -Fq 'TRACK_A_VNC_OBSERVER_HOLD=ACTIVE_NO_SECRET_NO_LOGIN' "$RUNNER_TEMP/helper.sh"
+          ! grep -Fq 'credential_email_handoff_timeout' "$RUNNER_TEMP/helper.sh"
           echo 'TRACK_A_VNC_LIVE_STATIC=PASS'
 
   live:
     needs: static
     runs-on: [otclient, synology]
-    timeout-minutes: 65
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -64,8 +74,10 @@ jobs:
           python3 .github/scripts/track-a-worldmap-causal-ui-geometry-repair.py "$R/a" "$R/b"
           python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v3-repair.py "$R/b" "$R/c"
           python3 .github/scripts/track-a-worldmap-causal-ui-field-discriminator-v4-repair.py "$R/c" "$R/d"
-          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$R/d" "$R/helper.sh"
+          python3 .github/scripts/track-a-worldmap-causal-ui-field-final-roi-v5-repair.py "$R/d" "$R/e"
+          python3 .github/scripts/track-a-worldmap-vnc-observer-hold-v24-repair.py "$R/e" "$R/helper.sh"
           bash -n "$R/helper.sh";chmod 700 "$R/helper.sh"
+          grep -Fq 'TRACK_A_VNC_OBSERVER_HOLD=ACTIVE_NO_SECRET_NO_LOGIN' "$R/helper.sh"
           echo "helper=$R/helper.sh" >>"$GITHUB_OUTPUT"
           echo 'TRACK_A_VNC_LIVE_COMPOSITION=PASS'
 
@@ -82,7 +94,9 @@ jobs:
           ready=0
           for _ in $(seq 1 1800);do
             [[ -f "$c/result" ]]&&{ cat "$c/helper.log";exit 95;}
-            if [[ -f "$c/presecret.ready" && -p "$c/credentials.fifo" ]] && grep -Fq 'TRACK_A_USER_VNC_MODE=VIEW_ONLY_PASSWORD_PROTECTED' "$c/helper.log" 2>/dev/null;then ready=1;break;fi
+            if [[ -f "$c/presecret.ready" && -p "$c/credentials.fifo" ]] \
+              && grep -Fq 'TRACK_A_USER_VNC_MODE=VIEW_ONLY_PASSWORD_PROTECTED' "$c/helper.log" 2>/dev/null \
+              && grep -Fq 'TRACK_A_VNC_OBSERVER_HOLD=ACTIVE_NO_SECRET_NO_LOGIN' "$c/helper.log" 2>/dev/null;then ready=1;break;fi
             kill -0 "$hp" 2>/dev/null||{ cat "$c/helper.log";exit 94;};sleep .5
           done
           [[ "$ready" == 1 ]]
@@ -102,10 +116,11 @@ jobs:
           echo 'TRACK_A_VNC_LIVE_READY=true'
           echo 'TRACK_A_VNC_LIVE_PORT=6082'
           echo 'TRACK_A_VNC_LIVE_SECRET_USED=false'
-          for _ in $(seq 1 3600);do
+          # Hold the workflow itself as well. The helper no longer has its former
+          # 180-second credential timeout, so the exact Xvfb/x11vnc/client stays alive.
+          while kill -0 "$hp" 2>/dev/null;do
             [[ -e "$state/stop" ]]&&break
-            kill -0 "$hp" 2>/dev/null||break
-            sleep 1
+            sleep 2
           done
 
       - if: always()
@@ -113,8 +128,9 @@ jobs:
         run: |
           set +e
           state=/home/runner/_work/_otclient_tibia_re_state/vnc-observer-live
-          rm -f "$state/stop" 2>/dev/null||true
           c="$RUNNER_TEMP/worldmap-baseline-control"
+          root=/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/worldmap-causal-baseline-ephemeral-v1
+          touch "$root/vnc-observer-stop" 2>/dev/null||true
           if [[ -f "$c/helper.pid" ]];then p="$(cat "$c/helper.pid")";kill -TERM "$p" 2>/dev/null||true;sleep 1;kill -KILL "$p" 2>/dev/null||true;fi
           rm -rf "$state" 2>/dev/null||true
           python3 - <<'PY'

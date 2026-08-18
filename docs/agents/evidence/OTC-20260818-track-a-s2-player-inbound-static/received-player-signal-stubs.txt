@@ -1,0 +1,59 @@
+# Exact client: 15.32.df7b29
+# SHA-256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+# Source: run 32115662884 / job 95644479664 / artifact 9316573491
+# QMeta owner: tibia::protocol::TProtocolMessageQueue
+# QMetaObject::activate target: 0x4dedc0
+
+receivedPlayerDataCurrentMessage / QMeta index 34 / target 0xdf8bc1
+0xdf8bc1:	mov	rax, qword ptr [rcx + 8]
+0xdf8bc5:	mov	edx, 0x22
+0xdf8bca:	mov	rcx, rsp
+0xdf8bcd:	lea	rsi, [rip + 0x228cf8c]
+0xdf8bd4:	mov	qword ptr [rsp], 0
+0xdf8bdc:	mov	qword ptr [rsp + 8], rax
+0xdf8be1:	call	0x4dedc0
+0xdf8be6:	jmp	0xdf66ed
+
+receivedPlayerDataBasicMessage / QMeta index 43 / target 0xdf8d3b
+0xdf8d3b:	mov	rax, qword ptr [rcx + 8]
+0xdf8d3f:	mov	edx, 0x2b
+0xdf8d44:	mov	rcx, rsp
+0xdf8d47:	lea	rsi, [rip + 0x228ce12]
+0xdf8d4e:	mov	qword ptr [rsp], 0
+0xdf8d56:	mov	qword ptr [rsp + 8], rax
+0xdf8d5b:	call	0x4dedc0
+0xdf8d60:	jmp	0xdf66ed
+
+receivedPlayerStateMessage / QMeta index 48 / target 0xdf8e0d
+0xdf8e0d:	mov	rax, qword ptr [rcx + 8]
+0xdf8e11:	mov	edx, 0x30
+0xdf8e16:	mov	rcx, rsp
+0xdf8e19:	lea	rsi, [rip + 0x228cd40]
+0xdf8e20:	mov	qword ptr [rsp], 0
+0xdf8e28:	mov	qword ptr [rsp + 8], rax
+0xdf8e2d:	call	0x4dedc0
+0xdf8e32:	jmp	0xdf66ed
+
+receivedPlayerSkillsMessage / QMeta index 49 / target 0xdf8e37
+0xdf8e37:	mov	rax, qword ptr [rcx + 8]
+0xdf8e3b:	mov	edx, 0x31
+0xdf8e40:	mov	rcx, rsp
+0xdf8e43:	lea	rsi, [rip + 0x228cd16]
+0xdf8e4a:	mov	qword ptr [rsp], 0
+0xdf8e52:	mov	qword ptr [rsp + 8], rax
+0xdf8e57:	call	0x4dedc0
+0xdf8e5c:	jmp	0xdf66ed
+
+receivedPlayerInventoryMessage / QMeta index 117 / target 0xdf899f
+0xdf899f:	mov	rax, qword ptr [rcx + 8]
+0xdf89a3:	mov	edx, 0x75
+0xdf89a8:	mov	rcx, rsp
+0xdf89ab:	lea	rsi, [rip + 0x228d1ae]
+0xdf89b2:	mov	qword ptr [rsp], 0
+0xdf89ba:	mov	qword ptr [rsp + 8], rax
+0xdf89bf:	call	0x4dedc0
+0xdf89c4:	jmp	0xdf66ed
+
+Classification:
+FACT: each listed exact QMeta dispatch target is a TProtocolMessageQueue signal stub for its exact GameserverMessagePlayer* parameter type and invokes QMetaObject::activate@0x4dedc0 with the corresponding signal index.
+UNKNOWN: the network decoder that triggers the signal, the connected receiver, and any downstream TPlayerData mutation are not proven by these stubs alone.

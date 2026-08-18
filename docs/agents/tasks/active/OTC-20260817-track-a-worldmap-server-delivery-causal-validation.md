@@ -1,62 +1,44 @@
 ---
 task_id: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-status: implementing
-agent: ChatGPT
-session_id: chatgpt-worldmap-server-delivery-causal-20260818-v19
-session_role: isolated_runtime_owner
+status: waiting
+agent: null
+session_id: null
+session_role: released
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: baseline_native_game_login_v19_world_entry_screenshot
+phase: released_successor_re_admission_required
 branch: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
 base_branch: main
-updated: 2026-08-18T00:45:00+02:00
+updated: 2026-08-18T09:40:00+02:00
 risk: critical
 related_pr: 475
-runtime_access: ephemeral_isolated
-runtime_owner_task: OTC-20260817-track-a-worldmap-server-delivery-causal-validation
-runtime_namespace: worldmap-causal-baseline-ephemeral-v1
+runtime_access: none
+runtime_owner_task: null
+runtime_namespace: null
 PHYSICAL_E2E_REQUIRED: true
-credentials_allowed: true
-login_allowed: true
-gameplay_allowed: true
-ninth_baseline_login_attempt_authorized: true
-second_live_session_authorized: false
-owner_authorization_source: current conversation
+credentials_allowed: false
+login_allowed: false
+gameplay_allowed: false
+mutation_authorized: false
+client_byte_mutation_authorized: false
+owner_authorization_source: historical_current_conversation_only
 owner_authorization_text: "dokoncz zadanie"
-owner_authorization_scope: exactly one additional sequential baseline login attempt for v19 after v18 consumed the eighth attempt; reuse the already-proven legitimate account-login and native single-character confirmation path unchanged; observe the exact downstream native game-login state-machine events; only if the v18 character confirmation has built controller-owned TCharacterLoginData and emitted requestCharacterLogin but the connected authentication transition does not fire, v19 may invoke the original TAuthenticationProcessController QMeta method requestCharacterGameserverLogin() on its unique live post-auth object after runtime-address and Qt-thread-affinity proof; no auth/session fabrication, no packet synthesis, no coordinate/OCR character control; completion remains FullMap plus >=10 strips plus post-structural screenshot; no parallel session
+owner_authorization_scope: historical only; all prior sequential-login/runtime authority is released by owner-requested session handoff and must not be inherited by a successor without fresh admission/ownership and then-current owner/governance authority
 owner_funded_ai_api_authorized: false
+owned_paths: []
 exact_client:
   version: 15.32.df7b29
   size: 51965216
   sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
   platform: official_native_linux_only
-native_character_control:
-  character_selection_static_metacall_va: '0x00d46550'
-  on_character_selection_confirmed_method_index: 11
-  on_character_selection_confirmed_impl_va: '0x00856550'
-  request_character_signal_activate_va: '0x00856880'
-  character_selection_vptr: '0x0308ed68'
-native_auth_control:
-  auth_static_metacall_va: '0x00cfabb0'
-  auth_vptr: '0x0307f1b0'
-  request_character_gameserver_login_method_index: 5
-  request_character_gameserver_login_case_va: '0x00cfb2e7'
-  start_game_server_login_case_va: '0x00cfb122'
-native_gameclient_control:
-  gameclient_vptr: '0x03076908'
-  connect_existing_credentials_va: '0x00d06660'
-  on_connect_gameserver_va: '0x00d06810'
-  abort_gameserver_connect_va: '0x00d067b0'
-  game_session_connected_va: '0x00d066e0'
-  game_session_login_successful_va: '0x00d066c8'
-  game_session_login_error_va: '0x00d064d8'
-  game_session_disconnected_va: '0x00d064c8'
+release_handoff: docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260818-session-release-handoff.md
 launch_budget:
-  baseline_ephemeral_login_max: 9
-  baseline_ephemeral_login_consumed: 8
-  patched_ephemeral_login_max: 1
+  baseline_ephemeral_login_max_historical: 12
+  baseline_ephemeral_login_consumed_before_v22_durable_authority: 11
+  baseline_ephemeral_login_consumed_final: UNKNOWN_REDERIVE_FROM_TERMINAL_V22_LOGS
+  patched_ephemeral_login_max_historical: 1
   patched_ephemeral_login_consumed: 0
   simultaneous_logged_in_sessions_max: 1
 safety:
@@ -73,16 +55,44 @@ safety:
   canonical_source_patch_in_place: forbidden
   rollback_required: true
   coordinate_character_selection_control: forbidden
-ci_check_generation: v19_downstream_game_login
+  current_session_runtime_use: forbidden_until_fresh_successor_admission
+ci_check_generation: released_handoff_v40
 ---
 
 # Objective
 
-Reach the real game world on the exact official Linux client, prove `IN_GAME` structurally with pre-Storage `FullMap` plus at least 10 map-description strip records, and persist one cropped map-only screenshot. The owner stop condition remains successful world entry plus screenshot.
+Reach the real game world on the exact official Linux client, prove `IN_GAME` structurally with pre-Storage `FullMap` plus at least 10 map-description strip records, persist one cropped map-only screenshot, then perform the single task-owned baseline `[18,14]` versus patched `[19,14]` causal comparison of authoritative server-delivered map data.
 
-# Proven upstream chain
+The objective is **not completed**.
 
-The following are now physically proven and are no longer hypotheses:
+# Owner-requested session release
+
+The owner explicitly requested that the current agent save its work and release tasks/runtime/session state so another agent can continue without being blocked.
+
+Therefore this checkpoint releases:
+
+```text
+CURRENT_AGENT_OWNERSHIP=NONE
+CURRENT_SESSION_ID=NONE
+CURRENT_RUNTIME_AUTHORITY=NONE
+CURRENT_CREDENTIAL_AUTHORITY=NONE
+CURRENT_LOGIN_AUTHORITY=NONE
+CURRENT_GAMEPLAY_AUTHORITY=NONE
+CURRENT_MUTATION_AUTHORITY=NONE
+OWNED_PATHS=[]
+```
+
+PR #475 remains Draft. This task remains under `tasks/active` with status `waiting` because the research objective is unresolved; it is not archived or marked complete.
+
+# Durable handoff
+
+Read first:
+
+`docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260818-session-release-handoff.md`
+
+That handoff records the physically proven account-login and native single-character confirmation chain, the v19 downstream signal boundary, the QMeta/thunk corrections, the v20-v22 conservative authority history, VNC observer findings, unresolved `FullMap` boundary, and the current-main drift that a successor must consume before resuming.
+
+# Proven state retained for successor
 
 ```text
 LEGITIMATE_ACCOUNT_LOGIN=PASS
@@ -95,82 +105,39 @@ QT_THREAD_AFFINITY_FOR_CHARACTER_CONFIRMATION=PASS
 NATIVE_CHARACTER_CONFIRMATION_QMETA=PASS
 TCHARACTERLOGINDATA_VECTOR_BEFORE=0
 TCHARACTERLOGINDATA_VECTOR_AFTER=1
-REQUEST_CHARACTER_LOGIN_SIGNAL_EMISSION=PROVEN_STATIC_AT_0x856880
+REQUEST_CHARACTER_LOGIN_SIGNAL=PROVEN
+REQUEST_CHARACTER_GAMESERVER_LOGIN=OBSERVED
+STRUCTURAL_IN_GAME=NOT_PROVEN
+MAP_SCREENSHOT=NOT_PROVEN
 ```
 
-V18 physical run `32076063134 / 95529595652` consumed baseline login 8 and emitted:
+V18 physical run `32076063134 / 95529595652` is the canonical character-confirmation discriminator.
+
+V19 established the downstream boundary with observed native request-character and request-character-gameserver activity but no accepted structural `FullMap` result.
+
+# Critical corrections
+
+- `Invalid Monk` is not a runtime-discovered fact and must not be used as a target assumption.
+- Coordinate/pixel/Tab character-selection control is closed.
+- Historical `0xd47300` must not be treated as a safe standalone `requestCharacterLogin` entry.
+- QMeta/static-metacall must use a proven live object, correct ABI/argv, exact relocated address/instruction fence and Qt thread affinity.
+- GDB scheduler locking must be restored before normal network/session progression.
+- QMeta case/thunk addresses must be distinguished from real implementations when observing state progress.
+
+# Current-main drift
+
+Before resuming, successor must re-read current `main`. Since this branch's runtime work began, canonical main gained newer native-auth work including:
 
 ```text
-WORLDMAP_V18_POSTAUTH_CHARSEL_INSTANCE_COUNT=1
-WORLDMAP_V18_RUNTIME_ADDRESS_PROVEN=PASS
-WORLDMAP_V18_NATIVE_CHARACTER_LIST_COUNT=1
-WORLDMAP_V18_NATIVE_CHARACTER_LIST_DISCOVERY=PASS
-WORLDMAP_V18_NATIVE_SELECTION_INDEX=0
-WORLDMAP_V18_QT_THREAD_AFFINITY=PASS
-WORLDMAP_V18_SELECTED_LOGIN_DATA_BEFORE=0
-WORLDMAP_V18_CONST_SELECTION_VIEW=PASS
-WORLDMAP_V18_SELECTED_LOGIN_DATA_AFTER=1
-WORLDMAP_V18_NATIVE_CHARACTER_CONFIRMATION_QMETA=PASS
-WORLDMAP_V18_SEMANTIC_RESULT=PASS
+PR #505 / 17cc0dc1bf29c440cc08e443bdce98e4dde7be5d  native cold-auth QMeta research
+PR #506 / ed6202216886ec31d432e4e7dec56b47626f10c4  closeout/release
+PR #507 / 2e6992da330e8a52d03b94b8d6a9de6fa79a6800  experimental form-less native auth bridge
+PR #508 / ed09418b431c28087775b419f85bed404fa85d70  bridge closeout/release
 ```
 
-It then failed only because `FullMap` was not observed. Cleanup/source rehash passed.
+A successor should consume/revalidate this newer promoted work instead of repeating the old form/UI credential-entry path unless the new bridge is proven inapplicable to the exact runtime.
 
-# Exact downstream static correction/proof
-
-Exact-SHA QMeta enumeration v19 revalidated AUTH and GAMECLIENT addresses. The relevant original client transitions are:
-
-```text
-TAuthenticationProcessController::requestCharacterGameserverLogin() -> 0xcfb2e7
-TAuthenticationProcessController::onStartGameServerLoginStateEntered   -> 0xcfb122
-TGameClient::connectClientToGameserverWithExistingCredentials()       -> 0xd06660
-TGameClient::onConnectClientToGameserver                              -> 0xd06810
-TGameClient::abortClientConnectToGameserver                           -> 0xd067b0
-TGameClient::onGameSessionConnected                                   -> 0xd066e0
-TGameClient::onGameSessionLoginSuccessful                             -> 0xd066c8
-TGameClient::onGameSessionLoginError                                  -> 0xd064d8
-TGameClient::onGameSessionDisconnected                                -> 0xd064c8
-```
-
-Static confirmation-tail run `32076966187 / 95532124926` proves `onCharacterSelectionConfirmed` emits QMeta signal index 0 at `0x856880` after building the selected `TCharacterLoginData`. Thus the current blocker is strictly propagation from that emitted native character-login signal into the authentication/game-server state machine.
-
-# V19 execution contract
-
-1. repeat the exact v18 account-login + native method-11 confirmation path unchanged;
-2. arm correct pre-Storage breakpoints before login for:
-   - `0x856880` request-character signal activation;
-   - `0xcfb2e7` request-character-gameserver-login;
-   - `0xcfb122` start-game-server-login;
-   - `0xd06660` connect-existing-credentials;
-   - `0xd06810` on-connect-gameserver;
-   - `0xd067b0` abort-gameserver-connect;
-   - `0xd066e0` game-session-connected;
-   - `0xd066c8` game-session-login-successful;
-   - `0xd064d8` game-session-login-error;
-   - `0xd064c8` game-session-disconnected;
-3. after native character confirmation PASS, wait a short bounded interval and compute event deltas without logging payloads;
-4. if `RequestCharacterLoginSignalActivate>0` and `RequestCharacterGameserverLogin==0`, locate exactly one post-auth `TAuthenticationProcessController` by relocated vptr, prove current exact-SHA runtime address and Qt thread affinity, then invoke its original `qt_static_metacall(this, InvokeMetaMethod, method_id=5, argv)` with no user arguments;
-5. do not perform that fallback if the normal connected transition has already fired;
-6. after any allowed fallback, require downstream progress and surface only sanitized event counts/categories;
-7. any explicit GameSessionLoginError/Abort is a fail-closed runtime result, not a reason to synthesize a protocol packet;
-8. success remains only `FullMap` plus >=10 strip records;
-9. only after structural IN_GAME, capture exact manifest-owned XID, export cropped PNG, delete transient XWD, persist screenshot and cleanup.
-
-# Required result
-
-```text
-ACCOUNT_LOGIN_TRANSPORT=PASS
-NATIVE_CHARACTER_CONFIRMATION_QMETA=PASS
-REQUEST_CHARACTER_SIGNAL>0
-REQUEST_CHARACTER_GAMESERVER_LOGIN>0
-START_GAME_SERVER_LOGIN>0
-GAME_SERVER_CONNECT_STARTED>0
-GAME_SESSION_CONNECTED_OR_LOGIN_SUCCESS>0
-STRUCTURAL_IN_GAME=PASS
-MAP_SCREENSHOT=PASS
-```
-
-# Wider causal result boundary
+# Current wider causal result
 
 ```text
 SERVER_MAP_DELIVERY_MODEL=UNKNOWN
@@ -182,16 +149,42 @@ STORAGE_EXTENT_CHANGE=UNKNOWN
 RENDER_PICKER_EXTENT_CHANGE=UNKNOWN
 ```
 
+No patched comparison is permitted before a fresh successor-owned baseline reaches structural `IN_GAME` and records the authoritative inbound baseline extent.
+
+# Successor admission contract
+
+A future agent must not inherit any live session or login authority from this checkpoint. It must:
+
+1. read current main and this release handoff;
+2. re-read terminal v18-v22 logs before asserting final login-budget consumption;
+3. perform fresh no-client/task-namespace inventory on `synology-otclient-01`;
+4. acquire fresh task/runtime ownership and then-current admission;
+5. prove one-session uniqueness and exact-client/XID/WARP/GDB gates anew;
+6. use runtime-discovered character data only;
+7. prefer current-main native auth bridge work when exact fences permit;
+8. complete only on `FullMap + >=10 strips + post-structural exact-window screenshot`;
+9. only then run the one task-owned `[19,14]` causal comparison.
+
 # Checkpoint
 
 ```yaml
-checkpoint_version: 30
-status: implementing
-phase: baseline_native_game_login_v19_world_entry_screenshot
-baseline_login_max: 9
-baseline_login_consumed: 8
-patched_login_consumed: 0
-last_completed_step: v18 physically completed native single-character confirmation and built one client-owned TCharacterLoginData; v19 static proof confirms the confirmation emits requestCharacterLogin signal index 0, while no FullMap followed
-blockers: []
-next_action: execute one v19 downstream state-machine discriminator with conditional original-AUTH QMeta transition only if the normal character signal does not propagate, then stop only at FullMap+screenshot or an explicit native game-login failure state
+checkpoint_version: 40
+status: waiting
+phase: released_successor_re_admission_required
+agent: null
+session_id: null
+runtime_access: none
+runtime_owner_task: null
+credentials_allowed: false
+login_allowed: false
+gameplay_allowed: false
+mutation_authorized: false
+owned_paths: []
+structural_in_game: false
+map_screenshot: false
+last_completed_step: persisted full current-session handoff and released repository/runtime ownership at owner request
+blockers:
+  - fresh successor admission and runtime ownership required
+  - successor must consume current-main native auth bridge drift before continuing
+next_action: successor re-reads current main plus handoff, re-derives terminal v22 consumption from logs, performs fresh no-client inventory, claims ownership, and resumes from the post-character-confirmation game-server state-machine boundary
 ```

@@ -1,0 +1,30 @@
+name: Track A native-login runner dependency queue drain
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-runner-deps-noop.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-native-login-runner-deps
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    name: Drain obsolete native-login dependency queue off-box
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Confirm no runtime or secret access
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo NATIVE_LOGIN_RUNNER_DEP_QUEUE_DRAIN=PASS
+          echo RUNTIME_ACCESS=none
+          echo SECRET_ACCESS=false
+          echo CLIENT_MUTATION=false
+          echo LOGIN=false

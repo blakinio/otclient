@@ -19,13 +19,13 @@ try:
 except ImportError:  # pragma: no cover - Linux-only experimental auth surface
     fcntl = None
 
+from tools.tibia_runtime_bridge.experimental_auth_client import auth_with_credentials_fd
 from tools.tibia_runtime_bridge.experimental_auth_launcher import build_experimental_env
 from tools.tibia_runtime_bridge.ipc_client import (
     BridgeClientError,
     BridgePeerIdentityError,
     BridgeProtocolError,
     PeerIdentityExpectation,
-    auth_with_credentials_fd,
     request,
     session_status,
 )
@@ -419,10 +419,13 @@ class IpcClientTests(unittest.TestCase):
 
     def test_experimental_auth_is_separate_and_exact_fenced(self):
         root = Path(__file__).parents[3]
-        stable = (root / "tools/tibia_runtime_bridge/bridge.cpp").read_text(encoding="utf-8")
+        stable_bridge = (root / "tools/tibia_runtime_bridge/bridge.cpp").read_text(encoding="utf-8")
+        stable_client = (root / "tools/tibia_runtime_bridge/ipc_client.py").read_text(encoding="utf-8")
         source = (root / "tools/tibia_runtime_bridge/experimental_auth.cpp").read_text(encoding="utf-8")
+        auth_client = (root / "tools/tibia_runtime_bridge/experimental_auth_client.py").read_text(encoding="utf-8")
         cmake = (root / "tools/tibia_runtime_bridge/CMakeLists.txt").read_text(encoding="utf-8")
-        self.assertNotIn("AUTH_WITH_CREDENTIALS", stable)
+        self.assertNotIn("AUTH_WITH_CREDENTIALS", stable_bridge)
+        self.assertNotIn("AUTH_WITH_CREDENTIALS", stable_client)
         self.assertIn("OTCLIENT_TIBIA_RE_BUILD_EXPERIMENTAL_AUTH", cmake)
         self.assertIn("OFF", cmake)
         self.assertIn("AUTH_WITH_CREDENTIALS", source)
@@ -441,6 +444,8 @@ class IpcClientTests(unittest.TestCase):
         self.assertIn("COLD_AUTH_QMETA_INVOKE_FAILED", source)
         self.assertNotIn("EXECUTE_ADDRESS", source)
         self.assertNotIn("CALL_ADDRESS", source)
+        self.assertNotIn("os.read(", auth_client)
+        self.assertNotIn("os.pread(", auth_client)
 
 
 if __name__ == "__main__":

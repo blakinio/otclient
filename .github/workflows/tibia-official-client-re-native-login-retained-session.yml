@@ -66,12 +66,8 @@ jobs:
           owner_helper='.github/scripts/tibia-official-client-re-xres-window-owner.py'
           wire_helper='.github/scripts/tibia-official-client-re-xres-wire.py'
           worker="${RUNNER_TEMP}/native-login-retained-worker-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
-          gout="${RUNNER_TEMP}/native-login-retained-gdb-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
-          gcmd="${RUNNER_TEMP}/native-login-retained-gdb-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.gdb"
 
-          cleanup() {
-            rm -f "$worker" "$gout" "$gcmd"
-          }
+          cleanup() { rm -f "$worker"; }
           trap cleanup EXIT
 
           [[ -f "$token" && ! -L "$token" ]] || {
@@ -144,11 +140,9 @@ jobs:
           }
           start_ticks="$(python3 - "$pid" <<'PY'
           import pathlib,sys
-          p=pathlib.Path('/proc')/sys.argv[1]/'stat'
-          s=p.read_text()
+          s=(pathlib.Path('/proc')/sys.argv[1]/'stat').read_text()
           r=s.rfind(')')
-          fields=s[r+2:].split()
-          print(fields[19])
+          print(s[r+2:].split()[19])
           PY
           )"
           [[ "$start_ticks" == 66643010 ]] || {
@@ -169,111 +163,120 @@ jobs:
           }
           echo 'NATIVE_LOGIN_RETAINED_PROCESS_IDENTITY=PASS'
 
-          command -v gdb >/dev/null || {
-            echo 'NATIVE_LOGIN_RETAINED_DISCRIMINATOR=GDB_UNAVAILABLE' >&2
-            exit 80
-          }
+          python3 - "$pid" "$exe" <<'PY'
+          from __future__ import annotations
+          import os, struct, sys
+          from pathlib import Path
 
-          cat >"$gcmd" <<'GDB'
-          set pagination off
-          set confirm off
-          set print elements 0
-          python
-          import gdb, os, struct
-          inf = gdb.selected_inferior()
-          pid = int(inf.pid)
-          exe = os.path.realpath(f'/proc/{pid}/exe')
-
-          def emit(k, v):
-              gdb.write(f'{k}={v}\n')
-
+          pid=int(sys.argv[1]); exe=os.path.realpath(sys.argv[2])
           maps=[]
-          with open(f'/proc/{pid}/maps', encoding='utf-8', errors='replace') as h:
-              for line in h:
-                  p=line.rstrip().split(None,5)
-                  if len(p)<5: continue
-                  lo,hi=(int(x,16) for x in p[0].split('-'))
-                  perms=p[1]; off=int(p[2],16); path=p[5] if len(p)>5 else ''
-                  maps.append((lo,hi,perms,off,path))
-          exe_maps=[m for m in maps if m[4] and os.path.realpath(m[4])==exe]
-          bases={lo-off for lo,hi,perms,off,path in exe_maps}
-          if len(bases)!=1:
-              emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:load_bias_not_unique')
-              gdb.execute('detach', to_string=True)
+          for line in Path(f'/proc/{pid}/maps').read_text(encoding='utf-8', errors='replace').splitlines():
+              p=line.split(None,5)
+              if len(p)<5: continue
+              lo,hi=(int(x,16) for x in p[0].split('-'))
+              perms=p[1]; off=int(p[2],16); path=p[5] if len(p)>5 else ''
+              maps.append((lo,hi,perms,off,path))
+
+          exe_zero=[]
+          for m in maps:
+              lo,hi,perms,off,path=m
+              if off != 0 or not path: continue
+              try: same=os.path.realpath(path)==exe
+              except OSError: same=False
+              if same: exe_zero.append(m)
+          if len(exe_zero)!=1:
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=FAIL:load_bias_not_unique')
               raise SystemExit(81)
-          bias=next(iter(bases))
-          emit('NATIVE_LOGIN_RETAINED_LOAD_BIAS_PROVEN','true')
+          bias=exe_zero[0][0]
+          print('NATIVE_LOGIN_RETAINED_LOAD_BIAS_PROVEN=true')
 
           target=bias+0x308ed68
           needle=struct.pack('<Q',target)
-          hits=[]
-          for lo,hi,perms,off,path in maps:
-              if not (perms.startswith('rw') and 'p' in perms): continue
-              cur=lo
-              while cur<hi:
-                  try: found=inf.search_memory(cur,hi-cur,needle)
-                  except Exception: found=None
-                  if found is None: break
-                  addr=int(found); hits.append(addr)
-                  if len(hits)>16: break
-                  cur=addr+8
-              if len(hits)>16: break
-          emit('NATIVE_LOGIN_RETAINED_CHARSEL_INSTANCE_COUNT',len(hits))
-          if len(hits)>1:
-              emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:charsel_instance_not_unique')
-          elif len(hits)==0:
-              emit('NATIVE_LOGIN_RETAINED_NATIVE_CHARACTER_LIST_COUNT',0)
-              emit('NATIVE_LOGIN_RETAINED_NATIVE_SELECTED_LOGIN_DATA_COUNT',0)
-              emit('NATIVE_LOGIN_RETAINED_SESSION','NOT_PROVEN_AVAILABLE')
-              emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','PASS:NO_CURRENT_CHARACTER_SELECTION_CONTROLLER')
-          else:
-              obj=hits[0]
-              raw_vptr=bytes(inf.read_memory(obj,8))
-              vptr=struct.unpack('<Q',raw_vptr)[0]
-              if vptr!=target:
-                  emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:vptr_mismatch')
-              else:
-                  raw_count=bytes(inf.read_memory(obj+0x108,8))
-                  count=struct.unpack('<q',raw_count)[0]
-                  raw_sel=bytes(inf.read_memory(obj+0x140,16))
-                  start,end=struct.unpack('<QQ',raw_sel)
-                  span=end-start if end>=start else -1
-                  selected=(span//0x70) if span>=0 and span%0x70==0 else -1
-                  emit('NATIVE_LOGIN_RETAINED_CHARSEL_VPTR_PROVEN','true')
-                  emit('NATIVE_LOGIN_RETAINED_NATIVE_CHARACTER_LIST_COUNT',count)
-                  emit('NATIVE_LOGIN_RETAINED_NATIVE_SELECTED_LOGIN_DATA_COUNT',selected)
-                  if count<0 or count>100:
-                      emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:character_count_out_of_range')
-                  elif selected<0 or selected>100:
-                      emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:selected_count_out_of_range')
-                  elif count>=1:
-                      emit('NATIVE_LOGIN_RETAINED_SESSION','PROVEN_AVAILABLE')
-                      emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','PASS:CURRENT_NATIVE_CHARACTER_MODEL_AVAILABLE')
-                  else:
-                      emit('NATIVE_LOGIN_RETAINED_SESSION','NOT_PROVEN_AVAILABLE')
-                      emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','PASS:CURRENT_NATIVE_CHARACTER_MODEL_EMPTY')
-          gdb.execute('detach', to_string=True)
-          end
-          quit
-          GDB
-          chmod 600 "$gcmd"
-          : >"$gout"; chmod 600 "$gout"
+          writable=[m for m in maps if m[2].startswith('rw') and 'p' in m[2]]
+          total=sum(hi-lo for lo,hi,perms,off,path in writable)
+          if total > 2*1024*1024*1024:
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=FAIL:writable_scan_budget_exceeded')
+              raise SystemExit(82)
 
-          gdb -q -nx -batch -p "$pid" -x "$gcmd" >"$gout" 2>&1 || gdb_rc=$?
-          gdb_rc="${gdb_rc:-0}"
-          grep -E '^NATIVE_LOGIN_RETAINED_(LOAD_BIAS_PROVEN|CHARSEL_INSTANCE_COUNT|CHARSEL_VPTR_PROVEN|NATIVE_CHARACTER_LIST_COUNT|NATIVE_SELECTED_LOGIN_DATA_COUNT|SESSION|DISCRIMINATOR)=' "$gout" || true
-          if [[ "$gdb_rc" != 0 ]]; then
-            echo "NATIVE_LOGIN_RETAINED_GDB_RC=$gdb_rc" >&2
-            exit "$gdb_rc"
-          fi
-          grep -Eq '^NATIVE_LOGIN_RETAINED_DISCRIMINATOR=PASS:' "$gout" || {
-            echo 'NATIVE_LOGIN_RETAINED_REFUSED=NO_PASS_DISCRIMINATOR' >&2
-            exit 82
-          }
-          grep -Eq '^NATIVE_LOGIN_RETAINED_SESSION=(PROVEN_AVAILABLE|NOT_PROVEN_AVAILABLE)$' "$gout" || {
-            echo 'NATIVE_LOGIN_RETAINED_REFUSED=NO_SESSION_CLASSIFICATION' >&2
-            exit 83
-          }
+          mem_path=f'/proc/{pid}/mem'
+          try:
+              memfd=os.open(mem_path, os.O_RDONLY | getattr(os,'O_CLOEXEC',0))
+          except OSError as exc:
+              print(f'NATIVE_LOGIN_RETAINED_DISCRIMINATOR=PROC_MEM_UNAVAILABLE:{exc.errno}')
+              raise SystemExit(83)
+
+          def read_exact(addr:int, size:int)->bytes:
+              try: data=os.pread(memfd,size,addr)
+              except OSError as exc:
+                  raise RuntimeError(f'pread_errno_{exc.errno}') from exc
+              if len(data)!=size: raise RuntimeError('short_read')
+              return data
+
+          hits=[]
+          chunk_size=4*1024*1024
+          try:
+              for lo,hi,perms,off,path in writable:
+                  pos=lo
+                  tail=b''
+                  while pos<hi:
+                      n=min(chunk_size,hi-pos)
+                      block=read_exact(pos,n)
+                      hay=tail+block
+                      origin=pos-len(tail)
+                      start=0
+                      while True:
+                          idx=hay.find(needle,start)
+                          if idx<0: break
+                          addr=origin+idx
+                          if lo<=addr<hi: hits.append(addr)
+                          if len(hits)>16: break
+                          start=idx+1
+                      if len(hits)>16: break
+                      tail=hay[-7:] if len(hay)>=7 else hay
+                      pos+=n
+                  if len(hits)>16: break
+          except RuntimeError as exc:
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=FAIL:proc_mem_scan_incomplete')
+              raise SystemExit(84) from exc
+
+          print(f'NATIVE_LOGIN_RETAINED_CHARSEL_INSTANCE_COUNT={len(hits)}')
+          if len(hits)>1:
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=FAIL:charsel_instance_not_unique')
+              raise SystemExit(85)
+          if len(hits)==0:
+              print('NATIVE_LOGIN_RETAINED_NATIVE_CHARACTER_LIST_COUNT=0')
+              print('NATIVE_LOGIN_RETAINED_NATIVE_SELECTED_LOGIN_DATA_COUNT=0')
+              print('NATIVE_LOGIN_RETAINED_SESSION=NOT_PROVEN_AVAILABLE')
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=PASS:NO_CURRENT_CHARACTER_SELECTION_CONTROLLER')
+              os.close(memfd)
+              raise SystemExit(0)
+
+          obj=hits[0]
+          vptr=struct.unpack('<Q',read_exact(obj,8))[0]
+          if vptr!=target:
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=FAIL:vptr_mismatch')
+              raise SystemExit(86)
+          count=struct.unpack('<q',read_exact(obj+0x108,8))[0]
+          start,end=struct.unpack('<QQ',read_exact(obj+0x140,16))
+          span=end-start if end>=start else -1
+          selected=(span//0x70) if span>=0 and span%0x70==0 else -1
+          print('NATIVE_LOGIN_RETAINED_CHARSEL_VPTR_PROVEN=true')
+          print(f'NATIVE_LOGIN_RETAINED_NATIVE_CHARACTER_LIST_COUNT={count}')
+          print(f'NATIVE_LOGIN_RETAINED_NATIVE_SELECTED_LOGIN_DATA_COUNT={selected}')
+          if count<0 or count>100:
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=FAIL:character_count_out_of_range')
+              raise SystemExit(87)
+          if selected<0 or selected>100:
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=FAIL:selected_count_out_of_range')
+              raise SystemExit(88)
+          if count>=1:
+              print('NATIVE_LOGIN_RETAINED_SESSION=PROVEN_AVAILABLE')
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=PASS:CURRENT_NATIVE_CHARACTER_MODEL_AVAILABLE')
+          else:
+              print('NATIVE_LOGIN_RETAINED_SESSION=NOT_PROVEN_AVAILABLE')
+              print('NATIVE_LOGIN_RETAINED_DISCRIMINATOR=PASS:CURRENT_NATIVE_CHARACTER_MODEL_EMPTY')
+          os.close(memfd)
+          PY
 
           bash "$lease" validate \
             --task-id "$task" \

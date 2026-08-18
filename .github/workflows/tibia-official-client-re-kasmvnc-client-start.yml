@@ -19,7 +19,7 @@ env:
   EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
   EXPECTED_SIZE: '52109920'
   SOURCE_PACKAGE: /home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia
-  DEST_PACKAGE: /opt/otclient-track-a/Tibia
+  DEST_PACKAGE: /home/kasm-user/otclient-track-a/Tibia
 
 jobs:
   start:
@@ -49,7 +49,7 @@ jobs:
           [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" == true ]]
           [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")" == track-a-kasmvnc-desktop ]]
           [[ "$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"')" == ':1' ]]
-          docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -x Xvnc >/dev/null'
+          docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -x Xvnc >/dev/null && test "$(getent passwd 1000 | cut -d: -f6)" = /home/kasm-user'
           client="$SOURCE_PACKAGE/bin/client"
           [[ -f "$client" && -x "$client" && ! -L "$client" ]]
           [[ "$(stat -c %s "$client")" == "$EXPECTED_SIZE" ]]
@@ -92,10 +92,11 @@ jobs:
           set +x
           set -Eeuo pipefail
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          docker exec "$CONTAINER_NAME" /bin/bash -lc 'rm -rf /opt/otclient-track-a/Tibia.new && mkdir -p /opt/otclient-track-a/Tibia.new'
-          docker cp "$SOURCE_PACKAGE/." "$CONTAINER_NAME:/opt/otclient-track-a/Tibia.new/"
-          docker exec "$CONTAINER_NAME" /bin/bash -lc "test -x '$DEST_PACKAGE.new/bin/client' && test \"\$(stat -c %s '$DEST_PACKAGE.new/bin/client')\" = '$EXPECTED_SIZE' && test \"\$(sha256sum '$DEST_PACKAGE.new/bin/client' | awk '{print \$1}')\" = '$EXPECTED_SHA'"
-          docker exec "$CONTAINER_NAME" /bin/bash -lc "rm -rf '$DEST_PACKAGE' && mv '$DEST_PACKAGE.new' '$DEST_PACKAGE' && chown -R 1000:0 '$DEST_PACKAGE'"
+          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc 'rm -rf /home/kasm-user/otclient-track-a/Tibia.new && mkdir -p /home/kasm-user/otclient-track-a/Tibia.new'
+          docker cp "$SOURCE_PACKAGE/." "$CONTAINER_NAME:/home/kasm-user/otclient-track-a/Tibia.new/"
+          docker exec "$CONTAINER_NAME" /bin/bash -lc "chown -R 1000:0 '/home/kasm-user/otclient-track-a'"
+          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "test -x '$DEST_PACKAGE.new/bin/client' && test \"\$(stat -c %s '$DEST_PACKAGE.new/bin/client')\" = '$EXPECTED_SIZE' && test \"\$(sha256sum '$DEST_PACKAGE.new/bin/client' | awk '{print \$1}')\" = '$EXPECTED_SHA'"
+          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "rm -rf '$DEST_PACKAGE' && mv '$DEST_PACKAGE.new' '$DEST_PACKAGE'"
           echo KASM_CLIENT_PACKAGE_STAGED=PASS
 
       - name: Start client on Kasm desktop
@@ -104,9 +105,8 @@ jobs:
           set +x
           set -Eeuo pipefail
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          home="$(docker exec "$CONTAINER_NAME" /bin/bash -lc "getent passwd 1000 | awk -F: '{print \\$6}'")"
-          [[ -n "$home" ]]
-          docker exec "$CONTAINER_NAME" /bin/bash -lc "mkdir -p '$home/.local/state/otclient-track-a' && chown -R 1000:0 '$home/.local/state/otclient-track-a'"
+          home=/home/kasm-user
+          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "mkdir -p '$home/.local/state/otclient-track-a'"
           docker exec -d -u 1000 \
             -e DISPLAY=:1 \
             -e HOME="$home" \
@@ -116,7 +116,7 @@ jobs:
             "$CONTAINER_NAME" /bin/bash -lc "cd '$DEST_PACKAGE' && exec ./bin/client >'$home/.local/state/otclient-track-a/tibia-client.log' 2>&1"
           pid=''
           for _ in $(seq 1 40); do
-            pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -o -f '^$DEST_PACKAGE/bin/client$|$DEST_PACKAGE/bin/client' || true")"
+            pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -o -f '$DEST_PACKAGE/bin/client' || true")"
             [[ "$pid" =~ ^[1-9][0-9]*$ ]] && break
             sleep .25
           done

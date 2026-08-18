@@ -87,7 +87,7 @@ audit:
   result: pending_fresh_independent
   material_findings_open: unknown
 last_completed_step: task-owned G24-G31 static evidence report completed with exact-build protocol registry mapping, version-fenced prior UI/controller mapping, handler-family xrefs, safety boundaries and residual UNKNOWNs
-next_action: verify exact PR diff/head/checks; then leave Draft PR #544 for fresh independent audit/coordinator promotion
+next_action: verify exact PR diff/head/checks; then leave Draft PR #546 for fresh independent audit/coordinator promotion
 ---
 
 # Track A economy panels static census

@@ -14,9 +14,9 @@ execution_reason: exhaustive deterministic exact-client protocol/QMeta census wi
 branch: research/OTC-20260818-track-a-s1-unfiltered-static-census
 base_branch: main
 base_main: ed09418b431c28087775b419f85bed404fa85d70
-related_pr: pending
+related_pr: 509
 created: 2026-08-18T09:29:00+02:00
-updated: 2026-08-18T09:29:00+02:00
+updated: 2026-08-18T09:43:00+02:00
 risk: medium
 implementation_authorized: true
 credentials_allowed: false
@@ -49,7 +49,10 @@ modules_touched:
 reuses:
   - docs/agents/tasks/archive/OTC-20260814-official-client-capability-experiment-sweep.md
   - docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-extent/20260817-complete-message-census.md
+  - tools/tibia_runtime_bridge/resolver.py
+  - tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json
   - historical exact-client static producer pattern from PR #473 / commit 553e447c0662892b0c1b9cab994c4545d09f22c8
+  - historical exact QMeta parser pattern from PR #505 / commit d0c1360b649fd8c4a92587b7713644c49162694c
 depends_on: []
 blocks: []
 non_overlap:
@@ -72,14 +75,14 @@ feature_scope:
   e2e_required: false
 validation_level: focused
 invocation_started_at: 2026-08-18T09:29:00+02:00
-last_progress_at: 2026-08-18T09:29:00+02:00
+last_progress_at: 2026-08-18T09:43:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
@@ -116,7 +119,8 @@ The bounded S1 producer may:
 
 - fetch the exact public Linux client on a disposable GitHub-hosted runner using the already-reviewed exact-hash/WARP producer pattern;
 - decompress only in runner scratch space;
-- inspect ELF sections, printable strings, RTTI/type names, Qt/QMeta metadata/string surfaces and bounded disassembly/xrefs;
+- inspect ELF sections, printable strings, RTTI/type names, QMeta-oriented string surfaces and bounded disassembly/xrefs;
+- reuse the current-main relocation-aware exact-build resolver for known static anchors;
 - write only sanitized text/JSON registries and summaries;
 - delete compressed/unpacked proprietary client bytes before artifact upload.
 
@@ -131,8 +135,8 @@ It may not:
 
 1. Revalidate the complete generated protocol denominator (`349 = 160 client -> server + 189 server -> client`) on the exact client.
 2. Persist the complete **189-name server -> client** registry, grouped by stable lexical families without dropping unmatched names.
-3. Enumerate all exact-binary inbound-oriented handler/QMeta strings without the historical narrow capability regex, including `handle*Message`, `received*Message`, protocol-handler/controller/storage class names and message-related method names.
-4. Where bounded static evidence directly supports it, associate a generated server message family with handler/QMeta surfaces and concrete static code/xref candidates.
+3. Enumerate exact-binary inbound-oriented handler/QMeta strings without the historical narrow capability regex, including `handle*Message`, `received*Message`, protocol-handler/message-queue types and relevant RTTI types.
+4. Where bounded static evidence directly supports it, associate a generated server message family with lexical/QMeta surfaces and concrete code-to-string xref candidates.
 5. Keep all unsupported message->handler or handler->storage edges explicitly `UNKNOWN`; do not force a single common inbound dispatcher hypothesis.
 6. Produce ranked S2 candidates for later dependency-graph proof, prioritizing session/world entry, player state, creatures, inventory/containers, chat/world events and non-worldmap protocol surfaces.
 
@@ -142,7 +146,8 @@ It may not:
 - [ ] generated-message denominator revalidated and complete 160/189 registries persisted;
 - [ ] all 189 inbound names preserved in machine-readable evidence;
 - [ ] unfiltered inbound-oriented handler/QMeta census persisted with counts and exact string evidence;
-- [ ] bounded static xref/dispatch candidates persisted with evidence strength labels;
+- [ ] bounded static code-to-string xref candidates persisted with evidence strength labels;
+- [ ] known current-main exact-build vptr anchors revalidated using the repository resolver;
 - [ ] no absence claim is made from a filtered subset;
 - [ ] no live/runtime/worldmap mutation or #475-owned surface is touched;
 - [ ] no raw client bytes are committed or uploaded;
@@ -169,37 +174,72 @@ target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 ```
 
-# Initial evidence boundary
+# Existing independent denominator control
 
-Already canonical/current-main inputs:
+The sanitized exact-build artifact from #473 remains available and was independently re-opened during this task:
 
-```text
-PROTOCOL_MESSAGE_TOTAL=349
-CLIENT_TO_SERVER_MESSAGE_SYMBOLS=160
-SERVER_TO_CLIENT_MESSAGE_SYMBOLS=189
+```yaml
+run: 32022209943
+artifact: 9285763750
+artifact_digest: sha256:0f71be3021885f3f8881199c5f74839fca6c6c5081594fab48998298abaadbd6
+artifact_expired: false
+observed_files:
+  - protocol-all.txt
+  - protocol-client-to-server.txt
+  - protocol-server-to-client.txt
+  - summary.json
+control_counts:
+  protocol_total: 349
+  client_to_server: 160
+  server_to_client: 189
 ```
 
-Those counts are accepted historical exact-build evidence from #473, but this task revalidates them as part of a fresh exhaustive S1 run. Static presence never becomes a live capability claim.
+That artifact is a comparison control, not a substitute for the fresh S1 producer.
+
+# Repair history
+
+## Repair 1 — checkout/scratch path fence
+
+The first producer implementation changed the shell working directory to runner scratch before invoking the repository resolver through a relative `tools/...` path. Self-review identified that this would make known-anchor validation depend on the wrong current directory.
+
+Repair:
+
+```text
+profile/resolver relative path
+ -> explicit $GITHUB_WORKSPACE absolute paths
+ -> assert both files exist before invoking resolver
+```
+
+The same repair also uses `c++filt -t` for RTTI type encodings and enables Capstone skipdata for the bounded executable-section xref scan. No runtime or evidence claim was promoted from the pre-repair run.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 1
+checkpoint_version: 2
 status: investigating
 phase: investigate
 base_main: ed09418b431c28087775b419f85bed404fa85d70
-last_completed_step: claimed a non-overlapping hosted/static S1 census frontier after live ownership and governance preflight
+pr: 509
+producer_workflow: .github/workflows/track-a-s1-unfiltered-static-census.yml
+pre_repair_head: 86bb32ffc0c06940cd76169a9f7123de1ff3c275
+repaired_producer_head: d4666383ae4bae6524d2b47a70ed0a9e0efc4c51
+first_producer_run: 32112477071
+last_completed_step: implemented the bounded hosted producer, independently re-opened the #473 sanitized denominator artifact, and repaired a checkout/scratch resolver-path defect before accepting any result
 proven:
   - PR #475 owns the current physical runtime/worldmap login lane and is outside this task's mutation/observation scope.
   - The archived capability experiment task explicitly names exhaustive unfiltered S1 protocol/QMeta/runtime census as the next programme action.
   - Current routing sends deterministic static Track A work to GitHub-hosted runners with runtime_access none.
+  - The independent #473 sanitized artifact still contains 349 generated names split 160 client-to-server / 189 server-to-client.
+  - The current-main resolver/profile provide exact-build static anchors including TPlayerProtocolMessageHandler, TPlayerData, TCreatureStorage and TContainerStorage.
 unknown:
-  - complete unfiltered inbound QMeta/handler denominator on the exact client
-  - number and strength of direct static message-to-handler associations recoverable in one bounded producer
+  - fresh repaired-producer result and artifact identity
+  - complete unfiltered inbound handler/method denominator on the exact client
+  - number and strength of direct code-to-string xrefs recoverable in one bounded producer
   - whether inbound handling is one dispatcher or several independent handler families
 rejected_hypotheses:
   - reuse PR #475 physical runtime for this census: rejected because static hosted evidence is sufficient and runtime is separately owned.
   - treat the old 98 capability-filtered protocol list as exhaustive: rejected by the accepted 349-name denominator.
+  - invoke the repository resolver relative to scratch cwd: rejected by self-review; checkout location is now explicit.
 blockers: []
-next_action: open the required Draft PR, then add one bounded GitHub-hosted exact-client S1 producer and inspect its first result before any repair.
+next_action: inspect the next exact-head S1 workflow result/artifact; if it is green, persist sanitized evidence and remove the temporary producer, otherwise repair only the first concrete failure within the bounded repair budget.
 ```

@@ -71,9 +71,9 @@ jobs:
           import hashlib
           import json
           import lzma
+          import os
           import pathlib
           import re
-          import struct
           import subprocess
           import sys
 
@@ -84,6 +84,7 @@ jobs:
           packed_path = pathlib.Path(sys.argv[1])
           raw_path = pathlib.Path(sys.argv[2])
           evidence = pathlib.Path(sys.argv[3])
+          workspace = pathlib.Path(os.environ['GITHUB_WORKSPACE'])
           evidence.mkdir(parents=True, exist_ok=True)
 
           packed = packed_path.read_bytes()
@@ -148,7 +149,7 @@ jobs:
           (evidence / 'protocol-client-to-server.txt').write_text('\n'.join(client_names) + '\n', encoding='utf-8')
           (evidence / 'protocol-server-to-client.txt').write_text('\n'.join(server_names) + '\n', encoding='utf-8')
 
-          FAMILY_RULES = [
+          family_rules = [
               ('session_auth_world', re.compile(r'(Login|Session|World|Pending|Enter|Disconnect|Connection|Challenge|Token|Ping|Pong)', re.I)),
               ('world_map', re.compile(r'(Map|Field|Floor|Row|Column|Tile|Coordinate|Effect|Missile)', re.I)),
               ('creature_combat', re.compile(r'(Creature|Attack|Follow|Combat|Death|Skull|Party|Outfit|Health|Light|Speed|Unpass|Mark)', re.I)),
@@ -159,12 +160,12 @@ jobs:
               ('cyclopedia_progression', re.compile(r'(Cyclopedia|Bestiary|Bosstiary|Prey|Task|Wheel|Forge|Imbu|Quest|Reward|Proficiency|Bonus)', re.I)),
           ]
 
-          families: dict[str, list[str]] = collections.OrderedDict((name, []) for name, _ in FAMILY_RULES)
+          families: dict[str, list[str]] = collections.OrderedDict((name, []) for name, _ in family_rules)
           families['other'] = []
           for full_name in server_names:
               stem = full_name.removeprefix('GameserverMessage')
               selected = 'other'
-              for family, regex in FAMILY_RULES:
+              for family, regex in family_rules:
                   if regex.search(stem):
                       selected = family
                       break
@@ -179,17 +180,16 @@ jobs:
               r'^(?:handle|received|receive|process|dispatch|parse|decode|on)[A-Z][A-Za-z0-9_]{1,120}(?:Message|Data|Event|Update|Changed|Received)$'
           )
           generic_handler_regex = re.compile(r'(?:ProtocolMessageHandler|MessageHandler|ProtocolMessageQueue|GameserverGameSession|MessageQueue)')
-          storage_controller_regex = re.compile(r'(?:Storage|Controller|DataModel)$')
 
           inbound_method_strings = sorted(set(value for value in printable_values if method_regex.match(value)))
           handler_type_strings = sorted(set(value for value in printable_values if generic_handler_regex.search(value)))
 
-          # Demangle relevant Itanium RTTI strings in one bounded batch. The resulting names are only exact-binary
-          # type-presence evidence; they do not establish object lifetime or runtime wiring.
-          mangled = sorted(set(value for value in printable_values if re.fullmatch(r'_?Z?N[0-9A-Za-z_]+E', value)))
+          # Demangle relevant Itanium RTTI strings in one bounded batch. c++filt -t accepts type encodings
+          # such as N5tibia...E that appear in RTTI. Type presence is still only static evidence.
+          mangled = sorted(set(value for value in printable_values if re.fullmatch(r'N[0-9A-Za-z_]+E', value)))
           if mangled:
               proc = subprocess.run(
-                  ['c++filt'],
+                  ['c++filt', '-t'],
                   input='\n'.join(mangled) + '\n',
                   text=True,
                   stdout=subprocess.PIPE,
@@ -207,12 +207,6 @@ jobs:
 
           # Exhaustive name-surface association. This is explicitly lexical/static and never promoted to a
           # message->handler FACT by itself.
-          normalized_strings: dict[str, list[str]] = collections.defaultdict(list)
-          for value in printable_values:
-              normalized = re.sub(r'[^a-z0-9]+', '', value.lower())
-              if normalized:
-                  normalized_strings[normalized].append(value)
-
           associations: list[dict[str, object]] = []
           unmatched: list[str] = []
           for full_name in server_names:
@@ -266,6 +260,7 @@ jobs:
 
           md = Cs(CS_ARCH_X86, CS_MODE_64)
           md.detail = True
+          md.skipdata = True
           xrefs: dict[str, list[dict[str, object]]] = collections.defaultdict(list)
           xref_limit_per_string = 8
           for section in sections:
@@ -302,9 +297,12 @@ jobs:
               json.dumps(xref_payload, indent=2, sort_keys=True) + '\n', encoding='utf-8'
           )
 
-          # Reuse the repository's relocation-aware primary-vptr resolver for known exact-build static anchors.
-          profile = pathlib.Path('tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json')
-          resolver = pathlib.Path('tools/tibia_runtime_bridge/resolver.py')
+          # Reuse current-main relocation-aware resolver through an absolute checkout path, because this
+          # producer deliberately executes from runner scratch rather than from the repository directory.
+          profile = workspace / 'tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json'
+          resolver = workspace / 'tools/tibia_runtime_bridge/resolver.py'
+          assert profile.is_file(), profile
+          assert resolver.is_file(), resolver
           resolver_proc = subprocess.run(
               [sys.executable, str(resolver), '--profile', str(profile), str(raw_path)],
               text=True,

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import array
 import hashlib
 import json
 import os
 from pathlib import Path
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -12,11 +14,18 @@ import threading
 import time
 import unittest
 
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Linux-only experimental auth surface
+    fcntl = None
+
+from tools.tibia_runtime_bridge.experimental_auth_launcher import build_experimental_env
 from tools.tibia_runtime_bridge.ipc_client import (
     BridgeClientError,
     BridgePeerIdentityError,
     BridgeProtocolError,
     PeerIdentityExpectation,
+    auth_with_credentials_fd,
     request,
     session_status,
 )
@@ -53,6 +62,25 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(f"{directory / 'bridge.so'}:/x.so", env["LD_PRELOAD"])
             self.assertEqual(str(directory / "bridge.sock"), env["OTCLIENT_TIBIA_RE_SOCKET"])
             self.assertIn("player_protocol_handler,1234,tibia::game::TPlayerProtocolMessageHandler", env["OTCLIENT_TIBIA_RE_TARGETS"])
+
+    def test_experimental_auth_environment_composes_separate_helper_and_socket(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            profile = load_profile(self.write_profile(directory, self.profile()))
+            env = build_experimental_env(
+                profile,
+                directory / "bridge.so",
+                directory / "bridge.sock",
+                directory / "auth.so",
+                directory / "auth.sock",
+                {"LD_PRELOAD": "/x.so"},
+            )
+            self.assertEqual(
+                f"{directory / 'auth.so'}:{directory / 'bridge.so'}:/x.so",
+                env["LD_PRELOAD"],
+            )
+            self.assertEqual(str(directory / "bridge.sock"), env["OTCLIENT_TIBIA_RE_SOCKET"])
+            self.assertEqual(str(directory / "auth.sock"), env["OTCLIENT_TIBIA_RE_AUTH_SOCKET"])
 
     def test_profile_rejects_unknown_schema(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -98,6 +126,44 @@ class IpcClientTests(unittest.TestCase):
 
     def run_server(self, path: Path, response: bytes) -> threading.Thread:
         return self.run_server_responses(path, [response])
+
+    def run_ancillary_server(self, path: Path, response: bytes, observed: dict[str, object]) -> threading.Thread:
+        ready = threading.Event()
+        def serve() -> None:
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            received_fds: list[int] = []
+            try:
+                server.bind(str(path)); server.listen(1); ready.set()
+                conn, _ = server.accept()
+                try:
+                    control = socket.CMSG_SPACE(array.array("i", [0]).itemsize * 4)
+                    data, ancillary, flags, _ = conn.recvmsg(4096, control)
+                    observed["command"] = data
+                    observed["message_flags"] = flags
+                    for level, kind, payload in ancillary:
+                        if level == socket.SOL_SOCKET and kind == socket.SCM_RIGHTS:
+                            descriptors = array.array("i")
+                            usable = len(payload) - (len(payload) % descriptors.itemsize)
+                            descriptors.frombytes(payload[:usable])
+                            received_fds.extend(descriptors.tolist())
+                    observed["fd_count"] = len(received_fds)
+                    if received_fds:
+                        os.lseek(received_fds[0], 0, os.SEEK_SET)
+                        chunks: list[bytes] = []
+                        while True:
+                            chunk = os.read(received_fds[0], 4096)
+                            if not chunk:
+                                break
+                            chunks.append(chunk)
+                        observed["fd_payload"] = b"".join(chunks)
+                    conn.sendall(response)
+                finally:
+                    conn.close()
+            finally:
+                for descriptor in received_fds:
+                    os.close(descriptor)
+                server.close()
+        thread = threading.Thread(target=serve); thread.start(); self.assertTrue(ready.wait(2)); return thread
 
     @staticmethod
     def process_start_ticks(pid: int) -> int:
@@ -169,6 +235,23 @@ class IpcClientTests(unittest.TestCase):
         except FileNotFoundError:
             pass
 
+    @staticmethod
+    def synthetic_credential_frame() -> bytes:
+        email = b"synthetic@example.invalid"
+        password = b"synthetic-not-a-real-password"
+        return struct.pack("<II", len(email), len(password)) + email + password
+
+    @staticmethod
+    def sealed_memfd(payload: bytes) -> int:
+        if fcntl is None:
+            raise unittest.SkipTest("fcntl unavailable")
+        flags = getattr(os, "MFD_CLOEXEC", 0) | getattr(os, "MFD_ALLOW_SEALING", 0)
+        fd = os.memfd_create("otclient-tibia-auth-test", flags)
+        os.write(fd, payload)
+        required = fcntl.F_SEAL_SEAL | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_GROW | fcntl.F_SEAL_WRITE
+        fcntl.fcntl(fd, fcntl.F_ADD_SEALS, required)
+        return fd
+
     def test_ping_response(self):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "bridge.sock"; thread = self.run_server(path, b'{"ok":true,"command":"PING"}\n')
@@ -180,6 +263,61 @@ class IpcClientTests(unittest.TestCase):
             path = Path(raw) / "bridge.sock"; thread = self.run_server(path, b'{"ok":true,"target":"player_protocol_handler","scan_status":"OK","vptr_hits":1,"validated_hits":1}\n')
             try: self.assertEqual(1, request(path, "DISCOVER player_protocol_handler")["validated_hits"])
             finally: thread.join(2)
+
+    @unittest.skipUnless(
+        hasattr(os, "memfd_create") and hasattr(os, "MFD_ALLOW_SEALING") and hasattr(socket, "SCM_RIGHTS") and fcntl is not None,
+        "Linux memfd and SCM_RIGHTS required",
+    )
+    def test_auth_fd_is_passed_without_client_reading_payload(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "auth.sock"
+            observed: dict[str, object] = {}
+            thread = self.run_ancillary_server(
+                path,
+                b'{"ok":true,"command":"AUTH_WITH_CREDENTIALS","invocation_dispatched":true}\n',
+                observed,
+            )
+            frame = self.synthetic_credential_frame()
+            fd = self.sealed_memfd(frame)
+            try:
+                response = auth_with_credentials_fd(path, fd)
+                self.assertTrue(response["ok"])
+                self.assertEqual(b"AUTH_WITH_CREDENTIALS\n", observed["command"])
+                self.assertEqual(1, observed["fd_count"])
+                self.assertEqual(frame, observed["fd_payload"])
+            finally:
+                os.close(fd)
+                thread.join(2)
+
+    @unittest.skipUnless(
+        hasattr(os, "memfd_create") and hasattr(os, "MFD_ALLOW_SEALING") and fcntl is not None,
+        "Linux memfd sealing required",
+    )
+    def test_auth_rejects_unsealed_memfd_before_connect(self):
+        fd = os.memfd_create("otclient-tibia-auth-unsealed", os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING)
+        try:
+            os.write(fd, self.synthetic_credential_frame())
+            with self.assertRaises(BridgeClientError):
+                auth_with_credentials_fd(Path("/unused"), fd)
+        finally:
+            os.close(fd)
+
+    def test_auth_rejects_invalid_fd(self):
+        with self.assertRaises(BridgeClientError):
+            auth_with_credentials_fd(Path("/unused"), -1)
+
+    @unittest.skipUnless(hasattr(socket.socket, "recvmsg"), "recvmsg required")
+    def test_normal_request_sends_no_ancillary_fd(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "bridge.sock"
+            observed: dict[str, object] = {}
+            thread = self.run_ancillary_server(path, b'{"ok":true,"command":"PING"}\n', observed)
+            try:
+                response = request(path, "PING")
+                self.assertTrue(response["ok"])
+                self.assertEqual(0, observed["fd_count"])
+            finally:
+                thread.join(2)
 
     def test_session_status_candidate_requires_all_markers(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -263,6 +401,31 @@ class IpcClientTests(unittest.TestCase):
         self.assertIn("if (!scan.ok)", source)
         self.assertIn("return errorJson(scan.error);", source)
         self.assertIn('\\"scan_status\\":\\"OK\\"', source)
+
+    def test_experimental_auth_is_separate_and_exact_fenced(self):
+        root = Path(__file__).parents[3]
+        stable = (root / "tools/tibia_runtime_bridge/bridge.cpp").read_text(encoding="utf-8")
+        source = (root / "tools/tibia_runtime_bridge/experimental_auth.cpp").read_text(encoding="utf-8")
+        cmake = (root / "tools/tibia_runtime_bridge/CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertNotIn("AUTH_WITH_CREDENTIALS", stable)
+        self.assertIn("OTCLIENT_TIBIA_RE_BUILD_EXPERIMENTAL_AUTH", cmake)
+        self.assertIn("OFF", cmake)
+        self.assertIn("AUTH_WITH_CREDENTIALS", source)
+        self.assertIn("kGameClientVptrOffset = 0x3076908", source)
+        self.assertIn("kColdAuthMethodId = 17", source)
+        self.assertIn('kColdAuthSignature[] = "onRequestLoginWithCredentials(QString,QString)"', source)
+        self.assertIn("kColdAuthTargetOffset = 0xd06850", source)
+        self.assertIn("COLD_AUTH_INSTRUCTION_FENCE_MISMATCH", source)
+        self.assertIn("CREDENTIAL_MEMFD_NOT_SEALED", source)
+        self.assertIn("GAME_CLIENT_VPTR_NOT_UNIQUE", source)
+        self.assertIn("GAME_CLIENT_QT_CLASS_MISMATCH", source)
+        self.assertIn("GAME_CLIENT_QT_THREAD_MISMATCH", source)
+        self.assertIn("GAME_CLIENT_QMETA_METHOD_MISMATCH", source)
+        self.assertIn("CREDENTIAL_UTF8_INVALID", source)
+        self.assertIn("CREDENTIAL_NUL_FORBIDDEN", source)
+        self.assertIn("COLD_AUTH_QMETA_INVOKE_FAILED", source)
+        self.assertNotIn("EXECUTE_ADDRESS", source)
+        self.assertNotIn("CALL_ADDRESS", source)
 
 
 if __name__ == "__main__":

@@ -7,16 +7,8 @@ from pathlib import Path
 PORT_OLD='  vnc_port="$(free_port 6082 6120)" || die no_free_vnc_port\n'
 PORT_NEW='  vnc_port=6082\n  ! listen "$vnc_port" || die observer_vnc_port_6082_busy\n'
 
-VNC_OLD = r'''  printf 'TRACK_A_CANONICAL_STAGE=vnc_start\n'
-  env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-    OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1 \
-    OTCLIENT_TIBIA_RE_ROLE=vnc HOME="$home" DISPLAY="$display" \
-    nohup "$vnc" -display "$display" -rfbport "$vnc_port" -forever -shared -viewonly \
-    -localhost -nopw -noxdamage >"$SESSION/vnc.log" 2>&1 </dev/null &
-  echo $! >"$SESSION/vnc.pid"
-'''
-
-VNC_NEW = r'''  # User-observer VNC remains the exact same task-owned Xvfb/display. It is
+START_ANCHOR="  printf 'TRACK_A_CANONICAL_STAGE=vnc_start\\n'\n"
+START_REPLACEMENT=r'''  # User-observer VNC remains the exact same task-owned Xvfb/display. It is
   # view-only and password protected. The password is persistent private runner
   # state (0600), never an argv value, environment value, log line or artifact.
   local vnc_password_file="$BASE/vnc-viewonly.password"
@@ -35,10 +27,13 @@ PYVNC
   [[ "$(stat -c %a "$vnc_password_file")" == 600 ]] || die vnc_password_mode_invalid
 
   printf 'TRACK_A_CANONICAL_STAGE=vnc_start\n'
-  env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-    OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1 \
-    OTCLIENT_TIBIA_RE_ROLE=vnc HOME="$home" DISPLAY="$display" \
-    nohup "$vnc" -display "$display" -rfbport "$vnc_port" -forever -shared -viewonly \
+'''
+
+CMD_OLD=r'''    nohup "$vnc" -display "$display" -rfbport "$vnc_port" -forever -shared -viewonly \
+    -localhost -nopw -noxdamage >"$SESSION/vnc.log" 2>&1 </dev/null &
+  echo $! >"$SESSION/vnc.pid"
+'''
+CMD_NEW=r'''    nohup "$vnc" -display "$display" -rfbport "$vnc_port" -forever -shared -viewonly \
     -listen 0.0.0.0 -passwdfile "$vnc_password_file" -noxdamage >"$SESSION/vnc.log" 2>&1 </dev/null &
   echo $! >"$SESSION/vnc.pid"
   echo "$vnc_password_file" >"$SESSION/vnc-password-file"
@@ -48,50 +43,33 @@ PYVNC
   printf 'TRACK_A_USER_VNC_PASSWORD_FILE=%s\n' "$vnc_password_file"
 '''
 
-class Refused(RuntimeError):
-    pass
+class Refused(RuntimeError): pass
 
-
-def transform(text: str) -> str:
-    if text.count(PORT_OLD) != 1:
-        raise Refused(f"PORT_ANCHOR_COUNT:{text.count(PORT_OLD)}")
+def transform(text:str)->str:
+    if text.count(PORT_OLD)!=1: raise Refused(f'PORT_ANCHOR_COUNT:{text.count(PORT_OLD)}')
     out=text.replace(PORT_OLD,PORT_NEW,1)
-    if out.count(VNC_OLD) != 1:
-        raise Refused(f"VNC_ANCHOR_COUNT:{out.count(VNC_OLD)}")
-    out = out.replace(VNC_OLD, VNC_NEW, 1)
-    required = (
-        "vnc_port=6082",
-        "observer_vnc_port_6082_busy",
-        "TRACK_A_USER_VNC_MODE=VIEW_ONLY_PASSWORD_PROTECTED",
-        "TRACK_A_USER_VNC_PORT=%s",
-        "-viewonly",
-        "-listen 0.0.0.0",
-        "-passwdfile \"$vnc_password_file\"",
-        "vnc-viewonly.password",
-        "chmod 600 \"$vnc_password_file\"",
+    if out.count(START_ANCHOR)!=1: raise Refused(f'START_ANCHOR_COUNT:{out.count(START_ANCHOR)}')
+    out=out.replace(START_ANCHOR,START_REPLACEMENT,1)
+    if out.count(CMD_OLD)!=1: raise Refused(f'CMD_ANCHOR_COUNT:{out.count(CMD_OLD)}')
+    out=out.replace(CMD_OLD,CMD_NEW,1)
+    required=(
+        'vnc_port=6082','observer_vnc_port_6082_busy',
+        'TRACK_A_USER_VNC_MODE=VIEW_ONLY_PASSWORD_PROTECTED',
+        'TRACK_A_USER_VNC_PORT=%s','-viewonly','-listen 0.0.0.0',
+        '-passwdfile "$vnc_password_file"','vnc-viewonly.password',
+        'chmod 600 "$vnc_password_file"',
     )
-    missing = [x for x in required if x not in out]
-    if missing:
-        raise Refused("REQUIRED_MISSING:" + ",".join(missing))
-    if "-localhost -nopw" in out:
-        raise Refused("LEGACY_UNREACHABLE_VNC_SURVIVED")
+    miss=[x for x in required if x not in out]
+    if miss: raise Refused('REQUIRED_MISSING:'+','.join(miss))
+    if '-localhost -nopw' in out: raise Refused('LEGACY_UNREACHABLE_VNC_SURVIVED')
     return out
 
+def main()->int:
+    p=argparse.ArgumentParser();p.add_argument('source',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
+    try:out=transform(a.source.read_text(encoding='utf-8'))
+    except Refused as e:
+        print('TRACK_A_VNC_OBSERVER_ACCESS_V23_REFUSED='+str(e));return 44
+    a.output.write_text(out,encoding='utf-8');a.output.chmod(0o700)
+    print('TRACK_A_VNC_OBSERVER_ACCESS_V23_REPAIR=PASS');return 0
 
-def main() -> int:
-    ap=argparse.ArgumentParser()
-    ap.add_argument('source',type=Path)
-    ap.add_argument('output',type=Path)
-    a=ap.parse_args()
-    try:
-        out=transform(a.source.read_text(encoding='utf-8'))
-    except Refused as exc:
-        print(f'TRACK_A_VNC_OBSERVER_ACCESS_V23_REFUSED={exc}')
-        return 44
-    a.output.write_text(out,encoding='utf-8')
-    a.output.chmod(0o700)
-    print('TRACK_A_VNC_OBSERVER_ACCESS_V23_REPAIR=PASS')
-    return 0
-
-if __name__=='__main__':
-    raise SystemExit(main())
+if __name__=='__main__':raise SystemExit(main())

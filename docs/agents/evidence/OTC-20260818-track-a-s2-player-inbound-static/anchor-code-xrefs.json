@@ -1,0 +1,28 @@
+{
+  "schema": "track-a-s2-player-anchor-xrefs-v1",
+  "exact_client_sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+  "TPlayerProtocolMessageHandler": {
+    "primary_vptr": "0x308a008",
+    "direct_code_xrefs": [
+      "0x825681",
+      "0x825991",
+      "0x194e5c6",
+      "0x194e8e4"
+    ]
+  },
+  "TPlayerData": {
+    "primary_vptr": "0x308ca70",
+    "direct_code_xrefs": [
+      "0x843e20",
+      "0x843f60",
+      "0x8440b0",
+      "0x8441f2",
+      "0xefd13c"
+    ]
+  },
+  "classification": {
+    "xref_presence": "FACT",
+    "constructor_or_destructor_role": "UNKNOWN_UNTIL_FUNCTION_BOUNDARY_PROVEN",
+    "handler_to_playerdata_edge": "UNKNOWN"
+  }
+}

@@ -2,18 +2,18 @@
 task_id: OTC-20260818-native-login-to-ingame-e2e
 status: validating
 agent: ChatGPT
-session_id: chatgpt-native-login-e2e-20260818
+session_id: chatgpt-native-login-e2e-20260818-v3
 session_role: canonical_runtime_owner
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: github-secrets-reentry-inventory
-branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v2
+phase: github-secrets-reentry-current-main-inventory
+branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3
 base_branch: main
-base_main: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
+base_main: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
 risk: critical
-updated: 2026-08-18T12:50:00+02:00
+updated: 2026-08-18T12:54:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -67,6 +67,11 @@ github_actions_secret_email_shape_valid: true
 github_actions_secret_password_shape_valid: true
 github_actions_secret_pair_ready: true
 github_actions_secret_values_logged: false
+previous_reentry_inventory_run: 32128864303
+previous_reentry_inventory_job: 95685348919
+previous_reentry_inventory_result: REFUSED_LIVE_MAIN_MOVED_BEFORE_RUNTIME
+previous_base_main: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
+current_main_rest_reason: docs(track-a) chat inbound static boundaries PR 527 only
 owner_funded_ai_api_authorized: false
 direct_codex_spark_authorized: true
 direct_codex_spark_model: gpt-5.3-codex-spark
@@ -110,49 +115,37 @@ success_result: CHARACTER_ACTUALLY_LOGGED_INTO_GAME
 causal_proof: INCOMPLETE
 ---
 
-# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — GitHub Secrets re-entry
+# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — GitHub Secrets re-entry on current main
 
-The owner explicitly requested a continuation using repository GitHub Actions Secrets. This checkpoint records that authorization without treating secret values as repository data.
+The owner explicitly requested continuation with repository GitHub Actions Secrets. Secret-presence workflow `32128651952 / 95684712657` proved both `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` are non-empty, UTF-8-bounded for the existing 1..1024-byte memfd contract, and masked by GitHub. No value was printed or returned to ChatGPT.
 
-## Verified secret availability
+The first re-entry controller inventory (`32128864303 / 95685348919`) refused before governance/runtime observation because live `main` had advanced from `a518cea...` to `066a5ba8...`. Inspection proved that new main commit is `docs(track-a): promote chat inbound static boundaries (#527)`, a static documentation/evidence promotion that does not mutate the physical runtime. This task was therefore restacked without carrying stale base authority.
 
-Hosted workflow `32128651952 / 95684712657` referenced only the canonical secret names already used by historical physical PR #475 and emitted booleans only:
+## Current secret-bearing boundary
 
-```text
-NATIVE_LOGIN_SECRET_EMAIL_PRESENT=true
-NATIVE_LOGIN_SECRET_PASSWORD_PRESENT=true
-NATIVE_LOGIN_SECRET_EMAIL_SHAPE_VALID=true
-NATIVE_LOGIN_SECRET_PASSWORD_SHAPE_VALID=true
-NATIVE_LOGIN_SECRET_PAIR_READY=true
-```
+Owner authorization permits this continuation to use the existing Actions secrets only through a one-shot secret producer. It does not permit plaintext files, logging, argv exposure, GUI credential entry, OCR, coordinate automation, auth bypass, challenge fabrication, TLS weakening or server-response spoofing.
 
-The secret values were masked by GitHub and were not printed, persisted, committed or returned to ChatGPT.
-
-This owner authorization supersedes the previous task-local assumption that only a human controlling `/dev/tty` may be used for this particular continuation. It does not authorize plaintext files, logs, argv exposure, GUI credential entry, OCR, coordinate automation, auth bypass, 2FA/CAPTCHA fabrication, TLS weakening or server-response spoofing.
-
-## Safety boundary for the next secret-bearing operation
-
-The intended path is:
+Intended secret path after fresh runtime admission:
 
 ```text
-GitHub Actions secret environment in a dedicated one-shot producer
- -> immediately bounded UTF-8 validation
+GitHub Actions secret environment in dedicated one-shot producer
+ -> bounded validation
  -> sealed anonymous memfd
- -> unset secret environment in the producer
  -> SCM_RIGHTS
  -> exact auth-helper socket
- -> exact client/peer identity fence
+ -> exact process/client/peer fence
  -> TGameClient::onRequestLoginWithCredentials(QString,QString)
- -> original Tibia authentication state machine
+ -> original Tibia auth state machine
 ```
 
-No secret-bearing operation is admitted yet. The prior generation-10 controller lease was deliberately released, so the continuation must first perform a fresh no-client controller-plane inventory, then establish fresh canonical authority. Because the currently registered runtime was launched without the experimental auth helper, it must be replaced or otherwise prepared through a separately admitted exact-client transition before credentials may be consumed.
+No secret may be consumed until current-main-fenced controller inventory, fresh generation authority and an exact auth-helper-enabled runtime are proven.
 
 ## Recovery checkpoint
 
 ```text
 STATUS=validating
-RESULT=CONTINUING_WITH_OWNER_AUTHORIZED_GITHUB_SECRETS
+BASE_MAIN=066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
+BRANCH=runtime/OTC-20260818-native-login-to-ingame-e2e-v3
 SECRET_PAIR_READY=true
 SECRET_VALUES_LOGGED=false
 CURRENT_KNOWN_LEASE_GENERATION=10
@@ -163,6 +156,6 @@ MUTATION_AUTHORIZED=false
 CREDENTIALS_ALLOWED=false
 LOGIN_ALLOWED=false
 GAMEPLAY_ALLOWED=false
-FIRST_UNRESOLVED_EDGE=fresh controller-plane state after terminal release
-NEXT_ACTION=run one fresh no-client controller-plane inventory on synology-otclient-01; if state remains released generation 10 with registration 2/10, admit exactly one generation-11 acquire/rebind/Gate-B transition before any runtime replacement or secret use
+FIRST_UNRESOLVED_EDGE=fresh controller-plane state on current main after terminal release
+NEXT_ACTION=run exactly one current-main-fenced no-client controller-plane inventory on synology-otclient-01; if released generation 10 and registration 2/10 remain unchanged, admit generation-11 rebind before any runtime replacement or secret use
 ```

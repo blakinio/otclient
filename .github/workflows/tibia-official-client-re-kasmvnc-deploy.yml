@@ -31,6 +31,9 @@ jobs:
       HOST_PORT: '6901'
       CONTAINER_PORT: '6901'
       STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
+      PUBLIC_HOST: synology
+      PUBLIC_PORT: '6902'
+      PUBLIC_URL: https://synology:6902/
       LEGACY_OBSERVER: http://192.168.1.2:6083/
       KASM_USERNAME: kasm_user
     steps:
@@ -166,21 +169,41 @@ jobs:
             docker start "$CONTAINER_NAME" >/dev/null || true
           fi
 
+          container_id="$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME")"
+          identity_file="$STATE_DIR/desktop-container-id"
+          if [[ -s "$identity_file" ]]; then
+            previous_id="$(cat "$identity_file")"
+            if [[ "$previous_id" != "$container_id" ]]; then
+              echo KASMVNC_DEPLOY_ERROR=desktop_identity_changed >&2
+              exit 1
+            fi
+          else
+            printf '%s\n' "$container_id" > "$identity_file"
+            chmod 600 "$identity_file"
+          fi
+
           unset KASM_PASSWORD
           echo KASMVNC_CONTAINER_DEPLOYED=true
           echo KASMVNC_PASSWORD_SOURCE=task-private-state-file
+          echo KASMVNC_DESKTOP_IDENTITY=PERSISTED
 
       - name: Verify local KasmVNC HTTPS backend
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
+          umask 077
           url="https://$HOST_IP:$HOST_PORT/"
+          auth_config="$(mktemp)"
+          trap 'rm -f "$auth_config"' EXIT
+          chmod 600 "$auth_config"
+          printf 'user = "%s:%s"\n' "$KASM_USERNAME" "$(cat "$STATE_DIR/browser-password")" > "$auth_config"
+
           ready=false
           for _ in $(seq 1 120); do
             running="$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)"
             [[ "$running" == true ]] || { sleep 1; continue; }
-            if curl -kfsS --max-time 5 "$url" -o /tmp/kasm-index.html; then
+            if curl -kfsS --config "$auth_config" --max-time 5 "$url" -o /tmp/kasm-index.html; then
               if [[ -s /tmp/kasm-index.html ]]; then
                 ready=true
                 break
@@ -204,12 +227,136 @@ jobs:
           [[ "$port_binding" == "$HOST_PORT" ]]
           [[ "$host_binding" == "$HOST_IP" ]]
           display="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"' 2>/dev/null || true)"
-          echo "KASMVNC_CONTAINER_DISPLAY=${display:-UNKNOWN}"
+          [[ "$display" == ':1' ]]
+          docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -af "[X]vnc" >/dev/null'
+          [[ "$(cat "$STATE_DIR/desktop-container-id")" == "$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME")" ]]
+          echo "KASMVNC_CONTAINER_DISPLAY=$display"
           echo "KASMVNC_BACKEND_URL=$url"
           echo "KASMVNC_USERNAME=$KASM_USERNAME"
           echo KASMVNC_HTTPS_BACKEND=PASS
+          echo KASMVNC_DESKTOP_PROCESS=PASS
           echo KASMVNC_PERSISTENCE=PASS
           echo KASMVNC_DSM_REVERSE_PROXY_REQUIRED=true
+
+      - name: Verify DSM reverse proxy HTTPS and WebSocket
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import base64
+          import hashlib
+          import os
+          import secrets
+          import socket
+          import ssl
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          username = os.environ['KASM_USERNAME']
+          password = (Path(os.environ['STATE_DIR']) / 'browser-password').read_text().strip()
+          if len(password) < 20:
+              raise SystemExit('KASMVNC_PUBLIC_E2E_ERROR=password_file_invalid')
+          auth = base64.b64encode(f'{username}:{password}'.encode()).decode()
+          context = ssl._create_unverified_context()
+
+          def fetch(url, attempts=30):
+              last = None
+              for _ in range(attempts):
+                  try:
+                      request = urllib.request.Request(url, headers={
+                          'Authorization': f'Basic {auth}',
+                          'User-Agent': 'otclient-track-a-kasmvnc-e2e/1',
+                      })
+                      with urllib.request.urlopen(request, context=context, timeout=5) as response:
+                          body = response.read(4 * 1024 * 1024)
+                          if response.status == 200 and body:
+                              return body
+                          last = f'status={response.status}'
+                  except Exception as exc:
+                      last = type(exc).__name__
+                  time.sleep(1)
+              raise SystemExit(f'KASMVNC_PUBLIC_E2E_ERROR=https_fetch_failed:{last}')
+
+          backend_url = f"https://{os.environ['HOST_IP']}:{os.environ['HOST_PORT']}/"
+          public_url = os.environ['PUBLIC_URL']
+          backend_body = fetch(backend_url)
+          public_body = fetch(public_url)
+          backend_sha = hashlib.sha256(backend_body).hexdigest()
+          public_sha = hashlib.sha256(public_body).hexdigest()
+          if backend_sha != public_sha:
+              raise SystemExit('KASMVNC_PUBLIC_E2E_ERROR=proxy_body_mismatch')
+
+          def websocket(host, port, origin, attempts=15):
+              last = None
+              for _ in range(attempts):
+                  raw = None
+                  tls = None
+                  try:
+                      raw = socket.create_connection((host, int(port)), timeout=5)
+                      tls = context.wrap_socket(raw, server_hostname=host)
+                      key = base64.b64encode(secrets.token_bytes(16)).decode()
+                      request = (
+                          'GET /websockify HTTP/1.1\r\n'
+                          f'Host: {host}:{port}\r\n'
+                          'Upgrade: websocket\r\n'
+                          'Connection: Upgrade\r\n'
+                          f'Origin: {origin}\r\n'
+                          f'Authorization: Basic {auth}\r\n'
+                          f'Sec-WebSocket-Key: {key}\r\n'
+                          'Sec-WebSocket-Version: 13\r\n'
+                          'Sec-WebSocket-Protocol: binary\r\n'
+                          '\r\n'
+                      ).encode('ascii')
+                      tls.sendall(request)
+                      data = b''
+                      while b'\r\n\r\n' not in data and len(data) < 32768:
+                          chunk = tls.recv(4096)
+                          if not chunk:
+                              break
+                          data += chunk
+                      head = data.split(b'\r\n\r\n', 1)[0].decode('iso-8859-1')
+                      lines = head.split('\r\n')
+                      if not lines or ' 101 ' not in lines[0]:
+                          last = lines[0] if lines else 'empty_response'
+                          raise RuntimeError('not_switching_protocols')
+                      headers = {}
+                      for line in lines[1:]:
+                          if ':' in line:
+                              name, value = line.split(':', 1)
+                              headers[name.strip().lower()] = value.strip()
+                      expected = base64.b64encode(hashlib.sha1(
+                          (key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode('ascii')
+                      ).digest()).decode('ascii')
+                      if headers.get('sec-websocket-accept') != expected:
+                          raise RuntimeError('bad_websocket_accept')
+                      if headers.get('upgrade', '').lower() != 'websocket':
+                          raise RuntimeError('missing_upgrade_header')
+                      return
+                  except Exception as exc:
+                      if last is None:
+                          last = type(exc).__name__
+                      time.sleep(1)
+                  finally:
+                      try:
+                          if tls is not None:
+                              tls.close()
+                          elif raw is not None:
+                              raw.close()
+                      except Exception:
+                          pass
+              raise SystemExit(f'KASMVNC_PUBLIC_E2E_ERROR=websocket_failed:{last}')
+
+          websocket(os.environ['HOST_IP'], os.environ['HOST_PORT'], backend_url.rstrip('/'))
+          websocket(os.environ['PUBLIC_HOST'], os.environ['PUBLIC_PORT'], public_url.rstrip('/'))
+          print(f'KASMVNC_BACKEND_BODY_SHA256={backend_sha}')
+          print(f'KASMVNC_PUBLIC_BODY_SHA256={public_sha}')
+          print('KASMVNC_BACKEND_WEBSOCKET=PASS')
+          print('KASMVNC_DSM_HTTPS=PASS')
+          print('KASMVNC_DSM_WEBSOCKET=PASS')
+          print('KASMVNC_PUBLIC_REAL_DESKTOP_PROVIDER=PASS')
+          PY
 
       - name: Re-prove no interference with PR 528 observer
         shell: bash
@@ -231,7 +378,8 @@ jobs:
           set -Eeuo pipefail
           echo 'KASMVNC_DEPLOYMENT=PASS'
           echo 'KASMVNC_BACKEND_URL=https://127.0.0.1:6901/'
-          echo 'KASMVNC_PUBLIC_ENTRYPOINT=DSM_REVERSE_PROXY_REQUIRED'
+          echo 'KASMVNC_PUBLIC_ENTRYPOINT=https://synology:6902/'
+          echo 'KASMVNC_PUBLIC_WEBSOCKET=PASS'
           echo 'KASMVNC_USERNAME=kasm_user'
           echo 'KASMVNC_PASSWORD_SOURCE=task-private-state-file'
           echo 'KASMVNC_OFFICIAL_CLIENT_STARTED=false'

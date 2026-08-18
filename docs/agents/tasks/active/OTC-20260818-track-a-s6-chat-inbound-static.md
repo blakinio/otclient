@@ -12,9 +12,9 @@ execution_mode: github_only
 branch: research/OTC-20260818-track-a-s6-chat-inbound-static
 base_branch: main
 base_main: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
-related_pr: pending
+related_pr: 526
 created: 2026-08-18T12:30:00+02:00
-updated: 2026-08-18T12:30:00+02:00
+updated: 2026-08-18T12:35:00+02:00
 risk: low
 implementation_authorized: true
 credentials_allowed: false
@@ -62,12 +62,12 @@ validation_level: focused
 
 # Objective
 
-Resolve, using only already-sanitized exact-build/repository evidence:
+Resolve the full handler-aligned chat inbound family, using only already-sanitized exact-build/repository evidence:
 
 ```text
-GameserverMessageTalk / Channels / ChannelEvent / OpenChannel /
-CloseChannel / OpenOwnChannel / PrivateChannel
-  -> exact received* owner and QMeta signal indices
+GameserverMessageTalk / Message / OpenChannel / OpenOwnChannel / CloseChannel /
+Channels / PrivateChannel / ChannelEvent / NpcTalkParters
+  -> exact TProtocolMessageQueue received* QMeta owner/signal indices
   -> exact TChatProtocolMessageHandler handle* QMeta boundaries
   -> exact TChatChannelStorage QMeta boundaries
 ```
@@ -77,9 +77,9 @@ Do not infer queue->handler or handler->storage edges from naming alone.
 # Acceptance
 
 - [ ] no new official-client download/execution;
-- [ ] recover exact queue owner and indices for all seven chat receive surfaces;
-- [ ] recover exact handler QMeta methods/signals;
-- [ ] recover exact chat-channel storage QMeta methods/signals;
+- [ ] recover exact queue owner and indices for all nine handler-aligned chat receive surfaces;
+- [ ] recover complete TChatProtocolMessageHandler QMeta method/signal table;
+- [ ] recover complete TChatChannelStorage QMeta method/signal table;
 - [ ] prove exact registerServerMessage<T> type surfaces where retained evidence permits;
 - [ ] explicit FACT / INFERENCE / UNKNOWN classifications;
 - [ ] no runtime/Synology/X11/process-memory/credentials/login/gameplay;
@@ -90,9 +90,9 @@ Do not infer queue->handler or handler->storage edges from naming alone.
 # Checkpoint
 
 ```yaml
-checkpoint_version: 1
+checkpoint_version: 2
 status: investigating
-last_completed_step: admitted chat-only static proof on current main after S5 promotion
+last_completed_step: first discriminator proved seven queue chat signals and recovered exact handler/storage QMeta; scope expanded to all nine handler-aligned handle*Message methods after discovering Message and NpcTalkParters in the same exact handler table
 blockers: []
-next_action: reuse historical exact-SHA exhaustive QMeta log and S1 type/name surfaces for queue, TChatProtocolMessageHandler and TChatChannelStorage.
+next_action: rerun historical exact-SHA QMeta log reuse with the complete nine-message set, then normalize durable FACT/UNKNOWN evidence.
 ```

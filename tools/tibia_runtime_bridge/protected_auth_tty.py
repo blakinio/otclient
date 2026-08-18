@@ -133,8 +133,10 @@ def read_hidden_tty_line(tty_fd: int, prompt: bytes, target: ProtectedSecretBuff
             raise BridgeClientError("NUL is forbidden in protected TTY input")
         target.length = end
     finally:
-        os.write(tty_fd, b"\n")
-        termios.tcsetattr(tty_fd, termios.TCSAFLUSH, original)
+        try:
+            os.write(tty_fd, b"\n")
+        finally:
+            termios.tcsetattr(tty_fd, termios.TCSAFLUSH, original)
 
 
 def _required_memfd_seals() -> int:
@@ -181,6 +183,14 @@ def load_exact_runtime_identity(path: Path) -> PeerIdentityExpectation:
         raise BridgeClientError("runtime identity path must be absolute")
     if path.is_symlink() or not path.is_file():
         raise BridgeClientError("runtime identity must be a regular non-symlink file")
+    try:
+        metadata = path.stat()
+    except OSError as exc:
+        raise BridgeClientError(f"runtime identity metadata is unavailable: {exc}") from exc
+    if metadata.st_uid != os.geteuid():
+        raise BridgeClientError("runtime identity must be owned by the current effective user")
+    if metadata.st_mode & 0o022:
+        raise BridgeClientError("runtime identity must not be group/world writable")
     try:
         doc = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:

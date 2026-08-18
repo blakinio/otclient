@@ -12,332 +12,203 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   recover:
-    name: Recover player queue signal connection candidates
+    name: Reuse prior exact-client Qt connection logs
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
 
-      - name: Fetch exact client and recover signal references
+      - name: Download only prior sanitized exact-client job logs
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends curl python3-pyelftools python3-capstone binutils
+          out="$RUNNER_TEMP/track-a-s3-prior-evidence"
+          mkdir -p "$out/raw" "$out/evidence"
 
-          r="$RUNNER_TEMP/track-a-s3-player-receiver"
-          mkdir -p "$r/bin" "$r/state" "$r/client" "$r/evidence"
-          cd "$r/bin"
-          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
-          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
-          curl -fsSL -o wireproxy.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
-          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tgz' | sha256sum -c -
-          mkdir wp
-          tar -xzf wireproxy.tgz -C wp
-          cp "$(find wp -type f -name wireproxy -print -quit)" wireproxy
-          chmod 755 wgcf wireproxy
-
-          cd "$r/state"
-          "$r/bin/wgcf" register --accept-tos >/dev/null
-          "$r/bin/wgcf" generate >/dev/null
-          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25349\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
-          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
-          for _ in $(seq 1 30); do
-            if curl --socks5-hostname 127.0.0.1:25349 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null; then
-              break
-            fi
-            sleep 2
+          # These are the accepted #498 hosted exact-SHA static analysis jobs. Their logs contain
+          # sanitized disassembly/QMeta output only; they never contain or upload the raw client.
+          for job in 95442653919 95443958584; do
+            curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${job}/logs" \
+              -o "$out/raw/${job}.log"
+            test -s "$out/raw/${job}.log"
           done
-          grep -Eq '^warp=(on|plus)$' "$r/trace"
-          echo 'PLAYER_S3_WARP_PATH=PASS'
 
-          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
-          curl --socks5-hostname 127.0.0.1:25349 --compressed -fL \
-            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
-            "$u" -o "$r/client/client.lzma"
-          echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  '"$r"'/client/client.lzma' | sha256sum -c -
-          echo 'PLAYER_S3_EXACT_PACKED_SHA=PASS'
+          sha256sum "$out/raw/"*.log | sed "s#${out}/raw/##" > "$out/evidence/input-log-sha256.txt"
 
-          python3 - "$r/client/client.lzma" "$r/client/client" "$r/evidence" <<'PY'
+          python3 - "$out/raw" "$out/evidence" <<'PY'
           from __future__ import annotations
 
           import hashlib
           import json
-          import lzma
           import pathlib
-          import struct
-          import subprocess
+          import re
           import sys
 
-          from capstone import Cs, CsError, CS_ARCH_X86, CS_MODE_64
-          from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
-          from elftools.elf.elffile import ELFFile
-          from elftools.elf.relocation import RelocationSection
-
-          packed_path = pathlib.Path(sys.argv[1])
-          raw_path = pathlib.Path(sys.argv[2])
-          evidence = pathlib.Path(sys.argv[3])
+          raw_dir = pathlib.Path(sys.argv[1])
+          evidence = pathlib.Path(sys.argv[2])
           evidence.mkdir(parents=True, exist_ok=True)
 
-          packed = packed_path.read_bytes()
-          props = packed[32]
-          lc = props % 9
-          rest = props // 9
-          lp = rest % 5
-          pb = rest // 5
-          dict_size = int.from_bytes(packed[33:37], 'little')
-          raw = lzma.decompress(
-              packed[45:], format=lzma.FORMAT_RAW,
-              filters=[{'id': lzma.FILTER_LZMA1, 'dict_size': dict_size, 'lc': lc, 'lp': lp, 'pb': pb}],
-          )
-          digest = hashlib.sha256(raw).hexdigest()
-          assert len(raw) == 51965216
-          assert digest == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
-          raw_path.write_bytes(raw)
-          print('PLAYER_S3_EXACT_CLIENT_SHA=PASS')
-          print('PLAYER_S3_CLIENT_EXECUTED=false')
-          print('PLAYER_S3_RUNTIME_ACCESS=none')
+          jobs = {
+              'phase4_hosted': 95442653919,
+              'phase5_hosted': 95443958584,
+          }
+          texts = {}
+          inputs = []
+          for label, job in jobs.items():
+              path = raw_dir / f'{job}.log'
+              data = path.read_bytes()
+              text = data.decode('utf-8', 'replace')
+              texts[label] = text
+              inputs.append({
+                  'label': label,
+                  'job': job,
+                  'sha256': hashlib.sha256(data).hexdigest(),
+                  'size': len(data),
+                  'source_status': 'prior_accepted_exact_client_sanitized_job_log',
+              })
 
-          with raw_path.open('rb') as fh:
-              elf = ELFFile(fh)
-              sections = [
-                  {'name': s.name, 'off': int(s['sh_offset']), 'size': int(s['sh_size']), 'va': int(s['sh_addr']), 'flags': int(s['sh_flags'])}
-                  for s in elf.iter_sections()
-              ]
-              relocs = {}
-              relocation_rows = []
-              for sec in elf.iter_sections():
-                  if not isinstance(sec, RelocationSection):
-                      continue
-                  symtab = elf.get_section(sec['sh_link']) if sec['sh_link'] else None
-                  for rel in sec.iter_relocations():
-                      where = int(rel['r_offset'])
-                      addend = int(rel['r_addend']) if rel.is_RELA() else 0
-                      rtype = int(rel['r_info_type'])
-                      symbol = ''
-                      target = None
-                      if rtype == 8:
-                          target = addend
-                          relocs[where] = target
-                      elif symtab is not None and rel['r_info_sym']:
-                          sym = symtab.get_symbol(rel['r_info_sym'])
-                          symbol = sym.name
-                          target = int(sym['st_value']) + addend
-                          relocs[where] = target
-                      relocation_rows.append({'where': where, 'type': rtype, 'symbol': symbol, 'target': target})
+          # Remove GitHub Actions timestamp/prefix fields and retain only sanitized semantic/disassembly payload.
+          def strip_prefix(line: str) -> str:
+              # Typical log line: 2026-...Z <payload>
+              return re.sub(r'^\d{4}-\d\d-\d\dT[^ ]+Z\s+', '', line)
 
-          def file_off(va):
-              for s in sections:
-                  if s['va'] <= va < s['va'] + s['size']:
-                      return s['off'] + va - s['va']
-              raise ValueError(hex(va))
+          combined_lines = []
+          for label, text in texts.items():
+              for line in text.splitlines():
+                  combined_lines.append((label, strip_prefix(line)))
 
-          def mapped(va):
-              return any(s['va'] <= va < s['va'] + s['size'] for s in sections)
-
-          def executable(va):
-              return any((s['flags'] & 4) and s['va'] <= va < s['va'] + s['size'] for s in sections)
-
-          def u64(va):
-              return struct.unpack_from('<Q', raw, file_off(va))[0]
-
-          def resolved_qword(va):
-              return relocs.get(va, u64(va))
-
-          signal_targets = {
-              'receivedPlayerDataCurrentMessage': 0xdf8bc1,
-              'receivedPlayerDataBasicMessage': 0xdf8d3b,
-              'receivedPlayerStateMessage': 0xdf8e0d,
-              'receivedPlayerSkillsMessage': 0xdf8e37,
-              'receivedPlayerInventoryMessage': 0xdf899f,
+          exact_signal_stubs = {
+              'receivedPlayerDataCurrentMessage': '0xdf8bc1',
+              'receivedPlayerDataBasicMessage': '0xdf8d3b',
+              'receivedPlayerStateMessage': '0xdf8e0d',
+              'receivedPlayerSkillsMessage': '0xdf8e37',
+              'receivedPlayerInventoryMessage': '0xdf899f',
+          }
+          exact_addresses = {
+              **exact_signal_stubs,
+              'TProtocolMessageQueue_staticMetaObject': '0x3085b60',
+              'TPlayerProtocolMessageHandler_primary_vptr': '0x308a008',
+              'TPlayerData_primary_vptr': '0x308ca70',
+              'phase4_connection_setup': '0x7d51b0',
+              'QObject_connect_candidate': '0x4dd800',
+              'QSlotObject_allocator_or_helper': '0x4df670',
           }
 
-          md_scan = Cs(CS_ARCH_X86, CS_MODE_64)
-          md_scan.detail = True
-          md_scan.skipdata = True
-          md = Cs(CS_ARCH_X86, CS_MODE_64)
-          md.detail = True
+          address_hits = {name: [] for name in exact_addresses}
+          connect_lines = []
+          setup_disassembly = []
+          queue_lines = []
+          for label, line in combined_lines:
+              lower = line.lower()
+              for name, addr in exact_addresses.items():
+                  if addr[2:].lower() in lower or addr.lower() in lower:
+                      address_hits[name].append({'source': label, 'line': line})
+              if any(token in line for token in ('QObject', 'connect', 'QSlotObject', 'QMetaObject')) or '4dd800' in lower or '4df670' in lower:
+                  connect_lines.append(f'[{label}] {line}')
+              if re.search(r'0x7d5[0-9a-f]{3}:', lower):
+                  setup_disassembly.append(f'[{label}] {line}')
+              if 'TProtocolMessageQueue' in line or '3085b60' in lower or 'TPlayerProtocolMessageHandler' in line or '308a008' in lower:
+                  queue_lines.append(f'[{label}] {line}')
 
-          def safe_operands(ins):
-              try:
-                  return ins.operands
-              except CsError:
-                  return []
-
-          # Direct executable references to exact signal-stub addresses.
-          code_xrefs = {name: [] for name in signal_targets}
-          for s in sections:
-              if not (s['flags'] & 4) or s['size'] == 0:
-                  continue
-              code = raw[s['off']:s['off'] + s['size']]
-              for ins in md_scan.disasm(code, s['va']):
-                  refs = set()
-                  for op in safe_operands(ins):
-                      if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
-                          refs.add(ins.address + ins.size + op.mem.disp)
-                      elif op.type == X86_OP_IMM:
-                          refs.add(int(op.imm))
-                  for name, target in signal_targets.items():
-                      if target in refs:
-                          code_xrefs[name].append({
-                              'instruction': f'0x{ins.address:x}',
-                              'mnemonic': ins.mnemonic,
-                              'op_str': ins.op_str,
-                          })
-
-          # Data/relocation cells that resolve exactly to the signal PMF function address.
-          data_refs = {name: [] for name in signal_targets}
-          for row in relocation_rows:
-              if row['target'] is None:
-                  continue
-              for name, target in signal_targets.items():
-                  if row['target'] == target:
-                      data_refs[name].append({
-                          'cell': f"0x{row['where']:x}",
-                          'relocation_type': row['type'],
-                          'symbol': row['symbol'],
-                      })
-
-          # Also scan mapped non-executable qword-aligned cells; limit to exact matches and record section.
-          for s in sections:
-              if s['flags'] & 4 or s['size'] < 8:
-                  continue
-              start = s['va']
-              end = start + s['size'] - 7
-              for va in range((start + 7) & ~7, end, 8):
-                  try:
-                      value = resolved_qword(va)
-                  except Exception:
+          # Deduplicate emitted lines but keep source labels and deterministic order.
+          def uniq(items):
+              seen = set()
+              out = []
+              for item in items:
+                  if item in seen:
                       continue
-                  for name, target in signal_targets.items():
-                      if value == target and not any(x['cell'] == f'0x{va:x}' for x in data_refs[name]):
-                          data_refs[name].append({'cell': f'0x{va:x}', 'relocation_type': None, 'symbol': '', 'section': s['name']})
+                  seen.add(item)
+                  out.append(item)
+              return out
 
-          # Find executable references to the PMF data cells as a second-level lead.
-          cell_lookup = {}
-          for signal, cells in data_refs.items():
-              for cell in cells:
-                  cell_lookup.setdefault(int(cell['cell'], 16), []).append(signal)
-          data_cell_xrefs = []
-          if cell_lookup:
-              for s in sections:
-                  if not (s['flags'] & 4) or s['size'] == 0:
-                      continue
-                  code = raw[s['off']:s['off'] + s['size']]
-                  for ins in md_scan.disasm(code, s['va']):
-                      for op in safe_operands(ins):
-                          if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
-                              ref = ins.address + ins.size + op.mem.disp
-                              if ref in cell_lookup:
-                                  data_cell_xrefs.append({
-                                      'signals': cell_lookup[ref],
-                                      'cell': f'0x{ref:x}',
-                                      'instruction': f'0x{ins.address:x}',
-                                      'mnemonic': ins.mnemonic,
-                                      'op_str': ins.op_str,
-                                  })
+          setup_disassembly = uniq(setup_disassembly)
+          connect_lines = uniq(connect_lines)
+          queue_lines = uniq(queue_lines)
 
-          # Resolve dynamic symbol relocations related to QObject connect/QSlotObject/QMetaObject so call targets can be recognized.
-          connect_symbols = []
-          for row in relocation_rows:
-              sym = row['symbol'] or ''
-              if any(token in sym for token in ('QObject', 'connect', 'QMetaObject', 'QSlotObject')):
-                  connect_symbols.append({
-                      'where': f"0x{row['where']:x}",
-                      'type': row['type'],
-                      'symbol': sym,
-                      'target': None if row['target'] is None else f"0x{row['target']:x}",
-                  })
+          # Recover every visible member offset in the phase-4 connection setup. This is a structural
+          # inventory only; member type is assigned only when prior evidence independently proves it.
+          member_offsets = {}
+          for line in setup_disassembly:
+              for match in re.finditer(r'\[(?:rbx|rdi|rbp|r12|r13|r14|r15) \+ (0x[0-9a-f]+)\]', line.lower()):
+                  member_offsets[match.group(1)] = member_offsets.get(match.group(1), 0) + 1
 
-          # Capture bounded windows around all unique direct signal/cell xrefs.
-          xref_addresses = set()
-          xref_context = []
-          for name, rows in code_xrefs.items():
-              for row in rows:
-                  xref_addresses.add(int(row['instruction'], 16))
-          for row in data_cell_xrefs:
-              xref_addresses.add(int(row['instruction'], 16))
+          # Split setup into bounded call blocks ending at the previously identified connect candidate.
+          call_blocks = []
+          current = []
+          for line in setup_disassembly:
+              current.append(line)
+              if re.search(r'call\s+0x4dd800\b', line.lower()):
+                  call_blocks.append(current)
+                  current = []
+          if current:
+              call_blocks.append(current)
 
-          def disasm_window(center, before=0x100, after=0x180):
-              start = max(0, center - before)
-              # Align to mapped executable section and decode a little before the exact xref.
-              sec = next((s for s in sections if (s['flags'] & 4) and s['va'] <= center < s['va'] + s['size']), None)
-              if sec is None:
-                  return []
-              start = max(sec['va'], start)
-              end = min(sec['va'] + sec['size'], center + after)
-              code = raw[file_off(start):file_off(end)]
-              lines = []
-              for ins in md.disasm(code, start):
-                  marker = ' <XREF>' if ins.address == center else ''
-                  lines.append(f'0x{ins.address:x}:\t{ins.mnemonic}\t{ins.op_str}{marker}')
-              return lines
-
-          for addr in sorted(xref_addresses):
-              xref_context.append({'xref': f'0x{addr:x}', 'disassembly': disasm_window(addr)})
-
-          # Exact raw byte hashes around each unique xref make later focused decoding reproducible without uploading client bytes.
-          windows = []
-          for addr in sorted(xref_addresses):
-              sec = next((s for s in sections if (s['flags'] & 4) and s['va'] <= addr < s['va'] + s['size']), None)
-              if sec is None:
-                  continue
-              start = max(sec['va'], addr - 0x100)
-              end = min(sec['va'] + sec['size'], addr + 0x180)
-              blob = raw[file_off(start):file_off(end)]
-              windows.append({
-                  'xref': f'0x{addr:x}',
-                  'window_start': f'0x{start:x}',
-                  'window_end': f'0x{end:x}',
-                  'sha256': hashlib.sha256(blob).hexdigest(),
+          block_rows = []
+          for idx, block in enumerate(call_blocks):
+              text = '\n'.join(block)
+              offsets = sorted(set(re.findall(r'\+ (0x[0-9a-f]+)\]', text.lower())))
+              known_signal_hits = [name for name, addr in exact_signal_stubs.items() if addr[2:].lower() in text.lower()]
+              block_rows.append({
+                  'block_index': idx,
+                  'member_offsets': offsets,
+                  'known_player_signal_stub_hits': known_signal_hits,
+                  'ends_in_connect_candidate': bool(re.search(r'call\s+0x4dd800\b', text.lower())),
+                  'lines': block,
               })
 
           summary = {
-              'schema': 'track-a-s3-player-queue-receiver-xrefs-v1',
-              'exact_client_sha': digest,
+              'schema': 'track-a-s3-prior-exact-log-reuse-v1',
+              'inputs': inputs,
               'runtime_access': 'none',
+              'client_downloaded': False,
               'client_executed': False,
-              'signal_stub_targets': {k: f'0x{v:x}' for k, v in signal_targets.items()},
-              'direct_code_xrefs': code_xrefs,
-              'signal_data_cells': data_refs,
-              'data_cell_code_xrefs': data_cell_xrefs,
-              'connect_related_dynamic_relocations': connect_symbols,
-              'xref_window_count': len(windows),
-              'raw_client_uploaded': False,
-              'secret_access': False,
+              'source_drift_bypassed': False,
+              'prior_exact_sha': 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
+              'setup_disassembly_line_count': len(setup_disassembly),
+              'connect_related_line_count': len(connect_lines),
+              'queue_identity_line_count': len(queue_lines),
+              'member_offset_counts': dict(sorted(member_offsets.items())),
+              'connection_block_count': len(call_blocks),
+              'address_hit_counts': {name: len(rows) for name, rows in address_hits.items()},
+              'exact_player_signal_stub_seen_in_prior_logs': any(address_hits[name] for name in exact_signal_stubs),
               'pr475_runtime_touched': False,
+              'secret_access': False,
           }
-          (evidence / 'summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n')
-          (evidence / 'xref-context.json').write_text(json.dumps(xref_context, indent=2, sort_keys=True) + '\n')
-          (evidence / 'xref-windows.json').write_text(json.dumps(windows, indent=2, sort_keys=True) + '\n')
 
-          # Small objdump control: only lines whose symbolized text mentions Qt connect-related names.
-          proc = subprocess.run(['objdump', '-d', '-C', str(raw_path)], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-          qt_lines = [line for line in proc.stdout.splitlines() if any(token in line for token in ('QObject::connect', 'connectImpl', 'QSlotObject', 'QMetaObject::Connection'))]
-          (evidence / 'objdump-connect-symbol-lines.txt').write_text('\n'.join(qt_lines[:2000]) + ('\n' if qt_lines else ''))
+          (evidence / 'summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          (evidence / 'exact-address-hits.json').write_text(json.dumps(address_hits, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          (evidence / 'connection-blocks.json').write_text(json.dumps(block_rows, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          (evidence / 'setup-disassembly.txt').write_text('\n'.join(setup_disassembly) + ('\n' if setup_disassembly else ''), encoding='utf-8')
+          (evidence / 'connect-related-lines.txt').write_text('\n'.join(connect_lines) + ('\n' if connect_lines else ''), encoding='utf-8')
+          (evidence / 'queue-identity-lines.txt').write_text('\n'.join(queue_lines) + ('\n' if queue_lines else ''), encoding='utf-8')
 
-          print('PLAYER_S3_DIRECT_XREF_COUNTS=' + json.dumps({k: len(v) for k, v in code_xrefs.items()}, sort_keys=True))
-          print('PLAYER_S3_DATA_CELL_COUNTS=' + json.dumps({k: len(v) for k, v in data_refs.items()}, sort_keys=True))
-          print(f'PLAYER_S3_DATA_CELL_CODE_XREFS={len(data_cell_xrefs)}')
-          print(f'PLAYER_S3_XREF_WINDOWS={len(windows)}')
+          print('PLAYER_S3_PRIOR_LOG_REUSE=PASS')
+          print('PLAYER_S3_SUMMARY=' + json.dumps(summary, sort_keys=True))
           print('PLAYER_S3_PR475_RUNTIME_TOUCHED=false')
           print('PLAYER_S3_SECRET_ACCESS=false')
           PY
 
-          rm -f "$r/client/client" "$r/client/client.lzma"
-          test ! -e "$r/client/client"
-          test ! -e "$r/client/client.lzma"
-          echo 'PLAYER_S3_RAW_CLIENT_REMOVED_BEFORE_UPLOAD=PASS'
+          # Raw downloaded inputs are prior sanitized logs, not client bytes. They are still removed so the
+          # uploaded artifact contains only the newly normalized task evidence.
+          rm -rf "$out/raw"
+          test ! -d "$out/raw"
 
-      - name: Upload sanitized connection candidates only
+      - name: Upload normalized prior-evidence analysis only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: track-a-s3-player-receiver-${{ github.run_id }}
-          path: ${{ runner.temp }}/track-a-s3-player-receiver/evidence
+          name: track-a-s3-prior-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-s3-prior-evidence/evidence
           if-no-files-found: error
           retention-days: 7

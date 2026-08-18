@@ -15,10 +15,10 @@ concurrency:
 
 jobs:
   inventory:
-    name: Inventory native-login package source read-only
+    name: Inventory package source and current official manifest read-only
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 6
     env:
       BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
       BASE: /home/runner/_work/_otclient_tibia_re_state
@@ -34,7 +34,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Read-only controller and package inventory
+      - name: Read-only controller, package and manifest inventory
         shell: bash
         env:
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -60,6 +60,19 @@ jobs:
           state="$BASE/canonical-live-runtime"
           package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
           client="$package/bin/client"
+          warp="$state/warp"
+          tmp="$RUNNER_TEMP/native-login-source-inventory-$GITHUB_RUN_ID"
+          mkdir -m700 "$tmp"
+          wp_pid=''
+          cleanup() {
+            if [[ "$wp_pid" =~ ^[1-9][0-9]*$ ]]; then
+              kill "$wp_pid" 2>/dev/null || true
+              for _ in $(seq 1 20); do kill -0 "$wp_pid" 2>/dev/null || break; sleep .1; done
+              kill -9 "$wp_pid" 2>/dev/null || true
+            fi
+            rm -rf "$tmp"
+          }
+          trap cleanup EXIT INT TERM HUP
 
           [[ -d "$state" ]]
           if [[ -e "$state/runtime-registration.json" ]]; then
@@ -88,37 +101,112 @@ jobs:
           if [[ ! -e "$client" ]]; then
             echo SOURCE_INVENTORY_CLIENT_PRESENT=false
             echo SOURCE_INVENTORY_CLASS=ABSENT
-            echo SOURCE_INVENTORY_SECRET_ACCESS=false
-            echo SOURCE_INVENTORY_CLIENT_MUTATION=false
-            echo SOURCE_INVENTORY_RUNTIME_RESTART=false
-            exit 0
+          else
+            echo SOURCE_INVENTORY_CLIENT_PRESENT=true
+            [[ -f "$client" ]]
+            [[ ! -L "$client" ]] && echo SOURCE_INVENTORY_CLIENT_SYMLINK=false || echo SOURCE_INVENTORY_CLIENT_SYMLINK=true
+            [[ -x "$client" ]] && echo SOURCE_INVENTORY_CLIENT_EXECUTABLE=true || echo SOURCE_INVENTORY_CLIENT_EXECUTABLE=false
+            size="$(stat -c %s "$client")"
+            sha="$(sha256sum "$client" | awk '{print $1}')"
+            echo "SOURCE_INVENTORY_CLIENT_SIZE=$size"
+            echo "SOURCE_INVENTORY_CLIENT_SHA256=$sha"
+            if [[ "$sha" == "$OLD_SHA" && "$size" == "$OLD_SIZE" ]]; then
+              class=PROVEN_OBSOLETE_OLD_EXACT
+            elif [[ "$sha" == "$LAST_KNOWN_CURRENT_SHA" && "$size" == "$LAST_KNOWN_CURRENT_SIZE" ]]; then
+              class=LAST_KNOWN_CURRENT_EXACT
+            else
+              class=UNEXPECTED_IDENTITY
+            fi
+            echo "SOURCE_INVENTORY_CLASS=$class"
           fi
 
-          echo SOURCE_INVENTORY_CLIENT_PRESENT=true
-          [[ -f "$client" ]]
-          if [[ -L "$client" ]]; then
-            echo SOURCE_INVENTORY_CLIENT_SYMLINK=true
-          else
-            echo SOURCE_INVENTORY_CLIENT_SYMLINK=false
-          fi
-          if [[ -x "$client" ]]; then
-            echo SOURCE_INVENTORY_CLIENT_EXECUTABLE=true
-          else
-            echo SOURCE_INVENTORY_CLIENT_EXECUTABLE=false
-          fi
-          size="$(stat -c %s "$client")"
-          sha="$(sha256sum "$client" | awk '{print $1}')"
-          echo "SOURCE_INVENTORY_CLIENT_SIZE=$size"
-          echo "SOURCE_INVENTORY_CLIENT_SHA256=$sha"
+          [[ -x "$warp/bin/wireproxy" && -s "$warp/state/wgcf-profile.conf" ]]
+          port="$(python3 - <<'PY'
+          import socket
+          for p in range(25421,25481):
+              s=socket.socket()
+              try: s.bind(('127.0.0.1',p))
+              except OSError: s.close(); continue
+              s.close(); print(p); break
+          else: raise SystemExit('no free source-inventory WARP port')
+          PY
+          )"
+          cat >"$tmp/wireproxy.conf" <<EOF
+          WGConfig = $warp/state/wgcf-profile.conf
+          [Socks5]
+          BindAddress = 127.0.0.1:$port
+          EOF
+          chmod 600 "$tmp/wireproxy.conf"
+          "$warp/bin/wireproxy" -n -c "$tmp/wireproxy.conf" >/dev/null
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=source-inventory-wireproxy \
+            nohup "$warp/bin/wireproxy" -c "$tmp/wireproxy.conf" >"$tmp/wireproxy.log" 2>&1 </dev/null &
+          wp_pid=$!
+          for _ in $(seq 1 40); do
+            kill -0 "$wp_pid" 2>/dev/null || { cat "$tmp/wireproxy.log" >&2; exit 1; }
+            python3 - "$port" <<'PY' && break || true
+          import socket,sys
+          s=socket.socket(); s.settimeout(.2)
+          try: s.connect(('127.0.0.1',int(sys.argv[1])))
+          except OSError: raise SystemExit(1)
+          finally: s.close()
+          PY
+            sleep .25
+          done
 
-          if [[ "$sha" == "$OLD_SHA" && "$size" == "$OLD_SIZE" ]]; then
-            class=PROVEN_OBSOLETE_OLD_EXACT
-          elif [[ "$sha" == "$LAST_KNOWN_CURRENT_SHA" && "$size" == "$LAST_KNOWN_CURRENT_SIZE" ]]; then
-            class=LAST_KNOWN_CURRENT_EXACT
-          else
-            class=UNEXPECTED_IDENTITY
-          fi
-          echo "SOURCE_INVENTORY_CLASS=$class"
+          base='https://static.tibia.com/launcher/tibiaclient-linux-current/'
+          manifest="$tmp/package.json"
+          curl --socks5-hostname "127.0.0.1:$port" --compressed -fL --retry 4 --retry-all-errors \
+            --connect-timeout 20 --max-time 120 "${base}package.json" -o "$manifest"
+          readarray -t m < <(python3 - "$manifest" <<'PY'
+          import json,sys
+          doc=json.load(open(sys.argv[1],encoding='utf-8'))
+          rows=[]
+          def walk(v):
+              if isinstance(v,dict):
+                  u=v.get('url'); p=v.get('packedhash'); q=v.get('unpackedhash')
+                  if isinstance(u,str) and isinstance(p,str): rows.append((u,p,q if isinstance(q,str) else ''))
+                  for x in v.values(): walk(x)
+              elif isinstance(v,list):
+                  for x in v: walk(x)
+          walk(doc)
+          matches=[x for x in rows if x[0].endswith('/bin/client.lzma') or x[0]=='bin/client.lzma' or x[0].endswith('client.lzma')]
+          if len(matches)!=1: raise SystemExit(f'expected one client.lzma entry, got {len(matches)}')
+          print(matches[0][0]); print(matches[0][1].lower()); print(matches[0][2].lower())
+          PY
+          )
+          rel="${m[0]}"; packed_expected="${m[1]}"; unpacked_expected="${m[2]}"
+          case "$rel" in
+            http://*|https://*) url="$rel" ;;
+            /*) url="https://static.tibia.com$rel" ;;
+            *) url="$base$rel" ;;
+          esac
+          packed="$tmp/client.lzma"
+          curl --socks5-hostname "127.0.0.1:$port" --compressed -fL --retry 4 --retry-all-errors \
+            --connect-timeout 20 --max-time 240 "$url" -o "$packed"
+          packed_actual="$(sha256sum "$packed" | awk '{print $1}')"
+          [[ "$packed_actual" == "$packed_expected" ]]
+          python3 - "$packed" "$unpacked_expected" "$LAST_KNOWN_CURRENT_SHA" <<'PY'
+          import hashlib,lzma,pathlib,re,sys
+          p=pathlib.Path(sys.argv[1]); expected=sys.argv[2].lower(); last=sys.argv[3]
+          b=p.read_bytes()
+          if len(b)<46: raise SystemExit('packed client too small')
+          q=b[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          sha=hashlib.sha256(raw).hexdigest()
+          if expected and sha!=expected: raise SystemExit(f'unpacked hash mismatch {sha}!={expected}')
+          print('CURRENT_MANIFEST_PACKED_SHA256='+hashlib.sha256(b).hexdigest())
+          print('CURRENT_MANIFEST_CLIENT_SHA256='+sha)
+          print('CURRENT_MANIFEST_CLIENT_SIZE='+str(len(raw)))
+          print('CURRENT_MANIFEST_CHANGED_SINCE_LAST_PROBE='+str(sha!=last).lower())
+          versions=[]
+          for pat in (rb'\b1[0-9]\.[0-9]{2}(?:\.[A-Za-z0-9]+)?\b', rb'\b[0-9]{1,2}\.[0-9]{2}\.[A-Fa-f0-9]{6,16}\b'):
+              for mm in re.finditer(pat,raw):
+                  s=mm.group().decode('ascii','ignore')
+                  if s not in versions: versions.append(s)
+          print('CURRENT_MANIFEST_VERSION_STRINGS='+','.join(versions[:40]))
+          PY
+
           echo SOURCE_INVENTORY_SECRET_ACCESS=false
           echo SOURCE_INVENTORY_CLIENT_MUTATION=false
           echo SOURCE_INVENTORY_RUNTIME_RESTART=false

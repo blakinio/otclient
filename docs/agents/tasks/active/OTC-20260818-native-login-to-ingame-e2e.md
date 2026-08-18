@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: native-login-post-bootstrap-admission
+phase: native-login-canonical-rebind
 branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v2
 base_branch: main
 base_main: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
 risk: critical
-updated: 2026-08-18T12:09:00+02:00
+updated: 2026-08-18T12:15:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -35,14 +35,14 @@ track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 execution_class: synology_physical_runtime
 runner: synology-otclient-01
-runtime_access: canonical_reuse_or_mutation
+runtime_access: canonical_rebind
 runtime_owner_task: OTC-20260818-native-login-to-ingame-e2e
 runtime_namespace: canonical-live-runtime
 canonical_registration: PRESENT
-canonical_lease_generation: 9
+canonical_lease_generation: 10
 registration_lease_generation: 9
 gate_a: REQUIRED_NOT_PROVEN
-generation_rebind: NOT_APPLICABLE
+generation_rebind: REQUIRED_NOT_PROVEN
 gate_b: REQUIRED_NOT_PROVEN
 bootstrap: NOT_APPLICABLE
 target_uniqueness: UNKNOWN
@@ -81,107 +81,69 @@ historical_login_budget_inherited: false
 protected_secret_source_required_if_cold_auth: true
 controller_plane_inventory_run: 32124348434
 controller_plane_inventory_job: 95671496871
-controller_plane_inventory_head: 82d27d97fce047dbad648212428e0b3cdb7f6211
-controller_plane_observed_lease_status: released
-controller_plane_observed_lease_generation: 8
-controller_plane_observed_registration: ABSENT
-controller_plane_control_metadata_unchanged: true
 canonical_bootstrap_attempts_consumed: 1
 canonical_bootstrap_run: 32125054251
 canonical_bootstrap_job: 95673637453
 canonical_bootstrap_head: d1ab020f11365abeab7a0c2cbd7eeea3e99de38b
 canonical_bootstrap_result: REGISTERED_GATE_B_PASS
-canonical_bootstrap_lease_generation: 9
 canonical_bootstrap_registration_generation: 1
 canonical_bootstrap_registered_pid: 2658
 canonical_bootstrap_registered_process_start_ticks: 66643010
 canonical_bootstrap_registered_boot_id_sha256: a7395225814c9a850ff7663d0bce2dd289cf300c37d78e286d5c7d31043653f9
 canonical_bootstrap_registered_display: ':99'
 canonical_bootstrap_registered_window_identity: x11-window:12582929
-canonical_bootstrap_registered_remote_view_endpoint: 127.0.0.1:6082
-canonical_bootstrap_registered_remote_view_mapping: PROVEN
-canonical_bootstrap_registered_state: UNKNOWN
-canonical_bootstrap_controller_released: true
-canonical_bootstrap_credentials_used: false
-canonical_bootstrap_login_performed: false
-canonical_bootstrap_gameplay_performed: false
+post_bootstrap_inventory_run: 32125504315
+post_bootstrap_inventory_job: 95675058329
+post_bootstrap_inventory_head: 4b02606b585c5f02f7f2293c5916f2a66ee6ad8a
+post_bootstrap_observed_lease_status: released
+post_bootstrap_observed_lease_generation: 9
+post_bootstrap_observed_registration_generation: 1
+post_bootstrap_observed_registration_lease_generation: 9
+post_bootstrap_control_metadata_unchanged: true
+next_lease_generation_expected: 10
+next_lease_generation_source: direct released generation 9 plus exactly one fail-closed acquire by this task/session
+canonical_rebind_attempt_limit: 1
+canonical_rebind_attempts_consumed: 0
 success_result: CHARACTER_ACTUALLY_LOGGED_INTO_GAME
 causal_proof: INCOMPLETE
 ---
 
-# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — post-bootstrap admission
+# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — next-generation rebind admission
 
-This is the single current RUNTIME task for the canonical v3 native-login objective. It consumes the current trusted `main`, including merged #505/#507/#510, and inherits no runtime/session/credential/login authority from released PR #475.
-
-## Fresh physical bootstrap result
-
-The one authorized canonical bootstrap attempt completed successfully on `synology-otclient-01`:
-
-```text
-RUN=32125054251
-JOB=95673637453
-HEAD=d1ab020f11365abeab7a0c2cbd7eeea3e99de38b
-TRACK_A_CANONICAL_BOOTSTRAP=PASS
-TRACK_A_CANONICAL_GATE_B=PASS
-LEASE_GENERATION=9
-REGISTRATION_GENERATION=1
-CLIENT_VERSION=15.32.df7b29
-CLIENT_SIZE=51965216
-CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-REMOTE_VIEW_MAPPING=PROVEN
-NATIVE_LOGIN_BOOTSTRAP_RESULT=REGISTERED_GATE_B_PASS
-```
-
-The exact registration published by that transaction identified PID `2658`, start ticks `66643010`, boot hash `a7395225814c9a850ff7663d0bce2dd289cf300c37d78e286d5c7d31043653f9`, display `:99`, window `x11-window:12582929`, and loopback remote-view endpoint `127.0.0.1:6082`.
-
-These values are historical evidence for the completed bootstrap transaction, not transferable authority. They must be freshly revalidated before any runtime observation/authentication.
+The fresh post-bootstrap controller inventory (`32125504315 / 95675058329`) proved that the authoritative registration still exists and is bound to released lease generation `9`; registration generation remains `1`, controller task/session are null, and the metadata was unchanged by the probe.
 
 Durable evidence:
 
 - `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-controller-plane-admission-inventory.md`
 - `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-canonical-bootstrap-gate-b.md`
+- `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-post-bootstrap-controller-inventory.md`
 
-The bootstrap workflow was removed after its one successful run. Bootstrap attempt budget is now fully consumed: `1/1`.
+## Rebind transition selected
 
-## Current released-controller checkpoint
-
-After successful same-generation Gate B, the task explicitly released lease generation `9` and left the registered runtime idle:
+Exactly one next controller acquisition is admitted for task/session:
 
 ```text
-CANONICAL_REGISTRATION=PRESENT
-CANONICAL_LEASE_STATUS=released
-CANONICAL_LEASE_GENERATION=9
+TASK=OTC-20260818-native-login-to-ingame-e2e
+SESSION=chatgpt-native-login-e2e-20260818
+OBSERVED_RELEASED_GENERATION=9
+EXPECTED_ACQUIRED_GENERATION=10
 REGISTRATION_LEASE_GENERATION=9
-CONTROLLER_TASK=null
-CONTROLLER_SESSION=null
-MUTATION_AUTHORIZED=false
-CREDENTIALS_ALLOWED=false
-LOGIN_ALLOWED=false
-GAMEPLAY_ALLOWED=false
 ```
 
-This checkpoint deliberately does not authorize use of the recorded PID/display or assume that the persistent runtime is still alive. The next action is a fresh current-main, controller-plane-only post-bootstrap inventory under shared flock. If registration or released generation changed, fail closed and reclassify from direct evidence.
+`canonical_lease_generation: 10` in this checkpoint is the fail-closed generation expected from that one acquisition, derived from the directly observed released generation `9`; it is not a claim that generation `10` already existed before the workflow. The physical workflow must refuse before rebind if acquisition does not produce exactly generation `10` or if any controller/registration field drifted.
 
-If the registration remains generation-bound to released lease `9`, the next controller acquisition will create a newer lease generation and therefore requires the promoted canonical generation-rebind path before any client mutation. No historical lease token, PID, XID, display or login budget is reused.
+After exact acquisition, the promoted `canonical_rebind` transition must operate under the canonical flock, re-prove the same exact boot/PID/start/client fence/display/window/state and unique official-client target, atomically increment `registration_generation`, bind the registration to lease generation `10`, and perform no client mutation. Immediate Gate B must then pass against the same active generation `10`.
 
-## Secret boundary
+The controller lease is intentionally kept active after successful rebind/Gate B so later native-login admission can reuse the same current generation without gratuitously advancing to another generation. The lease capability remains only in the task-local protected runtime path on `synology-otclient-01`; it is never committed or logged.
 
-Credentials remain forbidden. Before any password request, the admitted runtime must first prove current exact runtime identity/Gate B and test whether legal retained native authentication/play-session state already exists.
+## Forbidden in this phase
 
-If cold auth becomes necessary, only the merged #505/#507/#510 path may receive credentials locally from the legal protected source. If no real controlling `/dev/tty` or already-approved protected local broker is available at that point, the task stops at `EXTERNAL_ACTION_REQUIRED`; Actions secrets/env, pseudo-TTY substitution and GUI credential entry are forbidden fallbacks.
-
-`gpt-5.3-codex-spark` remains authorized for bounded non-secret assistance but has not been invoked because no Codex Spark execution tool is exposed in this session.
-
-## Acceptance
-
-1. Fresh post-bootstrap controller metadata confirms the current registration/lease relationship without observing or mutating the client.
-2. Current controller authority is acquired only through the next legal Track A generation transition; any lease-generation mismatch is resolved by the promoted rebind path and followed by same-generation Gate B.
-3. Before native auth, freshly prove exact client identity, process start, namespace, display/XRes ownership, WARP/SOCKS confinement, registration/generation and target uniqueness.
-4. Test retained native auth/session state before requesting credentials.
-5. If cold auth is required, use only merged #505/#507/#510 with the legal protected local source.
-6. Character selection uses the current native character model/controller and a semantically unique target, never the visual list.
-7. Original game-server login progression must reach server acceptance, `FullMap`, at least 10 map-description strips, active gameplay/local player and selected character/world identity.
-8. Only then may the task report `CHARACTER_ACTUALLY_LOGGED_INTO_GAME=YES` and `CAUSAL_PROOF=COMPLETE`.
+- account credentials or 2FA;
+- login, character selection or gameplay;
+- client-byte or process-memory mutation;
+- GUI/form input;
+- historical #475 PID/XID/session authority;
+- a second rebind attempt if the first attempt returns a new discriminator.
 
 ## Recovery checkpoint
 
@@ -189,19 +151,16 @@ If cold auth becomes necessary, only the merged #505/#507/#510 path may receive 
 STATUS=validating
 BASE_MAIN=a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
 BRANCH=runtime/OTC-20260818-native-login-to-ingame-e2e-v2
-RUNTIME_ACCESS=canonical_reuse_or_mutation
+RUNTIME_ACCESS=canonical_rebind
 CANONICAL_REGISTRATION=PRESENT
-CANONICAL_LEASE_GENERATION=9
+OBSERVED_RELEASED_LEASE_GENERATION=9
+EXPECTED_NEXT_ACTIVE_LEASE_GENERATION=10
 REGISTRATION_LEASE_GENERATION=9
-CONTROLLER_LEASE_STATUS=released
+GENERATION_REBIND=REQUIRED_NOT_PROVEN
 MUTATION_AUTHORIZED=false
-BOOTSTRAP_ATTEMPT_LIMIT=1
-BOOTSTRAP_ATTEMPTS_CONSUMED=1
 CREDENTIALS_ALLOWED=false
 LOGIN_ALLOWED=false
 GAMEPLAY_ALLOWED=false
-LAST_PROVEN_BOOTSTRAP=REGISTERED_GATE_B_PASS
-CURRENT_RUNTIME_IDENTITY=REQUIRES_FRESH_REVALIDATION
-FIRST_UNRESOLVED_EDGE=current post-bootstrap registration/lease state and next-generation rebind requirement
-NEXT_ACTION=run exactly one no-client shared-flock controller-plane inventory; if released generation 9 and registration generation binding still match, admit the next controller acquisition/rebind transaction without observing credentials/login/gameplay
+FIRST_UNRESOLVED_EDGE=acquire exact generation 10, rebind registration 1/9 -> 2/10, immediate same-generation Gate B
+NEXT_ACTION=run exactly one current-main fenced canonical acquire+rebind+Gate-B transaction and keep the proven generation-10 lease active on success
 ```

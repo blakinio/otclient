@@ -1,0 +1,179 @@
+name: Track A native-login gen16 VNC repair v2
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-vnc-gen16-repair-v2.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    name: Raw-XRes rebind noVNC 6082 to gen16
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      BASE_SHA: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
+      TASK: OTC-20260818-native-login-to-ingame-e2e
+      SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
+      STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+      TOKEN: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Rebind historical 6082 viewer to exact active display
+        shell: bash
+        env:
+          EVENT_BASE: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE" == "$BASE_SHA" && "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EVENT_BASE" --expected-branch "$HEAD_BRANCH"
+
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          transition=.github/scripts/tibia-official-client-re-canonical-live-transition.py
+          src=.github/scripts/tibia-official-client-re-canonical-live-session.sh
+          probe="$RUNNER_TEMP/vnc-v2-probe-${GITHUB_RUN_ID}.sh"
+          trap 'rm -f "$probe"' EXIT
+          [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
+          bash "$lease" validate --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN"
+          bash "$lease" renew --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN" --ttl-seconds 2700
+          python3 .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py "$src" "$probe" \
+            --owner-helper .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
+          chmod 700 "$probe"
+          python3 "$transition" gate-b --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN" --probe "$probe"
+
+          readarray -t r < <(python3 - "$STATE/lease.json" "$STATE/runtime-registration.json" <<'PY'
+          import json,pathlib,sys
+          l=json.loads(pathlib.Path(sys.argv[1]).read_text()); r=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert l.get('status')=='active' and l.get('generation')==16 and l.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          assert r.get('registration_generation')==1 and r.get('lease_generation')==16
+          assert r.get('client_version')=='15.32.df7b29' and r.get('client_size')==51965216
+          assert r.get('client_sha256')=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          print(r['display']); print(r['pid']); print(r['window_identity']); print(r.get('remote_view_endpoint','')); print(r.get('remote_view_mapping',''))
+          PY
+          )
+          display="${r[0]}"; pid="${r[1]}"; wid="${r[2]}"; endpoint="${r[3]}"; mapping="${r[4]}"
+          [[ "$display" =~ ^:[0-9]+$ && "$pid" =~ ^[1-9][0-9]*$ && "$wid" =~ ^x11-window:[0-9]+$ ]]
+          [[ -S "/tmp/.X11-unix/X${display#:}" ]]; kill -0 "$pid"
+          tool="$(cat "$STATE/session/toolroot")"
+          x11vnc="$tool/usr/bin/x11vnc"; [[ -x "$x11vnc" ]]
+          xid="$(python3 .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            --display "$display" --pid "$pid" --toolroot "$tool" \
+            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py --attempts 4 --delay .25)"
+          expected_xid="${wid#x11-window:}"
+          [[ "$xid" == "$expected_xid" ]]
+          echo "VNC_V2_ACTIVE_DISPLAY=$display"
+          echo "VNC_V2_ACTIVE_PID=$pid"
+          echo "VNC_V2_RAW_XRES_WINDOW=$xid"
+          echo 'VNC_V2_RAW_XRES_VIEWABLE_1920X1080=true'
+          echo "VNC_V2_CANONICAL_ENDPOINT=$endpoint"
+          echo "VNC_V2_CANONICAL_MAPPING=$mapping"
+
+          command -v websockify >/dev/null
+          [[ -d /usr/share/novnc && -S /var/run/docker.sock ]]
+          self="$(hostname)"; docker inspect "$self" >/dev/null
+          map6082="$(python3 - "$self" <<'PY'
+          import json,subprocess,sys
+          d=json.loads(subprocess.check_output(['docker','inspect',sys.argv[1]]))[0]
+          b=(d.get('NetworkSettings',{}).get('Ports',{}) or {}).get('6081/tcp') or []
+          hp=sorted({str(x.get('HostPort','')) for x in b if x.get('HostPort')})
+          print('true' if '6082' in hp else 'false')
+          PY
+          )"
+          echo "VNC_V2_HOST_6082_TO_CONTAINER_6081=$map6082"
+
+          # Stop only the dedicated historical viewer listeners; refuse any unrelated owner.
+          python3 - 5901 6081 <<'PY'
+          import os,pathlib,signal,sys,time
+          def ins(port):
+              out=set(); want=f'{port:04X}'
+              for t in ('/proc/net/tcp','/proc/net/tcp6'):
+                  try: rows=pathlib.Path(t).read_text().splitlines()[1:]
+                  except OSError: continue
+                  for row in rows:
+                      f=row.split()
+                      if len(f)>9 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': out.add(f[9])
+              return out
+          def pids(inodes):
+              out=set()
+              for p in pathlib.Path('/proc').iterdir():
+                  if not p.name.isdigit(): continue
+                  try:
+                      for fd in (p/'fd').iterdir():
+                          try: target=os.readlink(fd)
+                          except OSError: continue
+                          if target.startswith('socket:[') and target[8:-1] in inodes: out.add(int(p.name)); break
+                  except OSError: pass
+              return out
+          for port in map(int,sys.argv[1:]):
+              for p in sorted(pids(ins(port))):
+                  try: cmd=pathlib.Path(f'/proc/{p}/cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace')
+                  except OSError: continue
+                  if not (('x11vnc' in cmd) if port==5901 else ('websockify' in cmd)):
+                      raise SystemExit(f'REFUSE_UNKNOWN_LISTENER_{port}_{p}')
+                  print(f'VNC_V2_REPLACE_STALE_{port}=true')
+                  try: os.kill(p,signal.SIGTERM)
+                  except ProcessLookupError: pass
+              end=time.monotonic()+3
+              while ins(port) and time.monotonic()<end: time.sleep(.1)
+              for p in pids(ins(port)):
+                  try: os.kill(p,signal.SIGKILL)
+                  except ProcessLookupError: pass
+          PY
+
+          web="$STATE/session/novnc-web"
+          rm -rf "$web"; mkdir -p "$web"; cp -a /usr/share/novnc/. "$web/"
+          cat >"$web/index.html" <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>Track A Tibia live</title><script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=6&compression=3&show_dot=true&path=websockify');</script>
+          HTML
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD DISPLAY="$display" \
+            nohup "$x11vnc" -display "$display" -rfbport 5901 -localhost -forever -shared -nopw \
+            -xkb -repeat -wait 10 -defer 10 -deferupdate 20 -threads -noxrecord -noxfixes \
+            -o "$STATE/session/observability-x11vnc.log" >/dev/null 2>&1 </dev/null &
+          vp=$!; printf '%s\n' "$vp" >"$STATE/session/observability-x11vnc.pid"
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            nohup websockify --web "$web" 0.0.0.0:6081 127.0.0.1:5901 \
+            >"$STATE/session/observability-websockify.log" 2>&1 </dev/null &
+          wp=$!; printf '%s\n' "$wp" >"$STATE/session/observability-websockify.pid"
+          chmod 600 "$STATE/session/observability-x11vnc.pid" "$STATE/session/observability-websockify.pid"
+          for _ in $(seq 1 40); do
+            if kill -0 "$vp" 2>/dev/null && kill -0 "$wp" 2>/dev/null && curl -fsS --max-time 1 -o /dev/null http://127.0.0.1:6081/ 2>/dev/null; then break; fi
+            sleep .25
+          done
+          kill -0 "$vp"; kill -0 "$wp"; curl -fsS --max-time 2 -o /dev/null http://127.0.0.1:6081/
+          python3 - <<'PY'
+          import base64,os,socket
+          s=socket.create_connection(('127.0.0.1',5901),3); assert s.recv(12).startswith(b'RFB '); s.close()
+          key=base64.b64encode(os.urandom(16)).decode()
+          q=('GET /websockify HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'+f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
+          s=socket.create_connection(('127.0.0.1',6081),3); s.sendall(q); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
+          print('VNC_V2_RFB=PASS'); print('VNC_V2_WEBSOCKET=PASS')
+          PY
+          bash "$lease" validate --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN"
+          python3 "$transition" gate-b --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN" --probe "$probe"
+          echo 'VNC_V2_SECRET_ACCESS=false'
+          echo 'VNC_V2_AUTH_MUTATION=false'
+          echo 'VNC_V2_CLIENT_RESTART=false'
+          echo 'VNC_V2_RESULT=PASS'
+          echo 'VNC_V2_URL=http://synology:6082/'
+          rm -f "$probe"; trap - EXIT

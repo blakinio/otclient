@@ -16,7 +16,7 @@ COORDINATE_CLICK_USED=false
 BLIND_TAB_RETURN_USED=false
 RUNTIME_ACCESS=none
 CLIENT_EXECUTED=false
-SYNLOGY_RUNTIME_USED=false
+SYNOLOGY_RUNTIME_USED=false
 CREDENTIAL_ACCESS=false
 SESSION_ACCESS=false
 ```
@@ -126,6 +126,8 @@ unique live tibia::client::TGameClient instance
 ```
 
 The target code begins by loading `_a[2]` and `_a[1]`, consistent with the generated QMeta wrapper for two `QString` arguments. Runtime use still requires fresh exact-process/PIE rebinding, live object provenance, Qt thread-affinity proof, protected transient secret ingress, and current Track A runtime authority. This static task does not claim that those runtime gates have passed.
+
+A safer runtime consumer should prefer Qt's own invocation machinery from the owning Qt thread, for example a bounded `QMetaObject::invokeMethod` of `onRequestLoginWithCredentials` with the two validated `QString` values, while retaining `0xd06260`, method id `17`, target `0xd06850` and the instruction bytes as exact-build/runtime fences. Do not expose a general arbitrary-call RPC.
 
 ## Result
 

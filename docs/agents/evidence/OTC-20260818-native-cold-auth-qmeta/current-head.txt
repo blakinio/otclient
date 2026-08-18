@@ -1,1 +1,0 @@
-This branch is dedicated to exact-SHA native cold-auth QMeta recovery only. It does not own or touch PR #475 runtime.

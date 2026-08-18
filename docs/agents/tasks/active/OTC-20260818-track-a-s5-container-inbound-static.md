@@ -12,9 +12,9 @@ execution_mode: github_only
 branch: research/OTC-20260818-track-a-s5-container-inbound-static
 base_branch: main
 base_main: be0d3fd5468e70e8d97b66b838cd14ba24c56c73
-related_pr: pending
+related_pr: 518
 created: 2026-08-18T11:24:00+02:00
-updated: 2026-08-18T11:24:00+02:00
+updated: 2026-08-18T11:30:00+02:00
 risk: low
 implementation_authorized: true
 credentials_allowed: false
@@ -37,6 +37,7 @@ gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 owned_paths:
+  - .github/workflows/track-a-s5-container-inbound-log-reuse.yml
   - docs/agents/tasks/active/OTC-20260818-track-a-s5-container-inbound-static.md
   - docs/agents/evidence/OTC-20260818-track-a-s5-container-inbound-static/**
   - docs/agents/reports/OTCLIENT-20260818-track-a-s5-container-inbound-static.md
@@ -46,6 +47,7 @@ reuses:
   - docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/**
   - docs/agents/evidence/OTC-20260818-track-a-s2-player-inbound-static/**
   - sanitized S2 global QMeta artifact from run 32115662884
+  - sanitized exhaustive QMeta log from run 31790507112 / job 94736106350
   - docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/runtime_type_semantics.jsonl
 depends_on:
   - OTC-20260818-track-a-s4-creature-container-evidence-census
@@ -109,14 +111,15 @@ GameserverMessageDeleteInContainer -> receivedDeleteInContainerMessage
 - [ ] no client download/execution;
 - [ ] no runtime/Synology/X11/process-memory/credentials/login/gameplay;
 - [ ] no PR #475 observation/mutation;
+- [ ] temporary log-reuse workflow removed before promotion;
 - [ ] exact-head CI/governance and coordinator closeout.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 1
+checkpoint_version: 2
 status: investigating
-last_completed_step: admitted container-only static proof on current main after S4 evidence census
+last_completed_step: proved four container message types have exact TProtocolMessageQueue registerServerMessage<T> type surfaces and located the historical exhaustive QMeta log format
 blockers: []
-next_action: inspect the retained global QMeta artifact and exact QMeta registries for receivedContainer*, handler and storage surfaces.
+next_action: reuse job 94736106350 log to recover exact method indices/names for TProtocolMessageQueue, TContainerProtocolMessageHandler and TContainerStorage without obtaining client bytes.
 ```

@@ -1,5 +1,6 @@
 ---
 task_id: OTC-20260818-track-a-persistent-viewer-handoff
+track_id: official-client-re
 status: implementing
 agent: ChatGPT
 session_id: chatgpt-persistent-viewer-handoff-20260818-1641
@@ -7,12 +8,13 @@ session_role: implementer
 project_lane: otclient
 lane: RUNTIME
 task_kind: implementation
-phase: implement
+phase: validate
 branch: fix/OTC-20260818-track-a-persistent-viewer-handoff
 base_branch: main
 base_main: ebbb36f50076ff4072c7218e302614c1dfea00b1
+pull_request: 541
 risk: high
-updated: 2026-08-18T16:41:38+02:00
+updated: 2026-08-18T17:04:00+02:00
 policy_version: 2
 execution_mode: github_only
 execution_reason: repository tooling and deterministic tests are implemented through GitHub; physical Synology validation is deferred until it can be isolated from the active native-login owner
@@ -52,16 +54,13 @@ gameplay_allowed: false
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md
   - docs/agents/evidence/OTC-20260818-track-a-persistent-viewer-handoff/**
-  - .github/scripts/tibia-official-client-re-canonical-live-lease
-  - .github/scripts/tibia-official-client-re-canonical-live-lease.py
-  - .github/scripts/test_tibia_official_client_re_canonical_live-lease-handoff.py
-  - .github/scripts/tibia-official-client-re-canonical-live-session.sh
-  - .github/scripts/test_tibia_official_client_re_canonical_live_session.py
+  - .github/scripts/tibia-official-client-re-canonical-live-handoff.py
+  - .github/scripts/tibia-official-client-re-canonical-live-resume.py
   - .github/scripts/tibia-official-client-re-persistent-viewer.py
+  - .github/scripts/test_tibia_official_client_re_canonical_live_handoff.py
+  - .github/scripts/test_tibia_official_client_re_canonical_live_resume.py
   - .github/scripts/test_tibia_official_client_re_persistent_viewer.py
-  - docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
-  - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
-  - docs/agents/TIBIA_RESEARCH_TRACKS.md
+  - docs/agents/decisions/ADR-0002-track-a-persistent-viewer-handoff.md
 modules_touched:
   - track-a-canonical-controller-lease
   - track-a-canonical-live-runtime
@@ -76,37 +75,38 @@ acceptance:
   - PR #528 remains the current physical native-login/package owner and is not mutated or preempted by this task
 integration_dependency: PR #528 may consume the promoted controller/viewer tooling only after this task is independently audited and merged; this task must not use its unmerged governance/code to touch the live official client
 invocation_started_at: 2026-08-18T16:41:38+02:00
-last_progress_at: 2026-08-18T16:41:38+02:00
+last_progress_at: 2026-08-18T17:04:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
-next_action: implement same-task lease handoff, raw-XRes canonical window proof, and fixed 6081-to-6082 persistent viewer identity/health tooling with deterministic tests
+last_validation_failure: Track A deterministic admission-policy audit rejected the task because track_id was missing; Fresh admission behavior audit passed
+next_action: validate the repaired admission record and run the committed controller handoff/resume/viewer tests on the new exact head
 recovery:
   policy_version: 1
-  generation: 1
+  generation: 2
   session_id: chatgpt-persistent-viewer-handoff-20260818-1641
   session_started_at: 2026-08-18T16:41:38+02:00
-  checkpointed_at: 2026-08-18T16:41:38+02:00
-  last_progress_at: 2026-08-18T16:41:38+02:00
-  phase: implement
-  exact_head: task-claim-commit
-  pull_request: none
-  active_operation: none
+  checkpointed_at: 2026-08-18T17:04:00+02:00
+  last_progress_at: 2026-08-18T17:04:00+02:00
+  phase: validate
+  exact_head: after-admission-fix
+  pull_request: 541
+  active_operation: GitHub Actions exact-head validation
   external_run_ids: []
-  operation_started_at: null
+  operation_started_at: 2026-08-18T17:04:00+02:00
   wait_deadline_at: null
   check_generation: draft
   checks_used: 0
   status: active
   safe_to_resume: true
   resume_condition: branch and owned paths remain conflict-free and PR #528 continues to own the physical native-login runtime
-  next_action: implement the declared controller/viewer repository slice without touching PR #528
+  next_action: inspect the first exact-head CI result; repair only evidence-backed failures and do not touch PR #528 runtime
 ---
 
 # Track A persistent viewer and controller handoff
@@ -138,6 +138,17 @@ runtime identity      = registration + boot/PID/start/exact client/display/XID
 controller identity   = task + current disposable session + rotated capability
 viewer identity       = runtime registration binding + fixed backend/public mapping
 ```
+
+## Implemented repository slice
+
+The branch now contains:
+
+- a fail-closed same-task lease handoff that discovers the previous controller session from authoritative state, rotates the capability and increments generation;
+- a high-level resume/release helper that derives the replacement GitHub Actions session id, performs handoff only when explicitly requested, then uses the existing canonical rebind and Gate B transitions;
+- a persistent view-only viewer bound to immutable runtime identity and raw-XRes-owned XID, with fixed `5901 -> 6081 -> public 6082` topology;
+- an exact `viewer-identity.json` check plus RFB/WebSocket checks so a stale public presentation path cannot masquerade as the current viewer;
+- separate runtime and viewer health results so viewer failure does not authorize client restart;
+- focused deterministic tests and ADR-0002 documenting the transition boundaries.
 
 ## Safety boundary
 

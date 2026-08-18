@@ -1,0 +1,78 @@
+name: Track A protected TTY native-auth source
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-native-auth-protected-tty.yml
+      - tools/tibia_runtime_bridge/protected_auth_tty.py
+      - tools/tibia_runtime_bridge/PROTECTED_AUTH_TTY.md
+      - tests/tools/tibia_runtime_bridge/test_protected_auth_tty.py
+      - docs/agents/tasks/active/OTC-20260818-native-auth-protected-tty-source.md
+      - docs/agents/evidence/OTC-20260818-native-auth-protected-tty-source/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate no-form protected TTY credential source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Verify merged native-auth dependency remains unchanged
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git hash-object tools/tibia_runtime_bridge/experimental_auth_client.py)" = 4d2d7a93d896d37584d7f3817b63cdfa32d37805
+          test "$(git hash-object tools/tibia_runtime_bridge/experimental_auth.cpp)" = 13b5611483891ece91ec6f344790d21d1aeda0b6
+          test "$(git hash-object tools/tibia_runtime_bridge/bridge.cpp)" = c47dc3e81162867692e7608f14a9f53dea52bf3b
+          test "$(git hash-object tools/tibia_runtime_bridge/ipc_client.py)" = 63bdb9258ce2c67781f43de8f4a482024fc89672
+          echo 'PROTECTED_TTY_EXISTING_AUTH_SURFACES=UNCHANGED'
+
+      - name: Run synthetic protected TTY and memfd tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            tools/tibia_runtime_bridge/protected_auth_tty.py \
+            tests/tools/tibia_runtime_bridge/test_protected_auth_tty.py
+          PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_protected_auth_tty.py
+          echo 'PROTECTED_TTY_TEST_CREDENTIALS=synthetic_only'
+          echo 'PROTECTED_TTY_REAL_CREDENTIAL_ACCESS=false'
+          echo 'PROTECTED_TTY_OFFICIAL_CLIENT_EXECUTED=false'
+          echo 'PROTECTED_TTY_RUNTIME_ACCESS=none'
+          echo 'PROTECTED_TTY_FORM_UI_USED=false'
+
+      - name: Fail closed on unsafe source patterns
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          source=tools/tibia_runtime_bridge/protected_auth_tty.py
+          for forbidden in \
+            'sys.stdin' \
+            'getpass' \
+            'os.getenv(' \
+            'os.environ[' \
+            'add_argument("--email' \
+            'add_argument("--password'; do
+            if grep -F "$forbidden" "$source" >/dev/null; then
+              echo "unsafe protected-auth source pattern present: $forbidden" >&2
+              exit 1
+            fi
+          done
+          grep -F 'os.open("/dev/tty"' "$source" >/dev/null
+          grep -F 'PR_SET_DUMPABLE' "$source" >/dev/null
+          grep -F 'mlock' "$source" >/dev/null
+          grep -F 'os.memfd_create' "$source" >/dev/null
+          grep -F 'F_SEAL_WRITE' "$source" >/dev/null
+          grep -F 'auth_with_credentials_fd' "$source" >/dev/null
+          grep -F 'EXTERNAL_INTERACTIVE_TTY_REQUIRED' "$source" >/dev/null
+          echo 'PROTECTED_TTY_SECRET_ENV=REFUSED'
+          echo 'PROTECTED_TTY_STDIN_FALLBACK=ABSENT'
+          echo 'PROTECTED_TTY_PLAINTEXT_FILE_FALLBACK=ABSENT'

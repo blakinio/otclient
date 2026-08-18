@@ -1,0 +1,180 @@
+name: Track A S7 inventory equipment log reuse
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-s7-inventory-equipment-log-reuse.yml
+      - docs/agents/tasks/active/OTC-20260818-track-a-s7-inventory-equipment-static.md
+      - docs/agents/evidence/OTC-20260818-track-a-s7-inventory-equipment-static/**
+      - docs/agents/reports/OTCLIENT-20260818-track-a-s7-inventory-equipment-static.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  recover:
+    name: Recover inventory QMeta from sanitized historical log
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Download prior exact-SHA QMeta log and discover inventory owners
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/track-a-s7"
+          mkdir -p "$out/raw" "$out/evidence"
+          job=94736106350
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${job}/logs" \
+            -o "$out/raw/${job}.log"
+          test -s "$out/raw/${job}.log"
+
+          python3 - "$out/raw/${job}.log" "$out/evidence" <<'PY'
+          from __future__ import annotations
+          import hashlib, json, pathlib, re, sys
+
+          log_path=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2])
+          raw=log_path.read_bytes(); text=raw.decode('utf-8','replace')
+          ansi=re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+          records=[]
+          for line in text.splitlines():
+              line=ansi.sub('',line)
+              pos=line.find('QMETA_JSON ')
+              if pos<0: continue
+              try: records.append(json.loads(line[pos+len('QMETA_JSON '):].strip()))
+              except Exception: continue
+
+          by_type={r.get('type_name'):r for r in records if r.get('type_name')}
+          queue=by_type['tibia::protocol::TProtocolMessageQueue']
+          inventory_container=by_type['tibia::container::TInventoryContainer']
+          inventory_controller=by_type['tibia::gamewindow::TPlayerInventoryAndStatusController']
+          player_handler=by_type.get('tibia::game::TPlayerProtocolMessageHandler')
+
+          receive_names={
+              'receivedSetInventoryMessage',
+              'receivedDeleteInventoryMessage',
+              'receivedPlayerInventoryMessage',
+          }
+          handle_names={
+              'handleSetInventoryMessage',
+              'handleDeleteInventoryMessage',
+              'handlePlayerInventoryMessage',
+          }
+
+          queue_hits=[]
+          for m in queue['methods']:
+              if m.get('name') in receive_names:
+                  queue_hits.append({**m,'is_signal_by_qmeta_prefix':m['index']<queue['signals_count']})
+
+          owner_hits=[]
+          for r in records:
+              hits=[]
+              for m in r.get('methods',[]):
+                  if m.get('name') in handle_names:
+                      hits.append({**m,'is_signal_by_qmeta_prefix':m['index']<r.get('signals_count',0)})
+              if hits:
+                  owner_hits.append({
+                      'type_name':r['type_name'],
+                      'relationships':r.get('relationships',{}),
+                      'method_count':len(r.get('methods',[])),
+                      'signal_count':r.get('signals_count',0),
+                      'matches':hits,
+                  })
+
+          found_receive={m['name'] for m in queue_hits}
+          if found_receive != receive_names:
+              raise SystemExit('missing queue receives: '+','.join(sorted(receive_names-found_receive)))
+          found_handle={m['name'] for owner in owner_hits for m in owner['matches']}
+          if found_handle != handle_names:
+              raise SystemExit('missing handle methods: '+','.join(sorted(handle_names-found_handle)))
+
+          result={
+              'schema':'track-a-s7-inventory-equipment-log-reuse-v1',
+              'source_run':31790507112,
+              'source_job':94736106350,
+              'source_head':'9afdc76ca6fe238742f270e22d8ecf4abe5ba9a2',
+              'source_log_sha256':hashlib.sha256(raw).hexdigest(),
+              'source_exact_client_sha256':'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
+              'runtime_access':'none',
+              'client_downloaded':False,
+              'client_executed':False,
+              'queue':{
+                  'type_name':queue['type_name'],
+                  'method_count':len(queue['methods']),
+                  'signal_count':queue['signals_count'],
+                  'relationships':queue['relationships'],
+                  'inventory_receive_methods':queue_hits,
+              },
+              'handle_method_owners':owner_hits,
+              'inventory_container':{
+                  'type_name':inventory_container['type_name'],
+                  'method_count':len(inventory_container['methods']),
+                  'signal_count':inventory_container['signals_count'],
+                  'relationships':inventory_container['relationships'],
+                  'methods':inventory_container['methods'],
+              },
+              'inventory_controller':{
+                  'type_name':inventory_controller['type_name'],
+                  'method_count':len(inventory_controller['methods']),
+                  'signal_count':inventory_controller['signals_count'],
+                  'relationships':inventory_controller['relationships'],
+                  'methods':inventory_controller['methods'],
+              },
+              'player_handler': None if player_handler is None else {
+                  'type_name':player_handler['type_name'],
+                  'method_count':len(player_handler['methods']),
+                  'signal_count':player_handler['signals_count'],
+                  'relationships':player_handler['relationships'],
+                  'methods':player_handler['methods'],
+              },
+              'pr528_runtime_touched':False,
+              'pr475_runtime_touched':False,
+              'secret_access':False,
+          }
+          (out/'inventory-qmeta.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          (out/'queue-inventory-methods.txt').write_text('\n'.join(f"{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['is_signal_by_qmeta_prefix']).lower()}" for m in queue_hits)+'\n')
+          (out/'handle-owner-methods.txt').write_text('\n'.join(f"{owner['type_name']}\t{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['is_signal_by_qmeta_prefix']).lower()}" for owner in owner_hits for m in owner['matches'])+'\n')
+          (out/'inventory-container-methods.txt').write_text('\n'.join(f"{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['index']<inventory_container['signals_count']).lower()}" for m in inventory_container['methods'])+'\n')
+          (out/'inventory-controller-methods.txt').write_text('\n'.join(f"{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['index']<inventory_controller['signals_count']).lower()}" for m in inventory_controller['methods'])+'\n')
+          print('TRACK_A_S7_QMETA_LOG_REUSE=PASS')
+          print('TRACK_A_S7_QUEUE_RECEIVES='+','.join(f"{m['index']}:{m['name']}" for m in queue_hits))
+          print('TRACK_A_S7_HANDLE_OWNERS='+','.join(f"{o['type_name']}:{m['index']}:{m['name']}" for o in owner_hits for m in o['matches']))
+          print('TRACK_A_S7_INVENTORY_CONTAINER_METHODS='+str(len(inventory_container['methods'])))
+          print('TRACK_A_S7_INVENTORY_CONTROLLER_METHODS='+str(len(inventory_controller['methods'])))
+          print('TRACK_A_S7_PR528_RUNTIME_TOUCHED=false')
+          print('TRACK_A_S7_PR475_RUNTIME_TOUCHED=false')
+          PY
+
+          rm -rf "$out/raw"
+
+      - name: Add committed S1 inventory name surfaces
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/track-a-s7/evidence"
+          grep -nE 'received(SetInventory|DeleteInventory|PlayerInventory)Message' \
+            docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/received-message-methods.txt \
+            > "$out/s1-received-inventory-lines.txt"
+          grep -nE 'GameserverMessage(SetInventory|DeleteInventory|PlayerInventory)' \
+            docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-server-to-client.txt \
+            > "$out/s1-inventory-message-lines.txt"
+
+      - name: Upload normalized S7 evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-s7-inventory-equipment-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-s7/evidence
+          if-no-files-found: error
+          retention-days: 7

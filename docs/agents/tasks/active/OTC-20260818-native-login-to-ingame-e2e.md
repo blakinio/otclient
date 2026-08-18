@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: native-login-external-action-required
+phase: github-secrets-reentry-inventory
 branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v2
 base_branch: main
 base_main: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
 risk: critical
-updated: 2026-08-18T12:35:00+02:00
+updated: 2026-08-18T12:50:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -55,6 +55,18 @@ login_allowed: false
 gameplay_allowed: false
 simultaneous_logged_in_sessions_max: 1
 live_runtime_authorization_source: owner invocation of OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME on 2026-08-18
+github_actions_secret_ingress_authorized_by_owner: true
+github_actions_secret_ingress_authorization_source: owner request "To sprawdz to z secrets" on 2026-08-18
+github_actions_secret_email_name: TIBIA_TEST_EMAIL
+github_actions_secret_password_name: TIBIA_TEST_PASSWORD
+github_actions_secret_presence_run: 32128651952
+github_actions_secret_presence_job: 95684712657
+github_actions_secret_email_present: true
+github_actions_secret_password_present: true
+github_actions_secret_email_shape_valid: true
+github_actions_secret_password_shape_valid: true
+github_actions_secret_pair_ready: true
+github_actions_secret_values_logged: false
 owner_funded_ai_api_authorized: false
 direct_codex_spark_authorized: true
 direct_codex_spark_model: gpt-5.3-codex-spark
@@ -77,127 +89,80 @@ server_response_spoofed: false
 historical_runtime_authority_inherited: false
 historical_pid_xid_display_session_inherited: false
 historical_login_budget_inherited: false
-protected_secret_source_required_if_cold_auth: true
 controller_plane_inventory_run: 32124348434
 canonical_bootstrap_run: 32125054251
 canonical_bootstrap_result: REGISTERED_GATE_B_PASS
 post_bootstrap_inventory_run: 32125504315
 canonical_rebind_run: 32125924194
 canonical_rebind_result: REBIND_GATE_B_PASS_ACTIVE_GEN10
-canonical_rebind_registration_generation: 2
-canonical_rebind_registration_lease_generation: 10
 retained_session_probe_run: 32126937957
-retained_session_probe_job: 95679477308
 retained_session_probe_result: CURRENT_NATIVE_CHARACTER_MODEL_EMPTY
 retained_session_available: false
 cold_auth_required: true
 cold_auth_capability_run: 32127178186
-cold_auth_capability_job: 95680214790
 cold_auth_controlling_tty: false
-cold_auth_tty_errno: 6
 cold_auth_helper_loaded: false
 cold_auth_auth_socket_present: false
-cold_auth_protected_producer_import: PASS
 terminal_release_run: 32127353047
-terminal_release_job: 95680752008
 terminal_release_generation: 10
 controller_authority_released: true
-terminal_blocker: EXTERNAL_ACTION_REQUIRED
 success_result: CHARACTER_ACTUALLY_LOGGED_INTO_GAME
 causal_proof: INCOMPLETE
 ---
 
-# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — external secret boundary
+# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — GitHub Secrets re-entry
 
-## Verified progress
+The owner explicitly requested a continuation using repository GitHub Actions Secrets. This checkpoint records that authorization without treating secret values as repository data.
 
-Fresh physical execution on `synology-otclient-01` reached and validated the exact official client under the current Track A canonical runtime contract:
+## Verified secret availability
+
+Hosted workflow `32128651952 / 95684712657` referenced only the canonical secret names already used by historical physical PR #475 and emitted booleans only:
 
 ```text
-CLIENT_VERSION=15.32.df7b29
-CLIENT_SIZE=51965216
-CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-CANONICAL_BOOTSTRAP=PASS
-BOOTSTRAP_GATE_B=PASS
-CANONICAL_REBIND=PASS
-REBIND_GATE_B=PASS
-REGISTRATION_GENERATION=2
-LEASE_GENERATION=10
+NATIVE_LOGIN_SECRET_EMAIL_PRESENT=true
+NATIVE_LOGIN_SECRET_PASSWORD_PRESENT=true
+NATIVE_LOGIN_SECRET_EMAIL_SHAPE_VALID=true
+NATIVE_LOGIN_SECRET_PASSWORD_SHAPE_VALID=true
+NATIVE_LOGIN_SECRET_PAIR_READY=true
 ```
 
-The one bounded retained-native-session discriminator then proved exactly one current `TCharacterSelectionController`, but both current native model collections were empty:
+The secret values were masked by GitHub and were not printed, persisted, committed or returned to ChatGPT.
+
+This owner authorization supersedes the previous task-local assumption that only a human controlling `/dev/tty` may be used for this particular continuation. It does not authorize plaintext files, logs, argv exposure, GUI credential entry, OCR, coordinate automation, auth bypass, 2FA/CAPTCHA fabrication, TLS weakening or server-response spoofing.
+
+## Safety boundary for the next secret-bearing operation
+
+The intended path is:
 
 ```text
-NATIVE_LOGIN_RETAINED_CHARSEL_INSTANCE_COUNT=1
-NATIVE_LOGIN_RETAINED_CHARSEL_VPTR_PROVEN=true
-NATIVE_LOGIN_RETAINED_NATIVE_CHARACTER_LIST_COUNT=0
-NATIVE_LOGIN_RETAINED_NATIVE_SELECTED_LOGIN_DATA_COUNT=0
-NATIVE_LOGIN_RETAINED_SESSION=NOT_PROVEN_AVAILABLE
-NATIVE_LOGIN_RETAINED_DISCRIMINATOR=PASS:CURRENT_NATIVE_CHARACTER_MODEL_EMPTY
+GitHub Actions secret environment in a dedicated one-shot producer
+ -> immediately bounded UTF-8 validation
+ -> sealed anonymous memfd
+ -> unset secret environment in the producer
+ -> SCM_RIGHTS
+ -> exact auth-helper socket
+ -> exact client/peer identity fence
+ -> TGameClient::onRequestLoginWithCredentials(QString,QString)
+ -> original Tibia authentication state machine
 ```
 
-No direct-to-character-selection shortcut was invoked. Cold authentication is therefore required before native character selection can be legitimately reached.
+No secret-bearing operation is admitted yet. The prior generation-10 controller lease was deliberately released, so the continuation must first perform a fresh no-client controller-plane inventory, then establish fresh canonical authority. Because the currently registered runtime was launched without the experimental auth helper, it must be replaced or otherwise prepared through a separately admitted exact-client transition before credentials may be consumed.
 
-## Protected cold-auth boundary
-
-The promoted protected credential producer is importable, but the actual GitHub Actions execution context has no real controlling terminal:
+## Recovery checkpoint
 
 ```text
-NATIVE_LOGIN_COLD_AUTH_PROTECTED_PRODUCER_IMPORT=PASS
-NATIVE_LOGIN_COLD_AUTH_CONTROLLING_TTY=false
-NATIVE_LOGIN_COLD_AUTH_TTY_ERRNO=6
-```
-
-The currently registered client was also launched without the experimental native-auth helper and has no auth socket:
-
-```text
-NATIVE_LOGIN_COLD_AUTH_HELPER_LOADED=false
-NATIVE_LOGIN_COLD_AUTH_SESSION_AUTH_SOCKET_PRESENT=false
-NATIVE_LOGIN_COLD_AUTH_SESSION_AUTH_SOCKET_COUNT=0
-```
-
-The repository security contract forbids using GitHub Actions secrets/environment, stdin/getpass, pseudo-TTY, plaintext files, GUI credential entry, OCR or coordinate automation as a replacement for the missing real controlling `/dev/tty`. Credentials and 2FA must never be pasted into chat.
-
-## Terminal release
-
-After proving the external boundary, the task released controller authority cleanly:
-
-```text
-NATIVE_LOGIN_TERMINAL_RELEASE_PRECHECK=ACTIVE_GEN10_CURRENT_TASK
-TRACK_A_CANONICAL_LEASE_RELEASE=true
-TRACK_A_CANONICAL_LEASE_GENERATION=10
-NATIVE_LOGIN_TERMINAL_RELEASE_RESULT=RELEASED_GEN10
-NATIVE_LOGIN_TERMINAL_CLIENT_MUTATION=false
-NATIVE_LOGIN_TERMINAL_CREDENTIAL_ACCESS=false
-NATIVE_LOGIN_TERMINAL_LOGIN_PERFORMED=false
-```
-
-The task-local lease token was deleted. The registered client remains idle, but its PID/display/window and generation-10 registration are historical evidence only; they do not transfer authority to any continuation.
-
-## Durable evidence
-
-- `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-controller-plane-admission-inventory.md`
-- `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-canonical-bootstrap-gate-b.md`
-- `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-post-bootstrap-controller-inventory.md`
-- `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-canonical-rebind-gate-b.md`
-- `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-retained-session-discriminator.md`
-- `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-cold-auth-capability.md`
-- `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-terminal-controller-release.md`
-
-## Terminal checkpoint
-
-```text
-STATUS=WAITING
-RESULT=EXTERNAL_ACTION_REQUIRED
-CHARACTER_ACTUALLY_LOGGED_INTO_GAME=NO
-CAUSAL_PROOF=INCOMPLETE
-FORM_UI_USED=false
-OCR_USED=false
-IMAGE_MATCHING_USED=false
-GUI_CREDENTIAL_ENTRY_USED=false
-SECRET_REQUESTED_IN_ACTIONS=false
-SECRET_READ_BY_AGENT=false
-CONTROLLER_AUTHORITY_RELEASED=true
-BLOCKER=Cold auth is required, but the autonomous GitHub Actions context has no real controlling /dev/tty; the current client also lacks the launch-time native-auth helper/socket.
-NEXT_ACTION=On continuation, first re-admit from fresh controller-plane evidence and prepare an exact auth-helper-enabled client runtime. Then a human operator must enter account/password only through the protected producer on a real controlling Linux /dev/tty; do not send credentials or OTPs through chat. After successful native account auth, continue semantically through native character selection and prove actual game-server IN_GAME causally.
+STATUS=validating
+RESULT=CONTINUING_WITH_OWNER_AUTHORIZED_GITHUB_SECRETS
+SECRET_PAIR_READY=true
+SECRET_VALUES_LOGGED=false
+CURRENT_KNOWN_LEASE_GENERATION=10
+CURRENT_KNOWN_LEASE_STATUS=released
+CURRENT_KNOWN_REGISTRATION_GENERATION=2
+CURRENT_KNOWN_REGISTRATION_LEASE_GENERATION=10
+MUTATION_AUTHORIZED=false
+CREDENTIALS_ALLOWED=false
+LOGIN_ALLOWED=false
+GAMEPLAY_ALLOWED=false
+FIRST_UNRESOLVED_EDGE=fresh controller-plane state after terminal release
+NEXT_ACTION=run one fresh no-client controller-plane inventory on synology-otclient-01; if state remains released generation 10 with registration 2/10, admit exactly one generation-11 acquire/rebind/Gate-B transition before any runtime replacement or secret use
 ```

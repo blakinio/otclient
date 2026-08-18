@@ -1,4 +1,4 @@
-name: Track A native-login work-toolroot inventory
+name: Track A native-login persistent updater desktop
 
 on:
   pull_request:
@@ -14,13 +14,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  inventory:
-    name: Resolve canonical work toolroot read-only
+  start:
+    name: Start official updater only after persistent VNC passes
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
+      TASK: OTC-20260818-native-login-to-ingame-e2e
+      LEASE_SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
+      BASE: /home/runner/_work/_otclient_tibia_re_state
+      WORKBASE: /work/_otclient_tibia_re_state
+      TOKEN: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -28,7 +33,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Resolve toolroot without runtime mutation
+
+      - name: Establish persistent updater desktop and launch official updater
         shell: bash
         env:
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -36,26 +42,250 @@ jobs:
         run: |
           set +x
           set -Eeuo pipefail
+          umask 077
           [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
           [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
           [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
-          echo TOOLROOT_PROBE_SECRET_ACCESS=false
-          echo TOOLROOT_PROBE_MUTATION=false
-          home=/home/runner/_work/_otclient_tibia_re_state/toolroot
-          work=/work/_otclient_tibia_re_state/toolroot
-          for root in "$home" "$work"; do
-            tag=HOME; [[ "$root" == "$work" ]] && tag=WORK
-            [[ -d "$root" ]] && echo "TOOLROOT_${tag}_PRESENT=true" || echo "TOOLROOT_${tag}_PRESENT=false"
-            for b in Xvfb x11vnc xdotool; do
-              [[ -x "$root/usr/bin/$b" ]] && echo "TOOLROOT_${tag}_${b^^}=true" || echo "TOOLROOT_${tag}_${b^^}=false"
-            done
-            [[ -d "$root/usr/share/X11/xkb" ]] && echo "TOOLROOT_${tag}_XKB=true" || echo "TOOLROOT_${tag}_XKB=false"
-            [[ -f "$root/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so" ]] && echo "TOOLROOT_${tag}_SWRAST=true" || echo "TOOLROOT_${tag}_SWRAST=false"
-            p="$(find "$root" -xdev -type f -name libproxychains.so.4 -print -quit 2>/dev/null || true)"
-            [[ -n "$p" ]] && echo "TOOLROOT_${tag}_PROXYCHAINS=true" || echo "TOOLROOT_${tag}_PROXYCHAINS=false"
-          done
-          if [[ -x "$work/usr/bin/Xvfb" ]]; then
-            echo "TOOLROOT_WORK_XVFB_SHA256=$(sha256sum "$work/usr/bin/Xvfb" | awk '{print $1}')"
+
+          task=docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
+          grep -q '^task_id: OTC-20260818-native-login-to-ingame-e2e$' "$task"
+          grep -q '^branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3$' "$task"
+          grep -q '^runtime_access: ephemeral_isolated$' "$task"
+          grep -q '^credentials_allowed: false$' "$task"
+          grep -q '^login_allowed: false$' "$task"
+          echo TRACK_A_ADMISSION_RUNTIME_ACCESS=ephemeral_isolated
+          echo TRACK_A_ADMISSION_NAMESPACE=native-login-official-updater-desktop
+          echo TRACK_A_ADMISSION_TARGET_UNIQUENESS=FIXED_PACKAGE_PLUS_DEDICATED_UPDATE_STATE
+          echo TRACK_A_ADMISSION_MUTATION_AUTHORIZED=true
+          echo TRACK_A_ADMISSION_CREDENTIALS_ALLOWED=false
+          echo TRACK_A_ADMISSION_LOGIN_ALLOWED=false
+          echo TRACK_A_ADMISSION_GAMEPLAY_ALLOWED=false
+          echo TRACK_A_ADMISSION_AUTHORITY_SOURCE=CURRENT_OWNER_RESTART_UPDATE_AND_VNC_REQUEST
+
+          state="$BASE/canonical-live-runtime"
+          package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$package/bin/client"
+          tool="$WORKBASE/toolroot"
+          warp="$state/warp"
+          live="$BASE/native-login-update/live"
+          work="$BASE/native-login-update/assets-$GITHUB_RUN_ID"
+          mkdir -p -m700 "$work" "$(dirname "$live")"
+
+          stop_pid() {
+            local p="$1"
+            [[ "$p" =~ ^[1-9][0-9]*$ ]] || return 0
+            kill "$p" 2>/dev/null || true
+            for _ in $(seq 1 30); do kill -0 "$p" 2>/dev/null || return 0; sleep .1; done
+            kill -9 "$p" 2>/dev/null || true
+          }
+          cleanup_new() {
+            stop_pid "${launcher_pid:-}"
+            stop_pid "${ws_pid:-}"
+            stop_pid "${vnc_pid:-}"
+            stop_pid "${xvfb_pid:-}"
+            stop_pid "${wp_pid:-}"
+            rm -rf "$live"
+          }
+          trap cleanup_new ERR INT TERM HUP
+
+          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
+          [[ ! -e "$client" && ! -d "$package" ]]
+          [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
+          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 3600
+          python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          x=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert x.get('status')=='active' and x.get('generation')==16
+          assert x.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert x.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          print('UPDATER_DESKTOP_LEASE16=PASS')
+          PY
+
+          for b in Xvfb x11vnc xdotool; do [[ -x "$tool/usr/bin/$b" && ! -L "$tool/usr/bin/$b" ]]; done
+          [[ -d "$tool/usr/share/X11/xkb" && -f "$tool/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so" ]]
+          [[ -d /usr/share/novnc ]]
+          command -v websockify >/dev/null
+          preload="$(find "$tool" -xdev -type f -name libproxychains.so.4 -print -quit)"; [[ -n "$preload" ]]
+          [[ -x "$warp/bin/wireproxy" && -s "$warp/state/wgcf-profile.conf" ]]
+          echo UPDATER_DESKTOP_TOOLROOT=PASS
+
+          if [[ -d "$live" ]]; then
+            python3 - "$live/session.json" <<'PY' 2>/dev/null || { echo UPDATER_DESKTOP_REFUSE_EXISTING_UNVERIFIED_SESSION=true >&2; exit 1; }
+          import json,os,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text())
+          assert x.get('task')=='OTC-20260818-native-login-to-ingame-e2e'
+          for k in ('xvfb_pid','vnc_pid','websockify_pid','wireproxy_pid','launcher_pid'):
+              pid=int(x[k]); assert pathlib.Path(f'/proc/{pid}').exists()
+          print('UPDATER_DESKTOP_EXISTING_VERIFIED=true')
+          PY
+            echo UPDATER_DESKTOP_ALREADY_ACTIVE=true
+            cat "$live/public.txt"
+            trap - ERR INT TERM HUP
+            exit 0
           fi
-          echo TOOLROOT_PROBE_RESULT=PASS_READ_ONLY
+          mkdir -m700 "$live"
+
+          python3 - "$live/ports.txt" <<'PY'
+          import pathlib
+          def listening(port):
+              want=f'{port:04X}'
+              for fn in ('/proc/net/tcp','/proc/net/tcp6'):
+                  try: rows=pathlib.Path(fn).read_text().splitlines()[1:]
+                  except OSError: continue
+                  for r in rows:
+                      f=r.split()
+                      if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': return True
+              return False
+          def display_busy(n):
+              return pathlib.Path(f'/tmp/.X{n}-lock').exists() or pathlib.Path(f'/tmp/.X11-unix/X{n}').exists()
+          display=next((n for n in range(99,131) if not display_busy(n)),None)
+          rfb=next((p for p in range(5902,5921) if not listening(p)),None)
+          web=next((p for p in range(6082,6101) if not listening(p)),None)
+          if None in (display,rfb,web): raise SystemExit('no free display/ports')
+          pathlib.Path(__import__('sys').argv[1]).write_text(f'{display}\n{rfb}\n{web}\n')
+          PY
+          readarray -t p <"$live/ports.txt"; display_num="${p[0]}"; rfb_port="${p[1]}"; web_port="${p[2]}"; display=":$display_num"
+          echo "UPDATER_DESKTOP_DISPLAY=$display"
+          echo "UPDATER_DESKTOP_RFB_PORT=$rfb_port"
+          echo "UPDATER_DESKTOP_WEB_PORT=$web_port"
+
+          warp_port="$(python3 - <<'PY'
+          import socket
+          for p in range(25481,25541):
+              s=socket.socket()
+              try:s.bind(('127.0.0.1',p))
+              except OSError:s.close();continue
+              s.close();print(p);break
+          else:raise SystemExit('no free WARP port')
+          PY
+          )"
+          cat >"$live/wireproxy.conf" <<EOF
+          WGConfig = $warp/state/wgcf-profile.conf
+          [Socks5]
+          BindAddress = 127.0.0.1:$warp_port
+          EOF
+          chmod 600 "$live/wireproxy.conf"
+          "$warp/bin/wireproxy" -n -c "$live/wireproxy.conf" >/dev/null
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-wireproxy \
+            nohup "$warp/bin/wireproxy" -c "$live/wireproxy.conf" >"$live/wireproxy.log" 2>&1 </dev/null &
+          wp_pid=$!
+          for _ in $(seq 1 40); do
+            kill -0 "$wp_pid" 2>/dev/null || { cat "$live/wireproxy.log" >&2; exit 1; }
+            python3 - "$warp_port" <<'PY' && break || true
+          import socket,sys
+          s=socket.socket();s.settimeout(.2)
+          try:s.connect(('127.0.0.1',int(sys.argv[1])))
+          except OSError:raise SystemExit(1)
+          finally:s.close()
+          PY
+            sleep .25
+          done
+          curl --socks5-hostname "127.0.0.1:$warp_port" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo UPDATER_DESKTOP_WARP=PASS
+
+          dri="$tool/usr/lib/x86_64-linux-gnu/dri"
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-xvfb \
+            HOME="$BASE/home" PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+            LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \
+            nohup "$tool/usr/bin/Xvfb" "$display" -screen 0 1920x1080x24 -xkbdir "$tool/usr/share/X11/xkb" -nolisten tcp -noreset \
+            >"$live/xvfb.log" 2>&1 </dev/null &
+          xvfb_pid=$!
+          for _ in $(seq 1 60); do [[ -S "/tmp/.X11-unix/X$display_num" ]] && break; kill -0 "$xvfb_pid"; sleep .2; done
+          [[ -S "/tmp/.X11-unix/X$display_num" ]]
+          echo UPDATER_DESKTOP_XVFB=PASS
+
+          webroot="$live/novnc-web"; mkdir -m700 "$webroot"; cp -a /usr/share/novnc/. "$webroot/"
+          cat >"$webroot/index.html" <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>OTCLIENT Tibia updater</title><script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=6&compression=3&show_dot=true&path=websockify');</script>
+          HTML
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD DISPLAY="$display" \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-vnc \
+            nohup "$tool/usr/bin/x11vnc" -display "$display" -rfbport "$rfb_port" -localhost -forever -shared -nopw \
+            -xkb -repeat -wait 10 -defer 10 -deferupdate 20 -threads -noxrecord -noxfixes \
+            -o "$live/x11vnc.log" >/dev/null 2>&1 </dev/null &
+          vnc_pid=$!
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-websockify \
+            nohup websockify --web "$webroot" "0.0.0.0:$web_port" "127.0.0.1:$rfb_port" >"$live/websockify.log" 2>&1 </dev/null &
+          ws_pid=$!
+          for _ in $(seq 1 40); do
+            if kill -0 "$vnc_pid" 2>/dev/null && kill -0 "$ws_pid" 2>/dev/null && curl -fsS --max-time 1 -o /dev/null "http://127.0.0.1:$web_port/" 2>/dev/null; then break; fi
+            sleep .25
+          done
+          kill -0 "$vnc_pid"; kill -0 "$ws_pid"; curl -fsS --max-time 2 -o /dev/null "http://127.0.0.1:$web_port/"
+          python3 - "$rfb_port" "$web_port" <<'PY'
+          import base64,os,socket,sys
+          r=int(sys.argv[1]); w=int(sys.argv[2])
+          s=socket.create_connection(('127.0.0.1',r),3); assert s.recv(12).startswith(b'RFB '); s.close()
+          key=base64.b64encode(os.urandom(16)).decode(); q=('GET /websockify HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'+f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
+          s=socket.create_connection(('127.0.0.1',w),3); s.sendall(q); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
+          PY
+          echo UPDATER_DESKTOP_RFB=PASS
+          echo UPDATER_DESKTOP_WEBSOCKET=PASS
+          lan_url="http://synology:$web_port/"
+          if curl -fsS --max-time 3 -o /dev/null "$lan_url" 2>/dev/null; then lan_reachable=true; else lan_reachable=false; fi
+          echo "UPDATER_DESKTOP_LAN_REACHABLE=$lan_reachable"
+          echo "UPDATER_DESKTOP_URL=$lan_url"
+          [[ "$lan_reachable" == true ]]
+
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$warp_port" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          unpack="$work/unpacked"; mkdir -m700 "$unpack"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"; [[ -x "$launcher" && ! -L "$launcher" ]]
+          launcher_sha="$(sha256sum "$launcher" | awk '{print $1}')"
+          echo "UPDATER_DESKTOP_LAUNCHER_SHA256=$launcher_sha"
+          cat >"$live/proxychains.conf" <<EOF
+          strict_chain
+          proxy_dns
+          remote_dns_subnet 224
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 $warp_port
+          EOF
+          chmod 600 "$live/proxychains.conf"
+          workdir="$(dirname "$launcher")"
+          (
+            cd "$workdir"
+            env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+              OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=official-updater \
+              HOME="$BASE/home" XDG_DATA_HOME="$BASE/home/.local/share" DISPLAY="$display" \
+              PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+              LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+              LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+              LD_PRELOAD="$preload" PROXYCHAINS_CONF_FILE="$live/proxychains.conf" \
+              nohup "$launcher" >"$live/launcher.log" 2>&1 </dev/null &
+            echo $! >"$live/launcher.pid"
+          )
+          launcher_pid="$(cat "$live/launcher.pid")"; kill -0 "$launcher_pid"
+          sleep 2; kill -0 "$launcher_pid"
+          echo UPDATER_DESKTOP_OFFICIAL_LAUNCHER_STARTED=true
+
+          python3 - "$live/session.json" "$TASK" "$display" "$rfb_port" "$web_port" "$warp_port" "$xvfb_pid" "$vnc_pid" "$ws_pid" "$wp_pid" "$launcher_pid" "$launcher_sha" <<'PY'
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); task=sys.argv[2]
+          x={'task':task,'display':sys.argv[3],'rfb_port':int(sys.argv[4]),'web_port':int(sys.argv[5]),'warp_port':int(sys.argv[6]),'xvfb_pid':int(sys.argv[7]),'vnc_pid':int(sys.argv[8]),'websockify_pid':int(sys.argv[9]),'wireproxy_pid':int(sys.argv[10]),'launcher_pid':int(sys.argv[11]),'launcher_sha256':sys.argv[12]}
+          p.write_text(json.dumps(x,sort_keys=True)+'\n'); p.chmod(0o600)
+          PY
+          printf 'UPDATER_DESKTOP_URL=%s\nUPDATER_DESKTOP_DISPLAY=%s\n' "$lan_url" "$display" >"$live/public.txt"; chmod 600 "$live/public.txt"
+          echo UPDATER_DESKTOP_SECRET_ACCESS=false
+          echo UPDATER_DESKTOP_LOGIN=false
+          echo UPDATER_DESKTOP_RESULT=PASS_LAUNCHER_RUNNING
+          trap - ERR INT TERM HUP

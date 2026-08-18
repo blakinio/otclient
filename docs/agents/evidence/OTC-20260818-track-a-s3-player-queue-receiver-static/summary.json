@@ -1,0 +1,67 @@
+{
+  "schema": "track-a-s3-player-queue-receiver-static-v1",
+  "task": "OTC-20260818-track-a-s3-player-queue-receiver-static",
+  "pr": 514,
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+    "packed_lzma_sha256": "496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b"
+  },
+  "current_source_probe": {
+    "run": 32117023999,
+    "job": 95648736856,
+    "result": "FAIL_CLOSED_EXACT_PACKED_SHA_MISMATCH",
+    "semantic_analysis_started": false,
+    "interpretation": "static.tibia.com current endpoint advanced to a different build; old exact-build addresses were not reused on the changed bytes"
+  },
+  "prior_exact_evidence_reuse": {
+    "source_pr": 498,
+    "source_status": "predecessor_exact_sha_static_evidence_not_canonical_by_itself",
+    "phase4_job": 95442653919,
+    "phase5_job": 95443958584,
+    "normalization_run": 32118874353,
+    "normalization_job": 95654645734,
+    "artifact": 9317732982,
+    "artifact_digest": "sha256:2363db29be61748c491e369d8aadf067ba0bed65e86bc3b74aa61594625db312",
+    "setup_instruction_count": 334,
+    "connection_block_count": 4,
+    "member_offset_counts": {
+      "0x88": 4,
+      "0x9c0": 1
+    },
+    "exact_hit_counts": {
+      "queue_metaobject_0x3085b60": 34,
+      "connect_candidate_0x4dd800": 60,
+      "qslot_helper_0x4df670": 126,
+      "player_handler_vptr_0x308a008": 0,
+      "player_data_vptr_0x308ca70": 0,
+      "receivedPlayerDataCurrent_stub_0xdf8bc1": 0,
+      "receivedPlayerDataBasic_stub_0xdf8d3b": 0,
+      "receivedPlayerState_stub_0xdf8e0d": 0,
+      "receivedPlayerSkills_stub_0xdf8e37": 0,
+      "receivedPlayerInventory_stub_0xdf899f": 0
+    }
+  },
+  "canonical_inputs_from_513": {
+    "TProtocolMessageQueue_static_metaobject": "0x3085b60",
+    "receivedPlayerDataCurrent_stub": "0xdf8bc1",
+    "receivedPlayerDataBasic_stub": "0xdf8d3b",
+    "receivedPlayerState_stub": "0xdf8e0d",
+    "receivedPlayerSkills_stub": "0xdf8e37",
+    "receivedPlayerInventory_stub": "0xdf899f",
+    "TPlayerProtocolMessageHandler_direct_qmeta_ownership": "DISPROVEN"
+  },
+  "result": {
+    "queue_signal_to_receiver_connection": "UNKNOWN",
+    "receiver_type": "UNKNOWN",
+    "receiver_member_or_trampoline": "UNKNOWN",
+    "reason": "The current public client source no longer matches the exact build; the available prior exact-SHA sanitized connection logs cover a queue/auth connection setup but contain none of the five exact player signal-stub addresses, no TPlayerProtocolMessageHandler vptr hit, and no TPlayerData vptr hit. Inferring a player receiver from that window would exceed the evidence."
+  },
+  "runtime_access": "none",
+  "client_executed": false,
+  "synology_used": false,
+  "credentials_used": false,
+  "pr475_runtime_observed": false,
+  "pr475_runtime_mutated": false
+}

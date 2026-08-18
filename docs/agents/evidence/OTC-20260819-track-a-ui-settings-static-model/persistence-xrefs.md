@@ -32,9 +32,10 @@ elf_build_id: d803d9695868713ef6ab0c3cf65f91212c9c6a62
 
 ## Evidence classification
 
-- **FACT** — directly emitted by the successful static discriminator on the exact subject above.
+- **FACT** — directly emitted by a successful static discriminator on the exact subject above.
 - **INFERENCE** — structural interpretation that follows from multiple FACT items but is not runtime proof.
-- **UNKNOWN** — not established by this discriminator.
+- **UNKNOWN** — not established by these discriminators.
+- **NEGATIVE CONTROL** — a bounded discriminator that did not establish the proposed stronger relationship.
 
 ## `clientoptions.json` code references
 
@@ -139,7 +140,7 @@ QVulkanInstance::destroy
 
 The same repeated begin/set/end pattern occurs in this code region at emitted callsites including `0x6bab34`, `0x6baba4`, `0x6bac14`, and `0x6bac84` for `QSettings::setValue`.
 
-Other current-build `QSettings` clusters were also found, including read/value groups around `0x6c3cd5` and `0x76de4d`, and write groups around `0x6c4ffb`, `0x6edb24`, `0x6f5ac1`, `0x76e531`, and `0x76e5ed`. The bounded relevance filter did not recover their group/key strings.
+Other current-build `QSettings` clusters were also found, including read/value groups around `0x6c3cd5` and `0x76de4d`, and write groups around `0x6c4ffb`, `0x6edb24`, `0x6f5ac1`, `0x76e531`, and `0x76e5ed`.
 
 ### INFERENCE
 
@@ -147,9 +148,57 @@ The current official client has real code-level `QSettings` read and write behav
 
 This strengthens H10's persistence-side model beyond options-page names alone.
 
-### UNKNOWN / boundary
+## Third-stage key-adjacency discriminator
 
-The probe did not recover the actual `QSettings` group names or keys, and it did not connect these `QSettings` callsites to `TGraphicsQMLOptionsPage`, `TClientOptions`, or `clientoptions.json`.
+To test whether the missing `QSettings` group/key names could be recovered without executing the client, the workflow was narrowed to an unfiltered nearest-string adjacency pass around the already-proven callsites.
+
+Exact run:
+
+- workflow source commit: `ae2ec20356b354fc1a68a94df8b13df099bcc3e4`
+- workflow run: `32194829992`
+- job: `95896584056`, `Recover official-client UI/settings static model`
+- conclusion: `success`
+- `UI_SETTINGS_KEY_ADJACENCY_SCAN=PASS`
+- exact subject hashes and Build ID reproduced unchanged
+- `runtime_access: none`
+- `client_executed: false`
+- `proprietary_binary_retained: false`
+
+### FACT
+
+The third scan independently reproduced:
+
+```text
+UI_SETTINGS_KEYS_CLIENTOPTIONS_LITERAL_COUNT=1
+UI_SETTINGS_KEYS_CLIENTOPTIONS_LITERAL_VA=0x20d2406
+UI_SETTINGS_KEYS_CLIENTOPTIONS_XREF_COUNT=38
+UI_SETTINGS_KEYS_QSETTINGS_PLT_COUNT=4
+UI_SETTINGS_KEYS_QSETTINGS_CALL_COUNT=51
+```
+
+For the first `QSettings::beginGroup/value/endGroup` renderer-adjacent cluster at `0x6ba00a`, `0x6ba046`, and `0x6ba073`, the only printable nearest prior string emitted by the unfiltered scan was:
+
+```text
+QT_OPENGL_BUGLIST
+```
+
+The same calls retained the renderer/bootstrap PLT context (`QQuickWindow::setGraphicsApi`, `QQuickWindow::setTextRenderType`, Vulkan setup, and related calls).
+
+The repeated renderer-adjacent `QSettings::beginGroup/setValue/endGroup` sequences beginning at `0x6bab00` emitted **no** printable nearest prior string. Most other `QSettings` clusters likewise emitted no usable printable key/group candidate. One read cluster around `0x6c3cd5` emitted only low-information strings (`d`, and an adjacent `` `fn`` fragment), which are not treated as semantic keys.
+
+The `clientoptions.json` references again emitted only a broad nearby resource/file cluster such as `framedurations.csv`, `client.log`, `config.ini`, `:/tutorial`, `screenshots`, `characterdata`, `angle_current`, `angle_v1`, and `BattlEye`, with no JSON file-I/O call linkage.
+
+### NEGATIVE CONTROL
+
+The third scan did **not** recover an unambiguous `QSettings` group or key name and did **not** establish `TClientOptions -> clientoptions.json` linkage.
+
+`QT_OPENGL_BUGLIST` is retained only as a string-adjacency observation. It must **not** be asserted to be a `QSettings` group/key because the static adjacency probe does not prove the argument flow into `beginGroup` or `value`.
+
+This bounded negative result ends the current static iteration: repeating broader linear scans would add adjacency noise without a new discriminator.
+
+## UNKNOWN / boundary
+
+The probes did not connect these `QSettings` callsites to `TGraphicsQMLOptionsPage`, `TClientOptions`, or `clientoptions.json` and did not recover authoritative group/key argument flow.
 
 Accordingly, the following remain **UNKNOWN**:
 
@@ -172,9 +221,6 @@ This is not sufficient for `DONE` and does not satisfy the alias's required `rea
 
 ## Smallest next discriminator
 
-The static phase has established real persistence-capable callsites but not the high-level object-to-store relationship. The next useful discriminator should be one of:
+The bounded static phase is exhausted at a defensible evidence boundary. The next useful discriminator is a later live persistence proof **only after fresh Track A runtime admission**: choose one low-risk, non-display-critical, non-network-critical, fully reversible setting; record exact before state; perform one bounded UI write under the shared input lock; record immediate readback and storage observation; reload/restart only if separately admitted; verify persistence; restore the exact before state and verify rollback.
 
-1. a stronger static function-boundary/call-graph recovery around `clientoptions.json` and the JSON helper calls, if it can produce object-level linkage without speculative matching; or
-2. after fresh Track A runtime admission, a single low-risk reversible setting with exact before/read/write/reload/rollback evidence under the shared input lock.
-
-No live setting change, client execution, login, credential use, display/renderer mutation, or network mutation was performed in this phase.
+No live setting change, client execution, login, credential use, display/renderer mutation, network mutation, or anti-cheat interaction was performed in this phase.

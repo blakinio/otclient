@@ -1,0 +1,117 @@
+{
+  "schema": "track-a-s7-inventory-equipment-static-v1",
+  "task": "OTC-20260818-track-a-s7-inventory-equipment-static",
+  "researcher_pr": 529,
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "producer": {
+    "run": 32138692915,
+    "artifact": 9324985568,
+    "artifact_digest": "sha256:16b94a26815abcebe049f9e4731d3e1dd19675e4b981665592222358de32286d",
+    "historical_qmeta_source_run": 31790507112,
+    "historical_qmeta_source_job": 94736106350,
+    "historical_qmeta_source_head": "9afdc76ca6fe238742f270e22d8ecf4abe5ba9a2",
+    "historical_log_sha256": "481600615765a5bbc570888817f23b75ac5cf8b93fab693f3c461872c183ef70",
+    "s1_type_artifact": 9315562574,
+    "s1_type_artifact_digest": "sha256:583c8c217fa2eaa2411f79995473cd910b8803d8599f80574491ca27b8ab9860"
+  },
+  "queue": {
+    "type": "tibia::protocol::TProtocolMessageQueue",
+    "static_metaobject": "0x3085b60",
+    "qt_static_metacall": "0xdf5fe0",
+    "method_count": 355,
+    "signal_count": 192,
+    "inventory_signals": [
+      {"index": 40, "name": "receivedSetInventoryMessage"},
+      {"index": 67, "name": "receivedDeleteInventoryMessage"},
+      {"index": 117, "name": "receivedPlayerInventoryMessage"}
+    ]
+  },
+  "handler": {
+    "type": "tibia::container::TContainerProtocolMessageHandler",
+    "static_metaobject": "0x3084fe0",
+    "qt_static_metacall": "0xd1e000",
+    "method_count": 35,
+    "signal_count": 11,
+    "inventory_methods": [
+      {"index": 11, "name": "handleSetInventoryMessage"},
+      {"index": 12, "name": "handleDeleteInventoryMessage"},
+      {"index": 13, "name": "handlePlayerInventoryMessage"}
+    ]
+  },
+  "negative_control": {
+    "type": "tibia::game::TPlayerProtocolMessageHandler",
+    "static_metaobject": "0x30852a0",
+    "qt_static_metacall": "0xd1a920",
+    "method_count": 22,
+    "signal_count": 22,
+    "contains_inventory_handle_methods": false,
+    "classification": "DISPROVEN_QMETA_OWNERSHIP"
+  },
+  "inventory_container": {
+    "type": "tibia::container::TInventoryContainer",
+    "static_metaobject": "0x309a960",
+    "qt_static_metacall": "0xd15cf0",
+    "method_count": 1,
+    "signal_count": 1,
+    "signals": [
+      {"index": 0, "name": "inventoryChanged"}
+    ]
+  },
+  "inventory_status_controller": {
+    "type": "tibia::gamewindow::TPlayerInventoryAndStatusController",
+    "static_metaobject": "0x2f6e440",
+    "qt_static_metacall": "0xd8cef0",
+    "method_count": 39,
+    "signal_count": 14,
+    "relevant_methods": [
+      {"index": 18, "name": "onPlayerCreatureAdded"},
+      {"index": 19, "name": "onPlayerDataChanged"},
+      {"index": 20, "name": "onInventoryChanged"},
+      {"index": 21, "name": "onSlotClicked"},
+      {"index": 22, "name": "onSlotEntered"},
+      {"index": 23, "name": "onSlotExited"},
+      {"index": 24, "name": "onSlotStartDrag"},
+      {"index": 25, "name": "onSlotDragDropped"},
+      {"index": 26, "name": "onSlotTargetSelected"},
+      {"index": 29, "name": "onInventoryOptionsChanged"}
+    ]
+  },
+  "registration_type_contracts": {
+    "classification": "FACT",
+    "messages": [
+      "GameserverMessageSetInventory",
+      "GameserverMessageDeleteInventory",
+      "GameserverMessagePlayerInventory"
+    ],
+    "statement": "S1 retains TProtocolMessageQueue::registerServerMessage<T> template symbols whose parameter is a TProtocolMessageQueue member pointer accepting const T& for each listed exact protobuf type."
+  },
+  "classification": {
+    "queue_inventory_signal_ownership": "FACT",
+    "inventory_handle_owner": "FACT_TContainerProtocolMessageHandler",
+    "TPlayerProtocolMessageHandler_inventory_handle_ownership": "DISPROVEN_QMETA",
+    "inventory_container_qmeta": "FACT",
+    "inventory_status_controller_qmeta": "FACT",
+    "registered_member_pointer_equals_suffix_matching_received_signal": "INFERENCE_HIGH_NOT_DIRECTLY_PROVEN",
+    "queue_signal_to_container_handler_connection": "UNKNOWN",
+    "container_handler_to_inventory_mutation": "UNKNOWN",
+    "inventory_changed_to_ui_controller_connection": "UNKNOWN",
+    "runtime_inventory_delivery": "NOT_OBSERVED"
+  },
+  "safety": {
+    "new_client_bytes_obtained": false,
+    "client_executed": false,
+    "runtime_access": "none",
+    "synology_access": false,
+    "x11_or_vnc_access": false,
+    "process_memory_access": false,
+    "credential_access": false,
+    "login": false,
+    "gameplay": false,
+    "pr528_runtime_touched": false,
+    "pr475_runtime_touched": false
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "schema": "track-a-s8-creature-inbound-static-v1",
+  "task": "OTC-20260818-track-a-s8-creature-inbound-static",
+  "researcher_pr": 531,
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "producer": {
+    "run": 32139820275,
+    "artifact": 9325415016,
+    "artifact_digest": "sha256:12aeb152a863a1d03cbb10c33dff2abf7b6f62eb8859becc2ff91cf52b27f19a",
+    "historical_qmeta_source_run": 31790507112,
+    "historical_qmeta_source_job": 94736106350,
+    "historical_log_sha256": "481600615765a5bbc570888817f23b75ac5cf8b93fab693f3c461872c183ef70",
+    "s1_type_artifact": 9315562574,
+    "s1_type_artifact_digest": "sha256:583c8c217fa2eaa2411f79995473cd910b8803d8599f80574491ca27b8ab9860"
+  },
+  "queue": {
+    "type": "tibia::protocol::TProtocolMessageQueue",
+    "static_metaobject": "0x3085b60",
+    "qt_static_metacall": "0xdf5fe0",
+    "method_count": 355,
+    "signal_count": 192,
+    "creature_signals": [
+      [22, "receivedMoveCreatureMessage"],
+      [26, "receivedCreatureUpdateMessage"],
+      [27, "receivedCreatureHealthMessage"],
+      [28, "receivedCreatureOutfitMessage"],
+      [29, "receivedCreatureSpeedMessage"],
+      [30, "receivedCreatureSkullMessage"],
+      [31, "receivedCreaturePartyMessage"],
+      [32, "receivedCreatureUnpassMessage"],
+      [33, "receivedCreatureMarksMessage"],
+      [36, "receivedCreatureDataMessage"],
+      [44, "receivedCreatureLightMessage"],
+      [74, "receivedCreatureTypeMessage"],
+      [175, "receivedConfigureCreaturePodiumMessage"]
+    ]
+  },
+  "global_qmeta_suffix_handle_search": {
+    "expected_count": 13,
+    "matching_method_count": 0,
+    "classification": "DISPROVEN_IN_RETAINED_QMETA_ONLY"
+  },
+  "creature_protocol_handler": {
+    "type": "tibia::creatures::TCreatureProtocolMessageHandler",
+    "static_metaobject": "0x30cec80",
+    "qt_static_metacall": "0xd12510",
+    "method_count": 0,
+    "signal_count": 0
+  },
+  "creature": {
+    "type": "tibia::creatures::TCreature",
+    "static_metaobject": "0x3077d00",
+    "qt_static_metacall": "0xd15f60",
+    "signals": [
+      [0, "positionWasUpdated"],
+      [1, "playerKillerMarkChanged"],
+      [2, "playerGuildFlagChanged"],
+      [3, "playerPartyFlagChanged"],
+      [4, "inspectionStateChanged"]
+    ]
+  },
+  "creature_storage": {
+    "type": "tibia::creatures::TCreatureStorage",
+    "static_metaobject": "0x3085ba0",
+    "qt_static_metacall": "0xd25b70",
+    "signals": [
+      [0, "playerAdded"],
+      [1, "creatureUpdated"],
+      [2, "creatureAppearanceUpdated"]
+    ]
+  },
+  "creature_action_handler": {
+    "type": "tibia::creatures::TCreaturesGameActionHandler",
+    "static_metaobject": "0x3085060",
+    "qt_static_metacall": "0xd16340",
+    "method_count": 13,
+    "signal_count": 13,
+    "signals": [
+      "publishGameAction", "sendAttack", "sendFollow", "sendLookAtCreature",
+      "sendInspectPlayer", "sendInviteToParty", "sendJoinParty",
+      "sendRevokeInvitation", "sendPassLeadership", "sendLeaveParty",
+      "sendShareExperience", "sendGreet", "sendJoinAggression"
+    ]
+  },
+  "registration_type_contracts": {
+    "classification": "FACT",
+    "count": 13,
+    "concrete_member_pointer_identity": "UNKNOWN"
+  },
+  "classification": {
+    "queue_creature_signal_ownership": "FACT",
+    "suffix_matched_handle_methods_in_retained_qmeta": "DISPROVEN",
+    "creature_protocol_handler_qmeta_surface": "FACT_EMPTY_0_0",
+    "creature_model_qmeta": "FACT",
+    "creature_storage_qmeta": "FACT",
+    "creature_action_qmeta": "FACT",
+    "queue_to_creature_handler_dispatch": "UNKNOWN_NON_QMETA_WINDOW_REQUIRED",
+    "creature_handler_to_model_storage_mutation": "UNKNOWN",
+    "runtime_creature_delivery": "NOT_OBSERVED",
+    "creature_inbound_repo_only_qmeta_frontier": "EXHAUSTED"
+  },
+  "safety": {
+    "new_client_bytes_obtained": false,
+    "client_executed": false,
+    "runtime_access": "none",
+    "credentials": false,
+    "login": false,
+    "gameplay": false,
+    "pr528_runtime_touched": false,
+    "pr475_runtime_touched": false
+  }
+}

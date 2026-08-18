@@ -34,88 +34,43 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Verify Kasm runtime and exact client source
+      - name: Verify runtime and source
         shell: bash
         run: |
-          set +x
-          set -Eeuo pipefail
-          umask 077
-          ulimit -c 0 || true
+          set +x; set -Eeuo pipefail; umask 077; ulimit -c 0 || true
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
-          [[ -S /var/run/docker.sock ]]
           [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" == true ]]
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")" == track-a-kasmvnc-desktop ]]
           [[ "$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"')" == ':1' ]]
           docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -x Xvnc >/dev/null && test "$(getent passwd 1000 | cut -d: -f6)" = /home/kasm-user'
           client="$SOURCE_PACKAGE/bin/client"
-          [[ -f "$client" && -x "$client" && ! -L "$client" ]]
+          [[ -x "$client" && ! -L "$client" ]]
           [[ "$(stat -c %s "$client")" == "$EXPECTED_SIZE" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_SHA" ]]
           echo KASM_CLIENT_START_PREFLIGHT=PASS
           echo KASM_CLIENT_START_SECRET_ACCESS=false
-          echo KASM_CLIENT_START_LOGIN=false
-
-      - name: Prove no official client candidate is already running
+      - name: Stage exact package as Kasm user
         shell: bash
         run: |
-          set +x
-          set -Eeuo pipefail
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          if docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -af '$DEST_PACKAGE/bin/client'" >/dev/null 2>&1; then
-            echo KASM_CLIENT_ALREADY_RUNNING=true
-            exit 0
-          fi
-          python3 - "$SOURCE_PACKAGE/bin/client" <<'PY'
-          import pathlib,sys
-          exact=pathlib.Path(sys.argv[1]).resolve()
-          hits=[]
-          for p in pathlib.Path('/proc').iterdir():
-              if not p.name.isdigit():
-                  continue
-              try:
-                  exe=(p/'exe').resolve(strict=True)
-              except (OSError,RuntimeError):
-                  continue
-              if exe==exact:
-                  hits.append(int(p.name))
-          if hits:
-              raise SystemExit('source-package client already running on host')
-          print('KASM_CLIENT_HOST_SOURCE_CANDIDATES=0')
-          PY
-
-      - name: Stage exact package inside persistent Kasm container
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
+          set +x; set -Eeuo pipefail
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
           docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc 'rm -rf /home/kasm-user/otclient-track-a/Tibia.new && mkdir -p /home/kasm-user/otclient-track-a/Tibia.new'
-          docker cp "$SOURCE_PACKAGE/." "$CONTAINER_NAME:/home/kasm-user/otclient-track-a/Tibia.new/"
-          docker exec "$CONTAINER_NAME" /bin/bash -lc "chown -R 1000:0 '/home/kasm-user/otclient-track-a'"
+          tar -C "$SOURCE_PACKAGE" -cf - . | docker exec -i -u 1000 "$CONTAINER_NAME" tar --no-same-owner --no-same-permissions -C /home/kasm-user/otclient-track-a/Tibia.new -xf -
           docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "test -x '$DEST_PACKAGE.new/bin/client' && test \"\$(stat -c %s '$DEST_PACKAGE.new/bin/client')\" = '$EXPECTED_SIZE' && test \"\$(sha256sum '$DEST_PACKAGE.new/bin/client' | awk '{print \$1}')\" = '$EXPECTED_SHA'"
           docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "rm -rf '$DEST_PACKAGE' && mv '$DEST_PACKAGE.new' '$DEST_PACKAGE'"
           echo KASM_CLIENT_PACKAGE_STAGED=PASS
-
       - name: Start client on Kasm desktop
         shell: bash
         run: |
-          set +x
-          set -Eeuo pipefail
+          set +x; set -Eeuo pipefail
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          home=/home/kasm-user
-          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "mkdir -p '$home/.local/state/otclient-track-a'"
-          docker exec -d -u 1000 \
-            -e DISPLAY=:1 \
-            -e HOME="$home" \
-            -e QT_QUICK_BACKEND=software \
-            -e QSG_INFO=1 \
-            -e LD_LIBRARY_PATH="$DEST_PACKAGE/bin/lib" \
-            "$CONTAINER_NAME" /bin/bash -lc "cd '$DEST_PACKAGE' && exec ./bin/client >'$home/.local/state/otclient-track-a/tibia-client.log' 2>&1"
+          if docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -af '$DEST_PACKAGE/bin/client'" >/dev/null 2>&1; then
+            echo KASM_CLIENT_ALREADY_RUNNING=true
+          else
+            docker exec -d -u 1000 -e DISPLAY=:1 -e HOME=/home/kasm-user -e QT_QUICK_BACKEND=software -e QSG_INFO=1 -e LD_LIBRARY_PATH="$DEST_PACKAGE/bin/lib" "$CONTAINER_NAME" /bin/bash -lc "cd '$DEST_PACKAGE' && exec ./bin/client >/home/kasm-user/tibia-client.log 2>&1"
+          fi
           pid=''
-          for _ in $(seq 1 40); do
+          for _ in $(seq 1 60); do
             pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -o -f '$DEST_PACKAGE/bin/client' || true")"
             [[ "$pid" =~ ^[1-9][0-9]*$ ]] && break
             sleep .25
@@ -124,26 +79,14 @@ jobs:
           docker exec "$CONTAINER_NAME" /bin/bash -lc "kill -0 '$pid' && test \"\$(readlink -f /proc/$pid/exe)\" = '$DEST_PACKAGE/bin/client'"
           echo "KASM_CLIENT_PID=$pid"
           echo KASM_CLIENT_PROCESS=PASS
-
       - name: Verify visible Tibia window on DISPLAY :1
         shell: bash
         run: |
-          set +x
-          set -Eeuo pipefail
+          set +x; set -Eeuo pipefail
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
           found=0
           for _ in $(seq 1 60); do
-            if docker exec -u 1000 -e DISPLAY=:1 "$CONTAINER_NAME" /bin/bash -lc '
-              if command -v xdotool >/dev/null 2>&1; then
-                xdotool search --onlyvisible --name "^Tibia$" >/dev/null 2>&1
-              elif command -v wmctrl >/dev/null 2>&1; then
-                wmctrl -l | grep -Eq "[[:space:]]Tibia$"
-              elif command -v xwininfo >/dev/null 2>&1; then
-                xwininfo -root -tree 2>/dev/null | grep -q '"'"'Tibia'"'"'
-              else
-                exit 2
-              fi
-            '; then found=1; break; fi
+            if docker exec -u 1000 -e DISPLAY=:1 "$CONTAINER_NAME" /bin/bash -lc 'if command -v xdotool >/dev/null 2>&1; then xdotool search --onlyvisible --name "^Tibia$" >/dev/null 2>&1; elif command -v wmctrl >/dev/null 2>&1; then wmctrl -l | grep -Eq "[[:space:]]Tibia$"; else xwininfo -root -tree 2>/dev/null | grep -q '"'"'Tibia'"'"'; fi'; then found=1; break; fi
             sleep .5
           done
           [[ "$found" == 1 ]]

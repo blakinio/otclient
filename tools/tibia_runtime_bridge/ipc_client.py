@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import array
 from dataclasses import dataclass
+import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
 import socket
+import stat
 import struct
 import sys
 import threading
@@ -17,6 +20,9 @@ SESSION_MARKERS = (
     "gameserver_game_session",
     "worldmap_handler",
 )
+
+_MAX_CREDENTIAL_FRAME_BYTES = 8 + 2 * 1024
+_MIN_CREDENTIAL_FRAME_BYTES = 10
 
 
 class BridgeClientError(RuntimeError):
@@ -88,19 +94,19 @@ def _verify_peer_executable(expectation: PeerIdentityExpectation) -> None:
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
     fd = os.open(f"/proc/{expectation.pid}/exe", flags)
     try:
-        stat = os.fstat(fd)
-        if stat.st_size != expectation.client_size:
+        stat_result = os.fstat(fd)
+        if stat_result.st_size != expectation.client_size:
             raise BridgePeerIdentityError(
-                f"peer executable size mismatch: expected {expectation.client_size}, got {stat.st_size}"
+                f"peer executable size mismatch: expected {expectation.client_size}, got {stat_result.st_size}"
             )
         cache_key = (
             expectation.pid,
             expectation.process_start_ticks,
-            stat.st_dev,
-            stat.st_ino,
-            stat.st_size,
-            stat.st_mtime_ns,
-            stat.st_ctime_ns,
+            stat_result.st_dev,
+            stat_result.st_ino,
+            stat_result.st_size,
+            stat_result.st_mtime_ns,
+            stat_result.st_ctime_ns,
         )
         with _executable_digest_cache_lock:
             actual_sha256 = _executable_digest_cache.get(cache_key)
@@ -143,40 +149,36 @@ def _verify_peer_identity(client: socket.socket, expectation: PeerIdentityExpect
         raise BridgePeerIdentityError(f"peer identity verification failed: {exc}") from exc
 
 
-def request(
+def _connect(
     socket_path: Path,
-    command: str,
-    *,
-    timeout: float = 3.0,
-    expected_identity: PeerIdentityExpectation | None = None,
-) -> dict[str, Any]:
-    if not command or "\n" in command or "\r" in command:
-        raise BridgeClientError("command must be one non-empty line")
+    timeout: float,
+    expected_identity: PeerIdentityExpectation | None,
+) -> socket.socket:
     client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     client.settimeout(timeout)
     try:
         client.connect(str(socket_path))
         if expected_identity is not None:
             _verify_peer_identity(client, expected_identity)
-        client.sendall(command.encode("utf-8") + b"\n")
-        chunks: list[bytes] = []
-        total = 0
-        while True:
-            chunk = client.recv(4096)
-            if not chunk:
-                break
-            chunks.append(chunk)
-            total += len(chunk)
-            if total > 1024 * 1024:
-                raise BridgeProtocolError("bridge response exceeds 1 MiB")
-            if b"\n" in chunk:
-                break
-    except BridgeClientError:
-        raise
-    except OSError as exc:
-        raise BridgeTransportError(f"IPC request failed: {exc}") from exc
-    finally:
+        return client
+    except Exception:
         client.close()
+        raise
+
+
+def _receive_response(client: socket.socket) -> dict[str, Any]:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = client.recv(4096)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > 1024 * 1024:
+            raise BridgeProtocolError("bridge response exceeds 1 MiB")
+        if b"\n" in chunk:
+            break
 
     raw = b"".join(chunks)
     line = raw.split(b"\n", 1)[0]
@@ -187,6 +189,86 @@ def request(
     if not isinstance(doc, dict) or not isinstance(doc.get("ok"), bool):
         raise BridgeProtocolError("bridge response must contain boolean ok")
     return doc
+
+
+def request(
+    socket_path: Path,
+    command: str,
+    *,
+    timeout: float = 3.0,
+    expected_identity: PeerIdentityExpectation | None = None,
+) -> dict[str, Any]:
+    if not command or "\n" in command or "\r" in command:
+        raise BridgeClientError("command must be one non-empty line")
+    try:
+        client = _connect(socket_path, timeout, expected_identity)
+        try:
+            client.sendall(command.encode("utf-8") + b"\n")
+            return _receive_response(client)
+        finally:
+            client.close()
+    except BridgeClientError:
+        raise
+    except OSError as exc:
+        raise BridgeTransportError(f"IPC request failed: {exc}") from exc
+
+
+def _validate_credentials_memfd(credentials_fd: int) -> None:
+    if not isinstance(credentials_fd, int) or isinstance(credentials_fd, bool) or credentials_fd < 0:
+        raise BridgeClientError("credentials_fd must be a non-negative file descriptor")
+    try:
+        stat_result = os.fstat(credentials_fd)
+        if not stat.S_ISREG(stat_result.st_mode):
+            raise BridgeClientError("credentials_fd must refer to an anonymous sealed memfd")
+        if not (_MIN_CREDENTIAL_FRAME_BYTES <= stat_result.st_size <= _MAX_CREDENTIAL_FRAME_BYTES):
+            raise BridgeClientError("credentials memfd size is outside the bounded frame")
+        target = os.readlink(f"/proc/self/fd/{credentials_fd}")
+        if "memfd:" not in target:
+            raise BridgeClientError("credentials_fd must refer to an anonymous memfd")
+        required_names = ("F_GET_SEALS", "F_SEAL_SEAL", "F_SEAL_SHRINK", "F_SEAL_GROW", "F_SEAL_WRITE")
+        if any(not hasattr(fcntl, name) for name in required_names):
+            raise BridgeClientError("memfd sealing support is unavailable")
+        seals = fcntl.fcntl(credentials_fd, fcntl.F_GET_SEALS)
+        required = fcntl.F_SEAL_SEAL | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_GROW | fcntl.F_SEAL_WRITE
+        if seals & required != required:
+            raise BridgeClientError("credentials memfd must be fully sealed before handoff")
+    except BridgeClientError:
+        raise
+    except OSError as exc:
+        raise BridgeClientError(f"credentials_fd validation failed: {exc}") from exc
+
+
+def auth_with_credentials_fd(
+    socket_path: Path,
+    credentials_fd: int,
+    *,
+    timeout: float = 3.0,
+    expected_identity: PeerIdentityExpectation | None = None,
+) -> dict[str, Any]:
+    """Pass an already-sealed credential memfd without reading its payload bytes."""
+
+    _validate_credentials_memfd(credentials_fd)
+    if not hasattr(socket, "SCM_RIGHTS") or not hasattr(socket.socket, "sendmsg"):
+        raise BridgeClientError("SCM_RIGHTS descriptor passing is unavailable")
+
+    payload = b"AUTH_WITH_CREDENTIALS\n"
+    descriptor_array = array.array("i", [credentials_fd])
+    try:
+        client = _connect(socket_path, timeout, expected_identity)
+        try:
+            sent = client.sendmsg(
+                [payload],
+                [(socket.SOL_SOCKET, socket.SCM_RIGHTS, descriptor_array.tobytes())],
+            )
+            if sent != len(payload):
+                raise BridgeTransportError("experimental auth command was only partially sent")
+            return _receive_response(client)
+        finally:
+            client.close()
+    except BridgeClientError:
+        raise
+    except OSError as exc:
+        raise BridgeTransportError(f"experimental auth IPC failed: {exc}") from exc
 
 
 def session_status(
@@ -239,14 +321,18 @@ def main(argv: list[str] | None = None) -> int:
     discover = sub.add_parser("discover")
     discover.add_argument("target")
     sub.add_parser("session-status")
+    auth = sub.add_parser("auth-with-credentials-fd")
+    auth.add_argument("--credentials-fd", required=True, type=int)
     args = parser.parse_args(argv)
 
     if args.operation == "ping":
         response = request(args.socket, "PING")
     elif args.operation == "discover":
         response = request(args.socket, f"DISCOVER {args.target}")
-    else:
+    elif args.operation == "session-status":
         response = session_status(args.socket)
+    else:
+        response = auth_with_credentials_fd(args.socket, args.credentials_fd)
     json.dump(response, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
     return 0 if response.get("ok") else 2

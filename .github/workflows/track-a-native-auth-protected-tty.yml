@@ -54,12 +54,18 @@ jobs:
         run: |
           set -Eeuo pipefail
           source=tools/tibia_runtime_bridge/protected_auth_tty.py
-          ! grep -F 'sys.stdin' "$source"
-          ! grep -F 'getpass' "$source"
-          ! grep -F 'os.getenv(' "$source"
-          ! grep -F 'os.environ[' "$source"
-          ! grep -F 'add_argument("--email' "$source"
-          ! grep -F 'add_argument("--password' "$source"
+          for forbidden in \
+            'sys.stdin' \
+            'getpass' \
+            'os.getenv(' \
+            'os.environ[' \
+            'add_argument("--email' \
+            'add_argument("--password'; do
+            if grep -F "$forbidden" "$source" >/dev/null; then
+              echo "unsafe protected-auth source pattern present: $forbidden" >&2
+              exit 1
+            fi
+          done
           grep -F 'os.open("/dev/tty"' "$source" >/dev/null
           grep -F 'PR_SET_DUMPABLE' "$source" >/dev/null
           grep -F 'mlock' "$source" >/dev/null

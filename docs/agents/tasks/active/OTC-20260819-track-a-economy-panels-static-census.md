@@ -86,8 +86,12 @@ acceptance:
 audit:
   result: pending_fresh_independent
   material_findings_open: unknown
-last_completed_step: task-owned G24-G31 static evidence report completed and corrected against the exact S1 160/189 registries, exact client fence, 47 handler-type xref catalogue and same-build capability census; safety boundaries and residual UNKNOWNs are explicit
-next_action: verify exact PR diff/head/checks; then leave Draft PR #546 for fresh independent audit/coordinator promotion
+validation:
+  changed_files_expected: 2
+  changed_files_scope_only: true
+  combined_commit_status_observation: no_status_contexts_returned
+last_completed_step: task-owned exact-build G24-G31 static census corrected directly against the durable S1 registries and handler-xref catalogue; PR diff is limited to the task record and task-owned evidence namespace; no runtime or transaction action was performed
+next_action: fresh independent audit and coordinator promotion decision for Draft PR #546; runtime semantics remain a separate blocked follow-up
 ---
 
 # Track A economy panels static census

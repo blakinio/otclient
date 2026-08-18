@@ -1,0 +1,144 @@
+{
+  "schema": "track-a-s9-action-control-static-census-v1",
+  "task": "OTC-20260818-track-a-s9-action-control-static-census",
+  "researcher_pr": 535,
+  "exact_client_sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe",
+  "producer": {
+    "run": 32140983838,
+    "artifact": 9325847070,
+    "artifact_digest": "sha256:12ddebc9aa1ff73f96370091c50e33a6cf3bf7b37a4cf8bc7007175861c5491d",
+    "historical_qmeta_source_run": 31790507112,
+    "historical_qmeta_source_job": 94736106350,
+    "historical_log_sha256": "481600615765a5bbc570888817f23b75ac5cf8b93fab693f3c461872c183ef70"
+  },
+  "game_action_handler_denominator": {
+    "count": 28,
+    "types": [
+      "tibia::chat::TChatGameActionHandler",
+      "tibia::container::TContainerGameActionHandler",
+      "tibia::creatures::TCreaturesGameActionHandler",
+      "tibia::creatures::TVipGameActionHandler",
+      "tibia::dailyreward::TDailyRewardGameActionHandler",
+      "tibia::effects::TEffectGameActionHandler",
+      "tibia::exaltation::TExaltationGameActionHandler",
+      "tibia::exivaoptions::TExivaOptionsGameActionHandler",
+      "tibia::game::TPlayerGameActionHandler",
+      "tibia::gamewindow::TBattleListGameActionHandler",
+      "tibia::input::TActionButtonGameActionHandler",
+      "tibia::input::TClipboardGameActionHandler",
+      "tibia::input::TCrossHairSpellGameActionHandler",
+      "tibia::input::TGatherAllGameActionHandler",
+      "tibia::input::TGenericGameActionHandler",
+      "tibia::input::TOpenWebsiteGameActionHandler",
+      "tibia::input::TPlayerMovementGameActionHandler",
+      "tibia::input::TUseWithGameActionHandler",
+      "tibia::market::TMarketGameActionHandler",
+      "tibia::minimap::TMinimapMarkerGameActionHandler",
+      "tibia::prey::TPreyGameActionHandler",
+      "tibia::questlog::TQuestLogGameActionHandler",
+      "tibia::quickloot::TQuickLootGameActionHandler",
+      "tibia::skillwheel::TSkillWheelGameActionHandler",
+      "tibia::store::TStoreGameActionHandler",
+      "tibia::trade::TPlayerTradeGameActionHandler",
+      "tibia::tutorial::TTutorialSessiondumpGameActionHandler",
+      "tibia::worldmap::TWorldMapGameActionHandler"
+    ]
+  },
+  "core_surfaces": {
+    "movement_intent": {
+      "type": "tibia::input::TPlayerMovementIntentHandler",
+      "qmeta": "0x3085de0",
+      "metacall": "0xdc9220",
+      "methods": 19,
+      "signals": 18,
+      "actions": ["sendGoNorth","sendGoEast","sendGoSouth","sendGoWest","sendGoNorthEast","sendGoSouthEast","sendGoSouthWest","sendGoNorthWest","sendGoPath","sendRotateNorth","sendRotateEast","sendRotateSouth","sendRotateWest","sendStop","sendCancel","sendFollowZero"]
+    },
+    "player_protocol_movement": {
+      "type": "tibia::game::TPlayerProtocolMessageHandler",
+      "qmeta": "0x30852a0",
+      "metacall": "0xd1a920",
+      "methods": 22,
+      "signals": 22,
+      "actions": ["sendEnterWorld","sendGoNorth","sendGoEast","sendGoSouth","sendGoWest","sendStop","sendCancel","sendGoNorthEast","sendGoSouthEast","sendGoSouthWest","sendGoNorthWest","sendGoPath","sendRotateNorth","sendRotateEast","sendRotateSouth","sendRotateWest","sendSetTactics","worldEntered"]
+    },
+    "creatures": {
+      "type": "tibia::creatures::TCreaturesGameActionHandler",
+      "qmeta": "0x3085060",
+      "metacall": "0xd16340",
+      "methods": 13,
+      "signals": 13,
+      "actions": ["sendAttack","sendFollow","sendLookAtCreature","sendInspectPlayer","sendInviteToParty","sendJoinParty","sendRevokeInvitation","sendPassLeadership","sendLeaveParty","sendShareExperience","sendGreet","sendJoinAggression"]
+    },
+    "use_with": {
+      "type": "tibia::input::TUseWithGameActionHandler",
+      "qmeta": "0x3085120",
+      "metacall": "0xdc4480",
+      "methods": 5,
+      "signals": 4,
+      "actions": ["startTargetSelection","sendUseTwoObjects","sendUseOnCreature"]
+    },
+    "generic_object": {
+      "type": "tibia::input::TGenericGameActionHandler",
+      "qmeta": "0x3085020",
+      "metacall": "0xdcb990",
+      "methods": 31,
+      "signals": 12,
+      "actions": ["sendTurnObject","sendUseObject","sendLook","sendBrowseField","sendMoveObject"]
+    },
+    "container": {
+      "type": "tibia::container::TContainerGameActionHandler",
+      "qmeta": "0x30850a0",
+      "metacall": "0xd1dac0",
+      "methods": 23,
+      "signals": 9,
+      "actions": ["sendMoveObject","sendEquipObject","sendStashAction","sendOpenDepotSearch","sendCloseDepotSearch","sendDepotSearchType","sendOpenParentContainer","sendDepotSearchRetrieve"]
+    },
+    "chat": {
+      "type": "tibia::chat::TChatGameActionHandler",
+      "qmeta": "0x30851a0",
+      "metacall": "0xcff5b0",
+      "methods": 38,
+      "signals": 11,
+      "actions": ["sendGetChanneList","sendJoinChannel","sendOpenChannel","sendPrivateChannel","sendCloseNPCChannel","sendLeaveChannel","sendInviteToChannel","sendExcludeFromChannel","sendGuildMessage","sendTalkMessage"]
+    },
+    "player": {
+      "type": "tibia::game::TPlayerGameActionHandler",
+      "qmeta": "0x3085160",
+      "metacall": "0xd1a230",
+      "methods": 8,
+      "signals": 8,
+      "actions": ["sendMount","sendGetOutfit","sendSetOutfit","sendSetCreaturePodiumConfiguration","sendSetHirelingName","sendSetTactics","sendInspectPlayer"]
+    },
+    "router": {
+      "type": "tibia::game::TInternalGameActionRouter",
+      "qmeta": "0x3074b20",
+      "metacall": "0xd20600",
+      "methods": 4,
+      "signals": 2,
+      "actions": ["publishGameActionInternal","publishGameActionBetweenRouters","handleGameActionInternal","handleGameActionFromOtherRouter"]
+    }
+  },
+  "classification": {
+    "static_action_boundary_ownership": "FACT",
+    "movement_turn_stop_path_surface": "FACT",
+    "attack_follow_surface": "FACT",
+    "use_usewith_surface": "FACT",
+    "move_object_container_surface": "FACT",
+    "chat_action_surface": "FACT",
+    "internal_router_surface": "FACT",
+    "action_layer_to_protocol_connection": "UNKNOWN",
+    "per_action_protocol_to_serialized_message": "UNKNOWN",
+    "per_action_runtime_effect": "NOT_OBSERVED",
+    "static_action_control_catalogue": "EXHAUSTED_FOR_RETAINED_QMETA"
+  },
+  "safety": {
+    "new_client_bytes_obtained": false,
+    "client_executed": false,
+    "runtime_access": "none",
+    "credentials": false,
+    "login": false,
+    "gameplay": false,
+    "pr528_runtime_touched": false,
+    "pr475_runtime_touched": false
+  }
+}

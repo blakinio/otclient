@@ -1,4 +1,4 @@
-name: Diagnostic existing noVNC 6082
+name: Diagnostic persistent VNC v24
 
 on:
   push:
@@ -21,32 +21,38 @@ jobs:
           ref: diag/OTC-20260818-v18-run-discovery
           persist-credentials: true
           fetch-depth: 1
-      - name: Discover noVNC inspect run
+      - name: Discover persistent observer run
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_SHA: fe9af5530e7c95f8e970291ccc864c8899a2edd2
-          TARGET_PATH: .github/workflows/track-a-vnc-existing-novnc-inspect-v23.yml
+          TARGET_SHA: 135c808d40934e3f9dfafe8cb0efb83aade92858
+          TARGET_PATH: .github/workflows/track-a-vnc-observer-live-v23.yml
         run: |
           set -Eeuo pipefail
           api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$TARGET_SHA&event=push&per_page=50"
           run_id=''
-          for _ in $(seq 1 40);do
+          for _ in $(seq 1 60);do
             p="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$api")"
             run_id="$(jq -r --arg path "$TARGET_PATH" '.workflow_runs[]|select(.path==$path)|.id'<<<"$p"|head -1)"
             [[ "$run_id" =~ ^[1-9][0-9]*$ ]]&&break
-            sleep 3
+            sleep 2
           done
           [[ "$run_id" =~ ^[1-9][0-9]*$ ]]
-          one="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
-          jobs="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
+          for _ in $(seq 1 120);do
+            jobs="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
+            live="$(jq -c '.jobs[]|select(.name=="live")'<<<"$jobs")"
+            step="$(jq -c '.steps[]?|select(.number==4)'<<<"$live")"
+            status="$(jq -r '.status//""'<<<"$step")"
+            [[ "$status" == in_progress || "$status" == completed ]]&&break
+            sleep 3
+          done
           mkdir -p .diag
-          jq -n --argjson run_id "$run_id" --arg status "$(jq -r '.status'<<<"$one")" --arg conclusion "$(jq -r '.conclusion//""'<<<"$one")" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion}]'<<<"$jobs")" '{run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/novnc-inspect-status.json
-      - name: Persist current status
+          jq -n --argjson run_id "$run_id" --argjson live "${live:-null}" '{schema:"persistent-vnc-v24-current",run_id:$run_id,live:$live}' >.diag/persistent-vnc-v24.json
+      - name: Persist status
         shell: bash
         run: |
           set -Eeuo pipefail
           git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .diag/novnc-inspect-status.json
-          git commit -m 'diag(track-a): persist noVNC inspect status'
+          git add .diag/persistent-vnc-v24.json
+          git commit -m 'diag(track-a): persist VNC v24 status'
           git push origin HEAD:diag/OTC-20260818-v18-run-discovery

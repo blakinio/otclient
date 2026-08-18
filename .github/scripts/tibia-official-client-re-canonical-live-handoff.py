@@ -57,6 +57,15 @@ def _task_token_path(task_id: str, path: Path) -> Path:
     return candidate
 
 
+def _secure_token_parent(task_id: str, path: Path) -> None:
+    expected = (TASK_ROOT / task_id / "runtime").resolve(strict=False)
+    parent = path.parent.resolve(strict=False)
+    if parent != expected:
+        raise HandoffError("token_parent_must_be_task_runtime")
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(parent, 0o700)
+
+
 def _state_dir(path: Path) -> Path:
     if path != CANONICAL_STATE and os.environ.get("TRACK_A_CANONICAL_HANDOFF_CONTRACT_TEST") != "1":
         raise HandoffError("noncanonical_state_override_forbidden")
@@ -101,6 +110,8 @@ def handoff(
     new_token_file = _task_token_path(task_id, new_token_file)
     if current_token_file == new_token_file:
         raise HandoffError("handoff_token_paths_must_differ")
+    _secure_token_parent(task_id, current_token_file)
+    _secure_token_parent(task_id, new_token_file)
     if new_token_file.exists():
         raise HandoffError("handoff_new_token_exists")
 
@@ -125,6 +136,8 @@ def handoff(
             raise HandoffError("handoff_same_session")
         if not manager._token_matches(state, current_token):
             raise HandoffError("lease_token_mismatch")
+        if new_token_file.exists():
+            raise HandoffError("handoff_new_token_exists")
 
         new_generation = expected_generation + 1
         new_token = secrets.token_hex(32)

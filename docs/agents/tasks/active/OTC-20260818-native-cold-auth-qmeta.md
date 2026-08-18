@@ -1,8 +1,8 @@
 ---
 task_id: OTC-20260818-native-cold-auth-qmeta
-status: waiting
+status: ready
 agent: ChatGPT
-session_id: chatgpt-native-cold-auth-qmeta-20260818
+session_id: chatgpt-native-cold-auth-qmeta-20260818-r3
 session_role: researcher
 project_lane: otclient
 lane: COVERAGE-AUDIT
@@ -15,7 +15,7 @@ branch: research/OTC-20260818-native-cold-auth-qmeta
 base_branch: main
 base_main: bd167a8a9b4192b3c87c21423e2af37e897f5e79
 related_pr: 505
-updated: 2026-08-18T07:42:00+02:00
+updated: 2026-08-18T07:50:00+02:00
 risk: high
 implementation_authorized: true
 research_status: DRAFT_NOT_PROMOTED
@@ -44,10 +44,10 @@ owned_paths:
 modules_touched: []
 reuses:
   - PR #498 exact-SHA auth/session static evidence (DRAFT dependency)
-  - PR #475 GameClient QMeta constants at head 135c808d40934e3f9dfafe8cb0efb83aade92858 (DRAFT dependency)
+  - PR #475 GameClient QMeta constants (DRAFT dependency)
 depends_on:
   - blakinio/otclient#498
-  - blakinio/otclient#475@135c808d40934e3f9dfafe8cb0efb83aade92858
+  - blakinio/otclient#475
 blocks: []
 client_version: 15.32.df7b29
 client_size: 51965216
@@ -56,19 +56,19 @@ packed_client_lzma_sha256: 496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a80704
 context_pressure: medium
 context_growth: stable
 context_score: 6
-estimate_confidence: medium
+estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one bounded exact-SHA QMeta discriminator with independent paths and no runtime ownership
 validation_level: focused
 invocation_started_at: 2026-08-18T07:20:00+02:00
-last_progress_at: 2026-08-18T07:39:00+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: draft-repair-1
+last_progress_at: 2026-08-18T07:50:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: draft-final-evidence
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 1
+unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 1
+repair_cycles_for_current_gate: 3
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
@@ -83,11 +83,25 @@ TGameClient::onRequestLoginWithCredentials(QString, QString)
 
 for `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME`, specifically to authenticate through original native client logic **without using the login form**.
 
-Form automation is not an acceptable target mechanism: no OCR, image matching, coordinate clicks, blind Tab/Return or GUI-field operation.
+Form automation is outside the solution: no OCR, image matching, coordinate clicks, blind Tab/Return or GUI-field operation.
 
-# Verified progress
+# Final exact-SHA static result
 
-Run `32103383778` / job `95608065258` on PR #505 head `f4f7c903a30046ebf78ee884d8dc7658ed68d534` independently proved:
+Exact proving head before evidence-only closeout commit:
+
+```text
+d0c1360b649fd8c4a92587b7713644c49162694c
+```
+
+Workflow:
+
+```text
+run: 32104348691
+job: 95610768376
+conclusion: SUCCESS
+```
+
+Directly observed markers:
 
 ```text
 COLD_AUTH_EXACT_PACKED_SHA=PASS
@@ -97,36 +111,52 @@ COLD_AUTH_RUNTIME_ACCESS=none
 COLD_AUTH_QMETA_CLASS=tibia::client::TGameClient
 COLD_AUTH_QMETA_METHOD_COUNT=44
 COLD_AUTH_QMETA_SIGNAL_COUNT=6
+COLD_AUTH_METHOD_NAME=onRequestLoginWithCredentials
+COLD_AUTH_METHOD_META_INDEX=17
+COLD_AUTH_ARGC=2
+COLD_AUTH_METHOD_FLAGS=0x8
+COLD_AUTH_RAW_PARAM_TYPE_IDS=0x2b,0xa,0xa
+COLD_AUTH_ARG_TYPES=QString,QString
+COLD_AUTH_RETURN_TYPE=void
+COLD_AUTH_INVOKE_DISPATCH_ROLE=PROVEN_BY_CALL_AND_FULL_RANGE_GUARDS
+COLD_AUTH_DISPATCH_LEA=0xd0626a
+COLD_AUTH_DISPATCH_TABLE=0x1d6dea0
+COLD_AUTH_DISPATCH_TARGET=0xd06850
+COLD_AUTH_TARGET_EXECUTABLE=true
+COLD_AUTH_TARGET_INSTRUCTION_FENCE=488b5110488b71084883c4485b5de92d389eff0f1f440000488bbfa009000048
+COLD_AUTH_NEGATIVE_CONTROL_OTHER_EXECUTABLE_TABLES=1
+COLD_AUTH_STATIC_DISCRIMINATOR=PASS
 ```
 
-The first failure was only the worker assertion expecting shortened class name `TGameClient`. Repair commit `767d9f1bd38b7a35125105bc6ba86f0c486bfcbf` changed that exact identity assertion to `tibia::client::TGameClient`; it did not weaken SHA, method or dispatch gates.
+## FACT
 
-A subsequent metadata checkpoint head `ea4f5b693644337ca9946dcf2972d19350cfd08b` started exact-head discriminator run `32103641442`. Two ordinary observations were consumed while that run was still in progress, so this invocation must not poll the same head a third time.
+For exact official native Linux client `15.32.df7b29` / SHA `e6c244bd...`, `tibia::client::TGameClient::onRequestLoginWithCredentials(QString,QString)` is QMeta `InvokeMetaMethod` id `17`. The full 44-method dispatcher is selected by `QMetaObject::Call == 0` plus method range `0..43`, and method 17 dispatches to static VA `0xd06850`.
 
-# Acceptance
+The second executable table observed in the static-metacall region is rejected as a negative control because its own dispatcher range is only `0..4` (`cmp edx,4`), not the `TGameClient` 44-method range (`cmp edx,0x2b`).
 
-The next session must persist only directly proven values for:
+## Runtime boundary still required
 
-```text
-COLD_AUTH_METHOD_META_INDEX
-COLD_AUTH_ARGC
-COLD_AUTH_ARG_TYPES or UNKNOWN with raw IDs
-COLD_AUTH_METHOD_FLAGS
-COLD_AUTH_DISPATCH_TARGET
-COLD_AUTH_TARGET_INSTRUCTION_FENCE
-```
+This task intentionally does not execute authentication. A later RUNTIME-authorized consumer must still prove current exact process identity, PIE/load-bias rebinding, runtime instruction bytes, unique live `tibia::client::TGameClient` object provenance, Qt thread affinity and protected transient construction/cleanup of the two `QString` credentials before invoking the original QMeta route. It must not invoke success callbacks or synthesize authentication/session state.
 
-Ambiguity remains `UNKNOWN`. No live-client success callback may be invoked or fabricated to manufacture progress.
+Durable evidence:
+
+`docs/agents/evidence/OTC-20260818-native-cold-auth-qmeta/result.md`
+
+# Validation / audit boundary
+
+- focused exact-SHA discriminator: PASS on `d0c1360b...`;
+- runtime E2E: `NOT_APPLICABLE_WITH_REASON` — this worker is `runtime_access:none` and only proves the static QMeta contract;
+- independent promotion audit: still required by coordinator before canonical promotion;
+- final evidence-only exact-head repository/governance CI: pending after this checkpoint commit.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 3
-status: waiting
-last_completed_step: repaired exact namespaced TGameClient QMeta identity and started exact-head static validation with no runtime/client execution
-blockers:
-  - current invocation consumed the ordinary two-check budget for head ea4f5b693644337ca9946dcf2972d19350cfd08b while run 32103641442 remained in progress
-next_action: resolve current PR #505 head and inspect its terminal cold-auth QMeta discriminator result; if it passed, persist the exact method/dispatch contract, otherwise inspect the failed job once and apply only a new evidence-based repair
+checkpoint_version: 4
+status: ready
+last_completed_step: exact-SHA static cold-auth QMeta contract passed, including method id 17, two QString arguments, unique full-range InvokeMetaMethod dispatch target 0xd06850 and instruction fence
+blockers: []
+next_action: observe the final evidence-only exact-head checks once; if green, hand PR #505 to the coordinator for independent review/promotion without merging it from this researcher session
 ```
 
 ## Recovery checkpoint
@@ -134,22 +164,22 @@ next_action: resolve current PR #505 head and inspect its terminal cold-auth QMe
 ```yaml
 recovery:
   policy_version: 1
-  generation: 2
-  session_id: chatgpt-native-cold-auth-qmeta-20260818
-  session_started_at: 2026-08-18T07:20:00+02:00
-  checkpointed_at: 2026-08-18T07:42:00+02:00
-  last_progress_at: 2026-08-18T07:39:00+02:00
-  phase: validate_exact_qmeta_after_namespaced_class_repair
-  exact_head: ea4f5b693644337ca9946dcf2972d19350cfd08b
+  generation: 3
+  session_id: chatgpt-native-cold-auth-qmeta-20260818-r3
+  session_started_at: 2026-08-18T07:45:00+02:00
+  checkpointed_at: 2026-08-18T07:50:00+02:00
+  last_progress_at: 2026-08-18T07:50:00+02:00
+  phase: final_evidence_closeout
+  exact_head: pending-evidence-commit
   pull_request: 505
-  active_operation: workflow_wait
-  external_run_ids: [32103641442]
-  operation_started_at: 2026-08-18T07:39:00+02:00
+  active_operation: none
+  external_run_ids: [32104348691]
+  operation_started_at: null
   wait_deadline_at: null
-  check_generation: draft-repair-1
-  checks_used: 2
-  status: waiting
+  check_generation: draft-final-evidence
+  checks_used: 0
+  status: ready
   safe_to_resume: true
-  resume_condition: cold-auth QMeta discriminator reaches a terminal result
-  next_action: inspect that terminal result and continue from its first material finding
+  resume_condition: final evidence-only head exists
+  next_action: inspect final exact-head checks once and hand the Draft PR to the coordinator if green
 ```

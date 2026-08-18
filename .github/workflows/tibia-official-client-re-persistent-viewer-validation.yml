@@ -7,13 +7,16 @@ on:
       - '.github/scripts/tibia-official-client-re-canonical-live-resume.py'
       - '.github/scripts/tibia-official-client-re-canonical-live-xres-probe.py'
       - '.github/scripts/tibia-official-client-re-persistent-viewer.py'
+      - '.github/scripts/tibia-official-client-re-persistent-viewer-controller.py'
       - '.github/scripts/test_tibia_official_client_re_canonical_live_handoff.py'
       - '.github/scripts/test_tibia_official_client_re_canonical_live_resume.py'
       - '.github/scripts/test_tibia_official_client_re_canonical_live_xres_probe.py'
       - '.github/scripts/test_tibia_official_client_re_persistent_viewer.py'
+      - '.github/scripts/test_tibia_official_client_re_persistent_viewer_controller.py'
       - '.github/workflows/tibia-official-client-re-persistent-viewer-validation.yml'
       - 'docs/agents/contracts/TRACK_A_CONTROLLER_HANDOFF_AND_VIEWER_V1.md'
       - 'docs/agents/decisions/ADR-0002-track-a-persistent-viewer-handoff.md'
+      - 'docs/agents/AGENTS.md'
       - 'docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md'
   workflow_dispatch:
 
@@ -45,10 +48,12 @@ jobs:
             .github/scripts/tibia-official-client-re-canonical-live-resume.py \
             .github/scripts/tibia-official-client-re-canonical-live-xres-probe.py \
             .github/scripts/tibia-official-client-re-persistent-viewer.py \
+            .github/scripts/tibia-official-client-re-persistent-viewer-controller.py \
             .github/scripts/test_tibia_official_client_re_canonical_live_handoff.py \
             .github/scripts/test_tibia_official_client_re_canonical_live_resume.py \
             .github/scripts/test_tibia_official_client_re_canonical_live_xres_probe.py \
-            .github/scripts/test_tibia_official_client_re_persistent_viewer.py
+            .github/scripts/test_tibia_official_client_re_persistent_viewer.py \
+            .github/scripts/test_tibia_official_client_re_persistent_viewer_controller.py
 
       - name: Run same-task handoff tests against promoted lease manager
         shell: bash
@@ -75,6 +80,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 .github/scripts/test_tibia_official_client_re_persistent_viewer.py
+          python3 .github/scripts/test_tibia_official_client_re_persistent_viewer_controller.py
 
       - name: Reject whitespace errors
         shell: bash

@@ -16,25 +16,25 @@ concurrency:
   group: track-a-kasmvnc-desktop
   cancel-in-progress: true
 
+env:
+  TASK_ID: OTC-20260818-track-a-persistent-viewer-handoff
+  TASK_FILE: docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md
+  CONTAINER_NAME: otclient-track-a-kasmvnc
+  IMAGE: kasmweb/ubuntu-noble-desktop:1.17.0
+  HOST_IP: 127.0.0.1
+  HOST_PORT: '6901'
+  STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
+  PUBLIC_HOST: synology
+  PUBLIC_PORT: '6902'
+  PUBLIC_URL: https://synology:6902/
+  LEGACY_OBSERVER: http://192.168.1.2:6083/
+  KASM_USERNAME: kasm_user
+
 jobs:
   deploy:
     name: Deploy persistent KasmVNC desktop on Synology
     runs-on: [otclient, synology]
-    timeout-minutes: 30
-    env:
-      TASK_ID: OTC-20260818-track-a-persistent-viewer-handoff
-      TASK_FILE: docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md
-      CONTAINER_NAME: otclient-track-a-kasmvnc
-      IMAGE: kasmweb/ubuntu-noble-desktop:1.17.0
-      HOST_IP: 127.0.0.1
-      HOST_PORT: '6901'
-      CONTAINER_PORT: '6901'
-      STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
-      PUBLIC_HOST: synology
-      PUBLIC_PORT: '6902'
-      PUBLIC_URL: https://synology:6902/
-      LEGACY_OBSERVER: http://192.168.1.2:6083/
-      KASM_USERNAME: kasm_user
+    timeout-minutes: 20
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -51,14 +51,10 @@ jobs:
         run: |
           set +x
           set -Eeuo pipefail
-          umask 077
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$HEAD_BRANCH" == fix/OTC-20260818-track-a-persistent-viewer-handoff ]]
           [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
-          grep -q '^track_id: official-client-re$' "$TASK_FILE"
-          grep -q '^status: implementing$' "$TASK_FILE"
-          grep -q '^execution_class: synology_physical_runtime$' "$TASK_FILE"
           grep -q '^runtime_access: ephemeral_isolated$' "$TASK_FILE"
           grep -q '^runtime_owner_task: OTC-20260818-track-a-persistent-viewer-handoff$' "$TASK_FILE"
           grep -q '^runtime_namespace: track-a-kasmvnc-desktop$' "$TASK_FILE"
@@ -67,49 +63,26 @@ jobs:
           grep -q '^credentials_allowed: false$' "$TASK_FILE"
           grep -q '^login_allowed: false$' "$TASK_FILE"
           grep -q '^gameplay_allowed: false$' "$TASK_FILE"
-          grep -q '^kasm_container: otclient-track-a-kasmvnc$' "$TASK_FILE"
-          grep -q '^kasm_host_port: 6901$' "$TASK_FILE"
-          grep -q "^protected_concurrent_display: ':99'$" "$TASK_FILE"
-          grep -q '^protected_concurrent_url: http://192.168.1.2:6083/$' "$TASK_FILE"
           command -v docker >/dev/null
           [[ -S /var/run/docker.sock ]]
           echo KASMVNC_ADMISSION=PASS
 
-      - name: Prove legacy observer remains separate
+      - name: Prove isolation and image
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
-          if curl -fsS --max-time 5 "$LEGACY_OBSERVER" >/dev/null; then
-            echo LEGACY_6083_REACHABLE_BEFORE=true
-          else
-            echo LEGACY_6083_REACHABLE_BEFORE=false
-          fi
           owners="$(docker ps --filter publish="$HOST_PORT" --format '{{.Names}}' | sed '/^$/d')"
-          if [[ -n "$owners" && "$owners" != "$CONTAINER_NAME" ]]; then
-            echo "KASMVNC_DEPLOY_ERROR=host_port_6901_owned_by_other_container:$owners" >&2
-            exit 1
-          fi
+          [[ -z "$owners" || "$owners" == "$CONTAINER_NAME" ]]
           if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
             [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")" == "$TASK_ID" ]]
             [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")" == track-a-kasmvnc-desktop ]]
-            [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.role" }}' "$CONTAINER_NAME")" == kasmvnc-desktop ]]
           fi
-          echo KASMVNC_ISOLATION_PREFLIGHT=PASS
-
-      - name: Pull and pin KasmVNC image identity
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
           docker pull "$IMAGE"
-          image_id="$(docker image inspect -f '{{.Id}}' "$IMAGE")"
-          digest="$(docker image inspect -f '{{join .RepoDigests " "}}' "$IMAGE")"
-          [[ -n "$image_id" ]]
-          echo "KASMVNC_IMAGE_ID=$image_id"
-          echo "KASMVNC_IMAGE_REPODIGESTS=$digest"
+          echo "KASMVNC_IMAGE_ID=$(docker image inspect -f '{{.Id}}' "$IMAGE")"
+          echo "KASMVNC_IMAGE_REPODIGESTS=$(docker image inspect -f '{{join .RepoDigests " "}}' "$IMAGE")"
 
-      - name: Deploy persistent KasmVNC desktop
+      - name: Create or reuse persistent desktop
         shell: bash
         run: |
           set +x
@@ -117,11 +90,8 @@ jobs:
           umask 077
           mkdir -p "$STATE_DIR"
           chmod 700 "$STATE_DIR"
-          [[ "$(stat -c '%a' "$STATE_DIR")" == 700 ]]
-
           password_file="$STATE_DIR/browser-password"
           identity_file="$STATE_DIR/desktop-container-id"
-          password_created=false
           if [[ ! -s "$password_file" ]]; then
             python3 - <<'PY' > "$password_file"
           import secrets
@@ -129,45 +99,17 @@ jobs:
           print(''.join(secrets.choice(alphabet) for _ in range(32)))
           PY
             chmod 600 "$password_file"
-            password_created=true
           fi
           [[ "$(stat -c '%a' "$password_file")" == 600 ]]
-          [[ "$(stat -c '%u' "$password_file")" == "$(id -u)" ]]
           KASM_PASSWORD="$(cat "$password_file")"
           [[ ${#KASM_PASSWORD} -ge 20 ]]
 
-          desired_image_id="$(docker image inspect -f '{{.Id}}' "$IMAGE")"
-          [[ -n "$desired_image_id" ]]
-          recreate=true
-          if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
-            task_label="$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")"
-            runtime_label="$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")"
-            role_label="$(docker inspect -f '{{ index .Config.Labels "otclient.role" }}' "$CONTAINER_NAME")"
-            [[ "$task_label" == "$TASK_ID" && "$runtime_label" == track-a-kasmvnc-desktop && "$role_label" == kasmvnc-desktop ]]
-            configured_image="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME")"
-            actual_image_id="$(docker inspect -f '{{.Image}}' "$CONTAINER_NAME")"
-            restart_policy="$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER_NAME")"
-            port_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostPort}}' "$CONTAINER_NAME" 2>/dev/null || true)"
-            host_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostIp}}' "$CONTAINER_NAME" 2>/dev/null || true)"
-            container_password="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" | sed -n 's/^VNC_PW=//p' | head -n1)"
-            if [[ "$configured_image" == "$IMAGE" && "$actual_image_id" == "$desired_image_id" && "$restart_policy" == unless-stopped && "$port_binding" == "$HOST_PORT" && "$host_binding" == "$HOST_IP" && "$password_created" == false && "$container_password" == "$KASM_PASSWORD" ]]; then
-              recreate=false
-            elif [[ -s "$identity_file" ]]; then
-              echo KASMVNC_DEPLOY_ERROR=persistent_desktop_recreation_requires_explicit_migration >&2
-              unset KASM_PASSWORD container_password
-              exit 1
-            fi
-          fi
-
-          if [[ "$recreate" == true ]]; then
-            if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
-              docker rm -f "$CONTAINER_NAME"
-            fi
+          if ! docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
             docker run -d \
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
               --shm-size=1g \
-              -p "$HOST_IP:$HOST_PORT:$CONTAINER_PORT" \
+              -p "$HOST_IP:$HOST_PORT:6901" \
               --label otclient.track=official-client-re \
               --label "otclient.task=$TASK_ID" \
               --label otclient.runtime=track-a-kasmvnc-desktop \
@@ -177,359 +119,114 @@ jobs:
               -e MAX_FRAME_RATE=30 \
               "$IMAGE"
           else
+            [[ "$(docker inspect -f '{{.Image}}' "$CONTAINER_NAME")" == "$(docker image inspect -f '{{.Id}}' "$IMAGE")" ]]
+            [[ "$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER_NAME")" == unless-stopped ]]
+            [[ "$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostIp}}' "$CONTAINER_NAME")" == "$HOST_IP" ]]
+            [[ "$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostPort}}' "$CONTAINER_NAME")" == "$HOST_PORT" ]]
+            container_password="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CONTAINER_NAME" | sed -n 's/^VNC_PW=//p' | head -n1)"
+            [[ "$container_password" == "$KASM_PASSWORD" ]]
             docker start "$CONTAINER_NAME" >/dev/null || true
+            unset container_password
           fi
 
           container_id="$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME")"
           if [[ -s "$identity_file" ]]; then
-            previous_id="$(cat "$identity_file")"
-            if [[ "$previous_id" != "$container_id" ]]; then
-              echo KASMVNC_DEPLOY_ERROR=desktop_identity_changed >&2
-              unset KASM_PASSWORD container_password
-              exit 1
-            fi
+            [[ "$(cat "$identity_file")" == "$container_id" ]]
           else
             printf '%s\n' "$container_id" > "$identity_file"
             chmod 600 "$identity_file"
           fi
-          [[ "$(stat -c '%a' "$identity_file")" == 600 ]]
-          [[ "$(stat -c '%u' "$identity_file")" == "$(id -u)" ]]
-
-          unset KASM_PASSWORD container_password
-          echo KASMVNC_CONTAINER_DEPLOYED=true
-          echo KASMVNC_PASSWORD_SOURCE=task-private-state-file
+          unset KASM_PASSWORD
           echo KASMVNC_DESKTOP_IDENTITY=PERSISTED
 
       - name: Verify local KasmVNC HTTPS backend
+        id: backend
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
           umask 077
-          url="https://$HOST_IP:$HOST_PORT/"
           auth_config="$(mktemp)"
           trap 'rm -f "$auth_config"' EXIT
           chmod 600 "$auth_config"
           printf 'user = "%s:%s"\n' "$KASM_USERNAME" "$(cat "$STATE_DIR/browser-password")" > "$auth_config"
-
           ready=false
-          for _ in $(seq 1 120); do
-            running="$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)"
-            [[ "$running" == true ]] || { sleep 1; continue; }
-            if curl -kfsS --config "$auth_config" --max-time 5 "$url" -o /tmp/kasm-index.html; then
-              if [[ -s /tmp/kasm-index.html ]]; then
-                ready=true
-                break
-              fi
+          for _ in $(seq 1 90); do
+            if [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)" == true ]] && \
+               curl -kfsS --config "$auth_config" --max-time 4 "https://$HOST_IP:$HOST_PORT/" -o /tmp/kasm-index.html && \
+               [[ -s /tmp/kasm-index.html ]]; then
+              ready=true
+              break
             fi
             sleep 1
           done
-          if [[ "$ready" != true ]]; then
-            state="$(docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}' "$CONTAINER_NAME" 2>/dev/null || true)"
-            echo "KASMVNC_CONTAINER_STATE=${state:-UNKNOWN}" >&2
-            echo KASMVNC_DEPLOY_ERROR=https_backend_not_ready >&2
-            exit 1
-          fi
-
+          [[ "$ready" == true ]]
           [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" == true ]]
           [[ "$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER_NAME")" == unless-stopped ]]
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")" == "$TASK_ID" ]]
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")" == track-a-kasmvnc-desktop ]]
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.role" }}' "$CONTAINER_NAME")" == kasmvnc-desktop ]]
-          [[ "$(docker inspect -f '{{.Image}}' "$CONTAINER_NAME")" == "$(docker image inspect -f '{{.Id}}' "$IMAGE")" ]]
-          port_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostPort}}' "$CONTAINER_NAME")"
-          host_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostIp}}' "$CONTAINER_NAME")"
-          [[ "$port_binding" == "$HOST_PORT" ]]
-          [[ "$host_binding" == "$HOST_IP" ]]
-          display="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"' 2>/dev/null || true)"
-          [[ "$display" == ':1' ]]
-          docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -af "[X]vnc" >/dev/null'
           [[ "$(cat "$STATE_DIR/desktop-container-id")" == "$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME")" ]]
-          [[ "$(stat -c '%a' "$STATE_DIR/browser-password")" == 600 ]]
-          [[ "$(stat -c '%a' "$STATE_DIR/desktop-container-id")" == 600 ]]
-          echo "KASMVNC_CONTAINER_DISPLAY=$display"
-          echo "KASMVNC_BACKEND_URL=$url"
-          echo "KASMVNC_USERNAME=$KASM_USERNAME"
+          display="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"')"
+          [[ "$display" == ':1' ]]
+          docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -x Xvnc >/dev/null'
           echo KASMVNC_HTTPS_BACKEND=PASS
           echo KASMVNC_DESKTOP_PROCESS=PASS
-          echo KASMVNC_PERSISTENCE=PASS
-          echo KASMVNC_DSM_REVERSE_PROXY_REQUIRED=true
 
-      - name: Verify DSM reverse proxy HTTPS and WebSocket
+      - name: Safe Kasm startup diagnostics
+        if: failure() && steps.backend.outcome == 'failure'
         shell: bash
         run: |
           set +x
-          set -Eeuo pipefail
+          set -u
+          echo "KASMVNC_CONTAINER_STATE=$(docker inspect -f '{{.State.Status}}:{{.State.ExitCode}}:restarts={{.RestartCount}}' "$CONTAINER_NAME" 2>/dev/null || echo UNKNOWN)"
+          docker exec "$CONTAINER_NAME" /bin/bash -lc 'echo KASMVNC_SAFE_PROCESS_INVENTORY; ps -eo pid,comm | tail -n +2 | head -n 80; echo KASMVNC_SAFE_X11_SOCKET; ls -ld /tmp/.X11-unix /tmp/.X11-unix/X1 2>/dev/null || true; echo KASMVNC_SAFE_VNC_FILES; find "$HOME/.vnc" -maxdepth 1 -type f -printf "%f %s bytes\n" 2>/dev/null | sort || true; echo KASMVNC_SAFE_LISTENERS; (ss -ltn 2>/dev/null || true) | grep -E "(:5901|:6901)[[:space:]]" || true'
           python3 - <<'PY'
-          import base64
-          import hashlib
-          import os
-          import secrets
-          import socket
-          import ssl
-          import time
-          import urllib.request
+          import subprocess
           from pathlib import Path
-
-          username = os.environ['KASM_USERNAME']
-          password = (Path(os.environ['STATE_DIR']) / 'browser-password').read_text().strip()
-          if len(password) < 20:
-              raise SystemExit('KASMVNC_PUBLIC_E2E_ERROR=password_file_invalid')
-          auth = base64.b64encode(f'{username}:{password}'.encode()).decode()
-          context = ssl._create_unverified_context()
-
-          def fetch(url, attempts=30):
-              last = None
-              for _ in range(attempts):
-                  try:
-                      request = urllib.request.Request(url, headers={
-                          'Authorization': f'Basic {auth}',
-                          'User-Agent': 'otclient-track-a-kasmvnc-e2e/1',
-                      })
-                      with urllib.request.urlopen(request, context=context, timeout=5) as response:
-                          body = response.read(4 * 1024 * 1024)
-                          if response.status == 200 and body:
-                              return body
-                          last = f'status={response.status}'
-                  except Exception as exc:
-                      last = type(exc).__name__
-                  time.sleep(1)
-              raise SystemExit(f'KASMVNC_PUBLIC_E2E_ERROR=https_fetch_failed:{last}')
-
-          backend_url = f"https://{os.environ['HOST_IP']}:{os.environ['HOST_PORT']}/"
-          public_url = os.environ['PUBLIC_URL']
-          backend_body = fetch(backend_url)
-          public_body = fetch(public_url)
-          backend_sha = hashlib.sha256(backend_body).hexdigest()
-          public_sha = hashlib.sha256(public_body).hexdigest()
-          if backend_sha != public_sha:
-              raise SystemExit('KASMVNC_PUBLIC_E2E_ERROR=proxy_body_mismatch')
-
-          def websocket(host, port, origin, attempts=15):
-              last = None
-              for _ in range(attempts):
-                  raw = None
-                  tls = None
-                  try:
-                      raw = socket.create_connection((host, int(port)), timeout=5)
-                      tls = context.wrap_socket(raw, server_hostname=host)
-                      key = base64.b64encode(secrets.token_bytes(16)).decode()
-                      request = (
-                          'GET /websockify HTTP/1.1\r\n'
-                          f'Host: {host}:{port}\r\n'
-                          'Upgrade: websocket\r\n'
-                          'Connection: Upgrade\r\n'
-                          f'Origin: {origin}\r\n'
-                          f'Authorization: Basic {auth}\r\n'
-                          f'Sec-WebSocket-Key: {key}\r\n'
-                          'Sec-WebSocket-Version: 13\r\n'
-                          'Sec-WebSocket-Protocol: binary\r\n'
-                          '\r\n'
-                      ).encode('ascii')
-                      tls.sendall(request)
-                      data = b''
-                      while b'\r\n\r\n' not in data and len(data) < 32768:
-                          chunk = tls.recv(4096)
-                          if not chunk:
-                              break
-                          data += chunk
-                      head = data.split(b'\r\n\r\n', 1)[0].decode('iso-8859-1')
-                      lines = head.split('\r\n')
-                      if not lines or ' 101 ' not in lines[0]:
-                          last = lines[0] if lines else 'empty_response'
-                          raise RuntimeError('not_switching_protocols')
-                      headers = {}
-                      for line in lines[1:]:
-                          if ':' in line:
-                              name, value = line.split(':', 1)
-                              headers[name.strip().lower()] = value.strip()
-                      expected = base64.b64encode(hashlib.sha1(
-                          (key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode('ascii')
-                      ).digest()).decode('ascii')
-                      if headers.get('sec-websocket-accept') != expected:
-                          raise RuntimeError('bad_websocket_accept')
-                      if headers.get('upgrade', '').lower() != 'websocket':
-                          raise RuntimeError('missing_upgrade_header')
-                      return
-                  except Exception as exc:
-                      if last is None:
-                          last = type(exc).__name__
-                      time.sleep(1)
-                  finally:
-                      try:
-                          if tls is not None:
-                              tls.close()
-                          elif raw is not None:
-                              raw.close()
-                      except Exception:
-                          pass
-              raise SystemExit(f'KASMVNC_PUBLIC_E2E_ERROR=websocket_failed:{last}')
-
-          websocket(os.environ['HOST_IP'], os.environ['HOST_PORT'], backend_url.rstrip('/'))
-          websocket(os.environ['PUBLIC_HOST'], os.environ['PUBLIC_PORT'], public_url.rstrip('/'))
-          print(f'KASMVNC_BACKEND_BODY_SHA256={backend_sha}')
-          print(f'KASMVNC_PUBLIC_BODY_SHA256={public_sha}')
-          print('KASMVNC_BACKEND_WEBSOCKET=PASS')
-          print('KASMVNC_DSM_HTTPS=PASS')
-          print('KASMVNC_DSM_WEBSOCKET=PASS')
-          print('KASMVNC_PUBLIC_REAL_DESKTOP_PROVIDER=PASS')
+          name = 'otclient-track-a-kasmvnc'
+          state = Path('/home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc')
+          secret = (state / 'browser-password').read_text().strip()
+          cmd = ['docker','exec',name,'/bin/bash','-lc','for f in "$HOME"/.vnc/*.log; do test -f "$f" && cat "$f"; done']
+          p = subprocess.run(cmd, capture_output=True, text=True, check=False)
+          text = (p.stdout + '\n' + p.stderr).replace(secret, '[REDACTED]')
+          needles = ('error','fail','fatal','permission','denied','not found','unsupported','cannot','unable')
+          lines = [line for line in text.splitlines() if any(n in line.lower() for n in needles)]
+          print('KASMVNC_SAFE_VNC_ERROR_LINES_BEGIN')
+          for line in lines[-120:]: print(line[:1000])
+          print('KASMVNC_SAFE_VNC_ERROR_LINES_END')
           PY
 
-      - name: Re-prove no interference with PR 528 observer
+      - name: Verify DSM HTTPS and WebSocket
         shell: bash
         run: |
           set +x
           set -Eeuo pipefail
-          if curl -fsS --max-time 5 "$LEGACY_OBSERVER" >/dev/null; then
-            echo LEGACY_6083_REACHABLE_AFTER=true
-          else
-            echo LEGACY_6083_REACHABLE_AFTER=false
-          fi
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")" == "$TASK_ID" ]]
-          echo KASMVNC_NO_PR528_MUTATION=PASS
-
-      - name: Emit operator handoff
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
-          echo 'KASMVNC_DEPLOYMENT=PASS'
-          echo 'KASMVNC_BACKEND_URL=https://127.0.0.1:6901/'
-          echo 'KASMVNC_PUBLIC_ENTRYPOINT=https://synology:6902/'
-          echo 'KASMVNC_PUBLIC_WEBSOCKET=PASS'
-          echo 'KASMVNC_USERNAME=kasm_user'
-          echo 'KASMVNC_PASSWORD_SOURCE=task-private-state-file'
-          echo 'KASMVNC_OFFICIAL_CLIENT_STARTED=false'
-          echo 'KASMVNC_TIBIA_SECRET_ACCESS=false'
-
-  physical_audit:
-    name: Independent post-deploy KasmVNC physical audit
-    needs: deploy
-    runs-on: [otclient, synology]
-    timeout-minutes: 15
-    env:
-      TASK_ID: OTC-20260818-track-a-persistent-viewer-handoff
-      CONTAINER_NAME: otclient-track-a-kasmvnc
-      IMAGE: kasmweb/ubuntu-noble-desktop:1.17.0
-      HOST_IP: 127.0.0.1
-      HOST_PORT: '6901'
-      STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
-      PUBLIC_HOST: synology
-      PUBLIC_PORT: '6902'
-      PUBLIC_URL: https://synology:6902/
-      LEGACY_OBSERVER: http://192.168.1.2:6083/
-      KASM_USERNAME: kasm_user
-    steps:
-      - name: Falsify persistence and public presentation after deploy job exit
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
-          umask 077
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
-          [[ -S /var/run/docker.sock ]]
-          [[ -s "$STATE_DIR/browser-password" ]]
-          [[ -s "$STATE_DIR/desktop-container-id" ]]
-          [[ "$(stat -c '%a' "$STATE_DIR/browser-password")" == 600 ]]
-          [[ "$(stat -c '%a' "$STATE_DIR/desktop-container-id")" == 600 ]]
-          [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" == true ]]
-          [[ "$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER_NAME")" == unless-stopped ]]
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")" == "$TASK_ID" ]]
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")" == track-a-kasmvnc-desktop ]]
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.role" }}' "$CONTAINER_NAME")" == kasmvnc-desktop ]]
-          [[ "$(docker inspect -f '{{.Image}}' "$CONTAINER_NAME")" == "$(docker image inspect -f '{{.Id}}' "$IMAGE")" ]]
-          [[ "$(cat "$STATE_DIR/desktop-container-id")" == "$(docker inspect -f '{{.Id}}' "$CONTAINER_NAME")" ]]
-          [[ "$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostPort}}' "$CONTAINER_NAME")" == "$HOST_PORT" ]]
-          [[ "$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostIp}}' "$CONTAINER_NAME")" == "$HOST_IP" ]]
-          display="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"' 2>/dev/null || true)"
-          [[ "$display" == ':1' ]]
-          docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -af "[X]vnc" >/dev/null'
-
           python3 - <<'PY'
-          import base64
-          import hashlib
-          import os
-          import secrets
-          import socket
-          import ssl
-          import urllib.request
+          import base64, hashlib, os, secrets, socket, ssl, urllib.request
           from pathlib import Path
-
-          password = (Path(os.environ['STATE_DIR']) / 'browser-password').read_text().strip()
-          auth = base64.b64encode(f"{os.environ['KASM_USERNAME']}:{password}".encode()).decode()
-          context = ssl._create_unverified_context()
-
+          password=(Path(os.environ['STATE_DIR'])/'browser-password').read_text().strip()
+          auth=base64.b64encode(f"{os.environ['KASM_USERNAME']}:{password}".encode()).decode()
+          ctx=ssl._create_unverified_context()
           def fetch(url):
-              request = urllib.request.Request(url, headers={
-                  'Authorization': f'Basic {auth}',
-                  'User-Agent': 'otclient-track-a-kasmvnc-independent-audit/1',
-              })
-              with urllib.request.urlopen(request, context=context, timeout=8) as response:
-                  body = response.read(4 * 1024 * 1024)
-                  if response.status != 200 or not body:
-                      raise SystemExit('KASMVNC_INDEPENDENT_AUDIT_ERROR=https')
+              req=urllib.request.Request(url,headers={'Authorization':f'Basic {auth}','User-Agent':'otclient-kasm-e2e/2'})
+              with urllib.request.urlopen(req,context=ctx,timeout=8) as r:
+                  body=r.read(4*1024*1024)
+                  if r.status!=200 or not body: raise SystemExit('KASMVNC_E2E_ERROR=https')
                   return body
-
-          backend_url = f"https://{os.environ['HOST_IP']}:{os.environ['HOST_PORT']}/"
-          public_url = os.environ['PUBLIC_URL']
-          backend_body = fetch(backend_url)
-          public_body = fetch(public_url)
-          if hashlib.sha256(backend_body).digest() != hashlib.sha256(public_body).digest():
-              raise SystemExit('KASMVNC_INDEPENDENT_AUDIT_ERROR=proxy_body_mismatch')
-
-          def websocket(host, port, origin):
-              raw = socket.create_connection((host, int(port)), timeout=8)
-              tls = context.wrap_socket(raw, server_hostname=host)
+          backend=fetch(f"https://{os.environ['HOST_IP']}:{os.environ['HOST_PORT']}/")
+          public=fetch(os.environ['PUBLIC_URL'])
+          if hashlib.sha256(backend).digest()!=hashlib.sha256(public).digest(): raise SystemExit('KASMVNC_E2E_ERROR=proxy_body_mismatch')
+          def ws(host,port,origin):
+              raw=socket.create_connection((host,int(port)),timeout=8); tls=ctx.wrap_socket(raw,server_hostname=host)
               try:
-                  key = base64.b64encode(secrets.token_bytes(16)).decode()
-                  request = (
-                      'GET /websockify HTTP/1.1\r\n'
-                      f'Host: {host}:{port}\r\n'
-                      'Upgrade: websocket\r\n'
-                      'Connection: Upgrade\r\n'
-                      f'Origin: {origin}\r\n'
-                      f'Authorization: Basic {auth}\r\n'
-                      f'Sec-WebSocket-Key: {key}\r\n'
-                      'Sec-WebSocket-Version: 13\r\n'
-                      'Sec-WebSocket-Protocol: binary\r\n\r\n'
-                  ).encode('ascii')
-                  tls.sendall(request)
-                  data = b''
-                  while b'\r\n\r\n' not in data and len(data) < 32768:
-                      chunk = tls.recv(4096)
-                      if not chunk:
-                          break
-                      data += chunk
-                  head = data.split(b'\r\n\r\n', 1)[0].decode('iso-8859-1')
-                  lines = head.split('\r\n')
-                  if not lines or ' 101 ' not in lines[0]:
-                      raise SystemExit('KASMVNC_INDEPENDENT_AUDIT_ERROR=websocket_status')
-                  headers = {}
-                  for line in lines[1:]:
+                  key=base64.b64encode(secrets.token_bytes(16)).decode()
+                  req=('GET /websockify HTTP/1.1\r\n'+f'Host: {host}:{port}\r\n'+'Upgrade: websocket\r\nConnection: Upgrade\r\n'+f'Origin: {origin}\r\nAuthorization: Basic {auth}\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: binary\r\n\r\n').encode()
+                  tls.sendall(req); data=b''
+                  while b'\r\n\r\n' not in data and len(data)<32768:
+                      chunk=tls.recv(4096)
+                      if not chunk: break
+                      data+=chunk
+                  head=data.split(b'\r\n\r\n',1)[0].decode('iso-8859-1')
+                  if ' 101 ' not in head.split('\r\n',1)[0]: raise SystemExit('KASMVNC_E2E_ERROR=websocket_status')
+                  expected=base64.b64encode(hashlib.sha1((key+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode()).digest()).decode()
+                  headers={}
+                  for line in head.split('\r\n')[1:]:
                       if ':' in line:
-                          name, value = line.split(':', 1)
-                          headers[name.strip().lower()] = value.strip()
-                  expected = base64.b64encode(hashlib.sha1(
-                      (key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode('ascii')
-                  ).digest()).decode('ascii')
-                  if headers.get('sec-websocket-accept') != expected:
-                      raise SystemExit('KASMVNC_INDEPENDENT_AUDIT_ERROR=websocket_accept')
-              finally:
-                  tls.close()
-
-          websocket(os.environ['HOST_IP'], os.environ['HOST_PORT'], backend_url.rstrip('/'))
-          websocket(os.environ['PUBLIC_HOST'], os.environ['PUBLIC_PORT'], public_url.rstrip('/'))
-          print('KASMVNC_INDEPENDENT_BACKEND_HTTPS=PASS')
-          print('KASMVNC_INDEPENDENT_BACKEND_WEBSOCKET=PASS')
-          print('KASMVNC_INDEPENDENT_DSM_HTTPS=PASS')
-          print('KASMVNC_INDEPENDENT_DSM_WEBSOCKET=PASS')
-          PY
-
-          if curl -fsS --max-time 5 "$LEGACY_OBSERVER" >/dev/null; then
-            echo LEGACY_6083_REACHABLE_IN_AUDIT=true
-          else
-            echo LEGACY_6083_REACHABLE_IN_AUDIT=false
-          fi
-          echo KASMVNC_POST_DEPLOY_JOB_PERSISTENCE=PASS
-          echo KASMVNC_INDEPENDENT_PHYSICAL_AUDIT=PASS

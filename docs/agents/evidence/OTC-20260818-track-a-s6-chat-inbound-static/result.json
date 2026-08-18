@@ -1,0 +1,118 @@
+{
+  "schema": "track-a-s6-chat-inbound-static-v1",
+  "task": "OTC-20260818-track-a-s6-chat-inbound-static",
+  "pr": 526,
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "producer": {
+    "run": 32127503296,
+    "artifact": 9320905712,
+    "artifact_digest": "sha256:8016ce5b88f030335a9104e12c73ab320518b66505ed820833dc8e1bacf3c478",
+    "historical_qmeta_source_run": 31790507112,
+    "historical_qmeta_source_job": 94736106350,
+    "historical_qmeta_source_head": "9afdc76ca6fe238742f270e22d8ecf4abe5ba9a2",
+    "historical_log_sha256": "481600615765a5bbc570888817f23b75ac5cf8b93fab693f3c461872c183ef70",
+    "s1_type_artifact": 9315562574,
+    "s1_type_artifact_digest": "sha256:583c8c217fa2eaa2411f79995473cd910b8803d8599f80574491ca27b8ab9860"
+  },
+  "queue": {
+    "type": "tibia::protocol::TProtocolMessageQueue",
+    "static_metaobject": "0x3085b60",
+    "qt_static_metacall": "0xdf5fe0",
+    "method_count": 355,
+    "signal_count": 192,
+    "chat_signals": [
+      {"index": 21, "name": "receivedTalkMessage"},
+      {"index": 23, "name": "receivedMessageMessage"},
+      {"index": 54, "name": "receivedOpenChannelMessage"},
+      {"index": 85, "name": "receivedChannelsMessage"},
+      {"index": 86, "name": "receivedPrivateChannelMessage"},
+      {"index": 89, "name": "receivedOpenOwnChannelMessage"},
+      {"index": 90, "name": "receivedCloseChannelMessage"},
+      {"index": 115, "name": "receivedChannelEventMessage"},
+      {"index": 188, "name": "receivedNpcTalkPartersMessage"}
+    ]
+  },
+  "handler": {
+    "type": "tibia::chat::TChatProtocolMessageHandler",
+    "static_metaobject": "0x30877c0",
+    "qt_static_metacall": "0xd05f20",
+    "method_count": 13,
+    "signal_count": 2,
+    "signals": [
+      {"index": 0, "name": "currentlyAvailableChannels"},
+      {"index": 1, "name": "publishGameAction"}
+    ],
+    "message_methods": [
+      {"index": 2, "name": "handleTalkMessage"},
+      {"index": 3, "name": "handleMessageMessage"},
+      {"index": 4, "name": "handleOpenChannelMessage"},
+      {"index": 5, "name": "handleOpenOwnChannelMessage"},
+      {"index": 6, "name": "handleCloseChannelMessage"},
+      {"index": 7, "name": "handleChannelsMessage"},
+      {"index": 8, "name": "handlePrivateChannelMessage"},
+      {"index": 9, "name": "handleChannelEventMessage"},
+      {"index": 10, "name": "handleNpcTalkPartersMessage"}
+    ],
+    "other_slots": [
+      {"index": 11, "name": "onChatProtocolMessageHandlerOptionsChanged"},
+      {"index": 12, "name": "onPlayerCreatureAddedToCreatureStorage"}
+    ]
+  },
+  "storage": {
+    "type": "tibia::chat::TChatChannelStorage",
+    "static_metaobject": "0x3087900",
+    "qt_static_metacall": "0xd05c50",
+    "method_count": 6,
+    "signal_count": 5,
+    "signals": [
+      {"index": 0, "name": "newChatChannelOpened"},
+      {"index": 1, "name": "chatChannelReopend"},
+      {"index": 2, "name": "chatChannelRemoved"},
+      {"index": 3, "name": "entryAddedToChatChannel"},
+      {"index": 4, "name": "publishGameAction"}
+    ],
+    "slots": [
+      {"index": 5, "name": "onPlayerCreatureAddedToCreatureStorage"}
+    ]
+  },
+  "registration_type_contracts": {
+    "classification": "FACT",
+    "messages": [
+      "GameserverMessageTalk",
+      "GameserverMessageMessage",
+      "GameserverMessageOpenChannel",
+      "GameserverMessageOpenOwnChannel",
+      "GameserverMessageCloseChannel",
+      "GameserverMessageChannels",
+      "GameserverMessagePrivateChannel",
+      "GameserverMessageChannelEvent",
+      "GameserverMessageNpcTalkParters"
+    ],
+    "statement": "S1 retains TProtocolMessageQueue::registerServerMessage<T> template symbols whose parameter is a TProtocolMessageQueue member pointer accepting const T& for each listed exact protobuf message type."
+  },
+  "classification": {
+    "queue_chat_signal_ownership": "FACT",
+    "handler_qmeta_message_methods": "FACT",
+    "storage_qmeta_surface": "FACT",
+    "registered_member_pointer_equals_suffix_matching_received_signal": "INFERENCE_HIGH_NOT_DIRECTLY_PROVEN",
+    "queue_signal_to_chat_handler_connection": "UNKNOWN",
+    "chat_handler_to_channel_storage_mutation": "UNKNOWN",
+    "runtime_chat_delivery": "NOT_OBSERVED"
+  },
+  "safety": {
+    "new_client_bytes_obtained": false,
+    "client_executed": false,
+    "runtime_access": "none",
+    "synology_access": false,
+    "x11_or_vnc_access": false,
+    "process_memory_access": false,
+    "credential_access": false,
+    "login": false,
+    "gameplay": false,
+    "pr475_runtime_touched": false
+  }
+}

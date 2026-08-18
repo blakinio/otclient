@@ -24,7 +24,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Download only prior sanitized exact-client job logs
+      - name: Parse accepted exact-client connection logs
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -33,8 +33,6 @@ jobs:
           out="$RUNNER_TEMP/track-a-s3-prior-evidence"
           mkdir -p "$out/raw" "$out/evidence"
 
-          # These are the accepted #498 hosted exact-SHA static analysis jobs. Their logs contain
-          # sanitized disassembly/QMeta output only; they never contain or upload the raw client.
           for job in 95442653919 95443958584; do
             curl -fsSL \
               -H "Authorization: Bearer $GH_TOKEN" \
@@ -45,165 +43,114 @@ jobs:
             test -s "$out/raw/${job}.log"
           done
 
-          sha256sum "$out/raw/"*.log | sed "s#${out}/raw/##" > "$out/evidence/input-log-sha256.txt"
-
           python3 - "$out/raw" "$out/evidence" <<'PY'
           from __future__ import annotations
-
-          import hashlib
-          import json
-          import pathlib
-          import re
-          import sys
+          import hashlib, json, pathlib, re, sys
 
           raw_dir = pathlib.Path(sys.argv[1])
           evidence = pathlib.Path(sys.argv[2])
-          evidence.mkdir(parents=True, exist_ok=True)
-
-          jobs = {
-              'phase4_hosted': 95442653919,
-              'phase5_hosted': 95443958584,
+          sources = {
+              'phase4_hosted': raw_dir / '95442653919.log',
+              'phase5_hosted': raw_dir / '95443958584.log',
           }
-          texts = {}
+
           inputs = []
-          for label, job in jobs.items():
-              path = raw_dir / f'{job}.log'
+          normalized = []
+          for label, path in sources.items():
               data = path.read_bytes()
+              inputs.append({'label': label, 'job': int(path.stem), 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
               text = data.decode('utf-8', 'replace')
-              texts[label] = text
-              inputs.append({
-                  'label': label,
-                  'job': job,
-                  'sha256': hashlib.sha256(data).hexdigest(),
-                  'size': len(data),
-                  'source_status': 'prior_accepted_exact_client_sanitized_job_log',
-              })
-
-          # Remove GitHub Actions timestamp/prefix fields and retain only sanitized semantic/disassembly payload.
-          def strip_prefix(line: str) -> str:
-              # Typical log line: 2026-...Z <payload>
-              return re.sub(r'^\d{4}-\d\d-\d\dT[^ ]+Z\s+', '', line)
-
-          combined_lines = []
-          for label, text in texts.items():
               for line in text.splitlines():
-                  combined_lines.append((label, strip_prefix(line)))
+                  line = re.sub(r'^\d{4}-\d\d-\d\dT[^ ]+Z\s+', '', line)
+                  normalized.append((label, line))
 
-          exact_signal_stubs = {
-              'receivedPlayerDataCurrentMessage': '0xdf8bc1',
-              'receivedPlayerDataBasicMessage': '0xdf8d3b',
-              'receivedPlayerStateMessage': '0xdf8e0d',
-              'receivedPlayerSkillsMessage': '0xdf8e37',
-              'receivedPlayerInventoryMessage': '0xdf899f',
-          }
-          exact_addresses = {
-              **exact_signal_stubs,
-              'TProtocolMessageQueue_staticMetaObject': '0x3085b60',
-              'TPlayerProtocolMessageHandler_primary_vptr': '0x308a008',
-              'TPlayerData_primary_vptr': '0x308ca70',
-              'phase4_connection_setup': '0x7d51b0',
-              'QObject_connect_candidate': '0x4dd800',
-              'QSlotObject_allocator_or_helper': '0x4df670',
-          }
+          setup_re = re.compile(r'\b(7d5[0-9a-f]{3}):\s*(.*)$', re.I)
+          setup = []
+          for label, line in normalized:
+              m = setup_re.search(line)
+              if m:
+                  setup.append({'source': label, 'address': '0x' + m.group(1).lower(), 'asm': m.group(2).strip(), 'line': line})
 
-          address_hits = {name: [] for name in exact_addresses}
-          connect_lines = []
-          setup_disassembly = []
-          queue_lines = []
-          for label, line in combined_lines:
-              lower = line.lower()
-              for name, addr in exact_addresses.items():
-                  if addr[2:].lower() in lower or addr.lower() in lower:
-                      address_hits[name].append({'source': label, 'line': line})
-              if any(token in line for token in ('QObject', 'connect', 'QSlotObject', 'QMetaObject')) or '4dd800' in lower or '4df670' in lower:
-                  connect_lines.append(f'[{label}] {line}')
-              if re.search(r'0x7d5[0-9a-f]{3}:', lower):
-                  setup_disassembly.append(f'[{label}] {line}')
-              if 'TProtocolMessageQueue' in line or '3085b60' in lower or 'TPlayerProtocolMessageHandler' in line or '308a008' in lower:
-                  queue_lines.append(f'[{label}] {line}')
+          seen = set(); dedup = []
+          for row in setup:
+              key = (row['address'], row['asm'])
+              if key not in seen:
+                  seen.add(key); dedup.append(row)
+          setup = dedup
 
-          # Deduplicate emitted lines but keep source labels and deterministic order.
-          def uniq(items):
-              seen = set()
-              out = []
-              for item in items:
-                  if item in seen:
-                      continue
-                  seen.add(item)
-                  out.append(item)
-              return out
-
-          setup_disassembly = uniq(setup_disassembly)
-          connect_lines = uniq(connect_lines)
-          queue_lines = uniq(queue_lines)
-
-          # Recover every visible member offset in the phase-4 connection setup. This is a structural
-          # inventory only; member type is assigned only when prior evidence independently proves it.
-          member_offsets = {}
-          for line in setup_disassembly:
-              for match in re.finditer(r'\[(?:rbx|rdi|rbp|r12|r13|r14|r15) \+ (0x[0-9a-f]+)\]', line.lower()):
-                  member_offsets[match.group(1)] = member_offsets.get(match.group(1), 0) + 1
-
-          # Split setup into bounded call blocks ending at the previously identified connect candidate.
-          call_blocks = []
-          current = []
-          for line in setup_disassembly:
-              current.append(line)
-              if re.search(r'call\s+0x4dd800\b', line.lower()):
-                  call_blocks.append(current)
-                  current = []
+          blocks, current = [], []
+          for row in setup:
+              current.append(row)
+              if re.search(r'\bcall\s+(?:0x)?4dd800\b', row['asm'], re.I):
+                  blocks.append(current); current = []
           if current:
-              call_blocks.append(current)
+              blocks.append(current)
 
-          block_rows = []
-          for idx, block in enumerate(call_blocks):
-              text = '\n'.join(block)
-              offsets = sorted(set(re.findall(r'\+ (0x[0-9a-f]+)\]', text.lower())))
-              known_signal_hits = [name for name, addr in exact_signal_stubs.items() if addr[2:].lower() in text.lower()]
-              block_rows.append({
+          member_re = re.compile(r'\[(?:rbx|rdi|rbp|r12|r13|r14|r15)\s*\+\s*(0x[0-9a-f]+)\]', re.I)
+          imm_re = re.compile(r'\b(?:0x)?([0-9a-f]{6,8})\b', re.I)
+          rows = []
+          for idx, block in enumerate(blocks):
+              text = '\n'.join(r['asm'] for r in block)
+              offsets = sorted(set(x.lower() for x in member_re.findall(text)), key=lambda x: int(x,16))
+              immediates = sorted(set('0x'+x.lower() for x in imm_re.findall(text)), key=lambda x: int(x,16))
+              rows.append({
                   'block_index': idx,
+                  'start': block[0]['address'],
+                  'end': block[-1]['address'],
+                  'ends_in_connect_candidate': bool(re.search(r'\bcall\s+(?:0x)?4dd800\b', block[-1]['asm'], re.I)),
                   'member_offsets': offsets,
-                  'known_player_signal_stub_hits': known_signal_hits,
-                  'ends_in_connect_candidate': bool(re.search(r'call\s+0x4dd800\b', text.lower())),
-                  'lines': block,
+                  'immediates': immediates,
+                  'lines': [f"{r['address']}: {r['asm']}" for r in block],
               })
+
+          exact_tokens = {
+              'queue_metaobject': '3085b60',
+              'player_handler_vptr': '308a008',
+              'player_data_vptr': '308ca70',
+              'player_current_stub': 'df8bc1',
+              'player_basic_stub': 'df8d3b',
+              'player_state_stub': 'df8e0d',
+              'player_skills_stub': 'df8e37',
+              'player_inventory_stub': 'df899f',
+              'connect_candidate': '4dd800',
+              'qslot_helper': '4df670',
+          }
+          hits = {k: [] for k in exact_tokens}
+          for label, line in normalized:
+              low = line.lower()
+              for name, token in exact_tokens.items():
+                  if token in low:
+                      hits[name].append({'source': label, 'line': line})
+
+          member_counts = {}
+          for row in setup:
+              for off in member_re.findall(row['asm']):
+                  off = off.lower(); member_counts[off] = member_counts.get(off,0)+1
 
           summary = {
-              'schema': 'track-a-s3-prior-exact-log-reuse-v1',
+              'schema': 'track-a-s3-prior-exact-log-reuse-v2',
               'inputs': inputs,
+              'prior_exact_sha': 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
               'runtime_access': 'none',
               'client_downloaded': False,
               'client_executed': False,
-              'source_drift_bypassed': False,
-              'prior_exact_sha': 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
-              'setup_disassembly_line_count': len(setup_disassembly),
-              'connect_related_line_count': len(connect_lines),
-              'queue_identity_line_count': len(queue_lines),
-              'member_offset_counts': dict(sorted(member_offsets.items())),
-              'connection_block_count': len(call_blocks),
-              'address_hit_counts': {name: len(rows) for name, rows in address_hits.items()},
-              'exact_player_signal_stub_seen_in_prior_logs': any(address_hits[name] for name in exact_signal_stubs),
+              'setup_instruction_count': len(setup),
+              'connection_block_count': len(blocks),
+              'member_offset_counts': dict(sorted(member_counts.items(), key=lambda kv:int(kv[0],16))),
+              'exact_hit_counts': {k:len(v) for k,v in hits.items()},
+              'player_signal_stubs_seen_in_prior_logs': any(hits[k] for k in hits if k.startswith('player_') and k.endswith('_stub')),
               'pr475_runtime_touched': False,
               'secret_access': False,
           }
-
-          (evidence / 'summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-          (evidence / 'exact-address-hits.json').write_text(json.dumps(address_hits, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-          (evidence / 'connection-blocks.json').write_text(json.dumps(block_rows, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-          (evidence / 'setup-disassembly.txt').write_text('\n'.join(setup_disassembly) + ('\n' if setup_disassembly else ''), encoding='utf-8')
-          (evidence / 'connect-related-lines.txt').write_text('\n'.join(connect_lines) + ('\n' if connect_lines else ''), encoding='utf-8')
-          (evidence / 'queue-identity-lines.txt').write_text('\n'.join(queue_lines) + ('\n' if queue_lines else ''), encoding='utf-8')
-
-          print('PLAYER_S3_PRIOR_LOG_REUSE=PASS')
-          print('PLAYER_S3_SUMMARY=' + json.dumps(summary, sort_keys=True))
-          print('PLAYER_S3_PR475_RUNTIME_TOUCHED=false')
-          print('PLAYER_S3_SECRET_ACCESS=false')
+          (evidence/'summary.json').write_text(json.dumps(summary,indent=2,sort_keys=True)+'\n')
+          (evidence/'connection-blocks.json').write_text(json.dumps(rows,indent=2,sort_keys=True)+'\n')
+          (evidence/'exact-address-hits.json').write_text(json.dumps(hits,indent=2,sort_keys=True)+'\n')
+          (evidence/'setup-disassembly.txt').write_text('\n'.join(f"{r['address']}: {r['asm']}" for r in setup)+'\n')
+          print('PLAYER_S3_PRIOR_LOG_REUSE_V2=PASS')
+          print('PLAYER_S3_SUMMARY='+json.dumps(summary,sort_keys=True))
           PY
 
-          # Raw downloaded inputs are prior sanitized logs, not client bytes. They are still removed so the
-          # uploaded artifact contains only the newly normalized task evidence.
           rm -rf "$out/raw"
-          test ! -d "$out/raw"
 
       - name: Upload normalized prior-evidence analysis only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

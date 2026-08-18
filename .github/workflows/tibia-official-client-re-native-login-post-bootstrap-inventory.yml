@@ -1,0 +1,174 @@
+name: Track A native-login post-bootstrap inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-post-bootstrap-inventory.yml
+      - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-native-login-post-bootstrap-inventory
+  cancel-in-progress: false
+
+jobs:
+  controller-plane-inventory:
+    name: Read-only post-bootstrap canonical controller inventory
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v2' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Revalidate current main and Track A admission
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          CURRENT_MAIN="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          [[ "$CURRENT_MAIN" == "$EXPECTED_BASE_SHA" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$EVENT_BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          echo 'NATIVE_LOGIN_POST_BOOTSTRAP_CURRENT_MAIN=PASS'
+          echo 'NATIVE_LOGIN_POST_BOOTSTRAP_ADMISSION_POLICY=PASS'
+
+      - name: Read only released lease and authoritative registration under shared flock
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+          import fcntl, hashlib, json, os, stat
+          from pathlib import Path
+
+          STATE = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          LOCK = STATE / 'coordination.lock'
+          LEASE = STATE / 'lease.json'
+          REG = STATE / 'runtime-registration.json'
+
+          def emit(k, v):
+              print(f'{k}={json.dumps(v, sort_keys=True, separators=(",", ":"))}')
+
+          def fp(path: Path):
+              if not path.exists():
+                  return None
+              st = path.lstat()
+              if path.is_symlink():
+                  return {'kind':'symlink','mode':stat.S_IMODE(st.st_mode),'size':st.st_size,'mtime_ns':st.st_mtime_ns}
+              if not stat.S_ISREG(st.st_mode):
+                  return {'kind':'non_regular','mode':stat.S_IMODE(st.st_mode),'size':st.st_size,'mtime_ns':st.st_mtime_ns}
+              fd = os.open(path, os.O_RDONLY | getattr(os,'O_NOATIME',0) | getattr(os,'O_NOFOLLOW',0))
+              try:
+                  h = hashlib.sha256()
+                  while True:
+                      b = os.read(fd, 65536)
+                      if not b: break
+                      h.update(b)
+              finally:
+                  os.close(fd)
+              return {'kind':'regular','mode':stat.S_IMODE(st.st_mode),'size':st.st_size,'mtime_ns':st.st_mtime_ns,'sha256':h.hexdigest()}
+
+          def read_json(path: Path):
+              st = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(st.st_mode):
+                  raise SystemExit(f'NATIVE_LOGIN_POST_BOOTSTRAP_ERROR={path.name}_unsafe')
+              fd = os.open(path, os.O_RDONLY | getattr(os,'O_NOATIME',0) | getattr(os,'O_NOFOLLOW',0))
+              try:
+                  raw = b''
+                  while True:
+                      b = os.read(fd, 65536)
+                      if not b: break
+                      raw += b
+                      if len(raw) > 262144:
+                          raise SystemExit(f'NATIVE_LOGIN_POST_BOOTSTRAP_ERROR={path.name}_too_large')
+              finally:
+                  os.close(fd)
+              value = json.loads(raw.decode())
+              if not isinstance(value, dict):
+                  raise SystemExit(f'NATIVE_LOGIN_POST_BOOTSTRAP_ERROR={path.name}_not_object')
+              return value
+
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_CLIENT_PROCESS_OBSERVATION', False)
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_X11_OBSERVATION', False)
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_NETWORK_OBSERVATION', False)
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_CREDENTIAL_ACCESS', False)
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_LOGIN_PERFORMED', False)
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_GAMEPLAY_PERFORMED', False)
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_CONTROLLER_MUTATION', False)
+
+          if not STATE.is_dir() or not LOCK.is_file() or LOCK.is_symlink() or not LEASE.is_file() or not REG.is_file():
+              emit('NATIVE_LOGIN_POST_BOOTSTRAP_RESULT', 'EXPECTED_CONTROLLER_METADATA_ABSENT')
+              raise SystemExit(2)
+
+          before = {str(p): fp(p) for p in (LOCK, LEASE, REG)}
+          fd = os.open(LOCK, os.O_RDONLY | getattr(os,'O_NOATIME',0) | getattr(os,'O_NOFOLLOW',0))
+          try:
+              try:
+                  fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+              except BlockingIOError:
+                  emit('NATIVE_LOGIN_POST_BOOTSTRAP_RESULT', 'COORDINATION_LOCK_BUSY')
+                  raise SystemExit(3)
+              lease = read_json(LEASE)
+              reg = read_json(REG)
+          finally:
+              try: fcntl.flock(fd, fcntl.LOCK_UN)
+              except OSError: pass
+              os.close(fd)
+
+          checks = {
+              'lease.runtime_id': lease.get('runtime_id') == 'track-a-canonical-live',
+              'lease.status': lease.get('status') == 'released',
+              'lease.generation': lease.get('generation') == 9,
+              'lease.controller_task': lease.get('controller_task') is None,
+              'lease.controller_session': lease.get('controller_session') is None,
+              'reg.schema_version': reg.get('schema_version') == 1,
+              'reg.runtime_id': reg.get('runtime_id') == 'track-a-canonical-live',
+              'reg.registration_generation': reg.get('registration_generation') == 1,
+              'reg.lease_generation': reg.get('lease_generation') == 9,
+              'reg.client_version': reg.get('client_version') == '15.32.df7b29',
+              'reg.client_size': reg.get('client_size') == 51965216,
+              'reg.client_sha256': reg.get('client_sha256') == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
+              'reg.source_task': reg.get('source_task') == 'OTC-20260818-native-login-to-ingame-e2e',
+              'reg.source_run': str(reg.get('source_run')) == '32125054251',
+              'reg.remote_view_mapping': reg.get('remote_view_mapping') == 'PROVEN',
+          }
+          for key, ok in checks.items():
+              emit('NATIVE_LOGIN_POST_BOOTSTRAP_CHECK_' + key.upper().replace('.','_'), ok)
+          if not all(checks.values()):
+              emit('NATIVE_LOGIN_POST_BOOTSTRAP_RESULT', 'CONTROLLER_STATE_DRIFT')
+              raise SystemExit(4)
+
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_LEASE_STATUS', lease.get('status'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_LEASE_GENERATION', lease.get('generation'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_REGISTRATION_GENERATION', reg.get('registration_generation'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_REGISTRATION_LEASE_GENERATION', reg.get('lease_generation'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_REGISTRATION_STATE', reg.get('state'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_REGISTRATION_PID', reg.get('pid'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_REGISTRATION_PROCESS_START_TICKS', reg.get('process_start_ticks'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_REGISTRATION_DISPLAY', reg.get('display'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_REGISTRATION_WINDOW_IDENTITY', reg.get('window_identity'))
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_REGISTRATION_REMOTE_VIEW_ENDPOINT', reg.get('remote_view_endpoint'))
+
+          after = {str(p): fp(p) for p in (LOCK, LEASE, REG)}
+          if before != after:
+              emit('NATIVE_LOGIN_POST_BOOTSTRAP_RESULT', 'CONTROL_METADATA_CHANGED_DURING_PROBE')
+              raise SystemExit(5)
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_CONTROL_METADATA_UNCHANGED', True)
+          emit('NATIVE_LOGIN_POST_BOOTSTRAP_RESULT', 'REGISTERED_RELEASED_GEN9')
+          PY

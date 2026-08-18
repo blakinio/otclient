@@ -1,0 +1,90 @@
+{
+  "schema": "track-a-s2-player-qmeta-contract-v1",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "producer": {
+    "run": 32115252111,
+    "job": 95643199117,
+    "head": "74433287fa9549361eed3733c513b3f46fd2601c",
+    "artifact": 9316455906,
+    "artifact_digest": "sha256:434340656a520110ac417fbd1fbd844664e7b2d49da418e7de5bc21b8f830fa5"
+  },
+  "classes": {
+    "tibia::game::TPlayerProtocolMessageHandler": {
+      "primary_vptr": "0x308a008",
+      "static_metaobject": "0x30852a0",
+      "static_metacall": "0xd1a920",
+      "method_count": 22,
+      "signal_count": 22,
+      "dispatch_table": "0x1d713d0",
+      "full_range_guard": "cmp edx,0x15",
+      "received_player_qmeta_methods": 0,
+      "method_names": [
+        "sendEnterWorld",
+        "sendGoNorth",
+        "sendGoEast",
+        "sendGoSouth",
+        "sendGoWest",
+        "sendStop",
+        "sendCancel",
+        "sendGoNorthEast",
+        "sendGoSouthEast",
+        "sendGoSouthWest",
+        "sendGoNorthWest",
+        "sendGoPath",
+        "sendRotateNorth",
+        "sendRotateEast",
+        "sendRotateSouth",
+        "sendRotateWest",
+        "sendSetTactics",
+        "worldEntered",
+        "showSelectOutfitDialog",
+        "showConfigureCreaturePodiumDialog",
+        "showHirelingNameChangeConfiguration",
+        "publishGameAction"
+      ]
+    },
+    "tibia::game::TPlayerData": {
+      "primary_vptr": "0x308ca70",
+      "static_metaobject": "0x307ea60",
+      "static_metacall": "0xd19f40",
+      "method_count": 5,
+      "signal_count": 5,
+      "dispatch_table": "0x1d7139c",
+      "full_range_guard": "cmp edx,4",
+      "method_names": [
+        "playerDataChanged",
+        "publishGameAction",
+        "playerLevelUp",
+        "vocationSpecificPlayerDataChanged",
+        "vocationChanged"
+      ]
+    },
+    "tibia::game::TGameserverGameSession": {
+      "primary_vptr": "0x3078ba0",
+      "static_metaobject": "0x2f765a0",
+      "static_metacall": "0xd215c0",
+      "method_count": 3,
+      "signal_count": 0,
+      "dispatch_table": "0x1d71764",
+      "method_names": [
+        "onCharacterConfigurationLoaded",
+        "onGameReadyForSecondaryConnection",
+        "onClientCheckTimerElapsed"
+      ]
+    }
+  },
+  "classification": {
+    "qmeta_identity_and_method_tables": "FACT",
+    "full_range_dispatch_tables": "FACT",
+    "received_player_methods_directly_owned_by_TPlayerProtocolMessageHandler_qmeta": "DISPROVEN",
+    "non_qmeta_or_external_connection_into_TPlayerProtocolMessageHandler": "UNKNOWN"
+  },
+  "runtime_access": "none",
+  "client_executed": false,
+  "secret_access": false,
+  "pr475_runtime_touched": false
+}

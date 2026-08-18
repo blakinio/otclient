@@ -5,7 +5,7 @@ report_date: 2026-08-18
 repository: blakinio/otclient
 track: official-client-re
 subject: official native Linux Tibia client only
-snapshot_main: a10df477ce88183718ed855386ef96ba25b66320
+snapshot_main: ebbb36f50076ff4072c7218e302614c1dfea00b1
 task: OTC-20260818-track-a-full-client-re-coverage-audit
 pr: 536
 execution_class: github_hosted
@@ -49,7 +49,7 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 | `S6` | `docs/agents/reports/OTCLIENT-20260818-track-a-s6-chat-inbound-static.md` |
 | `S7` | `docs/agents/reports/OTCLIENT-20260818-track-a-s7-inventory-equipment-static.md` |
 | `S8` | `docs/agents/reports/OTCLIENT-20260818-track-a-s8-creature-inbound-static.md` |
-| `S9-WIP` | PR #535 / `OTC-20260818-track-a-s9-action-control-static-census`; in-flight candidate evidence only, not promoted fact |
+| `S9` | `docs/agents/reports/OTCLIENT-20260818-track-a-s9-action-control-static-census.md`, promoted by #537 on this snapshot |
 | `AUTH` | PR #498 / `docs/research/native-client/NATIVE_AUTH_SESSION_FLOW.md` |
 | `GAMELOGIN` | PR #499 / `docs/research/native-client/NATIVE_GAME_LOGIN_CREDENTIAL_PROOF.md` |
 | `LOGIN-E2E` | PR #528 and `docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**` |
@@ -71,8 +71,7 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 | `CURRENT-RE` | On the newly fenced client, re-prove required QMeta/vptr/offset/instruction/object contracts and rebuild/revalidate any exact-build helper. |
 | `IN-GAME` | Complete native auth → character selection → game-server login and prove causal structural `IN_GAME`, without OCR/coordinate login. |
 | `LIVE-STATE` | Bind the static/queue/handler/storage/controller surface to authoritative current live values with causal correlation. |
-| `LIVE-ACTION` | Prove semantic action → routing/protocol serialization → server/client effect, then expose it through the stable bridge. |
-| `PROMOTE-S9` | Finish PR #535 promotion, then consume its action catalogue as canonical input before wire/runtime proof. |
+| `LIVE-ACTION` | Starting from promoted S9 and exact code/dataflow evidence, prove semantic action → routing/protocol serialization → server/client effect, then expose it through the stable bridge. |
 | `STABILITY` | Prove rediscovery and equivalent semantics across restart/relogin; for address-sensitive rows also revalidate after client update. |
 | `DEDICATED-G0` | Create the first dedicated exact-build subsystem package and prove read-only G0/G1 semantics; add reversible action proof only where safe. |
 | `SAFE-READ` | Build a dedicated read-only semantic model for the account/economy surface; do not spend, purchase, transfer or irreversibly mutate resources for proof. |
@@ -109,7 +108,7 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 | B01 | Complete generated protocol identifier inventory 349/349 | **DONE** | S1/COV | NO-GAP |
 | B02 | Protocol direction inventory 160 C2S / 189 S2C | **DONE** | S1/COV | NO-GAP |
 | B03 | Common inbound dispatcher topology | **PARTIAL** | S1-S8 | LIVE-STATE |
-| B04 | Common outbound action router → protocol edge | **PARTIAL** | S9-WIP | PROMOTE-S9 → LIVE-ACTION |
+| B04 | Common outbound action router → protocol edge | **PARTIAL** | S9 | LIVE-ACTION |
 | B05 | Outbound framing | **DONE** | NET | NO-GAP |
 | B06 | Outbound sequence field semantics | **DONE** | NET | NO-GAP |
 | B07 | Outbound encryption transform / TXteaHelper role | **DONE** | NET | NO-GAP |
@@ -117,7 +116,7 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 | B09 | Final binary egress at Qt/QTcpSocket boundary | **DONE** | NET | NO-GAP |
 | B10 | Specific Linux OS socket syscall | **NOT_STARTED** | NET | OS-EGRESS |
 | B11 | Complete inbound transform/framing/decryption order | **NOT_STARTED** | COV | DEDICATED-G0 |
-| B12 | Per-message semantic support across all 349 identifiers | **PARTIAL** | S1-S8/COV | LIVE-STATE |
+| B12 | Per-message semantic support across all 349 identifiers | **PARTIAL** | S1-S9/COV | LIVE-STATE |
 | B13 | Unknown incoming-event preservation/classification | **PARTIAL** | S1/CAP | LIVE-STATE |
 
 ## C. Player state and native gameplay actions
@@ -134,18 +133,18 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 | C08 | Cooldown/exhaustion groups and lifetimes | **PARTIAL** | CAP | LIVE-STATE |
 | C09 | PvP/combat-mode state | **PARTIAL** | CAP | LIVE-STATE |
 | C10 | Authoritative local-player XYZ | **BLOCKED** | XYZ | IN-GAME → causal movement correlation |
-| C11 | Eight-direction movement | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C12 | Four-direction rotation | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C13 | Stop / cancel movement | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C14 | GoPath / autowalk/path state | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C15 | Attack | **PARTIAL** | S8, S9-WIP | PROMOTE-S9 → LIVE-ACTION |
-| C16 | Follow | **PARTIAL** | S8, S9-WIP | PROMOTE-S9 → LIVE-ACTION |
-| C17 | Cancel attack/follow target | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C18 | Use object | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C19 | Use-with / use two objects | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C20 | Use-on-creature | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C21 | Move item/object | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
-| C22 | Mount/outfit/tactics player actions | **PARTIAL** | S9-WIP, CAP | PROMOTE-S9 → LIVE-ACTION |
+| C11 | Eight-direction movement | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C12 | Four-direction rotation | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C13 | Stop / cancel movement | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C14 | GoPath / autowalk/path state | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C15 | Attack | **PARTIAL** | S8/S9 | LIVE-ACTION |
+| C16 | Follow | **PARTIAL** | S8/S9 | LIVE-ACTION |
+| C17 | Cancel attack/follow target | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C18 | Use object | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C19 | Use-with / use two objects | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C20 | Use-on-creature | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C21 | Move item/object | **PARTIAL** | S9, CAP | LIVE-ACTION |
+| C22 | Mount/outfit/tactics player actions | **PARTIAL** | S9, CAP | LIVE-ACTION |
 
 ## D. Creatures, inventory/equipment, containers and loot telemetry
 
@@ -158,7 +157,7 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 | D05 | Creature health/outfit/speed/skull/party/marks/light/type/unpass fields | **PARTIAL** | S8, CAP | LIVE-STATE |
 | D06 | Creature HUD names/icons/status effects | **NOT_STARTED** | CAP | DEDICATED-G0 |
 | D07 | Battle-list filters/sorting/secondary lists | **NOT_STARTED** | CAP | DEDICATED-G0 |
-| D08 | Battle target/first-next target selection | **PARTIAL** | S8/S9-WIP | PROMOTE-S9 → LIVE-ACTION |
+| D08 | Battle target/first-next target selection | **PARTIAL** | S8/S9 | LIVE-ACTION |
 | D09 | Inventory Set/Delete/PlayerInventory inbound boundaries | **PARTIAL** | S7 | LIVE-STATE |
 | D10 | Equipment slot semantic model | **PARTIAL** | S7, CAP | LIVE-STATE |
 | D11 | Inventory storage → status-controller propagation | **PARTIAL** | S7 | LIVE-STATE |
@@ -167,8 +166,8 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 | D14 | Object/weapon proficiency XP metadata | **NOT_STARTED** | CAP | DEDICATED-G0 |
 | D15 | Open-container registry/storage | **PARTIAL** | S5/S7 | LIVE-STATE |
 | D16 | Create/change/delete-in-container propagation | **PARTIAL** | S5 | LIVE-STATE |
-| D17 | Container close/up/parent/pagination navigation | **PARTIAL** | S5/S9-WIP | PROMOTE-S9 → LIVE-ACTION |
-| D18 | Container sort/object-info requests | **PARTIAL** | S5/S9-WIP | PROMOTE-S9 → LIVE-ACTION |
+| D17 | Container close/up/parent/pagination navigation | **PARTIAL** | S5/S9 | LIVE-ACTION |
+| D18 | Container sort/object-info requests | **PARTIAL** | S5/S9 | LIVE-ACTION |
 | D19 | Stash semantic model | **NOT_STARTED** | CAP | DEDICATED-G0 |
 | D20 | Depot search | **NOT_STARTED** | CAP | DEDICATED-G0 |
 | D21 | Managed/special containers | **NOT_STARTED** | CAP | DEDICATED-G0 |
@@ -182,8 +181,8 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 | ID | Subsystem / acceptance surface | Status | Evidence | Remaining step |
 |---|---|---|---|---|
 | E01 | Chat inbound queue/handler/channel-storage boundaries | **PARTIAL** | S6 | LIVE-STATE |
-| E02 | Chat outbound action boundary | **PARTIAL** | S9-WIP | PROMOTE-S9 → LIVE-ACTION |
-| E03 | Channel/private/NPC channel model and events | **PARTIAL** | S6/S9-WIP | LIVE-STATE |
+| E02 | Chat outbound action boundary | **PARTIAL** | S9 | LIVE-ACTION |
+| E03 | Channel/private/NPC channel model and events | **PARTIAL** | S6/S9 | LIVE-STATE |
 | E04 | Channel moderation invite/exclude | **NOT_STARTED** | CAP | DEDICATED-G0 |
 | E05 | NPC semantic conversation/options | **NOT_STARTED** | CAP | DEDICATED-G0 |
 | E06 | NPC trade offers/prices/buy-sell state | **NOT_STARTED** | CAP | DEDICATED-G0 |
@@ -293,10 +292,10 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 ## Programme conclusions
 
 1. **Structural discovery is broad, semantic completion is not.** The programme has a complete 349-message protocol denominator and a 642-record Tibia-owned QMeta denominator, but denominator completeness is not semantic completeness.
-2. **The core path is materially ahead of feature UI.** Login/session, outbound transport, player/containers/chat/inventory/creatures, worldmap and action-control surfaces have dedicated bounded work; most feature systems are still broad `STATIC_PRESENT` leads only.
-3. **Inventory/equipment is not `DONE`.** S7 proves exact queue/handler/storage/controller surfaces and corrects handler ownership, but queue→handler→inventory mutation→controller→authoritative live slot/value causality remains open.
-4. **Creatures are not `DONE`.** S8 exhausts the retained QMeta frontier and proves exact queue/model/storage/action-handler surfaces, but non-QMeta inbound dispatch and live mutation causality remain open.
-5. **Action control is in-flight.** PR #535 currently contains the S9 movement/attack/follow/use/container/chat/router QMeta catalogue. This checklist does not promote it ahead of its coordinator/CI lifecycle.
+2. **The independent repo-only S1–S9 wave is now closed.** Promoted S9 adds the 28-class `*GameActionHandler` denominator and principal movement/attack/follow/use/container/chat/player/router QMeta boundaries. It still does not prove per-action receiver/protocol dataflow, serialization or server effect.
+3. **The core path is materially ahead of feature UI.** Login/session, outbound transport, player/containers/chat/inventory/creatures, worldmap and action-control surfaces have dedicated bounded work; most feature systems are still broad `STATIC_PRESENT` leads only.
+4. **Inventory/equipment is not `DONE`.** S7 proves exact queue/handler/storage/controller surfaces and corrects handler ownership, but queue→handler→inventory mutation→controller→authoritative live slot/value causality remains open.
+5. **Creatures are not `DONE`.** S8 exhausts the retained QMeta frontier and proves exact queue/model/storage/action-handler surfaces, but non-QMeta inbound dispatch and live mutation causality remain open.
 6. **Options/settings are a first-class gap.** Graphics, audio, interface/sidebar, gameplay/control and persistence/profile settings are explicit `NOT_STARTED` rows because no dedicated Track A semantic settings model was located on this trusted snapshot.
 7. **The current official-client version update is the dominant cross-cutting blocker.** Runtime-sensitive proof must not reuse the `15.32.df7b29` address/fence set until the new client is acquired, hashed and re-reversed where needed.
 8. **Programme `100%` means every row `DONE`.** That requires current-build proof, causal live semantics where required, restart/relogin/update-stable rediscovery and a reusable structured interface rather than OCR, image matching or coordinate automation.
@@ -308,7 +307,7 @@ The exact researched `15.32.df7b29` client is now rejected by the live client/se
 2. Re-prove current-build QMeta/vptr/offset/instruction contracts and rebuild/revalidate native bridge helpers.
 3. Complete native login -> character selection -> game-server login -> causal IN_GAME.
 4. Use the single legal canonical runtime to close player XYZ, restart/relogin and worldmap server-delivery blockers.
-5. Promote S9 and convert core action boundaries into action-router -> protocol -> causal runtime proofs.
+5. Starting from promoted S9, recover exact action connection/dataflow windows and convert core action boundaries into router -> protocol -> causal runtime proofs.
 6. Close queue/handler/storage semantics for player, creature, inventory, container and chat families.
 7. Run dedicated read-only packages for item metadata, loot/analyzers, social/trade and minimap.
 8. Run dedicated feature waves for Cyclopedia/Bestiary/Bosstiary/Prey/Taskboard/Skill Wheel/Forge/Imbuements/Weapon Proficiency/Quest/Houses/Market.

@@ -1,11 +1,11 @@
 {
-  "schema": "v23-live-vnc-current-v1",
-  "run_id": 32100022949,
+  "schema": "v23-live-vnc-current-v2",
+  "run_id": 32100143242,
   "status": "in_progress",
   "conclusion": "",
   "jobs": [
     {
-      "id": 95598609709,
+      "id": 95598948063,
       "name": "static",
       "status": "completed",
       "conclusion": "success",
@@ -43,7 +43,7 @@
       ]
     },
     {
-      "id": 95598629510,
+      "id": 95598975175,
       "name": "live",
       "status": "in_progress",
       "conclusion": null,
@@ -57,37 +57,31 @@
         {
           "number": 2,
           "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
-          "status": "completed",
-          "conclusion": "success"
+          "status": "in_progress",
+          "conclusion": null
         },
         {
           "number": 3,
           "name": "Run set +x;set -Eeuo pipefail",
-          "status": "completed",
-          "conclusion": "success"
+          "status": "pending",
+          "conclusion": null
         },
         {
           "number": 4,
           "name": "Start exact no-secret client and keep observer endpoint live",
-          "status": "completed",
-          "conclusion": "failure"
+          "status": "pending",
+          "conclusion": null
         },
         {
           "number": 5,
           "name": "Run set +e",
-          "status": "completed",
-          "conclusion": "success"
+          "status": "pending",
+          "conclusion": null
         },
         {
           "number": 10,
           "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
-          "status": "completed",
-          "conclusion": "success"
-        },
-        {
-          "number": 11,
-          "name": "Complete job",
-          "status": "in_progress",
+          "status": "pending",
           "conclusion": null
         }
       ]

@@ -1,0 +1,273 @@
+name: Track A native-login official package update
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-update-package.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update official package after exact gen16 teardown
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      BASE_SHA: a10df477ce88183718ed855386ef96ba25b66320
+      TASK: OTC-20260818-native-login-to-ingame-e2e
+      LEASE_SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
+      BASE: /home/runner/_work/_otclient_tibia_re_state
+      TOKEN: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
+      OLD_SHA: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      OLD_SIZE: '51965216'
+      NEW_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+      NEW_SIZE: '52109920'
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run isolated official CipSoft updater
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
+          git cat-file -e "$BASE_SHA^{commit}"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          state="$BASE/canonical-live-runtime"
+          package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$package/bin/client"
+          tool="$BASE/toolroot"
+          warp="$state/warp"
+          work="$BASE/native-login-update/run-$GITHUB_RUN_ID"
+          backup="$BASE/native-login-update/backup-$GITHUB_RUN_ID"
+          mkdir -p "$work" "$(dirname "$backup")"
+          chmod 700 "$work" "$(dirname "$backup")"
+
+          wp_pid=''; xvfb_pid=''; launcher_pid=''; display=''; update_ok=false
+          stop_pid() {
+            local pid="$1"
+            [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 0
+            kill "$pid" 2>/dev/null || true
+            for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || return 0; sleep .1; done
+            kill -9 "$pid" 2>/dev/null || true
+          }
+          stop_package_clients() {
+            local e pid path
+            for e in /proc/[0-9]*/exe; do
+              [[ -e "$e" ]] || continue
+              path="$(readlink -f "$e" 2>/dev/null || true)"
+              [[ "$path" == "$(readlink -f "$client" 2>/dev/null || true)" ]] || continue
+              pid="${e#/proc/}"; pid="${pid%/exe}"
+              echo "PACKAGE_UPDATE_STOP_STRAY_CLIENT_PID=$pid"
+              stop_pid "$pid"
+            done
+          }
+          cleanup() {
+            stop_package_clients || true
+            stop_pid "$launcher_pid"
+            stop_pid "$xvfb_pid"
+            stop_pid "$wp_pid"
+            if [[ "$update_ok" != true && -d "$backup" ]]; then
+              stop_package_clients || true
+              rm -rf "$package"
+              cp -a "$backup" "$package"
+              echo PACKAGE_UPDATE_ROLLBACK_RESTORED=true
+            fi
+          }
+          trap cleanup EXIT INT TERM HUP
+
+          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
+          [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
+          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
+          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
+          python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          x=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert x.get('status')=='active' and x.get('generation')==16
+          assert x.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert x.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          print('PACKAGE_UPDATE_LEASE16=PASS')
+          PY
+
+          [[ -x "$client" && ! -L "$client" ]]
+          [[ "$(stat -c %s "$client")" == "$OLD_SIZE" ]]
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$OLD_SHA" ]]
+          stop_package_clients
+          # There must be no live official package client before bytes change.
+          for e in /proc/[0-9]*/exe; do
+            [[ -e "$e" ]] || continue
+            [[ "$(readlink -f "$e" 2>/dev/null || true)" != "$(readlink -f "$client")" ]]
+          done
+          echo PACKAGE_UPDATE_OLD_EXACT=PASS
+
+          rm -rf "$backup"
+          cp -a --reflink=auto "$package" "$backup"
+          [[ "$(sha256sum "$backup/bin/client" | awk '{print $1}')" == "$OLD_SHA" ]]
+          echo PACKAGE_UPDATE_BACKUP=PASS
+
+          [[ -x "$warp/bin/wireproxy" && -s "$warp/state/wgcf-profile.conf" ]]
+          port="$(python3 - <<'PY'
+          import socket
+          for p in range(25354,25421):
+              s=socket.socket()
+              try:s.bind(('127.0.0.1',p))
+              except OSError:s.close();continue
+              s.close();print(p);break
+          else:raise SystemExit('no free WARP port')
+          PY
+          )"
+          cat >"$work/wireproxy.conf" <<EOF
+          WGConfig = $warp/state/wgcf-profile.conf
+          [Socks5]
+          BindAddress = 127.0.0.1:$port
+          EOF
+          "$warp/bin/wireproxy" -n -c "$work/wireproxy.conf" >/dev/null
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=update-wireproxy \
+            nohup "$warp/bin/wireproxy" -c "$work/wireproxy.conf" >"$work/wireproxy.log" 2>&1 </dev/null &
+          wp_pid=$!
+          for _ in $(seq 1 40); do
+            kill -0 "$wp_pid" 2>/dev/null || { cat "$work/wireproxy.log" >&2; exit 1; }
+            python3 - "$port" <<'PY' && break || true
+          import socket,sys
+          s=socket.socket();s.settimeout(.2)
+          try:s.connect(('127.0.0.1',int(sys.argv[1])))
+          except OSError:raise SystemExit(1)
+          finally:s.close()
+          PY
+            sleep .25
+          done
+          curl --socks5-hostname "127.0.0.1:$port" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo PACKAGE_UPDATE_WARP=PASS
+
+          xvfb="$tool/usr/bin/Xvfb"
+          [[ -x "$xvfb" ]]
+          display_num="$(python3 - <<'PY'
+          import pathlib
+          for n in range(120,141):
+              if not pathlib.Path(f'/tmp/.X{n}-lock').exists() and not pathlib.Path(f'/tmp/.X11-unix/X{n}').exists():
+                  print(n);break
+          else:raise SystemExit('no free display')
+          PY
+          )"
+          display=":$display_num"
+          dri="$tool/usr/lib/x86_64-linux-gnu/dri"
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=update-xvfb \
+            HOME="$BASE/home" PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+            LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \
+            nohup "$xvfb" "$display" -screen 0 1920x1080x24 -xkbdir "$tool/usr/share/X11/xkb" -nolisten tcp -noreset \
+            >"$work/xvfb.log" 2>&1 </dev/null &
+          xvfb_pid=$!
+          for _ in $(seq 1 60); do [[ -S "/tmp/.X11-unix/X$display_num" ]] && break; kill -0 "$xvfb_pid"; sleep .2; done
+          [[ -S "/tmp/.X11-unix/X$display_num" ]]
+          echo "PACKAGE_UPDATE_DISPLAY=$display"
+
+          tarball="$work/tibia.x64.tar.gz"
+          url='https://static.tibia.com/download/tibia.x64.tar.gz'
+          curl --socks5-hostname "127.0.0.1:$port" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' "$url" -o "$tarball"
+          unpack="$work/unpacked"; mkdir -m700 "$unpack"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"
+          [[ -x "$launcher" ]]
+          echo "PACKAGE_UPDATE_LAUNCHER_SHA256=$(sha256sum "$launcher" | awk '{print $1}')"
+
+          preload="$(find "$tool" -xdev -type f -name libproxychains.so.4 -print -quit)"
+          [[ -n "$preload" ]]
+          cat >"$work/proxychains.conf" <<EOF
+          strict_chain
+          proxy_dns
+          remote_dns_subnet 224
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 $port
+          EOF
+          chmod 600 "$work/proxychains.conf"
+          workdir="$(dirname "$launcher")"
+          (
+            cd "$workdir"
+            env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+              OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=official-updater \
+              HOME="$BASE/home" XDG_DATA_HOME="$BASE/home/.local/share" DISPLAY="$display" \
+              PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+              LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+              LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+              LD_PRELOAD="$preload" PROXYCHAINS_CONF_FILE="$work/proxychains.conf" \
+              nohup "$launcher" >"$work/launcher.log" 2>&1 </dev/null &
+            echo $! >"$work/launcher.pid"
+          )
+          launcher_pid="$(cat "$work/launcher.pid")"
+          kill -0 "$launcher_pid"
+          echo PACKAGE_UPDATE_OFFICIAL_LAUNCHER_STARTED=true
+
+          stable=0; last=''; new_sha="$OLD_SHA"
+          for _ in $(seq 1 180); do
+            if [[ -s "$client" ]]; then
+              new_sha="$(sha256sum "$client" | awk '{print $1}')"
+              if [[ "$new_sha" != "$OLD_SHA" ]]; then
+                if [[ "$new_sha" == "$last" ]]; then stable=$((stable+1)); else stable=0; last="$new_sha"; fi
+                (( stable >= 3 )) && break
+              fi
+            fi
+            sleep 2
+          done
+          if [[ "$new_sha" != "$NEW_SHA" || $stable -lt 3 || "$(stat -c %s "$client" 2>/dev/null || true)" != "$NEW_SIZE" ]]; then
+            echo "PACKAGE_UPDATE_OBSERVED_SHA=$new_sha" >&2
+            echo "PACKAGE_UPDATE_OBSERVED_SIZE=$(stat -c %s "$client" 2>/dev/null || true)" >&2
+            tail -n 80 "$work/launcher.log" | sed 's/^/PACKAGE_UPDATE_LAUNCHER_LOG=/' >&2 || true
+            exit 1
+          fi
+          echo "PACKAGE_UPDATE_NEW_CLIENT_SHA256=$new_sha"
+          echo "PACKAGE_UPDATE_NEW_CLIENT_SIZE=$(stat -c %s "$client")"
+
+          # Stop updater-owned GUI processes before accepting the package.
+          stop_pid "$launcher_pid"; launcher_pid=''
+          stop_package_clients
+          stop_pid "$xvfb_pid"; xvfb_pid=''
+          stop_pid "$wp_pid"; wp_pid=''
+          for e in /proc/[0-9]*/exe; do
+            [[ -e "$e" ]] || continue
+            [[ "$(readlink -f "$e" 2>/dev/null || true)" != "$(readlink -f "$client")" ]]
+          done
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$NEW_SHA" ]]
+          [[ "$(stat -c %s "$client")" == "$NEW_SIZE" ]]
+          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
+          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
+          update_ok=true
+          echo PACKAGE_UPDATE_SECRET_ACCESS=false
+          echo PACKAGE_UPDATE_LOGIN=false
+          echo PACKAGE_UPDATE_CANONICAL_RUNTIME_STARTED=false
+          echo PACKAGE_UPDATE_RESULT=PASS_CURRENT_EXACT
+          trap - EXIT INT TERM HUP

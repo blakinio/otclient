@@ -12,9 +12,9 @@ execution_mode: github_only
 branch: research/OTC-20260818-track-a-s2-player-inbound-static
 base_branch: main
 base_main: a9e7ab21ed0962482e4381aadd50be92714785a6
-related_pr: pending
+related_pr: 512
 created: 2026-08-18T10:06:00+02:00
-updated: 2026-08-18T10:06:00+02:00
+updated: 2026-08-18T10:12:00+02:00
 risk: medium
 implementation_authorized: true
 credentials_allowed: false
@@ -49,6 +49,7 @@ policy_version: 2
 context_pressure: medium
 decomposition_decision: single
 validation_level: focused
+repair_cycles_for_current_gate: 1
 ---
 
 # Objective
@@ -79,45 +80,80 @@ platform: official_native_linux_only
 Promoted by #511:
 
 ```text
-GameserverMessagePlayerDataBasic    <-> receivedPlayerDataBasicMessage   (lexical alignment only)
-GameserverMessagePlayerDataCurrent  <-> receivedPlayerDataCurrentMessage (lexical alignment only)
-GameserverMessagePlayerInventory    <-> receivedPlayerInventoryMessage   (lexical alignment only)
-GameserverMessagePlayerSkills       <-> receivedPlayerSkillsMessage      (lexical alignment only)
-GameserverMessagePlayerState        <-> receivedPlayerStateMessage       (lexical alignment only)
+GameserverMessagePlayerDataBasic    <-> receivedPlayerDataBasicMessage    lexical alignment only
+GameserverMessagePlayerDataCurrent  <-> receivedPlayerDataCurrentMessage  lexical alignment only
+GameserverMessagePlayerInventory    <-> receivedPlayerInventoryMessage    lexical alignment only
+GameserverMessagePlayerSkills       <-> receivedPlayerSkillsMessage       lexical alignment only
+GameserverMessagePlayerState        <-> receivedPlayerStateMessage        lexical alignment only
 TPlayerProtocolMessageHandler primary vptr = 0x308a008
 TPlayerData primary vptr = 0x308ca70
 ```
 
-The message -> method dispatch and handler -> `TPlayerData` mutation edges remain `UNKNOWN` until this task proves them.
+Message -> method dispatch and handler -> `TPlayerData` mutation remain `UNKNOWN` until directly proven.
 
 # Questions
 
 1. Recover `TPlayerProtocolMessageHandler` exact Qt metaobject metadata and method table on the exact client.
-2. Determine whether the target `receivedPlayer*Message` methods are slots/signals/invokables and recover their exact QMeta indices/signatures/types.
+2. Determine whether target `receivedPlayer*Message` methods are signals/slots/invokables and recover exact QMeta indices/signatures/types.
 3. Recover exact dispatch targets from `qt_static_metacall`/equivalent metadata where directly supported.
-4. For each target method, inspect a bounded exact code window and direct calls/member accesses to identify downstream owner/storage/data edges.
-5. Promote a handler -> `TPlayerData` relation only if direct type/ownership/dataflow supports it; otherwise retain `UNKNOWN`.
+4. Inspect bounded target code/direct calls/member accesses for downstream owner/data edges.
+5. Promote handler -> `TPlayerData` only with direct type/ownership/dataflow evidence; otherwise retain `UNKNOWN`.
 6. Do not infer runtime player position or live state from static layout.
 
 # Acceptance
 
-- [ ] exact client fence revalidated;
+- [x] exact client fence revalidated by first hosted run before its producer-code failure;
 - [ ] `TPlayerProtocolMessageHandler` metaobject identity revalidated;
 - [ ] exact QMeta target methods/signatures/indices persisted where recoverable;
 - [ ] exact static dispatch targets persisted where recoverable;
-- [ ] bounded target function disassembly/call edges persisted;
+- [ ] bounded target disassembly/call edges persisted;
 - [ ] `TPlayerData` downstream relation classified `FACT | INFERENCE | UNKNOWN` per direct evidence;
-- [ ] no runtime/login/Synology/X11/process-memory/credential access;
-- [ ] no raw proprietary client committed/uploaded;
+- [x] no runtime/login/Synology/X11/process-memory/credential access;
+- [x] no raw proprietary client committed/uploaded;
 - [ ] temporary producer removed before promotion;
 - [ ] exact-head CI/governance and review hygiene before terminal disposition.
+
+# Failure / repair history
+
+## R1 — Capstone skipdata operand access
+
+First exact-head producer run:
+
+```text
+run: 32114891658
+job: 95642067206
+exact packed SHA: PASS
+exact unpacked SHA: PASS
+client executed: false
+runtime access: none
+result: producer failure before QMeta result
+```
+
+First causal error:
+
+```text
+capstone.CsError: Information irrelevant for 'data' instruction in SKIPDATA mode (CS_ERR_SKIPDATA)
+```
+
+The producer used one Capstone instance with `skipdata=True` for both whole-section scanning and bounded function decoding, then read `.operands` from skipdata pseudo-instructions.
+
+Repair on head `4c05b244f0c4d6fafaef4364ab6ee4f971e7673f`:
+
+```text
+bounded executable functions -> normal Capstone decoder
+whole executable sections     -> separate skipdata decoder
+skipdata operand reads        -> fail-safe empty operand list on CsError
+```
+
+The repair does not change research semantics or broaden scope. No result from the failed run is promoted beyond exact-client fence validation.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 1
+checkpoint_version: 2
 status: investigating
-last_completed_step: claimed the first post-#511 non-conflicting S2 frontier
+pr: 512
+last_completed_step: repaired the first deterministic producer failure without touching runtime or broadening scope
 blockers: []
-next_action: open Draft PR and run one bounded exact-client QMeta/dispatch discriminator for TPlayerProtocolMessageHandler.
+next_action: inspect the exact-head post-repair S2 producer; if green, review its sanitized QMeta/dispatch evidence before persisting any FACT, otherwise use only the second bounded repair cycle on the next concrete root cause.
 ```

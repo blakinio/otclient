@@ -148,3 +148,5 @@ jobs:
           echo 'NATIVE_LOGIN_GEN12_SECRET_ACCESS=false'
           echo 'NATIVE_LOGIN_GEN12_LOGIN_PERFORMED=false'
           echo 'NATIVE_LOGIN_GEN12_LEASE_LEFT_ACTIVE=true'
+
+# Trigger 2026-08-18T13:46+02:00 after generation-11 expiry.

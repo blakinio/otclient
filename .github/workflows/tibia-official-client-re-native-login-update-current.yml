@@ -1,4 +1,5 @@
 name: Track A native-login visible official package reinstall
+# Retrigger the corrected phase-recovery path after the prior run was cancelled before runner admission.
 
 on:
   pull_request:
@@ -209,7 +210,6 @@ jobs:
           PY
           echo RECOVER_UPDATE_STALE_PHASE_CLEARED=PASS
 
-          # With no updater process alive, clean only the task's partial package directory.
           current=false
           if [[ -f "$client" && ! -L "$client" && "$(stat -c %s "$client")" == "$EXPECTED_SIZE" && "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_SHA" ]]; then
             current=true

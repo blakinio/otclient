@@ -603,6 +603,21 @@ UiModelChanged
 
 and invoke proven semantic actions such as movement, turn, stop, attack, follow, use/use-with, move item, open/close/navigate container, talk and safe NPC trade operations without OCR or coordinate clicking.
 
+## Specialized monster spawn/mechanics subprogramme
+
+For P0 map/viewport/creature/battle/combat observations and related inbound events, use the specialized child programme when the research objective is monster spawn reconstruction, respawn timing or empirical monster mechanics:
+
+```text
+docs/agents/programs/OTCLIENT_TIBIA_RE_MONSTER_SPAWN_MECHANICS.md
+docs/agents/contracts/MONSTER_OBSERVATION_V1.md
+docs/agents/contracts/MONSTER_OBSERVATION_V1.schema.json
+docs/agents/prompts/OTCLIENT_TIBIA_RE_MONSTER_SPAWN_MECHANICS_ALIAS.md
+```
+
+A raw creature-create/add event remains only an observed appearance until the child programme's continuous-coverage, epoch, terminal/death, repetition and negative-control gates are satisfied. The child programme keeps observed creation tiles, inferred spawn regions and unknown server-side spawn/home rules separate, and keeps empirical behavior distinct from unproven server algorithms.
+
+Large observation streams remain sanitized artifacts with repository-indexed provenance. Physical evidence is serialized through current Track A RUNTIME ownership and at most the one legal canonical logged-in session by default; offline spawn/mechanics inference remains GitHub-hosted `runtime_access: none`.
+
 # Final worker response
 
 When a bounded invocation actually stops, return a compact status only after durable repository state is current:

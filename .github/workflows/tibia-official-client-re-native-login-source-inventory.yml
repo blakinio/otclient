@@ -94,7 +94,7 @@ jobs:
           [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
           lease=.github/scripts/tibia-official-client-re-canonical-live-lease
           bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
-          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 3600
+          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
           python3 - "$state/lease.json" <<'PY'
           import json,pathlib,sys
           x=json.loads(pathlib.Path(sys.argv[1]).read_text())
@@ -114,7 +114,7 @@ jobs:
 
           if [[ -d "$live" ]]; then
             python3 - "$live/session.json" <<'PY' 2>/dev/null || { echo UPDATER_DESKTOP_REFUSE_EXISTING_UNVERIFIED_SESSION=true >&2; exit 1; }
-          import json,os,pathlib,sys
+          import json,pathlib,sys
           p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text())
           assert x.get('task')=='OTC-20260818-native-login-to-ingame-e2e'
           for k in ('xvfb_pid','vnc_pid','websockify_pid','wireproxy_pid','launcher_pid'):
@@ -129,7 +129,7 @@ jobs:
           mkdir -m700 "$live"
 
           python3 - "$live/ports.txt" <<'PY'
-          import pathlib
+          import pathlib,sys
           def listening(port):
               want=f'{port:04X}'
               for fn in ('/proc/net/tcp','/proc/net/tcp6'):
@@ -145,7 +145,7 @@ jobs:
           rfb=next((p for p in range(5902,5921) if not listening(p)),None)
           web=next((p for p in range(6082,6101) if not listening(p)),None)
           if None in (display,rfb,web): raise SystemExit('no free display/ports')
-          pathlib.Path(__import__('sys').argv[1]).write_text(f'{display}\n{rfb}\n{web}\n')
+          pathlib.Path(sys.argv[1]).write_text(f'{display}\n{rfb}\n{web}\n')
           PY
           readarray -t p <"$live/ports.txt"; display_num="${p[0]}"; rfb_port="${p[1]}"; web_port="${p[2]}"; display=":$display_num"
           echo "UPDATER_DESKTOP_DISPLAY=$display"

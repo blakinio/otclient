@@ -1,0 +1,93 @@
+name: Track A native-login launcher log inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-launcher-log-inventory.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    name: Read official launcher metadata and log without mutation
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 6
+    env:
+      BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
+      BASE: /home/runner/_work/_otclient_tibia_re_state
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Read safe launcher diagnostics
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
+          echo LAUNCHER_DIAG_MUTATION=false
+          echo LAUNCHER_DIAG_SECRET_ACCESS=false
+          root="$BASE/home/.local/share/CipSoft GmbH/Tibia"
+          meta="$root/launchermetadata.json"
+          log="$root/log/tibia-launcher.log"
+          link="$root/Tibia"
+          printf 'LAUNCHER_DIAG_ROOT_EXISTS=%s\n' "$( [[ -d "$root" ]] && echo true || echo false )"
+          if [[ -L "$link" ]]; then
+            target="$(readlink "$link")"
+            echo "LAUNCHER_DIAG_TIBIA_LINK_TARGET=$target"
+            resolved="$(readlink -f "$link" 2>/dev/null || true)"
+            echo "LAUNCHER_DIAG_TIBIA_LINK_RESOLVES=$( [[ -n "$resolved" && -e "$resolved" ]] && echo true || echo false )"
+            [[ -n "$resolved" ]] && echo "LAUNCHER_DIAG_TIBIA_LINK_BASENAME=$(basename "$resolved")"
+          else
+            echo LAUNCHER_DIAG_TIBIA_LINK_PRESENT=false
+          fi
+          if [[ -f "$meta" ]]; then
+            echo "LAUNCHER_DIAG_METADATA_SIZE=$(stat -c %s "$meta")"
+            python3 - "$meta" <<'PY'
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text())
+          def scrub(v):
+              if isinstance(v,dict):
+                  return {str(k):scrub(z) for k,z in v.items() if not any(t in str(k).lower() for t in ('password','email','token','secret','credential','authorization','cookie'))}
+              if isinstance(v,list): return [scrub(z) for z in v]
+              if isinstance(v,(str,int,float,bool)) or v is None: return v
+              return str(v)
+          print('LAUNCHER_DIAG_METADATA_JSON='+json.dumps(scrub(x),sort_keys=True,separators=(',',':')))
+          PY
+          else
+            echo LAUNCHER_DIAG_METADATA_PRESENT=false
+          fi
+          if [[ -f "$log" ]]; then
+            echo "LAUNCHER_DIAG_LOG_SIZE=$(stat -c %s "$log")"
+            python3 - "$log" <<'PY'
+          import pathlib,re,sys
+          p=pathlib.Path(sys.argv[1]); lines=p.read_text(errors='replace').splitlines()[-160:]
+          pats=[
+              (re.compile(r'(?i)(password|passwd|pwd)\s*[:=]\s*\S+'),r'\1=<redacted>'),
+              (re.compile(r'(?i)(authorization|cookie|token|secret)\s*[:=]\s*\S+'),r'\1=<redacted>'),
+              (re.compile(r'(?i)([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})'),'<email-redacted>')]
+          for line in lines:
+              for rx,repl in pats: line=rx.sub(repl,line)
+              print('LAUNCHER_DIAG_LOG='+line[:2000])
+          PY
+          else
+            echo LAUNCHER_DIAG_LOG_PRESENT=false
+          fi
+          echo LAUNCHER_DIAG_RESULT=PASS_READ_ONLY

@@ -15,7 +15,7 @@ branch: research/OTC-20260818-native-cold-auth-qmeta
 base_branch: main
 base_main: bd167a8a9b4192b3c87c21423e2af37e897f5e79
 related_pr: 505
-updated: 2026-08-18T07:50:00+02:00
+updated: 2026-08-18T08:00:00+02:00
 risk: high
 implementation_authorized: true
 research_status: DRAFT_NOT_PROMOTED
@@ -59,11 +59,11 @@ context_score: 6
 estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one bounded exact-SHA QMeta discriminator with independent paths and no runtime ownership
-validation_level: focused
+validation_level: full-static
 invocation_started_at: 2026-08-18T07:20:00+02:00
-last_progress_at: 2026-08-18T07:50:00+02:00
+last_progress_at: 2026-08-18T08:00:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft-final-evidence
+ci_check_generation: draft-final-checkpoint
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -87,13 +87,13 @@ Form automation is outside the solution: no OCR, image matching, coordinate clic
 
 # Final exact-SHA static result
 
-Exact proving head before evidence-only closeout commit:
+Exact proving implementation head:
 
 ```text
 d0c1360b649fd8c4a92587b7713644c49162694c
 ```
 
-Workflow:
+Proving workflow:
 
 ```text
 run: 32104348691
@@ -130,7 +130,7 @@ COLD_AUTH_STATIC_DISCRIMINATOR=PASS
 
 ## FACT
 
-For exact official native Linux client `15.32.df7b29` / SHA `e6c244bd...`, `tibia::client::TGameClient::onRequestLoginWithCredentials(QString,QString)` is QMeta `InvokeMetaMethod` id `17`. The full 44-method dispatcher is selected by `QMetaObject::Call == 0` plus method range `0..43`, and method 17 dispatches to static VA `0xd06850`.
+For exact official native Linux client `15.32.df7b29` / SHA `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`, `tibia::client::TGameClient::onRequestLoginWithCredentials(QString,QString)` is QMeta `InvokeMetaMethod` id `17`. The full 44-method dispatcher is selected by `QMetaObject::Call == 0` plus method range `0..43`, and method 17 dispatches to static VA `0xd06850`.
 
 The second executable table observed in the static-metacall region is rejected as a negative control because its own dispatcher range is only `0..4` (`cmp edx,4`), not the `TGameClient` 44-method range (`cmp edx,0x2b`).
 
@@ -138,25 +138,43 @@ The second executable table observed in the static-metacall region is rejected a
 
 This task intentionally does not execute authentication. A later RUNTIME-authorized consumer must still prove current exact process identity, PIE/load-bias rebinding, runtime instruction bytes, unique live `tibia::client::TGameClient` object provenance, Qt thread affinity and protected transient construction/cleanup of the two `QString` credentials before invoking the original QMeta route. It must not invoke success callbacks or synthesize authentication/session state.
 
+The preferred consumer architecture is to reuse the merged `tools/tibia_runtime_bridge` `game_client` resolver and its Qt-thread scheduling, then invoke the named QMeta method through Qt itself. Static addresses remain runtime fences rather than a general direct-call RPC.
+
+Credential values must not be carried in textual IPC, argv, environment variables or plaintext temporary files. A later secret-capable arm needs a separately proven protected FD/pipe source. Current GitHub Actions `env: TIBIA_TEST_*` handoff used by older #475 generations does not satisfy this prompt.
+
 Durable evidence:
 
 `docs/agents/evidence/OTC-20260818-native-cold-auth-qmeta/result.md`
 
 # Validation / audit boundary
 
-- focused exact-SHA discriminator: PASS on `d0c1360b...`;
+Final cleaned evidence head validated before this documentation-only checkpoint descendant:
+
+```text
+head: 38e216bacabe4f96cd0b4468d6db040c38b6839c
+Track A native cold-auth QMeta discriminator: run 32104887420 = SUCCESS
+Track A agent runtime governance: run 32104887441 = SUCCESS
+CI: run 32104887681 = SUCCESS
+```
+
+Additional facts:
+
+- changed-file audit after cleanup: exactly six declared task/evidence/workflow paths;
+- three redundant checkpoint-only evidence files were removed before the validated head;
+- full diff self-audit: no Synology workflow, runtime/client execution, credentials, GUI automation, process memory or proprietary binary artifact added;
 - runtime E2E: `NOT_APPLICABLE_WITH_REASON` — this worker is `runtime_access:none` and only proves the static QMeta contract;
-- independent promotion audit: still required by coordinator before canonical promotion;
-- final evidence-only exact-head repository/governance CI: pending after this checkpoint commit.
+- independent promotion audit: still required by coordinator before canonical promotion.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 4
+checkpoint_version: 5
 status: ready
-last_completed_step: exact-SHA static cold-auth QMeta contract passed, including method id 17, two QString arguments, unique full-range InvokeMetaMethod dispatch target 0xd06850 and instruction fence
-blockers: []
-next_action: observe the final evidence-only exact-head checks once; if green, hand PR #505 to the coordinator for independent review/promotion without merging it from this researcher session
+last_completed_step: final cleaned evidence head 38e216ba passed exact-head native discriminator, Track A governance and repository CI; form-less cold-auth QMeta contract is ready for coordinator review
+blockers:
+  - promotion is coordinator-only; this researcher must not merge or promote its own Draft result
+  - physical consumer must not run until serialized Track A runtime ownership is free and protected non-env/non-argv credential ingress exists
+next_action: coordinator independently review PR #505 and, if accepted, promote the exact cold-auth QMeta contract; the next implementation consumer should reuse tools/tibia_runtime_bridge and expose only bounded AUTH_WITH_CREDENTIALS with protected FD ingress
 ```
 
 ## Recovery checkpoint
@@ -164,22 +182,22 @@ next_action: observe the final evidence-only exact-head checks once; if green, h
 ```yaml
 recovery:
   policy_version: 1
-  generation: 3
+  generation: 4
   session_id: chatgpt-native-cold-auth-qmeta-20260818-r3
   session_started_at: 2026-08-18T07:45:00+02:00
-  checkpointed_at: 2026-08-18T07:50:00+02:00
-  last_progress_at: 2026-08-18T07:50:00+02:00
-  phase: final_evidence_closeout
-  exact_head: pending-evidence-commit
+  checkpointed_at: 2026-08-18T08:00:00+02:00
+  last_progress_at: 2026-08-18T08:00:00+02:00
+  phase: coordinator_handoff
+  exact_validated_head: 38e216bacabe4f96cd0b4468d6db040c38b6839c
   pull_request: 505
   active_operation: none
-  external_run_ids: [32104348691]
+  external_run_ids: [32104887420,32104887441,32104887681]
   operation_started_at: null
   wait_deadline_at: null
-  check_generation: draft-final-evidence
+  check_generation: draft-final-checkpoint
   checks_used: 0
   status: ready
   safe_to_resume: true
-  resume_condition: final evidence-only head exists
-  next_action: inspect final exact-head checks once and hand the Draft PR to the coordinator if green
+  resume_condition: coordinator review available
+  next_action: coordinator independently review PR #505; do not start physical auth from this researcher session
 ```

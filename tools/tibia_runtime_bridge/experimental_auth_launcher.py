@@ -8,6 +8,17 @@ import sys
 
 from tools.tibia_runtime_bridge.launcher import BridgeConfigError, build_env, load_profile, sha256_file
 
+_FORBIDDEN_CREDENTIAL_ENV = (
+    "TIBIA_TEST_EMAIL",
+    "TIBIA_TEST_PASSWORD",
+)
+
+
+def _reject_credential_environment(base_env: dict[str, str]) -> None:
+    present = [name for name in _FORBIDDEN_CREDENTIAL_ENV if name in base_env]
+    if present:
+        raise BridgeConfigError("credential-bearing environment variables are forbidden for experimental native auth")
+
 
 def build_experimental_env(
     profile: dict,
@@ -21,7 +32,9 @@ def build_experimental_env(
         raise BridgeConfigError("bridge and experimental auth socket paths must be absolute")
     if bridge_socket == auth_socket:
         raise BridgeConfigError("experimental auth socket must be distinct from the read-only bridge socket")
-    env = build_env(profile, bridge_helper, bridge_socket, base_env)
+    source_env = dict(os.environ if base_env is None else base_env)
+    _reject_credential_environment(source_env)
+    env = build_env(profile, bridge_helper, bridge_socket, source_env)
     existing_preload = env.get("LD_PRELOAD", "").strip()
     env["LD_PRELOAD"] = f"{auth_helper}:{existing_preload}" if existing_preload else str(auth_helper)
     env["OTCLIENT_TIBIA_RE_AUTH_SOCKET"] = str(auth_socket)
@@ -32,10 +45,8 @@ def _prepare_socket_path(path: Path) -> None:
     if not path.is_absolute():
         raise BridgeConfigError("socket path must be absolute")
     path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        path.unlink()
-    except FileNotFoundError:
-        pass
+    if os.path.lexists(path):
+        raise BridgeConfigError(f"refusing to replace existing socket path: {path}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -71,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     if actual != expected:
         raise BridgeConfigError(f"client SHA-256 mismatch: expected {expected}, got {actual}")
 
+    _reject_credential_environment(dict(os.environ))
     _prepare_socket_path(bridge_socket)
     _prepare_socket_path(auth_socket)
     env = build_experimental_env(

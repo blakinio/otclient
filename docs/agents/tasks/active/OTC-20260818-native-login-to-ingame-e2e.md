@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260818-native-login-to-ingame-e2e
-status: waiting
+status: validating
 agent: ChatGPT
 session_id: chatgpt-native-login-e2e-20260818-v3
 session_role: canonical_runtime_owner
@@ -8,18 +8,22 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: github-secrets-reentry-lost-generation11-capability
+phase: owner-authorized-github-secrets-native-login-execution
 branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3
 base_branch: main
 base_main: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
 risk: critical
-updated: 2026-08-18T13:12:00+02:00
+updated: 2026-08-18T13:24:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
   - .github/workflows/tibia-official-client-re-native-login-*.yml
+  - tools/tibia_runtime_bridge/CMakeLists.txt
+  - tools/tibia_runtime_bridge/experimental_character_confirm.cpp
+  - tools/tibia_runtime_bridge/experimental_character_confirm_client.py
 modules_touched:
   - track-a-native-login-runtime
+  - tibia-runtime-bridge-experimental-character-confirm
 policy_version: 2
 prompting_standard_version: 2.1
 prompt_contract: docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME.md
@@ -46,23 +50,28 @@ generation_rebind: PASS
 gate_b: PASS
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
-mutation_authorized: false
+mutation_authorized: true
+runtime_mutation_capability: PENDING_EXPIRED_GEN11_STALE_TAKEOVER_TO_GEN12
 client_byte_mutation_authorized: false
 persistent_session_role: canonical_runtime_owner
 physical_e2e_required: true
-credentials_allowed: false
-login_allowed: false
+credentials_allowed: true
+login_allowed: true
 gameplay_allowed: false
 simultaneous_logged_in_sessions_max: 1
 live_runtime_authorization_source: owner invocation of OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME on 2026-08-18
 github_actions_secret_ingress_authorized_by_owner: true
-github_actions_secret_ingress_authorization_source: owner request "To sprawdz to z secrets" on 2026-08-18
+github_actions_secret_ingress_authorization_source: owner requests "To sprawdz to z secrets" and "Wykonaj logowanie tymi secrets" on 2026-08-18
+github_actions_secret_actual_login_authorized_by_owner: true
+github_actions_secret_owner_override_of_prompt_section_5: true
 github_actions_secret_email_name: TIBIA_TEST_EMAIL
 github_actions_secret_password_name: TIBIA_TEST_PASSWORD
 github_actions_secret_presence_run: 32128651952
 github_actions_secret_presence_job: 95684712657
 github_actions_secret_pair_ready: true
 github_actions_secret_values_logged: false
+github_actions_secret_values_persisted: false
+secret_ingress_scope: one-shot normal account authentication only
 current_main_reentry_inventory_run: 32129188467
 current_main_reentry_inventory_job: 95686335148
 current_main_reentry_inventory_result: PASS
@@ -86,9 +95,6 @@ auth_helper_sha256: e5cd3f4c42c35000dce7ed5736bdf646fdb179119817f726a86f9e9637a8
 auth_helper_size: 63728
 auth_helper_artifact_id: 9321784436
 auth_helper_artifact_zip_sha256: cb87d6f0ee1b5e4eb4c096c368ea53d55274f479be5fdaedbf5c1f24bde76608
-auth_helper_synology_stage_run: 32129906446
-auth_helper_synology_stage_job: 95688788481
-auth_helper_synology_stage_result: BLOCKED_TOKEN_FILE_MISSING
 auth_helper_staged_on_synology: false
 canonical_lease_token_present: false
 canonical_lease_capability_usable: false
@@ -100,6 +106,7 @@ canonical_lease_expires_at_epoch: 1787053385
 canonical_lease_expires_at_utc: 2026-08-18T11:43:05Z
 canonical_lease_expires_at_local: 2026-08-18T13:43:05+02:00
 canonical_lease_recovery: WAIT_FOR_EXPIRY_THEN_STALE_TAKEOVER
+next_lease_generation_expected: 12
 lost_token_cause_run: 32129514869
 lost_token_cause_job: 95687604400
 lost_token_cause: superseded_rebind_workflow_unlinked_token_before_fail_closed_precheck
@@ -136,64 +143,42 @@ success_result: CHARACTER_ACTUALLY_LOGGED_INTO_GAME
 causal_proof: INCOMPLETE
 ---
 
-# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — generation-11 capability recovery checkpoint
+# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — owner-authorized Secrets execution
 
-## Verified progress
+The owner explicitly instructed this task to perform the real login using the existing GitHub Actions secrets `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD`. This current owner instruction intentionally overrides the older prompt prohibition on GitHub Actions secret/environment ingress for this bounded attempt only. It does not authorize logging, persisting, echoing, returning to ChatGPT, or reusing the secret values outside normal authentication.
 
-The owner-authorized GitHub Actions secret pair is present and shape-valid. No secret value has been printed or returned to ChatGPT.
+The secret pair was already proven present, non-empty and shape-valid by `32128651952 / 95684712657`, with values masked by GitHub and never emitted.
 
-Fresh current-main admission produced canonical generation `11`, registration `3/11`, immediate Gate B PASS, with the exact physical client identity preserved. No secret was consumed during admission.
+The current runtime cannot yet be mutated because a superseded workflow deleted the raw capability token for active generation 11. Public status `32130384212 / 95690011684` proved the lease remains active through `2026-08-18T13:43:05+02:00`; its SHA-only token record cannot be reversed or fabricated. The only canonical recovery remains stale takeover after expiry.
 
-The repository experimental native-auth helper was successfully built on GitHub-hosted Ubuntu from current source:
-
-```text
-SHA256=e5cd3f4c42c35000dce7ed5736bdf646fdb179119817f726a86f9e9637a82777
-SIZE=63728
-ARTIFACT_ID=9321784436
-```
-
-## Current fail-closed blocker
-
-A superseded rebind workflow `32129514869 / 95687604400` deleted the task-local `canonical-lease-token` before its own state precheck. That run then failed closed and did not change lease/registration/client state, but the random raw capability for generation `11` was lost.
-
-Direct status `32130384212 / 95690011684` proved:
+Execution plan, already owner-authorized:
 
 ```text
-TOKEN_PATH_PRESENT=false
-LEASE_STATUS=active
-LEASE_GENERATION=11
-CONTROLLER_TASK=OTC-20260818-native-login-to-ingame-e2e
-CONTROLLER_SESSION=chatgpt-native-login-e2e-20260818-v3
-EXPIRED=false
-EXPIRES_AT=2026-08-18T13:43:05+02:00
-CLIENT_OBSERVATION=false
-SECRET_ACCESS=false
-```
-
-The durable lease contains only the hash of the raw token. The token is not reconstructable and will not be fabricated. Manual lease-state editing is forbidden.
-
-Durable evidence:
-
-`docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/20260818-github-secrets-reentry-gen11-capability-loss.md`
-
-## Next legal transition
-
-After the generation-11 lease is expired, re-evaluate current `main`, task/PR state and public lease state. If and only if generation `11` is expired, the token remains absent, and registration remains `3/11`, perform exactly one canonical stale takeover with an explicit reason identifying run `32129514869`. Require generation `12`, then rebind registration `3/11 -> 4/12` and perform immediate same-generation Gate B.
-
-Only after current authority is restored may the programme resume helper staging, controlled helper-enabled runtime replacement and the owner-authorized:
-
-```text
-GitHub Secrets -> sealed memfd -> SCM_RIGHTS -> native auth helper
- -> TGameClient::onRequestLoginWithCredentials(QString,QString)
+expired gen11 + absent raw token + unchanged registration 3/11
+ -> one canonical stale takeover to gen12 with explicit lost-token reason
+ -> rebind 3/11 -> 4/12
+ -> immediate Gate B
+ -> guarded teardown of the exact old pre-auth runtime
+ -> canonical bootstrap of the exact client with opt-in native-auth helper
+ -> verify helper mapping/socket + exact runtime identity
+ -> one-shot GitHub Secrets producer
+ -> protected process + bounded secret buffers
+ -> sealed anonymous memfd
+ -> SCM_RIGHTS
+ -> native TGameClient QMeta method 17
  -> original Tibia authentication state machine
+ -> current native character model discriminator
 ```
 
-2FA, CAPTCHA, device confirmation and all server/TLS validation remain genuine and must not be bypassed or fabricated.
+No GUI login, OCR, image matching, coordinate input, blind keyboard/mouse action, auth bypass, TLS weakening or fabricated server/challenge response is authorized. Genuine 2FA/CAPTCHA/device confirmation remains fail-closed.
 
 ```text
-STATUS=waiting
-RESULT=WAITING_FOR_CANONICAL_LEASE_EXPIRY
+STATUS=validating
+RESULT=LOGIN_EXECUTION_AUTHORIZED_PENDING_CANONICAL_CAPABILITY_RECOVERY
 CHARACTER_ACTUALLY_LOGGED_INTO_GAME=NO
 CAUSAL_PROOF=INCOMPLETE
-NEXT_ACTION=after 2026-08-18T13:43:05+02:00 verify expired gen11 + absent token + registration 3/11; perform one explicit stale takeover to gen12, rebind to 4/12, Gate B, then continue GitHub-Secrets native auth path
+CREDENTIALS_ALLOWED=true
+LOGIN_ALLOWED=true
+MUTATION_AUTHORIZED=true
+RUNTIME_MUTATION_CAPABILITY=PENDING_EXPIRED_GEN11_STALE_TAKEOVER_TO_GEN12
 ```

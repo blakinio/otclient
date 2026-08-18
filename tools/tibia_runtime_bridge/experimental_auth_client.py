@@ -26,6 +26,10 @@ _MAX_CREDENTIAL_FRAME_BYTES = 8 + 2 * 1024
 _MIN_CREDENTIAL_FRAME_BYTES = 10
 
 
+def _is_memfd_link_target(target: str) -> bool:
+    return target.startswith("/memfd:") or target.startswith("memfd:")
+
+
 def _validate_credentials_memfd(credentials_fd: int) -> None:
     if not isinstance(credentials_fd, int) or isinstance(credentials_fd, bool) or credentials_fd < 0:
         raise BridgeClientError("credentials_fd must be a non-negative file descriptor")
@@ -41,7 +45,7 @@ def _validate_credentials_memfd(credentials_fd: int) -> None:
         if not (_MIN_CREDENTIAL_FRAME_BYTES <= stat_result.st_size <= _MAX_CREDENTIAL_FRAME_BYTES):
             raise BridgeClientError("credentials memfd size is outside the bounded frame")
         target = os.readlink(f"/proc/self/fd/{credentials_fd}")
-        if "memfd:" not in target:
+        if not _is_memfd_link_target(target):
             raise BridgeClientError("credentials_fd must refer to an anonymous memfd")
         seals = _fcntl.fcntl(credentials_fd, _fcntl.F_GET_SEALS)
         required = _fcntl.F_SEAL_SEAL | _fcntl.F_SEAL_SHRINK | _fcntl.F_SEAL_GROW | _fcntl.F_SEAL_WRITE
@@ -62,6 +66,8 @@ def auth_with_credentials_fd(
 ) -> dict[str, object]:
     """Pass an already-sealed credential memfd without reading its payload bytes."""
 
+    if expected_identity is None:
+        raise BridgeClientError("explicit expected runtime identity is required for experimental auth")
     if not socket_path.is_absolute():
         raise BridgeClientError("experimental auth socket path must be absolute")
     _validate_credentials_memfd(credentials_fd)
@@ -74,8 +80,7 @@ def auth_with_credentials_fd(
     client.settimeout(timeout)
     try:
         client.connect(str(socket_path))
-        if expected_identity is not None:
-            _verify_peer_identity(client, expected_identity)
+        _verify_peer_identity(client, expected_identity)
         sent = client.sendmsg(
             [payload],
             [(socket.SOL_SOCKET, socket.SCM_RIGHTS, descriptor_array.tobytes())],
@@ -93,15 +98,17 @@ def auth_with_credentials_fd(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Invoke the one-shot experimental native-auth helper using an already-open sealed credential memfd"
+        description=(
+            "Low-level experimental auth FD transport. Physical use must call the Python API with a "
+            "Gate-B-approved PeerIdentityExpectation; the CLI intentionally cannot perform auth."
+        )
     )
     parser.add_argument("--socket", required=True, type=Path)
     parser.add_argument("--credentials-fd", required=True, type=int)
-    args = parser.parse_args(argv)
-    response = auth_with_credentials_fd(args.socket, args.credentials_fd)
-    json.dump(response, sys.stdout, indent=2, sort_keys=True)
-    sys.stdout.write("\n")
-    return 0 if response.get("ok") else 2
+    parser.parse_args(argv)
+    raise BridgeClientError(
+        "experimental auth CLI is disabled because mutating auth requires an explicit admitted runtime identity"
+    )
 
 
 if __name__ == "__main__":

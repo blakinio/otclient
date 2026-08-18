@@ -2,18 +2,18 @@
 task_id: OTC-20260818-native-login-to-ingame-e2e
 status: validating
 agent: ChatGPT
-session_id: chatgpt-native-login-e2e-20260818-v4-update
+session_id: chatgpt-native-login-e2e-20260818-v4-exact-sha-re
 session_role: implementer
 project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: official-package-reinstall-after-source-absent
+phase: exact-sha-native-route-reproof
 branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3
 base_branch: main
 base_main: ebbb36f50076ff4072c7218e302614c1dfea00b1
 risk: critical
-updated: 2026-08-18T16:22:00+02:00
+updated: 2026-08-18T17:10:18+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -24,11 +24,8 @@ owned_paths:
   - tools/tibia_runtime_bridge/experimental_auth.cpp
   - tools/tibia_runtime_bridge/experimental_auth_client.py
   - tools/tibia_runtime_bridge/experimental_auth_launcher.py
-  - tools/tibia_runtime_bridge/experimental_character_confirm.cpp
-  - tools/tibia_runtime_bridge/experimental_character_confirm_client.py
 modules_touched:
   - track-a-native-login-runtime
-  - track-a-official-package-update
   - tibia-runtime-bridge-native-auth
   - native-login-prompt-contract
 policy_version: 2
@@ -49,7 +46,7 @@ execution_class: synology_physical_runtime
 runner: synology-otclient-01
 runtime_access: ephemeral_isolated
 runtime_owner_task: OTC-20260818-native-login-to-ingame-e2e
-runtime_namespace: native-login-official-package-update
+runtime_namespace: native-login-exact-sha-re
 canonical_registration: NOT_APPLICABLE
 canonical_lease_generation: NOT_APPLICABLE
 registration_lease_generation: NOT_APPLICABLE
@@ -58,73 +55,54 @@ generation_rebind: NOT_APPLICABLE
 gate_b: NOT_APPLICABLE
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
-mutation_authorized: true
+mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
 physical_e2e_required: true
-live_runtime_authorization_source: current owner invocation of OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME on 2026-08-18 explicitly requesting restart/update and VNC observation
+live_runtime_authorization_source: current owner invocation of OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME on 2026-08-18; update/VNC already executed, secret authority preserved only for later bounded one-shot native-auth ingress
 last_proven_canonical_lease_generation: 16
 last_proven_canonical_lease_session: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
-canonical_lease_current_status: ACTIVE_FRESHLY_VALIDATED_AND_RENEWED
-canonical_lease_latest_validation_run: 32147631742
-canonical_lease_latest_validation_job: 95745198909
-canonical_teardown_validation_run: 32141293768
-canonical_teardown_validation_result: PASS
-canonical_teardown_run: 32141408237
-canonical_teardown_job: 95724675001
-canonical_teardown_result: PASS
-canonical_teardown_registration_absent: true
-canonical_teardown_runtime_gone: true
-canonical_teardown_lease_retained_at_run_end: true
+canonical_lease_current_status: ACTIVE_AT_LAST_SUCCESSFUL_UPDATE_VALIDATION
+canonical_lease_latest_validation_run: 32151397744
+canonical_lease_latest_validation_job: 95758005677
 current_registration_present: false
 current_canonical_session_present: false
-old_runtime_pid: 30067
-old_runtime_display: ':99'
-old_runtime_window_identity: x11-window:12582929
 old_exact_client_version: 15.32.df7b29
 old_exact_client_size: 51965216
 old_exact_client_sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-client_version_gate_live_ui_proven: true
-client_version_gate_text_sanitized: Your client version is too old. Restart Tibia to update your client.
-novnc_raw_xres_repair_run: 32138989357
-novnc_raw_xres_repair_job: 95717041668
-novnc_raw_xres_repair_result: PASS
-novnc_historical_display: ':99'
-novnc_historical_xid: 12582929
-current_installed_package_probe_run: 32145902488
-current_installed_package_probe_job: 95739442673
-current_installed_package_client_identity: ABSENT
-current_installed_package_directory_identity: ABSENT
+old_binary_offsets_reusable_on_current_official_client: false
+old_native_auth_helper_reusable_on_current_official_client: false
 current_official_probe_run: 32146091215
 current_official_probe_job: 95740074787
-current_official_probe_result: PASS_READ_ONLY
 current_official_packed_sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
 current_official_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
 current_official_client_size: 52109920
 current_official_version_strings: 15.32,11.25
-current_official_exact_build_suffix: UNKNOWN
-current_official_changed_since_previous_probe: false
-work_toolroot_probe_run: 32146913847
-work_toolroot_probe_job: 95742795369
-work_toolroot_complete: true
-novnc_backend_contract: websockify_6081_to_host_presentation_6082
-latest_vnc_attempt_run: 32147631742
-latest_vnc_attempt_job: 95745198909
-latest_vnc_attempt_result: FAIL_CLOSED_HOST_PORT_6082_ALREADY_OWNED_BY_PRESENTATION_LAYER
-latest_vnc_attempt_package_mutation_performed: false
-latest_vnc_attempt_client_started: false
-canonical_update_completed: false
+canonical_update_completed: true
+canonical_update_run: 32151397744
+canonical_update_job: 95758005677
+canonical_update_result: PASS_CURRENT_EXACT
+installed_exact_client_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+installed_exact_client_size: 52109920
+update_secret_access: false
+update_login: false
+update_canonical_runtime_started: false
+update_vnc_retained: true
+novnc_current_run: 32150057458
+novnc_current_job: 95753482037
+novnc_current_result: PASS_PERSISTENT_LAN_OBSERVER_READY
+novnc_current_display: ':99'
+novnc_current_url: http://192.168.1.2:6083/
 new_exact_auth_contract_reproven: false
+new_exact_character_contract_reproven: false
+new_exact_ingame_discriminator_reproven: false
 new_exact_helper_rebuilt: false
 new_exact_runtime_bootstrapped: false
 secret_ingress_historical_owner_authorization: true
 secret_ingress_current_owner_authorization_preserved: true
 secret_ingress_scope: bounded_one_shot_native_auth_only_after_updated_exact_sha_gates
-secret_retry_before_update: false
-native_auth_secret_dispatch_performed_on_old_client: true
-old_native_auth_helper_reusable_on_current_official_client: false
-old_binary_offsets_reusable_on_current_official_client: false
+secret_ingress_used_on_current_exact_client: false
 form_ui_used: false
 ocr_used: false
 image_matching_used: false
@@ -141,95 +119,53 @@ direct_codex_spark_model: gpt-5.3-codex-spark
 direct_codex_spark_used: false
 success_result: CHARACTER_ACTUALLY_LOGGED_INTO_GAME
 causal_proof: INCOMPLETE
-next_action: Establish updater-owned Xvfb/x11vnc/websockify on backend 6081, prove host-facing http://synology:6082/ reaches that exact observer, then run the official CipSoft Linux launcher reinstall with no credentials and verify the installed bin/client exact SHA and size.
+next_action: Read-only exact-SHA static RE against the installed current official client. Re-prove TGameClient/native auth route and instruction fence, character-selection/controller route and structural IN_GAME discriminator before any helper rebuild, client bootstrap, credential access or login.
 ---
 
-# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — active replacement-session checkpoint
+# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — exact-SHA RE checkpoint
 
-Continue PR #528 and this task only. The canonical prompt is v4.0.0 and the objective remains `CHARACTER ACTUALLY LOGGED INTO GAME` through original native client logic below the login-form/UI layer.
-
-## Freshly proven replacement-session facts
-
-Repository/controller plane:
+The official Linux package update is complete. The installed source package now matches the freshly verified official target exactly:
 
 ```text
-main=ebbb36f50076ff4072c7218e302614c1dfea00b1
-PR=#528
-branch=runtime/OTC-20260818-native-login-to-ingame-e2e-v3
-runner=synology-otclient-01
-canonical registration=ABSENT
-canonical session=ABSENT
-lease generation=16, freshly validate+renew PASS
+run=32151397744
+job=95758005677
+bin/client sha256=ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+bin/client size=52109920
+RESULT=PASS_CURRENT_EXACT
+SECRET_ACCESS=false
+LOGIN=false
+CANONICAL_RUNTIME_STARTED=false
+VNC_RETAINED=true
 ```
 
-Source package inventory:
+The retained observer is:
 
 ```text
-run=32145902488
-job=95739442673
-packages/Tibia/bin/client=ABSENT
-packages/Tibia directory=ABSENT at the later updater preflight
+run=32150057458
+job=95753482037
+DISPLAY=:99
+URL=http://192.168.1.2:6083/
+RFB/WebSocket/LAN proof=PASS
 ```
 
-Therefore there is no current source-package client binary to restart. The legal update path is a clean official-package recovery/reinstall, not another login attempt with the obsolete client.
-
-Fresh current-official manifest proof:
-
-```text
-run=32146091215
-job=95740074787
-packed client.lzma sha256=1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
-unpacked client sha256=ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-unpacked size=52109920
-changed since previous probe=false
-```
-
-The work-side Track A toolroot is complete and contains Xvfb/x11vnc/xdotool, XKB, software GL and proxychains (`32146913847 / 95742795369`).
-
-## noVNC correction
-
-The canonical prompt's durable presentation runbook is:
-
-```text
-exact updater/runtime DISPLAY
- -> x11vnc RFB backend
- -> websockify/noVNC backend on runner port 6081
- -> existing host-facing presentation http://synology:6082/
-```
-
-The failed replacement-session attempt `32147631742 / 95745198909` proved local Xvfb/VNC construction but incorrectly tried to publish host port 6082 a second time. Docker rejected that bind as already in use. Cleanup removed only the attempt-owned resources; no launcher/client/package mutation occurred.
+The obsolete binary and all old absolute/PIE-relative offsets, instruction fences, vptr offsets, QMeta assumptions and helper binaries are historical evidence only. They must not be reused by assumption.
 
 ## Current admission
 
-The source-package inventory has resolved to `ABSENT`, the official target has been freshly revalidated, canonical runtime/registration are absent, target uniqueness is proven, and the current owner explicitly requested restart/update plus VNC observation. The task is therefore re-admitted as task-owned `ephemeral_isolated` package-update work with `mutation_authorized: true` and with credentials/login/gameplay all still forbidden during update.
+This phase is read-only exact-SHA reverse engineering. Runtime/package mutation, credentials, login and gameplay are all forbidden. Account Secrets remain authorized by the current owner only for the later bounded one-shot native-auth ingress after the updated exact-SHA auth/character/IN_GAME contracts and helper/runtime gates are re-proven.
 
-Secrets remain authorized only for the later bounded one-shot native-auth ingress after the updated exact-client RE/helper/canonical gates are re-proven. No secret may be used by the updater or VNC observer.
+## Required continuation
 
-## Required continuation order
-
-```text
-prove host-facing noVNC against backend 6081
- -> official CipSoft launcher/package reinstall, no credentials
- -> exact installed client SHA/size proof, no stray updater/client
- -> re-prove exact-SHA native auth and character-selection contracts
- -> rebuild/revalidate helpers for that exact SHA
- -> separately reviewed trusted-base exact-client fence update if required
- -> fresh canonical bootstrap/admission
- -> restore noVNC on the admitted runtime
- -> bounded one-shot authorized native Secrets ingress
- -> native character selection from the live model
- -> original game-server progression
- -> structural causal IN_GAME proof
-```
-
-## Current result
+1. Assert the installed exact SHA/size again on `synology-otclient-01`.
+2. Perform bounded static analysis only; do not upload or persist the proprietary binary as an artifact.
+3. Re-prove the native authentication target and instruction fence instead of copying old offsets.
+4. Re-prove `TGameClient`/Qt semantic identity and method metadata.
+5. Re-prove the native character-selection/controller route and `requestCharacterGameserverLogin` progression surface.
+6. Establish a structural IN_GAME discriminator suitable for later causal E2E proof.
+7. Only then update/rebuild helper code for the exact SHA and separately re-admit a fresh runtime.
+8. Only after those gates may the preserved GitHub Secrets authorization be consumed through the canonical bounded one-shot native-auth ingress.
 
 ```text
-STATUS=VALIDATING
-RESULT=CONTINUE_FROM_OFFICIAL_PACKAGE_REINSTALL
 CHARACTER_ACTUALLY_LOGGED_INTO_GAME=NO
 CAUSAL_PROOF=INCOMPLETE
-CREDENTIALS_ALLOWED_NOW=false
-LOGIN_ALLOWED_NOW=false
-MUTATION_AUTHORIZED_NOW=true
 ```

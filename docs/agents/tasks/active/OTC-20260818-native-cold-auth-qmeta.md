@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260818-native-cold-auth-qmeta
-status: investigating
+status: validating
 agent: ChatGPT
 session_id: chatgpt-native-cold-auth-qmeta-20260818
 session_role: researcher
@@ -8,13 +8,14 @@ project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: discovery
-phase: investigate
+phase: validate
 execution_mode: github_only
-execution_reason: exact-SHA deterministic QMeta recovery does not require the serialized physical runtime
+execution_reason: exact-SHA deterministic QMeta recovery does not require serialized physical runtime
 branch: research/OTC-20260818-native-cold-auth-qmeta
 base_branch: main
 base_main: bd167a8a9b4192b3c87c21423e2af37e897f5e79
-updated: 2026-08-18T07:20:00+02:00
+related_pr: 505
+updated: 2026-08-18T07:39:00+02:00
 risk: high
 implementation_authorized: true
 research_status: DRAFT_NOT_PROMOTED
@@ -43,7 +44,7 @@ owned_paths:
 modules_touched: []
 reuses:
   - PR #498 exact-SHA auth/session static evidence (DRAFT dependency)
-  - PR #475 GameClient QMeta table constants and static-metacall evidence at head 135c808d40934e3f9dfafe8cb0efb83aade92858 (DRAFT dependency)
+  - PR #475 GameClient QMeta constants at head 135c808d40934e3f9dfafe8cb0efb83aade92858 (DRAFT dependency)
 depends_on:
   - blakinio/otclient#498
   - blakinio/otclient#475@135c808d40934e3f9dfafe8cb0efb83aade92858
@@ -60,51 +61,65 @@ decomposition_decision: single
 decomposition_reason: one bounded exact-SHA QMeta discriminator with independent paths and no runtime ownership
 validation_level: focused
 invocation_started_at: 2026-08-18T07:20:00+02:00
-last_progress_at: 2026-08-18T07:20:00+02:00
+last_progress_at: 2026-08-18T07:39:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: draft-repair-1
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
 stall_warnings: 0
 ---
 
 # Objective
 
-Recover, on the exact official native Linux client and without executing it, the concrete Qt/QMeta invocation contract for:
+Recover, on the exact official native Linux client and without executing it, the Qt/QMeta invocation contract for:
 
 ```text
 TGameClient::onRequestLoginWithCredentials(QString, QString)
 ```
 
-needed by `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` to replace the legacy GUI/button cold-auth path with original native client logic below the login form.
+This is strictly for `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` cold authentication **without operating the login form**.
+
+Forbidden target mechanisms remain OCR, screenshots as control input, coordinate clicks, blind Tab/Return, image matching or other form automation.
 
 # Trust boundary
 
-PR #498 and PR #475 are researcher inputs, not canonical facts merely because they are referenced here. Load-bearing values must be independently revalidated against the exact packed/unpacked SHA in this task before being labelled `FACT`.
+PR #498 and PR #475 are predecessor/research inputs. Load-bearing values are revalidated on the exact packed/unpacked SHA before promotion.
 
-No official-client process, X11 state, Synology runner, VNC observer, credentials, session, login budget or live account state may be touched by this task.
+This task does not touch the official-client process, Synology runner, VNC observer, X11, credentials, sessions or login budget.
 
-# Hypotheses
+# Run 1 — exact result
 
-## H1
-
-The exact `TGameClient` QMeta object represented by the predecessor candidates:
+PR #505 head `f4f7c903a30046ebf78ee884d8dc7658ed68d534`:
 
 ```text
-stringdata:      0x1c93cf4
-metadata:        0x1c93740
-static_metacall: 0xd06260
+workflow_run=32103383778
+job=95608065258
+result=FAIL
+COLD_AUTH_EXACT_PACKED_SHA=PASS
+COLD_AUTH_EXACT_CLIENT_SHA=PASS
+COLD_AUTH_CLIENT_EXECUTED=false
+COLD_AUTH_RUNTIME_ACCESS=none
+COLD_AUTH_QMETA_CLASS=tibia::client::TGameClient
+COLD_AUTH_QMETA_METHOD_COUNT=44
+COLD_AUTH_QMETA_SIGNAL_COUNT=6
+first_error=AssertionError: tibia::client::TGameClient
 ```
 
-contains `onRequestLoginWithCredentials` as an invokable two-argument method and allows an exact method metadata index to be recovered.
+Classification: the failure was the worker's exact class-name assertion (`TGameClient`) being shorter than the exact QMeta class identity (`tibia::client::TGameClient`). It occurred before method enumeration. It is not evidence against the native cold-auth method.
 
-## H2
+# Repair 1
 
-The static-metacall dispatch for that method resolves to one deterministic executable target whose instruction bytes can be fenced on exact SHA for later PIE/runtime rebinding.
+Commit `767d9f1bd38b7a35125105bc6ba86f0c486bfcbf` changes only the exact class identity assertion to:
+
+```text
+tibia::client::TGameClient
+```
+
+No semantic threshold or exact-client fence was weakened.
 
 # Acceptance
 
@@ -126,23 +141,47 @@ CLIENT_EXECUTED=false
 RUNTIME_ACCESS=none
 ```
 
-Fail closed if the exact SHA changed, the QMeta tables do not parse consistently, more than one dispatch candidate remains equally viable, or the method/target cannot be resolved without guessing.
+Fail closed on SHA mismatch, inconsistent QMeta tables, ambiguous dispatch target, or missing method.
 
 # Negative controls
 
-- Do not search live process memory.
-- Do not start the client or use Synology.
-- Do not consume credentials or environment secrets.
-- Do not infer method index from a historical call site.
-- Do not promote Draft PR #498/#475 prose as fact without exact-SHA reproduction.
-- Do not invoke or design calls to `onGameSessionConnected` / `onGameSessionLoginSuccessful` as success shortcuts.
+- No live process-memory scan or client startup.
+- No Synology/runtime use.
+- No credentials or secrets.
+- No method index inferred from historical UI behavior.
+- No `onGameSessionConnected` / `onGameSessionLoginSuccessful` success shortcut.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 1
-status: investigating
-last_completed_step: claimed independent GitHub-hosted static lane after live #475 V24 runtime ownership was proven active
+checkpoint_version: 2
+status: validating
+last_completed_step: exact-SHA run 1 isolated a namespaced-class assertion defect and repair 1 corrected only that parser assertion
 blockers: []
-next_action: add the exact-SHA hosted QMeta discriminator and open the required Draft PR before running it
+next_action: inspect the first exact-head cold-auth discriminator result produced after this checkpoint commit and either persist the exact QMeta contract or apply at most one new evidence-based repair
+```
+
+## Recovery checkpoint
+
+```yaml
+recovery:
+  policy_version: 1
+  generation: 1
+  session_id: chatgpt-native-cold-auth-qmeta-20260818
+  session_started_at: 2026-08-18T07:20:00+02:00
+  checkpointed_at: 2026-08-18T07:39:00+02:00
+  last_progress_at: 2026-08-18T07:39:00+02:00
+  phase: validate_exact_qmeta_after_namespaced_class_repair
+  exact_head: 767d9f1bd38b7a35125105bc6ba86f0c486bfcbf
+  pull_request: 505
+  active_operation: none
+  external_run_ids: [32103383778, 32103555614]
+  operation_started_at: null
+  wait_deadline_at: null
+  check_generation: draft-repair-1
+  checks_used: 2
+  status: ready
+  safe_to_resume: true
+  resume_condition: a fresh exact-head discriminator result exists after the checkpoint commit
+  next_action: inspect that result and continue from its first material finding
 ```

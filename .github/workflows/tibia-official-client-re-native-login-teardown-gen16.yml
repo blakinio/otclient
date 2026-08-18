@@ -1,0 +1,107 @@
+name: Track A native-login exact gen16 teardown
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-teardown-gen16.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  teardown:
+    name: Teardown obsolete exact gen16 canonical runtime
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      BASE_SHA: a10df477ce88183718ed855386ef96ba25b66320
+      TASK: OTC-20260818-native-login-to-ingame-e2e
+      SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
+      STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+      TOKEN: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
+      OLD_SHA: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      OLD_SIZE: '51965216'
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Exact proof then cancellation-safe teardown
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
+          git cat-file -e "$BASE_SHA^{commit}"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          transition=.github/scripts/tibia-official-client-re-canonical-live-transition.py
+          teardown=.github/scripts/tibia-official-client-re-canonical-live-teardown.py
+          worker=.github/scripts/tibia-official-client-re-canonical-live-session.sh
+          probe="$RUNNER_TEMP/teardown-gen16-probe-${GITHUB_RUN_ID}.sh"
+          trap 'rm -f "$probe"' EXIT
+
+          [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
+          bash "$lease" validate --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN"
+          bash "$lease" renew --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN" --ttl-seconds 2700
+
+          python3 .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py "$worker" "$probe" \
+            --owner-helper .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
+          chmod 700 "$probe"
+          python3 "$transition" gate-b --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN" --probe "$probe"
+
+          python3 - "$STATE/lease.json" "$STATE/runtime-registration.json" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          reg=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert lease.get('status')=='active' and lease.get('generation')==16
+          assert lease.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert lease.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          assert reg.get('registration_generation')==1 and reg.get('lease_generation')==16
+          assert reg.get('pid')==30067 and reg.get('display')==':99'
+          assert reg.get('client_size')==51965216
+          assert reg.get('client_sha256')=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          print('GEN16_TEARDOWN_PREFLIGHT=PASS_EXACT_REG1_16_PID30067')
+          PY
+
+          python3 "$teardown" \
+            --task-id "$TASK" \
+            --session-id "$SESSION" \
+            --token-file "$TOKEN" \
+            --probe "$probe" \
+            --worker "$worker" \
+            --expected-generation 16
+
+          [[ ! -e "$STATE/runtime-registration.json" ]]
+          [[ ! -d "$STATE/session" ]]
+          bash "$lease" validate --task-id "$TASK" --session-id "$SESSION" --token-file "$TOKEN"
+          python3 - "$STATE/lease.json" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert lease.get('status')=='active' and lease.get('generation')==16
+          assert lease.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert lease.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          print('GEN16_TEARDOWN_POSTCHECK=PASS_REGISTRATION_ABSENT_LEASE16_RETAINED')
+          PY
+          echo GEN16_TEARDOWN_SECRET_ACCESS=false
+          echo GEN16_TEARDOWN_CLIENT_UPDATE=false
+          echo GEN16_TEARDOWN_RESULT=PASS
+          rm -f "$probe"
+          trap - EXIT

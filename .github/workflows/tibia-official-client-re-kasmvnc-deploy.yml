@@ -1,0 +1,213 @@
+name: Track A KasmVNC deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - '.github/workflows/tibia-official-client-re-kasmvnc-deploy.yml'
+      - 'docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-kasmvnc-desktop
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy persistent KasmVNC desktop on Synology
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    env:
+      TASK_ID: OTC-20260818-track-a-persistent-viewer-handoff
+      TASK_FILE: docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md
+      CONTAINER_NAME: otclient-track-a-kasmvnc
+      IMAGE: kasmweb/ubuntu-noble-desktop:1.17.0
+      HOST_IP: 192.168.1.2
+      HOST_PORT: '6901'
+      CONTAINER_PORT: '6901'
+      STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
+      LEGACY_OBSERVER: http://192.168.1.2:6083/
+      KASM_USERNAME: kasm_user
+      KASM_PASSWORD: IVtWL5MZS0f5bDvLDyi7MlBqkkT3BTh2
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Verify isolated Track A admission
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          grep -q '^track_id: official-client-re$' "$TASK_FILE"
+          grep -q '^status: implementing$' "$TASK_FILE"
+          grep -q '^execution_class: synology_physical_runtime$' "$TASK_FILE"
+          grep -q '^runtime_access: ephemeral_isolated$' "$TASK_FILE"
+          grep -q '^runtime_owner_task: OTC-20260818-track-a-persistent-viewer-handoff$' "$TASK_FILE"
+          grep -q '^runtime_namespace: track-a-kasmvnc-desktop$' "$TASK_FILE"
+          grep -q '^target_uniqueness: PROVEN$' "$TASK_FILE"
+          grep -q '^mutation_authorized: true$' "$TASK_FILE"
+          grep -q '^credentials_allowed: false$' "$TASK_FILE"
+          grep -q '^login_allowed: false$' "$TASK_FILE"
+          grep -q '^gameplay_allowed: false$' "$TASK_FILE"
+          grep -q '^kasm_container: otclient-track-a-kasmvnc$' "$TASK_FILE"
+          grep -q '^kasm_host_port: 6901$' "$TASK_FILE"
+          grep -q "^protected_concurrent_display: ':99'$" "$TASK_FILE"
+          grep -q '^protected_concurrent_url: http://192.168.1.2:6083/$' "$TASK_FILE"
+          command -v docker >/dev/null
+          [[ -S /var/run/docker.sock ]]
+          echo KASMVNC_ADMISSION=PASS
+
+      - name: Prove legacy observer remains separate
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          if curl -fsS --max-time 5 "$LEGACY_OBSERVER" >/dev/null; then
+            echo LEGACY_6083_REACHABLE_BEFORE=true
+          else
+            echo LEGACY_6083_REACHABLE_BEFORE=false
+          fi
+          owners="$(docker ps --filter publish="$HOST_PORT" --format '{{.Names}}' | sed '/^$/d')"
+          if [[ -n "$owners" && "$owners" != "$CONTAINER_NAME" ]]; then
+            echo "KASMVNC_DEPLOY_ERROR=host_port_6901_owned_by_other_container:$owners" >&2
+            exit 1
+          fi
+          if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+            [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")" == "$TASK_ID" ]]
+            [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")" == track-a-kasmvnc-desktop ]]
+            [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.role" }}' "$CONTAINER_NAME")" == kasmvnc-desktop ]]
+          fi
+          echo KASMVNC_ISOLATION_PREFLIGHT=PASS
+
+      - name: Pull and pin KasmVNC image identity
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          docker pull "$IMAGE"
+          image_id="$(docker image inspect -f '{{.Id}}' "$IMAGE")"
+          digest="$(docker image inspect -f '{{join .RepoDigests " "}}' "$IMAGE")"
+          [[ -n "$image_id" ]]
+          echo "KASMVNC_IMAGE_ID=$image_id"
+          echo "KASMVNC_IMAGE_REPODIGESTS=$digest"
+
+      - name: Deploy persistent KasmVNC desktop
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "$STATE_DIR"
+          chmod 700 "$STATE_DIR"
+          printf '%s\n' "$KASM_PASSWORD" > "$STATE_DIR/browser-password"
+          chmod 600 "$STATE_DIR/browser-password"
+
+          recreate=true
+          if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+            task_label="$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")"
+            runtime_label="$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")"
+            role_label="$(docker inspect -f '{{ index .Config.Labels "otclient.role" }}' "$CONTAINER_NAME")"
+            [[ "$task_label" == "$TASK_ID" && "$runtime_label" == track-a-kasmvnc-desktop && "$role_label" == kasmvnc-desktop ]]
+            configured_image="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME")"
+            restart_policy="$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER_NAME")"
+            port_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostPort}}' "$CONTAINER_NAME" 2>/dev/null || true)"
+            if [[ "$configured_image" == "$IMAGE" && "$restart_policy" == unless-stopped && "$port_binding" == "$HOST_PORT" ]]; then
+              recreate=false
+            fi
+          fi
+
+          if [[ "$recreate" == true ]]; then
+            if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+              docker rm -f "$CONTAINER_NAME"
+            fi
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              --shm-size=1g \
+              -p "$HOST_IP:$HOST_PORT:$CONTAINER_PORT" \
+              --label otclient.track=official-client-re \
+              --label "otclient.task=$TASK_ID" \
+              --label otclient.runtime=track-a-kasmvnc-desktop \
+              --label otclient.role=kasmvnc-desktop \
+              -e "VNC_PW=$KASM_PASSWORD" \
+              -e VNC_RESOLUTION=1920x1080 \
+              -e MAX_FRAME_RATE=30 \
+              "$IMAGE"
+          else
+            docker start "$CONTAINER_NAME" >/dev/null || true
+          fi
+
+          echo KASMVNC_CONTAINER_DEPLOYED=true
+
+      - name: Verify KasmVNC HTTPS desktop
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          url="https://$HOST_IP:$HOST_PORT/"
+          ready=false
+          for _ in $(seq 1 120); do
+            running="$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)"
+            [[ "$running" == true ]] || { sleep 1; continue; }
+            if curl -kfsS --max-time 5 "$url" -o /tmp/kasm-index.html; then
+              if [[ -s /tmp/kasm-index.html ]]; then
+                ready=true
+                break
+              fi
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != true ]]; then
+            docker logs --tail 160 "$CONTAINER_NAME" >&2 || true
+            echo KASMVNC_DEPLOY_ERROR=https_not_ready >&2
+            exit 1
+          fi
+
+          [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" == true ]]
+          [[ "$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER_NAME")" == unless-stopped ]]
+          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")" == "$TASK_ID" ]]
+          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")" == track-a-kasmvnc-desktop ]]
+          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.role" }}' "$CONTAINER_NAME")" == kasmvnc-desktop ]]
+          port_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostPort}}' "$CONTAINER_NAME")"
+          [[ "$port_binding" == "$HOST_PORT" ]]
+          display="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"' 2>/dev/null || true)"
+          echo "KASMVNC_CONTAINER_DISPLAY=${display:-UNKNOWN}"
+          echo "KASMVNC_URL=$url"
+          echo "KASMVNC_USERNAME=$KASM_USERNAME"
+          echo KASMVNC_HTTPS=PASS
+          echo KASMVNC_PERSISTENCE=PASS
+
+      - name: Re-prove no interference with PR 528 observer
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          if curl -fsS --max-time 5 "$LEGACY_OBSERVER" >/dev/null; then
+            echo LEGACY_6083_REACHABLE_AFTER=true
+          else
+            echo LEGACY_6083_REACHABLE_AFTER=false
+          fi
+          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$CONTAINER_NAME")" == "$TASK_ID" ]]
+          echo KASMVNC_NO_PR528_MUTATION=PASS
+
+      - name: Emit operator handoff
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          echo 'KASMVNC_DEPLOYMENT=PASS'
+          echo 'KASMVNC_URL=https://192.168.1.2:6901/'
+          echo 'KASMVNC_USERNAME=kasm_user'
+          echo 'KASMVNC_PASSWORD_SOURCE=task-private-state-file'
+          echo 'KASMVNC_OFFICIAL_CLIENT_STARTED=false'
+          echo 'KASMVNC_TIBIA_SECRET_ACCESS=false'

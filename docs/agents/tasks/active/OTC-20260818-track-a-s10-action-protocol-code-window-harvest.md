@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260818-track-a-s10-action-protocol-code-window-harvest
-status: investigating
+status: ready
 agent: ChatGPT
 session_role: researcher
 project_lane: otclient
@@ -12,7 +12,7 @@ execution_mode: github_only
 branch: docs/OTC-20260818-track-a-s10-action-protocol-code-window-harvest
 base_branch: main
 base_main: ebbb36f50076ff4072c7218e302614c1dfea00b1
-related_pr: PENDING
+related_pr: 539
 created: 2026-08-18
 updated: 2026-08-18
 risk: low
@@ -80,6 +80,9 @@ identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
+last_completed_step: S10 scope, non-overlap, retained historical branch set, report and fail-closed proof contract persisted in Draft PR #539
+current_result: IN_PROGRESS
+next_action: inspect the retained exact-SHA single-item-drag workflow/evidence chain for a direct sendMoveObject GameActionHandler -> protocol owner -> message producer code window
 ---
 
 # Objective
@@ -205,8 +208,8 @@ Final documentation changes require Markdown/path/full-diff review and repositor
 # Current checkpoint
 
 ```yaml
-status: investigating
-last_completed_step: S10 scope, ownership, retained historical branch set and fail-closed evidence standard established from current main
-current_result: UNKNOWN
+status: ready
+last_completed_step: S10 scope, ownership, retained historical branch set, report and fail-closed evidence standard persisted in Draft PR #539
+current_result: IN_PROGRESS
 next_action: inspect the retained exact-SHA single-item-drag workflow/evidence chain for a direct sendMoveObject GameActionHandler -> protocol owner -> message producer code window
 ```

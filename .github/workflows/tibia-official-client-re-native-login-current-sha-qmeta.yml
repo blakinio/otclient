@@ -1,0 +1,249 @@
+name: Track A current-SHA native-login QMeta reproof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-current-sha-qmeta.yml
+
+permissions:
+  contents: read
+
+jobs:
+  qmeta:
+    name: Decode exact-SHA TGameClient QMeta auth route without execution
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+      EXPECTED_SIZE: '52109920'
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Fetch exact client and decode QMeta tables statically
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          ulimit -c 0 || true
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          echo QMETA_RUNTIME_ACCESS=none
+          echo QMETA_MUTATION=false
+          echo QMETA_SECRET_ACCESS=false
+          echo QMETA_LOGIN=false
+          echo QMETA_CLIENT_EXECUTION=false
+          echo QMETA_RAW_CLIENT_UPLOAD=false
+
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl python3-pyelftools binutils >/dev/null
+          root="$RUNNER_TEMP/native-login-qmeta"
+          rm -rf "$root"; mkdir -m700 -p "$root/warp/bin" "$root/warp/state" "$root/client"
+          cleanup() { [[ -n "${wp:-}" ]] && kill "$wp" 2>/dev/null || true; rm -rf "$root"; }
+          trap cleanup EXIT INT TERM HUP
+
+          cd "$root/warp/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c - >/dev/null
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c - >/dev/null
+          mkdir x; tar -xzf wp.tgz -C x; cp "$(find x -type f -name wireproxy -print -quit)" wireproxy; chmod 755 wgcf wireproxy
+          cd "$root/warp/state"
+          "$root/warp/bin/wgcf" register --accept-tos >/dev/null
+          "$root/warp/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25345\n' "$root/warp/state/wgcf-profile.conf" > w.conf
+          nohup "$root/warp/bin/wireproxy" -c w.conf >"$root/warp/wireproxy.log" 2>&1 </dev/null & wp=$!
+          for _ in $(seq 1 30); do
+            curl --socks5-hostname 127.0.0.1:25345 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$root/warp/trace" 2>/dev/null && break
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$root/warp/trace"
+          echo QMETA_WARP=PASS
+
+          base='https://static.tibia.com/launcher/tibiaclient-linux-current/'
+          curl --socks5-hostname 127.0.0.1:25345 --compressed -fsSL --retry 4 --retry-all-errors --connect-timeout 20 --max-time 120 "${base}package.json" -o "$root/client/package.json"
+          readarray -t m < <(python3 - "$root/client/package.json" <<'PY'
+          import json,sys
+          doc=json.load(open(sys.argv[1],encoding='utf-8')); rows=[]
+          def walk(v):
+              if isinstance(v,dict):
+                  u=v.get('url'); p=v.get('packedhash'); q=v.get('unpackedhash')
+                  if isinstance(u,str) and isinstance(p,str): rows.append((u,p,q if isinstance(q,str) else ''))
+                  for z in v.values(): walk(z)
+              elif isinstance(v,list):
+                  for z in v: walk(z)
+          walk(doc)
+          hits=[x for x in rows if x[0].endswith('/bin/client.lzma') or x[0]=='bin/client.lzma' or x[0].endswith('client.lzma')]
+          if len(hits)!=1: raise SystemExit(f'expected one client.lzma entry, got {len(hits)}')
+          print(hits[0][0]); print(hits[0][1].lower()); print(hits[0][2].lower())
+          PY
+          )
+          rel="${m[0]}"; packed_expected="${m[1]}"; unpacked_expected="${m[2]}"
+          case "$rel" in http://*|https://*) url="$rel";; /*) url="https://static.tibia.com$rel";; *) url="$base$rel";; esac
+          curl --socks5-hostname 127.0.0.1:25345 --compressed -fsSL --retry 4 --retry-all-errors --connect-timeout 20 --max-time 240 "$url" -o "$root/client/client.lzma"
+          [[ "$(sha256sum "$root/client/client.lzma" | awk '{print $1}')" == "$packed_expected" ]]
+          python3 - "$root/client/client.lzma" "$root/client/client" "$unpacked_expected" "$EXPECTED_SHA" "$EXPECTED_SIZE" <<'PY'
+          import hashlib,lzma,pathlib,sys
+          src,dst,msha,esha,esz=sys.argv[1:]; b=pathlib.Path(src).read_bytes()
+          q=b[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          sha=hashlib.sha256(raw).hexdigest(); assert sha==msha.lower()==esha and len(raw)==int(esz)
+          pathlib.Path(dst).write_bytes(raw)
+          print('QMETA_EXACT_CLIENT=PASS'); print('QMETA_CLIENT_SHA256='+sha); print('QMETA_CLIENT_SIZE='+str(len(raw)))
+          PY
+          chmod 600 "$root/client/client"
+
+          python3 - "$root/client/client" <<'PY'
+          import hashlib,pathlib,struct,sys
+          from elftools.elf.elffile import ELFFile
+          from elftools.elf.relocation import RelocationSection
+
+          p=pathlib.Path(sys.argv[1]); raw=p.read_bytes()
+          class_name=b'tibia::client::TGameClient'
+          method_name=b'onRequestLoginWithCredentials'
+          with p.open('rb') as fh:
+              elf=ELFFile(fh)
+              secs=[]; rels=[]
+              for s in elf.iter_sections():
+                  secs.append((s.name,int(s['sh_offset']),int(s['sh_size']),int(s['sh_addr']),int(s['sh_flags'])))
+              for s in elf.iter_sections():
+                  if not isinstance(s,RelocationSection): continue
+                  symtab=elf.get_section(s['sh_link']) if s['sh_link'] else None
+                  for r in s.iter_relocations():
+                      add=int(r['r_addend']) if r.is_RELA() else None
+                      sym=''
+                      if int(r['r_info_sym']) and symtab is not None:
+                          try: sym=symtab.get_symbol(int(r['r_info_sym'])).name
+                          except Exception: pass
+                      rels.append((int(r['r_offset']),int(r['r_info_type']),add,sym))
+          def offva(o):
+              for n,so,sz,va,fl in secs:
+                  if so<=o<so+sz:return va+(o-so)
+              return None
+          def vaoff(v):
+              for n,so,sz,va,fl in secs:
+                  if va<=v<va+sz:return so+(v-va)
+              raise ValueError(hex(v))
+          def u32(v): return struct.unpack_from('<I',raw,vaoff(v))[0]
+          def qword(v): return struct.unpack_from('<Q',raw,vaoff(v))[0]
+          def bytes_at(v,n): return raw[vaoff(v):vaoff(v)+n]
+          by_off={}
+          for off,typ,add,sym in rels: by_off.setdefault(off,[]).append((typ,add,sym))
+          def reloc_value(v):
+              vals=[]
+              for typ,add,sym in by_off.get(v,[]):
+                  if add is not None: vals.append(add)
+              if len(set(vals))==1:return vals[0]
+              try:return qword(v)
+              except Exception:return None
+
+          def unique_string(needle,label):
+              hits=[]; start=0
+              while True:
+                  x=raw.find(needle+b'\0',start)
+                  if x<0:break
+                  hits.append(offva(x));start=x+1
+              hits=[x for x in hits if x is not None]
+              print(f'QMETA_{label}_STRING_COUNT={len(hits)}')
+              for x in hits:print(f'QMETA_{label}_STRING_VA=0x{x:x}')
+              if len(hits)!=1:raise SystemExit(f'{label} string not unique')
+              return hits[0]
+          class_va=unique_string(class_name,'CLASS')
+          method_va=unique_string(method_name,'AUTH_METHOD')
+
+          # Qt6 moc stringdata is an array of uint32 offset/length pairs followed by strings.
+          # Recover the struct base and the method's string-table index by requiring pair[0]
+          # to resolve exactly to the class name and pair[i] to resolve exactly to the auth name.
+          candidates=[]
+          for n,so,sz,sva,fl in secs:
+              if not (fl & 2): continue
+              end=sva+sz
+              for pair_va in range(sva, end-8, 4):
+                  try:
+                      rel=u32(pair_va); ln=u32(pair_va+4)
+                  except Exception: continue
+                  if ln!=len(method_name): continue
+                  for idx in range(1,256):
+                      base=pair_va-8*idx
+                      if base<sva:break
+                      try:
+                          r0=u32(base); l0=u32(base+4)
+                      except Exception:continue
+                      if l0!=len(class_name):continue
+                      if base+r0!=class_va or base+rel!=method_va:continue
+                      if bytes_at(base+r0,l0)!=class_name or bytes_at(base+rel,ln)!=method_name:continue
+                      candidates.append((base,idx))
+          candidates=sorted(set(candidates))
+          print('QMETA_STRINGDATA_CANDIDATE_COUNT='+str(len(candidates)))
+          for base,idx in candidates:print(f'QMETA_STRINGDATA_CANDIDATE=base:0x{base:x},auth_string_index:{idx}')
+          if len(candidates)!=1:raise SystemExit('TGameClient Qt stringdata not unique')
+          string_base,string_index=candidates[0]
+
+          # Generated QMetaObject::Data stores stringdata at +8, metadata at +16 and
+          # static_metacall at +24. Locate the exact object through relocations.
+          static_candidates=[]
+          for off,typ,add,sym in rels:
+              if add!=string_base:continue
+              static=off-8
+              data=reloc_value(static+16); metacall=reloc_value(static+24)
+              if data is None or metacall is None:continue
+              try: hdr=[u32(data+4*i) for i in range(14)]
+              except Exception:continue
+              if hdr[1]!=0:continue
+              static_candidates.append((static,data,metacall,tuple(hdr)))
+          uniq={ (s,d,m,h) for s,d,m,h in static_candidates }
+          static_candidates=sorted(uniq,key=lambda x:x[0])
+          print('QMETA_STATIC_METAOBJECT_CANDIDATE_COUNT='+str(len(static_candidates)))
+          for s,d,m,h in static_candidates:
+              print(f'QMETA_STATIC_METAOBJECT=va:0x{s:x},data:0x{d:x},metacall:0x{m:x},revision:{h[0]},methods:{h[4]},method_data:{h[5]},signals:{h[13]}')
+          if len(static_candidates)!=1:raise SystemExit('TGameClient staticMetaObject not unique')
+          static,data,metacall,hdr=static_candidates[0]
+          revision,classname,ci_count,ci_data,method_count,method_data,prop_count,prop_data,enum_count,enum_data,ctor_count,ctor_data,flags,signal_count=hdr
+          if revision not in (10,11,12,13):raise SystemExit(f'unexpected Qt metadata revision {revision}')
+          if method_count<=0 or method_count>256:raise SystemExit(f'bad method count {method_count}')
+
+          rows=[]
+          # Qt6 method metadata entries are six uint32 values: name, argc,
+          # parameters, tag, flags, metatype offset.
+          for i in range(method_count):
+              a=data+4*(method_data+6*i)
+              vals=tuple(u32(a+4*j) for j in range(6))
+              rows.append(vals)
+          auth=[(i,v) for i,v in enumerate(rows) if v[0]==string_index]
+          print('QMETA_AUTH_METHOD_ROW_COUNT='+str(len(auth)))
+          for i,v in auth:print(f'QMETA_AUTH_METHOD_ROW=ordinal:{i},name_index:{v[0]},argc:{v[1]},params:{v[2]},tag:{v[3]},flags:0x{v[4]:x},metatype:{v[5]}')
+          if len(auth)!=1:raise SystemExit('auth method row not unique')
+          ordinal,entry=auth[0]
+          if entry[1]!=2:raise SystemExit(f'auth argc mismatch {entry[1]}')
+
+          # Bind a new exact-SHA instruction fence to the owning qt_static_metacall.
+          fence=bytes_at(metacall,32)
+          if len(fence)!=32:raise SystemExit('short metacall fence')
+          print(f'QMETA_TGAMECLIENT_STATIC_METAOBJECT=0x{static:x}')
+          print(f'QMETA_TGAMECLIENT_STRINGDATA=0x{string_base:x}')
+          print(f'QMETA_TGAMECLIENT_METADATA=0x{data:x}')
+          print(f'QMETA_TGAMECLIENT_STATIC_METACALL=0x{metacall:x}')
+          print(f'QMETA_TGAMECLIENT_LOCAL_METHOD_COUNT={method_count}')
+          print(f'QMETA_AUTH_STRING_INDEX={string_index}')
+          print(f'QMETA_AUTH_LOCAL_ORDINAL={ordinal}')
+          print(f'QMETA_AUTH_ARGC={entry[1]}')
+          print('QMETA_STATIC_METACALL_FENCE32='+fence.hex())
+          print('QMETA_STATIC_METACALL_FENCE32_SHA256='+hashlib.sha256(fence).hexdigest())
+          print('QMETA_METADATA_HEADER_SHA256='+hashlib.sha256(bytes_at(data,56)).hexdigest())
+          print('QMETA_AUTH_CONTRACT_STATIC_MINIMUM=PASS')
+          print('QMETA_RESULT=PASS')
+          PY
+
+          echo QMETA_SECRET_ACCESS=false
+          echo QMETA_LOGIN=false
+          echo QMETA_CLIENT_EXECUTION=false

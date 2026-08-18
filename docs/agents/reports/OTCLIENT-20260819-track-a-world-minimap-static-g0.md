@@ -103,7 +103,7 @@ The starting status is PR #536's 2026-08-18 169-row coverage matrix. This packag
 | F06 | PARTIAL | picker evidence exists; full semantic/current-build proof incomplete |
 | F07 | PARTIAL | camera evidence exists; this G0 adds current exact-build QML/renderer camera surface |
 | F08 | BLOCKED | server-delivered extent causality remains owned by PR #475's separate legal proof path |
-| F09 | DONE | promoted historical static map-mutation control/capability boundary remains authoritative for its row contract |
+| F09 | DONE | the exact historical `[19,14]` one-byte patched-client startup canary is proven by WM-CANARY; this G0 does not reinterpret it as current-build semantic propagation |
 | F10 | BLOCKED | map-mutation causality remains unresolved on PR #475 |
 | F11 | **PARTIAL** | current exact-build controller/visible-area/floor/layer/tile/render-info package recovered here |
 | F12 | **PARTIAL** | current exact-build marker action/storage/overlay/render-info/protobuf/disk package recovered here |
@@ -172,10 +172,10 @@ Promoted/historical inputs consumed without branch modification:
 
 ## Next discriminators
 
-The highest-value next static package for `F11/F12/F13` is a bounded current-build code/data-layout harvest around the direct targets retained here:
+The highest-value next static package for `F11/F12/F13` is a bounded current-build code/data-layout harvest around the direct static-metacall case targets retained here:
 
 1. `TMinimapController::{currentLayer,setCurrentLayer,updateMinimapVisibleAreaFromQuickitemSize,onMinimapDataChanged}` -> object fields / `TMinimapVisibleArea` ownership and layer bounds;
 2. `TMinimapMarkerStorage::{setMarkersFromMinimapMarkerFile,startSavingMinimapMarkerFileContentToDisk}` plus protobuf descriptors -> exact marker schema, coordinate representation and persistence rules;
-3. `TWorldMapCameraViewportQmlType` conversion targets -> exact transform formulas and deterministic round-trip vectors.
+3. `TWorldMapCameraViewportQmlType` conversion dispatch targets -> exact transform formulas and deterministic round-trip vectors.
 
 That follow-up can remain `RUNTIME_ACCESS:none` unless its own evidence proves that a live discriminator is necessary. It must not inherit PR #475 mutation/login rights.

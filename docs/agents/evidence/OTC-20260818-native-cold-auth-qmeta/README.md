@@ -6,6 +6,8 @@ Task: `OTC-20260818-native-cold-auth-qmeta`
 
 This namespace contains only deterministic static evidence for the exact official native Linux Tibia client. It must not contain credentials, session material, raw proprietary client bytes, process-memory data, screenshots, or runtime observations.
 
+The objective is strictly **login without using the visual login form**. GUI control, OCR, coordinate clicks, blind Tab/Return and image matching are forbidden as the target mechanism.
+
 The worker must independently verify:
 
 ```text
@@ -21,4 +23,4 @@ What exact QMeta method index, argument contract, static dispatch target and ins
 TGameClient::onRequestLoginWithCredentials(QString, QString)?
 ```
 
-Any unresolved ambiguity remains `UNKNOWN`.
+This boundary is intended to replace cold-auth form operation with original native client logic below the UI. Any unresolved ambiguity remains `UNKNOWN`.

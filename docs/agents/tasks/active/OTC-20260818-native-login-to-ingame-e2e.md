@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: github-secrets-reentry-current-main-inventory
+phase: github-secrets-reentry-generation11-rebind
 branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3
 base_branch: main
 base_main: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
 risk: critical
-updated: 2026-08-18T12:54:00+02:00
+updated: 2026-08-18T12:57:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -35,17 +35,17 @@ track_a_runtime_agent_admission_version: 1
 routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTING.md
 execution_class: synology_physical_runtime
 runner: synology-otclient-01
-runtime_access: canonical_reuse_or_mutation
+runtime_access: canonical_rebind
 runtime_owner_task: OTC-20260818-native-login-to-ingame-e2e
 runtime_namespace: canonical-live-runtime
 canonical_registration: PRESENT
-canonical_lease_generation: 10
+canonical_lease_generation: 11
 registration_lease_generation: 10
-gate_a: PASS
-generation_rebind: PASS
-gate_b: PASS
+gate_a: REQUIRED_NOT_PROVEN
+generation_rebind: REQUIRED_NOT_PROVEN
+gate_b: REQUIRED_NOT_PROVEN
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN
+target_uniqueness: UNKNOWN
 mutation_authorized: false
 client_byte_mutation_authorized: false
 persistent_session_role: canonical_runtime_owner
@@ -61,17 +61,18 @@ github_actions_secret_email_name: TIBIA_TEST_EMAIL
 github_actions_secret_password_name: TIBIA_TEST_PASSWORD
 github_actions_secret_presence_run: 32128651952
 github_actions_secret_presence_job: 95684712657
-github_actions_secret_email_present: true
-github_actions_secret_password_present: true
-github_actions_secret_email_shape_valid: true
-github_actions_secret_password_shape_valid: true
 github_actions_secret_pair_ready: true
 github_actions_secret_values_logged: false
-previous_reentry_inventory_run: 32128864303
-previous_reentry_inventory_job: 95685348919
-previous_reentry_inventory_result: REFUSED_LIVE_MAIN_MOVED_BEFORE_RUNTIME
-previous_base_main: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
-current_main_rest_reason: docs(track-a) chat inbound static boundaries PR 527 only
+current_main_reentry_inventory_run: 32129188467
+current_main_reentry_inventory_job: 95686335148
+current_main_reentry_inventory_result: PASS
+current_main_reentry_observed_lease_status: released
+current_main_reentry_observed_lease_generation: 10
+current_main_reentry_observed_registration_generation: 2
+current_main_reentry_observed_registration_lease_generation: 10
+next_lease_generation_expected: 11
+canonical_rebind_attempt_limit: 1
+canonical_rebind_attempts_consumed: 0
 owner_funded_ai_api_authorized: false
 direct_codex_spark_authorized: true
 direct_codex_spark_model: gpt-5.3-codex-spark
@@ -94,18 +95,14 @@ server_response_spoofed: false
 historical_runtime_authority_inherited: false
 historical_pid_xid_display_session_inherited: false
 historical_login_budget_inherited: false
-controller_plane_inventory_run: 32124348434
 canonical_bootstrap_run: 32125054251
 canonical_bootstrap_result: REGISTERED_GATE_B_PASS
-post_bootstrap_inventory_run: 32125504315
 canonical_rebind_run: 32125924194
 canonical_rebind_result: REBIND_GATE_B_PASS_ACTIVE_GEN10
 retained_session_probe_run: 32126937957
 retained_session_probe_result: CURRENT_NATIVE_CHARACTER_MODEL_EMPTY
 retained_session_available: false
 cold_auth_required: true
-cold_auth_capability_run: 32127178186
-cold_auth_controlling_tty: false
 cold_auth_helper_loaded: false
 cold_auth_auth_socket_present: false
 terminal_release_run: 32127353047
@@ -115,47 +112,37 @@ success_result: CHARACTER_ACTUALLY_LOGGED_INTO_GAME
 causal_proof: INCOMPLETE
 ---
 
-# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — GitHub Secrets re-entry on current main
+# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — generation 11 rebind
 
-The owner explicitly requested continuation with repository GitHub Actions Secrets. Secret-presence workflow `32128651952 / 95684712657` proved both `TIBIA_TEST_EMAIL` and `TIBIA_TEST_PASSWORD` are non-empty, UTF-8-bounded for the existing 1..1024-byte memfd contract, and masked by GitHub. No value was printed or returned to ChatGPT.
-
-The first re-entry controller inventory (`32128864303 / 95685348919`) refused before governance/runtime observation because live `main` had advanced from `a518cea...` to `066a5ba8...`. Inspection proved that new main commit is `docs(track-a): promote chat inbound static boundaries (#527)`, a static documentation/evidence promotion that does not mutate the physical runtime. This task was therefore restacked without carrying stale base authority.
-
-## Current secret-bearing boundary
-
-Owner authorization permits this continuation to use the existing Actions secrets only through a one-shot secret producer. It does not permit plaintext files, logging, argv exposure, GUI credential entry, OCR, coordinate automation, auth bypass, challenge fabrication, TLS weakening or server-response spoofing.
-
-Intended secret path after fresh runtime admission:
+Current-main controller inventory `32129188467 / 95686335148` proved, under the canonical flock and without client observation:
 
 ```text
-GitHub Actions secret environment in dedicated one-shot producer
- -> bounded validation
- -> sealed anonymous memfd
- -> SCM_RIGHTS
- -> exact auth-helper socket
- -> exact process/client/peer fence
- -> TGameClient::onRequestLoginWithCredentials(QString,QString)
- -> original Tibia auth state machine
+LEASE_STATUS=released
+LEASE_GENERATION=10
+REGISTRATION_GENERATION=2
+REGISTRATION_LEASE_GENERATION=10
+CLIENT_VERSION=15.32.df7b29
+CLIENT_SIZE=51965216
+CLIENT_SHA256=e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+NO_CLIENT_OBSERVATION=true
 ```
 
-No secret may be consumed until current-main-fenced controller inventory, fresh generation authority and an exact auth-helper-enabled runtime are proven.
+Exactly one next controller acquisition is admitted for this task/session. It must produce generation `11`, then the promoted canonical rebind must re-prove the exact runtime and atomically bind registration `2/10 -> 3/11`. Immediate Gate B must pass against the same active generation `11`.
 
-## Recovery checkpoint
+No secret, login, gameplay, process-memory mutation or GUI interaction is admitted in this phase. The generation-11 lease is kept active on success so the next phase can perform a controlled exact-runtime replacement without gratuitous generation advancement.
 
 ```text
 STATUS=validating
 BASE_MAIN=066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
 BRANCH=runtime/OTC-20260818-native-login-to-ingame-e2e-v3
-SECRET_PAIR_READY=true
-SECRET_VALUES_LOGGED=false
-CURRENT_KNOWN_LEASE_GENERATION=10
-CURRENT_KNOWN_LEASE_STATUS=released
-CURRENT_KNOWN_REGISTRATION_GENERATION=2
-CURRENT_KNOWN_REGISTRATION_LEASE_GENERATION=10
+RUNTIME_ACCESS=canonical_rebind
+OBSERVED_RELEASED_GENERATION=10
+EXPECTED_ACTIVE_GENERATION=11
+REGISTRATION_GENERATION=2
+REGISTRATION_LEASE_GENERATION=10
+GENERATION_REBIND=REQUIRED_NOT_PROVEN
 MUTATION_AUTHORIZED=false
 CREDENTIALS_ALLOWED=false
 LOGIN_ALLOWED=false
-GAMEPLAY_ALLOWED=false
-FIRST_UNRESOLVED_EDGE=fresh controller-plane state on current main after terminal release
-NEXT_ACTION=run exactly one current-main-fenced no-client controller-plane inventory on synology-otclient-01; if released generation 10 and registration 2/10 remain unchanged, admit generation-11 rebind before any runtime replacement or secret use
+NEXT_ACTION=acquire exactly generation 11, canonical rebind registration 2/10 -> 3/11, then immediate same-generation Gate B
 ```

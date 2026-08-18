@@ -1,0 +1,176 @@
+name: Track A native-login post-auth diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-post-auth-diagnostic.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    name: Diagnose gen16 native auth result without secrets
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Validate gen16 and inspect only non-secret auth state
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_BASE_SHA" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EVENT_BASE_SHA" --expected-branch "$HEAD_BRANCH"
+
+          task='OTC-20260818-native-login-to-ingame-e2e'
+          session='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          root='/home/runner/_work/_otclient_tibia_re_state'
+          state="$root/canonical-live-runtime"
+          task_runtime="$root/tasks/$task/runtime"
+          token="$task_runtime/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          source_worker='.github/scripts/tibia-official-client-re-canonical-live-session.sh'
+          probe="$RUNNER_TEMP/post-auth-probe-${GITHUB_RUN_ID}.sh"
+          trap 'rm -f "$probe"' EXIT
+
+          [[ -f "$token" && "$(stat -c %a "$token")" == 600 ]]
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          bash "$lease" renew --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 2700
+          python3 .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py "$source_worker" "$probe" \
+            --owner-helper .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
+          chmod 700 "$probe"
+          python3 "$transition" gate-b --task-id "$task" --session-id "$session" --token-file "$token" --probe "$probe"
+
+          python3 - "$state/lease.json" "$state/runtime-registration.json" "$state/session" <<'PY'
+          import collections, hashlib, json, os, pathlib, re, struct, sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          reg=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          session=pathlib.Path(sys.argv[3])
+          assert lease.get('status')=='active' and lease.get('generation')==16
+          assert lease.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert lease.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          assert reg.get('registration_generation')==1 and reg.get('lease_generation')==16
+          assert reg.get('client_version')=='15.32.df7b29' and reg.get('client_size')==51965216
+          assert reg.get('client_sha256')=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          pid=int(reg['pid'])
+          raw=pathlib.Path(f'/proc/{pid}/stat').read_text(); c=raw.rfind(')'); fields=raw[c+2:].split()
+          assert int(fields[19])==int(reg['process_start_ticks'])
+          exe=pathlib.Path(os.path.realpath(f'/proc/{pid}/exe'))
+          h=hashlib.sha256()
+          with exe.open('rb',buffering=0) as f:
+              for b in iter(lambda:f.read(1<<20),b''): h.update(b)
+          assert h.hexdigest()==reg['client_sha256']
+          env=pathlib.Path(f'/proc/{pid}/environ').read_bytes().split(b'\0')
+          assert not any(x.startswith(b'TIBIA_TEST_EMAIL=') or x.startswith(b'TIBIA_TEST_PASSWORD=') for x in env)
+          print('POST_AUTH_RUNTIME=PASS_ACTIVE_GEN16_REG1_16_GATE_B')
+          print('POST_AUTH_PID='+str(pid))
+
+          maps=pathlib.Path(f'/proc/{pid}/maps').read_text(errors='replace')
+          print('POST_AUTH_NATIVE_HELPER_MAPPED='+str('otclient-tibia-native-auth-experimental.so' in maps).lower())
+          print('POST_AUTH_DELAYED_SHIM_MAPPED='+str('otclient-tibia-delayed-auth-loader.so' in maps).lower())
+          print('POST_AUTH_ONE_SHOT_SOCKET_PRESENT='+str((session/'native-auth.sock').exists()).lower())
+
+          # Re-read the same native character-model discriminator used by the execution run.
+          realexe=os.path.realpath(f'/proc/{pid}/exe'); base=None; regions=[]
+          for line in pathlib.Path(f'/proc/{pid}/maps').read_text(errors='replace').splitlines():
+              p=line.split(maxsplit=5)
+              if len(p)<2: continue
+              lo,hi=(int(x,16) for x in p[0].split('-')); perms=p[1]; off=int(p[2],16)
+              path=p[5] if len(p)>5 else ''
+              if path==realexe and base is None: base=lo-off
+              if perms.startswith('rw') and 'p' in perms and 0 < hi-lo <= (512<<20): regions.append((lo,hi))
+          count='UNRESOLVED'; hits=[]
+          if base is not None:
+              needle=struct.pack('<Q',base+0x308ed68)
+              mfd=os.open(f'/proc/{pid}/mem',os.O_RDONLY)
+              try:
+                  for lo,hi in regions:
+                      cur=lo
+                      while cur<hi:
+                          n=min(1<<20,hi-cur)
+                          try:data=os.pread(mfd,n,cur)
+                          except OSError:break
+                          if len(data)!=n:break
+                          pos=0
+                          while True:
+                              j=data.find(needle,pos)
+                              if j<0:break
+                              a=cur+j
+                              if a%8==0:hits.append(a)
+                              pos=j+1
+                          cur+=n
+                  hits=sorted(set(hits))
+                  if len(hits)==1:
+                      b=os.pread(mfd,16,hits[0]+0x100)
+                      if len(b)==16:
+                          first,n=struct.unpack('<Qq',b); count=str(n) if first or n==0 else 'UNRESOLVED'
+              finally: os.close(mfd)
+          print('POST_AUTH_CHARACTER_CONTROLLER_HITS='+str(len(hits)))
+          print('POST_AUTH_CHARACTER_LIST_COUNT='+str(count))
+
+          # Network-state summary for the exact PID; no addresses are emitted.
+          socket_inodes=set()
+          fdroot=pathlib.Path(f'/proc/{pid}/fd')
+          for entry in fdroot.iterdir():
+              try:t=os.readlink(entry)
+              except OSError:continue
+              m=re.fullmatch(r'socket:\[(\d+)\]',t)
+              if m: socket_inodes.add(m.group(1))
+          state_names={'01':'ESTABLISHED','02':'SYN_SENT','03':'SYN_RECV','04':'FIN_WAIT1','05':'FIN_WAIT2','06':'TIME_WAIT','07':'CLOSE','08':'CLOSE_WAIT','09':'LAST_ACK','0A':'LISTEN','0B':'CLOSING'}
+          states=collections.Counter()
+          for table in ('/proc/net/tcp','/proc/net/tcp6'):
+              try:lines=pathlib.Path(table).read_text().splitlines()[1:]
+              except OSError:continue
+              for line in lines:
+                  cols=line.split()
+                  if len(cols)>=10 and cols[9] in socket_inodes: states[state_names.get(cols[3],cols[3])]+=1
+          print('POST_AUTH_SOCKET_FD_COUNT='+str(len(socket_inodes)))
+          print('POST_AUTH_TCP_STATES='+json.dumps(dict(sorted(states.items())),separators=(',',':')))
+
+          # Classify client log without printing account data, character data, URLs, hostnames or arbitrary raw lines.
+          log=session/'client.log'
+          text=log.read_text(errors='replace') if log.exists() else ''
+          categories={
+            'credential_rejected': [r'wrong password',r'incorrect password',r'invalid password',r'invalid credential',r'authentication failed',r'login failed',r'account.*password.*(wrong|invalid|incorrect)'],
+            'two_factor_or_otp': [r'two.?factor',r'2fa',r'authenticator',r'one.?time',r'otp',r'verification code'],
+            'device_confirmation': [r'device.*confirm',r'confirm.*device',r'new device',r'device verification'],
+            'captcha_or_challenge': [r'captcha',r'challenge'],
+            'rate_or_lock': [r'too many',r'rate limit',r'locked',r'temporar.*block'],
+            'tls_or_certificate': [r'certificate',r'\btls\b',r'\bssl\b'],
+            'network_or_timeout': [r'connection.*(failed|error|refused|closed)',r'network.*(failed|error)',r'timeout',r'timed out',r'could not resolve',r'host.*unreachable'],
+            'generic_error': [r'\berror\b',r'\bfailed\b',r'\bfailure\b',r'\brejected\b',r'\bdenied\b'],
+          }
+          low=text.lower()
+          for name,patterns in categories.items():
+              hits_n=sum(len(re.findall(p,low,re.I)) for p in patterns)
+              print('POST_AUTH_LOG_'+name.upper()+'_HITS='+str(hits_n))
+          print('POST_AUTH_CLIENT_LOG_BYTES='+str(len(text.encode(errors='replace'))))
+          print('POST_AUTH_CLIENT_LOG_LINES='+str(len(text.splitlines())))
+          PY
+          rm -f "$probe"
+          trap - EXIT

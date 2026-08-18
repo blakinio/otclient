@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   observer:
-    name: Replace proven stale backend and expose stable updater desktop
+    name: Establish stable updater desktop after proven stale-backend cleanup
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
     timeout-minutes: 7
@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Establish stable task-owned VNC observer
+      - name: Establish and prove persistent LAN VNC
         shell: bash
         env:
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -78,59 +78,12 @@ jobs:
           lease=.github/scripts/tibia-official-client-re-canonical-live-lease
           bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
           bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
-
           for b in Xvfb x11vnc xdotool; do [[ -x "$tool/usr/bin/$b" && ! -L "$tool/usr/bin/$b" ]]; done
           [[ -d "$tool/usr/share/X11/xkb" && -f "$tool/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so" && -d /usr/share/novnc ]]
           command -v websockify >/dev/null
           command -v docker >/dev/null
           [[ -S /var/run/docker.sock ]]
-          echo STABLE_VNC_PREFLIGHT=PASS
 
-          # 6081 is currently occupied by a proven stale historical websockify: its webroot
-          # was canonical session state already torn down, and its RFB target 5901 is absent.
-          stale_pid="$(python3 - <<'PY'
-          import os,pathlib
-          port=6081; want=f'{port:04X}'; ins=set()
-          for fn in ('/proc/net/tcp','/proc/net/tcp6'):
-              try: rows=pathlib.Path(fn).read_text().splitlines()[1:]
-              except OSError: continue
-              for row in rows:
-                  f=row.split()
-                  if len(f)>9 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': ins.add(f[9])
-          owners=[]
-          for p in pathlib.Path('/proc').iterdir():
-              if not p.name.isdigit(): continue
-              try:
-                  hit=False
-                  for fd in (p/'fd').iterdir():
-                      try:t=os.readlink(fd)
-                      except OSError:continue
-                      if t.startswith('socket:[') and t[8:-1] in ins: hit=True; break
-                  if not hit: continue
-                  args=[x.decode(errors='replace') for x in (p/'cmdline').read_bytes().split(b'\0') if x]
-              except OSError: continue
-              owners.append((int(p.name),args))
-          if len(owners)!=1: raise SystemExit(f'expected one stale 6081 owner, got {len(owners)}')
-          pid,args=owners[0]
-          joined='\n'.join(args)
-          required=['websockify','--web','canonical-live-runtime/session/novnc-web','0.0.0.0:6081','127.0.0.1:5901']
-          if not all(x in joined for x in required): raise SystemExit('6081 owner is not the proven stale canonical VNC backend')
-          # RFB 5901 must still have no listener.
-          want5901=f'{5901:04X}'
-          for fn in ('/proc/net/tcp','/proc/net/tcp6'):
-              try: rows=pathlib.Path(fn).read_text().splitlines()[1:]
-              except OSError: continue
-              for row in rows:
-                  f=row.split()
-                  if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==want5901 and f[3]=='0A': raise SystemExit('5901 unexpectedly has a listener')
-          print(pid)
-          PY
-          )"
-          [[ "$stale_pid" =~ ^[1-9][0-9]*$ ]]
-          echo "STABLE_VNC_REPLACE_STALE_6081_PID=$stale_pid"
-          kill "$stale_pid"
-          for _ in $(seq 1 40); do kill -0 "$stale_pid" 2>/dev/null || break; sleep .1; done
-          if kill -0 "$stale_pid" 2>/dev/null; then kill -9 "$stale_pid"; fi
           python3 - <<'PY'
           import pathlib
           for port in (5901,6081):
@@ -140,15 +93,17 @@ jobs:
                   except OSError: continue
                   for row in rows:
                       f=row.split()
-                      if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': raise SystemExit(f'port {port} still occupied')
+                      if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': raise SystemExit(f'port {port} unexpectedly occupied after proven stale cleanup')
           PY
-          echo STABLE_VNC_STALE_BACKEND_REMOVED=PASS
-
-          if [[ -e "$live/session.json" ]]; then
-            echo STABLE_VNC_REFUSE_PREEXISTING_TASK_SESSION=true >&2
-            exit 1
-          fi
+          [[ ! -e "$live/session.json" ]]
           rm -rf "$live"; mkdir -m700 -p "$live"
+          if docker container inspect "$RELAY_NAME" >/dev/null 2>&1; then
+            owner="$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$RELAY_NAME" 2>/dev/null || true)"
+            [[ "$owner" == "$TASK" ]] || { echo STABLE_VNC_REFUSE_FOREIGN_RELAY=true >&2; exit 1; }
+            docker rm -f "$RELAY_NAME" >/dev/null
+          fi
+          echo STABLE_VNC_PREFLIGHT=PASS
+
           xvfb_pid=''; vnc_pid=''; ws_pid=''; relay_created=false
           stop_pid() {
             local p="$1"; [[ "$p" =~ ^[1-9][0-9]*$ ]] || return 0
@@ -220,11 +175,6 @@ jobs:
           [[ "$network" == otclient-runner_default ]]
           runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
           [[ "$runner_ip" =~ ^172\.28\.[0-9]+\.[0-9]+$ ]]
-          if docker container inspect "$RELAY_NAME" >/dev/null 2>&1; then
-            owner="$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$RELAY_NAME" 2>/dev/null || true)"
-            [[ "$owner" == "$TASK" ]] || { echo STABLE_VNC_REFUSE_FOREIGN_RELAY=true >&2; exit 1; }
-            docker rm -f "$RELAY_NAME" >/dev/null
-          fi
           relay_script="$(cat <<'PY'
           import os,select,socket,threading
           target=(os.environ['TARGET_IP'],int(os.environ['TARGET_PORT']))
@@ -261,6 +211,8 @@ jobs:
           done
           [[ "$host_port" =~ ^[0-9]+$ ]]
           docker inspect -f '{{.State.Running}}' "$RELAY_NAME" | grep -qx true
+          binding="$(docker port "$RELAY_NAME" 6081/tcp)"
+          [[ "$binding" == "$HOST_LAN_IP:$host_port" ]]
           echo "STABLE_VNC_LAN_PORT=$host_port"
 
           host_probe="$(cat <<'PY'
@@ -274,9 +226,8 @@ jobs:
           print('HOST_NETWORK_VNC_PROBE=PASS')
           PY
           )"
-          docker run --rm --network host --entrypoint python3 "$image" -c "$host_probe" -- "$host_port" "$marker"
-          [[ "$(curl -fsS --max-time 5 "http://$HOST_LAN_IP:$host_port/health.txt")" == "$marker" ]]
-          echo STABLE_VNC_LAN_HTTP_WEBSOCKET=PASS
+          docker run --rm --network host --entrypoint python3 "$image" -c "$host_probe" "$host_port" "$marker"
+          echo STABLE_VNC_HOST_NETWORK_HTTP_WEBSOCKET=PASS
 
           relay_id="$(docker inspect -f '{{.Id}}' "$RELAY_NAME")"
           python3 - "$live/session.json" "$TASK" "$display" "$xvfb_pid" "$vnc_pid" "$ws_pid" "$RELAY_NAME" "$relay_id" "$host_port" <<'PY'

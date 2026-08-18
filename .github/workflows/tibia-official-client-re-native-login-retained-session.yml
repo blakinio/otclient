@@ -1,0 +1,287 @@
+name: Track A native-login retained session probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-retained-session.yml
+      - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-native-login-retained-session
+  cancel-in-progress: false
+
+jobs:
+  retained-native-session:
+    name: Read-only retained native session discriminator
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v2' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Renew generation 10, re-prove Gate B and inspect only native character-model structure
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+
+          [[ "$RUNNER_NAME" == 'synology-otclient-01' ]]
+          [[ "$GITHUB_REPOSITORY" == 'blakinio/otclient' ]]
+          [[ "$HEAD_BRANCH" == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v2' ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          current_main="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          [[ "$current_main" == "$EXPECTED_BASE_SHA" ]] || {
+            echo "NATIVE_LOGIN_RETAINED_REFUSED=LIVE_MAIN_MOVED:$current_main" >&2
+            exit 70
+          }
+
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$EVENT_BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          echo 'NATIVE_LOGIN_RETAINED_ADMISSION_POLICY=PASS'
+
+          task='OTC-20260818-native-login-to-ingame-e2e'
+          session='chatgpt-native-login-e2e-20260818'
+          state='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+          token="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          worker_source='.github/scripts/tibia-official-client-re-canonical-live-session.sh'
+          adapter='.github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py'
+          owner_helper='.github/scripts/tibia-official-client-re-xres-window-owner.py'
+          wire_helper='.github/scripts/tibia-official-client-re-xres-wire.py'
+          worker="${RUNNER_TEMP}/native-login-retained-worker-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
+          gout="${RUNNER_TEMP}/native-login-retained-gdb-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
+          gcmd="${RUNNER_TEMP}/native-login-retained-gdb-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.gdb"
+
+          cleanup() {
+            rm -f "$worker" "$gout" "$gcmd"
+          }
+          trap cleanup EXIT
+
+          [[ -f "$token" && ! -L "$token" ]] || {
+            echo 'NATIVE_LOGIN_RETAINED_REFUSED=LEASE_TOKEN_MISSING' >&2
+            exit 71
+          }
+          [[ "$(stat -c '%a' "$token")" == 600 ]] || {
+            echo 'NATIVE_LOGIN_RETAINED_REFUSED=LEASE_TOKEN_MODE' >&2
+            exit 72
+          }
+
+          bash "$lease" renew \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --ttl-seconds 2700
+
+          python3 - "$state/lease.json" "$state/runtime-registration.json" <<'PY'
+          import json, pathlib, sys
+          lease = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          reg = json.loads(pathlib.Path(sys.argv[2]).read_text())
+          checks = {
+              'lease.status': lease.get('status') == 'active',
+              'lease.generation': lease.get('generation') == 10,
+              'lease.controller_task': lease.get('controller_task') == 'OTC-20260818-native-login-to-ingame-e2e',
+              'lease.controller_session': lease.get('controller_session') == 'chatgpt-native-login-e2e-20260818',
+              'reg.registration_generation': reg.get('registration_generation') == 2,
+              'reg.lease_generation': reg.get('lease_generation') == 10,
+              'reg.client_version': reg.get('client_version') == '15.32.df7b29',
+              'reg.client_size': reg.get('client_size') == 51965216,
+              'reg.client_sha256': reg.get('client_sha256') == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
+              'reg.source_task': reg.get('source_task') == 'OTC-20260818-native-login-to-ingame-e2e',
+              'reg.source_run': str(reg.get('source_run')) == '32125924194',
+              'reg.remote_view_mapping': reg.get('remote_view_mapping') == 'PROVEN',
+          }
+          bad = [k for k,v in checks.items() if not v]
+          if bad:
+              raise SystemExit('NATIVE_LOGIN_RETAINED_CONTROLLER_DRIFT=' + ','.join(bad))
+          print('NATIVE_LOGIN_RETAINED_CONTROLLER_STATE=ACTIVE_GEN10_REG2_10')
+          PY
+
+          python3 .github/scripts/test_tibia_official_client_re_canonical_xres_worker_adapter.py
+          python3 .github/scripts/test_tibia_official_client_re_xres_window_owner.py
+          python3 .github/scripts/test_tibia_official_client_re_xres_wire.py
+          python3 "$adapter" "$worker_source" "$worker" --owner-helper "$owner_helper" --wire-helper "$wire_helper"
+          bash -n "$worker"
+          echo 'NATIVE_LOGIN_RETAINED_XRES_WORKER=PASS'
+
+          python3 "$transition" gate-b \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token" \
+            --probe "$worker"
+
+          pid="$(python3 - "$state/runtime-registration.json" <<'PY'
+          import json,pathlib,sys
+          d=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          p=d.get('pid')
+          if not isinstance(p,int) or p<2: raise SystemExit(2)
+          print(p)
+          PY
+          )"
+          [[ "$pid" == 2658 ]] || {
+            echo "NATIVE_LOGIN_RETAINED_REFUSED=PID_DRIFT:$pid" >&2
+            exit 73
+          }
+          [[ -r "/proc/$pid/stat" && -r "/proc/$pid/maps" && -r "/proc/$pid/exe" ]] || {
+            echo 'NATIVE_LOGIN_RETAINED_REFUSED=REGISTERED_PROCESS_UNAVAILABLE' >&2
+            exit 74
+          }
+          start_ticks="$(python3 - "$pid" <<'PY'
+          import pathlib,sys
+          p=pathlib.Path('/proc')/sys.argv[1]/'stat'
+          s=p.read_text()
+          r=s.rfind(')')
+          fields=s[r+2:].split()
+          print(fields[19])
+          PY
+          )"
+          [[ "$start_ticks" == 66643010 ]] || {
+            echo "NATIVE_LOGIN_RETAINED_REFUSED=PROCESS_START_DRIFT:$start_ticks" >&2
+            exit 75
+          }
+          exe="$(readlink -f "/proc/$pid/exe")"
+          [[ -n "$exe" && -f "$exe" && ! -L "$exe" ]] || {
+            echo 'NATIVE_LOGIN_RETAINED_REFUSED=EXE_UNAVAILABLE' >&2
+            exit 76
+          }
+          [[ "$(stat -c %s "$exe")" == 51965216 ]] || exit 77
+          [[ "$(sha256sum "$exe" | awk '{print $1}')" == e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe ]] || exit 78
+          boot_sha="$(tr -d '\n' </proc/sys/kernel/random/boot_id | sha256sum | awk '{print $1}')"
+          [[ "$boot_sha" == a7395225814c9a850ff7663d0bce2dd289cf300c37d78e286d5c7d31043653f9 ]] || {
+            echo 'NATIVE_LOGIN_RETAINED_REFUSED=BOOT_ID_DRIFT' >&2
+            exit 79
+          }
+          echo 'NATIVE_LOGIN_RETAINED_PROCESS_IDENTITY=PASS'
+
+          command -v gdb >/dev/null || {
+            echo 'NATIVE_LOGIN_RETAINED_DISCRIMINATOR=GDB_UNAVAILABLE' >&2
+            exit 80
+          }
+
+          cat >"$gcmd" <<'GDB'
+          set pagination off
+          set confirm off
+          set print elements 0
+          python
+          import gdb, os, struct
+          inf = gdb.selected_inferior()
+          pid = int(inf.pid)
+          exe = os.path.realpath(f'/proc/{pid}/exe')
+
+          def emit(k, v):
+              gdb.write(f'{k}={v}\n')
+
+          maps=[]
+          with open(f'/proc/{pid}/maps', encoding='utf-8', errors='replace') as h:
+              for line in h:
+                  p=line.rstrip().split(None,5)
+                  if len(p)<5: continue
+                  lo,hi=(int(x,16) for x in p[0].split('-'))
+                  perms=p[1]; off=int(p[2],16); path=p[5] if len(p)>5 else ''
+                  maps.append((lo,hi,perms,off,path))
+          exe_maps=[m for m in maps if m[4] and os.path.realpath(m[4])==exe]
+          bases={lo-off for lo,hi,perms,off,path in exe_maps}
+          if len(bases)!=1:
+              emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:load_bias_not_unique')
+              gdb.execute('detach', to_string=True)
+              raise SystemExit(81)
+          bias=next(iter(bases))
+          emit('NATIVE_LOGIN_RETAINED_LOAD_BIAS_PROVEN','true')
+
+          target=bias+0x308ed68
+          needle=struct.pack('<Q',target)
+          hits=[]
+          for lo,hi,perms,off,path in maps:
+              if not (perms.startswith('rw') and 'p' in perms): continue
+              cur=lo
+              while cur<hi:
+                  try: found=inf.search_memory(cur,hi-cur,needle)
+                  except Exception: found=None
+                  if found is None: break
+                  addr=int(found); hits.append(addr)
+                  if len(hits)>16: break
+                  cur=addr+8
+              if len(hits)>16: break
+          emit('NATIVE_LOGIN_RETAINED_CHARSEL_INSTANCE_COUNT',len(hits))
+          if len(hits)>1:
+              emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:charsel_instance_not_unique')
+          elif len(hits)==0:
+              emit('NATIVE_LOGIN_RETAINED_NATIVE_CHARACTER_LIST_COUNT',0)
+              emit('NATIVE_LOGIN_RETAINED_NATIVE_SELECTED_LOGIN_DATA_COUNT',0)
+              emit('NATIVE_LOGIN_RETAINED_SESSION','NOT_PROVEN_AVAILABLE')
+              emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','PASS:NO_CURRENT_CHARACTER_SELECTION_CONTROLLER')
+          else:
+              obj=hits[0]
+              raw_vptr=bytes(inf.read_memory(obj,8))
+              vptr=struct.unpack('<Q',raw_vptr)[0]
+              if vptr!=target:
+                  emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:vptr_mismatch')
+              else:
+                  raw_count=bytes(inf.read_memory(obj+0x108,8))
+                  count=struct.unpack('<q',raw_count)[0]
+                  raw_sel=bytes(inf.read_memory(obj+0x140,16))
+                  start,end=struct.unpack('<QQ',raw_sel)
+                  span=end-start if end>=start else -1
+                  selected=(span//0x70) if span>=0 and span%0x70==0 else -1
+                  emit('NATIVE_LOGIN_RETAINED_CHARSEL_VPTR_PROVEN','true')
+                  emit('NATIVE_LOGIN_RETAINED_NATIVE_CHARACTER_LIST_COUNT',count)
+                  emit('NATIVE_LOGIN_RETAINED_NATIVE_SELECTED_LOGIN_DATA_COUNT',selected)
+                  if count<0 or count>100:
+                      emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:character_count_out_of_range')
+                  elif selected<0 or selected>100:
+                      emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','FAIL:selected_count_out_of_range')
+                  elif count>=1:
+                      emit('NATIVE_LOGIN_RETAINED_SESSION','PROVEN_AVAILABLE')
+                      emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','PASS:CURRENT_NATIVE_CHARACTER_MODEL_AVAILABLE')
+                  else:
+                      emit('NATIVE_LOGIN_RETAINED_SESSION','NOT_PROVEN_AVAILABLE')
+                      emit('NATIVE_LOGIN_RETAINED_DISCRIMINATOR','PASS:CURRENT_NATIVE_CHARACTER_MODEL_EMPTY')
+          gdb.execute('detach', to_string=True)
+          end
+          quit
+          GDB
+          chmod 600 "$gcmd"
+          : >"$gout"; chmod 600 "$gout"
+
+          gdb -q -nx -batch -p "$pid" -x "$gcmd" >"$gout" 2>&1 || gdb_rc=$?
+          gdb_rc="${gdb_rc:-0}"
+          grep -E '^NATIVE_LOGIN_RETAINED_(LOAD_BIAS_PROVEN|CHARSEL_INSTANCE_COUNT|CHARSEL_VPTR_PROVEN|NATIVE_CHARACTER_LIST_COUNT|NATIVE_SELECTED_LOGIN_DATA_COUNT|SESSION|DISCRIMINATOR)=' "$gout" || true
+          if [[ "$gdb_rc" != 0 ]]; then
+            echo "NATIVE_LOGIN_RETAINED_GDB_RC=$gdb_rc" >&2
+            exit "$gdb_rc"
+          fi
+          grep -Eq '^NATIVE_LOGIN_RETAINED_DISCRIMINATOR=PASS:' "$gout" || {
+            echo 'NATIVE_LOGIN_RETAINED_REFUSED=NO_PASS_DISCRIMINATOR' >&2
+            exit 82
+          }
+          grep -Eq '^NATIVE_LOGIN_RETAINED_SESSION=(PROVEN_AVAILABLE|NOT_PROVEN_AVAILABLE)$' "$gout" || {
+            echo 'NATIVE_LOGIN_RETAINED_REFUSED=NO_SESSION_CLASSIFICATION' >&2
+            exit 83
+          }
+
+          bash "$lease" validate \
+            --task-id "$task" \
+            --session-id "$session" \
+            --token-file "$token"
+          echo 'NATIVE_LOGIN_RETAINED_METHOD_INVOCATION=false'
+          echo 'NATIVE_LOGIN_RETAINED_MEMORY_WRITE=false'
+          echo 'NATIVE_LOGIN_RETAINED_SECRET_VALUE_READ=false'
+          echo 'NATIVE_LOGIN_RETAINED_GUI_INTERACTION=false'
+          echo 'NATIVE_LOGIN_RETAINED_LOGIN_PERFORMED=false'
+          echo 'NATIVE_LOGIN_RETAINED_GAMEPLAY_PERFORMED=false'

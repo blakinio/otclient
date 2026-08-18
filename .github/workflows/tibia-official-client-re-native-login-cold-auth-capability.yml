@@ -1,0 +1,106 @@
+name: Track A native-login cold-auth capability
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-cold-auth-capability.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-native-login-cold-auth-capability
+  cancel-in-progress: false
+
+jobs:
+  protected-ingress-capability:
+    name: Non-secret protected cold-auth capability probe
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v2' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Renew authority and test only non-secret cold-auth prerequisites
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_BASE_SHA" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EVENT_BASE_SHA" --expected-branch "$HEAD_BRANCH"
+
+          task='OTC-20260818-native-login-to-ingame-e2e'
+          session='chatgpt-native-login-e2e-20260818'
+          state='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+          token="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime/canonical-lease-token"
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          transition='.github/scripts/tibia-official-client-re-canonical-live-transition.py'
+          worker_source='.github/scripts/tibia-official-client-re-canonical-live-session.sh'
+          adapter='.github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py'
+          owner_helper='.github/scripts/tibia-official-client-re-xres-window-owner.py'
+          wire_helper='.github/scripts/tibia-official-client-re-xres-wire.py'
+          worker="${RUNNER_TEMP}/native-login-cold-auth-worker-${GITHUB_RUN_ID}.sh"
+          trap 'rm -f "$worker"' EXIT
+
+          [[ -f "$token" && "$(stat -c '%a' "$token")" == 600 ]]
+          bash "$lease" renew --task-id "$task" --session-id "$session" --token-file "$token" --ttl-seconds 2700
+          python3 "$adapter" "$worker_source" "$worker" --owner-helper "$owner_helper" --wire-helper "$wire_helper"
+          python3 "$transition" gate-b --task-id "$task" --session-id "$session" --token-file "$token" --probe "$worker"
+
+          pid="$(python3 - "$state/runtime-registration.json" <<'PY'
+          import json,pathlib,sys
+          print(json.loads(pathlib.Path(sys.argv[1]).read_text())['pid'])
+          PY
+          )"
+          [[ "$pid" == 2658 ]]
+
+          python3 - "$pid" <<'PY'
+          import errno, os, pathlib, sys
+          pid=int(sys.argv[1])
+          try:
+              fd=os.open('/dev/tty', os.O_RDWR | getattr(os,'O_CLOEXEC',0))
+          except OSError as exc:
+              print('NATIVE_LOGIN_COLD_AUTH_CONTROLLING_TTY=false')
+              print(f'NATIVE_LOGIN_COLD_AUTH_TTY_ERRNO={exc.errno}')
+          else:
+              os.close(fd)
+              print('NATIVE_LOGIN_COLD_AUTH_CONTROLLING_TTY=true')
+              print('NATIVE_LOGIN_COLD_AUTH_TTY_ERRNO=0')
+
+          maps=pathlib.Path(f'/proc/{pid}/maps').read_text(encoding='utf-8',errors='replace')
+          helper='otclient-tibia-native-auth-experimental.so'
+          loaded=helper in maps
+          print(f'NATIVE_LOGIN_COLD_AUTH_HELPER_LOADED={str(loaded).lower()}')
+
+          session_root=pathlib.Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime/session')
+          sockets=[]
+          if session_root.is_dir():
+              for p in session_root.iterdir():
+                  if p.name.endswith('.sock') or 'auth' in p.name.lower():
+                      sockets.append(p.name)
+          print(f'NATIVE_LOGIN_COLD_AUTH_SESSION_AUTH_SOCKET_PRESENT={str(bool(sockets)).lower()}')
+          print('NATIVE_LOGIN_COLD_AUTH_SESSION_AUTH_SOCKET_COUNT=' + str(len(sockets)))
+          PY
+
+          python3 -m tools.tibia_runtime_bridge.protected_auth_tty --help >/dev/null
+          echo 'NATIVE_LOGIN_COLD_AUTH_PROTECTED_PRODUCER_IMPORT=PASS'
+          bash "$lease" validate --task-id "$task" --session-id "$session" --token-file "$token"
+          echo 'NATIVE_LOGIN_COLD_AUTH_SECRET_REQUESTED=false'
+          echo 'NATIVE_LOGIN_COLD_AUTH_SECRET_READ=false'
+          echo 'NATIVE_LOGIN_COLD_AUTH_METHOD_INVOKED=false'
+          echo 'NATIVE_LOGIN_COLD_AUTH_LOGIN_PERFORMED=false'

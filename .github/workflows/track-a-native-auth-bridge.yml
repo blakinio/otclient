@@ -1,0 +1,84 @@
+name: Track A native auth bridge validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-native-auth-bridge.yml
+      - tools/tibia_runtime_bridge/**
+      - tests/tools/tibia_runtime_bridge/test_bridge.py
+      - docs/agents/evidence/OTC-20260818-native-auth-with-credentials-bridge/**
+      - docs/agents/tasks/active/OTC-20260818-native-auth-with-credentials-bridge.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate form-less experimental auth bridge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Install deterministic build dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends cmake ninja-build qt6-base-dev binutils
+
+      - name: Run no-secret bridge unit tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            tools/tibia_runtime_bridge/ipc_client.py \
+            tools/tibia_runtime_bridge/experimental_auth_launcher.py \
+            tests/tools/tibia_runtime_bridge/test_bridge.py
+          PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_bridge.py
+          echo 'NATIVE_AUTH_TEST_CREDENTIALS=synthetic_only'
+          echo 'NATIVE_AUTH_OFFICIAL_CLIENT_EXECUTED=false'
+          echo 'NATIVE_AUTH_RUNTIME_ACCESS=none'
+
+      - name: Prove default build remains read-only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git hash-object tools/tibia_runtime_bridge/bridge.cpp)" = c47dc3e81162867692e7608f14a9f53dea52bf3b
+          build="$RUNNER_TEMP/bridge-default"
+          cmake -S tools/tibia_runtime_bridge -B "$build" -G Ninja
+          cmake --build "$build" --parallel 2
+          test -f "$build/otclient-tibia-runtime-bridge.so"
+          test ! -e "$build/otclient-tibia-native-auth-experimental.so"
+          if strings "$build/otclient-tibia-runtime-bridge.so" | grep -Fq 'AUTH_WITH_CREDENTIALS'; then
+            echo 'stable bridge unexpectedly exposes auth command' >&2
+            exit 1
+          fi
+          echo 'NATIVE_AUTH_DEFAULT_BUILD_MUTATION_SURFACE=ABSENT'
+          echo 'NATIVE_AUTH_STABLE_BRIDGE_BLOB=UNCHANGED'
+
+      - name: Build explicit experimental helper
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          build="$RUNNER_TEMP/bridge-experimental"
+          cmake -S tools/tibia_runtime_bridge -B "$build" -G Ninja \
+            -DOTCLIENT_TIBIA_RE_BUILD_EXPERIMENTAL_AUTH=ON
+          cmake --build "$build" --parallel 2
+          test -f "$build/otclient-tibia-runtime-bridge.so"
+          test -f "$build/otclient-tibia-native-auth-experimental.so"
+          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -Fq 'AUTH_WITH_CREDENTIALS'
+          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -Fq 'onRequestLoginWithCredentials'
+          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -Fq 'COLD_AUTH_INSTRUCTION_FENCE_MISMATCH'
+          if strings "$build/otclient-tibia-native-auth-experimental.so" | grep -Eq 'TIBIA_TEST_(EMAIL|PASSWORD)'; then
+            echo 'legacy credential environment names found in experimental helper' >&2
+            exit 1
+          fi
+          echo 'NATIVE_AUTH_EXPERIMENTAL_BUILD=PASS'
+          echo 'NATIVE_AUTH_FORM_UI_USED=false'
+          echo 'NATIVE_AUTH_SECRET_ENVIRONMENT_USED=false'
+          echo 'NATIVE_AUTH_CLIENT_EXECUTED=false'

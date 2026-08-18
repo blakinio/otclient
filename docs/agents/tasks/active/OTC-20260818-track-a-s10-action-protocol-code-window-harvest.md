@@ -12,9 +12,10 @@ execution_mode: github_only
 branch: docs/OTC-20260818-track-a-s10-action-protocol-code-window-harvest
 base_branch: main
 base_main: ebbb36f50076ff4072c7218e302614c1dfea00b1
+live_main_observed: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
 related_pr: 539
 created: 2026-08-18
-updated: 2026-08-18
+updated: 2026-08-19
 risk: low
 implementation_authorized: false
 credentials_allowed: false
@@ -61,7 +62,7 @@ policy_version: 2
 context_pressure: medium
 context_growth: stable
 context_score: 6
-estimate_confidence: medium
+estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one bounded retained-evidence harvest for the first causal action-to-protocol edge
 validation_level: focused
@@ -73,21 +74,22 @@ feature_scope:
   integration_required: false
   e2e_required: false
 invocation_started_at: 2026-08-18
-last_progress_at: 2026-08-18
+last_progress_at: 2026-08-19
 ci_checks_for_current_head: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 0
 context_reconstruction_attempts: 0
 stall_warnings: 0
-last_completed_step: S10 scope, non-overlap, retained historical branch set, report and fail-closed proof contract persisted in Draft PR #539
-current_result: IN_PROGRESS
-next_action: inspect the retained exact-SHA single-item-drag workflow/evidence chain for a direct sendMoveObject GameActionHandler -> protocol owner -> message producer code window
+last_completed_step: all four bounded retained historical branches inspected for the sendMoveObject action-to-protocol discriminator
+terminal_classification: PARTIAL_ACTION_TO_PROTOCOL_EDGE
+current_result: BLOCKED_MISSING_RETAINED_CODE_WINDOW
+next_action: run proportionate independent documentation audit and exact-head repository checks; if accepted, promote/archive this bounded result without weakening the missing-edge boundary
 ---
 
 # Objective
 
-Continue Track A after the promoted S1-S9 static wave by harvesting already-retained exact-SHA code/disassembly/connect evidence for the **first causal action-layer to protocol-layer edge**, without repeating exhausted QMeta/name scans and without touching the current physical/runtime package lane owned by PR #528.
+Continue Track A after the promoted S1-S9 static wave by harvesting already-retained exact-SHA code/disassembly/connect evidence for the first causal action-layer to protocol-layer edge, without repeating exhausted QMeta/name scans and without touching the current physical/runtime package lane owned by PR #528.
 
 Primary discriminator:
 
@@ -100,41 +102,23 @@ TContainerGameActionHandler / TGenericGameActionHandler
 
 A matching method name, adjacent type name, QMeta presence, or protocol-surface proximity is insufficient. Promotion requires direct retained disassembly, dataflow, or connection evidence that causally links the action sender to the protocol owner/producer.
 
-# Current trusted boundary
-
-Current trusted base is:
-
-```text
-main@ebbb36f50076ff4072c7218e302614c1dfea00b1
-```
-
-That base promoted S9 and formally closed the independent repo-only S1-S9 QMeta/static catalogue wave. The retained S9 boundary is:
+# Terminal S10 result
 
 ```yaml
-ACTION_LAYER_TO_PROTOCOL_CONNECTION: UNKNOWN
-PER_ACTION_PROTOCOL_TO_SERIALIZED_MESSAGE: UNKNOWN
-PER_ACTION_RUNTIME_EFFECT: NOT_OBSERVED
-STATIC_ACTION_CONTROL_CATALOGUE: EXHAUSTED_FOR_RETAINED_QMETA
+terminal_classification: PARTIAL_ACTION_TO_PROTOCOL_EDGE
+current_result: BLOCKED_MISSING_RETAINED_CODE_WINDOW
+ACTION_LAYER_TO_PROTOCOL_CONNECTION: UNKNOWN_FOR_THE_SPECIFIC_SENDMOVEOBJECT_EDGE
+EXACT_PROTOCOL_OWNER: PROVEN_HISTORICAL_EXACT_BUILD
+EXACT_MOVEOBJECT_MESSAGE_PRODUCER: PROVEN_HISTORICAL_EXACT_BUILD
+PER_ACTION_RUNTIME_EFFECT: NOT_OBSERVED_BY_S10
+CURRENT_BUILD_OFFSETS: UNKNOWN
 ```
 
-S10 therefore does **not** run another broad QMeta/name census.
+This blocker is terminal for the retained-evidence discriminator. It is not evidence that the action/protocol connection does not exist.
 
-# Historical retained-evidence sources
+# Historical exact-build fence
 
-Read-only historical branch sources verified to exist in `blakinio/otclient`:
-
-```text
-ci/OTC-20260814-track-a-single-item-drag
-ci/OTC-20260814-track-a-final-write-continuation
-ci/OTC-20260814-official-client-re-receiver-recovery
-ci/OTC-20260814-track-a-verified-merge-slice
-```
-
-Start with `single-item-drag`, because its retained workflow set includes move-object/game-action/protocol-queue investigations and is the most direct candidate for a `sendMoveObject` causal edge. The other branches are fallback retained-evidence sources, not authority to reuse stale runtime addresses on a current client.
-
-# Exact-build safety boundary
-
-Historical retained evidence may remain fenced to the previously researched official native Linux client:
+All executable addresses below are historical evidence for exactly:
 
 ```text
 version: 15.32.df7b29
@@ -142,74 +126,169 @@ size: 51965216
 sha256: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 ```
 
-PR #528 has separately produced runtime evidence that this old build is now refused as too old. Therefore historical exact-SHA code windows can prove historical client semantics only; they do not prove current-build offsets, helper compatibility, or runtime identity.
+They must not be reused as current-client offsets. PR #528 owns the current official-client package/runtime lane.
 
-This task does not independently acquire the current official client because PR #528 is the active owner of current package/runtime/login continuation.
+# H1 — historical move-object sender: PROVEN
 
-# Evidence standard
+Retained evidence:
 
-Accept only a directly evidenced causal chain such as:
+`docs/agents/evidence/OTC-20260813-official-client-re/20260814-high-value-outbound-signal-disassembly.md`
+from `ci/OTC-20260814-track-a-single-item-drag`.
 
-```text
-GameActionHandler sender/callsite
- -> concrete receiver/connect/direct-call edge
- -> protocol owner/handler
- -> concrete message producer/builder
-```
-
-Required classification:
+Direct exact-build facts:
 
 ```text
-PROVEN     direct retained code/disassembly/dataflow/connect evidence closes the claimed edge
-DERIVED    inference from PROVEN facts, explicitly weaker than direct proof
-UNKNOWN    retained evidence does not close the edge
-DISPROVEN  bounded candidate is directly falsified
+TContainerGameActionHandler static metaobject 0x30850a0
+qt_static_metacall 0xd1dac0
+sendMoveObject QMeta case 0xd1df30
+QMeta signal index 1
+wrapper -> QMetaObject::activate
 ```
 
-Never promote name similarity or QMeta adjacency to `PROVEN`.
+The wrapper loads the QMeta argument pointer and emits a Qt signal. It is not a serializer or protocol builder.
 
-# Planned harvest order
+Historical successful workflow provenance recorded by the retained evidence:
 
-1. Inspect retained `single-item-drag` workflow definitions and any referenced artifact/evidence indexes for `sendMoveObject`, `GameActionHandler`, protocol queue/handler and high-value send disassembly.
-2. Reconstruct only the smallest bounded code windows needed to connect sender -> receiver/owner -> producer.
-3. If that branch is insufficient, repeat the same bounded search over `final-write-continuation`, `receiver-recovery`, then `verified-merge-slice`.
-4. If `sendMoveObject` cannot be closed, do not widen into another general census; record the exact missing retained code window before considering another principal action family.
+```text
+run 31793188185
+job 94744455372
+head 1c4ef6b612220e24cb312dfa6fce032b5c13d484
+```
 
-# Stop / blocker contract
+# H2 — sender-to-receiver binding: PARTIAL, insufficient for the target edge
 
-If the retained historical exact-SHA evidence does not contain a direct causal code/dataflow/connect window sufficient to close the edge, persist exactly:
+Retained evidence:
+
+- `20260814-gameaction-connectimpl-arguments.md`
+- `20260814-gameaction-slot-provenance.md`
+- `experiments/EXP-20260814-gameaction-connectimpl-correlation.yaml`
+
+Direct exact-build facts:
+
+```text
+Container connect candidate 0x7ffb24:
+  sender static metaobject = 0x30850a0 (TContainerGameActionHandler)
+  recovered slot payload target = 0x8332d0
+  adjustment = 0
+
+0x8332d0:
+  class = tibia::game::TInternalGameActionRouter
+  behavior = Qt re-emitter / internal action router
+  serializer = false
+```
+
+The retained connect reconstruction explicitly does not establish the pointer-to-member signal index for the proven sender-metaobject sites. Therefore `0x7ffb24` cannot be causally identified as the connection for `TContainerGameActionHandler::sendMoveObject` signal index `1` from the retained window alone.
+
+The second nearby Container site, `0x7d7307`, also does not close the gap: within the bounded window the Container metaobject is loaded into the receiver-side register while the pushed sender metaobject remains unresolved.
+
+Classification:
+
+```yaml
+TContainerGameActionHandler_some_signal_to_TInternalGameActionRouter: PROVEN_HISTORICAL_EXACT_BUILD
+TContainerGameActionHandler_sendMoveObject_signal_1_to_that_connect_site: UNKNOWN
+```
+
+# H3 — exact protocol owner and MoveObject producer: PROVEN independently
+
+Retained evidence:
+
+`docs/agents/evidence/OTC-20260813-official-client-re/20260814-protocol-queue-action-builders.md`
+from `ci/OTC-20260814-track-a-single-item-drag`.
+
+Direct exact-build facts:
+
+```text
+static metaobject 0x3085b60 = tibia::protocol::TProtocolMessageQueue
+QMeta index 218 = sendMoveObject
+case entry 0xdf6d58
+concrete builder body 0xbd3be0
+internal GameclientMessage discriminator 0x78
+```
+
+The builder allocates/initialises the message object, prepares typed payload storage, copies action parameters and submits the owning message. The `0x78` value is only an internal message discriminator; it is not promoted to a final wire opcode/byte.
+
+Historical successful workflow provenance:
+
+```text
+QMeta decode run 31802808290 / job 94774542787
+dispatch run 31802935253 / job 94774953120
+builder disassembly run 31803012968 / job 94775199763
+convergence run 31803088165 / job 94775445667
+```
+
+# Fallback retained branches
+
+The bounded fallback pool was also inspected:
+
+```text
+ci/OTC-20260814-track-a-final-write-continuation
+ci/OTC-20260814-official-client-re-receiver-recovery
+ci/OTC-20260814-track-a-verified-merge-slice
+```
+
+Later retained continuation state promotes the general historical model:
+
+```text
+semantic action
+ -> TInternalGameActionRouter
+ -> TProtocolMessageQueue builder
+ -> clientMessageReadyToProcess
+ -> transport processing
+```
+
+It also corrects older transport hypotheses and identifies the queue consumer QSlotObject at `0x7dd630` plus downstream transport classes. None of these retained additions supplies the missing action-specific pointer-to-member/connect proof binding `TContainerGameActionHandler::sendMoveObject` signal index `1` to the concrete router/queue path.
+
+`ci/OTC-20260814-track-a-verified-merge-slice` adds final-write/TCP provenance but no new action-specific Container connection window.
+
+# Exact missing retained window
+
+To promote the full target to `PROVEN_ACTION_TO_PROTOCOL_EDGE`, one of the following would be required:
+
+```text
+1. exact connect construction proving:
+   TContainerGameActionHandler::sendMoveObject signal index 1
+   -> concrete receiver/member
+   -> TInternalGameActionRouter / TProtocolMessageQueue action path
+
+or
+
+2. direct disassembly/dataflow proving that the sendMoveObject payload from the action handler
+   reaches TProtocolMessageQueue::sendMoveObject / body 0xbd3be0 while preserving action identity.
+```
+
+The four bounded retained branches do not contain that proof window in the evidence inspected by S10.
+
+Therefore the required fail-closed result is:
 
 ```text
 BLOCKED_MISSING_RETAINED_CODE_WINDOW
 ```
 
-That is a terminal result for this retained-evidence discriminator, not negative proof that the action/protocol connection does not exist.
+# Safety / non-overlap
 
-The next meaningful proof would then require one of:
-
-```text
-- an admissible exact code window for the legitimate current official client after current-build provenance is established; or
-- a separately legal non-conflicting runtime evidence path under current Track A admission/ownership.
-```
-
-Do not guess or reuse stale offsets to avoid this blocker.
-
-# Validation / E2E
-
-This is documentation plus read-only retained-repository evidence analysis.
+S10 performed repository-only retained-evidence analysis.
 
 ```yaml
+runtime_access: none
+client_executed: false
+new_client_bytes_obtained: false
+credentials_accessed: false
+login_performed: false
+gameplay_performed: false
+pr528_runtime_touched: false
+pr475_runtime_touched: false
+pr302_runtime_touched: false
 E2E: NOT_APPLICABLE
-reason: no client execution, login, gameplay, runtime observation or mutation occurs in S10 retained-evidence harvest
 ```
 
-Final documentation changes require Markdown/path/full-diff review and repository fast/docs or equivalent exact-head checks. Completion still requires the repository's proportionate fresh independent documentation audit and normal closeout gates.
+The Remote Desktop/Synology connector became unavailable during this invocation; no runtime claim depends on it and no runtime operation was attempted after the disconnect.
 
-# Current checkpoint
+# Closeout gate
 
-```yaml
-status: ready
-last_completed_step: S10 scope, ownership, retained historical branch set, report and fail-closed evidence standard persisted in Draft PR #539
-current_result: IN_PROGRESS
-next_action: inspect the retained exact-SHA single-item-drag workflow/evidence chain for a direct sendMoveObject GameActionHandler -> protocol owner -> message producer code window
-```
+The research discriminator itself is exhausted. Remaining work on PR #539 is governance/validation only:
+
+1. independent documentation audit;
+2. exact-head path/Markdown/full-diff repository checks;
+3. if accepted, promotion/archive of this bounded partial result without converting the missing edge to `PROVEN`.
+
+Any future causal proof requires an admissible exact code window for the legitimate current official client or a separately legal non-conflicting Track A runtime path. It must not reuse the historical addresses above as current-build facts.

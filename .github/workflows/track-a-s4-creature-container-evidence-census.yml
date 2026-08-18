@@ -1,0 +1,155 @@
+name: Track A S4 creature container evidence census
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-s4-creature-container-evidence-census.yml
+      - docs/agents/tasks/active/OTC-20260818-track-a-s4-creature-container-evidence-census.md
+      - docs/agents/evidence/OTC-20260818-track-a-s4-creature-container-evidence-census/**
+      - docs/agents/reports/OTCLIENT-20260818-track-a-s4-creature-container-evidence-census.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  census:
+    name: Census committed creature/container exact evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build deterministic evidence inventory
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/track-a-s4"
+          mkdir -p "$out"
+          python3 - "$out" <<'PY'
+          from __future__ import annotations
+          import json, pathlib, re, subprocess, sys
+
+          out = pathlib.Path(sys.argv[1])
+          families = {
+              'creature': {
+                  'tokens': [
+                      'TCreatureProtocolMessageHandler','TCreatureStorage','0x308d078',
+                      'receivedCreatureDataMessage','receivedCreatureHealthMessage',
+                      'receivedCreatureUpdateMessage','receivedMoveCreatureMessage',
+                      'GameserverMessageCreatureData','GameserverMessageCreatureHealth',
+                      'GameserverMessageCreatureUpdate','GameserverMessageMoveCreature',
+                  ]
+              },
+              'container': {
+                  'tokens': [
+                      'TContainerProtocolMessageHandler','TContainerStorage','0x308a1a0',
+                      'receivedContainerMessage','receivedCreateInContainerMessage',
+                      'receivedChangeInContainerMessage','receivedDeleteInContainerMessage',
+                      'GameserverMessageContainer','GameserverMessageCreateInContainer',
+                      'GameserverMessageChangeInContainer','GameserverMessageDeleteInContainer',
+                  ]
+              },
+          }
+
+          def run(*args):
+              return subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False).stdout
+
+          tracked = [p for p in run('git','ls-files').splitlines()
+                     if p.startswith(('docs/','.github/','tools/','tests/'))]
+          current_rows = []
+          for path in tracked:
+              try:
+                  text = pathlib.Path(path).read_text(encoding='utf-8', errors='replace')
+              except Exception:
+                  continue
+              for fam, spec in families.items():
+                  for token in spec['tokens']:
+                      if token not in text:
+                          continue
+                      for i, line in enumerate(text.splitlines(),1):
+                          if token in line:
+                              current_rows.append({'family':fam,'token':token,'path':path,'line':i,'text':line.strip()[:500]})
+
+          history = []
+          for fam, spec in families.items():
+              for token in spec['tokens']:
+                  log = run('git','log','--all','--date=iso-strict','--format=%H%x09%ad%x09%s','-S'+token,'--','docs','.github','tools','tests')
+                  for line in log.splitlines()[:100]:
+                      parts=line.split('\t',2)
+                      if len(parts)==3:
+                          history.append({'family':fam,'token':token,'commit':parts[0],'date':parts[1],'subject':parts[2]})
+
+          strength_patterns = [
+              ('runtime_proven', re.compile(r'\b(runtime|live|causal|observed|process memory|PID)\b',re.I)),
+              ('bounded_disassembly', re.compile(r'\b(disassembly|objdump|instruction|asm|call\s+0x|lea\s+|mov\s+)\b',re.I)),
+              ('qmeta', re.compile(r'\b(QMeta|staticMetaObject|qt_static_metacall|signal|slot|method_count|signal_count)\b',re.I)),
+              ('exact_address', re.compile(r'0x[0-9a-fA-F]{6,}|\bvptr\b|sha256|exact[-_ ]build|exact[-_ ]client',re.I)),
+          ]
+
+          by_path={}
+          for row in current_rows:
+              key=(row['family'],row['path'])
+              rec=by_path.setdefault(key, {'family':row['family'],'path':row['path'],'hits':0,'tokens':set(),'strengths':set(),'sample_lines':[]})
+              rec['hits']+=1; rec['tokens'].add(row['token'])
+              for name, pat in strength_patterns:
+                  if pat.search(row['text']): rec['strengths'].add(name)
+              if len(rec['sample_lines'])<12: rec['sample_lines'].append({'line':row['line'],'text':row['text'],'token':row['token']})
+          records=[]
+          for rec in by_path.values():
+              rec['tokens']=sorted(rec['tokens']); rec['strengths']=sorted(rec['strengths'])
+              if not rec['strengths']: rec['strengths']=['name_only']
+              records.append(rec)
+          records.sort(key=lambda r:(r['family'],-len(r['strengths']),-r['hits'],r['path']))
+
+          summary={}
+          for fam in families:
+              famrecs=[r for r in records if r['family']==fam]
+              summary[fam]={
+                  'paths_with_hits':len(famrecs),
+                  'total_line_hits':sum(r['hits'] for r in famrecs),
+                  'qmeta_paths':sum('qmeta' in r['strengths'] for r in famrecs),
+                  'bounded_disassembly_paths':sum('bounded_disassembly' in r['strengths'] for r in famrecs),
+                  'runtime_proven_paths':sum('runtime_proven' in r['strengths'] for r in famrecs),
+                  'exact_address_paths':sum('exact_address' in r['strengths'] for r in famrecs),
+                  'history_commit_token_hits':sum(1 for h in history if h['family']==fam),
+              }
+
+          # Candidate rank: prefer exact-address + qmeta/disassembly, penalize pure name-only evidence.
+          def score(rec):
+              weights={'runtime_proven':8,'bounded_disassembly':6,'qmeta':5,'exact_address':3,'name_only':0}
+              return sum(weights.get(x,0) for x in rec['strengths']) + min(rec['hits'],10)/10
+          ranked={fam:sorted([r for r in records if r['family']==fam], key=score, reverse=True)[:20] for fam in families}
+          top_score={fam:(score(ranked[fam][0]) if ranked[fam] else 0) for fam in families}
+          if top_score['creature']>top_score['container']:
+              recommendation='creature'
+          elif top_score['container']>top_score['creature']:
+              recommendation='container'
+          else:
+              recommendation='tie_or_insufficient'
+
+          payload={
+              'schema':'track-a-s4-creature-container-evidence-census-v1',
+              'runtime_access':'none','client_downloaded':False,'client_executed':False,
+              'pr475_runtime_touched':False,'summary':summary,'top_score':top_score,
+              'recommended_next_frontier':recommendation,'ranked_paths':ranked,'history':history,
+          }
+          (out/'census.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          (out/'current-hits.json').write_text(json.dumps(current_rows,indent=2,sort_keys=True)+'\n')
+          print('TRACK_A_S4_CENSUS=PASS')
+          print('TRACK_A_S4_SUMMARY='+json.dumps(summary,sort_keys=True))
+          print('TRACK_A_S4_RECOMMENDED_NEXT='+recommendation)
+          print('TRACK_A_S4_PR475_RUNTIME_TOUCHED=false')
+          PY
+
+      - name: Upload sanitized repository census
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-s4-creature-container-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-s4
+          if-no-files-found: error
+          retention-days: 7

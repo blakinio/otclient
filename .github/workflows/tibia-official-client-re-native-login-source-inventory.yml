@@ -1,4 +1,4 @@
-name: Track A native-login VNC prerequisite inventory
+name: Track A native-login surviving display inventory
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   inventory:
-    name: Inventory updater VNC prerequisites read-only
+    name: Classify surviving display 98 read-only
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
     timeout-minutes: 5
@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Read-only prerequisite inventory
+      - name: Read-only display ownership inventory
         shell: bash
         env:
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -43,67 +43,78 @@ jobs:
           [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
           [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
           [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
-
+          echo DISPLAY98_SECRET_ACCESS=false
+          echo DISPLAY98_MUTATION=false
           state="$BASE/canonical-live-runtime"
-          package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
-          client="$package/bin/client"
-          tool="$BASE/toolroot"
-
-          echo VNC_PREREQ_SECRET_ACCESS=false
-          echo VNC_PREREQ_MUTATION=false
-          [[ -e "$state/runtime-registration.json" ]] && echo VNC_PREREQ_REGISTRATION_PRESENT=true || echo VNC_PREREQ_REGISTRATION_PRESENT=false
-          [[ -d "$state/session" ]] && echo VNC_PREREQ_SESSION_PRESENT=true || echo VNC_PREREQ_SESSION_PRESENT=false
-          [[ -e "$client" ]] && echo VNC_PREREQ_CLIENT_PRESENT=true || echo VNC_PREREQ_CLIENT_PRESENT=false
-          [[ -d "$package" ]] && echo VNC_PREREQ_PACKAGE_DIR_PRESENT=true || echo VNC_PREREQ_PACKAGE_DIR_PRESENT=false
-
-          [[ -d "$tool" ]] && echo VNC_PREREQ_BASE_TOOLROOT_PRESENT=true || echo VNC_PREREQ_BASE_TOOLROOT_PRESENT=false
-          [[ -x "$tool/usr/bin/Xvfb" ]] && echo VNC_PREREQ_BASE_XVFB_EXECUTABLE=true || echo VNC_PREREQ_BASE_XVFB_EXECUTABLE=false
-          [[ -x "$tool/usr/bin/x11vnc" ]] && echo VNC_PREREQ_BASE_X11VNC_EXECUTABLE=true || echo VNC_PREREQ_BASE_X11VNC_EXECUTABLE=false
-          [[ -d /usr/share/novnc ]] && echo VNC_PREREQ_SYSTEM_NOVNC_PRESENT=true || echo VNC_PREREQ_SYSTEM_NOVNC_PRESENT=false
-          if command -v websockify >/dev/null 2>&1; then echo "VNC_PREREQ_WEBSOCKIFY=$(command -v websockify)"; else echo VNC_PREREQ_WEBSOCKIFY=ABSENT; fi
-          if command -v Xvfb >/dev/null 2>&1; then echo "VNC_PREREQ_SYSTEM_XVFB=$(command -v Xvfb)"; else echo VNC_PREREQ_SYSTEM_XVFB=ABSENT; fi
-          if command -v x11vnc >/dev/null 2>&1; then echo "VNC_PREREQ_SYSTEM_X11VNC=$(command -v x11vnc)"; else echo VNC_PREREQ_SYSTEM_X11VNC=ABSENT; fi
-
-          python3 - "$BASE" <<'PY'
-          import pathlib,sys
-          base=pathlib.Path(sys.argv[1])
-          names={'Xvfb','x11vnc','websockify'}
-          out=[]
-          for p in base.rglob('*'):
-              try:
-                  if p.is_file() and p.name in names:
-                      out.append(str(p))
-              except OSError:
-                  pass
-              if len(out)>=30: break
-          for p in sorted(out): print('VNC_PREREQ_FOUND_BINARY='+p)
-          PY
+          [[ -e "$state/runtime-registration.json" ]] && echo DISPLAY98_REGISTRATION_PRESENT=true || echo DISPLAY98_REGISTRATION_PRESENT=false
+          [[ -d "$state/session" ]] && echo DISPLAY98_CANONICAL_SESSION_PRESENT=true || echo DISPLAY98_CANONICAL_SESSION_PRESENT=false
 
           python3 - <<'PY'
-          import pathlib
-          free=[]; used=[]
-          for n in range(90,141):
-              lock=pathlib.Path(f'/tmp/.X{n}-lock'); sock=pathlib.Path(f'/tmp/.X11-unix/X{n}')
-              (used if lock.exists() or sock.exists() else free).append(n)
-          print('VNC_PREREQ_USED_DISPLAYS='+','.join(map(str,used)))
-          print('VNC_PREREQ_FREE_DISPLAY_FIRST='+str(free[0] if free else 'NONE'))
+          import os,pathlib
+          n=98
+          lock=pathlib.Path(f'/tmp/.X{n}-lock')
+          sock=pathlib.Path(f'/tmp/.X11-unix/X{n}')
+          print('DISPLAY98_LOCK_PRESENT='+str(lock.exists()).lower())
+          print('DISPLAY98_SOCKET_PRESENT='+str(sock.exists()).lower())
+          if sock.exists():
+              st=sock.stat(); print(f'DISPLAY98_SOCKET_UID={st.st_uid}'); print(f'DISPLAY98_SOCKET_GID={st.st_gid}'); print(f'DISPLAY98_SOCKET_MODE={oct(st.st_mode & 0o777)}')
+          pid=None
+          if lock.exists():
+              try: pid=int(lock.read_text().strip())
+              except Exception: pass
+          print('DISPLAY98_LOCK_PID='+str(pid if pid else 'UNKNOWN'))
+          if pid and pathlib.Path(f'/proc/{pid}').exists():
+              try: exe=os.readlink(f'/proc/{pid}/exe')
+              except OSError: exe='UNAVAILABLE'
+              print('DISPLAY98_SERVER_EXE='+exe)
+              try:
+                  first=pathlib.Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0',1)[0].decode(errors='replace')
+              except OSError: first='UNAVAILABLE'
+              print('DISPLAY98_SERVER_ARGV0='+first)
+              try:
+                  lines=pathlib.Path(f'/proc/{pid}/status').read_text().splitlines()
+                  uid=next(x.split(':',1)[1].strip() for x in lines if x.startswith('Uid:'))
+                  gid=next(x.split(':',1)[1].strip() for x in lines if x.startswith('Gid:'))
+                  print('DISPLAY98_SERVER_UIDS='+uid.replace('\t',',')); print('DISPLAY98_SERVER_GIDS='+gid.replace('\t',','))
+              except Exception: pass
+              try:
+                  cg=pathlib.Path(f'/proc/{pid}/cgroup').read_text().splitlines()
+                  for x in cg[:8]: print('DISPLAY98_SERVER_CGROUP='+x)
+              except OSError: pass
           PY
 
-          if command -v docker >/dev/null 2>&1 && [[ -S /var/run/docker.sock ]]; then
-            self="$(hostname)"
-            if docker inspect "$self" >/dev/null 2>&1; then
-              python3 - "$self" <<'PY'
-          import json,subprocess,sys
-          d=json.loads(subprocess.check_output(['docker','inspect',sys.argv[1]]))[0]
-          ports=d.get('NetworkSettings',{}).get('Ports',{}) or {}
-          for cp,b in sorted(ports.items()):
-              if b:
-                  for x in b: print(f"VNC_PREREQ_DOCKER_PORT={cp}->{x.get('HostIp','')}:{x.get('HostPort','')}")
+          for c in xset xdpyinfo xwininfo xprop; do
+            if command -v "$c" >/dev/null 2>&1; then echo "DISPLAY98_TOOL_${c^^}=$(command -v "$c")"; else echo "DISPLAY98_TOOL_${c^^}=ABSENT"; fi
+          done
+          if command -v xdpyinfo >/dev/null 2>&1; then
+            if DISPLAY=:98 xdpyinfo >/tmp/display98-xdpyinfo.$$ 2>/dev/null; then
+              echo DISPLAY98_CONNECT=PASS
+              grep -E '^(name of display:|dimensions:|number of screens:)' /tmp/display98-xdpyinfo.$$ | sed 's/^/DISPLAY98_XDPYINFO=/' || true
+            else
+              echo DISPLAY98_CONNECT=FAIL
+            fi
+            rm -f /tmp/display98-xdpyinfo.$$
+          fi
+          if command -v xwininfo >/dev/null 2>&1; then
+            if DISPLAY=:98 xwininfo -root -tree >/tmp/display98-tree.$$ 2>/dev/null; then
+              echo DISPLAY98_TREE_QUERY=PASS
+              python3 - /tmp/display98-tree.$$ <<'PY'
+          import pathlib,sys,re
+          lines=pathlib.Path(sys.argv[1]).read_text(errors='replace').splitlines()
+          # Only structural window identifiers/titles; bound output and redact suspicious long strings.
+          count=0
+          for line in lines:
+              if '0x' not in line: continue
+              clean=re.sub(r'[^\x20-\x7e]','?',line.strip())
+              if len(clean)>180: clean=clean[:180]+'...'
+              print('DISPLAY98_WINDOW='+clean)
+              count+=1
+              if count>=25: break
+          print('DISPLAY98_WINDOW_COUNT_SHOWN='+str(count))
           PY
             else
-              echo VNC_PREREQ_DOCKER_SELF_INSPECT=false
+              echo DISPLAY98_TREE_QUERY=FAIL
             fi
-          else
-            echo VNC_PREREQ_DOCKER_UNAVAILABLE=true
+            rm -f /tmp/display98-tree.$$
           fi
-          echo VNC_PREREQ_RESULT=PASS_READ_ONLY
+          echo DISPLAY98_RESULT=PASS_READ_ONLY

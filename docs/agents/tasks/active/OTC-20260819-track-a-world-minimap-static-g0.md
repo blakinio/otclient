@@ -1,18 +1,18 @@
 ---
 task_id: OTC-20260819-track-a-world-minimap-static-g0
-status: implementing
-agent: ChatGPT
-session_id: chatgpt-world-minimap-static-g0-20260819
+status: blocked
+agent: null
+session_id: null
 session_role: researcher
 project_lane: otclient
 lane: P0-STATE
 task_kind: discovery
-phase: current-package-static-minimap-census
+phase: independent-audit-gate
 branch: research/OTC-20260819-track-a-world-minimap-static-g0
 base_branch: main
 base_main: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
 created: 2026-08-19T00:33:00+02:00
-updated: 2026-08-19T00:33:00+02:00
+updated: 2026-08-19T00:52:08+02:00
 risk: low
 execution_mode: github_only
 EXECUTION_CLASS: github_hosted
@@ -43,7 +43,6 @@ owned_paths:
   - docs/agents/tasks/active/OTC-20260819-track-a-world-minimap-static-g0.md
   - docs/agents/reports/OTCLIENT-20260819-track-a-world-minimap-static-g0.md
   - docs/agents/evidence/OTC-20260819-track-a-world-minimap-static-g0/**
-  - .github/workflows/track-a-world-minimap-static-g0.yml
 reuses:
   - docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md
   - docs/agents/reports/OTCLIENT-20260816-official-client-map-viewport-feasibility.md
@@ -58,6 +57,7 @@ related_prs:
   - 528
   - 536
   - 543
+  - 545
 ---
 
 # Track A world/minimap static G0
@@ -66,11 +66,9 @@ related_prs:
 
 Execute the owner alias `TIBIA-RE-WORLD-MINIMAP` as a bounded static Track A package, prioritizing the previously uncovered minimap rows while preserving the already-promoted worldmap dependency evidence.
 
-Primary mission coverage is `F01-F15`; this task is the dedicated G0 producer for `F11`/`F12` and may strengthen `F13` only where direct current-package static evidence supports it. It does not claim that blocked physical worldmap rows `F08`/`F10` are solved.
+Primary mission coverage is `F01-F15`; this task is the dedicated G0 producer for `F11`/`F12` and strengthens `F13` only where direct current-package static evidence supports it. It does not claim that blocked physical worldmap rows `F08`/`F10` are solved.
 
 ## Authority and isolation
-
-This task is GitHub-hosted/static only.
 
 ```yaml
 runtime_access: none
@@ -81,42 +79,63 @@ login_allowed: false
 gameplay_allowed: false
 ```
 
-It must not:
+No Synology/KasmVNC runtime was observed or controlled. No credentials were consumed. The official client was never executed, logged into or mutated. PR #475, #528, #536 and #543 branches were not modified.
 
-- observe, bootstrap, log in to, control or mutate the shared Synology/KasmVNC client;
-- consume credential/Secrets state;
-- run the historical `[19,14]` client mutation;
-- modify branches owned by PR #475, #528, #536 or #543;
-- upload or commit the official Tibia executable or proprietary asset payloads;
-- treat historical offsets as current-build facts without a fresh exact package fence.
+## Producer result
 
-PR #475 is read-only dependency evidence for the still-unresolved server-delivery causal rows. PR #528's published current-package hash is only a candidate fence and must fail closed if the public package changed.
+GitHub-hosted producer:
 
-## Verified starting evidence
+```text
+run/job: 32194443653 / 95895463554
+producer_head: 715b4c63271e16ff97ff3bd18498f74a652bae7c
+result: SUCCESS
+artifact: 9345368809
+artifact_digest: sha256:c3c32ad9ce527e5ff7d469ae41914f3802fb55d465a993c8dbb32be2840e9755
+packed_sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+unpacked_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+unpacked_size: 52109920
+current_package_fence: PASS
+raw_client_retained: false
+```
 
-Historical exact build `15.32.df7b29` / SHA-256 `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe` established:
+Current exact-build evidence recovered:
 
-- `TMinimapController` and `TMinimapRenderInfoStorage` static presence;
-- QML world-map camera/viewport coordinate-transform helpers;
-- worldmap Handler -> Storage dependency graph, Storage bounds/eviction, Viewport geometry, RenderProvider clipping/indexing, Picker transforms and bounded Camera ownership through merged #367;
-- server-delivery control/capability remains `UNKNOWN` through merged #473;
-- one `[19,14]` startup canary is safe only for the bounded no-login lifecycle and does not prove semantic propagation through merged #462.
+- `TMinimapController` — 24 QMeta methods including layer, visible-area, position, zoom/scroll/click/marker surfaces;
+- `TMinimapVisibleArea`, tile storage/manager and render-info storage;
+- marker edit dialog, game-action handler, controller/storage/overlay/render-info, protobuf/disk persistence names;
+- current world-map camera/viewport conversion and layer-translation helper surfaces.
 
-A newer read-only package probe in PR #528 reported candidate unpacked SHA-256 `ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8` and size `52109920`. This task must verify that fence before promoting any new current-package fact.
+Coverage delta against PR #536:
+
+```text
+F11 NOT_STARTED -> PARTIAL
+F12 NOT_STARTED -> PARTIAL
+F13 PARTIAL -> PARTIAL (strengthened current exact-build evidence)
+F08 BLOCKED unchanged
+F10 BLOCKED unchanged
+```
+
+Retained report/evidence:
+
+- `docs/agents/reports/OTCLIENT-20260819-track-a-world-minimap-static-g0.md`
+- `docs/agents/evidence/OTC-20260819-track-a-world-minimap-static-g0/20260819-current-package-minimap-qmeta.md`
+
+The temporary producer workflow was removed after the compact text evidence was persisted.
 
 ## Acceptance inventory
 
-- [ ] Fresh current public Linux package is fetched only in a GitHub-hosted ephemeral job through the existing WARP pattern and exact packed/unpacked hashes are recorded.
-- [ ] If the #528 candidate package fence still matches, enumerate all QMeta methods for every minimap-specific controller/storage/render-info metaobject rather than relying on the old capability regex subset.
-- [ ] Enumerate current-package world-map camera/viewport conversion helpers relevant to `F13`.
-- [ ] Recover direct static method targets when the Qt static-metacall jump table is unambiguous; otherwise retain `UNKNOWN`.
-- [ ] Persist only compact text evidence; delete the executable/package before artifact upload and remove the temporary workflow before terminal review.
-- [ ] Classify `F11`, `F12` and any strengthened `F13` row as `DONE|PARTIAL|NOT_STARTED|BLOCKED` with FACT/INFERENCE/UNKNOWN separation.
-- [ ] Preserve `F08`/`F10` as blocked unless independent causal physical evidence exists; do not inherit mutation authority from #475.
-- [ ] Connect minimap semantics to the promoted worldmap/storage/render/picker/camera graph without conflating minimap UI state, live worldmap Storage extent and server-delivered extent.
-- [ ] Record an exact next discriminator for every remaining UNKNOWN.
-- [ ] Run proportional exact-head repository checks.
-- [ ] Obtain a fresh independent documentation/research audit before `completed`; author self-review is not sufficient.
+- [x] Fresh current public Linux package fetched only in a GitHub-hosted ephemeral job through the existing WARP pattern and exact packed/unpacked hashes recorded.
+- [x] #528 candidate package fence revalidated before current-build facts were promoted.
+- [x] All QMeta methods enumerated for discovered minimap-specific controller/storage/render-info metaobjects.
+- [x] Current-package world-map camera/viewport conversion helpers relevant to `F13` enumerated.
+- [x] Direct static method targets retained only where the Qt static-metacall jump table was unambiguous; unresolved targets remain without invented addresses.
+- [x] Only compact text evidence persisted; packed/unpacked client deleted before artifact upload; temporary workflow retired before terminal review.
+- [x] `F11`, `F12`, and strengthened `F13` classified with FACT/INFERENCE/UNKNOWN boundaries.
+- [x] `F08`/`F10` preserved as blocked; no mutation authority inherited from #475.
+- [x] Minimap UI/controller state, worldmap Storage state, render/picker/camera projection state, server-delivered extent and World Observation/OTBM reconstruction kept distinct.
+- [x] Exact next static discriminators recorded for remaining minimap/transform UNKNOWNs.
+- [ ] Proportional exact-head repository checks — execute on the checkpoint commit produced by this task update; record terminal run IDs in PR #545 without further branch mutation.
+- [ ] Fresh independent documentation/research audit — required and unavailable in this session; author self-review does not count.
 
 ## Delivery classification
 
@@ -128,52 +147,53 @@ feature_scope:
   frontend_required: false
   integration_required: false
   e2e_required: false
-implementation_status: research_in_progress
+implementation_status: research_complete_pending_independent_audit
 complete_user_facing_feature: false
 physical_e2e: NOT_APPLICABLE_WITH_REASON
 physical_e2e_reason: static reverse-engineering evidence package with runtime_access none
 ```
-
-## Non-overlap
-
-- #367/#439/#462/#473 are merged evidence inputs only.
-- #475 retains its physical worldmap causal scope and branch.
-- #528 retains current package/native-login runtime scope.
-- #536 owns the broad 169-row coverage matrix; this task will not edit that branch.
-- #543 owns the unmerged alias/prompt package; this task consumes its mission wording as scope data only and does not rely on it to expand authority.
 
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
-  session_id: chatgpt-world-minimap-static-g0-20260819
+  generation: 2
+  session_id: null
   session_started_at: 2026-08-19T00:33:00+02:00
-  checkpointed_at: 2026-08-19T00:33:00+02:00
-  last_progress_at: 2026-08-19T00:33:00+02:00
-  phase: current-package-static-minimap-census
-  exact_head: pending-first-task-commit
-  pull_request: none
-  active_operation: none
-  external_run_ids: []
-  operation_started_at: null
+  checkpointed_at: 2026-08-19T00:52:08+02:00
+  last_progress_at: 2026-08-19T00:52:08+02:00
+  phase: independent-audit-gate
+  exact_head: checkpoint-commit-created-by-this-update
+  pull_request: 545
+  active_operation: exact-head-ci-observation
+  external_run_ids:
+    - 32194443653
+  operation_started_at: 2026-08-19T00:52:08+02:00
   wait_deadline_at: null
-  check_generation: null
+  check_generation: 2
   checks_used: 0
-  status: active
+  status: blocked
   safe_to_resume: true
-  resume_condition: branch and task remain exclusively owned with no overlapping minimap PR
-  next_action: Add the branch-only hosted static minimap census workflow, then verify the candidate current-package fence and collect the minimap/QMeta text evidence.
+  resume_condition: fresh independent documentation/research auditor is available for exact PR #545 head
+  next_action: Verify exact-head governance/CI once, then obtain a fresh independent documentation/research audit. If zero material findings, revalidate main freshness, mark Ready, merge under repository policy, and archive the task.
 ```
+
+## Blocker
+
+```text
+BLOCKER=REQUIRED_FRESH_INDEPENDENT_RESEARCH_DOCUMENTATION_AUDIT_UNAVAILABLE_IN_CURRENT_SESSION
+```
+
+This is the only intended terminal blocker after exact-head repository checks. It is not satisfied by author self-review or by an advisory standing pre-review.
 
 ## Invocation counters
 
 ```yaml
 invocation_started_at: 2026-08-19T00:33:00+02:00
-last_progress_at: 2026-08-19T00:33:00+02:00
+last_progress_at: 2026-08-19T00:52:08+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: 2
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0

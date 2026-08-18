@@ -38,6 +38,6 @@ jobs:
           task='OTC-20260818-native-login-to-ingame-e2e'
           token="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime/canonical-lease-token"
           if [[ -e "$token" ]]; then echo 'NATIVE_LOGIN_LOST_TOKEN_PATH_PRESENT=true'; else echo 'NATIVE_LOGIN_LOST_TOKEN_PATH_PRESENT=false'; fi
-          .github/scripts/tibia-official-client-re-canonical-live-lease status --json
+          bash .github/scripts/tibia-official-client-re-canonical-live-lease status --json
           echo 'NATIVE_LOGIN_LOST_TOKEN_CLIENT_OBSERVATION=false'
           echo 'NATIVE_LOGIN_LOST_TOKEN_SECRET_ACCESS=false'

@@ -1,4 +1,4 @@
-name: Track A native-login package source inventory
+name: Track A native-login official package reinstall with VNC
 
 on:
   pull_request:
@@ -14,18 +14,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  inventory:
-    name: Inventory package source and current official manifest read-only
+  reinstall:
+    name: Reinstall exact current official package with VNC observability
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 12
     env:
       BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
+      TASK: OTC-20260818-native-login-to-ingame-e2e
+      LEASE_SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
       BASE: /home/runner/_work/_otclient_tibia_re_state
-      OLD_SHA: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
-      OLD_SIZE: '51965216'
-      LAST_KNOWN_CURRENT_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
-      LAST_KNOWN_CURRENT_SIZE: '52109920'
+      TOKEN: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
+      CURRENT_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+      CURRENT_SIZE: '52109920'
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -34,7 +35,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Read-only controller, package and manifest inventory
+      - name: Reinstall through official CipSoft launcher under VNC
         shell: bash
         env:
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -43,8 +44,7 @@ jobs:
           set +x
           set -Eeuo pipefail
           umask 077
-          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
-          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
           [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
           [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
@@ -52,162 +52,296 @@ jobs:
           task=docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
           grep -q '^task_id: OTC-20260818-native-login-to-ingame-e2e$' "$task"
           grep -q '^branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3$' "$task"
-          grep -q '^runtime_namespace: native-login-package-source-inventory$' "$task"
-          grep -q '^mutation_authorized: false$' "$task"
+          grep -q '^runtime_access: ephemeral_isolated$' "$task"
           grep -q '^credentials_allowed: false$' "$task"
           grep -q '^login_allowed: false$' "$task"
+
+          echo TRACK_A_ADMISSION_RUNTIME_ACCESS=ephemeral_isolated
+          echo TRACK_A_ADMISSION_NAMESPACE=native-login-official-package-reinstall
+          echo TRACK_A_ADMISSION_TARGET_UNIQUENESS=PROVEN_BY_FIXED_PACKAGE_PATH_AND_SERIALIZED_CONCURRENCY
+          echo TRACK_A_ADMISSION_MUTATION_AUTHORIZED=true
+          echo TRACK_A_ADMISSION_CREDENTIALS_ALLOWED=false
+          echo TRACK_A_ADMISSION_LOGIN_ALLOWED=false
+          echo TRACK_A_ADMISSION_GAMEPLAY_ALLOWED=false
+          echo TRACK_A_ADMISSION_AUTHORITY_SOURCE=CURRENT_OWNER_INVOCATION_RESTART_UPDATE_ONLY
 
           state="$BASE/canonical-live-runtime"
           package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
           client="$package/bin/client"
+          tool="$BASE/toolroot"
           warp="$state/warp"
-          tmp="$RUNNER_TEMP/native-login-source-inventory-$GITHUB_RUN_ID"
-          mkdir -m700 "$tmp"
-          wp_pid=''
+          work="$BASE/native-login-update/run-$GITHUB_RUN_ID"
+          backup="$BASE/native-login-update/backup-$GITHUB_RUN_ID"
+          mkdir -m700 -p "$work" "$(dirname "$backup")"
+
+          wp_pid=''; xvfb_pid=''; launcher_pid=''; vnc_pid=''; ws_pid=''; display=''; update_ok=false; had_package=false
+          stop_pid() {
+            local pid="$1"
+            [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 0
+            kill "$pid" 2>/dev/null || true
+            for _ in $(seq 1 40); do kill -0 "$pid" 2>/dev/null || return 0; sleep .1; done
+            kill -9 "$pid" 2>/dev/null || true
+          }
+          stop_package_clients() {
+            [[ -e "$client" ]] || return 0
+            local target e pid path
+            target="$(readlink -f "$client")"
+            [[ -n "$target" ]] || return 0
+            for e in /proc/[0-9]*/exe; do
+              [[ -e "$e" ]] || continue
+              path="$(readlink -f "$e" 2>/dev/null || true)"
+              [[ "$path" == "$target" ]] || continue
+              pid="${e#/proc/}"; pid="${pid%/exe}"
+              echo "PACKAGE_REINSTALL_STOP_CLIENT_PID=$pid"
+              stop_pid "$pid"
+            done
+          }
           cleanup() {
-            if [[ "$wp_pid" =~ ^[1-9][0-9]*$ ]]; then
-              kill "$wp_pid" 2>/dev/null || true
-              for _ in $(seq 1 20); do kill -0 "$wp_pid" 2>/dev/null || break; sleep .1; done
-              kill -9 "$wp_pid" 2>/dev/null || true
+            stop_package_clients || true
+            stop_pid "$launcher_pid"
+            stop_pid "$ws_pid"
+            stop_pid "$vnc_pid"
+            stop_pid "$xvfb_pid"
+            stop_pid "$wp_pid"
+            if [[ "$update_ok" != true ]]; then
+              if [[ "$had_package" == true && -d "$backup" ]]; then
+                rm -rf "$package"
+                cp -a "$backup" "$package"
+                echo PACKAGE_REINSTALL_ROLLBACK_RESTORED=true
+              elif [[ "$had_package" != true ]]; then
+                rm -rf "$package"
+                echo PACKAGE_REINSTALL_ROLLBACK_REMOVED_NEW_PACKAGE=true
+              fi
             fi
-            rm -rf "$tmp"
           }
           trap cleanup EXIT INT TERM HUP
 
-          [[ -d "$state" ]]
-          if [[ -e "$state/runtime-registration.json" ]]; then
-            echo SOURCE_INVENTORY_REGISTRATION_PRESENT=true
-          else
-            echo SOURCE_INVENTORY_REGISTRATION_PRESENT=false
-          fi
-          if [[ -d "$state/session" ]]; then
-            echo SOURCE_INVENTORY_SESSION_PRESENT=true
-          else
-            echo SOURCE_INVENTORY_SESSION_PRESENT=false
-          fi
-
-          if [[ -f "$state/lease.json" ]]; then
-            python3 - "$state/lease.json" <<'PY'
+          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
+          [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
+          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
+          python3 - "$state/lease.json" <<'PY'
           import json,pathlib,sys
           x=json.loads(pathlib.Path(sys.argv[1]).read_text())
-          for key in ('status','generation','controller_task','controller_session','expires_at_epoch'):
-              value=x.get(key)
-              print(f"SOURCE_INVENTORY_LEASE_{key.upper()}={value if value is not None else 'null'}")
+          assert x.get('status')=='active' and x.get('generation')==16
+          assert x.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert x.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          print('PACKAGE_REINSTALL_LEASE16=PASS')
           PY
-          else
-            echo SOURCE_INVENTORY_LEASE_FILE=ABSENT
-          fi
 
-          if [[ ! -e "$client" ]]; then
-            echo SOURCE_INVENTORY_CLIENT_PRESENT=false
-            echo SOURCE_INVENTORY_CLASS=ABSENT
-          else
-            echo SOURCE_INVENTORY_CLIENT_PRESENT=true
-            [[ -f "$client" ]]
-            [[ ! -L "$client" ]] && echo SOURCE_INVENTORY_CLIENT_SYMLINK=false || echo SOURCE_INVENTORY_CLIENT_SYMLINK=true
-            [[ -x "$client" ]] && echo SOURCE_INVENTORY_CLIENT_EXECUTABLE=true || echo SOURCE_INVENTORY_CLIENT_EXECUTABLE=false
-            size="$(stat -c %s "$client")"
-            sha="$(sha256sum "$client" | awk '{print $1}')"
-            echo "SOURCE_INVENTORY_CLIENT_SIZE=$size"
-            echo "SOURCE_INVENTORY_CLIENT_SHA256=$sha"
-            if [[ "$sha" == "$OLD_SHA" && "$size" == "$OLD_SIZE" ]]; then
-              class=PROVEN_OBSOLETE_OLD_EXACT
-            elif [[ "$sha" == "$LAST_KNOWN_CURRENT_SHA" && "$size" == "$LAST_KNOWN_CURRENT_SIZE" ]]; then
-              class=LAST_KNOWN_CURRENT_EXACT
-            else
-              class=UNEXPECTED_IDENTITY
-            fi
-            echo "SOURCE_INVENTORY_CLASS=$class"
+          [[ ! -e "$client" ]]
+          echo PACKAGE_REINSTALL_SOURCE_CLIENT_ABSENT=PROVEN
+          if [[ -d "$package" ]]; then
+            had_package=true
+            rm -rf "$backup"
+            cp -a --reflink=auto "$package" "$backup"
+            echo PACKAGE_REINSTALL_PARTIAL_BACKUP=PASS
           fi
 
           [[ -x "$warp/bin/wireproxy" && -s "$warp/state/wgcf-profile.conf" ]]
           port="$(python3 - <<'PY'
           import socket
-          for p in range(25421,25481):
+          for p in range(25481,25541):
               s=socket.socket()
-              try: s.bind(('127.0.0.1',p))
-              except OSError: s.close(); continue
-              s.close(); print(p); break
-          else: raise SystemExit('no free source-inventory WARP port')
+              try:s.bind(('127.0.0.1',p))
+              except OSError:s.close();continue
+              s.close();print(p);break
+          else:raise SystemExit('no free WARP port')
           PY
           )"
-          cat >"$tmp/wireproxy.conf" <<EOF
+          cat >"$work/wireproxy.conf" <<EOF
           WGConfig = $warp/state/wgcf-profile.conf
           [Socks5]
           BindAddress = 127.0.0.1:$port
           EOF
-          chmod 600 "$tmp/wireproxy.conf"
-          "$warp/bin/wireproxy" -n -c "$tmp/wireproxy.conf" >/dev/null
+          chmod 600 "$work/wireproxy.conf"
+          "$warp/bin/wireproxy" -n -c "$work/wireproxy.conf" >/dev/null
           env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=source-inventory-wireproxy \
-            nohup "$warp/bin/wireproxy" -c "$tmp/wireproxy.conf" >"$tmp/wireproxy.log" 2>&1 </dev/null &
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=update-wireproxy \
+            nohup "$warp/bin/wireproxy" -c "$work/wireproxy.conf" >"$work/wireproxy.log" 2>&1 </dev/null &
           wp_pid=$!
           for _ in $(seq 1 40); do
-            kill -0 "$wp_pid" 2>/dev/null || { cat "$tmp/wireproxy.log" >&2; exit 1; }
+            kill -0 "$wp_pid" 2>/dev/null || { cat "$work/wireproxy.log" >&2; exit 1; }
             python3 - "$port" <<'PY' && break || true
           import socket,sys
-          s=socket.socket(); s.settimeout(.2)
-          try: s.connect(('127.0.0.1',int(sys.argv[1])))
-          except OSError: raise SystemExit(1)
-          finally: s.close()
+          s=socket.socket();s.settimeout(.2)
+          try:s.connect(('127.0.0.1',int(sys.argv[1])))
+          except OSError:raise SystemExit(1)
+          finally:s.close()
           PY
             sleep .25
           done
+          curl --socks5-hostname "127.0.0.1:$port" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo PACKAGE_REINSTALL_WARP=PASS
 
-          base='https://static.tibia.com/launcher/tibiaclient-linux-current/'
-          manifest="$tmp/package.json"
-          curl --socks5-hostname "127.0.0.1:$port" --compressed -fL --retry 4 --retry-all-errors \
-            --connect-timeout 20 --max-time 120 "${base}package.json" -o "$manifest"
-          readarray -t m < <(python3 - "$manifest" <<'PY'
-          import json,sys
-          doc=json.load(open(sys.argv[1],encoding='utf-8'))
-          rows=[]
-          def walk(v):
-              if isinstance(v,dict):
-                  u=v.get('url'); p=v.get('packedhash'); q=v.get('unpackedhash')
-                  if isinstance(u,str) and isinstance(p,str): rows.append((u,p,q if isinstance(q,str) else ''))
-                  for x in v.values(): walk(x)
-              elif isinstance(v,list):
-                  for x in v: walk(x)
-          walk(doc)
-          matches=[x for x in rows if x[0].endswith('/bin/client.lzma') or x[0]=='bin/client.lzma' or x[0].endswith('client.lzma')]
-          if len(matches)!=1: raise SystemExit(f'expected one client.lzma entry, got {len(matches)}')
-          print(matches[0][0]); print(matches[0][1].lower()); print(matches[0][2].lower())
+          xvfb="$tool/usr/bin/Xvfb"; x11vnc="$tool/usr/bin/x11vnc"
+          [[ -x "$xvfb" && -x "$x11vnc" && -d /usr/share/novnc ]]
+          command -v websockify >/dev/null
+          display_num="$(python3 - <<'PY'
+          import pathlib
+          for n in range(120,141):
+              if not pathlib.Path(f'/tmp/.X{n}-lock').exists() and not pathlib.Path(f'/tmp/.X11-unix/X{n}').exists():
+                  print(n);break
+          else:raise SystemExit('no free display')
           PY
+          )"
+          display=":$display_num"
+          dri="$tool/usr/lib/x86_64-linux-gnu/dri"
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=update-xvfb \
+            HOME="$BASE/home" PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+            LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+            LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \
+            nohup "$xvfb" "$display" -screen 0 1920x1080x24 -xkbdir "$tool/usr/share/X11/xkb" -nolisten tcp -noreset \
+            >"$work/xvfb.log" 2>&1 </dev/null &
+          xvfb_pid=$!
+          for _ in $(seq 1 60); do [[ -S "/tmp/.X11-unix/X$display_num" ]] && break; kill -0 "$xvfb_pid"; sleep .2; done
+          [[ -S "/tmp/.X11-unix/X$display_num" ]]
+          echo "PACKAGE_REINSTALL_DISPLAY=$display"
+
+          python3 - 5901 6081 <<'PY'
+          import os,pathlib,signal,sys,time
+          def ins(port):
+              out=set(); want=f'{port:04X}'
+              for t in ('/proc/net/tcp','/proc/net/tcp6'):
+                  try: rows=pathlib.Path(t).read_text().splitlines()[1:]
+                  except OSError: continue
+                  for row in rows:
+                      f=row.split()
+                      if len(f)>9 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': out.add(f[9])
+              return out
+          def pids(inodes):
+              out=set()
+              for p in pathlib.Path('/proc').iterdir():
+                  if not p.name.isdigit(): continue
+                  try:
+                      for fd in (p/'fd').iterdir():
+                          try: target=os.readlink(fd)
+                          except OSError: continue
+                          if target.startswith('socket:[') and target[8:-1] in inodes: out.add(int(p.name)); break
+                  except OSError: pass
+              return out
+          for port in map(int,sys.argv[1:]):
+              for p in sorted(pids(ins(port))):
+                  try: cmd=pathlib.Path(f'/proc/{p}/cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace')
+                  except OSError: continue
+                  if not (('x11vnc' in cmd) if port==5901 else ('websockify' in cmd)):
+                      raise SystemExit(f'REFUSE_UNKNOWN_LISTENER_{port}_{p}')
+                  os.kill(p,signal.SIGTERM)
+              end=time.monotonic()+3
+              while ins(port) and time.monotonic()<end: time.sleep(.1)
+              for p in pids(ins(port)):
+                  try: os.kill(p,signal.SIGKILL)
+                  except ProcessLookupError: pass
+          PY
+
+          web="$work/novnc-web"; mkdir -p "$web"; cp -a /usr/share/novnc/. "$web/"
+          cat >"$web/index.html" <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>Track A Tibia updater</title><script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=6&compression=3&show_dot=true&path=websockify');</script>
+          HTML
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD DISPLAY="$display" \
+            nohup "$x11vnc" -display "$display" -rfbport 5901 -localhost -forever -shared -nopw \
+            -xkb -repeat -wait 10 -defer 10 -deferupdate 20 -threads -noxrecord -noxfixes \
+            -o "$work/x11vnc.log" >/dev/null 2>&1 </dev/null &
+          vnc_pid=$!
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            nohup websockify --web "$web" 0.0.0.0:6081 127.0.0.1:5901 >"$work/websockify.log" 2>&1 </dev/null &
+          ws_pid=$!
+          for _ in $(seq 1 40); do
+            if kill -0 "$vnc_pid" 2>/dev/null && kill -0 "$ws_pid" 2>/dev/null && curl -fsS --max-time 1 -o /dev/null http://127.0.0.1:6081/ 2>/dev/null; then break; fi
+            sleep .25
+          done
+          kill -0 "$vnc_pid"; kill -0 "$ws_pid"; curl -fsS --max-time 2 -o /dev/null http://127.0.0.1:6081/
+          python3 - <<'PY'
+          import base64,os,socket
+          s=socket.create_connection(('127.0.0.1',5901),3); assert s.recv(12).startswith(b'RFB '); s.close()
+          key=base64.b64encode(os.urandom(16)).decode()
+          q=('GET /websockify HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'+f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
+          s=socket.create_connection(('127.0.0.1',6081),3); s.sendall(q); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
+          print('PACKAGE_REINSTALL_VNC_RFB=PASS'); print('PACKAGE_REINSTALL_VNC_WEBSOCKET=PASS')
+          PY
+          if curl -fsS --max-time 3 -o /dev/null http://synology:6082/ 2>/dev/null; then
+            echo PACKAGE_REINSTALL_VNC_LAN_URL_REACHABLE=true
+          else
+            echo PACKAGE_REINSTALL_VNC_LAN_URL_REACHABLE=false
+          fi
+          echo PACKAGE_REINSTALL_VNC_URL=http://synology:6082/
+
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$port" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          unpack="$work/unpacked"; mkdir -m700 "$unpack"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"; [[ -x "$launcher" ]]
+          echo "PACKAGE_REINSTALL_LAUNCHER_SHA256=$(sha256sum "$launcher" | awk '{print $1}')"
+
+          preload="$(find "$tool" -xdev -type f -name libproxychains.so.4 -print -quit)"; [[ -n "$preload" ]]
+          cat >"$work/proxychains.conf" <<EOF
+          strict_chain
+          proxy_dns
+          remote_dns_subnet 224
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 $port
+          EOF
+          chmod 600 "$work/proxychains.conf"
+          workdir="$(dirname "$launcher")"
+          (
+            cd "$workdir"
+            env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+              OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=official-updater \
+              HOME="$BASE/home" XDG_DATA_HOME="$BASE/home/.local/share" DISPLAY="$display" \
+              PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+              LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+              LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+              LD_PRELOAD="$preload" PROXYCHAINS_CONF_FILE="$work/proxychains.conf" \
+              nohup "$launcher" >"$work/launcher.log" 2>&1 </dev/null &
+            echo $! >"$work/launcher.pid"
           )
-          rel="${m[0]}"; packed_expected="${m[1]}"; unpacked_expected="${m[2]}"
-          case "$rel" in
-            http://*|https://*) url="$rel" ;;
-            /*) url="https://static.tibia.com$rel" ;;
-            *) url="$base$rel" ;;
-          esac
-          packed="$tmp/client.lzma"
-          curl --socks5-hostname "127.0.0.1:$port" --compressed -fL --retry 4 --retry-all-errors \
-            --connect-timeout 20 --max-time 240 "$url" -o "$packed"
-          packed_actual="$(sha256sum "$packed" | awk '{print $1}')"
-          [[ "$packed_actual" == "$packed_expected" ]]
-          python3 - "$packed" "$unpacked_expected" "$LAST_KNOWN_CURRENT_SHA" <<'PY'
-          import hashlib,lzma,pathlib,re,sys
-          p=pathlib.Path(sys.argv[1]); expected=sys.argv[2].lower(); last=sys.argv[3]
-          b=p.read_bytes()
-          if len(b)<46: raise SystemExit('packed client too small')
-          q=b[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
-          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
-          sha=hashlib.sha256(raw).hexdigest()
-          if expected and sha!=expected: raise SystemExit(f'unpacked hash mismatch {sha}!={expected}')
-          print('CURRENT_MANIFEST_PACKED_SHA256='+hashlib.sha256(b).hexdigest())
-          print('CURRENT_MANIFEST_CLIENT_SHA256='+sha)
-          print('CURRENT_MANIFEST_CLIENT_SIZE='+str(len(raw)))
-          print('CURRENT_MANIFEST_CHANGED_SINCE_LAST_PROBE='+str(sha!=last).lower())
-          versions=[]
-          for pat in (rb'\b1[0-9]\.[0-9]{2}(?:\.[A-Za-z0-9]+)?\b', rb'\b[0-9]{1,2}\.[0-9]{2}\.[A-Fa-f0-9]{6,16}\b'):
-              for mm in re.finditer(pat,raw):
-                  s=mm.group().decode('ascii','ignore')
-                  if s not in versions: versions.append(s)
-          print('CURRENT_MANIFEST_VERSION_STRINGS='+','.join(versions[:40]))
-          PY
+          launcher_pid="$(cat "$work/launcher.pid")"; kill -0 "$launcher_pid"
+          echo PACKAGE_REINSTALL_OFFICIAL_LAUNCHER_STARTED=true
 
-          echo SOURCE_INVENTORY_SECRET_ACCESS=false
-          echo SOURCE_INVENTORY_CLIENT_MUTATION=false
-          echo SOURCE_INVENTORY_RUNTIME_RESTART=false
-          echo SOURCE_INVENTORY_RESULT=PASS_READ_ONLY
+          stable=0; last=''; new_sha=''
+          for _ in $(seq 1 180); do
+            if [[ -s "$client" ]]; then
+              new_sha="$(sha256sum "$client" | awk '{print $1}')"
+              if [[ "$new_sha" == "$CURRENT_SHA" && "$(stat -c %s "$client")" == "$CURRENT_SIZE" ]]; then
+                if [[ "$new_sha" == "$last" ]]; then stable=$((stable+1)); else stable=0; last="$new_sha"; fi
+                (( stable >= 3 )) && break
+              else
+                stable=0; last="$new_sha"
+              fi
+            fi
+            sleep 2
+          done
+          if [[ "$new_sha" != "$CURRENT_SHA" || $stable -lt 3 || "$(stat -c %s "$client" 2>/dev/null || true)" != "$CURRENT_SIZE" ]]; then
+            echo "PACKAGE_REINSTALL_OBSERVED_SHA=$new_sha" >&2
+            echo "PACKAGE_REINSTALL_OBSERVED_SIZE=$(stat -c %s "$client" 2>/dev/null || true)" >&2
+            tail -n 80 "$work/launcher.log" | sed 's/^/PACKAGE_REINSTALL_LAUNCHER_LOG=/' >&2 || true
+            exit 1
+          fi
+          echo "PACKAGE_REINSTALL_NEW_CLIENT_SHA256=$new_sha"
+          echo "PACKAGE_REINSTALL_NEW_CLIENT_SIZE=$(stat -c %s "$client")"
+
+          stop_pid "$launcher_pid"; launcher_pid=''
+          stop_package_clients
+          [[ "$(sha256sum "$client" | awk '{print $1}')" == "$CURRENT_SHA" ]]
+          [[ "$(stat -c %s "$client")" == "$CURRENT_SIZE" ]]
+          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
+          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
+          update_ok=true
+          echo PACKAGE_REINSTALL_SECRET_ACCESS=false
+          echo PACKAGE_REINSTALL_LOGIN=false
+          echo PACKAGE_REINSTALL_CANONICAL_RUNTIME_STARTED=false
+          echo PACKAGE_REINSTALL_RESULT=PASS_CURRENT_EXACT

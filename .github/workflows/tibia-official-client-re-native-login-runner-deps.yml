@@ -1,0 +1,63 @@
+name: Track A native-login runner dependencies
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-runner-deps.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-native-login-runner-deps
+  cancel-in-progress: false
+
+jobs:
+  deps:
+    name: Provision bounded native-login build dependencies
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install only missing analysis/build dependencies
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          need_os=false
+          python3 -c 'import elftools' 2>/dev/null || need_os=true
+          command -v cmake >/dev/null || need_os=true
+          command -v ninja >/dev/null || need_os=true
+          command -v pkg-config >/dev/null || need_os=true
+          pkg-config --exists Qt6Core 2>/dev/null || need_os=true
+          if [[ "$need_os" == true ]]; then
+            if [[ "$(id -u)" == 0 ]] && command -v apt-get >/dev/null; then
+              apt-get update -qq
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-pyelftools cmake ninja-build pkg-config qt6-base-dev
+            elif command -v sudo >/dev/null && command -v apt-get >/dev/null; then
+              sudo apt-get update -qq
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-pyelftools cmake ninja-build pkg-config qt6-base-dev
+            elif python3 -m pip --version >/dev/null 2>&1; then
+              python3 -m pip install --user --disable-pip-version-check 'pyelftools==0.32'
+            else
+              echo 'NATIVE_LOGIN_RUNNER_DEPS_ERROR=no_supported_dependency_installer' >&2
+              exit 2
+            fi
+          fi
+          python3 -c 'import elftools; print("PYELFTOOLS=PASS")'
+          cmake --version | head -1
+          ninja --version
+          pkg-config --modversion Qt6Core
+          echo NATIVE_LOGIN_RUNNER_DEPS=PASS
+          echo SECRET_ACCESS=false
+          echo CLIENT_MUTATION=false
+          echo LOGIN=false

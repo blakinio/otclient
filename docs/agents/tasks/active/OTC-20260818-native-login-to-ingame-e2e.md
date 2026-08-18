@@ -2,7 +2,7 @@
 task_id: OTC-20260818-native-login-to-ingame-e2e
 status: validating
 agent: ChatGPT
-session_id: chatgpt-native-login-e2e-20260818-v3
+session_id: chatgpt-native-login-e2e-20260818-v3-gen12
 session_role: canonical_runtime_owner
 project_lane: otclient
 lane: RUNTIME
@@ -13,7 +13,7 @@ branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3
 base_branch: main
 base_main: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
 risk: critical
-updated: 2026-08-18T13:24:00+02:00
+updated: 2026-08-18T13:50:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -43,15 +43,16 @@ runtime_access: canonical_reuse_or_mutation
 runtime_owner_task: OTC-20260818-native-login-to-ingame-e2e
 runtime_namespace: canonical-live-runtime
 canonical_registration: PRESENT
-canonical_lease_generation: 11
-registration_lease_generation: 11
+canonical_lease_generation: 12
+registration_generation: 4
+registration_lease_generation: 12
 gate_a: PASS
 generation_rebind: PASS
 gate_b: PASS
 bootstrap: NOT_APPLICABLE
 target_uniqueness: PROVEN
 mutation_authorized: true
-runtime_mutation_capability: PENDING_EXPIRED_GEN11_STALE_TAKEOVER_TO_GEN12
+runtime_mutation_capability: ACTIVE_GEN12_CURRENT_TASK
 client_byte_mutation_authorized: false
 persistent_session_role: canonical_runtime_owner
 physical_e2e_required: true
@@ -85,6 +86,18 @@ secret_reentry_registered_process_start_ticks: 66643010
 secret_reentry_registered_display: ':99'
 secret_reentry_registered_window_identity: x11-window:12582929
 secret_reentry_remote_view_mapping: PROVEN
+gen12_recovery_run: 32133489401
+gen12_recovery_job: 95699515238
+gen12_recovery_result: PASS_ACTIVE_GEN12_REG4_12_GATE_B
+gen12_recovery_head: acb5e556ae3c790157bcc136a30dea26c1e43e4f
+gen12_registered_pid: 2658
+gen12_registered_process_start_ticks: 66643010
+gen12_registered_display: ':99'
+gen12_registered_window_identity: x11-window:12582929
+gen12_remote_view_mapping: PROVEN
+gen12_lease_expires_at_epoch: 1787056382
+gen12_lease_expires_at_utc: 2026-08-18T12:33:02Z
+gen12_lease_expires_at_local: 2026-08-18T14:33:02+02:00
 auth_helper_local_build_run: 32129514948
 auth_helper_local_build_job: 95687339670
 auth_helper_local_build_result: CMAKE_UNAVAILABLE
@@ -96,17 +109,12 @@ auth_helper_size: 63728
 auth_helper_artifact_id: 9321784436
 auth_helper_artifact_zip_sha256: cb87d6f0ee1b5e4eb4c096c368ea53d55274f479be5fdaedbf5c1f24bde76608
 auth_helper_staged_on_synology: false
-canonical_lease_token_present: false
-canonical_lease_capability_usable: false
+canonical_lease_token_present: true
+canonical_lease_capability_usable: true
 canonical_lease_status_probe_run: 32130384212
-canonical_lease_status_probe_job: 95690011684
 canonical_lease_status: active
 canonical_lease_expired: false
-canonical_lease_expires_at_epoch: 1787053385
-canonical_lease_expires_at_utc: 2026-08-18T11:43:05Z
-canonical_lease_expires_at_local: 2026-08-18T13:43:05+02:00
-canonical_lease_recovery: WAIT_FOR_EXPIRY_THEN_STALE_TAKEOVER
-next_lease_generation_expected: 12
+canonical_lease_recovery: COMPLETED_STALE_TAKEOVER_GEN11_TO_GEN12
 lost_token_cause_run: 32129514869
 lost_token_cause_job: 95687604400
 lost_token_cause: superseded_rebind_workflow_unlinked_token_before_fail_closed_precheck
@@ -149,36 +157,42 @@ The owner explicitly instructed this task to perform the real login using the ex
 
 The secret pair was already proven present, non-empty and shape-valid by `32128651952 / 95684712657`, with values masked by GitHub and never emitted.
 
-The current runtime cannot yet be mutated because a superseded workflow deleted the raw capability token for active generation 11. Public status `32130384212 / 95690011684` proved the lease remains active through `2026-08-18T13:43:05+02:00`; its SHA-only token record cannot be reversed or fabricated. The only canonical recovery remains stale takeover after expiry.
+Canonical authority recovery is complete. Run `32133489401`, job `95699515238` directly proved the expired generation-11 state, absent raw token and unchanged registration `3/11`; acquired generation `12` through the promoted stale-takeover mechanism with the explicit lost-token reason naming superseded run `32129514869 / 95687604400`; rebound registration to `4/12`; and passed immediate same-generation Gate B. The exact client remained PID `2658`, process start ticks `66643010`, exact SHA `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`, display `:99`, XRes window `12582929`. No secret was accessed and no login was performed by recovery.
 
-Execution plan, already owner-authorized:
+The completed one-shot generation-12 recovery workflow has been removed from the branch. A superseded duplicate recovery run triggered after the successful takeover and failed closed at the expected token-absent precondition; it made no runtime mutation and is not authority.
+
+Next execution uses runtime-preserving helper activation rather than destructive canonical replacement. The promoted transition stack does not expose a reviewed canonical teardown/unregister primitive; manually deleting or editing `runtime-registration.json` is forbidden. Under the current generation-12 canonical `guard-run`, the exact already-admitted client may therefore receive only the verified opt-in native-auth shared object through a bounded debugger-mediated `dlopen`, with no client-byte mutation. The same guard remains held through one-shot auth dispatch and native character confirmation/world-entry observation so no mutation-capable interval escapes serialization. The helper receives no lease capability and the persistent client remains free of credential environment variables.
+
+Execution plan:
 
 ```text
-expired gen11 + absent raw token + unchanged registration 3/11
- -> one canonical stale takeover to gen12 with explicit lost-token reason
- -> rebind 3/11 -> 4/12
- -> immediate Gate B
- -> guarded teardown of the exact old pre-auth runtime
- -> canonical bootstrap of the exact client with opt-in native-auth helper
- -> verify helper mapping/socket + exact runtime identity
- -> one-shot GitHub Secrets producer
- -> protected process + bounded secret buffers
+active gen12 + registration 4/12 + exact same PID/start/SHA + Gate B
+ -> renew/validate current lease
+ -> verify hosted auth-helper artifact digest + helper SHA/size
+ -> canonical guard-run holds coordination lock
+ -> bounded exact-PID debugger activation of opt-in native-auth helper
+ -> verify helper mapping + one-shot mode-0600 auth socket + exact runtime identity
+ -> separate one-shot GitHub Secrets producer
+ -> RLIMIT_CORE=0 + PR_SET_DUMPABLE=0 + bounded source handling
  -> sealed anonymous memfd
  -> SCM_RIGHTS
  -> native TGameClient QMeta method 17
  -> original Tibia authentication state machine
  -> current native character model discriminator
+ -> if exactly one current character: freshly revalidate V18 controller/QMeta confirmation and Qt affinity
+ -> observe original game-server login chain and structural FullMap/map-description evidence
+ -> prove active gameplay/local-player identity or stop at the first genuine external-action/state-machine blocker
 ```
 
 No GUI login, OCR, image matching, coordinate input, blind keyboard/mouse action, auth bypass, TLS weakening or fabricated server/challenge response is authorized. Genuine 2FA/CAPTCHA/device confirmation remains fail-closed.
 
 ```text
 STATUS=validating
-RESULT=LOGIN_EXECUTION_AUTHORIZED_PENDING_CANONICAL_CAPABILITY_RECOVERY
+RESULT=LOGIN_EXECUTION_AUTHORIZED_AND_GEN12_READY
 CHARACTER_ACTUALLY_LOGGED_INTO_GAME=NO
 CAUSAL_PROOF=INCOMPLETE
 CREDENTIALS_ALLOWED=true
 LOGIN_ALLOWED=true
 MUTATION_AUTHORIZED=true
-RUNTIME_MUTATION_CAPABILITY=PENDING_EXPIRED_GEN11_STALE_TAKEOVER_TO_GEN12
+RUNTIME_MUTATION_CAPABILITY=ACTIVE_GEN12_CURRENT_TASK
 ```

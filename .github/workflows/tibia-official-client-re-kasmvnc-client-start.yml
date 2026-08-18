@@ -34,12 +34,8 @@ jobs:
           echo KASM_CLIENT_PACKAGE_STAGED=PASS
           docker exec -d -u 1000 -e DISPLAY=:1 -e HOME=/home/kasm-user -e QT_QUICK_BACKEND=software -e LD_LIBRARY_PATH="$dest/bin/lib" "$CONTAINER_NAME" /bin/bash -lc "cd '$dest' && exec ./bin/client >/home/kasm-user/tibia-client.log 2>&1"
           sleep 3
-          pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'pgrep -o -x client || true')"
-          if [[ ! "$pid" =~ ^[1-9][0-9]*$ ]]; then
-            echo KASM_CLIENT_EARLY_EXIT=true
-            docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc 'tail -n 80 /home/kasm-user/tibia-client.log 2>/dev/null || true'
-            exit 41
-          fi
+          pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'pgrep -n -x client || true')"
+          [[ "$pid" =~ ^[1-9][0-9]*$ ]] || { docker exec -u 1000 "$CONTAINER_NAME" tail -n 80 /home/kasm-user/tibia-client.log || true; exit 41; }
           exe="$(docker exec "$CONTAINER_NAME" readlink -f "/proc/$pid/exe")"
           [[ "$exe" == "$dest/bin/client" ]]
           echo "KASM_CLIENT_PID=$pid"

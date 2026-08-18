@@ -1,0 +1,393 @@
+name: Track A S1 unfiltered static census
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-s1-unfiltered-static-census.yml
+      - docs/agents/tasks/active/OTC-20260818-track-a-s1-unfiltered-static-census.md
+      - docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/**
+      - docs/agents/reports/OTCLIENT-20260818-track-a-s1-unfiltered-static-census.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  census:
+    name: Recover exact inbound protocol and handler census
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Fetch exact client and emit sanitized S1 evidence
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl binutils python3-pyelftools python3-capstone
+
+          r="$RUNNER_TEMP/track-a-s1-static"
+          mkdir -p "$r/bin" "$r/state" "$r/client" "$r/evidence"
+          cd "$r/bin"
+
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wireproxy.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tgz' | sha256sum -c -
+          mkdir wireproxy-unpack
+          tar -xzf wireproxy.tgz -C wireproxy-unpack
+          cp "$(find wireproxy-unpack -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+
+          cd "$r/state"
+          "$r/bin/wgcf" register --accept-tos >/dev/null
+          "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25346\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            if curl --socks5-hostname 127.0.0.1:25346 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+          echo 'S1_WARP_PATH=PASS'
+
+          client_url=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25346 --compressed -fL \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$client_url" -H 'Accept: */*' \
+            "$client_url" -o "$r/client/client.lzma"
+          echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  '"$r"'/client/client.lzma' | sha256sum -c -
+          echo 'S1_EXACT_PACKED_SHA=PASS'
+
+          python3 - "$r/client/client.lzma" "$r/client/client" "$r/evidence" <<'PY'
+          from __future__ import annotations
+
+          import collections
+          import hashlib
+          import json
+          import lzma
+          import pathlib
+          import re
+          import struct
+          import subprocess
+          import sys
+
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
+          from elftools.elf.elffile import ELFFile
+
+          packed_path = pathlib.Path(sys.argv[1])
+          raw_path = pathlib.Path(sys.argv[2])
+          evidence = pathlib.Path(sys.argv[3])
+          evidence.mkdir(parents=True, exist_ok=True)
+
+          packed = packed_path.read_bytes()
+          props = packed[32]
+          lc = props % 9
+          rest = props // 9
+          lp = rest % 5
+          pb = rest // 5
+          dict_size = int.from_bytes(packed[33:37], 'little')
+          raw = lzma.decompress(
+              packed[45:],
+              format=lzma.FORMAT_RAW,
+              filters=[{'id': lzma.FILTER_LZMA1, 'dict_size': dict_size, 'lc': lc, 'lp': lp, 'pb': pb}],
+          )
+          exact_sha = hashlib.sha256(raw).hexdigest()
+          assert len(raw) == 51965216, len(raw)
+          assert exact_sha == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe', exact_sha
+          raw_path.write_bytes(raw)
+          print('S1_EXACT_CLIENT_SHA=PASS')
+          print('S1_CLIENT_EXECUTED=false')
+          print('S1_RUNTIME_ACCESS=none')
+
+          with raw_path.open('rb') as handle:
+              elf = ELFFile(handle)
+              sections = [
+                  {
+                      'name': section.name,
+                      'offset': int(section['sh_offset']),
+                      'size': int(section['sh_size']),
+                      'va': int(section['sh_addr']),
+                      'flags': int(section['sh_flags']),
+                  }
+                  for section in elf.iter_sections()
+              ]
+
+          def offset_to_va(offset: int) -> int | None:
+              for section in sections:
+                  if section['offset'] <= offset < section['offset'] + section['size']:
+                      return section['va'] + offset - section['offset']
+              return None
+
+          printable_records: list[dict[str, object]] = []
+          printable_values: list[str] = []
+          for match in re.finditer(rb'[ -~]{4,220}', raw):
+              value = match.group().decode('ascii', 'ignore')
+              va = offset_to_va(match.start())
+              if va is None:
+                  continue
+              printable_records.append({'value': value, 'va': va, 'offset': match.start()})
+              printable_values.append(value)
+
+          text = '\n'.join(printable_values)
+          protocol_names = sorted(set(re.findall(r'\b(?:GameclientMessage|GameserverMessage)[A-Za-z0-9_]{2,100}\b', text)))
+          client_names = [name for name in protocol_names if name.startswith('GameclientMessage')]
+          server_names = [name for name in protocol_names if name.startswith('GameserverMessage')]
+          assert len(protocol_names) == 349, len(protocol_names)
+          assert len(client_names) == 160, len(client_names)
+          assert len(server_names) == 189, len(server_names)
+          assert len(set(server_names)) == 189
+
+          (evidence / 'protocol-all.txt').write_text('\n'.join(protocol_names) + '\n', encoding='utf-8')
+          (evidence / 'protocol-client-to-server.txt').write_text('\n'.join(client_names) + '\n', encoding='utf-8')
+          (evidence / 'protocol-server-to-client.txt').write_text('\n'.join(server_names) + '\n', encoding='utf-8')
+
+          FAMILY_RULES = [
+              ('session_auth_world', re.compile(r'(Login|Session|World|Pending|Enter|Disconnect|Connection|Challenge|Token|Ping|Pong)', re.I)),
+              ('world_map', re.compile(r'(Map|Field|Floor|Row|Column|Tile|Coordinate|Effect|Missile)', re.I)),
+              ('creature_combat', re.compile(r'(Creature|Attack|Follow|Combat|Death|Skull|Party|Outfit|Health|Light|Speed|Unpass|Mark)', re.I)),
+              ('player_state', re.compile(r'(Player|Skill|Vocation|State|Capacity|Mana|Soul|Cooldown|Experience|Level)', re.I)),
+              ('inventory_container_item', re.compile(r'(Inventory|Container|Object|Item|Depot|Stash|Loot|Goods|Store|Market)', re.I)),
+              ('chat_channel_npc', re.compile(r'(Talk|Channel|Npc|Message|Text|Modal)', re.I)),
+              ('trade_social_party', re.compile(r'(Trade|Friend|Vip|Social|Party|Guild|Team|Shared)', re.I)),
+              ('cyclopedia_progression', re.compile(r'(Cyclopedia|Bestiary|Bosstiary|Prey|Task|Wheel|Forge|Imbu|Quest|Reward|Proficiency|Bonus)', re.I)),
+          ]
+
+          families: dict[str, list[str]] = collections.OrderedDict((name, []) for name, _ in FAMILY_RULES)
+          families['other'] = []
+          for full_name in server_names:
+              stem = full_name.removeprefix('GameserverMessage')
+              selected = 'other'
+              for family, regex in FAMILY_RULES:
+                  if regex.search(stem):
+                      selected = family
+                      break
+              families[selected].append(full_name)
+          assert sum(len(values) for values in families.values()) == 189
+          assert sorted(name for values in families.values() for name in values) == server_names
+          (evidence / 'protocol-server-families.json').write_text(
+              json.dumps(families, indent=2, sort_keys=False) + '\n', encoding='utf-8'
+          )
+
+          method_regex = re.compile(
+              r'^(?:handle|received|receive|process|dispatch|parse|decode|on)[A-Z][A-Za-z0-9_]{1,120}(?:Message|Data|Event|Update|Changed|Received)$'
+          )
+          generic_handler_regex = re.compile(r'(?:ProtocolMessageHandler|MessageHandler|ProtocolMessageQueue|GameserverGameSession|MessageQueue)')
+          storage_controller_regex = re.compile(r'(?:Storage|Controller|DataModel)$')
+
+          inbound_method_strings = sorted(set(value for value in printable_values if method_regex.match(value)))
+          handler_type_strings = sorted(set(value for value in printable_values if generic_handler_regex.search(value)))
+
+          # Demangle relevant Itanium RTTI strings in one bounded batch. The resulting names are only exact-binary
+          # type-presence evidence; they do not establish object lifetime or runtime wiring.
+          mangled = sorted(set(value for value in printable_values if re.fullmatch(r'_?Z?N[0-9A-Za-z_]+E', value)))
+          if mangled:
+              proc = subprocess.run(
+                  ['c++filt'],
+                  input='\n'.join(mangled) + '\n',
+                  text=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  check=True,
+              )
+              demangled_all = [line.strip() for line in proc.stdout.splitlines()]
+          else:
+              demangled_all = []
+          relevant_types = sorted(set(
+              value for value in demangled_all
+              if generic_handler_regex.search(value)
+              or re.search(r'(?:CreatureStorage|ContainerStorage|PlayerData|Inventory|Chat|Channel|GameSession|Protocol)', value)
+          ))
+
+          # Exhaustive name-surface association. This is explicitly lexical/static and never promoted to a
+          # message->handler FACT by itself.
+          normalized_strings: dict[str, list[str]] = collections.defaultdict(list)
+          for value in printable_values:
+              normalized = re.sub(r'[^a-z0-9]+', '', value.lower())
+              if normalized:
+                  normalized_strings[normalized].append(value)
+
+          associations: list[dict[str, object]] = []
+          unmatched: list[str] = []
+          for full_name in server_names:
+              stem = full_name.removeprefix('GameserverMessage')
+              stem_norm = re.sub(r'[^a-z0-9]+', '', stem.lower())
+              exact_candidates = [
+                  f'handle{stem}Message',
+                  f'received{stem}Message',
+                  f'receive{stem}Message',
+                  f'process{stem}Message',
+                  f'on{stem}Message',
+              ]
+              hits = sorted(set(candidate for candidate in exact_candidates if candidate in printable_values))
+              broader = sorted(set(
+                  value for value in inbound_method_strings
+                  if stem_norm and stem_norm in re.sub(r'[^a-z0-9]+', '', value.lower())
+              ))
+              all_hits = sorted(set(hits + broader))
+              if not all_hits:
+                  unmatched.append(full_name)
+              associations.append({
+                  'message': full_name,
+                  'stem': stem,
+                  'lexical_handler_surfaces': all_hits,
+                  'evidence_strength': 'STATIC_LEXICAL_ASSOCIATION' if all_hits else 'UNKNOWN',
+                  'semantic_handler_edge_proven': False,
+              })
+
+          (evidence / 'inbound-lexical-associations.json').write_text(
+              json.dumps(associations, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+          (evidence / 'inbound-method-strings.txt').write_text(
+              '\n'.join(inbound_method_strings) + ('\n' if inbound_method_strings else ''), encoding='utf-8'
+          )
+          (evidence / 'inbound-handler-type-strings.txt').write_text(
+              '\n'.join(handler_type_strings) + ('\n' if handler_type_strings else ''), encoding='utf-8'
+          )
+          (evidence / 'relevant-demangled-types.txt').write_text(
+              '\n'.join(relevant_types) + ('\n' if relevant_types else ''), encoding='utf-8'
+          )
+
+          # Direct code-to-string xrefs are a bounded structural candidate signal only. We scan executable
+          # sections and retain xrefs only to exact starts of protocol/handler strings. This does not claim
+          # that the referring function is the semantic dispatcher.
+          interesting_values = set(server_names) | set(inbound_method_strings) | set(handler_type_strings)
+          interesting_va_to_value: dict[int, str] = {}
+          for record in printable_records:
+              value = str(record['value'])
+              if value in interesting_values:
+                  interesting_va_to_value[int(record['va'])] = value
+
+          md = Cs(CS_ARCH_X86, CS_MODE_64)
+          md.detail = True
+          xrefs: dict[str, list[dict[str, object]]] = collections.defaultdict(list)
+          xref_limit_per_string = 8
+          for section in sections:
+              if not (section['flags'] & 0x4) or section['size'] == 0:
+                  continue
+              start = section['offset']
+              end = start + section['size']
+              code = raw[start:end]
+              for ins in md.disasm(code, section['va']):
+                  targets: set[int] = set()
+                  for operand in ins.operands:
+                      if operand.type == X86_OP_MEM and operand.mem.base == X86_REG_RIP:
+                          targets.add(ins.address + ins.size + operand.mem.disp)
+                      elif operand.type == X86_OP_IMM:
+                          targets.add(int(operand.imm))
+                  for target in targets:
+                      value = interesting_va_to_value.get(target)
+                      if value is None or len(xrefs[value]) >= xref_limit_per_string:
+                          continue
+                      xrefs[value].append({
+                          'instruction_va': f'0x{ins.address:x}',
+                          'mnemonic': ins.mnemonic,
+                          'op_str': ins.op_str,
+                          'target_string_va': f'0x{target:x}',
+                          'evidence_strength': 'DIRECT_CODE_TO_STRING_XREF',
+                          'semantic_dispatcher_edge_proven': False,
+                      })
+
+          xref_payload = [
+              {'string': value, 'xrefs': refs}
+              for value, refs in sorted(xrefs.items())
+          ]
+          (evidence / 'direct-code-string-xrefs.json').write_text(
+              json.dumps(xref_payload, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+
+          # Reuse the repository's relocation-aware primary-vptr resolver for known exact-build static anchors.
+          profile = pathlib.Path('tools/tibia_runtime_bridge/profiles/tibia-15.32.df7b29.json')
+          resolver = pathlib.Path('tools/tibia_runtime_bridge/resolver.py')
+          resolver_proc = subprocess.run(
+              [sys.executable, str(resolver), '--profile', str(profile), str(raw_path)],
+              text=True,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              check=False,
+          )
+          (evidence / 'known-anchor-vptr-resolution.json').write_text(resolver_proc.stdout, encoding='utf-8')
+          (evidence / 'known-anchor-vptr-resolution.stderr.txt').write_text(resolver_proc.stderr, encoding='utf-8')
+          assert resolver_proc.returncode == 0, resolver_proc.stderr
+          resolved = json.loads(resolver_proc.stdout)
+          assert all(item['unique'] for item in resolved['targets'].values())
+
+          priority_terms = re.compile(r'(WorldEntered|Pending|PlayerData|PlayerState|Creature|Inventory|Container|Talk|Channel|Modal|Death|Disconnect|Session)', re.I)
+          s2_priority = []
+          assoc_by_message = {entry['message']: entry for entry in associations}
+          for message in server_names:
+              if not priority_terms.search(message):
+                  continue
+              entry = assoc_by_message[message]
+              s2_priority.append({
+                  'message': message,
+                  'lexical_handler_surfaces': entry['lexical_handler_surfaces'],
+                  'next_proof': 'resolve concrete QMeta/handler dispatch and downstream owner/storage edge from exact static code',
+                  'runtime_required': False,
+                  'worldmap_runtime_overlap': bool(re.search(r'(FullMap|FieldData|Column|Row|Floor|CreateOnMap|ChangeOnMap|DeleteOnMap)', message)),
+              })
+          (evidence / 's2-priority-candidates.json').write_text(
+              json.dumps(s2_priority, indent=2, sort_keys=True) + '\n', encoding='utf-8'
+          )
+
+          summary = {
+              'schema': 'track-a-s1-unfiltered-static-census-v1',
+              'client': {
+                  'version': '15.32.df7b29',
+                  'size': len(raw),
+                  'sha256': exact_sha,
+              },
+              'runtime_access': 'none',
+              'client_executed': False,
+              'protocol_message_total': len(protocol_names),
+              'client_to_server_total': len(client_names),
+              'server_to_client_total': len(server_names),
+              'all_inbound_names_preserved': len(server_names) == 189,
+              'server_family_counts': {name: len(values) for name, values in families.items()},
+              'inbound_method_string_total': len(inbound_method_strings),
+              'handler_type_string_total': len(handler_type_strings),
+              'relevant_demangled_type_total': len(relevant_types),
+              'messages_with_lexical_handler_surface': sum(bool(entry['lexical_handler_surfaces']) for entry in associations),
+              'messages_without_lexical_handler_surface': len(unmatched),
+              'direct_code_string_xref_string_total': len(xrefs),
+              'direct_code_string_xref_total': sum(len(refs) for refs in xrefs.values()),
+              'known_anchor_resolver_pass': True,
+              'semantic_common_inbound_dispatcher': 'UNKNOWN',
+              'raw_client_uploaded': False,
+              'secret_access': False,
+              'worldmap_runtime_access': False,
+              'pr475_runtime_touched': False,
+          }
+          (evidence / 'summary.json').write_text(json.dumps(summary, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          (evidence / 'messages-without-lexical-handler-surface.txt').write_text(
+              '\n'.join(unmatched) + ('\n' if unmatched else ''), encoding='utf-8'
+          )
+
+          print('S1_CENSUS_SUMMARY=' + json.dumps(summary, sort_keys=True))
+          print('S1_PROTOCOL_DENOMINATOR=PASS')
+          print('S1_ALL_189_INBOUND_NAMES_PRESERVED=PASS')
+          print('S1_KNOWN_ANCHOR_RESOLVER=PASS')
+          print('S1_COMMON_INBOUND_DISPATCHER=UNKNOWN')
+          print('S1_PR475_RUNTIME_TOUCHED=false')
+          print('S1_SECRET_ACCESS=false')
+          PY
+
+          # Proprietary client bytes are never part of uploaded evidence.
+          rm -f "$r/client/client" "$r/client/client.lzma"
+          test ! -e "$r/client/client"
+          test ! -e "$r/client/client.lzma"
+          echo 'S1_RAW_CLIENT_REMOVED_BEFORE_UPLOAD=PASS'
+
+      - name: Upload sanitized text and JSON evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-s1-static-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-s1-static/evidence
+          if-no-files-found: error
+          retention-days: 7

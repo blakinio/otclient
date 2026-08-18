@@ -69,9 +69,9 @@ jobs:
           if missing: raise SystemExit('missing exact QMeta records: '+','.join(missing))
 
           wanted=[
-            'receivedTalkMessage','receivedChannelsMessage','receivedChannelEventMessage',
-            'receivedOpenChannelMessage','receivedCloseChannelMessage',
-            'receivedOpenOwnChannelMessage','receivedPrivateChannelMessage',
+            'receivedTalkMessage','receivedMessageMessage','receivedOpenChannelMessage',
+            'receivedOpenOwnChannelMessage','receivedCloseChannelMessage','receivedChannelsMessage',
+            'receivedPrivateChannelMessage','receivedChannelEventMessage','receivedNpcTalkPartersMessage',
           ]
           queue=records['queue']; methods=queue['methods']; sig_count=queue['signals_count']
           queue_hits=[]
@@ -80,8 +80,9 @@ jobs:
                   queue_hits.append({**m,'is_signal_by_qmeta_prefix':m['index']<sig_count})
 
           handler=records['handler']; storage=records['storage']
+          handler_message_methods=[m for m in handler['methods'] if m.get('name','').startswith('handle') and m.get('name','').endswith('Message')]
           result={
-            'schema':'track-a-s6-prior-qmeta-log-reuse-v1',
+            'schema':'track-a-s6-prior-qmeta-log-reuse-v2',
             'source_run':31790507112,
             'source_job':94736106350,
             'source_head':'9afdc76ca6fe238742f270e22d8ecf4abe5ba9a2',
@@ -103,6 +104,7 @@ jobs:
                 'method_count':len(handler['methods']),
                 'signal_count':handler['signals_count'],
                 'relationships':handler['relationships'],
+                'message_methods':handler_message_methods,
                 'methods':handler['methods'],
               },
               'storage':{
@@ -119,14 +121,18 @@ jobs:
           required=set(wanted); found={m['name'] for m in queue_hits}
           result['required_found']=sorted(required & found)
           result['required_missing']=sorted(required-found)
+          result['handler_message_method_count']=len(handler_message_methods)
           if result['required_missing']:
               raise SystemExit('missing required chat receive methods: '+','.join(result['required_missing']))
+          if len(handler_message_methods)!=9:
+              raise SystemExit(f'unexpected handler message method count: {len(handler_message_methods)}')
           (out/'chat-qmeta.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
           (out/'handler-methods.txt').write_text('\n'.join(f"{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['index']<handler['signals_count']).lower()}" for m in handler['methods'])+'\n')
           (out/'storage-methods.txt').write_text('\n'.join(f"{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['index']<storage['signals_count']).lower()}" for m in storage['methods'])+'\n')
-          (out/'queue-chat-methods.txt').write_text('\n'.join(f"{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['is_signal_by_qmeta_prefix']).lower()}" for m in queue_hits)+'\n')
+          (out/'queue-chat-methods.txt').write_text('\n'.join(f"{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['is_signal_by_qmeta_prefix']).lower()}" for m in sorted(queue_hits,key=lambda x:x['index']))+'\n')
           print('TRACK_A_S6_QMETA_LOG_REUSE=PASS')
           print('TRACK_A_S6_REQUIRED='+','.join(sorted(result['required_found'])))
+          print('TRACK_A_S6_HANDLER_MESSAGE_METHOD_COUNT='+str(len(handler_message_methods)))
           print('TRACK_A_S6_HANDLER_METHOD_COUNT='+str(len(handler['methods'])))
           print('TRACK_A_S6_STORAGE_METHOD_COUNT='+str(len(storage['methods'])))
           print('TRACK_A_S6_PR475_RUNTIME_TOUCHED=false')
@@ -139,10 +145,10 @@ jobs:
         run: |
           set -Eeuo pipefail
           out="$RUNNER_TEMP/track-a-s6/evidence"
-          grep -nE 'received(Talk|Channels|ChannelEvent|OpenChannel|CloseChannel|OpenOwnChannel|PrivateChannel)Message' \
+          grep -nE 'received(Talk|Message|OpenChannel|OpenOwnChannel|CloseChannel|Channels|PrivateChannel|ChannelEvent|NpcTalkParters)Message' \
             docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/received-message-methods.txt \
             > "$out/s1-received-chat-lines.txt"
-          grep -nE 'GameserverMessage(Talk|Channels|ChannelEvent|OpenChannel|CloseChannel|OpenOwnChannel|PrivateChannel)' \
+          grep -nE 'GameserverMessage(Talk|Message|OpenChannel|OpenOwnChannel|CloseChannel|Channels|PrivateChannel|ChannelEvent|NpcTalkParters)' \
             docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-server-to-client.txt \
             > "$out/s1-chat-message-lines.txt"
           grep -n 'tibia::chat::TChatProtocolMessageHandler' \

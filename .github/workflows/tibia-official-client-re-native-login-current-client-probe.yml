@@ -38,7 +38,6 @@ jobs:
       - name: Resolve current official client identity read-only
         shell: bash
         env:
-          EVENT_BASE: ${{ github.event.pull_request.base.sha }}
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
@@ -46,9 +45,10 @@ jobs:
           set -Eeuo pipefail
           umask 077
           [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
-          [[ "$EVENT_BASE" == "$BASE_SHA" && "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
           [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
-          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EVENT_BASE" --expected-branch "$HEAD_BRANCH"
+          git cat-file -e "$BASE_SHA^{commit}"
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
 
           lease=.github/scripts/tibia-official-client-re-canonical-live-lease
           transition=.github/scripts/tibia-official-client-re-canonical-live-transition.py

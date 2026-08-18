@@ -1,0 +1,214 @@
+name: Track A KasmVNC and controller-handoff validation
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/tibia-official-client-re-canonical-live-handoff.py'
+      - '.github/scripts/tibia-official-client-re-canonical-live-resume.py'
+      - '.github/scripts/tibia-official-client-re-canonical-live-xres-probe.py'
+      - '.github/scripts/test_tibia_official_client_re_canonical_live_handoff.py'
+      - '.github/scripts/test_tibia_official_client_re_canonical_live_resume.py'
+      - '.github/scripts/test_tibia_official_client_re_canonical_live_xres_probe.py'
+      - '.github/workflows/tibia-official-client-re-kasmvnc-deploy.yml'
+      - '.github/workflows/tibia-official-client-re-persistent-viewer-validation.yml'
+      - 'docs/agents/contracts/TRACK_A_CONTROLLER_HANDOFF_AND_VIEWER_V1.md'
+      - 'docs/agents/decisions/ADR-0002-track-a-persistent-viewer-handoff.md'
+      - 'docs/agents/AGENTS.md'
+      - 'docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic:
+    name: Deterministic handoff and raw-XRes contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Compile controller tooling
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            .github/scripts/tibia-official-client-re-canonical-live-handoff.py \
+            .github/scripts/tibia-official-client-re-canonical-live-resume.py \
+            .github/scripts/tibia-official-client-re-canonical-live-xres-probe.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_handoff.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_resume.py \
+            .github/scripts/test_tibia_official_client_re_canonical_live_xres_probe.py
+
+      - name: Run same-task handoff tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_tibia_official_client_re-canonical-live-handoff.py 2>/dev/null || \
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_handoff.py
+
+      - name: Run replacement-session resume tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_resume.py
+          grep -Fq 'tibia-official-client-re-canonical-live-xres-probe.py' \
+            .github/scripts/tibia-official-client-re-canonical-live-resume.py
+
+      - name: Run raw-XRes canonical reuse probe tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_xres_probe.py
+
+      - name: Reject legacy noVNC implementation files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test ! -e .github/scripts/tibia-official-client-re-persistent-viewer.py
+          test ! -e .github/scripts/tibia-official-client-re-persistent-viewer-controller.py
+          test ! -e .github/scripts/test_tibia_official_client_re_persistent_viewer.py
+          test ! -e .github/scripts/test_tibia_official_client_re_persistent_viewer_controller.py
+
+      - name: Reject whitespace errors
+        shell: bash
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -Eeuo pipefail
+          if [[ -n "${BASE_REF:-}" ]]; then
+            git diff --check "$BASE_REF...HEAD"
+          else
+            git diff --check HEAD^..HEAD
+          fi
+
+  audit:
+    name: Fresh KasmVNC authority and isolation audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Falsify KasmVNC and controller boundaries
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          base = '${{ github.event.pull_request.base.sha }}'
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', f'{base}...HEAD'], text=True
+          ).splitlines())
+          allowed = {
+              '.github/scripts/test_tibia_official_client_re_canonical_live_handoff.py',
+              '.github/scripts/test_tibia_official_client_re_canonical_live_resume.py',
+              '.github/scripts/test_tibia_official_client_re_canonical_live_xres_probe.py',
+              '.github/scripts/tibia-official-client-re-canonical-live-handoff.py',
+              '.github/scripts/tibia-official-client-re-canonical-live-resume.py',
+              '.github/scripts/tibia-official-client-re-canonical-live-xres-probe.py',
+              '.github/workflows/tibia-official-client-re-kasmvnc-deploy.yml',
+              '.github/workflows/tibia-official-client-re-persistent-viewer-validation.yml',
+              'docs/agents/AGENTS.md',
+              'docs/agents/contracts/TRACK_A_CONTROLLER_HANDOFF_AND_VIEWER_V1.md',
+              'docs/agents/decisions/ADR-0002-track-a-persistent-viewer-handoff.md',
+              'docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md',
+          }
+          extra = sorted(changed - allowed)
+          if extra:
+              raise SystemExit(f'AUDIT_SCOPE_FAIL unexpected paths: {extra}')
+
+          handoff = Path('.github/scripts/tibia-official-client-re-canonical-live-handoff.py').read_text()
+          resume = Path('.github/scripts/tibia-official-client-re-canonical-live-resume.py').read_text()
+          probe = Path('.github/scripts/tibia-official-client-re-canonical-live-xres-probe.py').read_text()
+          deploy = Path('.github/workflows/tibia-official-client-re-kasmvnc-deploy.yml').read_text()
+          contract = Path('docs/agents/contracts/TRACK_A_CONTROLLER_HANDOFF_AND_VIEWER_V1.md').read_text()
+          adr = Path('docs/agents/decisions/ADR-0002-track-a-persistent-viewer-handoff.md').read_text()
+          task = Path('docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md').read_text()
+
+          required = {
+              'handoff': ['handoff_cross_task_forbidden', 'lease_generation_changed', 'handoff_same_session', 'token_sha256'],
+              'resume': ['active_same_task_requires_explicit_replacement', '--replace-active-same-task', 'tibia-official-client-re-canonical-live-xres-probe.py'],
+              'probe': ['LocalClientPid', 'raw_xres_window_unresolved', 'listener_owner_mismatch'],
+              'deploy': [
+                  'kasmweb/ubuntu-noble-desktop:1.17.0',
+                  'otclient-track-a-kasmvnc',
+                  'HOST_IP: 127.0.0.1',
+                  "HOST_PORT: '6901'",
+                  '--restart unless-stopped',
+                  'otclient.runtime=track-a-kasmvnc-desktop',
+                  'curl -kfsS',
+                  'KASMVNC_DSM_REVERSE_PROXY_REQUIRED=true',
+                  'KASMVNC_OFFICIAL_CLIENT_STARTED=false',
+                  'KASMVNC_TIBIA_SECRET_ACCESS=false',
+              ],
+              'contract': [
+                  'browser_desktop_provider: KasmVNC',
+                  'public_frontend: DSM_reverse_proxy',
+                  '127.0.0.1:6901',
+                  'WebSocket',
+                  'MUST NOT use `x11vnc`, `websockify` or noVNC',
+              ],
+              'adr': [
+                  'KasmVNC becomes the persistent browser desktop',
+                  'DSM Reverse Proxy',
+                  'https://127.0.0.1:6901/',
+                  'noVNC is not part of the new path',
+              ],
+              'task': [
+                  'runtime_access: ephemeral_isolated',
+                  'runtime_namespace: track-a-kasmvnc-desktop',
+                  'kasm_backend_host: 127.0.0.1',
+                  'kasm_public_frontend: DSM_reverse_proxy',
+                  'credentials_allowed: false',
+                  'login_allowed: false',
+              ],
+          }
+          sources = {'handoff': handoff, 'resume': resume, 'probe': probe, 'deploy': deploy, 'contract': contract, 'adr': adr, 'task': task}
+          for label, needles in required.items():
+              missing = [needle for needle in needles if needle not in sources[label]]
+              if missing:
+                  raise SystemExit(f'AUDIT_REQUIRED_FAIL {label}: {missing}')
+
+          for obsolete in (
+              '.github/scripts/tibia-official-client-re-persistent-viewer.py',
+              '.github/scripts/tibia-official-client-re-persistent-viewer-controller.py',
+              '.github/scripts/test_tibia_official_client_re_persistent_viewer.py',
+              '.github/scripts/test_tibia_official_client_re_persistent_viewer_controller.py',
+          ):
+              if Path(obsolete).exists():
+                  raise SystemExit(f'AUDIT_LEGACY_VIEWER_STILL_PRESENT: {obsolete}')
+
+          forbidden = handoff + resume + deploy
+          for needle in (
+              'os.environ.get("TIBIA_TEST_EMAIL")',
+              'os.environ.get("TIBIA_TEST_PASSWORD")',
+              'os.getenv("TIBIA_TEST_EMAIL")',
+              'os.getenv("TIBIA_TEST_PASSWORD")',
+              'pkill ',
+              'HOST_IP: 192.168.1.2',
+              'KASM_PASSWORD:',
+          ):
+              if needle in forbidden:
+                  raise SystemExit(f'AUDIT_FORBIDDEN_FAIL: {needle}')
+          if '--current-session-id' in handoff or '--current-session-id' in resume:
+              raise SystemExit('AUDIT_FORBIDDEN_FAIL historical session id input')
+          if 'xdotool search --pid' in probe:
+              raise SystemExit('AUDIT_FORBIDDEN_FAIL xdotool reuse authority')
+
+          print('TRACK_A_KASMVNC_FRESH_AUDIT=PASS')
+          print(f'TRACK_A_KASMVNC_AUDITED_PATHS={len(changed)}')
+          PY

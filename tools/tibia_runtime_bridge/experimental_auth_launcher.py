@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 from tools.tibia_runtime_bridge.launcher import BridgeConfigError, build_env, load_profile, sha256_file
 
@@ -16,6 +17,10 @@ def build_experimental_env(
     auth_socket: Path,
     base_env: dict[str, str] | None = None,
 ) -> dict[str, str]:
+    if not bridge_socket.is_absolute() or not auth_socket.is_absolute():
+        raise BridgeConfigError("bridge and experimental auth socket paths must be absolute")
+    if bridge_socket == auth_socket:
+        raise BridgeConfigError("experimental auth socket must be distinct from the read-only bridge socket")
     env = build_env(profile, bridge_helper, bridge_socket, base_env)
     existing_preload = env.get("LD_PRELOAD", "").strip()
     env["LD_PRELOAD"] = f"{auth_helper}:{existing_preload}" if existing_preload else str(auth_helper)
@@ -24,6 +29,8 @@ def build_experimental_env(
 
 
 def _prepare_socket_path(path: Path) -> None:
+    if not path.is_absolute():
+        raise BridgeConfigError("socket path must be absolute")
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         path.unlink()
@@ -48,6 +55,10 @@ def main(argv: list[str] | None = None) -> int:
     client = args.client.resolve()
     bridge_helper = args.bridge_helper.resolve()
     auth_helper = args.auth_helper.resolve()
+    bridge_socket = args.bridge_socket.absolute()
+    auth_socket = args.auth_socket.absolute()
+    if bridge_socket == auth_socket:
+        raise BridgeConfigError("experimental auth socket must be distinct from the read-only bridge socket")
     if not client.is_file():
         raise BridgeConfigError(f"client does not exist: {client}")
     if not bridge_helper.is_file():
@@ -60,14 +71,14 @@ def main(argv: list[str] | None = None) -> int:
     if actual != expected:
         raise BridgeConfigError(f"client SHA-256 mismatch: expected {expected}, got {actual}")
 
-    _prepare_socket_path(args.bridge_socket)
-    _prepare_socket_path(args.auth_socket)
+    _prepare_socket_path(bridge_socket)
+    _prepare_socket_path(auth_socket)
     env = build_experimental_env(
         profile,
         bridge_helper,
-        args.bridge_socket,
+        bridge_socket,
         auth_helper,
-        args.auth_socket,
+        auth_socket,
         os.environ,
     )
     result = subprocess.run([str(client), *args.client_args], env=env, check=False)
@@ -78,5 +89,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except BridgeConfigError as exc:
-        print(f"experimental auth launcher error: {exc}", file=os.sys.stderr)
+        print(f"experimental auth launcher error: {exc}", file=sys.stderr)
         raise SystemExit(2)

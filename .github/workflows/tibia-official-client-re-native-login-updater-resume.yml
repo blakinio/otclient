@@ -1,0 +1,280 @@
+name: Track A native-login official updater resume
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-updater-resume.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  updater:
+    name: Start official CipSoft updater on proven VNC desktop
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 12
+    env:
+      BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
+      TASK: OTC-20260818-native-login-to-ingame-e2e
+      LEASE_SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
+      BASE: /home/runner/_work/_otclient_tibia_re_state
+      WORKBASE: /work/_otclient_tibia_re_state
+      TOKEN: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Validate observer and start official updater
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
+
+          task=docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
+          grep -q '^task_id: OTC-20260818-native-login-to-ingame-e2e$' "$task"
+          grep -q '^status: validating$' "$task"
+          grep -q '^runtime_access: ephemeral_isolated$' "$task"
+          grep -q '^runtime_namespace: native-login-official-package-update$' "$task"
+          grep -q '^mutation_authorized: true$' "$task"
+          grep -q '^credentials_allowed: false$' "$task"
+          grep -q '^login_allowed: false$' "$task"
+          grep -q '^gameplay_allowed: false$' "$task"
+          echo UPDATER_ADMISSION_MUTATION_AUTHORIZED=true
+          echo UPDATER_ADMISSION_CREDENTIALS_ALLOWED=false
+          echo UPDATER_ADMISSION_LOGIN_ALLOWED=false
+
+          state="$BASE/canonical-live-runtime"
+          package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$package/bin/client"
+          tool="$WORKBASE/toolroot"
+          warp="$state/warp"
+          live="$BASE/native-login-update/live"
+          session="$live/session.json"
+          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
+          [[ ! -d "$package" ]]
+          [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
+          [[ -f "$session" && "$(stat -c %a "$session")" == 600 ]]
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
+          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
+
+          readarray -t obs < <(python3 - "$session" <<'PY'
+          import json,pathlib,sys
+          x=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert x.get('task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert x.get('phase')=='vnc-ready'
+          assert x.get('relay_network')=='host'
+          assert x.get('lan_ip')=='192.168.1.2'
+          assert x.get('credentials_accessed') is False
+          assert x.get('client_started') is False
+          for k in ('xvfb_pid','vnc_pid','websockify_pid'):
+              pid=int(x[k]); assert pathlib.Path(f'/proc/{pid}').is_dir(), k
+          print(x['display']); print(x['xvfb_pid']); print(x['vnc_pid']); print(x['websockify_pid'])
+          print(x['relay_name']); print(x['relay_id']); print(x['lan_port']); print(x['marker'])
+          PY
+          )
+          display="${obs[0]}"; xvfb_pid="${obs[1]}"; vnc_pid="${obs[2]}"; ws_pid="${obs[3]}"
+          relay_name="${obs[4]}"; relay_id="${obs[5]}"; lan_port="${obs[6]}"; marker="${obs[7]}"
+          [[ "$display" =~ ^:[0-9]+$ && "$lan_port" =~ ^[0-9]+$ ]]
+          [[ "$(docker inspect -f '{{.Id}}' "$relay_name")" == "$relay_id" ]]
+          [[ "$(docker inspect -f '{{.State.Running}}' "$relay_name")" == true ]]
+          [[ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$relay_name")" == host ]]
+          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$relay_name")" == "$TASK" ]]
+          [[ "$(curl -fsS --max-time 5 "http://192.168.1.2:$lan_port/health.txt")" == "$marker" ]]
+          python3 - "$lan_port" <<'PY'
+          import base64,os,socket,sys
+          p=int(sys.argv[1]); key=base64.b64encode(os.urandom(16)).decode()
+          q=(f'GET /websockify HTTP/1.1\r\nHost: 192.168.1.2:{p}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
+          s=socket.create_connection(('192.168.1.2',p),5); s.sendall(q); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
+          PY
+          echo "UPDATER_VNC_URL=http://192.168.1.2:$lan_port/"
+          echo UPDATER_EXISTING_VNC=PASS
+
+          preload="$(find "$tool" -xdev -type f -name libproxychains.so.4 -print -quit)"
+          [[ -n "$preload" && -x "$warp/bin/wireproxy" && -s "$warp/state/wgcf-profile.conf" ]]
+          work="$BASE/native-login-update/updater-$GITHUB_RUN_ID"
+          [[ ! -e "$work" ]]; mkdir -m700 "$work"
+          wp_pid=''; launcher_pid=''; success=false
+          stop_pid() {
+            local p="$1"; [[ "$p" =~ ^[1-9][0-9]*$ ]] || return 0
+            kill "$p" 2>/dev/null || true
+            for _ in $(seq 1 30); do kill -0 "$p" 2>/dev/null || return 0; sleep .1; done
+            kill -9 "$p" 2>/dev/null || true
+          }
+          cleanup() {
+            [[ "$success" == true ]] && return 0
+            stop_pid "$launcher_pid"; stop_pid "$wp_pid"; rm -rf "$work"
+          }
+          trap cleanup EXIT ERR INT TERM HUP
+
+          warp_port="$(python3 - <<'PY'
+          import socket
+          for p in range(25481,25541):
+              s=socket.socket()
+              try:s.bind(('127.0.0.1',p))
+              except OSError:s.close();continue
+              s.close();print(p);break
+          else:raise SystemExit('no free WARP port')
+          PY
+          )"
+          cat >"$work/wireproxy.conf" <<EOF
+          WGConfig = $warp/state/wgcf-profile.conf
+          [Socks5]
+          BindAddress = 127.0.0.1:$warp_port
+          EOF
+          chmod 600 "$work/wireproxy.conf"
+          "$warp/bin/wireproxy" -n -c "$work/wireproxy.conf" >/dev/null
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-wireproxy \
+            nohup "$warp/bin/wireproxy" -c "$work/wireproxy.conf" >"$work/wireproxy.log" 2>&1 </dev/null &
+          wp_pid=$!
+          for _ in $(seq 1 40); do
+            kill -0 "$wp_pid" 2>/dev/null || { cat "$work/wireproxy.log" >&2; exit 1; }
+            python3 - "$warp_port" <<'PY' && break || true
+          import socket,sys
+          s=socket.socket();s.settimeout(.2)
+          try:s.connect(('127.0.0.1',int(sys.argv[1])))
+          except OSError:raise SystemExit(1)
+          finally:s.close()
+          PY
+            sleep .25
+          done
+          curl --socks5-hostname "127.0.0.1:$warp_port" -fsS --max-time 20 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo UPDATER_WARP=PASS
+
+          base='https://static.tibia.com/launcher/tibiaclient-linux-current/'
+          manifest="$work/package.json"
+          curl --socks5-hostname "127.0.0.1:$warp_port" --compressed -fsSL --retry 4 --retry-all-errors --connect-timeout 20 --max-time 120 "${base}package.json" -o "$manifest"
+          readarray -t m < <(python3 - "$manifest" <<'PY'
+          import json,sys
+          doc=json.load(open(sys.argv[1],encoding='utf-8')); rows=[]
+          def walk(v):
+              if isinstance(v,dict):
+                  u=v.get('url'); p=v.get('packedhash'); q=v.get('unpackedhash')
+                  if isinstance(u,str) and isinstance(p,str): rows.append((u,p,q if isinstance(q,str) else ''))
+                  for z in v.values(): walk(z)
+              elif isinstance(v,list):
+                  for z in v: walk(z)
+          walk(doc)
+          mm=[x for x in rows if x[0].endswith('/bin/client.lzma') or x[0]=='bin/client.lzma' or x[0].endswith('client.lzma')]
+          if len(mm)!=1: raise SystemExit(f'expected one client.lzma entry, got {len(mm)}')
+          print(mm[0][0]); print(mm[0][1].lower()); print(mm[0][2].lower())
+          PY
+          )
+          rel="${m[0]}"; packed_expected="${m[1]}"; unpacked_expected="${m[2]}"
+          case "$rel" in http://*|https://*) target_url="$rel" ;; /*) target_url="https://static.tibia.com$rel" ;; *) target_url="$base$rel" ;; esac
+          packed="$work/current-client.lzma"
+          curl --socks5-hostname "127.0.0.1:$warp_port" --compressed -fsSL --retry 4 --retry-all-errors --connect-timeout 20 --max-time 240 "$target_url" -o "$packed"
+          [[ "$(sha256sum "$packed" | awk '{print $1}')" == "$packed_expected" ]]
+          readarray -t target < <(python3 - "$packed" "$unpacked_expected" <<'PY'
+          import hashlib,lzma,pathlib,re,sys
+          b=pathlib.Path(sys.argv[1]).read_bytes(); expected=sys.argv[2].lower()
+          if len(b)<46: raise SystemExit('packed client too small')
+          q=b[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          sha=hashlib.sha256(raw).hexdigest()
+          if expected and sha!=expected: raise SystemExit('unpacked client hash mismatch')
+          versions=[]
+          for pat in (rb'\b1[0-9]\.[0-9]{2}(?:\.[A-Za-z0-9]+)?\b', rb'\b[0-9]{1,2}\.[0-9]{2}\.[A-Fa-f0-9]{6,16}\b'):
+              for mm in re.finditer(pat,raw):
+                  s=mm.group().decode('ascii','ignore')
+                  if s not in versions and len(versions)<40: versions.append(s)
+          print(sha); print(len(raw)); print(','.join(versions))
+          PY
+          )
+          target_sha="${target[0]}"; target_size="${target[1]}"; target_versions="${target[2]}"
+          echo "UPDATER_CURRENT_OFFICIAL_CLIENT_SHA256=$target_sha"
+          echo "UPDATER_CURRENT_OFFICIAL_CLIENT_SIZE=$target_size"
+          echo "UPDATER_CURRENT_OFFICIAL_VERSION_STRINGS=$target_versions"
+
+          tarball="$work/tibia.x64.tar.gz"
+          curl --socks5-hostname "127.0.0.1:$warp_port" --compressed -fL --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+          unpack="$work/unpacked"; mkdir -m700 "$unpack"
+          python3 - "$tarball" "$unpack" <<'PY'
+          import pathlib,sys,tarfile
+          a=pathlib.Path(sys.argv[1]); d=pathlib.Path(sys.argv[2])
+          with tarfile.open(a,'r:gz') as h:
+              for m in h.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+              try:h.extractall(d,filter='data')
+              except TypeError:h.extractall(d)
+          PY
+          launcher="$unpack/Tibia/Tibia"; [[ -x "$launcher" && ! -L "$launcher" ]]
+          launcher_sha="$(sha256sum "$launcher" | awk '{print $1}')"
+          echo "UPDATER_OFFICIAL_LAUNCHER_SHA256=$launcher_sha"
+          cat >"$work/proxychains.conf" <<EOF
+          strict_chain
+          proxy_dns
+          remote_dns_subnet 224
+          tcp_read_time_out 15000
+          tcp_connect_time_out 8000
+          [ProxyList]
+          socks5 127.0.0.1 $warp_port
+          EOF
+          chmod 600 "$work/proxychains.conf"
+          launcher_dir="$(dirname "$launcher")"
+          (
+            cd "$launcher_dir"
+            env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+              OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=official-updater \
+              HOME="$BASE/home" XDG_DATA_HOME="$BASE/home/.local/share" DISPLAY="$display" \
+              PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+              LD_LIBRARY_PATH="$launcher_dir:$launcher_dir/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+              LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+              LD_PRELOAD="$preload" PROXYCHAINS_CONF_FILE="$work/proxychains.conf" \
+              nohup "$launcher" >"$work/launcher.log" 2>&1 </dev/null &
+            echo $! >"$work/launcher.pid"
+          )
+          launcher_pid="$(cat "$work/launcher.pid")"
+          kill -0 "$launcher_pid"; sleep 3; kill -0 "$launcher_pid"
+          echo UPDATER_OFFICIAL_LAUNCHER_STARTED=true
+
+          python3 - "$session" "$wp_pid" "$warp_port" "$launcher_pid" "$launcher_sha" "$work" "$target_sha" "$target_size" "$target_versions" <<'PY'
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text())
+          x.update({'phase':'official-updater-running','wireproxy_pid':int(sys.argv[2]),'warp_port':int(sys.argv[3]),'launcher_pid':int(sys.argv[4]),'launcher_sha256':sys.argv[5],'updater_workdir':sys.argv[6],'target_client_sha256':sys.argv[7],'target_client_size':int(sys.argv[8]),'target_version_strings':sys.argv[9],'credentials_accessed':False,'login_attempted':False})
+          p.write_text(json.dumps(x,sort_keys=True)+'\n'); p.chmod(0o600)
+          PY
+          printf 'UPDATER_VNC_URL=http://192.168.1.2:%s/\nUPDATER_VNC_DISPLAY=%s\nTARGET_CLIENT_SHA256=%s\nTARGET_CLIENT_SIZE=%s\n' "$lan_port" "$display" "$target_sha" "$target_size" >"$live/public.txt"; chmod 600 "$live/public.txt"
+
+          sleep 8
+          kill -0 "$xvfb_pid"; kill -0 "$vnc_pid"; kill -0 "$ws_pid"; kill -0 "$wp_pid"; kill -0 "$launcher_pid"
+          [[ "$(curl -fsS --max-time 5 "http://192.168.1.2:$lan_port/health.txt")" == "$marker" ]]
+          if [[ -f "$client" ]]; then
+            now_size="$(stat -c %s "$client")"
+            echo "UPDATER_INITIAL_CLIENT_SIZE=$now_size"
+            if [[ "$now_size" == "$target_size" ]]; then
+              now_sha="$(sha256sum "$client" | awk '{print $1}')"; echo "UPDATER_INITIAL_CLIENT_SHA256=$now_sha"
+              [[ "$now_sha" == "$target_sha" ]] && echo UPDATER_PACKAGE_CURRENT=true || echo UPDATER_PACKAGE_CURRENT=false
+            else
+              echo UPDATER_PACKAGE_CURRENT=false
+            fi
+          else
+            echo UPDATER_PACKAGE_CURRENT=false
+          fi
+          echo "UPDATER_VNC_URL=http://192.168.1.2:$lan_port/"
+          echo UPDATER_SECRET_ACCESS=false
+          echo UPDATER_LOGIN_ATTEMPTED=false
+          echo UPDATER_RESULT=PASS_OFFICIAL_UPDATER_RUNNING
+          success=true
+          trap - EXIT ERR INT TERM HUP

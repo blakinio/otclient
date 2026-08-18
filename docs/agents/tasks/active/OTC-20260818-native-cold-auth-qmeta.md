@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260818-native-cold-auth-qmeta
-status: validating
+status: waiting
 agent: ChatGPT
 session_id: chatgpt-native-cold-auth-qmeta-20260818
 session_role: researcher
@@ -15,7 +15,7 @@ branch: research/OTC-20260818-native-cold-auth-qmeta
 base_branch: main
 base_main: bd167a8a9b4192b3c87c21423e2af37e897f5e79
 related_pr: 505
-updated: 2026-08-18T07:39:00+02:00
+updated: 2026-08-18T07:42:00+02:00
 risk: high
 implementation_authorized: true
 research_status: DRAFT_NOT_PROMOTED
@@ -62,11 +62,11 @@ decomposition_reason: one bounded exact-SHA QMeta discriminator with independent
 validation_level: focused
 invocation_started_at: 2026-08-18T07:20:00+02:00
 last_progress_at: 2026-08-18T07:39:00+02:00
-ci_checks_for_current_head: 0
+ci_checks_for_current_head: 2
 ci_check_generation: draft-repair-1
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 0
+unchanged_state_checks: 1
 identical_failure_retries: 0
 repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 1
@@ -75,30 +75,21 @@ stall_warnings: 0
 
 # Objective
 
-Recover, on the exact official native Linux client and without executing it, the Qt/QMeta invocation contract for:
+Recover the exact Qt/QMeta invocation contract for:
 
 ```text
 TGameClient::onRequestLoginWithCredentials(QString, QString)
 ```
 
-This is strictly for `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` cold authentication **without operating the login form**.
+for `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME`, specifically to authenticate through original native client logic **without using the login form**.
 
-Forbidden target mechanisms remain OCR, screenshots as control input, coordinate clicks, blind Tab/Return, image matching or other form automation.
+Form automation is not an acceptable target mechanism: no OCR, image matching, coordinate clicks, blind Tab/Return or GUI-field operation.
 
-# Trust boundary
+# Verified progress
 
-PR #498 and PR #475 are predecessor/research inputs. Load-bearing values are revalidated on the exact packed/unpacked SHA before promotion.
-
-This task does not touch the official-client process, Synology runner, VNC observer, X11, credentials, sessions or login budget.
-
-# Run 1 — exact result
-
-PR #505 head `f4f7c903a30046ebf78ee884d8dc7658ed68d534`:
+Run `32103383778` / job `95608065258` on PR #505 head `f4f7c903a30046ebf78ee884d8dc7658ed68d534` independently proved:
 
 ```text
-workflow_run=32103383778
-job=95608065258
-result=FAIL
 COLD_AUTH_EXACT_PACKED_SHA=PASS
 COLD_AUTH_EXACT_CLIENT_SHA=PASS
 COLD_AUTH_CLIENT_EXECUTED=false
@@ -106,59 +97,36 @@ COLD_AUTH_RUNTIME_ACCESS=none
 COLD_AUTH_QMETA_CLASS=tibia::client::TGameClient
 COLD_AUTH_QMETA_METHOD_COUNT=44
 COLD_AUTH_QMETA_SIGNAL_COUNT=6
-first_error=AssertionError: tibia::client::TGameClient
 ```
 
-Classification: the failure was the worker's exact class-name assertion (`TGameClient`) being shorter than the exact QMeta class identity (`tibia::client::TGameClient`). It occurred before method enumeration. It is not evidence against the native cold-auth method.
+The first failure was only the worker assertion expecting shortened class name `TGameClient`. Repair commit `767d9f1bd38b7a35125105bc6ba86f0c486bfcbf` changed that exact identity assertion to `tibia::client::TGameClient`; it did not weaken SHA, method or dispatch gates.
 
-# Repair 1
-
-Commit `767d9f1bd38b7a35125105bc6ba86f0c486bfcbf` changes only the exact class identity assertion to:
-
-```text
-tibia::client::TGameClient
-```
-
-No semantic threshold or exact-client fence was weakened.
+A subsequent metadata checkpoint head `ea4f5b693644337ca9946dcf2972d19350cfd08b` started exact-head discriminator run `32103641442`. Two ordinary observations were consumed while that run was still in progress, so this invocation must not poll the same head a third time.
 
 # Acceptance
 
-Persist DRAFT evidence with:
+The next session must persist only directly proven values for:
 
 ```text
-EXACT_PACKED_SHA=PASS
-EXACT_CLIENT_SHA=PASS
-TGAMECLIENT_QMETA_IDENTITY=PASS|FAIL
-COLD_AUTH_METHOD_NAME=onRequestLoginWithCredentials
-COLD_AUTH_METHOD_META_INDEX=<integer|UNKNOWN>
-COLD_AUTH_ARGC=2|UNKNOWN
-COLD_AUTH_ARG_TYPES=<QString,QString|UNKNOWN>
-COLD_AUTH_METHOD_FLAGS=<value|UNKNOWN>
-COLD_AUTH_DISPATCH_TARGET=<va|UNKNOWN>
-COLD_AUTH_TARGET_EXECUTABLE=true|false|UNKNOWN
-COLD_AUTH_TARGET_INSTRUCTION_FENCE=<hex|UNKNOWN>
-CLIENT_EXECUTED=false
-RUNTIME_ACCESS=none
+COLD_AUTH_METHOD_META_INDEX
+COLD_AUTH_ARGC
+COLD_AUTH_ARG_TYPES or UNKNOWN with raw IDs
+COLD_AUTH_METHOD_FLAGS
+COLD_AUTH_DISPATCH_TARGET
+COLD_AUTH_TARGET_INSTRUCTION_FENCE
 ```
 
-Fail closed on SHA mismatch, inconsistent QMeta tables, ambiguous dispatch target, or missing method.
-
-# Negative controls
-
-- No live process-memory scan or client startup.
-- No Synology/runtime use.
-- No credentials or secrets.
-- No method index inferred from historical UI behavior.
-- No `onGameSessionConnected` / `onGameSessionLoginSuccessful` success shortcut.
+Ambiguity remains `UNKNOWN`. No live-client success callback may be invoked or fabricated to manufacture progress.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 2
-status: validating
-last_completed_step: exact-SHA run 1 isolated a namespaced-class assertion defect and repair 1 corrected only that parser assertion
-blockers: []
-next_action: inspect the first exact-head cold-auth discriminator result produced after this checkpoint commit and either persist the exact QMeta contract or apply at most one new evidence-based repair
+checkpoint_version: 3
+status: waiting
+last_completed_step: repaired exact namespaced TGameClient QMeta identity and started exact-head static validation with no runtime/client execution
+blockers:
+  - current invocation consumed the ordinary two-check budget for head ea4f5b693644337ca9946dcf2972d19350cfd08b while run 32103641442 remained in progress
+next_action: resolve current PR #505 head and inspect its terminal cold-auth QMeta discriminator result; if it passed, persist the exact method/dispatch contract, otherwise inspect the failed job once and apply only a new evidence-based repair
 ```
 
 ## Recovery checkpoint
@@ -166,22 +134,22 @@ next_action: inspect the first exact-head cold-auth discriminator result produce
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
+  generation: 2
   session_id: chatgpt-native-cold-auth-qmeta-20260818
   session_started_at: 2026-08-18T07:20:00+02:00
-  checkpointed_at: 2026-08-18T07:39:00+02:00
+  checkpointed_at: 2026-08-18T07:42:00+02:00
   last_progress_at: 2026-08-18T07:39:00+02:00
   phase: validate_exact_qmeta_after_namespaced_class_repair
-  exact_head: 767d9f1bd38b7a35125105bc6ba86f0c486bfcbf
+  exact_head: ea4f5b693644337ca9946dcf2972d19350cfd08b
   pull_request: 505
-  active_operation: none
-  external_run_ids: [32103383778, 32103555614]
-  operation_started_at: null
+  active_operation: workflow_wait
+  external_run_ids: [32103641442]
+  operation_started_at: 2026-08-18T07:39:00+02:00
   wait_deadline_at: null
   check_generation: draft-repair-1
   checks_used: 2
-  status: ready
+  status: waiting
   safe_to_resume: true
-  resume_condition: a fresh exact-head discriminator result exists after the checkpoint commit
-  next_action: inspect that result and continue from its first material finding
+  resume_condition: cold-auth QMeta discriminator reaches a terminal result
+  next_action: inspect that terminal result and continue from its first material finding
 ```

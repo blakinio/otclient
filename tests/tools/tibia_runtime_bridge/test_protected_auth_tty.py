@@ -47,6 +47,7 @@ class ProtectedAuthTtyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "identity.json"
             path.write_text(json.dumps(self.valid_identity()), encoding="utf-8")
+            path.chmod(0o600)
             identity = load_exact_runtime_identity(path.resolve())
             self.assertEqual(EXACT_CLIENT_VERSION, identity.client_version)
             self.assertEqual(EXACT_CLIENT_SIZE, identity.client_size)
@@ -57,12 +58,19 @@ class ProtectedAuthTtyTests(unittest.TestCase):
             doc = self.valid_identity()
             doc["client_sha256"] = "b" * 64
             path.write_text(json.dumps(doc), encoding="utf-8")
+            path.chmod(0o600)
             with self.assertRaises(BridgeClientError):
                 load_exact_runtime_identity(path.resolve())
 
-    def test_runtime_identity_rejects_relative_path(self):
+    def test_runtime_identity_rejects_relative_and_writable_metadata(self):
         with self.assertRaises(BridgeClientError):
             load_exact_runtime_identity(Path("identity.json"))
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "identity.json"
+            path.write_text(json.dumps(self.valid_identity()), encoding="utf-8")
+            path.chmod(0o622)
+            with self.assertRaises(BridgeClientError):
+                load_exact_runtime_identity(path.resolve())
 
     def test_legacy_secret_environment_fails_closed_without_reading_values(self):
         with mock.patch.dict(os.environ, {"TIBIA_TEST_EMAIL": "synthetic-do-not-read"}, clear=False):
@@ -191,6 +199,9 @@ class ProtectedAuthTtyTests(unittest.TestCase):
         self.assertIn("F_SEAL_WRITE", source)
         self.assertIn("auth_with_credentials_fd", source)
         self.assertIn("EXTERNAL_INTERACTIVE_TTY_REQUIRED", source)
+        self.assertIn("metadata.st_uid != os.geteuid()", source)
+        self.assertIn("metadata.st_mode & 0o022", source)
+        self.assertIn("finally:\n            termios.tcsetattr", source)
 
 
 if __name__ == "__main__":

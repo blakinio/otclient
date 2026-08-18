@@ -97,15 +97,21 @@ registered canonical X11 DISPLAY
 
 `6081` and `6082` are different roles. A worker must not bind the runner websockify backend to `6082` and then attempt to publish another host relay on `6082`.
 
-The low-level viewer implementation is:
+The **supported viewer entry point** is:
+
+```text
+.github/scripts/tibia-official-client-re-persistent-viewer-controller.py
+```
+
+For `start`, this controller first runs the existing canonical `gate-b` transition with the raw-XRes probe. Only after Gate B succeeds may it invoke the low-level presentation primitive:
 
 ```text
 .github/scripts/tibia-official-client-re-persistent-viewer.py
 ```
 
-`start` and `stop` are state-changing observer-management operations and are legal only for the current controller after current Gate A/rebind/Gate B authority is already established for the exact registered runtime. The viewer implementation's lease validation is an additional guard, not a substitute for Gate B.
+The low-level `persistent-viewer.py start` is an implementation primitive, not a standalone authority entry point. Agents must not invoke it directly to bypass Gate B. Its own lease validation and coordination-lock checks are additional guards, not substitutes for Gate B.
 
-A future higher-level caller may compose `resume -> Gate B -> viewer start`; it must not weaken this ordering.
+`stop` remains bounded cleanup of separately marked viewer-owned processes and requires the current canonical lease; it does not require a healthy client merely to remove its own observer.
 
 ## Viewer identity and health
 
@@ -155,12 +161,13 @@ The release helper discovers the current authoritative controller session and cu
 Repository tests are not physical deployment proof. Before this facility is called deployed, a serialized physical Synology validation must prove on the current admitted exact client that:
 
 1. one controller establishes Gate B;
-2. the viewer is healthy through the exact public `:6082` identity and WebSocket path;
-3. controller authority is released/replaced without terminating the client/viewer;
-4. the replacement controller obtains a fresh session/capability/generation;
-5. required rebind + Gate B pass using the raw-XRes probe;
-6. the same runtime identity and viewer instance remain healthy after controller replacement;
-7. no second official-client login/session is created;
-8. no Tibia credential or auth/session secret is accessed by the viewer/handoff test.
+2. viewer `start` passes through `persistent-viewer-controller.py` and cannot proceed when Gate B fails;
+3. the viewer is healthy through the exact public `:6082` identity and WebSocket path;
+4. controller authority is released/replaced without terminating the client/viewer;
+5. the replacement controller obtains a fresh session/capability/generation;
+6. required rebind + Gate B pass using the raw-XRes probe;
+7. the same runtime identity and viewer instance remain healthy after controller replacement;
+8. no second official-client login/session is created;
+9. no Tibia credential or auth/session secret is accessed by the viewer/handoff test.
 
 If another task owns the required Synology/runtime surface, the physical validation waits. It must never preempt that owner merely to complete this contract.

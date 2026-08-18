@@ -16,7 +16,7 @@ base_branch: main
 base_main: ed09418b431c28087775b419f85bed404fa85d70
 related_pr: 509
 created: 2026-08-18T09:29:00+02:00
-updated: 2026-08-18T09:54:00+02:00
+updated: 2026-08-18T10:03:00+02:00
 risk: medium
 implementation_authorized: true
 credentials_allowed: false
@@ -74,9 +74,9 @@ feature_scope:
   e2e_required: false
 validation_level: focused
 invocation_started_at: 2026-08-18T09:29:00+02:00
-last_progress_at: 2026-08-18T09:54:00+02:00
+last_progress_at: 2026-08-18T10:03:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: final-docs
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -92,13 +92,12 @@ Execute the archived capability-sweep programme's next safe static step without 
 
 ```text
 exact official Linux client 15.32.df7b29
-  -> exhaustive unfiltered generated-message census
-  -> exhaustive inbound-oriented QMeta/handler string census
-  -> bounded static xref candidate extraction
-  -> durable S1 registries and ranked S2 follow-up edges
+  -> exhaustive generated-message census
+  -> complete inbound receive-method name surface
+  -> protocol-handler type/code xrefs
+  -> current exact-build anchor revalidation
+  -> ranked non-runtime S2 follow-up
 ```
-
-This task is deliberately independent of the currently active PR #475 runtime/world-entry/worldmap mutation work.
 
 # Exact client fence
 
@@ -112,32 +111,33 @@ platform: official_native_linux_only
 
 # Acceptance inventory
 
-- [x] exact client compressed and unpacked hashes revalidated on hosted runner;
-- [x] generated-message denominator revalidated: 349 total / 160 client->server / 189 server->client;
-- [x] complete 160/189 registries persisted in Git;
-- [x] fresh registries independently compared byte-for-byte with #473 sanitized control and all three hashes match exactly;
-- [x] all 189 inbound names preserved;
-- [x] unfiltered inbound-oriented method census persisted: 542 exact strings;
-- [x] 47 distinct `*ProtocolMessageHandler` class names with direct code-to-class-string xrefs persisted;
-- [x] bounded xref evidence strength explicitly stops at `DIRECT_CODE_TO_STRING_XREF` and does not claim a dispatcher edge;
-- [x] current-main exact-build vptr anchors revalidated: 7/7 unique;
-- [x] generated-message-to-similar-method correlations classified only as static lexical inference;
-- [x] sole automatic lexical miss identified as `GameserverMessageTrackQuestFlags`; nearby `TrackedQuestFlags` methods recorded without overclaim;
-- [x] no common inbound dispatcher was invented; status remains `UNKNOWN`;
-- [x] producer substring-family grouping was independently falsified as semantic evidence (`Mark`/`Market`, `row`/`Browse`) and excluded from promoted conclusions;
-- [x] no live/runtime/worldmap mutation or #475-owned surface touched;
-- [x] no raw client bytes committed or uploaded;
+- [x] exact compressed/unpacked hashes revalidated on GitHub-hosted runner;
+- [x] protocol denominator revalidated: 349 total / 160 client->server / 189 server->client;
+- [x] complete 160/189 registries persisted;
+- [x] fresh registries byte-identical to independent #473 sanitized control;
+- [x] complete 189 `received*Message` string surface persisted;
+- [x] broad candidate method census split correctly: 149 `handle*` + 189 `received*` + 204 `on*` = 542;
+- [x] exact string comparison: 188 receive-method stems match generated server-message stems exactly; one `TrackQuestFlags` / `TrackedQuestFlags` variant;
+- [x] no receive-method string is promoted to a concrete dispatch edge;
+- [x] 47 distinct `*ProtocolMessageHandler` class strings with direct executable xrefs persisted;
+- [x] xref evidence stops at `DIRECT_CODE_TO_STRING_XREF`; dispatcher role remains unproven;
+- [x] current-main exact-build vptr anchors revalidated 7/7 unique;
+- [x] common upstream inbound dispatcher remains `UNKNOWN`;
+- [x] naive substring family buckets independently rejected as semantic evidence;
+- [x] no #475/runtime/Synology/X11/process-memory/login/credential/gameplay access;
+- [x] no raw proprietary client bytes committed or uploaded;
 - [x] temporary producer workflow removed from final branch diff;
-- [x] result/report distinguish FACT / INFERENCE / UNKNOWN;
-- [x] E2E = NOT_APPLICABLE: static exact-file discovery only; no product/runtime behavior changed;
-- [ ] fresh final diff audit on current final head;
-- [ ] exact-head required repository CI/governance green;
-- [ ] zero unresolved material review findings and coordinator/promotion disposition where required;
+- [x] E2E = `NOT_APPLICABLE`: static exact-file discovery only;
+- [ ] final current-head diff/path audit after audit corrections;
+- [ ] current-main freshness/reconciliation;
+- [ ] exact-head required CI/governance;
+- [ ] zero unresolved material review findings;
+- [ ] coordinator/promotion disposition if required by current Track A governance.
 
 # Fresh producer evidence
 
 ```yaml
-producer_pre_checkpoint_head: cb575cec2077c8002bb6712ffac4d4dc77420499
+producer_head: cb575cec2077c8002bb6712ffac4d4dc77420499
 workflow_run: 32112814216
 job: 95635760592
 conclusion: SUCCESS
@@ -150,22 +150,7 @@ pr475_runtime_touched: false
 raw_client_uploaded: false
 ```
 
-Primary durable evidence:
-
-```text
-docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/summary.json
-docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/result.md
-docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-client-to-server.txt
-docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-server-to-client.txt
-docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/inbound-method-strings.txt
-docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-handler-code-xrefs.tsv
-docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/known-anchor-vptr-resolution.json
-docs/agents/reports/OTCLIENT-20260818-track-a-s1-unfiltered-static-census.md
-```
-
-# Independent denominator control
-
-The sanitized exact-build #473 artifact was independently re-opened during this task:
+Independent #473 denominator control:
 
 ```yaml
 run: 32022209943
@@ -177,68 +162,65 @@ server_to_client_sha256: e642f661546c2e6e89ddcd77ac5e8aa9cd517408a309f95a3a367af
 fresh_lists_byte_identical: true
 ```
 
-# Material findings
-
-## FACT — protocol denominator
+# Durable evidence
 
 ```text
-349 generated protocol message names
-160 GameclientMessage*
-189 GameserverMessage*
+docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/summary.json
+docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/result.md
+docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-client-to-server.txt
+docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-server-to-client.txt
+docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/received-message-methods.txt
+docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/inbound-method-strings.txt
+docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/protocol-handler-code-xrefs.tsv
+docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/known-anchor-vptr-resolution.json
+docs/agents/reports/OTCLIENT-20260818-track-a-s1-unfiltered-static-census.md
 ```
 
-The historical 98-message capability-regex list was only a filtered subset and is not the denominator.
+# Material result
 
-## FACT — inbound-oriented native surface
+```yaml
+FACT:
+  generated_protocol_total: 349
+  client_to_server: 160
+  server_to_client: 189
+  broad_candidate_method_strings: 542
+  handle_prefixed: 149
+  received_message_strings: 189
+  on_prefixed: 204
+  received_exact_stem_matches: 188
+  received_naming_variants: 1
+  protocol_message_handler_class_xrefs: 47
+  exact_profile_vptr_targets_unique: 7
 
-```text
-542 inbound-oriented method strings
-148 relevant demangled protocol/storage/session/data types in the producer artifact
-51 interesting strings with direct executable code xrefs
-52 retained direct xrefs
-47 distinct *ProtocolMessageHandler class names with direct executable xrefs
+INFERENCE:
+  generated_message_to_received_method_name_alignment: static_lexical_only
+  native_protocol_handler_type_surface: domain_partitioned
+
+UNKNOWN:
+  generated_message_to_concrete_handler_dispatch
+  received_method_to_handler_owner
+  handler_to_storage_controller_mutation_edge
+  common_upstream_inbound_dispatcher
+  runtime_delivery_or_state_mutation
 ```
 
-Representative exact handler classes include player, creature, container, chat, game, login, market, quickloot, quest, sound, store, trade and worldmap domains.
+# Repair and audit history
 
-## FACT — current exact-build anchors
+## R1 — resolver checkout/scratch path
 
-```text
-TGameClient                     0x3076908
-TGameserverGameSession          0x3078ba0
-TPlayerProtocolMessageHandler   0x308a008
-TPlayerData                     0x308ca70
-TContainerStorage               0x308a1a0
-TCreatureStorage                0x308d078
-TWorldmapProtocolMessageHandler 0x30871d8
-```
+Initial producer changed cwd to runner scratch but referred to the repository resolver/profile relatively. Self-review repaired this before accepting evidence by using exact `$GITHUB_WORKSPACE` paths and asserting both files exist. RTTI demangling was also corrected to `c++filt -t`. No pre-repair result was promoted.
 
-All seven were re-resolved uniquely by the current-main relocation-aware resolver on the fresh exact binary.
+## A1 — diagnostic family buckets rejected
 
-## INFERENCE — lexical message/method alignment
+Substring-only grouping could misclassify names (`Mark` inside `Market`, `row` inside `Browse`). These buckets were excluded from all durable semantic conclusions.
 
-188/189 generated inbound names have at least one exact/broader `handle*` / `received*` / related method surface under the bounded static matcher. This is not a call edge.
+## A2 — broad 542-method set narrowed
 
-The one automatic miss is `GameserverMessageTrackQuestFlags`; `handleTrackedQuestFlagsMessage`, `receivedTrackedQuestFlagsMessage` and `onTrackedQuestFlagsChanged` exist separately and are retained as a naming-variant hypothesis only.
+Final diff review found the broad `handle/received/on` set was being described too strongly as an inbound-handler denominator. It was corrected to the actual prefix distribution `149/189/204`; the durable inbound receive-surface denominator is the exact 189 `received*Message` strings. The report/result/summary now preserve this distinction.
 
-## UNKNOWN — semantic wiring
+## A3 — shared-upstream-dispatcher non-claim
 
-```text
-GameserverMessageX -> exact handler dispatch
-handler -> storage/controller mutation
-single/global inbound dispatcher
-runtime delivery/state mutation
-```
-
-# Repair history
-
-## Repair 1 — checkout/scratch resolver path
-
-Self-review found that the first producer implementation changed cwd to runner scratch but called the repository resolver through a relative `tools/...` path. The producer was repaired to use exact `$GITHUB_WORKSPACE` paths and assert resolver/profile existence before evidence was accepted. `c++filt -t` was also used for RTTI type encodings. No pre-repair result was promoted.
-
-## Audit finding A1 — diagnostic family grouping rejected
-
-Post-artifact review found that substring-only convenience grouping could misclassify names (`Mark` inside `Market`, `row` inside `Browse`). Those buckets are not durable semantic evidence and no report conclusion depends on them. Exact names/types/xrefs are used instead.
+Many domain-specific `*ProtocolMessageHandler` types prove a broad partitioned handler type surface, but do not disprove a common upstream router/queue. Wording was corrected so `COMMON_UPSTREAM_INBOUND_DISPATCHER=UNKNOWN` remains explicit.
 
 # Non-overlap / E2E
 
@@ -258,36 +240,30 @@ physical_e2e:
 
 # Ranked next static frontier
 
-While #475 owns live native-login/worldmap runtime, next independent S2 priority is:
-
 ```text
-TPlayerProtocolMessageHandler
-  -> PlayerDataCurrent / PlayerState / PlayerInventory / PlayerSkills
-  -> exact QMeta/dispatch targets
-  -> exact static owner/mutation edge into TPlayerData where provable
+1. TPlayerProtocolMessageHandler
+   -> PlayerDataCurrent / PlayerState / PlayerInventory / PlayerSkills
+   -> exact QMeta/dispatch targets
+   -> static TPlayerData owner/mutation edge where provable
+
+2. TCreatureProtocolMessageHandler -> TCreatureStorage
+3. TContainerProtocolMessageHandler -> TContainerStorage
+4. TChatProtocolMessageHandler -> chat storage/controller
 ```
 
-Then, independently:
-
-```text
-TCreatureProtocolMessageHandler -> TCreatureStorage
-TContainerProtocolMessageHandler -> TContainerStorage
-TChatProtocolMessageHandler -> chat storage/controller
-```
+All are exact-file static work and remain independent of PR #475 physical runtime.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 3
+checkpoint_version: 4
 status: validating
 phase: exact-head-validation
 base_main_at_claim: ed09418b431c28087775b419f85bed404fa85d70
 pr: 509
-pre_checkpoint_head: b25ea25b732154e273ef4182cbe9c14429acbbf6
-producer_workflow_removed: true
 research_result: COMPLETE
-promotion_status: PENDING_FINAL_AUDIT_AND_EXACT_HEAD_CHECKS
-last_completed_step: persisted complete protocol registries, 542-method census, 47 handler xrefs, exact vptr anchors, result and report; removed the temporary producer
+producer_workflow_removed: true
+last_completed_step: corrected final evidence semantics after A2/A3, including the exact 189 received-method denominator and shared-upstream-dispatcher non-claim
 blockers: []
-next_action: perform full final PR diff/changed-path audit against current main, reconcile only real base drift if necessary, then require exact-head CI/governance and review hygiene before promotion/merge.
+next_action: perform current-head full diff/path audit, refresh current main and promotion authority, reconcile only if required, then require exact-head CI/governance and review hygiene before terminal disposition.
 ```

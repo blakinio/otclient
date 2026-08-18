@@ -1,0 +1,555 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:blakinio:otclient:monster-observation:v1",
+  "title": "MONSTER_OBSERVATION_V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "record_id",
+    "record_type",
+    "producer_sequence",
+    "time",
+    "client",
+    "runtime",
+    "source",
+    "coverage"
+  ],
+  "properties": {
+    "schema": {
+      "const": "MONSTER_OBSERVATION_V1"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "record_type": {
+      "enum": [
+        "EPOCH_START",
+        "EPOCH_END",
+        "COVERAGE_START",
+        "COVERAGE_UPDATE",
+        "COVERAGE_END",
+        "PLAYER_POSITION",
+        "CONTROL_STIMULUS",
+        "CREATURE_CREATE",
+        "CREATURE_MOVE",
+        "CREATURE_UPDATE",
+        "CREATURE_HEALTH",
+        "CREATURE_TYPE",
+        "CREATURE_DELETE"
+      ]
+    },
+    "producer_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "monotonic_ns"
+      ],
+      "properties": {
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_time_utc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "sha256",
+        "size"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_epoch_id",
+        "process_epoch_id",
+        "world_key"
+      ],
+      "properties": {
+        "observation_epoch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "process_epoch_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "world_key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence",
+        "layer"
+      ],
+      "properties": {
+        "evidence": {
+          "enum": [
+            "DIRECT",
+            "CORRELATED",
+            "DERIVED",
+            "UNKNOWN"
+          ]
+        },
+        "layer": {
+          "enum": [
+            "PROTOCOL",
+            "RUNTIME_MODEL",
+            "BRIDGE",
+            "OBSERVER",
+            "INFERENCE"
+          ]
+        },
+        "message_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "handler_or_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "source_record_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "continuity_token",
+        "tile_observed",
+        "continuous_since_monotonic_ns",
+        "last_gap_reason"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "UNKNOWN",
+            "VISIBLE_RENDERED",
+            "DECODED_CURRENT",
+            "DECODED_CACHE",
+            "CONTINUOUS_CONFIRMED"
+          ]
+        },
+        "continuity_token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "tile_observed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "continuous_since_monotonic_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "last_gap_reason": {
+          "enum": [
+            "NONE",
+            "VIEWPORT_EXIT",
+            "FLOOR_CHANGE",
+            "DISCONNECT",
+            "RELOGIN",
+            "CLIENT_RESTART",
+            "CACHE_EVICTION",
+            "OBSERVER_RESTART",
+            "TARGET_UNPROVEN",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z",
+        "evidence"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "z": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evidence": {
+          "enum": [
+            "DIRECT",
+            "CORRELATED",
+            "DERIVED",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "creature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_instance_id",
+        "class"
+      ],
+      "properties": {
+        "observation_instance_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "client_creature_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "class": {
+          "enum": [
+            "MONSTER",
+            "PLAYER",
+            "NPC",
+            "SUMMON",
+            "UNKNOWN"
+          ]
+        },
+        "race_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "type_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "appearance_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "semantic_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "hp_percent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "speed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "direction": {
+          "enum": [
+            "NORTH",
+            "EAST",
+            "SOUTH",
+            "WEST",
+            "UNKNOWN"
+          ]
+        },
+        "target_relation": {
+          "enum": [
+            "ATTACKING_LOCAL_PLAYER",
+            "ATTACKED_BY_LOCAL_PLAYER",
+            "OTHER",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "player": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y",
+            "z",
+            "evidence"
+          ],
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "y": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "z": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "evidence": {
+              "enum": [
+                "DIRECT",
+                "CORRELATED",
+                "DERIVED",
+                "UNKNOWN"
+              ]
+            }
+          }
+        },
+        "target_relation": {
+          "enum": [
+            "TARGETING_CREATURE",
+            "NOT_TARGETING_CREATURE",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "stimulus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "label": {
+          "enum": [
+            "PLAYER_STEP_NORTH",
+            "PLAYER_STEP_EAST",
+            "PLAYER_STEP_SOUTH",
+            "PLAYER_STEP_WEST",
+            "PLAYER_STOP",
+            "TARGET_MONSTER",
+            "CANCEL_TARGET",
+            "NO_STIMULUS_BASELINE"
+          ]
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        }
+      }
+    },
+    "appearance_context": {
+      "enum": [
+        "INITIAL_SYNC",
+        "VISIBILITY_GAIN",
+        "AFTER_COVERAGE_GAP",
+        "CONTINUOUS_COVERAGE_CREATE",
+        "UNKNOWN"
+      ]
+    },
+    "disappearance_context": {
+      "enum": [
+        "SERVER_DELETE_DURING_COVERAGE",
+        "VISIBILITY_LOSS",
+        "FLOOR_CHANGE",
+        "DISCONNECT",
+        "RELOGIN",
+        "CLIENT_RESTART",
+        "CACHE_EVICTION",
+        "UNKNOWN"
+      ]
+    },
+    "death_evidence": {
+      "enum": [
+        "NONE",
+        "EXPLICIT_SERVER_EVENT",
+        "ZERO_HP_CORRELATED",
+        "CORPSE_TRANSITION_CORRELATED",
+        "COMBAT_EVENT_CORRELATED",
+        "UNKNOWN"
+      ]
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 512
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "enum": [
+              "CREATURE_CREATE",
+              "CREATURE_MOVE",
+              "CREATURE_UPDATE",
+              "CREATURE_HEALTH",
+              "CREATURE_TYPE",
+              "CREATURE_DELETE"
+            ]
+          }
+        },
+        "required": [
+          "record_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "creature"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "const": "CREATURE_CREATE"
+          }
+        },
+        "required": [
+          "record_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "appearance_context"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "const": "CREATURE_DELETE"
+          }
+        },
+        "required": [
+          "record_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "disappearance_context",
+          "death_evidence"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "const": "PLAYER_POSITION"
+          }
+        },
+        "required": [
+          "record_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "player"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "const": "CONTROL_STIMULUS"
+          }
+        },
+        "required": [
+          "record_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "stimulus"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "coverage": {
+            "properties": {
+              "mode": {
+                "const": "CONTINUOUS_CONFIRMED"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          }
+        },
+        "required": [
+          "coverage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "coverage": {
+            "properties": {
+              "continuous_since_monotonic_ns": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "last_gap_reason": {
+                "const": "NONE"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

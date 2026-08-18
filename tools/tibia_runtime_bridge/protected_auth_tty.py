@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import resource
+import stat
 import struct
 import sys
 import termios
@@ -23,6 +24,7 @@ EXACT_CLIENT_SIZE = 51965216
 EXACT_CLIENT_SHA256 = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
 MAX_SECRET_BYTES = 1024
 _SECRET_BUFFER_BYTES = MAX_SECRET_BYTES + 2
+_MAX_IDENTITY_JSON_BYTES = 4096
 _PR_SET_DUMPABLE = 4
 _LEGACY_SECRET_ENV = ("TIBIA_TEST_EMAIL", "TIBIA_TEST_PASSWORD")
 
@@ -178,26 +180,58 @@ def _lower_sha256(value: object) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(ch in "0123456789abcdef" for ch in value)
 
 
+def _identity_stat_key(metadata: os.stat_result) -> tuple[int, int, int, int, int]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
 def load_exact_runtime_identity(path: Path) -> PeerIdentityExpectation:
     if not path.is_absolute():
         raise BridgeClientError("runtime identity path must be absolute")
-    if path.is_symlink() or not path.is_file():
-        raise BridgeClientError("runtime identity must be a regular non-symlink file")
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise BridgeClientError("O_NOFOLLOW is unavailable for runtime identity")
+
+    flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
     try:
-        metadata = path.stat()
+        fd = os.open(path, flags)
     except OSError as exc:
-        raise BridgeClientError(f"runtime identity metadata is unavailable: {exc}") from exc
-    if metadata.st_uid != os.geteuid():
-        raise BridgeClientError("runtime identity must be owned by the current effective user")
-    if metadata.st_mode & 0o022:
-        raise BridgeClientError("runtime identity must not be group/world writable")
+        raise BridgeClientError(f"runtime identity open failed: {exc}") from exc
     try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise BridgeClientError(f"runtime identity JSON is invalid: {exc}") from exc
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise BridgeClientError("runtime identity must be a regular file")
+        if before.st_uid != os.geteuid():
+            raise BridgeClientError("runtime identity must be owned by the current effective user")
+        if before.st_mode & 0o022:
+            raise BridgeClientError("runtime identity must not be group/world writable")
+        if before.st_size <= 0 or before.st_size > _MAX_IDENTITY_JSON_BYTES:
+            raise BridgeClientError("runtime identity JSON size is invalid")
+
+        raw = bytearray()
+        while len(raw) < before.st_size:
+            chunk = os.read(fd, min(1024, before.st_size - len(raw)))
+            if not chunk:
+                break
+            raw.extend(chunk)
+        after = os.fstat(fd)
+        if len(raw) != before.st_size or _identity_stat_key(before) != _identity_stat_key(after):
+            raise BridgeClientError("runtime identity changed during read")
+        try:
+            doc = json.loads(raw.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise BridgeClientError(f"runtime identity JSON is invalid: {exc}") from exc
+        finally:
+            raw.clear()
+    finally:
+        os.close(fd)
+
     if not isinstance(doc, dict):
         raise BridgeClientError("runtime identity JSON must be an object")
-
     if doc.get("client_version") != EXACT_CLIENT_VERSION:
         raise BridgeClientError("runtime identity client version mismatch")
     if doc.get("client_size") != EXACT_CLIENT_SIZE:

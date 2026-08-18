@@ -20,7 +20,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy persistent KasmVNC desktop on Synology
-    runs-on: self-hosted
+    runs-on: [otclient, synology]
     timeout-minutes: 30
     env:
       TASK_ID: OTC-20260818-track-a-persistent-viewer-handoff

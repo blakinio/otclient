@@ -1,0 +1,262 @@
+name: Track A world minimap static G0
+
+on:
+  push:
+    branches:
+      - research/OTC-20260819-track-a-world-minimap-static-g0
+    paths:
+      - .github/workflows/track-a-world-minimap-static-g0.yml
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_PACKED_SHA256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+  EXPECTED_UNPACKED_SHA256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+  EXPECTED_UNPACKED_SIZE: '52109920'
+
+jobs:
+  census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Install bounded static-analysis dependencies
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl python3-capstone python3-pyelftools
+
+      - name: Fetch and fence current public Linux package through WARP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          r=/tmp/track-a-wm-g0
+          mkdir -p "$r/bin" "$r/state" /tmp/track-a-wm-client /tmp/track-a-wm-evidence
+          cd "$r/bin"
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wp.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wp.tgz' | sha256sum -c -
+          mkdir x
+          tar -xzf wp.tgz -C x
+          cp "$(find x -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+          cd "$r/state"
+          "$r/bin/wgcf" register --accept-tos >/dev/null
+          "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25345\n' "$r/state/wgcf-profile.conf" > w.conf
+          nohup "$r/bin/wireproxy" -c w.conf >/tmp/track-a-wm-wireproxy.log 2>&1 </dev/null &
+          echo $! >/tmp/track-a-wm-wireproxy.pid
+          for _ in $(seq 1 30); do
+            if curl --socks5-hostname 127.0.0.1:25345 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >/tmp/track-a-wm-trace 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' /tmp/track-a-wm-trace
+
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25345 --compressed -fL -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' "$u" -o /tmp/track-a-wm-client/client.lzma
+          actual_packed="$(sha256sum /tmp/track-a-wm-client/client.lzma | awk '{print $1}')"
+          printf 'PACKED_SHA256=%s\n' "$actual_packed" | tee /tmp/track-a-wm-evidence/fence.txt
+          test "$actual_packed" = "$EXPECTED_PACKED_SHA256"
+
+          python3 - <<'PY'
+          import hashlib
+          import lzma
+          import os
+          from pathlib import Path
+
+          src = Path('/tmp/track-a-wm-client/client.lzma')
+          blob = src.read_bytes()
+          q = blob[32]
+          lc = q % 9
+          z = q // 9
+          lp = z % 5
+          pb = z // 5
+          dict_size = int.from_bytes(blob[33:37], 'little')
+          filters = [{'id': lzma.FILTER_LZMA1, 'dict_size': dict_size, 'lc': lc, 'lp': lp, 'pb': pb}]
+          out = lzma.decompress(blob[45:], format=lzma.FORMAT_RAW, filters=filters)
+          digest = hashlib.sha256(out).hexdigest()
+          size = len(out)
+          expected_digest = os.environ['EXPECTED_UNPACKED_SHA256']
+          expected_size = int(os.environ['EXPECTED_UNPACKED_SIZE'])
+          print(f'UNPACKED_SHA256={digest}')
+          print(f'UNPACKED_SIZE={size}')
+          if digest != expected_digest or size != expected_size:
+              raise SystemExit('CURRENT_PACKAGE_FENCE_MISMATCH')
+          Path('/tmp/track-a-wm-client/client').write_bytes(out)
+          with Path('/tmp/track-a-wm-evidence/fence.txt').open('a', encoding='utf-8') as f:
+              f.write(f'UNPACKED_SHA256={digest}\nUNPACKED_SIZE={size}\nCURRENT_PACKAGE_FENCE=PASS\n')
+          PY
+
+      - name: Enumerate minimap and world-map transform QMeta surfaces
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY' | tee /tmp/track-a-wm-evidence/minimap-qmeta.txt
+          from pathlib import Path
+          from elftools.elf.elffile import ELFFile
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86_const import X86_OP_MEM, X86_OP_REG, X86_REG_RIP
+          import re
+          import struct
+
+          client = Path('/tmp/track-a-wm-client/client')
+          raw = client.read_bytes()
+          with client.open('rb') as fh:
+              elf = ELFFile(fh)
+              sections = [
+                  (s.name, int(s['sh_offset']), int(s['sh_size']), int(s['sh_addr']), int(s['sh_flags']))
+                  for s in elf.iter_sections()
+              ]
+
+          def vaoff(va):
+              for name, off, size, base, flags in sections:
+                  if base <= va < base + size:
+                      return off + (va - base), name
+              raise ValueError(f'unmapped va 0x{va:x}')
+
+          def mapped(va):
+              return any(base <= va < base + size for _, _, size, base, _ in sections)
+
+          def executable(va):
+              return any((flags & 4) and base <= va < base + size for _, _, size, base, flags in sections)
+
+          def u32(va):
+              return struct.unpack_from('<I', raw, vaoff(va)[0])[0]
+
+          def i32(va):
+              return struct.unpack_from('<i', raw, vaoff(va)[0])[0]
+
+          def parse_meta(stringdata, metadata):
+              try:
+                  h = [u32(metadata + i * 4) for i in range(14)]
+              except Exception:
+                  return None
+              rev, class_index, _, _, method_count, method_data, prop_count, prop_data, enum_count, enum_data, ctor_count, ctor_data, flags, signals = h
+              if rev > 20 or method_count > 2000 or method_data > 200000 or class_index > 20000 or signals > method_count:
+                  return None
+              try:
+                  def qstr(index):
+                      entry = stringdata + index * 8
+                      rel = u32(entry)
+                      size = u32(entry + 4)
+                      if size > 32768 or rel > (1 << 24):
+                          raise ValueError
+                      off, _ = vaoff(stringdata + rel)
+                      return raw[off:off + size].decode('utf-8', 'replace')
+                  cls = qstr(class_index)
+                  methods = []
+                  for k in range(method_count):
+                      row_base = metadata + (method_data + k * 6) * 4
+                      row = [u32(row_base + j * 4) for j in range(6)]
+                      methods.append((k, qstr(row[0])))
+                  return cls, methods, signals
+              except Exception:
+                  return None
+
+          target_class = re.compile(r'(minimap|worldmapcamera|worldmapviewport|worldmaprender|worldmappicker|edit.*marker|marker.*minimap)', re.I)
+          found = []
+          seen = set()
+          for sec_name, sec_off, sec_size, sec_va, sec_flags in sections:
+              if sec_flags & 4 or sec_size < 32:
+                  continue
+              for rel in range(0, sec_size - 31, 8):
+                  try:
+                      qmeta = sec_va + rel
+                      stringdata = struct.unpack_from('<Q', raw, sec_off + rel + 8)[0]
+                      metadata = struct.unpack_from('<Q', raw, sec_off + rel + 16)[0]
+                      static_metacall = struct.unpack_from('<Q', raw, sec_off + rel + 24)[0]
+                  except Exception:
+                      continue
+                  if not mapped(stringdata) or not mapped(metadata) or not executable(static_metacall):
+                      continue
+                  parsed = parse_meta(stringdata, metadata)
+                  if not parsed:
+                      continue
+                  cls, methods, signals = parsed
+                  if not target_class.search(cls):
+                      continue
+                  key = (qmeta, stringdata, metadata, static_metacall)
+                  if key in seen:
+                      continue
+                  seen.add(key)
+                  found.append((cls, qmeta, static_metacall, methods, signals))
+
+          if not any('TMinimapController' in cls for cls, *_ in found):
+              raise SystemExit('MINIMAP_CONTROLLER_QMETA_NOT_FOUND')
+
+          md = Cs(CS_ARCH_X86, CS_MODE_64)
+          md.detail = True
+          print('CURRENT_MINIMAP_QMETA_BEGIN')
+          for cls, qmeta, static_metacall, methods, signals in sorted(found, key=lambda x: x[0]):
+              print(f'CLASS={cls} QMETA=0x{qmeta:x} STATIC=0x{static_metacall:x} SIGNALS={signals} METHODS={len(methods)}')
+              start, _ = vaoff(static_metacall)
+              ins = list(md.disasm(raw[start:start + 0x500], static_metacall))
+              candidates = []
+              for pos, inst in enumerate(ins):
+                  if inst.mnemonic != 'lea' or len(inst.operands) < 2:
+                      continue
+                  if inst.operands[0].type != X86_OP_REG or inst.operands[1].type != X86_OP_MEM:
+                      continue
+                  mem = inst.operands[1].mem
+                  if mem.base != X86_REG_RIP:
+                      continue
+                  reg = inst.operands[0].reg
+                  table = inst.address + inst.size + mem.disp
+                  used = any(
+                      any(op.type == X86_OP_MEM and op.mem.base == reg and op.mem.scale == 4 for op in later.operands)
+                      for later in ins[pos + 1:pos + 10]
+                  )
+                  if not used:
+                      continue
+                  try:
+                      targets = [table + i32(table + k * 4) for k in range(len(methods))]
+                      score = sum(executable(v) for v in targets)
+                      candidates.append((score, table, targets))
+                  except Exception:
+                      pass
+              candidates.sort(reverse=True)
+              best = candidates[0] if candidates else None
+              direct = bool(best and best[0] == len(methods))
+              for index, name in methods:
+                  if direct:
+                      print(f'  METHOD index={index} name={name} target=0x{best[2][index]:x} direct=true')
+                  else:
+                      print(f'  METHOD index={index} name={name} direct=false')
+          print('CURRENT_MINIMAP_QMETA_END')
+          print(f'CURRENT_MINIMAP_QMETA_CLASS_COUNT={len(found)}')
+          PY
+
+          strings -a /tmp/track-a-wm-client/client \
+            | grep -Eai 'minimap|world.?map.?camera|world.?map.?viewport|world.?map.?picker|edit.*marker|marker.*minimap' \
+            | sed 's/[^[:print:]]//g' \
+            | sort -u \
+            | head -n 600 \
+            > /tmp/track-a-wm-evidence/minimap-strings.txt
+          test -s /tmp/track-a-wm-evidence/minimap-strings.txt
+          printf 'MINIMAP_STRING_LINES=%s\n' "$(wc -l < /tmp/track-a-wm-evidence/minimap-strings.txt)" | tee -a /tmp/track-a-wm-evidence/fence.txt
+
+      - name: Remove proprietary package before evidence upload
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if test -f /tmp/track-a-wm-wireproxy.pid; then
+            kill "$(cat /tmp/track-a-wm-wireproxy.pid)" 2>/dev/null || true
+          fi
+          rm -rf /tmp/track-a-wm-client /tmp/track-a-wm-g0 /tmp/track-a-wm-trace /tmp/track-a-wm-wireproxy.log /tmp/track-a-wm-wireproxy.pid
+          test ! -e /tmp/track-a-wm-client/client
+          test ! -e /tmp/track-a-wm-client/client.lzma
+          printf 'RAW_CLIENT_RETAINED=false\n' | tee -a /tmp/track-a-wm-evidence/fence.txt
+
+      - name: Upload compact text evidence
+        if: success()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: track-a-world-minimap-static-g0-${{ github.run_id }}
+          path: /tmp/track-a-wm-evidence
+          if-no-files-found: error
+          retention-days: 7

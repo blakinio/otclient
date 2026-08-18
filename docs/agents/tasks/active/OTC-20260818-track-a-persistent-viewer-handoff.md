@@ -14,7 +14,7 @@ base_branch: main
 base_main: ebbb36f50076ff4072c7218e302614c1dfea00b1
 pull_request: 541
 risk: high
-updated: 2026-08-18T18:05:00+02:00
+updated: 2026-08-18T18:18:00+02:00
 policy_version: 2
 execution_mode: github-orchestrated-synology
 execution_reason: deploy a real persistent KasmVNC desktop on synology-otclient-01, isolated from the active native-login runtime, with DSM Reverse Proxy as the stable browser frontend
@@ -24,7 +24,7 @@ context_growth: stable
 context_score: 9
 estimate_confidence: high
 decomposition_decision: phased
-decomposition_reason: preserve the validated controller-handoff work, deploy a task-owned persistent KasmVNC loopback backend, expose it only through DSM Reverse Proxy, then integrate the official client only after the current native-login owner releases or explicitly reconciles its client runtime surface
+decomposition_reason: preserve the validated controller-handoff work, deploy a task-owned persistent KasmVNC loopback HTTPS backend, expose it only through DSM Reverse Proxy, then integrate the official client only after the current native-login owner releases or explicitly reconciles its client runtime surface
 feature_scope:
   type: infrastructure
   user_facing: true
@@ -62,8 +62,12 @@ kasm_container_port: 6901
 kasm_internal_display: ':1'
 kasm_backend_url: https://127.0.0.1:6901/
 kasm_public_frontend: DSM_reverse_proxy
-kasm_public_source_port: 443
-kasm_public_url: operator-configured HTTPS hostname via DSM Reverse Proxy
+kasm_public_source_host: synology
+kasm_public_source_port: 6902
+kasm_public_url: https://synology:6902/
+kasm_proxy_destination_scheme: HTTPS
+kasm_proxy_destination_host: 127.0.0.1
+kasm_proxy_destination_port: 6901
 kasm_websocket_required: true
 kasm_restart_policy: unless-stopped
 protected_concurrent_owner_task: OTC-20260818-native-login-to-ingame-e2e
@@ -89,16 +93,16 @@ acceptance:
   - KasmVNC is the actual persistent browser desktop provider; no x11vnc/websockify/noVNC chain is used for the new desktop
   - one task-owned Docker container named otclient-track-a-kasmvnc remains alive after the GitHub Actions deployment job exits
   - KasmVNC publishes only host loopback https://127.0.0.1:6901 and is not intentionally exposed directly at 192.168.1.2:6901
-  - the stable user-facing endpoint is DSM Reverse Proxy HTTPS on port 443 with WebSocket forwarding to https://127.0.0.1:6901
+  - the stable user-facing endpoint is DSM Reverse Proxy https://synology:6902 with WebSocket forwarding to https://127.0.0.1:6901
   - the Kasm desktop has its own isolated display and namespace and does not attach to, stop, reconfigure or replace PR #528 display :99 or port 6083
   - no TIBIA_TEST_EMAIL, TIBIA_TEST_PASSWORD, canonical lease capability or official-client session material is passed to the Kasm container
   - Kasm browser credentials are generated at deployment time into task-private mode-0600 state and are not committed or printed by CI
   - replacement agent sessions do not create a new Kasm desktop; they reuse the same container and DSM endpoint
   - existing same-task controller handoff remains fail-closed and does not use historical session_id as runtime identity
   - an official Tibia client is not started inside the new Kasm desktop until the active native-login owner releases or explicitly reconciles that client runtime surface
-integration_dependency: KasmVNC backend deployment itself is independent and may proceed now in the isolated track-a-kasmvnc-desktop namespace; DSM Reverse Proxy must then be configured by the operator and verified; migration of the official client into Kasm waits for PR #528 runtime ownership reconciliation
+integration_dependency: KasmVNC backend deployment itself is independent and may proceed now in the isolated track-a-kasmvnc-desktop namespace; DSM Reverse Proxy is configured by the operator at https://synology:6902 -> https://127.0.0.1:6901 with WebSocket; migration of the official client into Kasm waits for PR #528 runtime ownership reconciliation
 invocation_started_at: 2026-08-18T17:35:00+02:00
-last_progress_at: 2026-08-18T18:05:00+02:00
+last_progress_at: 2026-08-18T18:18:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: draft
 terminal_ci_wait_started_at: null
@@ -109,28 +113,28 @@ repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 last_validation_failure: direct LAN 192.168.1.2:6901 was incorrectly described as the supported user-facing endpoint before physical deployment; architecture corrected to loopback Kasm backend plus DSM Reverse Proxy frontend
-blocker: self-hosted synology-otclient-01 has not accepted the queued deployment job yet; until the backend exists, DSM Reverse Proxy has no healthy upstream
-next_action: when synology-otclient-01 accepts the queued job, deploy and prove https://127.0.0.1:6901 locally; then configure and verify DSM Reverse Proxy HTTPS/WebSocket frontend
+blocker: GitHub Actions run 32158812260 remains queued on runs-on self-hosted while hosted jobs on the same head complete; therefore no eligible online self-hosted runner is currently accepting the job. Repository tooling cannot restart the Synology runner process/container itself.
+next_action: restore synology-otclient-01 to Online/Idle; queued deployment then automatically deploys and proves https://127.0.0.1:6901, after which verify DSM https://synology:6902 with destination protocol HTTPS and WebSocket forwarding
 recovery:
   policy_version: 1
-  generation: 5
+  generation: 6
   session_id: chatgpt-track-a-kasmvnc-20260818-1735
   session_started_at: 2026-08-18T17:35:00+02:00
-  checkpointed_at: 2026-08-18T18:05:00+02:00
-  last_progress_at: 2026-08-18T18:05:00+02:00
+  checkpointed_at: 2026-08-18T18:18:00+02:00
+  last_progress_at: 2026-08-18T18:18:00+02:00
   phase: kasmvnc-physical-deploy
-  exact_head: dsm-proxy-architecture
+  exact_head: runner-offline-diagnosis
   pull_request: 541
-  active_operation: wait for self-hosted runner to deploy isolated loopback KasmVNC backend
-  external_run_ids: [32157262148]
-  operation_started_at: 2026-08-18T17:54:00+02:00
+  active_operation: queued self-hosted KasmVNC deployment
+  external_run_ids: [32158812260]
+  operation_started_at: 2026-08-18T16:10:09Z
   wait_deadline_at: null
   check_generation: draft
   checks_used: 0
   status: active
   safe_to_resume: true
-  resume_condition: container name otclient-track-a-kasmvnc and host port 6901 remain unowned or owned only by this exact task; PR #528 :99/6083/canonical lease remain untouched
-  next_action: prove loopback KasmVNC backend, then configure DSM Reverse Proxy with WebSocket to the verified backend
+  resume_condition: synology-otclient-01 is Online/Idle and accepts run 32158812260 or its newest synchronized successor
+  next_action: verify loopback KasmVNC HTTPS backend, then verify DSM Reverse Proxy HTTPS/WebSocket path at https://synology:6902/
 ---
 
 # Track A persistent KasmVNC desktop and controller handoff
@@ -143,10 +147,10 @@ The target path is:
 
 ```text
 browser
-  -> HTTPS stable hostname :443
+  -> HTTPS synology:6902
   -> DSM Reverse Proxy + WebSocket
   -> HTTPS 127.0.0.1:6901
-  -> KasmVNC web server / WebSocket
+  -> stock KasmVNC web server / WebSocket (-sslOnly)
   -> persistent Kasm desktop DISPLAY=:1 inside task-owned container
 ```
 
@@ -160,7 +164,7 @@ The Kasm deployment uses only:
 
 ```text
 container: otclient-track-a-kasmvnc
-host backend: 127.0.0.1:6901
+host backend: 127.0.0.1:6901 (HTTPS)
 container port: 6901
 container display: :1
 state: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
@@ -168,7 +172,9 @@ state: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-pe
 
 ## DSM presentation boundary
 
-The backend port is loopback-only. The operator-facing endpoint is created in DSM Reverse Proxy and must forward HTTPS plus WebSocket traffic to `https://127.0.0.1:6901`.
+The backend port is loopback-only. The operator-facing endpoint is DSM Reverse Proxy `https://synology:6902/` and must forward HTTPS plus WebSocket traffic to `https://127.0.0.1:6901`.
+
+The stock Kasm workspace image explicitly starts KasmVNC with `-sslOnly`, so the DSM destination protocol is intentionally **HTTPS**. Using HTTP as the destination would be a protocol mismatch.
 
 The repository does not modify DSM global reverse-proxy configuration automatically. Therefore backend deployment and public frontend verification are two explicit gates.
 

@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260818-native-auth-with-credentials-bridge
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-native-auth-bridge-20260818
 session_role: implementer
@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 execution_mode: github_only
 execution_reason: implement and validate a bounded experimental native-auth helper without touching the serialized physical runtime
 branch: feat/OTC-20260818-native-auth-with-credentials-bridge
 base_branch: main
 base_main: ed6202216886ec31d432e4e7dec56b47626f10c4
 related_pr: 507
-updated: 2026-08-18T08:15:00+02:00
+updated: 2026-08-18T08:31:00+02:00
 risk: critical
 implementation_authorized: true
 credentials_allowed: false
@@ -41,14 +41,17 @@ bootstrap: NOT_APPLICABLE
 target_uniqueness: NOT_APPLICABLE
 owned_paths:
   - tools/tibia_runtime_bridge/CMakeLists.txt
-  - tools/tibia_runtime_bridge/ipc_client.py
   - tools/tibia_runtime_bridge/experimental_auth.cpp
+  - tools/tibia_runtime_bridge/experimental_auth_client.py
   - tools/tibia_runtime_bridge/experimental_auth_launcher.py
   - tools/tibia_runtime_bridge/EXPERIMENTAL_AUTH.md
   - tests/tools/tibia_runtime_bridge/test_bridge.py
   - .github/workflows/track-a-native-auth-bridge.yml
   - docs/agents/tasks/active/OTC-20260818-native-auth-with-credentials-bridge.md
   - docs/agents/evidence/OTC-20260818-native-auth-with-credentials-bridge/**
+read_only_exact_blobs:
+  tools/tibia_runtime_bridge/bridge.cpp: c47dc3e81162867692e7608f14a9f53dea52bf3b
+  tools/tibia_runtime_bridge/ipc_client.py: 63bdb9258ce2c67781f43de8f4a482024fc89672
 modules_touched:
   - tibia_runtime_bridge
 reuses:
@@ -62,11 +65,11 @@ context_score: 7
 estimate_confidence: medium
 decomposition_decision: single
 decomposition_reason: one bounded experimental helper plus deterministic no-secret tests
-validation_level: focused
+validation_level: component
 invocation_started_at: 2026-08-18T08:11:00+02:00
-last_progress_at: 2026-08-18T08:15:00+02:00
+last_progress_at: 2026-08-18T08:31:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft
+ci_check_generation: draft-component
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -94,22 +97,30 @@ This task does not execute the official client, does not access credentials, doe
 
 # Isolation decision
 
-The merged stable `otclient-tibia-runtime-bridge.so` remains byte-for-byte read-only in this task. Do **not** add a write command to `bridge.cpp` before live causal proof.
+Both merged stable surfaces remain byte-for-byte read-only:
+
+```text
+tools/tibia_runtime_bridge/bridge.cpp      blob c47dc3e81162867692e7608f14a9f53dea52bf3b
+tools/tibia_runtime_bridge/ipc_client.py  blob 63bdb9258ce2c67781f43de8f4a482024fc89672
+```
+
+No `AUTH_WITH_CREDENTIALS` command is added to either stable server or stable client API.
 
 Instead:
 
 - CMake option `OTCLIENT_TIBIA_RE_BUILD_EXPERIMENTAL_AUTH` defaults `OFF`;
 - only when enabled, build a separate `otclient-tibia-native-auth-experimental.so`;
-- an experimental launcher composes that helper beside the unchanged stable bridge and supplies a separate non-secret auth socket path;
+- `experimental_auth_client.py` owns sealed-memfd validation and `SCM_RIGHTS` transport;
+- `experimental_auth_launcher.py` composes the helper beside the unchanged stable bridge and supplies a separate non-secret auth socket path;
 - the experimental helper serves exactly one connection/attempt, then closes and unlinks its auth socket;
 - no arbitrary method/RPC/call-address surface exists.
 
 # Hard design constraints
 
 - No credential values in textual IPC, command line, environment variables, GitHub logs, artifacts or plaintext temp files.
-- Python `auth_with_credentials_fd()` accepts an already-open FD and passes only that descriptor using `SCM_RIGHTS`; it must not read/stringify payload bytes.
+- Experimental `auth_with_credentials_fd()` accepts an already-open FD and passes only that descriptor using `SCM_RIGHTS`; it does not read/stringify payload bytes.
 - Runtime helper requires a sealed anonymous memfd (`F_GET_SEALS` plus write/grow/shrink/seal seals) and rejects ordinary files/pipes.
-- Helper accepts exactly one ancillary FD and rejects missing/multiple/unexpected descriptors.
+- Helper accepts exactly one ancillary FD and rejects missing/multiple/unexpected descriptors; received descriptors are closed even when the ancillary request is rejected/truncated.
 - Binary secret frame is little-endian length-prefixed, bounded, non-empty, valid UTF-8 and rejects embedded NUL/trailing bytes.
 - Helper-owned raw byte/QString buffers receive best-effort zeroing immediately after one invocation attempt.
 - Helper independently verifies `/proc/self/exe` size/SHA for exact client `15.32.df7b29` before exposing the auth socket.
@@ -129,18 +140,21 @@ password bytes
 
 Each field must be `1..1024` bytes; memfd size must exactly match the two lengths plus the 8-byte header. No trailing bytes are accepted.
 
-# Acceptance
+# Current implementation
 
-Deterministic GitHub-hosted validation must prove at least:
+Implemented on Draft PR #507:
 
-- default CMake build produces only the unchanged stable bridge and no experimental auth `.so`;
-- opt-in CMake build compiles the experimental helper with strict warnings;
-- Python client rejects invalid/unsealed/non-memfd descriptors without reading payload bytes;
-- synthetic Unix server receives exactly one `SCM_RIGHTS` FD and reads the complete synthetic frame, proving the client did not pre-read it;
-- normal `request()` commands send no ancillary FD;
-- experimental source contains exact client/class/vptr/QMeta/id/fence constants and no general execute command;
-- source has explicit fail-closed paths for FD count, memfd seals/type, target uniqueness/class, method/signature, Qt thread, instruction fence, frame/UTF-8/NUL and invoke failure;
-- no real credential or official-client process is used.
+- separate default-OFF CMake target;
+- one-shot exact-client-fenced C++ helper;
+- separate experimental launcher;
+- separate experimental FD client;
+- same-UID Unix socket, exact-one-connection/exact-one-FD contract;
+- sealed anonymous memfd metadata/seal validation without payload read in Python;
+- exact-build vptr/QMeta/thread/instruction-fence runtime gates;
+- Qt named invocation rather than raw target jump;
+- synthetic Linux `SCM_RIGHTS` tests preserving the source FD offset across handoff;
+- automated proof that stable bridge/server blobs remain unchanged;
+- dedicated GitHub-hosted build/test workflow.
 
 # Runtime boundary
 
@@ -149,9 +163,9 @@ A later separately admitted RUNTIME task may opt in to the experimental helper o
 # Checkpoint
 
 ```yaml
-checkpoint_version: 2
-status: implementing
-last_completed_step: opened Draft PR #507 and refined design to a separate opt-in one-shot auth helper so the merged stable bridge remains read-only
+checkpoint_version: 3
+status: validating
+last_completed_step: isolated all mutation into separate experimental helper/client/launcher, restored stable bridge and ipc client to exact main blobs, and started no-secret component validation
 blockers: []
-next_action: implement the experimental helper, SCM_RIGHTS client transport, launcher composition and focused GitHub-hosted build/tests
+next_action: inspect the terminal native-auth bridge validation result on the current exact head; repair only the first causal build/test failure if present, otherwise perform final diff/security audit and exact-head closeout
 ```

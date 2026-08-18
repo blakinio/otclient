@@ -8,12 +8,12 @@ project_lane: otclient
 lane: RUNTIME
 track_id: official-client-re
 task_kind: e2e
-phase: github-secrets-reentry-helper-build-capability
+phase: github-secrets-reentry-hosted-helper-artifact
 branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3
 base_branch: main
 base_main: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
 risk: critical
-updated: 2026-08-18T12:59:00+02:00
+updated: 2026-08-18T13:03:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -77,6 +77,13 @@ secret_reentry_registered_display: ':99'
 secret_reentry_registered_window_identity: x11-window:12582929
 secret_reentry_remote_view_mapping: PROVEN
 secret_reentry_lease_left_active: true
+auth_helper_local_build_run: 32129514948
+auth_helper_local_build_job: 95687339670
+auth_helper_local_build_result: CMAKE_UNAVAILABLE
+auth_helper_local_build_client_observation: false
+auth_helper_local_build_client_mutation: false
+auth_helper_local_build_secret_access: false
+auth_helper_distribution_plan: github_hosted_build_artifact_to_task_local_synology_state
 owner_funded_ai_api_authorized: false
 direct_codex_spark_authorized: true
 direct_codex_spark_model: gpt-5.3-codex-spark
@@ -99,7 +106,6 @@ server_response_spoofed: false
 historical_runtime_authority_inherited: false
 historical_pid_xid_display_session_inherited: false
 historical_login_budget_inherited: false
-retained_session_probe_run: 32126937957
 retained_session_probe_result: CURRENT_NATIVE_CHARACTER_MODEL_EMPTY
 retained_session_available: false
 cold_auth_required: true
@@ -109,44 +115,29 @@ success_result: CHARACTER_ACTUALLY_LOGGED_INTO_GAME
 causal_proof: INCOMPLETE
 ---
 
-# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — active generation 11
+# OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — hosted auth-helper artifact
 
-Current-main physical re-entry transaction `32129321883 / 95686751815` succeeded:
+Active physical authority remains generation `11`, registration `3/11`, Gate B PASS. No credentials have been consumed.
+
+The bounded Synology build probe `32129514948 / 95687339670` proved `cmake` is absent on the runner. It stopped before configuration/build and explicitly performed no client observation, client mutation or secret access. Installing development tooling on the physical host is unnecessary.
+
+The next deterministic phase is routed to GitHub-hosted Linux. It will build the repository's exact `otclient-tibia-native-auth-experimental.so` with Qt6 development packages, create a SHA-256 manifest, and upload both files as a pinned Actions artifact. A dependent Synology job may download that artifact, verify the SHA/size and required ELF dependencies, and install only that non-secret helper into the task-local protected state directory. It may not access or mutate the running client and may not access account secrets.
+
+Pinned artifact actions selected from their official `v4` refs:
 
 ```text
-TRACK_A_CANONICAL_LEASE_GENERATION=11
-TRACK_A_CANONICAL_REBIND=PASS
-TRACK_A_CANONICAL_GATE_B=PASS
-REGISTRATION_GENERATION=3
-REGISTRATION_LEASE_GENERATION=11
-PID=2658
-PROCESS_START_TICKS=66643010
-DISPLAY=:99
-WINDOW=x11-window:12582929
-REMOTE_VIEW_MAPPING=PROVEN
-SECRET_ACCESS=false
-LOGIN_PERFORMED=false
+actions/upload-artifact = ea165f8d65b6e75b540449e92b4886f43607fa02
+actions/download-artifact = d3f86a106a0bac45b974a628896c90dbdf5c8093
 ```
-
-The task now owns active canonical generation 11. No credential has yet been consumed.
-
-## Next discriminator
-
-The running client cannot accept the merged one-shot native-auth socket because it was originally launched without `otclient-tibia-native-auth-experimental.so`. Before replacing that runtime, first establish how the Synology runner can obtain the exact helper binary without touching the client. The next workflow may inspect only build/toolchain availability and build the repository helper in task-local temporary storage. It may not stop, attach to, modify or relaunch the client and may not access GitHub Secrets.
 
 ```text
 STATUS=validating
-RUNTIME_ACCESS=canonical_reuse_or_mutation
 LEASE_GENERATION=11
 REGISTRATION_GENERATION=3
 REGISTRATION_LEASE_GENERATION=11
-GATE_A=PASS
-GENERATION_REBIND=PASS
-GATE_B=PASS
-TARGET_UNIQUENESS=PROVEN
 MUTATION_AUTHORIZED=false
 CREDENTIALS_ALLOWED=false
 LOGIN_ALLOWED=false
-FIRST_UNRESOLVED_EDGE=auth-helper build availability on synology-otclient-01
-NEXT_ACTION=build/probe the experimental auth helper without observing or mutating the client; if successful, persist only helper hash/toolchain facts and then separately admit controlled exact-runtime replacement
+FIRST_UNRESOLVED_EDGE=produce and verify compatible non-secret native-auth helper artifact
+NEXT_ACTION=hosted build + pinned artifact upload; dependent Synology download/hash/dependency verification and task-local install only
 ```

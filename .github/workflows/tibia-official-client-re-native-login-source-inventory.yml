@@ -1,0 +1,125 @@
+name: Track A native-login package source inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-source-inventory.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    name: Inventory native-login package source read-only
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    env:
+      BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
+      BASE: /home/runner/_work/_otclient_tibia_re_state
+      OLD_SHA: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      OLD_SIZE: '51965216'
+      LAST_KNOWN_CURRENT_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+      LAST_KNOWN_CURRENT_SIZE: '52109920'
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Read-only controller and package inventory
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
+
+          task=docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
+          grep -q '^task_id: OTC-20260818-native-login-to-ingame-e2e$' "$task"
+          grep -q '^branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v3$' "$task"
+          grep -q '^runtime_namespace: native-login-package-source-inventory$' "$task"
+          grep -q '^mutation_authorized: false$' "$task"
+          grep -q '^credentials_allowed: false$' "$task"
+          grep -q '^login_allowed: false$' "$task"
+
+          state="$BASE/canonical-live-runtime"
+          package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$package/bin/client"
+
+          [[ -d "$state" ]]
+          if [[ -e "$state/runtime-registration.json" ]]; then
+            echo SOURCE_INVENTORY_REGISTRATION_PRESENT=true
+          else
+            echo SOURCE_INVENTORY_REGISTRATION_PRESENT=false
+          fi
+          if [[ -d "$state/session" ]]; then
+            echo SOURCE_INVENTORY_SESSION_PRESENT=true
+          else
+            echo SOURCE_INVENTORY_SESSION_PRESENT=false
+          fi
+
+          if [[ -f "$state/lease.json" ]]; then
+            python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          x=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          for key in ('status','generation','controller_task','controller_session','expires_at_epoch'):
+              value=x.get(key)
+              print(f"SOURCE_INVENTORY_LEASE_{key.upper()}={value if value is not None else 'null'}")
+          PY
+          else
+            echo SOURCE_INVENTORY_LEASE_FILE=ABSENT
+          fi
+
+          if [[ ! -e "$client" ]]; then
+            echo SOURCE_INVENTORY_CLIENT_PRESENT=false
+            echo SOURCE_INVENTORY_CLASS=ABSENT
+            echo SOURCE_INVENTORY_SECRET_ACCESS=false
+            echo SOURCE_INVENTORY_CLIENT_MUTATION=false
+            echo SOURCE_INVENTORY_RUNTIME_RESTART=false
+            exit 0
+          fi
+
+          echo SOURCE_INVENTORY_CLIENT_PRESENT=true
+          [[ -f "$client" ]]
+          if [[ -L "$client" ]]; then
+            echo SOURCE_INVENTORY_CLIENT_SYMLINK=true
+          else
+            echo SOURCE_INVENTORY_CLIENT_SYMLINK=false
+          fi
+          if [[ -x "$client" ]]; then
+            echo SOURCE_INVENTORY_CLIENT_EXECUTABLE=true
+          else
+            echo SOURCE_INVENTORY_CLIENT_EXECUTABLE=false
+          fi
+          size="$(stat -c %s "$client")"
+          sha="$(sha256sum "$client" | awk '{print $1}')"
+          echo "SOURCE_INVENTORY_CLIENT_SIZE=$size"
+          echo "SOURCE_INVENTORY_CLIENT_SHA256=$sha"
+
+          if [[ "$sha" == "$OLD_SHA" && "$size" == "$OLD_SIZE" ]]; then
+            class=PROVEN_OBSOLETE_OLD_EXACT
+          elif [[ "$sha" == "$LAST_KNOWN_CURRENT_SHA" && "$size" == "$LAST_KNOWN_CURRENT_SIZE" ]]; then
+            class=LAST_KNOWN_CURRENT_EXACT
+          else
+            class=UNEXPECTED_IDENTITY
+          fi
+          echo "SOURCE_INVENTORY_CLASS=$class"
+          echo SOURCE_INVENTORY_SECRET_ACCESS=false
+          echo SOURCE_INVENTORY_CLIENT_MUTATION=false
+          echo SOURCE_INVENTORY_RUNTIME_RESTART=false
+          echo SOURCE_INVENTORY_RESULT=PASS_READ_ONLY

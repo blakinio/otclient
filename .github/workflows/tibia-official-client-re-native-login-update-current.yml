@@ -15,10 +15,10 @@ concurrency:
 
 jobs:
   update:
-    name: Reinstall exact current official package on persistent VNC
+    name: Recover stale updater state and install exact current official package
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
-    timeout-minutes: 14
+    timeout-minutes: 18
     env:
       BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
       TASK: OTC-20260818-native-login-to-ingame-e2e
@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Run visible official CipSoft package reinstall
+      - name: Recover and complete visible official update
         shell: bash
         env:
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -74,17 +74,36 @@ jobs:
           echo TRACK_A_ADMISSION_GAMEPLAY_ALLOWED=false
 
           state="$BASE/canonical-live-runtime"
-          package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          root="$BASE/home/.local/share/CipSoft GmbH/Tibia"
+          package="$root/packages/Tibia"
           client="$package/bin/client"
+          live="$BASE/native-login-update/live"
+          session="$live/session.json"
           tool="$WORKBASE/toolroot"
           warp="$state/warp"
-          live="$BASE/native-login-update/live"
-          work="$BASE/native-login-update/install-$GITHUB_RUN_ID"
+          work="$BASE/native-login-update/recover-$GITHUB_RUN_ID"
           mkdir -m700 -p "$work"
 
-          wp_pid=''
-          launcher_pid=''
-          update_ok=false
+          [[ ! -e "$state/runtime-registration.json" ]]
+          [[ ! -d "$state/session" ]]
+          [[ -f "$TOKEN" ]]
+          [[ "$(stat -c %a "$TOKEN")" == 600 ]]
+          [[ -f "$session" ]]
+          [[ -x "$warp/bin/wireproxy" && ! -L "$warp/bin/wireproxy" ]]
+          [[ -s "$warp/state/wgcf-profile.conf" ]]
+          [[ -x "$tool/usr/bin/xdotool" ]]
+
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
+          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
+          python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          x=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert x.get('status')=='active' and x.get('generation')==16
+          assert x.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert x.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
+          print('RECOVER_UPDATE_LEASE16=PASS')
+          PY
 
           stop_pid() {
             local pid="$1"
@@ -97,6 +116,36 @@ jobs:
             kill -9 "$pid" 2>/dev/null || true
           }
 
+          stop_owned_role_pid() {
+            local pid="$1" expected="$2"
+            [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 0
+            [[ -d "/proc/$pid" ]] || return 0
+            python3 - "$pid" "$expected" <<'PY'
+          import pathlib,sys
+          pid=sys.argv[1]; expected=sys.argv[2].encode()
+          env=pathlib.Path('/proc/'+pid+'/environ').read_bytes().split(b'\0')
+          if b'OTCLIENT_TIBIA_RE_TRACK=official-client-re' not in env: raise SystemExit('refuse non-Track-A pid')
+          if b'OTCLIENT_TIBIA_RE_ROLE='+expected not in env: raise SystemExit('refuse unexpected role')
+          PY
+            echo "RECOVER_UPDATE_STOP_OWNED_ROLE=$expected:$pid"
+            stop_pid "$pid"
+          }
+
+          stop_role_processes() {
+            local expected="$1"
+            python3 - "$expected" <<'PY'
+          import os,pathlib,signal,sys
+          expected=('OTCLIENT_TIBIA_RE_ROLE='+sys.argv[1]).encode()
+          for p in pathlib.Path('/proc').iterdir():
+              if not p.name.isdigit(): continue
+              try: env=(p/'environ').read_bytes().split(b'\0')
+              except OSError: continue
+              if b'OTCLIENT_TIBIA_RE_TRACK=official-client-re' not in env or expected not in env: continue
+              try: os.kill(int(p.name),signal.SIGTERM)
+              except ProcessLookupError: pass
+          PY
+          }
+
           stop_package_clients() {
             [[ -e "$client" ]] || return 0
             local target e pid path
@@ -106,115 +155,109 @@ jobs:
               [[ -e "$e" ]] || continue
               path="$(readlink -f "$e" 2>/dev/null || true)"
               [[ "$path" == "$target" ]] || continue
-              pid="${e#/proc/}"
-              pid="${pid%/exe}"
-              echo "VISIBLE_UPDATE_STOP_PACKAGE_CLIENT_PID=$pid"
+              pid="${e#/proc/}"; pid="${pid%/exe}"
+              echo "RECOVER_UPDATE_STOP_PACKAGE_CLIENT_PID=$pid"
               stop_pid "$pid"
             done
           }
 
-          stop_updater_role_processes() {
-            python3 - <<'PY'
-          import os,pathlib,signal
-          me=os.getpid()
-          for p in pathlib.Path('/proc').iterdir():
-              if not p.name.isdigit() or int(p.name)==me:
-                  continue
-              try:
-                  env=p.joinpath('environ').read_bytes().split(b'\0')
-              except OSError:
-                  continue
-              if b'OTCLIENT_TIBIA_RE_ROLE=official-updater' not in env:
-                  continue
-              try: os.kill(int(p.name),signal.SIGTERM)
-              except ProcessLookupError: pass
-          PY
-          }
-
-          cleanup() {
-            stop_package_clients || true
-            stop_pid "$launcher_pid"
-            stop_updater_role_processes || true
-            stop_pid "$wp_pid"
-            if [[ "$update_ok" != true ]]; then
-              rm -rf "$package"
-              echo VISIBLE_UPDATE_ROLLBACK_REMOVED_PARTIAL_PACKAGE=true
-            fi
-          }
-          trap cleanup EXIT INT TERM HUP
-
-          [[ ! -e "$state/runtime-registration.json" ]]
-          [[ ! -d "$state/session" ]]
-          [[ ! -e "$client" ]]
-          [[ ! -d "$package" ]]
-          [[ -f "$TOKEN" ]]
-          [[ "$(stat -c %a "$TOKEN")" == 600 ]]
-
-          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
-          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
-          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
-          python3 - "$state/lease.json" <<'PY'
+          readarray -t obs < <(python3 - "$session" "$TASK" <<'PY'
           import json,pathlib,sys
-          x=json.loads(pathlib.Path(sys.argv[1]).read_text())
-          assert x.get('status')=='active'
-          assert x.get('generation')==16
-          assert x.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
-          assert x.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen16-secrets'
-          print('VISIBLE_UPDATE_LEASE16=PASS')
-          PY
-
-          [[ -f "$live/session.json" ]]
-          readarray -t observer < <(python3 - "$live/session.json" "$TASK" <<'PY'
-          import json,pathlib,sys
-          p=pathlib.Path(sys.argv[1]); task=sys.argv[2]
-          x=json.loads(p.read_text())
+          x=json.loads(pathlib.Path(sys.argv[1]).read_text()); task=sys.argv[2]
           assert x.get('task')==task
-          assert x.get('phase')=='vnc-ready'
-          assert x.get('rfb_port')==5901
-          assert x.get('web_backend_port')==6081
-          assert x.get('relay_network')=='host'
-          assert x.get('lan_ip')=='192.168.1.2'
-          assert x.get('client_started') is False
+          assert x.get('phase') in ('vnc-ready','official-updater-running')
+          assert x.get('rfb_port')==5901 and x.get('web_backend_port')==6081
+          assert x.get('relay_network')=='host' and x.get('lan_ip')=='192.168.1.2'
           assert x.get('credentials_accessed') is False
           for key in ('xvfb_pid','vnc_pid','websockify_pid'):
-              pid=int(x[key]); assert pathlib.Path(f'/proc/{pid}').exists(), (key,pid)
-          print(x['display'])
-          print(x['lan_port'])
-          print(x['marker'])
-          print(x['relay_name'])
-          print(x['relay_id'])
+              pid=int(x[key]); assert pathlib.Path('/proc/'+str(pid)).is_dir(), (key,pid)
+          print(x['display']); print(x['lan_port']); print(x['marker']); print(x['relay_name']); print(x['relay_id'])
+          print(x.get('phase','')); print(x.get('launcher_pid','')); print(x.get('wireproxy_pid',''))
           PY
           )
-          display="${observer[0]}"
-          lan_port="${observer[1]}"
-          marker="${observer[2]}"
-          relay_name="${observer[3]}"
-          relay_id="${observer[4]}"
-          [[ "$display" =~ ^:[0-9]+$ ]]
-          [[ "$lan_port" =~ ^[0-9]+$ ]]
-          [[ "$relay_name" == otclient-tibia-native-login-vnc-relay ]]
+          display="${obs[0]}"; lan_port="${obs[1]}"; marker="${obs[2]}"; relay_name="${obs[3]}"; relay_id="${obs[4]}"
+          old_phase="${obs[5]}"; old_launcher_pid="${obs[6]}"; old_wp_pid="${obs[7]}"
+          [[ "$display" =~ ^:[0-9]+$ && "$lan_port" =~ ^[0-9]+$ ]]
           command -v docker >/dev/null
           [[ -S /var/run/docker.sock ]]
+          [[ "$relay_name" == otclient-tibia-native-login-vnc-relay ]]
           [[ "$(docker inspect -f '{{.Id}}' "$relay_name")" == "$relay_id" ]]
           [[ "$(docker inspect -f '{{.State.Running}}' "$relay_name")" == true ]]
           [[ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$relay_name")" == host ]]
           [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$relay_name")" == "$TASK" ]]
           [[ "$(curl -fsS --max-time 5 "http://192.168.1.2:$lan_port/health.txt")" == "$marker" ]]
-          echo "VISIBLE_UPDATE_VNC_URL=http://192.168.1.2:$lan_port/"
-          echo "VISIBLE_UPDATE_DISPLAY=$display"
-          echo VISIBLE_UPDATE_VNC=PASS
+          echo "RECOVER_UPDATE_VNC_URL=http://192.168.1.2:$lan_port/"
+          echo "RECOVER_UPDATE_DISPLAY=$display"
+          echo "RECOVER_UPDATE_PREVIOUS_PHASE=$old_phase"
+          echo RECOVER_UPDATE_VNC=PASS
 
-          [[ -x "$warp/bin/wireproxy" ]]
-          [[ ! -L "$warp/bin/wireproxy" ]]
-          [[ -s "$warp/state/wgcf-profile.conf" ]]
+          if [[ "$old_phase" == official-updater-running ]]; then
+            stop_owned_role_pid "$old_launcher_pid" official-updater
+            stop_owned_role_pid "$old_wp_pid" native-login-updater-wireproxy
+          fi
+          stop_role_processes official-updater
+          sleep .5
+          stop_role_processes official-updater
+
+          python3 - "$session" <<'PY'
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text())
+          x['phase']='vnc-ready'; x['client_started']=False; x['credentials_accessed']=False
+          for k in ('launcher_pid','wireproxy_pid','updater_workdir','target_sha256','target_size','current_sha256','current_size'):
+              x.pop(k,None)
+          p.write_text(json.dumps(x,sort_keys=True)+'\n'); p.chmod(0o600)
+          PY
+          echo RECOVER_UPDATE_STALE_PHASE_CLEARED=PASS
+
+          # With no updater process alive, clean only the task's partial package directory.
+          current=false
+          if [[ -f "$client" && ! -L "$client" && "$(stat -c %s "$client")" == "$EXPECTED_SIZE" && "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_SHA" ]]; then
+            current=true
+          fi
+          if [[ "$current" != true ]]; then
+            rm -rf "$package"
+            if [[ -f "$root/.running" ]]; then rm -f "$root/.running"; fi
+            echo RECOVER_UPDATE_PARTIAL_PACKAGE_CLEARED=true
+          else
+            echo RECOVER_UPDATE_PACKAGE_ALREADY_CURRENT=true
+          fi
+
+          wp_pid=''; launcher_pid=''; update_ok=false
+          reset_session() {
+            python3 - "$session" <<'PY' 2>/dev/null || true
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text())
+          x['phase']='vnc-ready'; x['client_started']=False; x['credentials_accessed']=False
+          for k in ('launcher_pid','wireproxy_pid','updater_workdir','target_sha256','target_size','current_sha256','current_size'):
+              x.pop(k,None)
+          p.write_text(json.dumps(x,sort_keys=True)+'\n'); p.chmod(0o600)
+          PY
+          }
+          cleanup() {
+            [[ "$update_ok" == true ]] && return 0
+            stop_pid "$launcher_pid"
+            stop_role_processes official-updater || true
+            stop_package_clients || true
+            stop_pid "$wp_pid"
+            if [[ -f "$client" ]]; then
+              got_sha="$(sha256sum "$client" | awk '{print $1}')"; got_size="$(stat -c %s "$client")"
+              if [[ "$got_sha" != "$EXPECTED_SHA" || "$got_size" != "$EXPECTED_SIZE" ]]; then rm -rf "$package"; fi
+            else
+              rm -rf "$package"
+            fi
+            reset_session
+            echo RECOVER_UPDATE_FAIL_CLOSED=true
+          }
+          trap cleanup EXIT ERR INT TERM HUP
+
           proxy_port="$(python3 - <<'PY'
           import socket
           for p in range(25354,25481):
               s=socket.socket()
-              try: s.bind(('127.0.0.1',p))
-              except OSError: s.close(); continue
-              s.close(); print(p); break
-          else: raise SystemExit('no free WARP port')
+              try:s.bind(('127.0.0.1',p))
+              except OSError:s.close();continue
+              s.close();print(p);break
+          else:raise SystemExit('no free WARP port')
           PY
           )"
           cat >"$work/wireproxy.conf" <<EOF
@@ -225,107 +268,86 @@ jobs:
           chmod 600 "$work/wireproxy.conf"
           "$warp/bin/wireproxy" -n -c "$work/wireproxy.conf" >/dev/null
           env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-            OTCLIENT_TIBIA_RE_ROLE=visible-update-wireproxy \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-wireproxy \
             nohup "$warp/bin/wireproxy" -c "$work/wireproxy.conf" >"$work/wireproxy.log" 2>&1 </dev/null &
           wp_pid=$!
           for _ in $(seq 1 40); do
             kill -0 "$wp_pid" 2>/dev/null || { cat "$work/wireproxy.log" >&2; exit 1; }
             python3 - "$proxy_port" <<'PY' && break || true
           import socket,sys
-          s=socket.socket(); s.settimeout(.2)
-          try: s.connect(('127.0.0.1',int(sys.argv[1])))
-          except OSError: raise SystemExit(1)
-          finally: s.close()
+          s=socket.socket();s.settimeout(.2)
+          try:s.connect(('127.0.0.1',int(sys.argv[1])))
+          except OSError:raise SystemExit(1)
+          finally:s.close()
           PY
             sleep .25
           done
-          curl --socks5-hostname "127.0.0.1:$proxy_port" -fsS --max-time 15 \
-            https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
-          echo VISIBLE_UPDATE_WARP=PASS
+          curl --socks5-hostname "127.0.0.1:$proxy_port" -fsS --max-time 15 https://www.cloudflare.com/cdn-cgi/trace | grep -Eq '^warp=(on|plus)$'
+          echo RECOVER_UPDATE_WARP=PASS
 
           base='https://static.tibia.com/launcher/tibiaclient-linux-current/'
           manifest="$work/package.json"
-          curl --socks5-hostname "127.0.0.1:$proxy_port" --compressed -fL \
-            --retry 4 --retry-all-errors --connect-timeout 20 --max-time 120 \
-            "${base}package.json" -o "$manifest"
-
-          readarray -t current < <(python3 - "$manifest" <<'PY'
+          curl --socks5-hostname "127.0.0.1:$proxy_port" --compressed -fL --retry 4 --retry-all-errors \
+            --connect-timeout 20 --max-time 120 "${base}package.json" -o "$manifest"
+          readarray -t m < <(python3 - "$manifest" <<'PY'
           import json,sys
-          doc=json.load(open(sys.argv[1],encoding='utf-8'))
-          rows=[]
+          doc=json.load(open(sys.argv[1],encoding='utf-8')); rows=[]
           def walk(v):
               if isinstance(v,dict):
                   u=v.get('url'); p=v.get('packedhash'); q=v.get('unpackedhash')
                   if isinstance(u,str) and isinstance(p,str): rows.append((u,p,q if isinstance(q,str) else ''))
-                  for child in v.values(): walk(child)
+                  for z in v.values(): walk(z)
               elif isinstance(v,list):
-                  for child in v: walk(child)
+                  for z in v: walk(z)
           walk(doc)
-          matches=[x for x in rows if x[0].endswith('/bin/client.lzma') or x[0]=='bin/client.lzma' or x[0].endswith('client.lzma')]
-          if len(matches)!=1: raise SystemExit(f'expected one client.lzma entry, got {len(matches)}')
-          print(matches[0][0]); print(matches[0][1].lower()); print(matches[0][2].lower())
+          hits=[x for x in rows if x[0].endswith('/bin/client.lzma') or x[0]=='bin/client.lzma' or x[0].endswith('client.lzma')]
+          if len(hits)!=1: raise SystemExit(f'expected one client.lzma entry, got {len(hits)}')
+          print(hits[0][0]); print(hits[0][1].lower()); print(hits[0][2].lower())
           PY
           )
-          rel="${current[0]}"
-          packed_expected="${current[1]}"
-          unpacked_expected="${current[2]}"
-          case "$rel" in
-            http://*|https://*) current_url="$rel" ;;
-            /*) current_url="https://static.tibia.com$rel" ;;
-            *) current_url="$base$rel" ;;
-          esac
+          rel="${m[0]}"; packed_expected="${m[1]}"; unpacked_expected="${m[2]}"
+          case "$rel" in http://*|https://*) url="$rel";; /*) url="https://static.tibia.com$rel";; *) url="$base$rel";; esac
           packed="$work/client.lzma"
-          curl --socks5-hostname "127.0.0.1:$proxy_port" --compressed -fL \
-            --retry 4 --retry-all-errors --connect-timeout 20 --max-time 240 \
-            "$current_url" -o "$packed"
+          curl --socks5-hostname "127.0.0.1:$proxy_port" --compressed -fL --retry 4 --retry-all-errors \
+            --connect-timeout 20 --max-time 240 "$url" -o "$packed"
           [[ "$(sha256sum "$packed" | awk '{print $1}')" == "$packed_expected" ]]
-
           readarray -t target < <(python3 - "$packed" "$unpacked_expected" <<'PY'
           import hashlib,lzma,pathlib,sys
           b=pathlib.Path(sys.argv[1]).read_bytes(); expected=sys.argv[2].lower()
-          if len(b)<46: raise SystemExit('packed client too small')
           q=b[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
           raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
           sha=hashlib.sha256(raw).hexdigest()
-          if expected and sha!=expected: raise SystemExit(f'unpacked hash mismatch {sha}!={expected}')
+          if expected and sha!=expected: raise SystemExit('unpacked manifest hash mismatch')
           print(sha); print(len(raw))
           PY
           )
-          target_sha="${target[0]}"
-          target_size="${target[1]}"
-          echo "VISIBLE_UPDATE_CURRENT_CLIENT_SHA256=$target_sha"
-          echo "VISIBLE_UPDATE_CURRENT_CLIENT_SIZE=$target_size"
-          [[ "$target_sha" == "$EXPECTED_SHA" ]]
-          [[ "$target_size" == "$EXPECTED_SIZE" ]]
-          echo VISIBLE_UPDATE_CURRENT_MANIFEST_REPROVEN=PASS
+          target_sha="${target[0]}"; target_size="${target[1]}"
+          echo "RECOVER_UPDATE_CURRENT_CLIENT_SHA256=$target_sha"
+          echo "RECOVER_UPDATE_CURRENT_CLIENT_SIZE=$target_size"
+          [[ "$target_sha" == "$EXPECTED_SHA" && "$target_size" == "$EXPECTED_SIZE" ]]
+          echo RECOVER_UPDATE_MANIFEST_REPROVEN=PASS
 
-          tarball="$work/tibia.x64.tar.gz"
-          curl --socks5-hostname "127.0.0.1:$proxy_port" --compressed -fL \
-            --connect-timeout 20 --max-time 240 --retry 4 --retry-all-errors --retry-delay 2 \
-            -A 'Mozilla/5.0 (X11; Linux x86_64)' \
-            https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
-
-          unpack="$work/unpacked"
-          mkdir -m700 "$unpack"
-          python3 - "$tarball" "$unpack" <<'PY'
+          if [[ "$current" != true ]]; then
+            tarball="$work/tibia.x64.tar.gz"
+            curl --socks5-hostname "127.0.0.1:$proxy_port" --compressed -fL --retry 4 --retry-all-errors \
+              --retry-delay 2 --connect-timeout 20 --max-time 240 -A 'Mozilla/5.0 (X11; Linux x86_64)' \
+              https://static.tibia.com/download/tibia.x64.tar.gz -o "$tarball"
+            unpack="$work/unpacked"; mkdir -m700 "$unpack"
+            python3 - "$tarball" "$unpack" <<'PY'
           import pathlib,sys,tarfile
-          archive=pathlib.Path(sys.argv[1]); dest=pathlib.Path(sys.argv[2])
-          with tarfile.open(archive,'r:gz') as tf:
-              for member in tf.getmembers():
-                  p=pathlib.PurePosixPath(member.name)
-                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe archive path')
+          dest=pathlib.Path(sys.argv[2])
+          with tarfile.open(sys.argv[1],'r:gz') as tf:
+              for m in tf.getmembers():
+                  p=pathlib.PurePosixPath(m.name)
+                  if p.is_absolute() or '..' in p.parts: raise SystemExit('unsafe launcher archive')
               try: tf.extractall(dest,filter='data')
               except TypeError: tf.extractall(dest)
           PY
-          launcher="$unpack/Tibia/Tibia"
-          [[ -x "$launcher" ]]
-          [[ ! -L "$launcher" ]]
-          echo "VISIBLE_UPDATE_LAUNCHER_SHA256=$(sha256sum "$launcher" | awk '{print $1}')"
-
-          preload="$(find "$tool" -xdev -type f -name libproxychains.so.4 -print -quit)"
-          [[ -n "$preload" ]]
-          cat >"$work/proxychains.conf" <<EOF
+            launcher="$unpack/Tibia/Tibia"
+            [[ -x "$launcher" && ! -L "$launcher" ]]
+            preload="$(find "$tool" -xdev -type f -name libproxychains.so.4 -print -quit)"
+            [[ -n "$preload" ]]
+            cat >"$work/proxychains.conf" <<EOF
           strict_chain
           proxy_dns
           remote_dns_subnet 224
@@ -334,87 +356,69 @@ jobs:
           [ProxyList]
           socks5 127.0.0.1 $proxy_port
           EOF
-          chmod 600 "$work/proxychains.conf"
+            chmod 600 "$work/proxychains.conf"
+            workdir="$(dirname "$launcher")"
+            (
+              cd "$workdir"
+              env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+                OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=official-updater \
+                HOME="$BASE/home" XDG_DATA_HOME="$BASE/home/.local/share" DISPLAY="$display" \
+                PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+                LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
+                LIBGL_ALWAYS_SOFTWARE=1 QT_QUICK_BACKEND=software QT_XCB_GL_INTEGRATION=none \
+                LD_PRELOAD="$preload" PROXYCHAINS_CONF_FILE="$work/proxychains.conf" \
+                nohup "$launcher" >"$work/launcher.log" 2>&1 </dev/null &
+              echo $! >"$work/launcher.pid"
+            )
+            launcher_pid="$(cat "$work/launcher.pid")"
+            kill -0 "$launcher_pid"
+            python3 - "$session" "$launcher_pid" "$wp_pid" "$work" "$target_sha" "$target_size" <<'PY'
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text())
+          x.update({'phase':'official-updater-running','launcher_pid':int(sys.argv[2]),'wireproxy_pid':int(sys.argv[3]),'updater_workdir':sys.argv[4],'target_sha256':sys.argv[5],'target_size':int(sys.argv[6]),'client_started':False,'credentials_accessed':False})
+          p.write_text(json.dumps(x,sort_keys=True)+'\n'); p.chmod(0o600)
+          PY
+            echo "RECOVER_UPDATE_OFFICIAL_LAUNCHER_PID=$launcher_pid"
+            echo "RECOVER_UPDATE_WATCH=http://192.168.1.2:$lan_port/"
+            echo RECOVER_UPDATE_OFFICIAL_LAUNCHER_STARTED=true
 
-          workdir="$(dirname "$launcher")"
-          (
-            cd "$workdir"
-            env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-              OTCLIENT_TIBIA_RE_TRACK=official-client-re \
-              OTCLIENT_TIBIA_RE_ROLE=official-updater \
-              HOME="$BASE/home" \
-              XDG_DATA_HOME="$BASE/home/.local/share" \
-              DISPLAY="$display" \
-              PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
-              LD_LIBRARY_PATH="$workdir:$workdir/lib:$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
-              LIBGL_ALWAYS_SOFTWARE=1 \
-              QT_QUICK_BACKEND=software \
-              QT_XCB_GL_INTEGRATION=none \
-              LD_PRELOAD="$preload" \
-              PROXYCHAINS_CONF_FILE="$work/proxychains.conf" \
-              nohup "$launcher" >"$work/launcher.log" 2>&1 </dev/null &
-            echo $! >"$work/launcher.pid"
-          )
-          launcher_pid="$(cat "$work/launcher.pid")"
-          kill -0 "$launcher_pid"
-          echo VISIBLE_UPDATE_OFFICIAL_LAUNCHER_STARTED=true
-          echo "VISIBLE_UPDATE_WATCH=http://192.168.1.2:$lan_port/"
-
-          stable=0
-          last=''
-          observed=''
-          for _ in $(seq 1 210); do
-            if [[ -s "$client" ]]; then
-              observed="$(sha256sum "$client" | awk '{print $1}')"
-              size="$(stat -c %s "$client")"
-              if [[ "$observed" == "$target_sha" && "$size" == "$target_size" ]]; then
-                if [[ "$observed:$size" == "$last" ]]; then
-                  stable=$((stable+1))
+            stable=0; last=''; observed=''; observed_size=''
+            for _ in $(seq 1 300); do
+              if [[ -s "$client" && ! -L "$client" ]]; then
+                observed="$(sha256sum "$client" | awk '{print $1}')"; observed_size="$(stat -c %s "$client")"
+                if [[ "$observed" == "$target_sha" && "$observed_size" == "$target_size" ]]; then
+                  if [[ "$last" == "$observed:$observed_size" ]]; then stable=$((stable+1)); else stable=0; last="$observed:$observed_size"; fi
+                  (( stable >= 3 )) && break
                 else
-                  stable=0
-                  last="$observed:$size"
+                  stable=0; last="$observed:$observed_size"
                 fi
-                (( stable >= 3 )) && break
-              else
-                stable=0
-                last="$observed:$size"
               fi
+              sleep 2
+            done
+            if [[ "$observed" != "$target_sha" || "$observed_size" != "$target_size" || $stable -lt 3 ]]; then
+              echo "RECOVER_UPDATE_OBSERVED_SHA=${observed:-ABSENT}" >&2
+              echo "RECOVER_UPDATE_OBSERVED_SIZE=${observed_size:-ABSENT}" >&2
+              tail -n 120 "$work/launcher.log" | sed 's/^/RECOVER_UPDATE_LAUNCHER_LOG=/' >&2 || true
+              exit 1
             fi
-            sleep 2
-          done
-
-          observed_size="$(stat -c %s "$client" 2>/dev/null || true)"
-          if [[ "$observed" != "$target_sha" || "$observed_size" != "$target_size" || $stable -lt 3 ]]; then
-            echo "VISIBLE_UPDATE_OBSERVED_SHA=${observed:-ABSENT}" >&2
-            echo "VISIBLE_UPDATE_OBSERVED_SIZE=${observed_size:-ABSENT}" >&2
-            tail -n 100 "$work/launcher.log" | sed 's/^/VISIBLE_UPDATE_LAUNCHER_LOG=/' >&2 || true
-            exit 1
           fi
 
-          echo "VISIBLE_UPDATE_NEW_CLIENT_SHA256=$observed"
-          echo "VISIBLE_UPDATE_NEW_CLIENT_SIZE=$observed_size"
-
-          stop_pid "$launcher_pid"
-          launcher_pid=''
-          stop_updater_role_processes
+          stop_pid "$launcher_pid"; launcher_pid=''
+          stop_role_processes official-updater
           stop_package_clients
-          stop_pid "$wp_pid"
-          wp_pid=''
-
-          [[ -f "$client" ]]
-          [[ -x "$client" ]]
-          [[ ! -L "$client" ]]
+          stop_pid "$wp_pid"; wp_pid=''
+          [[ -f "$client" && -x "$client" && ! -L "$client" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$target_sha" ]]
           [[ "$(stat -c %s "$client")" == "$target_size" ]]
-          [[ ! -e "$state/runtime-registration.json" ]]
-          [[ ! -d "$state/session" ]]
           [[ "$(curl -fsS --max-time 5 "http://192.168.1.2:$lan_port/health.txt")" == "$marker" ]]
+          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
           bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
-
+          reset_session
           update_ok=true
-          echo VISIBLE_UPDATE_SECRET_ACCESS=false
-          echo VISIBLE_UPDATE_LOGIN=false
-          echo VISIBLE_UPDATE_CANONICAL_RUNTIME_STARTED=false
-          echo VISIBLE_UPDATE_VNC_RETAINED=true
-          echo VISIBLE_UPDATE_RESULT=PASS_CURRENT_EXACT
-          trap - EXIT INT TERM HUP
+          echo "RECOVER_UPDATE_INSTALLED_SHA256=$(sha256sum "$client" | awk '{print $1}')"
+          echo "RECOVER_UPDATE_INSTALLED_SIZE=$(stat -c %s "$client")"
+          echo RECOVER_UPDATE_SECRET_ACCESS=false
+          echo RECOVER_UPDATE_LOGIN=false
+          echo RECOVER_UPDATE_CANONICAL_RUNTIME_STARTED=false
+          echo RECOVER_UPDATE_VNC_RETAINED=true
+          echo RECOVER_UPDATE_RESULT=PASS_CURRENT_EXACT

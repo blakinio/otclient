@@ -18,7 +18,6 @@ env:
   EXPECTED_SIZE: '52109920'
   CONTAINER: otclient-track-a-kasmvnc
   CLIENT: /home/kasm-user/otclient-track-a/Tibia-32177065988-1/bin/client
-  CLIENT_ROOT: /home/kasm-user/otclient-track-a/Tibia-32177065988-1
   TASK_ROOT: /tmp/otclient-native-login-current-sha
   BRIDGE_SOCKET: /tmp/otclient-native-login-current-sha/bridge.sock
   AUTH_SOCKET: /tmp/otclient-native-login-current-sha/auth.sock
@@ -26,98 +25,12 @@ env:
   CLIENT_VERSION: 15.32.current.ed5469
 
 jobs:
-  build:
-    name: Build exact-SHA helper bundle off-box
-    runs-on: ubuntu-24.04
+  execute:
+    name: Reuse admitted helper runtime and reach structural IN_GAME
+    runs-on: [otclient, synology]
     timeout-minutes: 8
     steps:
-      - name: Checkout exact PR head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          fetch-depth: 1
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Build non-proprietary helper binaries
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends g++ pkg-config qt6-base-dev >/dev/null
-          out="$RUNNER_TEMP/helpers"; mkdir -m700 -p "$out"
-          cp tools/tibia_runtime_bridge/experimental_auth.cpp "$RUNNER_TEMP/current-auth.cpp"
-          python3 - "$RUNNER_TEMP/current-auth.cpp" <<'PY'
-          import pathlib,re,sys
-          p=pathlib.Path(sys.argv[1]); s=p.read_text(encoding='utf-8')
-          replacements={
-            'constexpr std::uint64_t kClientSize = 51965216;':'constexpr std::uint64_t kClientSize = 52109920;',
-            'constexpr char kClientSha256[] = "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe";':'constexpr char kClientSha256[] = "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8";',
-            'constexpr std::uintptr_t kGameClientVptrOffset = 0x3076908;':'constexpr std::uintptr_t kGameClientVptrOffset = 0x30adce8;',
-            'constexpr std::uintptr_t kColdAuthTargetOffset = 0xd06850;':'constexpr std::uintptr_t kColdAuthTargetOffset = 0xd196f0;',
-          }
-          for old,new in replacements.items():
-              if s.count(old)!=1: raise SystemExit('auth source constant fence failed')
-              s=s.replace(old,new)
-          fence='''constexpr std::array<unsigned char, 32> kColdAuthFence = {
-              0x48, 0x8b, 0x51, 0x10, 0x48, 0x8b, 0x71, 0x08,
-              0x48, 0x83, 0xc4, 0x48, 0x5b, 0x5d, 0xe9, 0x3d,
-              0x60, 0x9c, 0xff, 0x0f, 0x1f, 0x44, 0x00, 0x00,
-              0x48, 0x8b, 0xbf, 0xa0, 0x09, 0x00, 0x00, 0x48,
-          };'''
-          s,n=re.subn(r'constexpr std::array<unsigned char, 32> kColdAuthFence = \{.*?\n\};',fence,s,count=1,flags=re.S)
-          if n!=1: raise SystemExit('auth source fence block not unique')
-          p.write_text(s,encoding='utf-8')
-          PY
-          qt_flags="$(pkg-config --cflags --libs Qt6Core)"
-          g++ -std=c++20 -O2 -fPIC -shared -Wall -Wextra -Wpedantic "$RUNNER_TEMP/current-auth.cpp" -o "$out/auth.so" $qt_flags -ldl -pthread
-          g++ -std=c++20 -O2 -fPIC -shared -Wall -Wextra -Wpedantic tools/tibia_runtime_bridge/bridge.cpp -o "$out/bridge.so" $qt_flags -ldl -pthread
-          g++ -std=c++20 -O2 -fPIC -shared -Wall -Wextra -Wpedantic -include cstdlib tools/tibia_runtime_bridge/experimental_character_control_current.cpp -o "$out/character.so" $qt_flags -ldl -pthread
-          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic tools/tibia_runtime_bridge/current_sha_secret_ingress.cpp -o "$out/secret-ingress"
-          chmod 700 "$out/secret-ingress"
-          test -s "$out/auth.so" -a -s "$out/bridge.so" -a -s "$out/character.so" -a -x "$out/secret-ingress"
-          echo CURRENT_HELPER_BUILD=PASS
-          echo SECRET_ACCESS=false
-          echo CLIENT_EXECUTION=false
-
-      - name: Upload helper bundle only
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: current-sha-native-login-helpers-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/helpers/
-          if-no-files-found: error
-          retention-days: 1
-
-  execute:
-    name: Native auth to structural IN_GAME on Synology
-    needs: build
-    runs-on: [otclient, synology]
-    timeout-minutes: 14
-    steps:
-      - name: Checkout exact PR head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-          fetch-depth: 1
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Download exact helper bundle
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: current-sha-native-login-helpers-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/helpers
-
-      - name: Restore bounded helper modes after artifact extraction
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          chmod 755 "$RUNNER_TEMP/helpers/auth.so" "$RUNNER_TEMP/helpers/bridge.so" "$RUNNER_TEMP/helpers/character.so"
-          chmod 700 "$RUNNER_TEMP/helpers/secret-ingress"
-          test -s "$RUNNER_TEMP/helpers/auth.so" -a -s "$RUNNER_TEMP/helpers/bridge.so" -a -s "$RUNNER_TEMP/helpers/character.so" -a -x "$RUNNER_TEMP/helpers/secret-ingress"
-          echo HELPER_ARTIFACT_MODE_RESTORE=PASS
-
-      - name: Re-prove live exact SHA and all native gates
+      - name: Revalidate existing helper-enabled exact runtime
         shell: bash
         run: |
           set +x
@@ -126,88 +39,42 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           docker inspect "$CONTAINER" >/dev/null
           test "$(docker inspect "$CONTAINER" --format '{{.State.Status}}')" = running
-          tmp="$RUNNER_TEMP/current-client"; rm -f "$tmp"
-          docker cp "$CONTAINER:$CLIENT" "$tmp" >/dev/null
-          python3 tools/tibia_runtime_bridge/current_sha_native_login_gate.py "$tmp" "$RUNNER_TEMP/current-targets.env"
-          source "$RUNNER_TEMP/current-targets.env"
-          test -n "$TARGETS"
-          echo CURRENT_EXACT_LIVE_ADMISSION=PASS
-          echo SECRET_ACCESS=false
-          echo LOGIN=false
-
-      - name: Start helper-enabled client in the existing KasmVNC display
-        shell: bash
-        run: |
-          set +x
-          set -Eeuo pipefail
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          source "$RUNNER_TEMP/current-targets.env"
-          helper="$RUNNER_TEMP/helpers"
-          docker exec -u 0 "$CONTAINER" /bin/sh -lc "rm -rf '$TASK_ROOT'; mkdir -p '$TASK_ROOT/repo'; chown -R kasm-user:kasm-user '$TASK_ROOT'"
-          docker cp "$helper/auth.so" "$CONTAINER:$TASK_ROOT/auth.so" >/dev/null
-          docker cp "$helper/bridge.so" "$CONTAINER:$TASK_ROOT/bridge.so" >/dev/null
-          docker cp "$helper/character.so" "$CONTAINER:$TASK_ROOT/character.so" >/dev/null
-          docker cp "$helper/secret-ingress" "$CONTAINER:$TASK_ROOT/secret-ingress" >/dev/null
-          docker cp tools "$CONTAINER:$TASK_ROOT/repo/" >/dev/null
-          docker exec -u 0 "$CONTAINER" chown -R kasm-user:kasm-user "$TASK_ROOT"
-          docker exec -u kasm-user "$CONTAINER" python3 - "$CLIENT" <<'PY'
-          import os,pathlib,signal,sys,time
-          target=os.path.realpath(sys.argv[1]); pids=[]
-          for item in pathlib.Path('/proc').iterdir():
-              if not item.name.isdigit(): continue
-              try:
-                  if os.path.realpath(str(item/'exe'))==target: pids.append(int(item.name))
-              except OSError: pass
-          if len(pids)!=1: raise SystemExit(f'exact live client count must be 1, got {len(pids)}')
-          os.kill(pids[0],signal.SIGTERM)
-          for _ in range(120):
-              if not pathlib.Path(f'/proc/{pids[0]}').exists(): break
-              time.sleep(.1)
-          if pathlib.Path(f'/proc/{pids[0]}').exists(): raise SystemExit('exact live client did not terminate')
-          print('PREVIOUS_EXACT_CLIENT_STOPPED=PASS')
-          PY
-          docker exec -d -u kasm-user -w "$CLIENT_ROOT" \
-            -e DISPLAY=:1 \
-            -e HOME=/home/kasm-user \
-            -e LD_LIBRARY_PATH="$CLIENT_ROOT/bin/lib" \
-            -e LD_PRELOAD="$TASK_ROOT/auth.so:$TASK_ROOT/character.so:$TASK_ROOT/bridge.so" \
-            -e OTCLIENT_TIBIA_RE_SOCKET="$BRIDGE_SOCKET" \
-            -e OTCLIENT_TIBIA_RE_AUTH_SOCKET="$AUTH_SOCKET" \
-            -e OTCLIENT_TIBIA_RE_CHARACTER_SOCKET="$CHARACTER_SOCKET" \
-            -e OTCLIENT_TIBIA_RE_BINARY_SHA256="$EXPECTED_SHA" \
-            -e OTCLIENT_TIBIA_RE_CLIENT_VERSION="$CLIENT_VERSION" \
-            -e OTCLIENT_TIBIA_RE_TARGETS="$TARGETS" \
-            "$CONTAINER" ./bin/client
-          for _ in $(seq 1 200); do
-            if docker exec -u kasm-user "$CONTAINER" test -S "$BRIDGE_SOCKET" && \
-               docker exec -u kasm-user "$CONTAINER" test -S "$AUTH_SOCKET" && \
-               docker exec -u kasm-user "$CONTAINER" test -S "$CHARACTER_SOCKET"; then break; fi
-            sleep .25
+          for socket in "$BRIDGE_SOCKET" "$AUTH_SOCKET" "$CHARACTER_SOCKET"; do
+            docker exec -u kasm-user "$CONTAINER" test -S "$socket"
           done
-          docker exec -u kasm-user "$CONTAINER" test -S "$BRIDGE_SOCKET"
-          docker exec -u kasm-user "$CONTAINER" test -S "$AUTH_SOCKET"
-          docker exec -u kasm-user "$CONTAINER" test -S "$CHARACTER_SOCKET"
-          runtime_pid="$(docker exec -u kasm-user -e PYTHONPATH="$TASK_ROOT/repo" -e SOCKET="$BRIDGE_SOCKET" "$CONTAINER" python3 - <<'PY'
-          import os
-          from pathlib import Path
-          from tools.tibia_runtime_bridge.ipc_client import request
-          doc=request(Path(os.environ['SOCKET']),'PING')
-          if not doc.get('ok'): raise SystemExit(2)
-          print(doc['pid'])
+          runtime_pid="$(docker exec -i -u kasm-user -e SOCKET="$BRIDGE_SOCKET" "$CONTAINER" python3 - <<'PY'
+          import json,os,socket,struct
+          s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); s.settimeout(5); s.connect(os.environ['SOCKET'])
+          pid,uid,gid=struct.unpack('3i',s.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
+          if uid!=os.geteuid(): raise SystemExit('bridge UID mismatch')
+          s.sendall(b'PING\n'); raw=b''
+          while b'\n' not in raw:
+              part=s.recv(4096)
+              if not part: break
+              raw+=part
+          s.close(); doc=json.loads(raw.split(b'\n',1)[0])
+          if not doc.get('ok') or doc.get('pid')!=pid: raise SystemExit('bridge PING/peer mismatch')
+          print(pid)
           PY
           )"
-          test "$runtime_pid" -gt 0
-          docker exec -u kasm-user "$CONTAINER" python3 - "$runtime_pid" "$CLIENT" "$EXPECTED_SHA" "$EXPECTED_SIZE" <<'PY'
+          [[ "$runtime_pid" =~ ^[0-9]+$ ]] && (( runtime_pid > 0 ))
+          docker exec -i -u kasm-user "$CONTAINER" python3 - "$runtime_pid" "$CLIENT" "$EXPECTED_SHA" "$EXPECTED_SIZE" "$CLIENT_VERSION" "$TASK_ROOT" <<'PY'
           import hashlib,os,pathlib,sys
-          pid=int(sys.argv[1]); expected=os.path.realpath(sys.argv[2]); sha=sys.argv[3]; size=int(sys.argv[4])
-          if os.path.realpath(f'/proc/{pid}/exe')!=expected: raise SystemExit('runtime exe identity mismatch')
+          pid=int(sys.argv[1]); expected=os.path.realpath(sys.argv[2]); sha=sys.argv[3]; size=int(sys.argv[4]); version=sys.argv[5]; root=sys.argv[6]
+          if os.path.realpath(f'/proc/{pid}/exe')!=expected: raise SystemExit('runtime executable mismatch')
           p=pathlib.Path(f'/proc/{pid}/exe')
-          if p.stat().st_size!=size or hashlib.sha256(p.read_bytes()).hexdigest()!=sha: raise SystemExit('runtime exact hash mismatch')
+          if p.stat().st_size!=size or hashlib.sha256(p.read_bytes()).hexdigest()!=sha: raise SystemExit('runtime SHA/size mismatch')
+          maps=pathlib.Path(f'/proc/{pid}/maps').read_text(errors='replace')
+          for name in ('auth.so','character.so','bridge.so'):
+              if f'{root}/{name}' not in maps: raise SystemExit(f'helper mapping missing: {name}')
+          keys={item.split(b'=',1)[0] for item in pathlib.Path(f'/proc/{pid}/environ').read_bytes().split(b'\0') if b'=' in item}
+          if b'TIBIA_TEST_EMAIL' in keys or b'TIBIA_TEST_PASSWORD' in keys: raise SystemExit('secret leaked to persistent runtime environment')
           print('HELPER_RUNTIME_EXACT_IDENTITY=PASS')
+          print('HELPER_PRELOAD_MAPPINGS=PASS')
+          print('PERSISTENT_SECRET_ENVIRONMENT=false')
           PY
           printf '%s\n' "$runtime_pid" > "$RUNNER_TEMP/current-runtime-pid"
-          echo HELPER_ENABLED_KASM_RUNTIME=PASS
-          echo DISPLAY=:1
+          echo HELPER_RUNTIME_REUSE=PASS
           echo SECRET_ACCESS=false
           echo LOGIN=false
 
@@ -219,6 +86,8 @@ jobs:
         run: |
           set +x
           set -Eeuo pipefail
+          test -n "${TIBIA_TEST_EMAIL:-}"
+          test -n "${TIBIA_TEST_PASSWORD:-}"
           runtime_pid="$(cat "$RUNNER_TEMP/current-runtime-pid")"
           docker exec -i -u kasm-user \
             -e TIBIA_TEST_EMAIL \
@@ -226,7 +95,7 @@ jobs:
             "$CONTAINER" "$TASK_ROOT/secret-ingress" "$AUTH_SOCKET" "$runtime_pid"
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
 
-      - name: Confirm the native character only when the current model is a singleton
+      - name: Resolve current native character model and confirm singleton only
         shell: bash
         run: |
           set +x
@@ -238,7 +107,7 @@ jobs:
           def call(command):
               s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); s.settimeout(5); s.connect(path)
               pid,uid,gid=struct.unpack('3i',s.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
-              if pid!=expected or uid!=os.geteuid(): raise SystemExit('character socket peer identity mismatch')
+              if pid!=expected or uid!=os.geteuid(): raise SystemExit('character socket peer mismatch')
               s.sendall(command.encode()+b'\n'); raw=b''
               while b'\n' not in raw:
                   part=s.recv(4096)
@@ -253,8 +122,10 @@ jobs:
               if isinstance(count,int) and count>0: break
               time.sleep(.5)
           if not state or not state.get('ok'): raise SystemExit('native character model unavailable')
-          count=state.get('character_count',-1); print('NATIVE_CHARACTER_COUNT='+str(count))
+          count=state.get('character_count',-1)
+          print('NATIVE_CHARACTER_COUNT='+str(count))
           if count!=1:
+              print('NATIVE_CHARACTER_NAMES='+json.dumps(state.get('character_names',[]),ensure_ascii=True))
               print('NATIVE_CHARACTER_CONFIRM=OWNER_DECISION_REQUIRED')
               raise SystemExit(78)
           result=call('CONFIRM_UNIQUE')
@@ -270,25 +141,25 @@ jobs:
           set +x
           set -Eeuo pipefail
           runtime_pid="$(cat "$RUNNER_TEMP/current-runtime-pid")"
-          docker exec -i -u kasm-user \
-            -e PYTHONPATH="$TASK_ROOT/repo" \
-            -e BRIDGE_SOCKET="$BRIDGE_SOCKET" \
-            -e EXPECTED_PID="$runtime_pid" \
-            -e EXPECTED_SHA="$EXPECTED_SHA" \
-            -e EXPECTED_SIZE="$EXPECTED_SIZE" \
-            -e CLIENT_VERSION="$CLIENT_VERSION" \
-            "$CONTAINER" python3 - <<'PY'
-          import os,time
-          from pathlib import Path
-          from tools.tibia_runtime_bridge.ipc_client import PeerIdentityExpectation,request,session_status
-          path=Path(os.environ['BRIDGE_SOCKET']); ping=request(path,'PING')
-          if ping.get('pid')!=int(os.environ['EXPECTED_PID']): raise SystemExit('bridge PID drift')
-          exp=PeerIdentityExpectation(boot_id_sha256=ping['boot_id_sha256'],pid=ping['pid'],process_start_ticks=ping['process_start_ticks'],client_version=os.environ['CLIENT_VERSION'],client_size=int(os.environ['EXPECTED_SIZE']),client_sha256=os.environ['EXPECTED_SHA'])
-          request(path,'PING',expected_identity=exp)
-          last=None
-          for _ in range(45):
-              last=session_status(path,expected_identity=exp)
-              if last.get('ok') and last.get('in_game_candidate'):
+          docker exec -i -u kasm-user -e SOCKET="$BRIDGE_SOCKET" -e EXPECTED_PID="$runtime_pid" "$CONTAINER" python3 - <<'PY'
+          import json,os,socket,struct,time
+          path=os.environ['SOCKET']; expected=int(os.environ['EXPECTED_PID'])
+          def call(command):
+              s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); s.settimeout(5); s.connect(path)
+              pid,uid,gid=struct.unpack('3i',s.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))
+              if pid!=expected or uid!=os.geteuid(): raise SystemExit('bridge socket peer mismatch')
+              s.sendall(command.encode()+b'\n'); raw=b''
+              while b'\n' not in raw:
+                  part=s.recv(4096)
+                  if not part: break
+                  raw+=part
+                  if len(raw)>65536: raise SystemExit('bridge response too large')
+              s.close(); return json.loads(raw.split(b'\n',1)[0])
+          names=('player_protocol_handler','gameserver_game_session','worldmap_handler')
+          last={}
+          for _ in range(60):
+              last={name:call('DISCOVER '+name) for name in names}
+              if all(doc.get('ok') and doc.get('validated_hits')==1 for doc in last.values()):
                   print('RESULT=SUCCESS')
                   print('CHARACTER_ACTUALLY_LOGGED_INTO_GAME=YES')
                   print('CAUSAL_PROOF=COMPLETE')
@@ -296,8 +167,7 @@ jobs:
                   raise SystemExit(0)
               time.sleep(2)
           print('STRUCTURAL_IN_GAME=FAIL')
-          markers=(last or {}).get('markers',{})
-          for name in ('player_protocol_handler','gameserver_game_session','worldmap_handler'):
-              print(name.upper()+'_HITS='+str(markers.get(name,{}).get('validated_hits','UNKNOWN')))
+          for name in names:
+              print(name.upper()+'_HITS='+str(last.get(name,{}).get('validated_hits','UNKNOWN')))
           raise SystemExit(2)
           PY

@@ -33,7 +33,7 @@ blocks: []
 policy_version: 2
 prompting_standard_version: 2.1
 execution_mode: github-only
-execution_reason: current work is a read-only static census; physical official-client runtime was live-revalidated through the configured Remote Desktop Commander locator and was not verifiably reachable, so no runtime claim is admissible
+execution_reason: current work is a read-only static census; attempted live revalidation of the configured physical official-client runtime through Remote Desktop Commander did not yield a verifiably reachable session, so no runtime claim is admissible
 run_scope: single_task
 continuation_policy: continue_until_real_stop
 task_completion_policy: full_closeout
@@ -78,15 +78,15 @@ safety_boundary:
     - GUI input or process control
 acceptance:
   - record exact-build static evidence for G24-G31 without overstating runtime semantics
-  - map economy-related protocol registry names and recovered inbound handler code xrefs where the trusted S1 census supports them
-  - map G28-G31 UI/controller presence to the trusted capability census and identify residual evidence gaps
+  - map economy-related protocol registry names and recovered protocol-handler direct code-to-string xrefs where the trusted S1 census supports them
+  - map G28-G31 UI/controller presence to the exact-build capability census and identify residual evidence gaps
   - preserve direct-message and transaction-confirmation boundaries; no transaction-producing action may be executed
   - leave PR as Draft and do not edit shared matrix/checklist owned by PR #536
   - verify changed files and exact branch head before delivery
 audit:
   result: pending_fresh_independent
   material_findings_open: unknown
-last_completed_step: task-owned G24-G31 static evidence report completed with exact-build protocol registry mapping, version-fenced prior UI/controller mapping, handler-family xrefs, safety boundaries and residual UNKNOWNs
+last_completed_step: task-owned G24-G31 static evidence report completed and corrected against the exact S1 160/189 registries, exact client fence, 47 handler-type xref catalogue and same-build capability census; safety boundaries and residual UNKNOWNs are explicit
 next_action: verify exact PR diff/head/checks; then leave Draft PR #546 for fresh independent audit/coordinator promotion
 ---
 

@@ -3,7 +3,6 @@ on:
   pull_request:
     branches: [main]
     paths: ['.github/workflows/tibia-official-client-re-kasmvnc-client-start.yml']
-  workflow_dispatch:
 permissions: {contents: read}
 concurrency: {group: track-a-kasmvnc-client-start, cancel-in-progress: false}
 env:
@@ -18,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with: {persist-credentials: false, fetch-depth: 0, ref: '${{ github.event.pull_request.head.sha }}'}
-      - name: Stage, start, prove
+      - name: Stage start prove
         shell: bash
         run: |
           set +x; set -Eeuo pipefail; umask 077; ulimit -c 0 || true
@@ -35,14 +34,15 @@ jobs:
           echo KASM_CLIENT_PACKAGE_STAGED=PASS
           docker exec -d -u 1000 -e DISPLAY=:1 -e HOME=/home/kasm-user -e QT_QUICK_BACKEND=software -e LD_LIBRARY_PATH="$dest/bin/lib" "$CONTAINER_NAME" /bin/bash -lc "cd '$dest' && exec ./bin/client >/home/kasm-user/tibia-client.log 2>&1"
           sleep 3
-          pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -o -f '$dest/bin/client' || true")"
+          pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'pgrep -o -x client || true')"
           if [[ ! "$pid" =~ ^[1-9][0-9]*$ ]]; then
             echo KASM_CLIENT_EARLY_EXIT=true
             docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc 'tail -n 80 /home/kasm-user/tibia-client.log 2>/dev/null || true'
-            docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "ldd '$dest/bin/client' 2>/dev/null | grep 'not found' || true"
             exit 41
           fi
-          docker exec "$CONTAINER_NAME" /bin/bash -lc "test \"\$(readlink -f /proc/$pid/exe)\" = '$dest/bin/client'"
+          exe="$(docker exec "$CONTAINER_NAME" readlink -f "/proc/$pid/exe")"
+          [[ "$exe" == "$dest/bin/client" ]]
+          echo "KASM_CLIENT_PID=$pid"
           echo KASM_CLIENT_PROCESS=PASS
           found=0
           for _ in $(seq 1 60); do

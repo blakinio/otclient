@@ -1,0 +1,44 @@
+name: Track A inspect existing Synology noVNC 6082
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-vnc-existing-novnc-inspect-v23.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: [self-hosted, oteryn-staging]
+    timeout-minutes: 10
+    steps:
+      - name: Inspect host 6082 owner and noVNC/websockify topology
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          command -v docker >/dev/null
+          test -S /var/run/docker.sock
+          echo 'TRACK_A_NOVNC_INSPECT_BEGIN'
+          echo '--- published port 6082 candidates ---'
+          docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' | grep -E '(^|[ ,:])6082([-/,: ]|$)' || true
+          echo '--- containers with novnc/websockify names or commands ---'
+          for id in $(docker ps -q); do
+            name="$(docker inspect -f '{{.Name}}' "$id" | sed 's#^/##')"
+            image="$(docker inspect -f '{{.Config.Image}}' "$id")"
+            cmd="$(docker inspect -f '{{json .Config.Cmd}}' "$id")"
+            entry="$(docker inspect -f '{{json .Config.Entrypoint}}' "$id")"
+            ports="$(docker port "$id" 2>/dev/null | tr '\n' ';' || true)"
+            if printf '%s %s %s %s %s\n' "$name" "$image" "$cmd" "$entry" "$ports" | grep -Eqi 'novnc|websockify|6082|vnc'; then
+              printf 'CONTAINER name=%s image=%s ports=%s\n' "$name" "$image" "$ports"
+              printf 'CMD=%s\nENTRYPOINT=%s\n' "$cmd" "$entry"
+              echo 'NETWORKS:'
+              docker inspect -f '{{range $n,$v := .NetworkSettings.Networks}}{{$n}} ip={{$v.IPAddress}} {{end}}' "$id"
+            fi
+          done
+          echo '--- otclient-runner network ---'
+          docker inspect -f 'OTCLIENT name={{.Name}} {{range $n,$v := .NetworkSettings.Networks}}network={{$n}} ip={{$v.IPAddress}} {{end}}' otclient-runner
+          echo 'TRACK_A_NOVNC_INSPECT_END'

@@ -124,11 +124,12 @@ BLOCKED
 - [x] every checklist row has a concrete remaining-step code/path to `DONE`;
 - [x] compact matrix provides area counts and a full 169-ID one-hot projection with no status reinterpretation;
 - [x] matrix scope table explicitly includes equipment/options/client feature families;
+- [x] full changed-path and full-diff self-audit after matrix addition: exactly three declared documentation/task paths; no workflow/runtime/client mutation;
+- [x] matrix totals reconcile exactly to checklist totals: `10 + 64 + 86 + 9 = 169`;
 - [x] E2E = `NOT_APPLICABLE` with documentation/audit reason;
-- [ ] full changed-path and full-diff self-audit after matrix addition;
 - [ ] fresh independent documentation audit with material findings `0`;
-- [ ] required exact-head checks on the final unchanged head;
-- [ ] final review threads/requested changes = `0/0`;
+- [ ] required exact-head checks on the final unchanged head after this checkpoint commit;
+- [x] review threads/requested changes at matrix self-audit checkpoint: `0/0`;
 - [ ] mark Ready, protected squash merge, task archive and ownership release.
 
 # Matrix projection
@@ -151,6 +152,21 @@ Critical dependency matrix
 Completion-condition matrix
 ```
 
+# Validation checkpoint
+
+The matrix head immediately before this checkpoint-only task update was:
+
+```text
+2a2e7d44dc87bc83badb5fde08ce03b3b3a4033e
+Track A agent runtime governance 32144075488 = SUCCESS
+CI 32144075809 = SUCCESS
+main freshness = ebbb36f50076ff4072c7218e302614c1dfea00b1
+changed paths = exactly 3 declared files
+review threads = 0
+```
+
+This checkpoint changes the head; exact-head required checks must be green again before any Ready/merge transition.
+
 # Independent-audit blocker
 
 Repository governance requires a fresh independent documentation audit. The current worker's self-review cannot satisfy that gate, and the standing central Spark pre-review is explicitly advisory and does not replace required independent review. No separate independent auditor/validator with fresh semantic context is available through the current execution surface.
@@ -159,6 +175,6 @@ Repository governance requires a fresh independent documentation audit. The curr
 status: blocked
 material_findings_open_from_self_audit: 0
 blocker: REQUIRED_FRESH_INDEPENDENT_DOCUMENTATION_AUDIT_UNAVAILABLE_IN_CURRENT_SESSION
-last_completed_step: compact matrix projection added for all 169 checklist IDs without changing any underlying status
-next_action: audit the final three-path PR #536 diff, verify exact-head CI, then have a fresh independent auditor validate the checklist/matrix against current main and primary evidence; if material findings are 0, mark Ready and continue protected squash merge/closeout
+last_completed_step: full-client checklist plus compact matrix persisted; 169 IDs/totals reconciled; final three-path diff self-audited with no unrelated mutation
+next_action: a fresh independent auditor validates PR #536 exact final diff against current main and primary evidence; if material findings are 0 and final-head CI is green, mark Ready and continue protected squash merge/closeout
 ```

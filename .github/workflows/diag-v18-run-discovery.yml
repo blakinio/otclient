@@ -1,4 +1,4 @@
-name: Diagnostic v20 AUTH transition wiring run
+name: Diagnostic VNC v23 runs
 
 on:
   push:
@@ -11,10 +11,6 @@ permissions:
   contents: write
   actions: read
 
-env:
-  TARGET_SHA: 976823acd1d5f7f947c0bac9bd8d8277f1c47686
-  TARGET_PATH: .github/workflows/track-a-worldmap-auth-transition-wiring-v20.yml
-
 jobs:
   discover:
     runs-on: ubuntu-24.04
@@ -25,21 +21,47 @@ jobs:
           ref: diag/OTC-20260818-v18-run-discovery
           persist-credentials: true
           fetch-depth: 1
-      - name: Discover terminal target run
+      - name: Discover terminal VNC runs
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
-          api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$TARGET_SHA&event=push&per_page=50";run_id=''
-          for _ in $(seq 1 60);do payload="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$api")";run_id="$(jq -r --arg p "$TARGET_PATH" '.workflow_runs[]|select(.path==$p)|.id'<<<"$payload"|head -1)";[[ "$run_id" =~ ^[1-9][0-9]*$ ]]&&break;sleep 5;done
-          [[ "$run_id" =~ ^[1-9][0-9]*$ ]];status='';conclusion=''
-          for _ in $(seq 1 150);do one="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")";status="$(jq -r '.status'<<<"$one")";conclusion="$(jq -r '.conclusion//""'<<<"$one")";[[ "$status" == completed ]]&&break;sleep 10;done
-          jobs="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")";mkdir -p .diag
-          jq -n --arg target_sha "$TARGET_SHA" --argjson run_id "$run_id" --arg status "$status" --arg conclusion "$conclusion" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion}]'<<<"$jobs")" '{schema:"v20-auth-transition-wiring-terminal-v1",target_sha:$target_sha,run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/v20-auth-transition-wiring-status.json
-          [[ "$status" == completed ]]
-      - name: Persist terminal diagnostic
-        if: always()
+          mkdir -p .diag
+          python3 - <<'PY'
+          import json,os,subprocess,time
+          token=os.environ['GH_TOKEN'];repo=os.environ['GITHUB_REPOSITORY'];api=os.environ['GITHUB_API_URL']
+          targets=[
+            ('sidecar','6258524cc57703ab335cf020de9b0c8768a71da9','.github/workflows/track-a-vnc-loopback-sidecar-deploy-v23.yml'),
+            ('smoke','fc7d772971f8b3010196a8dfec04277f97dd40ca','.github/workflows/track-a-vnc-observer-smoke-v23.yml'),
+          ]
+          headers=['-H',f'Authorization: Bearer {token}','-H','Accept: application/vnd.github+json','-H','X-GitHub-Api-Version: 2022-11-28']
+          def get(url):
+            return json.loads(subprocess.check_output(['curl','-fsSL',*headers,url],text=True))
+          result={}
+          for name,sha,path in targets:
+            run=None
+            for _ in range(60):
+              p=get(f'{api}/repos/{repo}/actions/runs?head_sha={sha}&event=push&per_page=50')
+              run=next((r for r in p.get('workflow_runs',[]) if r.get('path')==path),None)
+              if run:break
+              time.sleep(5)
+            if not run:
+              result[name]={'target_sha':sha,'status':'not_found'};continue
+            for _ in range(180):
+              one=get(f'{api}/repos/{repo}/actions/runs/{run["id"]}')
+              if one.get('status')=='completed':break
+              time.sleep(10)
+            jobs=get(f'{api}/repos/{repo}/actions/runs/{run["id"]}/jobs?per_page=100').get('jobs',[])
+            result[name]={'target_sha':sha,'run_id':run['id'],'status':one.get('status'),'conclusion':one.get('conclusion'),'jobs':[{'id':j['id'],'name':j['name'],'status':j['status'],'conclusion':j.get('conclusion')} for j in jobs]}
+          open('.diag/v23-vnc-status.json','w').write(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(result,indent=2,sort_keys=True))
+          PY
+      - name: Persist VNC diagnostic
         shell: bash
         run: |
-          set -Eeuo pipefail;test -s .diag/v20-auth-transition-wiring-status.json;git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com';git add .diag/v20-auth-transition-wiring-status.json;git commit -m 'diag(track-a): persist v20 auth transition wiring status';git push origin HEAD:diag/OTC-20260818-v18-run-discovery
+          set -Eeuo pipefail
+          git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .diag/v23-vnc-status.json
+          git commit -m 'diag(track-a): persist VNC v23 run status'
+          git push origin HEAD:diag/OTC-20260818-v18-run-discovery

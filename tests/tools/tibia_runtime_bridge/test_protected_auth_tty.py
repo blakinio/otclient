@@ -43,11 +43,14 @@ class ProtectedAuthTtyTests(unittest.TestCase):
             "client_sha256": EXACT_CLIENT_SHA256,
         }
 
+    def write_identity(self, path: Path, doc: dict[str, object] | None = None) -> None:
+        path.write_text(json.dumps(self.valid_identity() if doc is None else doc), encoding="utf-8")
+        path.chmod(0o600)
+
     def test_exact_runtime_identity_accepts_only_exact_client_fence(self):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "identity.json"
-            path.write_text(json.dumps(self.valid_identity()), encoding="utf-8")
-            path.chmod(0o600)
+            self.write_identity(path)
             identity = load_exact_runtime_identity(path.resolve())
             self.assertEqual(EXACT_CLIENT_VERSION, identity.client_version)
             self.assertEqual(EXACT_CLIENT_SIZE, identity.client_size)
@@ -57,20 +60,26 @@ class ProtectedAuthTtyTests(unittest.TestCase):
 
             doc = self.valid_identity()
             doc["client_sha256"] = "b" * 64
-            path.write_text(json.dumps(doc), encoding="utf-8")
-            path.chmod(0o600)
+            self.write_identity(path, doc)
             with self.assertRaises(BridgeClientError):
                 load_exact_runtime_identity(path.resolve())
 
-    def test_runtime_identity_rejects_relative_and_writable_metadata(self):
+    def test_runtime_identity_rejects_relative_writable_and_symlink_metadata(self):
         with self.assertRaises(BridgeClientError):
             load_exact_runtime_identity(Path("identity.json"))
         with tempfile.TemporaryDirectory() as raw:
-            path = Path(raw) / "identity.json"
-            path.write_text(json.dumps(self.valid_identity()), encoding="utf-8")
+            root = Path(raw)
+            path = root / "identity.json"
+            self.write_identity(path)
             path.chmod(0o622)
             with self.assertRaises(BridgeClientError):
                 load_exact_runtime_identity(path.resolve())
+
+            self.write_identity(path)
+            symlink = root / "identity-link.json"
+            symlink.symlink_to(path)
+            with self.assertRaises(BridgeClientError):
+                load_exact_runtime_identity(symlink.absolute())
 
     def test_legacy_secret_environment_fails_closed_without_reading_values(self):
         with mock.patch.dict(os.environ, {"TIBIA_TEST_EMAIL": "synthetic-do-not-read"}, clear=False):
@@ -199,8 +208,11 @@ class ProtectedAuthTtyTests(unittest.TestCase):
         self.assertIn("F_SEAL_WRITE", source)
         self.assertIn("auth_with_credentials_fd", source)
         self.assertIn("EXTERNAL_INTERACTIVE_TTY_REQUIRED", source)
-        self.assertIn("metadata.st_uid != os.geteuid()", source)
-        self.assertIn("metadata.st_mode & 0o022", source)
+        self.assertIn("os.O_NOFOLLOW", source)
+        self.assertIn("os.fstat(fd)", source)
+        self.assertIn("before.st_uid != os.geteuid()", source)
+        self.assertIn("before.st_mode & 0o022", source)
+        self.assertIn("runtime identity changed during read", source)
         self.assertIn("finally:\n            termios.tcsetattr", source)
 
 

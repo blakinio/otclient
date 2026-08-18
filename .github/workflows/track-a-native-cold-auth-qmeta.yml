@@ -131,7 +131,7 @@ jobs:
           print(f'COLD_AUTH_QMETA_CLASS={class_name}')
           print(f'COLD_AUTH_QMETA_METHOD_COUNT={method_count}')
           print(f'COLD_AUTH_QMETA_SIGNAL_COUNT={signal_count}')
-          assert class_name == 'TGameClient', class_name
+          assert class_name == 'tibia::client::TGameClient', class_name
 
           methods = []
           for idx in range(method_count):
@@ -139,10 +139,8 @@ jobs:
               name = qstring(row[0])
               argc = row[1]
               params_offset = row[2]
-              tag_index = row[3]
               method_flags = row[4]
               meta_revision = row[5]
-              # Parameters are encoded as return type then argc argument types; values >= 0x80000000 are unresolved custom types.
               params = [u32(METADATA + (params_offset + j) * 4) for j in range(argc + 1)]
               methods.append((idx, name, argc, method_flags, meta_revision, params))
               print(f'COLD_AUTH_METHOD_META_INDEX={idx};NAME={name};ARGC={argc};FLAGS=0x{method_flags:x};REV={meta_revision};PARAMS=' + ','.join(hex(x) for x in params))
@@ -158,7 +156,6 @@ jobs:
           print(f'COLD_AUTH_METHOD_FLAGS=0x{method_flags:x}')
           print('COLD_AUTH_RAW_PARAM_TYPE_IDS=' + ','.join(hex(x) for x in params))
 
-          # Recover jump-table candidates from the exact static metacall using the same fail-closed structure as the predecessor census.
           md = Cs(CS_ARCH_X86, CS_MODE_64)
           md.detail = True
           ins = list(md.disasm(raw[file_off(STATIC_METACALL):file_off(STATIC_METACALL) + 0x900], STATIC_METACALL))
@@ -203,12 +200,9 @@ jobs:
           print('COLD_AUTH_TARGET_EXECUTABLE=true')
           print('COLD_AUTH_TARGET_INSTRUCTION_FENCE=' + fence.hex())
 
-          # Resolve argument type names from QMeta type IDs only when they map directly to string-table entries.
-          # If this exact encoding does not resolve cleanly, leave the type text UNKNOWN instead of guessing.
           resolved = []
           for type_id in params[1:]:
               name_value = None
-              # Qt meta-type encoding may use the high bit for string-table type names.
               if type_id & 0x80000000:
                   candidate_index = type_id & 0x7fffffff
                   try:

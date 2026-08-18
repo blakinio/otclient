@@ -64,8 +64,6 @@ jobs:
           import hashlib
           import lzma
           import pathlib
-          import re
-          import subprocess
           import sys
 
           packed_path = pathlib.Path(sys.argv[1])
@@ -96,82 +94,11 @@ jobs:
           print('UI_SETTINGS_CLIENT_SIZE=' + str(len(raw)))
           print('UI_SETTINGS_CLIENT_SHA256=' + hashlib.sha256(raw).hexdigest())
           print(f'UI_SETTINGS_LZMA_ENVELOPE=offset45;lc={lc};lp={lp};pb={pb};dict={dict_size}')
-
-          # Keep only bounded printable strings; no proprietary binary bytes are emitted.
-          printable = {
-              m.group().decode('utf-8', 'ignore')
-              for m in re.finditer(rb'[\x20-\x7e]{5,240}', raw)
-          }
-
-          buckets = {
-              'GRAPHICS': re.compile(r'graphic|video|renderer|rendering|vsync|vertical.?sync|fullscreen|windowed|frame.?rate|\bfps\b|antialias|anti.?alias|brightness|light.?level', re.I),
-              'AUDIO': re.compile(r'audio|sound|music|ambient|volume|mute|speaker|playback.?device', re.I),
-              'INTERFACE': re.compile(r'interface|sidebar|ui.?scale|status.?bar|action.?bar|minimap|window.?layout|chat.?window', re.I),
-              'GAMEPLAY': re.compile(r'gameplay|control|keyboard|mouse|chase|attack.?mode|movement|walk|turn|smart.?click', re.I),
-              'PERSISTENCE': re.compile(r'setting|option|preference|config|configuration|profile|persist|migration|migrate|save.?file|standard.?path', re.I),
-              'HOTKEY_ACTIONBAR': re.compile(r'hotkey|key.?bind|binding|shortcut|action.?bar|multi.?action|cooldown', re.I),
-          }
-
-          persistence_api = re.compile(r'QSettings|QStandardPaths|QSaveFile|QJson|sqlite|\.config|settings\.(json|ini|cfg)|options\.(json|ini|cfg)', re.I)
-
-          def demangle(values):
-              if not values:
-                  return {}
-              proc = subprocess.run(
-                  ['c++filt', '-t'],
-                  input='\n'.join(values) + '\n',
-                  text=True,
-                  stdout=subprocess.PIPE,
-                  stderr=subprocess.DEVNULL,
-                  check=True,
-              )
-              return dict(zip(values, proc.stdout.splitlines()))
-
-          def rank(s):
-              low = s.lower()
-              score = 0
-              if 'tibia::' in low: score += 100
-              if 'tibia' in low: score += 35
-              if 'qsettings' in low or 'qstandardpaths' in low or 'qsavefile' in low: score += 80
-              if re.search(r'(^|::)T[A-Z]', s): score += 30
-              if s.startswith('N') and 'tibia' in low: score += 25
-              if 'setting' in low or 'option' in low or 'preference' in low: score += 20
-              if 'config' in low or 'profile' in low: score += 15
-              if 'hotkey' in low or 'actionbar' in low or 'action bar' in low: score += 15
-              if len(s) <= 120: score += 5
-              return (-score, len(s), s)
-
-          all_candidates = set()
-          bucket_candidates = {}
-          for name, pattern in buckets.items():
-              vals = [s for s in printable if pattern.search(s)]
-              vals = sorted(vals, key=rank)[:120]
-              bucket_candidates[name] = vals
-              all_candidates.update(vals)
-
-          api_candidates = sorted([s for s in printable if persistence_api.search(s)], key=rank)[:120]
-          all_candidates.update(api_candidates)
-
-          demangle_input = [s for s in all_candidates if re.fullmatch(r'_?Z?T?[SVI]?N?[0-9A-Za-z_]+E?', s)]
-          demangled = demangle(demangle_input)
-
-          for name in buckets:
-              vals = bucket_candidates[name]
-              print(f'UI_SETTINGS_BUCKET_{name}_COUNT={len(vals)}')
-              for idx, value in enumerate(vals):
-                  d = demangled.get(value, value)
-                  print(f'UI_SETTINGS_CANDIDATE={name};INDEX={idx};RAW={value};DEMANGLED={d}')
-
-          print('UI_SETTINGS_PERSISTENCE_API_COUNT=' + str(len(api_candidates)))
-          for idx, value in enumerate(api_candidates):
-              d = demangled.get(value, value)
-              print(f'UI_SETTINGS_PERSISTENCE_API={idx};RAW={value};DEMANGLED={d}')
-
-          print('UI_SETTINGS_STATIC_SCAN=PASS')
           PY
 
           python3 - "$r/client/client" <<'PY'
           from collections import deque
+          import json
           import re
           import subprocess
           import sys
@@ -183,6 +110,25 @@ jobs:
           path = sys.argv[1]
           SHF_ALLOC = 0x2
           SHF_EXECINSTR = 0x4
+
+          def unique_nearest_strings(previous, limit=24):
+              out = []
+              for refs, _ in reversed(previous):
+                  for _, text in refs:
+                      if text not in out:
+                          out.append(text)
+                          if len(out) >= limit:
+                              return out
+              return out
+
+          def unique_nearest_calls(previous, limit=16):
+              out = []
+              for _, call in reversed(previous):
+                  if call and call not in out:
+                      out.append(call)
+                      if len(out) >= limit:
+                          return out
+              return out
 
           with open(path, 'rb') as fh:
               elf = ELFFile(fh)
@@ -196,17 +142,14 @@ jobs:
                       continue
                   data = section.data()
                   base = int(section['sh_addr'])
-                  for match in re.finditer(rb'[\x20-\x7e]{4,160}\x00', data):
+                  for match in re.finditer(rb'[\x20-\x7e]{1,160}\x00', data):
                       text = match.group()[:-1].decode('utf-8', 'ignore')
                       strings_by_va[base + match.start()] = text
 
-              literal_vas = {
-                  va for va, text in strings_by_va.items()
-                  if text == 'clientoptions.json'
-              }
-              print('UI_SETTINGS_XREF_CLIENTOPTIONS_LITERAL_VA_COUNT=' + str(len(literal_vas)))
+              literal_vas = {va for va, text in strings_by_va.items() if text == 'clientoptions.json'}
+              print('UI_SETTINGS_KEYS_CLIENTOPTIONS_LITERAL_COUNT=' + str(len(literal_vas)))
               for va in sorted(literal_vas):
-                  print(f'UI_SETTINGS_XREF_CLIENTOPTIONS_LITERAL_VA=0x{va:x}')
+                  print(f'UI_SETTINGS_KEYS_CLIENTOPTIONS_LITERAL_VA=0x{va:x}')
 
               plt = subprocess.run(
                   ['objdump', '-d', '-C', '--no-show-raw-insn', '-j', '.plt', '-j', '.plt.sec', path],
@@ -226,21 +169,12 @@ jobs:
                   if 'QSettings::' in name
                   and any(token in name for token in ('value(', 'setValue(', 'beginGroup(', 'endGroup('))
               }
-              print('UI_SETTINGS_XREF_QSETTINGS_PLT_COUNT=' + str(len(qsettings_plt)))
-              for va, name in sorted(qsettings_plt.items()):
-                  print(f'UI_SETTINGS_XREF_QSETTINGS_PLT=0x{va:x};SYMBOL={name}')
+              print('UI_SETTINGS_KEYS_QSETTINGS_PLT_COUNT=' + str(len(qsettings_plt)))
 
               md = Cs(CS_ARCH_X86, CS_MODE_64)
               md.detail = True
-
-              client_xrefs = []
               qsettings_calls = []
-              pending_client_contexts = []
-
-              relevance = re.compile(
-                  r'option|setting|config|profile|client|hotkey|action|sound|audio|graphic|video|interface|sidebar|gameplay|control|window|json|ini|cfg|tibia',
-                  re.I,
-              )
+              client_xrefs = []
 
               def string_refs(insn):
                   found = []
@@ -253,96 +187,63 @@ jobs:
                   return found
 
               for section in elf.iter_sections():
-                  flags = int(section['sh_flags'])
-                  if not (flags & SHF_EXECINSTR):
+                  if not (int(section['sh_flags']) & SHF_EXECINSTR):
                       continue
-                  data = section.data()
-                  base = int(section['sh_addr'])
-                  previous = deque(maxlen=80)
-
-                  for insn in md.disasm(data, base):
+                  previous = deque(maxlen=96)
+                  for insn in md.disasm(section.data(), int(section['sh_addr'])):
                       refs = string_refs(insn)
                       direct_call = None
+                      target = None
                       if insn.id == X86_INS_CALL and insn.operands and insn.operands[0].type == X86_OP_IMM:
                           target = int(insn.operands[0].imm)
                           direct_call = plt_by_va.get(target)
 
-                      for context in pending_client_contexts:
-                          if context['remaining'] > 0:
-                              context['remaining'] -= 1
-                              if direct_call and len(context['calls']) < 16:
-                                  context['calls'].append(direct_call)
-                              for _, text in refs:
-                                  if relevance.search(text) and text not in context['strings'] and len(context['strings']) < 16:
-                                      context['strings'].append(text)
-
-                      if any(target in literal_vas for target, _ in refs):
-                          prior_calls = []
-                          prior_strings = []
-                          for p_refs, p_call in previous:
-                              if p_call and p_call not in prior_calls and len(prior_calls) < 16:
-                                  prior_calls.append(p_call)
-                              for _, text in p_refs:
-                                  if relevance.search(text) and text not in prior_strings and len(prior_strings) < 16:
-                                      prior_strings.append(text)
-                          context = {
+                      if any(va in literal_vas for va, _ in refs):
+                          client_xrefs.append({
                               'address': insn.address,
-                              'prior_calls': prior_calls,
-                              'prior_strings': prior_strings,
-                              'calls': [],
-                              'strings': [],
-                              'remaining': 80,
-                          }
-                          client_xrefs.append(context)
-                          pending_client_contexts.append(context)
+                              'strings': unique_nearest_strings(previous),
+                              'calls': unique_nearest_calls(previous),
+                          })
 
-                      if direct_call and any(insn.operands[0].imm == va for va in qsettings_plt):
-                          prior_strings = []
-                          prior_calls = []
-                          for p_refs, p_call in previous:
-                              if p_call and p_call not in prior_calls and len(prior_calls) < 12:
-                                  prior_calls.append(p_call)
-                              for _, text in p_refs:
-                                  if relevance.search(text) and text not in prior_strings and len(prior_strings) < 12:
-                                      prior_strings.append(text)
+                      if target in qsettings_plt:
                           qsettings_calls.append({
                               'address': insn.address,
-                              'symbol': direct_call,
-                              'prior_strings': prior_strings,
-                              'prior_calls': prior_calls,
+                              'symbol': qsettings_plt[target],
+                              'strings': unique_nearest_strings(previous),
+                              'calls': unique_nearest_calls(previous),
                           })
 
                       previous.append((refs, direct_call))
 
-              # Keep the report bounded and textual. Addresses are code-level anchors, not binary content.
-              print('UI_SETTINGS_XREF_CLIENTOPTIONS_CODE_COUNT=' + str(len(client_xrefs)))
-              for idx, context in enumerate(client_xrefs[:32]):
-                  calls = '|'.join(dict.fromkeys(context['prior_calls'] + context['calls']))
-                  strings = '|'.join(dict.fromkeys(context['prior_strings'] + context['strings']))
+              print('UI_SETTINGS_KEYS_CLIENTOPTIONS_XREF_COUNT=' + str(len(client_xrefs)))
+              for idx, item in enumerate(client_xrefs[:16]):
                   print(
-                      f"UI_SETTINGS_XREF_CLIENTOPTIONS_CODE={idx};VA=0x{context['address']:x};"
-                      f"NEARBY_PLT_CALLS={calls};NEARBY_RELEVANT_STRINGS={strings}"
+                      'UI_SETTINGS_KEYS_CLIENTOPTIONS_XREF=' + str(idx)
+                      + ';VA=0x' + format(item['address'], 'x')
+                      + ';PRIOR_STRINGS_JSON=' + json.dumps(item['strings'], ensure_ascii=True, separators=(',', ':'))
+                      + ';PRIOR_PLT_JSON=' + json.dumps(item['calls'], ensure_ascii=True, separators=(',', ':'))
                   )
 
-              print('UI_SETTINGS_XREF_QSETTINGS_CALL_COUNT=' + str(len(qsettings_calls)))
-              for idx, context in enumerate(qsettings_calls[:64]):
-                  strings = '|'.join(context['prior_strings'])
-                  calls = '|'.join(context['prior_calls'])
+              print('UI_SETTINGS_KEYS_QSETTINGS_CALL_COUNT=' + str(len(qsettings_calls)))
+              for idx, item in enumerate(qsettings_calls[:64]):
                   print(
-                      f"UI_SETTINGS_XREF_QSETTINGS_CALL={idx};VA=0x{context['address']:x};"
-                      f"SYMBOL={context['symbol']};PRIOR_RELEVANT_STRINGS={strings};PRIOR_PLT_CALLS={calls}"
+                      'UI_SETTINGS_KEYS_QSETTINGS_CALL=' + str(idx)
+                      + ';VA=0x' + format(item['address'], 'x')
+                      + ';SYMBOL=' + item['symbol']
+                      + ';PRIOR_STRINGS_JSON=' + json.dumps(item['strings'], ensure_ascii=True, separators=(',', ':'))
+                      + ';PRIOR_PLT_JSON=' + json.dumps(item['calls'], ensure_ascii=True, separators=(',', ':'))
                   )
 
-              if not literal_vas:
-                  raise SystemExit('clientoptions.json literal missing from current binary')
+              if len(literal_vas) != 1:
+                  raise SystemExit(f'expected one clientoptions.json literal, got {len(literal_vas)}')
               if not client_xrefs:
                   raise SystemExit('clientoptions.json has no decoded RIP-relative code xref')
-              if not qsettings_plt:
-                  raise SystemExit('QSettings persistence PLT surface missing')
+              if len(qsettings_plt) < 4:
+                  raise SystemExit(f'expected QSettings read/write/group PLT surface, got {len(qsettings_plt)}')
               if not qsettings_calls:
                   raise SystemExit('QSettings persistence PLT surface has no decoded direct callsites')
 
-              print('UI_SETTINGS_XREF_SCAN=PASS')
+              print('UI_SETTINGS_KEY_ADJACENCY_SCAN=PASS')
           PY
 
           echo 'UI_SETTINGS_BUILD_ID_BEGIN'

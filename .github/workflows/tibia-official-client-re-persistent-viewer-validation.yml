@@ -93,3 +93,112 @@ jobs:
           else
             git diff --check HEAD^..HEAD
           fi
+
+  audit:
+    name: Fresh authority and viewer-boundary audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head with base history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Falsify scope authority and presentation invariants
+        shell: bash
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          base = '${{ github.event.pull_request.base.sha }}'
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', f'{base}...HEAD'], text=True
+          ).splitlines())
+          allowed = {
+              '.github/scripts/test_tibia_official_client_re_canonical_live_handoff.py',
+              '.github/scripts/test_tibia_official_client_re_canonical_live_resume.py',
+              '.github/scripts/test_tibia_official_client_re_canonical_live_xres_probe.py',
+              '.github/scripts/test_tibia_official_client_re_persistent_viewer.py',
+              '.github/scripts/test_tibia_official_client_re_persistent_viewer_controller.py',
+              '.github/scripts/tibia-official-client-re-canonical-live-handoff.py',
+              '.github/scripts/tibia-official-client-re-canonical-live-resume.py',
+              '.github/scripts/tibia-official-client-re-canonical-live-xres-probe.py',
+              '.github/scripts/tibia-official-client-re-persistent-viewer.py',
+              '.github/scripts/tibia-official-client-re-persistent-viewer-controller.py',
+              '.github/workflows/tibia-official-client-re-persistent-viewer-validation.yml',
+              'docs/agents/AGENTS.md',
+              'docs/agents/contracts/TRACK_A_CONTROLLER_HANDOFF_AND_VIEWER_V1.md',
+              'docs/agents/decisions/ADR-0002-track-a-persistent-viewer-handoff.md',
+              'docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md',
+          }
+          extra = sorted(changed - allowed)
+          if extra:
+              raise SystemExit(f'AUDIT_SCOPE_FAIL unexpected paths: {extra}')
+
+          handoff = Path('.github/scripts/tibia-official-client-re-canonical-live-handoff.py').read_text()
+          resume = Path('.github/scripts/tibia-official-client-re-canonical-live-resume.py').read_text()
+          probe = Path('.github/scripts/tibia-official-client-re-canonical-live-xres-probe.py').read_text()
+          viewer = Path('.github/scripts/tibia-official-client-re-persistent-viewer.py').read_text()
+          controller = Path('.github/scripts/tibia-official-client-re-persistent-viewer-controller.py').read_text()
+          contract = Path('docs/agents/contracts/TRACK_A_CONTROLLER_HANDOFF_AND_VIEWER_V1.md').read_text()
+
+          required = {
+              'handoff': [
+                  'handoff_cross_task_forbidden', 'lease_generation_changed',
+                  'handoff_same_session', 'token_sha256', 'new_token_file',
+              ],
+              'resume': [
+                  'active_same_task_requires_explicit_replacement',
+                  '--replace-active-same-task',
+                  'tibia-official-client-re-canonical-live-xres-probe.py',
+                  'canonical_bootstrap',
+              ],
+              'probe': [
+                  'LocalClientPid', 'raw_xres_window_unresolved',
+                  'listener_owner_mismatch', 'tracked_process_secret_env_leak',
+              ],
+              'viewer': [
+                  'DEFAULT_BACKEND_PORT = 6081',
+                  'DEFAULT_PUBLIC_URL = "http://synology:6082/"',
+                  'viewer-identity.json', '"-viewonly"',
+                  'viewer_public_identity_mismatch',
+                  'runtime_health', 'viewer_health',
+              ],
+              'controller': [
+                  'gate-b', 'tibia-official-client-re-canonical-live-xres-probe.py',
+                  'gate_b_failed',
+              ],
+              'contract': [
+                  'historical `session_id`',
+                  'viewer repair only',
+                  'Physical validation gate',
+              ],
+          }
+          sources = {
+              'handoff': handoff, 'resume': resume, 'probe': probe,
+              'viewer': viewer, 'controller': controller, 'contract': contract,
+          }
+          for label, needles in required.items():
+              missing = [n for n in needles if n not in sources[label]]
+              if missing:
+                  raise SystemExit(f'AUDIT_REQUIRED_FAIL {label}: {missing}')
+
+          forbidden_sources = handoff + resume + viewer + controller
+          for needle in ('os.environ.get("TIBIA_TEST_EMAIL")', 'os.environ.get("TIBIA_TEST_PASSWORD")',
+                         'os.getenv("TIBIA_TEST_EMAIL")', 'os.getenv("TIBIA_TEST_PASSWORD")',
+                         'pkill '):
+              if needle in forbidden_sources:
+                  raise SystemExit(f'AUDIT_FORBIDDEN_FAIL: {needle}')
+          if '--current-session-id' in handoff or '--current-session-id' in resume:
+              raise SystemExit('AUDIT_FORBIDDEN_FAIL historical session id input')
+          if 'xdotool search --pid' in probe:
+              raise SystemExit('AUDIT_FORBIDDEN_FAIL xdotool reuse authority')
+
+          print('TRACK_A_PERSISTENT_VIEWER_FRESH_AUDIT=PASS')
+          print(f'TRACK_A_PERSISTENT_VIEWER_AUDITED_PATHS={len(changed)}')
+          PY

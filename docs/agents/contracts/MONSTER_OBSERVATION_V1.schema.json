@@ -550,6 +550,31 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "creature": {
+            "required": [
+              "semantic_name"
+            ]
+          }
+        },
+        "required": [
+          "creature"
+        ]
+      },
+      "then": {
+        "properties": {
+          "creature": {
+            "properties": {
+              "class": {
+                "const": "MONSTER"
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

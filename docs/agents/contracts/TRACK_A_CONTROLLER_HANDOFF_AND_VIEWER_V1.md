@@ -6,6 +6,7 @@ track_id: official-client-re
 repository: blakinio/otclient
 runtime_platform: official_native_linux_only
 browser_desktop_provider: KasmVNC
+public_frontend: DSM_reverse_proxy
 status: proposed_until_PR_541_merge
 ```
 
@@ -13,14 +14,15 @@ This contract extends, and never weakens, `TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
 
 ## Purpose
 
-Make the GUI desktop a durable programme resource instead of an artifact of one agent/job. A replacement agent gets a fresh controller session and capability while reusing the same KasmVNC desktop/container and browser URL.
+Make the GUI desktop a durable programme resource instead of an artifact of one agent/job. A replacement agent gets a fresh controller session and capability while reusing the same KasmVNC desktop/container and browser endpoint.
 
 Keep these identities separate:
 
 ```text
 runtime    = exact registered official client identity when one exists
 controller = task + current disposable session + capability + lease generation
-desktop    = task-owned KasmVNC container + internal display + stable HTTPS endpoint
+desktop    = task-owned KasmVNC container + internal display + loopback backend
+frontend   = DSM reverse-proxy rule + stable HTTPS hostname + WebSocket forwarding
 ```
 
 A historical agent `session_id` is never desktop identity.
@@ -47,11 +49,13 @@ When a canonical official-client registration survives across controller generat
 
 ## KasmVNC desktop is the browser presentation authority
 
-The new Track A user-facing GUI path is:
+The new Track A GUI topology is:
 
 ```text
 browser
-  -> HTTPS 192.168.1.2:6901
+  -> HTTPS <stable-kasm-hostname>:443
+  -> DSM Reverse Proxy with WebSocket forwarding
+  -> HTTPS 127.0.0.1:6901
   -> KasmVNC integrated web server/WebSocket
   -> task-owned persistent Kasm desktop DISPLAY=:1
 ```
@@ -61,12 +65,15 @@ The task-owned deployment identity is fixed:
 ```yaml
 container: otclient-track-a-kasmvnc
 runtime_namespace: track-a-kasmvnc-desktop
-host_port: 6901
+backend_host: 127.0.0.1
+backend_port: 6901
 container_port: 6901
 internal_display: ':1'
 restart_policy: unless-stopped
 state_directory: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
 ```
+
+Port `6901` is a loopback backend, not the supported user-facing LAN endpoint. The supported public/LAN entrypoint is a DSM Reverse Proxy HTTPS hostname on port `443`. The DSM rule must preserve WebSocket upgrade semantics.
 
 KasmVNC owns the desktop and browser transport. The new desktop path MUST NOT use `x11vnc`, `websockify` or noVNC as an intermediate presentation chain.
 
@@ -74,14 +81,17 @@ The retained PR #528 observer `DISPLAY=:99` / `http://192.168.1.2:6083/` is lega
 
 ## Isolated deployment boundary
 
-KasmVNC desktop bootstrap is permitted as `runtime_access: ephemeral_isolated` only when the active task declares and verifies its unique container, state directory and host port. This desktop-only deployment:
+KasmVNC desktop bootstrap is permitted as `runtime_access: ephemeral_isolated` only when the active task declares and verifies its unique container, state directory and backend port. This desktop-only deployment:
 
 - may create/restart only `otclient-track-a-kasmvnc` whose labels prove exact task ownership;
-- may bind only host `192.168.1.2:6901` for the browser desktop;
+- may bind only host loopback `127.0.0.1:6901` for the Kasm backend;
 - must fail closed when that container name or port is owned by an unrelated process/container;
+- must not mutate DSM reverse-proxy configuration automatically from repository code;
 - must not access or mutate the canonical lease/registration merely to create the desktop;
 - must not launch an official Tibia client while another task owns the official-client runtime surface;
 - must not touch PR #528 `:99/6083` except optional non-invasive reachability checks.
+
+DSM Reverse Proxy configuration is an operator-owned presentation step. Repository deployment may verify the loopback backend independently, but public desktop health is not `PASS` until the DSM rule itself is configured and verified from a browser/client path.
 
 ## Persistence across agent turnover
 
@@ -106,36 +116,48 @@ canonical lease token/capability
 Tibia auth/session material
 ```
 
-The Kasm browser password is a separate temporary LAN credential stored only in the task-private state directory with mode `0600`; it is not Tibia authentication authority.
+The Kasm browser password is a separate temporary desktop credential. It is generated at deployment time, stored only in the task-private state directory with mode `0600`, and is not committed or printed by CI. It is not Tibia authentication authority.
 
 Kasm container metadata/state must not contain Tibia credentials, cookies, session keys, packet payloads or account identifiers.
 
 ## Health and failure semantics
 
-Desktop health and official-client runtime health are separate facts.
+Desktop-backend health, DSM presentation health and official-client runtime health are separate facts.
 
-A healthy Kasm desktop is proven by at least:
+Backend health is proven by at least:
 
 ```text
 exact task-owned container labels    PASS
 container running                    PASS
 restart policy unless-stopped        PASS
-host 192.168.1.2:6901 mapping        PASS
+host 127.0.0.1:6901 mapping          PASS
 HTTPS Kasm web application reachable PASS
 ```
 
-A Kasm desktop failure does not authorize restart/logout/login of an otherwise healthy official client. Likewise, a client failure does not authorize broad Docker cleanup of the desktop.
+Public presentation health additionally requires:
+
+```text
+DSM HTTPS hostname reachable         PASS
+DSM reverse proxy destination        127.0.0.1:6901
+WebSocket upgrade through DSM        PASS
+Kasm login/application usable        PASS
+```
+
+A Kasm/DSM presentation failure does not authorize restart/logout/login of an otherwise healthy official client. Likewise, a client failure does not authorize broad Docker cleanup of the desktop.
 
 ## Validation gates
 
-Before calling the Kasm desktop deployed, physical Synology evidence must prove:
+Before calling the Kasm backend deployed, physical Synology evidence must prove:
 
 1. `otclient-track-a-kasmvnc` is running on the Docker daemon used by `synology-otclient-01`;
 2. exact task/runtime/role labels match;
 3. restart policy is `unless-stopped`;
-4. `https://192.168.1.2:6901/` serves the KasmVNC application;
-5. the container remains alive after the deployment GitHub Actions job exits;
-6. PR #528 `:99/6083` is not mutated by the deployment;
-7. no Tibia secret is accessed and no official client is launched by the desktop-only deployment.
+4. `https://127.0.0.1:6901/` serves the KasmVNC application on Synology host loopback;
+5. no non-loopback `6901` publication exists;
+6. the container remains alive after the deployment GitHub Actions job exits;
+7. PR #528 `:99/6083` is not mutated by the deployment;
+8. no Tibia secret is accessed and no official client is launched by the desktop-only deployment.
+
+Before calling the browser desktop available to the operator, additionally prove the DSM Reverse Proxy rule on the selected HTTPS hostname, including WebSocket forwarding to `https://127.0.0.1:6901`.
 
 Repository controller-handoff tests remain separately required. Integration of the official client into the Kasm desktop is a later physical gate after runtime ownership is available.

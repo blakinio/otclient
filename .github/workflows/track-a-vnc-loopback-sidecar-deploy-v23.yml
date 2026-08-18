@@ -1,0 +1,74 @@
+name: Track A VNC localhost sidecar v23
+
+on:
+  push:
+    branches:
+      - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+    paths:
+      - .github/workflows/track-a-vnc-loopback-sidecar-deploy-v23.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-vnc-loopback-sidecar-v23
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy localhost-only VNC forwarder
+    runs-on: [self-hosted, oteryn-staging]
+    timeout-minutes: 15
+    steps:
+      - name: Install isolated VNC forwarder without touching OTClient runner
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          command -v docker >/dev/null
+          test -S /var/run/docker.sock
+          docker inspect otclient-runner >/dev/null
+
+          net="$(docker inspect -f '{{range $name,$cfg := .NetworkSettings.Networks}}{{println $name}}{{end}}' otclient-runner | sed '/^$/d' | head -1)"
+          [[ -n "$net" ]]
+          echo "TRACK_A_VNC_SIDECAR_NETWORK=$net"
+
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          cat >"$tmp/Dockerfile" <<'EOF'
+          FROM alpine:3.20
+          RUN apk add --no-cache socat
+          COPY entrypoint.sh /entrypoint.sh
+          RUN chmod 0755 /entrypoint.sh
+          ENTRYPOINT ["/entrypoint.sh"]
+          EOF
+          cat >"$tmp/entrypoint.sh" <<'EOF'
+          #!/bin/sh
+          set -eu
+          for p in $(seq 6082 6120); do
+            socat "TCP-LISTEN:${p},fork,reuseaddr" "TCP:otclient-runner:${p}" &
+          done
+          wait
+          EOF
+          docker build -q -t otclient-vnc-loopback:v23 "$tmp" >/dev/null
+          docker rm -f otclient-vnc-loopback >/dev/null 2>&1 || true
+          docker run -d \
+            --name otclient-vnc-loopback \
+            --restart unless-stopped \
+            --network "$net" \
+            -p 127.0.0.1:6082-6120:6082-6120 \
+            otclient-vnc-loopback:v23 >/dev/null
+
+          for _ in $(seq 1 30); do
+            [[ "$(docker inspect -f '{{.State.Running}}' otclient-vnc-loopback 2>/dev/null || true)" == true ]] && break
+            sleep .5
+          done
+          [[ "$(docker inspect -f '{{.State.Running}}' otclient-vnc-loopback)" == true ]]
+          ports="$(docker port otclient-vnc-loopback)"
+          printf '%s\n' "$ports"
+          ! grep -Ev ' -> 127\.0\.0\.1:' <<<"$ports" | grep -q .
+          count="$(grep -c ' -> 127\.0\.0\.1:' <<<"$ports")"
+          [[ "$count" -eq 39 ]]
+          echo 'TRACK_A_VNC_HOST_BIND=127.0.0.1_ONLY'
+          echo 'TRACK_A_VNC_FORWARD_RANGE=6082-6120'
+          echo 'TRACK_A_VNC_SIDECAR=PASS'

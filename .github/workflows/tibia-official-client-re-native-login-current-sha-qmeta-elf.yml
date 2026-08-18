@@ -1,0 +1,110 @@
+name: Track A installed current-SHA QMeta ELF binding
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-current-sha-qmeta-elf.yml
+
+permissions:
+  contents: read
+
+jobs:
+  bind:
+    name: Bind exact-SHA auth MOC blob to static metaobject read-only
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+      EXPECTED_SIZE: '52109920'
+      CLIENT: /home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client
+      STRINGDATA_BASE: '0x1cb4cf4'
+      AUTH_STRING_INDEX: '31'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Parse ELF64 RELA and Qt metadata
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ -f "$CLIENT" && ! -L "$CLIENT" ]]
+          [[ "$(stat -c %s "$CLIENT")" == "$EXPECTED_SIZE" ]]
+          [[ "$(sha256sum "$CLIENT"|awk '{print $1}')" == "$EXPECTED_SHA" ]]
+          echo QMETA_ELF_EXACT_CLIENT=PASS
+          echo QMETA_ELF_MUTATION=false
+          echo QMETA_ELF_SECRET_ACCESS=false
+          echo QMETA_ELF_CLIENT_EXECUTION=false
+          python3 - "$CLIENT" "$STRINGDATA_BASE" "$AUTH_STRING_INDEX" <<'PY'
+          import hashlib,pathlib,struct,sys
+          r=pathlib.Path(sys.argv[1]).read_bytes(); base=int(sys.argv[2],0); auth_idx=int(sys.argv[3])
+          assert r[:4]==b'\x7fELF' and r[4]==2 and r[5]==1
+          shoff=struct.unpack_from('<Q',r,0x28)[0]; shentsz=struct.unpack_from('<H',r,0x3a)[0]; shnum=struct.unpack_from('<H',r,0x3c)[0]; shstr=struct.unpack_from('<H',r,0x3e)[0]
+          assert shentsz>=64 and shnum>0
+          secs=[]
+          for i in range(shnum):
+              o=shoff+i*shentsz
+              name,typ,flags,addr,off,size,link,info,align,entsz=struct.unpack_from('<IIQQQQIIQQ',r,o)
+              secs.append({'i':i,'nameoff':name,'type':typ,'flags':flags,'addr':addr,'off':off,'size':size,'link':link,'entsz':entsz})
+          ss=secs[shstr]; names=r[ss['off']:ss['off']+ss['size']]
+          for s in secs:
+              e=names.find(b'\0',s['nameoff']);s['name']=names[s['nameoff']:e].decode('ascii','replace') if e>=0 else '?'
+          def vo(v):
+              for s in secs:
+                  if s['size'] and s['addr']<=v<s['addr']+s['size']:return s['off']+(v-s['addr'])
+              raise ValueError(hex(v))
+          def u32(v):return struct.unpack_from('<I',r,vo(v))[0]
+          def q(v):return struct.unpack_from('<Q',r,vo(v))[0]
+          def bs(v,n):return r[vo(v):vo(v)+n]
+          rels=[]
+          for s in secs:
+              if s['type']!=4:continue # SHT_RELA
+              es=s['entsz'] or 24
+              for o in range(s['off'],s['off']+s['size'],es):
+                  if o+24>len(r):break
+                  ro,ri,ra=struct.unpack_from('<QQq',r,o);rels.append((ro,ri&0xffffffff,ra,s['name']))
+          print('QMETA_ELF_RELA_COUNT='+str(len(rels)))
+          by={}
+          for ro,rt,ra,sn in rels:by.setdefault(ro,[]).append((rt,ra,sn))
+          def rv(v):
+              vals=[ra for rt,ra,sn in by.get(v,[])]
+              if vals and len(set(vals))==1:return vals[0]
+              try:return q(v)
+              except Exception:return None
+          br=[x for x in rels if x[2]==base]
+          print('QMETA_ELF_STRINGDATA_RELOC_COUNT='+str(len(br)))
+          for ro,rt,ra,sn in br:print(f'QMETA_ELF_STRINGDATA_RELOC=offset:{ro:#x},type:{rt},section:{sn}')
+          mos=[]
+          for ro,rt,ra,sn in br:
+              mo=ro-8; data=rv(mo+16); call=rv(mo+24)
+              vals=[rv(mo+d) for d in (0,8,16,24,32,40,48)]
+              print('QMETA_ELF_METAOBJECT_NEIGHBORS=mo:%#x,vals:%s'%(mo,','.join('NONE' if x is None else hex(x) for x in vals)))
+              if data is None or call is None:continue
+              try:h=tuple(u32(data+4*i) for i in range(14))
+              except Exception:continue
+              mos.append((mo,data,call,h))
+          mos=sorted(set(mos),key=lambda x:x[0]);print('QMETA_ELF_METAOBJECT_COUNT='+str(len(mos)))
+          for mo,d,c,h in mos:print(f'QMETA_ELF_METAOBJECT=mo:{mo:#x},data:{d:#x},call:{c:#x},rev:{h[0]},classidx:{h[1]},methods:{h[4]},method_data:{h[5]},signals:{h[13]}')
+          assert len(mos)==1
+          mo,data,call,h=mos[0];rev,cl,cc,cd,mc,md,pc,pd,ec,ed,kc,kd,flags,sc=h
+          assert cl==0 and rev in (10,11,12,13) and 0<mc<=256
+          rows=[]
+          for i in range(mc):rows.append(tuple(u32(data+4*(md+6*i)+4*j) for j in range(6)))
+          auth=[(i,row) for i,row in enumerate(rows) if row[0]==auth_idx]
+          print('QMETA_ELF_AUTH_ROW_COUNT='+str(len(auth)))
+          for i,row in auth:print(f'QMETA_ELF_AUTH_ROW=ordinal:{i},name_index:{row[0]},argc:{row[1]},params:{row[2]},tag:{row[3]},flags:{row[4]:#x},metatype:{row[5]}')
+          assert len(auth)==1 and auth[0][1][1]==2
+          ordinal,row=auth[0]; fence=bs(call,32)
+          print(f'QMETA_ELF_STATIC_METAOBJECT={mo:#x}');print(f'QMETA_ELF_METADATA={data:#x}');print(f'QMETA_ELF_STATIC_METACALL={call:#x}');print(f'QMETA_ELF_LOCAL_METHOD_COUNT={mc}');print(f'QMETA_ELF_AUTH_LOCAL_ORDINAL={ordinal}')
+          print('QMETA_ELF_STATIC_METACALL_FENCE32='+fence.hex());print('QMETA_ELF_STATIC_METACALL_FENCE_SHA256='+hashlib.sha256(fence).hexdigest());print('QMETA_ELF_METADATA_HEADER_SHA256='+hashlib.sha256(bs(data,56)).hexdigest());print('QMETA_ELF_RESULT=PASS')
+          PY

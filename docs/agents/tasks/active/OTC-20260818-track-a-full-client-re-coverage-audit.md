@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260818-track-a-full-client-re-coverage-audit
-status: validating
+status: blocked
 agent: ChatGPT
 session_role: auditor
 project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: audit
-phase: full-diff-audit
+phase: independent-audit-required
 execution_mode: github_only
 branch: docs/OTC-20260818-track-a-full-client-re-coverage-audit
 base_branch: main
@@ -121,18 +121,35 @@ BLOCKED
 - [x] promoted S9 reconciled from current `main@ebbb36f50076ff4072c7218e302614c1dfea00b1`;
 - [x] primary evidence keys/PRs/reports recorded;
 - [x] every row has a concrete remaining-step code/path to `DONE`;
-- [ ] full changed-path and full-diff audit;
+- [x] full changed-path and full-diff self-audit: exactly two declared files, no unrelated/runtime/workflow path;
 - [x] E2E = `NOT_APPLICABLE` with documentation/audit reason;
 - [ ] fresh independent documentation audit with material findings `0`;
-- [ ] exact-head repository CI/governance green before completion;
-- [ ] zero unresolved review threads/requested changes before merge;
-- [ ] protected squash merge, task archive and ownership release.
+- [ ] required exact-head checks on the final unchanged head;
+- [x] current review threads/requested changes: `0/0` at pre-blocker checkpoint;
+- [ ] mark Ready, protected squash merge, task archive and ownership release.
 
-# Current checkpoint
+# Validation checkpoint
+
+Pre-blocker exact-head evidence before this checkpoint-only task update:
+
+```text
+head 303d4523140d9c5b4c270b7459f57af154d82028
+Track A agent runtime governance 32142933741 = SUCCESS
+CI 32142933853 = SUCCESS
+changed paths = exactly 2 declared files
+review threads = 0
+```
+
+This task-record update changes the head, so the above CI is supporting evidence only; required CI must pass again on the new final head before Ready/merge.
+
+# Independent-audit blocker
+
+Repository governance requires a fresh independent documentation audit. The current worker's self-review cannot satisfy that gate, and the standing central Spark pre-review is explicitly advisory and does not replace required independent review. No separate independent auditor/validator with fresh semantic context is available through the current execution surface.
 
 ```yaml
-status: validating
-last_completed_step: 169-row full-client matrix persisted and reconciled after S9 promotion on current main
-material_findings_open: 0
-next_action: restack the branch onto current main without force, then audit the exact two-path diff and validate the final head
+status: blocked
+material_findings_open_from_self_audit: 0
+blocker: REQUIRED_FRESH_INDEPENDENT_DOCUMENTATION_AUDIT_UNAVAILABLE_IN_CURRENT_SESSION
+last_completed_step: 169-row current-main checklist, S9 reconciliation, exact two-path full-diff self-audit and green pre-checkpoint CI
+next_action: a fresh independent auditor validates PR #536 exact final diff against current main and primary evidence; if material findings are 0 and final-head CI is green, mark Ready and continue protected squash merge/closeout
 ```

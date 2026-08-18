@@ -1,0 +1,81 @@
+name: Track A installed current-SHA QMeta raw locator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-current-sha-qmeta-raw.yml
+
+permissions:
+  contents: read
+
+jobs:
+  locate:
+    name: Locate exact-SHA Qt MOC stringdata without dependencies
+    runs-on: [otclient, synology]
+    timeout-minutes: 4
+    env:
+      EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+      EXPECTED_SIZE: '52109920'
+      CLIENT: /home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia/bin/client
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Raw MOC locator
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ -f "$CLIENT" && ! -L "$CLIENT" ]]
+          [[ "$(stat -c %s "$CLIENT")" == "$EXPECTED_SIZE" ]]
+          [[ "$(sha256sum "$CLIENT"|awk '{print $1}')" == "$EXPECTED_SHA" ]]
+          echo QMETA_RAW_EXACT_CLIENT=PASS
+          echo QMETA_RAW_MUTATION=false
+          echo QMETA_RAW_SECRET_ACCESS=false
+          echo QMETA_RAW_CLIENT_EXECUTION=false
+          python3 - "$CLIENT" <<'PY'
+          import pathlib,struct,sys
+          r=pathlib.Path(sys.argv[1]).read_bytes(); cn=b'tibia::client::TGameClient'; mn=b'onRequestLoginWithCredentials'
+          def hits(s):
+              out=[];i=0
+              while True:
+                  j=r.find(s+b'\0',i)
+                  if j<0:return out
+                  out.append(j);i=j+1
+          cvs=hits(cn);mvs=hits(mn)
+          print('QMETA_RAW_CLASS_OFFSETS='+','.join(hex(x) for x in cvs));print('QMETA_RAW_METHOD_OFFSETS='+','.join(hex(x) for x in mvs))
+          assert cvs and len(mvs)==1;mv=mvs[0]
+          bases=[]
+          for cv in cvs:
+              lo=max(0,cv-131072)
+              for b in range(cv-8,lo-1,-1):
+                  if b+8>len(r):continue
+                  rel,ln=struct.unpack_from('<II',r,b)
+                  if ln==len(cn) and b+rel==cv:bases.append((b,cv))
+              print('QMETA_RAW_PREFIX_%x='%cv+r[max(0,cv-256):cv].hex())
+          bases=sorted(set(bases));print('QMETA_RAW_BASE_COUNT='+str(len(bases)))
+          for b,c in bases:print(f'QMETA_RAW_BASE=0x{b:x},class=0x{c:x},delta={c-b}')
+          structs=[]
+          for b,c in bases:
+              for idx in range(1,512):
+                  a=b+8*idx
+                  if a+8>len(r):break
+                  rel,ln=struct.unpack_from('<II',r,a)
+                  if ln==len(mn) and b+rel==mv:structs.append((b,idx,c))
+          structs=sorted(set(structs));print('QMETA_RAW_STRUCT_COUNT='+str(len(structs)))
+          for b,i,c in structs:print(f'QMETA_RAW_STRUCT=base:0x{b:x},auth_index:{i},class:0x{c:x},method:0x{mv:x}')
+          if len(structs)!=1:raise SystemExit('raw MOC structural identity not unique')
+          b,i,c=structs[0]
+          print(f'QMETA_RAW_SELECTED_BASE=0x{b:x}');print(f'QMETA_RAW_AUTH_STRING_INDEX={i}');print('QMETA_RAW_RESULT=PASS')
+          PY
+          command -v readelf >/dev/null && echo QMETA_RAW_READELF_AVAILABLE=true || echo QMETA_RAW_READELF_AVAILABLE=false

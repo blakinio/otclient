@@ -1,0 +1,156 @@
+name: Track A S9 action control log reuse
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-s9-action-control-log-reuse.yml
+      - docs/agents/tasks/active/OTC-20260818-track-a-s9-action-control-static-census.md
+      - docs/agents/evidence/OTC-20260818-track-a-s9-action-control-static-census/**
+      - docs/agents/reports/OTCLIENT-20260818-track-a-s9-action-control-static-census.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  recover:
+    name: Recover gameplay action QMeta from sanitized historical log
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Download prior exact-SHA QMeta log and enumerate action boundaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/track-a-s9"
+          mkdir -p "$out/raw" "$out/evidence"
+          job=94736106350
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${job}/logs" \
+            -o "$out/raw/${job}.log"
+          test -s "$out/raw/${job}.log"
+
+          python3 - "$out/raw/${job}.log" "$out/evidence" <<'PY'
+          from __future__ import annotations
+          import hashlib, json, pathlib, re, sys
+
+          log_path=pathlib.Path(sys.argv[1]); out=pathlib.Path(sys.argv[2])
+          raw=log_path.read_bytes(); text=raw.decode('utf-8','replace')
+          ansi=re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+          records=[]
+          for line in text.splitlines():
+              line=ansi.sub('',line)
+              pos=line.find('QMETA_JSON ')
+              if pos<0: continue
+              try: records.append(json.loads(line[pos+len('QMETA_JSON '):].strip()))
+              except Exception: continue
+          by_type={r.get('type_name'):r for r in records if r.get('type_name')}
+
+          all_actions=[]
+          for r in records:
+              if r.get('type_name','').endswith('GameActionHandler'):
+                  all_actions.append({
+                      'type_name':r['type_name'],
+                      'method_count':len(r.get('methods',[])),
+                      'signal_count':r.get('signals_count',0),
+                      'relationships':r.get('relationships',{}),
+                      'methods':r.get('methods',[]),
+                  })
+          all_actions.sort(key=lambda x:x['type_name'])
+
+          required_types=[
+              'tibia::input::TPlayerMovementGameActionHandler',
+              'tibia::input::TPlayerMovementIntentHandler',
+              'tibia::game::TPlayerProtocolMessageHandler',
+              'tibia::creatures::TCreaturesGameActionHandler',
+              'tibia::input::TUseWithGameActionHandler',
+              'tibia::input::TGenericGameActionHandler',
+              'tibia::container::TContainerGameActionHandler',
+              'tibia::chat::TChatGameActionHandler',
+              'tibia::game::TPlayerGameActionHandler',
+              'tibia::game::TInternalGameActionRouter',
+          ]
+          required={}
+          missing=[]
+          for t in required_types:
+              r=by_type.get(t)
+              if r is None:
+                  missing.append(t); continue
+              required[t]={
+                  'type_name':t,
+                  'method_count':len(r.get('methods',[])),
+                  'signal_count':r.get('signals_count',0),
+                  'relationships':r.get('relationships',{}),
+                  'methods':r.get('methods',[]),
+              }
+          if missing:
+              raise SystemExit('missing required QMeta records: '+','.join(missing))
+
+          # Mechanically select high-value action/control method names without promoting semantics beyond names/QMeta ownership.
+          keywords=('Move','Walk','Turn','Stop','Attack','Follow','Use','Object','Container','Talk','Say','Chat','Look','Open','Close','Equip','Unequip','Trade','Rotate','Greet','Request','Send','send','move','use','attack','follow','talk','turn','stop')
+          core_hits=[]
+          for t,r in required.items():
+              for m in r['methods']:
+                  name=m.get('name','')
+                  if any(k in name for k in keywords):
+                      core_hits.append({
+                          'type_name':t,
+                          'index':m['index'],
+                          'name':name,
+                          'argc':m['argc'],
+                          'flags':m['flags'],
+                          'is_signal_by_qmeta_prefix':m['index']<r['signal_count'],
+                      })
+
+          result={
+              'schema':'track-a-s9-action-control-log-reuse-v1',
+              'source_run':31790507112,
+              'source_job':94736106350,
+              'source_head':'9afdc76ca6fe238742f270e22d8ecf4abe5ba9a2',
+              'source_log_sha256':hashlib.sha256(raw).hexdigest(),
+              'source_exact_client_sha256':'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe',
+              'runtime_access':'none',
+              'client_downloaded':False,
+              'client_executed':False,
+              'game_action_handler_count':len(all_actions),
+              'game_action_handlers':all_actions,
+              'required_surfaces':required,
+              'core_keyword_hits':core_hits,
+              'pr528_runtime_touched':False,
+              'pr475_runtime_touched':False,
+              'secret_access':False,
+          }
+          (out/'action-control-qmeta.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          (out/'game-action-handler-denominator.txt').write_text('\n'.join(f"{r['type_name']}\tmethods={r['method_count']}\tsignals={r['signal_count']}\tmeta={r['relationships'].get('qmeta_record_va')}\tmetacall={r['relationships'].get('static_metacall_va')}" for r in all_actions)+'\n')
+          for t,r in required.items():
+              safe=t.replace('::','__')
+              (out/f'{safe}.txt').write_text('\n'.join(f"{m['index']}\t{m['name']}\targc={m['argc']}\tflags=0x{m['flags']:x}\tsignal={str(m['index']<r['signal_count']).lower()}" for m in r['methods'])+'\n')
+          (out/'core-keyword-hits.txt').write_text('\n'.join(f"{x['type_name']}\t{x['index']}\t{x['name']}\targc={x['argc']}\tsignal={str(x['is_signal_by_qmeta_prefix']).lower()}" for x in core_hits)+'\n')
+          print('TRACK_A_S9_ACTION_QMETA_REUSE=PASS')
+          print('TRACK_A_S9_GAME_ACTION_HANDLER_COUNT='+str(len(all_actions)))
+          for t,r in required.items():
+              print('TRACK_A_S9_REQUIRED='+t+'|methods='+str(r['method_count'])+'|signals='+str(r['signal_count']))
+          print('TRACK_A_S9_CORE_HIT_COUNT='+str(len(core_hits)))
+          print('TRACK_A_S9_PR528_RUNTIME_TOUCHED=false')
+          print('TRACK_A_S9_PR475_RUNTIME_TOUCHED=false')
+          PY
+          rm -rf "$out/raw"
+
+      - name: Upload normalized S9 evidence only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: track-a-s9-action-control-${{ github.run_id }}
+          path: ${{ runner.temp }}/track-a-s9/evidence
+          if-no-files-found: error
+          retention-days: 7

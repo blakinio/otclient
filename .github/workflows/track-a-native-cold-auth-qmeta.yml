@@ -132,6 +132,7 @@ jobs:
           print(f'COLD_AUTH_QMETA_METHOD_COUNT={method_count}')
           print(f'COLD_AUTH_QMETA_SIGNAL_COUNT={signal_count}')
           assert class_name == 'tibia::client::TGameClient', class_name
+          assert method_count == 44, method_count
 
           methods = []
           for idx in range(method_count):
@@ -148,6 +149,7 @@ jobs:
           hits = [m for m in methods if m[1] == TARGET_NAME]
           assert len(hits) == 1, ('target_name_count', len(hits))
           meta_index, name, argc, method_flags, meta_revision, params = hits[0]
+          assert meta_index == 17, meta_index
           assert argc == 2, argc
           assert params == [0x2b, 0x0a, 0x0a], [hex(x) for x in params]
           print('COLD_AUTH_TGAMECLIENT_QMETA_IDENTITY=PASS')
@@ -162,7 +164,8 @@ jobs:
           md = Cs(CS_ARCH_X86, CS_MODE_64)
           md.detail = True
           ins = list(md.disasm(raw[file_off(STATIC_METACALL):file_off(STATIC_METACALL) + 0x900], STATIC_METACALL))
-          candidates = []
+          all_candidates = []
+          full_range_candidates = []
           for pos, inst in enumerate(ins):
               if inst.mnemonic != 'lea' or len(inst.operands) < 2:
                   continue
@@ -182,37 +185,35 @@ jobs:
                   targets = [table + i32(table + i * 4) for i in range(method_count)]
               except Exception:
                   continue
-              score = sum(executable(t) for t in targets)
-              if score != method_count:
+              if sum(executable(t) for t in targets) != method_count:
                   continue
               context = ins[max(0, pos - 12):pos + 3]
               normalized = [(x.mnemonic, x.op_str.replace(' ', '')) for x in context]
-              role = 'UNKNOWN'
-              if any(m == 'test' and o == 'esi,esi' for m, o in normalized) or any(m == 'cmp' and o in ('esi,0', 'esi,0x0') for m, o in normalized):
-                  role = 'INVOKE_META_METHOD'
-              if any(m == 'cmp' and o in ('esi,0xa', 'esi,10') for m, o in normalized):
-                  role = 'REGISTER_METHOD_ARGUMENT_METATYPE'
-              candidates.append((role, table, targets, inst.address, context))
+              has_invoke_guard = any(m == 'test' and o == 'esi,esi' for m, o in normalized) or any(m == 'cmp' and o in ('esi,0', 'esi,0x0') for m, o in normalized)
+              full_range_tokens = (f'edx,{method_count - 1}', f'edx,0x{method_count - 1:x}')
+              has_full_method_range = any(m == 'cmp' and o in full_range_tokens for m, o in normalized)
+              all_candidates.append((has_invoke_guard, has_full_method_range, table, targets, inst.address, context))
+              if has_invoke_guard and has_full_method_range:
+                  full_range_candidates.append((table, targets, inst.address, context))
 
-          print(f'COLD_AUTH_PERFECT_DISPATCH_CANDIDATE_COUNT={len(candidates)}')
-          for n, (role, table, targets, lea_at, context) in enumerate(candidates):
-              print(f'COLD_AUTH_DISPATCH_CANDIDATE={n};ROLE={role};LEA=0x{lea_at:x};TABLE=0x{table:x};TARGET_FOR_METHOD=0x{targets[meta_index]:x}')
+          print(f'COLD_AUTH_EXECUTABLE_TABLE_CANDIDATE_COUNT={len(all_candidates)}')
+          for n, (invoke_guard, full_range, table, targets, lea_at, context) in enumerate(all_candidates):
+              print(f'COLD_AUTH_DISPATCH_CANDIDATE={n};INVOKE_GUARD={str(invoke_guard).lower()};FULL_44_RANGE={str(full_range).lower()};LEA=0x{lea_at:x};TABLE=0x{table:x};TARGET_FOR_METHOD=0x{targets[meta_index]:x}')
               print('COLD_AUTH_DISPATCH_CONTEXT_' + str(n) + '=' + '|'.join(f'0x{x.address:x}:{x.mnemonic}:{x.op_str}' for x in context))
 
-          invokes = [c for c in candidates if c[0] == 'INVOKE_META_METHOD']
-          registrations = [c for c in candidates if c[0] == 'REGISTER_METHOD_ARGUMENT_METATYPE']
-          assert len(invokes) == 1, ('invoke_dispatch_count', len(invokes))
-          assert len(registrations) == 1, ('register_type_dispatch_count', len(registrations))
-          role, table, targets, lea_at, context = invokes[0]
+          assert len(full_range_candidates) == 1, ('full_range_invoke_dispatch_count', len(full_range_candidates))
+          table, targets, lea_at, context = full_range_candidates[0]
           target = targets[meta_index]
           assert executable(target), hex(target)
           fence = raw[file_off(target):file_off(target) + 32]
           assert len(fence) == 32
-          print('COLD_AUTH_INVOKE_DISPATCH_ROLE=PROVEN')
+          print('COLD_AUTH_INVOKE_DISPATCH_ROLE=PROVEN_BY_CALL_AND_FULL_RANGE_GUARDS')
+          print(f'COLD_AUTH_DISPATCH_LEA=0x{lea_at:x}')
           print(f'COLD_AUTH_DISPATCH_TABLE=0x{table:x}')
           print(f'COLD_AUTH_DISPATCH_TARGET=0x{target:x}')
           print('COLD_AUTH_TARGET_EXECUTABLE=true')
           print('COLD_AUTH_TARGET_INSTRUCTION_FENCE=' + fence.hex())
-          print(f'COLD_AUTH_NEGATIVE_CONTROL_REGISTER_TYPE_TARGET=0x{registrations[0][2][meta_index]:x}')
+          rejected = [c for c in all_candidates if not c[1]]
+          print(f'COLD_AUTH_NEGATIVE_CONTROL_OTHER_EXECUTABLE_TABLES={len(rejected)}')
           print('COLD_AUTH_STATIC_DISCRIMINATOR=PASS')
           PY

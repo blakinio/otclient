@@ -1,0 +1,226 @@
+name: Track A native cold-auth QMeta discriminator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/track-a-native-cold-auth-qmeta.yml
+      - docs/agents/evidence/OTC-20260818-native-cold-auth-qmeta/**
+      - docs/agents/tasks/active/OTC-20260818-native-cold-auth-qmeta.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover:
+    name: Recover exact TGameClient cold-auth QMeta entry
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Fetch exact official client through WARP and recover QMeta contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl python3-pyelftools python3-capstone
+
+          r="$RUNNER_TEMP/cold-auth-qmeta"
+          mkdir -p "$r/bin" "$r/state" "$r/client"
+          cd "$r/bin"
+
+          curl -fsSL -o wgcf https://github.com/ViRb3/wgcf/releases/download/v2.2.32/wgcf_2.2.32_linux_amd64
+          echo '2ff97f2201972ce582a424455d50a3719a380eef0cd1f3144f7779348e122a2c  wgcf' | sha256sum -c -
+          curl -fsSL -o wireproxy.tgz https://github.com/windtf/wireproxy/releases/download/v1.1.3/wireproxy_linux_amd64.tar.gz
+          echo 'e88c1d090740373fc606c1bafd81d9a5eadc642cce5667616e20e9d7a444f51c  wireproxy.tgz' | sha256sum -c -
+          mkdir wp
+          tar -xzf wireproxy.tgz -C wp
+          cp "$(find wp -type f -name wireproxy -print -quit)" wireproxy
+          chmod 755 wgcf wireproxy
+
+          cd "$r/state"
+          "$r/bin/wgcf" register --accept-tos >/dev/null
+          "$r/bin/wgcf" generate >/dev/null
+          printf 'WGConfig = %s\n\n[Socks5]\nBindAddress = 127.0.0.1:25344\n' "$r/state/wgcf-profile.conf" > wireproxy.conf
+          nohup "$r/bin/wireproxy" -c wireproxy.conf >"$r/wireproxy.log" 2>&1 </dev/null &
+          for _ in $(seq 1 30); do
+            if curl --socks5-hostname 127.0.0.1:25344 -fsS --max-time 10 https://www.cloudflare.com/cdn-cgi/trace >"$r/trace" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          grep -Eq '^warp=(on|plus)$' "$r/trace"
+
+          u=https://static.tibia.com/launcher/tibiaclient-linux-current/bin/client.lzma
+          curl --socks5-hostname 127.0.0.1:25344 --compressed -fL \
+            -A 'Mozilla/5.0 (X11; Linux x86_64)' -e "$u" -H 'Accept: */*' \
+            "$u" -o "$r/client/client.lzma"
+          echo '496c5b3517c0996a1bbd0e76a7738d450f79d0bf4fef140a807044776042dc9b  '"$r"'/client/client.lzma' | sha256sum -c -
+          echo 'COLD_AUTH_EXACT_PACKED_SHA=PASS'
+
+          python3 - "$r/client/client.lzma" "$r/client/client" <<'PY'
+          import hashlib
+          import lzma
+          import pathlib
+          import struct
+          import sys
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86_const import X86_OP_MEM, X86_REG_RIP
+          from elftools.elf.elffile import ELFFile
+
+          packed = pathlib.Path(sys.argv[1]).read_bytes()
+          props = packed[32]
+          lc = props % 9
+          rest = props // 9
+          lp = rest % 5
+          pb = rest // 5
+          dict_size = int.from_bytes(packed[33:37], 'little')
+          raw = lzma.decompress(
+              packed[45:],
+              format=lzma.FORMAT_RAW,
+              filters=[{'id': lzma.FILTER_LZMA1, 'dict_size': dict_size, 'lc': lc, 'lp': lp, 'pb': pb}],
+          )
+          assert len(raw) == 51965216, len(raw)
+          assert hashlib.sha256(raw).hexdigest() == 'e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          print('COLD_AUTH_EXACT_CLIENT_SHA=PASS')
+          print('COLD_AUTH_CLIENT_EXECUTED=false')
+          print('COLD_AUTH_RUNTIME_ACCESS=none')
+
+          out = pathlib.Path(sys.argv[2])
+          out.write_bytes(raw)
+          with out.open('rb') as fh:
+              elf = ELFFile(fh)
+              sections = [
+                  (int(s['sh_offset']), int(s['sh_size']), int(s['sh_addr']), int(s['sh_flags']))
+                  for s in elf.iter_sections()
+              ]
+
+          def file_off(va):
+              for off, size, addr, flags in sections:
+                  if addr <= va < addr + size:
+                      return off + va - addr
+              raise ValueError(hex(va))
+
+          def u32(va):
+              return struct.unpack_from('<I', raw, file_off(va))[0]
+
+          def i32(va):
+              return struct.unpack_from('<i', raw, file_off(va))[0]
+
+          def executable(va):
+              return any((flags & 4) and addr <= va < addr + size for off, size, addr, flags in sections)
+
+          STRINGDATA = 0x1c93cf4
+          METADATA = 0x1c93740
+          STATIC_METACALL = 0xd06260
+          TARGET_NAME = 'onRequestLoginWithCredentials'
+
+          def qstring(index):
+              entry = STRINGDATA + index * 8
+              rel = u32(entry)
+              length = u32(entry + 4)
+              return raw[file_off(STRINGDATA + rel):file_off(STRINGDATA + rel) + length].decode('utf-8', 'strict')
+
+          header = [u32(METADATA + i * 4) for i in range(14)]
+          revision, class_index, class_info_count, class_info_data, method_count, method_data, property_count, property_data, enum_count, enum_data, ctor_count, ctor_data, flags, signal_count = header
+          class_name = qstring(class_index)
+          print(f'COLD_AUTH_QMETA_CLASS={class_name}')
+          print(f'COLD_AUTH_QMETA_METHOD_COUNT={method_count}')
+          print(f'COLD_AUTH_QMETA_SIGNAL_COUNT={signal_count}')
+          assert class_name == 'TGameClient', class_name
+
+          methods = []
+          for idx in range(method_count):
+              row = [u32(METADATA + (method_data + idx * 6 + j) * 4) for j in range(6)]
+              name = qstring(row[0])
+              argc = row[1]
+              params_offset = row[2]
+              tag_index = row[3]
+              method_flags = row[4]
+              meta_revision = row[5]
+              # Parameters are encoded as return type then argc argument types; values >= 0x80000000 are unresolved custom types.
+              params = [u32(METADATA + (params_offset + j) * 4) for j in range(argc + 1)]
+              methods.append((idx, name, argc, method_flags, meta_revision, params))
+              print(f'COLD_AUTH_METHOD_META_INDEX={idx};NAME={name};ARGC={argc};FLAGS=0x{method_flags:x};REV={meta_revision};PARAMS=' + ','.join(hex(x) for x in params))
+
+          hits = [m for m in methods if m[1] == TARGET_NAME]
+          assert len(hits) == 1, ('target_name_count', len(hits))
+          meta_index, name, argc, method_flags, meta_revision, params = hits[0]
+          assert argc == 2, argc
+          print('COLD_AUTH_TGAMECLIENT_QMETA_IDENTITY=PASS')
+          print(f'COLD_AUTH_METHOD_NAME={name}')
+          print(f'COLD_AUTH_METHOD_META_INDEX={meta_index}')
+          print(f'COLD_AUTH_ARGC={argc}')
+          print(f'COLD_AUTH_METHOD_FLAGS=0x{method_flags:x}')
+          print('COLD_AUTH_RAW_PARAM_TYPE_IDS=' + ','.join(hex(x) for x in params))
+
+          # Recover jump-table candidates from the exact static metacall using the same fail-closed structure as the predecessor census.
+          md = Cs(CS_ARCH_X86, CS_MODE_64)
+          md.detail = True
+          ins = list(md.disasm(raw[file_off(STATIC_METACALL):file_off(STATIC_METACALL) + 0x900], STATIC_METACALL))
+          candidates = []
+          for pos, inst in enumerate(ins):
+              if inst.mnemonic != 'lea' or len(inst.operands) < 2:
+                  continue
+              op = inst.operands[1]
+              if op.type != X86_OP_MEM or op.mem.base != X86_REG_RIP:
+                  continue
+              table = inst.address + inst.size + op.mem.disp
+              reg = inst.operands[0].reg
+              used = False
+              for nxt in ins[pos + 1:pos + 12]:
+                  for operand in nxt.operands:
+                      if operand.type == X86_OP_MEM and operand.mem.base == reg and operand.mem.scale == 4:
+                          used = True
+              if not used:
+                  continue
+              try:
+                  targets = [table + i32(table + i * 4) for i in range(method_count)]
+              except Exception:
+                  continue
+              score = sum(executable(t) for t in targets)
+              candidates.append((score, table, targets, inst.address))
+
+          candidates.sort(reverse=True, key=lambda item: (item[0], -item[1]))
+          perfect = [c for c in candidates if c[0] == method_count]
+          print(f'COLD_AUTH_DISPATCH_CANDIDATE_COUNT={len(candidates)}')
+          print(f'COLD_AUTH_PERFECT_DISPATCH_CANDIDATE_COUNT={len(perfect)}')
+          for n, (score, table, targets, lea_at) in enumerate(candidates[:12]):
+              print(f'COLD_AUTH_DISPATCH_CANDIDATE={n};LEA=0x{lea_at:x};TABLE=0x{table:x};EXEC_SCORE={score}/{method_count};TARGET_FOR_METHOD=0x{targets[meta_index]:x}')
+
+          assert len(perfect) == 1, ('perfect_dispatch_count', len(perfect))
+          score, table, targets, lea_at = perfect[0]
+          target = targets[meta_index]
+          assert executable(target), hex(target)
+          fence = raw[file_off(target):file_off(target) + 32]
+          assert len(fence) == 32
+          print(f'COLD_AUTH_DISPATCH_TABLE=0x{table:x}')
+          print(f'COLD_AUTH_DISPATCH_TARGET=0x{target:x}')
+          print('COLD_AUTH_TARGET_EXECUTABLE=true')
+          print('COLD_AUTH_TARGET_INSTRUCTION_FENCE=' + fence.hex())
+
+          # Resolve argument type names from QMeta type IDs only when they map directly to string-table entries.
+          # If this exact encoding does not resolve cleanly, leave the type text UNKNOWN instead of guessing.
+          resolved = []
+          for type_id in params[1:]:
+              name_value = None
+              # Qt meta-type encoding may use the high bit for string-table type names.
+              if type_id & 0x80000000:
+                  candidate_index = type_id & 0x7fffffff
+                  try:
+                      name_value = qstring(candidate_index)
+                  except Exception:
+                      name_value = None
+              resolved.append(name_value)
+          if resolved == ['QString', 'QString']:
+              print('COLD_AUTH_ARG_TYPES=QString,QString')
+          else:
+              print('COLD_AUTH_ARG_TYPES=UNKNOWN')
+              print('COLD_AUTH_ARG_TYPE_NAMES=' + ','.join(x or 'UNKNOWN' for x in resolved))
+
+          print('COLD_AUTH_STATIC_DISCRIMINATOR=PASS')
+          PY

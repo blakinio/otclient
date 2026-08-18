@@ -42,9 +42,14 @@ jobs:
             tools/tibia_runtime_bridge/experimental_auth_launcher.py \
             tests/tools/tibia_runtime_bridge/test_bridge.py
           PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_bridge.py
+          grep -F 'credential-bearing environment variables are forbidden' \
+            tools/tibia_runtime_bridge/experimental_auth_launcher.py >/dev/null
+          grep -F 'os.path.lexists' tools/tibia_runtime_bridge/experimental_auth_launcher.py >/dev/null
           echo 'NATIVE_AUTH_TEST_CREDENTIALS=synthetic_only'
           echo 'NATIVE_AUTH_OFFICIAL_CLIENT_EXECUTED=false'
           echo 'NATIVE_AUTH_RUNTIME_ACCESS=none'
+          echo 'NATIVE_AUTH_LAUNCHER_SECRET_ENV=FAIL_CLOSED'
+          echo 'NATIVE_AUTH_SOCKET_REPLACEMENT=REFUSED'
 
       - name: Prove stable bridge and client remain read-only
         shell: bash

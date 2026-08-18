@@ -16,14 +16,16 @@ except ImportError:  # pragma: no cover - Linux-only experimental auth surface
 
 from tools.tibia_runtime_bridge.ipc_client import (
     BridgeClientError,
+    BridgePeerIdentityError,
+    BridgeProtocolError,
     BridgeTransportError,
     PeerIdentityExpectation,
-    _receive_response,
     _verify_peer_identity,
 )
 
 _MAX_CREDENTIAL_FRAME_BYTES = 8 + 2 * 1024
 _MIN_CREDENTIAL_FRAME_BYTES = 10
+_MAX_RESPONSE_BYTES = 1024 * 1024
 
 
 def _is_memfd_link_target(target: str) -> bool:
@@ -57,6 +59,30 @@ def _validate_credentials_memfd(credentials_fd: int) -> None:
         raise BridgeClientError(f"credentials_fd validation failed: {exc}") from exc
 
 
+def _receive_auth_response(client: socket.socket) -> dict[str, object]:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = client.recv(4096)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        total += len(chunk)
+        if total > _MAX_RESPONSE_BYTES:
+            raise BridgeProtocolError("experimental auth response exceeds 1 MiB")
+        if b"\n" in chunk:
+            break
+    raw = b"".join(chunks)
+    line = raw.split(b"\n", 1)[0]
+    try:
+        doc = json.loads(line.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BridgeProtocolError("experimental auth helper returned invalid JSON") from exc
+    if not isinstance(doc, dict) or not isinstance(doc.get("ok"), bool):
+        raise BridgeProtocolError("experimental auth response must contain boolean ok")
+    return doc
+
+
 def auth_with_credentials_fd(
     socket_path: Path,
     credentials_fd: int,
@@ -87,7 +113,7 @@ def auth_with_credentials_fd(
         )
         if sent != len(payload):
             raise BridgeTransportError("experimental auth command was only partially sent")
-        return _receive_response(client)
+        return _receive_auth_response(client)
     except BridgeClientError:
         raise
     except OSError as exc:

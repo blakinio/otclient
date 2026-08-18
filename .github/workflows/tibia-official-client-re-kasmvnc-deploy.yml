@@ -26,13 +26,12 @@ jobs:
       TASK_FILE: docs/agents/tasks/active/OTC-20260818-track-a-persistent-viewer-handoff.md
       CONTAINER_NAME: otclient-track-a-kasmvnc
       IMAGE: kasmweb/ubuntu-noble-desktop:1.17.0
-      HOST_IP: 192.168.1.2
+      HOST_IP: 127.0.0.1
       HOST_PORT: '6901'
       CONTAINER_PORT: '6901'
       STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
       LEGACY_OBSERVER: http://192.168.1.2:6083/
       KASM_USERNAME: kasm_user
-      KASM_PASSWORD: IVtWL5MZS0f5bDvLDyi7MlBqkkT3BTh2
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -115,8 +114,20 @@ jobs:
           umask 077
           mkdir -p "$STATE_DIR"
           chmod 700 "$STATE_DIR"
-          printf '%s\n' "$KASM_PASSWORD" > "$STATE_DIR/browser-password"
-          chmod 600 "$STATE_DIR/browser-password"
+
+          password_file="$STATE_DIR/browser-password"
+          password_created=false
+          if [[ ! -s "$password_file" ]]; then
+            python3 - <<'PY' > "$password_file"
+          import secrets
+          alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789_-!@'
+          print(''.join(secrets.choice(alphabet) for _ in range(32)))
+          PY
+            chmod 600 "$password_file"
+            password_created=true
+          fi
+          KASM_PASSWORD="$(cat "$password_file")"
+          [[ ${#KASM_PASSWORD} -ge 20 ]]
 
           recreate=true
           if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
@@ -127,7 +138,8 @@ jobs:
             configured_image="$(docker inspect -f '{{.Config.Image}}' "$CONTAINER_NAME")"
             restart_policy="$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER_NAME")"
             port_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostPort}}' "$CONTAINER_NAME" 2>/dev/null || true)"
-            if [[ "$configured_image" == "$IMAGE" && "$restart_policy" == unless-stopped && "$port_binding" == "$HOST_PORT" ]]; then
+            host_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostIp}}' "$CONTAINER_NAME" 2>/dev/null || true)"
+            if [[ "$configured_image" == "$IMAGE" && "$restart_policy" == unless-stopped && "$port_binding" == "$HOST_PORT" && "$host_binding" == "$HOST_IP" && "$password_created" == false ]]; then
               recreate=false
             fi
           fi
@@ -153,9 +165,11 @@ jobs:
             docker start "$CONTAINER_NAME" >/dev/null || true
           fi
 
+          unset KASM_PASSWORD
           echo KASMVNC_CONTAINER_DEPLOYED=true
+          echo KASMVNC_PASSWORD_SOURCE=task-private-state-file
 
-      - name: Verify KasmVNC HTTPS desktop
+      - name: Verify local KasmVNC HTTPS backend
         shell: bash
         run: |
           set +x
@@ -175,7 +189,7 @@ jobs:
           done
           if [[ "$ready" != true ]]; then
             docker logs --tail 160 "$CONTAINER_NAME" >&2 || true
-            echo KASMVNC_DEPLOY_ERROR=https_not_ready >&2
+            echo KASMVNC_DEPLOY_ERROR=https_backend_not_ready >&2
             exit 1
           fi
 
@@ -185,13 +199,16 @@ jobs:
           [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.runtime" }}' "$CONTAINER_NAME")" == track-a-kasmvnc-desktop ]]
           [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.role" }}' "$CONTAINER_NAME")" == kasmvnc-desktop ]]
           port_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostPort}}' "$CONTAINER_NAME")"
+          host_binding="$(docker inspect -f '{{(index (index .HostConfig.PortBindings "6901/tcp") 0).HostIp}}' "$CONTAINER_NAME")"
           [[ "$port_binding" == "$HOST_PORT" ]]
+          [[ "$host_binding" == "$HOST_IP" ]]
           display="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"' 2>/dev/null || true)"
           echo "KASMVNC_CONTAINER_DISPLAY=${display:-UNKNOWN}"
-          echo "KASMVNC_URL=$url"
+          echo "KASMVNC_BACKEND_URL=$url"
           echo "KASMVNC_USERNAME=$KASM_USERNAME"
-          echo KASMVNC_HTTPS=PASS
+          echo KASMVNC_HTTPS_BACKEND=PASS
           echo KASMVNC_PERSISTENCE=PASS
+          echo KASMVNC_DSM_REVERSE_PROXY_REQUIRED=true
 
       - name: Re-prove no interference with PR 528 observer
         shell: bash
@@ -212,7 +229,8 @@ jobs:
           set +x
           set -Eeuo pipefail
           echo 'KASMVNC_DEPLOYMENT=PASS'
-          echo 'KASMVNC_URL=https://192.168.1.2:6901/'
+          echo 'KASMVNC_BACKEND_URL=https://127.0.0.1:6901/'
+          echo 'KASMVNC_PUBLIC_ENTRYPOINT=DSM_REVERSE_PROXY_REQUIRED'
           echo 'KASMVNC_USERNAME=kasm_user'
           echo 'KASMVNC_PASSWORD_SOURCE=task-private-state-file'
           echo 'KASMVNC_OFFICIAL_CLIENT_STARTED=false'

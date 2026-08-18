@@ -1,0 +1,224 @@
+name: Track A native-login resume inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-resume-inventory.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    name: Inventory source package and current official client
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    env:
+      TASK: OTC-20260818-native-login-to-ingame-e2e
+      BASE: /home/runner/_work/_otclient_tibia_re_state
+      OLD_SHA: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      OLD_SIZE: '51965216'
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Read-only package/controller inventory and manifest probe
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
+
+          state="$BASE/canonical-live-runtime"
+          package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          client="$package/bin/client"
+          token="$BASE/tasks/$TASK/runtime/canonical-lease-token"
+          work="$RUNNER_TEMP/native-login-resume-inventory-$GITHUB_RUN_ID"
+          mkdir -m700 "$work"
+          wp_pid=''
+          cleanup() {
+            if [[ "$wp_pid" =~ ^[1-9][0-9]*$ ]]; then
+              kill "$wp_pid" 2>/dev/null || true
+              for _ in $(seq 1 30); do kill -0 "$wp_pid" 2>/dev/null || break; sleep .1; done
+              kill -9 "$wp_pid" 2>/dev/null || true
+            fi
+            rm -rf "$work"
+          }
+          trap cleanup EXIT INT TERM HUP
+
+          echo "RESUME_MAIN_SHA=$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          echo "RESUME_PR_HEAD=$EVENT_HEAD"
+          echo "RESUME_RUNNER=$RUNNER_NAME"
+
+          python3 - "$state" "$token" <<'PY'
+          import json, pathlib, sys, time
+          state=pathlib.Path(sys.argv[1]); token=pathlib.Path(sys.argv[2])
+          lease=state/'lease.json'; reg=state/'runtime-registration.json'; session=state/'session'
+          print('RESUME_REGISTRATION_PRESENT='+str(reg.is_file()).lower())
+          print('RESUME_SESSION_DIR_PRESENT='+str(session.is_dir()).lower())
+          print('RESUME_LEASE_FILE_PRESENT='+str(lease.is_file()).lower())
+          print('RESUME_TOKEN_PRESENT='+str(token.is_file()).lower())
+          if token.is_file():
+              print('RESUME_TOKEN_MODE='+oct(token.stat().st_mode & 0o777)[2:])
+          if lease.is_file():
+              x=json.loads(lease.read_text())
+              for key in ('status','generation','controller_task','controller_session','expires_at_epoch'):
+                  v=x.get(key)
+                  print('RESUME_LEASE_'+key.upper()+'='+str(v))
+              exp=x.get('expires_at_epoch')
+              if isinstance(exp,(int,float)):
+                  print('RESUME_LEASE_EXPIRED_NOW='+str(exp <= time.time()).lower())
+          PY
+
+          python3 - "$client" <<'PY'
+          import hashlib, os, pathlib, re, stat, sys
+          p=pathlib.Path(sys.argv[1])
+          print('SOURCE_CLIENT_EXISTS='+str(p.exists()).lower())
+          if not p.exists(): raise SystemExit('source client absent')
+          st=p.lstat()
+          print('SOURCE_CLIENT_IS_SYMLINK='+str(stat.S_ISLNK(st.st_mode)).lower())
+          print('SOURCE_CLIENT_IS_REGULAR='+str(stat.S_ISREG(st.st_mode)).lower())
+          print('SOURCE_CLIENT_EXECUTABLE='+str(os.access(p,os.X_OK)).lower())
+          if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode) or not os.access(p,os.X_OK):
+              raise SystemExit('source client type/executable fence failed')
+          h=hashlib.sha256(); versions=[]
+          with p.open('rb') as f:
+              while True:
+                  b=f.read(4*1024*1024)
+                  if not b: break
+                  h.update(b)
+                  for pat in (rb'\b1[0-9]\.[0-9]{2}(?:\.[A-Za-z0-9]+)?\b', rb'\b[0-9]{1,2}\.[0-9]{2}\.[A-Fa-f0-9]{6,16}\b'):
+                      for m in re.finditer(pat,b):
+                          s=m.group().decode('ascii','ignore')
+                          if s not in versions and len(versions)<40: versions.append(s)
+          print('SOURCE_CLIENT_SIZE='+str(st.st_size))
+          print('SOURCE_CLIENT_SHA256='+h.hexdigest())
+          print('SOURCE_CLIENT_VERSION_STRINGS='+','.join(versions))
+          PY
+
+          resolved="$(readlink -f "$client")"
+          matches=()
+          for e in /proc/[0-9]*/exe; do
+            [[ -e "$e" ]] || continue
+            path="$(readlink -f "$e" 2>/dev/null || true)"
+            [[ "$path" == "$resolved" ]] || continue
+            pid="${e#/proc/}"; pid="${pid%/exe}"
+            matches+=("$pid")
+          done
+          echo "SOURCE_CLIENT_EXECUTING_COUNT=${#matches[@]}"
+          if ((${#matches[@]})); then printf 'SOURCE_CLIENT_EXECUTING_PIDS=%s\n' "$(IFS=,; echo "${matches[*]}")"; fi
+
+          warp="$state/warp"
+          [[ -x "$warp/bin/wireproxy" && -s "$warp/state/wgcf-profile.conf" ]]
+          port="$(python3 - <<'PY'
+          import socket
+          for p in range(25422,25489):
+              s=socket.socket()
+              try:s.bind(('127.0.0.1',p))
+              except OSError:s.close();continue
+              s.close();print(p);break
+          else:raise SystemExit('no free isolated WARP port')
+          PY
+          )"
+          cat >"$work/wireproxy.conf" <<EOF
+          WGConfig = $warp/state/wgcf-profile.conf
+          [Socks5]
+          BindAddress = 127.0.0.1:$port
+          EOF
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=resume-inventory-wireproxy \
+            nohup "$warp/bin/wireproxy" -c "$work/wireproxy.conf" >"$work/wireproxy.log" 2>&1 </dev/null &
+          wp_pid=$!
+          for _ in $(seq 1 40); do
+            kill -0 "$wp_pid" 2>/dev/null || { cat "$work/wireproxy.log" >&2; exit 1; }
+            python3 - "$port" <<'PY' && break || true
+          import socket,sys
+          s=socket.socket(); s.settimeout(.2)
+          try:s.connect(('127.0.0.1',int(sys.argv[1])))
+          except OSError:raise SystemExit(1)
+          finally:s.close()
+          PY
+            sleep .25
+          done
+
+          base='https://static.tibia.com/launcher/tibiaclient-linux-current/'
+          manifest="$work/package.json"
+          curl --socks5-hostname "127.0.0.1:$port" --compressed -fsSL --retry 4 --retry-all-errors --connect-timeout 20 --max-time 120 "${base}package.json" -o "$manifest"
+          readarray -t m < <(python3 - "$manifest" <<'PY'
+          import json,sys
+          doc=json.load(open(sys.argv[1],encoding='utf-8')); rows=[]
+          def walk(v):
+              if isinstance(v,dict):
+                  u=v.get('url'); p=v.get('packedhash'); q=v.get('unpackedhash')
+                  if isinstance(u,str) and isinstance(p,str): rows.append((u,p,q if isinstance(q,str) else ''))
+                  for x in v.values(): walk(x)
+              elif isinstance(v,list):
+                  for x in v: walk(x)
+          walk(doc)
+          matches=[x for x in rows if x[0].endswith('/bin/client.lzma') or x[0]=='bin/client.lzma' or x[0].endswith('client.lzma')]
+          if len(matches)!=1: raise SystemExit(f'expected one client.lzma manifest entry, got {len(matches)}')
+          print(matches[0][0]); print(matches[0][1].lower()); print(matches[0][2].lower())
+          PY
+          )
+          rel="${m[0]}"; packed_expected="${m[1]}"; unpacked_expected="${m[2]}"
+          case "$rel" in
+            http://*|https://*) url="$rel" ;;
+            /*) url="https://static.tibia.com$rel" ;;
+            *) url="$base$rel" ;;
+          esac
+          packed="$work/client.lzma"
+          curl --socks5-hostname "127.0.0.1:$port" --compressed -fsSL --retry 4 --retry-all-errors --connect-timeout 20 --max-time 240 "$url" -o "$packed"
+          [[ "$(sha256sum "$packed" | awk '{print $1}')" == "$packed_expected" ]]
+
+          readarray -t cur < <(python3 - "$packed" "$unpacked_expected" <<'PY'
+          import hashlib,lzma,pathlib,re,sys
+          p=pathlib.Path(sys.argv[1]); expected=sys.argv[2].lower(); b=p.read_bytes()
+          if len(b)<46: raise SystemExit('packed client too small')
+          q=b[32]; lc=q%9; z=q//9; lp=z%5; pb=z//5; ds=int.from_bytes(b[33:37],'little')
+          raw=lzma.decompress(b[45:],format=lzma.FORMAT_RAW,filters=[{'id':lzma.FILTER_LZMA1,'dict_size':ds,'lc':lc,'lp':lp,'pb':pb}])
+          sha=hashlib.sha256(raw).hexdigest()
+          if expected and sha!=expected: raise SystemExit('unpacked hash mismatch')
+          versions=[]
+          for pat in (rb'\b1[0-9]\.[0-9]{2}(?:\.[A-Za-z0-9]+)?\b', rb'\b[0-9]{1,2}\.[0-9]{2}\.[A-Fa-f0-9]{6,16}\b'):
+              for mm in re.finditer(pat,raw):
+                  s=mm.group().decode('ascii','ignore')
+                  if s not in versions and len(versions)<40: versions.append(s)
+          print(hashlib.sha256(b).hexdigest()); print(sha); print(len(raw)); print(','.join(versions))
+          PY
+          )
+          echo "CURRENT_OFFICIAL_PACKED_SHA256=${cur[0]}"
+          echo "CURRENT_OFFICIAL_CLIENT_SHA256=${cur[1]}"
+          echo "CURRENT_OFFICIAL_CLIENT_SIZE=${cur[2]}"
+          echo "CURRENT_OFFICIAL_VERSION_STRINGS=${cur[3]}"
+
+          installed_sha="$(sha256sum "$client" | awk '{print $1}')"
+          installed_size="$(stat -c %s "$client")"
+          if [[ "$installed_sha" == "${cur[1]}" && "$installed_size" == "${cur[2]}" ]]; then
+            echo RESUME_PACKAGE_CLASSIFICATION=ALREADY_CURRENT
+          elif [[ "$installed_sha" == "$OLD_SHA" && "$installed_size" == "$OLD_SIZE" ]]; then
+            echo RESUME_PACKAGE_CLASSIFICATION=PROVEN_OBSOLETE_GEN16
+          else
+            echo RESUME_PACKAGE_CLASSIFICATION=UNEXPECTED_FAIL_CLOSED
+            exit 2
+          fi
+          echo RESUME_SECRET_ACCESS=false
+          echo RESUME_LOGIN=false
+          echo RESUME_CANONICAL_CLIENT_STARTED=false
+          echo RESUME_PACKAGE_MUTATION=false
+          echo RESUME_INVENTORY_RESULT=PASS

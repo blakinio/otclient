@@ -1,5 +1,5 @@
 {
-  "schema": "track-a-s1-unfiltered-static-census-result-v1",
+  "schema": "track-a-s1-unfiltered-static-census-result-v2",
   "task": "OTC-20260818-track-a-s1-unfiltered-static-census",
   "pr": 509,
   "exact_client": {
@@ -41,11 +41,18 @@
     "all_189_inbound_names_persisted": true,
     "all_160_outbound_names_persisted": true
   },
-  "inbound_static_surface": {
-    "inbound_oriented_method_strings": 542,
-    "messages_with_lexical_handler_surface": 188,
-    "messages_without_lexical_handler_surface": 1,
-    "sole_unmatched_generated_message": "GameserverMessageTrackQuestFlags",
+  "static_method_surface": {
+    "broad_candidate_method_strings": 542,
+    "handle_prefixed": 149,
+    "received_prefixed": 189,
+    "on_prefixed": 204,
+    "received_message_methods_persisted": 189,
+    "server_message_stems_matching_received_method_stems_exactly": 188,
+    "sole_stem_variant": {
+      "generated": "GameserverMessageTrackQuestFlags",
+      "received_method": "receivedTrackedQuestFlagsMessage"
+    },
+    "received_surface_is_dispatch_proof": false,
     "relevant_demangled_types_in_artifact": 148,
     "direct_code_to_string_xref_strings": 51,
     "direct_code_to_string_xrefs": 52,
@@ -64,10 +71,11 @@
   },
   "classification": {
     "generated_message_denominator": "FACT",
+    "complete_received_method_name_denominator": "FACT_STRING_PRESENCE",
+    "received_method_to_generated_message_name_alignment": "INFERENCE_STATIC_LEXICAL_ONLY",
     "handler_class_type_presence": "FACT",
     "direct_code_to_handler_class_string_xrefs": "FACT",
-    "message_name_to_similar_received_or_handle_method_name": "INFERENCE_STATIC_LEXICAL_ONLY",
-    "message_to_concrete_handler_dispatch": "UNKNOWN",
+    "generated_message_to_concrete_handler_dispatch": "UNKNOWN",
     "handler_to_storage_or_controller_edge": "UNKNOWN",
     "one_common_inbound_dispatcher": "UNKNOWN"
   },

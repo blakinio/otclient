@@ -6,6 +6,7 @@ on:
       - runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
     paths:
       - .github/workflows/track-a-vnc-observer-live-v23.yml
+      - .github/scripts/track-a-worldmap-vnc-observer-access-v23-repair.py
 
 permissions:
   contents: read
@@ -101,8 +102,6 @@ jobs:
           echo 'TRACK_A_VNC_LIVE_READY=true'
           echo 'TRACK_A_VNC_LIVE_PORT=6082'
           echo 'TRACK_A_VNC_LIVE_SECRET_USED=false'
-          # Intentionally never write the credential FIFO. Keep this exact
-          # no-secret session available for owner observation only.
           for _ in $(seq 1 3600);do
             [[ -e "$state/stop" ]]&&break
             kill -0 "$hp" 2>/dev/null||break

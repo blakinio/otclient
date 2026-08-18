@@ -28,6 +28,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <sys/socket.h>
@@ -301,6 +302,11 @@ std::uint32_t readLe32(const unsigned char* bytes)
         (static_cast<std::uint32_t>(bytes[3]) << 24u);
 }
 
+bool isMemfdLinkTarget(const std::string& target)
+{
+    return target.rfind("/memfd:", 0) == 0 || target.rfind("memfd:", 0) == 0;
+}
+
 std::string readCredentialMemfd(const int fd, QByteArray& email, QByteArray& password)
 {
     if (fd < 0) {
@@ -315,7 +321,7 @@ std::string readCredentialMemfd(const int fd, QByteArray& email, QByteArray& pas
         return "CREDENTIAL_FD_IDENTITY_FAILED";
     }
     const std::string linkText(linkTarget, static_cast<std::size_t>(linkLength));
-    if (linkText.find("memfd:") == std::string::npos) {
+    if (!isMemfdLinkTarget(linkText)) {
         return "CREDENTIAL_FD_NOT_MEMFD";
     }
 

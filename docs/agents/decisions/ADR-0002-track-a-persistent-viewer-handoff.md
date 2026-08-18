@@ -32,7 +32,7 @@ The persistent desktop provider is KasmVNC, hosted as a task-owned Docker contai
 
 ```text
 browser
-  -> https://<stable-kasm-hostname>:443/
+  -> https://synology:6902/
   -> DSM Reverse Proxy + WebSocket forwarding
   -> https://127.0.0.1:6901/
   -> KasmVNC integrated HTTPS/WebSocket service
@@ -48,10 +48,11 @@ backend_host: 127.0.0.1
 backend_port: 6901
 container_port: 6901
 internal_display: ':1'
+public_url: https://synology:6902/
 restart_policy: unless-stopped
 ```
 
-The Kasm desktop is not created per ChatGPT/GitHub Actions session. Its container survives the deployment job and later controller turnover. The DSM hostname remains stable independently of agent/session turnover.
+The Kasm desktop is not created per ChatGPT/GitHub Actions session. Its container survives the deployment job and later controller turnover. The DSM source `HTTPS synology:6902` remains stable independently of agent/session turnover.
 
 ### 3. noVNC is not part of the new path
 
@@ -69,13 +70,21 @@ PR #528 may temporarily retain its legacy observer `DISPLAY=:99` / `http://192.1
 
 Port `6901` is bound only to `127.0.0.1` on Synology. A browser is not expected to reach `192.168.1.2:6901` directly.
 
-The operator configures DSM Reverse Proxy with an HTTPS source hostname on port `443` and destination `HTTPS 127.0.0.1:6901`. WebSocket upgrade forwarding is mandatory. Repository automation deliberately does not edit DSM's global reverse-proxy configuration.
+The operator-configured rule for this deployment is exactly:
+
+```text
+source:      HTTPS synology:6902
+destination: HTTPS 127.0.0.1:6901
+WebSocket:   enabled
+```
+
+Repository automation deliberately does not edit DSM's global reverse-proxy configuration.
 
 Backend deployment and public presentation are separate health gates:
 
 ```text
 Kasm backend health  = container + loopback HTTPS
-DSM frontend health  = hostname + TLS + reverse proxy + WebSocket + Kasm app
+DSM frontend health  = https://synology:6902/ + TLS + reverse proxy + WebSocket + Kasm app
 ```
 
 A healthy backend is not enough to claim the browser endpoint available.
@@ -99,7 +108,7 @@ Desktop deployment never reads or passes Tibia account/auth/session secrets. The
 ## Consequences
 
 - The human observer gets a genuinely different technology from noVNC.
-- DSM provides the stable HTTPS hostname/certificate/WebSocket frontend.
+- DSM provides the stable `https://synology:6902/` HTTPS/WebSocket frontend.
 - Kasm's backend port is not intentionally exposed on the LAN.
 - `session_id` remains a controller-authority property, not GUI identity.
 - Kasm desktop deployment can proceed without creating a conflicting second official-client session.
@@ -118,6 +127,6 @@ Before claiming the Kasm backend deployed, physical Synology evidence must show:
 6. PR #528 `:99/6083` remains untouched;
 7. the deploy path accessed no Tibia secrets and launched no official client.
 
-Before claiming the operator browser endpoint available, additionally prove a DSM Reverse Proxy HTTPS hostname with WebSocket forwarding to `https://127.0.0.1:6901`.
+Before claiming the operator browser endpoint available, additionally prove `https://synology:6902/` reaches the KasmVNC application through DSM and that `/websockify` upgrades successfully through the proxy to `https://127.0.0.1:6901`.
 
 Before claiming the full Track A runtime migration complete, a later serialized E2E must additionally prove the official client runs inside this persistent Kasm desktop and remains correctly registered/controlled across a replacement controller handoff without creating a second official-client session.

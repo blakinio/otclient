@@ -20,7 +20,7 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 10
     env:
-      BASE_SHA: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
+      BASE_SHA: d53eec81bf718b1128fc8e7f9b0a53d991bf30bf
       TASK: OTC-20260818-native-login-to-ingame-e2e
       SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
       STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime

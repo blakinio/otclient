@@ -25,6 +25,7 @@ env:
   HOST_PORT: '6901'
   STATE_DIR: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
   PUBLIC_URL: https://synology:6902/
+  PUBLIC_RESOLVE: synology:6902:192.168.1.2
   LEGACY_OBSERVER: http://192.168.1.2:6083/
   KASM_USERNAME: kasm_user
 
@@ -143,10 +144,10 @@ jobs:
           umask 077
           cfg="$(mktemp)"; trap 'rm -f "$cfg"' EXIT; chmod 600 "$cfg"
           printf 'user = "%s:%s"\n' "$KASM_USERNAME" "$(cat "$STATE_DIR/browser-password")" > "$cfg"
-          curl -kfsS --config "$cfg" --max-time 8 "$PUBLIC_URL" -o /tmp/kasm-public.html
+          curl -kfsS --resolve "$PUBLIC_RESOLVE" --config "$cfg" --max-time 8 "$PUBLIC_URL" -o /tmp/kasm-public.html
           grep -qiE 'kasm|vnc' /tmp/kasm-public.html
           ws=(-H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: binary')
-          public_code="$(curl -k -sS --config "$cfg" --http1.1 --max-time 3 -o /dev/null -w '%{http_code}' "${ws[@]}" "${PUBLIC_URL}websockify" || true)"
+          public_code="$(curl -k -sS --resolve "$PUBLIC_RESOLVE" --config "$cfg" --http1.1 --max-time 3 -o /dev/null -w '%{http_code}' "${ws[@]}" "${PUBLIC_URL}websockify" || true)"
           backend_code="$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'curl -k -sS -u "kasm_user:$VNC_PW" --http1.1 --max-time 3 -o /dev/null -w "%{http_code}" -H "Connection: Upgrade" -H "Upgrade: websocket" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Protocol: binary" https://127.0.0.1:6901/websockify || true')"
           [[ "$backend_code" == 101 ]]
           [[ "$public_code" == 101 ]]

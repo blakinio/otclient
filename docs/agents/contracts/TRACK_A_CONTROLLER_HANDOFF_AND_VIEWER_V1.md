@@ -53,7 +53,7 @@ The new Track A GUI topology is:
 
 ```text
 browser
-  -> HTTPS <stable-kasm-hostname>:443
+  -> HTTPS synology:6902
   -> DSM Reverse Proxy with WebSocket forwarding
   -> HTTPS 127.0.0.1:6901
   -> KasmVNC integrated web server/WebSocket
@@ -71,9 +71,10 @@ container_port: 6901
 internal_display: ':1'
 restart_policy: unless-stopped
 state_directory: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
+public_url: https://synology:6902/
 ```
 
-Port `6901` is a loopback backend, not the supported user-facing LAN endpoint. The supported public/LAN entrypoint is a DSM Reverse Proxy HTTPS hostname on port `443`. The DSM rule must preserve WebSocket upgrade semantics.
+Port `6901` is a loopback backend, not the supported user-facing LAN endpoint. The supported public/LAN entrypoint for this deployment is DSM Reverse Proxy `https://synology:6902/`. The DSM rule must preserve WebSocket upgrade semantics and forward to `HTTPS 127.0.0.1:6901`.
 
 KasmVNC owns the desktop and browser transport. The new desktop path MUST NOT use `x11vnc`, `websockify` or noVNC as an intermediate presentation chain.
 
@@ -91,7 +92,7 @@ KasmVNC desktop bootstrap is permitted as `runtime_access: ephemeral_isolated` o
 - must not launch an official Tibia client while another task owns the official-client runtime surface;
 - must not touch PR #528 `:99/6083` except optional non-invasive reachability checks.
 
-DSM Reverse Proxy configuration is an operator-owned presentation step. Repository deployment may verify the loopback backend independently, but public desktop health is not `PASS` until the DSM rule itself is configured and verified from a browser/client path.
+DSM Reverse Proxy configuration is an operator-owned presentation step. Repository deployment may verify the loopback backend independently, but public desktop health is not `PASS` until `https://synology:6902/` itself is verified from a real HTTPS/WebSocket client path.
 
 ## Persistence across agent turnover
 
@@ -137,8 +138,8 @@ HTTPS Kasm web application reachable PASS
 Public presentation health additionally requires:
 
 ```text
-DSM HTTPS hostname reachable         PASS
-DSM reverse proxy destination        127.0.0.1:6901
+DSM https://synology:6902 reachable  PASS
+DSM reverse proxy destination        HTTPS 127.0.0.1:6901
 WebSocket upgrade through DSM        PASS
 Kasm login/application usable        PASS
 ```
@@ -158,6 +159,6 @@ Before calling the Kasm backend deployed, physical Synology evidence must prove:
 7. PR #528 `:99/6083` is not mutated by the deployment;
 8. no Tibia secret is accessed and no official client is launched by the desktop-only deployment.
 
-Before calling the browser desktop available to the operator, additionally prove the DSM Reverse Proxy rule on the selected HTTPS hostname, including WebSocket forwarding to `https://127.0.0.1:6901`.
+Before calling the browser desktop available to the operator, additionally prove DSM Reverse Proxy `https://synology:6902/`, including authenticated Kasm content and WebSocket forwarding to `https://127.0.0.1:6901`.
 
 Repository controller-handoff tests remain separately required. Integration of the official client into the Kasm desktop is a later physical gate after runtime ownership is available.

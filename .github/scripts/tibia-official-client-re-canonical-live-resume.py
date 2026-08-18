@@ -20,7 +20,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 LEASE_WRAPPER = SCRIPT_DIR / "tibia-official-client-re-canonical-live-lease"
 HANDOFF = SCRIPT_DIR / "tibia-official-client-re-canonical-live-handoff.py"
 TRANSITION = SCRIPT_DIR / "tibia-official-client-re-canonical-live-transition.py"
-DEFAULT_PROBE = SCRIPT_DIR / "tibia-official-client-re-canonical-live-session.sh"
+DEFAULT_PROBE = SCRIPT_DIR / "tibia-official-client-re-canonical-live-xres-probe.py"
 IDENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$")
 
 
@@ -81,6 +81,13 @@ def _new_token_path(task_id: str, generation: int) -> Path:
     return TASK_ROOT / task_id / "runtime" / f"canonical-lease-token.g{generation}"
 
 
+def _secure_task_runtime_dir(task_id: str) -> Path:
+    path = TASK_ROOT / task_id / "runtime"
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path, 0o700)
+    return path
+
+
 def _run(command: list[str], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
     completed = subprocess.run(
         command,
@@ -115,7 +122,7 @@ def _acquire(
     *,
     stale_reason: str | None = None,
 ) -> None:
-    token_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _secure_task_runtime_dir(task_id)
     command = [
         str(LEASE_WRAPPER),
         "acquire",
@@ -159,7 +166,7 @@ def _handoff(
     reason: str,
 ) -> Path:
     target = _new_token_path(task_id, generation + 1)
-    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _secure_task_runtime_dir(task_id)
     _run(
         [
             sys.executable,

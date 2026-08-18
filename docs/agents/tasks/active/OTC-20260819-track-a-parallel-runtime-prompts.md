@@ -7,11 +7,12 @@ project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: documentation
-phase: prompt-as-code-authoring
+phase: exact-head-validation
 execution_mode: github_only
 branch: docs/OTC-20260819-track-a-parallel-runtime-prompts
 base_branch: main
 base_main: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
+related_pr: 543
 created: 2026-08-19
 updated: 2026-08-19
 risk: medium
@@ -22,7 +23,19 @@ gameplay_allowed: false
 mutation_authorized: false
 EXECUTION_CLASS: github_hosted
 RUNTIME_ACCESS: none
+PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 owned_paths:
   - docs/agents/tasks/active/OTC-20260819-track-a-parallel-runtime-prompts.md
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_PARALLEL_RUNTIME_AGENT_PROMPTS_V1.md
@@ -68,7 +81,7 @@ user_communication: low_noise
 
 Persist the owner's complete ready-to-invoke parallel Track A agent prompt package so the owner can use short aliases while workers resolve the full instructions from Git.
 
-The package must bind every runtime-capable worker to the current canonical KasmVNC locator contract, live PID/start/exe/XID revalidation, shared GUI coordination, and the owner's current campaign authorization for minimal anti-idle input. It must preserve stricter repository rules for login, credentials, process control, client mutation, irreversible economy operations and canonical promotion.
+The package binds every runtime-capable worker to the current canonical KasmVNC locator contract, live PID/start/exe/XID revalidation, shared GUI coordination, and the owner's current campaign authorization for minimal anti-idle input. It preserves stricter repository rules for login, credentials, process control, client mutation, irreversible economy operations and canonical promotion.
 
 # Prompt contract
 
@@ -101,23 +114,52 @@ This is narrowly encoded as:
 
 # Acceptance
 
-- [ ] canonical prompt file contains the common runtime contract and all requested aliases;
-- [ ] every alias has one bounded subsystem mission and explicit coverage ownership;
-- [ ] all workers point to `otclient-track-a-kasmvnc`, `DISPLAY=:1`, KasmVNC, and `TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md`;
-- [ ] live process identity requires PID + start ticks + executable + build fence where relevant + XID ownership; historical PID/XID are forbidden as authority;
-- [ ] shared anti-idle uses one heartbeat and serialized input so many agents do not all move the character independently;
-- [ ] current owner authorization is bounded and does not silently broaden credentials/login/process-control/irreversible effects;
-- [ ] researcher outputs remain Draft-only and coordinator-only promotion is preserved;
-- [ ] prompt eval includes positive, negative, boundary, stale-target, concurrency, injection, authorization and closeout cases;
-- [ ] full diff is documentation-only and does not touch #528/#539/#475/#302/#536 owned paths;
-- [ ] exact-head CI/governance green or exact blocker recorded;
+- [x] canonical prompt file contains the common runtime contract and all requested aliases;
+- [x] every alias has one bounded subsystem mission and explicit coverage ownership;
+- [x] all workers point to `otclient-track-a-kasmvnc`, `DISPLAY=:1`, KasmVNC, and `TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md`;
+- [x] live process identity requires PID + start ticks + executable + build fence where relevant + XID ownership; historical PID/XID are forbidden as authority;
+- [x] shared anti-idle uses one heartbeat and serialized input so many agents do not all move the character independently;
+- [x] current owner authorization is bounded and does not silently broaden credentials/login/process-control/irreversible effects;
+- [x] researcher outputs remain Draft-only and coordinator-only promotion is preserved;
+- [x] prompt eval includes positive, negative, boundary, stale-target, concurrency, injection, authorization and closeout cases;
+- [x] full diff is documentation-only and does not touch #528/#539/#475/#302/#536 owned paths;
+- [ ] exact-head CI/governance green on the final unchanged head;
 - [ ] fresh proportionate documentation/prompt audit completed before merge;
+
+# Validation checkpoint
+
+The first complete prompt/eval head was:
+
+```text
+62b65f9b975f0282ee0acf386210b218bb814e94
+CI 32192910735 = SUCCESS
+Track A agent runtime governance 32192910601 = FAILURE
+```
+
+The governance failure was metadata-only and correctly identified this task record as missing the universal Track A admission fields. No prompt/eval content failure was reported. This update adds the required docs-only values:
+
+```text
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
+```
+
+Full changed-file inventory and all three patches were self-reviewed. Material prompt findings from self-review: `0`.
 
 # Current checkpoint
 
 ```yaml
 status: in_progress
 base_main: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
-last_completed_step: branch and task ownership created from current main after merged KasmVNC locator contract #542
-next_action: persist the complete prompt alias package and manual prompt-eval matrix, then open/update Draft PR and validate exact head
+related_pr: 543
+last_completed_step: complete 12-alias prompt package, 25-case manual eval matrix and three-path full-diff self-review; governance metadata defect repaired
+next_action: verify exact-head CI/governance and current-main freshness, then obtain a fresh independent prompt/documentation audit before Ready/merge
 ```

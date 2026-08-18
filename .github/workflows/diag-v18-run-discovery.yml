@@ -1,4 +1,4 @@
-name: Diagnostic live VNC observer v23
+name: Diagnostic existing noVNC 6082
 
 on:
   push:
@@ -21,12 +21,12 @@ jobs:
           ref: diag/OTC-20260818-v18-run-discovery
           persist-credentials: true
           fetch-depth: 1
-      - name: Discover current live VNC run
+      - name: Discover noVNC inspect run
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TARGET_SHA: 74e19cda655932feeedb12e55e90984cd9247a15
-          TARGET_PATH: .github/workflows/track-a-vnc-observer-live-v23.yml
+          TARGET_SHA: fe9af5530e7c95f8e970291ccc864c8899a2edd2
+          TARGET_PATH: .github/workflows/track-a-vnc-existing-novnc-inspect-v23.yml
         run: |
           set -Eeuo pipefail
           api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$TARGET_SHA&event=push&per_page=50"
@@ -41,12 +41,12 @@ jobs:
           one="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
           jobs="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100")"
           mkdir -p .diag
-          jq -n --argjson run_id "$run_id" --arg status "$(jq -r '.status'<<<"$one")" --arg conclusion "$(jq -r '.conclusion//""'<<<"$one")" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion,steps:[.steps[]|{number,name,status,conclusion}]}]'<<<"$jobs")" '{schema:"v23-live-vnc-current-v2",run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/v23-live-vnc-current.json
+          jq -n --argjson run_id "$run_id" --arg status "$(jq -r '.status'<<<"$one")" --arg conclusion "$(jq -r '.conclusion//""'<<<"$one")" --argjson jobs "$(jq '[.jobs[]|{id,name,status,conclusion}]'<<<"$jobs")" '{run_id:$run_id,status:$status,conclusion:$conclusion,jobs:$jobs}' >.diag/novnc-inspect-status.json
       - name: Persist current status
         shell: bash
         run: |
           set -Eeuo pipefail
           git config user.name 'github-actions[bot]';git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .diag/v23-live-vnc-current.json
-          git commit -m 'diag(track-a): refresh corrected live VNC status'
+          git add .diag/novnc-inspect-status.json
+          git commit -m 'diag(track-a): persist noVNC inspect status'
           git push origin HEAD:diag/OTC-20260818-v18-run-discovery

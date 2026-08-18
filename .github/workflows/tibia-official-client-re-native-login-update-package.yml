@@ -20,7 +20,7 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 12
     env:
-      BASE_SHA: a10df477ce88183718ed855386ef96ba25b66320
+      BASE_SHA: ebb b36f50076ff4072c7218e302614c1dfea00b1
       TASK: OTC-20260818-native-login-to-ingame-e2e
       LEASE_SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
       BASE: /home/runner/_work/_otclient_tibia_re_state
@@ -113,7 +113,6 @@ jobs:
           [[ "$(stat -c %s "$client")" == "$OLD_SIZE" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$OLD_SHA" ]]
           stop_package_clients
-          # There must be no live official package client before bytes change.
           for e in /proc/[0-9]*/exe; do
             [[ -e "$e" ]] || continue
             [[ "$(readlink -f "$e" 2>/dev/null || true)" != "$(readlink -f "$client")" ]]
@@ -252,7 +251,6 @@ jobs:
           echo "PACKAGE_UPDATE_NEW_CLIENT_SHA256=$new_sha"
           echo "PACKAGE_UPDATE_NEW_CLIENT_SIZE=$(stat -c %s "$client")"
 
-          # Stop updater-owned GUI processes before accepting the package.
           stop_pid "$launcher_pid"; launcher_pid=''
           stop_package_clients
           stop_pid "$xvfb_pid"; xvfb_pid=''

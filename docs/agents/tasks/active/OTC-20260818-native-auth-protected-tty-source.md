@@ -1,6 +1,6 @@
 ---
 task_id: OTC-20260818-native-auth-protected-tty-source
-status: implementing
+status: validating
 agent: ChatGPT
 session_id: chatgpt-native-auth-protected-tty-20260818
 session_role: implementer
@@ -8,13 +8,14 @@ project_lane: otclient
 lane: P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: implement
+phase: validate
 execution_mode: github_only
 execution_reason: implement and validate a protected interactive secret source without touching the serialized physical runtime
 branch: feat/OTC-20260818-native-auth-protected-tty-source
 base_branch: main
 base_main: ed09418b431c28087775b419f85bed404fa85d70
-updated: 2026-08-18T09:32:00+02:00
+related_pr: 510
+updated: 2026-08-18T09:43:00+02:00
 risk: critical
 implementation_authorized: true
 credentials_allowed: false
@@ -57,11 +58,11 @@ context_score: 4
 estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one bounded protected secret-ingress helper plus deterministic no-secret tests
-validation_level: focused
+validation_level: component
 invocation_started_at: 2026-08-18T09:32:00+02:00
-last_progress_at: 2026-08-18T09:32:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+last_progress_at: 2026-08-18T09:43:00+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: draft-component
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
@@ -94,7 +95,7 @@ This repository task does not read real credentials, does not execute the offici
 
 - CLI accepts no email/password values, credential paths, environment-secret names or plaintext secret files.
 - Real secret entry is only from `/dev/tty`; both account identifier and password are entered with terminal echo disabled.
-- Secret input uses preallocated mutable buffers; helper best-effort locks those pages with `mlock`, wipes them before release and disables core dumps/dumpability before reading secrets.
+- Secret input uses preallocated mutable buffers; helper requires `mlock`, wipes those buffers before release and disables core dumps/dumpability before reading secrets.
 - Build the credential frame directly into an anonymous `memfd_create(..., MFD_ALLOW_SEALING)` descriptor; no plaintext staging file.
 - Require `F_SEAL_SEAL|F_SEAL_SHRINK|F_SEAL_GROW|F_SEAL_WRITE` before handoff.
 - Load only non-secret runtime identity from an explicit absolute JSON path and require exact client `15.32.df7b29`, size `51965216`, SHA `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`.
@@ -117,16 +118,36 @@ GitHub-hosted tests use synthetic values only and must prove:
 
 # Current physical-runtime boundary
 
-PR #475 remains the serialized physical owner on head `135c808d40934e3f9dfafe8cb0efb83aade92858`; its V24 workflow deliberately holds a no-secret/no-login client/VNC observer for up to 360 minutes. This task is `runtime_access:none` and must not observe, attach to, stop, inject into or otherwise mutate that runtime.
+PR #475 remains the serialized physical owner on head `135c808d40934e3f9dfafe8cb0efb83aade92858`. Its V24 workflow deliberately holds a no-secret/no-login exact client plus view-only VNC observer for up to 360 minutes; the latest durable owner reconciliation is still inside that declared window. The connector cannot currently prove the push-workflow terminal state, so current ownership remains fail-closed and this task stays `runtime_access:none`.
+
+# Current implementation
+
+Draft PR #510 now contains:
+
+- `protected_auth_tty.py`: hidden controlling-TTY capture into required-mlock mutable buffers, RLIMIT_CORE=0/PR_SET_DUMPABLE=0, exact runtime identity validation, sealed anonymous memfd construction and delegation to the merged descriptor-only auth client;
+- `PROTECTED_AUTH_TTY.md`: security and physical-use boundary;
+- `test_protected_auth_tty.py`: synthetic pseudo-TTY, exact identity, wipe, seal and sanitizer tests;
+- `track-a-native-auth-protected-tty.yml`: GitHub-hosted no-secret validation with exact dependency-blob fences.
+
+The first aggregate CI snapshot on implementation head `027afb000e171d6a7dce7b09cbf8dd36d1fcc984` observed:
+
+```text
+CI 32112655654 = pending
+Track A native auth bridge validation 32112655421 = in_progress
+Track A protected TTY native-auth source 32112655515 = in_progress
+Track A agent runtime governance 32112655470 = in_progress
+```
+
+No physical runtime or credential operation occurred.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 1
-status: implementing
-last_completed_step: live-state preflight confirmed PR #475 is still inside its V24 ownership window and merged #507 leaves protected root credential acquisition as the remaining safe-prep frontier
+checkpoint_version: 2
+status: validating
+last_completed_step: opened Draft PR #510 and implemented the protected controlling-TTY -> sealed memfd source plus synthetic validation workflow while leaving PR #475 runtime untouched
 blockers: []
-next_action: open a Draft PR and implement the no-secret protected TTY -> sealed memfd producer with deterministic pseudo-TTY/memfd tests
+next_action: inspect one aggregate snapshot of checks on the checkpoint descendant head; on failure inspect only the first causal failing job, otherwise perform final diff/security audit and freeze final evidence
 ```
 
 ## Recovery checkpoint
@@ -134,22 +155,22 @@ next_action: open a Draft PR and implement the no-secret protected TTY -> sealed
 ```yaml
 recovery:
   policy_version: 1
-  generation: 1
+  generation: 2
   session_id: chatgpt-native-auth-protected-tty-20260818
   session_started_at: 2026-08-18T09:32:00+02:00
-  checkpointed_at: 2026-08-18T09:32:00+02:00
-  last_progress_at: 2026-08-18T09:32:00+02:00
-  phase: implementation
-  exact_head: ed09418b431c28087775b419f85bed404fa85d70
-  pull_request: none
-  active_operation: none
-  external_run_ids: []
-  operation_started_at: null
+  checkpointed_at: 2026-08-18T09:43:00+02:00
+  last_progress_at: 2026-08-18T09:43:00+02:00
+  phase: component_validation
+  exact_head: 027afb000e171d6a7dce7b09cbf8dd36d1fcc984
+  pull_request: 510
+  active_operation: draft component CI
+  external_run_ids: [32112655654, 32112655421, 32112655515, 32112655470]
+  operation_started_at: 2026-08-18T09:41:00+02:00
   wait_deadline_at: null
-  check_generation: draft
-  checks_used: 0
+  check_generation: draft-component
+  checks_used: 1
   status: active
   safe_to_resume: true
-  resume_condition: task branch remains non-conflicting and runtime_access remains none
-  next_action: open Draft PR and implement protected_auth_tty.py plus synthetic tests
+  resume_condition: PR #510 remains non-conflicting and runtime_access remains none
+  next_action: inspect one aggregate snapshot of the checkpoint-descendant checks; if green, perform final diff/security audit; if failed, inspect only the first causal failing job
 ```

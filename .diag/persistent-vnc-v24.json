@@ -1,0 +1,32 @@
+{
+  "schema": "persistent-vnc-v24-current",
+  "run_id": 32101237392,
+  "live": {
+    "id": 95602038297,
+    "run_id": 32101237392,
+    "workflow_name": "Track A live VNC observer v24",
+    "head_branch": "runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation",
+    "run_url": "https://api.github.com/repos/blakinio/otclient/actions/runs/32101237392",
+    "run_attempt": 1,
+    "node_id": "CR_kwDOTVmdjs8AAAAWQlNWGQ",
+    "head_sha": "135c808d40934e3f9dfafe8cb0efb83aade92858",
+    "url": "https://api.github.com/repos/blakinio/otclient/actions/jobs/95602038297",
+    "html_url": "https://github.com/blakinio/otclient/actions/runs/32101237392/job/95602038297",
+    "status": "completed",
+    "conclusion": "skipped",
+    "created_at": "2026-08-18T05:00:47Z",
+    "started_at": "2026-08-18T05:00:47Z",
+    "completed_at": "2026-08-18T05:00:47Z",
+    "name": "live",
+    "steps": [],
+    "check_run_url": "https://api.github.com/repos/blakinio/otclient/check-runs/95602038297",
+    "labels": [
+      "otclient",
+      "synology"
+    ],
+    "runner_id": null,
+    "runner_name": null,
+    "runner_group_id": null,
+    "runner_group_name": null
+  }
+}

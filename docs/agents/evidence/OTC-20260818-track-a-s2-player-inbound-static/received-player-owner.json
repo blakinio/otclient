@@ -1,0 +1,94 @@
+{
+  "schema": "track-a-s2-player-received-owner-v1",
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "producer": {
+    "run": 32115662884,
+    "job": 95644479664,
+    "head": "ea22c8db751f82fff17ae22c2be4f4fc3cd0420d",
+    "artifact": 9316573491,
+    "artifact_digest": "sha256:ec97899357f6db77d45cf915d9133c778d48469f03628ea8914d6402ca3aca8f"
+  },
+  "global_qmeta_census": {
+    "valid_metaobjects": 708,
+    "target_match_count": 5,
+    "target_owner_classes": ["tibia::protocol::TProtocolMessageQueue"]
+  },
+  "owner": {
+    "class_name": "tibia::protocol::TProtocolMessageQueue",
+    "static_metaobject": "0x3085b60",
+    "static_metacall": "0xdf5fe0",
+    "method_count": 355,
+    "signal_count": 192,
+    "dispatch_table": "0x1d8bd6c",
+    "unique_full_range_dispatch_table": true
+  },
+  "targets": [
+    {
+      "method_index": 34,
+      "name": "receivedPlayerDataCurrentMessage",
+      "argc": 1,
+      "is_signal": true,
+      "parameter_type": "tibia::protobuf::protocol::GameserverMessagePlayerDataCurrent",
+      "dispatch_target": "0xdf8bc1",
+      "signal_activate_index": 34,
+      "signal_stub_calls": "QMetaObject::activate@0x4dedc0"
+    },
+    {
+      "method_index": 43,
+      "name": "receivedPlayerDataBasicMessage",
+      "argc": 1,
+      "is_signal": true,
+      "parameter_type": "tibia::protobuf::protocol::GameserverMessagePlayerDataBasic",
+      "dispatch_target": "0xdf8d3b",
+      "signal_activate_index": 43,
+      "signal_stub_calls": "QMetaObject::activate@0x4dedc0"
+    },
+    {
+      "method_index": 48,
+      "name": "receivedPlayerStateMessage",
+      "argc": 1,
+      "is_signal": true,
+      "parameter_type": "tibia::protobuf::protocol::GameserverMessagePlayerState",
+      "dispatch_target": "0xdf8e0d",
+      "signal_activate_index": 48,
+      "signal_stub_calls": "QMetaObject::activate@0x4dedc0"
+    },
+    {
+      "method_index": 49,
+      "name": "receivedPlayerSkillsMessage",
+      "argc": 1,
+      "is_signal": true,
+      "parameter_type": "tibia::protobuf::protocol::GameserverMessagePlayerSkills",
+      "dispatch_target": "0xdf8e37",
+      "signal_activate_index": 49,
+      "signal_stub_calls": "QMetaObject::activate@0x4dedc0"
+    },
+    {
+      "method_index": 117,
+      "name": "receivedPlayerInventoryMessage",
+      "argc": 1,
+      "is_signal": true,
+      "parameter_type": "tibia::protobuf::protocol::GameserverMessagePlayerInventory",
+      "dispatch_target": "0xdf899f",
+      "signal_activate_index": 117,
+      "signal_stub_calls": "QMetaObject::activate@0x4dedc0"
+    }
+  ],
+  "classification": {
+    "received_player_signal_owner": "FACT:tibia::protocol::TProtocolMessageQueue",
+    "received_player_qmeta_signatures": "FACT",
+    "received_player_signal_stubs": "FACT",
+    "protobuf_type_to_queue_signal_contract": "FACT_STATIC_QMETA_CONTRACT",
+    "network_decoder_to_queue_signal_emission": "UNKNOWN",
+    "queue_signal_to_TPlayerProtocolMessageHandler_connection": "UNKNOWN",
+    "TPlayerProtocolMessageHandler_to_TPlayerData_mutation": "UNKNOWN"
+  },
+  "runtime_access": "none",
+  "client_executed": false,
+  "secret_access": false,
+  "pr475_runtime_touched": false
+}

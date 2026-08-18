@@ -1,0 +1,179 @@
+name: Track A native-login post-launcher inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-post-launcher-inventory.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    name: Read-only package, process, X11 and VNC inventory after launcher exit
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
+      TASK: OTC-20260818-native-login-to-ingame-e2e
+      BASE: /home/runner/_work/_otclient_tibia_re_state
+      WORKBASE: /work/_otclient_tibia_re_state
+      TARGET_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+      TARGET_SIZE: '52109920'
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Inspect post-launcher runtime without mutation
+        shell: bash
+        env:
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
+          echo POST_LAUNCHER_MUTATION=false
+          echo POST_LAUNCHER_SECRET_ACCESS=false
+          echo POST_LAUNCHER_LOGIN=false
+
+          task=docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
+          grep -q '^task_id: OTC-20260818-native-login-to-ingame-e2e$' "$task"
+          grep -q '^status: validating$' "$task"
+          grep -q '^credentials_allowed: false$' "$task"
+          grep -q '^login_allowed: false$' "$task"
+
+          package_root="$BASE/home/.local/share/CipSoft GmbH/Tibia"
+          package="$package_root/packages/Tibia"
+          client="$package/bin/client"
+          live="$BASE/native-login-update/live"
+          session="$live/session.json"
+          tool="$WORKBASE/toolroot"
+
+          python3 - "$package_root" "$client" "$TARGET_SHA" "$TARGET_SIZE" <<'PY'
+          import hashlib,os,pathlib,re,stat,sys
+          root=pathlib.Path(sys.argv[1]); client=pathlib.Path(sys.argv[2]); target_sha=sys.argv[3]; target_size=int(sys.argv[4])
+          print('POST_PACKAGE_ROOT_EXISTS='+str(root.exists()).lower())
+          print('POST_PACKAGE_DIR_EXISTS='+str(client.parent.parent.exists()).lower())
+          print('POST_CLIENT_EXISTS='+str(client.exists()).lower())
+          if client.exists():
+              st=client.lstat()
+              print('POST_CLIENT_IS_SYMLINK='+str(stat.S_ISLNK(st.st_mode)).lower())
+              print('POST_CLIENT_IS_REGULAR='+str(stat.S_ISREG(st.st_mode)).lower())
+              print('POST_CLIENT_EXECUTABLE='+str(os.access(client,os.X_OK)).lower())
+              if stat.S_ISREG(st.st_mode):
+                  h=hashlib.sha256(); versions=[]
+                  with client.open('rb') as f:
+                      while True:
+                          b=f.read(4*1024*1024)
+                          if not b: break
+                          h.update(b)
+                          for pat in (rb'\b1[0-9]\.[0-9]{2}(?:\.[A-Za-z0-9]+)?\b', rb'\b[0-9]{1,2}\.[0-9]{2}\.[A-Fa-f0-9]{6,16}\b'):
+                              for m in re.finditer(pat,b):
+                                  s=m.group().decode('ascii','ignore')
+                                  if s not in versions and len(versions)<40: versions.append(s)
+                  sha=h.hexdigest()
+                  print('POST_CLIENT_SIZE='+str(st.st_size))
+                  print('POST_CLIENT_SHA256='+sha)
+                  print('POST_CLIENT_VERSION_STRINGS='+','.join(versions))
+                  print('POST_CLIENT_MATCHES_TARGET='+str(st.st_size==target_size and sha==target_sha).lower())
+          if root.exists():
+              rows=[]
+              for p in root.rglob('*'):
+                  try:
+                      rel=p.relative_to(root)
+                      if len(rel.parts)>5: continue
+                      if p.is_symlink(): kind='symlink'; size=0
+                      elif p.is_dir(): kind='dir'; size=0
+                      elif p.is_file(): kind='file'; size=p.stat().st_size
+                      else: kind='other'; size=0
+                      rows.append((str(rel),kind,size))
+                  except OSError: pass
+              rows.sort()
+              print('POST_PACKAGE_TREE_COUNT='+str(len(rows)))
+              for rel,kind,size in rows[:300]: print(f'POST_PACKAGE_TREE={kind}\t{size}\t{rel}')
+          PY
+
+          python3 - "$BASE" <<'PY'
+          import os,pathlib,sys
+          base=str(pathlib.Path(sys.argv[1]).resolve())
+          found=[]
+          for p in pathlib.Path('/proc').iterdir():
+              if not p.name.isdigit(): continue
+              try:
+                  env=(p/'environ').read_bytes().split(b'\0'); args=(p/'cmdline').read_bytes().split(b'\0')
+              except OSError: continue
+              role=''; track=''; display=''; home=''
+              for raw in env:
+                  if b'=' not in raw: continue
+                  k,v=raw.split(b'=',1)
+                  if k==b'OTCLIENT_TIBIA_RE_ROLE': role=v.decode('utf-8','replace')
+                  elif k==b'OTCLIENT_TIBIA_RE_TRACK': track=v.decode('utf-8','replace')
+                  elif k==b'DISPLAY': display=v.decode('utf-8','replace')
+                  elif k==b'HOME': home=v.decode('utf-8','replace')
+              try: exe=os.path.realpath(os.readlink(p/'exe'))
+              except OSError: exe=''
+              arg_text=' '.join(a.decode('utf-8','replace') for a in args if a)
+              relevant=(track=='official-client-re' or role.startswith('native-login') or role=='official-updater' or exe.startswith(base+os.sep) or 'CipSoft GmbH/Tibia' in arg_text)
+              if not relevant: continue
+              found.append((int(p.name),os.path.basename(exe),role,track,display,home==base+'/home'))
+          found.sort()
+          print('POST_RELEVANT_PROCESS_COUNT='+str(len(found)))
+          for pid,exe,role,track,display,home_ok in found:
+              print(f'POST_PROCESS=pid:{pid}\texe:{exe}\trole:{role}\ttrack:{track}\tdisplay:{display}\thome_is_task:{str(home_ok).lower()}')
+          PY
+
+          if [[ -f "$session" ]]; then
+            python3 - "$session" <<'PY'
+          import json,pathlib,sys,urllib.request
+          p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text())
+          print('POST_VNC_SESSION_PRESENT=true')
+          print('POST_VNC_PHASE='+str(x.get('phase','')))
+          print('POST_VNC_DISPLAY='+str(x.get('display','')))
+          print('POST_VNC_LAN_PORT='+str(x.get('lan_port','')))
+          for k in ('xvfb_pid','vnc_pid','websockify_pid'):
+              v=x.get(k); print('POST_VNC_'+k.upper()+'_LIVE='+str(isinstance(v,int) and pathlib.Path('/proc/'+str(v)).is_dir()).lower())
+          ip=x.get('lan_ip'); port=x.get('lan_port'); marker=x.get('marker')
+          ok=False
+          if isinstance(ip,str) and isinstance(port,int) and isinstance(marker,str):
+              try:
+                  with urllib.request.urlopen(f'http://{ip}:{port}/health.txt',timeout=4) as r: ok=(r.read().decode().strip()==marker)
+              except Exception: pass
+          print('POST_VNC_LAN_HTTP='+('PASS' if ok else 'FAIL'))
+          PY
+          else
+            echo POST_VNC_SESSION_PRESENT=false
+          fi
+
+          display="$(python3 - "$session" <<'PY'
+          import json,pathlib,sys
+          p=pathlib.Path(sys.argv[1])
+          if p.is_file():
+              try: print(json.loads(p.read_text()).get('display',''))
+              except Exception: print('')
+          else: print('')
+          PY
+          )"
+          if [[ "$display" =~ ^:[0-9]+$ && -x "$tool/usr/bin/xdotool" ]]; then
+            DISPLAY="$display" "$tool/usr/bin/xdotool" search --onlyvisible --name '.*' 2>/dev/null | head -n 100 | while read -r wid; do
+              [[ "$wid" =~ ^[0-9]+$ ]] || continue
+              title="$(DISPLAY="$display" "$tool/usr/bin/xdotool" getwindowname "$wid" 2>/dev/null || true)"
+              title="${title//$'\n'/ }"; title="${title//$'\r'/ }"
+              printf 'POST_X11_WINDOW=id:%s\ttitle:%s\n' "$wid" "$title"
+            done
+          fi
+          echo POST_LAUNCHER_INVENTORY_RESULT=PASS_READ_ONLY

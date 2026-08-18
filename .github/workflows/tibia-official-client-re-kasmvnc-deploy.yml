@@ -1,5 +1,6 @@
 name: Track A KasmVNC deploy
 
+# Runner scheduling refresh: synology-otclient-01 confirmed online/idle on 2026-08-18.
 on:
   pull_request:
     types: [opened, synchronize, reopened]

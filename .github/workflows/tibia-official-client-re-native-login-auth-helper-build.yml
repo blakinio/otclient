@@ -1,0 +1,101 @@
+name: Track A native-login auth-helper build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-auth-helper-build.yml
+      - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-native-login-auth-helper-build
+  cancel-in-progress: false
+
+jobs:
+  build-helper:
+    name: Build exact experimental auth helper without client access
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Validate authority metadata and build helper only
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_BASE_SHA" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EVENT_BASE_SHA" --expected-branch "$HEAD_BRANCH"
+
+          state='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+          python3 - "$state/lease.json" "$state/runtime-registration.json" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          reg=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert lease.get('status')=='active'
+          assert lease.get('generation')==11
+          assert lease.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert lease.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3'
+          assert reg.get('registration_generation')==3
+          assert reg.get('lease_generation')==11
+          assert reg.get('client_sha256')=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          print('NATIVE_LOGIN_AUTH_HELPER_BUILD_AUTHORITY=ACTIVE_GEN11_REG3_11')
+          PY
+
+          command -v cmake >/dev/null || { echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_CMAKE=false'; exit 41; }
+          command -v c++ >/dev/null || { echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_CXX=false'; exit 42; }
+          echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_CMAKE=true'
+          echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_CXX=true'
+
+          root="${RUNNER_TEMP}/native-login-auth-helper-${GITHUB_RUN_ID}"
+          rm -rf "$root"
+          mkdir -p "$root/build" "$root/out"
+          cmake -S tools/tibia_runtime_bridge -B "$root/build" \
+            -DOTCLIENT_TIBIA_RE_BUILD_EXPERIMENTAL_AUTH=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY="$root/out" \
+            >"$root/cmake.log" 2>&1 || {
+              if grep -Eq 'Qt6|Qt6Config|Could not find.*Qt' "$root/cmake.log"; then
+                echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_QT6_DEV=false'
+                exit 43
+              fi
+              echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_CONFIGURE=false'
+              exit 44
+            }
+          echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_QT6_DEV=true'
+          cmake --build "$root/build" --target otclient_tibia_native_auth_experimental --parallel 2 >"$root/build.log" 2>&1 || {
+            echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_COMPILE=false'
+            exit 45
+          }
+          helper="$root/out/otclient-tibia-native-auth-experimental.so"
+          [[ -f "$helper" && ! -L "$helper" && -s "$helper" ]]
+          sha="$(sha256sum "$helper" | awk '{print $1}')"
+          size="$(stat -c %s "$helper")"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$size" =~ ^[1-9][0-9]*$ ]]
+          echo "NATIVE_LOGIN_AUTH_HELPER_BUILD_SHA256=$sha"
+          echo "NATIVE_LOGIN_AUTH_HELPER_BUILD_SIZE=$size"
+          echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_RESULT=PASS'
+          echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_CLIENT_OBSERVATION=false'
+          echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_CLIENT_MUTATION=false'
+          echo 'NATIVE_LOGIN_AUTH_HELPER_BUILD_SECRET_ACCESS=false'
+          rm -rf "$root"

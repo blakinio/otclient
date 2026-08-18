@@ -2,23 +2,25 @@
 
 ```yaml
 report_date: 2026-08-18
+refreshed_at: 2026-08-18T16:08:00+02:00
 repository: blakinio/otclient
 track: official-client-re
 subject: official native Linux Tibia client only
 snapshot_main: ebbb36f50076ff4072c7218e302614c1dfea00b1
 source_checklist: docs/agents/reports/OTCLIENT-20260818-full-client-re-100-percent-checklist.md
+current_refresh_overlay: docs/agents/reports/OTCLIENT-20260818-full-client-re-current-refresh.md
 task: OTC-20260818-track-a-full-client-re-coverage-audit
 pr: 536
 status_rows_total: 169
 done: 10
-partial: 64
+partial: 65
 not_started: 86
-blocked: 9
+blocked: 8
 ```
 
 ## Matrix contract
 
-This file is a compact matrix projection of the canonical 169-row checklist. It does not create new evidence or promote any row. Full subsystem names, evidence keys and exact remaining proof are authoritative in `OTCLIENT-20260818-full-client-re-100-percent-checklist.md`.
+This file is the compact current matrix projection of the canonical 169-row checklist plus the current refresh overlay. It does not create new evidence. Full subsystem names and the original evidence boundary remain authoritative in `OTCLIENT-20260818-full-client-re-100-percent-checklist.md`; post-snapshot deltas are authoritative in `OTCLIENT-20260818-full-client-re-current-refresh.md`.
 
 Status meanings:
 
@@ -33,7 +35,7 @@ The counts are row counts, not a weighted percentage of the client.
 
 | Area | DONE | PARTIAL | NOT STARTED | BLOCKED | TOTAL |
 |---|---:|---:|---:|---:|---:|
-| **A — Lifecycle / version / runtime / login / session** | 1 | 11 | 0 | 4 | 16 |
+| **A — Lifecycle / version / runtime / login / session** | 1 | 12 | 0 | 3 | 16 |
 | **B — Protocol inventory / transport** | 7 | 4 | 2 | 0 | 13 |
 | **C — Player state / native gameplay actions** | 0 | 21 | 0 | 1 | 22 |
 | **D — Creatures / inventory / equipment / containers / loot** | 0 | 13 | 12 | 0 | 25 |
@@ -41,15 +43,15 @@ The counts are row counts, not a weighted percentage of the client.
 | **F — Worldmap / minimap / render / observation** | 2 | 9 | 2 | 2 | 15 |
 | **G — Cyclopedia / progression / economy / feature systems** | 0 | 1 | 40 | 0 | 41 |
 | **H — Generic UI / action bars / options / health / update resilience** | 0 | 2 | 19 | 2 | 23 |
-| **TOTAL** | **10** | **64** | **86** | **9** | **169** |
+| **TOTAL** | **10** | **65** | **86** | **8** | **169** |
 
 ## 2. Full 169-row ID matrix
 
-Every checklist ID appears exactly once below.
+Every checklist ID appears exactly once below. `A01` is the only status delta in the 16:08 refresh.
 
 | Area | DONE | PARTIAL | NOT STARTED | BLOCKED |
 |---|---|---|---|---|
-| **A** | `A04` | `A02`, `A03`, `A05–A13` | — | `A01`, `A14–A16` |
+| **A** | `A04` | `A01–A03`, `A05–A13` | — | `A14–A16` |
 | **B** | `B01`, `B02`, `B05–B09` | `B03`, `B04`, `B12`, `B13` | `B10`, `B11` | — |
 | **C** | — | `C01–C09`, `C11–C22` | — | `C10` |
 | **D** | — | `D01–D05`, `D08–D11`, `D15–D18` | `D06`, `D07`, `D12–D14`, `D19–D25` | — |
@@ -71,28 +73,38 @@ Every checklist ID appears exactly once below.
 | **G** | Cyclopedia, Bestiary/charms, monster bonus effects, Bosstiary, Prey, Taskboard/Bounty/Weekly/Soul Seals, Skill Wheel, Forge, Imbuements, Weapon Proficiency, Quest Log/Tracker, Houses, Market, Store, rewards, character/account panels, Calendar/News, Highscores, Hirelings, podium, offline training, vocation/tutorial, inspect/item info and Outfit Memorial |
 | **H** | modal/death/logout UI, context menus, generic dialogs, drag/drop, action bars, hotkeys, multi-action buttons, graphics/audio/interface/gameplay options, settings persistence, sound events, network/FPS/latency state, passive anti-cheat/session signals, sessiondump lead, updater/current-client revalidation and full-client coverage registry |
 
-## 4. Critical dependency matrix
+## 4. Current-package evidence matrix
+
+| Evidence | Current result | Consequence |
+|---|---|---|
+| Obsolete researched runtime build | `15.32.df7b29`, size `51965216`, SHA `e6c244bd...`; live UI says too old | historical offsets/QMeta/vptr/helper assumptions are not current-build authority |
+| Current-official read-only package probe #528 | run/job `32140385842 / 95721374178`; packed SHA `1fc26d66...`; unpacked SHA `ed5469b9...`; unpacked size `52109920` | `A01` becomes `PARTIAL`; current upstream package fingerprint exists |
+| Canonical on-disk source-package `bin/client` | `UNKNOWN` after the latest updater failed closed before package mutation | read-only stat+SHA and manifest reconciliation are still required before updater mutation/current-build RE |
+| Current login E2E | `CHARACTER_ACTUALLY_LOGGED_INTO_GAME=NO` | no semantic runtime row is promoted by the package fingerprint alone |
+
+## 5. Critical dependency / active-frontier matrix
 
 | Dependency / proof gate | Current state | Main affected rows | Required transition |
 |---|---|---|---|
-| **Current official client fence** | `BLOCKED` | `A01`, `A14–A16`, `H20–H22` plus every old-address-sensitive runtime row | acquire legitimate current Linux client → record exact version/size/SHA-256 |
-| **Current-build RE refresh** | `BLOCKED_BY_CURRENT_FENCE` | auth helper, QMeta/vptr/offset/instruction-sensitive rows | re-prove exact-build contracts before reuse |
+| **Current official client fence** | `PARTIAL` | `A01`, `A14–A16`, `H20–H22` plus old-address-sensitive runtime rows | reconcile canonical source-package `bin/client` with the current official manifest/fingerprint, then establish the exact current client fence |
+| **Current-build RE refresh** | `BLOCKED_BY_FULL_CURRENT_FENCE` | auth helper, QMeta/vptr/offset/instruction-sensitive rows | re-prove exact-build contracts before reuse |
 | **Causal structural IN_GAME** | `BLOCKED` | `A14`, `A15`, `C10` and most `LIVE-STATE`/`LIVE-ACTION` work | native auth → character selection → game-server login → structural world-state proof |
-| **Authoritative player XYZ** | `BLOCKED` | `C10` | causal movement correlation against current `IN_GAME` runtime |
-| **Worldmap server-delivery causality** | `BLOCKED` | `F08`, `F10` | complete authorized PR #475 baseline `[18,14]` vs `[19,14]` discriminator |
+| **Authoritative player XYZ** | `BLOCKED` | `C10` | causal movement correlation against a legal current `IN_GAME` runtime |
+| **Worldmap server-delivery causality** | `BLOCKED` | `F08`, `F10` | complete PR #475's own legal causal evidence path; no result is promoted by this coverage PR |
+| **S10 action→protocol code-window harvest** | `IN_PROGRESS` on PR #539 | especially `B04` and `C21` | direct retained code/dataflow/connect evidence for `sendMoveObject` → protocol owner → message producer, or fail closed with missing-window blocker |
 | **Core live-state semantics** | `OPEN` | player/creature/inventory/container/chat/world rows | queue/handler/storage/controller → authoritative live-value correlation |
-| **Core live-action semantics** | `OPEN` | movement/combat/use/container/chat actions | promoted S9 → exact dataflow/serialization → causal server/client effect |
+| **Core live-action semantics** | `OPEN` | movement/combat/use/container/chat actions | promoted S9 + exact dataflow/serialization (S10 is first active discriminator) → causal server/client effect |
 | **Options/settings semantic model** | `NOT_STARTED` | `H10–H14` | recover persistence/controller/storage model → safe read → reversible write/reload proof |
 | **Feature/economy waves** | `MOSTLY_NOT_STARTED` | majority of `G` plus parts of `D/E/H` | dedicated read-only G0/G1 packages; no spending/transfers for proof |
 | **Restart/update-stable bridge** | `BLOCKED` | `A15`, `A16`, `H21`, `H22` | current-build rediscovery + restart/relogin equivalence |
 
-## 5. Completion matrix
+## 6. Completion matrix
 
 | Programme condition | Required for 100% |
 |---|---|
 | All 169 IDs classified `DONE` | **YES** |
 | Static/QMeta/protobuf name alone sufficient | **NO** |
-| Current official-client version fenced | **YES** for runtime-sensitive claims |
+| Current official-client version/fence fully established | **YES** for runtime-sensitive claims |
 | Causal live state/action proof where required | **YES** |
 | Restart/relogin rediscovery | **YES** for stable bridge rows |
 | Client-update rediscovery | **YES** for update-resilience rows |
@@ -101,4 +113,4 @@ Every checklist ID appears exactly once below.
 
 ## Interpretation
 
-The matrix shows that the programme is strongest in protocol inventory/transport (`B`) and has substantial partial structural work in the core gameplay path (`A`, `C`, `D`, `F`). The largest untouched semantic surface is the feature/economy family (`G`), followed by generic UI/options/settings (`H`). The dominant cross-cutting blocker is the obsolete researched client build `15.32.df7b29`: current runtime-sensitive work must wait for a legitimate current-client fence and exact-build RE refresh rather than reusing historical addresses as if they were current.
+The programme remains strongest in protocol inventory/transport (`B`) and has substantial partial structural work in the core gameplay path (`A`, `C`, `D`, `F`). The largest untouched semantic surface is the feature/economy family (`G`), followed by generic UI/options/settings (`H`). The important change in this refresh is that current-client identification is no longer a total absence: #528 has a current upstream package fingerprint. The remaining package gate is narrower and concrete — reconcile the canonical on-disk source package, establish the full exact current fence, then redo current-build-sensitive RE. In parallel, #539/S10 is now the active non-runtime path for the first direct action-layer → protocol-layer code/dataflow edge.

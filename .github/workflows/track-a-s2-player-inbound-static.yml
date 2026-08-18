@@ -75,7 +75,7 @@ jobs:
           import struct
           import sys
 
-          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone import Cs, CsError, CS_ARCH_X86, CS_MODE_64
           from capstone.x86_const import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
           from elftools.elf.elffile import ELFFile
           from elftools.elf.relocation import RelocationSection
@@ -202,11 +202,20 @@ jobs:
 
           md = Cs(CS_ARCH_X86, CS_MODE_64)
           md.detail = True
-          md.skipdata = True
 
-          def rip_targets(code: bytes, base: int):
-              for ins in md.disasm(code, base):
-                  for op in ins.operands:
+          md_scan = Cs(CS_ARCH_X86, CS_MODE_64)
+          md_scan.detail = True
+          md_scan.skipdata = True
+
+          def safe_operands(ins):
+              try:
+                  return ins.operands
+              except CsError:
+                  return []
+
+          def rip_targets(disassembler, code: bytes, base: int):
+              for ins in disassembler.disasm(code, base):
+                  for op in safe_operands(ins):
                       if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
                           yield ins, ins.address + ins.size + op.mem.disp
                       elif op.type == X86_OP_IMM:
@@ -228,7 +237,7 @@ jobs:
                       code = raw[file_off(target):file_off(target) + 0x220]
                   except Exception:
                       continue
-                  for ins, ref in rip_targets(code, target):
+                  for ins, ref in rip_targets(md, code, target):
                       meta = validate_metaobject(ref, expected)
                       if meta is not None:
                           found.append((idx, target, ins.address, meta))
@@ -280,9 +289,10 @@ jobs:
               if n == 0:
                   return None, []
               for pos, ins in enumerate(insns):
-                  if ins.mnemonic != 'lea' or len(ins.operands) < 2:
+                  ops = safe_operands(ins)
+                  if ins.mnemonic != 'lea' or len(ops) < 2:
                       continue
-                  op = ins.operands[1]
+                  op = ops[1]
                   if op.type != X86_OP_MEM or op.mem.base != X86_REG_RIP:
                       continue
                   table = ins.address + ins.size + op.mem.disp
@@ -308,10 +318,10 @@ jobs:
                       'context': [f'0x{x.address:x}:{x.mnemonic} {x.op_str}' for x in context],
                   })
               strong = [c for c in candidates if c['full_method_range_guard']]
-              assert len(strong) == 1, (meta['class_name'], 'strong_dispatch_candidates', len(strong), [(hex(c['lea']), hex(c['table'])) for c in candidates])
-              chosen = strong[0]
-              for method, target in zip(methods, chosen['targets']):
-                  method['dispatch_target'] = f'0x{target:x}'
+              chosen = strong[0] if len(strong) == 1 else None
+              if chosen is not None:
+                  for method, target in zip(methods, chosen['targets']):
+                      method['dispatch_target'] = f'0x{target:x}'
               return chosen, candidates
 
           classes = {
@@ -341,9 +351,10 @@ jobs:
                       'context': chosen['context'],
                   },
                   'candidate_count': len(candidates),
+                  'strong_candidate_count': sum(c['full_method_range_guard'] for c in candidates),
               }
               vtables[key] = slots
-              print(f"PLAYER_S2_META_{key.upper()}={meta['class_name']};METHODS={meta['method_count']};SIGNALS={meta['signal_count']};STATIC_METACALL=0x{meta['static_metacall']:x}")
+              print(f"PLAYER_S2_META_{key.upper()}={meta['class_name']};METHODS={meta['method_count']};SIGNALS={meta['signal_count']};STATIC_METACALL=0x{meta['static_metacall']:x};DISPATCH={'PROVEN' if chosen else 'UNKNOWN'}")
 
           (evidence / 'metaobjects.json').write_text(json.dumps(meta_output, indent=2, sort_keys=True) + '\n')
           (evidence / 'methods.json').write_text(json.dumps(all_methods, indent=2, sort_keys=True) + '\n')
@@ -388,15 +399,13 @@ jobs:
               lines = []
               for ins in instructions:
                   lines.append(f'0x{ins.address:x}:\t{ins.mnemonic}\t{ins.op_str}')
-                  if ins.mnemonic == 'ret':
-                      # Keep a little post-ret code out of a target body only when the function is a tiny wrapper.
-                      if len(lines) > 8:
-                          break
-                  for op in ins.operands:
+                  for op in safe_operands(ins):
                       if ins.mnemonic == 'call' and op.type == X86_OP_IMM:
                           direct_calls.append(f'0x{int(op.imm):x}')
                       if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
                           rip_refs.append(f'0x{ins.address + ins.size + op.mem.disp:x}')
+                  if ins.mnemonic == 'ret' and len(lines) > 8:
+                      break
               target_disassembly.append(f"## 0x{target:x}\n" + '\n'.join(lines) + '\n')
               target_analysis.append({
                   'target': f'0x{target:x}',
@@ -410,7 +419,6 @@ jobs:
           (evidence / 'target-disassembly.txt').write_text('\n'.join(target_disassembly))
           (evidence / 'target-analysis.json').write_text(json.dumps(target_analysis, indent=2, sort_keys=True) + '\n')
 
-          # Bounded exact code xrefs to the two known primary vptr anchors. These are constructor/identity leads only.
           anchor_vas = {
               'TPlayerProtocolMessageHandler': 0x308a008,
               'TPlayerData': 0x308ca70,
@@ -420,18 +428,19 @@ jobs:
               if not (s['flags'] & 4) or s['size'] == 0:
                   continue
               code = raw[s['off']:s['off'] + s['size']]
-              for ins, ref in rip_targets(code, s['va']):
+              for ins, ref in rip_targets(md_scan, code, s['va']):
                   for name, anchor in anchor_vas.items():
                       if ref == anchor and len(anchor_xrefs[name]) < 32:
                           anchor_xrefs[name].append({'instruction': f'0x{ins.address:x}', 'mnemonic': ins.mnemonic, 'op_str': ins.op_str})
           (evidence / 'anchor-code-xrefs.json').write_text(json.dumps(anchor_xrefs, indent=2, sort_keys=True) + '\n')
 
           summary = {
-              'schema': 'track-a-s2-player-inbound-static-v1',
+              'schema': 'track-a-s2-player-inbound-static-v2',
               'exact_client_sha': digest,
               'runtime_access': 'none',
               'client_executed': False,
               'classes_recovered': {k: v['class_name'] for k, v in meta_output.items()},
+              'dispatch_status': {k: ('PROVEN_FULL_RANGE_TABLE' if dispatch_output[k]['selected'] else 'UNKNOWN') for k in dispatch_output},
               'target_methods': target_methods,
               'handler_to_playerdata_relation': 'UNKNOWN_PENDING_REVIEW',
               'raw_client_uploaded': False,

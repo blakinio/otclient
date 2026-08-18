@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   inventory:
-    name: Prove isolated viewer and zero official-client candidates before start
+    name: Prove zero official-client candidates before fresh isolated start
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
     timeout-minutes: 6
@@ -64,53 +64,19 @@ jobs:
 
           state="$BASE/canonical-live-runtime"
           source_root="$BASE/home/.local/share/CipSoft GmbH/Tibia"
-          source_pkg="$source_root/packages/Tibia"
-          client="$source_pkg/bin/client"
-          viewer="$BASE/native-login-update/live/session.json"
+          client="$source_root/packages/Tibia/bin/client"
           tool=/work/_otclient_tibia_re_state/toolroot
+          viewer="$BASE/native-login-update/live/session.json"
 
           [[ -f "$client" && -x "$client" && ! -L "$client" ]]
           [[ "$(stat -c %s "$client")" == "$EXPECTED_SIZE" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_SHA" ]]
           [[ ! -e "$state/runtime-registration.json" ]]
           [[ ! -d "$state/session" ]]
-          [[ -f "$viewer" ]]
           [[ -d "$tool" && ! -L "$tool" ]]
-
-          readarray -t v < <(python3 - "$viewer" "$TASK" <<'PY'
-          import json,pathlib,sys
-          p=pathlib.Path(sys.argv[1]); x=json.loads(p.read_text()); task=sys.argv[2]
-          assert x.get('task')==task
-          assert x.get('phase') in ('vnc-ready','official-updater-running')
-          assert x.get('credentials_accessed') is False
-          assert x.get('client_started') is False
-          assert x.get('relay_network')=='host'
-          assert x.get('lan_ip')=='192.168.1.2'
-          assert x.get('rfb_port')==5901 and x.get('web_backend_port')==6081
-          for key in ('xvfb_pid','vnc_pid','websockify_pid'):
-              pid=int(x[key]); assert pathlib.Path('/proc')/str(pid)
-              assert (pathlib.Path('/proc')/str(pid)).is_dir(), (key,pid)
-          print(x['display'])
-          print(x['lan_port'])
-          print(x['marker'])
-          print(x['relay_name'])
-          print(x['relay_id'])
-          print(x['xvfb_pid'])
-          print(x['vnc_pid'])
-          print(x['websockify_pid'])
-          PY
-          )
-          display="${v[0]}"; lan_port="${v[1]}"; marker="${v[2]}"; relay_name="${v[3]}"; relay_id="${v[4]}"
-          [[ "$display" =~ ^:[0-9]+$ && "$lan_port" =~ ^[0-9]+$ ]]
-          [[ -S /tmp/.X11-unix/X${display#:} ]]
-          command -v docker >/dev/null
-          [[ -S /var/run/docker.sock ]]
-          [[ "$relay_name" == otclient-tibia-native-login-vnc-relay ]]
-          [[ "$(docker inspect -f '{{.Id}}' "$relay_name")" == "$relay_id" ]]
-          [[ "$(docker inspect -f '{{.State.Running}}' "$relay_name")" == true ]]
-          [[ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$relay_name")" == host ]]
-          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$relay_name")" == "$TASK" ]]
-          [[ "$(curl -fsS --max-time 5 "http://192.168.1.2:$lan_port/health.txt")" == "$marker" ]]
+          [[ -x "$tool/usr/bin/Xvfb" && -x "$tool/usr/bin/x11vnc" ]]
+          [[ -f "$state/warp/state/wgcf-profile.conf" ]]
+          [[ -x "$state/warp/bin/wireproxy" && ! -L "$state/warp/bin/wireproxy" ]]
 
           readarray -t counts < <(python3 - "$client" "$BASE" <<'PY'
           import pathlib,sys
@@ -122,29 +88,43 @@ jobs:
                   exe=(p/'exe').resolve(strict=True)
               except (OSError,RuntimeError):
                   continue
-              if exe==exact:
-                  exact_hits.append(int(p.name))
               text=str(exe)
+              if exe==exact: exact_hits.append(int(p.name))
               if exe.name=='client' and 'CipSoft GmbH/Tibia' in text and text.startswith(str(base)):
                   plausible.append((int(p.name),text))
-          print(len(exact_hits))
-          print(len(plausible))
+          print(len(exact_hits)); print(len(plausible))
           if exact_hits or plausible:
               raise SystemExit('official client candidate already present')
           PY
           )
           [[ "${counts[0]}" == 0 && "${counts[1]}" == 0 ]]
 
-          # Ensure no task-owned client-start runtime from an earlier attempt is still present.
           runtime="$BASE/native-login-visible-current-client"
           if [[ -e "$runtime/session.json" ]]; then
             python3 - "$runtime/session.json" <<'PY'
           import json,pathlib,sys
           x=json.loads(pathlib.Path(sys.argv[1]).read_text())
-          pid=x.get('client_pid')
-          if isinstance(pid,int) and (pathlib.Path('/proc')/str(pid)).exists():
-              raise SystemExit('task-owned visible client runtime already live')
+          for key in ('client_pid','xvfb_pid','vnc_pid','websockify_pid','wireproxy_pid'):
+              pid=x.get(key)
+              if isinstance(pid,int) and (pathlib.Path('/proc')/str(pid)).exists():
+                  raise SystemExit('task-owned visible runtime already live: '+key)
           PY
+          fi
+
+          viewer_state=ABSENT
+          if [[ -f "$viewer" ]]; then
+            viewer_state="$(python3 - "$viewer" <<'PY'
+          import json,pathlib,sys
+          x=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          keys=('xvfb_pid','vnc_pid','websockify_pid')
+          live=[]
+          for k in keys:
+              try: pid=int(x.get(k,0))
+              except Exception: pid=0
+              live.append(pid>1 and (pathlib.Path('/proc')/str(pid)).is_dir())
+          print('HEALTHY' if all(live) else 'STALE')
+          PY
+          )"
           fi
 
           echo VISIBLE_START_PREFLIGHT_RUNTIME_ACCESS=ephemeral_isolated
@@ -155,6 +135,6 @@ jobs:
           echo VISIBLE_START_PREFLIGHT_CANONICAL_SESSION=ABSENT
           echo VISIBLE_START_PREFLIGHT_EXACT_CLIENT_CANDIDATES=0
           echo VISIBLE_START_PREFLIGHT_ALL_TASKROOT_CIPSOFT_CLIENT_CANDIDATES=0
-          echo "VISIBLE_START_PREFLIGHT_DISPLAY=$display"
-          echo "VISIBLE_START_PREFLIGHT_VNC_URL=http://192.168.1.2:$lan_port/"
+          echo "VISIBLE_START_PREFLIGHT_OLD_VIEWER=$viewer_state"
+          echo VISIBLE_START_PREFLIGHT_FRESH_VIEWER_REQUIRED=true
           echo VISIBLE_START_PREFLIGHT_RESULT=PASS

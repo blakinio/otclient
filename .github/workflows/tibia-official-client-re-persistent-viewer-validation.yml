@@ -52,6 +52,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+          python3 .github/scripts/test_tibia_official_client_re-canonical-live-handoff.py 2>/dev/null || \
           python3 .github/scripts/test_tibia_official_client_re_canonical_live_handoff.py
 
       - name: Run replacement-session resume tests
@@ -145,17 +146,36 @@ jobs:
               'deploy': [
                   'kasmweb/ubuntu-noble-desktop:1.17.0',
                   'otclient-track-a-kasmvnc',
-                  '192.168.1.2',
+                  'HOST_IP: 127.0.0.1',
                   "HOST_PORT: '6901'",
                   '--restart unless-stopped',
                   'otclient.runtime=track-a-kasmvnc-desktop',
                   'curl -kfsS',
+                  'KASMVNC_DSM_REVERSE_PROXY_REQUIRED=true',
                   'KASMVNC_OFFICIAL_CLIENT_STARTED=false',
                   'KASMVNC_TIBIA_SECRET_ACCESS=false',
               ],
-              'contract': ['browser_desktop_provider: KasmVNC', 'https://192.168.1.2:6901', 'MUST NOT use `x11vnc`, `websockify` or noVNC'],
-              'adr': ['KasmVNC becomes the persistent browser desktop', 'https://192.168.1.2:6901/', 'noVNC is not part of the new path'],
-              'task': ['runtime_access: ephemeral_isolated', 'runtime_namespace: track-a-kasmvnc-desktop', 'credentials_allowed: false', 'login_allowed: false'],
+              'contract': [
+                  'browser_desktop_provider: KasmVNC',
+                  'public_frontend: DSM_reverse_proxy',
+                  '127.0.0.1:6901',
+                  'WebSocket',
+                  'MUST NOT use `x11vnc`, `websockify` or noVNC',
+              ],
+              'adr': [
+                  'KasmVNC becomes the persistent browser desktop',
+                  'DSM Reverse Proxy',
+                  'https://127.0.0.1:6901/',
+                  'noVNC is not part of the new path',
+              ],
+              'task': [
+                  'runtime_access: ephemeral_isolated',
+                  'runtime_namespace: track-a-kasmvnc-desktop',
+                  'kasm_backend_host: 127.0.0.1',
+                  'kasm_public_frontend: DSM_reverse_proxy',
+                  'credentials_allowed: false',
+                  'login_allowed: false',
+              ],
           }
           sources = {'handoff': handoff, 'resume': resume, 'probe': probe, 'deploy': deploy, 'contract': contract, 'adr': adr, 'task': task}
           for label, needles in required.items():
@@ -179,6 +199,8 @@ jobs:
               'os.getenv("TIBIA_TEST_EMAIL")',
               'os.getenv("TIBIA_TEST_PASSWORD")',
               'pkill ',
+              'HOST_IP: 192.168.1.2',
+              'KASM_PASSWORD:',
           ):
               if needle in forbidden:
                   raise SystemExit(f'AUDIT_FORBIDDEN_FAIL: {needle}')

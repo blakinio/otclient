@@ -19,7 +19,10 @@ try:
 except ImportError:  # pragma: no cover - Linux-only experimental auth surface
     fcntl = None
 
-from tools.tibia_runtime_bridge.experimental_auth_client import auth_with_credentials_fd
+from tools.tibia_runtime_bridge.experimental_auth_client import (
+    _is_memfd_link_target,
+    auth_with_credentials_fd,
+)
 from tools.tibia_runtime_bridge.experimental_auth_launcher import build_experimental_env
 from tools.tibia_runtime_bridge.ipc_client import (
     BridgeClientError,
@@ -281,7 +284,7 @@ class IpcClientTests(unittest.TestCase):
         hasattr(os, "memfd_create") and hasattr(os, "MFD_ALLOW_SEALING") and hasattr(socket, "SCM_RIGHTS") and fcntl is not None,
         "Linux memfd and SCM_RIGHTS required",
     )
-    def test_auth_fd_is_passed_without_client_consuming_or_rewinding_payload(self):
+    def test_auth_fd_is_passed_only_after_exact_peer_identity_check(self):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "auth.sock"
             observed: dict[str, object] = {}
@@ -293,7 +296,11 @@ class IpcClientTests(unittest.TestCase):
             frame = self.synthetic_credential_frame()
             fd = self.sealed_memfd(frame)
             try:
-                response = auth_with_credentials_fd(path, fd)
+                response = auth_with_credentials_fd(
+                    path,
+                    fd,
+                    expected_identity=self.expectation_for_pid(os.getpid()),
+                )
                 self.assertTrue(response["ok"])
                 self.assertEqual(b"AUTH_WITH_CREDENTIALS\n", observed["command"])
                 self.assertEqual(1, observed["fd_count"])
@@ -308,18 +315,43 @@ class IpcClientTests(unittest.TestCase):
         hasattr(os, "memfd_create") and hasattr(os, "MFD_ALLOW_SEALING") and fcntl is not None,
         "Linux memfd sealing required",
     )
-    def test_auth_rejects_unsealed_memfd_before_connect(self):
-        fd = os.memfd_create("otclient-tibia-auth-unsealed", os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING)
+    def test_auth_rejects_valid_memfd_without_explicit_runtime_identity(self):
+        fd = self.sealed_memfd(self.synthetic_credential_frame())
         try:
-            os.write(fd, self.synthetic_credential_frame())
             with self.assertRaises(BridgeClientError):
                 auth_with_credentials_fd(Path("/unused"), fd)
         finally:
             os.close(fd)
 
+    @unittest.skipUnless(
+        hasattr(os, "memfd_create") and hasattr(os, "MFD_ALLOW_SEALING") and fcntl is not None,
+        "Linux memfd sealing required",
+    )
+    def test_auth_rejects_unsealed_memfd_before_connect(self):
+        fd = os.memfd_create("otclient-tibia-auth-unsealed", os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING)
+        try:
+            os.write(fd, self.synthetic_credential_frame())
+            with self.assertRaises(BridgeClientError):
+                auth_with_credentials_fd(
+                    Path("/unused"),
+                    fd,
+                    expected_identity=self.expectation_for_pid(os.getpid()),
+                )
+        finally:
+            os.close(fd)
+
     def test_auth_rejects_invalid_fd(self):
         with self.assertRaises(BridgeClientError):
-            auth_with_credentials_fd(Path("/unused"), -1)
+            auth_with_credentials_fd(
+                Path("/unused"),
+                -1,
+                expected_identity=self.expectation_for_pid(os.getpid()),
+            )
+
+    def test_memfd_name_check_is_anchored(self):
+        self.assertTrue(_is_memfd_link_target("/memfd:otclient-secret (deleted)"))
+        self.assertTrue(_is_memfd_link_target("memfd:otclient-secret (deleted)"))
+        self.assertFalse(_is_memfd_link_target("/tmp/memfd:not-an-anonymous-memfd"))
 
     @unittest.skipUnless(hasattr(socket.socket, "recvmsg"), "recvmsg required")
     def test_normal_request_sends_no_ancillary_fd(self):
@@ -444,6 +476,7 @@ class IpcClientTests(unittest.TestCase):
         self.assertIn("COLD_AUTH_QMETA_INVOKE_FAILED", source)
         self.assertNotIn("EXECUTE_ADDRESS", source)
         self.assertNotIn("CALL_ADDRESS", source)
+        self.assertIn("explicit expected runtime identity is required", auth_client)
         self.assertNotIn("os.read(", auth_client)
         self.assertNotIn("os.pread(", auth_client)
 

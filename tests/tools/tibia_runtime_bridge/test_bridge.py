@@ -82,6 +82,21 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(str(directory / "bridge.sock"), env["OTCLIENT_TIBIA_RE_SOCKET"])
             self.assertEqual(str(directory / "auth.sock"), env["OTCLIENT_TIBIA_RE_AUTH_SOCKET"])
 
+    def test_experimental_auth_environment_rejects_shared_socket(self):
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            profile = load_profile(self.write_profile(directory, self.profile()))
+            shared = directory / "shared.sock"
+            with self.assertRaises(BridgeConfigError):
+                build_experimental_env(
+                    profile,
+                    directory / "bridge.so",
+                    shared,
+                    directory / "auth.so",
+                    shared,
+                    {},
+                )
+
     def test_profile_rejects_unknown_schema(self):
         with tempfile.TemporaryDirectory() as raw:
             directory = Path(raw)
@@ -148,14 +163,11 @@ class IpcClientTests(unittest.TestCase):
                             received_fds.extend(descriptors.tolist())
                     observed["fd_count"] = len(received_fds)
                     if received_fds:
-                        os.lseek(received_fds[0], 0, os.SEEK_SET)
-                        chunks: list[bytes] = []
-                        while True:
-                            chunk = os.read(received_fds[0], 4096)
-                            if not chunk:
-                                break
-                            chunks.append(chunk)
-                        observed["fd_payload"] = b"".join(chunks)
+                        descriptor = received_fds[0]
+                        observed["fd_offset_before_read"] = os.lseek(descriptor, 0, os.SEEK_CUR)
+                        size = os.fstat(descriptor).st_size
+                        observed["fd_payload"] = os.pread(descriptor, size, 0)
+                        observed["fd_offset_after_pread"] = os.lseek(descriptor, 0, os.SEEK_CUR)
                     conn.sendall(response)
                 finally:
                     conn.close()
@@ -250,6 +262,7 @@ class IpcClientTests(unittest.TestCase):
         os.write(fd, payload)
         required = fcntl.F_SEAL_SEAL | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_GROW | fcntl.F_SEAL_WRITE
         fcntl.fcntl(fd, fcntl.F_ADD_SEALS, required)
+        os.lseek(fd, 3, os.SEEK_SET)
         return fd
 
     def test_ping_response(self):
@@ -268,7 +281,7 @@ class IpcClientTests(unittest.TestCase):
         hasattr(os, "memfd_create") and hasattr(os, "MFD_ALLOW_SEALING") and hasattr(socket, "SCM_RIGHTS") and fcntl is not None,
         "Linux memfd and SCM_RIGHTS required",
     )
-    def test_auth_fd_is_passed_without_client_reading_payload(self):
+    def test_auth_fd_is_passed_without_client_consuming_or_rewinding_payload(self):
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "auth.sock"
             observed: dict[str, object] = {}
@@ -284,7 +297,9 @@ class IpcClientTests(unittest.TestCase):
                 self.assertTrue(response["ok"])
                 self.assertEqual(b"AUTH_WITH_CREDENTIALS\n", observed["command"])
                 self.assertEqual(1, observed["fd_count"])
+                self.assertEqual(3, observed["fd_offset_before_read"])
                 self.assertEqual(frame, observed["fd_payload"])
+                self.assertEqual(3, observed["fd_offset_after_pread"])
             finally:
                 os.close(fd)
                 thread.join(2)

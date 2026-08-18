@@ -39,6 +39,7 @@ target_uniqueness: NOT_APPLICABLE
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-track-a-full-client-re-coverage-audit.md
   - docs/agents/reports/OTCLIENT-20260818-full-client-re-100-percent-checklist.md
+  - docs/agents/reports/OTCLIENT-20260818-full-client-re-matrix.md
 modules_touched:
   - official-client-re-documentation
 reuses:
@@ -67,7 +68,7 @@ context_growth: stable
 context_score: 8
 estimate_confidence: medium
 decomposition_decision: single
-decomposition_reason: one repository-wide coverage synthesis with one canonical report output
+decomposition_reason: one repository-wide coverage synthesis with checklist plus compact matrix projection
 validation_level: focused
 feature_scope:
   type: documentation
@@ -88,9 +89,9 @@ stall_warnings: 0
 
 # Objective
 
-Create one canonical, evidence-bounded **FULL CLIENT RE 100%** checklist for the official native Linux Tibia client reverse-engineering programme.
+Create one canonical, evidence-bounded **FULL CLIENT RE 100%** checklist and a compact **coverage matrix** for the official native Linux Tibia client reverse-engineering programme.
 
-The checklist covers the whole client rather than only login or worldmap: gameplay state/actions, inventory/equipment, containers, creatures, chat/social/trade, minimap/worldmap, analyzers, Cyclopedia/progression systems, account/economy UI, network/runtime infrastructure, user options/settings and updater/versioning.
+The coverage spans the whole client rather than only login or worldmap: gameplay state/actions, inventory/equipment, containers, creatures, chat/social/trade, minimap/worldmap, analyzers, Cyclopedia/progression systems, account/economy UI, network/runtime infrastructure, user options/settings and updater/versioning.
 
 # Status contract
 
@@ -120,27 +121,35 @@ BLOCKED
 - [x] structural inventory separated from semantic/runtime proof;
 - [x] promoted S9 reconciled from current `main@ebbb36f50076ff4072c7218e302614c1dfea00b1`;
 - [x] primary evidence keys/PRs/reports recorded;
-- [x] every row has a concrete remaining-step code/path to `DONE`;
-- [x] full changed-path and full-diff self-audit: exactly two declared files, no unrelated/runtime/workflow path;
+- [x] every checklist row has a concrete remaining-step code/path to `DONE`;
+- [x] compact matrix provides area counts and a full 169-ID one-hot projection with no status reinterpretation;
+- [x] matrix scope table explicitly includes equipment/options/client feature families;
 - [x] E2E = `NOT_APPLICABLE` with documentation/audit reason;
+- [ ] full changed-path and full-diff self-audit after matrix addition;
 - [ ] fresh independent documentation audit with material findings `0`;
 - [ ] required exact-head checks on the final unchanged head;
-- [x] current review threads/requested changes: `0/0` at pre-blocker checkpoint;
+- [ ] final review threads/requested changes = `0/0`;
 - [ ] mark Ready, protected squash merge, task archive and ownership release.
 
-# Validation checkpoint
+# Matrix projection
 
-Pre-blocker exact-head evidence before this checkpoint-only task update:
+Canonical detailed checklist:
+
+`docs/agents/reports/OTCLIENT-20260818-full-client-re-100-percent-checklist.md`
+
+Compact dashboard/matrix:
+
+`docs/agents/reports/OTCLIENT-20260818-full-client-re-matrix.md`
+
+The matrix is deliberately a projection of the checklist, not an independent source of truth. It contains:
 
 ```text
-head 303d4523140d9c5b4c270b7459f57af154d82028
-Track A agent runtime governance 32142933741 = SUCCESS
-CI 32142933853 = SUCCESS
-changed paths = exactly 2 declared files
-review threads = 0
+Executive status matrix: 8 areas × 4 states
+Full ID matrix: all 169 IDs exactly once
+Scope matrix: what each area covers
+Critical dependency matrix
+Completion-condition matrix
 ```
-
-This task-record update changes the head, so the above CI is supporting evidence only; required CI must pass again on the new final head before Ready/merge.
 
 # Independent-audit blocker
 
@@ -150,6 +159,6 @@ Repository governance requires a fresh independent documentation audit. The curr
 status: blocked
 material_findings_open_from_self_audit: 0
 blocker: REQUIRED_FRESH_INDEPENDENT_DOCUMENTATION_AUDIT_UNAVAILABLE_IN_CURRENT_SESSION
-last_completed_step: 169-row current-main checklist, S9 reconciliation, exact two-path full-diff self-audit and green pre-checkpoint CI
-next_action: a fresh independent auditor validates PR #536 exact final diff against current main and primary evidence; if material findings are 0 and final-head CI is green, mark Ready and continue protected squash merge/closeout
+last_completed_step: compact matrix projection added for all 169 checklist IDs without changing any underlying status
+next_action: audit the final three-path PR #536 diff, verify exact-head CI, then have a fresh independent auditor validate the checklist/matrix against current main and primary evidence; if material findings are 0, mark Ready and continue protected squash merge/closeout
 ```

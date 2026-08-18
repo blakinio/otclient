@@ -1,228 +1,101 @@
-# ADR-0002: Persistent Track A viewer and same-task controller handoff
+# ADR-0002: Persistent KasmVNC desktop and same-task controller handoff
 
 - Status: proposed
 - Date: 2026-08-18
 - Task/PR: `OTC-20260818-track-a-persistent-viewer-handoff` / `#541`
 - Extends: `ADR-0001-track-a-canonical-live-runtime.md`
-- Authority note: this decision is not live-operation authority until independently reviewed and merged.
+- Supersedes in this PR: the proposed `x11vnc -> websockify -> noVNC` persistent-viewer design
+- Authority note: this unmerged ADR does not expand live official-client authority.
 
 ## Context
 
-Track A already targets one persistent canonical official-client runtime with disposable controller sessions. Two operational gaps repeatedly caused recovery work:
+Track A needs two kinds of continuity that must not be confused:
 
-1. a replacement agent could hold the same task and face a fresh active controller lease whose `controller_session` belonged to the previous disposable worker; there was no narrow same-task transfer primitive, so historical session identifiers leaked into continuation procedures;
-2. remote-view health was coupled to ad-hoc noVNC/X11 presentation plumbing. A black browser canvas could coexist with a healthy exact client and viewable X11 window.
+1. the exact official-client runtime may survive replacement agent/controller sessions;
+2. the human observer needs one stable desktop URL that survives replacement agent/controller sessions.
 
-The failure is concrete. In native-login PR #528 run/job `32147631742 / 95745198909`, the updater started websockify on runner port `6082` and then attempted to publish a relay on host `192.168.1.2:6082`; Docker correctly failed with `address already in use`. Earlier gen16 evidence separately proved a healthy client on `DISPLAY=:99`, raw-XRes PID ownership of the expected `1920x1080` window, a working RFB listener and working WebSocket while the host `6082 -> runner 6081` presentation mapping was wrong.
-
-A controller session and a browser presentation endpoint are therefore not runtime identity.
+The prior proposal still used noVNC and therefore did not satisfy the owner's requirement for a genuinely different, persistent desktop technology. Historical failures also showed that a browser presentation chain could be broken while the underlying X11/client state remained healthy.
 
 ## Decision
 
-### 1. Keep three identities separate
+### 1. Controller session remains disposable
 
-Track A uses these distinct identities:
+Controller authority is still `task_id + current session_id + capability + lease generation`. Same-task handoff rotates the capability and advances generation. A replacement agent does not reuse an old `session_id` merely to pass validation.
 
-```text
-runtime identity
-  = runtime_id + boot identity + PID + process start ticks
-    + exact executable fence + DISPLAY + raw-XRes-owned XID
+The existing raw-XRes reuse/Gate-B work in PR #541 remains valid and is retained for canonical official-client identity when a registered client exists.
 
-controller identity
-  = task_id + current disposable session_id + current capability
-    + current lease generation
+### 2. KasmVNC becomes the persistent browser desktop
 
-viewer identity
-  = immutable runtime identity + viewer instance
-    + RFB/backend/public presentation topology
-```
-
-Controller `session_id`, lease generation and registration generation MUST NOT be part of the viewer's immutable runtime binding.
-
-### 2. Same-task controller handoff is a narrow authority transition
-
-A replacement worker may transfer an **active, fresh lease for the same task only** when all of these are true:
-
-- repository/session recovery preflight has established that replacing the prior worker is safe;
-- the authoritative lease is active and unexpired;
-- the lease's `controller_task` equals the replacement task;
-- the caller holds the current capability token;
-- the caller supplies the exact expected lease generation observed immediately before handoff;
-- the new session id differs from the currently registered controller session;
-- the new capability is written to a distinct mode-0600 task-local token slot before the lease record is committed;
-- the canonical `coordination.lock` remains held for the complete transfer;
-- the lease generation increments;
-- the capability rotates;
-- the previous token is invalid immediately after commit even if unlinking the stale token file later fails.
-
-A handoff MUST NOT:
-
-- cross task ids;
-- transfer an expired lease;
-- infer ownership from task/PR prose;
-- bypass a different task's live controller;
-- reuse the old session id merely to make validation pass;
-- leave the lease generation unchanged.
-
-An expired lease continues to use the existing stale-takeover path with its explicit reason. A different-task conflict remains a hard refusal.
-
-After same-task handoff, an unchanged registered runtime normally has an older `lease_generation`. The existing reviewed generation-rebind transition MUST then re-prove the exact runtime and bind registration to the new controller generation before Gate B can pass.
-
-### 3. High-level resume owns session-id discovery
-
-The supported continuation entry point is:
+The Track A user-facing desktop provider is KasmVNC, hosted as a task-owned persistent Docker container on Synology:
 
 ```text
-tibia-official-client-re-canonical-live-resume.py
+browser
+  -> https://192.168.1.2:6901/
+  -> KasmVNC integrated HTTPS/WebSocket service
+  -> persistent Kasm desktop DISPLAY=:1
 ```
 
-On GitHub Actions it derives the replacement `session_id` from the current run/attempt/job rather than accepting a historical value from a handoff document. Outside GitHub Actions an explicit new session id is required.
+Deployment identity:
 
-For a fresh active same-task controller, replacement is never silent. The caller must explicitly select same-task replacement and provide a reason after the repository recovery/ownership preflight. The helper then:
+```yaml
+container: otclient-track-a-kasmvnc
+runtime_namespace: track-a-kasmvnc-desktop
+host_port: 6901
+container_port: 6901
+internal_display: ':1'
+restart_policy: unless-stopped
+```
+
+The Kasm desktop is not created per ChatGPT/GitHub Actions session. Its container and URL survive the deployment job and later controller turnover.
+
+### 3. noVNC is not part of the new path
+
+The new Kasm desktop MUST NOT use:
 
 ```text
-fresh/released lease
-  -> acquire
-
-active same task + same session
-  -> renew
-
-active same task + replacement authorized
-  -> same-task handoff
-  -> generation increment + capability rotation
-
-registration generation mismatch
-  -> canonical rebind
-
-unchanged exact runtime
-  -> Gate B
-
-registration absent
-  -> report canonical_bootstrap as the next transition
-     without launching a client
+Xvfb -> x11vnc -> websockify -> noVNC
 ```
 
-`release` discovers the current authoritative session from lease state and releases controller authority while preserving the runtime.
+as its browser presentation implementation.
 
-### 4. Viewer is a persistent programme presentation resource
+PR #528 may temporarily retain its legacy observer `DISPLAY=:99` / `http://192.168.1.2:6083/` while its own task still owns that surface. That observer is historical/legacy task state and must not be presented as the new Track A desktop.
 
-The browser viewer uses a fixed layered topology:
+### 4. Desktop deployment is isolated from official-client execution
 
-```text
-canonical X11 DISPLAY
-  -> x11vnc view-only RFB 127.0.0.1:5901
-  -> websockify/noVNC runner backend 0.0.0.0:6081
-  -> existing host presentation mapping
-  -> http://synology:6082/
-```
+A desktop-only Kasm deployment is an `ephemeral_isolated` runtime operation. It is allowed to create only its declared container/state/port and must not touch another task's official-client process/session/display/lease/registration.
 
-`6081` is the runner backend. `6082` is the user-facing host endpoint. A workflow MUST NOT bind websockify to `6082` and then attempt to publish another relay on the same host port.
+Because PR #528 currently owns the native-login official-client surface, PR #541 may deploy KasmVNC now but MUST NOT start an additional official Tibia client inside it yet.
 
-The viewer start/stop transition requires current controller lease authority and executes while holding the canonical coordination lock. Viewer children receive neither the coordination-lock file descriptor nor the lease capability. They run with credential/capability environment variables removed and `x11vnc` is `-viewonly`.
+After #528 releases or explicitly reconciles official-client ownership, the official native Linux client launch/bootstrap path should be migrated to run inside the persistent Kasm desktop. At that point current canonical admission, registration and Gate B must describe the exact client actually running there.
 
-The viewer may survive controller release or controller handoff. Its identity binds to immutable runtime identity, so a lease/rebind generation change alone does not invalidate a healthy viewer.
+### 5. Failure domains stay separate
 
-A client PID/start/executable/display/window change does invalidate the viewer and requires a new viewer binding.
+Kasm desktop health is not official-client health. A broken Kasm endpoint does not authorize a Tibia client restart, and a Tibia client failure does not authorize broad Kasm/Docker cleanup.
 
-### 5. Raw XRes is the window-ownership authority
+Kasm health is proven from exact container ownership, running state, restart policy, port mapping and the real HTTPS application response.
 
-For viewer binding and health, the supported authority is:
+### 6. Secret boundary
 
-```text
-.github/scripts/tibia-official-client-re-xres-window-owner.py
-```
-
-The resolved XID must:
-
-- be `VIEWABLE`;
-- have the expected `1920x1080` geometry;
-- resolve through raw XRes 1.2 LocalClientPid to the registered exact client PID;
-- equal the registration's `x11-window:<xid>` identity.
-
-`xdotool search --pid` is discovery convenience only and MUST NOT override contradictory raw-XRes ownership evidence.
-
-### 6. Public viewer health is proven end to end
-
-A listening process or HTTP 200 on one layer is insufficient.
-
-Every viewer instance serves a non-secret:
-
-```text
-/viewer-identity.json
-```
-
-containing the immutable runtime binding, viewer instance id and backend port. Health requires all of:
-
-```text
-registered runtime identity       PASS
-raw-XRes window/PID ownership     PASS
-x11vnc RFB banner                 PASS
-local :6081 identity              exact match
-local /websockify upgrade         HTTP 101
-public :6082 identity             exact same match
-public /websockify upgrade        HTTP 101
-```
-
-The identity request is cache-busted and compared structurally. This prevents a stale or unrelated host presentation service from being reported healthy merely because port `6082` accepts connections.
-
-### 7. Runtime and viewer health are independent
-
-Report independently:
-
-```text
-TRACK_A_RUNTIME_HEALTH=PASS|FAIL_<reason>
-TRACK_A_VIEWER_HEALTH=PASS|FAIL_<reason>|UNKNOWN
-TRACK_A_VIEWER_URL=http://synology:6082/
-```
-
-A viewer failure with runtime health `PASS` MUST NOT authorize client restart, logout, login, character selection, process signalling or runtime-registration mutation.
-
-Repair the viewer path only.
-
-A runtime identity failure is not relabelled as a presentation failure.
-
-### 8. Port/ownership failures are fail closed
-
-If `5901`, `6081` or public `6082` is already owned by an unproven process/service, the viewer controller refuses destructive replacement.
-
-It may stop only viewer PIDs recorded in its own mode-restricted state whose process environment proves the expected Track A viewer instance and role.
-
-It never uses broad `pkill`, broad Docker cleanup or unrelated listener replacement.
-
-### 9. Secret boundary
-
-Viewer and controller-continuation tooling never reads Tibia account/password values.
-
-Persistent viewer children must not inherit:
-
-```text
-TIBIA_TEST_*
-RUNNER_TRACKING_ID
-*LEASE_TOKEN*
-*CAPABILITY*
-```
-
-Viewer state and `/viewer-identity.json` are non-secret and must not contain credentials, account identifiers, session/auth tokens, cookies, packet payloads, framebuffer contents or character-selection secrets.
+Desktop deployment never reads or passes Tibia account/auth/session secrets. The Kasm browser credential is a separate LAN desktop credential and grants no Tibia authority.
 
 ## Consequences
 
-- Replacement agents get a new disposable session id instead of reusing stale chat/history values.
-- A safe same-task handoff invalidates the old capability and deliberately advances generation, preserving the existing rebind/Gate B trust chain.
-- The canonical client can survive controller turnover.
-- The browser endpoint can survive controller turnover because viewer identity does not include controller-generation metadata.
-- Black noVNC is diagnosed as presentation failure when exact runtime/XRes evidence remains healthy.
-- `6081`/`6082` roles are unambiguous.
-- Physical activation remains serialized and cannot be authorized by this unmerged ADR.
+- The human observer gets a genuinely different technology from noVNC.
+- One stable endpoint can survive replacement agents and GitHub Actions jobs.
+- `session_id` remains a controller-authority property, not GUI identity.
+- Kasm desktop deployment can proceed without creating a conflicting second official-client session.
+- The official client migration becomes a clear later integration step rather than being silently mixed into viewer installation.
+- The retained noVNC observer on `6083` is explicitly legacy and can be retired by its owner after migration.
 
-## Validation requirements
+## Acceptance
 
-Before promotion:
+Before claiming the desktop deployed, physical Synology evidence must show:
 
-1. deterministic unit tests for handoff refusal/success/token rotation;
-2. deterministic tests for session-id derivation and rebind/Gate B routing;
-3. deterministic tests proving viewer identity excludes controller generations and strips credentials/capabilities;
-4. exact-head repository CI;
-5. fresh independent audit of the authority and process-ownership boundaries;
-6. physical Synology E2E after ownership is available, proving persistence across replacement jobs and exact public `6082` identity/WebSocket mapping without touching a second logged-in official-client session.
+1. the exact task-owned Kasm container is running;
+2. `restart=unless-stopped`;
+3. host `192.168.1.2:6901` reaches the Kasm HTTPS application;
+4. the container survives the deploy job;
+5. PR #528 `:99/6083` remains untouched;
+6. the deploy path accessed no Tibia secrets and launched no official client.
 
-Until item 6 passes, repository implementation may be complete but physical deployment is not.
+Before claiming the full Track A runtime migration complete, a later serialized E2E must additionally prove the official client runs inside this persistent Kasm desktop and remains correctly registered/controlled across a replacement controller handoff without creating a second official-client session.

@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import array
 from dataclasses import dataclass
-import fcntl
 import hashlib
 import json
 import os
@@ -14,6 +13,11 @@ import struct
 import sys
 import threading
 from typing import Any
+
+try:
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - Linux-only experimental auth surface
+    _fcntl = None
 
 SESSION_MARKERS = (
     "player_protocol_handler",
@@ -216,6 +220,11 @@ def request(
 def _validate_credentials_memfd(credentials_fd: int) -> None:
     if not isinstance(credentials_fd, int) or isinstance(credentials_fd, bool) or credentials_fd < 0:
         raise BridgeClientError("credentials_fd must be a non-negative file descriptor")
+    if _fcntl is None:
+        raise BridgeClientError("memfd sealing support is unavailable")
+    required_names = ("F_GET_SEALS", "F_SEAL_SEAL", "F_SEAL_SHRINK", "F_SEAL_GROW", "F_SEAL_WRITE")
+    if any(not hasattr(_fcntl, name) for name in required_names):
+        raise BridgeClientError("memfd sealing support is unavailable")
     try:
         stat_result = os.fstat(credentials_fd)
         if not stat.S_ISREG(stat_result.st_mode):
@@ -225,11 +234,8 @@ def _validate_credentials_memfd(credentials_fd: int) -> None:
         target = os.readlink(f"/proc/self/fd/{credentials_fd}")
         if "memfd:" not in target:
             raise BridgeClientError("credentials_fd must refer to an anonymous memfd")
-        required_names = ("F_GET_SEALS", "F_SEAL_SEAL", "F_SEAL_SHRINK", "F_SEAL_GROW", "F_SEAL_WRITE")
-        if any(not hasattr(fcntl, name) for name in required_names):
-            raise BridgeClientError("memfd sealing support is unavailable")
-        seals = fcntl.fcntl(credentials_fd, fcntl.F_GET_SEALS)
-        required = fcntl.F_SEAL_SEAL | fcntl.F_SEAL_SHRINK | fcntl.F_SEAL_GROW | fcntl.F_SEAL_WRITE
+        seals = _fcntl.fcntl(credentials_fd, _fcntl.F_GET_SEALS)
+        required = _fcntl.F_SEAL_SEAL | _fcntl.F_SEAL_SHRINK | _fcntl.F_SEAL_GROW | _fcntl.F_SEAL_WRITE
         if seals & required != required:
             raise BridgeClientError("credentials memfd must be fully sealed before handoff")
     except BridgeClientError:

@@ -1,6 +1,4 @@
-# OTC-20260819 Track A UI/settings static model
-
-```yaml
+---
 task_id: OTC-20260819-track-a-ui-settings-static-model
 project_lane: otclient
 programme: OTCLIENT-TIBIA-RE
@@ -27,22 +25,36 @@ context_growth: stable
 context_score: 8
 estimate_confidence: medium
 invocation_started_at: 2026-08-19T00:33:00+02:00
-updated_at: 2026-08-19T00:33:00+02:00
-last_progress_at: 2026-08-19T00:33:00+02:00
-ci_checks_for_current_head: 0
-ci_check_generation: draft
+updated_at: 2026-08-19T00:47:00+02:00
+last_progress_at: 2026-08-19T00:47:00+02:00
+ci_checks_for_current_head: 1
+ci_check_generation: static_probe_success_governance_repair
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 1
 context_reconstruction_attempts: 0
 stall_warnings: 0
 session_rotation_count: 0
-heavy_validation_runs: 0
+heavy_validation_runs: 1
 stale_takeover_count: 0
 human_interruptions: 0
-```
+runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
+mutation_authorized: false
+---
+
+# OTC-20260819 Track A UI/settings static model
 
 ## Invocation and authority
 
@@ -122,14 +134,18 @@ Dependencies/evidence inputs:
 ## Checkpoint
 
 ```yaml
-last_completed_step: claimed disjoint task/branch with static-only runtime admission
+last_completed_step: current-build static probe succeeded; fixed task metadata to YAML front matter after deterministic governance identified the formatting defect
 validation_level: focused
 facts:
   - current main at claim is a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
   - PR #536 records H10-H14 as NOT_STARTED with remaining step SETTINGS
+  - static probe run 32194079533 job 95894394865 completed success without executing the client
+  - current package client sha256 is ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+  - current ELF build id is d803d9695868713ef6ab0c3cf65f91212c9c6a62
+  - current client contains concrete graphics, sound, interface, gameplay, hotkey/actionbar and persistence-model identifiers plus QSettings value/setValue APIs and clientoptions.json
 unknown:
-  - concrete official-client settings controller/backing model/persistence topology
-  - current-build equivalence of any historical settings artifacts
+  - exact code-level linkage from each options page/model to a persistence sink
+  - runtime read/write/reload/restart persistence semantics
 blockers: []
-next_action: inspect retained Track A capability/static evidence for concrete settings, controller and persistence identifiers and classify H10-H14 evidence boundaries
+next_action: persist compact current-build evidence, then run one bounded static xref discriminator for clientoptions.json/QSettings callsites before deciding whether the static phase is exhausted
 ```

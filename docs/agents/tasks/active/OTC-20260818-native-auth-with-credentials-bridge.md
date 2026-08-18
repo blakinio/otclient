@@ -8,14 +8,14 @@ project_lane: otclient
 lane: P1-BRIDGE
 track_id: official-client-re
 task_kind: implementation
-phase: validate
+phase: final_exact_head
 execution_mode: github_only
 execution_reason: implement and validate a bounded experimental native-auth helper without touching the serialized physical runtime
 branch: feat/OTC-20260818-native-auth-with-credentials-bridge
 base_branch: main
 base_main: ed6202216886ec31d432e4e7dec56b47626f10c4
 related_pr: 507
-updated: 2026-08-18T08:31:00+02:00
+updated: 2026-08-18T08:45:00+02:00
 risk: critical
 implementation_authorized: true
 credentials_allowed: false
@@ -62,110 +62,129 @@ blocks: []
 context_pressure: medium
 context_growth: stable
 context_score: 7
-estimate_confidence: medium
+estimate_confidence: high
 decomposition_decision: single
 decomposition_reason: one bounded experimental helper plus deterministic no-secret tests
-validation_level: component
+validation_level: full
 invocation_started_at: 2026-08-18T08:11:00+02:00
-last_progress_at: 2026-08-18T08:31:00+02:00
+last_progress_at: 2026-08-18T08:45:00+02:00
 ci_checks_for_current_head: 0
-ci_check_generation: draft-component
+ci_check_generation: draft-final-evidence
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ---
 
 # Objective
 
-Implement the smallest non-generalized experimental helper needed by `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` to invoke the original native account-authentication entry **without using the login form**:
+Provide the smallest isolated experimental primitive required by `OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME` to enter the official Linux client's original account-authentication logic **without using the login form**.
 
 ```text
-AUTH_WITH_CREDENTIALS
-  -> one protected sealed-memfd received over Unix SCM_RIGHTS
-  -> bounded binary credential frame read only inside the experimental helper
-  -> unique exact-build tibia::client::TGameClient
-  -> owning Qt thread
-  -> exact QMeta method validation for onRequestLoginWithCredentials(QString,QString)
-  -> Qt DirectConnection invocation of that named method
+sealed credential memfd
+  -> exact admitted runtime identity
+  -> SCM_RIGHTS
+  -> one-shot experimental helper
+  -> exact client + PIE/fence + unique TGameClient + QMeta/thread gates
+  -> onRequestLoginWithCredentials(QString,QString)
 ```
 
-This task does not execute the official client, does not access credentials, does not log in and does not mutate any physical runtime.
+# Final implementation boundary
 
-# Isolation decision
-
-Both merged stable surfaces remain byte-for-byte read-only:
+The merged stable bridge surfaces are preserved byte-for-byte and contain no mutating command:
 
 ```text
-tools/tibia_runtime_bridge/bridge.cpp      blob c47dc3e81162867692e7608f14a9f53dea52bf3b
-tools/tibia_runtime_bridge/ipc_client.py  blob 63bdb9258ce2c67781f43de8f4a482024fc89672
+tools/tibia_runtime_bridge/bridge.cpp
+  c47dc3e81162867692e7608f14a9f53dea52bf3b
+tools/tibia_runtime_bridge/ipc_client.py
+  63bdb9258ce2c67781f43de8f4a482024fc89672
 ```
 
-No `AUTH_WITH_CREDENTIALS` command is added to either stable server or stable client API.
+Mutation is isolated into:
 
-Instead:
+- default-OFF CMake option `OTCLIENT_TIBIA_RE_BUILD_EXPERIMENTAL_AUTH`;
+- separate `otclient-tibia-native-auth-experimental.so`;
+- separate `experimental_auth_client.py`;
+- separate `experimental_auth_launcher.py`;
+- one separate auth socket and one connection/attempt.
 
-- CMake option `OTCLIENT_TIBIA_RE_BUILD_EXPERIMENTAL_AUTH` defaults `OFF`;
-- only when enabled, build a separate `otclient-tibia-native-auth-experimental.so`;
-- `experimental_auth_client.py` owns sealed-memfd validation and `SCM_RIGHTS` transport;
-- `experimental_auth_launcher.py` composes the helper beside the unchanged stable bridge and supplies a separate non-secret auth socket path;
-- the experimental helper serves exactly one connection/attempt, then closes and unlinks its auth socket;
-- no arbitrary method/RPC/call-address surface exists.
+The helper is exact-build fenced to client `15.32.df7b29`, size `51965216`, SHA `e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe`, `TGameClient` vptr `0x3076908`, local QMeta method count `44`, method id `17`, signature `onRequestLoginWithCredentials(QString,QString)`, and the promoted `0xd06850` 32-byte instruction fence.
 
-# Hard design constraints
+The address is never exposed as a call primitive. Invocation is through Qt named QMeta machinery on the object's owning Qt thread.
 
-- No credential values in textual IPC, command line, environment variables, GitHub logs, artifacts or plaintext temp files.
-- Experimental `auth_with_credentials_fd()` accepts an already-open FD and passes only that descriptor using `SCM_RIGHTS`; it does not read/stringify payload bytes.
-- Runtime helper requires a sealed anonymous memfd (`F_GET_SEALS` plus write/grow/shrink/seal seals) and rejects ordinary files/pipes.
-- Helper accepts exactly one ancillary FD and rejects missing/multiple/unexpected descriptors; received descriptors are closed even when the ancillary request is rejected/truncated.
-- Binary secret frame is little-endian length-prefixed, bounded, non-empty, valid UTF-8 and rejects embedded NUL/trailing bytes.
-- Helper-owned raw byte/QString buffers receive best-effort zeroing immediately after one invocation attempt.
-- Helper independently verifies `/proc/self/exe` size/SHA for exact client `15.32.df7b29` before exposing the auth socket.
-- Runtime method validation verifies exact class `tibia::client::TGameClient`, one unique primary-vptr `0x3076908` target, class-local method id `17` / signature `onRequestLoginWithCredentials(QString,QString)`, object thread affinity and exact 32-byte fence at rebased `0xd06850`.
-- Invocation uses Qt QMeta machinery on the owning Qt thread; never jump directly to `0xd06850`.
-- Success means only that Qt accepted the invocation. It must not fabricate/claim authentication success; later RUNTIME evidence must observe the legitimate auth state machine.
-- 2FA/device confirmation remains untouched and proceeds through original client logic.
+# Secret and ownership boundary
 
-# Credential memfd frame v1
+- no credential value may enter textual IPC, argv, environment, logs, artifacts, screenshots or plaintext temporary files;
+- the controller accepts only an already-open fully sealed anonymous memfd;
+- the controller does not read/pread the credential payload;
+- the controller requires explicit `PeerIdentityExpectation` and verifies the Unix peer before sending the descriptor;
+- helper accepts exactly one `SCM_RIGHTS` descriptor and closes received descriptors even when the request is rejected/truncated;
+- launcher refuses legacy `TIBIA_TEST_EMAIL/PASSWORD` in its environment;
+- launcher refuses to replace an existing socket path;
+- real credential acquisition/memfd creation remains a separate future RUNTIME producer and is not implemented here.
+
+# Validation
+
+Green component gate on implementation head `9534b1dd6f5451400e21a12248c1e12faa296cbc`:
 
 ```text
-u32 email_utf8_length
-u32 password_utf8_length
-email bytes
-password bytes
+Track A native auth bridge validation
+run=32108044508
+job=95621417173
+conclusion=SUCCESS
 ```
 
-Each field must be `1..1024` bytes; memfd size must exactly match the two lengths plus the 8-byte header. No trailing bytes are accepted.
+All job stages passed:
 
-# Current implementation
+```text
+no-secret synthetic unit tests=SUCCESS
+stable bridge/client exact-blob proof=SUCCESS
+default build=SUCCESS; experimental auth helper absent
+explicit experimental build=SUCCESS with -Werror
+```
 
-Implemented on Draft PR #507:
+The only later implementation-branch change before the final evidence checkpoint was validator hardening for launcher credential-env and socket-replacement fail-closed markers; no runtime/auth algorithm changed.
 
-- separate default-OFF CMake target;
-- one-shot exact-client-fenced C++ helper;
-- separate experimental launcher;
-- separate experimental FD client;
-- same-UID Unix socket, exact-one-connection/exact-one-FD contract;
-- sealed anonymous memfd metadata/seal validation without payload read in Python;
-- exact-build vptr/QMeta/thread/instruction-fence runtime gates;
-- Qt named invocation rather than raw target jump;
-- synthetic Linux `SCM_RIGHTS` tests preserving the source FD offset across handoff;
-- automated proof that stable bridge/server blobs remain unchanged;
-- dedicated GitHub-hosted build/test workflow.
+Two repair cycles were consumed and resolved:
 
-# Runtime boundary
+1. missing `python3-pyelftools` in the dedicated workflow;
+2. attempted import of a non-existent private response helper after restoring the stable client; the experimental response parser is now self-contained.
 
-A later separately admitted RUNTIME task may opt in to the experimental helper only after current Track A ownership/lease/identity gates allow mutation and a protected producer supplies an already-open sealed memfd without first placing credential values in env/argv/plaintext files. This implementation task does not authorize physical execution.
+# Audit
+
+Final diff/security audit after those repairs:
+
+```text
+stable_bridge_mutation=ABSENT
+stable_ipc_client_mutation=ABSENT
+arbitrary_rpc=ABSENT
+raw_address_call_surface=ABSENT
+explicit_runtime_identity_required=true
+sealed_memfd_required=true
+legacy_secret_env=REFUSED
+existing_socket_replacement=REFUSED
+real_credentials_used=false
+official_client_executed=false
+open_material_findings=0
+```
+
+Durable implementation evidence:
+
+`docs/agents/evidence/OTC-20260818-native-auth-with-credentials-bridge/result.md`
+
+# Non-claims
+
+This task does not prove account authentication, 2FA, character login or `IN_GAME`. It has `runtime_access:none` and cannot satisfy physical E2E. A later RUNTIME consumer needs fresh legal Track A ownership plus a protected real-credential memfd producer.
 
 # Checkpoint
 
 ```yaml
-checkpoint_version: 3
+checkpoint_version: 4
 status: validating
-last_completed_step: isolated all mutation into separate experimental helper/client/launcher, restored stable bridge and ipc client to exact main blobs, and started no-secret component validation
+last_completed_step: full no-secret component build/test passed; final security audit has zero material findings; implementation frozen for final exact-head validation
 blockers: []
-next_action: inspect the terminal native-auth bridge validation result on the current exact head; repair only the first causal build/test failure if present, otherwise perform final diff/security audit and exact-head closeout
+next_action: require final exact-head native-auth validation, Track A governance and repository CI; if all pass, perform independent promotion review, ready-state required CI and protected merge without physical runtime execution
 ```

@@ -54,7 +54,7 @@ jobs:
           cmake --build "$build" --parallel 2
           test -f "$build/otclient-tibia-runtime-bridge.so"
           test ! -e "$build/otclient-tibia-native-auth-experimental.so"
-          if strings "$build/otclient-tibia-runtime-bridge.so" | grep -Fq 'AUTH_WITH_CREDENTIALS'; then
+          if strings "$build/otclient-tibia-runtime-bridge.so" | grep -F 'AUTH_WITH_CREDENTIALS' >/dev/null; then
             echo 'stable bridge unexpectedly exposes auth command' >&2
             exit 1
           fi
@@ -71,10 +71,10 @@ jobs:
           cmake --build "$build" --parallel 2
           test -f "$build/otclient-tibia-runtime-bridge.so"
           test -f "$build/otclient-tibia-native-auth-experimental.so"
-          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -Fq 'AUTH_WITH_CREDENTIALS'
-          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -Fq 'onRequestLoginWithCredentials'
-          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -Fq 'COLD_AUTH_INSTRUCTION_FENCE_MISMATCH'
-          if strings "$build/otclient-tibia-native-auth-experimental.so" | grep -Eq 'TIBIA_TEST_(EMAIL|PASSWORD)'; then
+          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -F 'AUTH_WITH_CREDENTIALS' >/dev/null
+          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -F 'onRequestLoginWithCredentials' >/dev/null
+          strings "$build/otclient-tibia-native-auth-experimental.so" | grep -F 'COLD_AUTH_INSTRUCTION_FENCE_MISMATCH' >/dev/null
+          if strings "$build/otclient-tibia-native-auth-experimental.so" | grep -E 'TIBIA_TEST_(EMAIL|PASSWORD)' >/dev/null; then
             echo 'legacy credential environment names found in experimental helper' >&2
             exit 1
           fi

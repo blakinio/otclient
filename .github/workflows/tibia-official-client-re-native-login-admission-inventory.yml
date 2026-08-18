@@ -1,0 +1,211 @@
+name: Track A native-login admission inventory
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-admission-inventory.yml
+      - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-native-login-admission-inventory
+  cancel-in-progress: false
+
+jobs:
+  controller-plane-inventory:
+    name: Non-mutating native-login controller-plane inventory
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v2' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Revalidate fresh current-main admission
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          CURRENT_MAIN="$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')"
+          [[ -n "$CURRENT_MAIN" && "$CURRENT_MAIN" == "$BASE_SHA" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py \
+            --changed-from "$BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          echo 'NATIVE_LOGIN_CURRENT_MAIN=PASS'
+          echo 'NATIVE_LOGIN_ADMISSION_POLICY=PASS'
+
+      - name: Read only existing canonical controller metadata under shared flock
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import fcntl
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import stat
+          import time
+
+          STATE = Path('/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime')
+          LOCK = STATE / 'coordination.lock'
+          LEASE = STATE / 'lease.json'
+          REG = STATE / 'runtime-registration.json'
+          EXPECTED_TASK = 'OTC-20260818-native-login-to-ingame-e2e'
+
+          def emit(key: str, value) -> None:
+              print(f'{key}={json.dumps(value, sort_keys=True, separators=(",", ":"))}')
+
+          def fingerprint(path: Path):
+              if not path.exists():
+                  return None
+              st = path.lstat()
+              if path.is_symlink():
+                  return {'kind': 'symlink', 'mode': stat.S_IMODE(st.st_mode), 'size': st.st_size, 'mtime_ns': st.st_mtime_ns}
+              if not stat.S_ISREG(st.st_mode):
+                  return {'kind': 'non_regular', 'mode': stat.S_IMODE(st.st_mode), 'size': st.st_size, 'mtime_ns': st.st_mtime_ns}
+              flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0) | getattr(os, 'O_NOFOLLOW', 0)
+              fd = os.open(path, flags)
+              try:
+                  h = hashlib.sha256()
+                  while True:
+                      chunk = os.read(fd, 65536)
+                      if not chunk:
+                          break
+                      h.update(chunk)
+              finally:
+                  os.close(fd)
+              return {'kind': 'regular', 'mode': stat.S_IMODE(st.st_mode), 'size': st.st_size, 'mtime_ns': st.st_mtime_ns, 'sha256': h.hexdigest()}
+
+          def read_json_noatime(path: Path):
+              st = path.lstat()
+              if path.is_symlink() or not stat.S_ISREG(st.st_mode):
+                  raise SystemExit(f'NATIVE_LOGIN_ADMISSION_ERROR={path.name.upper().replace("-", "_")}_UNSAFE')
+              flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0) | getattr(os, 'O_NOFOLLOW', 0)
+              fd = os.open(path, flags)
+              try:
+                  chunks = []
+                  total = 0
+                  while True:
+                      chunk = os.read(fd, 65536)
+                      if not chunk:
+                          break
+                      total += len(chunk)
+                      if total > 262144:
+                          raise SystemExit(f'NATIVE_LOGIN_ADMISSION_ERROR={path.name.upper().replace("-", "_")}_TOO_LARGE')
+                      chunks.append(chunk)
+              finally:
+                  os.close(fd)
+              return json.loads(b''.join(chunks).decode('utf-8'))
+
+          emit('NATIVE_LOGIN_CLIENT_PROCESS_OBSERVATION', False)
+          emit('NATIVE_LOGIN_X11_OBSERVATION', False)
+          emit('NATIVE_LOGIN_VNC_RFB_OBSERVATION', False)
+          emit('NATIVE_LOGIN_NETWORK_SESSION_OBSERVATION', False)
+          emit('NATIVE_LOGIN_CREDENTIAL_ACCESS', False)
+          emit('NATIVE_LOGIN_LOGIN_PERFORMED', False)
+          emit('NATIVE_LOGIN_GAMEPLAY_PERFORMED', False)
+          emit('NATIVE_LOGIN_CONTROLLER_MUTATION', False)
+
+          if not STATE.is_dir():
+              emit('NATIVE_LOGIN_CANONICAL_NAMESPACE', 'ABSENT')
+              emit('NATIVE_LOGIN_CANONICAL_COORDINATION_LOCK', 'ABSENT')
+              emit('NATIVE_LOGIN_CANONICAL_LEASE', 'ABSENT')
+              emit('NATIVE_LOGIN_CANONICAL_REGISTRATION', 'ABSENT')
+              emit('NATIVE_LOGIN_ADMISSION_RESULT', 'CANONICAL_NAMESPACE_ABSENT')
+              emit('NATIVE_LOGIN_ADMISSION_INVENTORY', 'COMPLETE')
+              raise SystemExit(0)
+
+          if not LOCK.exists() or not LOCK.is_file() or LOCK.is_symlink():
+              emit('NATIVE_LOGIN_CANONICAL_NAMESPACE', 'PRESENT')
+              emit('NATIVE_LOGIN_CANONICAL_COORDINATION_LOCK', 'ABSENT_OR_INVALID')
+              emit('NATIVE_LOGIN_ADMISSION_RESULT', 'CANONICAL_COORDINATION_LOCK_UNAVAILABLE')
+              emit('NATIVE_LOGIN_ADMISSION_INVENTORY', 'COMPLETE')
+              raise SystemExit(0)
+
+          before = {str(p): fingerprint(p) for p in (LOCK, LEASE, REG)}
+          lock_flags = os.O_RDONLY | getattr(os, 'O_NOATIME', 0) | getattr(os, 'O_NOFOLLOW', 0)
+          lock_fd = os.open(LOCK, lock_flags)
+          try:
+              try:
+                  fcntl.flock(lock_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+              except BlockingIOError:
+                  emit('NATIVE_LOGIN_CANONICAL_NAMESPACE', 'PRESENT')
+                  emit('NATIVE_LOGIN_CANONICAL_COORDINATION_LOCK', 'BUSY')
+                  emit('NATIVE_LOGIN_ADMISSION_RESULT', 'COORDINATION_LOCK_BUSY')
+                  emit('NATIVE_LOGIN_ADMISSION_INVENTORY', 'COMPLETE')
+                  raise SystemExit(0)
+
+              now = int(time.time())
+              lease = None
+              if LEASE.exists():
+                  lease = read_json_noatime(LEASE)
+                  if not isinstance(lease, dict):
+                      raise SystemExit('NATIVE_LOGIN_ADMISSION_ERROR=LEASE_NOT_OBJECT')
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE', 'PRESENT')
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE_SCHEMA_VERSION', lease.get('schema_version'))
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE_RUNTIME_ID', lease.get('runtime_id'))
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE_STATUS', lease.get('status'))
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE_GENERATION', lease.get('generation'))
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE_CONTROLLER_TASK', lease.get('controller_task'))
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE_CONTROLLER_SESSION', lease.get('controller_session'))
+                  expires = lease.get('expires_at')
+                  expired = bool(lease.get('status') == 'active' and isinstance(expires, int) and expires <= now)
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE_EXPIRED', expired)
+              else:
+                  emit('NATIVE_LOGIN_CANONICAL_LEASE', 'ABSENT')
+
+              registration = None
+              if REG.exists():
+                  registration = read_json_noatime(REG)
+                  if not isinstance(registration, dict):
+                      raise SystemExit('NATIVE_LOGIN_ADMISSION_ERROR=REGISTRATION_NOT_OBJECT')
+                  emit('NATIVE_LOGIN_CANONICAL_REGISTRATION', 'PRESENT')
+                  whitelist = (
+                      'schema_version', 'runtime_id', 'registration_generation', 'lease_generation',
+                      'registered_at', 'boot_id_sha256', 'pid', 'process_start_ticks',
+                      'client_version', 'client_size', 'client_sha256', 'display',
+                      'window_identity', 'remote_view_endpoint', 'remote_view_mapping',
+                      'state', 'source_task', 'source_run'
+                  )
+                  for key in whitelist:
+                      emit('NATIVE_LOGIN_CANONICAL_REG_' + key.upper(), registration.get(key))
+              else:
+                  emit('NATIVE_LOGIN_CANONICAL_REGISTRATION', 'ABSENT')
+
+              if registration is None:
+                  result = 'REGISTRATION_ABSENT'
+              elif lease and lease.get('status') == 'active' and not bool(
+                  isinstance(lease.get('expires_at'), int) and lease['expires_at'] <= now
+              ):
+                  if lease.get('controller_task') == EXPECTED_TASK:
+                      result = 'REGISTERED_CURRENT_TASK_ACTIVE_LEASE'
+                  else:
+                      result = 'REGISTERED_OTHER_TASK_ACTIVE_LEASE'
+              else:
+                  result = 'REGISTERED_NO_FRESH_ACTIVE_LEASE'
+              emit('NATIVE_LOGIN_ADMISSION_RESULT', result)
+          finally:
+              try:
+                  fcntl.flock(lock_fd, fcntl.LOCK_UN)
+              except OSError:
+                  pass
+              os.close(lock_fd)
+
+          after = {str(p): fingerprint(p) for p in (LOCK, LEASE, REG)}
+          if before != after:
+              raise SystemExit('NATIVE_LOGIN_ADMISSION_ERROR=CONTROL_METADATA_CHANGED_DURING_READ_ONLY_PROBE')
+          emit('NATIVE_LOGIN_CANONICAL_CONTROL_METADATA_UNCHANGED', True)
+          emit('NATIVE_LOGIN_ADMISSION_INVENTORY', 'COMPLETE')
+          PY

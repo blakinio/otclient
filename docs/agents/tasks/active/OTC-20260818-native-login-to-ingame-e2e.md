@@ -13,7 +13,7 @@ branch: runtime/OTC-20260818-native-login-to-ingame-e2e-v2
 base_branch: main
 base_main: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
 risk: critical
-updated: 2026-08-18T12:24:00+02:00
+updated: 2026-08-18T12:25:00+02:00
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
@@ -41,11 +41,11 @@ runtime_namespace: canonical-live-runtime
 canonical_registration: PRESENT
 canonical_lease_generation: 10
 registration_lease_generation: 10
-gate_a: PASS_BY_REBIND_PROBE
+gate_a: PASS
 generation_rebind: PASS
 gate_b: PASS
 bootstrap: NOT_APPLICABLE
-target_uniqueness: PROVEN_BY_REBIND_PROBE
+target_uniqueness: PROVEN
 mutation_authorized: false
 client_byte_mutation_authorized: false
 persistent_session_role: canonical_runtime_owner
@@ -108,6 +108,9 @@ canonical_rebind_controller_session: chatgpt-native-login-e2e-20260818
 canonical_rebind_lease_left_active: true
 retained_session_probe_limit: 1
 retained_session_probe_attempts_consumed: 0
+retained_session_probe_preflight_failure_run: 32126542329
+retained_session_probe_preflight_failure_job: 95678250579
+retained_session_probe_preflight_failure_discriminator: invalid_gate_a_enum
 retained_session_probe_process_observation_authorized: true
 retained_session_probe_memory_read_authorized: true
 retained_session_probe_method_invocation_authorized: false
@@ -118,7 +121,7 @@ causal_proof: INCOMPLETE
 
 # OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — retained native session discriminator
 
-The current physical runtime is now authoritatively bound to active canonical lease generation `10` and registration generation `2` after fresh exact-client rebind and immediate same-generation Gate B:
+The current physical runtime is authoritatively bound to active canonical lease generation `10` and registration generation `2` after fresh exact-client rebind and immediate same-generation Gate B:
 
 ```text
 RUN=32125924194
@@ -153,6 +156,8 @@ Exactly one **read-only retained-native-session discriminator** is admitted whil
 5. recheck authoritative registration generation `2` / lease generation `10` and the exact official-client fence.
 
 Only after those gates may the probe observe the current client process.
+
+The first workflow run (`32126542329 / 95678250579`) stopped before lease renewal or process observation because the task used a non-canonical textual value for `gate_a`. Current governance permits only `PASS`, `REQUIRED_NOT_PROVEN`, or `NOT_APPLICABLE`. The task now records the already-proven rebind/identity fence using canonical `gate_a: PASS` and `target_uniqueness: PROVEN`; no runtime hypothesis changed and the retained-session attempt budget remains unconsumed.
 
 The discriminator may attach read-only to the exact registered PID and inspect only structural, non-secret current-native-model facts required to decide whether the client is already at/owns character-selection state. The strongest previously validated current-session discriminator is the exact `TCharacterSelectionController` primary vptr `0x308ed68` plus its native character-list cardinality boundary from the historical V17 work. For this fresh runtime the probe must independently derive PIE load bias, require exactly one current controller instance if present, verify the runtime vptr, and emit only cardinality/structural booleans. It must not print names, worlds, tokens, strings, raw buffers, screenshots, packets or arbitrary memory.
 
@@ -192,8 +197,10 @@ CANONICAL_LEASE_STATUS=active
 CANONICAL_LEASE_GENERATION=10
 REGISTRATION_GENERATION=2
 REGISTRATION_LEASE_GENERATION=10
+GATE_A=PASS
 GENERATION_REBIND=PASS
 GATE_B=PASS
+TARGET_UNIQUENESS=PROVEN
 MUTATION_AUTHORIZED=false
 CREDENTIALS_ALLOWED=false
 LOGIN_ALLOWED=false

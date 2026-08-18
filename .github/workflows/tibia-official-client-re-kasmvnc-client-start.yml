@@ -1,26 +1,19 @@
 name: Track A KasmVNC current-client start
-
 on:
   pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/tibia-official-client-re-kasmvnc-client-start.yml'
+    paths: ['.github/workflows/tibia-official-client-re-kasmvnc-client-start.yml']
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: track-a-kasmvnc-client-start
   cancel-in-progress: false
-
 env:
   CONTAINER_NAME: otclient-track-a-kasmvnc
   EXPECTED_SHA: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
   EXPECTED_SIZE: '52109920'
   SOURCE_PACKAGE: /home/runner/_work/_otclient_tibia_re_state/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia
-  DEST_PACKAGE: /home/kasm-user/otclient-track-a/Tibia
-
 jobs:
   start:
     name: Start exact current official client on Kasm DISPLAY :1
@@ -28,8 +21,7 @@ jobs:
     runs-on: [otclient, synology]
     timeout-minutes: 8
     steps:
-      - name: Checkout exact PR head
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           persist-credentials: false
           fetch-depth: 0
@@ -42,41 +34,31 @@ jobs:
           [[ "$RUNNER_NAME" == synology-otclient-01 ]]
           [[ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME")" == true ]]
           [[ "$(docker exec "$CONTAINER_NAME" /bin/bash -lc 'printf %s "${DISPLAY:-}"')" == ':1' ]]
-          docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -x Xvnc >/dev/null && test "$(getent passwd 1000 | cut -d: -f6)" = /home/kasm-user'
+          docker exec "$CONTAINER_NAME" /bin/bash -lc 'test -S /tmp/.X11-unix/X1 && pgrep -x Xvnc >/dev/null'
           client="$SOURCE_PACKAGE/bin/client"
           [[ -x "$client" && ! -L "$client" ]]
           [[ "$(stat -c %s "$client")" == "$EXPECTED_SIZE" ]]
           [[ "$(sha256sum "$client" | awk '{print $1}')" == "$EXPECTED_SHA" ]]
           echo KASM_CLIENT_START_PREFLIGHT=PASS
-          echo KASM_CLIENT_START_SECRET_ACCESS=false
-      - name: Stage exact package as Kasm user
+      - name: Stage and start exact client
         shell: bash
         run: |
           set +x; set -Eeuo pipefail
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc 'rm -rf /home/kasm-user/otclient-track-a/Tibia.new && mkdir -p /home/kasm-user/otclient-track-a/Tibia.new'
-          tar -C "$SOURCE_PACKAGE" -cf - . | docker exec -i -u 1000 "$CONTAINER_NAME" tar --no-same-owner --no-same-permissions -C /home/kasm-user/otclient-track-a/Tibia.new -xf -
-          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "test -x '$DEST_PACKAGE.new/bin/client' && test \"\$(stat -c %s '$DEST_PACKAGE.new/bin/client')\" = '$EXPECTED_SIZE' && test \"\$(sha256sum '$DEST_PACKAGE.new/bin/client' | awk '{print \$1}')\" = '$EXPECTED_SHA'"
-          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "rm -rf '$DEST_PACKAGE' && mv '$DEST_PACKAGE.new' '$DEST_PACKAGE'"
+          dest="/home/kasm-user/otclient-track-a/Tibia-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker exec -u 1000 "$CONTAINER_NAME" mkdir -p "$dest"
+          tar -C "$SOURCE_PACKAGE" -cf - . | docker exec -i -u 1000 "$CONTAINER_NAME" tar --no-same-owner --no-same-permissions -C "$dest" -xf -
+          docker exec -u 1000 "$CONTAINER_NAME" /bin/bash -lc "test -x '$dest/bin/client' && test \"\$(stat -c %s '$dest/bin/client')\" = '$EXPECTED_SIZE' && test \"\$(sha256sum '$dest/bin/client' | awk '{print \$1}')\" = '$EXPECTED_SHA'"
           echo KASM_CLIENT_PACKAGE_STAGED=PASS
-      - name: Start client on Kasm desktop
-        shell: bash
-        run: |
-          set +x; set -Eeuo pipefail
-          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
-          if docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -af '$DEST_PACKAGE/bin/client'" >/dev/null 2>&1; then
-            echo KASM_CLIENT_ALREADY_RUNNING=true
-          else
-            docker exec -d -u 1000 -e DISPLAY=:1 -e HOME=/home/kasm-user -e QT_QUICK_BACKEND=software -e QSG_INFO=1 -e LD_LIBRARY_PATH="$DEST_PACKAGE/bin/lib" "$CONTAINER_NAME" /bin/bash -lc "cd '$DEST_PACKAGE' && exec ./bin/client >/home/kasm-user/tibia-client.log 2>&1"
-          fi
+          docker exec -d -u 1000 -e DISPLAY=:1 -e HOME=/home/kasm-user -e QT_QUICK_BACKEND=software -e QSG_INFO=1 -e LD_LIBRARY_PATH="$dest/bin/lib" "$CONTAINER_NAME" /bin/bash -lc "cd '$dest' && exec ./bin/client >/home/kasm-user/tibia-client.log 2>&1"
           pid=''
           for _ in $(seq 1 60); do
-            pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -o -f '$DEST_PACKAGE/bin/client' || true")"
+            pid="$(docker exec "$CONTAINER_NAME" /bin/bash -lc "pgrep -o -f '$dest/bin/client' || true")"
             [[ "$pid" =~ ^[1-9][0-9]*$ ]] && break
             sleep .25
           done
           [[ "$pid" =~ ^[1-9][0-9]*$ ]]
-          docker exec "$CONTAINER_NAME" /bin/bash -lc "kill -0 '$pid' && test \"\$(readlink -f /proc/$pid/exe)\" = '$DEST_PACKAGE/bin/client'"
+          docker exec "$CONTAINER_NAME" /bin/bash -lc "kill -0 '$pid' && test \"\$(readlink -f /proc/$pid/exe)\" = '$dest/bin/client'"
           echo "KASM_CLIENT_PID=$pid"
           echo KASM_CLIENT_PROCESS=PASS
       - name: Verify visible Tibia window on DISPLAY :1

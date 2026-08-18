@@ -1,13 +1,13 @@
 ---
 task_id: OTC-20260819-track-a-parallel-runtime-prompts
-status: in_progress
+status: blocked
 agent: ChatGPT
 session_role: prompt-author
 project_lane: otclient
 lane: COVERAGE-AUDIT
 track_id: official-client-re
 task_kind: documentation
-phase: exact-head-validation
+phase: fresh-independent-prompt-audit-required
 execution_mode: github_only
 branch: docs/OTC-20260819-track-a-parallel-runtime-prompts
 base_branch: main
@@ -123,12 +123,14 @@ This is narrowly encoded as:
 - [x] researcher outputs remain Draft-only and coordinator-only promotion is preserved;
 - [x] prompt eval includes positive, negative, boundary, stale-target, concurrency, injection, authorization and closeout cases;
 - [x] full diff is documentation-only and does not touch #528/#539/#475/#302/#536 owned paths;
-- [ ] exact-head CI/governance green on the final unchanged head;
-- [ ] fresh proportionate documentation/prompt audit completed before merge;
+- [x] complete prompt/eval content passed exact-head CI/governance before this checkpoint-only task update;
+- [ ] final unchanged checkpoint head exact-head CI/governance green;
+- [ ] fresh independent documentation/prompt audit with material findings `0`;
+- [ ] mark Ready, squash merge, archive task and release ownership.
 
 # Validation checkpoint
 
-The first complete prompt/eval head was:
+First complete prompt/eval head:
 
 ```text
 62b65f9b975f0282ee0acf386210b218bb814e94
@@ -136,30 +138,28 @@ CI 32192910735 = SUCCESS
 Track A agent runtime governance 32192910601 = FAILURE
 ```
 
-The governance failure was metadata-only and correctly identified this task record as missing the universal Track A admission fields. No prompt/eval content failure was reported. This update adds the required docs-only values:
+That governance failure was metadata-only: this task record lacked universal Track A admission fields. No prompt/eval content failure was reported.
+
+After adding the required `none/NOT_APPLICABLE` admission values, exact head:
 
 ```text
-runtime_access: none
-runtime_owner_task: NOT_APPLICABLE
-runtime_namespace: NOT_APPLICABLE
-canonical_registration: NOT_APPLICABLE
-canonical_lease_generation: NOT_APPLICABLE
-registration_lease_generation: NOT_APPLICABLE
-gate_a: NOT_APPLICABLE
-generation_rebind: NOT_APPLICABLE
-gate_b: NOT_APPLICABLE
-bootstrap: NOT_APPLICABLE
-target_uniqueness: NOT_APPLICABLE
+c50d8984ce6b1a75b2b7b6dd35219c8c5d95b15b
+CI 32193038317 = SUCCESS
+Track A agent runtime governance 32193038190 = SUCCESS
 ```
 
-Full changed-file inventory and all three patches were self-reviewed. Material prompt findings from self-review: `0`.
+Full changed-file inventory is exactly three declared documentation/task paths. All three complete patches were self-reviewed. Manual eval contains 25 representative positive/negative/boundary cases. Material prompt findings from self-review: `0`.
 
-# Current checkpoint
+This checkpoint-only task update changes the head, so final exact-head checks must be observed once more before any Ready transition.
+
+# Independent-audit blocker
+
+`PROMPT_EVAL_STANDARD.md` and task closeout require a fresh independent prompt/documentation validator for this material prompting change. The authoring worker's self-review cannot be represented as independent validation.
 
 ```yaml
-status: in_progress
-base_main: a1368bbecd5b6a6bc2447d2c7debb1141efc2dcb
-related_pr: 543
-last_completed_step: complete 12-alias prompt package, 25-case manual eval matrix and three-path full-diff self-review; governance metadata defect repaired
-next_action: verify exact-head CI/governance and current-main freshness, then obtain a fresh independent prompt/documentation audit before Ready/merge
+status: blocked
+blocker: REQUIRED_FRESH_INDEPENDENT_PROMPT_DOCUMENTATION_AUDIT
+material_findings_open_from_self_review: 0
+last_completed_step: full 12-alias prompt package, shared KasmVNC/anti-idle contract, 25-case manual eval, exact three-path self-review, green pre-checkpoint CI/governance
+next_action: fresh validator audits exact final diff against PROMPTING_STANDARD, PROMPT_EVAL_STANDARD, parallel coordination and KasmVNC runtime contract; if material findings are 0 and final exact-head checks remain green, mark Ready and squash-merge/archive
 ```

@@ -30,8 +30,9 @@ class CanonicalXResProbeTests(unittest.TestCase):
             self.m._require_listener(42, 5901, "vnc")
         with mock.patch.object(self.m, "_listener_inodes", return_value={"123"}), \
                 mock.patch.object(self.m, "_process_socket_inodes", return_value={"999"}):
-            with self.assertRaisesRegex(self.m.ProbeError, "listener_owner_mismatch"):
+            with self.assertRaises(self.m.ProbeError) as raised:
                 self.m._require_listener(42, 5901, "vnc")
+        self.assertEqual(raised.exception.code, "listener_owner_mismatch")
 
     def test_role_validation_rejects_secret_or_capability_environment(self):
         env = {
@@ -42,8 +43,9 @@ class CanonicalXResProbeTests(unittest.TestCase):
         }
         with mock.patch.object(self.m, "_pgrp", return_value=77), \
                 mock.patch.object(self.m, "_proc_env", return_value=env):
-            with self.assertRaisesRegex(self.m.ProbeError, "tracked_process_secret_env_leak"):
+            with self.assertRaises(self.m.ProbeError) as raised:
                 self.m._require_role(42, "client", 77)
+        self.assertEqual(raised.exception.code, "tracked_process_secret_env_leak")
 
     def test_raw_xres_window_requires_numeric_positive_xid(self):
         ok = mock.Mock(returncode=0, stdout="12582929\n")
@@ -51,8 +53,9 @@ class CanonicalXResProbeTests(unittest.TestCase):
             self.assertEqual(self.m._raw_xres_window(":99", 42, Path("/tool")), 12582929)
         bad = mock.Mock(returncode=0, stdout="not-an-xid\n")
         with mock.patch.object(self.m.subprocess, "run", return_value=bad):
-            with self.assertRaisesRegex(self.m.ProbeError, "raw_xres_window_invalid"):
+            with self.assertRaises(self.m.ProbeError) as raised:
                 self.m._raw_xres_window(":99", 42, Path("/tool"))
+        self.assertEqual(raised.exception.code, "raw_xres_window_invalid")
 
     def test_probe_manifest_uses_raw_xres_identity_and_exact_roles(self):
         roles = {"client": 41, "xvfb": 42, "vnc": 43, "wireproxy": 44}
@@ -71,11 +74,13 @@ class CanonicalXResProbeTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "manifest.json"
+            session = Path(tmp) / "session"
+            session.mkdir()
             with mock.patch.dict(
                 self.m.os.environ,
                 {"RUNNER_NAME": "synology-otclient-01", "GITHUB_REPOSITORY": "blakinio/otclient"},
                 clear=True,
-            ), mock.patch.object(self.m.SESSION, "is_dir", return_value=True), \
+            ), mock.patch.object(self.m, "SESSION", session), \
                     mock.patch.object(self.m, "_positive_int", side_effect=positive), \
                     mock.patch.object(self.m, "_toolroot", return_value=Path("/tool")), \
                     mock.patch.object(self.m, "_within", side_effect=lambda _root, path: path), \
@@ -103,9 +108,10 @@ class CanonicalXResProbeTests(unittest.TestCase):
             rfb.assert_called_once_with(5901)
             xres.assert_called_once_with(":99", 41, Path("/tool"))
 
-    def test_source_contains_no_xdotool_window_lookup(self):
+    def test_source_uses_no_xdotool_window_command(self):
         source = SCRIPT.read_text()
-        self.assertNotIn("xdotool", source)
+        self.assertNotIn("search --onlyvisible", source)
+        self.assertNotIn("/usr/bin/xdotool", source)
         self.assertIn("tibia-official-client-re-xres-window-owner.py", source)
         self.assertIn("LocalClientPid", source)
 

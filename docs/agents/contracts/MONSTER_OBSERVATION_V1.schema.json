@@ -149,6 +149,7 @@
         },
         "source_record_ids": {
           "type": "array",
+          "minItems": 1,
           "maxItems": 64,
           "uniqueItems": true,
           "items": {
@@ -469,6 +470,43 @@
       "if": {
         "properties": {
           "record_type": {
+            "const": "CREATURE_CREATE"
+          },
+          "appearance_context": {
+            "const": "CONTINUOUS_COVERAGE_CREATE"
+          }
+        },
+        "required": [
+          "record_type",
+          "appearance_context"
+        ]
+      },
+      "then": {
+        "properties": {
+          "coverage": {
+            "properties": {
+              "mode": {
+                "const": "CONTINUOUS_CONFIRMED"
+              },
+              "tile_observed": {
+                "const": true
+              },
+              "continuous_since_monotonic_ns": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "last_gap_reason": {
+                "const": "NONE"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_type": {
             "const": "CREATURE_DELETE"
           }
         },
@@ -497,7 +535,14 @@
       "then": {
         "required": [
           "player"
-        ]
+        ],
+        "properties": {
+          "player": {
+            "required": [
+              "position"
+            ]
+          }
+        }
       }
     },
     {
@@ -545,6 +590,67 @@
               },
               "last_gap_reason": {
                 "const": "NONE"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "evidence": {
+                "const": "DERIVED"
+              }
+            },
+            "required": [
+              "evidence"
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "required": [
+              "source_record_ids"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "layer": {
+                "const": "INFERENCE"
+              }
+            },
+            "required": [
+              "layer"
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source": {
+            "required": [
+              "source_record_ids"
+            ],
+            "properties": {
+              "evidence": {
+                "const": "DERIVED"
               }
             }
           }

@@ -4,6 +4,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+PORT_OLD='  vnc_port="$(free_port 6082 6120)" || die no_free_vnc_port\n'
+PORT_NEW='  vnc_port=6082\n  ! listen "$vnc_port" || die observer_vnc_port_6082_busy\n'
+
 VNC_OLD = r'''  printf 'TRACK_A_CANONICAL_STAGE=vnc_start\n'
   env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
     OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_CANONICAL_RUNTIME=1 \
@@ -50,10 +53,15 @@ class Refused(RuntimeError):
 
 
 def transform(text: str) -> str:
-    if text.count(VNC_OLD) != 1:
-        raise Refused(f"VNC_ANCHOR_COUNT:{text.count(VNC_OLD)}")
-    out = text.replace(VNC_OLD, VNC_NEW, 1)
+    if text.count(PORT_OLD) != 1:
+        raise Refused(f"PORT_ANCHOR_COUNT:{text.count(PORT_OLD)}")
+    out=text.replace(PORT_OLD,PORT_NEW,1)
+    if out.count(VNC_OLD) != 1:
+        raise Refused(f"VNC_ANCHOR_COUNT:{out.count(VNC_OLD)}")
+    out = out.replace(VNC_OLD, VNC_NEW, 1)
     required = (
+        "vnc_port=6082",
+        "observer_vnc_port_6082_busy",
         "TRACK_A_USER_VNC_MODE=VIEW_ONLY_PASSWORD_PROTECTED",
         "TRACK_A_USER_VNC_PORT=%s",
         "-viewonly",
@@ -65,9 +73,8 @@ def transform(text: str) -> str:
     missing = [x for x in required if x not in out]
     if missing:
         raise Refused("REQUIRED_MISSING:" + ",".join(missing))
-    for forbidden in ("-localhost -nopw", "TIBIA_TEST_PASSWORD=", "TIBIA_TEST_EMAIL="):
-        if forbidden in out and forbidden == "-localhost -nopw":
-            raise Refused("LEGACY_UNREACHABLE_VNC_SURVIVED")
+    if "-localhost -nopw" in out:
+        raise Refused("LEGACY_UNREACHABLE_VNC_SURVIVED")
     return out
 
 

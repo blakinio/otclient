@@ -1,0 +1,41 @@
+{
+  "schema": "otclient.tibia-runtime-bridge.discovery.v1",
+  "binary": "<runner-scratch>/client",
+  "targets": {
+    "container_storage": {
+      "expected_qt_class": "tibia::container::TContainerStorage",
+      "primary_vptr_candidates": ["0x308a1a0"],
+      "unique": true
+    },
+    "creature_storage": {
+      "expected_qt_class": "tibia::creatures::TCreatureStorage",
+      "primary_vptr_candidates": ["0x308d078"],
+      "unique": true
+    },
+    "game_client": {
+      "expected_qt_class": "tibia::client::TGameClient",
+      "primary_vptr_candidates": ["0x3076908"],
+      "unique": true
+    },
+    "gameserver_game_session": {
+      "expected_qt_class": "tibia::game::TGameserverGameSession",
+      "primary_vptr_candidates": ["0x3078ba0"],
+      "unique": true
+    },
+    "player_data": {
+      "expected_qt_class": "tibia::game::TPlayerData",
+      "primary_vptr_candidates": ["0x308ca70"],
+      "unique": true
+    },
+    "player_protocol_handler": {
+      "expected_qt_class": "tibia::game::TPlayerProtocolMessageHandler",
+      "primary_vptr_candidates": ["0x308a008"],
+      "unique": true
+    },
+    "worldmap_handler": {
+      "expected_qt_class": "tibia::worldmap::TWorldmapProtocolMessageHandler",
+      "primary_vptr_candidates": ["0x30871d8"],
+      "unique": true
+    }
+  }
+}

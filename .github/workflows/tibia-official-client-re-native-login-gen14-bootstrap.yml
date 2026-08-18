@@ -1,0 +1,108 @@
+name: Track A native-login generation 14 bootstrap
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-gen14-bootstrap.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Recover standard canonical runtime at generation 14
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 8
+    env:
+      TASK_ID: OTC-20260818-native-login-to-ingame-e2e
+      SESSION_ID: chatgpt-native-login-e2e-20260818-v3-gen14
+      STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+      TOKEN_FILE: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
+      EXPECTED_MAIN: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Acquire generation 14, bootstrap exact client, Gate B
+        shell: bash
+        env:
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_MAIN" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_MAIN" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EVENT_BASE_SHA" --expected-branch "$HEAD_BRANCH"
+
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          transition=.github/scripts/tibia-official-client-re-canonical-live-transition.py
+          worker_source=.github/scripts/tibia-official-client-re-canonical-live-session.sh
+          worker="$RUNNER_TEMP/native-login-gen14-bootstrap-${GITHUB_RUN_ID}.sh"
+          mkdir -p "$(dirname "$TOKEN_FILE")"
+          chmod 700 "$(dirname "$TOKEN_FILE")"
+          [[ ! -e "$TOKEN_FILE" ]]
+          bash "$lease" status --json >"$RUNNER_TEMP/lease-pre.json"
+          python3 - "$RUNNER_TEMP/lease-pre.json" "$STATE/runtime-registration.json" "$STATE/session" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert lease.get('status')=='released',lease
+          assert lease.get('generation')==13,lease
+          assert not pathlib.Path(sys.argv[2]).exists(),'registration unexpectedly present'
+          assert not pathlib.Path(sys.argv[3]).exists(),'session unexpectedly present'
+          print('NATIVE_LOGIN_GEN14_PRECHECK=PASS_RELEASED_GEN13_NO_RUNTIME')
+          PY
+          acquired=0;success=0
+          cleanup(){
+            rc=$?
+            rm -f "$worker"
+            if [[ "$success" != 1 && "$acquired" == 1 && -f "$TOKEN_FILE" ]];then
+              bash "$lease" release --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" >/dev/null 2>&1 || true
+            fi
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          bash "$lease" acquire --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" --ttl-seconds 2700
+          acquired=1
+          python3 .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py \
+            "$worker_source" "$worker" \
+            --owner-helper .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
+          chmod 700 "$worker";bash -n "$worker"
+          python3 "$transition" bootstrap --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" --worker "$worker" --worker-timeout 180
+          python3 "$transition" gate-b --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" --probe "$worker"
+          python3 - "$STATE/lease.json" "$STATE/runtime-registration.json" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text());reg=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert lease.get('status')=='active' and lease.get('generation')==14
+          assert lease.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert lease.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen14'
+          assert reg.get('registration_generation')==1 and reg.get('lease_generation')==14
+          assert reg.get('client_version')=='15.32.df7b29' and reg.get('client_size')==51965216
+          assert reg.get('client_sha256')=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          print('NATIVE_LOGIN_GEN14_BOOTSTRAP=PASS')
+          print('NATIVE_LOGIN_GEN14_GATE_B=PASS')
+          print('NATIVE_LOGIN_GEN14_PID='+str(reg['pid']))
+          print('NATIVE_LOGIN_GEN14_START='+str(reg['process_start_ticks']))
+          print('NATIVE_LOGIN_GEN14_DISPLAY='+str(reg['display']))
+          PY
+          success=1
+          rm -f "$worker"
+          trap - EXIT
+          echo 'NATIVE_LOGIN_GEN14_SECRET_ACCESS=false'
+          echo 'NATIVE_LOGIN_GEN14_LOGIN_PERFORMED=false'

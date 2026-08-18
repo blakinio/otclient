@@ -1,173 +1,141 @@
-# Track A Controller Handoff and Persistent Viewer Contract v1
+# Track A Controller Handoff and Persistent KasmVNC Desktop Contract v2
 
 ```yaml
-track_a_controller_handoff_and_viewer_version: 1
+track_a_controller_handoff_and_viewer_version: 2
 track_id: official-client-re
 repository: blakinio/otclient
 runtime_platform: official_native_linux_only
+browser_desktop_provider: KasmVNC
 status: proposed_until_PR_541_merge
 ```
 
-This contract extends, and never weakens, `TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`, `TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md` and ADR-0001. Until PR #541 is reviewed and merged, it is implementation evidence only and is **not** live runtime authority.
+This contract extends, and never weakens, `TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`, `TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md` and ADR-0001. Until PR #541 is reviewed and merged, repository changes here do not expand live official-client authority.
 
 ## Purpose
 
-Keep the canonical official-client runtime and browser observer durable across replacement agent sessions without treating a historical agent `session_id` as runtime identity.
+Make the GUI desktop a durable programme resource instead of an artifact of one agent/job. A replacement agent gets a fresh controller session and capability while reusing the same KasmVNC desktop/container and browser URL.
 
-The three identities are separate:
+Keep these identities separate:
 
 ```text
-runtime    = registration + boot/PID/start/exact-client/display/raw-XRes XID
-controller = current task + disposable current session + capability + lease generation
-viewer     = immutable runtime binding + viewer instance + presentation topology
+runtime    = exact registered official client identity when one exists
+controller = task + current disposable session + capability + lease generation
+desktop    = task-owned KasmVNC container + internal display + stable HTTPS endpoint
 ```
 
-A controller session may change while the same exact runtime and the same viewer remain alive.
+A historical agent `session_id` is never desktop identity.
 
-## Mandatory replacement-session sequence
+## Mandatory controller replacement
 
-A replacement worker must first perform ordinary repository/session recovery and current Track A admission. It must not copy a historical `session_id` from a handoff document merely to satisfy lease validation.
+The supported canonical controller entry point remains:
 
-The supported controller entry point is:
+```text
+python3 .github/scripts/tibia-official-client-re-canonical-live-resume.py resume --task-id <task>
+```
+
+On GitHub Actions it derives a fresh current session from the current run/attempt/job. For an active fresh lease owned by the same task but a prior agent session, replacement is explicit and requires a reason:
 
 ```text
 python3 .github/scripts/tibia-official-client-re-canonical-live-resume.py \
-  resume \
-  --task-id <current task>
-```
-
-On GitHub Actions the helper derives a fresh controller session from the current run/attempt/job. Outside GitHub Actions a fresh explicit `--session-id` is required.
-
-If a fresh unexpired controller already belongs to the **same task** but a different prior session, replacement is explicit:
-
-```text
-python3 .github/scripts/tibia-official-client-re-canonical-live-resume.py \
-  resume \
-  --task-id <same task> \
-  --replace-active-same-task \
+  resume --task-id <same-task> --replace-active-same-task \
   --reason '<verified recovery reason>'
 ```
 
-The same-task handoff must:
+The handoff must remain fail closed: same task only, current capability required, exact expected generation required, capability rotated, generation incremented, old capability invalidated at commit, and canonical coordination serialization preserved. Expired leases use the existing stale-takeover path. Different-task ownership remains a refusal.
 
-- discover the previous session from authoritative lease state;
-- require the current capability and expected generation;
-- refuse another task;
-- refuse an expired lease and use normal stale takeover instead;
-- rotate the capability;
-- increment lease generation;
-- invalidate the old capability immediately at state commit;
-- keep the canonical coordination lock through the transfer.
+When a canonical official-client registration survives across controller generations, the existing reviewed generation-rebind transition and Gate B remain mandatory. The default reuse/Gate-B window proof is the raw-XRes probe, not `xdotool --pid`.
 
-A new generation does **not** automatically bless the existing registration. When registration survives from the older generation, `resume.py` must use the promoted generation-rebind transition and then Gate B.
+## KasmVNC desktop is the browser presentation authority
 
-## Canonical reuse and Gate B window authority
-
-For replacement-session reuse, rebind and Gate B, the default probe is:
+The new Track A user-facing GUI path is:
 
 ```text
-.github/scripts/tibia-official-client-re-canonical-live-xres-probe.py
+browser
+  -> HTTPS 192.168.1.2:6901
+  -> KasmVNC integrated web server/WebSocket
+  -> task-owned persistent Kasm desktop DISPLAY=:1
 ```
 
-It must prove the registered X11 window through:
+The task-owned deployment identity is fixed:
+
+```yaml
+container: otclient-track-a-kasmvnc
+runtime_namespace: track-a-kasmvnc-desktop
+host_port: 6901
+container_port: 6901
+internal_display: ':1'
+restart_policy: unless-stopped
+state_directory: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-track-a-persistent-viewer-handoff/kasmvnc
+```
+
+KasmVNC owns the desktop and browser transport. The new desktop path MUST NOT use `x11vnc`, `websockify` or noVNC as an intermediate presentation chain.
+
+The retained PR #528 observer `DISPLAY=:99` / `http://192.168.1.2:6083/` is legacy task-owned state only. It is not the new Track A desktop and must not be attached to, stopped, replaced or republished by the KasmVNC task.
+
+## Isolated deployment boundary
+
+KasmVNC desktop bootstrap is permitted as `runtime_access: ephemeral_isolated` only when the active task declares and verifies its unique container, state directory and host port. This desktop-only deployment:
+
+- may create/restart only `otclient-track-a-kasmvnc` whose labels prove exact task ownership;
+- may bind only host `192.168.1.2:6901` for the browser desktop;
+- must fail closed when that container name or port is owned by an unrelated process/container;
+- must not access or mutate the canonical lease/registration merely to create the desktop;
+- must not launch an official Tibia client while another task owns the official-client runtime surface;
+- must not touch PR #528 `:99/6083` except optional non-invasive reachability checks.
+
+## Persistence across agent turnover
+
+The KasmVNC container uses `restart: unless-stopped` and is deliberately not tied to the lifecycle of a GitHub Actions job or ChatGPT session. A replacement worker must discover/reuse the exact task-owned container rather than creating a new desktop because its own `session_id` changed.
+
+Once the official-client runtime is migrated into Kasm under separately admitted ownership, a controller turnover must preserve the Kasm container and desktop. Controller release is not desktop teardown.
+
+## Official-client migration gate
+
+Deploying the desktop does not authorize launching Tibia inside it. Before the official native Linux client is migrated into the Kasm desktop, the current official-client owner must release or explicitly reconcile its runtime surface and current Track A admission must prove the required client/runtime gates.
+
+The migration must ensure the future canonical registration describes the exact client actually running inside the Kasm desktop. No second official-client login/session may be created merely to populate the new desktop.
+
+## Secret boundary
+
+The Kasm deployment must never read or receive:
 
 ```text
-raw X11/XRes
- -> LocalClientPid
- -> exact registered client PID
- -> VIEWABLE 1920x1080 XID
- -> exact registration window_identity
+TIBIA_TEST_EMAIL
+TIBIA_TEST_PASSWORD
+canonical lease token/capability
+Tibia auth/session material
 ```
 
-The reuse/Gate-B path must not use `xdotool search --pid` as window-ownership authority. `xdotool` may remain a bootstrap/discovery implementation detail until the separate initial-creation worker is migrated, but it cannot override raw-XRes evidence for reuse of an already registered runtime.
+The Kasm browser password is a separate temporary LAN credential stored only in the task-private state directory with mode `0600`; it is not Tibia authentication authority.
 
-The raw-XRes reuse probe also verifies the canonical tracked process group, role markers, secret-free process environments, VNC and WARP listener ownership, and the RFB banner before returning a manifest to the existing transition manager.
+Kasm container metadata/state must not contain Tibia credentials, cookies, session keys, packet payloads or account identifiers.
 
-## Persistent browser observer
+## Health and failure semantics
 
-The canonical browser presentation topology is:
+Desktop health and official-client runtime health are separate facts.
+
+A healthy Kasm desktop is proven by at least:
 
 ```text
-registered canonical X11 DISPLAY
- -> x11vnc view-only 127.0.0.1:5901
- -> websockify/noVNC runner backend :6081
- -> existing host presentation layer :6082
- -> http://synology:6082/
+exact task-owned container labels    PASS
+container running                    PASS
+restart policy unless-stopped        PASS
+host 192.168.1.2:6901 mapping        PASS
+HTTPS Kasm web application reachable PASS
 ```
 
-`6081` and `6082` are different roles. A worker must not bind the runner websockify backend to `6082` and then attempt to publish another host relay on `6082`.
+A Kasm desktop failure does not authorize restart/logout/login of an otherwise healthy official client. Likewise, a client failure does not authorize broad Docker cleanup of the desktop.
 
-The **supported viewer entry point** is:
+## Validation gates
 
-```text
-.github/scripts/tibia-official-client-re-persistent-viewer-controller.py
-```
+Before calling the Kasm desktop deployed, physical Synology evidence must prove:
 
-For `start`, this controller first runs the existing canonical `gate-b` transition with the raw-XRes probe. Only after Gate B succeeds may it invoke the low-level presentation primitive:
+1. `otclient-track-a-kasmvnc` is running on the Docker daemon used by `synology-otclient-01`;
+2. exact task/runtime/role labels match;
+3. restart policy is `unless-stopped`;
+4. `https://192.168.1.2:6901/` serves the KasmVNC application;
+5. the container remains alive after the deployment GitHub Actions job exits;
+6. PR #528 `:99/6083` is not mutated by the deployment;
+7. no Tibia secret is accessed and no official client is launched by the desktop-only deployment.
 
-```text
-.github/scripts/tibia-official-client-re-persistent-viewer.py
-```
-
-The low-level `persistent-viewer.py start` is an implementation primitive, not a standalone authority entry point. Agents must not invoke it directly to bypass Gate B. Its own lease validation and coordination-lock checks are additional guards, not substitutes for Gate B.
-
-`stop` remains bounded cleanup of separately marked viewer-owned processes and requires the current canonical lease; it does not require a healthy client merely to remove its own observer.
-
-## Viewer identity and health
-
-Every viewer instance serves a non-secret `viewer-identity.json` that binds the presentation backend to immutable runtime identity. Viewer health requires:
-
-```text
-runtime registration binding       PASS
-raw-XRes registered XID ownership  PASS
-RFB banner                          PASS
-local :6081 identity               exact match
-local :6081 WebSocket upgrade      HTTP 101
-public :6082 identity              exact same match
-public :6082 WebSocket upgrade     HTTP 101
-```
-
-Runtime health and viewer health are reported independently.
-
-If the exact runtime remains healthy but viewer health fails:
-
-```text
-TRACK_A_RUNTIME_HEALTH=PASS
-TRACK_A_VIEWER_HEALTH=FAIL_<presentation reason>
-```
-
-then the failure authorizes **viewer repair only**. It does not authorize client restart, login/logout, character selection, process signalling or registration mutation.
-
-## Viewer process ownership
-
-The viewer may replace only its own recorded PIDs whose `/proc/<pid>/environ` proves the exact Track A viewer instance and role. Unknown listeners fail closed. Broad `pkill`, broad Docker cleanup, display cleanup and unrelated listener replacement remain forbidden.
-
-The viewer is view-only. Persistent viewer children must not inherit credentials, lease capabilities, `RUNNER_TRACKING_ID` or secret-bearing variables.
-
-## Release
-
-A controller may release authority without destroying the canonical runtime or viewer:
-
-```text
-python3 .github/scripts/tibia-official-client-re-canonical-live-resume.py \
-  release \
-  --task-id <current task>
-```
-
-The release helper discovers the current authoritative controller session and current token slot from controller state. A historical `session_id` is not an input.
-
-## Physical validation gate
-
-Repository tests are not physical deployment proof. Before this facility is called deployed, a serialized physical Synology validation must prove on the current admitted exact client that:
-
-1. one controller establishes Gate B;
-2. viewer `start` passes through `persistent-viewer-controller.py` and cannot proceed when Gate B fails;
-3. the viewer is healthy through the exact public `:6082` identity and WebSocket path;
-4. controller authority is released/replaced without terminating the client/viewer;
-5. the replacement controller obtains a fresh session/capability/generation;
-6. required rebind + Gate B pass using the raw-XRes probe;
-7. the same runtime identity and viewer instance remain healthy after controller replacement;
-8. no second official-client login/session is created;
-9. no Tibia credential or auth/session secret is accessed by the viewer/handoff test.
-
-If another task owns the required Synology/runtime surface, the physical validation waits. It must never preempt that owner merely to complete this contract.
+Repository controller-handoff tests remain separately required. Integration of the official client into the Kasm desktop is a later physical gate after runtime ownership is available.

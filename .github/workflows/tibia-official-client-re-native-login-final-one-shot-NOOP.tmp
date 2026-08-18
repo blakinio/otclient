@@ -1,0 +1,30 @@
+name: Track A current-SHA native login final one-shot
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-final-one-shot.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: track-a-current-sha-native-login-final
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    name: Preserve single mutating run; drain newer duplicate off-box
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: No runtime or secret access
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo CURRENT_SHA_FINAL_DUPLICATE_DRAIN=PASS
+          echo RUNTIME_ACCESS=none
+          echo SECRET_ACCESS=false
+          echo CLIENT_MUTATION=false
+          echo LOGIN=false

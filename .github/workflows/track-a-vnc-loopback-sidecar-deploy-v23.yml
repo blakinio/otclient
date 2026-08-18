@@ -8,11 +8,14 @@ on:
       - .github/workflows/track-a-vnc-loopback-sidecar-deploy-v23.yml
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: track-a-vnc-loopback-sidecar-v23
   cancel-in-progress: false
+
+env:
+  EVIDENCE: docs/agents/evidence/OTC-20260817-track-a-worldmap-server-delivery-causal-validation/20260818-v23-vnc-sidecar.md
 
 jobs:
   deploy:
@@ -20,6 +23,12 @@ jobs:
     runs-on: [self-hosted, oteryn-staging]
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation
+          persist-credentials: true
+          fetch-depth: 0
+
       - name: Install isolated VNC forwarder without touching OTClient runner
         shell: bash
         run: |
@@ -69,6 +78,31 @@ jobs:
           ! grep -Ev ' -> 127\.0\.0\.1:' <<<"$ports" | grep -q .
           count="$(grep -c ' -> 127\.0\.0\.1:' <<<"$ports")"
           [[ "$count" -eq 39 ]]
+          {
+            echo '# Track A v23 VNC sidecar deployment'
+            echo
+            echo '```text'
+            echo 'TRACK_A_VNC_HOST_BIND=127.0.0.1_ONLY'
+            echo 'TRACK_A_VNC_FORWARD_RANGE=6082-6120'
+            echo "TRACK_A_VNC_DOCKER_NETWORK=$net"
+            echo 'TRACK_A_VNC_SIDECAR=PASS'
+            echo 'OTCLIENT_RUNNER_RECREATED=false'
+            echo 'VNC_PUBLIC_LAN_EXPOSURE=false'
+            echo '```'
+          } > "$EVIDENCE"
           echo 'TRACK_A_VNC_HOST_BIND=127.0.0.1_ONLY'
           echo 'TRACK_A_VNC_FORWARD_RANGE=6082-6120'
           echo 'TRACK_A_VNC_SIDECAR=PASS'
+
+      - name: Persist deploy proof
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -s "$EVIDENCE"
+          git fetch -q origin +refs/heads/runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation:refs/remotes/origin/task
+          git checkout -q -B runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation refs/remotes/origin/task
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$EVIDENCE"
+          git commit -m 'evidence(track-a): persist localhost-only VNC sidecar deploy'
+          git push origin HEAD:runtime/OTC-20260817-track-a-worldmap-server-delivery-causal-validation

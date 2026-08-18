@@ -1,0 +1,143 @@
+{
+  "schema": "track-a-s5-container-inbound-static-v1",
+  "task": "OTC-20260818-track-a-s5-container-inbound-static",
+  "pr": 518,
+  "exact_client": {
+    "version": "15.32.df7b29",
+    "size": 51965216,
+    "sha256": "e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe"
+  },
+  "s5_log_reuse_producer": {
+    "run": 32122620894,
+    "job": 95666177103,
+    "artifact": 9319111338,
+    "artifact_digest": "sha256:0e92295e1486540cf82233bdf7eb1c24b9c15c585f815f52a0847b340d4ee745",
+    "historical_qmeta_source_run": 31790507112,
+    "historical_qmeta_source_job": 94736106350,
+    "historical_qmeta_source_head": "9afdc76ca6fe238742f270e22d8ecf4abe5ba9a2",
+    "historical_log_sha256": "481600615765a5bbc570888817f23b75ac5cf8b93fab693f3c461872c183ef70"
+  },
+  "s1_registration_artifact": {
+    "run": 32112814216,
+    "artifact": 9315562574,
+    "artifact_digest": "sha256:583c8c217fa2eaa2411f79995473cd910b8803d8599f80574491ca27b8ab9860",
+    "registration_type_contracts": [
+      {
+        "message": "tibia::protobuf::protocol::GameserverMessageContainer",
+        "demangled_contract": "tibia::protocol::TProtocolMessageQueue::registerServerMessage<tibia::protobuf::protocol::GameserverMessageContainer>(void (tibia::protocol::TProtocolMessageQueue::*)(tibia::protobuf::protocol::GameserverMessageContainer const&))::<lambda(std::shared_ptr<tibia::protobuf::protocol::GameserverMessage> const&)>"
+      },
+      {
+        "message": "tibia::protobuf::protocol::GameserverMessageCreateInContainer",
+        "demangled_contract": "tibia::protocol::TProtocolMessageQueue::registerServerMessage<tibia::protobuf::protocol::GameserverMessageCreateInContainer>(void (tibia::protocol::TProtocolMessageQueue::*)(tibia::protobuf::protocol::GameserverMessageCreateInContainer const&))::<lambda(std::shared_ptr<tibia::protobuf::protocol::GameserverMessage> const&)>"
+      },
+      {
+        "message": "tibia::protobuf::protocol::GameserverMessageChangeInContainer",
+        "demangled_contract": "tibia::protocol::TProtocolMessageQueue::registerServerMessage<tibia::protobuf::protocol::GameserverMessageChangeInContainer>(void (tibia::protocol::TProtocolMessageQueue::*)(tibia::protobuf::protocol::GameserverMessageChangeInContainer const&))::<lambda(std::shared_ptr<tibia::protobuf::protocol::GameserverMessage> const&)>"
+      },
+      {
+        "message": "tibia::protobuf::protocol::GameserverMessageDeleteInContainer",
+        "demangled_contract": "tibia::protocol::TProtocolMessageQueue::registerServerMessage<tibia::protobuf::protocol::GameserverMessageDeleteInContainer>(void (tibia::protocol::TProtocolMessageQueue::*)(tibia::protobuf::protocol::GameserverMessageDeleteInContainer const&))::<lambda(std::shared_ptr<tibia::protobuf::protocol::GameserverMessage> const&)>"
+      }
+    ]
+  },
+  "queue": {
+    "class": "tibia::protocol::TProtocolMessageQueue",
+    "static_metaobject": "0x3085b60",
+    "static_metacall": "0xdf5fe0",
+    "method_count": 355,
+    "signal_count": 192,
+    "container_receive_signals": [
+      {"index": 62, "name": "receivedContainerMessage", "argc": 1, "flags": "0x6", "qmeta_signal": true},
+      {"index": 64, "name": "receivedCreateInContainerMessage", "argc": 1, "flags": "0x6", "qmeta_signal": true},
+      {"index": 65, "name": "receivedChangeInContainerMessage", "argc": 1, "flags": "0x6", "qmeta_signal": true},
+      {"index": 66, "name": "receivedDeleteInContainerMessage", "argc": 1, "flags": "0x6", "qmeta_signal": true}
+    ],
+    "adjacent_container_signals": [
+      {"index": 63, "name": "receivedCloseContainerMessage", "argc": 1, "flags": "0x6"},
+      {"index": 147, "name": "receivedUpdateManagedContainersMessage", "argc": 1, "flags": "0x6"},
+      {"index": 154, "name": "receivedSpecialContainersAvailableMessage", "argc": 1, "flags": "0x6"}
+    ]
+  },
+  "handler": {
+    "class": "tibia::container::TContainerProtocolMessageHandler",
+    "static_metaobject": "0x3084fe0",
+    "static_metacall": "0xd1e000",
+    "method_count": 35,
+    "signal_count": 11,
+    "direct_code_to_class_string_xref": "0xd290dd",
+    "container_handle_methods": [
+      {"index": 14, "name": "handleContainerMessage", "argc": 1, "flags": "0xa", "qmeta_signal": false},
+      {"index": 18, "name": "handleCreateInContainerMessage", "argc": 1, "flags": "0xa", "qmeta_signal": false},
+      {"index": 16, "name": "handleChangeInContainerMessage", "argc": 1, "flags": "0xa", "qmeta_signal": false},
+      {"index": 17, "name": "handleDeleteInContainerMessage", "argc": 1, "flags": "0xa", "qmeta_signal": false}
+    ],
+    "all_methods": [
+      "publishGameAction",
+      "sendCloseContainerMessage",
+      "sendUpContainerMessage",
+      "sendSeekInContainerMessage",
+      "sendGetObjectInfoMessage",
+      "sendContainerActionMessage",
+      "requestShowStashMessageDialog",
+      "requestShowOrRefreshStashDialog",
+      "requestCloseStashDialog",
+      "requestOpenDepotSearchWidget",
+      "requestCloseDepotSearchWidget",
+      "handleSetInventoryMessage",
+      "handleDeleteInventoryMessage",
+      "handlePlayerInventoryMessage",
+      "handleContainerMessage",
+      "handleCloseContainerMessage",
+      "handleChangeInContainerMessage",
+      "handleDeleteInContainerMessage",
+      "handleCreateInContainerMessage",
+      "handleObjectInfoMessage",
+      "handleStashMessage",
+      "handleShowMessageDialogMessage",
+      "handleSpecialContainersAvailableMessage",
+      "handleDepotSearchResultMessage",
+      "handleDepotSearchDetailListMessage",
+      "handleCloseDepotSearchMessage",
+      "requestCloseContainer",
+      "requestUpContainer",
+      "requestNextPageForContainer",
+      "requestPreviousPageForContainer",
+      "requestUpdateContainer",
+      "requestGetObjectsInfo",
+      "requestGetObjectInfo",
+      "requestSortContainer",
+      "requestMoveContentToManagedContainers"
+    ]
+  },
+  "storage": {
+    "class": "tibia::container::TContainerStorage",
+    "primary_vptr": "0x308a1a0",
+    "static_metaobject": "0x308e720",
+    "static_metacall": "0xd15af0",
+    "method_count": 3,
+    "signal_count": 3,
+    "signals": [
+      {"index": 0, "name": "containerUpdated", "argc": 2, "flags": "0x6"},
+      {"index": 1, "name": "containerRemoved", "argc": 1, "flags": "0x6"},
+      {"index": 2, "name": "manualSortModeChanged", "argc": 0, "flags": "0x6"}
+    ]
+  },
+  "classification": {
+    "four_container_message_types_have_queue_registerServerMessage_typed_member_pointer_contract": "FACT_TYPEINFO",
+    "four_received_container_methods_are_owned_by_TProtocolMessageQueue_QMeta": "FACT",
+    "four_received_container_methods_are_QMeta_signals": "FACT",
+    "four_corresponding_handle_methods_are_owned_by_TContainerProtocolMessageHandler_QMeta": "FACT",
+    "TContainerStorage_three_signal_surface": "FACT",
+    "specific_registerServerMessage_member_pointer_is_each_named_received_signal": "INFERENCE_HIGH_NOT_DIRECTLY_PROVEN",
+    "queue_signal_to_TContainerProtocolMessageHandler_connection": "UNKNOWN",
+    "TContainerProtocolMessageHandler_to_TContainerStorage_mutation": "UNKNOWN",
+    "runtime_delivery_or_causal_storage_change": "NOT_OBSERVED"
+  },
+  "current_task_runtime_access": "none",
+  "current_task_synology_access": false,
+  "client_downloaded_by_s5": false,
+  "client_executed_by_s5": false,
+  "credentials_used": false,
+  "pr475_runtime_observed": false,
+  "pr475_runtime_mutated": false
+}

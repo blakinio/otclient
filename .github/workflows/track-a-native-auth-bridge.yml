@@ -37,6 +37,7 @@ jobs:
           set -Eeuo pipefail
           python3 -m py_compile \
             tools/tibia_runtime_bridge/ipc_client.py \
+            tools/tibia_runtime_bridge/experimental_auth_client.py \
             tools/tibia_runtime_bridge/experimental_auth_launcher.py \
             tests/tools/tibia_runtime_bridge/test_bridge.py
           PYTHONPATH=. python3 tests/tools/tibia_runtime_bridge/test_bridge.py
@@ -44,11 +45,12 @@ jobs:
           echo 'NATIVE_AUTH_OFFICIAL_CLIENT_EXECUTED=false'
           echo 'NATIVE_AUTH_RUNTIME_ACCESS=none'
 
-      - name: Prove default build remains read-only
+      - name: Prove stable bridge and client remain read-only
         shell: bash
         run: |
           set -Eeuo pipefail
           test "$(git hash-object tools/tibia_runtime_bridge/bridge.cpp)" = c47dc3e81162867692e7608f14a9f53dea52bf3b
+          test "$(git hash-object tools/tibia_runtime_bridge/ipc_client.py)" = 63bdb9258ce2c67781f43de8f4a482024fc89672
           build="$RUNNER_TEMP/bridge-default"
           cmake -S tools/tibia_runtime_bridge -B "$build" -G Ninja
           cmake --build "$build" --parallel 2
@@ -58,8 +60,13 @@ jobs:
             echo 'stable bridge unexpectedly exposes auth command' >&2
             exit 1
           fi
+          if grep -F 'AUTH_WITH_CREDENTIALS' tools/tibia_runtime_bridge/ipc_client.py >/dev/null; then
+            echo 'stable bridge client unexpectedly exposes auth command' >&2
+            exit 1
+          fi
           echo 'NATIVE_AUTH_DEFAULT_BUILD_MUTATION_SURFACE=ABSENT'
           echo 'NATIVE_AUTH_STABLE_BRIDGE_BLOB=UNCHANGED'
+          echo 'NATIVE_AUTH_STABLE_CLIENT_BLOB=UNCHANGED'
 
       - name: Build explicit experimental helper
         shell: bash

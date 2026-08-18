@@ -17,6 +17,7 @@
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -288,7 +289,7 @@ bool coldAuthFenceMatches()
     if (mainBase == 0) {
         return false;
     }
-    std::array<unsigned char, kColdAuthFence.size()> actual{};
+    std::array<unsigned char, 32> actual{};
     return readSelfMemory(mainBase + kColdAuthTargetOffset, actual.data(), actual.size()) && actual == kColdAuthFence;
 }
 
@@ -493,21 +494,22 @@ IpcRequest receiveRequest(const int client)
     if (count <= 0) {
         return {false, {}, {}, "IPC_REQUEST_READ_FAILED"};
     }
-    if ((message.msg_flags & (MSG_CTRUNC | MSG_TRUNC)) != 0) {
-        return {false, {}, {}, "IPC_REQUEST_TRUNCATED"};
-    }
 
     IpcRequest request{true, std::string(commandBuffer, static_cast<std::size_t>(count)), {}, {}};
     for (cmsghdr* header = CMSG_FIRSTHDR(&message); header != nullptr; header = CMSG_NXTHDR(&message, header)) {
         if (header->cmsg_level != SOL_SOCKET || header->cmsg_type != SCM_RIGHTS || header->cmsg_len < CMSG_LEN(sizeof(int))) {
+            if (request.error.empty()) {
+                request.error = "IPC_ANCILLARY_DATA_INVALID";
+            }
             request.ok = false;
-            request.error = "IPC_ANCILLARY_DATA_INVALID";
             continue;
         }
         const std::size_t payloadBytes = header->cmsg_len - CMSG_LEN(0);
         if (payloadBytes % sizeof(int) != 0) {
+            if (request.error.empty()) {
+                request.error = "IPC_ANCILLARY_DATA_INVALID";
+            }
             request.ok = false;
-            request.error = "IPC_ANCILLARY_DATA_INVALID";
             continue;
         }
         const std::size_t descriptorCount = payloadBytes / sizeof(int);
@@ -515,12 +517,21 @@ IpcRequest receiveRequest(const int client)
         request.fileDescriptors.insert(request.fileDescriptors.end(), descriptors, descriptors + descriptorCount);
     }
 
+    if ((message.msg_flags & (MSG_CTRUNC | MSG_TRUNC)) != 0) {
+        if (request.error.empty()) {
+            request.error = "IPC_REQUEST_TRUNCATED";
+        }
+        request.ok = false;
+    }
+
     while (!request.command.empty() && (request.command.back() == '\n' || request.command.back() == '\r')) {
         request.command.pop_back();
     }
     if (request.command.empty() || request.command.find('\n') != std::string::npos || request.command.find('\r') != std::string::npos) {
+        if (request.error.empty()) {
+            request.error = "IPC_COMMAND_INVALID";
+        }
         request.ok = false;
-        request.error = "IPC_COMMAND_INVALID";
     }
     return request;
 }
@@ -569,10 +580,12 @@ void authServer()
         return;
     }
     g_authSocketPath = socketEnv;
-    if (g_authSocketPath.size() >= sizeof(sockaddr_un::sun_path)) {
+    sockaddr_un address{};
+    if (g_authSocketPath.size() >= sizeof(address.sun_path)) {
         return;
     }
     struct stat existing {};
+    errno = 0;
     if (::lstat(g_authSocketPath.c_str(), &existing) == 0 || errno != ENOENT) {
         return;
     }
@@ -582,7 +595,6 @@ void authServer()
         return;
     }
     ::umask(0077);
-    sockaddr_un address{};
     address.sun_family = AF_UNIX;
     std::strncpy(address.sun_path, g_authSocketPath.c_str(), sizeof(address.sun_path) - 1);
     if (::bind(server, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||

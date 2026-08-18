@@ -121,7 +121,7 @@ jobs:
             --task-id "$task" \
             --session-id "$session" \
             --token-file "$token" \
-            --ttl-seconds 3600
+            --ttl-seconds 2700
           acquired=1
 
           python3 - "$state/lease.json" <<'PY'

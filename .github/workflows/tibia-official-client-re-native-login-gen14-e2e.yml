@@ -1,0 +1,440 @@
+name: Track A native login gen14 E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-gen14-e2e.yml
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: track-a-canonical-live-runtime
+  cancel-in-progress: false
+
+jobs:
+  physical:
+    name: Recover canonical runtime and execute native login
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 20
+    env:
+      TASK_ID: OTC-20260818-native-login-to-ingame-e2e
+      SESSION_ID: chatgpt-native-login-e2e-20260818-v3-gen14
+      BASE: /home/runner/_work/_otclient_tibia_re_state
+      STATE: /home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime
+      TOKEN_FILE: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
+      NATIVE_ROOT: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/native-auth-gen14
+      EXPECTED_MAIN: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
+      EXPECTED_CLIENT_SHA: e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
+      AUTH_HELPER_SHA: e5cd3f4c42c35000dce7ed5736bdf646fdb179119817f726a86f9e9637a82777
+      AUTH_HELPER_SIZE: '63728'
+
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Download exact experimental native-auth helper
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: native-login-auth-helper-5376592fd7382406b4c97de9813a40841d1b3bfd
+          path: ${{ runner.temp }}/native-login-auth-helper-gen14
+          repository: blakinio/otclient
+          run-id: 32129906446
+          github-token: ${{ github.token }}
+
+      - name: Recover canonical runtime as generation 14 and prove Gate B
+        shell: bash
+        env:
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_MAIN" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_MAIN" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EVENT_BASE_SHA" --expected-branch "$HEAD_BRANCH"
+
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          transition=.github/scripts/tibia-official-client-re-canonical-live-transition.py
+          worker_source=.github/scripts/tibia-official-client-re-canonical-live-session.sh
+          worker="$RUNNER_TEMP/native-login-gen14-worker-${GITHUB_RUN_ID}.sh"
+          mkdir -p "$(dirname "$TOKEN_FILE")" "$NATIVE_ROOT"
+          chmod 700 "$(dirname "$TOKEN_FILE")" "$NATIVE_ROOT"
+          [[ ! -e "$TOKEN_FILE" ]]
+          "$lease" status --json >"$RUNNER_TEMP/gen14-lease-pre.json"
+          python3 - "$RUNNER_TEMP/gen14-lease-pre.json" "$STATE/runtime-registration.json" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          reg=pathlib.Path(sys.argv[2])
+          assert lease.get('status')=='released',lease
+          assert lease.get('generation')==13,lease
+          assert not reg.exists(),'registration unexpectedly present after failed gen13 bootstrap'
+          print('NATIVE_LOGIN_GEN14_PRECHECK=PASS_RELEASED_GEN13_NO_REGISTRATION')
+          PY
+          acquired=0; success=0
+          cleanup(){
+            rc=$?
+            rm -f "$worker"
+            if [[ "$success" != 1 && "$acquired" == 1 && -f "$TOKEN_FILE" ]];then
+              "$lease" release --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" >/dev/null 2>&1 || true
+            fi
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          "$lease" acquire --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" --ttl-seconds 2700
+          acquired=1
+          python3 .github/scripts/tibia-official-client-re-canonical-xres-worker-adapter.py \
+            "$worker_source" "$worker" \
+            --owner-helper .github/scripts/tibia-official-client-re-xres-window-owner.py \
+            --wire-helper .github/scripts/tibia-official-client-re-xres-wire.py
+          chmod 700 "$worker"; bash -n "$worker"
+          python3 "$transition" bootstrap --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" --worker "$worker" --worker-timeout 180
+          python3 "$transition" gate-b --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" --probe "$worker"
+          python3 - "$STATE/lease.json" "$STATE/runtime-registration.json" <<'PY'
+          import json,pathlib,sys
+          lease=json.loads(pathlib.Path(sys.argv[1]).read_text());reg=json.loads(pathlib.Path(sys.argv[2]).read_text())
+          assert lease.get('status')=='active' and lease.get('generation')==14
+          assert lease.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert lease.get('controller_session')=='chatgpt-native-login-e2e-20260818-v3-gen14'
+          assert reg.get('registration_generation')==1 and reg.get('lease_generation')==14
+          assert reg.get('client_version')=='15.32.df7b29' and reg.get('client_size')==51965216
+          assert reg.get('client_sha256')=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe'
+          print('NATIVE_LOGIN_GEN14_BOOTSTRAP_GATE_B=PASS')
+          print('NATIVE_LOGIN_GEN14_PID='+str(reg['pid']))
+          print('NATIVE_LOGIN_GEN14_START='+str(reg['process_start_ticks']))
+          PY
+          success=1
+          rm -f "$worker"
+          trap - EXIT
+
+      - name: Arm guarded late helper activation and native observer
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
+          "$lease" renew --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" --ttl-seconds 2700
+          helper_src="$RUNNER_TEMP/native-login-auth-helper-gen14/otclient-tibia-native-auth-experimental.so"
+          helper="$NATIVE_ROOT/otclient-tibia-native-auth-experimental.so"
+          [[ -f "$helper_src" && "$(stat -c %s "$helper_src")" == "$AUTH_HELPER_SIZE" ]]
+          [[ "$(sha256sum "$helper_src" | awk '{print $1}')" == "$AUTH_HELPER_SHA" ]]
+          install -m700 "$helper_src" "$helper"
+          package="$STATE/session/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
+          compat="$RUNNER_TEMP/gen14-helper-ldd.txt"
+          LD_LIBRARY_PATH="$package/bin/lib" ldd "$helper" >"$compat" 2>&1
+          ! grep -Eq 'not found|version .* not found' "$compat"
+          grep -q 'libQt6Core.so.6' "$compat"
+          rm -f "$compat"
+          pid="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["pid"])' "$STATE/runtime-registration.json")"
+          ! grep -F "$helper" "/proc/$pid/maps" >/dev/null
+          TOOL="$(cat "$STATE/session/toolroot")"
+          GDB="$TOOL/usr/bin/gdb"
+          [[ -x "$GDB" ]]
+          LIBPY="$(find "$TOOL" -xdev -type f -name 'libpython3.12.so.1.0' -print -quit 2>/dev/null || true)"
+          [[ -n "$LIBPY" ]]
+          GDB_LD="$(dirname "$LIBPY"):$TOOL/usr/lib/x86_64-linux-gnu:$TOOL/lib/x86_64-linux-gnu"
+          env LD_LIBRARY_PATH="$GDB_LD" PYTHONHOME="$TOOL/usr" "$GDB" -q -nx -batch -ex 'python import struct,time; print("NATIVE_LOGIN_GDB_PYTHON=PASS")' >"$RUNNER_TEMP/gdb-selftest.txt" 2>&1
+          grep -Fq 'NATIVE_LOGIN_GDB_PYTHON=PASS' "$RUNNER_TEMP/gdb-selftest.txt"
+          echo "$GDB_LD" >"$NATIVE_ROOT/gdb-ld-path"; chmod 600 "$NATIVE_ROOT/gdb-ld-path"
+          echo "$TOOL" >"$NATIVE_ROOT/toolroot"; chmod 600 "$NATIVE_ROOT/toolroot"
+
+          controller="$NATIVE_ROOT/controller.sh"
+          cat >"$controller" <<'CONTROLLER'
+          #!/usr/bin/env bash
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          ROOT="$NATIVE_ROOT"; REG="$STATE/runtime-registration.json"
+          HELPER="$ROOT/otclient-tibia-native-auth-experimental.so"; SOCK="$ROOT/auth.sock"
+          READY="$ROOT/controller.ready"; DISPATCH="$ROOT/auth.dispatched"; RESULT="$ROOT/controller.result"
+          EVENTS="$ROOT/native-events.tsv"; STRIPS="$ROOT/worldmap-strips.tsv"; GOUT="$ROOT/native-observer.log"
+          INJECT="$ROOT/inject.gdb"; GCMD="$ROOT/observer.gdb"
+          :>"$EVENTS";:>"$STRIPS";:>"$GOUT";chmod 600 "$EVENTS" "$STRIPS" "$GOUT"
+          rm -f "$SOCK" "$READY" "$DISPATCH" "$RESULT" "$INJECT" "$GCMD"
+          fail(){ printf 'NATIVE_LOGIN_CONTROLLER_ERROR=%s\n' "$1" >&2;printf 'BLOCKED:%s\n' "$1" >"$RESULT";exit 1; }
+          read -r GDB_LD <"$ROOT/gdb-ld-path";read -r TOOL <"$ROOT/toolroot";GDB="$TOOL/usr/bin/gdb"
+          PID="$(python3 - "$REG" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1]));assert r['registration_generation']==1 and r['lease_generation']==14
+          assert r['client_sha256']=='e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe';print(r['pid'])
+          PY
+          )"
+          [[ -e "/proc/$PID" ]]||fail registered_pid_missing
+          CLIENT="$(readlink -f "/proc/$PID/exe")";[[ "$(sha256sum "$CLIENT"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA" ]]||fail client_sha_drift
+          [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$PID/status")" == 0 ]]||fail client_already_traced
+          line="$(grep -F "$CLIENT" "/proc/$PID/maps"|awk '$2~/r-xp/{print;exit}')";[[ -n "$line" ]]||fail exec_mapping_missing
+          start="$(awk '{split($1,a,"-");print a[1]}'<<<"$line")";off="$(awk '{print $3}'<<<"$line")";BIAS=$((16#$start-16#$off))
+          python3 - "$INJECT" "$PID" "$SOCK" "$HELPER" <<'PY'
+          import sys
+          out,pid,sock,helper=sys.argv[1:]
+          def q(s):return s.replace('\\','\\\\').replace('"','\\"')
+          open(out,'w').write(f'''set pagination off\nset confirm off\nattach {pid}\nset $s=(int)setenv("OTCLIENT_TIBIA_RE_AUTH_SOCKET","{q(sock)}",1)\nprintf "NATIVE_LOGIN_INJECT_SETENV_RC=%d\\n",$s\nif $s != 0\n quit 43\nend\nset $h=(void*)dlopen("{q(helper)}",2)\nprintf "NATIVE_LOGIN_INJECT_DLOPEN=%p\\n",$h\nif $h == 0\n quit 44\nend\ndetach\nquit\n''')
+          PY
+          chmod 600 "$INJECT"
+          env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD LD_LIBRARY_PATH="$GDB_LD" PYTHONHOME="$TOOL/usr" "$GDB" -q -nx -batch -x "$INJECT" >"$ROOT/inject.log" 2>&1 || { cat "$ROOT/inject.log";fail helper_dlopen_failed; }
+          grep -Fq 'NATIVE_LOGIN_INJECT_SETENV_RC=0' "$ROOT/inject.log"||fail helper_setenv_failed
+          grep -Eq 'NATIVE_LOGIN_INJECT_DLOPEN=0x[1-9a-fA-F][0-9a-fA-F]*' "$ROOT/inject.log"||fail helper_dlopen_null
+          kill -0 "$PID"||fail client_died_after_helper_activation
+          [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$PID/status")" == 0 ]]||fail tracer_left_after_injection
+          grep -F "$HELPER" "/proc/$PID/maps" >/dev/null||fail helper_mapping_missing
+          for _ in $(seq 1 100);do [[ -S "$SOCK" ]]&&break;kill -0 "$PID"||fail client_died_before_socket;sleep .1;done
+          [[ -S "$SOCK" && "$(stat -c %a "$SOCK")" == 600 ]]||fail auth_socket_not_ready
+
+          python3 - "$GCMD" "$PID" "$BIAS" "$EVENTS" "$STRIPS" <<'PY'
+          import sys
+          out,pid,bias,ev,strips=sys.argv[1:]
+          t=r'''set pagination off
+          set confirm off
+          attach @PID@
+          python
+          import gdb,struct,time
+          inf=gdb.selected_inferior();ev=r'@EV@';strips=r'@STRIPS@';bias=@BIAS@
+          def mem(a,n):
+              try:return bytes(inf.read_memory(a,n))
+              except:return None
+          class M(gdb.Breakpoint):
+              def __init__(self,o,n):self.n=n;super().__init__('*0x%x'%(bias+o),internal=False)
+              def stop(self):
+                  try:
+                      with open(ev,'a') as f:f.write(f'{time.time_ns()}\t{self.n}\n')
+                  except:pass
+                  return False
+          for o,n in ((0xcfb374,'ShowCharacterSelection'),(0x856880,'RequestCharacterLoginSignalActivate'),(0xcfb2e7,'RequestCharacterGameserverLogin'),(0xcfb122,'StartGameServerLogin'),(0xd06660,'ConnectExistingCredentials'),(0xd06810,'OnConnectGameserver'),(0xd067b0,'AbortGameserverConnect'),(0xd066e0,'GameSessionConnected'),(0xd066c8,'GameSessionLoginSuccessful'),(0xd064d8,'GameSessionLoginError'),(0xd064c8,'GameSessionDisconnected'),(0xcec8d0,'FullMap')):M(o,n)
+          class S(gdb.Breakpoint):
+              def __init__(self):super().__init__('*0x%x'%(bias+0x19a8ea3),internal=False)
+              def stop(self):
+                  try:
+                      ns=time.time_ns();rsp=int(gdb.parse_and_eval('$rsp'));order=int(gdb.parse_and_eval('$rbp'))&0xffffffff;b=mem(rsp+0x88,12)
+                      if b:
+                          x,y,z=struct.unpack('<III',b)
+                          if 0<x<100000 and 0<y<100000 and z<32 and order<128:
+                              with open(strips,'a') as f:f.write(f'{ns}\t{x}\t{y}\t{z}\t{order}\n')
+                  except:pass
+                  return False
+          S();gdb.write('NATIVE_LOGIN_OBSERVER_ARMED=PASS\n')
+          end
+          continue
+          python
+          import struct,gdb
+          inf=gdb.selected_inferior();bias=@BIAS@
+          def emit(s):gdb.write(s+'\n')
+          def mem(a,n):
+              try:return bytes(inf.read_memory(a,n))
+              except:return None
+          def ranges():
+              out=[]
+              try:
+                  for line in open(f'/proc/{inf.pid}/maps',errors='replace'):
+                      p=line.split()
+                      if len(p)>=2 and p[1].startswith('rw') and 'p' in p[1]:
+                          lo,hi=(int(x,16) for x in p[0].split('-'))
+                          if hi>lo:out.append((lo,hi))
+              except:pass
+              return out
+          def scan(v):
+              needle=struct.pack('<Q',v);hits=[]
+              for lo,hi in ranges():
+                  cur=lo
+                  while cur<hi:
+                      try:f=inf.search_memory(cur,hi-cur,needle)
+                      except:f=None
+                      if f is None:break
+                      a=int(f);hits.append(a)
+                      if len(hits)>16:return hits
+                      cur=a+8
+              return hits
+          def resolve(m,d):
+              for e in (f'(void*){m}',f"(void*)&'{d}'"):
+                  try:
+                      v=int(gdb.parse_and_eval(e))
+                      if v:return v
+                  except:pass
+              return 0
+          def selected(o):
+              b=mem(o+0x140,16)
+              if b is None:return -1
+              a,z=struct.unpack('<QQ',b);s=z-a
+              return s//0x70 if z>=a and s%0x70==0 else -1
+          result='FAIL:unknown';locked=False
+          try:
+              hits=scan(bias+0x308ed68);emit('NATIVE_LOGIN_CHARACTER_CONTROLLER_COUNT='+str(len(hits)))
+              if len(hits)!=1:result='FAIL:controller_count'
+              else:
+                  o=hits[0];p=mem(bias+0xd46550,16)
+                  if p is None or p.hex()!='41574156415541544989cc55534889fb':result='FAIL:qmeta_fence'
+                  else:
+                      b1=mem(o+0x108,8);b2=mem(o+0x100,8);count=struct.unpack('<q',b1)[0] if b1 else -1;model=struct.unpack('<Q',b2)[0] if b2 else 0
+                      emit('NATIVE_LOGIN_NATIVE_CHARACTER_LIST_COUNT='+str(count))
+                      if count!=1 or model==0 or mem(model,8) is None:result='FAIL:single_character_not_proven'
+                      else:
+                          mains=[t for t in inf.threads() if len(t.ptid)>=2 and t.ptid[1]==inf.pid]
+                          if len(mains)!=1:result='FAIL:main_lwp'
+                          else:
+                              mains[0].switch();gdb.execute('set scheduler-locking on',to_string=True);locked=True
+                              qt=resolve('_ZNK7QObject6threadEv','QObject::thread() const');qc=resolve('_ZN7QThread13currentThreadEv','QThread::currentThread()')
+                              owner=int(gdb.parse_and_eval(f'((void*(*)(void*))0x{qt:x})((void*)0x{o:x})')) if qt else 0;current=int(gdb.parse_and_eval(f'((void*(*)())0x{qc:x})()')) if qc else -1
+                              if owner==0 or owner!=current:result='FAIL:qt_affinity'
+                              else:
+                                  emit('NATIVE_LOGIN_CHARACTER_QT_AFFINITY=PASS');before=selected(o);emit('NATIVE_LOGIN_SELECTED_DATA_BEFORE='+str(before))
+                                  idx=int(gdb.parse_and_eval('((void*(*)(unsigned long))malloc)(8)'));view=int(gdb.parse_and_eval('((void*(*)(unsigned long))malloc)(24)'));argv=int(gdb.parse_and_eval('((void*(*)(unsigned long))malloc)(16)'));ok=bool(idx and view and argv)
+                                  if ok:
+                                      inf.write_memory(idx,struct.pack('<iI',0,0));inf.write_memory(view,struct.pack('<QQq',0,idx,1));inf.write_memory(argv,struct.pack('<QQ',0,view));gdb.parse_and_eval(f'((void(*)(void*,int,int,void**))0x{bias+0xd46550:x})((void*)0x{o:x},0,11,(void**)0x{argv:x})')
+                                  after=selected(o) if ok else -1;emit('NATIVE_LOGIN_SELECTED_DATA_AFTER='+str(after))
+                                  for x in (argv,view,idx):
+                                      if x:
+                                          try:gdb.parse_and_eval(f'((void(*)(void*))free)((void*)0x{x:x})')
+                                          except:pass
+                                  result='PASS' if ok and after>=1 else 'FAIL:qmeta_confirmation'
+          except Exception:result='FAIL:exception'
+          finally:
+              if locked:
+                  try:gdb.execute('set scheduler-locking off',to_string=True)
+                  except:pass
+          emit('NATIVE_LOGIN_CHARACTER_CONFIRM='+result)
+          end
+          continue
+          detach
+          quit
+          '''
+          open(out,'w').write(t.replace('@PID@',pid).replace('@BIAS@',bias).replace('@EV@',ev).replace('@STRIPS@',strips))
+          PY
+          chmod 600 "$GCMD"
+          nohup env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD LD_LIBRARY_PATH="$GDB_LD" PYTHONHOME="$TOOL/usr" "$GDB" -q -nx -batch -x "$GCMD" >"$GOUT" 2>&1 </dev/null &
+          GDBPID=$!;echo "$GDBPID" >"$ROOT/gdb.pid";chmod 600 "$ROOT/gdb.pid"
+          for _ in $(seq 1 100);do grep -Fq 'NATIVE_LOGIN_OBSERVER_ARMED=PASS' "$GOUT" 2>/dev/null&&break;kill -0 "$GDBPID" 2>/dev/null||break;sleep .1;done
+          grep -Fq 'NATIVE_LOGIN_OBSERVER_ARMED=PASS' "$GOUT"||{ cat "$GOUT";fail observer_not_armed; }
+          [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$PID/status")" == "$GDBPID" ]]||fail observer_not_exact_tracer
+          printf 'READY\n' >"$READY";chmod 600 "$READY"
+          for _ in $(seq 1 1200);do [[ -f "$DISPATCH" ]]&&break;kill -0 "$PID"||fail client_died_waiting_dispatch;sleep .1;done
+          [[ -f "$DISPATCH" ]]||fail auth_dispatch_timeout
+          char=0
+          for _ in $(seq 1 900);do grep -Fq $'\tShowCharacterSelection' "$EVENTS" 2>/dev/null&&{ char=1;break; };grep -Fq $'\tGameSessionLoginError' "$EVENTS" 2>/dev/null&&break;kill -0 "$PID"||fail client_died_post_auth;sleep .1;done
+          [[ "$char" == 1 ]]||{ kill -INT "$GDBPID" 2>/dev/null||true;sleep .5;kill -INT "$GDBPID" 2>/dev/null||true;fail postauth_character_selection_not_observed; }
+          echo 'NATIVE_LOGIN_POSTAUTH_CHARACTER_SELECTION=OBSERVED'
+          kill -INT "$GDBPID"||fail confirmation_interrupt_failed
+          sem=0
+          for _ in $(seq 1 400);do grep -Fq 'NATIVE_LOGIN_CHARACTER_CONFIRM=PASS' "$GOUT" 2>/dev/null&&{ sem=1;break; };grep -Fq 'NATIVE_LOGIN_CHARACTER_CONFIRM=FAIL:' "$GOUT" 2>/dev/null&&break;kill -0 "$GDBPID" 2>/dev/null||break;sleep .1;done
+          [[ "$sem" == 1 ]]||{ kill -INT "$GDBPID" 2>/dev/null||true;fail native_character_confirmation_failed; }
+          world=0
+          for _ in $(seq 1 1200);do fm="$(awk -F '\t' '$2=="FullMap"{c++}END{print c+0}' "$EVENTS")";sc="$(wc -l <"$STRIPS")";if [[ "$fm" -ge 1 && "$sc" -ge 10 ]];then world=1;break;fi;grep -Fq $'\tGameSessionLoginError' "$EVENTS" 2>/dev/null&&break;grep -Fq $'\tAbortGameserverConnect' "$EVENTS" 2>/dev/null&&break;kill -0 "$PID"||fail client_died_game_login;sleep .1;done
+          for n in ShowCharacterSelection RequestCharacterLoginSignalActivate RequestCharacterGameserverLogin StartGameServerLogin ConnectExistingCredentials OnConnectGameserver AbortGameserverConnect GameSessionConnected GameSessionLoginSuccessful GameSessionLoginError GameSessionDisconnected FullMap;do c="$(awk -F '\t' -v n="$n" '$2==n{c++}END{print c+0}' "$EVENTS")";echo "NATIVE_LOGIN_EVENT_${n}=$c";done
+          echo "NATIVE_LOGIN_MAP_DESCRIPTION_STRIPS=$(wc -l <"$STRIPS")"
+          kill -INT "$GDBPID" 2>/dev/null||true
+          for _ in $(seq 1 50);do kill -0 "$GDBPID" 2>/dev/null||break;sleep .1;done
+          [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$PID/status")" == 0 ]]||fail tracer_left_after_observation
+          [[ "$world" == 1 ]]||fail structural_world_entry_not_observed
+          echo 'NATIVE_LOGIN_STRUCTURAL_FULLMAP=PASS';printf 'STRUCTURAL_IN_GAME\n' >"$RESULT"
+          CONTROLLER
+          chmod 700 "$controller"
+          rm -f "$NATIVE_ROOT/controller.ready" "$NATIVE_ROOT/auth.dispatched" "$NATIVE_ROOT/controller.result" "$NATIVE_ROOT/guard.log" "$NATIVE_ROOT/guard.pid"
+          nohup env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            "$lease" guard-run --task-id "$TASK_ID" --session-id "$SESSION_ID" --token-file "$TOKEN_FILE" -- \
+            env -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD bash "$controller" \
+            >"$NATIVE_ROOT/guard.log" 2>&1 </dev/null &
+          echo $! >"$NATIVE_ROOT/guard.pid";chmod 600 "$NATIVE_ROOT/guard.pid"
+          ready=0
+          for _ in $(seq 1 300);do [[ -f "$NATIVE_ROOT/controller.ready" && -S "$NATIVE_ROOT/auth.sock" ]]&&{ ready=1;break; };p="$(cat "$NATIVE_ROOT/guard.pid")";kill -0 "$p" 2>/dev/null||break;sleep .1;done
+          if [[ "$ready" != 1 ]];then cat "$NATIVE_ROOT/guard.log";exit 82;fi
+          echo 'NATIVE_LOGIN_GEN14_HELPER_OBSERVER_READY=PASS'
+
+      - name: Dispatch account credentials only through sealed anonymous memfd
+        shell: bash
+        env:
+          TIBIA_TEST_EMAIL: ${{ secrets.TIBIA_TEST_EMAIL }}
+          TIBIA_TEST_PASSWORD: ${{ secrets.TIBIA_TEST_PASSWORD }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ -f "$NATIVE_ROOT/controller.ready" && -S "$NATIVE_ROOT/auth.sock" ]]
+          python3 - "$NATIVE_ROOT/auth.sock" "$STATE/runtime-registration.json" <<'PY'
+          import ctypes,fcntl,os,resource,struct,sys
+          from pathlib import Path
+          from tools.tibia_runtime_bridge.experimental_auth_client import auth_with_credentials_fd
+          from tools.tibia_runtime_bridge.protected_auth_tty import load_exact_runtime_identity
+          libc=ctypes.CDLL(None,use_errno=True)
+          libc.getenv.argtypes=[ctypes.c_char_p];libc.getenv.restype=ctypes.c_void_p
+          libc.strlen.argtypes=[ctypes.c_void_p];libc.strlen.restype=ctypes.c_size_t
+          libc.write.argtypes=[ctypes.c_int,ctypes.c_void_p,ctypes.c_size_t];libc.write.restype=ctypes.c_ssize_t
+          libc.mlock.argtypes=[ctypes.c_void_p,ctypes.c_size_t];libc.munlock.argtypes=[ctypes.c_void_p,ctypes.c_size_t]
+          resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+          if libc.prctl(4,0,0,0,0)!=0:raise SystemExit('NATIVE_LOGIN_SECRET_PRODUCER_ERROR=prctl')
+          ptrs=[];fd=-1
+          try:
+            for name in (b'TIBIA_TEST_EMAIL',b'TIBIA_TEST_PASSWORD'):
+              p=libc.getenv(name)
+              if not p:raise SystemExit('NATIVE_LOGIN_SECRET_PRODUCER_ERROR=missing_secret')
+              n=int(libc.strlen(p))
+              if not 1<=n<=1024:raise SystemExit('NATIVE_LOGIN_SECRET_PRODUCER_ERROR=secret_length')
+              if libc.mlock(p,n)!=0:raise SystemExit('NATIVE_LOGIN_SECRET_PRODUCER_ERROR=mlock')
+              ptrs.append((name,p,n))
+            fd=os.memfd_create('otclient-tibia-native-auth',os.MFD_CLOEXEC|os.MFD_ALLOW_SEALING)
+            os.write(fd,struct.pack('<II',ptrs[0][2],ptrs[1][2]))
+            for _,p,n in ptrs:
+              if libc.write(fd,p,n)!=n:raise SystemExit('NATIVE_LOGIN_SECRET_PRODUCER_ERROR=memfd_write')
+            req=fcntl.F_SEAL_SEAL|fcntl.F_SEAL_SHRINK|fcntl.F_SEAL_GROW|fcntl.F_SEAL_WRITE
+            fcntl.fcntl(fd,fcntl.F_ADD_SEALS,req)
+            if fcntl.fcntl(fd,fcntl.F_GET_SEALS)&req!=req:raise SystemExit('NATIVE_LOGIN_SECRET_PRODUCER_ERROR=seals')
+            os.lseek(fd,0,os.SEEK_SET)
+            for name,p,n in ptrs:
+              ctypes.memset(p,0,n);libc.unsetenv(name);libc.munlock(p,n)
+            ptrs=[]
+            ident=load_exact_runtime_identity(Path(sys.argv[2]))
+            r=auth_with_credentials_fd(Path(sys.argv[1]),fd,timeout=5.0,expected_identity=ident)
+            if r.get('ok') is not True or r.get('invocation_dispatched') is not True:
+              raise SystemExit('NATIVE_LOGIN_NATIVE_AUTH_ERROR='+str(r.get('error','unknown')))
+            print('NATIVE_LOGIN_SECRET_MEMFD_SEALED=PASS')
+            print('NATIVE_LOGIN_NATIVE_AUTH_QMETA17_DISPATCHED=PASS')
+            print('NATIVE_LOGIN_SECRET_VALUE_LOGGED=false')
+            print('NATIVE_LOGIN_SECRET_VALUE_PERSISTED=false')
+          finally:
+            for name,p,n in ptrs:
+              ctypes.memset(p,0,n);libc.unsetenv(name);libc.munlock(p,n)
+            if fd>=0:os.close(fd)
+          PY
+          unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
+          printf 'DISPATCHED\n' >"$NATIVE_ROOT/auth.dispatched";chmod 600 "$NATIVE_ROOT/auth.dispatched"
+
+      - name: Verify native character and structural game entry
+        shell: bash
+        run: |
+          set +x
+          set -Eeuo pipefail
+          result=''
+          for _ in $(seq 1 1800);do
+            if [[ -f "$NATIVE_ROOT/controller.result" ]];then result="$(cat "$NATIVE_ROOT/controller.result")";break;fi
+            p="$(cat "$NATIVE_ROOT/guard.pid" 2>/dev/null||true)";[[ -n "$p" ]]&&kill -0 "$p" 2>/dev/null||break
+            sleep .1
+          done
+          cat "$NATIVE_ROOT/guard.log" || true
+          [[ -n "$result" ]]||{ echo 'NATIVE_LOGIN_RESULT=BLOCKED_NO_CONTROLLER_RESULT';exit 83; }
+          echo "NATIVE_LOGIN_CONTROLLER_RESULT=$result"
+          [[ "$result" == STRUCTURAL_IN_GAME ]]
+          pid="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["pid"])' "$STATE/runtime-registration.json")"
+          kill -0 "$pid"
+          [[ "$(sha256sum "/proc/$pid/exe"|awk '{print $1}')" == "$EXPECTED_CLIENT_SHA" ]]
+          ! grep -azEq '^(TIBIA_TEST_EMAIL|TIBIA_TEST_PASSWORD)=' "/proc/$pid/environ"
+          [[ "$(awk '/^TracerPid:/{print $2}' "/proc/$pid/status")" == 0 ]]
+          echo 'NATIVE_LOGIN_STRUCTURAL_IN_GAME=PASS'
+          echo 'NATIVE_LOGIN_PERSISTENT_CLIENT_SECRET_ENV=false'
+
+      - name: Cleanup temporary control files
+        if: always()
+        shell: bash
+        run: |
+          set +x
+          rm -f "$NATIVE_ROOT/controller.ready" "$NATIVE_ROOT/auth.dispatched" "$NATIVE_ROOT/auth.sock" "$NATIVE_ROOT/inject.gdb" "$NATIVE_ROOT/observer.gdb" "$NATIVE_ROOT/gdb-ld-path" "$NATIVE_ROOT/toolroot"
+          echo 'NATIVE_LOGIN_TEMP_CONTROL_FILES_CLEANED=true'

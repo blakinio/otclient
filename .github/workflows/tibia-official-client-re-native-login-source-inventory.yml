@@ -1,11 +1,10 @@
-name: Track A native-login updater VNC observer
+name: Track A native-login existing VNC backend inventory
 
 on:
   pull_request:
     branches: [main]
     paths:
       - .github/workflows/tibia-official-client-re-native-login-source-inventory.yml
-      - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
 
 permissions:
   contents: read
@@ -15,21 +14,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  observer:
-    name: Establish persistent updater VNC on canonical presentation path
+  inventory:
+    name: Identify existing 5901/6081 VNC owners read-only
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
-    timeout-minutes: 6
+    timeout-minutes: 5
     env:
       BASE_SHA: ebbb36f50076ff4072c7218e302614c1dfea00b1
-      TASK: OTC-20260818-native-login-to-ingame-e2e
-      LEASE_SESSION: chatgpt-native-login-e2e-20260818-v3-gen16-secrets
       BASE: /home/runner/_work/_otclient_tibia_re_state
-      WORKBASE: /work/_otclient_tibia_re_state
-      TOKEN: /home/runner/_work/_otclient_tibia_re_state/tasks/OTC-20260818-native-login-to-ingame-e2e/runtime/canonical-lease-token
-      HOST_PRESENTATION: synology
-      HOST_PRESENTATION_PORT: '6082'
-      BACKEND_WEB_PORT: '6081'
     steps:
       - name: Checkout exact PR head
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
@@ -38,7 +30,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Establish exact updater observer
+      - name: Read-only VNC ownership inventory
         shell: bash
         env:
           EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -51,139 +43,89 @@ jobs:
           [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
           [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
           [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
+          echo VNC_OWNER_SECRET_ACCESS=false
+          echo VNC_OWNER_MUTATION=false
 
-          task=docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
-          grep -q '^task_id: OTC-20260818-native-login-to-ingame-e2e$' "$task"
-          grep -q '^status: validating$' "$task"
-          grep -q '^runtime_access: ephemeral_isolated$' "$task"
-          grep -q '^runtime_namespace: native-login-official-package-update$' "$task"
-          grep -q '^mutation_authorized: true$' "$task"
-          grep -q '^credentials_allowed: false$' "$task"
-          grep -q '^login_allowed: false$' "$task"
-          grep -q '^gameplay_allowed: false$' "$task"
-          echo TRACK_A_ADMISSION_RUNTIME_ACCESS=ephemeral_isolated
-          echo TRACK_A_ADMISSION_NAMESPACE=native-login-official-package-update
-          echo TRACK_A_ADMISSION_TARGET_UNIQUENESS=PROVEN
-          echo TRACK_A_ADMISSION_MUTATION_AUTHORIZED=true
-          echo TRACK_A_ADMISSION_CREDENTIALS_ALLOWED=false
-          echo TRACK_A_ADMISSION_LOGIN_ALLOWED=false
-          echo TRACK_A_ADMISSION_GAMEPLAY_ALLOWED=false
-
-          state="$BASE/canonical-live-runtime"
-          package="$BASE/home/.local/share/CipSoft GmbH/Tibia/packages/Tibia"
-          client="$package/bin/client"
-          tool="$WORKBASE/toolroot"
-          live="$BASE/native-login-update/live"
-          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
-          [[ ! -e "$client" && ! -d "$package" ]]
-          [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
-          lease=.github/scripts/tibia-official-client-re-canonical-live-lease
-          bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
-          bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
-          for b in Xvfb x11vnc xdotool; do [[ -x "$tool/usr/bin/$b" && ! -L "$tool/usr/bin/$b" ]]; done
-          [[ -d "$tool/usr/share/X11/xkb" && -f "$tool/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so" && -d /usr/share/novnc ]]
-          command -v websockify >/dev/null
-          echo UPDATER_VNC_PREFLIGHT=PASS
-
-          # Remove only the task-owned failed experimental relay if Docker left one behind.
-          if command -v docker >/dev/null 2>&1 && [[ -S /var/run/docker.sock ]] && docker container inspect otclient-tibia-native-login-vnc-relay >/dev/null 2>&1; then
-            owner="$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' otclient-tibia-native-login-vnc-relay 2>/dev/null || true)"
-            [[ "$owner" == "$TASK" ]] || { echo UPDATER_VNC_REFUSE_FOREIGN_RELAY=true >&2; exit 1; }
-            docker rm -f otclient-tibia-native-login-vnc-relay >/dev/null
-            echo UPDATER_VNC_OWNED_FAILED_RELAY_REMOVED=true
-          fi
-
-          [[ ! -e "$live" ]] || { echo UPDATER_VNC_REFUSE_EXISTING_LIVE_DIR=true >&2; exit 1; }
-          mkdir -m700 -p "$live"
-          xvfb_pid=''; vnc_pid=''; ws_pid=''
-          stop_pid() {
-            local p="$1"; [[ "$p" =~ ^[1-9][0-9]*$ ]] || return 0
-            kill "$p" 2>/dev/null || true
-            for _ in $(seq 1 30); do kill -0 "$p" 2>/dev/null || return 0; sleep .1; done
-            kill -9 "$p" 2>/dev/null || true
-          }
-          cleanup() {
-            stop_pid "$ws_pid"; stop_pid "$vnc_pid"; stop_pid "$xvfb_pid"; rm -rf "$live"
-          }
-          trap cleanup ERR INT TERM HUP
-
-          python3 - "$BACKEND_WEB_PORT" "$live/ports.txt" <<'PY'
-          import pathlib,sys
-          web=int(sys.argv[1])
-          def listening(port):
-              want=f'{port:04X}'
+          python3 - <<'PY'
+          import os,pathlib,re,socket
+          def inodes(port):
+              out=set(); want=f'{port:04X}'
               for fn in ('/proc/net/tcp','/proc/net/tcp6'):
                   try: rows=pathlib.Path(fn).read_text().splitlines()[1:]
                   except OSError: continue
-                  for r in rows:
-                      f=r.split()
-                      if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': return True
-              return False
-          def dbusy(n): return pathlib.Path(f'/tmp/.X{n}-lock').exists() or pathlib.Path(f'/tmp/.X11-unix/X{n}').exists()
-          if listening(web): raise SystemExit(f'backend web port {web} already has a listener')
-          display=next((n for n in range(99,131) if not dbusy(n)),None)
-          rfb=next((p for p in range(5901,5921) if not listening(p)),None)
-          if display is None or rfb is None: raise SystemExit('no free updater display/RFB port')
-          pathlib.Path(sys.argv[2]).write_text(f'{display}\n{rfb}\n{web}\n')
+                  for row in rows:
+                      f=row.split()
+                      if len(f)>9 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': out.add(f[9])
+              return out
+          def pids_for(ins):
+              out=[]
+              for p in pathlib.Path('/proc').iterdir():
+                  if not p.name.isdigit(): continue
+                  try:
+                      for fd in (p/'fd').iterdir():
+                          try: t=os.readlink(fd)
+                          except OSError: continue
+                          if t.startswith('socket:[') and t[8:-1] in ins:
+                              out.append(int(p.name)); break
+                  except OSError: pass
+              return sorted(set(out))
+          def safe_env(pid):
+              wanted={'OTCLIENT_TIBIA_RE_TRACK','OTCLIENT_TIBIA_RE_ROLE','DISPLAY'}
+              vals={}
+              try: raw=pathlib.Path(f'/proc/{pid}/environ').read_bytes().split(b'\0')
+              except OSError: return vals
+              for x in raw:
+                  if b'=' not in x: continue
+                  k,v=x.split(b'=',1); k=k.decode(errors='ignore')
+                  if k in wanted:
+                      s=v.decode(errors='replace')
+                      vals[k]=re.sub(r'[^\x20-\x7e]','?',s)[:160]
+              return vals
+          for port in (5901,6081,5902,6082):
+              ins=inodes(port); ps=pids_for(ins)
+              print(f'VNC_OWNER_PORT_{port}_LISTEN='+str(bool(ins)).lower())
+              print(f'VNC_OWNER_PORT_{port}_PIDS='+','.join(map(str,ps)))
+              for pid in ps:
+                  try: exe=os.readlink(f'/proc/{pid}/exe')
+                  except OSError: exe='UNAVAILABLE'
+                  try:
+                      argv=pathlib.Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')
+                      args=[re.sub(r'[^\x20-\x7e]','?',a.decode(errors='replace'))[:180] for a in argv if a]
+                  except OSError: args=[]
+                  print(f'VNC_OWNER_PORT_{port}_PID_{pid}_EXE={exe}')
+                  print(f'VNC_OWNER_PORT_{port}_PID_{pid}_ARGV0={args[0] if args else "UNAVAILABLE"}')
+                  print(f'VNC_OWNER_PORT_{port}_PID_{pid}_ARGS='+('|'.join(args[1:10])))
+                  for k,v in sorted(safe_env(pid).items()): print(f'VNC_OWNER_PORT_{port}_PID_{pid}_ENV_{k}={v}')
+          try:
+              print('VNC_OWNER_SYNOLOGY_DNS='+socket.gethostbyname('synology'))
+          except OSError as e: print('VNC_OWNER_SYNOLOGY_DNS=FAIL')
           PY
-          readarray -t p <"$live/ports.txt"; display_num="${p[0]}"; rfb_port="${p[1]}"; web_port="${p[2]}"; display=":$display_num"
-          echo "UPDATER_VNC_DISPLAY=$display"
-          echo "UPDATER_VNC_RFB_PORT=$rfb_port"
-          echo "UPDATER_VNC_BACKEND_WEB_PORT=$web_port"
 
-          dri="$tool/usr/lib/x86_64-linux-gnu/dri"
-          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-xvfb \
-            HOME="$BASE/home" PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
-            LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
-            LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \
-            nohup "$tool/usr/bin/Xvfb" "$display" -screen 0 1920x1080x24 -xkbdir "$tool/usr/share/X11/xkb" -nolisten tcp -noreset \
-            >"$live/xvfb.log" 2>&1 </dev/null &
-          xvfb_pid=$!
-          for _ in $(seq 1 60); do [[ -S "/tmp/.X11-unix/X$display_num" ]] && break; kill -0 "$xvfb_pid"; sleep .2; done
-          [[ -S "/tmp/.X11-unix/X$display_num" ]]
-
-          webroot="$live/novnc-web"; mkdir -m700 "$webroot"; cp -a /usr/share/novnc/. "$webroot/"
-          cat >"$webroot/index.html" <<'HTML'
-          <!doctype html><meta charset="utf-8"><title>OTCLIENT Tibia updater</title><script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=6&compression=3&show_dot=true&path=websockify');</script>
-          HTML
-          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD DISPLAY="$display" \
-            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-vnc \
-            nohup "$tool/usr/bin/x11vnc" -display "$display" -rfbport "$rfb_port" -localhost -forever -shared -nopw \
-            -xkb -repeat -wait 10 -defer 10 -deferupdate 20 -threads -noxrecord -noxfixes -o "$live/x11vnc.log" >/dev/null 2>&1 </dev/null &
-          vnc_pid=$!
-          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-websockify \
-            nohup websockify --web "$webroot" "0.0.0.0:$web_port" "127.0.0.1:$rfb_port" >"$live/websockify.log" 2>&1 </dev/null &
-          ws_pid=$!
-
-          for _ in $(seq 1 40); do
-            if kill -0 "$vnc_pid" 2>/dev/null && kill -0 "$ws_pid" 2>/dev/null && curl -fsS --max-time 1 -o /dev/null "http://127.0.0.1:$web_port/" 2>/dev/null; then break; fi
-            sleep .25
+          for u in http://127.0.0.1:6081/ http://synology:6082/; do
+            label=LOCAL6081; [[ "$u" == *synology* ]] && label=HOST6082
+            code="$(curl -sS --max-time 3 -o /tmp/vnc-owner-body.$$ -w '%{http_code}' "$u" 2>/tmp/vnc-owner-err.$$ || true)"
+            echo "VNC_OWNER_${label}_HTTP_CODE=${code:-CURL_FAIL}"
+            if [[ -s /tmp/vnc-owner-body.$$ ]]; then
+              echo "VNC_OWNER_${label}_BODY_SHA256=$(sha256sum /tmp/vnc-owner-body.$$ | awk '{print $1}')"
+              echo "VNC_OWNER_${label}_BODY_SIZE=$(stat -c %s /tmp/vnc-owner-body.$$)"
+            fi
+            if [[ -s /tmp/vnc-owner-err.$$ ]]; then
+              err="$(tr '\n' ' ' </tmp/vnc-owner-err.$$ | sed -E 's/[^[:print:]]/?/g' | cut -c1-240)"
+              echo "VNC_OWNER_${label}_CURL_ERROR=$err"
+            fi
+            rm -f /tmp/vnc-owner-body.$$ /tmp/vnc-owner-err.$$
           done
-          kill -0 "$xvfb_pid"; kill -0 "$vnc_pid"; kill -0 "$ws_pid"
-          curl -fsS --max-time 2 -o /dev/null "http://127.0.0.1:$web_port/"
-          python3 - "$rfb_port" "$HOST_PRESENTATION" "$HOST_PRESENTATION_PORT" <<'PY'
-          import base64,os,socket,sys
-          r=int(sys.argv[1]); host=sys.argv[2]; web=int(sys.argv[3])
-          s=socket.create_connection(('127.0.0.1',r),3); banner=s.recv(12); s.close(); assert banner.startswith(b'RFB ')
-          key=base64.b64encode(os.urandom(16)).decode()
-          q=('GET /websockify HTTP/1.1\r\nHost: '+host+'\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'+f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
-          s=socket.create_connection((host,web),3); s.sendall(q); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
-          print('UPDATER_VNC_RFB=PASS')
-          print('UPDATER_VNC_HOST_WEBSOCKET=PASS')
-          PY
-          curl -fsS --max-time 3 -o /dev/null "http://$HOST_PRESENTATION:$HOST_PRESENTATION_PORT/"
-          echo UPDATER_VNC_HOST_HTTP=PASS
 
-          python3 - "$live/session.json" "$TASK" "$display" "$rfb_port" "$web_port" "$xvfb_pid" "$vnc_pid" "$ws_pid" <<'PY'
-          import json,pathlib,sys
-          x={'task':sys.argv[2],'phase':'vnc-ready','display':sys.argv[3],'rfb_port':int(sys.argv[4]),'web_backend_port':int(sys.argv[5]),'host_presentation':'http://synology:6082/','xvfb_pid':int(sys.argv[6]),'vnc_pid':int(sys.argv[7]),'websockify_pid':int(sys.argv[8])}
-          p=pathlib.Path(sys.argv[1]); p.write_text(json.dumps(x,sort_keys=True)+'\n'); p.chmod(0o600)
+          if command -v docker >/dev/null 2>&1 && [[ -S /var/run/docker.sock ]]; then
+            self="$(hostname)"
+            docker inspect "$self" >/dev/null
+            python3 - "$self" <<'PY'
+          import json,subprocess,sys
+          d=json.loads(subprocess.check_output(['docker','inspect',sys.argv[1]]))[0]
+          ports=d.get('NetworkSettings',{}).get('Ports',{}) or {}
+          for cp in ('6081/tcp','6082/tcp','5901/tcp','5902/tcp'):
+              vals=ports.get(cp) or []
+              print('VNC_OWNER_DOCKER_'+cp.replace('/','_').upper()+'='+','.join(f"{x.get('HostIp','')}:{x.get('HostPort','')}" for x in vals))
           PY
-          printf 'UPDATER_VNC_URL=http://%s:%s/\nUPDATER_VNC_DISPLAY=%s\nUPDATER_VNC_BACKEND_PORT=%s\n' "$HOST_PRESENTATION" "$HOST_PRESENTATION_PORT" "$display" "$web_port" >"$live/public.txt"; chmod 600 "$live/public.txt"
-          echo "UPDATER_VNC_URL=http://$HOST_PRESENTATION:$HOST_PRESENTATION_PORT/"
-          echo UPDATER_VNC_SECRET_ACCESS=false
-          echo UPDATER_VNC_CLIENT_STARTED=false
-          echo UPDATER_VNC_RESULT=PASS_PERSISTENT_OBSERVER_READY
-          trap - ERR INT TERM HUP
+          fi
+          echo VNC_OWNER_RESULT=PASS_READ_ONLY

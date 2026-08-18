@@ -14,7 +14,7 @@ base_branch: main
 base_main: a9e7ab21ed0962482e4381aadd50be92714785a6
 related_pr: 512
 created: 2026-08-18T10:06:00+02:00
-updated: 2026-08-18T10:22:00+02:00
+updated: 2026-08-18T10:25:00+02:00
 risk: medium
 implementation_authorized: true
 credentials_allowed: false
@@ -26,6 +26,16 @@ RUNTIME_ACCESS: none
 PERSISTENT_SESSION_ROLE: none
 PHYSICAL_E2E_REQUIRED: false
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 owned_paths:
   - docs/agents/tasks/active/OTC-20260818-track-a-s2-player-inbound-static.md
   - docs/agents/evidence/OTC-20260818-track-a-s2-player-inbound-static/**
@@ -88,9 +98,9 @@ platform: official_native_linux_only
 - [x] no raw proprietary client committed/uploaded;
 - [x] temporary producer workflow removed from final diff;
 - [x] E2E = `NOT_APPLICABLE`: static exact-file discovery only;
-- [ ] final full diff/path audit;
-- [ ] current-main freshness/reconciliation;
-- [ ] exact-head required CI/governance;
+- [x] final full diff/path audit completed before admission-metadata-only repair;
+- [x] current main matched task base at final pre-repair audit;
+- [ ] exact-head required CI/governance after admission-metadata repair;
 - [ ] zero unresolved material review findings;
 - [ ] coordinator/promotion disposition.
 
@@ -178,6 +188,8 @@ UNKNOWN:
 
 First phase-1 run `32114891658 / 95642067206` passed both exact-client hashes but failed in producer tooling with Capstone `CS_ERR_SKIPDATA`. The bounded repair separated function decoding from whole-section skipdata scanning and guarded pseudo-instruction operand access. No semantic result from the failed run was promoted.
 
+Final governance run `32116125158` failed only because this static task record omitted the universal Track A admission keys even though `runtime_access:none` was already declared. The exact failure listed `runtime_owner_task`, `runtime_namespace`, `canonical_registration`, both lease-generation fields, `gate_a`, `generation_rebind`, `gate_b`, `bootstrap` and `target_uniqueness`. This checkpoint adds every required key explicitly as `NOT_APPLICABLE`; no research or runtime semantics changed.
+
 # Durable evidence
 
 ```text
@@ -203,13 +215,13 @@ Only after that edge should a later static task trace the receiver into `TPlayer
 # Checkpoint
 
 ```yaml
-checkpoint_version: 4
+checkpoint_version: 5
 status: validating
 phase: exact-head-validation
 pr: 512
 research_result: COMPLETE_BOUNDED
 producer_workflow_removed: true
-last_completed_step: persisted exact queue-owner player signal contracts and bounded all downstream unproven edges as UNKNOWN
+last_completed_step: repaired final governance admission metadata exactly as required; no evidence or scope change
 blockers: []
-next_action: perform final full diff/path audit against current main, reconcile only real drift, then require exact-head CI/governance and coordinator promotion before creating the queue-to-receiver follow-up.
+next_action: require exact-head Track A governance and CI on the admission-fixed head, then inspect review hygiene and perform coordinator promotion before creating the queue-to-receiver follow-up.
 ```

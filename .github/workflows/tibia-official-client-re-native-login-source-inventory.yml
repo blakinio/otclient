@@ -1,4 +1,4 @@
-name: Track A native-login stable VNC LAN observer
+name: Track A native-login stable VNC observer
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   observer:
-    name: Establish stable updater desktop after proven stale-backend cleanup
+    name: Establish stable updater desktop on Synology LAN
     if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v3' }}
     runs-on: [otclient, synology]
     timeout-minutes: 7
@@ -45,7 +45,9 @@ jobs:
           set +x
           set -Eeuo pipefail
           umask 077
-          [[ "$RUNNER_NAME" == synology-otclient-01 && "$GITHUB_REPOSITORY" == blakinio/otclient ]]
+
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$GITHUB_REPOSITORY" == blakinio/otclient ]]
           [[ "$HEAD_BRANCH" == runtime/OTC-20260818-native-login-to-ingame-e2e-v3 ]]
           [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD" ]]
           [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$BASE_SHA" ]]
@@ -55,10 +57,12 @@ jobs:
           grep -q '^status: validating$' "$task"
           grep -q '^runtime_access: ephemeral_isolated$' "$task"
           grep -q '^runtime_namespace: native-login-official-package-update$' "$task"
+          grep -q '^target_uniqueness: PROVEN$' "$task"
           grep -q '^mutation_authorized: true$' "$task"
           grep -q '^credentials_allowed: false$' "$task"
           grep -q '^login_allowed: false$' "$task"
           grep -q '^gameplay_allowed: false$' "$task"
+
           echo TRACK_A_ADMISSION_RUNTIME_ACCESS=ephemeral_isolated
           echo TRACK_A_ADMISSION_NAMESPACE=native-login-official-package-update
           echo TRACK_A_ADMISSION_TARGET_UNIQUENESS=PROVEN
@@ -72,172 +76,292 @@ jobs:
           client="$package/bin/client"
           tool="$WORKBASE/toolroot"
           live="$BASE/native-login-update/live"
-          [[ ! -e "$state/runtime-registration.json" && ! -d "$state/session" ]]
-          [[ ! -e "$client" && ! -d "$package" ]]
-          [[ -f "$TOKEN" && "$(stat -c %a "$TOKEN")" == 600 ]]
+
+          [[ ! -e "$state/runtime-registration.json" ]]
+          [[ ! -d "$state/session" ]]
+          [[ ! -e "$client" ]]
+          [[ ! -d "$package" ]]
+          [[ -f "$TOKEN" ]]
+          [[ "$(stat -c %a "$TOKEN")" == 600 ]]
+
           lease=.github/scripts/tibia-official-client-re-canonical-live-lease
           bash "$lease" validate --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN"
           bash "$lease" renew --task-id "$TASK" --session-id "$LEASE_SESSION" --token-file "$TOKEN" --ttl-seconds 2700
-          for b in Xvfb x11vnc xdotool; do [[ -x "$tool/usr/bin/$b" && ! -L "$tool/usr/bin/$b" ]]; done
-          [[ -d "$tool/usr/share/X11/xkb" && -f "$tool/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so" && -d /usr/share/novnc ]]
+
+          for b in Xvfb x11vnc xdotool; do
+            [[ -x "$tool/usr/bin/$b" ]]
+            [[ ! -L "$tool/usr/bin/$b" ]]
+          done
+          [[ -d "$tool/usr/share/X11/xkb" ]]
+          [[ -f "$tool/usr/lib/x86_64-linux-gnu/dri/swrast_dri.so" ]]
+          [[ -d /usr/share/novnc ]]
           command -v websockify >/dev/null
           command -v docker >/dev/null
           [[ -S /var/run/docker.sock ]]
 
           python3 - <<'PY'
           import pathlib
-          for port in (5901,6081):
+          for port in (5901, 6081):
               want=f'{port:04X}'
               for fn in ('/proc/net/tcp','/proc/net/tcp6'):
                   try: rows=pathlib.Path(fn).read_text().splitlines()[1:]
                   except OSError: continue
                   for row in rows:
                       f=row.split()
-                      if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A': raise SystemExit(f'port {port} unexpectedly occupied after proven stale cleanup')
+                      if len(f)>3 and f[1].rsplit(':',1)[-1].upper()==want and f[3]=='0A':
+                          raise SystemExit(f'refuse: port {port} already has a listener')
           PY
+
           [[ ! -e "$live/session.json" ]]
-          rm -rf "$live"; mkdir -m700 -p "$live"
+          rm -rf "$live"
+          mkdir -m700 -p "$live"
+
           if docker container inspect "$RELAY_NAME" >/dev/null 2>&1; then
             owner="$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$RELAY_NAME" 2>/dev/null || true)"
             [[ "$owner" == "$TASK" ]] || { echo STABLE_VNC_REFUSE_FOREIGN_RELAY=true >&2; exit 1; }
             docker rm -f "$RELAY_NAME" >/dev/null
           fi
+
           echo STABLE_VNC_PREFLIGHT=PASS
 
-          xvfb_pid=''; vnc_pid=''; ws_pid=''; relay_created=false
+          xvfb_pid=''
+          vnc_pid=''
+          ws_pid=''
+          relay_created=false
+          success=false
+
           stop_pid() {
-            local p="$1"; [[ "$p" =~ ^[1-9][0-9]*$ ]] || return 0
+            local p="$1"
+            [[ "$p" =~ ^[1-9][0-9]*$ ]] || return 0
             kill "$p" 2>/dev/null || true
-            for _ in $(seq 1 30); do kill -0 "$p" 2>/dev/null || return 0; sleep .1; done
+            for _ in $(seq 1 30); do
+              kill -0 "$p" 2>/dev/null || return 0
+              sleep .1
+            done
             kill -9 "$p" 2>/dev/null || true
           }
+
           cleanup() {
-            stop_pid "$ws_pid"; stop_pid "$vnc_pid"; stop_pid "$xvfb_pid"
-            if [[ "$relay_created" == true ]] && docker container inspect "$RELAY_NAME" >/dev/null 2>&1; then docker rm -f "$RELAY_NAME" >/dev/null || true; fi
+            [[ "$success" == true ]] && return 0
+            stop_pid "$ws_pid"
+            stop_pid "$vnc_pid"
+            stop_pid "$xvfb_pid"
+            if [[ "$relay_created" == true ]] && docker container inspect "$RELAY_NAME" >/dev/null 2>&1; then
+              owner="$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$RELAY_NAME" 2>/dev/null || true)"
+              [[ "$owner" == "$TASK" ]] && docker rm -f "$RELAY_NAME" >/dev/null || true
+            fi
             rm -rf "$live"
           }
-          trap cleanup ERR INT TERM HUP
+          trap cleanup EXIT ERR INT TERM HUP
 
           display_num="$(python3 - <<'PY'
           import pathlib
-          for n in range(99,131):
-              if not pathlib.Path(f'/tmp/.X{n}-lock').exists() and not pathlib.Path(f'/tmp/.X11-unix/X{n}').exists(): print(n); break
-          else: raise SystemExit('no free updater display')
+          for n in range(99, 131):
+              if not pathlib.Path(f'/tmp/.X{n}-lock').exists() and not pathlib.Path(f'/tmp/.X11-unix/X{n}').exists():
+                  print(n)
+                  break
+          else:
+              raise SystemExit('no free updater display')
           PY
           )"
           display=":$display_num"
           dri="$tool/usr/lib/x86_64-linux-gnu/dri"
+
           env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-xvfb \
-            HOME="$BASE/home" PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            OTCLIENT_TIBIA_RE_ROLE=native-login-updater-xvfb \
+            HOME="$BASE/home" \
+            PATH="$tool/usr/bin:$tool/usr/sbin:/usr/bin:/bin" \
             LD_LIBRARY_PATH="$tool/usr/lib/x86_64-linux-gnu:$tool/lib/x86_64-linux-gnu" \
-            LIBGL_DRIVERS_PATH="$dri" XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \
-            nohup "$tool/usr/bin/Xvfb" "$display" -screen 0 1920x1080x24 -xkbdir "$tool/usr/share/X11/xkb" -nolisten tcp -noreset \
-            >"$live/xvfb.log" 2>&1 </dev/null &
+            LIBGL_DRIVERS_PATH="$dri" \
+            XKB_CONFIG_ROOT="$tool/usr/share/X11/xkb" \
+            nohup "$tool/usr/bin/Xvfb" "$display" -screen 0 1920x1080x24 \
+              -xkbdir "$tool/usr/share/X11/xkb" -nolisten tcp -noreset \
+              >"$live/xvfb.log" 2>&1 </dev/null &
           xvfb_pid=$!
-          for _ in $(seq 1 60); do [[ -S "/tmp/.X11-unix/X$display_num" ]] && break; kill -0 "$xvfb_pid"; sleep .2; done
+
+          for _ in $(seq 1 60); do
+            [[ -S "/tmp/.X11-unix/X$display_num" ]] && break
+            kill -0 "$xvfb_pid"
+            sleep .2
+          done
           [[ -S "/tmp/.X11-unix/X$display_num" ]]
           echo "STABLE_VNC_DISPLAY=$display"
 
-          webroot="$live/novnc-web"; mkdir -m700 "$webroot"; cp -a /usr/share/novnc/. "$webroot/"
+          webroot="$live/novnc-web"
+          mkdir -m700 "$webroot"
+          cp -a /usr/share/novnc/. "$webroot/"
           marker="OTCLIENT_NATIVE_LOGIN_VNC_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
           printf '%s\n' "$marker" >"$webroot/health.txt"
           cat >"$webroot/index.html" <<'HTML'
           <!doctype html><meta charset="utf-8"><title>OTCLIENT Tibia updater</title><script>location.replace('/vnc.html?autoconnect=1&resize=scale&quality=6&compression=3&show_dot=true&path=websockify');</script>
           HTML
-          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD DISPLAY="$display" \
-            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-vnc \
-            nohup "$tool/usr/bin/x11vnc" -display "$display" -rfbport 5901 -localhost -forever -shared -nopw \
-            -xkb -repeat -wait 10 -defer 10 -deferupdate 20 -threads -noxrecord -noxfixes -o "$live/x11vnc.log" >/dev/null 2>&1 </dev/null &
-          vnc_pid=$!
+
           env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
-            OTCLIENT_TIBIA_RE_TRACK=official-client-re OTCLIENT_TIBIA_RE_ROLE=native-login-updater-websockify \
-            nohup websockify --web "$webroot" 0.0.0.0:6081 127.0.0.1:5901 >"$live/websockify.log" 2>&1 </dev/null &
+            DISPLAY="$display" \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            OTCLIENT_TIBIA_RE_ROLE=native-login-updater-vnc \
+            nohup "$tool/usr/bin/x11vnc" -display "$display" -rfbport 5901 \
+              -localhost -forever -shared -nopw -xkb -repeat -wait 10 -defer 10 \
+              -deferupdate 20 -threads -noxrecord -noxfixes \
+              -o "$live/x11vnc.log" >/dev/null 2>&1 </dev/null &
+          vnc_pid=$!
+
+          env -u RUNNER_TRACKING_ID -u TIBIA_TEST_EMAIL -u TIBIA_TEST_PASSWORD \
+            OTCLIENT_TIBIA_RE_TRACK=official-client-re \
+            OTCLIENT_TIBIA_RE_ROLE=native-login-updater-websockify \
+            nohup websockify --web "$webroot" 0.0.0.0:6081 127.0.0.1:5901 \
+              >"$live/websockify.log" 2>&1 </dev/null &
           ws_pid=$!
+
           for _ in $(seq 1 50); do
-            if kill -0 "$vnc_pid" 2>/dev/null && kill -0 "$ws_pid" 2>/dev/null && [[ "$(curl -fsS --max-time 1 http://127.0.0.1:6081/health.txt 2>/dev/null || true)" == "$marker" ]]; then break; fi
+            if kill -0 "$vnc_pid" 2>/dev/null && kill -0 "$ws_pid" 2>/dev/null \
+              && [[ "$(curl -fsS --max-time 1 http://127.0.0.1:6081/health.txt 2>/dev/null || true)" == "$marker" ]]; then
+              break
+            fi
             sleep .2
           done
-          kill -0 "$xvfb_pid"; kill -0 "$vnc_pid"; kill -0 "$ws_pid"
+
+          kill -0 "$xvfb_pid"
+          kill -0 "$vnc_pid"
+          kill -0 "$ws_pid"
           [[ "$(curl -fsS --max-time 2 http://127.0.0.1:6081/health.txt)" == "$marker" ]]
+
           python3 - <<'PY'
-          import base64,os,socket
-          s=socket.create_connection(('127.0.0.1',5901),3); assert s.recv(12).startswith(b'RFB '); s.close()
+          import base64, os, socket
+          s=socket.create_connection(('127.0.0.1',5901),3)
+          assert s.recv(12).startswith(b'RFB ')
+          s.close()
           key=base64.b64encode(os.urandom(16)).decode()
-          req=('GET /websockify HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'+f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
-          s=socket.create_connection(('127.0.0.1',6081),3); s.sendall(req); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
+          req=('GET /websockify HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
+               + f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
+          s=socket.create_connection(('127.0.0.1',6081),3)
+          s.sendall(req)
+          data=s.recv(4096)
+          s.close()
+          assert b' 101 ' in data.split(b'\r\n',1)[0]
           PY
           echo STABLE_VNC_LOCAL_RFB_WEBSOCKET=PASS
 
-          self="$(hostname)"; docker inspect "$self" >/dev/null
+          self="$(hostname)"
+          docker inspect "$self" >/dev/null
           image="$(docker inspect -f '{{.Image}}' "$self")"
           network="$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$self")"
           [[ "$network" == otclient-runner_default ]]
           runner_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$self")"
           [[ "$runner_ip" =~ ^172\.28\.[0-9]+\.[0-9]+$ ]]
+
           relay_script="$(cat <<'PY'
-          import os,select,socket,threading
+          import os, select, socket, threading
           target=(os.environ['TARGET_IP'],int(os.environ['TARGET_PORT']))
-          def handle(c):
-              s=None
+          def handle(client):
+              upstream=None
               try:
-                  s=socket.create_connection(target,5); pair=(c,s)
+                  upstream=socket.create_connection(target,5)
+                  pair=(client,upstream)
                   while True:
-                      r,_,_=select.select(pair,[],[],60)
-                      if not r: continue
-                      for src in r:
+                      readable,_,_=select.select(pair,[],[],60)
+                      if not readable:
+                          continue
+                      for src in readable:
                           data=src.recv(65536)
-                          if not data: return
-                          (s if src is c else c).sendall(data)
+                          if not data:
+                              return
+                          (upstream if src is client else client).sendall(data)
               finally:
-                  try:c.close()
-                  except:pass
-                  if s:
-                      try:s.close()
-                      except:pass
-          ls=socket.socket(); ls.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); ls.bind(('0.0.0.0',6081)); ls.listen(64)
+                  try: client.close()
+                  except Exception: pass
+                  if upstream:
+                      try: upstream.close()
+                      except Exception: pass
+          listener=socket.socket()
+          listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+          listener.bind(('0.0.0.0',6081))
+          listener.listen(64)
           while True:
-              c,_=ls.accept(); threading.Thread(target=handle,args=(c,),daemon=True).start()
+              client,_=listener.accept()
+              threading.Thread(target=handle,args=(client,),daemon=True).start()
           PY
           )"
+
           host_port=''
           for hp in $(seq 6083 6092); do
-            if docker run -d --name "$RELAY_NAME" --label "otclient.task=$TASK" --label 'otclient.role=native-login-vnc-relay' \
-              --network "$network" -p "$HOST_LAN_IP:$hp:6081/tcp" \
-              -e "TARGET_IP=$runner_ip" -e 'TARGET_PORT=6081' --entrypoint python3 "$image" -u -c "$relay_script" >/dev/null 2>&1; then
-              host_port="$hp"; relay_created=true; break
+            if docker run -d --name "$RELAY_NAME" \
+              --label "otclient.task=$TASK" \
+              --label 'otclient.role=native-login-vnc-relay' \
+              --network "$network" \
+              -p "$HOST_LAN_IP:$hp:6081/tcp" \
+              -e "TARGET_IP=$runner_ip" -e 'TARGET_PORT=6081' \
+              --entrypoint python3 "$image" -u -c "$relay_script" >/dev/null 2>&1; then
+              host_port="$hp"
+              relay_created=true
+              break
             fi
             docker rm -f "$RELAY_NAME" >/dev/null 2>&1 || true
           done
+
           [[ "$host_port" =~ ^[0-9]+$ ]]
           docker inspect -f '{{.State.Running}}' "$RELAY_NAME" | grep -qx true
+          [[ "$(docker inspect -f '{{ index .Config.Labels "otclient.task" }}' "$RELAY_NAME")" == "$TASK" ]]
           binding="$(docker port "$RELAY_NAME" 6081/tcp)"
           [[ "$binding" == "$HOST_LAN_IP:$host_port" ]]
           echo "STABLE_VNC_LAN_PORT=$host_port"
 
           host_probe="$(cat <<'PY'
-          import base64,os,socket,sys,urllib.request
-          port=int(sys.argv[1]); marker=sys.argv[2]
-          with urllib.request.urlopen(f'http://127.0.0.1:{port}/health.txt',timeout=5) as r:
-              assert r.read().decode().strip()==marker
-          key=base64.b64encode(os.urandom(16)).decode()
-          req=(f'GET /websockify HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
-          s=socket.create_connection(('127.0.0.1',port),5); s.sendall(req); d=s.recv(4096); s.close(); assert b' 101 ' in d.split(b'\r\n',1)[0]
+          import base64, socket, sys, urllib.request
+          host=sys.argv[1]
+          port=int(sys.argv[2])
+          marker=sys.argv[3]
+          with urllib.request.urlopen(f'http://{host}:{port}/health.txt',timeout=5) as response:
+              assert response.read().decode().strip()==marker
+          key=base64.b64encode(__import__('os').urandom(16)).decode()
+          req=(f'GET /websockify HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n'
+               + f'Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n').encode()
+          s=socket.create_connection((host,port),5)
+          s.sendall(req)
+          data=s.recv(4096)
+          s.close()
+          assert b' 101 ' in data.split(b'\r\n',1)[0]
           print('HOST_NETWORK_VNC_PROBE=PASS')
           PY
           )"
-          docker run --rm --network host --entrypoint python3 "$image" -c "$host_probe" "$host_port" "$marker"
-          echo STABLE_VNC_HOST_NETWORK_HTTP_WEBSOCKET=PASS
+
+          docker run --rm --network host --entrypoint python3 "$image" \
+            -c "$host_probe" "$HOST_LAN_IP" "$host_port" "$marker"
+          echo STABLE_VNC_HOST_LAN_HTTP_WEBSOCKET=PASS
 
           relay_id="$(docker inspect -f '{{.Id}}' "$RELAY_NAME")"
-          python3 - "$live/session.json" "$TASK" "$display" "$xvfb_pid" "$vnc_pid" "$ws_pid" "$RELAY_NAME" "$relay_id" "$host_port" <<'PY'
-          import json,pathlib,sys
-          x={'task':sys.argv[2],'phase':'vnc-ready','display':sys.argv[3],'rfb_port':5901,'web_backend_port':6081,'xvfb_pid':int(sys.argv[4]),'vnc_pid':int(sys.argv[5]),'websockify_pid':int(sys.argv[6]),'relay_name':sys.argv[7],'relay_id':sys.argv[8],'lan_ip':'192.168.1.2','lan_port':int(sys.argv[9]),'client_started':False,'credentials_accessed':False}
-          p=pathlib.Path(sys.argv[1]); p.write_text(json.dumps(x,sort_keys=True)+'\n'); p.chmod(0o600)
+          python3 - "$live/session.json" "$TASK" "$display" "$xvfb_pid" "$vnc_pid" "$ws_pid" \
+            "$RELAY_NAME" "$relay_id" "$host_port" "$marker" <<'PY'
+          import json, pathlib, sys
+          data={
+              'task':sys.argv[2],
+              'phase':'vnc-ready',
+              'display':sys.argv[3],
+              'rfb_port':5901,
+              'web_backend_port':6081,
+              'xvfb_pid':int(sys.argv[4]),
+              'vnc_pid':int(sys.argv[5]),
+              'websockify_pid':int(sys.argv[6]),
+              'relay_name':sys.argv[7],
+              'relay_id':sys.argv[8],
+              'lan_ip':'192.168.1.2',
+              'lan_port':int(sys.argv[9]),
+              'marker':sys.argv[10],
+              'client_started':False,
+              'credentials_accessed':False,
+          }
+          path=pathlib.Path(sys.argv[1])
+          path.write_text(json.dumps(data,sort_keys=True)+'\n')
+          path.chmod(0o600)
           PY
-          printf 'UPDATER_VNC_URL=http://%s:%s/\nUPDATER_VNC_DISPLAY=%s\n' "$HOST_LAN_IP" "$host_port" "$display" >"$live/public.txt"; chmod 600 "$live/public.txt"
+
+          printf 'UPDATER_VNC_URL=http://%s:%s/\nUPDATER_VNC_DISPLAY=%s\n' \
+            "$HOST_LAN_IP" "$host_port" "$display" >"$live/public.txt"
+          chmod 600 "$live/public.txt"
+
           echo "STABLE_VNC_URL=http://$HOST_LAN_IP:$host_port/"
           echo STABLE_VNC_SECRET_ACCESS=false
           echo STABLE_VNC_CLIENT_STARTED=false
           echo STABLE_VNC_RESULT=PASS_PERSISTENT_LAN_OBSERVER_READY
-          trap - ERR INT TERM HUP
+          success=true

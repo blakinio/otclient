@@ -149,12 +149,15 @@ jobs:
           assert len(hits) == 1, ('target_name_count', len(hits))
           meta_index, name, argc, method_flags, meta_revision, params = hits[0]
           assert argc == 2, argc
+          assert params == [0x2b, 0x0a, 0x0a], [hex(x) for x in params]
           print('COLD_AUTH_TGAMECLIENT_QMETA_IDENTITY=PASS')
           print(f'COLD_AUTH_METHOD_NAME={name}')
           print(f'COLD_AUTH_METHOD_META_INDEX={meta_index}')
           print(f'COLD_AUTH_ARGC={argc}')
           print(f'COLD_AUTH_METHOD_FLAGS=0x{method_flags:x}')
           print('COLD_AUTH_RAW_PARAM_TYPE_IDS=' + ','.join(hex(x) for x in params))
+          print('COLD_AUTH_ARG_TYPES=QString,QString')
+          print('COLD_AUTH_RETURN_TYPE=void')
 
           md = Cs(CS_ARCH_X86, CS_MODE_64)
           md.detail = True
@@ -180,41 +183,36 @@ jobs:
               except Exception:
                   continue
               score = sum(executable(t) for t in targets)
-              candidates.append((score, table, targets, inst.address))
+              if score != method_count:
+                  continue
+              context = ins[max(0, pos - 12):pos + 3]
+              normalized = [(x.mnemonic, x.op_str.replace(' ', '')) for x in context]
+              role = 'UNKNOWN'
+              if any(m == 'test' and o == 'esi,esi' for m, o in normalized) or any(m == 'cmp' and o in ('esi,0', 'esi,0x0') for m, o in normalized):
+                  role = 'INVOKE_META_METHOD'
+              if any(m == 'cmp' and o in ('esi,0xa', 'esi,10') for m, o in normalized):
+                  role = 'REGISTER_METHOD_ARGUMENT_METATYPE'
+              candidates.append((role, table, targets, inst.address, context))
 
-          candidates.sort(reverse=True, key=lambda item: (item[0], -item[1]))
-          perfect = [c for c in candidates if c[0] == method_count]
-          print(f'COLD_AUTH_DISPATCH_CANDIDATE_COUNT={len(candidates)}')
-          print(f'COLD_AUTH_PERFECT_DISPATCH_CANDIDATE_COUNT={len(perfect)}')
-          for n, (score, table, targets, lea_at) in enumerate(candidates[:12]):
-              print(f'COLD_AUTH_DISPATCH_CANDIDATE={n};LEA=0x{lea_at:x};TABLE=0x{table:x};EXEC_SCORE={score}/{method_count};TARGET_FOR_METHOD=0x{targets[meta_index]:x}')
+          print(f'COLD_AUTH_PERFECT_DISPATCH_CANDIDATE_COUNT={len(candidates)}')
+          for n, (role, table, targets, lea_at, context) in enumerate(candidates):
+              print(f'COLD_AUTH_DISPATCH_CANDIDATE={n};ROLE={role};LEA=0x{lea_at:x};TABLE=0x{table:x};TARGET_FOR_METHOD=0x{targets[meta_index]:x}')
+              print('COLD_AUTH_DISPATCH_CONTEXT_' + str(n) + '=' + '|'.join(f'0x{x.address:x}:{x.mnemonic}:{x.op_str}' for x in context))
 
-          assert len(perfect) == 1, ('perfect_dispatch_count', len(perfect))
-          score, table, targets, lea_at = perfect[0]
+          invokes = [c for c in candidates if c[0] == 'INVOKE_META_METHOD']
+          registrations = [c for c in candidates if c[0] == 'REGISTER_METHOD_ARGUMENT_METATYPE']
+          assert len(invokes) == 1, ('invoke_dispatch_count', len(invokes))
+          assert len(registrations) == 1, ('register_type_dispatch_count', len(registrations))
+          role, table, targets, lea_at, context = invokes[0]
           target = targets[meta_index]
           assert executable(target), hex(target)
           fence = raw[file_off(target):file_off(target) + 32]
           assert len(fence) == 32
+          print('COLD_AUTH_INVOKE_DISPATCH_ROLE=PROVEN')
           print(f'COLD_AUTH_DISPATCH_TABLE=0x{table:x}')
           print(f'COLD_AUTH_DISPATCH_TARGET=0x{target:x}')
           print('COLD_AUTH_TARGET_EXECUTABLE=true')
           print('COLD_AUTH_TARGET_INSTRUCTION_FENCE=' + fence.hex())
-
-          resolved = []
-          for type_id in params[1:]:
-              name_value = None
-              if type_id & 0x80000000:
-                  candidate_index = type_id & 0x7fffffff
-                  try:
-                      name_value = qstring(candidate_index)
-                  except Exception:
-                      name_value = None
-              resolved.append(name_value)
-          if resolved == ['QString', 'QString']:
-              print('COLD_AUTH_ARG_TYPES=QString,QString')
-          else:
-              print('COLD_AUTH_ARG_TYPES=UNKNOWN')
-              print('COLD_AUTH_ARG_TYPE_NAMES=' + ','.join(x or 'UNKNOWN' for x in resolved))
-
+          print(f'COLD_AUTH_NEGATIVE_CONTROL_REGISTER_TYPE_TARGET=0x{registrations[0][2][meta_index]:x}')
           print('COLD_AUTH_STATIC_DISCRIMINATOR=PASS')
           PY

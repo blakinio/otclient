@@ -1,0 +1,68 @@
+name: Track A native-login terminal release
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/tibia-official-client-re-native-login-terminal-release.yml
+
+permissions:
+  contents: read
+
+jobs:
+  release-controller:
+    name: Release generation-10 controller authority
+    if: ${{ github.event.pull_request.head.ref == 'runtime/OTC-20260818-native-login-to-ingame-e2e-v2' }}
+    runs-on: [otclient, synology]
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Release exact current lease without touching client
+        shell: bash
+        env:
+          EXPECTED_BASE_SHA: a518ceaef9135c05e36ffd7066b3acb2d81f8c4c
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set +x
+          set -Eeuo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == synology-otclient-01 ]]
+          [[ "$EVENT_BASE_SHA" == "$EXPECTED_BASE_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EVENT_HEAD_SHA" ]]
+          [[ "$(git ls-remote origin refs/heads/main | awk 'NR==1 {print $1}')" == "$EXPECTED_BASE_SHA" ]]
+          python3 .github/scripts/test_track_a_agent_runtime_governance.py --changed-from "$EVENT_BASE_SHA" --expected-branch "$HEAD_BRANCH"
+          task='OTC-20260818-native-login-to-ingame-e2e'
+          session='chatgpt-native-login-e2e-20260818'
+          token="/home/runner/_work/_otclient_tibia_re_state/tasks/$task/runtime/canonical-lease-token"
+          state='/home/runner/_work/_otclient_tibia_re_state/canonical-live-runtime'
+          lease='.github/scripts/tibia-official-client-re-canonical-live-lease'
+          python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          d=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert d.get('status')=='active'
+          assert d.get('generation')==10
+          assert d.get('controller_task')=='OTC-20260818-native-login-to-ingame-e2e'
+          assert d.get('controller_session')=='chatgpt-native-login-e2e-20260818'
+          print('NATIVE_LOGIN_TERMINAL_RELEASE_PRECHECK=ACTIVE_GEN10_CURRENT_TASK')
+          PY
+          bash "$lease" release --task-id "$task" --session-id "$session" --token-file "$token"
+          rm -f "$token"
+          python3 - "$state/lease.json" <<'PY'
+          import json,pathlib,sys
+          d=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          assert d.get('status')=='released'
+          assert d.get('generation')==10
+          assert d.get('controller_task') is None
+          assert d.get('controller_session') is None
+          print('NATIVE_LOGIN_TERMINAL_RELEASE_RESULT=RELEASED_GEN10')
+          PY
+          echo 'NATIVE_LOGIN_TERMINAL_CLIENT_MUTATION=false'
+          echo 'NATIVE_LOGIN_TERMINAL_CREDENTIAL_ACCESS=false'
+          echo 'NATIVE_LOGIN_TERMINAL_LOGIN_PERFORMED=false'

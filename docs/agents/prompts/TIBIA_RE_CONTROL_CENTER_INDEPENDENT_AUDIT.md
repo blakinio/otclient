@@ -2,7 +2,7 @@
 
 Recommended reasoning effort: high / maximum.
 
-Act as a **fresh independent read-only architecture, security, concurrency, durability and implementation-readiness auditor**.
+Act as a **fresh independent read-only architecture, security, concurrency, durability, privacy and implementation-readiness auditor**.
 
 Repository:
 
@@ -10,11 +10,11 @@ Repository:
 https://github.com/blakinio/otclient
 ```
 
-Use connected live GitHub repository state as the source of truth.
+Use live connected GitHub state as source of truth.
 
-This is an independent falsification task. Do not trust conclusions from the design/hardening authors.
+Do not trust conclusions from the design/hardening authors.
 
-# 1. Absolute execution boundary
+## 1. Absolute execution boundary
 
 Do not implement fixes.
 
@@ -27,150 +27,151 @@ Do not:
 - create replacement architecture;
 - perform Track A runtime actions;
 - launch/control the Tibia client;
-- access credentials or secret values;
+- access credentials/secret values;
 - log in;
-- perform gameplay actions;
+- perform gameplay;
 - write to `blakinio/Oteryn-v2`.
 
-Use `runtime_access:none` reasoning only.
+This audit is `runtime_access:none`.
 
-# 2. Audit target and freshness
+## 2. Freshness/discovery
 
-Audit the **current complete design** of:
-
-```text
-TIBIA RE Control Center / E2E Lab
-```
-
-Historical discovery anchors:
+Historical anchors are discovery hints only:
 
 ```text
-design PR       blakinio/otclient#600
-design merge    ada65af85a872e2df43469f5687418fc5647811a
-closeout PR     blakinio/otclient#601
-closeout merge  5817f1ad699c2d68dfb1a03886dc8c20dace67e7
-audit prompt PR blakinio/otclient#602
+original design PR       #600
+original design merge    ada65af85a872e2df43469f5687418fc5647811a
+original closeout PR     #601
+original closeout merge  5817f1ad699c2d68dfb1a03886dc8c20dace67e7
+audit prompt PR          #602
+hardening PR             #605 or its merged successor/current state
 ```
 
-These are hints only.
+Before relying on any:
 
-Before relying on them:
-
-1. fetch current `main`;
-2. verify #600/#601/#602 merge status/SHAs;
-3. identify every later merged/open PR touching Control Center architecture/contracts/prompts;
+1. fetch exact current `main`;
+2. verify merge/open state and exact SHAs for relevant PRs;
+3. identify later Control Center commits/PRs;
 4. verify current blobs of all audited files;
-5. inspect current open PRs and active tasks for overlapping Control Center, Surveyor, runtime bridge, Track A authority, E2E, HTTP/CLI or Oteryn work;
-6. use live state when historical hints differ and report the discrepancy.
+5. inspect current open PRs/tasks for overlapping Control Center, Surveyor, runtime bridge, Track A authority, HTTP/CLI/E2E/persistence work;
+6. report discrepancies and use live state.
 
-# 3. Mandatory files
+If the hardening is still an open PR and the owner explicitly asks to audit that exact PR/head, audit its exact unchanged head against current main; otherwise audit trusted current main.
 
-Read in full from current trusted `main`:
+## 3. Mandatory Control Center files
 
-- `AGENTS.md`
-- `docs/agents/README.md`
-- `docs/agents/programs/TIBIA_RE_CONTROL_CENTER_E2E.md`
-- `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md`
-- `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md`
-- `docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md`
-- `docs/agents/tasks/archive/OTC-20260819-tibia-re-control-center-e2e-design.md`
+Read in full:
 
-Also inspect current Track A governance/dependencies including:
+```text
+docs/agents/programs/TIBIA_RE_CONTROL_CENTER_E2E.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md
+docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_CONTROL_API_V1.md
+docs/agents/prompts/TIBIA_RE_CONTROL_CENTER_MVP.md
+```
 
-- `docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`
-- `docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`
-- `docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md`
-- current canonical lease/registration/Gate A/rebind/Gate B/bootstrap/whole-lifetime-supervisor contracts referenced by trusted instructions
-- current GUI input lock/activity heartbeat helpers/contracts
-- `docs/agents/MODULE_CATALOG.md`
-- `docs/agents/REPOSITORY_MAP.md`
-- `docs/agents/KNOWN_RISKS.md`
-- `docs/agents/BUILD_TEST_MATRIX.md`
-- `docs/agents/CROSS_REPO_CONTRACTS.md`
+Also read relevant lifecycle task/archive records for #600/#605 or their successors.
 
-Inspect exact current state/content of:
+## 4. Mandatory repository governance/dependencies
 
-- PR #592 Surveyor;
+Read/inspect current:
+
+```text
+AGENTS.md
+docs/agents/README.md
+docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md
+docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md
+current canonical lease/registration/Gate A/rebind/Gate B/bootstrap/whole-lifetime-supervisor contracts
+current GUI input-lock/activity-heartbeat contracts/helpers
+docs/agents/MODULE_CATALOG.md
+docs/agents/REPOSITORY_MAP.md
+docs/agents/KNOWN_RISKS.md
+docs/agents/BUILD_TEST_MATRIX.md
+docs/agents/CROSS_REPO_CONTRACTS.md
+```
+
+Inspect:
+
+- current exact PR #592 Surveyor state;
 - `tools/tibia_re_surveyor/**` if present/accepted;
 - `tools/tibia_runtime_bridge/**`;
-- canonical lease/input-lock/runtime-control helpers;
-- existing scenario, recorder, artifact, persistence, HTTP, web, CLI, cancellation, idempotency and fake/test infrastructure that could overlap.
+- canonical Track A lease/transition/guard/input helpers;
+- existing scenario/recorder/persistence/HTTP/CLI/fake/idempotency infrastructure that could overlap.
 
-For `blakinio/Oteryn-v2`, read-only inspect:
+For `blakinio/Oteryn-v2`, read-only inspect current:
 
-- current `main` SHA;
-- `AGENTS.md` and applicable nested instructions;
+- main SHA;
+- `AGENTS.md` and applicable nested rules;
 - `docs/architecture/ADR-0007-native-end-to-end-test-platform.md`;
-- relevant current architecture/security documents;
+- relevant security/architecture docs;
 - `apps/client`;
-- existing E2E/test-support/control interfaces;
+- current test/E2E/control interfaces;
 - production/test-build restrictions.
 
-Do not assume historical `otclient/oteryn-client/**` is canonical.
+Do not treat historical `otclient/oteryn-client/**` as canonical.
 
-# 4. Evidence discipline
+## 5. Evidence labels
 
-Use:
+Use explicitly:
 
 ```text
-FACT       directly verified from repository/tool state
+FACT       directly verified
 INFERENCE  derived from verified facts
-UNKNOWN    missing/unavailable evidence
+UNKNOWN    evidence unavailable/missing
 ```
 
-Do not convert design intent into readiness automatically.
+A prose intention is not an implementation contract unless behavior is sufficiently specified for two competent independent implementers to produce materially compatible safety behavior.
 
-A contract passes only when two competent independent implementers could derive materially compatible safety behavior without this chat.
+A test list does not cure ambiguous normative semantics.
 
-A test list does not repair an ambiguous contract unless the expected behavior is normatively defined.
+## 6. Primary objective
 
-# 5. Primary objective
-
-Determine whether the current design is:
+Determine whether the design is:
 
 1. architecturally sound;
 2. implementable without material redesign;
-3. integrated with existing Track A infrastructure rather than duplicating it;
-4. fail-closed at the exact irreversible mutation boundary;
+3. integrated with existing Track A infrastructure without duplication;
+4. fail-closed at the irreversible mutation boundary;
 5. linearizable under STOP/concurrent dispatch;
-6. idempotent under retries/repeated POST/browser reload;
+6. idempotent under duplicate browser/CLI/HTTP requests;
 7. crash-safe against duplicate side effects;
-8. conservative/enforceable for side-effect budgets;
-9. privacy-safe before normal object creation;
-10. truthful for multi-source causal evidence;
-11. suitable for one browser/CLI backend;
-12. reusable as an E2E/research platform;
-13. compatible with current Oteryn v2 ADR-0007 without a second Oteryn E2E authority;
-14. suitable for semantic differential testing;
-15. sufficiently specified for a fresh Package A implementation with zero Track A runtime access.
+8. conservative/enforceable for budgets;
+9. deterministic/bounded at the scenario-parser/semantic layer;
+10. privacy-safe before normal object creation;
+11. truthful for multi-source causal evidence;
+12. secure enough for initial local browser/CLI operation;
+13. safe against cross-origin/DNS-rebinding abuse of loopback HTTP;
+14. incapable of hiding mutation inside capture/emergency cleanup;
+15. compatible with Oteryn-v2 ADR-0007 without a second Oteryn E2E authority;
+16. suitable for semantic differential E2E;
+17. sufficiently specified for Package A implementation with zero Track A runtime access.
 
-# 6. Non-negotiable invariants
-
-Attempt to disprove each:
+## 7. Non-negotiable invariants to falsify
 
 ```text
 scenario validity
 != capability support
 != evidence maturity
-!= observation freshness
+!= freshness
 != mutation authority
 ```
 
 ```text
 Browser ----\
-             -> one Control API/domain service -> Scenario Engine -> MutationCoordinator -> Adapter
+             -> one Control API/domain service -> Run Manager -> Scenario Engine -> MutationCoordinator -> Adapter
 CLI --------/
 ```
 
 ```text
 backend restart -> fresh backend_epoch
-control_generation is scoped to backend_epoch
-old backend callbacks cannot control new execution
+old-backend callbacks cannot control new execution
 ```
 
 ```text
-STOP wins dispatch_gate -> no dispatch commit -> no physical mutation
-commit_dispatch wins dispatch_gate -> action is durably possible-dispatched before STOP
+STOP wins dispatch_gate -> no dispatch commit -> no physical effect
+commit_dispatch wins dispatch_gate -> possible-dispatch/at-risk is durable before STOP observes it
 ```
 
 ```text
@@ -178,28 +179,38 @@ physical mutation requires successful one-shot durable dispatch commit
 ```
 
 ```text
-same action_id + same request -> one logical dispatch maximum
-same action_id + different request -> deterministic refusal
+request_id dedupes transport/domain requests
+action_id dedupes semantic action attempts
 ```
 
 ```text
-possible dispatch + missing terminal proof -> AMBIGUOUS
-AMBIGUOUS mutation -> no automatic retry
+POSSIBLY_DISPATCHED without authoritative terminal proof -> AMBIGUOUS
+AMBIGUOUS -> no automatic retry
 ```
 
 ```text
-secret-class data never enters normal Event/Artifact/Error/Report/AgentBundle objects
+secret-class data never enters normal Event/Artifact/Error/Report/AgentBundle
 ```
 
 ```text
 ingest order != source causal order
 ```
 
-Safety-relevant violation is at least P1 and P0 when it can permit unauthorized mutation, secret exposure or uncontrolled irreversible/value effects.
+```text
+passive capture != permission to attach/inject/input/mutate
+STOP != permission for compensating gameplay/process mutation
+```
 
-# 7. Repository fit and duplication
+```text
+loopback bind != browser trust
+Host + Origin + nonce are required by Control API v1
+```
 
-Classify every proposed component:
+Any safety-relevant violation is at least P1 and P0 when it can cause unauthorized mutation, secret exposure or uncontrolled irreversible/value effects.
+
+## 8. Audit A — repository fit/duplication
+
+Classify each:
 
 ```text
 REUSE_EXISTING
@@ -209,144 +220,145 @@ DUPLICATE_OR_CONFLICTING
 UNKNOWN
 ```
 
-Audit:
+Components:
 
-- Safety Controller;
-- MutationCoordinator;
 - Scenario Engine;
+- MutationCoordinator;
+- Safety Controller;
 - Recorder;
 - Artifact Store;
-- action/run persistence;
+- Request/Action/Budget persistence;
 - Adapter API;
 - Control API;
 - fake adapter;
 - Surveyor integration;
-- runtime bridge;
+- runtime bridge integration;
 - Track A lease/registration/Gates/supervisor/input lock;
 - Oteryn adapter/E2E integration.
 
-Verify no component becomes a second source of truth for Track A authority/evidence or Oteryn E2E authority.
+Verify no second source of truth for Track A authority/evidence or Oteryn E2E authority.
 
-# 8. Final authority and dispatch path
+## 9. Audit B — Scenario v1 parser/semantic determinism
 
-Do not accept `preflight immediately before dispatch` by itself.
+Verify exact contract for:
 
-Verify a concrete two-stage path exists:
+- JSON/YAML -> same typed AST;
+- document/depth/string/collection/step bounds;
+- duplicate-key rejection;
+- unsafe custom YAML tag/object-constructor rejection;
+- bounded/disabled aliases;
+- UTF-8;
+- non-finite/out-of-domain number rejection;
+- JCS/RFC-8785 canonicalization;
+- SHA-256 scenario/action hashes;
+- deterministic explicit/generated step IDs;
+- typed predicates without implicit coercion;
+- UNKNOWN behavior;
+- retry only after proven NOT_DISPATCHED;
+- semantic selectors instead of raw client internals;
+- action-specific parameter schemas;
+- finite EffectBound;
+- capture/privacy policies.
+
+Flag any `object` field whose semantics remain materially free-form enough to produce incompatible engines for a core action.
+
+## 10. Audit C — final authority/dispatch
+
+Do not accept advisory preflight as authority.
+
+Verify sequence:
 
 ```text
 prepare outside local dispatch_gate
--> acquire/hold external adapter authority guard where required
--> final revalidation + durable commit under local dispatch_gate
--> physical effect while external guard remains held
+-> acquire/hold external authority guard where required
+-> final checks + durable local commit under dispatch_gate
+-> physical effect while external guard remains continuously held
 ```
 
-Verify local `dispatch_gate` is **not held while waiting for external/Track A locks or slow I/O**, so STOP can still linearize while an action waits.
+Verify local dispatch gate is not held while waiting for Track A/external locks.
 
 At final commit verify:
 
-- action ledger/request hash;
-- backend epoch;
-- control generation;
-- STOP/cancellation state;
-- adapter generation;
-- runtime instance;
-- session epoch;
-- side-effect reservation;
+- action ID/hash;
+- backend/control generation;
+- STOP/cancellation;
+- adapter/runtime/session fences;
+- budget reservation;
 - capability;
 - current external authority;
-- shared GUI/input lock if needed;
-- all current official Track A identity/authority checks within the existing guarded mutation boundary.
+- current GUI input lock;
+- all current Track A final identity/authority requirements for Official Tibia.
 
-For official adapter verify the Track A external guard remains continuously held from final Track A checks through local `commit_dispatch()` and physical effect.
+Verify official external guard remains continuously held through local commit and physical effect.
 
-Falsify against stale/expired lease, stale registration, generation mismatch, client restart, PID reuse, executable/boot/window/display/container/session changes and authority loss immediately before commit.
+## 11. Audit D — durability-before-effect
 
-# 9. Durable write-ahead dispatch commit
+Verify persistent Package B+/future Package D requires before physical effect:
 
-Verify persistent Package B+ semantics require, before physical mutation:
-
-- durable `DISPATCH_COMMITTED`;
-- `POSSIBLY_DISPATCHED` state;
-- action ID/request hash;
-- backend/control generation;
-- fence provenance;
-- budget `AT_RISK` transition;
-- successful storage durability barrier.
-
-If the durability barrier fails, physical mutation must not begin.
-
-Crash after durable commit but before physical external call must recover conservatively as AMBIGUOUS unless authoritative reconciliation proves no effect.
-
-Flag any design that records `POSSIBLY_DISPATCHED` only after the external call.
-
-# 10. STOP ALL and concurrency
-
-Verify STOP linearizes using the same `dispatch_gate` used by final commit.
-
-Audit:
-
-- control-generation increment/latch;
-- queued old-generation rejection;
-- cancellation while waiting for external authority;
-- active wait/capture cancellation;
-- not-yet-committed mutation prevention;
-- already-committed conservative classification;
-- stale completion rejection;
-- reset semantics;
-- concurrent browser/CLI operators;
-- concurrent scenarios;
-- concurrent read-only work;
-- resource cleanup.
-
-Reject vague `cancel active action` language without a concrete ordering rule.
-
-# 11. Idempotency, replay and crash recovery
+```text
+DISPATCH_COMMITTED
+POSSIBLY_DISPATCHED
+budget AT_RISK
+backend/control/action/hash/fence provenance
+successful local durability barrier
+```
 
 Verify:
 
-- globally unique logical `action_id` scope;
-- canonical normalized-request hash;
-- same-ID/same-request behavior;
-- same-ID/different-request conflict;
-- repeated HTTP POST;
-- CLI retry;
-- browser reload;
-- duplicate tabs;
-- duplicate budget reservation prevention;
-- action/result retrieval;
-- no auto-retry after dispatch commit/ambiguity;
-- backend restart creates fresh backend epoch;
-- stale old-backend callback rejection;
-- no automatic mutation resume;
-- `NOT_DISPATCHED` vs `POSSIBLY_DISPATCHED` recovery;
-- missing/corrupt/contradictory ledger fails closed.
+- only this bounded local durability transaction may run under dispatch gate;
+- explicit finite durability deadline exists;
+- no external network dependency under dispatch gate;
+- barrier timeout/error -> no physical effect;
+- crash after commit but before effect -> AMBIGUOUS unless authoritatively reconciled;
+- safety journal cannot be lost merely because report/artifact presentation fails.
 
-# 12. Scenario Engine determinism
+## 12. Audit E — STOP/concurrency
 
-Verify typed/versioned semantics for:
+Verify one dispatch-gate linearization point for STOP versus commit.
 
-- schema version;
-- deterministic step IDs;
-- predicates/operators;
-- UNKNOWN behavior;
-- preconditions;
-- assertions;
-- waits;
-- timeouts;
-- pause/resume;
-- abort conditions;
-- explicit retries;
-- failure propagation;
-- partial completion;
-- backend/control/adapter/runtime/session fencing;
-- capabilities;
-- reproducibility.
+Audit:
 
-Ensure movement, turn, spell, potion, food, rune, target selection, attack/follow, inventory, containers, equipment, controlled chat, read-only observation and before/after checkpoints are representable semantically.
+- generation increment/latch;
+- overflow fail-closed;
+- queued old-generation cancellation;
+- action waiting on Track A/external authority while STOP occurs;
+- active waits/captures;
+- already-committed conservative classification;
+- stale callback rejection;
+- reset;
+- multiple browser tabs;
+- browser + CLI concurrency;
+- multiple runs;
+- read-only concurrency safety.
 
-# 13. Side-effect budgets
+Reject vague `cancel active action` without ordering semantics.
 
-Verify per-run dimensions use:
+## 13. Audit F — idempotency/replay
+
+Verify ActionLedger:
+
+- action ID scope;
+- canonical action hash;
+- same-ID/same-hash behavior;
+- same-ID/different-hash conflict;
+- no duplicate budget reservation;
+- new retry ID/attempt;
+- no auto-retry after possible dispatch.
+
+Verify Control API RequestLedger:
+
+- request ID distinct from action ID;
+- canonical method/path/body request hash;
+- same-ID/same-hash resource/result replay;
+- same-ID/different-hash conflict;
+- repeated POST /runs returns same run;
+- repeated one-step request returns same logical resources;
+- durable mapping survives restart where needed;
+- corrupt/missing safety-critical ledger fails closed.
+
+## 14. Audit G — side-effect budgets
+
+Verify per dimension:
 
 ```text
 limit
@@ -356,35 +368,46 @@ committed
 uncertain
 ```
 
-Audit:
+Audit reserve-before-dispatch, atomic at-risk transition, conservative ambiguity accounting, exact no-effect release requirements, checked arithmetic and duplicate/retry behavior.
 
-- reserve maximum plausible effect before dispatch;
-- move reservation to at-risk atomically with durable dispatch commit;
-- release only with proven no-effect;
-- measured confirmed commit;
-- conservative commit for dispatched-but-unmeasurable;
-- timeout/fail/cancel/ambiguous -> uncertain maximum;
-- uncertain counts against future admission;
-- duplicate same action ID creates no second accounting;
-- new retry creates new reservation;
-- checked/overflow-safe arithmetic.
+At minimum:
 
-At minimum inspect runtime, actions, movement, spells, consumables, moved items, gold, Tibia Coins and irreversible changes.
+- runtime;
+- actions;
+- movement;
+- spells;
+- consumables;
+- moved items;
+- gold;
+- Tibia Coins;
+- irreversible changes.
 
-A hard budget that cannot be safely bounded must refuse before dispatch.
+Hard unbounded effect must refuse before dispatch.
 
-# 14. Recorder and causal evidence
+## 15. Audit H — pause/restart/stale work
 
-Compare with `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`.
+Verify:
 
-Verify Event model distinguishes:
+- pause does not freeze external authority/generations;
+- resume revalidates required fences;
+- session/runtime change invalidates pending mutation;
+- fresh backend epoch after restart;
+- old-epoch callback refusal;
+- no automatic mutation resume;
+- NOT_DISPATCHED/POSSIBLY_DISPATCHED/CONFIRMED recovery;
+- corrupt/contradictory state fails closed.
 
-- ingestion sequence/time;
-- source timestamp;
-- source clock domain;
+## 16. Audit I — Recorder/causal evidence
+
+Compare with normative Track A experiment model.
+
+Verify distinction of:
+
+- ingest sequence/time;
+- source timestamp/clock domain;
 - source sequence/scope;
 - ordering confidence;
-- backend/control/adapter/runtime/session generations;
+- backend/control/adapter/runtime/session fences;
 - late status.
 
 Verify preservation when observable of:
@@ -392,28 +415,16 @@ Verify preservation when observable of:
 - stimulus/BACKGROUND;
 - direction;
 - message sequence/type/lane;
-- runtime thread;
-- handler/runtime object/object-instance epoch;
+- thread;
+- handler/runtime object/object epoch;
 - before/after hashes;
 - semantic delta;
 - evidence ref;
-- negative/no-stimulus controls.
+- negative/no-stimulus control linkage.
 
-A single total ingest sequence must not be represented as source causal order.
+A total ingest sequence must not be presented as source causal order.
 
-# 15. Late events and artifact finalization
-
-Verify:
-
-```text
-ACTIVE -> CLOSING -> FINALIZED
-```
-
-Audit bounded drain/watermarks, late event tagging, inability to rewrite terminal results, crash/incomplete artifacts, staged finalization, immutable finalized result, append-only supplements and no synthesized PASS.
-
-Also verify durable dispatch journal/action ledger is persisted independently enough that artifact-report failure cannot erase possible-dispatch safety state.
-
-# 16. Security/privacy at construction time
+## 17. Audit J — privacy before object creation
 
 Falsify against:
 
@@ -421,58 +432,113 @@ Falsify against:
 - auth/session tokens;
 - cookies/tickets;
 - encryption/RSA material;
-- private chat/player identities;
+- private chat/player identity;
 - environment variables;
 - raw packet payloads;
 - trace strings;
 - exception/repr/debug text;
-- login/auth screenshots.
+- login/auth screenshots;
+- Control API nonce.
 
 Required:
 
 ```text
-classification/redaction/rejection BEFORE normal object construction
+classification/redaction/rejection BEFORE normal persistent-object construction
 ```
 
-`SECRET_REJECTED` may store category/reason only, never value/hash/reversible derivative.
+`SECRET_REJECTED` contains category/reason only.
 
-Screenshots need safe/quarantine/reject admission.
+Export-time-only redaction is insufficient.
 
-Export-time-only redaction is material weakness.
+## 18. Audit K — capture/emergency-stop bypass
 
-# 17. Network capture
+Verify ordinary snapshot/wait/capture paths are observational only.
 
-Default persistent path must be metadata-only.
+If enabling capture requires attach/injection/input/process/network mutation, passive capture must refuse and require separately governed mutation action/contract.
 
-Verify C2S/S2C, lane, source-local sequence when known, size, structurally known message type, correlation ID and `payload_capture=NONE` default.
+Verify `emergency_stop()` cannot use STOP as authority to:
 
-No raw-payload fallback.
+- send gameplay stop/movement/action;
+- inject input;
+- kill/signal/restart client;
+- attach/detach instrumentation;
+- mutate networking/client config.
 
-Future sanitized payload mode needs separate explicit policy proving pre-persistence secret exclusion.
+Harness-owned passive-resource cleanup is allowed.
 
-# 18. Control API/browser/CLI
+## 19. Audit L — network capture
 
-Verify one backend/domain implementation.
+Default persistent path metadata-only.
+
+Verify:
+
+- C2S/S2C;
+- lane;
+- source-local sequence when known;
+- structurally known message type only;
+- size;
+- correlation ID;
+- `payload_capture=NONE` default;
+- no raw fallback.
+
+Future payload capture must be separately approved and sanitize before persistence.
+
+## 20. Audit M — artifact/finalization
+
+Verify:
+
+```text
+ACTIVE -> CLOSING -> FINALIZED
+```
 
 Audit:
 
-- versioning;
-- loopback-only default;
-- request/collection/history bounds;
-- subscriber/backpressure bounds;
-- idempotency keys;
-- duplicate POST/result retrieval;
-- malformed input;
-- STOP/reset/pause/resume/abort;
-- browser reload;
-- backend shutdown/restart;
-- absence of raw/debug action bypass.
+- bounded drain/watermarks;
+- late tagging;
+- late event cannot rewrite terminal result;
+- incomplete/crash state;
+- staged finalization;
+- immutable finalized result;
+- append-only supplements;
+- no synthesized PASS;
+- safety ledgers durable independently enough from report presentation.
 
-Remote/LAN control must not be enabled through trivial unauthenticated bind configuration.
+## 21. Audit N — Control API local security
 
-# 19. UI truthfulness
+Verify exact v1 rules:
 
-Required major surfaces:
+- default bind `127.0.0.1`;
+- wildcard/non-loopback rejected;
+- optional `::1` only explicit;
+- fresh >=256-bit nonce per backend epoch;
+- nonce not in URL/query/log/artifact/CLI argv;
+- all `/v1/*` requests require nonce;
+- exact Host allowlist including port;
+- arbitrary DNS name resolving to loopback not trusted;
+- exact browser same-origin Origin;
+- no permissive/reflected CORS;
+- no cookie ambient auth;
+- CLI without Origin still requires Host+nonce;
+- bounded bodies/headers/pages/events/subscribers;
+- deterministic slow-consumer/backpressure behavior;
+- stable safe errors;
+- no raw/debug/eval/adapter endpoint;
+- remote/LAN unsupported in v1;
+- graceful shutdown semantics.
+
+Determine whether DNS rebinding/cross-origin browser requests can still reach authenticated control operations.
+
+## 22. Audit O — browser/CLI parity
+
+Verify both surfaces call one domain implementation.
+
+CLI must not import/call concrete adapters directly.
+
+Browser reload/new tab must recover active backend-owned run/action state rather than create duplicate work.
+
+## 23. Audit P — UI truthfulness
+
+Required tabs:
 
 ```text
 Main Runtime Movement Healing Spells Consumables Combat Targeting
@@ -480,7 +546,7 @@ Inventory Containers Equipment Chat Conditions Scenarios Recorder
 Network Experiments Compare Logger
 ```
 
-Verify explicit separation of:
+Required distinct always-visible concepts:
 
 ```text
 AUTHORITY
@@ -493,33 +559,31 @@ FRESHNESS
 
 UNKNOWN/STALE/UNSUPPORTED/NOT_PROVEN remain truthful.
 
-Quick Actions must be one-step Scenario Engine experiments.
+Quick Actions are one-step scenarios, not bypasses.
 
-# 20. Official Tibia adapter
+## 24. Audit Q — Official adapter
 
-Verify common scenarios hide coordinates, raw keys, QMeta IDs, addresses/vtables, opcodes and wire layouts.
+Verify semantic scenarios hide coordinates/raw keys/QMeta IDs/addresses/vtables/opcodes/wire layouts.
 
-Generic support is:
+Generic support:
 
 ```text
 read_supported
 action_supported
 ```
 
-Official-only maturity remains:
+Official-only evidence:
 
 ```text
 R0-R4
 A0-A4
 ```
 
-Verify current Track A infrastructure is consumed/extended, not reimplemented.
+Verify Official adapter extends current Track A infrastructure instead of duplicating authority.
 
-Crucially verify the official adapter obtains Track A guard without holding local dispatch gate, then keeps Track A guard continuously held through final Track A checks, durable local commit and physical mutation.
+## 25. Audit R — Surveyor
 
-# 21. Surveyor boundary
-
-Verify integration pins:
+Verify Package C pins:
 
 ```text
 surveyor_schema_version
@@ -527,28 +591,28 @@ producer_commit
 producer_interface
 ```
 
-Schema mismatch -> explicit `UNAVAILABLE/INCOMPATIBLE`, not copied fallback logic.
+Mismatch -> explicit unavailable/incompatible, not copied fallback/fabricated data.
 
-Control Center cannot silently promote/overwrite Surveyor evidence/coverage state.
+No Control Center overwrite/promotion of Surveyor-owned evidence.
 
-# 22. Oteryn v2 integration
+## 26. Audit S — Oteryn v2
 
-Audit current `blakinio/Oteryn-v2`, especially accepted ADR-0007.
+Audit current Oteryn-v2 against accepted ADR-0007.
 
 Verify:
 
 - `protocol-oteryn` retained;
-- semantic comparison sufficient;
 - client intent/server authority retained;
 - no second Oteryn E2E/scenario authority;
-- no hidden authoritative mutation hook;
-- production test-control exclusion/lockdown;
+- no hidden authoritative client mutation;
+- no unauthenticated production test control;
+- test-only production exclusion/lockdown;
 - explicit cross-repo versioning;
 - no Track A R/A pollution of generic Oteryn capabilities.
 
-# 23. Differential E2E
+## 27. Audit T — differential E2E
 
-Verify versioned profiles support:
+Verify versioned comparison classes:
 
 ```text
 EXACT
@@ -560,13 +624,27 @@ REFERENCE_ONLY
 NOT_COMPARABLE
 ```
 
-Classify position, HP, mana, conditions, target, inventory, containers, equipment, cooldown state/timing, visual effects, pixel output, latency, protocol bytes, object layout and renderer implementation.
+At minimum classify position, HP, mana, conditions, target, inventory, containers, equipment, cooldown state/timing, visual effects, pixels, latency, protocol bytes, internal layout and renderer implementation.
 
-UNKNOWN/unobservable reference is coverage gap, not candidate mismatch.
+UNKNOWN/unobservable reference must be coverage gap, not mismatch.
 
-# 24. Package A zero-runtime testability
+## 28. Audit U — phasing/Package A zero-runtime readiness
 
-Package A must be implementable with:
+Expected order:
+
+```text
+P0 contracts/falsification baseline
+P1 Package A control-core + fake durability/Recorder/Scenario
+P2 Package B local Control API/browser/CLI/persistent store
+P3 Package C accepted Surveyor/read-only
+P4 Package D separately admitted official action adapter
+P5 runtime capture producers
+P6 research suites
+P7 Oteryn adapter
+P8 differential E2E
+```
+
+Package A must require:
 
 ```text
 runtime_access=none
@@ -574,102 +652,100 @@ network_listener=none
 official_client_access=none
 ```
 
-Fake/manual-clock/store model must deterministically exercise all execution semantics including durability failure and crash after dispatch commit.
+If core semantics require real client access, report phasing defect.
 
-If a core semantic test needs the official client, report a phasing defect.
+## 29. Mandatory falsification matrix
 
-# 25. Implementation phasing
-
-Expected:
+For each return:
 
 ```text
-P0 contracts/falsification baseline
-P1 Package A control-core + Recorder + fake durability model
-P2 Package B loopback API + browser + CLI + persistent store
-P3 Package C accepted Surveyor/read-only integration
-P4 Package D separately admitted official Track A adapter
-P5 runtime capture producers
-P6 research suites
-P7 Oteryn adapter
-P8 differential E2E
+SAFE_DEFINED | UNSAFE | UNDERSPECIFIED
 ```
 
-Verify Scenario Engine/Recorder/fake adapter precede UI and real actions; Surveyor waits for accepted interface; Oteryn remains separate repo governance.
+plus exact contract evidence.
 
-# 26. Mandatory falsification matrix
+1. Authority expires immediately before dispatch commit. Expected: commit refuses.
+2. Client restarts between preflight and execute. Expected: stale fences refuse commit.
+3. Two browser tabs start mutation scenarios simultaneously. Expected: per-adapter serialization.
+4. CLI/browser submit same action ID/hash. Expected: at most one dispatch.
+5. STOP races with commit. Expected: exactly one dispatch-gate order.
+6. Network event arrives after run terminal. Expected: late evidence only.
+7. Screenshot may contain login credentials. Expected: quarantine/refusal before normal artifact.
+8. Adapter exception contains secret. Expected: raw text excluded.
+9. Event sources use different clocks. Expected: no false total causal order.
+10. Potion result is lost and caller retries same action ID. Expected: no second dispatch; conservative budget.
+11. Oteryn reports field official client cannot observe. Expected: coverage gap.
+12. Official action maturity A4/read maturity R1. Expected: independent truthfulness.
+13. Surveyor schema changes. Expected: pinned incompatibility.
+14. HTTP repeats same action POST after connection loss. Expected: same logical action/resource.
+15. Runtime authority changes while paused. Expected: resume/final commit revalidation.
+16. New session epoch while scenario paused. Expected: pending mutation invalidated.
+17. Browser reload during active run. Expected: backend-owned state, no duplicate.
+18. Backend restarts with possible in-flight action. Expected: fresh epoch; possible dispatch -> AMBIGUOUS/no auto-retry.
+19. Same action ID reused with different parameters. Expected: conflict refusal.
+20. STOP finishes then stale old-generation callback reports PASS. Expected: evidence only, no run advance.
+21. Ambiguous item/gold effect consumes remaining budget. Expected: overlapping new action refused if bound exceeded.
+22. Recorder/report crashes before result flush. Expected: incomplete, never synthetic PASS.
+23. Auth packet appears under metadata capture. Expected: no raw payload persistence.
+24. Oteryn test adapter appears in production-default profile. Expected: current Oteryn policy prevents/flags readiness.
+25. Dispatch-journal durability barrier fails. Expected: no physical effect.
+26. Crash after durable commit before physical effect. Expected: AMBIGUOUS unless authoritative no-effect proof.
+27. New backend starts same numeric control generation as old. Expected: backend epoch fences stale work.
+28. Action waits for Track A guard while STOP occurs. Expected: STOP can linearize; later stale commit refuses.
+29. Malicious YAML uses duplicate keys/custom tags/alias amplification. Expected: bounded parser rejection.
+30. Two semantically identical scenario/action objects differ only in map key order. Expected: same JCS hash.
+31. Mutation retry configured after `DISPATCH_COMMITTED`. Expected: validation/execution refuses retry path.
+32. Passive capture request requires new debugger attach. Expected: passive capture refuses; no hidden attach.
+33. `emergency_stop()` implementation tries to send stop-movement input/kill client. Expected: forbidden without separate action/authority.
+34. Browser from hostile website sends request to loopback API. Expected: Origin+nonce prevent control.
+35. DNS-rebinding Host points attacker domain at 127.0.0.1. Expected: exact Host allowlist rejects.
+36. Valid nonce from previous backend epoch is replayed after restart. Expected: rejected.
+37. `POST /v1/runs` response is lost; caller repeats same request ID after backend restart. Expected: same durable run resource, not duplicate.
+38. Same request ID reused for different POST body. Expected: deterministic idempotency conflict.
+39. Slow event subscriber fills queue. Expected: bounded backpressure/disconnect, no execution blockage.
+40. Wildcard `0.0.0.0` bind requested. Expected: Control API v1 refuses.
+41. Dispatch durability store stalls. Expected: finite commit timeout; no effect; STOP not blocked indefinitely.
+42. Capture cleanup tries to introduce a new invasive detach/signal. Expected: refuse unless separately authorized action.
 
-For every case return `SAFE_DEFINED`, `UNSAFE`, or `UNDERSPECIFIED` plus exact evidence.
+Any safety-critical `UNDERSPECIFIED` causes FAIL.
 
-1. Authority expires one nanosecond before final dispatch commit. Expected: commit refuses.
-2. Client restarts between advisory preflight and execute. Expected: runtime/adapter/session fence refuses stale commit.
-3. Two browser tabs start mutation scenarios simultaneously. Expected: one per-adapter MutationCoordinator serializes.
-4. CLI and browser submit same logical Quick Action with same action ID. Expected: at most one dispatch commit/effect.
-5. STOP races with commit_dispatch. Expected: exactly one dispatch-gate linearization order.
-6. Network recorder reports after run terminal state. Expected: late evidence only; terminal result unchanged.
-7. Screenshot may contain login credentials. Expected: quarantine/refuse before normal artifact construction.
-8. Adapter throws exception containing secret material. Expected: stable safe reason; raw text excluded.
-9. Sources use different clock domains. Expected: source/ingest clocks distinct; no false total order.
-10. Potion result is lost then caller retries same action ID. Expected: existing possible-dispatch state/result, no second dispatch; conservative budget.
-11. Oteryn reports field official Tibia cannot observe. Expected: coverage gap/not comparable.
-12. Official action evidence A4 while read path R1. Expected: independent maturity truthful.
-13. Surveyor output schema changes. Expected: pinned incompatibility/refusal.
-14. HTTP client repeats POST after connection loss. Expected: same idempotency key returns existing logical state/result.
-15. Runtime authority changes while scenario paused. Expected: resume/final dispatch revalidation.
-16. Stale scenario resumes after new session epoch. Expected: pending mutation invalidated.
-17. Browser reloads during active run. Expected: backend remains owner; no duplicate action/run dispatch.
-18. Backend restarts with action possibly in flight. Expected: fresh backend epoch; possible dispatch -> AMBIGUOUS/no auto-retry.
-19. Same action ID reused with different parameters. Expected: idempotency conflict refusal.
-20. STOP completes then stale old-generation callback returns PASS. Expected: evidence may persist but cannot advance current run.
-21. Ambiguous item/gold action consumes remaining conservative budget. Expected: overlapping retry/new action refused if it would exceed budget.
-22. Recorder/report process crashes before final result flush. Expected: incomplete run, never synthesized PASS.
-23. Auth packet appears with metadata recorder. Expected: metadata only, no raw fallback.
-24. Oteryn test adapter appears in production-default profile. Expected: current Oteryn build/security policy flags/prevents readiness.
-25. Persistent dispatch-journal durability barrier fails immediately before physical effect. Expected: no physical effect.
-26. Backend crashes after durable `DISPATCH_COMMITTED` but before physical effect. Expected: restart classifies AMBIGUOUS unless authoritative no-effect reconciliation exists; no auto-retry.
-27. New backend restarts `control_generation` numerically at the same value as old backend. Expected: distinct backend epoch prevents stale callback/action acceptance.
-28. Action is waiting to acquire Track A guard and operator presses STOP. Expected: STOP can acquire local dispatch gate and linearize without waiting for Track A acquisition; when action later acquires Track A guard its stale generation causes commit refusal.
-
-# 27. Package A readiness question
+## 30. Package A readiness question
 
 Answer exactly:
 
-> Could a fresh competent implementation agent implement Package A solely from current repository documentation, without this chat and without inventing concurrency, dispatch, durability, STOP, retry, budget, privacy, event-ordering, artifact or restart semantics?
+> Could a fresh competent implementation agent implement Package A solely from current repository documentation, without this chat and without inventing scenario types, parser safety, concurrency, dispatch, STOP, retry, durability, budget, privacy, event-ordering, artifact, capture or restart semantics?
 
-If NO, enumerate exact missing contract/types/lifecycles/tests.
+If NO, list exact missing contract/type/lifecycle/test.
 
-# 28. Severity
+## 31. Severity
 
-`P0` — can permit unauthorized mutation, secret exposure, uncontrolled irreversible/value effects, or invalidates core architecture.
+`P0` — can permit unauthorized mutation, secret exposure, uncontrolled irreversible/value effect, or invalidates the architecture.
 
-`P1` — material flaw/ambiguity making implementation unsafe/unreliable or requiring redesign before affected phase.
+`P1` — material ambiguity/flaw requiring redesign or making affected implementation unsafe/unreliable.
 
-`P2` — meaningful correctness/testability/maintainability gap to fix before/while implementing affected phase.
+`P2` — meaningful correctness/testability/maintainability gap that should be fixed before/while implementing affected phase.
 
 `P3` — non-blocking improvement.
 
-Do not invent findings. Clean section must be exactly `NONE`.
+Do not invent findings. Clean section must say exactly `NONE`.
 
-# 29. Decision criteria
+## 32. Decision criteria
 
 `PASS` only if:
 
 - no P0/P1;
-- Package A readiness=YES;
-- every safety-critical falsification case is `SAFE_DEFINED`.
+- Package A implementation ready=YES;
+- every safety-critical falsification is SAFE_DEFINED.
 
 `PASS_WITH_FINDINGS` only if:
 
 - no P0/P1;
-- Package A readiness=YES;
-- remaining findings are P2/P3.
+- Package A ready=YES;
+- remaining findings only P2/P3.
 
-`FAIL` if:
+`FAIL` if any P0/P1, Package A ready=NO, or safety-critical semantics remain underspecified.
 
-- any P0/P1; or
-- Package A readiness=NO; or
-- required safety-critical behavior is underspecified.
-
-# 30. Required output
+## 33. Required output
 
 Return exactly:
 
@@ -678,6 +754,7 @@ REVIEW_TYPE=TIBIA_RE_CONTROL_CENTER_INDEPENDENT_AUDIT
 
 REPOSITORY=
 CURRENT_MAIN=
+AUDITED_HEAD=
 DESIGN_PR=
 DESIGN_MERGE=
 LATEST_CONTROL_CENTER_HARDENING=
@@ -705,6 +782,9 @@ P3_FINDINGS:
 ARCHITECTURE_VERDICT:
 ...
 
+SCENARIO_CONTRACT_VERDICT:
+...
+
 TRACK_A_AUTHORITY_VERDICT:
 ...
 
@@ -717,9 +797,6 @@ STOP_ALL_CONCURRENCY_VERDICT:
 IDEMPOTENCY_REPLAY_VERDICT:
 ...
 
-SCENARIO_ENGINE_VERDICT:
-...
-
 SIDE_EFFECT_BUDGET_VERDICT:
 ...
 
@@ -730,6 +807,12 @@ ARTIFACT_RECOVERY_VERDICT:
 ...
 
 SECURITY_PRIVACY_VERDICT:
+...
+
+CAPTURE_EMERGENCY_STOP_VERDICT:
+...
+
+CONTROL_API_SECURITY_VERDICT:
 ...
 
 BROWSER_CLI_VERDICT:
@@ -759,7 +842,7 @@ FALSIFICATION_RESULTS:
 1. ...
 2. ...
 ...
-28. ...
+42. ...
 
 RECOMMENDED_CHANGES_BEFORE_IMPLEMENTATION:
 1. ...

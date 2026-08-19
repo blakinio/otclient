@@ -2,7 +2,7 @@
 
 ```yaml
 contract_id: TIBIA-RE-CONTROL-CENTER-CONTROL-API-V1
-version: 1.0
+version: 1.1
 major_version: 1
 status: normative_design
 producer_repository: blakinio/otclient
@@ -31,6 +31,7 @@ The local API must defend against at least:
 - connection loss after the backend accepted a request;
 - crash after durable request acceptance but before resource creation;
 - crash after resource creation but before a completed response mapping;
+- delayed replay of an older STOP/reset request after later control transitions;
 - duplicate tabs/operators;
 - oversized/malformed requests;
 - slow event consumers;
@@ -207,8 +208,11 @@ RequestLedgerEntry:
   request_hash: string
   backend_epoch_created: string
   operation: string
-  resource_id: string | null
+  resource_id: string
   status: ACCEPTED | COMPLETED | FAILED
+  result_status: string | null
+  result_control_generation: integer | null
+  result_ref: string | null
   response_code: integer | null
   response_body_hash: string | null
 ```
@@ -226,19 +230,22 @@ request_hash = lowercase_hex(SHA-256(UTF8(JCS({
 
 Headers carrying nonce, request ID, timestamps or transport metadata do not participate in the request hash.
 
+Every POST preallocates one final logical `resource_id` before domain execution. Resource-creating POSTs use the final run/experiment/action-domain ID. STOP/reset use a preallocated control-transition resource identity whose transition ID is also used by the resulting Artifact-v1 `ControlState.transition_id`.
+
 Duplicate rules:
 
 - same `request_id` + same request hash -> resolve the existing durable request/resource/result; never allocate a second logical resource merely due to transport replay;
 - same `request_id` + different request hash -> `409 CONTROL_IDEMPOTENCY_CONFLICT`;
 - a repeated `POST /v1/runs` with the same request ID must return the same `run_id`, never create a second run;
 - a repeated one-step experiment request must resolve to the same experiment/run/action identities;
-- duplicate STOP/reset requests resolve their existing durable control transition/result and must not create accidental additional semantic/external effects merely due to transport retry.
+- duplicate or delayed STOP/reset requests resolve their original durable control-transition identity/result and must not create a second transition, relatch/clear a newer state or advance generation merely due to transport replay;
+- FAILED is a terminal result for that request identity; a deliberate new logical attempt uses a new request ID.
 
 ## 13. Request-ledger durability and domain ordering
 
 Package B persists RequestLedger in the backend-global Artifact-v1 control store, not inside a run directory.
 
-For every resource-creating POST, the exact order is:
+For **every POST**, the exact order is:
 
 ```text
 validate + normalize body
@@ -248,22 +255,27 @@ validate + normalize body
 -> durably append/commit RequestLedger ACCEPTED(request_id, hash, operation, resource_id)
 -> durability barrier succeeds
 -> invoke domain handler using exactly that preallocated resource_id
--> domain handler idempotently ensure/create/schedule only that resource
+-> domain handler idempotently ensure/create/schedule/transition only that resource
 -> durably transition RequestLedger to COMPLETED or FAILED with bounded replayable result metadata
 -> return response
 ```
 
-The `ACCEPTED` durability barrier is before **domain creation/scheduling**, not merely before HTTP success. If acceptance durability fails, the domain handler is not invoked.
+The `ACCEPTED` durability barrier is before **domain creation/scheduling/control transition**, not merely before HTTP success. If acceptance durability fails, the domain handler is not invoked.
 
 Crash/replay semantics:
 
-- crash after durable ACCEPTED but before domain creation -> same request/hash reuses the reserved `resource_id`; the handler may ensure/create that same resource once;
-- crash after domain creation/scheduling but before RequestLedger COMPLETED -> same request/hash discovers/resumes/returns that same resource ID; it never allocates a second resource;
-- crash after COMPLETED but before caller receives response -> replay returns the existing resource/result;
-- same request/hash in FAILED state follows the operation's explicitly declared replay rule and may not silently allocate a new identity; a deliberate logical retry uses a new request ID;
+- crash after durable ACCEPTED but before domain execution -> same request/hash reuses the reserved `resource_id`; the handler may ensure/create/perform only that resource identity once;
+- crash after domain resource creation/scheduling/control transition but before RequestLedger COMPLETED -> same request/hash discovers/resumes/returns that same resource identity; it never allocates a second resource/transition;
+- crash after COMPLETED but before caller receives response -> replay returns the original durable resource/result;
+- same request/hash in FAILED state replays the same failed logical request and may not silently allocate/re-execute; a deliberate logical retry uses a new request ID;
 - same request ID/different hash always conflicts before domain execution.
 
-For non-resource operations such as STOP/reset, the durable RequestLedger entry must bind to the already-created durable control transition/result identity (for example Artifact-v1 `ControlState.transition_id`) before returning success. Replaying the request returns that result and does not repeat unrelated external effects.
+For STOP/reset:
+
+- the preallocated control-transition resource embeds or deterministically references one transition ID;
+- the domain operation must use that exact ID as `ControlState.transition_id`;
+- COMPLETED persists the resulting control generation/result metadata in RequestLedger;
+- replay after later unrelated STOP/reset transitions returns the original result and does not mutate the current ControlState.
 
 After backend restart:
 
@@ -272,7 +284,7 @@ After backend restart:
 - missing/corrupt contradictory request-ledger/domain/safety state fails closed and must not silently recreate mutation-capable work;
 - request IDs are never reused for a different operation/body.
 
-The ledger may retain completed non-mutating requests for a bounded retention window, but any entry needed to prevent duplicate side effects/resource creation remains at least as long as the corresponding resource/run/action recovery state.
+The ledger may retain completed non-mutating requests for a bounded retention window, but any entry needed to prevent duplicate side effects/resource/control-transition creation remains at least as long as the corresponding resource/run/action/recovery state.
 
 ## 14. Normalized request bodies
 
@@ -362,10 +374,11 @@ Graceful backend shutdown:
 4. flush required backend-global ControlState/RequestLedger plus per-run action dispatch journal, budget ledger and event/artifact state;
 5. boundedly stop harness-owned subscribers/captures/resources;
 6. mark unresolved runs/actions truthfully incomplete/ambiguous as required;
-7. invalidate/delete current control nonce;
-8. exit.
+7. only after required safety state is durable, write the Artifact-v1 clean-shutdown transition that clears `active_backend_epoch`; if that write fails, leave the prior active marker so next startup recovers conservatively;
+8. invalidate/delete current control nonce;
+9. exit.
 
-Forced/crash shutdown is recovered according to Execution/Artifact v1. It never implies successful cleanup or PASS and never implicitly clears durable STOP.
+Forced/crash shutdown is recovered according to Execution/Artifact v1. It never implies successful cleanup or PASS and never implicitly clears durable STOP/recovery-required state.
 
 ## 20. No remote/LAN mode in v1
 
@@ -406,15 +419,18 @@ At minimum:
 17. response lost after COMPLETED then backend restart returns the existing durable resource/result;
 18. corrupt/missing contradictory safety-critical RequestLedger does not silently re-execute mutation-capable work;
 19. duplicate STOP/reset request returns the existing durable control transition/result;
-20. slow event subscriber cannot block execution and receives deterministic backpressure behavior;
-21. page/event bounds enforced;
-22. unknown raw/debug/action endpoint absent;
-23. browser reload/new tab cannot duplicate an active run/action solely due to lost client state;
-24. graceful shutdown flushes required global/per-run safety state and invalidates nonce;
-25. crash recovery follows Execution v1 rather than auto-resuming mutation.
+20. delayed replay of old STOP after later reset does not relatch or increment generation;
+21. delayed replay of old reset after later STOP does not clear the newer STOP;
+22. slow event subscriber cannot block execution and receives deterministic backpressure behavior;
+23. page/event bounds enforced;
+24. unknown raw/debug/action endpoint absent;
+25. browser reload/new tab cannot duplicate an active run/action solely due to lost client state;
+26. graceful shutdown flushes required global/per-run safety state before clean-shutdown marker and invalidates nonce;
+27. failed clean-shutdown marker leaves next backend recovery-required rather than assuming clean state;
+28. crash recovery follows Execution v1 rather than auto-resuming mutation.
 
 ## 23. Compatibility
 
 Control API major version 1 is local-only and additive-only.
 
-Changing nonce authentication, Host/origin trust, RequestLedger pre-domain durability/idempotency semantics, remote exposure policy or domain bypass guarantees requires a new major contract or an explicitly reviewed security profile.
+Changing nonce authentication, Host/origin trust, pre-domain resource/control-transition identity, RequestLedger durability/replay semantics, remote exposure policy or domain bypass guarantees requires a new major contract or an explicitly reviewed security profile.

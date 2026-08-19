@@ -1,0 +1,55 @@
+{
+  "schema": "track-a-inventory-containers-live-result-v1",
+  "task": "OTC-20260819-track-a-inventory-containers-live-e2e",
+  "source_pr": 582,
+  "trusted_main": "5d1a09dcb5b3abc22d341951b81d557495d755a6",
+  "bounded_task_result": "PASSIVE_LIVE_STRENGTHENING_MUTATION_BLOCKED_NO_EXISTING_RUNTIME_ADOPTION_PATH",
+  "current_client": {
+    "version_token": "15.32",
+    "size": 52109920,
+    "sha256": "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8",
+    "pid": 11365,
+    "display": ":1",
+    "state": "IN_GAME",
+    "target_uniqueness": "PROVEN"
+  },
+  "live_strengthening": {
+    "D10": {
+      "status_delta": "NONE_REMAINS_PARTIAL",
+      "new_fact": "Authenticated equipment/status UI visible with capacity 410, soul 100 and populated equipment slots."
+    },
+    "D13": {
+      "status_delta": "NONE_REMAINS_PARTIAL",
+      "new_fact": "Authenticated backpack UI visibly renders stack counts 50, 8 and 7."
+    },
+    "D15": {
+      "status_delta": "NONE_REMAINS_PARTIAL",
+      "new_fact": "Authenticated open Backpack container visible with 8 visible slots, 6 occupied and 2 empty."
+    }
+  },
+  "remaining_rows": "D09-D22 remain PARTIAL; no row becomes DONE from this passive snapshot.",
+  "mutation_gate": {
+    "canonical_registration": "ABSENT",
+    "lease_generation_file": 16,
+    "lease_expired": true,
+    "lease_owner_task": "OTC-20260818-native-login-to-ingame-e2e",
+    "lease_owner_task_terminal_released": true,
+    "canonical_transition_operations_present": ["bootstrap", "rebind", "gate-b"],
+    "existing_unregistered_runtime_adoption_operation_present": false,
+    "bootstrap_legal_with_existing_client": false,
+    "rebind_legal_without_registration": false,
+    "gui_input_authorized": false,
+    "mutation_authorized": false
+  },
+  "safety": {
+    "gui_input_sent": false,
+    "credentials_accessed": false,
+    "login_performed": false,
+    "gameplay_action_sent": false,
+    "process_mutation": false,
+    "transaction_performed": false,
+    "raw_frames_deleted": true,
+    "raw_frame_committed_or_uploaded": false
+  },
+  "next_programme_gate": "Implement and independently review an explicit fail-closed reconciliation/adoption transition for one already-running exact unregistered official client, merge it to trusted main, then use it only from a later invocation before any agent-driven GUI input."
+}

@@ -12,13 +12,23 @@ Use this user prompt:
 
 The agent must first read current Track A admission/governance, verify the workflow is present on live `main`, and establish fresh authority for the exact runtime. The user sentence above is credential-use authorization only; it does not manufacture runtime ownership, Gate A/Gate B, bootstrap or target uniqueness.
 
-## Dispatch
+## Connector-friendly dispatch
 
-Dispatch `Track A native login` from `main` with input:
+Preferred for ChatGPT agents using the connected GitHub tool: add this exact comment to PR #599:
+
+`/track-a-native-login ONE_SHOT_NATIVE_LOGIN`
+
+The permanent workflow on `main` listens for `issue_comment` and runs only when all of these are true: the actor is `blakinio`, the target is PR #599, and the comment body matches the exact command above. A different user, issue/PR number or comment is ignored before any secret-bearing job starts.
+
+Do not put credentials or secret values in the comment. The exact command represents the owner's fresh one-shot authorization for that run; the workflow obtains the actual values only from GitHub Actions secrets on the self-hosted runner.
+
+## Manual dispatch
+
+The same workflow can be started manually from `main` with:
 
 `authorization=ONE_SHOT_NATIVE_LOGIN`
 
-Do not dispatch from a feature branch or substitute a copied temporary workflow. The GitHub Actions run on the `synology-otclient-01` self-hosted runner is the secret boundary; do not invoke `secret-ingress` directly through Remote Desktop Commander.
+Manual dispatch is also restricted to actor `blakinio`. Do not dispatch a copied workflow from a feature branch. The GitHub Actions run on the `synology-otclient-01` self-hosted runner is the secret boundary; do not invoke `secret-ingress` directly through Remote Desktop Commander.
 
 ## Invariants
 
@@ -37,7 +47,7 @@ The workflow must preserve all of these properties:
 
 The workflow intentionally fails before secret access if `auth.sock` is absent or stale. Recreating the one-shot listener is a separate pre-auth runtime mutation and must be performed only after current Track A admission proves that the target client is the authorized logged-out runtime. Never add a post-auth restart fallback to this operator.
 
-If preflight fails, inspect the exact failed prerequisite. A preflight failure does not consume the one-shot credential authorization.
+If preflight fails, inspect the exact failed prerequisite. A preflight failure does not consume the one-shot credential authorization. It is safe for an admitted agent to repair only this non-secret pre-auth listener prerequisite and then post a new exact operator command after the owner confirms a fresh one-shot authorization if the prior command reached the credential step.
 
 ## Expected terminal markers
 

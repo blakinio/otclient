@@ -44,8 +44,10 @@ jobs:
           for f in bridge.so auth.so character.so secret-ingress; do
             docker exec -u kasm-user "$CONTAINER" test -s "$TASK_ROOT/$f"
           done
-          docker exec -u kasm-user "$CONTAINER" strings "$TASK_ROOT/auth.so" | grep -qx "$EXPECTED_SHA"
-          docker exec -u kasm-user "$CONTAINER" strings "$TASK_ROOT/character.so" | grep -qx "$EXPECTED_SHA"
+          docker exec -u kasm-user "$CONTAINER" strings "$TASK_ROOT/auth.so" > "$RUNNER_TEMP/auth.strings"
+          docker exec -u kasm-user "$CONTAINER" strings "$TASK_ROOT/character.so" > "$RUNNER_TEMP/character.strings"
+          grep -qx "$EXPECTED_SHA" "$RUNNER_TEMP/auth.strings"
+          grep -qx "$EXPECTED_SHA" "$RUNNER_TEMP/character.strings"
           echo CURRENT_HELPER_SET=PASS
           echo SECRET_ACCESS=false
 

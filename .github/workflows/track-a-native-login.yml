@@ -49,8 +49,8 @@ jobs:
           unset TIBIA_TEST_EMAIL TIBIA_TEST_PASSWORD
           pid="$(docker exec -u kasm-user "$CONTAINER" pgrep -x client)"
           [[ "$pid" =~ ^[0-9]+$ ]]
-          test "$(docker exec -u kasm-user "$CONTAINER" stat -Lc %s /proc/$pid/exe)" = "$EXPECTED_SIZE"
-          test "$(docker exec -u kasm-user "$CONTAINER" sha256sum /proc/$pid/exe | awk '{print $1}')" = "$EXPECTED_SHA"
+          test "$(docker exec -u kasm-user "$CONTAINER" stat -Lc %s "/proc/$pid/exe")" = "$EXPECTED_SIZE"
+          test "$(docker exec -u kasm-user "$CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')" = "$EXPECTED_SHA"
           for s in "$BRIDGE_SOCKET" "$AUTH_SOCKET" "$CHARACTER_SOCKET"; do docker exec -u kasm-user "$CONTAINER" test -S "$s"; done
           printf '%s\n' "$pid" > "$RUNNER_TEMP/preauth-pid"
           echo EXACT_HELPER_RUNTIME=PASS
@@ -88,8 +88,8 @@ jobs:
           sleep 3
           pid="$(docker exec -u kasm-user "$CONTAINER" pgrep -x client)"
           [[ "$pid" =~ ^[0-9]+$ ]]
-          test "$(docker exec -u kasm-user "$CONTAINER" stat -Lc %s /proc/$pid/exe)" = "$EXPECTED_SIZE"
-          test "$(docker exec -u kasm-user "$CONTAINER" sha256sum /proc/$pid/exe | awk '{print $1}')" = "$EXPECTED_SHA"
+          test "$(docker exec -u kasm-user "$CONTAINER" stat -Lc %s "/proc/$pid/exe")" = "$EXPECTED_SIZE"
+          test "$(docker exec -u kasm-user "$CONTAINER" sha256sum "/proc/$pid/exe" | awk '{print $1}')" = "$EXPECTED_SHA"
           printf '%s\n' "$pid" > "$RUNNER_TEMP/replacement-pid"
           echo CLIENT_TERMINATED_BY_WORKFLOW=false
           docker exec -i -u kasm-user -e EXPECTED_PID="$pid" -e BSOCK="$BRIDGE_SOCKET" -e CSOCK="$CHARACTER_SOCKET" "$CONTAINER" python3 - <<'PY'

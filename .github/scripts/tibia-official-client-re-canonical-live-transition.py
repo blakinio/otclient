@@ -32,6 +32,8 @@ FIELDS = {
     'source_task', 'source_run',
 }
 TRACKED_ROLES = {'client', 'xvfb', 'vnc', 'wireproxy'}
+ADOPTION_PROOF_KIND = 'existing_runtime_adoption_v1'
+ADOPTION_STATE_EVIDENCE = {'BRIDGE_3_OF_3', 'NO_STRUCTURAL_BRIDGE'}
 
 
 class E(RuntimeError):
@@ -233,6 +235,26 @@ def _read() -> dict[str, Any] | None:
         raise E('registration_generation_invalid')
     if not isinstance(data.get('lease_generation'), int) or data['lease_generation'] < 1:
         raise E('registration_lease_generation_invalid')
+    if data.get('proof_kind') == ADOPTION_PROOF_KIND:
+        required = {
+            'runtime_locator', 'inventory_scope', 'inventory_complete', 'candidate_count',
+            'candidate_fingerprint', 'state_evidence',
+        }
+        if not required.issubset(data):
+            raise E('adoption_registration_schema_invalid')
+        if data['inventory_scope'] != 'all_running_docker_containers' or data['inventory_complete'] is not True:
+            raise E('adoption_registration_inventory_invalid')
+        if data['candidate_count'] != 1:
+            raise E('adoption_registration_candidate_count_invalid')
+        if not isinstance(data['runtime_locator'], str) or not data['runtime_locator'].startswith('docker:'):
+            raise E('adoption_registration_runtime_locator_invalid')
+        fingerprint = data['candidate_fingerprint']
+        if not isinstance(fingerprint, str) or len(fingerprint) != 64 or any(c not in '0123456789abcdef' for c in fingerprint.lower()):
+            raise E('adoption_registration_candidate_fingerprint_invalid')
+        if data['state_evidence'] not in ADOPTION_STATE_EVIDENCE:
+            raise E('adoption_registration_state_evidence_invalid')
+        if data['state'] == 'IN_GAME' and data['state_evidence'] != 'BRIDGE_3_OF_3':
+            raise E('adoption_registration_ingame_without_structural_proof')
     return data
 
 
@@ -292,11 +314,11 @@ def _manifest(path: Path) -> dict[str, Any]:
         data = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         raise E('probe_manifest_invalid', str(exc)) from exc
-    required = {
-        'pid', 'process_group_id', 'tracked_processes', 'display', 'window_identity',
-        'remote_view_endpoint', 'remote_view_mapping', 'state',
+    common = {
+        'pid', 'display', 'window_identity', 'remote_view_endpoint',
+        'remote_view_mapping', 'state',
     }
-    if not isinstance(data, dict) or not required.issubset(data):
+    if not isinstance(data, dict) or not common.issubset(data):
         raise E('probe_manifest_missing_fields')
     if not isinstance(data['pid'], int) or data['pid'] < 2:
         raise E('probe_pid_invalid')
@@ -306,19 +328,74 @@ def _manifest(path: Path) -> dict[str, Any]:
         raise E('probe_window_invalid')
     if data['remote_view_mapping'] not in {'PROVEN', 'UNKNOWN'} or data['state'] not in STATES:
         raise E('probe_state_invalid')
+
+    if data.get('proof_kind') == ADOPTION_PROOF_KIND:
+        required = {
+            'boot_id_sha256', 'process_start_ticks', 'client_version', 'client_size',
+            'client_sha256', 'runtime_locator', 'inventory_scope', 'inventory_complete',
+            'candidate_count', 'candidate_fingerprint', 'state_evidence',
+        }
+        if not required.issubset(data):
+            raise E('adoption_manifest_missing_fields')
+        if data['inventory_complete'] is not True or data['inventory_scope'] != 'all_running_docker_containers':
+            raise E('adoption_inventory_incomplete')
+        if data['candidate_count'] != 1:
+            raise E('adoption_target_not_unique')
+        if data['client_version'] != VER or data['client_size'] != SIZE or data['client_sha256'] != SHA:
+            raise E('adoption_client_fence_invalid')
+        if not isinstance(data['process_start_ticks'], int) or data['process_start_ticks'] < 1:
+            raise E('adoption_start_ticks_invalid')
+        for field in ('boot_id_sha256', 'candidate_fingerprint'):
+            value = data[field]
+            if not isinstance(value, str) or len(value) != 64 or any(c not in '0123456789abcdef' for c in value.lower()):
+                raise E(f'adoption_{field}_invalid')
+        if not isinstance(data['runtime_locator'], str) or not data['runtime_locator'].startswith('docker:'):
+            raise E('adoption_runtime_locator_invalid')
+        if data['state_evidence'] not in ADOPTION_STATE_EVIDENCE:
+            raise E('adoption_state_evidence_invalid')
+        if data['state'] == 'IN_GAME' and data['state_evidence'] != 'BRIDGE_3_OF_3':
+            raise E('adoption_ingame_without_structural_proof')
+        return data
+
+    legacy = {'process_group_id', 'tracked_processes'}
+    if not legacy.issubset(data):
+        raise E('probe_manifest_missing_fields')
     return data
+
+
+def _is_adoption_manifest(manifest: dict[str, Any]) -> bool:
+    return manifest.get('proof_kind') == ADOPTION_PROOF_KIND
+
+
+def _adoption_signature(manifest: dict[str, Any]) -> tuple[Any, ...]:
+    if not _is_adoption_manifest(manifest):
+        raise E('adoption_manifest_required')
+    return tuple(manifest[key] for key in (
+        'boot_id_sha256', 'pid', 'process_start_ticks', 'client_version', 'client_size',
+        'client_sha256', 'display', 'window_identity', 'remote_view_endpoint',
+        'remote_view_mapping', 'state', 'state_evidence', 'runtime_locator', 'inventory_scope',
+        'candidate_count', 'candidate_fingerprint',
+    ))
 
 
 def _match(manifest: dict[str, Any], registration: dict[str, Any]) -> None:
     for key in ('pid', 'display', 'window_identity', 'remote_view_endpoint', 'remote_view_mapping', 'state'):
         if manifest.get(key) != registration.get(key):
             raise E(f'probe_registration_{key}_mismatch')
+    if _is_adoption_manifest(manifest):
+        for key in (
+            'boot_id_sha256', 'pid', 'process_start_ticks', 'client_version', 'client_size',
+            'client_sha256', 'proof_kind', 'runtime_locator', 'inventory_scope',
+            'inventory_complete', 'candidate_count', 'candidate_fingerprint', 'state_evidence',
+        ):
+            if manifest.get(key) != registration.get(key):
+                raise E(f'registered_identity_{key}_mismatch')
+        return
     identity = _ident(int(registration['pid']))
     _exact(identity)
     for key in ('boot_id_sha256', 'pid', 'process_start_ticks'):
         if identity[key] != registration.get(key):
             raise E(f'registered_identity_{key}_mismatch')
-
 
 def _env() -> dict[str, str]:
     env = dict(os.environ)
@@ -417,16 +494,110 @@ def _probe_reg(
     path = STATE / '.gate-b-manifest.json'
     try:
         manifest = _probe(args.probe, path)
-        _assert_group_tracked(manifest)
-        _match(manifest, registration)
-        if _candidates() != [int(registration['pid'])]:
-            raise E('registered_target_not_unique')
+        if _is_adoption_manifest(manifest):
+            _match(manifest, registration)
+        else:
+            _assert_group_tracked(manifest)
+            _match(manifest, registration)
+            if _candidates() != [int(registration['pid'])]:
+                raise E('registered_target_not_unique')
         _lease(manager, lease, identity, args.token_file, generation)
         _cancel(guard)
         return registration, manifest
     finally:
         path.unlink(missing_ok=True)
 
+
+def _adopt_existing(
+    args: argparse.Namespace,
+    guard: Any,
+    lease: Any,
+    manager: Any,
+    identity: Any,
+    generation: int,
+) -> None:
+    if _read() is not None:
+        raise E('registration_already_present')
+    path = STATE / '.adopt-existing-manifest.json'
+    staged: Path | None = None
+    committed: dict[str, Any] | None = None
+    try:
+        STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+        first = _probe(args.probe, path)
+        if not _is_adoption_manifest(first):
+            raise E('adoption_manifest_required')
+        signature = _adoption_signature(first)
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+        if _read() is not None:
+            raise E('adoption_registration_race')
+        registration = {
+            'schema_version': 1,
+            'runtime_id': RID,
+            'registration_generation': 1,
+            'lease_generation': generation,
+            'registered_at': int(time.time()),
+            'boot_id_sha256': first['boot_id_sha256'],
+            'pid': first['pid'],
+            'process_start_ticks': first['process_start_ticks'],
+            'client_version': VER,
+            'client_size': SIZE,
+            'client_sha256': SHA,
+            'display': first['display'],
+            'window_identity': first['window_identity'],
+            'remote_view_endpoint': first['remote_view_endpoint'],
+            'remote_view_mapping': first['remote_view_mapping'],
+            'state': first['state'],
+            'proof_kind': first['proof_kind'],
+            'runtime_locator': first['runtime_locator'],
+            'inventory_scope': first['inventory_scope'],
+            'inventory_complete': first['inventory_complete'],
+            'candidate_count': first['candidate_count'],
+            'candidate_fingerprint': first['candidate_fingerprint'],
+            'state_evidence': first['state_evidence'],
+            'source_task': args.task_id,
+            'source_run': _runid(),
+        }
+        staged = _stage(registration)
+        second = _probe(args.probe, path)
+        if _adoption_signature(second) != signature:
+            raise E('adoption_identity_changed_before_commit')
+        if _read() is not None:
+            raise E('adoption_registration_race')
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+        try:
+            _commit(staged)
+        except BaseException:
+            current = _read()
+            if current == registration:
+                committed = registration
+            elif current is not None:
+                raise E('adoption_registration_commit_conflict')
+            raise
+        else:
+            staged = None
+            committed = registration
+        if _read() != registration:
+            raise E('adoption_registration_revalidation_failed')
+        third = _probe(args.probe, path)
+        if _adoption_signature(third) != signature:
+            raise E('adoption_identity_changed_after_commit')
+        _match(third, registration)
+        _lease(manager, lease, identity, args.token_file, generation)
+        _cancel(guard)
+    except BaseException as exc:
+        if committed is not None:
+            current = _read()
+            if current == committed:
+                _remove(committed)
+            elif current is not None:
+                raise E('adoption_rollback_registration_conflict') from exc
+        raise
+    finally:
+        path.unlink(missing_ok=True)
+        if staged is not None:
+            staged.unlink(missing_ok=True)
 
 def _bootstrap(
     args: argparse.Namespace,
@@ -603,7 +774,7 @@ def _child(args: argparse.Namespace, guard: Any, lock_fd: int, previous_mask: se
         identity = lease.LeaseIdentity(args.task_id, args.session_id)
         generation = _lease(manager, lease, identity, args.token_file)
         _cancel(guard)
-        {'bootstrap': _bootstrap, 'rebind': _rebind, 'gate-b': _gateb}[args.operation](
+        {'bootstrap': _bootstrap, 'adopt-existing': _adopt_existing, 'rebind': _rebind, 'gate-b': _gateb}[args.operation](
             args, guard, lease, manager, identity, generation
         )
         label = args.operation.upper().replace('-', '_')
@@ -679,7 +850,7 @@ def _supervise(args: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     sub = result.add_subparsers(dest='operation', required=True)
-    for name in ('bootstrap', 'rebind', 'gate-b'):
+    for name in ('bootstrap', 'adopt-existing', 'rebind', 'gate-b'):
         command = sub.add_parser(name)
         command.add_argument('--task-id', required=True)
         command.add_argument('--session-id', required=True)

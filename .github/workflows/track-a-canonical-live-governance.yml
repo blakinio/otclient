@@ -5,6 +5,14 @@ on:
     branches: [main]
     paths:
       - .github/workflows/track-a-canonical-live-governance.yml
+      - .github/scripts/tibia-official-client-re-canonical-live-transition.py
+      - .github/scripts/test_tibia_official_client_re_canonical_live_transition.py
+      - .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+      - .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py
+      - docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+      - docs/agents/MODULE_CATALOG.md
+      - docs/agents/tasks/active/OTC-20260819-track-a-existing-runtime-adoption.md
+      - docs/agents/evidence/OTC-20260819-track-a-existing-runtime-adoption/**
       - docs/agents/CHANGELOG.md
       - docs/agents/TIBIA_RESEARCH_TRACKS.md
       - docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
@@ -98,3 +106,23 @@ jobs:
 
           print('TRACK_A_CANONICAL_GOVERNANCE_FRESH_AUDIT_PASS=true')
           PY
+
+  existing-runtime-adoption-tests:
+    name: Existing runtime adoption fail-closed tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate adoption implementation and governance markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/tibia-official-client-re-canonical-live-transition.py .github/scripts/tibia-official-client-re-kasm-existing-runtime-probe.py
+          python3 .github/scripts/test_tibia_official_client_re_canonical_live_transition.py -v
+          python3 .github/scripts/test_tibia_official_client_re_kasm_existing_runtime_probe.py -v
+          grep -Fq "def _adopt_existing(" .github/scripts/tibia-official-client-re-canonical-live-transition.py
+          grep -Fq "Existing-runtime adoption" docs/agents/TIBIA_RESEARCH_TRACKS.md
+          grep -Fq "metadata-only registration of one exact pre-existing client" docs/agents/decisions/ADR-0001-track-a-canonical-live-runtime.md
+          grep -Fq "adopt_existing" docs/agents/contracts/TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md
+          grep -Fq "Existing-runtime adoption — separate missing-registration transition" docs/agents/contracts/TRACK_A_CANONICAL_LIVE_BOOTSTRAP_V1.md
+          echo TRACK_A_EXISTING_RUNTIME_ADOPTION_VALIDATION=PASS

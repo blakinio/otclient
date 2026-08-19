@@ -88,6 +88,21 @@ per-action server acceptance/effect = NOT_OBSERVED
 
 This G0 preserves those boundaries and does not overlap PR #539/S10 action-protocol ownership.
 
+## Current-package provenance boundary
+
+PR #555 is still unmerged and is therefore read-only provenance context, not authority for this task. Its independently reproduced public-package candidate is:
+
+```text
+packed_size     10214529
+packed_sha256   1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+unpacked_size   52109920
+unpacked_sha256 ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+elf_build_id    d803d9695868713ef6ab0c3cf65f91212c9c6a62
+version_token   15.32
+```
+
+The producer must independently reproduce the packed/unpacked hash+size fence before any current-package static fact is admitted. The task does not inherit PR #555 runtime authority or governance changes.
+
 ## Current-package producer contract
 
 Run `32228647135` is intentionally GitHub-hosted and disposable. The workflow must:
@@ -99,7 +114,22 @@ Run `32228647135` is intentionally GitHub-hosted and disposable. The workflow mu
 5. delete packed and unpacked proprietary client bytes before upload;
 6. upload only compact text evidence.
 
-At this checkpoint, the producer is still running. Current-package QMeta/protocol/string findings are therefore `UNKNOWN` until its artifact is available and independently inspected.
+At this checkpoint, the producer is still running. Current-package QMeta/protocol/string findings are therefore `UNKNOWN` until its artifact is available and inspected.
+
+## Predeclared classification rules
+
+These rules are fixed before reading the producer artifact to reduce confirmation bias:
+
+```text
+D01-D05: remain PARTIAL even if current-package names/QMeta revalidate; LIVE-STATE and exact non-QMeta code/dataflow remain required.
+D06: may move NOT_STARTED -> PARTIAL only if a dedicated current-package HUD/status-effect surface is directly enumerated.
+D07: may move NOT_STARTED -> PARTIAL only if a dedicated current-package battle-list/filter/sort/secondary-list surface is directly enumerated.
+D08: remains PARTIAL even if target-selection surfaces revalidate; LIVE-ACTION remains required.
+C15-C17: remain PARTIAL even if attack/follow/cancel surfaces revalidate; action->protocol->effect causality remains required.
+No D01-D08/C15-C17 row can become DONE from this static G0 alone.
+```
+
+A lexical string without direct class/method ownership is corroboration only and cannot by itself cause a status transition.
 
 ## Expected evidence questions
 

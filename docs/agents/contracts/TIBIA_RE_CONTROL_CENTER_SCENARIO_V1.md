@@ -94,6 +94,22 @@ SemanticKey:
 
 IDs are non-secret and must not contain account names, credentials, tokens or arbitrary chat text.
 
+### 4.1 Semantic field paths
+
+`SemanticFieldPath` is a validated path into the normalized `GameSnapshot`/retained checkpoint model, never a raw adapter/runtime namespace.
+
+```yaml
+SemanticFieldPath:
+  max_bytes: 256
+  max_segments: 8
+  segment_regex: '^[a-z][a-z0-9_]{0,63}$'
+  roots: [client_state, player, conditions, action_state, target, inventory, containers, battle_list, source_quality]
+```
+
+The serialized form is dot-separated, for example `player.hp` or `player.position.x`. Brackets, numeric indexes, wildcards, JSON Pointer syntax, path separators and empty segments are rejected. Collection members are selected through typed semantic references rather than embedded indexes or runtime IDs in a path.
+
+Path validation uses the versioned normalized snapshot schema advertised by the adapter. Missing, unsupported, stale or unobservable values resolve to UNKNOWN; they are never coerced to zero, empty text, `false` or another plausible default. `SNAPSHOT_PATH` references may additionally resolve the same grammar against an explicitly retained normalized checkpoint.
+
 ## 5. Stable step IDs
 
 A scenario step may declare an optional local `id` matching `ScenarioId` syntax.
@@ -140,6 +156,27 @@ privacy_policy: PrivacyPolicy
 
 `name` is descriptive only and does not participate in authority.
 
+### 6.1 Side-effect budget
+
+Every scenario carries one explicit finite hard budget:
+
+```yaml
+SideEffectBudget:
+  max_runtime_seconds: integer
+  max_actions: integer
+  max_movement_tiles: integer
+  max_spells: integer
+  max_consumables: integer
+  max_items_moved: integer
+  max_gold: integer
+  max_tibia_coins: integer
+  max_irreversible_changes: integer
+```
+
+All fields are required in the validated canonical AST. `1 <= max_runtime_seconds <= 86400`; every other dimension is a checked integer in `0..2147483647`. Implementations/adapters may impose lower ceilings but may not silently raise a scenario value. Read-only scenarios use zero for every external-effect dimension. Gold, Tibia Coin and irreversible-change budgets are zero unless deliberately admitted.
+
+`max_runtime_seconds` is measured from run activation using the backend monotonic clock and bounds scheduling/waiting; expiry stops new dispatch. Action-specific maximum effects are separately produced as `EffectBound` and reserved against these run-level dimensions under Execution v1. No omitted/null/unbounded budget value exists in major version 1.
+
 ## 7. Predicates
 
 ```yaml
@@ -163,6 +200,19 @@ Rules:
 - type mismatch is validation failure or deterministic predicate error, never implicit coercion.
 
 Numeric comparisons do not coerce strings to numbers.
+
+### 7.1 Abort conditions
+
+```yaml
+AbortCondition:
+  id: ScenarioId | null
+  condition: Predicate
+  reason_code: SemanticKey
+```
+
+An abort condition is safety-significant: its predicate must use `unknown_policy=FAIL`; `WAIT` and `ACCEPT` are invalid in this context. The engine evaluates abort conditions before each step, on relevant observation changes while waiting, and again immediately before any mutation dispatch commit. A TRUE abort predicate or an UNKNOWN/error at a required safety evaluation stops scheduling new work and records the declared reason.
+
+An abort never rewrites history. If an action has already reached `DISPATCH_COMMITTED`, its possible external effect is reconciled under Execution v1 and remains non-retryable unless authoritative no-effect proof exists. `reason_code` must be one of the standard abort codes in section 13 or a separately negotiated additive extension.
 
 ## 8. Step union
 
@@ -200,7 +250,7 @@ Bounds:
 
 ```text
 1 <= timeout_ms <= 300000
-0 <= retry.max_attempts <= 3
+1 <= retry.max_attempts <= 3
 ```
 
 For mutation-capable actions, default `max_attempts=1` total attempt. A retry may occur only after positive proof of `NOT_DISPATCHED`. States at or beyond `DISPATCH_COMMITTED`, including AMBIGUOUS, are not retryable by this mechanism.
@@ -211,27 +261,47 @@ A retry creates a new action ID and attempt index and requires fresh budget rese
 
 Common scenarios never contain process pointers, heap addresses, X11 coordinates, QMeta IDs, vtable/function addresses or protocol opcodes.
 
-Object references are semantic selectors:
+Object references are closed discriminated unions. Unknown fields, missing kind-required fields, or fields belonging to another kind are validation errors.
 
 ```yaml
+EquipmentSlot: HEAD | NECK | BACK | ARMOR | RIGHT_HAND | LEFT_HAND | LEGS | FEET | RING | AMMO | OTHER
+
+WorldPosition:
+  x: integer  # 0..65535
+  y: integer  # 0..65535
+  z: integer  # 0..15
+
 EntityRef:
   kind: SELF | SELECTED_TARGET | CREATURE_ID | SNAPSHOT_PATH
-  value: string | integer | null
+  creature_id: integer | null       # required only for CREATURE_ID, 0..4294967295
+  snapshot_path: SemanticFieldPath | null  # required only for SNAPSHOT_PATH
 
 ItemRef:
   kind: INVENTORY_SLOT | CONTAINER_SLOT | EQUIPMENT_SLOT | SNAPSHOT_PATH
-  container_ref: string | null
-  slot: integer | string | null
+  inventory_slot: SemanticKey | null
+  container_ref: SemanticKey | null
+  slot_index: integer | null        # 0..65535; adapter may advertise a lower maximum
+  equipment_slot: EquipmentSlot | null
+  snapshot_path: SemanticFieldPath | null
   expected_semantic_item: SemanticKey | null
 
 DestinationRef:
   kind: INVENTORY_SLOT | CONTAINER_SLOT | EQUIPMENT_SLOT | GROUND_POSITION
-  value: object
+  inventory_slot: SemanticKey | null
+  container_ref: SemanticKey | null
+  slot_index: integer | null        # 0..65535; adapter may advertise a lower maximum
+  equipment_slot: EquipmentSlot | null
+  position: WorldPosition | null
 ```
 
-Adapters resolve these references against the fenced current snapshot/state and refuse stale/ambiguous selectors.
+Per-kind rules:
 
-A `SNAPSHOT_PATH` must name a retained normalized checkpoint, never raw runtime memory.
+- `SELF` and `SELECTED_TARGET` carry no selector payload; `CREATURE_ID` requires only `creature_id`; entity `SNAPSHOT_PATH` requires only `snapshot_path`.
+- inventory item/destination requires only `inventory_slot`; container item/destination requires `container_ref` + `slot_index`; equipment item/destination requires only `equipment_slot`; item `SNAPSHOT_PATH` requires only `snapshot_path`.
+- `GROUND_POSITION` requires only `position`. A ground destination always reserves at least one `max_irreversible_changes` unit in addition to other effect dimensions; the official adapter may refuse ground movement entirely when safe rollback/value risk cannot be bounded.
+- `expected_semantic_item` is an optional additional identity fence for an `ItemRef`; mismatch/UNKNOWN refuses at final resolution.
+
+Adapters resolve references against the fenced current normalized snapshot/state and refuse stale, missing or ambiguous selectors. A `SNAPSHOT_PATH` names only a retained normalized checkpoint/object and never raw runtime memory.
 
 ## 10. Atomic semantic action parameter schemas
 
@@ -355,19 +425,19 @@ move_item:
   count: integer
 ```
 
-`move_item.count` must be positive and must not exceed the current proven source stack/count or the side-effect reservation.
+`move_item.count` must be positive and must not exceed the current proven source stack/count or the side-effect reservation. A `GROUND_POSITION` destination additionally consumes the conservative irreversible-change reservation defined in section 9.
 
 ### 10.6 Equipment
 
 ```yaml
 equip:
   item: ItemRef
-  slot: HEAD | NECK | BACK | ARMOR | RIGHT_HAND | LEFT_HAND | LEGS | FEET | RING | AMMO | OTHER
+  slot: EquipmentSlot
 ```
 
 ```yaml
 unequip:
-  slot: HEAD | NECK | BACK | ARMOR | RIGHT_HAND | LEFT_HAND | LEGS | FEET | RING | AMMO | OTHER
+  slot: EquipmentSlot
   destination: DestinationRef
 ```
 
@@ -414,6 +484,8 @@ EffectBound:
   measurable_after: bool
   reason_codes: [string]
 ```
+
+Every numeric EffectBound dimension is a checked non-negative integer and must fit the corresponding `SideEffectBudget` dimension. `max_actions` counts this semantic action once when it can cross an external-effect boundary. Runtime is bounded by the run-level `max_runtime_seconds` rather than by individual EffectBound records.
 
 Package A fake adapter provides deterministic EffectBound fixtures.
 
@@ -471,7 +543,7 @@ RECORDER_FATAL
 ARTIFACT_FATAL
 ```
 
-Unknown abort code is validation failure unless negotiated by an additive extension.
+Unknown abort code is validation failure unless negotiated by an additive extension. Each entry in `abort_conditions` uses the typed `AbortCondition` schema from section 7.1; arbitrary code-only strings are not scenario abort conditions.
 
 A triggered abort stops scheduling subsequent steps. It does not assert that a previously dispatch-committed external effect was reversed.
 

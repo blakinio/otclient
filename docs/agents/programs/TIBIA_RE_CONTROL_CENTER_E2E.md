@@ -5,7 +5,7 @@ programme: TIBIA-RE-CONTROL-CENTER-E2E
 repository: blakinio/otclient
 track: official-client-re
 status: hardened_design_baseline
-version: 2.1
+version: 2.2
 runtime_access_of_this_document: none
 future_official_client_runtime: Track A canonical live runtime only
 future_oteryn_runtime: separate adapter task in blakinio/Oteryn-v2
@@ -57,13 +57,13 @@ A competent implementation agent must read these together:
 2. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_SCENARIO_V1.md`
    - typed/bounded scenario language, SideEffectBudget/AbortCondition/semantic paths/references, action schemas, canonical hashes, predicates, retries and EffectBound;
 3. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_EXECUTION_V1.md`
-   - backend activation/recovery, MutationCoordinator, terminal action lifecycle, final dispatch commit, STOP linearization, idempotency, durability, budgets, privacy, recorder and crash recovery;
+   - backend activation/recovery, MutationCoordinator, terminal action lifecycle, final dispatch commit, STOP linearization, idempotency, durability, runtime deadline, external-effect budgets, privacy, recorder and crash recovery;
 4. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ADAPTER_V1.md`
    - semantic client adapter boundary and official/Oteryn-specific invariants;
 5. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_CONTROL_API_V1.md`
    - browser/CLI loopback transport, local control credential, Host/Origin policy, crash-safe request idempotency, bounds/backpressure and shutdown;
 6. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_ARTIFACT_V1.md`
-   - backend-global ControlState/RequestLedger, per-run safety/evidence state, recovery/finalization/retention;
+   - backend-global ControlState/RequestLedger, runtime deadline plus per-run safety/evidence state, recovery/finalization/retention;
 7. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_COMPARISON_V1.md`
    - versioned semantic differential comparison/coverage-gap rules;
 8. `docs/agents/contracts/TIBIA_RE_CONTROL_CENTER_POLICY_BOUNDARY_V1.md`
@@ -214,7 +214,7 @@ Recorder cannot promote a correlation or policy statement to causal proof/capabi
 Owns Artifact-v1 persistence:
 
 - backend-global ControlState and RequestLedger;
-- per-run Action/Budget/Recovery safety state;
+- per-run runtime deadline plus Action/Budget/Recovery safety state;
 - run staging/finalization/evidence;
 - immutable finalized view and append-only supplements.
 
@@ -267,13 +267,14 @@ Outside the local `dispatch_gate`:
 
 - validate scenario/action;
 - compute EffectBound;
-- reserve budget;
+- reserve external-effect budget;
+- verify the fixed monotonic run deadline has not expired;
 - run advisory preflight;
 - acquire external/Track A guard;
 - acquire GUI input lock where required;
 - capture before-state.
 
-All waits are bounded/cancellable.
+All waits are bounded/cancellable and cannot extend the original run deadline.
 
 ### 8.2 Final commit
 
@@ -281,9 +282,9 @@ While required external authority guard remains held:
 
 ```text
 enter dispatch_gate
--> revalidate local generation/idempotency/budget/STOP/recovery/runtime/session/adapter fences
+-> revalidate local generation/idempotency/external-effect budget/STOP/recovery/runtime deadline/session/adapter fences
 -> revalidate current external authority
--> durably write DISPATCH_COMMITTED + POSSIBLY_DISPATCHED + budget AT_RISK
+-> durably write DISPATCH_COMMITTED + POSSIBLY_DISPATCHED + external-effect budget AT_RISK
 -> local durability barrier succeeds
 -> leave dispatch_gate
 -> with external authority guard still continuously held, cross physical irreversible boundary exactly once
@@ -306,7 +307,7 @@ For Official Tibia:
 1. obtain current Track A authority using existing trusted-base mechanisms;
 2. do not hold local `dispatch_gate` while waiting for Track A locks/guard;
 3. when Track A guard is held, revalidate current Track A identity/authority;
-4. retain the required GUI/input lock;
+4. retain the required GUI input lock;
 5. invoke local one-shot `commit_dispatch()`;
 6. after COMMITTED, perform exactly one physical effect while Track A guard remains continuously held;
 7. preserve whole-lifetime supervisor behavior for mutation descendants.
@@ -356,19 +357,39 @@ request_id  -> transport/domain request dedupe (Control API/Artifact v1)
 action_id   -> semantic action-attempt dedupe (Execution/Scenario v1)
 ```
 
-For a resource-creating POST, the backend preallocates the final logical resource ID and durably records RequestLedger `ACCEPTED(request_id, request_hash, operation, resource_id)` **before** invoking domain creation/scheduling.
+Every POST preallocates one final logical resource identity and durably records RequestLedger `ACCEPTED(request_id, request_hash, operation, resource_id)` **before** invoking its domain operation.
 
-Repeated request with same ID/body returns/resolves the same logical resource/result across backend restart.
+For run/experiment/action-domain creation, this is the final resource ID. For STOP/reset, this is a control-transition resource whose exact transition ID is used by the resulting `ControlState.transition_id`.
 
-Crash after ACCEPTED-before-create or after create-before-COMPLETED cannot allocate a second logical resource.
+Repeated request with same ID/body returns/resolves the same logical resource/result across backend restart and after later unrelated control transitions.
+
+Crash after ACCEPTED-before-domain execution or after resource/control transition but before COMPLETED cannot allocate/execute a second logical resource/transition.
+
+A delayed replay of an older STOP/reset returns its original durable transition result; it cannot relatch/clear a newer ControlState or advance generation again.
 
 Same request ID with different normalized body is a deterministic conflict.
 
 Possible-dispatch action is never auto-retried.
 
-## 12. Side-effect budgets
+## 12. Runtime deadline and external-effect budgets
 
-Scenario v1 supplies one explicit finite `SideEffectBudget`. Every run tracks per hard dimension:
+Scenario v1 supplies one explicit finite `SideEffectBudget`, but runtime and ambiguous external effects are accounted differently.
+
+Runtime uses one monotonic deadline derived once at run activation:
+
+```text
+runtime_deadline = checked_add(run_started_monotonic, max_runtime_seconds)
+```
+
+Rules:
+
+- overflow fails closed;
+- waits use the earlier of their own timeout and the run deadline;
+- pause, backend restart and external-authority waits never freeze or extend the deadline;
+- expiry stops new scheduling/dispatch and produces the timeout path;
+- elapsed time never enters `reserved/at_risk/committed/uncertain` because it is not an ambiguous external side effect.
+
+External-effect dimensions track:
 
 ```text
 limit
@@ -380,16 +401,15 @@ uncertain
 
 Action effects are bounded before dispatch using Scenario-v1 `EffectBound`.
 
-At dispatch commit, reserved effect moves atomically to at-risk.
+At dispatch commit, reserved external effect moves atomically to at-risk.
 
-Uncertain/ambiguous effect counts as consumed until authoritative reconciliation.
+Uncertain/ambiguous external effect counts as consumed until authoritative reconciliation.
 
-Hard budget with no safe finite bound -> refuse before dispatch.
+Hard external-effect budget with no safe finite bound -> refuse before dispatch.
 
-Minimum dimensions:
+Core external-effect dimensions:
 
-- runtime;
-- action attempts;
+- semantic actions that can cross an external-effect boundary;
 - movement tiles;
 - spells;
 - consumables;
@@ -398,7 +418,7 @@ Minimum dimensions:
 - Tibia Coins;
 - irreversible changes.
 
-Tibia Coins and irreversible changes default to zero.
+`max_actions` is not a count of parser/refusal attempts. Tibia Coins and irreversible changes default to zero.
 
 ## 13. Crash/restart semantics
 
@@ -417,6 +437,8 @@ Crash after durable dispatch commit but before physical effect is known -> `AMBI
 Missing/corrupt/contradictory initialized safety state -> fail closed.
 
 Unclean prior active-backend marker -> recovery-required before mutation admission.
+
+Crash/restart never grants a fresh runtime window; any recovery decision preserves the original activation/deadline.
 
 No automatic mutation resume or retry after restart.
 
@@ -562,7 +584,7 @@ Security baseline:
 - no permissive CORS/cookie ambient auth;
 - every `/v1/*` request authenticated with current nonce;
 - backend-global durable `request_id` ledger for every POST;
-- pre-domain durable resource-ID reservation for resource-creating requests;
+- pre-domain durable final resource/control-transition identity reservation for every POST;
 - bounded bodies/pages/events/subscribers/backpressure;
 - no raw/debug/adapter bypass endpoints;
 - remote/LAN unsupported in v1;
@@ -825,7 +847,7 @@ Run identical semantic scenarios/checkpoints and emit Comparison-v1 mismatch/cov
 
 Package A may start only after a fresh independent auditor answers YES:
 
-> Can a competent implementation agent implement Package A solely from current repository documentation without inventing scenario types, concurrency, terminal-success, dispatch, STOP, reset/recovery, backend activation, retry, durability, budget, privacy, event-ordering, artifact or restart semantics?
+> Can a competent implementation agent implement Package A solely from current repository documentation without inventing scenario types, concurrency, terminal-success, dispatch, STOP, reset/recovery, backend activation, retry, durability, runtime deadline, external-effect budget, privacy, event-ordering, artifact or restart semantics?
 
 All safety-critical falsification cases in the independent-audit prompt must be `SAFE_DEFINED`.
 
@@ -841,7 +863,7 @@ Read-only runtime status              YES
 Capability/evidence/freshness views   YES
 Live normalized event stream          YES
 Scenario catalogue/browser            YES
-Fake one-step experiments              YES
+Fake one-step experiments             YES
 STOP/idempotency/restart safety        YES
 Artifact/run browser                   YES
 privacy-safe agent_bundle.json         YES

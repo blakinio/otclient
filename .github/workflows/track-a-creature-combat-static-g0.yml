@@ -1,11 +1,6 @@
 name: Track A creature combat static G0
 
 on:
-  push:
-    branches:
-      - research/OTC-20260819-track-a-creature-combat-static-g0
-    paths:
-      - .github/workflows/track-a-creature-combat-static-g0.yml
   pull_request:
     branches:
       - main
@@ -25,12 +20,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Install bounded static-analysis dependencies
+      - name: Prepare bounded static-analysis dependencies
         shell: bash
         run: |
           set -Eeuo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends curl python3-pyelftools binutils
+          command -v curl
+          command -v strings
+          python3 -m pip install --disable-pip-version-check --no-input --user pyelftools
+          python3 - <<'PY'
+          from elftools.elf.elffile import ELFFile
+          print('PYELFTOOLS_IMPORT=PASS')
+          PY
 
       - name: Fetch and fence current public Linux package through WARP
         shell: bash
@@ -236,6 +236,7 @@ jobs:
             kill "$(cat /tmp/track-a-cc-wireproxy.pid)" 2>/dev/null || true
           fi
           rm -rf /tmp/track-a-cc-client /tmp/track-a-cc-g0 /tmp/track-a-cc-trace /tmp/track-a-cc-wireproxy.log /tmp/track-a-cc-wireproxy.pid
+          mkdir -p /tmp/track-a-cc-evidence
           test ! -e /tmp/track-a-cc-client/client
           test ! -e /tmp/track-a-cc-client/client.lzma
           printf 'RAW_CLIENT_RETAINED=false\n' | tee -a /tmp/track-a-cc-evidence/fence.txt

@@ -11,24 +11,28 @@ contains_secrets: forbidden
 
 ## 1. Purpose
 
-Define the deterministic per-run persistence envelope used by Package A tests and Package B+ durable storage/export.
+Define the deterministic backend-global safety/control envelope plus per-run persistence envelope used by Package A tests and Package B+ durable storage/export.
 
 This contract separates:
 
-1. **safety state** required to prevent duplicate/unsafe mutation after crash;
-2. **evidence state** used for analysis;
-3. **presentation/export state** used by browser/CLI/agents.
+1. **backend-global safety/control state** required for STOP/reset and request replay across backend epochs;
+2. **per-run safety state** required to prevent duplicate/unsafe mutation after crash;
+3. **evidence state** used for analysis;
+4. **presentation/export state** used by browser/CLI/agents.
 
 Presentation failure must never erase or downgrade safety state.
 
 ## 2. Logical storage root
 
-The implementation chooses a repository-conformant runtime data root. Under that root, one run owns:
+The implementation chooses a repository-conformant runtime data root. The authoritative logical topology is:
 
 ```text
+control/
+  control-state.json
+  request-ledger.jsonl
+
 runs/<run-id>/
   safety/
-    request-ledger.jsonl
     action-ledger.jsonl
     budget-ledger.json
     recovery.json
@@ -57,7 +61,9 @@ runs/<run-id>/
     <supplement-id>/...
 ```
 
-Physical filenames/directories may be implemented through a transactional database plus export materialization, but the logical records and atomicity semantics must remain equivalent.
+`control/request-ledger.jsonl` is authoritative even before a run/resource exists and for global operations such as STOP/reset. A per-run export may include a bounded projection/reference to relevant request IDs, but that projection is never the dedupe source of truth.
+
+Physical filenames/directories may be implemented through a transactional database plus export materialization, but the logical records, scope and atomicity semantics must remain equivalent.
 
 Do not store large/raw capture bytes in Git unless current evidence policy explicitly permits them.
 
@@ -71,14 +77,15 @@ All filesystem implementations must:
 - reject path separators, `..`, NUL and absolute paths in IDs;
 - use no symlink-following when materializing run-owned files where practical;
 - keep temporary/final rename targets inside the selected runtime root;
-- create sensitive local-control/safety metadata with owner-only permissions where the platform permits;
-- never materialize the Control API nonce into run artifacts.
+- create local control/safety metadata with owner-only permissions where the platform permits;
+- never materialize the Control API nonce into control/run artifacts.
 
 ## 4. Safety-state precedence
 
-`safety/` or its database equivalent is the authoritative local source for:
+`control/` plus per-run `safety/`, or their database equivalents, are the authoritative local sources for:
 
-- RequestLedger dedupe;
+- durable STOP/reset ControlState;
+- RequestLedger dedupe/resource reservation;
 - ActionLedger dispatch state;
 - BudgetLedger reserved/at-risk/committed/uncertain state;
 - backend/recovery classification.
@@ -88,8 +95,34 @@ If presentation/evidence records disagree with safety state:
 ```text
 fail closed
 preserve both as contradiction evidence
+never clear STOP because presentation says RUNNING
 never downgrade POSSIBLY_DISPATCHED/AT_RISK based on presentation text
 ```
+
+### 4.1 Backend-global ControlState
+
+```yaml
+ControlState:
+  schema_version: 1
+  stop_latched: bool
+  control_generation: integer
+  transition_id: string
+  written_by_backend_epoch: string
+  reason_code: string
+  updated_monotonic_ns: integer
+```
+
+The record is backend-global and survives `backend_epoch` changes. STOP/reset writes replace it atomically (or transactionally equivalent) under Execution-v1 `dispatch_gate` with a finite local durability deadline.
+
+Rules:
+
+- every initialized persistent store has exactly one authoritative current ControlState;
+- first initialization must durably create a known initial record before mutation can be admitted;
+- durable `stop_latched=true` remains true across restart until an explicit durable reset;
+- reset cannot expose RUNNING before the `stop_latched=false` record is durable;
+- STOP durability failure leaves the process in-memory STOPPED/mutation-disabled; reset durability failure leaves STOP latched;
+- missing/corrupt/contradictory ControlState in a previously initialized store fails closed as STOPPED/mutation-disabled;
+- ControlState grants no external/Track A authority and does not erase Action/Budget uncertainty.
 
 ## 5. RequestLedger record
 
@@ -102,15 +135,25 @@ RequestLedgerRecord:
   resource_id: string | null
   backend_epoch_created: string
   status: ACCEPTED | COMPLETED | FAILED
-  response_code: integer
+  response_code: integer | null
   response_body_hash: lowercase_hex_sha256 | null
   created_monotonic_ns: integer
   updated_monotonic_ns: integer
 ```
 
-Records are append-only transitions or transactionally equivalent versioned rows.
+The RequestLedger is backend-global under `control/`. Records are append-only transitions or transactionally equivalent versioned rows.
 
-A later record for the same request ID must preserve the same request hash/operation/resource identity.
+A later record for the same request ID must preserve the same request hash, operation and resource identity. For any resource-creating operation, the backend allocates the final logical `resource_id` and durably writes the `ACCEPTED` record **before invoking the domain handler that can create/schedule that resource**. If this reservation cannot be made durable, the domain handler is not invoked.
+
+The domain path must then use the preallocated `resource_id` idempotently. Consequences:
+
+- crash after durable ACCEPTED but before resource creation -> retry uses the same reserved ID and may complete only that resource;
+- crash after resource creation but before COMPLETED response mapping -> retry resolves the same reserved resource, never allocates a second one;
+- same request ID/hash -> same durable identity/result;
+- same request ID/different hash -> conflict, never reuse;
+- a missing/corrupt record in a previously initialized ledger cannot be interpreted as permission to recreate mutation-capable work when contradictory domain/safety state exists.
+
+For non-resource global operations, `resource_id` may be null only when the operation has a durable replayable transition/result identity (for example the ControlState `transition_id`) and duplicate execution cannot create a second semantic/external effect.
 
 ## 6. ActionLedger record
 
@@ -140,6 +183,8 @@ ActionLedgerRecord:
 The transition to `DISPATCH_COMMITTED/POSSIBLY_DISPATCHED` is durability-coupled to BudgetLedger `AT_RISK` transition as required by Execution v1.
 
 A later transition cannot legally move from possible-dispatched back to not-dispatched without authoritative reconciliation evidence proving no effect.
+
+`CONFIRMED` is a terminal successful lifecycle state. Replaying a confirmed action returns the existing result and never redispatches.
 
 ## 7. BudgetLedger
 
@@ -181,6 +226,8 @@ RecoveryRecord:
 Recovery never invents PASS.
 
 `CONTRADICTORY` fails closed.
+
+Recovery never implicitly clears backend-global STOP.
 
 ## 9. Manifest
 
@@ -274,12 +321,14 @@ Finalization requires:
 
 1. no execution step can still mutate terminal result;
 2. bounded late-event drain completed/expired;
-3. required safety ledgers flushed;
+3. required per-run safety ledgers flushed;
 4. required evidence files flushed;
 5. hashes computed from exact final bytes;
 6. `result.json` produced from authoritative run/action states;
 7. final manifest written;
 8. staging is atomically promoted to finalized view where filesystem semantics permit.
+
+Backend-global ControlState/RequestLedger durability is not weakened by run finalization and is not deleted with a presentation export.
 
 If any required finalization step fails:
 
@@ -381,9 +430,13 @@ Do not hash secret material merely to include it; secret-class material is exclu
 
 ## 20. Retention/bounds
 
-Package B must define finite configurable retention limits for completed runs and large evidence, while never evicting safety records still required to prevent duplicate/unsafe recovery of an active/ambiguous run.
+Package B must define finite configurable retention limits for completed runs and large evidence, while never evicting:
 
-Eviction itself must not convert UNKNOWN/AMBIGUOUS into safe-to-retry.
+- ControlState needed to preserve STOP/reset truth;
+- RequestLedger entries still needed for replay/dedupe;
+- safety records still required to prevent duplicate/unsafe recovery of an active/ambiguous run.
+
+Eviction itself must not convert UNKNOWN/AMBIGUOUS into safe-to-retry or clear STOP.
 
 Git stores normalized durable evidence summaries/hashes only where current repository evidence policy permits it.
 
@@ -405,10 +458,16 @@ At minimum:
 12. finalized view cannot be silently mutated;
 13. supplement cannot rewrite original result;
 14. agent bundle contains only bounded non-secret references/summaries;
-15. report contradiction with machine-readable result is validation failure.
+15. report contradiction with machine-readable result is validation failure;
+16. durable STOP ControlState survives backend restart;
+17. reset durability failure leaves STOP latched;
+18. initialized-store missing/corrupt ControlState fails closed;
+19. resource-creating RequestLedger ACCEPTED record/resource ID is durable before domain creation;
+20. crash after ACCEPTED before creation and crash after creation before COMPLETED both replay to the same resource ID without duplicate work;
+21. global STOP/reset request replay does not depend on a run directory.
 
 ## 22. Compatibility
 
 Artifact major version 1 is additive-only.
 
-Changing safety-state precedence, dispatch-journal durability, finalization immutability or secret exclusion requires a new major contract or separately reviewed compatible extension.
+Changing safety-state precedence, ControlState/RequestLedger scope or durability, dispatch-journal durability, finalization immutability or secret exclusion requires a new major contract or separately reviewed compatible extension.

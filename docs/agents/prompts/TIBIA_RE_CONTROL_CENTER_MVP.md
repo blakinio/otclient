@@ -44,7 +44,7 @@ official_client_access: false
 
 Package A must be fully implementable and testable without Track A runtime, KasmVNC, official-client processes, credentials, login, GUI input or gameplay.
 
-Package B remains read-only with respect to the real official-client path.
+Package B remains read-only for the real official-client path.
 
 Real official-client mutation belongs only to a separate Package D runtime-sensitive task with fresh current Track A admission.
 
@@ -52,20 +52,20 @@ Real official-client mutation belongs only to a separate Package D runtime-sensi
 
 Before editing:
 
-1. read root `AGENTS.md`, `docs/agents/README.md` and any nearer applicable instructions;
+1. read root `AGENTS.md`, `docs/agents/README.md` and nearer applicable instructions;
 2. fetch current `main` and verify exact head;
 3. inspect all open PRs and `docs/agents/tasks/active/**` for overlapping Control Center/scenario/recorder/API/adapter work;
-4. read in full the three normative design files listed above;
+4. read the three normative design files in full;
 5. read `docs/agents/programs/OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md`;
-6. read current Track A admission/routing/contracts required by `docs/agents/README.md`, even though Package A itself uses `runtime_access:none`;
-7. inspect current #592 Surveyor state and do not assume merge/interface stability;
-8. inspect `tools/tibia_runtime_bridge/**` and existing test/runtime helpers for reuse;
-9. inspect `docs/agents/MODULE_CATALOG.md`, `REPOSITORY_MAP.md`, `KNOWN_RISKS.md`, `BUILD_TEST_MATRIX.md`, `CROSS_REPO_CONTRACTS.md`;
-10. search for existing scenario, recorder, HTTP, CLI, artifact, cancellation, idempotency and fake-adapter infrastructure before creating new abstractions;
+6. read current Track A admission/routing/contracts required by `docs/agents/README.md`, even though Package A uses `runtime_access:none`;
+7. inspect exact current #592 Surveyor state and do not assume merge/interface stability;
+8. inspect `tools/tibia_runtime_bridge/**` and current test/runtime helpers for reuse;
+9. inspect `MODULE_CATALOG.md`, `REPOSITORY_MAP.md`, `KNOWN_RISKS.md`, `BUILD_TEST_MATRIX.md`, `CROSS_REPO_CONTRACTS.md`;
+10. search existing scenario, recorder, HTTP, CLI, artifact, cancellation, idempotency, persistence and fake/test infrastructure before creating abstractions;
 11. create one dedicated task, branch/worktree and Draft PR before substantial implementation;
-12. declare owned paths and resolve live overlap before editing shared paths.
+12. declare owned paths and resolve live overlap before shared-path edits.
 
-If repository state supersedes examples in this prompt, follow current trusted-base contracts and record the discrepancy.
+If repository state supersedes an example here, follow current trusted-base contracts and record the discrepancy.
 
 # 2. Architecture invariant
 
@@ -97,180 +97,263 @@ Forbidden:
 CLI -> direct adapter
 Browser -> raw action endpoint
 Quick Action -> raw keypress/tool
-Scenario -> Track A lease mutation
+Scenario -> Track A lease/registration mutation
 Recorder -> capability promotion
+Artifact Store -> evidence-registry promotion
 ```
 
 # 3. Package order
 
-Implement in this order. Do not collapse all packages into one PR.
+Do not collapse all phases into one PR.
 
 ## Package A — control-core
 
 No network listener. No official client. No Surveyor dependency required for tests.
 
-Recommended path after verifying live repository conventions:
+Recommended path only after checking live conventions:
 
 ```text
 tools/tibia_re_control_center/
 ```
 
-Package A must implement:
+### A1. Typed domain models
 
-### A1. Typed contract models
+Implement:
 
-- adapter identity/version negotiation;
+- adapter and execution contract version negotiation;
 - generic capability support;
 - official-client evidence extension types without requiring them for fake adapters;
-- normalized runtime status/freshness;
+- runtime status/freshness;
 - normalized snapshots;
+- `backend_epoch` and `control_generation`;
 - dispatch fences;
 - action request/result/lifecycle;
-- normalized event ordering/causal fields;
+- event ordering/causal fields;
 - typed predicates;
-- side-effect budgets/ledgers;
-- run/action/artifact states.
+- side-effect ledgers;
+- run/artifact states.
+
+`backend_epoch` is a fresh opaque unique value for every backend process lifetime. `control_generation` is monotonic only within that epoch.
 
 ### A2. Deterministic Scenario Engine
+
+Implement:
 
 - `schema_version` validation;
 - deterministic stable step IDs;
 - typed preconditions/assertions/waits;
 - explicit UNKNOWN semantics;
-- explicit timeout semantics;
+- deterministic timeout semantics;
 - deterministic failure propagation;
 - mutation retry default `0`;
 - one-step experiment representation;
 - pause/resume fencing;
-- runtime/session/adapter-generation invalidation;
+- backend/control/adapter/runtime/session invalidation;
 - no hidden retries.
 
 ### A3. MutationCoordinator
 
-Implement one coordinator per adapter instance.
+Exactly one coordinator per adapter instance.
 
 It owns only local:
 
 - mutation serialization;
-- `control_generation`;
+- unique `backend_epoch`;
+- monotonic `control_generation`;
 - action idempotency ledger;
-- budget reservation/admission;
+- budget reservation/accounting;
 - dispatch lifecycle bookkeeping;
-- STOP ALL linearization.
+- tiny `dispatch_gate` linearization domain;
+- STOP/reset semantics.
 
 It does not own Track A authority.
 
-### A4. Atomic dispatch semantics
+Do **not** hold `dispatch_gate` while waiting for slow/external authority, I/O, Track A locks, capture or GUI resources.
 
-A mutation-capable action crosses the irreversible boundary only through the execution contract's logical `atomic_dispatch` operation.
+### A4. Idempotency ledger
 
-Immediately before dispatch verify inside one local coordinator critical section:
-
-1. action has not already dispatched;
-2. idempotency request matches existing ledger state;
-3. expected `control_generation` is current;
-4. cancellation is not latched;
-5. adapter generation matches;
-6. runtime/session fences match;
-7. budget reservation remains valid;
-8. capability remains supported;
-9. required authority provider says the action is currently allowed;
-10. then dispatch exactly once.
-
-For Package A the authority provider is fake/deterministic. Package A must not implement or simulate success from real Track A state.
-
-### A5. STOP ALL
-
-STOP must linearize under the same coordinator synchronization domain as dispatch admission.
-
-Required invariant:
-
-```text
-STOP before dispatch -> no dispatch
-Dispatch before STOP -> already-dispatched classification
-```
-
-Required behavior:
-
-- increment/latch `control_generation`;
-- reject new mutation admissions;
-- cancel queued old-generation steps;
-- signal active waits/captures/actions;
-- prevent not-yet-dispatched mutation;
-- reject stale completion as control input;
-- preserve late/stale evidence;
-- cleanup harness-owned resources;
-- require explicit reset before future mutation-capable runs.
-
-### A6. Idempotency and replay
-
-`action_id` is mandatory.
+`action_id` is mandatory and stores a canonical normalized-request hash.
 
 Rules:
 
-- same `action_id` + same normalized request -> existing logical state/result, no second dispatch;
-- same `action_id` + different normalized request -> deterministic conflict refusal;
-- connection loss or caller retry cannot create a second dispatch;
-- `AMBIGUOUS`, `DISPATCHED`, `FAILED_AFTER_DISPATCH`, `TIMED_OUT_AFTER_DISPATCH` are never automatically retried;
-- a new explicit retry uses a new `action_id` and a new budget reservation.
+- same ID + same request hash -> same logical state/result, no second dispatch;
+- same ID + different request hash -> deterministic conflict refusal;
+- duplicate caller/API attempt -> no second budget reservation;
+- new explicit retry -> new ID and new budget admission;
+- after possible dispatch, automatic retry is forbidden.
 
-### A7. Side-effect budget ledger
+### A5. Side-effect reservation before dispatch
 
 Per dimension track:
 
 ```text
 limit
 reserved
+at_risk
 committed
 uncertain
 ```
 
-Reserve maximum plausible effect before dispatch.
+Before final dispatch, reserve the maximum plausible effect.
+
+If a hard budget cannot be safely bounded, refuse.
+
+Use checked/overflow-safe arithmetic.
+
+### A6. Preparation outside the dispatch gate
+
+Preparation may:
+
+- validate action/schema;
+- resolve capability;
+- reserve budget;
+- run advisory preflight;
+- await/acquire fake/external authority provider;
+- prepare before-state.
+
+All waits are bounded and cancellation-aware.
+
+Preparation never authorizes final dispatch.
+
+### A7. One-shot dispatch commit
+
+Model the adapter execution context with a one-shot coordinator-owned operation equivalent to:
+
+```text
+commit_dispatch() -> COMMITTED | REFUSED
+```
+
+Immediately before the fake irreversible effect, `commit_dispatch()` acquires `dispatch_gate` and verifies:
+
+1. action record is still dispatchable and not already committed;
+2. request hash still matches;
+3. expected backend epoch is current;
+4. expected control generation is current;
+5. STOP is not latched;
+6. cancellation is not latched;
+7. adapter generation matches;
+8. runtime/session fences match;
+9. budget reservation remains valid;
+10. semantic capability remains supported;
+11. current authority provider still permits the exact action.
+
+Then it atomically/deterministically transitions the fake persistence model to:
+
+```text
+lifecycle_state=DISPATCH_COMMITTED
+dispatch_state=POSSIBLY_DISPATCHED
+budget reserved -> at_risk
+```
+
+Only after that commit succeeds may the fake adapter cross its irreversible test effect.
+
+### A8. Dispatch durability model
+
+Package A must implement a deterministic store abstraction that can simulate a durability barrier.
+
+Required behavior:
+
+```text
+write-ahead commit/barrier fails -> no physical fake effect
+write-ahead commit/barrier succeeds -> action is now possible-dispatch / no safe auto-retry
+```
+
+A crash after durable dispatch commit but before the fake physical effect recovers as `AMBIGUOUS` unless a deterministic reconciliation fixture proves no effect.
+
+This conservative false-positive ambiguity is intentional.
+
+### A9. STOP ALL
+
+STOP and dispatch commit use the same tiny `dispatch_gate`.
+
+Required linearizability:
+
+```text
+STOP acquires dispatch_gate first
+  -> control_generation increments/latches STOP
+  -> stale commit fails
+  -> no physical mutation begins
+
+commit_dispatch acquires dispatch_gate first
+  -> possible-dispatch state is recorded
+  -> STOP later sees already committed/in-flight work
+  -> no fiction that STOP undid it
+```
+
+STOP then:
+
+- cancels queued old-generation steps;
+- signals active waits/captures/actions;
+- rejects stale completions as control input;
+- preserves them as evidence where useful;
+- cleans harness-owned resources;
+- requires explicit reset.
+
+### A10. Reset
+
+Reset is local only and never restores external authority from cache.
+
+It must preserve safe handling of unresolved `AMBIGUOUS` side-effect domains.
+
+### A11. Crash/restart recovery
+
+On simulated backend restart:
+
+- create a new unique `backend_epoch`;
+- stale old-epoch callbacks cannot influence current execution;
+- do not auto-resume mutation-capable scenarios;
+- state before durable dispatch commit is `NOT_DISPATCHED`;
+- durable `DISPATCH_COMMITTED` without authoritative terminal evidence becomes `AMBIGUOUS`;
+- contradictory/corrupt/missing ledger fails closed;
+- all authority is reacquired/revalidated.
+
+### A12. Budget reconciliation
+
+At durable dispatch commit, reservation moves to `at_risk` in the same logical transaction.
 
 After outcome:
 
-- proven no-dispatch -> release reservation;
-- confirmed measured effect -> commit measured amount;
-- dispatched but not exactly measurable -> commit conservative maximum;
-- possible dispatch + timeout/failure/cancellation -> move conservative maximum to `uncertain` and treat as consumed for future admission.
+- proven no physical dispatch/effect -> release only with proof;
+- measured confirmed effect -> move measured amount to `committed`, release proven remainder;
+- dispatched but unmeasurable -> conservatively commit maximum plausible effect;
+- timeout/failure/cancellation/ambiguity after dispatch commit -> move maximum plausible amount to `uncertain`;
+- `uncertain` counts as consumed until safely reconciled.
 
-If a hard budget cannot be safely bounded, refuse the action before dispatch.
+### A13. Recorder core
 
-### A8. Recorder core
+`events.jsonl` order is ingestion order, not causal source order.
 
-`events.jsonl` ordering is ingestion order, not causal clock order.
+Preserve:
 
-Each event must preserve:
-
-- `ingest_seq`;
+- ingest sequence;
 - ingestion monotonic timestamp;
 - source timestamp;
 - source clock domain;
 - source sequence/scope;
 - ordering confidence;
+- backend/control/adapter/runtime/session generations;
 - run/step/stimulus identity;
-- control/runtime/session/adapter generations;
 - late flag;
-- sensitivity classification.
+- sensitivity.
 
-Preserve causal fields required by `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md` when observable.
+Preserve causal fields from `OTCLIENT_TIBIA_RE_EXPERIMENT_EXECUTION_MODEL.md` when supplied/observable.
 
-Do not infer causality from timestamp proximity.
+Never infer causality from timestamp proximity.
 
-### A9. Privacy constructors
+### A14. Privacy constructors
 
-Secret classification happens before ordinary Event/Error/Artifact object creation.
+Secret classification occurs before normal Event/Error/Artifact construction.
 
-Package A must provide safe construction boundaries so:
+Provide constructors/barriers so:
 
 - arbitrary runtime/exception text is not implicitly safe;
-- secret-shaped fields cannot enter normal event payloads;
-- a `SECRET_REJECTED` event contains category/reason only;
+- secret-shaped values cannot enter ordinary event payloads;
+- `SECRET_REJECTED` contains category/reason only;
 - environment values cannot be serialized accidentally;
-- screenshot admission can represent `SAFE`, `QUARANTINED`, `REJECTED` without persisting test secret material;
-- export-time redaction is not the primary control.
+- screenshot admission supports `SAFE`, `QUARANTINED`, `REJECTED` without persisting synthetic secret values;
+- export-time redaction is only defense in depth.
 
-### A10. Artifact lifecycle
+### A15. Artifact lifecycle
 
 Logical run state:
 
@@ -278,58 +361,56 @@ Logical run state:
 ACTIVE -> CLOSING -> FINALIZED
 ```
 
-Artifact state supports:
+Support:
 
-- staging/incomplete;
+- staging/incomplete state;
 - deterministic flush/finalization;
+- manifest with backend/control/fence/action/budget provenance;
 - immutable finalized result;
-- append-only late supplement where later evidence is explicitly admitted;
+- append-only supplement model;
 - no synthesized PASS after crash.
 
-Package A may use a temporary directory in tests; production path decisions follow current repository conventions.
+### A16. Fake adapter
 
-### A11. Fake adapter
-
-The fake adapter is normative test infrastructure, not a toy stub.
-
-Use a deterministic manual clock/state machine capable of injecting:
+Use deterministic manual clock/state scheduling capable of injecting:
 
 - read-only/mutation authority;
 - capability present/missing;
-- runtime generation change;
-- session epoch change;
-- adapter generation change;
+- backend/control/adapter/runtime/session changes;
 - success/refusal;
 - before-dispatch failure;
+- dispatch durability failure;
+- crash after dispatch commit before effect;
 - after-dispatch failure;
-- ambiguous dispatch;
-- timeout;
-- cancellation;
-- exact STOP-vs-dispatch race scheduling;
+- ambiguous completion;
+- timeout/cancellation;
+- exact STOP-vs-dispatch-gate interleavings;
 - duplicate action IDs;
-- deterministic consumable/movement effects;
+- deterministic movement/consumable effects;
 - multi-clock event sources;
 - late events;
-- secret-shaped rejected data.
+- secret-shaped rejected data;
+- artifact crash/finalization.
 
-Fake adapter tests never prove official-client action support.
+Fake success never proves official-client capability.
 
 ## Package B — loopback Control API + browser + CLI
 
 Consume merged Package A.
 
+Before accepting operator mutation-capable requests even for fake adapters, the backend's selected persistent store must implement the execution contract's durable write-ahead dispatch commit. The storage technology is not prescribed, but durability/failure semantics are.
+
 Implement:
 
 - versioned loopback-only API, preferably `/v1`;
 - browser UI;
-- CLI as a client of the same backend/domain operations;
+- CLI as a client of exactly the same domain operations;
 - status/capability/evidence/freshness views;
 - scenario/run/action views;
-- bounded live events;
+- bounded live events/history/subscribers/backpressure;
 - artifact browser/export;
 - STOP/reset/pause/resume/abort;
 - duplicate request/result retrieval;
-- bounded history/subscribers/backpressure;
 - no official-client mutation.
 
 Mutating UI controls may operate only against explicit fake adapters in Package B. For real Track A state they remain disabled/refused.
@@ -348,7 +429,7 @@ producer_commit:
 producer_interface:
 ```
 
-Consume Surveyor outputs; do not copy internals.
+Consume outputs; do not copy internals.
 
 Expose:
 
@@ -358,9 +439,9 @@ Expose:
 - current-client fence/provenance;
 - bundle reference/status.
 
-Incompatible/missing Surveyor becomes explicit `UNAVAILABLE/INCOMPATIBLE`, not fabricated data.
+Incompatible/missing Surveyor -> explicit `UNAVAILABLE/INCOMPATIBLE`, not fabricated data.
 
-Control Center per-run artifacts reference Surveyor/evidence registries but do not silently promote or overwrite them.
+Control Center per-run artifacts may reference but not promote/overwrite Surveyor-owned evidence/coverage state.
 
 ## Package D — official Track A action adapter
 
@@ -368,17 +449,19 @@ Separate runtime-sensitive task. This prompt does not authorize it.
 
 Before any real action:
 
-- read then-current trusted-base Track A governance;
-- create a current runtime task;
-- obtain current runtime access class;
-- satisfy current canonical lease/registration/Gate A/rebind/Gate B/target uniqueness/whole-lifetime supervisor requirements;
-- use current shared GUI input lock when applicable;
-- prove action evidence/parity gate;
-- define action-specific maximum plausible effect/budget;
-- integrate final `atomic_dispatch` check inside the existing Track A guarded mutation boundary;
-- start with one smallest already-proven semantic action.
+1. read then-current trusted-base Track A governance;
+2. create a current runtime task and obtain current runtime access class;
+3. satisfy canonical lease/registration/Gate A/rebind/Gate B/target uniqueness/whole-lifetime supervisor requirements;
+4. use the shared GUI input lock when applicable;
+5. prove action evidence/parity gate;
+6. define safe maximum plausible effect/budget;
+7. acquire current Track A guarded mutation boundary **without holding the local dispatch gate while waiting**;
+8. while Track A guard remains continuously held, run final current Track A identity/authority checks;
+9. immediately before physical effect call coordinator `commit_dispatch()`;
+10. if durable local commit succeeds, cross physical irreversible boundary exactly once while Track A guard remains held;
+11. reconcile action/budget/evidence conservatively.
 
-Never implement a second lease manager, registration source of truth or authority lock inside Control Center.
+Never implement a second lease manager, registration source or authority lock inside Control Center.
 
 ## Package E — Oteryn v2 adapter
 
@@ -390,7 +473,7 @@ blakinio/Oteryn-v2
 
 Read current Oteryn governance and accepted `docs/architecture/ADR-0007-native-end-to-end-test-platform.md`.
 
-The adapter must integrate with Oteryn's existing shared E2E architecture or an explicitly versioned cross-repo semantic contract. Do not create a second Oteryn E2E platform.
+Integrate with Oteryn's existing shared E2E architecture or an explicitly versioned cross-repo semantic contract. Do not create a second Oteryn E2E platform.
 
 Requirements:
 
@@ -400,11 +483,11 @@ Requirements:
 - no hidden authoritative mutation hook;
 - no unauthenticated production test-control interface;
 - test-only hooks excluded/locked down under Oteryn policy;
-- generic semantic capability model, not fake Track A R/A grades.
+- generic semantic capability model, not Track A R/A grades.
 
 # 4. UI requirements
 
-Always-visible state should separate:
+Always-visible state separates:
 
 ```text
 RUNTIME | CLIENT | RECORDER | AUTHORITY | CAPABILITY | EVIDENCE | FRESHNESS | SESSION
@@ -419,15 +502,15 @@ Inventory Containers Equipment Chat Conditions Scenarios Recorder
 Network Experiments Compare Logger
 ```
 
-Never present `MUTATION_ALLOWED` as a checkbox or local preference.
+Never present `MUTATION_ALLOWED` as a checkbox/local preference.
 
-Unknown/unproven/stale fields render truthfully as `UNKNOWN`, `UNSUPPORTED`, `NOT_PROVEN`, `STALE` or equivalent.
+Unknown/unproven/stale fields render explicitly as `UNKNOWN`, `UNSUPPORTED`, `NOT_PROVEN`, `STALE` or equivalent.
 
-Every manual Quick Action becomes exactly one validated one-step experiment through the normal Scenario Engine path.
+Every manual Quick Action becomes exactly one validated one-step experiment through Scenario Engine.
 
 # 5. Differential comparison rules
 
-Use explicit comparison profiles.
+Use explicit versioned comparison profiles.
 
 Baseline:
 
@@ -450,66 +533,70 @@ internal object layout    NOT_COMPARABLE
 renderer implementation  NOT_COMPARABLE
 ```
 
-Do not report an E2E mismatch when the reference field is unobservable/UNKNOWN. Report coverage state instead.
+Do not report mismatch when the reference field is unobservable/UNKNOWN. Report coverage state.
 
 # 6. Package A mandatory deterministic tests
 
-Package A is not complete until all of these pass without Track A runtime access:
+Package A is not complete until all pass with `runtime_access:none`:
 
 1. scenario schema accept/reject;
 2. deterministic stable step IDs;
 3. typed predicate UNKNOWN behavior;
 4. unsupported capability refusal;
-5. mutation refusal under read-only authority;
-6. authority expires exactly at final dispatch admission;
-7. runtime instance changes exactly at final dispatch admission;
-8. session epoch changes exactly at final dispatch admission;
-9. adapter generation changes exactly at final dispatch admission;
-10. two concurrent mutation requests serialize;
-11. browser/CLI-equivalent duplicate logical request model dispatches once;
-12. same `action_id` + same request returns existing result;
-13. same `action_id` + different request is refused;
-14. STOP linearizes before dispatch and prevents it;
-15. dispatch linearizes before STOP and is classified already-dispatched;
-16. stale completion from old control generation cannot resume/advance run;
-17. queued old-generation action is rejected after STOP;
-18. explicit reset creates fresh control generation and does not restore cached authority;
+5. read-only mutation refusal;
+6. stale backend epoch refusal;
+7. authority expires exactly at final dispatch commit;
+8. runtime instance changes at final dispatch commit;
+9. session epoch changes at final dispatch commit;
+10. adapter generation changes at final dispatch commit;
+11. two concurrent mutation requests serialize;
+12. same action ID/same request dispatches at most once;
+13. same action ID/different request is refused;
+14. duplicate request creates no second reservation;
+15. STOP wins dispatch gate -> no commit/no effect;
+16. commit wins dispatch gate -> STOP sees possible-dispatch/already committed;
+17. stale old-generation completion cannot resume/advance run;
+18. explicit reset does not restore cached authority;
 19. pause/resume after runtime/session change refuses pending mutation;
 20. engine timeout;
 21. cancellation while waiting;
-22. cancellation before dispatch;
-23. after-dispatch cancellation classification;
-24. budget reservation and exhaustion;
-25. duplicate request creates no second reservation;
-26. ambiguous potion/consumable action conservatively consumes budget;
-27. ambiguous action is not automatically retried;
-28. possibly-dispatched crash recovery becomes `AMBIGUOUS`;
-29. not-dispatched crash recovery does not silently execute;
-30. source/ingest clocks from different domains remain distinguishable;
-31. ingestion sequence never masquerades as causal proof;
-32. late event cannot rewrite terminal result;
-33. causal fields preserve stimulus/direction/lane/sequence/handler/object/delta/evidence refs when provided;
-34. secret-shaped event input rejected before ordinary event construction;
-35. exception/repr secret-shaped text does not reach `safe_message`;
-36. screenshot secret-risk path is quarantined/rejected;
-37. artifact crash remains incomplete, never PASS;
-38. finalized artifact is stable/immutable except explicit supplement;
-39. fake one-step scenario succeeds deterministically;
-40. no browser/CLI-facing domain interface can call adapter directly.
+22. cancellation before commit;
+23. after-commit cancellation classification;
+24. budget reservation/exhaustion;
+25. dispatch commit moves reservation to at-risk atomically;
+26. durability barrier failure -> no effect;
+27. crash after durable commit before effect -> AMBIGUOUS/no retry;
+28. ambiguous consumable action conservatively consumes budget;
+29. ambiguous action is not automatically retried;
+30. backend restart creates a fresh backend epoch;
+31. stale old-backend callback rejected as control input;
+32. source/ingest clocks from different domains remain distinguishable;
+33. ingestion sequence never masquerades as causal proof;
+34. late event cannot rewrite terminal result;
+35. causal fields preserve supplied stimulus/direction/lane/sequence/handler/object/delta/evidence refs;
+36. secret-shaped event input rejected before ordinary event construction;
+37. exception/repr secret-shaped text does not reach `safe_message`;
+38. screenshot risk path is quarantined/rejected;
+39. artifact crash remains incomplete, never PASS;
+40. finalized artifact is stable except explicit supplement;
+41. fake one-step scenario succeeds deterministically;
+42. no browser/CLI-facing domain interface can call adapter directly.
 
-Add focused property/race tests where deterministic interleavings are easier to express parametrically.
+Add deterministic interleaving/property tests where they make race semantics clearer.
 
 # 7. Package B mandatory tests
 
 At minimum:
 
 - loopback bind default;
-- non-loopback request/config fails closed absent separate approved profile;
+- non-loopback config fails closed absent approved profile;
 - request/body/collection bounds;
-- bounded event history/subscriber/backpressure behavior;
+- bounded history/subscribers/backpressure;
 - malformed API requests;
 - duplicate POST idempotency/result retrieval;
-- browser/CLI semantic parity for shared domain operations;
+- durable dispatch journal barrier failure path;
+- backend restart with committed fake action -> AMBIGUOUS/no retry;
+- browser/CLI semantic parity;
 - authority/capability/evidence/freshness rendered separately;
 - disabled/refused real mutation under read-only/unknown/stale authority;
 - STOP/reset visible state;
@@ -518,7 +605,7 @@ At minimum:
 
 # 8. Security/privacy acceptance
 
-Fail the implementation if any ordinary persistent/loggable object can accidentally contain:
+Fail implementation if ordinary persistent/loggable objects can contain:
 
 - email/password/2FA;
 - auth/session tokens;
@@ -530,21 +617,21 @@ Fail the implementation if any ordinary persistent/loggable object can accidenta
 - unapproved private chat text;
 - unreviewed login/auth screenshot.
 
-Use stable reason codes and explicitly safe fields.
+Use stable reason codes and explicitly classified safe fields.
 
 # 9. Validation procedure
 
-For every package PR:
+For each package PR:
 
-1. inspect full changed-file list and full diff;
+1. inspect full changed-file list and diff;
 2. run focused deterministic tests;
-3. select exact commands from current `BUILD_TEST_MATRIX.md`; do not invent presets;
+3. select commands from current `BUILD_TEST_MATRIX.md`; do not invent presets;
 4. run required exact-head CI;
-5. perform full self-review against the normative architecture/contracts;
-6. perform or obtain independent review when current repository risk policy requires it;
-7. specifically re-run affected race/idempotency/privacy tests after any concurrency or error-path change;
-8. update task/checkpoint with exact commands/outcomes/SHA;
-9. update module catalogue/changelog when required and not blocked by current path ownership;
+5. perform full self-review against normative contracts;
+6. obtain independent review when current risk policy requires it;
+7. re-run affected race/idempotency/durability/privacy tests after related changes;
+8. update task with exact commands/outcomes/SHA;
+9. update catalogue/changelog when required and not blocked by live ownership;
 10. merge only through current repository policy after all gates pass.
 
 # 10. Mandatory non-claims
@@ -555,30 +642,33 @@ Never claim:
 - Track A authority from Control Center state;
 - runtime compatibility from repository-only tests;
 - causal proof from timestamp correlation;
-- exact source ordering across different clock domains without evidence;
-- no side effect merely because an after-dispatch call timed out;
-- Oteryn parity before its separate adapter exists;
-- Oteryn failure when official reference state is unobservable;
-- remote/LAN security before a separate exposure design is accepted;
+- exact source ordering across different clocks without evidence;
+- no side effect merely because an after-commit call timed out/failed;
+- safe retry after dispatch commit without authoritative no-effect proof;
+- Oteryn parity before separate Oteryn adapter;
+- Oteryn mismatch when official reference is unobservable;
+- remote/LAN security before separate exposure design;
 - safe secret handling from export-time redaction alone.
 
 # 11. Package A terminal acceptance
 
-Package A may be called implementation-ready only when all are true:
+Package A may be called implementation-ready only when:
 
 ```text
 runtime_access=none
 network_listener=none
 real_official_client_access=none
 all mandatory deterministic tests=PASS
-no adapter bypass=PASS
-atomic dispatch model=PASS
+backend_epoch fencing=PASS
+dispatch gate linearizability=PASS
+durable write-ahead commit model=PASS
 STOP race model=PASS
 idempotency/replay=PASS
-budget ambiguity handling=PASS
+budget at-risk/uncertain accounting=PASS
 multi-clock recorder=PASS
 construction-time secret rejection=PASS
 artifact crash/finalization=PASS
+no adapter bypass=PASS
 self-review=no material findings
 required independent review=PASS when applicable
 exact-head CI=PASS
@@ -588,15 +678,15 @@ A fresh agent must be able to continue from Git/task/PR alone without this chat.
 
 # 12. Desired first operator result
 
-After Packages A-C the operator should be able to:
+After Packages A-C the operator can:
 
-- start the Control Center locally;
+- start Control Center locally;
 - use browser or CLI against the same backend;
 - inspect truthful read-only Track A/Surveyor status;
 - see authority/capability/evidence/freshness separately;
 - browse scenarios/runs/actions/events/artifacts;
 - execute deterministic fake-adapter one-step experiments;
-- prove STOP ALL/idempotency/cancellation behavior;
+- prove STOP/idempotency/durability/cancellation behavior;
 - export privacy-safe `agent_bundle.json`;
 
-while every real official-client mutation remains fail-closed until Package D receives its own current Track A authority and runtime evidence.
+while every real official-client mutation remains fail-closed until Package D receives separate current Track A authority and runtime evidence.

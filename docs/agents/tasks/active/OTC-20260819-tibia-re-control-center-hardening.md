@@ -8,6 +8,16 @@ track_id: official-client-re
 task_kind: architecture_contract_hardening
 risk: medium
 runtime_access: none
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -107,15 +117,25 @@ Surveyor #592 was rechecked and remained an open Draft at `90fb32f69173a6e621dfe
 
 Draft PR #605 exists. Current intended changed-file set is exactly the five Control Center programme/contract/prompt paths, `MODULE_CATALOG.md`, `CHANGELOG.md`, and this task record.
 
+Exact-head `e4d4892392a624ff04bc513faa31dbe63d268b64` produced:
+
+```text
+CI                              32262909925 = SUCCESS
+Track A canonical live governance 32262909567 = SUCCESS
+Track A agent runtime governance  32262909467 = FAILURE
+```
+
+The failure was diagnosed from job `96100231787`: the task correctly declared `runtime_access:none` but omitted the full no-runtime admission schema required by `TRACK_A_RUNTIME_AGENT_ADMISSION_V1.md`. This commit repairs that metadata with all runtime authority fields explicitly `NOT_APPLICABLE`; no runtime action or authority change is involved.
+
 Before readiness:
 
 1. recheck/reconcile any newer `main` movement that can affect the design;
 2. inspect the exact final changed-file set and full diff;
-3. run repository-required docs/governance checks on the exact final head;
+3. require repository docs/governance checks to pass on the exact final head;
 4. perform full self-review;
 5. obtain a genuinely fresh independent re-audit of the exact final hardening head; this implementing session cannot self-label its own review independent;
 6. only if the independent result has no P0/P1 and `PACKAGE_A_IMPLEMENTATION_READY=YES`, proceed to readiness/merge under repository policy.
 
 ## Next action
 
-Revalidate current `main` and exact PR #605 head, run exact-head repository checks, then hand the exact unchanged head to a fresh independent Control Center audit.
+Observe the exact-head checks after this admission-metadata repair; if green, perform final diff/self-review and hand the unchanged head to a fresh independent Control Center audit.

@@ -1,0 +1,39 @@
+{
+  "schema": "track-a-inventory-containers-source-manifest-v2",
+  "task": "OTC-20260819-track-a-inventory-containers-runtime",
+  "current_trusted_main": "34e41a04d62e642ef0ae67c79354f183473270a3",
+  "current_package_analysis_main": "2e572789a2bc4b64c5e906c4515c15c625f6bc9e",
+  "external_references": {
+    "coverage_audit_pr536_head": "24bdc5b959ff02733ada3967cae8ad1df1465f7d",
+    "coverage_audit_pr536_state": "draft_stale_relative_to_current_main",
+    "current_fence_pr555_exact_audited_head": "1f06f6a36683f3a1c5e92570439e89854b7876b5",
+    "current_fence_pr555_merge_commit": "2e572789a2bc4b64c5e906c4515c15c625f6bc9e",
+    "current_fence_closeout_pr561_commit": "34e41a04d62e642ef0ae67c79354f183473270a3"
+  },
+  "historical_repository_sources": [
+    {"path":"docs/agents/evidence/OTC-20260818-track-a-s5-container-inbound-static/result.json","sha256":"7992fbb017fbb24a2618e0c2d7ff83a457453ef9ae2531cf357305510807271e","bytes":7385},
+    {"path":"docs/agents/evidence/OTC-20260818-track-a-s7-inventory-equipment-static/result.json","sha256":"c9c7cf2da841bc83ee5f8f0e0ce053cf1826d6b33847c87e88a3e832cf8b0000","bytes":4536},
+    {"path":"docs/agents/evidence/OTC-20260818-track-a-s9-action-control-static-census/result.json","sha256":"3b56f3abd2e3b0dbdfff7b8bcbcf5e2cb39faef8d5107c040f1d51c363810153","bytes":6371},
+    {"path":"docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/runtime_type_semantics.jsonl","sha256":"a54e80a20768a5e554c1502337d3ce19b3cdbcf97d3eff24763910e84f70f9fd","bytes":470624},
+    {"path":"docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/protocol_message_semantics.jsonl","sha256":"488f9277493f717a92b2a8aefb9886c46467927901026aa4eac1d8b0ecb6b445","bytes":185880},
+    {"path":"docs/agents/evidence/OTC-20260815-track-a-coverage-registry-audit/protocol_direct_qmeta_cases.json","sha256":"0710435a8935d6c48bac86dcfcb494fa3c43c5c89c7d123fc235379d8b167bd1","bytes":997},
+    {"path":"docs/agents/evidence/OTC-20260818-track-a-s1-unfiltered-static-census/inbound-method-strings.txt","sha256":"25804b4a6f29a9acb03c51b8ff488e3114e5047f2adbfaf2b2aa55d6ca9b06b3","bytes":15203},
+    {"path":"docs/agents/reports/OTCLIENT-20260814-official-client-capability-census.md","sha256":"c139c420d6a517ce214f3e868f07f0b505f9eb573127f585b0ce171077dd9c84","bytes":30171}
+  ],
+  "current_public_package_provenance": {
+    "source_role": "official current Linux launcher package; URL recorded in bounded evidence and existing #555 provenance",
+    "packed_size": 10214529,
+    "packed_sha256": "1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354",
+    "unpacked_size": 52109920,
+    "unpacked_sha256": "ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8",
+    "elf_build_id": "d803d9695868713ef6ab0c3cf65f91212c9c6a62",
+    "fresh_task_local_refetch": true,
+    "client_executed": false,
+    "raw_proprietary_client_retained": false,
+    "raw_binary_committed_or_uploaded": false,
+    "bounded_evidence": [
+      "docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/20260819-current-package-static-revalidation.md",
+      "docs/agents/evidence/OTC-20260819-track-a-inventory-containers-runtime/current_package_static_revalidation.json"
+    ]
+  }
+}

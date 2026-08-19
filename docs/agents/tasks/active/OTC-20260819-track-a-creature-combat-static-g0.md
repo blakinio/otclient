@@ -1,19 +1,19 @@
 ---
 task_id: OTC-20260819-track-a-creature-combat-static-g0
-status: waiting
+status: validating
 agent: chatgpt-gpt-5.6-sol
 session_id: 20260819-creature-combat-g0
 session_role: researcher
 project_lane: otclient
 lane: P0-STATE
 task_kind: discovery
-phase: producer-wait
+phase: final-draft-validation
 branch: research/OTC-20260819-track-a-creature-combat-static-g0
 base_branch: main
 base_main: 82e5f435c3aa4172115bf7f6a0cd7a5cc6da3d50
 current_main_observed: cf90b84442dda730bdab93d8aa9f3236b7532ad8
 created: 2026-08-19T09:35:00+02:00
-updated: 2026-08-19T09:49:00+02:00
+updated: 2026-08-19T09:58:00+02:00
 risk: low
 execution_mode: github_only
 execution_reason: deterministic current-package static census and evidence processing; physical session is not required
@@ -75,18 +75,7 @@ related_prs:
 
 ## Objective
 
-Execute owner alias `TIBIA-RE-CREATURE-COMBAT` as one bounded current-package static research slice for primary coverage `D01-D08` and structural leads relevant to `C15-C17`, without taking over the shared physical runtime or S10 action-protocol ownership.
-
-Research targets:
-
-- creature-family inbound dispatch and registry/lifecycle names;
-- creature health/outfit/speed/skull/party/marks/light/type/unpass state surfaces;
-- creature HUD/status-effect surfaces;
-- battle-list models, filtering, sorting and secondary lists;
-- target selection plus attack/follow/cancel structural action/state surfaces;
-- current-package generated-message/protocol names relevant to those families.
-
-Runtime combat causality remains `UNKNOWN` unless separately proven by an admitted physical-runtime task. This G0 task must not initiate combat or send game input.
+Execute owner alias `TIBIA-RE-CREATURE-COMBAT` as one bounded current-package static research slice for primary coverage `D01-D08` and structural leads relevant to `C15-C17`, without taking over the shared physical runtime, canonical coverage files, S10 action-protocol ownership, or spawn/mechanics work.
 
 ## Authority and isolation
 
@@ -99,53 +88,104 @@ login_allowed: false
 gameplay_allowed: false
 ```
 
-The official Linux client may be fetched and decompressed only inside an ephemeral GitHub-hosted static-analysis job. It must never be executed, logged into, mutated, committed, or uploaded. Only compact sanitized text evidence may be retained, and raw package/client bytes must be deleted before artifact upload.
+No Synology/KasmVNC/client runtime was observed or controlled. The public official Linux package existed only inside disposable GitHub-hosted producer jobs and was deleted before compact text evidence upload.
 
-Shared canonical coverage/knowledge files, PR #536 paths, PR #539/S10 paths, PR #528/#550 runtime state, and PR #540 spawn/mechanics paths are read-only dependencies and not owned by this researcher.
+## Producer generations
 
-## Producer checkpoint
-
-```text
-Draft PR: 558
-producer workflow: Track A creature combat static G0
-producer run/job: 32228647135 / 95993567735
-producer source head: 2df47c74c8140d458d8fb37bb6cee68b527c0cc8
-producer state on resume: IN_PROGRESS at dependency-install step
-source-head CI run: 32228647686
-source-head CI / Required: SUCCESS
-source-head Track A governance: SUCCESS (run 32228647177)
-latest material report head: bcd7ef8eb1442564909ee3ab56c2a2bea3a26d33
-```
-
-The current producer is a deliberate external operation from the unchanged workflow source head. Do not rerun or duplicate it merely because the branch later receives report/task checkpoint commits. Its in-progress job logs were not yet available through the GitHub API.
-
-## Predeclared status rules
-
-The researcher report now fixes the row decision rules before the producer artifact is read:
+### Generation 1 — infrastructure cancellation
 
 ```text
-D01-D05 remain PARTIAL from static G0 alone.
-D06 may move NOT_STARTED -> PARTIAL only with directly enumerated current-package HUD/status-effect ownership.
-D07 may move NOT_STARTED -> PARTIAL only with directly enumerated current-package battle-list/filter/sort/secondary-list ownership.
-D08 remains PARTIAL from static G0 alone.
-C15-C17 remain PARTIAL from static G0 alone.
-No D01-D08/C15-C17 row may become DONE from this producer.
-Lexical strings alone cannot cause a status transition.
+run/job: 32228647135 / 95993567735
+result: CANCELLED
+failure_boundary: apt-get dependency installation exceeded job timeout
+current_package_fetched: false
+raw_client_retained: false
 ```
 
-This precommit is intended to reduce confirmation bias when the artifact is inspected.
+The retry was not blind: the producer was changed to dependency-light hosted setup using preinstalled `curl`/`strings` plus `pip pyelftools`.
+
+### Generation 2 — bounded pipeline defect
+
+```text
+run/job: 32230003488 / 95997593305
+result: FAILURE
+PYELFTOOLS_IMPORT=PASS
+CURRENT_PACKAGE_FENCE=PASS
+QMETA_ENUMERATION=PASS
+failure_boundary: sort -u | head under pipefail reported expected truncation SIGPIPE as failure
+cleanup: PASS
+raw_client_retained: false
+```
+
+The second repair removed the truncating pipeline shape without changing research filters or semantic classification rules.
+
+### Generation 3 — successful producer
+
+```text
+producer_head: bb0dc3a44a6e5daca2f81817696f91043f8c03d5
+run/job: 32230171183 / 95998084380
+result: SUCCESS
+artifact: 9356949168
+artifact_digest: sha256:d08fba81bbb41ef2f18e6967163ad59c6883b31392836104253c2a4e2f8abbf7
+packed_sha256: 1fc26d66cef90723d29293f177fcff41c8e937e7aac830f08e82c2f4c69eb354
+packed_size: 10214529
+unpacked_sha256: ed5469b9fa71349de688f719434d23875f76f28a3ebd08a36d30f7f6da0af6b8
+unpacked_size: 52109920
+current_package_fence: PASS
+raw_client_retained: false
+```
+
+The downloaded artifact ZIP was independently hashed and exactly matched GitHub metadata. It contains only four text files: QMeta, fence, protocol strings and neutral semantic strings.
+
+The temporary producer workflow was deleted after successful artifact verification and is absent from the intended final PR diff.
+
+## Research result
+
+The predeclared row rules were applied without widening them after reading the artifact.
+
+```text
+D01 PARTIAL -> PARTIAL
+D02 PARTIAL -> PARTIAL
+D03 PARTIAL -> PARTIAL
+D04 PARTIAL -> PARTIAL
+D05 PARTIAL -> PARTIAL
+D06 NOT_STARTED -> PARTIAL
+D07 NOT_STARTED -> PARTIAL
+D08 PARTIAL -> PARTIAL
+C15 PARTIAL -> PARTIAL
+C16 PARTIAL -> PARTIAL
+C17 PARTIAL -> PARTIAL
+```
+
+### D06 dedicated current-build proof
+
+Current `TCreatureHUDQmlRenderInfo` exposes exact QMeta ownership for creature name, health, mana/mana-shield bars, horizontal/vertical icons, player states, special conditions and `statusEffectsChanged`; `TCreatureHUDOverlayController` exposes HUD refresh/update.
+
+This closes the `NOT_STARTED` dedicated-evidence gap but not authoritative storage/schema/runtime semantics, so `D06` is only `PARTIAL`.
+
+### D07 dedicated current-build proof
+
+Current `TBattleListController` exposes filter state/toggling and secondary-list creation; `TBattleListGameActionHandler` exposes first/next/previous target actions plus `filterDrawCommands` and `sortDrawCommands`; current neutral types include the battle-list sort/filter proxy and secondary-list action.
+
+This closes the `NOT_STARTED` dedicated-evidence gap but not exact filter/sort/live-membership semantics, so `D07` is only `PARTIAL`.
+
+### Existing partial rows
+
+Current exact-package evidence revalidates `TCreature`, `TCreatureStorage`, `TCreatureProtocolMessageHandler`, `TCreaturesGameActionHandler`, creature server-message families, target-selection structure, `sendAttack`, `sendFollow`, `GameclientMessageAttack` and `GameclientMessageFollow`.
+
+It does not close queue -> non-QMeta handler, handler -> model mutation, authoritative live state, target/action -> protocol -> effect causality, or server acceptance. No dedicated current-build cancel-attack/follow name was recovered; absence is not negative proof and `C17` receives no new semantic promotion.
 
 ## Acceptance inventory
 
-- [ ] Fresh current public Linux package is fetched in a GitHub-hosted ephemeral job and exact packed/unpacked identity is fenced.
-- [ ] Creature/battle/combat QMeta class/method ownership is enumerated without relying on the disproven per-method jump-target heuristic from world/minimap G0.
-- [ ] Relevant generated protobuf/message and neutral string surfaces are enumerated.
-- [ ] D01-D08 and C15-C17 findings are classified as FACT / INFERENCE / UNKNOWN without runtime overclaim.
-- [ ] Negative scope control proves no credentials, login, gameplay, runtime observation, client execution, client mutation, or raw-client artifact retention.
-- [ ] Temporary producer workflow is removed before the final research head.
-- [x] Task-owned report path contains the trusted S8/S9 baseline, current-provenance boundary and predeclared classification rules.
-- [ ] Final task-owned evidence path contains enough information for a fresh coordinator to audit without chat history.
-- [ ] Exact-head repository checks are recorded for the final Draft head.
+- [x] Fresh current public Linux package fetched in a GitHub-hosted ephemeral job and exact packed/unpacked identity fenced.
+- [x] Creature/battle/combat QMeta class/method ownership enumerated without the rejected per-method jump-target heuristic.
+- [x] Relevant generated protobuf/message and neutral string surfaces enumerated.
+- [x] D01-D08 and C15-C17 findings classified as FACT / INFERENCE / UNKNOWN without runtime overclaim.
+- [x] Negative scope control proves no credentials, login, gameplay, runtime observation, client execution, client mutation or raw-client artifact retention.
+- [x] Temporary producer workflow removed before final research head.
+- [x] Task-owned report and evidence paths are sufficient for a fresh coordinator without chat history.
+- [ ] Exact-head repository checks on the final Draft checkpoint head.
+- [ ] Coordinator independent review/promotion decision; researcher has no promotion/merge authority.
 
 ## Delivery classification
 
@@ -157,51 +197,56 @@ feature_scope:
   frontend_required: false
   integration_required: false
   e2e_required: false
-implementation_status: research_waiting_for_static_producer
+implementation_status: researcher_package_complete_validating
 physical_e2e: NOT_APPLICABLE
 physical_e2e_reason: static reverse-engineering evidence package with runtime_access none
+canonical_promotion: NOT_PERFORMED
 ```
+
+## Durable outputs
+
+- `docs/agents/reports/OTCLIENT-20260819-track-a-creature-combat-static-g0.md`
+- `docs/agents/evidence/OTC-20260819-track-a-creature-combat-static-g0/20260819-current-package-creature-combat.md`
+- Draft PR #558
 
 ## Recovery checkpoint
 
 ```yaml
 recovery:
   policy_version: 1
-  generation: 3
+  generation: 4
   session_id: 20260819-creature-combat-g0
   session_started_at: 2026-08-19T09:35:00+02:00
-  checkpointed_at: 2026-08-19T09:49:00+02:00
-  last_progress_at: 2026-08-19T09:49:00+02:00
-  phase: producer-wait
+  checkpointed_at: 2026-08-19T09:58:00+02:00
+  last_progress_at: 2026-08-19T09:58:00+02:00
+  phase: final-draft-validation
   exact_head: checkpoint-commit-created-by-this-update
   pull_request: 558
-  active_operation: github-hosted current-package static producer
+  active_operation: exact-head-ci-observation
   external_run_ids:
-    - 32228647135
-    - 32228647686
-    - 32228647177
-  operation_started_at: 2026-08-19T09:36:00+02:00
+    - 32230171183
+  operation_started_at: 2026-08-19T09:58:00+02:00
   wait_deadline_at: null
-  check_generation: producer-source-head
-  checks_used: 2
-  status: waiting
+  check_generation: final-draft
+  checks_used: 0
+  status: active
   safe_to_resume: true
-  resume_condition: workflow run 32228647135 reaches a terminal state
-  next_action: Inspect run 32228647135 and its compact artifact. If successful and raw-client retention is false, persist exact current-package evidence, apply the predeclared row rules, then delete the temporary producer workflow before final exact-head validation. If the producer times out or fails in dependency installation, inspect the terminal error and repair the producer with a dependency-light hosted implementation rather than blindly rerunning it.
+  resume_condition: final Draft head has terminal repository checks
+  next_action: Verify the complete PR diff, exact-head CI/governance, review threads and current main. If clean, write the terminal researcher-ready checkpoint and leave Draft PR #558 for coordinator independent review without merging or canonical promotion.
 ```
 
 ## Invocation counters
 
 ```yaml
-invocation_started_at: 2026-08-19T09:47:00+02:00
-last_progress_at: 2026-08-19T09:49:00+02:00
-ci_checks_for_current_head: 2
-ci_check_generation: producer-source-head
+invocation_started_at: 2026-08-19T09:52:00+02:00
+last_progress_at: 2026-08-19T09:58:00+02:00
+ci_checks_for_current_head: 0
+ci_check_generation: final-draft
 terminal_ci_wait_started_at: null
 terminal_ci_checks_for_current_generation: 0
-unchanged_state_checks: 2
+unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
+repair_cycles_for_current_gate: 2
 context_reconstruction_attempts: 0
 stall_warnings: 0
 ```

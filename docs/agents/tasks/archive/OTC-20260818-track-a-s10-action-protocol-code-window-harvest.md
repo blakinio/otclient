@@ -1,37 +1,55 @@
 ---
 task_id: OTC-20260818-track-a-s10-action-protocol-code-window-harvest
-status: promotion_pending
-session_role: coordinator
+status: completed
+session_role: released
 project_lane: otclient
 lane: P1-BRIDGE
 track_id: official-client-re
 task_kind: discovery
-phase: coordinator-promotion
+phase: closed
 source_pr: 539
 source_branch: docs/OTC-20260818-track-a-s10-action-protocol-code-window-harvest
 source_head: ac34c2f906e834ace414f8c8d8fa75a150b4b65a
-source_disposition: close_unmerged_after_promotion
+source_disposition: closed_unmerged_superseded
 coordinator_review: 4970899448
 coordinator_decision: ACCEPT
 open_material_findings: 0
 promotion_base: 5ce628b7e565eb17876b76305af6a6086ed7f258
-promotion_pr: pending
-promotion_head: pending
-promotion_merge: pending
+promotion_pr: 571
+promotion_head: c4ba046bd9eb3b5999b9fbfba1c722c48eddfbb2
+promotion_merge: b63ba927ec341b58c246a4e44ffb6d3cffe23e08
+promotion_merge_method: squash
+promotion_changed_paths: 3
+promotion_ahead_by: 1
+promotion_behind_by: 0
+promotion_ci_run: 32240754268
+promotion_ci_result: SUCCESS
+promotion_review: 4970916936
+promotion_review_threads_open: 0
 runtime_access: none
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
 gameplay_allowed: false
 physical_e2e_required: false
-ownership_release_state: pending_promotion_merge
+e2e_result: NOT_APPLICABLE
+e2e_reason: retained historical static evidence only; no official-client runtime operation was part of S10
+ownership_released: true
 ---
 
-# Track A S10 — action/protocol retained-evidence archive checkpoint
+# Track A S10 — terminal action/protocol retained-evidence archive
 
-## Coordinator disposition
+## Terminal disposition
 
-Source PR #539 is accepted as a bounded historical retained-evidence result. Its terminal classification remains deliberately partial:
+The bounded S10 retained-evidence discriminator is completed and ownership is released.
+
+Source PR #539 was preserved as provenance and closed unmerged as superseded after clean coordinator promotion #571 squash-merged as:
+
+```text
+b63ba927ec341b58c246a4e44ffb6d3cffe23e08
+```
+
+## Canonical S10 result
 
 ```yaml
 terminal_classification: PARTIAL_ACTION_TO_PROTOCOL_EDGE
@@ -43,11 +61,11 @@ CURRENT_BUILD_OFFSETS: UNKNOWN
 RUNTIME_EFFECT_BY_S10: NOT_OBSERVED
 ```
 
-The blocker means the retained corpus is insufficient to prove the specific action-identity-preserving connect edge; it does not disprove that the connection exists.
+The blocker means the retained historical corpus is insufficient to prove the specific action-identity-preserving connect/dataflow edge; it does not disprove that the connection exists.
 
 ## Historical exact-build fence
 
-All executable addresses in this package are valid only for:
+Every executable address in S10 remains valid only for:
 
 ```text
 version 15.32.df7b29
@@ -55,13 +73,13 @@ size    51965216
 sha256  e6c244bd39fe2e0632f6f000efd3147164696efa8e901718668e0442325ff7fe
 ```
 
-They must not be reused as current-client offsets. Current trusted executable identity is independently governed by the later `52109920 / ed5469...` fence.
+No S10 address is a current-build offset.
 
-## Accepted direct evidence
+## Accepted evidence boundary
 
 ```text
 TContainerGameActionHandler::sendMoveObject
-  signal index 1 / signal-emission wrapper                    PROVEN historical
+  QMeta signal index 1 / signal-emission wrapper              PROVEN historical
 
 TContainerGameActionHandler::<some signal>
   -> TInternalGameActionRouter 0x8332d0                      PROVEN historical
@@ -73,26 +91,18 @@ TProtocolMessageQueue::sendMoveObject
   -> internal GameclientMessage discriminator 0x78           PROVEN historical
 ```
 
-`0x78` is not a final wire opcode/byte.
+The corrected retained `QObject::connectImpl` reconstruction explicitly does not establish the sender pointer-to-member signal index at the proven Container connection site. Therefore it cannot specifically bind `sendMoveObject` signal index 1 to that router/queue path without inference.
 
-The corrected retained `connectImpl` evidence does not establish the pointer-to-member signal index at the proven Container sender-metaobject site. Therefore the following remains `UNKNOWN`:
+`0x78` remains an internal message discriminator, not a final wire opcode/byte.
 
-```text
-TContainerGameActionHandler::sendMoveObject signal index 1
-  -> exact connect receiver/member preserving action identity
-  -> TProtocolMessageQueue::sendMoveObject
-```
+## Independent audit and validation
 
-## Independent audit
+Coordinator review `4970899448` independently re-read the original retained H1/H2/H3 evidence and found zero material issues.
 
-Coordinator review `4970899448` re-read the original retained H1/H2/H3 evidence on the historical branch and found zero material issues. The source exact head has green CI/governance and zero review threads.
+Promotion #571 was a clean one-commit current-main promotion, `ahead_by=1`, `behind_by=0`, with three documentation/evidence/archive paths. It passed exact-head CI `32240754268`, final review `4970916936`, and had zero open review threads before merge.
 
-Because source #539 is 19 commits behind current main, accepted material is promoted through a clean current-main branch rather than by merging researcher history.
+## Safety / follow-up
 
-## Safety
+No client execution, new client-byte acquisition, credentials, login, gameplay, process-memory access, GUI input or runtime mutation occurred in S10 or coordinator promotion/closeout.
 
-`runtime_access:none`; no client execution, new client-byte acquisition, credentials, login, gameplay, process-memory access, GUI input or runtime mutation occurred in S10 coordinator review/promotion. Physical E2E is not applicable.
-
-## Lifecycle
-
-After the clean promotion merges, source #539 must be closed unmerged as superseded and this archive finalized to `status: completed`, `session_role: released`, `ownership_released: true` in a lifecycle-only closeout.
+Any future attempt to close the missing edge must use a new task and admissible current-build code/connect/dataflow evidence. Historical offsets above must not be reused as current-build facts.

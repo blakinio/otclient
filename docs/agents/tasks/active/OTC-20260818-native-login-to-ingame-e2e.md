@@ -15,8 +15,6 @@ base_main: e4357137e47836d67eb19ceb13a8e313f69bf778
 risk: critical
 updated: 2026-08-19T11:26:00+02:00
 owned_paths:
-  - docs/agents/AGENTS.md
-  - docs/agents/contracts/TRACK_A_KASMVNC_RUNTIME_ACCESS_V1.md
   - docs/agents/tasks/active/OTC-20260818-native-login-to-ingame-e2e.md
   - docs/agents/evidence/OTC-20260818-native-login-to-ingame-e2e/**
   - docs/agents/prompts/OTCLIENT_TIBIA_RE_NATIVE_LOGIN_TO_INGAME.md
@@ -27,7 +25,6 @@ modules_touched:
   - track-a-native-login-runtime
   - tibia-runtime-bridge-current-sha
   - native-login-prompt-contract
-  - track-a-kasmvnc-runtime-access
 reuses:
   - merged PR #555 current-build exact identity fence
   - current-build static auth/session evidence from PR #556 as supporting evidence only
@@ -66,16 +63,16 @@ routing_contract: docs/agents/programs/OTCLIENT_TIBIA_RE_HYBRID_EXECUTION_ROUTIN
 execution_class: github_static_closeout
 runner: synology-otclient-01
 runtime_access: none
-runtime_owner_task: null
-runtime_namespace: null
-canonical_registration: NOT_APPLICABLE_TO_CLOSEOUT
-canonical_lease_generation: NOT_APPLICABLE_TO_CLOSEOUT
-registration_lease_generation: NOT_APPLICABLE_TO_CLOSEOUT
-gate_a: NOT_APPLICABLE_TO_CLOSEOUT
-generation_rebind: NOT_APPLICABLE_TO_CLOSEOUT
-gate_b: NOT_APPLICABLE_TO_CLOSEOUT
-bootstrap: NOT_APPLICABLE_TO_CLOSEOUT
-target_uniqueness: NOT_APPLICABLE_TO_CLOSEOUT
+runtime_owner_task: NOT_APPLICABLE
+runtime_namespace: NOT_APPLICABLE
+canonical_registration: NOT_APPLICABLE
+canonical_lease_generation: NOT_APPLICABLE
+registration_lease_generation: NOT_APPLICABLE
+gate_a: NOT_APPLICABLE
+generation_rebind: NOT_APPLICABLE
+gate_b: NOT_APPLICABLE
+bootstrap: NOT_APPLICABLE
+target_uniqueness: NOT_APPLICABLE
 mutation_authorized: false
 credentials_allowed: false
 login_allowed: false
@@ -139,13 +136,21 @@ pre_reconcile_head: 5ff501a783956c114aaa2d911a16f3b72e21e82e
 pre_reconcile_merge_base: 066a5ba8b1811ef61d3aa8ac2ff3fc3601fe7b9d
 pre_reconcile_ahead_by: 158
 pre_reconcile_behind_by: 20
-s7_s8_s9_restaked_debt_cleanup: REQUIRED_AND_PLANNED_IN_RECONCILE_COMMIT
-temporary_physical_workflows_cleanup: REQUIRED_AND_PLANNED_IN_RECONCILE_COMMIT
-one_shot_teardown_script_cleanup: REQUIRED_AND_PLANNED_IN_RECONCILE_COMMIT
+reconcile_commit: 379e265ed30747d256a8b04be8524aef405d2ffa
+post_reconcile_behind_by: 0
+s7_s8_s9_restaked_debt_cleanup: COMPLETE
+temporary_physical_workflows_cleanup: COMPLETE
+one_shot_teardown_script_cleanup: COMPLETE
+exact_head_ci_initial_run: 32239529388
+exact_head_ci_initial_failure: invalid_gate_a_checkpoint_enum
+exact_head_ci_initial_failure_remediation: task_record_enum_only
+exact_head_ci_other_runs:
+  - 'CI 32239529635: PASS'
+  - 'Track A native auth bridge validation 32239529337: PASS'
 independent_audit_result: PENDING_REQUIRED
 independent_validator: null
 material_findings_open: UNKNOWN_UNTIL_INDEPENDENT_AUDIT
-final_exact_head_ci: PENDING_AFTER_RECONCILIATION
+final_exact_head_ci: PENDING_RERUN_AFTER_ENUM_REMEDIATION
 review_threads_open: 0
 pr_528_state: DRAFT_OPEN
 pr_528_merged: false
@@ -153,7 +158,7 @@ direct_codex_spark_authorized: true
 direct_codex_spark_model: gpt-5.3-codex-spark
 direct_codex_spark_used: false
 direct_codex_spark_unavailable_reason: no approved managed Codex/Spark invocation tool is exposed in this session
-next_action: Reconcile #528 onto live main with only task-owned durable evidence/governance/current-SHA helper sources, then obtain a fresh independent post-implementation audit on the exact reconciled head before final CI/readiness/merge.
+next_action: Verify the remediation head CI/governance, then obtain a fresh independent post-implementation audit on that exact head before readiness or merge.
 ---
 
 # OTCLIENT-TIBIA-RE-NATIVE-LOGIN-TO-INGAME — closeout checkpoint
@@ -189,6 +194,12 @@ It is not classified as missing Secrets, local secret-ingress validation, peer/P
 
 The owner-authorized GitHub Secrets ingress was consumed once on the current exact client. Values were not printed, logged, committed, placed in argv, persisted in the client environment or used through the GUI. The task will not consume credentials again merely to reproduce an E2E event that already has causal structural proof.
 
-## Closeout boundary
+## Closeout reconciliation
 
-This phase performs no live runtime operation. It reconciles the long-lived PR branch onto current `main`, removes accidental S7/S8/S9 restack debt and completed temporary physical execution machinery, preserves task-owned sanitized evidence and current-SHA helper sources, then requires a fresh independent audit and exact-head CI before readiness or merge.
+PR #528 was reconciled onto `main@e4357137e47836d67eb19ceb13a8e313f69bf778` with merge commit `379e265ed30747d256a8b04be8524aef405d2ffa`, leaving `behind_by=0`. Accidental S7/S8/S9 restack debt, the three task-specific temporary native-login workflows and the completed one-shot teardown script were removed from the final diff.
+
+The first exact-head governance run caught one task-record-only enum error (`gate_a=NOT_APPLICABLE_TO_CLOSEOUT`). The current remediation changes only the closeout admission checkpoint values to the validator-defined `NOT_APPLICABLE` forms for `runtime_access=none`; no runtime, helper, auth or E2E behavior changed.
+
+## Remaining closeout boundary
+
+This phase performs no live runtime operation. Completion still requires green exact-head CI/governance on the remediation head and a fresh independent post-implementation audit before readiness or merge. The successful physical E2E is retained and is not rerun merely for closeout.
